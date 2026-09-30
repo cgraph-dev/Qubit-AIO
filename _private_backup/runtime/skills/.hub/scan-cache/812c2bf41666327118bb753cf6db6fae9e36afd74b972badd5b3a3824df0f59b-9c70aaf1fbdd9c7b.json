@@ -1,0 +1,54 @@
+{
+  "bundle_hash": "sha256:812c2bf41666327118bb753cf6db6fae9e36afd74b972badd5b3a3824df0f59b",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/slime",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 66,
+      "match": "cd /root/slime && pip install -e . --no-deps",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 75,
+      "match": "pip install -e .",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 72,
+      "match": "git clone https://github.com/THUDM/slime.git",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "docker_pull",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 61,
+      "match": "docker pull slimerl/slime:latest",
+      "description": "pulls a Docker image at runtime"
+    }
+  ],
+  "rules": [
+    "docker_pull",
+    "git_clone",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:54.170865+00:00",
+  "summary": "slime: safe \u2014 4 finding(s) in supply_chain",
+  "fresh": true
+}

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qubit VoiceBridge — Operations</title>
+<style>
+ body{font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px;max-width:1000px}
+ h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
+ .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+ button{margin:4px 8px 4px 0;padding:6px 14px;border-radius:6px;border:0;cursor:pointer}
+ .ok{background:var(--primary);color:#10120a}.warn{background:var(--warning);color:#201a0a}.no{background:var(--danger);color:#201010}
+ button:disabled{opacity:.45;cursor:default}
+ .muted{color:var(--muted)}.err{color:var(--danger)}
+ .tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:6px}
+ .tag.executed,.tag.OK{background:var(--success)}.tag.failed,.tag.refused,.tag.FAILED,.tag.DENIED{background:var(--danger)}
+ .tag.needs-confirm,.tag.degraded,.tag.DEGRADED,.tag.PARTIAL{background:var(--warning)}
+ .tag.MISSING,.tag.UNAVAILABLE{background:var(--faint)}
+ .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+ label{font-size:12px} input,select,textarea{padding:6px;border-radius:6px;background:var(--surface-soft);color:var(--text);border:1px solid var(--line-strong);font-size:13px}
+ input[type=text],input:not([type]),textarea{min-width:200px} input[type=password]{min-width:200px}
+ pre{background:var(--surface-soft);padding:8px;border-radius:6px;overflow:auto;max-height:300px;font-size:12px;white-space:pre-wrap;word-break:break-word}
+ a{color:var(--primary)} code{background:var(--surface-soft);padding:1px 4px;border-radius:4px}
+ .op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+ .op{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface)}
+ .op h3{font-size:13px;margin:0 0 2px} .op .desc{font-size:12px;color:var(--muted);margin-bottom:6px}
+ .op .field{margin:4px 0} .op .field label{display:block;margin-bottom:2px}
+ .op .field input,.op .field select,.op .field textarea{width:100%;box-sizing:border-box}
+ .estop{border:2px solid var(--danger);border-radius:10px;padding:10px;margin-bottom:10px;font-weight:bold}
+ .hidden{display:none}
+ @media (max-width:640px){body{padding:12px}.op-grid{grid-template-columns:1fr}}
+</style><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<main id="main-content" tabindex="-1">
+<h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit VoiceBridge</h1>
+<div class="muted">Operations · every control calls the real backend — the same operation the CLI and voice commands use. Nothing here succeeds without a backend result.</div>
+<nav class="page-nav" aria-label="Primary">
+ <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops" aria-current="page">Operations</a><a href="/approvals">Approvals</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a href="/docs">Docs</a><a class="nav-utility" href="/token-setup">Pair device</a>
+</nav>
+
+<div id="estop" class="estop hidden" role="alert">Emergency stop is latched — mutating operations will be refused until it is reset.</div>
+<div id="pairhint" class="card hidden">Pair this dashboard first (<a class="tap-target" href="/token-setup">Pair device</a>) — controls stay disabled until then.</div>
+
+<div class="card">
+ <div class="row">
+  <label for="q">Filter operations</label>
+  <input id="q" type="text" placeholder="e.g. kanban, brain, backup" oninput="render()" spellcheck="false">
+  <label for="group">Group</label>
+  <select id="group" onchange="render()"><option value="">All groups</option></select>
+  <button onclick="loadCatalog()">Reload</button>
+  <span id="cat-state" class="muted" role="status">loading…</span>
+ </div>
+ <div class="muted" style="margin-top:6px">Reads run immediately. Anything that changes state asks for confirmation first (approve in <a class="tap-target" href="/approvals">Approvals</a> or inline below). Secrets are never displayed; passphrases are re-entered at confirm time and never stored.</div>
+</div>
+
+<div id="ops"></div>
+</main>
+<script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
+<script>
+let CATALOG = [];
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function show(id,html){document.getElementById(id).innerHTML = html;}
+async function api(path,opts){
+ const r = await vbApi(path,opts||{});
+ return {status:r.status,body:r.body,authRequired:!!r.authRequired};
+}
+function tag(state){return '<span class="tag '+esc(String(state)).replace(/[^a-zA-Z-]/g,'')+'">'+esc(state)+'</span>';}
+async function loadCatalog(){
+ show('cat-state','loading…');
+ const {status,body,authRequired} = await api('/api/ops');
+ if(authRequired){document.getElementById('pairhint').classList.remove('hidden');show('cat-state',tag('UNAVAILABLE')+' pairing required');return;}
+ if(status!==200||!body||!body.ops){show('cat-state',tag('UNAVAILABLE')+' operations unavailable');return;}
+ CATALOG = body.ops;
+ const groups = [...new Set(CATALOG.map(o=>o.group))].sort();
+ const sel = document.getElementById('group');
+ sel.innerHTML = '<option value="">All groups</option>'+groups.map(g=>'<option value="'+esc(g)+'">'+esc(g)+'</option>').join('');
+ show('cat-state',tag('OK')+' '+CATALOG.length+' operations · same backend as CLI/voice');
+ checkEstop();
+ render();
+}
+async function checkEstop(){
+ try{
+  const {body} = await api('/api/runtime');
+  const latch = body && (body.estop_latched ?? body?.broker?.estop_latched ?? body?.power?.emergency_stop);
+  if(latch===true) document.getElementById('estop').classList.remove('hidden');
+ }catch(_){}
+}
+function fieldHtml(op,arg){
+ const id = 'f-'+op.id+'-'+arg.name;
+ const req = arg.required ? ' required aria-required="true"' : '';
+ const secret = arg.secret ? ' <span class="muted">(never stored)</span>' : '';
+ let input = '';
+ if(arg.type==='choice' && arg.choices && arg.choices.length){
+  input = '<select id="'+esc(id)+'"'+req+'>'+(arg.required?'':'<option value="">—</option>')+arg.choices.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('')+'</select>';
+ }else if(arg.type==='int'){
+  input = '<input id="'+esc(id)+'" type="text" inputmode="numeric"'+req+' placeholder="'+esc(arg.clarifier||arg.name)+'">';
+ }else if(arg.secret){
+  input = '<input id="'+esc(id)+'" type="password" autocomplete="new-password"'+req+'>';
+ }else if(arg.name==='snapshot'||arg.name==='answers'||arg.name==='body'){
+  input = '<textarea id="'+esc(id)+'" rows="3"'+req+' placeholder="'+esc(arg.clarifier||arg.name)+'"></textarea>';
+ }else{
+  input = '<input id="'+esc(id)+'" type="text"'+req+' placeholder="'+esc(arg.clarifier||arg.name)+'" spellcheck="false">';
+ }
+ return '<div class="field"><label for="'+esc(id)+'">'+esc(arg.name)+secret+'</label>'+input+'</div>';
+}
+function render(){
+ const q = (document.getElementById('q').value||'').toLowerCase();
+ const g = document.getElementById('group').value;
+ const list = CATALOG.filter(o=>(!g||o.group===g)&&(!q||(o.id+' '+o.title+' '+(o.help||'')).toLowerCase().includes(q)));
+ if(!list.length){show('ops','<div class="card muted">No operations match. Clear the filter.</div>');return;}
+ const byGroup = {};
+ list.forEach(o=>{(byGroup[o.group]=byGroup[o.group]||[]).push(o);});
+ let html = '';
+ Object.keys(byGroup).sort().forEach(group=>{
+  html += '<h2>'+esc(group)+' ('+byGroup[group].length+')</h2><div class="op-grid">';
+  byGroup[group].forEach(op=>{
+   html += '<div class="op" id="op-'+esc(op.id)+'"><h3>'+esc(op.title)+'</h3>'
+    +'<div class="desc"><code>'+esc(op.id)+'</code> · '+esc(op.help||'')+'</div>';
+   if(op.interfaces && op.interfaces.length<3)
+    html += '<div class="desc">Interfaces: '+esc(op.interfaces.join(', '))+(op.interface_reason?' — '+esc(op.interface_reason):'')+'</div>';
+   if(op.confirm) html += '<div class="desc">Confirmation-gated.</div>';
+   (op.args||[]).forEach(a=>{html += fieldHtml(op,a);});
+   html += '<div class="row"><button class="ok" onclick="runOp(\''+esc(op.id)+'\')">Run</button></div>'
+    +'<div id="res-'+esc(op.id)+'" aria-live="polite"></div></div>';
+  });
+  html += '</div>';
+ });
+ show('ops',html);
+}
+function collectArgs(op){
+ const args = {};
+ for(const a of (op.args||[])){
+  const el = document.getElementById('f-'+op.id+'-'+a.name);
+  if(!el) continue;
+  const v = el.value;
+  if(v!=null && String(v)!=='') args[a.name] = v;
+ }
+ return args;
+}
+function renderOut(opId,out){
+ let html = tag(out.state||'UNAVAILABLE');
+ if(out.code) html += ' <code>'+esc(out.code)+'</code>';
+ if(out.speech) html += '<div>'+esc(out.speech)+'</div>';
+ if(out.confirmation_id){
+  html += '<div class="row"><span class="muted">confirmation <code>'+esc(out.confirmation_id)+'</code></span>'
+   +'<button class="ok" onclick="confirmOp(\''+esc(opId)+'\',\''+esc(out.confirmation_id)+'\')">Confirm</button>'
+   +'<button class="warn" onclick="cancelOp(\''+esc(opId)+'\',\''+esc(out.confirmation_id)+'\')">Cancel</button></div>';
+  if(out.sensitive_required) html += '<div class="muted">Re-enter '+esc(out.sensitive_required.join(', '))+' to confirm (never stored).</div>';
+ }
+ if(out.receipt) html += '<pre>'+esc(JSON.stringify(out.receipt,null,2)).slice(0,4000)+'</pre>';
+ if(out.detail) html += '<div class="err">'+esc(out.detail)+'</div>';
+ if((out.state==='failed'||out.state==='refused')) html += ' <span class="err">(no change made)</span>';
+ show('res-'+opId,html);
+ const region = document.getElementById('res-'+CSS.escape(opId));
+ if(region) region.setAttribute('tabindex','-1'), region.focus({preventScroll:true});
+}
+async function runOp(opId){
+ const op = CATALOG.find(o=>o.id===opId);
+ if(!op) return;
+ show('res-'+opId,'<span class="muted">working…</span>');
+ const {body,authRequired} = await api('/api/ops/run',{method:'POST',body:JSON.stringify({id:opId,args:collectArgs(op)})});
+ if(authRequired){renderOut(opId,{state:'refused',code:'UNPAIRED',detail:'Pair this dashboard first.'});return;}
+ renderOut(opId,body||{state:'failed',detail:'empty response'});
+}
+async function confirmOp(opId,cid){
+ const op = CATALOG.find(o=>o.id===opId);
+ // Map password fields back to arg names via the catalog.
+ const payloadSensitive = {};
+ (op.args||[]).forEach(a=>{
+  const el = document.getElementById('f-'+opId+'-'+a.name);
+  if(el && el.type==='password' && el.value) payloadSensitive[a.name] = el.value;
+ });
+ const {body} = await api('/api/ops/confirm',{method:'POST',body:JSON.stringify({confirmation_id:cid,sensitive:payloadSensitive})});
+ renderOut(opId,body||{state:'failed',detail:'empty response'});
+}
+async function cancelOp(opId,cid){
+ const {body} = await api('/api/ops/cancel',{method:'POST',body:JSON.stringify({confirmation_id:cid})});
+ renderOut(opId,body||{state:'failed',detail:'empty response'});
+}
+loadCatalog();
+</script>
+</body></html>

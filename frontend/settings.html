@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qubit VoiceBridge — Settings</title>
+<style>
+ body{font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px;max-width:900px}
+ h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
+ .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+ button{margin-right:8px;padding:6px 14px;border-radius:6px;border:0;cursor:pointer}
+ .ok{background:var(--primary);color:#10120a}.warn{background:var(--warning);color:#201a0a}.no{background:var(--danger);color:#201010}
+ .muted{color:var(--muted)}.err{color:var(--danger)}.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:6px}
+ .tag.OK{background:var(--success)}.tag.DENIED,.tag.FAILED{background:var(--danger)}.tag.DEGRADED,.tag.PARTIAL{background:var(--warning)}.tag.MISSING,.tag.UNAVAILABLE{background:var(--faint)}
+ .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap} select{padding:6px;border-radius:6px;background:var(--surface-soft);color:var(--text);border:1px solid var(--line-strong)}
+ .advanced{display:none} .advanced.open{display:block} .hidden{display:none}
+ a{color:var(--primary)} code{background:var(--surface-soft);padding:1px 4px;border-radius:4px}
+</style><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<main id="main-content" tabindex="-1">
+<h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit VoiceBridge</h1>
+<div class="muted">Settings · beginner mode by default; <button class="warn" onclick="toggleAdvanced()">Advanced</button></div>
+<nav class="page-nav" aria-label="Primary">
+ <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals">Approvals</a><a href="/settings" aria-current="page">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a href="/docs">Docs</a><a class="nav-utility" href="/token-setup">Pair device</a>
+</nav>
+
+<details class="help-panel">
+ <summary>How Qubit works</summary>
+ <div><ol><li>Talk or type a request.</li><li>Qubit chooses the safest available route and shows progress.</li><li>Read-only work can run automatically; sending, publishing, deleting, or account changes always ask first.</li></ol><p>Use Advanced when you want to change models, voices, permissions, integrations, or recovery settings.</p></div>
+</details>
+
+<div id="onboarding" class="card">
+ <b>Welcome</b> — you're already set up with the safe, verified defaults:
+ <div class="muted">Qubit brain · CPU speech-to-text · Piper voice · your current audio devices.</div>
+ <button class="ok" onclick="loadAll()">Check health</button>
+<button onclick="branding()">Branding plan</button>
+  <span id="health" class="muted">—</span>
+</div>
+
+<h2 style="border:0;margin-top:14px">Websites</h2>
+<div class="card">
+  <div class="row">
+    <label class="sr-only" for="ws-url">Website address</label><input id="ws-url" placeholder="https://example.com" spellcheck="false"
+      style="flex:1;min-width:220px;padding:6px;border-radius:6px;background:var(--surface-soft);color:var(--text);border:1px solid var(--line-strong)">
+    <button class="ok" onclick="wsAdd()">Add Website</button>
+    <button onclick="wsList()">Refresh list</button>
+  </div>
+  <div class="muted" style="margin-top:6px">Adding a URL only creates a pending, disabled proposal. It never grants access, never runs page instructions, and is restricted by default. To use a site you must first link an approved skill.</div>
+  <div class="row" style="margin-top:8px">
+    <label class="sr-only" for="ws-skill-beginner">Skill to link</label><select id="ws-skill-beginner" style="font-size:12px"></select>
+    <button class="ok" onclick="wsLinkBeginner()">Link skill</button>
+    <span id="ws-beginner-state" class="muted"></span>
+  </div>
+  <div id="ws-add-state" class="muted"></div>
+  <div id="ws-list"></div>
+</div>
+
+<h2 style="border:0;margin-top:14px">Controlled actions</h2>
+<div class="card">
+  <div class="muted" style="margin-top:0">Typed browser/desktop/editor actions are restricted by default, always previewed, and confirmation-gated for sending, posting, purchasing, deleting, and account/system changes. Live adapters are disabled — previews, approvals, and receipts work today.</div>
+  <div class="row" style="margin-top:8px">
+    <button onclick="actList()">List actions</button>
+    <button onclick="actReceipts()">Recent receipts</button>
+    <span id="act-beginner-state" class="muted"></span>
+  </div>
+  <div id="act-beginner"></div>
+</div>
+
+<div class="advanced">
+ <h2>Reasoning model (brain)</h2>
+ <div class="card row">
+   <label class="sr-only" for="brain-sel">Reasoning model</label><select id="brain-sel"></select>
+   <button class="ok" onclick="applyProfile('brain')">Select</button>
+   <button onclick="resetProfile('brain')">Reset</button>
+   <button class="warn" onclick="checkProfile('brain')">Check</button>
+   <span id="brain-state" class="muted"></span>
+ </div>
+
+ <h2>Speech-to-text</h2>
+ <div class="card row">
+   <label class="sr-only" for="stt-sel">Speech-to-text model</label><select id="stt-sel"></select>
+   <button class="ok" onclick="applyProfile('stt')">Select</button>
+   <button onclick="resetProfile('stt')">Reset</button>
+   <span id="stt-state" class="muted"></span>
+ </div>
+
+ <h2>Text-to-speech provider</h2>
+ <div class="card row">
+   <label class="sr-only" for="tts-sel">Text-to-speech provider</label><select id="tts-sel"></select>
+   <button class="ok" onclick="applyProfile('tts')">Select</button>
+   <button onclick="resetProfile('tts')">Reset</button>
+   <span id="tts-state" class="muted"></span>
+ </div>
+
+ <h2>Voice artifact</h2>
+ <div class="card row">
+   <label class="sr-only" for="voice-sel">Voice artifact</label><select id="voice-sel"></select>
+   <button class="ok" onclick="applyProfile('voice')">Select</button>
+   <button onclick="resetProfile('voice')">Reset</button>
+   <span id="voice-state" class="muted"></span>
+ </div>
+
+ <h2>Audio devices</h2>
+ <div class="card row">
+   <button onclick="audioStatus()">Status</button>
+   <button onclick="audioList()">List devices</button>
+   <button onclick="audioReset()">Reset to OS defaults</button>
+   <span id="audio-state" class="muted"></span>
+ </div>
+
+<h2>Permissions</h2>
+  <div class="card"><button onclick="permissions()">Review permissions</button><span id="perm-state" class="muted"></span></div>
+
+  <h2>Power profile</h2>
+   <div class="card">
+     <p class="muted" style="margin:0 0 6px">One authenticated policy path. Available never means authorized: every capability has a typed state plus revoke/disable controls, and the owner power grant only auto-allows routine read/search/navigation/fill. Posting, sending, publishing, purchasing, deleting, and modifying project code always ask for fresh confirmation.</p>
+     <div class="row">
+       <button onclick="powerProfile()">Inventory</button>
+       <button onclick="powerStatus()">Control status</button>
+       <button onclick="powerCircuits()">Circuits</button>
+       <button onclick="powerCheck()">Check capability</button>
+       <button class="ok" onclick="powerGrant()">Owner grant</button>
+       <button onclick="powerRevoke()">Revoke grant</button>
+       <button class="warn" onclick="powerEmergencyStop()">Emergency stop</button>
+       <button onclick="powerReset()">Reset latches</button>
+       <span id="power-state" class="muted"></span>
+     </div>
+     <div class="row" style="margin-top:8px">
+       <label class="sr-only" for="power-cap">Capability</label><input id="power-cap" placeholder="ghost.comet.ask" style="font-size:12px;flex:1;min-width:140px">
+       <button onclick="powerCheck()">Check</button>
+       <span id="power-detail" class="muted"></span>
+     </div>
+     <div class="muted" id="power-list" style="margin-top:8px;font-size:12px"></div>
+   </div>
+
+  <h2>Runtime</h2>
+  <div class="card">
+    <p class="muted" style="margin:0 0 6px">Qubit Agent foundation: product identity, agent-runtime provision state, vendored modules, voice/provider/session/approval/adapter health, and the broker emergency-stop latch. Read-only; every value comes from the authenticated backend.</p>
+    <div class="row">
+      <button onclick="runtimeStatus()">Check runtime</button>
+      <span id="runtime-state" class="muted"></span>
+    </div>
+    <div class="muted" id="runtime-list" style="margin-top:8px;font-size:12px"></div>
+  </div>
+
+  <h2>Websites (advanced)</h2>
+  <div class="card">
+    <p class="muted" style="margin:0 0 6px">Versioned integration records and redacted progress/error logs. Each control calls the real backend; enabling, grants, and manifest linking require confirmation.</p>
+    <div class="row">
+      <button onclick="wsList()">List</button>
+      <button onclick="wsDetail()">Show selected</button>
+      <button onclick="wsInspectSel()">Inspect</button>
+      <button onclick="wsCheckSel()">Check</button>
+      <button onclick="wsLogsSel()">Logs</button>
+      <button class="ok" onclick="wsGrantSel()">Grant</button>
+      <button onclick="wsRevokeSel()">Revoke</button>
+      <button class="ok" onclick="wsEnableSel()">Enable</button>
+      <button onclick="wsDisableSel()">Disable</button>
+      <button onclick="wsRemoveSel()">Remove</button>
+      <button onclick="wsRollbackSel()">Rollback</button>
+      <label class="sr-only" for="ws-sel">Website integration</label><select id="ws-sel" style="font-size:12px"></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="sr-only" for="ws-skill-adv">Skill manifest</label><select id="ws-skill-adv" style="font-size:12px"></select>
+      <button class="ok" onclick="wsLinkSel()">Link manifest</button>
+      <span id="ws-link-state" class="muted"></span>
+    </div>
+    <div class="muted" id="ws-adv-state"></div>
+    <div class="muted" id="ws-detail"></div>
+  </div>
+
+<h2>Permission mode (websites)</h2>
+   <div class="card">
+     <div class="row">
+       <button onclick="permModeShow()">Show mode</button>
+       <button class="ok" onclick="permModeSetRestricted()">Set Restricted</button>
+       <button onclick="permModeSetUnrestricted()">Set Unrestricted</button>
+       <button onclick="permReset()">Reset to restricted (revoke all grants)</button>
+       <span id="perm-mode-state" class="muted"></span>
+     </div>
+     <div class="muted" style="margin-top:6px">Restricted is the default. Unrestricted only pre-authorizes routine read-only work inside the scopes you choose; it never bypasses confirmation, hard-deny rules, audit, or limits. Mode is durable policy state — page/model text can never change it.</div>
+   </div>
+
+ <h2>Actions (advanced)</h2>
+  <div class="card">
+    <p class="muted" style="margin:0 0 6px">Packet 8F typed actions. Preview always; execute only after reviewing the exact preview and confirming (sending/posting/purchasing/deleting/account/system always need confirmation). Every result is the real backend typed state.</p>
+    <div class="row">
+      <label class="sr-only" for="act-sel">Action contract</label><select id="act-sel" style="font-size:12px"></select>
+      <button onclick="actShow()">Show contract</button>
+      <button onclick="actCheck()">Check</button>
+      <button class="warn" onclick="actPreview()">Preview</button>
+      <button class="ok" onclick="actExecute()">Approve &amp; Execute</button>
+      <button onclick="actCancel()">Cancel last</button>
+      <button onclick="actRecover()">Recover</button>
+      <button onclick="actRetry()">Retry</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <label class="sr-only" for="act-args">Action arguments (JSON)</label><input id="act-args" placeholder='{"recipient":"you@example.com","subject":"…","body":"…"}' spellcheck="false"
+        style="flex:1;min-width:240px;padding:6px;border-radius:6px;background:var(--surface-soft);color:var(--text);border:1px solid var(--line-strong);font-size:12px">
+    </div>
+    <div class="muted" id="act-adv-state"></div>
+    <div class="muted" id="act-detail"></div>
+  </div>
+
+ <h2>Device enrollment</h2>
+ <div class="card row">
+   <button onclick="deviceStatus()">Status</button>
+   <button class="ok" onclick="deviceEnroll()">Enroll this device</button>
+   <span id="device-state" class="muted"></span>
+ </div>
+
+ <h2>Task progress, approvals, reports</h2>
+ <div class="card row">
+   <button onclick="taskStatus()">Task progress</button>
+   <button onclick="approvals()">Approvals</button>
+   <button onclick="reports()">Reports</button>
+   <span id="misc-state" class="muted"></span>
+ </div>
+
+<h2>Export / import / upgrade / rollback</h2>
+  <div class="card">
+    <div class="row">
+      <button class="ok" onclick="exportState()">Export state</button>
+      <input type="file" id="import-file" accept=".vbp" style="font-size:12px">
+      <label class="sr-only" for="import-file">Import state bundle</label>
+      <button class="ok" onclick="importState()">Import state</button>
+      <button onclick="upgradeAll()">Upgrade checks</button>
+      <button onclick="upgradeProfile('brain')">Upgrade brain</button>
+      <button onclick="upgradeProfile('tts')">Upgrade TTS</button>
+      <button onclick="rollbackProfile('brain')">Rollback brain</button>
+      <label class="sr-only" for="remove-kind">Profile kind to remove</label><select id="remove-kind" style="font-size:12px"></select>
+      <button onclick="removeProfile()">Remove profile</button>
+    </div>
+    <div class="muted" id="state-out"></div>
+  </div>
+</div>
+
+</main>
+<script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
+<script>
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// Packet 8L XSS repair: dynamic Settings content is rendered through the
+// shared audited sanitizer (vbSafeHTML strips inline on* handlers, javascript:
+// URLs, and script/iframe/object/embed) or as real DOM nodes built with
+// textContent + data attributes + addEventListener. Backend-controlled IDs and
+// text are NEVER placed inside inline event attributes or JS strings.
+function show(id, html){
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (html && html.nodeType === 1) { vbClear(el); el.appendChild(html); return; }
+  vbSafeHTML(el, html);
+}
+function fillOptions(sel, items){
+  if (!sel) return;
+  sel.replaceChildren();
+  (items || []).forEach(it => {
+    const o = document.createElement('option');
+    o.value = String(it.value == null ? '' : it.value);
+    o.textContent = String(it.label == null ? '' : it.label);
+    if (it.selected) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+function tag(state){return '<span class="tag '+esc(state)+'">'+esc(state)+'</span>';}
+// One shared authenticated helper (frontend/vb.js): sends X-Api-Token from the
+// browser-stored token on every request; a 401 shows the "Pair this dashboard"
+// hint and is reported as a typed authRequired result (never a bare HTTP 401).
+async function api(path,opts){
+ const r = await vbApi(path,opts||{});
+ return {status:r.status,body:r.body,authRequired:!!r.authRequired};
+}
+// ---- typed-state interpreter: only OK/dry-run count as success; every other
+// state is rendered explicitly (never a generic "worked").
+function renderResult(out){
+ if(!out||out==null) return tag('UNAVAILABLE');
+ const st = out.state || (out.enrolled!=null ? (out.enrolled?'OK':'DENIED') : 'UNAVAILABLE');
+ const detail = out.detail || out.action || '';
+ let html = tag(st);
+ if(detail) html += ' <span class="muted">'+esc(detail)+'</span>';
+ if(out.backup) html += ' <span class="muted">backup '+esc(out.backup)+'</span>';
+ if(st==='FAILED'||st==='DENIED'||st==='MISSING'||st==='UNAVAILABLE') html += ' <span class="err">(no change made)</span>';
+ return html;
+}
+// ---- real confirmation dialog before any side-effecting action
+function confirmDialog(message, fn){
+ if(!window.confirm(message)) return;
+ fn();
+}
+function toggleAdvanced(){
+ document.querySelector('.advanced').classList.toggle('open');
+}
+async function loadAll(){
+ const {status,body,authRequired} = await api('/api/status');
+ if(authRequired){ show('health', tag('UNAVAILABLE')+' pair this dashboard (see the banner)'); return; }
+ show('health', status===200 && body && body.bridge==='up'
+   ? tag('OK')+' bridge up' : tag('UNAVAILABLE')+' bridge offline / degraded');
+ // Stale/version-mismatched external frontend warning with the repair path.
+ if(body && body.frontend && body.frontend.stale){
+   show('health', tag('DEGRADED')+' bridge up · frontend: serving repository UI because '
+     +'the configured webui.frontend_dir is stale/version-mismatched — update the '
+     +'external checkout to carry a matching frontend/VERSION marker or remove the '
+     +'override; the external checkout was not modified.');
+ }
+ loadProfiles();
+}
+async function loadProfiles(){
+ const {body} = await api('/api/profiles');
+ if(!body||!body.profiles){show('health',tag('UNAVAILABLE')+' profiles unavailable');return;}
+for(const kind of ['brain','stt','tts','voice']){
+   const sel = document.getElementById(kind+'-sel');
+   if(!sel)continue;
+   const list = body.profiles.filter(p=>p.kind===kind);
+   const active = body.active ? body.active[kind] : '';
+   fillOptions(sel, list.map(p => ({
+     value: String(p.id || ''),
+     selected: String(p.id || '') === String(active || ''),
+     label: String(p.id || '') + ' (' + String(p.gate || '') + ')',
+   })));
+   show(kind+'-state', 'active: '+esc(active||'—'));
+  }
+  // populate the removable list (non-default only)
+  const rem = document.getElementById('remove-kind');
+  if(rem){
+   const opts = [];
+   ['brain','stt','tts','voice','audio'].forEach(k => {
+    (body.profiles||[]).filter(p=>p.kind===k && !p.default).forEach(p => {
+      opts.push({ value: k+':'+p.id, label: k+' '+p.id });
+    });
+   });
+   fillOptions(rem, opts);
+  }
+}
+async function applyProfile(kind){
+ const profile = document.getElementById(kind+'-sel').value;
+ const doIt = async () => {
+   const {status,body} = await api('/api/profiles/apply',{method:'POST',
+     body:JSON.stringify({kind,profile,dry_run:false,confirm:true})});
+   show(kind+'-state', renderResult(body));
+   loadProfiles();
+ };
+ confirmDialog('Replace '+kind+' with '+profile+'? (side effect, reversible with rollback)', doIt);
+}
+async function resetProfile(kind){
+ const doIt = async () => {
+   const {status,body} = await api('/api/profiles/reset',{method:'POST',
+     body:JSON.stringify({kind,apply:true})});
+   show(kind+'-state', renderResult(body));
+   loadProfiles();
+ };
+ confirmDialog('Reset '+kind+' to its verified default?', doIt);
+}
+async function checkProfile(kind){
+ const {body} = await api('/api/profiles/check?kind='+kind);
+ const st = body && body.state ? body.state : 'UNAVAILABLE';
+ show(kind+'-state', tag(st)+' <span class="muted">'+esc(JSON.stringify(body&&body.gates||{}))+'</span>');
+}
+async function rollbackProfile(kind){
+ const doIt = async () => {
+   const {status,body} = await api('/api/profiles/rollback',{method:'POST',
+     body:JSON.stringify({kind,apply:true})});
+   show(kind+'-state', renderResult(body));
+   loadProfiles();
+ };
+ confirmDialog('Roll back '+kind+' to its previous profile?', doIt);
+}
+async function upgradeProfile(kind){
+ const profile = document.getElementById(kind+'-sel').value;
+ const doIt = async () => {
+   const {status,body} = await api('/api/profiles/upgrade',{method:'POST',
+     body:JSON.stringify({kind,profile,apply:true})});
+   show(kind+'-state', renderResult(body));
+ };
+ confirmDialog('Upgrade '+kind+' ('+profile+')? Re-verifies gates and refreshes artifact metadata.', doIt);
+}
+async function removeProfile(){
+ const val = document.getElementById('remove-kind').value;
+ if(!val) return;
+ const [kind, profile] = val.split(':');
+ const doIt = async () => {
+   const {status,body} = await api('/api/profiles/remove',{method:'POST',
+     body:JSON.stringify({kind,profile,apply:true})});
+   show('misc-state', renderResult(body));
+   loadProfiles();
+ };
+ confirmDialog('Remove profile '+profile+' ('+kind+') from the registry?', doIt);
+}
+async function audioStatus(){
+ const {status,body} = await api('/api/audio/status');
+ const st = body && body.mic ? (body.mic.state + ' / ' + body.output.state) : 'UNAVAILABLE';
+ show('audio-state', tag(st)+' <span class="muted">'+esc(JSON.stringify(body||{}))+'</span>');
+}
+async function audioList(){
+ const {status,body} = await api('/api/audio/list');
+ if(!body) { show('audio-state', tag('UNAVAILABLE')); return; }
+ show('audio-state', tag('OK')+' inputs '+body.inputs.length+' outputs '+body.outputs.length);
+}
+async function audioReset(){
+ const doIt = async () => {
+   const {status,body} = await api('/api/audio/reset',{method:'POST',body:'{}'});
+   show('audio-state', renderResult(body));
+ };
+ confirmDialog('Reset audio devices to OS defaults?', doIt);
+}
+async function permissions(){
+ const {status,body} = await api('/api/permissions');
+ const st = body && body.items ? 'OK' : 'UNAVAILABLE';
+ show('perm-state', tag(st)+' <span class="muted">'+esc((body&&body.items||[]).map(i=>i.capability||i.name||'').join(', '))+'</span>');
+}
+async function powerProfile(){
+ const {body} = await api('/api/power');
+ if(!body || !body.profile){ show('power-state', tag('UNAVAILABLE')); return; }
+ const p = body.profile;
+ show('power-state', tag('OK')+' total '+p.total+' · enabled '+p.enabled+' · authorized '+p.authorized);
+ show('power-list', '<div>Domains: '+esc(Object.keys(p.domains||{}).join(', '))+'</div>'
+   + (body.grant ? '<div>Owner grant: '+esc(body.grant.grant_id.slice(0,8))+'… expires '+esc(new Date(body.grant.expires_at*1000).toISOString())+'</div>' : '<div>No active owner grant</div>'));
+}
+async function powerStatus(){
+ const {body} = await api('/api/power');
+ if(!body || !body.control){ show('power-state', tag('UNAVAILABLE')); return; }
+ const c = body.control;
+ show('power-state', tag(c.emergency_stop ? 'EMERGENCY STOP' : (c.global_disable ? 'DISABLED' : 'OK'))
+   +' <span class="muted">active '+c.active+' / '+c.max_concurrency+' · '+esc(JSON.stringify(c.circuits||{}))+'</span>');
+}
+async function powerCircuits(){
+ const {body} = await api('/api/power');
+ show('power-state', tag('OK')+' <span class="muted">'+esc(JSON.stringify((body&&body.control&&body.control.circuits)||{}))+'</span>');
+}
+async function powerCheck(){
+ const cap = (document.getElementById('power-cap')&&document.getElementById('power-cap').value||'').trim();
+ if(!cap){ show('power-detail', tag('MISSING')+' enter a capability id'); return; }
+ const {body} = await api('/api/power?capability='+encodeURIComponent(cap));
+ show('power-detail', body ? tag(body.allowed ? 'ALLOWED' : 'DENIED')+' <span class="muted">'+esc(body.code||'')+' · '+esc(body.detail||'')+'</span>' : tag('UNAVAILABLE'));
+}
+async function powerGrant(){
+ const origin = window.prompt('Owner power grant — origin allowlist (e.g. https://perplexity.ai; comma separated):','https://perplexity.ai');
+ if(origin==null) return;
+ const scopes = window.prompt('Scopes (comma separated; e.g. research,web):','research');
+ if(scopes==null) return;
+ const ttl = parseFloat(window.prompt('Duration seconds (1–'+(90*86400)+'; default 7 days):',''+(7*86400)))||7*86400;
+ const caps = window.prompt('Exact capability ids (comma separated; e.g. ghost.comet.ask,ghost.browser.tabs):','ghost.comet.ask');
+ if(caps==null) return;
+ const doIt = async () => {
+   const {status,body} = await api('/api/power',{method:'POST',body:JSON.stringify({
+     action:'grant', confirmed:true,
+     origins: origin.split(',').map(s=>s.trim()).filter(Boolean),
+     scopes: scopes.split(',').map(s=>s.trim()).filter(Boolean),
+     capabilities: caps.split(',').map(s=>s.trim()).filter(Boolean),
+     ttl: ttl})});
+   show('power-state', renderResult(body));
+ };
+ confirmDialog('Issue the one owner power grant? (visible, expiring, revocable, target-bound, audited)', doIt);
+}
+async function powerRevoke(){
+ const doIt = async () => {
+   const {body} = await api('/api/power',{method:'POST',body:JSON.stringify({action:'reset-grant', confirmed:true})});
+   show('power-state', renderResult(body));
+ };
+ confirmDialog('Remove the owner power grant?', doIt);
+}
+async function powerEmergencyStop(){
+ const doIt = async () => {
+   const {body} = await api('/api/power',{method:'POST',body:JSON.stringify({action:'emergency-stop', confirmed:true})});
+   show('power-state', renderResult(body));
+ };
+ confirmDialog('Global emergency stop? This latches and cancels active runs until reset.', doIt);
+}
+async function powerReset(){
+ const doIt = async () => {
+   const {body} = await api('/api/power',{method:'POST',body:JSON.stringify({action:'reset', confirmed:true})});
+   show('power-state', renderResult(body));
+ };
+ confirmDialog('Reset emergency-stop / disable latches?', doIt);
+}
+async function runtimeStatus(){
+ const {body} = await api('/api/runtime');
+ if(!body || !body.product){ show('runtime-state', tag('UNAVAILABLE')); return; }
+ const p = body.product, a = body.agent||{}, b = body.broker||{};
+ show('runtime-state', tag(a.enabled === false ? 'DISABLED' : 'OK')
+   +' <span class="muted">'+esc(p.name)+' · agent '+esc(a.runtime||'qubit-native')
+   +' · estop '+(b.emergency_stop ? 'LATCHED' : 'clear')+'</span>');
+ const rows = [];
+ if(a.module_sha256) rows.push('<div>agent '+esc(a.runtime||'')+' · '+esc(a.module_sha256||'').slice(0,12)+'</div>');
+ if(body.voice) rows.push('<div>voice '+esc(body.voice.asr_provider||'?')+'/'+esc(body.voice.tts_provider||'?')+'</div>');
+ if(body.approvals && body.approvals.pending !== undefined) rows.push('<div>approvals pending '+esc(String(body.approvals.pending))+'</div>');
+ if(body.auth && body.auth.providers) rows.push('<div>credentials '+esc(String(body.auth.providers.filter(p=>p.configured).length))+'/'+esc(String(body.auth.providers.length))+' configured (names only)</div>');
+ if(body.sessions && body.sessions.count !== undefined) rows.push('<div>sessions '+esc(String(body.sessions.count))+' recent</div>');
+ if(body.mcp) rows.push('<div>mcp '+esc(String((body.mcp.servers||[]).length))+' configured · '+esc(body.mcp.state||'?')+'</div>');
+  if(body.worker) rows.push('<div>worker '+esc(body.worker.route||'local')+' · '+(body.worker.agent_enabled === false ? 'disabled' : 'ready')+'</div>');
+  if(body.vision) rows.push('<div>vision '+esc(body.vision.state||'?')+(body.vision.model?' · '+esc(body.vision.model):'')+'</div>');
+  if(body.messaging) rows.push('<div>messaging '+esc(String(body.messaging.accounts||0))+' accounts · '+esc(String(body.messaging.outbox||0))+' outbox · '+esc(String(body.messaging.inbox||0))+' inbox</div>');
+ if(body.capabilities && body.capabilities.states){
+   const s = body.capabilities.states;
+   rows.push('<div>capabilities '+esc(String(s.IMPLEMENTED||0))+' implemented · '+esc(String(s.BLOCKED||0))+' blocked · '+esc(String(s.REJECTED||0))+' rejected</div>');
+ }
+ show('runtime-list', rows.join(''));
+}
+async function deviceStatus(){
+ const {status,body} = await api('/api/device/status');
+ show('device-state', (body&&body.enrolled!=null?tag(body.enrolled?'OK':'DENIED'):tag('UNAVAILABLE'))
+   +' <span class="muted">'+esc((body&&body.detail)||'')+'</span>');
+}
+async function deviceEnroll(){
+ const doIt = async () => {
+   const {status,body} = await api('/api/device/enroll',{method:'POST',body:'{}'});
+   show('device-state', body&&body.enrolled ? tag('OK')+' device enrolled' : tag('DENIED')+' '+esc(body&&body.detail||''));
+ };
+ confirmDialog('Enroll this device as trusted? (explicit authorization)', doIt);
+}
+async function taskStatus(){
+ const {status,body} = await api('/api/status');
+ show('misc-state', body&&body.task_active!=null ? tag('OK')+' task_active: '+body.task_active : tag('UNAVAILABLE'));
+}
+async function approvals(){
+ const {status,body} = await api('/api/approvals');
+ show('misc-state', body&&body.items ? tag('OK')+' approvals pending: '+body.items.length : tag('UNAVAILABLE'));
+}
+async function reports(){
+ const {status,body} = await api('/api/reports?limit=5&days=30');
+ show('misc-state', body&&body.items ? tag('OK')+' reports: '+body.items.length : tag('UNAVAILABLE'));
+}
+async function exportState(){
+ const pw = window.prompt('Export passphrase (required):','');
+ if(pw==null) return;
+ const doIt = async () => {
+   const {status,body} = await api('/api/export-state',{method:'POST',
+     body:JSON.stringify({passphrase:pw})});
+   show('state-out', renderResult(body));
+ };
+ confirmDialog('Export encrypted portable state? (side effect)', doIt);
+}
+async function importState(){
+ const pw = window.prompt('Import passphrase (required):','');
+ if(pw==null) return;
+ const fileEl = document.getElementById('import-file');
+ const f = fileEl && fileEl.files && fileEl.files[0];
+ if(!f){ show('state-out', tag('MISSING')+' choose a .vbp bundle first'); return; }
+ const reader = new FileReader();
+ reader.onload = async () => {
+   const b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(reader.result)));
+   const preview = await api('/api/import-state',{method:'POST',
+     body:JSON.stringify({bundle_b64:b64,passphrase:pw})});
+   show('state-out', renderResult(preview.body));
+   if(preview.body && preview.body.state==='OK' && preview.body.dry_run){
+     const doRestore = async () => {
+       const r = await api('/api/import-state',{method:'POST',
+         body:JSON.stringify({bundle_b64:b64,passphrase:pw,apply:true})});
+       show('state-out', renderResult(r.body));
+     };
+     confirmDialog('Preview OK. Apply this restore now? (atomic + backed up + rollback-safe)', doRestore);
+   }
+ };
+ reader.readAsArrayBuffer(f);
+}
+async function upgradeAll(){
+ const {body} = await api('/api/profiles');
+ if(!body||!body.profiles)return;
+ const kinds=[...new Set(body.profiles.map(p=>p.kind))];
+ const out=[];
+ for(const k of kinds){
+   const {body:b}=await api('/api/profiles/check?kind='+k);
+   out.push(k+':'+((b&&b.state)||'UNAVAILABLE'));
+ }
+ show('state-out','upgrade checks: '+out.join(', ')+' — use per-component Upgrade to apply');
+}
+async function branding(){
+  const {status,body} = await api('/api/branding');
+  const st = body && body.state ? body.state : 'UNAVAILABLE';
+  show('health', tag(st)+' <span class="muted">'+esc(JSON.stringify({new_name:body&&body.new_name,files_migrated:body&&body.files_migrated,remaining:body&&body.files_remaining}))+'</span>');
+}
+// ---- Packet 8E websites (beginner + advanced parity) ---------------------
+async function wsAdd(){
+  const url = (document.getElementById('ws-url').value||'').trim();
+  if(!url){ show('ws-add-state', tag('MISSING')+' paste a URL first'); return; }
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'add',url})});
+    show('ws-add-state', renderResult(body));
+    wsList();
+  };
+  doIt();
+}
+function wsSelectValue(){
+  const el = document.getElementById('ws-sel');
+  return el ? el.value : '';
+}
+function wsPopulate(integrations){
+  const el = document.getElementById('ws-sel');
+  if(!el) return;
+  fillOptions(el, (integrations||[]).map(r => ({
+    value: String(r.integration_id || ''),
+    label: (r.display_name || r.origin || '') + ' [' + String(r.status || '') + ']',
+  })));
+}
+async function wsList(){
+  const {status,body} = await api('/api/websites');
+  if(!body || !body.integrations){ show('ws-add-state', tag('UNAVAILABLE')); return; }
+  wsPopulate(body.integrations);
+  wsPopulateSkills(body.skills||[]);
+  const list = vbBuild('div', null);
+  (body.integrations||[]).forEach(r => {
+    const caps = (r.requested_capabilities||[]).length;
+    const grants = (r.grant_ids||[]).length;
+    const row = vbBuild('div', {class:'row', style:'margin:6px 0'});
+    row.appendChild(vbBuild('span', {class:'tag '+String(r.status||'')}, String(r.status||'')));
+    row.appendChild(vbBuild('b', null, String(r.display_name||r.origin||'')));
+    row.appendChild(vbBuild('span', {class:'muted'}, String(r.origin||'')));
+    row.appendChild(vbBuild('span', {class:'muted'}, 'caps:'+caps+' grants:'+grants));
+    if (r.manifest_link) row.appendChild(vbBuild('span', {class:'tag OK'}, 'link:'+String(r.manifest_link)));
+    else row.appendChild(vbBuild('span', {class:'tag UNAVAILABLE'}, 'unlinked'));
+    const id = String(r.integration_id || '');
+    const actions = [['Show', wsDetail], ['Inspect', wsInspect], ['Logs', wsLogs]];
+    actions.forEach(([label, fn]) => {
+      const b = vbBuild('button', {type:'button'}, label);
+      b.addEventListener('click', () => fn(id));
+      row.appendChild(b);
+    });
+    list.appendChild(row);
+  });
+  const wrap = vbBuild('div', null);
+  if(!(body.integrations||[]).length) wrap.appendChild(vbBuild('span', {class:'muted'}, 'no integrations yet'));
+  else wrap.appendChild(list);
+  show('ws-list', wrap);
+  show('ws-add-state', tag('OK')+' '+body.integrations.length+' record(s) · mode '+esc(body.mode||'restricted')+' · skills '+(body.skills||[]).length);
+}
+function wsPopulateSkills(skills){
+  const active = (skills||[]).filter(s=>s.status==='active');
+  const opts = active.map(s => ({
+    value: String(s.skill_id || ''),
+    label: String(s.skill_id || '') + ' (v' + String(s.version || '') + ')',
+  }));
+  if(!opts.length) opts.push({ value: '', label: 'no active skills' });
+  ['ws-skill-beginner','ws-skill-adv'].forEach(id=>{
+    fillOptions(document.getElementById(id), opts);
+  });
+}
+async function wsLink(id, skillId){
+  if(!skillId){ show('ws-beginner-state', tag('MISSING')+' no active skill selected'); return; }
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'manifest-link',id_or_url:id||wsSelectValue(),skill_id:skillId})});
+    show('ws-link-state', renderResult(body));
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Link the active skill "'+esc(skillId)+'" to this website? Grants and enabling stay impossible until the link is valid and active.', doIt);
+}
+async function wsLinkSel(){ await wsLink('', wsSkillValue('ws-skill-adv')); }
+async function wsLinkBeginner(){ await wsLink(wsSelectValue(), wsSkillValue('ws-skill-beginner')); }
+function wsSkillValue(id){
+  const el = document.getElementById(id);
+  return el ? el.value : '';
+}
+async function wsShow(id){
+  const {status,body} = await api('/api/websites?id='+encodeURIComponent(id||wsSelectValue()));
+  if(!body || !body.integration){ show('ws-adv-state', tag('MISSING')); return; }
+  const i = body.integration;
+  const eff = body.effective || {};
+  const effTxt = Object.keys(eff).map(c=>esc(c)+':'+tag((eff[c]||{}).code||'UNAVAILABLE')).join(' ');
+  const grants = (eff.grants||[]).map(g=>esc(g.capability)+' @'+esc((g.scopes||[]).join(','))+' exp:'+esc(g.expires_at?new Date(g.expires_at*1000).toISOString():'never')).join('\n');
+  const man = i.manifest_link
+    ? 'manifest: '+esc(i.manifest_link)+' · license '+esc(i.license||'?')+' · hash '+esc((i.content_hash||'').slice(0,16))+'…'
+    : 'manifest: <span class="tag UNAVAILABLE">unlinked</span>';
+  show('ws-detail', '<pre style="white-space:pre-wrap;font-size:12px">'+esc(JSON.stringify(i,null,1))+'</pre><div>'+effTxt+'</div><div>'+man+'</div><pre style="white-space:pre-wrap;font-size:11px">'+esc(grants||'(no grants)')+'</pre>');
+  show('ws-adv-state', tag('OK')+' '+esc(i.status)+' · '+esc(i.origin));
+}
+async function wsDetail(id){ await wsShow(id); }
+async function wsInspect(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'inspect',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Run bounded read-only discovery for this website? (public HTTP metadata only; never authenticates)', doIt);
+}
+async function wsInspectSel(){ await wsInspect(''); }
+async function wsCheck(id){
+  const {status,body} = await api('/api/websites',{method:'POST',
+    body:JSON.stringify({action:'check',id_or_url:id||wsSelectValue()})});
+  show('ws-adv-state', renderResult(body));
+  show('ws-detail', '<div class="muted">'+esc(JSON.stringify(body&&body.grants||{}))+'</div>');
+}
+async function wsCheckSel(){ await wsCheck(''); }
+async function wsLogs(id){
+  const {status,body} = await api('/api/websites?logs='+encodeURIComponent(id||wsSelectValue())+'&tail=40');
+  if(!body){ show('ws-detail', tag('UNAVAILABLE')); return; }
+  const rows = (body.logs||[]).map(l=>'['+esc(l.op)+'] '+tag(l.status)+' '+esc(l.reason||'')+' <span class="muted">'+esc(l.origin||'')+'</span>').join('\n');
+  show('ws-detail', '<pre style="white-space:pre-wrap;font-size:12px">'+esc(rows||'(empty)')+'</pre>');
+  show('ws-adv-state', tag('OK')+' '+(body.logs||[]).length+' log entr'+(body.logs&&body.logs.length===1?'y':'ies'));
+}
+async function wsLogsSel(){ await wsLogs(''); }
+async function wsGrant(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'grant',id_or_url:id||wsSelectValue(),ttl:7*24*3600})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Grant the PROPOSED read-only observation capabilities for this site, scoped to its origin, expiring in 7 days?', doIt);
+}
+async function wsGrantSel(){ await wsGrant(''); }
+async function wsRevoke(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'revoke',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Revoke every grant linked to this website integration?', doIt);
+}
+async function wsRevokeSel(){ await wsRevoke(''); }
+async function wsEnable(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'enable',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Enable this proposal for observability? This does NOT grant any capability by itself.', doIt);
+}
+async function wsEnableSel(){ await wsEnable(''); }
+async function wsDisable(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'disable',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Disable this website integration?', doIt);
+}
+async function wsDisableSel(){ await wsDisable(''); }
+async function wsRemove(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'remove',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Remove this integration AND revoke its linked grants? (backed up; rollback restores the record but not grants)', doIt);
+}
+async function wsRemoveSel(){ await wsRemove(''); }
+async function wsRollback(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'rollback',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Roll back this integration to its previous state? (grants are never auto-restored)', doIt);
+}
+async function wsRollbackSel(){ await wsRollback(''); }
+// ---- Permission mode for websites (same 7E backend as the permissions CLI) --
+async function permModeShow(){
+  const {status,body} = await api('/api/permissions');
+  const st = body && body.mode ? body.mode : 'UNAVAILABLE';
+  show('perm-mode-state', tag(st)+' <span class="muted">scopes: '+esc((body&&body.mode_scopes||[]).join(', ')||'none')
+    +' · expires: '+esc(body&&body.mode_expires_at?new Date(body.mode_expires_at*1000).toISOString():'never')
+    +' · grants: '+((body&&body.grants||[]).length)+'</span>');
+}
+async function permModeSetRestricted(){
+  const doIt = async () => {
+    const {status,body} = await api('/api/permissions',{method:'POST',
+      body:JSON.stringify({action:'set-mode',mode:'restricted',confirmed:true})});
+    show('perm-mode-state', renderResult(body));
+  };
+  confirmDialog('Switch permission mode to Restricted (the safe default)?', doIt);
+}
+async function permModeSetUnrestricted(){
+  const scope = window.prompt('Unrestricted mode scopes (comma-separated, e.g. web:https://example.com):','');
+  if(scope==null) return;
+  const scopes = scope.split(',').map(s=>s.trim()).filter(Boolean);
+  const ttl = window.prompt('TTL hours (time-bounded; blank = until reset):','24');
+  if(ttl==null) return;
+  const doIt = async () => {
+    const {status,body} = await api('/api/permissions',{method:'POST',
+      body:JSON.stringify({action:'set-mode',mode:'unrestricted',
+        scopes, ttl: ttl.trim()? parseFloat(ttl)*3600 : null, confirmed:true})});
+    show('perm-mode-state', renderResult(body));
+  };
+  confirmDialog('Enable Unrestricted mode inside the chosen scopes only? It still never bypasses hard-deny, confirmation, audit, or limits.', doIt);
+}
+async function permReset(){
+  const doIt = async () => {
+    const {status,body} = await api('/api/permissions',{method:'POST',
+      body:JSON.stringify({action:'reset',confirmed:true})});
+    show('perm-mode-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Reset to Restricted and revoke EVERY grant? (backed up, audited, reversible via the permission store backups)', doIt);
+}
+// ---- Packet 8F actions (same backend as the actions CLI / voice path) ------
+let ACT_LAST_RECEIPT = '';
+function actArgs(){ try { return JSON.parse(document.getElementById('act-args').value||'{}'); }
+  catch(e){ return null; } }
+function actSelValue(){ const s=document.getElementById('act-sel'); return s?s.value:''; }
+function actTargetFor(id){
+  // contract-first target hint; the user can refine after preview
+  const kind = (id||'').indexOf('editor')===0?'workspace'
+    : (id==='act.desktop.launch'?'desktop':'URL');
+  const hint = kind==='workspace'?'workspace.example'
+    : (kind==='desktop'?'desktop':'https://example.com');
+  const t = window.prompt('Target ('+kind+'):', hint);
+  return t||'';
+}
+function actScopeFor(id){
+  const map={'act.browser.read':'web','act.browser.search':'web','act.browser.fill':'web',
+    'act.browser.draft':'web','act.browser.write':'web','act.mail.send':'mail',
+    'act.social.post':'social','act.purchase':'web','act.editor.write':'workspace',
+    'act.editor.delete':'workspace','act.desktop.launch':'desktop',
+    'act.account.change':'account','act.system.setting':'system'};
+  return map[id]||'web';
+}
+async function actList(){
+  const {status,body,authRequired} = await api('/api/actions');
+  if(authRequired){ show('act-beginner-state', tag('UNAVAILABLE')+' pair this dashboard'); return; }
+  const rows = (body&&body.actions||[]);
+  const wrap = vbBuild('div', {style:'margin-top:6px'});
+  if(!rows.length) wrap.appendChild(vbBuild('span', {class:'muted'}, 'no actions'));
+  rows.forEach(a => {
+    const eff = a.effective||{};
+    const line = vbBuild('div', {class:'muted', style:'margin:4px 0'});
+    line.appendChild(vbBuild('span', null, String(a.action_id||'')));
+    line.appendChild(vbBuild('span', {class:'tag '+String(a.tier||'')}, String(a.tier||'')));
+    line.appendChild(vbBuild('span', {class:'tag '+String(eff.code||'UNKNOWN')}, String(eff.code||'UNKNOWN')));
+    line.appendChild(vbBuild('span', null, ' · '+String(a.executor||'disabled')+' · '+(a.confirmation_required?'confirm required':'')));
+    line.appendChild(vbBuild('div', {style:'margin-left:14px;color:var(--muted)'}, String((a.summary||'').slice(0,120))));
+    wrap.appendChild(line);
+  });
+  show('act-beginner', wrap);
+  const sel = document.getElementById('act-sel');
+  if(sel) fillOptions(sel, rows.map(a => ({ value: String(a.action_id||''), label: String(a.action_id||'') })));
+  show('act-beginner-state', ' '+rows.length+' action contract(s) · mode '+esc(body&&body.mode||'?'));
+}
+async function actReceipts(){
+  const {status,body} = await api('/api/actions?receipts=10');
+  const rows = body&&body.receipts||[];
+  show('act-beginner', '<div style="margin-top:6px">receipts: '
+    +(rows.map(r=>esc(r.receipt_id)+' <span class="tag '+esc(r.state)+'">'+esc(r.state)+'</span> '
+      +esc(r.action_id)+' · '+esc(r.action_hash.slice(0,10))).join('<br>')||'none')+'</div>');
+  if(rows.length) ACT_LAST_RECEIPT = rows[0].receipt_id;
+}
+async function actShow(){
+  const id = actSelValue(); if(!id) return;
+  const {status,body} = await api('/api/actions?id='+encodeURIComponent(id));
+  const a = body&&body.action||{};
+  show('act-adv-state', tag('OK')+' '+esc(a.action_id)+' v'+esc(a.version)
+    +' · '+esc(a.tier)+' · rollback '+esc(a.rollback_kind)
+    +' · confirm='+(a.confirmation_required?'yes':'no'));
+  show('act-detail', '<div class="muted">'+esc(a.summary)
+    +'<br>scopes: '+esc((a.scopes||[]).join(', '))
+    +'<br>side effects: '+esc(a.side_effects)
+    +'<br>rollback: '+esc(a.rollback)+'</div>');
+}
+async function actCheck(){
+  const id = actSelValue(); if(!id) return;
+  const {status,body} = await api('/api/actions?check='+encodeURIComponent(id)
+    +'&scope='+encodeURIComponent(actScopeFor(id)));
+  show('act-adv-state', tag(body&&body.code||'UNKNOWN')+' <span class="muted">'
+    +esc((body&&body.detail||'').slice(0,140))+'</span>');
+}
+async function actPreview(){
+  const id = actSelValue(); if(!id) return;
+  const args = actArgs(); if(args===null){ show('act-adv-state', tag('FAILED')+' invalid args JSON'); return; }
+  const target = actTargetFor(id); if(!target) return;
+  const {status,body} = await api('/api/actions',{method:'POST',
+    body:JSON.stringify({action:'preview',action_id:id,args,target,
+      scope:actScopeFor(id),idempotency_key:''})});
+  show('act-adv-state', renderResult(body));
+  show('act-detail', '<div class="muted">'+esc(body&&body.preview||'—')
+    +'<br>hash '+esc((body&&body.action_hash||'').slice(0,16))
+    +' · confirm='+(body&&body.confirmation_required?'required':'not required')
+    +'</div>');
+}
+async function actExecute(){
+  const id = actSelValue(); if(!id) return;
+  const args = actArgs(); if(args===null){ show('act-adv-state', tag('FAILED')+' invalid args JSON'); return; }
+  const target = actTargetFor(id); if(!target) return;
+  const doIt = async () => {
+    const {status,body} = await api('/api/actions',{method:'POST',
+      body:JSON.stringify({action:'execute',action_id:id,args,target,
+        scope:actScopeFor(id),confirmed:true})});
+    show('act-adv-state', renderResult(body));
+    if(body&&body.receipt_id){ ACT_LAST_RECEIPT = body.receipt_id;
+      show('act-detail','<div class="muted">receipt '+esc(body.receipt_id)
+        +' · state '+esc(body.state)+' · '+esc(body.detail||'')+'</div>'); }
+    else if(body&&body.state){ show('act-detail','<div class="muted">'+esc(body.state)
+      +' · '+esc((body.detail||body.code||'').slice(0,160))+'</div>'); }
+  };
+  confirmDialog('Execute '+id+' on '+target+' with the exact args shown in the args box? '
+    +'Sending/posting/purchasing/deleting/account/system actions cannot be rolled back remotely.', doIt);
+}
+async function actCancel(){
+  if(!ACT_LAST_RECEIPT){ show('act-adv-state', tag('UNAVAILABLE')+' no receipt selected'); return; }
+  const {status,body} = await api('/api/actions',{method:'POST',
+    body:JSON.stringify({action:'cancel',receipt_id:ACT_LAST_RECEIPT})});
+  show('act-adv-state', renderResult(body));
+}
+async function actRecover(){
+  if(!ACT_LAST_RECEIPT){ show('act-adv-state', tag('UNAVAILABLE')+' no receipt selected'); return; }
+  const doIt = async () => {
+    const {status,body} = await api('/api/actions',{method:'POST',
+      body:JSON.stringify({action:'recover',receipt_id:ACT_LAST_RECEIPT,confirmed:true})});
+    show('act-adv-state', renderResult(body));
+    show('act-detail','<div class="muted">'+esc(body&&body.detail||'')+'</div>');
+  };
+  confirmDialog('Run the compensating rollback for receipt '+ACT_LAST_RECEIPT
+    +'? (honest ROLLBACK_IMPOSSIBLE for sent/purchased/deleted actions)', doIt);
+}
+async function actRetry(){
+  if(!ACT_LAST_RECEIPT){ show('act-adv-state', tag('UNAVAILABLE')+' no receipt selected'); return; }
+  const args = actArgs(); if(args===null){ show('act-adv-state', tag('FAILED')+' invalid args JSON'); return; }
+  const id = actSelValue();
+  const doIt = async () => {
+    const {status,body} = await api('/api/actions',{method:'POST',
+      body:JSON.stringify({action:'retry',receipt_id:ACT_LAST_RECEIPT,args,
+        target:actTargetFor(id),scope:actScopeFor(id),confirmed:true})});
+    show('act-adv-state', renderResult(body));
+    if(body&&body.receipt){ ACT_LAST_RECEIPT = body.receipt.receipt_id; }
+  };
+  confirmDialog('Retry receipt '+ACT_LAST_RECEIPT+' with the exact original args?', doIt);
+}
+loadAll();
+</script>
+</body></html>

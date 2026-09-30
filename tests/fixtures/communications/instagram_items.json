@@ -1,0 +1,38 @@
+{
+  "_synthetic": true,
+  "_comment": "Synthetic sanitized Instagram DM rows for Packet 8A contract tests.",
+  "platform": "instagram",
+  "adapter": "instagram_cdp",
+  "adapter_version": "8a-1",
+  "account_scope": "synth-ig-a",
+  "items": [
+    {
+      "source_item_id": "syn-ig-thread-2001",
+      "thread_id": "syn-ig-thread-2001",
+      "sender": "Synthetic IG Sender Delta",
+      "display_name": "Delta (synthetic)",
+      "subject": "",
+      "preview": "Synthetic direct message from delta.",
+      "time_raw": "2026-08-04T12:00:00+03:00",
+      "ts_normalized": "2026-08-04T09:00:00Z",
+      "unread": true,
+      "read_state": "unread",
+      "safe_url": "https://www.instagram.com/direct/t/syn-ig-thread-2001/",
+      "evidence_status": "not_available"
+    },
+    {
+      "source_item_id": "syn-ig-thread-2002",
+      "thread_id": "syn-ig-thread-2002",
+      "sender": "Synthetic IG Sender Echo",
+      "display_name": "Echo (synthetic)",
+      "subject": "",
+      "preview": "Synthetic direct message from echo.",
+      "time_raw": "2026-08-05T18:45:00+03:00",
+      "ts_normalized": "2026-08-05T15:45:00Z",
+      "unread": false,
+      "read_state": "read",
+      "safe_url": "https://www.instagram.com/direct/t/syn-ig-thread-2002/",
+      "evidence_status": "not_available"
+    }
+  ]
+}

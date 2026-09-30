@@ -1,0 +1,10 @@
+<!-- _synthetic: Packet 8B sanitized LOGGED-OUT / 2FA layout fixture (no private data).
+     Exercises the AUTH_REQUIRED classification: a login form / password field
+     must classify the scan as auth-required, never as an empty successful inbox. -->
+<!doctype html><html><head><title>Sign in (synthetic)</title></head><body>
+<form action="/accounts/login" method="post">
+  <label>Username <input type="text" name="username"></label>
+  <label>Password <input type="password" name="password"></label>
+  <button type="submit">Sign in</button>
+</form>
+</body></html>

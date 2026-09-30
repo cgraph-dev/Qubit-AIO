@@ -1,0 +1,809 @@
+{
+  "schema_version": 1,
+  "fixtures": [
+    {
+      "path": "tests/fixtures/differential/acp/catalog_status.json",
+      "sha256": "26b4f2c49d3e31877a24b650352147b45d4513c9252e50e5c2ab5190a0ca8828",
+      "family": "acp",
+      "fixture_id": "acp.harness.catalog_status"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_delete_attachments_attachment_id_dc42b255.json",
+      "sha256": "56b72b7d958c5d44c580ec76a92bcaad9f299f4fc3a396b040c64740693eb18a",
+      "family": "api",
+      "fixture_id": "api.route.delete-attachments-attachment_id.dc42b255"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_delete_boards_slug_1284be50.json",
+      "sha256": "a2f33b05e7fc64d28e6221d5c84357d7ede6ab1415e3fa6a6b5d38a806c15b46",
+      "family": "api",
+      "fixture_id": "api.route.delete-boards-slug.1284be50"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_delete_links_8b3a2476.json",
+      "sha256": "1defc66db5274d89482a844b83b92f7f14b05a953d8c9e048e1f5f6bfb2eb073",
+      "family": "api",
+      "fixture_id": "api.route.delete-links.8b3a2476"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_delete_tasks_task_id_f93faf80.json",
+      "sha256": "5af2b2ce434c6714e736d636080717bbdfb9c77efa49ae6049b196cb865b9213",
+      "family": "api",
+      "fixture_id": "api.route.delete-tasks-task_id.f93faf80"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_delete_tasks_task_id_home_subscribe_platform_66b3e686.json",
+      "sha256": "88fb921ab707c9633a56f1f654184d4c58d8807893de76cdfe7528f072f0c164",
+      "family": "api",
+      "fixture_id": "api.route.delete-tasks-task_id-home-subscribe-platform.66b3e686"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_api_actions_name_status_8a373f8a.json",
+      "sha256": "0d62919c67792e41c92f7d8e79a2a8ebcfc98e04b139b3b5264da430046b3b27",
+      "family": "api",
+      "fixture_id": "api.route.get-api-actions-name-status.8a373f8a"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_api_cron_blueprints_2ae1e138.json",
+      "sha256": "0089f30c9548bc2fc81e67cf0e68bbb19799dd324caeff1872394b94f4cf4a13",
+      "family": "api",
+      "fixture_id": "api.route.get-api-cron-blueprints.2ae1e138"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_api_cron_delivery_targets_da83e2bf.json",
+      "sha256": "4a847646ccc5d37b8bc06c67f7d28bdb012de811677add28dc3c6664867c2573",
+      "family": "api",
+      "fixture_id": "api.route.get-api-cron-delivery-targets.da83e2bf"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_api_dashboard_font_37a89ecc.json",
+      "sha256": "76022b18a5d82e3bd696e4b6994e4dd06b8b5f3c361005d74914347c5057d679",
+      "family": "api",
+      "fixture_id": "api.route.get-api-dashboard-font.37a89ecc"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_api_dashboard_plugins_rescan_b66252c9.json",
+      "sha256": "77da672ecbee4e96e835db4d3cd6c0a6251af1acf1d1324d86b2ffa65e6d3ae6",
+      "family": "api",
+      "fixture_id": "api.route.get-api-dashboard-plugins-rescan.b66252c9"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_attachments_attachment_id_65a1390a.json",
+      "sha256": "6016c771cca4fe67546579994051317e7ab085a336c17ac16af3563025f85bd6",
+      "family": "api",
+      "fixture_id": "api.route.get-attachments-attachment_id.65a1390a"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_provider_oauth_status_04f00046.json",
+      "sha256": "75bc2f1ef9e90ad0ff44be50c9fb6b5bba37c64a34f67200a60bb84c648feef8",
+      "family": "api",
+      "fixture_id": "api.route.get-provider-oauth-status.04f00046"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_runs_run_id_6083750b.json",
+      "sha256": "919ce6d79508d9553bf199a22eae25d9d12e9e0309d5a3e462f132c17da928a0",
+      "family": "api",
+      "fixture_id": "api.route.get-runs-run_id.6083750b"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_runs_run_id_inspect_e725edd9.json",
+      "sha256": "7beb9108b19d4a8de80c544d32ada4c3db7a81655ee660284a0fe5d83a114d4a",
+      "family": "api",
+      "fixture_id": "api.route.get-runs-run_id-inspect.e725edd9"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_sessions_session_id_badges_74dce249.json",
+      "sha256": "2a4ead46b9c9ce20aa28e79f9f5fb34af9c852d5aef04126c46de04678231201",
+      "family": "api",
+      "fixture_id": "api.route.get-sessions-session_id-badges.74dce249"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_tasks_task_id_afc17fe8.json",
+      "sha256": "820ef09ccd7332b221084e514dcec436c613f5ecb08668c2d60323fd2f685576",
+      "family": "api",
+      "fixture_id": "api.route.get-tasks-task_id.afc17fe8"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_tasks_task_id_attachments_c1ba1c46.json",
+      "sha256": "cd6868cb108d9e73884a4cf9cd4edaf7ed8f9a618be9c001033130a661625dea",
+      "family": "api",
+      "fixture_id": "api.route.get-tasks-task_id-attachments.c1ba1c46"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_tasks_task_id_log_452dd4ec.json",
+      "sha256": "613e793391e533c16749260bdd21896abc3db3e0fadd1e93b8680eef6d0b754f",
+      "family": "api",
+      "fixture_id": "api.route.get-tasks-task_id-log.452dd4ec"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_get_workers_active_2f802e21.json",
+      "sha256": "eccce135a50df0b6c1de19e20a73023cf6359b2360d926a2157c61043b772473",
+      "family": "api",
+      "fixture_id": "api.route.get-workers-active.2f802e21"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_patch_boards_slug_ef02e407.json",
+      "sha256": "c8299f119825ab0b7cb06f5ed26721b1cea61f92d019773a9523437c08e55c07",
+      "family": "api",
+      "fixture_id": "api.route.patch-boards-slug.ef02e407"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_patch_profiles_profile_name_f918b2ea.json",
+      "sha256": "95ad94ea137b4b164f89f6cc48ce0ef1dcb3da5da45d93f3771fd1dff4e7d4ec",
+      "family": "api",
+      "fixture_id": "api.route.patch-profiles-profile_name.f918b2ea"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_patch_tasks_task_id_4a26fe86.json",
+      "sha256": "cd491a9acdf8ac3608f9a272d54b18c7870dda299f299aedabb310bfce434f83",
+      "family": "api",
+      "fixture_id": "api.route.patch-tasks-task_id.4a26fe86"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_cron_jobs_job_id_pause_3ad7ac03.json",
+      "sha256": "a14781a13ee1483985ae4900dbdac4cb55cef765f6effc8c64fc6878289221ce",
+      "family": "api",
+      "fixture_id": "api.route.post-api-cron-jobs-job_id-pause.3ad7ac03"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_cron_jobs_job_id_resume_67b33b18.json",
+      "sha256": "c36a7d3fe4baa555d215e98ea7359342fa3b5ad1eafb0041b39a6c0df4d96ff1",
+      "family": "api",
+      "fixture_id": "api.route.post-api-cron-jobs-job_id-resume.67b33b18"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_cron_jobs_job_id_trigger_53ac8c30.json",
+      "sha256": "0f7f2efb15b8c979f33693f059c2061f89f6131989398216af3dbf3b67489897",
+      "family": "api",
+      "fixture_id": "api.route.post-api-cron-jobs-job_id-trigger.53ac8c30"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_dashboard_plugins_name_path_visibility_296b2a8e.json",
+      "sha256": "831534b38b9607165bf31c1cb2f97332bdd68cbd5dbd7cd63b9732e85a70c04f",
+      "family": "api",
+      "fixture_id": "api.route.post-api-dashboard-plugins-name-path-visibility.296b2a8e"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_gateway_start_52679e95.json",
+      "sha256": "3e5ff3c5fed253404f40c37a18f8b36ea56df89493f16cd85e3f7e437694fba0",
+      "family": "api",
+      "fixture_id": "api.route.post-api-gateway-start.52679e95"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_gateway_stop_01e5ff6b.json",
+      "sha256": "5fe4901ae80e773db32646f7de9f8ad03b2708e0328608c665cddce7d12073d7",
+      "family": "api",
+      "fixture_id": "api.route.post-api-gateway-stop.01e5ff6b"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_git_branch_switch_3c3ee1ca.json",
+      "sha256": "82f946b9e584b4327b69dee6f8bcbbd9757cf07afb0cab128c885386874d737e",
+      "family": "api",
+      "fixture_id": "api.route.post-api-git-branch-switch.3c3ee1ca"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_git_review_commit_e3ae0f42.json",
+      "sha256": "bac3b79a6c10600be81c317d5218743825d9079ccdfb0ed71521e511638cd7de",
+      "family": "api",
+      "fixture_id": "api.route.post-api-git-review-commit.e3ae0f42"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_git_review_revert_1789e289.json",
+      "sha256": "d0a84dea4e793a3aa50f368515f182807f1f60fa2daa618224254e0ed5651c0e",
+      "family": "api",
+      "fixture_id": "api.route.post-api-git-review-revert.1789e289"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_git_review_stage_416b286e.json",
+      "sha256": "f8db189ca0ab44f1e5e3ef0a4f4b9e307c5fc2fd049c7c473d52d04000b0ad33",
+      "family": "api",
+      "fixture_id": "api.route.post-api-git-review-stage.416b286e"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_git_review_unstage_65a1d445.json",
+      "sha256": "d0e6e0b95bcf57c8afb20cb91aaf3be14a8b29a7e9b378696313a1eec157b19c",
+      "family": "api",
+      "fixture_id": "api.route.post-api-git-review-unstage.65a1d445"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_git_worktree_add_ed769e39.json",
+      "sha256": "1b40c98a4ac018cede8ffc7408a7aa05c82e8388ddd4fe1e5aa14363b0ad9d02",
+      "family": "api",
+      "fixture_id": "api.route.post-api-git-worktree-add.ed769e39"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_git_worktree_remove_aef42b1e.json",
+      "sha256": "9db8f84fdee38b28df15b03f08d6fdd66078906783d0e188f5923ae0606e1315",
+      "family": "api",
+      "fixture_id": "api.route.post-api-git-worktree-remove.aef42b1e"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_memory_reset_e3e0e6d0.json",
+      "sha256": "f0536b4ce788d053bea249accd590d0ff9204ab79a6f0f0c96390c940fc1ed83",
+      "family": "api",
+      "fixture_id": "api.route.post-api-memory-reset.e3e0e6d0"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_ops_debug_share_5e0f49db.json",
+      "sha256": "b6439321d11120df26c87eb70e681f01c9d97bf72dbc960b8f61fc0f80798f8b",
+      "family": "api",
+      "fixture_id": "api.route.post-api-ops-debug-share.5e0f49db"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_pairing_approve_6188059e.json",
+      "sha256": "2b2603c492b68d8fb9e77d12b6945c822bf8d34d0b2c134a194bacbb6655fe4a",
+      "family": "api",
+      "fixture_id": "api.route.post-api-pairing-approve.6188059e"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_pairing_clear_pending_d17a0a5a.json",
+      "sha256": "a6a2f679c3c54a66890f74e7438d971938d22e3e72ac4d3d086459d94911a2a4",
+      "family": "api",
+      "fixture_id": "api.route.post-api-pairing-clear-pending.d17a0a5a"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_pairing_revoke_ae105340.json",
+      "sha256": "1f7989698ca49a0f424f30c19aa7dcbed82ad3afd94aff1039aff1e163838a6f",
+      "family": "api",
+      "fixture_id": "api.route.post-api-pairing-revoke.ae105340"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_tools_toolsets_name_post_setup_a08b47b7.json",
+      "sha256": "7bc758fdffdeb4bb562682f9699a3a1a00adacb966ebee2caf78146c20fdbd28",
+      "family": "api",
+      "fixture_id": "api.route.post-api-tools-toolsets-name-post-setup.a08b47b7"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_api_webhooks_bfc04b7d.json",
+      "sha256": "63f6aa9ff0a108e391c4826cdd0c74ea47c2b426cb02b04e07a98c0bb566ff45",
+      "family": "api",
+      "fixture_id": "api.route.post-api-webhooks.bfc04b7d"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_boards_e6060e28.json",
+      "sha256": "875514a6d1a08e467a4c92ee54e5783688a0dc9cba17083eee3bdd31b7d3e7b9",
+      "family": "api",
+      "fixture_id": "api.route.post-boards.e6060e28"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_boards_import_e0a61897.json",
+      "sha256": "ae6c062f866fc80f04abbcd7b3ba5c01f90f4f2b78d05b35d5a745b8049af13a",
+      "family": "api",
+      "fixture_id": "api.route.post-boards-import.e0a61897"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_boards_slug_export_9e887e65.json",
+      "sha256": "1221af9884eb51fd40610a424ee1a520c298da698d7875c5fc47efefe8bfede0",
+      "family": "api",
+      "fixture_id": "api.route.post-boards-slug-export.9e887e65"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_boards_slug_switch_f55b0700.json",
+      "sha256": "98bba2a2a2915529e4465aee92999b7f052c2904d1e3f57a18dd3e8414099936",
+      "family": "api",
+      "fixture_id": "api.route.post-boards-slug-switch.f55b0700"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_dispatch_a94b2520.json",
+      "sha256": "94c571bd80c46b835dbe1f65ace09a716ce4be41dfed75616515c049059f638e",
+      "family": "api",
+      "fixture_id": "api.route.post-dispatch.a94b2520"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_estimate_fa150437.json",
+      "sha256": "5a82b0ac7285760e0ff313d5fe11883dd8ea86faffbfdf6afd626e540f0d2ff5",
+      "family": "api",
+      "fixture_id": "api.route.post-estimate.fa150437"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_links_10c77e23.json",
+      "sha256": "5a39ce84e5bc85e310c432d337976fda66e2bb7b156c295167e9a0ab87bcca2d",
+      "family": "api",
+      "fixture_id": "api.route.post-links.10c77e23"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_profiles_profile_name_describe_auto_7a340571.json",
+      "sha256": "9579d3e3b795f32eb34893a0a213e456e12710454a8539839be236a274a4e6bf",
+      "family": "api",
+      "fixture_id": "api.route.post-profiles-profile_name-describe-auto.7a340571"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_provider_oauth_start_6a61f711.json",
+      "sha256": "09d94f26b39f9abed9caae0836b4b56dceaa9f386870a73f8b85b8bbed8e0f4a",
+      "family": "api",
+      "fixture_id": "api.route.post-provider-oauth-start.6a61f711"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_rescan_9c85c7ee.json",
+      "sha256": "6922f05e977a8eab61d1c6d34eac8af5887d77be0945a56c830421f7e5371f05",
+      "family": "api",
+      "fixture_id": "api.route.post-rescan.9c85c7ee"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_reset_state_bcfdb823.json",
+      "sha256": "cbefebc613f8aba97dec21524416632624b10c286a933636fadf1eb4cfb633aa",
+      "family": "api",
+      "fixture_id": "api.route.post-reset-state.bcfdb823"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_runs_run_id_terminate_021946c4.json",
+      "sha256": "60fae2067184907a4566c99da11f55a06f39c0548937ebd2643d7c99ddb66af3",
+      "family": "api",
+      "fixture_id": "api.route.post-runs-run_id-terminate.021946c4"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_tasks_0a30a7a2.json",
+      "sha256": "6a40cd4621048f37b2a28a206e9850e3e6c053352ecc3ad826adf6db5d50a3f8",
+      "family": "api",
+      "fixture_id": "api.route.post-tasks.0a30a7a2"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_tasks_bulk_2a4334b5.json",
+      "sha256": "ead302afa917d0fcb8cd9c1a6b1a3050d694c430b14359f6ca2b5855f46c084d",
+      "family": "api",
+      "fixture_id": "api.route.post-tasks-bulk.2a4334b5"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_tasks_task_id_attachments_c2547c10.json",
+      "sha256": "c3e194e7baabf447a9c8a970ab8a5c9ccd07b859a4f028646c678e1fa6227f6e",
+      "family": "api",
+      "fixture_id": "api.route.post-tasks-task_id-attachments.c2547c10"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_tasks_task_id_comments_c1a68d95.json",
+      "sha256": "3fe379083171dff2a95a7f5f0d0b94058c7c29a3f413b34188ea3b2a368714f9",
+      "family": "api",
+      "fixture_id": "api.route.post-tasks-task_id-comments.c1a68d95"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_tasks_task_id_decompose_8c2eacb3.json",
+      "sha256": "514a6a59feeccc79ff632ead6c949beb721f592af3bc68470907ae6230d81c64",
+      "family": "api",
+      "fixture_id": "api.route.post-tasks-task_id-decompose.8c2eacb3"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_tasks_task_id_estimate_ed5a2d25.json",
+      "sha256": "cd7c0e4358c05f07c408854f4bb8b3431fb9825113481cefa67f65cb0d4f5c3b",
+      "family": "api",
+      "fixture_id": "api.route.post-tasks-task_id-estimate.ed5a2d25"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_tasks_task_id_home_subscribe_platform_187663d2.json",
+      "sha256": "7babd2795a7bbccdb974aea4148fc97cea9447c744d86421d6ba9d4fc9c919fc",
+      "family": "api",
+      "fixture_id": "api.route.post-tasks-task_id-home-subscribe-platform.187663d2"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_tasks_task_id_reassign_728109d6.json",
+      "sha256": "1d8f8c0b20258f08551cd23ea1074e0e93cefb1cb67378ef23e1fe23dcb38679",
+      "family": "api",
+      "fixture_id": "api.route.post-tasks-task_id-reassign.728109d6"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_tasks_task_id_reclaim_88d6920b.json",
+      "sha256": "27980531467a8df639c0da4eaf15d6418a64d3ff8c25e444d0dfc4e81f4816ad",
+      "family": "api",
+      "fixture_id": "api.route.post-tasks-task_id-reclaim.88d6920b"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_post_tasks_task_id_specify_d85b6077.json",
+      "sha256": "957c7ac51082e245aab2e7e1346e38061646e959dd531c0ddf568da882292726",
+      "family": "api",
+      "fixture_id": "api.route.post-tasks-task_id-specify.d85b6077"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_put_api_dashboard_font_c2609b45.json",
+      "sha256": "b48ef9f7b13eca9c75d2ecb86b0b14685e473b1a93cbddf1bc9d56a68e770835",
+      "family": "api",
+      "fixture_id": "api.route.put-api-dashboard-font.c2609b45"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_put_api_dashboard_plugin_providers_632a34fd.json",
+      "sha256": "636ed04c81ac21d34db38b8da563b07e044d461085ebf992bddc217aacec65f3",
+      "family": "api",
+      "fixture_id": "api.route.put-api-dashboard-plugin-providers.632a34fd"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_put_api_tools_toolsets_name_bda709b4.json",
+      "sha256": "169b606239cf5c4b80d87010ff9ae6c5ae15a5a492b86a5333525de33d884750",
+      "family": "api",
+      "fixture_id": "api.route.put-api-tools-toolsets-name.bda709b4"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_put_api_tools_toolsets_name_env_fd496871.json",
+      "sha256": "e5c6756eff88c415d5a62f3caaef0e8b3af39285c4e401038ae8ba756be3f0c3",
+      "family": "api",
+      "fixture_id": "api.route.put-api-tools-toolsets-name-env.fd496871"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_put_api_tools_toolsets_name_model_f40e1bba.json",
+      "sha256": "c79e33f15f68d0742a69b3a733309aecc5f5c5e9725b0242348968ac4b6944c4",
+      "family": "api",
+      "fixture_id": "api.route.put-api-tools-toolsets-name-model.f40e1bba"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_put_api_tools_toolsets_name_provider_30413ad4.json",
+      "sha256": "1a2e9fd1435c993fa74aebdcf5fbae95523b2e4b353ab47c53b83070c4dc6885",
+      "family": "api",
+      "fixture_id": "api.route.put-api-tools-toolsets-name-provider.30413ad4"
+    },
+    {
+      "path": "tests/fixtures/differential/api/compat_api_route_put_orchestration_b964c02e.json",
+      "sha256": "d63e2d12a98d422ff858e5eaae7958c45e73f991beb1edc1167b0c172856f919",
+      "family": "api",
+      "fixture_id": "api.route.put-orchestration.b964c02e"
+    },
+    {
+      "path": "tests/fixtures/differential/api/status_headers.json",
+      "sha256": "608fcd28221d7059c41b5a8473231b3574db04ced2b9d281c19815618b09d0fb",
+      "family": "api",
+      "fixture_id": "api.route.status_headers"
+    },
+    {
+      "path": "tests/fixtures/differential/api/status_schema.json",
+      "sha256": "ea81b834b16935ddac8543effd32363f5bc01be1b08bfe839b527ee17f24a014",
+      "family": "api",
+      "fixture_id": "api.route.status_schema"
+    },
+    {
+      "path": "tests/fixtures/differential/approval/pending_list.json",
+      "sha256": "8775ae048fdd4ed8eaf22b22be2d256446951f5ffae6e6b3f621cc3bd5713453",
+      "family": "approval",
+      "fixture_id": "approval.journal.pending_list"
+    },
+    {
+      "path": "tests/fixtures/differential/auth/read_only.json",
+      "sha256": "d09c06ddc017c8e15528b0c8ba171522bed8a02ac43d162c9edd004ab88dd3dd",
+      "family": "auth",
+      "fixture_id": "auth.status.read_only"
+    },
+    {
+      "path": "tests/fixtures/differential/board/boards_list.json",
+      "sha256": "e134acbd3ca5a26d77655c447feebe37e52bcd595867938dff0168cdeced518f",
+      "family": "board",
+      "fixture_id": "board.kanban.boards_list"
+    },
+    {
+      "path": "tests/fixtures/differential/browser/read_only.json",
+      "sha256": "3c52ff3d13c913098ba4460a925136b054acf0a2db75cd195afa2d0d1537f5f0",
+      "family": "browser",
+      "fixture_id": "browser.status.read_only"
+    },
+    {
+      "path": "tests/fixtures/differential/cli/help_canonical_command.json",
+      "sha256": "5d670575b5230929a68c3367fc83ebac64e2432eda34605d30a36d648d7db25d",
+      "family": "cli",
+      "fixture_id": "cli.argument_parser.help_canonical_command"
+    },
+    {
+      "path": "tests/fixtures/differential/cli/help_exit_code.json",
+      "sha256": "69b63dcfc495191d4dde31f818429fba93de81fc57dae96b51dccade9aad1be5",
+      "family": "cli",
+      "fixture_id": "cli.argument_parser.help_exit_code"
+    },
+    {
+      "path": "tests/fixtures/differential/cli/list_json.json",
+      "sha256": "766115865adff6fee748d2d8d9965938bcb634db5beab19afd8d53433ea7d62c",
+      "family": "cli",
+      "fixture_id": "cli.model_profile.list_json"
+    },
+    {
+      "path": "tests/fixtures/differential/cli/vendor_qubit_constants.json",
+      "sha256": "d3b01aef4a861f42e9f47e35e220bd431bb8b1d1f151f31e9e1f3bfa2b69b417",
+      "family": "cli",
+      "fixture_id": "cli.vendor.qubit_constants"
+    },
+    {
+      "path": "tests/fixtures/differential/cron/list.json",
+      "sha256": "8356790ddde8e41327ce38b42c64aa0a256209c09ecb90557cd9c7235bf90d99",
+      "family": "cron",
+      "fixture_id": "cron.schedules.list"
+    },
+    {
+      "path": "tests/fixtures/differential/dashboard/delta_checks.json",
+      "sha256": "e77e5b900e2120bad1964d165485697342177fc779cdb66fa7657dceeb6f8302",
+      "family": "dashboard",
+      "fixture_id": "gateway.method.controlUi.sessionPullRequests.checks"
+    },
+    {
+      "path": "tests/fixtures/differential/dashboard/drift_achievements_share.json",
+      "sha256": "9825126cc86ad0186fea91bd66d86c667bf8129609af560b0a99ecb99ffb15f1",
+      "family": "dashboard",
+      "fixture_id": "drift.achievements.share"
+    },
+    {
+      "path": "tests/fixtures/differential/dashboard/drift_plugins_catalog.json",
+      "sha256": "7b067b6719834b62e2b5c5a133c78407b52c244335ef6ad257dd0ea6d3184446",
+      "family": "dashboard",
+      "fixture_id": "drift.plugins.catalog"
+    },
+    {
+      "path": "tests/fixtures/differential/dashboard/multiviewport.json",
+      "sha256": "b001da2447de34e59b9adc9a526319d9ad978386f07f02313a79b9467e03eb71",
+      "family": "dashboard",
+      "fixture_id": "dashboard.dom.a11y.screenshot.multiviewport"
+    },
+    {
+      "path": "tests/fixtures/differential/dashboard/run_op.json",
+      "sha256": "40d2598321e34e9fd0def4cfe89ad2b7436c59c6fa8865ddc9f0a3156fe8d212",
+      "family": "dashboard",
+      "fixture_id": "dashboard.control.run_op"
+    },
+    {
+      "path": "tests/fixtures/differential/desktop/profile.json",
+      "sha256": "eb2df9ab92f8bb51c4fcd722e5fdf6b5f0ae3e53ad6aa14a3fc845146340ab8b",
+      "family": "desktop",
+      "fixture_id": "desktop.device.profile"
+    },
+    {
+      "path": "tests/fixtures/differential/file/inspect_active_project.json",
+      "sha256": "55c25a0de775116ba549cf1e7e5995b3476b1192ba86b52f4f08ed47fdf965cd",
+      "family": "file",
+      "fixture_id": "file.files.inspect_active_project"
+    },
+    {
+      "path": "tests/fixtures/differential/gateway/delta_changed.json",
+      "sha256": "300b2e22fe6b99490176758ab52366a94bc46052293397c4a9216ca845518995",
+      "family": "gateway",
+      "fixture_id": "gateway.event.plugins.changed"
+    },
+    {
+      "path": "tests/fixtures/differential/gateway/delta_preview.json",
+      "sha256": "837572a17092b40471fa856f23825ae407620f1bd67f5058d40e61e3cde7c52e",
+      "family": "gateway",
+      "fixture_id": "gateway.method.canvas.document.preview"
+    },
+    {
+      "path": "tests/fixtures/differential/gateway/delta_snapshot.json",
+      "sha256": "ff09d6a6afe0d1f278a24ffc3f7cc2d722f413860882d100d6d9c229dd93d072",
+      "family": "gateway",
+      "fixture_id": "gateway.event.models.snapshot"
+    },
+    {
+      "path": "tests/fixtures/differential/gateway/protocol_negotiate.json",
+      "sha256": "61ff44fdd97efbdc636a15f16b7577ec1e20ad462db8a893a2bf6d96b296cb2f",
+      "family": "gateway",
+      "fixture_id": "gateway.peers.protocol_negotiate"
+    },
+    {
+      "path": "tests/fixtures/differential/gateway/vendor_qubit_constants.json",
+      "sha256": "20feef12cd08d263e20ca5d01ba7ffeb5c402d1c9c69b63773703bac20b77234",
+      "family": "gateway",
+      "fixture_id": "gateway.vendor.qubit_constants"
+    },
+    {
+      "path": "tests/fixtures/differential/mcp/grants_status.json",
+      "sha256": "b1ec42b0d1b76fa5af93e1b6828f14f90e85115826b2f69cbb3370cb0758a0bb",
+      "family": "mcp",
+      "fixture_id": "mcp.loopback.grants_status"
+    },
+    {
+      "path": "tests/fixtures/differential/media/status.json",
+      "sha256": "9c09939933165b9164745b24a83385b2911576912c51e79eedef6d196d66f049",
+      "family": "media",
+      "fixture_id": "media.catalog.status"
+    },
+    {
+      "path": "tests/fixtures/differential/memory/status.json",
+      "sha256": "1975473b6102c1e3bb87effc330096dbfe5dcb477ebe1c79bce148a18d89b693",
+      "family": "memory",
+      "fixture_id": "memory.store.status"
+    },
+    {
+      "path": "tests/fixtures/differential/messaging/list.json",
+      "sha256": "ac6d5e35128c378e0150f79b2e2c0ef55906363854f4062de770002dfd45c776",
+      "family": "messaging",
+      "fixture_id": "messaging.accounts.list"
+    },
+    {
+      "path": "tests/fixtures/differential/plugin/list.json",
+      "sha256": "085dd73ebc47fd27690ed58a4a7601b05c7f040a6861dd53ebe3eb67c5ceb7c7",
+      "family": "plugin",
+      "fixture_id": "plugin.runtime.list"
+    },
+    {
+      "path": "tests/fixtures/differential/project/list.json",
+      "sha256": "8b2e6a098d64d55e4ff275752d44233439672b4d59b04d9f41349fb6cf7c4027",
+      "family": "project",
+      "fixture_id": "project.registry.list"
+    },
+    {
+      "path": "tests/fixtures/differential/provider/brain4_default.json",
+      "sha256": "ac7a9eadee7f65ff70f17f4d4b41498b2dacfa93f294e35908f68bbdf414b5f2",
+      "family": "provider",
+      "fixture_id": "provider.model_profile.brain4_default"
+    },
+    {
+      "path": "tests/fixtures/differential/provider/delta_radius.json",
+      "sha256": "1db7b29a740b6e664ede237d9bdd7723c59745d73bc86400745ba24336574ce3",
+      "family": "provider",
+      "fixture_id": "provider.plugin.radius"
+    },
+    {
+      "path": "tests/fixtures/differential/provider/opencode_coding.json",
+      "sha256": "400d2ec9cc0282b550d3cc6915a5fe4a5097978b5711540d4bde33286ba4683f",
+      "family": "provider",
+      "fixture_id": "provider.model_profile.opencode_coding"
+    },
+    {
+      "path": "tests/fixtures/differential/provider/openrouter_api.json",
+      "sha256": "daa7fd1d73af306adc58ea3ec8d0443e16906db3d3cded0208621c7f15b4c966",
+      "family": "provider",
+      "fixture_id": "provider.model_profile.openrouter_api"
+    },
+    {
+      "path": "tests/fixtures/differential/provider/resolved_identity.json",
+      "sha256": "988f858b0e8c778068ed9d0df121725f035b6bf63d4b92bd071b54282e3ddecd",
+      "family": "provider",
+      "fixture_id": "provider.runtime.resolved_identity"
+    },
+    {
+      "path": "tests/fixtures/differential/recovery/delta_cpuprofile.json",
+      "sha256": "5e3862ec92d5f7cbea3eb4e3f67d91a001630337d2c2541687490ad4c0d34a64",
+      "family": "recovery",
+      "fixture_id": "gateway.method.diagnostics.cpuProfile"
+    },
+    {
+      "path": "tests/fixtures/differential/recovery/latch_resume.json",
+      "sha256": "e31b75bfad30373e37efc3b23f7bd2f2909fb12d17c14f055b8e153d05e94fe5",
+      "family": "recovery",
+      "fixture_id": "recovery.estop.latch_resume"
+    },
+    {
+      "path": "tests/fixtures/differential/recovery/probe.json",
+      "sha256": "4a56560872fd5769952fd61225ad7ab6a9a556a096842e55e90c8e9f985ddf23",
+      "family": "recovery",
+      "fixture_id": "recovery.crash.probe"
+    },
+    {
+      "path": "tests/fixtures/differential/recovery/refusal.json",
+      "sha256": "83ceb161f4439c780491f000f9324ef5dbd2b9f0f9cb0f461f752a7823710451",
+      "family": "recovery",
+      "fixture_id": "recovery.estop.refusal"
+    },
+    {
+      "path": "tests/fixtures/differential/rpc/error_envelope.json",
+      "sha256": "47ae52421ae162fef7747a53c57aa94b4486db76a81dca19219095e781c239cd",
+      "family": "rpc",
+      "fixture_id": "rpc.methodregistry.error_envelope"
+    },
+    {
+      "path": "tests/fixtures/differential/rpc/session_list.json",
+      "sha256": "bf72948590fd9f1f1194b5c2bf34f552cbe9312025945a5e2219b99ac794d965",
+      "family": "rpc",
+      "fixture_id": "rpc.methodregistry.session_list"
+    },
+    {
+      "path": "tests/fixtures/differential/session/delta_ensure.json",
+      "sha256": "4dcf256c632c609ce7c92ee10e96c3506adbba6453861f93b92735c73775e882",
+      "family": "session",
+      "fixture_id": "gateway.method.sessions.activitySummary.ensure"
+    },
+    {
+      "path": "tests/fixtures/differential/session/list_persisted.json",
+      "sha256": "c7bf00c8eaaa302d309625dfb19ec99beffab80555617fd27c71581a5729f0e5",
+      "family": "session",
+      "fixture_id": "session.store.list_persisted"
+    },
+    {
+      "path": "tests/fixtures/differential/session/vendor_qubit_state_common.json",
+      "sha256": "9dfec4b775cef4dcfed27b1be17880b7d961ded71866b47ebf335b22510b2e54",
+      "family": "session",
+      "fixture_id": "session.vendor.qubit_state_common"
+    },
+    {
+      "path": "tests/fixtures/differential/skill/delta_visualize.json",
+      "sha256": "34e06fd77d0924eceef53538610130f1b707ed9e2a65f84cc48d53a0320a64af",
+      "family": "skill",
+      "fixture_id": "skill.bundled.visualize"
+    },
+    {
+      "path": "tests/fixtures/differential/skill/list.json",
+      "sha256": "0d633f6c0bf205834420a45a7ac67cdd676a74c5bfa3302d7bda0fade26d80fd",
+      "family": "skill",
+      "fixture_id": "skill.verified.list"
+    },
+    {
+      "path": "tests/fixtures/differential/sse/error_preflight.json",
+      "sha256": "8b681ea2b95dcfc9837bcc5b3cad1b11ce65678a24bc5738bcbc1efd54235bd3",
+      "family": "sse",
+      "fixture_id": "sse.chat_stream.error_preflight"
+    },
+    {
+      "path": "tests/fixtures/differential/sse/event_order.json",
+      "sha256": "435d472391910ffa3bba698841ccd54786c5c3c238b0f752a669e54713a3751f",
+      "family": "sse",
+      "fixture_id": "sse.chat_stream.event_order"
+    },
+    {
+      "path": "tests/fixtures/differential/task/status.json",
+      "sha256": "12ab5a7ca9be041cf2b5d964f93a181e4dec8dc287b9c5dc8587cadcf0856ef3",
+      "family": "task",
+      "fixture_id": "task.ledger.status"
+    },
+    {
+      "path": "tests/fixtures/differential/voice/cancel_semantics.json",
+      "sha256": "99639e8764b7d3e6253587a672ecd1d9df112c186f8220520a72b4f7908514ae",
+      "family": "voice",
+      "fixture_id": "voice.confirm.cancel_semantics"
+    },
+    {
+      "path": "tests/fixtures/differential/voice/canonical_op.json",
+      "sha256": "9590ac8c3b18f7491a354450c878b1687ef7b24a9dc977d0d62b93b325a3bb60",
+      "family": "voice",
+      "fixture_id": "voice.intent.canonical_op"
+    },
+    {
+      "path": "tests/fixtures/differential/voice/create_project_confirm.json",
+      "sha256": "f490f46e1831021bf0cdeb58c8ce103d2afacaf1db9ced8acf99ab1872640132",
+      "family": "voice",
+      "fixture_id": "voice.write.confirm_create_project"
+    },
+    {
+      "path": "tests/fixtures/differential/voice/sessions_list.json",
+      "sha256": "9ea7c4307fda49a9123a7383ab0e2d9acdf19ebf8176789cb871efc7c70ce27e",
+      "family": "voice",
+      "fixture_id": "voice.read.list_sessions"
+    },
+    {
+      "path": "tests/fixtures/differential/voice/status_read.json",
+      "sha256": "f37803b7b8bacc06ab1cb6abc5c29a5b8886102515a0ab25be2114f9eb476b33",
+      "family": "voice",
+      "fixture_id": "voice.status.read"
+    },
+    {
+      "path": "tests/fixtures/differential/webhook/list.json",
+      "sha256": "9fca570765537412c1f9b248db1360e330b718947b318d35320df3a3b4e0204d",
+      "family": "webhook",
+      "fixture_id": "webhook.subscriptions.list"
+    },
+    {
+      "path": "tests/fixtures/differential/ws/auth_scope_denied.json",
+      "sha256": "135e3df44da3fc9a14638c4cea7f0a0a0a55fe6f316bee8540b5c6a3a6739409",
+      "family": "ws",
+      "fixture_id": "ws.handshake.auth_scope_denied"
+    },
+    {
+      "path": "tests/fixtures/differential/ws/compat_ws_route_ws_api_audio_speak_stream_03c4ec2c.json",
+      "sha256": "46dda9146154dc025e3f28bd64e08762542e2a58fa17dd8e2a7753283fa39d2f",
+      "family": "ws",
+      "fixture_id": "ws.route.ws-api-audio-speak-stream.03c4ec2c"
+    },
+    {
+      "path": "tests/fixtures/differential/ws/compat_ws_route_ws_api_console_e15d9ab3.json",
+      "sha256": "2c789ff38f4f8b9c31f8c2a67d38d4e2d7b6df9b46263a95e61ee139c2f57c00",
+      "family": "ws",
+      "fixture_id": "ws.route.ws-api-console.e15d9ab3"
+    },
+    {
+      "path": "tests/fixtures/differential/ws/compat_ws_route_ws_api_pty_eecf355b.json",
+      "sha256": "e9baf77ef783a21640aa8da592862797c4ba052f941b86497f76c06057199655",
+      "family": "ws",
+      "fixture_id": "ws.route.ws-api-pty.eecf355b"
+    },
+    {
+      "path": "tests/fixtures/differential/ws/compat_ws_route_ws_api_pub_cab36bf8.json",
+      "sha256": "20c4746aeede48fe9163aae68f3733adb8d68d549fd3811b14e2bc6ee144d93a",
+      "family": "ws",
+      "fixture_id": "ws.route.ws-api-pub.cab36bf8"
+    },
+    {
+      "path": "tests/fixtures/differential/ws/compat_ws_route_ws_api_ws_f5138dff.json",
+      "sha256": "3df8baeec448f9fb01f4e4c6ceda13f4ec2413bd6a36ede02169db90f97d15c1",
+      "family": "ws",
+      "fixture_id": "ws.route.ws-api-ws.f5138dff"
+    },
+    {
+      "path": "tests/fixtures/differential/ws/compat_ws_route_ws_events_76698526.json",
+      "sha256": "ef52b6a8ece78b9703937c79480e4ca57b24cf93a701cebbeb95c423b06fccf8",
+      "family": "ws",
+      "fixture_id": "ws.route.ws-events.76698526"
+    },
+    {
+      "path": "tests/fixtures/differential/ws/scope_events.json",
+      "sha256": "b3c6a8a041b90f10b6d7a09234c8f74e767866c28d3e4c64c52712773e40b347",
+      "family": "ws",
+      "fixture_id": "ws.handshake.scope_events"
+    }
+  ]
+}

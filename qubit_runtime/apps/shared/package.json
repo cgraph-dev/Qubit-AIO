@@ -1,0 +1,27 @@
+{
+  "name": "@qubit/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./billing": "./src/billing-types.ts",
+    "./billing-policy": "./src/billing-policy.ts",
+    "./charge-settlement": "./src/charge-settlement.ts",
+    "./color": "./src/color.ts",
+    "./gateway-events": "./src/gateway-events.ts",
+    "./json-rpc-channel": "./src/json-rpc-channel.ts",
+    "./skin": "./src/skin.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "fix": "npm run lint:fix",
+    "typecheck": "tsc -p . --noEmit",
+    "check": "npm run typecheck && npm run lint"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

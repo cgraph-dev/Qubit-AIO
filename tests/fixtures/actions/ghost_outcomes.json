@@ -1,0 +1,57 @@
+{
+  "_comment": "Packet 8N synthetic Ghost adapter outcomes (explicit simulation only; never live). The fixture controls ONLY the simulated adapter OUTCOME; the capability contract, gate, confirmation, action hash, receipts, audit, cancellation and session-grant logic are always real. Synthetic data only — no private content.",
+  "ghost.desktop.discover": {
+    "state": "OK",
+    "detail": "found 3 windows (bounded inventory)"
+  },
+  "ghost.desktop.launch": {
+    "state": "OK",
+    "detail": "launcher started the app (no app control claimed)",
+    "compensation": "close the launched app (best effort)"
+  },
+  "ghost.window.anchor": {
+    "state": "OK",
+    "detail": "window anchored; focus preserved"
+  },
+  "ghost.browser.tabs": {
+    "state": "OK",
+    "detail": "tab inventory returned for the role"
+  },
+  "ghost.browser.screenshot": {
+    "state": "OK",
+    "detail": "clipped redacted evidence captured"
+  },
+  "ghost.input.click": {
+    "state": "OK",
+    "detail": "clicked exact semantic target (verified)"
+  },
+  "ghost.input.type": {
+    "state": "OK",
+    "detail": "typed into exact semantic field"
+  },
+  "ghost.input.scroll": {
+    "state": "OK",
+    "detail": "scrolled bounded direction"
+  },
+  "ghost.clipboard.read": {
+    "state": "OK",
+    "detail": "clipboard read; output redacted"
+  },
+  "ghost.desktop.screenshot": {
+    "state": "OK",
+    "detail": "clipped redacted desktop evidence captured (session backend)"
+  },
+  "ghost.input.key": {
+    "state": "OK",
+    "detail": "named key pressed on exact semantic target"
+  },
+  "ghost.input.cursor": {
+    "state": "OK",
+    "detail": "cursor moved to exact semantic target (no click)",
+    "compensation": "move the cursor back (best effort)"
+  },
+  "ghost.window.close": {
+    "state": "OK",
+    "detail": "window closed by bounded identifier"
+  }
+}

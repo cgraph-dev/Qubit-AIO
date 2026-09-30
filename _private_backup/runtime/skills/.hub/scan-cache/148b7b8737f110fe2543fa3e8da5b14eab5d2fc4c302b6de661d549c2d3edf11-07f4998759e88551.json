@@ -1,0 +1,34 @@
+{
+  "bundle_hash": "sha256:148b7b8737f110fe2543fa3e8da5b14eab5d2fc4c302b6de661d549c2d3edf11",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/saelens",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 44,
+      "match": "pip install sae-lens",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/README.md",
+      "line": 19,
+      "match": "pip install sae-lens",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:53.698613+00:00",
+  "summary": "saelens: safe \u2014 2 finding(s) in supply_chain",
+  "fresh": true
+}

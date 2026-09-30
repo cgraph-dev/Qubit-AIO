@@ -1,0 +1,29 @@
+[Unit]
+# Packet 8I: TEMPORARY isolated accelerated failure-path test unit.
+# NEVER installed automatically and NEVER part of the production hourly
+# schedule. It exercises the monitor's failure paths (overlap, malformed time
+# config, delivery failure, timeout) at an accelerated cadence inside an
+# ISOLATED qualification state dir with synthetic fixtures — it can never
+# substitute for observing the production-equivalent hourly schedule.
+# The operator installs/starts this ONLY to watch failure-path behaviour, then
+# removes it (see docs/OPERATIONS_8I.md §9).
+Description=Qubit - temporary accelerated monitor failure-path qualification (8I)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=__PROJECT_DIR__
+# Runs the hermetic accelerated qualification (no browser, isolated state).
+ExecStart=__PROJECT_DIR__/.venv/bin/python scripts/timer_qualify.py --accelerated
+# Bounded resources: the accelerated suite must stay inside the same envelope
+# as the real oneshot.
+MemoryHigh=300M
+MemoryMax=400M
+TimeoutStartSec=120
+Environment=VOICE_BRIDGE_CONFIG=%h/.config/qubit-voicebridge/voice.yaml
+# Isolated state root so the accelerated unit NEVER touches production state.
+Environment=VOICE_BRIDGE_QUALIFY_ACCEL_STATE=%h/.cache/qubit-voicebridge/timer-qualify-accel
+
+[Install]
+WantedBy=default.target

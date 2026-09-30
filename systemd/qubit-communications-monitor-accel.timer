@@ -1,0 +1,17 @@
+[Unit]
+# Packet 8I: temporary accelerated trigger for the failure-path test unit.
+# NEVER installed automatically. OnCalendar fires every 5 minutes — far faster
+# than the production hourly schedule — so the operator can watch failure-path
+# behaviour quickly; the operator MUST remove this unit after the drill
+# (systemctl --user disable --now <unit>) because it is NOT a real schedule.
+Description=Qubit - temporary accelerated monitor failure-path trigger (8I)
+RefuseManualStart=false
+
+[Timer]
+# Accelerated cadence (every 5 minutes on the wall clock) for the isolated
+# failure-path drill only. Production scheduling remains the hourly timer.
+OnCalendar=*:0/5
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

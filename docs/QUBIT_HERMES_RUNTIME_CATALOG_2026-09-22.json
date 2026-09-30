@@ -1,0 +1,1718 @@
+{
+  "captured": "2026-09-22",
+  "schema": "qubit.hermes_runtime_catalog_snapshot/1",
+  "skills": [
+    {
+      "category": "autonomous-ai-agents",
+      "description": "Operate the Antigravity CLI (agy): plugins, auth, sandbox.",
+      "enabled": true,
+      "name": "antigravity-cli",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "autonomous-ai-agents",
+      "description": "Delegate coding tasks to Blackbox AI CLI agent. Multi-model agent with built-in judge that runs tasks through multiple LLMs and picks the best result. Requires the blackbox CLI and a Blackbox AI API key.",
+      "enabled": true,
+      "name": "blackbox",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "autonomous-ai-agents",
+      "description": "Drive the desktop background-first; escalate on signal.",
+      "enabled": true,
+      "name": "computer-use",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "autonomous-ai-agents",
+      "description": "Delegate coding to xAI Grok Build CLI (features, PRs).",
+      "enabled": true,
+      "name": "grok",
+      "provenance": "hub",
+      "usage": 2
+    },
+    {
+      "category": "autonomous-ai-agents",
+      "description": "Use, configure, theme, extend, and orchestrate Hermes Agent.",
+      "enabled": true,
+      "name": "hermes-agent",
+      "provenance": "bundled",
+      "usage": 12
+    },
+    {
+      "category": "autonomous-ai-agents",
+      "description": "Configure and use Honcho memory with Hermes -- cross-session user modeling, multi-profile peer isolation, observation config, dialectic reasoning, session summaries, and context budget enforcement. Use when setting up Honcho, troubleshooting memory, managing profiles with Honcho peers, or tuning observation, recall, and dialectic settings.",
+      "enabled": true,
+      "name": "honcho",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "autonomous-ai-agents",
+      "description": "Delegate coding to OpenHands CLI (model-agnostic, LiteLLM).",
+      "enabled": true,
+      "name": "openhands",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "blockchain",
+      "description": "Read-only EVM client: wallets, tokens, gas across 8 chains.",
+      "enabled": true,
+      "name": "evm",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "blockchain",
+      "description": "Hyperliquid market data, account history, trade review.",
+      "enabled": true,
+      "name": "hyperliquid",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "blockchain",
+      "description": "Query Solana blockchain data with USD pricing — wallet balances, token portfolios with values, transaction details, NFTs, whale detection, and live network stats. Uses Solana RPC + CoinGecko. No API key required.",
+      "enabled": true,
+      "name": "solana",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": null,
+      "description": "How to make the local 3B brain smarter at the weight level (LoRA, abliteration, modelfile, auto-improve loop) — beyond prompts.",
+      "enabled": true,
+      "name": "brain-upgrade",
+      "provenance": "agent",
+      "usage": 7
+    },
+    {
+      "category": "communication",
+      "description": "Structured decision-making framework for technical proposals and trade-off analysis. When the user faces a choice between multiple approaches (architecture decisions, tool selection, refactoring strategies, migration paths), this skill produces a 1-3-1 format: one clear problem statement, three distinct options with pros/cons, and one concrete recommendation with definition of done and implementation plan. Use when the user asks for a \"1-3-1\", says \"give me options\", or needs help choosing between competing approaches.\n",
+      "enabled": true,
+      "name": "one-three-one-rule",
+      "provenance": "hub",
+      "usage": 3
+    },
+    {
+      "category": "communication",
+      "description": "Read latest messages from the user's logged-in social accounts (Gmail, Facebook Messenger, Instagram DMs) via deterministic CDP scripts against the Hermes Chromium profile — zero LLM tokens, works with a small local model.",
+      "enabled": true,
+      "name": "social-inbox-check",
+      "provenance": "agent",
+      "usage": 6
+    },
+    {
+      "category": "creative",
+      "description": "ASCII art: pyfiglet, cowsay, boxes, image-to-ascii.",
+      "enabled": true,
+      "name": "ascii-art",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Article illustrations: type × style × palette consistency.",
+      "enabled": true,
+      "name": "baoyu-article-illustrator",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Knowledge comics (知识漫画): educational, biography, tutorial.",
+      "enabled": true,
+      "name": "baoyu-comic",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Control Blender directly from Hermes via socket connection to the blender-mcp addon. Create 3D objects, materials, animations, and run arbitrary Blender Python (bpy) code. Use when user wants to create or modify anything in Blender.",
+      "enabled": true,
+      "name": "blender-mcp",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Generate images, video, and audio with ComfyUI — install, launch, manage nodes/models, run workflows with parameter injection. Uses the official comfy-cli for lifecycle and direct REST/WebSocket API for execution.",
+      "enabled": true,
+      "name": "comfyui",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Generate flat, minimal light/dark-aware SVG diagrams as standalone HTML files, using a unified educational visual language with 9 semantic color ramps, sentence-case typography, and automatic dark mode. Best suited for educational and non-software visuals — physics setups, chemistry mechanisms, math curves, physical objects (aircraft, turbines, smartphones, mechanical watches), anatomy, floor plans, cross-sections, narrative journeys (lifecycle of X, process of Y), hub-spoke system integrations (smart city, IoT), and exploded layer views. If a more specialized skill exists for the subject (dedicated software/cloud architecture, hand-drawn sketches, animated explainers, etc.), prefer that — otherwise this skill can also serve as a general-purpose SVG diagram fallback with a clean educational look. Ships with 15 example diagrams.",
+      "enabled": true,
+      "name": "concept-diagrams",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Generate project ideas via creative constraints.",
+      "enabled": true,
+      "name": "ideation",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Hand-drawn Excalidraw JSON diagrams (arch, flow, seq).",
+      "enabled": true,
+      "name": "excalidraw",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Create HTML-based video compositions, animated title cards, social overlays, captioned talking-head videos, audio-reactive visuals, and shader transitions using HyperFrames. HTML is the source of truth for video. Use when the user wants a rendered MP4/WebM from an HTML composition, wants to animate text/logos/charts over media, needs captions synced to audio, wants TTS narration, or wants to convert a website into a video.",
+      "enabled": true,
+      "name": "hyperframes",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Plan, set up, and monitor a multi-agent video production pipeline backed by Hermes Kanban. Use when the user wants to make ANY video — narrative film, product/marketing, music video, explainer, ASCII/terminal art, abstract/generative loop, comic, 3D, real-time/installation — and the work warrants decomposition into specialized profiles (writer, designer, animator, renderer, voice, editor, etc.) coordinated through a kanban board. Performs adaptive discovery to scope the brief, designs an appropriate team for the requested style, generates the setup script that creates Hermes profiles + initial kanban task, then helps monitor execution and intervene when tasks stall or fail. Routes scenes to whichever Hermes rendering / audio / design skill fits each beat (`ascii-video`, `manim-video`, `p5js`, `comfyui`, `touchdesigner-mcp`, `blender-mcp`, `pixel-art`, `baoyu-comic`, `claude-design`, `excalidraw`, `songsee`, `heartmula`, …) plus external APIs for TTS, image-gen, and image-to-video as needed.",
+      "enabled": true,
+      "name": "kanban-video-orchestrator",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Generate real meme images by picking a template and overlaying text with Pillow. Produces actual .png meme files.",
+      "enabled": true,
+      "name": "meme-generation",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Pixel art w/ era palettes (NES, Game Boy, PICO-8).",
+      "enabled": true,
+      "name": "pixel-art",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Use when building creative browser demos with @chenglou/pretext — DOM-free text layout for ASCII art, typographic flow around obstacles, text-as-geometry games, kinetic typography, and text-powered generative art. Produces single-file HTML demos by default.",
+      "enabled": true,
+      "name": "pretext",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Throwaway HTML mockups: 2-3 design variants to compare.",
+      "enabled": true,
+      "name": "sketch",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "creative",
+      "description": "Control a running TouchDesigner instance via twozero MCP — create operators, set parameters, wire connections, execute Python, build real-time visuals. 36 native tools.",
+      "enabled": true,
+      "name": "touchdesigner-mcp",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "data-science",
+      "description": "Iterative Python via live Jupyter kernel (hamelnb).",
+      "enabled": true,
+      "name": "jupyter-live-kernel",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "devops",
+      "description": "Run 150+ AI apps via inference.sh CLI (infsh) — image generation, video creation, LLMs, search, 3D, social automation. Uses the terminal tool. Triggers: inference.sh, infsh, ai apps, flux, veo, image generation, video generation, seedream, seedance, tavily",
+      "enabled": true,
+      "name": "inference-sh-cli",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "devops",
+      "description": "Manage Docker containers, images, volumes, networks, and Compose stacks — lifecycle ops, debugging, cleanup, and Dockerfile optimization.",
+      "enabled": true,
+      "name": "docker-management",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "devops",
+      "description": "Decomposition playbook + anti-temptation rules for an orchestrator profile routing work through Kanban. The \"don't do the work yourself\" rule and the basic lifecycle are auto-injected into every kanban worker's system prompt; this skill is the deeper playbook when you're specifically playing the orchestrator role.",
+      "enabled": true,
+      "name": "kanban-orchestrator",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "devops",
+      "description": "Pitfalls, examples, and edge cases for Hermes Kanban workers. The lifecycle itself is auto-injected into every worker's system prompt as KANBAN_GUIDANCE (from agent/prompt_builder.py); this skill is what you load when you want deeper detail on specific scenarios.",
+      "enabled": true,
+      "name": "kanban-worker",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "devops",
+      "description": "Set up a Linux workstation (Ubuntu/Debian) for productive AI agent and development work. Covers system tools, shell environment, Hermes optimization, voice mode setup/troubleshooting, and credential configuration.",
+      "enabled": true,
+      "name": "linux-workstation-setup",
+      "provenance": "agent",
+      "usage": 34
+    },
+    {
+      "category": "devops",
+      "description": "Operate a running OpenClaw gateway — register local models (Ollama), patch openclaw.json safely, set default models, run agent turns, and verify model changes end-to-end.",
+      "enabled": true,
+      "name": "openclaw-operations",
+      "provenance": "agent",
+      "usage": 49
+    },
+    {
+      "category": "devops",
+      "description": "Operate and debug the local OpenClaw Voice Bridge and Voice Dashboard (Parakeet-TDT/Silero/eres2net/llama3.2-abliterate 3b/piper on 8GB 3070 Ti, port 8890) plus qubit-dev terminal and strict live logs.",
+      "enabled": true,
+      "name": "openclaw-voice-bridge",
+      "provenance": "agent",
+      "usage": 461
+    },
+    {
+      "category": "devops",
+      "description": "Zero-install localhost tunnels over SSH via Pinggy.",
+      "enabled": true,
+      "name": "pinggy-tunnel",
+      "provenance": "hub",
+      "usage": 2
+    },
+    {
+      "category": "devops",
+      "description": "Review Kanban handoffs and route verified outcomes.",
+      "enabled": true,
+      "name": "sdlc-review",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "devops",
+      "description": "Poll RSS, JSON APIs, and GitHub with watermark dedup.",
+      "enabled": true,
+      "name": "watchers",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "email",
+      "description": "Give the agent its own dedicated email inbox via AgentMail. Send, receive, and manage email autonomously using agent-owned email addresses (e.g. hermes-agent@agentmail.to).",
+      "enabled": true,
+      "name": "agentmail",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "email",
+      "description": "Triage an inbox: prioritize threads, draft replies safely.",
+      "enabled": true,
+      "name": "email-inbox-triage",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "finance",
+      "description": "Build fully-integrated 3-statement models (IS, BS, CF) in Excel with working capital schedules, D&A roll-forwards, debt schedule, and the plugs that make cash and retained earnings tie. Pairs with excel-author.",
+      "enabled": true,
+      "name": "3-statement-model",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "finance",
+      "description": "Build comparable company analysis in Excel — operating metrics, valuation multiples, statistical benchmarking vs peer sets. Pairs with excel-author. Use for public-company valuation, IPO pricing, sector benchmarking, or outlier detection.",
+      "enabled": true,
+      "name": "comps-analysis",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "finance",
+      "description": "Build institutional-quality DCF valuation models in Excel — revenue projections, FCF build, WACC, terminal value, Bear/Base/Bull scenarios, 5x5 sensitivity tables. Pairs with excel-author. Use for intrinsic-value equity analysis.",
+      "enabled": true,
+      "name": "dcf-model",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "finance",
+      "description": "Build auditable Excel workbooks headless with openpyxl — blue/black/green cell conventions, formulas over hardcodes, named ranges, balance checks, sensitivity tables. Use for financial models, audit outputs, reconciliations.",
+      "enabled": true,
+      "name": "excel-author",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "finance",
+      "description": "Build leveraged buyout models in Excel — sources & uses, debt schedule, cash sweep, exit multiple, IRR/MOIC sensitivity. Pairs with excel-author. Use for PE screening, sponsor-case valuation, or illustrative LBO in a pitch.",
+      "enabled": true,
+      "name": "lbo-model",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "finance",
+      "description": "Build accretion/dilution (merger) models in Excel — pro-forma P&L, synergies, financing mix, EPS impact. Pairs with excel-author. Use for M&A pitches, board materials, or deal evaluation.",
+      "enabled": true,
+      "name": "merger-model",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "finance",
+      "description": "Build PowerPoint decks headless with python-pptx. Pairs with excel-author for model-backed decks where every number traces to a workbook cell. Use for pitch decks, IC memos, earnings notes.",
+      "enabled": true,
+      "name": "pptx-author",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "finance",
+      "description": "Stock quotes, history, search, compare, crypto via Yahoo.",
+      "enabled": true,
+      "name": "stocks",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "gaming",
+      "description": "Host modded Minecraft servers (CurseForge, Modrinth).",
+      "enabled": true,
+      "name": "minecraft-modpack-server",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "gaming",
+      "description": "Play Pokemon via headless emulator + RAM reads.",
+      "enabled": true,
+      "name": "pokemon-player",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "github",
+      "description": "GitHub auth setup: HTTPS tokens, SSH keys, gh CLI login.",
+      "enabled": true,
+      "name": "github-auth",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "github",
+      "description": "Review PRs: diffs, inline comments via gh or REST.",
+      "enabled": true,
+      "name": "github-code-review",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "github",
+      "description": "Create, triage, label, assign GitHub issues via gh or REST.",
+      "enabled": true,
+      "name": "github-issues",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "github",
+      "description": "GitHub PR lifecycle: branch, commit, open, CI, merge.",
+      "enabled": true,
+      "name": "github-pr-workflow",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "github",
+      "description": "Clone/create/fork repos; manage remotes, releases.",
+      "enabled": true,
+      "name": "github-repo-management",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "health",
+      "description": "Gym workout planner and nutrition tracker. Search 690+ exercises by muscle, equipment, or category via wger. Look up macros and calories for 380,000+ foods via USDA FoodData Central. Compute BMI, TDEE, one-rep max, macro splits, and body fat — pure Python, no pip installs. Built for anyone chasing gains, cutting weight, or just trying to eat better.\n",
+      "enabled": true,
+      "name": "fitness-nutrition",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "health",
+      "description": "Connect to a running NeuroSkill instance and incorporate the user's real-time cognitive and emotional state (focus, relaxation, mood, cognitive load, drowsiness, heart rate, HRV, sleep staging, and 40+ derived EXG scores) into responses. Requires a BCI wearable (Muse 2/S or OpenBCI) and the NeuroSkill desktop app running locally.\n",
+      "enabled": true,
+      "name": "neuroskill-bci",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": null,
+      "description": "Setup, configure, and troubleshoot Hermes voice mode (STT + TTS), push-to-talk, microphone issues, and audio provider quirks.",
+      "enabled": true,
+      "name": "hermes-voice-mode",
+      "provenance": "agent",
+      "usage": 36
+    },
+    {
+      "category": "mcp",
+      "description": "Build, test, inspect, install, and deploy MCP servers with FastMCP in Python. Use when creating a new MCP server, wrapping an API or database as MCP tools, exposing resources or prompts, or preparing a FastMCP server for Claude Code, Cursor, or HTTP deployment.",
+      "enabled": true,
+      "name": "fastmcp",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mcp",
+      "description": "Use the mcporter CLI to list, configure, auth, and call MCP servers/tools directly (HTTP or stdio), including ad-hoc servers, config edits, and CLI/type generation.",
+      "enabled": true,
+      "name": "mcporter",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "media",
+      "description": "HeartMuLa: Suno-like song generation from lyrics + tags.",
+      "enabled": true,
+      "name": "heartmula",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "media",
+      "description": "Local ASR + TTS on consumer NVIDIA GPUs — faster-whisper/ctranslate2 CUDA setup (libcublas fix via Ollama's bundled cu12 libs), VRAM coexistence budgeting, piper TTS install/API quirks, push-to-talk + barge-in audio patterns.",
+      "enabled": true,
+      "name": "local-voice-stack",
+      "provenance": "agent",
+      "usage": 17
+    },
+    {
+      "category": "migration",
+      "description": "Migrate a user's OpenClaw customization footprint into Hermes Agent. Imports Hermes-compatible memories, SOUL.md, command allowlists, user skills, and selected workspace assets from ~/.openclaw, then reports exactly what could not be migrated and why.",
+      "enabled": true,
+      "name": "openclaw-migration",
+      "provenance": "hub",
+      "usage": 4
+    },
+    {
+      "category": "mlops",
+      "description": "Simplest distributed training API. 4 lines to add distributed support to any PyTorch script. Unified API for DeepSpeed/FSDP/Megatron/DDP. Automatic device placement, mixed precision (FP16/BF16/FP8). Interactive config, single launch command. HuggingFace ecosystem standard.",
+      "enabled": true,
+      "name": "huggingface-accelerate",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Open-source embedding database for AI applications. Store embeddings and metadata, perform vector and full-text search, filter by metadata. Simple 4-function API. Scales from notebooks to production clusters. Use for semantic search, RAG applications, or document retrieval. Best for local development and open-source projects.",
+      "enabled": true,
+      "name": "chroma",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "OpenAI's model connecting vision and language. Enables zero-shot image classification, image-text matching, and cross-modal retrieval. Trained on 400M image-text pairs. Use for image search, content moderation, or vision-language tasks without fine-tuning. Best for general-purpose image understanding.",
+      "enabled": true,
+      "name": "clip",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "lm-eval-harness: benchmark LLMs (MMLU, GSM8K, etc.).",
+      "enabled": true,
+      "name": "evaluating-llms-harness",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "W&B: log ML experiments, sweeps, model registry, dashboards.",
+      "enabled": true,
+      "name": "weights-and-biases",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Facebook's library for efficient similarity search and clustering of dense vectors. Supports billions of vectors, GPU acceleration, and various index types (Flat, IVF, HNSW). Use for fast k-NN search, large-scale vector retrieval, or when you need pure similarity search without metadata. Best for high-performance applications.",
+      "enabled": true,
+      "name": "faiss",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Optimizes transformer attention with Flash Attention for 2-4x speedup and 10-20x memory reduction. Use when training/running transformers with long sequences (>512 tokens), encountering GPU memory issues with attention, or need faster inference. Supports PyTorch native SDPA, flash-attn library, H100 FP8, and sliding window attention.",
+      "enabled": true,
+      "name": "optimizing-attention-flash",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Control LLM output with regex and grammars, guarantee valid JSON/XML/code generation, enforce structured formats, and build multi-step workflows with Guidance - Microsoft Research's constrained generation framework",
+      "enabled": true,
+      "name": "guidance",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "HuggingFace hf CLI: search/download/upload models, datasets.",
+      "enabled": true,
+      "name": "huggingface-hub",
+      "provenance": "agent",
+      "usage": 2
+    },
+    {
+      "category": "mlops",
+      "description": "Fast tokenizers optimized for research and production. Rust-based implementation tokenizes 1GB in <20 seconds. Supports BPE, WordPiece, and Unigram algorithms. Train custom vocabularies, track alignments, handle padding/truncation. Integrates seamlessly with transformers. Use when you need high-performance tokenization or custom tokenizer training.",
+      "enabled": true,
+      "name": "huggingface-tokenizers",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "llama.cpp local GGUF inference + HF Hub model discovery.",
+      "enabled": true,
+      "name": "llama-cpp",
+      "provenance": "agent",
+      "usage": 26
+    },
+    {
+      "category": "mlops",
+      "description": "Outlines: structured JSON/regex/Pydantic LLM generation.",
+      "enabled": true,
+      "name": "outlines",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "vLLM: high-throughput LLM serving, OpenAI API, quantization.",
+      "enabled": true,
+      "name": "serving-llms-vllm",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Extract structured data from LLM responses with Pydantic validation, retry failed extractions automatically, parse complex JSON with type safety, and stream partial results with Instructor - battle-tested structured output library",
+      "enabled": true,
+      "name": "instructor",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Reserved and on-demand GPU cloud instances for ML training and inference. Use when you need dedicated GPU instances with simple SSH access, persistent filesystems, or high-performance multi-node clusters for large-scale training.",
+      "enabled": true,
+      "name": "lambda-labs-gpu-cloud",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Large Language and Vision Assistant. Enables visual instruction tuning and image-based conversations. Combines CLIP vision encoder with Vicuna/LLaMA language models. Supports multi-turn image chat, visual question answering, and instruction following. Use for vision-language chatbots or image understanding tasks. Best for conversational image analysis.",
+      "enabled": true,
+      "name": "llava",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Serverless GPU cloud platform for running ML workloads. Use when you need on-demand GPU access without infrastructure management, deploying ML models as APIs, or running batch jobs with automatic scaling.",
+      "enabled": true,
+      "name": "modal-serverless-gpu",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "AudioCraft: MusicGen text-to-music, AudioGen text-to-sound.",
+      "enabled": true,
+      "name": "audiocraft-audio-generation",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "SAM: zero-shot image segmentation via points, boxes, masks.",
+      "enabled": true,
+      "name": "segment-anything-model",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "GPU-accelerated data curation for LLM training. Supports text/image/video/audio. Features fuzzy deduplication (16× faster), quality filtering (30+ heuristics), semantic deduplication, PII redaction, NSFW detection. Scales across GPUs with RAPIDS. Use for preparing high-quality training datasets, cleaning web data, or deduplicating large corpora.",
+      "enabled": true,
+      "name": "nemo-curator",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "OBLITERATUS: abliterate LLM refusals (diff-in-means).",
+      "enabled": true,
+      "name": "obliteratus",
+      "provenance": "hub",
+      "usage": 2
+    },
+    {
+      "category": "mlops",
+      "description": "Parameter-efficient fine-tuning for LLMs using LoRA, QLoRA, and 25+ methods. Use when fine-tuning large models (7B-70B) with limited GPU memory, when you need to train <1% of parameters with minimal accuracy loss, or for multi-adapter serving. HuggingFace's official library integrated with transformers ecosystem.",
+      "enabled": true,
+      "name": "peft-fine-tuning",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Managed vector database for production AI applications. Fully managed, auto-scaling, with hybrid search (dense + sparse), metadata filtering, and namespaces. Low latency (<100ms p95). Use for production RAG, recommendation systems, or semantic search at scale. Best for serverless, managed infrastructure.",
+      "enabled": true,
+      "name": "pinecone",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Expert guidance for Fully Sharded Data Parallel training with PyTorch FSDP - parameter sharding, mixed precision, CPU offloading, FSDP2",
+      "enabled": true,
+      "name": "pytorch-fsdp",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "High-level PyTorch framework with Trainer class, automatic distributed training (DDP/FSDP/DeepSpeed), callbacks system, and minimal boilerplate. Scales from laptop to supercomputer with same code. Use when you want clean training loops with built-in best practices.",
+      "enabled": true,
+      "name": "pytorch-lightning",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "High-performance vector similarity search engine for RAG and semantic search. Use when building production RAG systems requiring fast nearest neighbor search, hybrid search with filtering, or scalable vector storage with Rust-powered performance.",
+      "enabled": true,
+      "name": "qdrant-vector-search",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "DSPy: declarative LM programs, auto-optimize prompts, RAG.",
+      "enabled": true,
+      "name": "dspy",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Provides guidance for training and analyzing Sparse Autoencoders (SAEs) using SAELens to decompose neural network activations into interpretable features. Use when discovering interpretable features, analyzing superposition, or studying monosemantic representations in language models.",
+      "enabled": true,
+      "name": "sparse-autoencoder-training",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Simple Preference Optimization for LLM alignment. Reference-free alternative to DPO with better performance (+6.4 points on AlpacaEval 2.0). No reference model needed, more efficient than DPO. Use for preference alignment when want simpler, faster training than DPO/PPO.",
+      "enabled": true,
+      "name": "simpo-training",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Provides guidance for LLM post-training with RL using slime, a Megatron+SGLang framework. Use when training GLM models, implementing custom data generation workflows, or needing tight Megatron-LM integration for RL scaling.",
+      "enabled": true,
+      "name": "slime-rl-training",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "State-of-the-art text-to-image generation with Stable Diffusion models via HuggingFace Diffusers. Use when generating images from text prompts, performing image-to-image translation, inpainting, or building custom diffusion pipelines.",
+      "enabled": true,
+      "name": "stable-diffusion-image-generation",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Optimizes LLM inference with NVIDIA TensorRT for maximum throughput and lowest latency. Use for production deployment on NVIDIA GPUs (A100/H100), when you need 10-100x faster inference than PyTorch, or for serving models with quantization (FP8/INT4), in-flight batching, and multi-GPU scaling.",
+      "enabled": true,
+      "name": "tensorrt-llm",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Provides PyTorch-native distributed LLM pretraining using torchtitan with 4D parallelism (FSDP2, TP, PP, CP). Use when pretraining Llama 3.1, DeepSeek V3, or custom models at scale from 8 to 512+ GPUs with Float8, torch.compile, and distributed checkpointing.",
+      "enabled": true,
+      "name": "distributed-llm-pretraining-torchtitan",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Axolotl: YAML LLM fine-tuning (LoRA, DPO, GRPO).",
+      "enabled": true,
+      "name": "axolotl",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "TRL: SFT, DPO, PPO, GRPO, reward modeling for LLM RLHF.",
+      "enabled": true,
+      "name": "fine-tuning-with-trl",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "Unsloth: 2-5x faster LoRA/QLoRA fine-tuning, less VRAM.",
+      "enabled": true,
+      "name": "unsloth",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "mlops",
+      "description": "OpenAI's general-purpose speech recognition model. Supports 99 languages, transcription, translation to English, and language identification. Six model sizes from tiny (39M params) to large (1550M params). Use for speech-to-text, podcast transcription, or multilingual audio processing. Best for robust, multilingual ASR.",
+      "enabled": true,
+      "name": "whisper",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "payments",
+      "description": "Pay HTTP 402 APIs via Machine Payments Protocol (MPP).",
+      "enabled": true,
+      "name": "mpp-agent",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "payments",
+      "description": "Agent payments via Stripe Link — cards, SPT, approvals.",
+      "enabled": true,
+      "name": "stripe-link-cli",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "payments",
+      "description": "Provision SaaS services + sync creds via Stripe Projects.",
+      "enabled": true,
+      "name": "stripe-projects",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Box manages cloud files, sharing, search, and metadata.",
+      "enabled": true,
+      "name": "box",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Canvas LMS integration — fetch enrolled courses and assignments using API token authentication.",
+      "enabled": true,
+      "name": "canvas",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Extract cited obligations, deadlines, tasks from documents.",
+      "enabled": true,
+      "name": "document-to-action-items",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Create, read, edit, template, and review Word .docx files.",
+      "enabled": true,
+      "name": "docx",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Publish static sites to {slug}.here.now and store private files in cloud Drives for agent-to-agent handoff.",
+      "enabled": true,
+      "name": "here.now",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Turn meeting notes into cited decisions, owners, tickets.",
+      "enabled": true,
+      "name": "meeting-action-items",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Spaced-repetition flashcard system. Create cards from facts or text, chat with flashcards using free-text answers graded by the agent, generate quizzes from YouTube transcripts, review due cards with adaptive scheduling, and export/import decks as CSV.",
+      "enabled": true,
+      "name": "memento-flashcards",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Edit PDF text/typos/titles via nano-pdf CLI (NL prompts).",
+      "enabled": true,
+      "name": "nano-pdf",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Extract text from PDFs/scans (pymupdf, marker-pdf).",
+      "enabled": true,
+      "name": "ocr-and-documents",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "PDF files: create, read, merge, fill, OCR, edit text.",
+      "enabled": true,
+      "name": "pdf",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Watch product, flight, or listing prices; alert on target.",
+      "enabled": true,
+      "name": "product-price-monitor",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Shop catalog search, checkout, order tracking, returns.",
+      "enabled": true,
+      "name": "shop",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Shopify Admin & Storefront GraphQL APIs via curl. Products, orders, customers, inventory, metafields.",
+      "enabled": true,
+      "name": "shopify",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "SiYuan Note API for searching, reading, creating, and managing blocks and documents in a self-hosted knowledge base via curl.",
+      "enabled": true,
+      "name": "siyuan",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Give Hermes phone capabilities without core tool changes. Provision and persist a Twilio number, send and receive SMS/MMS, make direct calls, and place AI-driven outbound calls through Bland.ai or Vapi.",
+      "enabled": true,
+      "name": "telephony",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Weekly reset: commitments, stalled work, next-week plan.",
+      "enabled": true,
+      "name": "weekly-review-planning",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "productivity",
+      "description": "Create, read, edit Excel .xlsx workbooks and CSVs.",
+      "enabled": true,
+      "name": "xlsx",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": null,
+      "description": "Professional two-layer reporting for voice bridge tasks. Every coding agent task must produce a FULL detailed report plus a final 40-word spoken summary.",
+      "enabled": true,
+      "name": "professional-reporting",
+      "provenance": "agent",
+      "usage": 31
+    },
+    {
+      "category": "research",
+      "description": "Gateway to 400+ bioinformatics skills from bioSkills and ClawBio. Covers genomics, transcriptomics, single-cell, variant calling, pharmacogenomics, metagenomics, structural biology, and more. Fetches domain-specific reference material on demand.",
+      "enabled": true,
+      "name": "bioinformatics",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool.",
+      "enabled": true,
+      "name": "blogwatcher",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Watch named companies for material news; cited digests.",
+      "enabled": true,
+      "name": "competitor-news-monitor",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Evolve prompts/regex/SQL/code with Imbue's evolution loop.",
+      "enabled": true,
+      "name": "darwinian-evolver",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Systematically review multi-document project plan/specification repositories to determine phase status, authority hierarchy, blockers, and next steps without activating implementation.",
+      "enabled": true,
+      "name": "documentation-audit",
+      "provenance": "agent",
+      "usage": 2
+    },
+    {
+      "category": "research",
+      "description": "Passive domain reconnaissance using Python stdlib. Subdomain discovery, SSL certificate inspection, WHOIS lookups, DNS records, domain availability checks, and bulk multi-domain analysis. No API keys required.",
+      "enabled": true,
+      "name": "domain-intel",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Pharmaceutical research assistant for drug discovery workflows. Search bioactive compounds on ChEMBL, calculate drug-likeness (Lipinski Ro5, QED, TPSA, synthetic accessibility), look up drug-drug interactions via OpenFDA, interpret ADMET profiles, and assist with lead optimization. Use for medicinal chemistry questions, molecule property analysis, clinical pharmacology, and open-science drug research.\n",
+      "enabled": true,
+      "name": "drug-discovery",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Free web search via DuckDuckGo — text, news, images, videos. No API key needed. Prefer the `ddgs` CLI when installed; use the Python DDGS library only after verifying that `ddgs` is available in the current runtime.",
+      "enabled": true,
+      "name": "duckduckgo-search",
+      "provenance": "hub",
+      "usage": 2
+    },
+    {
+      "category": "research",
+      "description": "Index a codebase with GitNexus and serve an interactive knowledge graph via web UI + Cloudflare tunnel.",
+      "enabled": true,
+      "name": "gitnexus-explorer",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Ground answers and documents in cited, verifiable sources.",
+      "enabled": true,
+      "name": "grounded-citations",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Public-records OSINT investigation framework — SEC EDGAR filings, USAspending contracts, Senate lobbying, OFAC sanctions, ICIJ offshore leaks, NYC property records (ACRIS), OpenCorporates registries, CourtListener court records, Wayback Machine archives, Wikipedia + Wikidata, GDELT news monitoring. Entity resolution across sources, cross-link analysis, timing correlation, evidence chains. Python stdlib only.",
+      "enabled": true,
+      "name": "osint-investigation",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Optional vendor skill for Parallel CLI — agent-native web search, extraction, deep research, enrichment, FindAll, and monitoring. Prefer JSON output and non-interactive flows.",
+      "enabled": true,
+      "name": "parallel-cli",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Zero-cost web search via the user's logged-in Perplexity Pro browser session (CDP) instead of the paid API. Use for any web/research query to save API money.",
+      "enabled": true,
+      "name": "perplexity-web-search",
+      "provenance": "agent",
+      "usage": 15
+    },
+    {
+      "category": "research",
+      "description": "Query Polymarket: markets, prices, orderbooks, history.",
+      "enabled": true,
+      "name": "polymarket",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Search personal knowledge bases, notes, docs, and meeting transcripts locally using qmd — a hybrid retrieval engine with BM25, vector search, and LLM reranking. Supports CLI and MCP integration.",
+      "enabled": true,
+      "name": "qmd",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Write ML papers for NeurIPS/ICML/ICLR: design→submit.",
+      "enabled": true,
+      "name": "research-paper-writing",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Web scraping with Scrapling - HTTP fetching, stealth browser automation, Cloudflare bypass, and spider crawling via CLI and Python.",
+      "enabled": true,
+      "name": "scrapling",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "research",
+      "description": "Free meta-search via SearXNG — aggregates results from 70+ search engines. Self-hosted or use a public instance. No API key needed. Falls back automatically when the web search toolset is unavailable.",
+      "enabled": true,
+      "name": "searxng-search",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "security",
+      "description": "Set up and use 1Password CLI (op). Use when installing the CLI, enabling desktop app integration, signing in, and reading/injecting secrets for commands.",
+      "enabled": true,
+      "name": "1password",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "security",
+      "description": "Jailbreak LLMs: Parseltongue, GODMODE, ULTRAPLINIAN.",
+      "enabled": true,
+      "name": "godmode",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "security",
+      "description": "Supply chain investigation, evidence recovery, and forensic analysis for GitHub repositories.\nCovers deleted commit recovery, force-push detection, IOC extraction, multi-source evidence\ncollection, hypothesis formation/validation, and structured forensic reporting.\nInspired by RAPTOR's 1800+ line OSS Forensics system.\n",
+      "enabled": true,
+      "name": "oss-forensics",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "security",
+      "description": "OSINT username search across 400+ social networks. Hunt down social media accounts by username.",
+      "enabled": true,
+      "name": "sherlock",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "security",
+      "description": "Authorized web application penetration testing — reconnaissance, vulnerability\nanalysis, proof-based exploitation, and professional reporting. Adapts\nShannon's \"No Exploit, No Report\" methodology with hard guardrails for\nscope, authorization, and aux-client leakage. Active testing against running\napplications you own or have written authorization to test.\n",
+      "enabled": true,
+      "name": "web-pentest",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "smart-home",
+      "description": "Control Philips Hue lights, scenes, rooms via OpenHue CLI.",
+      "enabled": true,
+      "name": "openhue",
+      "provenance": "agent",
+      "usage": 0
+    },
+    {
+      "category": "software-development",
+      "description": "Generate wiki docs + Mermaid diagrams for any codebase.",
+      "enabled": true,
+      "name": "code-wiki",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "software-development",
+      "description": "GitHub via gh CLI: PRs, issues, reviews, repos, auth.",
+      "enabled": true,
+      "name": "github",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "software-development",
+      "description": "Build and query knowledge graphs of codebases with graphify (@sentropic/graphify) — AST extraction, semantic enrichment, DeepSeek integration via fence proxy, MCP/CLI querying.",
+      "enabled": true,
+      "name": "graphify-knowledge-graph",
+      "provenance": "agent",
+      "usage": 15
+    },
+    {
+      "category": "software-development",
+      "description": "Read the live Hermes desktop DOM/CSS over CDP.",
+      "enabled": true,
+      "name": "inspecting-hermes-desktop-dom",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": "software-development",
+      "description": "Plan mode: write an actionable markdown plan to .hermes/plans/, no execution. Bite-sized tasks, exact paths, complete code.",
+      "enabled": true,
+      "name": "plan",
+      "provenance": "agent",
+      "usage": 4
+    },
+    {
+      "category": "software-development",
+      "description": "Debug REST/GraphQL APIs: status codes, auth, schemas, repro.",
+      "enabled": true,
+      "name": "rest-graphql-debug",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "software-development",
+      "description": "Execute plans via delegate_task subagents (2-stage review).",
+      "enabled": true,
+      "name": "subagent-driven-development",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "software-development",
+      "description": "4-phase root cause debugging: understand bugs before fixing.",
+      "enabled": true,
+      "name": "systematic-debugging",
+      "provenance": "bundled",
+      "usage": 8
+    },
+    {
+      "category": "software-development",
+      "description": "TDD: enforce RED-GREEN-REFACTOR, tests before code.",
+      "enabled": true,
+      "name": "test-driven-development",
+      "provenance": "bundled",
+      "usage": 3
+    },
+    {
+      "category": null,
+      "description": "How the voice bridge routes utterances to the right lane (coding vs conversation vs local) without burning the small model. Templates beat LLMs.",
+      "enabled": true,
+      "name": "voice-routing",
+      "provenance": "agent",
+      "usage": 20
+    },
+    {
+      "category": null,
+      "description": "Make VS Code tasks and terminal output survive provider switches and reboots — same durable ledger as voice/openclaw/hermes.",
+      "enabled": true,
+      "name": "vscode-memory",
+      "provenance": "agent",
+      "usage": 5
+    },
+    {
+      "category": "web-development",
+      "description": "Embed alibaba/page-agent into your own web application — a pure-JavaScript in-page GUI agent that ships as a single <script> tag or npm package and lets end-users of your site drive the UI with natural language (\"click login, fill username as John\"). No Python, no headless browser, no extension required. Use this skill when the user is a web developer who wants to add an AI copilot to their SaaS / admin panel / B2B tool, make a legacy web app accessible via natural language, or evaluate page-agent against a local (Ollama) or cloud (Qwen / OpenAI / OpenRouter) LLM. NOT for server-side browser automation — point those users to Hermes' built-in browser tool instead.",
+      "enabled": true,
+      "name": "page-agent",
+      "provenance": "hub",
+      "usage": 0
+    },
+    {
+      "category": "web",
+      "description": "Use when a fetch fails: 403/429, paywall, WAF, bot wall.",
+      "enabled": true,
+      "name": "blocked-page-recovery",
+      "provenance": "bundled",
+      "usage": 0
+    },
+    {
+      "category": null,
+      "description": "Yuanbao (元宝) groups: @mention users, query info/members.",
+      "enabled": true,
+      "name": "yuanbao",
+      "provenance": "agent",
+      "usage": 0
+    }
+  ],
+  "source": "live Hermes dashboard handlers GET /api/tools/toolsets + GET /api/skills (hermes-agent 0.21.3, code_sha db39ee3f)",
+  "toolsets": [
+    {
+      "available": true,
+      "configured": true,
+      "description": "web_search, web_extract",
+      "enabled": true,
+      "label": "Web Search & Scraping",
+      "name": "web",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "web_extract",
+        "web_search"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "navigate, click, type, scroll",
+      "enabled": true,
+      "label": "Browser Automation",
+      "name": "browser",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "browser_back",
+        "browser_cdp",
+        "browser_click",
+        "browser_console",
+        "browser_dialog",
+        "browser_exec",
+        "browser_get_images",
+        "browser_navigate",
+        "browser_press",
+        "browser_scroll",
+        "browser_snapshot",
+        "browser_type",
+        "browser_vault_enter_code",
+        "browser_vault_fill",
+        "browser_vault_list",
+        "browser_vault_save_login",
+        "browser_vault_unlock",
+        "browser_vision"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "terminal, process",
+      "enabled": true,
+      "label": "Terminal & Processes",
+      "name": "terminal",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "process_manage",
+        "terminal"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "read, write, patch, search",
+      "enabled": true,
+      "label": "File Operations",
+      "name": "file",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "patch",
+        "read_file",
+        "search_files",
+        "write_file"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "execute_code",
+      "enabled": true,
+      "label": "Code Execution",
+      "name": "code_execution",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "execute_code"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "vision_analyze",
+      "enabled": true,
+      "label": "Vision / Image Analysis",
+      "name": "vision",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "vision_analyze"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "video_analyze (requires video-capable model)",
+      "enabled": true,
+      "label": "Video Analysis",
+      "name": "video",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "video_analyze"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "image_generate",
+      "enabled": true,
+      "label": "Image Generation",
+      "name": "image_gen",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "image_generate"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "video_generate (text/image/reference)",
+      "enabled": true,
+      "label": "Video Generation",
+      "name": "video_gen",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "video_generate",
+        "xai_video_edit",
+        "xai_video_extend"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "x_search (requires xAI OAuth or XAI_API_KEY)",
+      "enabled": true,
+      "label": "X (Twitter) Search",
+      "name": "x_search",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "x_search"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "text_to_speech",
+      "enabled": true,
+      "label": "Text-to-Speech",
+      "name": "tts",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "text_to_speech"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "voice transcription (gateway voice messages + voice mode)",
+      "enabled": true,
+      "label": "Speech-to-Text",
+      "name": "stt",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": []
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "list, view, manage",
+      "enabled": true,
+      "label": "Skills",
+      "name": "skills",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "skill_manage",
+        "skill_view",
+        "skills_list"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "todo_list",
+      "enabled": true,
+      "label": "Task Planning",
+      "name": "todo",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "todo_list"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "opt-in task board tools for this platform",
+      "enabled": true,
+      "label": "Kanban",
+      "name": "kanban",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "kanban_attach",
+        "kanban_attach_url",
+        "kanban_attachments",
+        "kanban_block",
+        "kanban_comment",
+        "kanban_complete",
+        "kanban_create",
+        "kanban_heartbeat",
+        "kanban_link",
+        "kanban_list",
+        "kanban_request_changes",
+        "kanban_request_review",
+        "kanban_show",
+        "kanban_unblock"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "persistent memory across sessions",
+      "enabled": true,
+      "label": "Memory",
+      "name": "memory",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "memory"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "runtime tools from the active context engine",
+      "enabled": true,
+      "label": "Context Engine",
+      "name": "context_engine",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": []
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "search past conversations",
+      "enabled": true,
+      "label": "Session Search",
+      "name": "session_search",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "session_search"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "remote connector tools and account authorization",
+      "enabled": true,
+      "label": "Connections",
+      "name": "connections",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "manage_connections"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "clarify",
+      "enabled": true,
+      "label": "Clarifying Questions",
+      "name": "clarify",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "clarify"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "delegate_task",
+      "enabled": true,
+      "label": "Task Delegation",
+      "name": "delegation",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "delegate_task"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "create/list/update/pause/resume/run, with optional attached skills",
+      "enabled": true,
+      "label": "Cron Jobs",
+      "name": "cronjob",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "cronjob_manage"
+      ]
+    },
+    {
+      "available": true,
+      "configured": false,
+      "description": "smart home device control",
+      "enabled": true,
+      "label": "Home Assistant",
+      "name": "homeassistant",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "ha_call_service",
+        "ha_get_state",
+        "ha_list_entities",
+        "ha_list_services"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "playback, search, playlists, library",
+      "enabled": true,
+      "label": "Spotify",
+      "name": "spotify",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "spotify_albums",
+        "spotify_devices",
+        "spotify_library",
+        "spotify_playback",
+        "spotify_playlists",
+        "spotify_queue",
+        "spotify_search"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "fetch messages, search members, create thread",
+      "enabled": true,
+      "label": "Discord (read/participate)",
+      "name": "discord",
+      "platform": "discord",
+      "platform_label": "Discord",
+      "tools": [
+        "discord"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "list channels/roles, pin, assign roles",
+      "enabled": true,
+      "label": "Discord Server Admin",
+      "name": "discord_admin",
+      "platform": "discord",
+      "platform_label": "Discord",
+      "tools": [
+        "discord_admin"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "group info, member queries, DM",
+      "enabled": true,
+      "label": "Yuanbao",
+      "name": "yuanbao",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "yb_query_group_info",
+        "yb_query_group_members",
+        "yb_search_sticker",
+        "yb_send_dm",
+        "yb_send_sticker"
+      ]
+    },
+    {
+      "available": true,
+      "configured": true,
+      "description": "background desktop control via cua-driver",
+      "enabled": true,
+      "label": "Computer Use (macOS/Windows/Linux)",
+      "name": "computer_use",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "computer_use"
+      ]
+    },
+    {
+      "available": false,
+      "configured": true,
+      "description": "A2A (Agent-to-Agent) protocol v1.0 support for Hermes Agent — both directions of the open Linux Foundation standard for inter-agent communication.\nOUTBOUND (client tools): a2a_discover, a2a_call, a2a_list, a2a_history, and a2a_orchestrate let the agent fetch another agent's Agent Card and send it tasks over JSON-RPC — works with any A2A-compliant peer (Hermes, LangChain, CrewAI, Google ADK, OpenClaw, ...).\nINBOUND (platform adapter): exposes Hermes as an A2A-discoverable agent. An Agent Card is served at /.well-known/agent-card.json (v1.0 canonical path; legacy agent.json also answers) and incoming tasks are routed into the agent's live gateway session like any other platform — so the agent that replies is the same one talking to its user, with full memory and context, not a throwaway clone.\nSecurity is on by default: no bearer token configured => localhost-only bind. Inbound task text passes through prompt-injection filters; outbound text is scrubbed of credential-shaped strings; every exchange is audit-logged and persisted to disk outside the context-compaction pipeline so conversations survive compaction and restarts.\nPure stdlib transport (http.server + urllib) — no a2a-sdk dependency required.\n",
+      "enabled": false,
+      "label": "A2A",
+      "name": "a2a",
+      "platform": "cli",
+      "platform_label": "CLI",
+      "tools": [
+        "a2a_call",
+        "a2a_discover",
+        "a2a_history",
+        "a2a_list",
+        "a2a_orchestrate"
+      ]
+    }
+  ]
+}

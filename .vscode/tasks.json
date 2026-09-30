@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "taskTitle",
+      "type": "promptString",
+      "description": "Report title (task)",
+      "default": "Task"
+    },
+    {
+      "id": "summary",
+      "type": "promptString",
+      "description": "40-word spoken summary (last paragraph)",
+      "default": "Completed the task, files changed, next step."
+    },
+    {
+      "id": "files",
+      "type": "promptString",
+      "description": "Files (path:Change:desc; ...)",
+      "default": ""
+    },
+    {
+      "id": "verify",
+      "type": "promptString",
+      "description": "Verification (e.g. pytest 12 passed)",
+      "default": ""
+    }
+  ],
+  "tasks": [
+    {
+      "label": "report: generate professional report",
+      "type": "shell",
+      "command": "python ~/Projects/Repos/openclaw-voice-bridge/scripts/generate_report.py --task \"${input:taskTitle}\" --summary \"${input:summary}\" --files \"${input:files}\" --verify \"${input:verify}\" --project \"${workspaceFolder}\"",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    }
+  ]
+}

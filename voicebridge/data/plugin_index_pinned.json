@@ -1,0 +1,128 @@
+{
+  "schema": "qubit-pinned-plugin-index/1",
+  "curated": true,
+  "pinned": true,
+  "source": "qubit_runtime/qubit_cli/data/plugin_index.json",
+  "source_schema_version": 1,
+  "source_generated_at": "2026-08-12T00:00:00Z",
+  "curation": "Qubit-curated subset of the upstream pinned plugin index. Every entry is a real remote plugin source pinned to a full 40-character commit SHA; no entry is fabricated. The upstream identity (name/repo/ref/author) is preserved verbatim in the vendored source index; the real third-party repository URL is retained on each entry and presented as third-party, never rewritten to a fabricated Qubit URL.",
+  "install_policy": "curated-and-pinned; raw unvetted remote fetch stays refused. An entry install is confirm/audit/e-stop gated and operator-verified at the pinned ref before any repository is fetched.",
+  "license_note": "Licenses are not carried by the source index and are not fetched with it; `license` is `unverified` until an operator verifies the license at the pinned commit before install.",
+  "entries": [
+    {
+      "name": "hermes-media-studio",
+      "label": "Media Studio",
+      "description": "Media Studio - generative media workspace plugin for Qubit Desktop (fal + Krea, durable job queue, library).",
+      "repo": "https://github.com/NousResearch/hermes-media-studio",
+      "subdir": "",
+      "pinned_ref": "e8d59971d2b7901405b39dac7b03bdd616272d0d",
+      "homepage": "https://github.com/NousResearch/hermes-media-studio",
+      "maintainer": "third-party (upstream)",
+      "license": "unverified",
+      "tier": "official",
+      "category": "desktop",
+      "capabilities": ["tools", "dashboard"],
+      "api_version": 1,
+      "tags": ["media", "image-gen", "video-gen", "dashboard", "desktop"],
+      "provenance": {
+        "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
+        "source_ref": "e8d59971d2b7901405b39dac7b03bdd616272d0d",
+        "source_author": "third-party (upstream)",
+        "curation": "curated+pinned",
+        "license_note": "unverified; verify at the pinned ref before install"
+      }
+    },
+    {
+      "name": "hermes-telegram-business",
+      "label": "Telegram Business",
+      "description": "Observe-with-approval Telegram Business Mode (secretary bot) plugin - every drafted reply requires owner approval before it reaches the customer.",
+      "repo": "https://github.com/NousResearch/hermes-telegram-business",
+      "subdir": "",
+      "pinned_ref": "e905f3bc5eeaa5a9dab9bc5155601b3ebec75757",
+      "homepage": "https://github.com/NousResearch/hermes-telegram-business",
+      "maintainer": "third-party (upstream)",
+      "license": "unverified",
+      "tier": "official",
+      "category": "platform",
+      "capabilities": ["platform"],
+      "api_version": 1,
+      "tags": ["telegram", "gateway", "approvals", "messaging"],
+      "provenance": {
+        "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
+        "source_ref": "e905f3bc5eeaa5a9dab9bc5155601b3ebec75757",
+        "source_author": "third-party (upstream)",
+        "curation": "curated+pinned",
+        "license_note": "unverified; verify at the pinned ref before install"
+      }
+    },
+    {
+      "name": "plugin-llm-example",
+      "label": "LLM Example",
+      "description": "Reference plugin showing host-owned structured LLM access via ctx.llm.complete_structured(). Registers a /receipt-extract slash command.",
+      "repo": "https://github.com/NousResearch/hermes-example-plugins",
+      "subdir": "plugin-llm-example",
+      "pinned_ref": "38fe0fb53eff98d477f807432e965429e665ca33",
+      "homepage": "https://github.com/NousResearch/hermes-example-plugins/tree/main/plugin-llm-example",
+      "maintainer": "third-party (upstream)",
+      "license": "unverified",
+      "tier": "official",
+      "category": "tools",
+      "capabilities": ["commands", "llm"],
+      "api_version": 1,
+      "tags": ["example", "llm", "reference", "slash-command"],
+      "provenance": {
+        "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
+        "source_ref": "38fe0fb53eff98d477f807432e965429e665ca33",
+        "source_author": "third-party (upstream)",
+        "curation": "curated+pinned",
+        "license_note": "unverified; verify at the pinned ref before install"
+      }
+    },
+    {
+      "name": "plugin-llm-async-example",
+      "label": "LLM Async Example",
+      "description": "Reference plugin demonstrating async host-owned LLM access from plugin code - the asyncio counterpart to plugin-llm-example.",
+      "repo": "https://github.com/NousResearch/hermes-example-plugins",
+      "subdir": "plugin-llm-async-example",
+      "pinned_ref": "38fe0fb53eff98d477f807432e965429e665ca33",
+      "homepage": "https://github.com/NousResearch/hermes-example-plugins/tree/main/plugin-llm-async-example",
+      "maintainer": "third-party (upstream)",
+      "license": "unverified",
+      "tier": "official",
+      "category": "tools",
+      "capabilities": ["commands", "llm"],
+      "api_version": 1,
+      "tags": ["example", "llm", "async", "reference"],
+      "provenance": {
+        "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
+        "source_ref": "38fe0fb53eff98d477f807432e965429e665ca33",
+        "source_author": "third-party (upstream)",
+        "curation": "curated+pinned",
+        "license_note": "unverified; verify at the pinned ref before install"
+      }
+    },
+    {
+      "name": "hermes-plugin-chrome-profiles",
+      "label": "Chrome Profiles",
+      "description": "Switch Qubit browser tools between Chrome profiles via CDP.",
+      "repo": "https://github.com/anpicasso/hermes-plugin-chrome-profiles",
+      "subdir": "",
+      "pinned_ref": "5b9c3257b464c0f926d4355149a8aed9c8f307b4",
+      "homepage": "https://github.com/anpicasso/hermes-plugin-chrome-profiles",
+      "maintainer": "anpicasso",
+      "license": "unverified",
+      "tier": "community",
+      "category": "web",
+      "capabilities": ["tools"],
+      "api_version": 1,
+      "tags": ["browser", "chrome", "cdp", "tools"],
+      "provenance": {
+        "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
+        "source_ref": "5b9c3257b464c0f926d4355149a8aed9c8f307b4",
+        "source_author": "anpicasso",
+        "curation": "curated+pinned",
+        "license_note": "unverified; verify at the pinned ref before install"
+      }
+    }
+  ]
+}

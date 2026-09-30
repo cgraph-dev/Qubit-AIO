@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "fixture_id": "cli.argument_parser.help_canonical_command",
+  "family": "cli",
+  "command": {
+    "argv": [
+      "voicebridge",
+      "--help"
+    ],
+    "stdin": null,
+    "env": {}
+  },
+  "request": null,
+  "normalizers": [
+    "product_branding"
+  ],
+  "expected": {
+    "exit_code": 0,
+    "help_contains": [
+      "voicebridge"
+    ]
+  },
+  "qubit": {
+    "path": "voicebridge/cli.py:256",
+    "caller": "build_parser",
+    "approval": null
+  },
+  "hermes": {
+    "path": "qubit_cli/_parser.py:280",
+    "symbol": "build_top_level_parser",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/cli/argv.ts:32",
+    "symbol": "isHelpOrVersionInvocation",
+    "mapping_status": "VERIFIED"
+  },
+  "references": {
+    "hermes": {
+      "kind": "cli",
+      "argv": [
+        "hermes",
+        "--help"
+      ],
+      "env": {},
+      "equivalent_kind": "exact_equivalent",
+      "expectation": "PASS",
+      "notes": "Root help lists the canonical command tree and exits 0.",
+      "pinned_commit": "2237be355906fbe6065ce1815711eee52b2d646e"
+    },
+    "openclaw": {
+      "kind": "cli",
+      "argv": [
+        "openclaw",
+        "--help"
+      ],
+      "env": {},
+      "equivalent_kind": "exact_equivalent",
+      "expectation": "PASS",
+      "notes": "Root help lists the canonical command tree and exits 0.",
+      "pinned_commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
+    }
+  },
+  "disposition": "PASS",
+  "notes": "P0 cli.argument_parser.help_canonical_command: run `voicebridge --help`; argparse exits 0 and stdout carries the canonical Qubit command marker 'voicebridge' (check_help_text / CANONICAL_QUBIT_COMMAND). Separate branding normalizer only. Real pinned reference invocations confirmed by refruntimes/REFERENCE_RUNTIMES.json: `hermes --help` (rc 0; pinned 2237be3, entrypoint `hermes` = qubit_cli.main:main, parser qubit_cli/_parser.py:280) and `openclaw --help` (rc 0; pinned 3a9d69d, entrypoint src/openclaw.mjs, src/cli/argv.ts:32). Hermes's pinned wrapper `--version` prints `Hermes Agent v0.21.1 (2026.9.7) \u00b7 upstream <varies> \u00b7 local 2237be35 (+1 carried commit)`, so the hermes reference resolves pinned automatically from `--version` (local 2237be35 is a prefix of the contractual pin); openclaw --version prints '(3a9d69d)' and also resolves pinned automatically. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/_parser.py:280 (build_top_level_parser); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/cli/argv.ts:32 (isHelpOrVersionInvocation). Side-effect-free reference invocation(s) declared and pinnable: `hermes --help` (2237be355906fbe6065ce1815711eee52b2d646e, exact_equivalent); `openclaw --help` (3a9d69db306cd7f081e06254cb89c4bcc14a7107, exact_equivalent). The declared `hermes` reference is pinned: the pinned wrapper's probed `--version` prints `Hermes Agent v0.21.1 (2026.9.7) \u00b7 upstream <varies> \u00b7 local 2237be35 (+1 carried commit)`, and the `2237be35` token is a prefix of the contractual pin 2237be355906fbe6065ce1815711eee52b2d646e, so the runner's `_reference_is_pinned` resolves pinned=true from `--version` alone. No `pinned=false` override is declared and this fixture claims PASS. The pinned openclaw reference(s) (3a9d69db306cd7f081e06254cb89c4bcc14a7107) remain byte-comparable where declared.",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "argv": [
+        "voicebridge",
+        "--help"
+      ]
+    },
+    "broker_policy_decision": null,
+    "runtime_provider": null,
+    "store_state_assertion": null,
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "store_state_assertion": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    },
+    "test_ids": [
+      "tests/test_differential_parity8u.py::test_help_text_asserts_canonical_qubit_command"
+    ]
+  },
+  "test_ids": [
+    "tests/test_differential_parity8u.py::test_help_text_asserts_canonical_qubit_command"
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "fixture_id": "dashboard.control.run_op",
+  "family": "dashboard",
+  "read_only": true,
+  "command": null,
+  "request": {
+    "kind": null,
+    "method": "POST",
+    "path": "/agent/api/ops/run",
+    "headers": {},
+    "body": {
+      "id": "product_status",
+      "args": {}
+    },
+    "event": null,
+    "argv": []
+  },
+  "transport": "http",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "normalizers": [
+    "timestamp",
+    "uuid",
+    "session_token",
+    "generated_hash",
+    "product_branding"
+  ],
+  "expected": {
+    "http_status": 200,
+    "json_schema": {
+      "ok": true
+    }
+  },
+  "qubit": {
+    "path": "voicebridge/dashboard_ops.py:609",
+    "caller": "run_op",
+    "approval": null
+  },
+  "hermes": {
+    "path": "qubit_cli/web_routers/actions.py:342",
+    "symbol": "get_action_status",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods.ts:223",
+    "symbol": "createRequestGatewayMethodRegistry",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "Dashboard control contract. VISUAL family: a control must reach a canonical dashboard_ops operation (run_op/confirm_op/cancel_op), not merely render. The real transport is POST /agent/api/ops/run with a catalogue op id; the pinned read-only op used here is product_status. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/actions.py:342 (get_action_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods.ts:223 (createRequestGatewayMethodRegistry). No reference declared: the pinned side-effect-free upstream surface here is only a nearest/non-equivalent read-only analogue (or a transport-shaped contract a CLI reference cannot satisfy); a nearest-surface-only match must never be counted as PASS.",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": "/agent/api/ops/run",
+    "dashboard_control": "product_status",
+    "request_schema": {
+      "method": "POST",
+      "path": "/agent/api/ops/run",
+      "body": {
+        "id": "product_status",
+        "args": "object"
+      }
+    },
+    "broker_policy_decision": "run_op dispatch through the shared dashboard_ops registry; sensitive ops require the shared approval journal and are e-stop aware",
+    "runtime_provider": null,
+    "store_state_assertion": null,
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": {
+      "content-type": "application/json"
+    },
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "store_state_assertion": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface"
+    },
+    "screenshot_ref": {
+      "kind": "screenshot",
+      "ref": "evidence:dashboard.control.run_op/screenshot.png"
+    },
+    "dom_snapshot_ref": {
+      "kind": "dom",
+      "ref": "evidence:dashboard.control.run_op/dom.html"
+    },
+    "a11y_snapshot_ref": {
+      "kind": "a11y",
+      "ref": "evidence:dashboard.control.run_op/a11y.json"
+    }
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "Requires QUBIT_DIFFERENTIAL_QUBIT_TOKEN and a live instance. The op id 'status.read' is not a catalogue op; use product_status / runtime_status / browser_status via POST /agent/api/ops/run (qubit_compat.py:4474 h_ops_run -> dashboard_ops.py:609 run_op)."
+}

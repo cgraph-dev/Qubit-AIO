@@ -1,0 +1,61 @@
+{
+ "schema": "qubit-hermes-rebase/1",
+ "generated": "2026-09-25",
+ "target_pin": "69948c005791d4d0e51670ca015238c2c7663749",
+ "target_version": "v2026.9.24-2096 (v0.21.5+2053-class)",
+ "previous_pin": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
+ "limitation": "GitHub unreachable at pin time; source of record is the read-only reference install ~/.hermes/hermes-agent",
+ "engine": {
+  "rebrand_content_files_changed": 5011,
+  "rebrand_paths_renamed": 44,
+  "debrand_files_changed": 2035,
+  "tokens_added": [
+   "hermes_state_health->qubit_state_health",
+   "hermes_yaml->qubit_yaml"
+  ],
+  "determinism": "verified byte-identical x2 (idempotent)"
+ },
+ "candidate_files": 16074,
+ "vs_current": {
+  "byte_identical": 5896,
+  "differing": 7109,
+  "only_in_candidate": 3069,
+  "only_in_current": 1441,
+  "differing_by_top_dir": {
+   "tests": 2605,
+   "apps": 1681,
+   "website": 771,
+   "qubit_cli": 394,
+   "tools": 252,
+   "agent": 211,
+   "ui-tui": 200,
+   "plugins": 153,
+   "gateway": 125,
+   "optional-skills": 111
+  },
+  "only_in_candidate_by_top_dir": {
+   "tests": 1828,
+   "apps": 487,
+   "ui-tui": 183,
+   "scripts": 113,
+   "contributors": 84,
+   "plugin-catalog": 71,
+   "qubit_cli": 65,
+   "pm": 53
+  },
+  "only_in_current_by_top_dir": {
+   "tests": 911,
+   "ui-tui": 176,
+   "apps": 128,
+   "website": 52,
+   "skills": 32,
+   "optional-skills": 26,
+   "scripts": 25,
+   "docs": 23,
+   "plugins": 17,
+   "web": 10
+  }
+ },
+ "candidate_path": "/tmp/qubit-rebase-20260925-085919/root/qubit_runtime",
+ "note": "Not merged/applied/verified. Single-writer freeze + 3-way merge required."
+}

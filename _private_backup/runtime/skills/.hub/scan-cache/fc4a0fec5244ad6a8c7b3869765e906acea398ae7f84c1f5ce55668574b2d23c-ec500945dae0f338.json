@@ -1,0 +1,25 @@
+{
+  "bundle_hash": "sha256:fc4a0fec5244ad6a8c7b3869765e906acea398ae7f84c1f5ce55668574b2d23c",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/research/searxng-search",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 143,
+      "match": "pip install searxng",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:51:06.049570+00:00",
+  "summary": "searxng-search: safe \u2014 1 finding(s) in supply_chain",
+  "fresh": true
+}

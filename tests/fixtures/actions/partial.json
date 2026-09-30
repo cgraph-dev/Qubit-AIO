@@ -1,0 +1,11 @@
+{
+  "_comment": "Packet 8F synthetic PARTIAL adapter outcomes (simulation only). Used to prove typed partial-execution states without live services.",
+  "act.browser.write": {
+    "state": "partial",
+    "detail": "edit applied to 2 of 3 fields before timeout; no data lost"
+  },
+  "act.mail.send": {
+    "state": "partial",
+    "detail": "message accepted but delivery confirmation unavailable"
+  }
+}

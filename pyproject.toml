@@ -1,0 +1,501 @@
+[project]
+name = "qubit-voicebridge"
+version = "1.0.0"
+description = "Qubit Agent (Qubit VoiceBridge) — local push-to-talk voice agent: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 5 GB VRAM budget."
+readme = "README.md"
+# The project's own LICENSE is the Qubit VoiceBridge Educational Project
+# License: it applies ONLY to original Qubit material (see the root LICENSE
+# file and docs/LICENSING.md). Third-party/upstream-derived material remains
+# under its original license and is recorded in THIRD_PARTY_NOTICES.md and
+# docs/UPSTREAM_REUSE.md. The repository as a whole is not an OSI-approved
+# open-source project.
+license = { text = "Qubit VoiceBridge Educational Project License — Copyright © 2026 Qubit by Tricky; applies only to original Qubit material. Third-party/upstream-derived material remains under its original license; see LICENSE, docs/LICENSING.md, and THIRD_PARTY_NOTICES.md." }
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+# Python floor is 3.12, not 3.11: the product uses PEP 701 f-strings (e.g.
+# voicebridge/local_llm.py) and scripts/install.sh creates the venv with
+# `uv venv --python 3.12`. Declaring 3.11 let pip/uv build a 3.11 environment
+# where `qubit run` dies at import with SyntaxError; the metadata now matches
+# the interpreter the product actually supports and installs.
+requires-python = ">=3.12"
+dependencies = [
+    "sherpa-onnx>=1.13",      # Moonshine ASR + Silero VAD + eres2net voice-ID + Kokoro
+    "sounddevice>=0.4",       # mic capture + playback (PortAudio)
+    "numpy>=1.24",            # 2.5-safe audio handled by voicebridge/audio/sndcompat.py
+                              # (sounddevice 0.5.6 uses the deprecated in-place shape set)
+    "cloudpickle>=3.0",       # serialize broker callable-tool closures for forkserver isolation
+    "pyyaml>=6",
+    "piper-tts>=1.2",         # default TTS
+    "faster-whisper>=1.1,<2",  # ASR fallback (asr.provider: whisper) + accurate local STT (voice_edit)
+    "webrtcvad>=2.0.10",      # optional VAD fallback (vad.backend: webrtc)
+    # webrtcvad imports the legacy pkg_resources API at import time. The
+    # default VAD backend is silero, but when the silero model is absent (a
+    # stock install before model download) voicebridge/audio/vad.py falls back
+    # to webrtcvad, so the runtime import would fail with ModuleNotFoundError:
+    # pkg_resources. scripts/install.sh already installs setuptools<81 for
+    # exactly this reason; declare it here so every install path (pip/uv/wheel,
+    # not just the repo installer) gets a working runtime.
+    "setuptools<81",
+    "onnx>=1.14",             # Parakeet ONNX metadata patcher (scripts/install.sh) + guarded sherpa fallback
+    "playwright>=1.49",       # browser inbox reader (Gmail/IG/FB/TikTok via persistent profiles)
+
+    # --- Qubit-owned runtime (vendored fork in qubit_runtime/) ----------------
+    # The product's agent loop/CLI/dashboard execute from the vendored fork
+    # (docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md). These are the
+    # pinned upstream core dependencies (qubit_runtime/pyproject.toml), declared
+    # here so a clean install runs the runtime with no external upstream install.
+    "openai==2.24.0",
+    "certifi==2026.5.20",
+    "python-dotenv==1.2.2",
+    "fire==0.7.1",
+    "httpx[socks]==0.28.1",
+    "rich==14.3.3",
+    "tenacity==9.1.4",
+    "ruamel.yaml==0.18.17",
+    "requests==2.33.0",
+    "jinja2==3.1.6",
+    "firecrawl-anydoc==0.2.4",
+    "pydantic==2.13.4",
+    "prompt_toolkit==3.0.52",
+    "croniter==6.0.0",
+    "snowballstemmer==3.1.1",
+    "packaging==26.0",
+    "Markdown==3.10.2",
+    "PyJWT[crypto]==2.13.0",
+    "urllib3>=2.7.0,<3",
+    "cryptography==50.0.0",
+    "psutil==7.2.2",
+    "pathspec==1.1.1",
+    "fastapi>=0.104.0,<1",
+    "uvicorn[standard]>=0.31.0,<1",
+    "python-multipart>=0.0.9,<1",
+    "ptyprocess>=0.7.0,<1; sys_platform != 'win32'",
+    "Pillow==12.3.0",
+    "websockets==15.0.1",
+]
+
+[project.optional-dependencies]
+hotkey = ["pynput>=1.7"]
+edge = ["edge-tts>=6"]
+kokoro = []                   # Kokoro TTS ships inside sherpa-onnx; model download only
+test = ["pytest>=8"]
+# ACP (Agent Client Protocol) server backend — mirrors the vendored
+# qubit-agent ``acp`` extra. The adapter is packaged in the runtime subset
+# (see force-include); the SDK only installs on demand.
+acp = ["agent-client-protocol==0.9.0"]
+# OPTIONAL GPU acceleration for the accurate local STT path
+# (voicebridge/voice_edit/asr_accurate.py preloads these via
+# voicebridge/asr/gpu.py::ensure_cuda_libraries before ctranslate2 imports).
+# NOT a core dependency: CPU-only installs work without this extra — the
+# accurate decoder stays on CPU and reports a typed fallback reason if a
+# library is missing. GPU here is best-effort. Install with: ``pip install
+# "qubit-voicebridge[accel]"``. Bounded on the cu12 line (<13).
+accel = [
+    "nvidia-cublas-cu12>=12.4,<13",
+    "nvidia-cudnn-cu12>=9,<13",
+    "nvidia-cuda-runtime-cu12>=12.4,<13",
+    "nvidia-cufft-cu12>=11.2,<13",
+    "nvidia-curand-cu12>=10.3,<13",
+    "nvidia-cuda-nvrtc-cu12>=12.4,<13",
+    "nvidia-nvjitlink-cu12>=12.4,<13",
+]
+
+[project.scripts]
+# Canonical public launcher: `qubit` (all user docs reference this name).
+# `voicebridge` remains only as a compatibility alias (same parser/backend).
+qubit = "voicebridge.cli:main"
+voicebridge = "voicebridge.cli:main"
+qubit-dev = "voicebridge.terminal:main"
+# Direct launcher for the vendored Qubit-owned runtime (same backend the
+# `qubit agent …` subcommand and the dashboard dispatch to).
+qubit-agent = "voicebridge.qubit_runtime:entry"
+# ACP server launcher — the real vendored entry, shipped under the runtime
+# subset (`qubit_runtime/acp_adapter/`). The adapter imports top-level runtime
+# modules, so `qubit agent acp` (which bootstraps the runtime root via
+# `voicebridge.qubit_runtime.ensure_path()`) is the canonical path; this script
+# mirrors the vendored qubit-agent `qubit-acp` entry.
+qubit-acp = "acp_adapter.entry:main"
+# Global desktop voice typing / selected-text editing helper (opt-in; disabled
+# by default via the `voice_edit` feature flag).
+qubit-voice-typing = "voicebridge.desktop_helper:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["voicebridge"]
+# The built Qubit dashboard (frontend/qubit-dist) is generated from
+# frontend/qubit-web with `npm run build` (see frontend/qubit-app/
+# README.md and scripts/build_dashboard.sh). It is a build artifact, so it
+# is listed under `artifacts` (hatchling only ships VCS-ignored paths when
+# they are declared here) — a clean wheel install then serves the real
+# dashboard without any checkout or untracked file.
+#
+# Reproducibility (Wave 5): a clean git clone does NOT contain
+# frontend/qubit-dist (it is git-ignored), so a wheel/sdist built from a bare
+# clone is dashboard-less. scripts/install.sh and scripts/clean_install_check.sh
+# therefore build it deterministically when node/npm are available and fail
+# with a TYPED degradation otherwise; scripts/release_qualify.py rejects a
+# dashboard-less artifact. The release sdist (built from a tree that already
+# carries frontend/qubit-dist) ships the bundle, so downstream wheel rebuilds
+# need no npm. See docs/CLEAN_CLONE_AUDIT_WAVE5.md.
+artifacts = ["frontend/qubit-dist"]
+
+# The wheel force-includes the frontend tree for the packaged dashboard.
+# Hatchling `exclude` does not filter `force-include`, so a custom build hook
+# (scripts/hatch_build_qubit.py) stages `frontend/` as a filtered per-file
+# mapping. A dirty working-tree build must never embed node_modules (git-ignored
+# but walked by `force-include`) or its placeholder user-home paths into the wheel.
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "scripts/hatch_build_qubit.py"
+
+# Ship the runtime resources inside the wheel so a clean install (no checkout)
+# can resolve the dashboard frontend, config examples, prompt dialogs, task
+# templates, report templates, and systemd units (Packet 8K). voicebridge/
+# resources.py resolves package data first, then the checkout path when run
+# from a repository. No files are duplicated in the repo.
+[tool.hatch.build.targets.wheel.force-include]
+# NOTE: the ``frontend`` tree is force-included by the custom build hook
+# (scripts/hatch_build_qubit.py) as a filtered per-file mapping, because a raw
+# directory mapping would sweep the git-ignored node_modules tree into the wheel.
+"templates" = "voicebridge/_data/templates"
+"config/dialogs.md" = "voicebridge/_data/config/dialogs.md"
+# ship the PORTABLE example as the installed default; the developer's personal
+# task-templates.yaml is never shipped (Packet 8K private-state rule).
+"config/task-templates.example.yaml" = "voicebridge/_data/config/task-templates.yaml"
+"config/local-actions.example.yaml" = "voicebridge/_data/config/local-actions.example.yaml"
+"config/release-signer.example.fingerprint" = "voicebridge/_data/config/release-signer.example.fingerprint"
+"config/voice.example.yaml" = "voicebridge/_data/config/voice.example.yaml"
+# curated user guide for the dashboard /docs page (no secrets, no
+# machine-specific paths; secret-scanned like the rest of the tree).
+# The docs reorg (2026-09-21) moved the source docs under
+# docs/archive/2026-09-21/; the installed resource names/destinations are
+# unchanged so voicebridge/resources.py and install-time readers keep working.
+"docs/archive/2026-09-21/HowTo.md" = "voicebridge/_data/docs/HowTo.md"
+"docs/archive/2026-09-21/AUDIO_SETUP.md" = "voicebridge/_data/docs/AUDIO_SETUP.md"
+"docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md" = "voicebridge/_data/docs/VOICE_BRIDGE_SYSTEM.md"
+"docs/archive/2026-09-21/QUBIT_MIGRATION.md" = "voicebridge/_data/docs/archive/2026-09-21/QUBIT_MIGRATION.md"
+"systemd" = "voicebridge/_data/systemd"
+
+# --- Qubit-owned runtime (Packet 8U, owner amendment 2026-09-11) ----------
+# A clean install ships the runtime subset under
+# ``voicebridge/_data/qubit_runtime`` — the path
+# ``voicebridge.qubit_runtime.runtime_root()`` resolves first, before the
+# checkout. The fork's tests/, apps/, website/, contributors/, evals/,
+# lockfiles and other non-runtime material are intentionally NOT packaged.
+# Hatchling force-include walks each mapped directory recursively but does not
+# support globs, so the runtime dirs are mapped individually and the fork's
+# top-level modules are listed explicitly.
+"qubit_runtime/qubit_cli" = "voicebridge/_data/qubit_runtime/qubit_cli"
+"qubit_runtime/agent" = "voicebridge/_data/qubit_runtime/agent"
+"qubit_runtime/tools" = "voicebridge/_data/qubit_runtime/tools"
+"qubit_runtime/gateway" = "voicebridge/_data/qubit_runtime/gateway"
+"qubit_runtime/plugins" = "voicebridge/_data/qubit_runtime/plugins"
+"qubit_runtime/skills" = "voicebridge/_data/qubit_runtime/skills"
+"qubit_runtime/optional-skills" = "voicebridge/_data/qubit_runtime/optional-skills"
+# Runtime catalogs read by ``qubit_cli/mcp_catalog.py`` (``optional-mcps/``)
+# and ``qubit_cli/plugin_catalog.py`` (``plugin-catalog/``) via
+# ``Path(__file__).parent.parent / <name>``. In the installed wheel that
+# resolves to ``voicebridge/_data/qubit_runtime/<name>``; without these the
+# MCP/plugin catalogs silently come back empty on a clean install.
+"qubit_runtime/optional-mcps" = "voicebridge/_data/qubit_runtime/optional-mcps"
+"qubit_runtime/plugin-catalog" = "voicebridge/_data/qubit_runtime/plugin-catalog"
+"qubit_runtime/cron" = "voicebridge/_data/qubit_runtime/cron"
+"qubit_runtime/providers" = "voicebridge/_data/qubit_runtime/providers"
+"qubit_runtime/ui-tui" = "voicebridge/_data/qubit_runtime/ui-tui"
+"qubit_runtime/tui_gateway" = "voicebridge/_data/qubit_runtime/tui_gateway"
+# The ACP (Agent Client Protocol) server entry — ``acp_adapter/entry.py`` is
+# reached by the ``qubit-acp`` console script and ``qubit agent acp`` after the
+# runtime root is on ``sys.path``. Ship it in the subset or those paths fail to
+# import the adapter and fall back to a misleading install hint.
+"qubit_runtime/acp_adapter" = "voicebridge/_data/qubit_runtime/acp_adapter"
+"qubit_runtime/native" = "voicebridge/_data/qubit_runtime/native"
+"qubit_runtime/locales" = "voicebridge/_data/qubit_runtime/locales"
+"qubit_runtime/assets" = "voicebridge/_data/qubit_runtime/assets"
+"qubit_runtime/mcp-research-data" = "voicebridge/_data/qubit_runtime/mcp-research-data"
+"qubit_runtime/web" = "voicebridge/_data/qubit_runtime/web"
+"qubit_runtime/batch_runner.py" = "voicebridge/_data/qubit_runtime/batch_runner.py"
+"qubit_runtime/cli.py" = "voicebridge/_data/qubit_runtime/cli.py"
+"qubit_runtime/qubit_bootstrap.py" = "voicebridge/_data/qubit_runtime/qubit_bootstrap.py"
+"qubit_runtime/qubit_constants.py" = "voicebridge/_data/qubit_runtime/qubit_constants.py"
+"qubit_runtime/qubit_logging.py" = "voicebridge/_data/qubit_runtime/qubit_logging.py"
+"qubit_runtime/qubit_startup_watchdog.py" = "voicebridge/_data/qubit_runtime/qubit_startup_watchdog.py"
+"qubit_runtime/qubit_state.py" = "voicebridge/_data/qubit_runtime/qubit_state.py"
+"qubit_runtime/qubit_state_common.py" = "voicebridge/_data/qubit_runtime/qubit_state_common.py"
+"qubit_runtime/qubit_state_compression.py" = "voicebridge/_data/qubit_runtime/qubit_state_compression.py"
+"qubit_runtime/qubit_state_dbfile.py" = "voicebridge/_data/qubit_runtime/qubit_state_dbfile.py"
+"qubit_runtime/qubit_state_errors.py" = "voicebridge/_data/qubit_runtime/qubit_state_errors.py"
+"qubit_runtime/qubit_state_fts.py" = "voicebridge/_data/qubit_runtime/qubit_state_fts.py"
+"qubit_runtime/qubit_state_gateway.py" = "voicebridge/_data/qubit_runtime/qubit_state_gateway.py"
+"qubit_runtime/qubit_state_guard.py" = "voicebridge/_data/qubit_runtime/qubit_state_guard.py"
+"qubit_runtime/qubit_state_holders.py" = "voicebridge/_data/qubit_runtime/qubit_state_holders.py"
+"qubit_runtime/qubit_state_ids.py" = "voicebridge/_data/qubit_runtime/qubit_state_ids.py"
+"qubit_runtime/qubit_state_lockguard.py" = "voicebridge/_data/qubit_runtime/qubit_state_lockguard.py"
+"qubit_runtime/qubit_state_lockowners.py" = "voicebridge/_data/qubit_runtime/qubit_state_lockowners.py"
+"qubit_runtime/qubit_state_maintenance.py" = "voicebridge/_data/qubit_runtime/qubit_state_maintenance.py"
+"qubit_runtime/qubit_state_messages.py" = "voicebridge/_data/qubit_runtime/qubit_state_messages.py"
+"qubit_runtime/qubit_state_portability.py" = "voicebridge/_data/qubit_runtime/qubit_state_portability.py"
+"qubit_runtime/qubit_state_profile_repair.py" = "voicebridge/_data/qubit_runtime/qubit_state_profile_repair.py"
+"qubit_runtime/qubit_state_readpool.py" = "voicebridge/_data/qubit_runtime/qubit_state_readpool.py"
+"qubit_runtime/qubit_state_registry.py" = "voicebridge/_data/qubit_runtime/qubit_state_registry.py"
+"qubit_runtime/qubit_state_repair.py" = "voicebridge/_data/qubit_runtime/qubit_state_repair.py"
+"qubit_runtime/qubit_state_rewind.py" = "voicebridge/_data/qubit_runtime/qubit_state_rewind.py"
+"qubit_runtime/qubit_state_schema.py" = "voicebridge/_data/qubit_runtime/qubit_state_schema.py"
+"qubit_runtime/qubit_state_search.py" = "voicebridge/_data/qubit_runtime/qubit_state_search.py"
+"qubit_runtime/qubit_state_sessions.py" = "voicebridge/_data/qubit_runtime/qubit_state_sessions.py"
+"qubit_runtime/qubit_state_telegram.py" = "voicebridge/_data/qubit_runtime/qubit_state_telegram.py"
+"qubit_runtime/qubit_state_timeline.py" = "voicebridge/_data/qubit_runtime/qubit_state_timeline.py"
+"qubit_runtime/qubit_state_titles.py" = "voicebridge/_data/qubit_runtime/qubit_state_titles.py"
+"qubit_runtime/qubit_state_usage.py" = "voicebridge/_data/qubit_runtime/qubit_state_usage.py"
+"qubit_runtime/qubit_state_user_copy.py" = "voicebridge/_data/qubit_runtime/qubit_state_user_copy.py"
+"qubit_runtime/qubit_state_wal.py" = "voicebridge/_data/qubit_runtime/qubit_state_wal.py"
+"qubit_runtime/qubit_time.py" = "voicebridge/_data/qubit_runtime/qubit_time.py"
+"qubit_runtime/mcp_serve.py" = "voicebridge/_data/qubit_runtime/mcp_serve.py"
+"qubit_runtime/mini_swe_runner.py" = "voicebridge/_data/qubit_runtime/mini_swe_runner.py"
+"qubit_runtime/model_tools.py" = "voicebridge/_data/qubit_runtime/model_tools.py"
+"qubit_runtime/registration_lifecycle.py" = "voicebridge/_data/qubit_runtime/registration_lifecycle.py"
+"qubit_runtime/run_agent.py" = "voicebridge/_data/qubit_runtime/run_agent.py"
+"qubit_runtime/setup.py" = "voicebridge/_data/qubit_runtime/setup.py"
+"qubit_runtime/toolset_distributions.py" = "voicebridge/_data/qubit_runtime/toolset_distributions.py"
+"qubit_runtime/toolsets.py" = "voicebridge/_data/qubit_runtime/toolsets.py"
+"qubit_runtime/trajectory_compressor.py" = "voicebridge/_data/qubit_runtime/trajectory_compressor.py"
+"qubit_runtime/utils.py" = "voicebridge/_data/qubit_runtime/utils.py"
+"qubit_runtime/LICENSE" = "voicebridge/_data/qubit_runtime/LICENSE"
+"qubit_runtime/pyproject.toml" = "voicebridge/_data/qubit_runtime/pyproject.toml"
+# ``qubit_runtime.status()`` reads the provenance manifest from the canonical
+# generated location (docs/generated/) with the frozen archive as read-only
+# fallback (see voicebridge/qubit_runtime.manifest_path()); ship the canonical
+# manifest at the archive destination so a clean install reports
+# upstream_revision/patched/file_count.
+"docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json" = "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
+# Wave 5: ship the small, secret-free matrices/docs that install-time code
+# reads. They land under package data so the resolver can reach them with the
+# installed path preferred and the checkout as fallback. voicebridge/
+# capability_catalog.py and voicebridge/portable.py must resolve these through
+# ``voicebridge.resources`` (reported as a cross-boundary repair) — a wheel-root
+# ``docs/`` mapping is not permitted by the packaging contract. The source
+# docs moved under docs/archive/2026-09-21/ in the 2026-09-21 reorg; the
+# installed resource names (``docs/<name>``) are unchanged so
+# voicebridge/capability_catalog.py and voicebridge/portable.py resolve them.
+"docs/archive/2026-09-21/PARITY_HERMES.json" = "voicebridge/_data/docs/PARITY_HERMES.json"
+"docs/archive/2026-09-21/MATRIX_8T_F.json" = "voicebridge/_data/docs/MATRIX_8T_F.json"
+"docs/archive/2026-09-21/MIGRATIONS.md" = "voicebridge/_data/docs/MIGRATIONS.md"
+
+[tool.hatch.build.targets.sdist]
+# The generated dashboard build ships in the sdist too (reproducible build
+# from the sdist without a separate npm build). Requires the bundle to have
+# been built before packaging; scripts/install.sh builds it deterministically
+# from a clean clone when node/npm are available and otherwise fails typed
+# (see the wheel comment above and docs/CLEAN_CLONE_AUDIT_WAVE5.md).
+artifacts = ["frontend/qubit-dist"]
+# NEVER ship the developer's live config, private browser state, or accidental
+# dirty/untracked files (Packet 8K "no private developer state in the release").
+# The sdist carries the portable example config only.
+exclude = [
+  "config/voice.yaml",
+  "config/voice.local.yaml",
+  # the developer's personal template set stays out of the release
+  "config/task-templates.yaml",
+  # developer's personal knowledge + model file stay out of the release
+  "config/personal-knowledge.md",
+  "Modelfile.qubit",
+  # internal dev change reports carry machine-specific history; not needed to
+  # build, run, or test the release
+  "docs/CHANGE_REPORTS",
+  # the 2026-09-22 docs reset archived the pre-reset docs here; they are
+  # internal history (some carry a developer home path) and must not ship.
+  "docs/archive/2026-09-22-pre-reset",
+  # forensic audit evidence generated by an operator/agent session records real
+  # machine paths; it is internal evidence, never product docs, so keep it out
+  # of the release sdist.
+  "docs/generated/audit",
+  # working-tree documents the developer edits in parallel with packaging; they
+  # carry machine-specific history and must not ship (Packet 8K sdist privacy)
+  "docs/UNIFIED_AGENT_PLAN.md",
+  # internal migration/audit/evidence notes that record the developer's real
+  # home path; excluded from the sdist so the release carries no developer
+  # home path (the repo retains the provenance records). Sanitizing the source
+  # docs remains the owning agent's follow-up.
+  "docs/8TF_COMPLETE_MIGRATION_PLAN.md",
+  "docs/8TF_SOURCE_OF_TRUTH.md",
+  "docs/AUDIT_OPENCLAW_2026-09-11.md",
+  "docs/AUDIT_OPENCLAW_V2026_9_4_DELTA.md",
+  "docs/BAKEOFF_4D.json",
+  "docs/BAKEOFF_4D.md",
+  "docs/OPERATIONS_8S.md",
+  "docs/archive/2026-09-21/QUBIT_COMPLETION_EVIDENCE.md",
+  "docs/archive/2026-09-21/QUBIT_FINAL_CODE_READY_PROMPT.md",
+  "docs/OPERATOR_QUALIFICATION.md",
+  "docs/SECURITY_AUDIT_WAVE4.md",
+  # Wave 5: an untracked agent wave prompt is swept into the sdist by the
+  # working-tree build; it is internal and carries the developer home path, so
+  # exclude it (a clean release is built from a committed tree anyway).
+  "docs/archive/2026-09-21/QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md",
+  # Wave 2 (full-parity): internal agent reports/evidence that are untracked
+  # working-tree artifacts. They are not product docs, and one carries a real
+  # developer home path, so they must never be swept into the release sdist.
+  "docs/archive/2026-09-21/QUBIT_QBPV2_PACKAGING.md",
+  "docs/archive/2026-09-21/QUBIT_QBPV_PACKAGING_SECURITY.md",
+  "docs/archive/2026-09-21/QUBIT_BYTE_PARITY_EVIDENCE.md",
+  "docs/archive/2026-09-21/QUBIT_REACHABILITY_AUDIT.md",
+  # Wave 2 (Agent 5 re-audit): untracked internal evidence/allowlist docs swept
+  # into the sdist by a working-tree build. QUBIT_WAVE2_EVIDENCE.md carries a
+  # real developer home path, so the release must not ship either file.
+  "docs/archive/2026-09-21/QUBIT_WAVE2_EVIDENCE.md",
+  "docs/archive/2026-09-21/QUBIT_REBRAND_ALLOWLIST.md",
+  # untracked agent execution prompt swept in by a working-tree build; carries
+  # a real developer home path, so the release must not ship it.
+  "docs/archive/2026-09-21/QUBIT_PROVIDER_VOICE_EXECUTION_PROMPT_2026-09-15.md",
+  # Living docs and generated evidence that record the developer's real home
+  # path (reference install / project-root provenance). They stay in the repo;
+  # the release sdist must carry no developer home path (Packet 8K sdist
+  # privacy; enforced by tests/test_packaging_wave3.py).
+  "docs/DECISIONS.md",
+  "docs/PARITY.md",
+  "docs/QUBIT_OWNER_AMENDMENT_2026-09-22_STAGED_GATES_AND_RULINGS.md",
+  "docs/QUBIT_OWNER_AMENDMENT_2026-09-23_W9_VENDOR_SYNC.md",
+  "docs/QUBIT_RESET_IMPLEMENTATION_STRATEGY_PROMPT_2026-09-22.md",
+  "docs/QUBIT_VENDOR_DELTA_2026-09-22.md",
+  "docs/STATUS.md",
+  "docs/generated/QUBIT_DASHBOARD_AUDIT_2026-09-23.json",
+  "docs/generated/QUBIT_SOURCE_INVENTORY.json",
+  "docs/generated/parity_inventory.json",
+  # Newly generated controls E2E evidence (untracked working-tree artifact)
+  # also records the developer home path; exclude it like the other generated
+  # evidence (Packet 8K sdist privacy).
+  "docs/generated/QUBIT_CONTROLS_E2E_2026-09-23.json",
+  # The 2026-09-21 docs reorg relocated the internal evidence/prompt docs under
+  # docs/archive/2026-09-21/. These mirror the home-path-bearing entries above
+  # now that the working-tree build sweeps the archive location instead.
+  "docs/archive/2026-09-21/QUBIT_BYTE_PARITY_EVIDENCE.md",
+  "docs/archive/2026-09-21/QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md",
+  "docs/archive/2026-09-21/QUBIT_FINAL_CODE_READY_PROMPT.md",
+  "docs/archive/2026-09-21/QUBIT_PROVIDER_VOICE_EXECUTION_PROMPT_2026-09-15.md",
+  "docs/archive/2026-09-21/QUBIT_QBPV_PACKAGING_SECURITY.md",
+  "docs/archive/2026-09-21/QUBIT_WAVE2_EVIDENCE.md",
+  # The active 2026-09-21 execution brief is an internal contract that records
+  # the developer's repo path; it is not a shipped product doc.
+  "docs/archive/2026-09-22-pre-reset/QUBIT_ACTIVE_EXECUTION_BRIEF_2026-09-21.md",
+  # tests that reference a concrete developer home path as a fixture or
+  # scan pattern are source-only; keep the release sdist free of dev paths.
+  "tests/test_cli_chat_sessions_rebrand_9u.py",
+  "tests/test_foundation_gate.py",
+  "tests/test_host_hygiene_pra07.py",
+  "tests/test_new_features.py",
+  "tests/test_packet8r.py",
+  "tests/test_packet8s.py",
+  "tests/test_paths8tf.py",
+  "tests/test_source_inventory.py",
+  "scripts/browser_profiles",
+  "scripts/browser_auto_state",
+  "106",
+  "DESIGN.md",
+  "PRODUCT.md",
+  ".claude",
+  ".cursor",
+  ".gemini",
+  ".github",
+  ".kiro",
+  ".vscode",
+  ".windsurf",
+  ".adal",
+  ".pytest_cache",
+  "graft",
+  ".mcp.json",
+  "opencode.json",
+  # Agent-harness state swept into a working-tree sdist: .opencode ships a
+  # node_modules tree (3655 members), and the Playwright/agent scratch files
+  # are internal. None may enter the release (Packet 8K sdist privacy).
+  ".opencode",
+  ".playwright-mcp",
+  "opencode.json.backup",
+  "deintegratecuritate.md",
+  "docs/OPENCODE_WORKFLOW.md",
+  # The whole vendored fork is excluded from the default sdist tree walk; the
+  # runtime subset is force-included below at its original qubit_runtime/
+  # layout (mirrors the wheel subset) so the sdist still rebuilds the wheel
+  # without shipping the fork's tests/, apps/, website/, evals/, lockfiles, etc.
+  "qubit_runtime",
+]
+
+# Sdist mirror of the wheel's Qubit-owned runtime subset (Packet 8U).
+# Files land at their original qubit_runtime/ paths so a wheel can be rebuilt
+# from the sdist with the wheel force-include table above.
+[tool.hatch.build.targets.sdist.force-include]
+"qubit_runtime/qubit_cli" = "qubit_runtime/qubit_cli"
+"qubit_runtime/agent" = "qubit_runtime/agent"
+"qubit_runtime/tools" = "qubit_runtime/tools"
+"qubit_runtime/gateway" = "qubit_runtime/gateway"
+"qubit_runtime/plugins" = "qubit_runtime/plugins"
+"qubit_runtime/skills" = "qubit_runtime/skills"
+"qubit_runtime/optional-skills" = "qubit_runtime/optional-skills"
+"qubit_runtime/optional-mcps" = "qubit_runtime/optional-mcps"
+"qubit_runtime/plugin-catalog" = "qubit_runtime/plugin-catalog"
+"qubit_runtime/cron" = "qubit_runtime/cron"
+"qubit_runtime/providers" = "qubit_runtime/providers"
+"qubit_runtime/ui-tui" = "qubit_runtime/ui-tui"
+"qubit_runtime/tui_gateway" = "qubit_runtime/tui_gateway"
+"qubit_runtime/acp_adapter" = "qubit_runtime/acp_adapter"
+"qubit_runtime/native" = "qubit_runtime/native"
+"qubit_runtime/locales" = "qubit_runtime/locales"
+"qubit_runtime/assets" = "qubit_runtime/assets"
+"qubit_runtime/mcp-research-data" = "qubit_runtime/mcp-research-data"
+"qubit_runtime/web" = "qubit_runtime/web"
+"qubit_runtime/batch_runner.py" = "qubit_runtime/batch_runner.py"
+"qubit_runtime/cli.py" = "qubit_runtime/cli.py"
+"qubit_runtime/qubit_bootstrap.py" = "qubit_runtime/qubit_bootstrap.py"
+"qubit_runtime/qubit_constants.py" = "qubit_runtime/qubit_constants.py"
+"qubit_runtime/qubit_logging.py" = "qubit_runtime/qubit_logging.py"
+"qubit_runtime/qubit_startup_watchdog.py" = "qubit_runtime/qubit_startup_watchdog.py"
+"qubit_runtime/qubit_state.py" = "qubit_runtime/qubit_state.py"
+"qubit_runtime/qubit_state_common.py" = "qubit_runtime/qubit_state_common.py"
+"qubit_runtime/qubit_state_compression.py" = "qubit_runtime/qubit_state_compression.py"
+"qubit_runtime/qubit_state_dbfile.py" = "qubit_runtime/qubit_state_dbfile.py"
+"qubit_runtime/qubit_state_errors.py" = "qubit_runtime/qubit_state_errors.py"
+"qubit_runtime/qubit_state_fts.py" = "qubit_runtime/qubit_state_fts.py"
+"qubit_runtime/qubit_state_gateway.py" = "qubit_runtime/qubit_state_gateway.py"
+"qubit_runtime/qubit_state_guard.py" = "qubit_runtime/qubit_state_guard.py"
+"qubit_runtime/qubit_state_holders.py" = "qubit_runtime/qubit_state_holders.py"
+"qubit_runtime/qubit_state_ids.py" = "qubit_runtime/qubit_state_ids.py"
+"qubit_runtime/qubit_state_lockguard.py" = "qubit_runtime/qubit_state_lockguard.py"
+"qubit_runtime/qubit_state_lockowners.py" = "qubit_runtime/qubit_state_lockowners.py"
+"qubit_runtime/qubit_state_maintenance.py" = "qubit_runtime/qubit_state_maintenance.py"
+"qubit_runtime/qubit_state_messages.py" = "qubit_runtime/qubit_state_messages.py"
+"qubit_runtime/qubit_state_portability.py" = "qubit_runtime/qubit_state_portability.py"
+"qubit_runtime/qubit_state_profile_repair.py" = "qubit_runtime/qubit_state_profile_repair.py"
+"qubit_runtime/qubit_state_readpool.py" = "qubit_runtime/qubit_state_readpool.py"
+"qubit_runtime/qubit_state_registry.py" = "qubit_runtime/qubit_state_registry.py"
+"qubit_runtime/qubit_state_repair.py" = "qubit_runtime/qubit_state_repair.py"
+"qubit_runtime/qubit_state_rewind.py" = "qubit_runtime/qubit_state_rewind.py"
+"qubit_runtime/qubit_state_schema.py" = "qubit_runtime/qubit_state_schema.py"
+"qubit_runtime/qubit_state_search.py" = "qubit_runtime/qubit_state_search.py"
+"qubit_runtime/qubit_state_sessions.py" = "qubit_runtime/qubit_state_sessions.py"
+"qubit_runtime/qubit_state_telegram.py" = "qubit_runtime/qubit_state_telegram.py"
+"qubit_runtime/qubit_state_timeline.py" = "qubit_runtime/qubit_state_timeline.py"
+"qubit_runtime/qubit_state_titles.py" = "qubit_runtime/qubit_state_titles.py"
+"qubit_runtime/qubit_state_usage.py" = "qubit_runtime/qubit_state_usage.py"
+"qubit_runtime/qubit_state_user_copy.py" = "qubit_runtime/qubit_state_user_copy.py"
+"qubit_runtime/qubit_state_wal.py" = "qubit_runtime/qubit_state_wal.py"
+"qubit_runtime/qubit_time.py" = "qubit_runtime/qubit_time.py"
+"qubit_runtime/mcp_serve.py" = "qubit_runtime/mcp_serve.py"
+"qubit_runtime/mini_swe_runner.py" = "qubit_runtime/mini_swe_runner.py"
+"qubit_runtime/model_tools.py" = "qubit_runtime/model_tools.py"
+"qubit_runtime/registration_lifecycle.py" = "qubit_runtime/registration_lifecycle.py"
+"qubit_runtime/run_agent.py" = "qubit_runtime/run_agent.py"
+"qubit_runtime/setup.py" = "qubit_runtime/setup.py"
+"qubit_runtime/toolset_distributions.py" = "qubit_runtime/toolset_distributions.py"
+"qubit_runtime/toolsets.py" = "qubit_runtime/toolsets.py"
+"qubit_runtime/trajectory_compressor.py" = "qubit_runtime/trajectory_compressor.py"
+"qubit_runtime/utils.py" = "qubit_runtime/utils.py"
+"qubit_runtime/LICENSE" = "qubit_runtime/LICENSE"
+"qubit_runtime/pyproject.toml" = "qubit_runtime/pyproject.toml"
+
+# Sdist mirror of the wheel's dev-tree pruning. Hatchling force-include walks a
+# directory mapping recursively and only skips the names in its own
+# EXCLUDED_DIRECTORIES set (which omits ``node_modules``), so the git-ignored
+# ``qubit_runtime/ui-tui/node_modules`` tree would otherwise enter the sdist.
+# The shared hook extends that exclusion set for the build (and stages the
+# wheel's frontend tree per-file); it does not reparent the frontend for the
+# sdist, which keeps its normal layout.
+[tool.hatch.build.targets.sdist.hooks.custom]
+path = "scripts/hatch_build_qubit.py"

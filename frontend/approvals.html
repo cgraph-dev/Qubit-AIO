@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qubit VoiceBridge — Approvals</title>
+<style>
+ body{font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px}
+ h1{font-size:18px;margin:0 0 16px}
+ .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+ button{margin-right:8px;padding:6px 14px;border-radius:6px;border:0;cursor:pointer}
+ .ok{background:var(--primary);color:#10120a}.no{background:var(--danger);color:#201010}
+ .muted{color:var(--muted)}.err{color:var(--danger)}
+</style><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<main id="main-content" tabindex="-1">
+<h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit VoiceBridge — Approvals</h1>
+<nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals" aria-current="page">Approvals</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a href="/docs">Docs</a><a class="nav-utility" href="/token-setup">Pair device</a></nav>
+<p class="muted">Review actions that need your decision. Nothing is sent or changed until you approve it.</p>
+<div id="list" class="muted">loading…</div>
+</main>
+<script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
+<script>
+// Token comes ONLY from localStorage via the shared helper (frontend/vb.js).
+vbResolveBase();
+const list = document.getElementById('list');
+function approvalCard(a){
+  const cap = vbBuild('b', null, String(a.capability || 'action'));
+  const when = vbBuild('span', {class:'muted'},
+    ' · ' + new Date((a.created_at||0)*1000).toLocaleString());
+  const head = vbBuild('div', null, cap, when);
+  const summary = vbBuild('div', null, String(a.summary || ''));
+  const ok = vbBuild('button', {class:'ok', type:'button'}, 'Approve');
+  const no = vbBuild('button', {class:'no', type:'button'}, 'Deny');
+  ok.addEventListener('click', function(){ respond(a.id, 'approve'); });
+  no.addEventListener('click', function(){ respond(a.id, 'deny'); });
+  return vbBuild('div', {class:'card', dataset:{id: String(a.id)}}, head, summary, ok, no);
+}
+async function load(){
+  const res = await vbApi('/api/approvals');
+  if (res.authRequired) {
+    vbClear(list);
+    list.appendChild(vbBuild('span', {class:'err'},
+      'Not paired — open Pair device and save your token.'));
+    return;
+  }
+  if (!res.ok || !res.body || !Array.isArray(res.body.items)) {
+    vbClear(list);
+    list.appendChild(vbBuild('span', {class:'err'}, vbApiMessage(res) || 'Could not load approvals.'));
+    return;
+  }
+  const items = res.body.items;
+  vbClear(list);
+  if (!items.length) { list.textContent = 'Nothing pending.'; return; }
+  items.forEach(a => list.appendChild(approvalCard(a)));
+  vbAnnounce(items.length + ' pending approval' + (items.length===1?'':'s'));
+}
+async function respond(id, decision){
+  const res = await vbApi('/api/approvals/respond',
+    {method:'POST', body: JSON.stringify({id: id, decision: decision})});
+  if (!res.ok) vbAnnounce(vbApiMessage(res) || 'Could not submit your decision.');
+  load();
+}
+load(); setInterval(load,3000);
+</script></body></html>

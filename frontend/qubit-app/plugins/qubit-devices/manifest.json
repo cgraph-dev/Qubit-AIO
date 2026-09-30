@@ -1,0 +1,12 @@
+{
+  "name": "qubit-devices",
+  "label": "Devices",
+  "description": "Browser, desktop, IDE, vision, and pinned-runtime availability (same runtime inventory and broker ops as `qubit runtime` CLI and voice).",
+  "icon": "monitor-smartphone",
+  "version": "1.0.0",
+  "tab": {"path": "/devices", "position": "after:qubit-runtime"},
+  "entry": "qubit-devices.js",
+  "css": null,
+  "has_api": true,
+  "source": "qubit-overlay"
+}

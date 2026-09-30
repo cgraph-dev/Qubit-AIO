@@ -1,0 +1,1160 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qubit VoiceBridge — Workspace</title>
+<link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body>
+<!--
+THESIS: A calm control surface for speaking to a local assistant.
+OWN-WORLD: Near-black surfaces, warm text, and a signal-lime action color make system state legible.
+STORY: Pair the device, choose Talk, speak or type, then inspect activity and reports when needed.
+FIRST VIEWPORT: The status, main talk control, text fallback, and plain-language tools are visible immediately.
+FORM: One primary action, quiet secondary controls, clear focus, and responsive rows keep the interface usable.
+FINISH: Every state explains what happened and what the operator can safely do next.
+-->
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<main class="wrap workspace-shell" id="main-content" tabindex="-1">
+  <header class="workspace-header">
+    <div class="brand-lockup">
+      <span class="brand-mark brand-mark-large" aria-hidden="true">Q</span>
+      <div>
+        <h1>Qubit Voice Agent</h1>
+        <p class="page-lead">Your local command center for voice, tasks, approvals, and project work.</p>
+      </div>
+    </div>
+    <div class="status-cluster status-card" aria-label="Bridge status">
+      <span class="status-dot" aria-hidden="true"></span>
+      <div><span class="status-label">Bridge status</span><span class="status" id="st" aria-live="polite">connecting…</span></div>
+    </div>
+  </header>
+  <nav class="page-nav" aria-label="Primary">
+    <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a>
+    <span class="nav-separator" aria-hidden="true"></span><a href="/" aria-current="page">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals">Approvals</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a href="/docs">Docs</a><a class="nav-utility" href="/token-setup">Pair device</a>
+  </nav>
+
+  <details class="help-panel">
+    <summary>How Qubit works — first time here?</summary>
+    <div>
+      <ol>
+        <li><b>Pair this device</b> once: open <a class="tap-target" href="/token-setup">Pair device</a>, paste the <code>webui.token</code> from <code>~/.config/qubit-voicebridge/voice.yaml</code>, and choose Save &amp; test. Your token is stored only in this browser.</li>
+        <li><b>Talk or type</b> below. Hold the button and speak, or type a task and press Enter.</li>
+        <li><b>Watch progress</b> in the transcript and on <a class="tap-target" href="/activity">Activity</a>. Read-only work can run automatically; anything sensitive always asks first.</li>
+        <li><b>Review reports</b> and <a class="tap-target" href="/reports">Reports</a>. Use <a class="tap-target" href="/settings">Settings</a> only when you need to change models, voices, permissions, or pairing.</li>
+      </ol>
+      <p>Everything runs on your PC. No account is required, nothing is sent unless you act, and every change is backed up and reversible.</p>
+    </div>
+  </details>
+
+  <section class="command-workspace" aria-label="Qubit command workspace">
+    <aside class="command-rail" aria-label="Quick actions">
+      <div class="rail-heading">Workspace</div>
+      <a class="rail-action rail-action-active" href="#talk"><span class="rail-icon" aria-hidden="true">◉</span><span><b>Talk</b><small>Ask Qubit anything</small></span></a>
+      <a class="rail-action" href="/activity"><span class="rail-icon" aria-hidden="true">↗</span><span><b>Activity</b><small>Live runs and events</small></span></a>
+      <a class="rail-action" href="/reports"><span class="rail-icon" aria-hidden="true">▤</span><span><b>Reports</b><small>Private result bundles</small></span></a>
+      <a class="rail-action" href="/ops"><span class="rail-icon" aria-hidden="true">⌘</span><span><b>Operations</b><small>Run approved actions</small></span></a>
+      <div class="rail-divider"></div>
+      <div class="rail-heading">Control</div>
+      <a class="rail-action" href="/settings"><span class="rail-icon" aria-hidden="true">⚙</span><span><b>Settings</b><small>Models, audio, access</small></span></a>
+      <a class="rail-action" href="/setup"><span class="rail-icon" aria-hidden="true">✦</span><span><b>Setup</b><small>Health and repairs</small></span></a>
+      <a class="rail-action" href="/token-setup"><span class="rail-icon" aria-hidden="true">⌁</span><span><b>Pair device</b><small>Connect this browser</small></span></a>
+      <div class="rail-footer"><span class="rail-footer-dot"></span> Local-first workspace<br><span class="rail-footer-muted">Your data stays on this PC</span></div>
+    </aside>
+
+    <div class="talk-column" id="talk">
+      <div class="section-heading">
+        <div><h2>What should Qubit do?</h2><span class="section-meta">VOICE + TEXT COMMANDS</span></div>
+        <span class="session-chip"><span class="session-dot"></span> Ready for input</span>
+      </div>
+      <div class="talk-stage">
+        <div class="talk-stage-orbit orbit-one" aria-hidden="true"></div>
+        <div class="talk-stage-orbit orbit-two" aria-hidden="true"></div>
+        <div class="talk-stage-content">
+          <span class="talk-glyph" aria-hidden="true">Q</span>
+          <button class="ptt" id="ptt">Hold to talk</button>
+          <p class="talk-stage-copy">Press and speak naturally. Qubit will show the plan before anything sensitive happens.</p>
+        </div>
+      </div>
+      <div class="hint"><span class="keycap">SPACE</span> hold to talk <span class="hint-separator">·</span> release to send <span class="hint-separator">·</span> <span class="keycap">ESC</span> stop <a href="#" class="tap-target interrupt-link" id="interruptBtn">interrupt</a></div>
+
+      <div class="typed-command">
+        <label for="textin">Or type a command</label>
+        <div class="row talk-input-row">
+          <input id="textin" type="text" placeholder="Try “summarize my active project”" autocomplete="off">
+          <button id="textsend" class="ok" type="button"><span aria-hidden="true">↗</span> Run command</button>
+        </div>
+        <div id="slashpop" role="listbox" aria-label="Voice command suggestions" style="display:none"></div>
+      </div>
+
+      <div class="row talk-tools-row">
+        <label for="modelsel">Reasoning profile</label>
+        <select id="modelsel" aria-label="Reasoning profile"></select>
+        <span id="modelstate" class="muted" role="status"></span>
+        <button type="button" class="quiet-action" id="sessionbtn" aria-expanded="false" aria-controls="sessiondrawer">Recent sessions</button>
+      </div>
+      <section id="sessiondrawer" aria-label="Recent sessions" style="display:none">
+        <div class="row"><strong>Recent sessions</strong><span class="muted">action receipts, newest first</span><button type="button" class="quiet-action" id="newsession">New session</button></div>
+        <div id="sessionlist"></div>
+      </section>
+
+      <section class="live-session" aria-labelledby="session-title">
+        <div class="live-session-header"><div><h2 id="session-title">Command activity</h2><span class="section-meta">LIVE SESSION</span></div><span class="live-pulse"><span></span> streaming</span></div>
+        <div id="transcript"><div class="empty-session"><span class="empty-icon" aria-hidden="true">✦</span><div><strong>Your conversation will appear here</strong><p>Speak or type a task to begin. Progress, approvals, and results stay visible in this session.</p></div></div></div>
+      </section>
+    </div>
+
+    <aside class="context-panel" aria-label="Workspace context">
+      <div class="context-header"><h3>At a glance</h3><span class="context-menu" aria-hidden="true">•••</span></div>
+      <div class="context-health"><span class="health-ring"><span>Q</span></span><div><strong>Qubit is ready</strong><p>Local bridge connected</p></div></div>
+      <div class="context-stat-grid"><div><strong>Local</strong><span>Runtime</span></div><div><strong>On</strong><span>Voice input</span></div><div><strong>Safe</strong><span>Action mode</span></div><div><strong>Live</strong><span>Audit trail</span></div></div>
+      <div class="context-divider"></div>
+      <h3>Next steps</h3>
+      <a class="context-link" href="/setup"><span>✦</span><span><b>Check installation</b><small>Review models, audio, and services</small></span><i>›</i></a>
+      <a class="context-link" href="/ops"><span>⌘</span><span><b>Open operations</b><small>Browse approved capabilities</small></span><i>›</i></a>
+      <a class="context-link" href="/token-setup"><span>⌁</span><span><b>Pair another device</b><small>Use Qubit from your phone</small></span><i>›</i></a>
+      <div class="context-note"><span aria-hidden="true">✓</span><p>Qubit asks before sending, publishing, deleting, or changing protected systems.</p></div>
+    </aside>
+  </section>
+
+  <div class="workspace-actions" aria-label="Talk tools">
+    <button type="button" class="quiet-action" id="lessonslink">Learned preferences</button>
+    <button type="button" class="quiet-action" id="permslink">Permissions</button>
+    <button type="button" class="quiet-action" id="reportslink">Inbox</button>
+    <button type="button" class="quiet-action" id="gearlink" aria-label="Open talk settings">Connection settings</button>
+  </div>
+</main>
+
+
+<div id="settings" style="display:none; border:1px solid var(--line-strong); border-radius:10px; padding:10px; margin:10px 0; background:var(--surface);">
+  <div style="font-size:13px; margin-bottom:6px;">API server (from Vercel, paste your PC's tunnel URL, e.g. https://xxx.run.pinggy-free.link)</div>
+  <label class="sr-only" for="set-api">API server URL</label>
+  <input id="set-api" type="text" placeholder="https://your-pc-tunnel-url" style="width:100%; padding:6px; margin-bottom:6px; background:var(--surface-soft); border:1px solid var(--line-strong); color:var(--text); border-radius:6px;">
+  <label class="sr-only" for="set-token">API token</label>
+  <input id="set-token" type="text" placeholder="token (optional)" style="width:100%; padding:6px; margin-bottom:6px; background:var(--surface-soft); border:1px solid var(--line-strong); color:var(--text); border-radius:6px;">
+  <div class="row"><button id="set-save" class="ok" type="button" style="padding:6px 14px; border-radius:6px;">Save</button>
+  <span id="set-status" style="font-size:12px; color:var(--muted); margin-left:10px;"></span></div>
+  <div style="font-size:13px; margin:6px 0 4px;">Voice (TTS)</div>
+  <div id="voice-info" style="font-size:12px; color:var(--muted);">Voice is controlled by bridge settings.</div>
+</div>
+
+<div id="lessonspanel" style="display:none; border:1px solid var(--line-strong); border-radius:10px; padding:10px; margin:10px 0; background:var(--surface);">
+  <div style="font-size:13px; margin-bottom:6px; color:var(--text);">Learned preferences <span style="color:var(--muted);">— what I remember, why, and how to remove it</span></div>
+  <div id="lessonslist" style="font-size:12px;"></div>
+  <div id="lessonsreviews" style="font-size:12px; margin-top:8px;"></div>
+</div>
+
+<div id="permspanel" style="display:none; border:1px solid var(--line-strong); border-radius:10px; padding:10px; margin:10px 0; background:var(--surface);">
+  <div style="font-size:13px; margin-bottom:6px; color:var(--text);">Permissions &amp; skills <span style="color:var(--muted);">— restricted (default) / unrestricted (opt-in) · scoped grants · skill manifests</span></div>
+  <div id="perms-status" style="font-size:12px; color:var(--muted);"></div>
+  <div style="margin:8px 0 4px; font-size:13px; color:var(--text);">Mode</div>
+  <div class="row" style="gap:6px;">
+    <button id="perm-restricted" style="padding:6px 12px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface-soft);color:var(--text);cursor:pointer;">Restricted</button>
+    <button id="perm-unrestricted" style="padding:6px 12px;border:1px solid var(--danger);border-radius:6px;background:var(--surface-soft);color:var(--danger);cursor:pointer;">Unrestricted</button>
+    <label class="sr-only" for="perm-scopes">Scopes for unrestricted mode</label>
+    <input id="perm-scopes" type="text" placeholder="scopes for unrestricted (comma-separated)"
+           style="flex:1;padding:6px;background:var(--surface-soft);border:1px solid var(--line-strong);color:var(--text);border-radius:6px;font-size:12px;">
+  </div>
+  <div style="font-size:11px;color:var(--danger);margin:4px 0 8px;">Unrestricted pre-authorizes routine non-destructive work only inside your selected scopes. It never bypasses hard-deny, audit, isolation, or confirmation for sending/publishing/purchasing/deleting/credentials/security/system changes.</div>
+  <div style="margin:8px 0 4px;font-size:13px;color:var(--text);">Current grants <button id="perm-reset" style="margin-left:8px;padding:3px 10px;background:var(--danger);border:none;color:#201010;border-radius:5px;cursor:pointer;font-size:11px;">reset to restricted</button></div>
+  <div id="perm-grants" style="font-size:12px;"></div>
+  <div style="margin:8px 0 4px;font-size:13px;color:var(--text);">Skills <span style="color:var(--muted);">(installs are staged disabled)</span></div>
+  <div id="perm-skills" style="font-size:12px;"></div>
+  <details style="margin-top:8px;">
+    <summary style="font-size:12px;color:var(--muted);cursor:pointer;">advanced: effective check + audit</summary>
+    <div class="row" style="margin:6px 0;">
+      <label class="sr-only" for="perm-check-cap">Capability to check</label>
+      <input id="perm-check-cap" type="text" placeholder="capability, e.g. browser.snapshot" style="flex:1;padding:5px;background:var(--surface-soft);border:1px solid var(--line-strong);color:var(--text);border-radius:6px;font-size:12px;">
+      <button id="perm-check-btn" style="padding:5px 10px;background:var(--primary);border:none;color:#10120a;border-radius:5px;cursor:pointer;font-size:11px;">check</button>
+    </div>
+    <div id="perm-effective" style="font-size:12px;color:var(--muted);"></div>
+    <div id="perm-audit" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
+  </details>
+</div>
+
+<div id="reportspanel" style="display:none; border:1px solid var(--line-strong); border-radius:10px; padding:10px; margin:10px 0; background:var(--surface);">
+  <div style="font-size:13px; margin-bottom:6px; color:var(--text);">Reports <span style="color:var(--muted);">— canonical private bundles (JSON / Markdown / HTML)</span>
+    <span id="notif-badge" style="margin-left:10px;display:none;background:var(--primary);color:#10120a;border-radius:10px;padding:1px 8px;font-size:11px;"></span>
+  </div>
+  <div class="row" style="gap:6px; margin-bottom:6px;">
+    <label class="sr-only" for="reports-q">Search reports</label>
+    <input id="reports-q" type="text" placeholder="search reports…"
+           style="flex:1;padding:6px;background:var(--surface-soft);border:1px solid var(--line-strong);color:var(--text);border-radius:6px;font-size:12px;">
+    <button data-p="" style="padding:5px 10px;background:var(--primary);border:none;color:#10120a;border-radius:5px;cursor:pointer;font-size:11px;">all</button>
+    <button data-p="gmail" style="padding:5px 10px;background:var(--surface-soft);border:none;color:var(--text);border-radius:5px;cursor:pointer;font-size:11px;">gmail</button>
+    <button data-p="instagram" style="padding:5px 10px;background:var(--surface-soft);border:none;color:var(--text);border-radius:5px;cursor:pointer;font-size:11px;">instagram</button>
+    <button data-p="messenger" style="padding:5px 10px;background:var(--surface-soft);border:none;color:var(--text);border-radius:5px;cursor:pointer;font-size:11px;">messenger</button>
+  </div>
+  <div id="reports-list" style="font-size:12px;"></div>
+</div>
+
+<script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
+<script>
+// API base is same-origin by default. An attacker-controlled ?api= query string
+// is NEVER honored (it could redirect the stored token); the base is changed
+// only through the explicit Settings/Pairing action below, which validates the
+// origin, requires confirmation, and tests the token before saving.
+// Token comes ONLY from localStorage via the shared helper (frontend/vb.js).
+// Query-string tokens are never accepted or placed in URLs.
+
+const ptt = document.getElementById('ptt');
+const st = document.getElementById('st');
+const transcript = document.getElementById('transcript');
+let ctx=null, source=null, processor=null, chunks=[], recording=false, busy=false;
+let micStream=null;            // the getUserMedia stream; MUST be stopped on release
+let micBusy=false;             // a getUserMedia() is in flight (debounce rapid taps)
+let pushMode = 'hold';  // 'hold' = press-and-hold, 'tap' = one-tap toggle
+let sampleRate = 16000;  // the REAL AudioContext rate — sent to the backend
+
+function addMsg(cls, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls;
+  d.textContent = text;
+  transcript.prepend(d);
+}
+function setStatus(t, live=false) {
+  st.textContent = t;
+  st.className = 'status' + (live ? ' live' : '');
+}
+
+function micError(err) {
+  const n = err && err.name;
+  if (n === 'NotAllowedError' || n === 'SecurityError')
+    return 'Microphone permission denied — allow mic access in the browser and retry.';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError')
+    return 'No microphone found or it is unavailable — check the mic and retry.';
+  if (n === 'NotReadableError')
+    return 'Microphone is busy or blocked — close other apps using it and retry.';
+  return 'Mic error: ' + (err && err.message ? err.message : err);
+}
+
+/* Always release the mic tracks AND close the AudioContext (also used on the
+ * startRec error path so a failed getUserMedia never leaks the stream). */
+function releaseMic() {
+  try { if (micStream && micStream.getTracks) micStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+  micStream = null;
+  try { if (source) source.disconnect(); } catch (_) {}
+  try { if (processor) processor.disconnect(); } catch (_) {}
+  try { if (ctx) ctx.close(); } catch (_) {}
+  source = processor = ctx = null;
+}
+
+async function startRec() {
+  if (recording || micBusy) return;   // already recording, or a mic request is in flight
+  micBusy = true;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      channelCount: 1, echoCancellation: true, noiseSuppression: true }});
+    micStream = stream;                      // keep a handle so we can release it
+    // Ask for 16k, but Chrome does NOT reliably honor it — record the REAL
+    // context rate and send it so the backend never misreads 48 kHz as 16 kHz.
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    sampleRate = ctx.sampleRate || 16000;
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume(); } catch (_) {}
+    }
+    source = ctx.createMediaStreamSource(stream);
+    processor = ctx.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = (e) => {
+      if (!recording) return;
+      const ch = e.inputBuffer.getChannelData(0);
+      const buf = new Int16Array(ch.length);
+      for (let i = 0; i < ch.length; i++) buf[i] = Math.max(-1, Math.min(1, ch[i])) * 32767;
+      chunks.push(buf);
+    };
+    source.connect(processor);
+    processor.connect(ctx.destination);
+    recording = true;
+    setStatus('listening…', true);
+  } catch (err) {
+    releaseMic();
+    addMsg('err', micError(err));
+    setStatus('mic error');
+  } finally {
+    micBusy = false;                     // allow the next tap now that this one resolved
+  }
+}
+
+async function stopRec() {
+  if (!recording) return;
+  recording = false;
+  const total = chunks.reduce((a, c) => a + c.length, 0);
+  const out = new Int16Array(total);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.length; }
+  chunks = [];
+  releaseMic();
+  setStatus('thinking…');
+  const minSamples = Math.round((sampleRate || 16000) * 0.1); // 100ms @ actual rate
+  if (total < minSamples) {  // <0.1s of audio = accidental tap
+    setStatus('too short — try again');
+    setTimeout(() => setStatus('ready'), 1500);
+    return;
+  }
+  await sendAudio(out.buffer, sampleRate);
+}
+
+async function sendAudio(pcm, rate) {
+  busy = true;
+  ptt.disabled = true;
+  ptt.textContent = 'listening to result…';
+  let rid;
+  try {
+    // 1. submit -> instant request_id (the bridge acks immediately)
+    //    Binary PCM body preserved; the shared vbApi() helper sends
+    //    X-Api-Token and checks Content-Type before parsing the JSON reply.
+    //    X-Audio-Rate carries the browser's REAL AudioContext rate so the
+    //    backend resamples 48 kHz instead of misreading it as 16 kHz.
+    const res = await vbApi('/api/talk', {
+      method: 'POST',
+      headers: vbHeaders({ 'Content-Type': 'application/octet-stream',
+                           'X-Audio-Rate': String(rate || 16000) }),
+      body: pcm,
+    });
+    if (!res.ok) throw new Error(res.authRequired ? 'not paired' : ('HTTP ' + (res.status || 'network')));
+    const data = res.body;
+    rid = data && data.request_id;
+    setStatus('working…', true);
+    // 2. poll the result until done
+    while (true) {
+      await new Promise(r => setTimeout(r, 900));
+      const r = await vbApi('/api/result/' + rid);
+      const poll = r.body;
+      if (!r.ok) {
+        if (r.authRequired) addMsg('err', 'Dashboard not paired — open /token-setup.');
+        else addMsg('err', 'Result poll failed: ' + (r.error || r.status));
+        break;
+      }
+      if (poll && poll.status === 'done') {
+        await playResult(poll);
+        break;
+      } else if (poll && poll.status === 'unknown') {
+        addMsg('err', 'Request lost (bridge restarted?). Try again.');
+        break;
+      }
+    }
+  } catch (err) {
+    addMsg('err', 'Request failed: ' + err.message);
+    setStatus('error');
+  } finally {
+    busy = false;
+    ptt.disabled = false;
+    ptt.textContent = 'Hold to talk';
+    setStatus('ready');
+  }
+}
+
+// ---- settings (API base + token for Vercel -> PC tunnel) ----
+const gear = document.getElementById('gearlink');
+const panel = document.getElementById('settings');
+gear.addEventListener('click', (e) => { e.preventDefault(); panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; });
+document.getElementById('set-api').value = localStorage.getItem('vdb_api') || '';
+document.getElementById('set-token').value = localStorage.getItem('vdb_token') || '';
+// Explicit pairing action (Packet 8L): validate the origin strictly, ask for
+// confirmation when switching servers, TEST the candidate token with the
+// request header BEFORE saving, and keep the previous working token whenever
+// the candidate is rejected, expired, or the bridge is unreachable. The
+// stored token is never sent to an unapproved origin.
+document.getElementById('set-save').addEventListener('click', async () => {
+  const statusEl = document.getElementById('set-status');
+  statusEl.style.color = 'var(--muted)';
+  const apiCheck = vbValidateApiOrigin(document.getElementById('set-api').value);
+  if (apiCheck.error) { statusEl.textContent = apiCheck.error; statusEl.style.color = 'var(--danger)'; return; }
+  const tok = document.getElementById('set-token').value.trim();
+  const base = apiCheck.base;
+  const changed = base && base !== vbApiBase();
+  if (changed && !confirm('Pair this browser with ' + base + '?\n\nYour dashboard token will be sent ONLY to this address, using the X-Api-Token header. Only continue if you trust it.')) {
+    statusEl.textContent = 'Pairing cancelled — previous server kept.';
+    return;
+  }
+  const res = await vbApiTest(base, tok);
+  if (res.status === 200) {
+    localStorage.setItem('vdb_api', base);
+    localStorage.setItem('vdb_token', tok);
+    statusEl.textContent = 'Paired and saved. Reloading…';
+    statusEl.style.color = 'var(--success)';
+    setTimeout(() => location.reload(), 400);
+  } else if (res.status === 401) {
+    statusEl.textContent = 'Token rejected (401) — previous pairing kept.';
+    statusEl.style.color = 'var(--danger)';
+  } else {
+    statusEl.textContent = 'Bridge unavailable (' + (res.status || 0) + ') — previous pairing kept.';
+    statusEl.style.color = 'var(--danger)';
+  }
+});
+
+async function playResult(data) {
+  // Typed no-speech / too-short results from the backend get a clear label
+  // instead of a generic "(no speech recognized)".
+  const noSpeech = data.reason === 'NO_SPEECH' || data.reason === 'SHORT';
+  addMsg('user', data.text || (noSpeech ? '(no speech detected)' : '(no speech recognized)'));
+  if (data.events && data.events.length) {
+    for (const ev of data.events) {
+      if (ev.kind === 'meta') addMsg('meta', '· ' + ev.text);
+    }
+  }
+  if (data.audio_b64) {
+    const audio = new Audio('data:audio/wav;base64,' + data.audio_b64);
+    addMsg('assistant', data.summary || data.text || '');
+    setStatus('speaking…', true);
+    await audio.play();
+    await new Promise(r => audio.onended = r);
+  } else if (data.summary) {
+    addMsg('assistant', data.summary);
+  } else if (data.error) {
+    addMsg('err', data.error);
+  }
+}
+
+// ---- PTT: hold on desktop / toggle on touch ----
+let holdTimer = null;
+ptt.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (busy) return;
+  if (pushMode === 'hold') {
+    holdTimer = setTimeout(() => { pushMode = 'toggle'; startRec(); }, 120);
+  } else {
+    startRec();
+  }
+});
+ptt.addEventListener('pointerup', (e) => {
+  e.preventDefault();
+  if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+  if (pushMode === 'hold' && !recording) { pushMode = 'toggle'; }
+  if (recording) stopRec();
+});
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') { if (recording) stopRec(); }
+});
+
+// ---- typed tasks (no mic needed) ----
+async function sendTyped() {
+  const input = document.getElementById('textin');
+  const t = input.value.trim();
+  if (!t || busy) return;
+  input.value = '';
+  busy = true;
+  ptt.disabled = true;
+  try {
+    const res = await vbApi('/api/type', {
+      method: 'POST',
+      body: JSON.stringify({ text: t }),
+    });
+    if (!res.ok) throw new Error(res.authRequired ? 'not paired' : ('HTTP ' + (res.status || 'network')));
+    const data = res.body;
+    const rid = data && data.request_id;
+    setStatus('working…', true);
+    while (true) {
+      await new Promise(r => setTimeout(r, 900));
+      const r = await vbApi('/api/result/' + rid);
+      const poll = r.body;
+      if (!r.ok) {
+        if (r.authRequired) addMsg('err', 'Dashboard not paired — open /token-setup.');
+        else addMsg('err', 'Result poll failed: ' + (r.error || r.status));
+        break;
+      }
+      if (poll && poll.status === 'done') { await playResult(poll); break; }
+      if (poll && poll.status === 'unknown') { addMsg('err', 'Request lost.'); break; }
+    }
+  } catch (err) {
+    addMsg('err', 'Request failed: ' + err.message);
+    setStatus('error');
+  } finally {
+    busy = false;
+    ptt.disabled = false;
+    setStatus('ready');
+  }
+}
+document.getElementById('textsend').addEventListener('click', sendTyped);
+document.getElementById('textin').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendTyped();
+});
+
+document.getElementById('interruptBtn').addEventListener('click', async (e)=>{ e.preventDefault(); try{ await vbApi('/api/interrupt', {method:'POST', body: JSON.stringify({mode:'interrupt'})}); addMsg('meta','· interrupt sent'); }catch(_){}});
+
+// ---- Talk adapters: sessions drawer, slash commands, profile select ----
+// All three call the same authenticated backends as CLI/voice (session
+// list, command catalog with examples, reasoning-profile registry).
+// Everything renders via textContent; confirmations settle on
+// /approvals or the event stream.
+async function opsRun(id, args) {
+  return vbApi('/api/ops/run', {method:'POST', body: JSON.stringify({id:id, args:args||{}})});
+}
+var talkSession = 'talk-' + Date.now().toString(36);
+var sessionOpen = false;
+document.getElementById('sessionbtn').addEventListener('click', async ()=>{
+  var drawer = document.getElementById('sessiondrawer');
+  sessionOpen = !sessionOpen;
+  drawer.style.display = sessionOpen ? '' : 'none';
+  document.getElementById('sessionbtn').setAttribute('aria-expanded', sessionOpen ? 'true' : 'false');
+  if (!sessionOpen) return;
+  var list = document.getElementById('sessionlist');
+  list.textContent = 'loading…';
+  try {
+    const res = await opsRun('sessions', {});
+    if (res.authRequired) { list.textContent = 'Not paired — open Pair device.'; return; }
+    const out = res.body || {};
+    const result = out.receipt && out.receipt.result ? out.receipt.result : out;
+    const items = result.sessions || [];
+    list.textContent = '';
+    if (!items.length) { list.textContent = (result.detail || 'No sessions yet.'); return; }
+    items.slice(0, 12).forEach(function (s) {
+      const row = document.createElement('div');
+      row.className = 'msg meta';
+      row.textContent = (s.created_at ? new Date(s.created_at*1000).toLocaleTimeString() + ' · ' : '') + (s.action_id || s.receipt_id || 'session') + ' · ' + (s.state || '') + (s.detail ? ' · ' + s.detail : '');
+      list.appendChild(row);
+    });
+  } catch (_) { list.textContent = 'Sessions unavailable.'; }
+});
+document.getElementById('newsession').addEventListener('click', ()=>{
+  talkSession = 'talk-' + Date.now().toString(36);
+  transcript.textContent = '';
+  addMsg('meta', '· new session started (' + talkSession + ')');
+});
+var slashCache = null;
+async function slashCommands() {
+  if (slashCache) return slashCache;
+  try {
+    const res = await opsRun('commands_list', {});
+    const out = res.body || {};
+    const result = out.receipt && out.receipt.result ? out.receipt.result : out;
+    slashCache = (result.commands || []).filter(c => c && c.id);
+  } catch (_) { slashCache = []; }
+  return slashCache;
+}
+document.getElementById('textin').addEventListener('input', async (e)=>{
+  const pop = document.getElementById('slashpop');
+  const v = e.target.value;
+  if (v.charAt(0) !== '/') { pop.style.display = 'none'; pop.textContent = ''; return; }
+  const q = v.slice(1).toLowerCase();
+  const cmds = (await slashCommands()).filter(c =>
+    !q || c.id.toLowerCase().indexOf(q) !== -1 ||
+    (c.aliases||[]).join(' ').toLowerCase().indexOf(q) !== -1).slice(0, 8);
+  pop.textContent = '';
+  if (!cmds.length) { pop.style.display = 'none'; return; }
+  cmds.forEach(function (c) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.setAttribute('role', 'option');
+    b.className = 'quiet-action';
+    b.textContent = '/' + c.id + (c.confirm ? ' (asks first)' : '');
+    b.title = c.help || c.title || c.id;
+    b.addEventListener('click', ()=>{
+      document.getElementById('textin').value = c.example ? String(c.example).replace(/^qubit,\s*/, '') : c.id.replace(/_/g, ' ');
+      pop.style.display = 'none'; pop.textContent = '';
+      document.getElementById('textin').focus();
+    });
+    pop.appendChild(b);
+  });
+  pop.style.display = '';
+});
+document.getElementById('textin').addEventListener('keydown', (e)=>{
+  if (e.key === 'Escape') { const pop = document.getElementById('slashpop'); pop.style.display = 'none'; pop.textContent = ''; }
+});
+async function loadProfiles() {
+  const sel = document.getElementById('modelsel'), st = document.getElementById('modelstate');
+  try {
+    const res = await opsRun('config_profiles', {kind: 'brain'});
+    if (res.authRequired) { st.textContent = 'pair to manage profiles'; return; }
+    const out = res.body || {};
+    const result = out.receipt && out.receipt.result ? out.receipt.result : out;
+    const profiles = (result.profiles || []).filter(p => (p.kind || 'brain') === 'brain');
+    sel.textContent = '';
+    if (!profiles.length) { st.textContent = (result.detail || 'no brain profiles'); return; }
+    profiles.forEach(function (p) {
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.id + (p.active ? ' (active)' : '');
+      if (p.active) o.selected = true;
+      sel.appendChild(o);
+    });
+    st.textContent = '';
+  } catch (_) { st.textContent = 'profiles unavailable'; }
+}
+document.getElementById('modelsel').addEventListener('change', async (e)=>{
+  const st = document.getElementById('modelstate');
+  const name = e.target.value;
+  if (!name) return;
+  st.textContent = 'requesting…';
+  try {
+    const res = await opsRun('profile_select', {kind: 'brain', profile: name});
+    const out = res.body || {};
+    if (out.state === 'needs-confirm' && out.confirmation_id) {
+      st.textContent = 'confirmation staged — approve on /approvals';
+      addMsg('meta', '· profile change waits for your approval (' + out.confirmation_id + ')');
+    } else if (out.state === 'executed') {
+      st.textContent = 'active';
+      addMsg('meta', '· reasoning profile: ' + name);
+    } else {
+      st.textContent = (out.code || out.state || 'failed') + (out.detail ? ' — ' + out.detail : '');
+    }
+  } catch (_) { st.textContent = 'request failed'; }
+});
+loadProfiles();
+setStatus('ready');
+// /api/status now goes through the shared vbApi() helper: it sends the
+// X-Api-Token header, shows the "Dashboard not paired" hint on 401, and never
+// calls JSON.parse on a plain-text error body.
+vbApi('/api/status').then(res => {
+  const d = res.body || {};
+  if (res.authRequired) { setStatus('not paired — open /token-setup'); return; }
+  if (res.ok && d.bridge === 'up') setStatus('bridge up · ' + window.vbRouteLabel(d.route), true);
+  else setStatus('bridge: ' + (d.bridge || res.error || 'offline'));
+  // Voice is read-only: show the effective provider the backend reports.
+  const vi = document.getElementById('voice-info');
+  if (vi) vi.textContent = (res.ok && d.tts)
+    ? 'Effective voice: ' + d.tts + ' (controlled by bridge settings)'
+    : 'Voice is controlled by bridge settings.';
+}).catch(() => setStatus('bridge offline'));
+</script>
+<script>
+// ---- Packet 2B: typed event stream consumer (fetch-SSE; header-token safe).
+// EventSource cannot send X-Api-Token, so the stream is consumed with fetch +
+// a manual frame parser. Reconnects resume from the journal via ?last_seq=.
+// On `resync` the response is aborted IMMEDIATELY and we reconnect with NO
+// cursor (?last_seq absent) — full replay from the durable journal is the
+// safe baseline. JSON polling above remains the compatibility fallback.
+(function(){
+  let lastSeq = null, backoff = 1000, stopped = false;
+  function show(text){ try{ addMsg('meta', text); }catch(_){ } }
+  async function consume(){
+    while(!stopped){
+      const ctrl = new AbortController();
+      try{
+        // lastSeq === null -> deliberately NO last_seq param: server replays
+        // the whole journal (safe cursor after resync / first connect).
+        // vbStream (frontend/ui.js) opens the stream with the shared header
+        // token and returns typed {ok, status, authRequired, reader, cancel}.
+        const res = await vbStream('/api/events/stream' +
+          (lastSeq != null ? ('?last_seq=' + lastSeq) : ''),
+          { accept: 'text/event-stream', signal: ctrl.signal });
+        if (res.authRequired) {
+          // unpaired: stop retrying and show the pairing hint
+          stopped = true;
+          break;
+        }
+        if(!res.ok || !res.reader) throw new Error('stream http ' + (res.status||0));
+        backoff = 1000;
+        const reader = res.reader; const dec = new TextDecoder();
+        let buf = '', needResync = false;
+        for(;;){
+          const {done, value} = await reader.read();
+          if(done) break;
+          buf += dec.decode(value, {stream:true});
+          let i;
+          while((i = buf.indexOf('\n\n')) >= 0 && !needResync){
+            const block = buf.slice(0, i); buf = buf.slice(i + 2);
+            let id = null, data = '', evname = 'message';
+            for(const line of block.split('\n')){
+              if(line.startsWith(':')) continue;               // comment/heartbeat
+              else if(line.startsWith('id:')) id = line.slice(3).trim();
+              else if(line.startsWith('event:')) evname = line.slice(6).trim();
+              else if(line.startsWith('data:')) data += line.slice(5).trim();
+            }
+            if(evname === 'resync'){
+              // queue overflow server-side: drop EVERYTHING local and take a
+              // fresh authoritative replay; abort this connection now.
+              needResync = true; lastSeq = null;
+              try{ await reader.cancel(); }catch(_){}
+              ctrl.abort();
+              break;
+            }
+            if(id != null) lastSeq = parseInt(id, 10);
+            if(data){
+              let ev; try{ ev = JSON.parse(data); }catch(_){ continue; }
+              const t = ev.type || '';
+              if(t === 'RUN_STARTED' || t === 'RUN_FINISHED' ||
+                 t === 'RUN_ERROR' || t === 'RUN_CANCELLED')
+                show('· run ' + (ev.runId||'') + ': ' + t.toLowerCase());
+              else if(t === 'CUSTOM' && String(ev.name||'').startsWith('approval'))
+                show('· approval: ' + ev.name + ' ' + ((ev.value||{}).capability||''));
+              else if(t === 'STEP_STARTED' || t === 'STEP_FINISHED')
+                show('· ' + (ev.stepName||'step'));
+              else if(t === 'STATE_SNAPSHOT' || t === 'STATE_DELTA')
+                show('· state update');
+              try{ document.dispatchEvent(new CustomEvent('vdb-event', {detail: ev})); }catch(_){}
+            }
+          }
+          if(needResync) break;
+        }
+      }catch(err){
+        show('· live stream unavailable (' + (err && err.message || err) + '); polling fallback active');
+      }
+      finally{
+        try{ ctrl.abort(); }catch(_){}   // never leak a half-open stream
+      }
+      if(stopped) return;
+      await new Promise(r => setTimeout(r, Math.min(backoff *= 2, 15000)));
+    }
+  }
+  window.vdbCancelRun = async function(runId, reason){
+    try{
+      const res = await vbApi('/api/runs/' + encodeURIComponent(runId) + '/cancel',
+        { method:'POST', body: JSON.stringify({reason: reason || 'user'}) });
+      return Object.assign({ ok: res.ok, status: res.status, error: res.error },
+                           res.body || {});
+    }catch(e){ return {ok:false, error:String(e)}; }
+  };
+  document.addEventListener('visibilitychange', ()=>{ /* keep-alive: refetch on tab focus is handled by reconnect loop */ });
+  consume();
+})();
+</script>
+<script>
+// ---- Inline history correction (STEAL_LIST Item 4 / CLHF feedback loop).
+// Wraps addMsg so every assistant answer carries a "Teach" row posting to the
+// existing POST /api/feedback endpoint (good/bad/correction contract).
+(function(){
+  const orig = addMsg;
+  let lastUser = '(previous utterance)';
+  window.addMsg = function(cls, text){
+    if(cls === 'user' && text) lastUser = text;
+    orig.call(this, cls, text);
+    if(cls !== 'assistant') return;
+    const tr = document.getElementById('transcript');
+    const row = tr && tr.firstElementChild;
+    if(!row) return;
+    const bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;gap:6px;margin:-2px 0 8px;';
+    const input = document.createElement('input');
+    input.className = 'history-correction-input';
+    input.placeholder = 'What should Qubit have said?';
+    input.style.cssText = 'flex:1;padding:4px 8px;background:var(--surface-soft);border:1px solid var(--line-strong);color:var(--text);border-radius:6px;font-size:12px;';
+    const send = document.createElement('button');
+    send.textContent = 'Teach';
+    send.className = 'ok';
+    send.style.cssText = 'padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;';
+    send.addEventListener('click', async () => {
+      const corrected = input.value.trim();
+      const body = {
+        user: lastUser,
+        answer: String(text || ''),
+        // empty box = plain bad rating; typed text = explicit correction
+        feedback: corrected ? 'correction' : 'bad',
+        corrected: corrected
+      };
+      try{
+        const res = await vbApi('/api/feedback',
+          { method:'POST', body: JSON.stringify(body) });
+        const out = res.body || {};
+        addMsg('meta', res.ok ? (corrected ? '· taught: correction stored'
+                                 : '· rated bad')
+                    : ('· feedback rejected: ' + (out.error || res.error || res.status)));
+        if(res.ok && out.ok){ input.value=''; send.textContent='Taught ✓'; setTimeout(()=>send.textContent='Teach',1500); }
+      }catch(e){ addMsg("meta", "· feedback failed: " + e.message); }
+    });
+    bar.appendChild(input); bar.appendChild(send);
+    row.insertAdjacentElement('afterend', bar);
+  };
+})();
+</script>
+<script>
+// ---- Packet 6A: learned-preferences panel (user-visible provenance + removal).
+// Explanations come from the stored lesson rows (source/confidence/evidence),
+// never from a model-invented answer. All text is rendered via textContent.
+(function(){
+  const panel = document.getElementById('lessonspanel');
+  const listEl = document.getElementById('lessonslist');
+  const revEl = document.getElementById('lessonsreviews');
+  const link = document.getElementById('lessonslink');
+
+  function row(label, text){
+    const el = document.createElement('div');
+    el.style.cssText = 'padding:6px 0;border-bottom:1px solid var(--line);';
+    const src = document.createElement('span');
+    src.textContent = label;
+    src.style.cssText = 'color:var(--primary);margin-right:6px;';
+    const body = document.createElement('span');
+    body.textContent = text;
+    el.appendChild(src); el.appendChild(body);
+    return el;
+  }
+  function action(label, title){
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.title = title || '';
+    b.className = 'quiet-action';
+    b.style.cssText = 'padding:2px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-left:8px;';
+    return b;
+  }
+  function explainLine(l){
+    const bits = [];
+    if (l.kind) bits.push('source: ' + l.source);
+    if (typeof l.confidence === 'number') bits.push('confidence: ' + l.confidence);
+    if (l.evidence_count) bits.push('evidence: ' + l.evidence_count);
+    if (l.created_at) bits.push('learned ' + new Date(l.created_at * 1000).toLocaleString());
+    return bits.join(' · ');
+  }
+  function refresh(){
+    vbApi('/api/lessons').then(res => {
+      const d = res.body || { lessons: [], reviews: [] };
+      const lessons = d.lessons || [];
+      const reviews = d.reviews || [];
+      listEl.replaceChildren();
+      revEl.replaceChildren();
+      if (res.authRequired){ listEl.textContent = 'not paired — open /token-setup'; return; }
+      if (!lessons.length && !reviews.length){
+        listEl.textContent = 'No learned preferences yet. Rate an answer or teach a correction to create one.';
+        return;
+      }
+      if (lessons.length){
+        listEl.appendChild(document.createTextNode('Active:'));
+        lessons.forEach(l => {
+          const el = row('▸', l.text);
+          const why = action('why', 'Show stored provenance');
+          const rm = action('remove', 'Forget this preference');
+          el.appendChild(why); el.appendChild(rm);
+          why.addEventListener('click', () => { addMsg('meta', '· ' + l.text + ' (' + explainLine(l) + ')'); });
+          rm.addEventListener('click', async () => {
+            await vbApi('/api/lessons/remove',
+              { method:'POST', body: JSON.stringify({ lesson_id: l.lesson_id }) });
+            addMsg('meta', '· removed: ' + l.text);
+            refresh();
+          });
+          listEl.appendChild(el);
+        });
+      }
+      if (reviews.length){
+        revEl.appendChild(document.createTextNode('Needs your review:'));
+        reviews.forEach(l => {
+          const el = row('⚠', l.text);
+          const why = action('why', 'Show stored provenance');
+          const rm = action('remove', 'Reject this');
+          const keep = action('keep', 'Promote this to a preference');
+          el.appendChild(why); el.appendChild(rm); el.appendChild(keep);
+          why.addEventListener('click', () => { addMsg('meta', '· ' + l.text + ' (' + explainLine(l) + ')'); });
+          rm.addEventListener('click', async () => {
+            await vbApi('/api/lessons/remove',
+              { method:'POST', body: JSON.stringify({ lesson_id: l.lesson_id }) });
+            refresh();
+          });
+          keep.addEventListener('click', async () => {
+            await vbApi('/api/lessons/promote',
+              { method:'POST', body: JSON.stringify({ lesson_id: l.lesson_id }) });
+            refresh();
+          });
+          revEl.appendChild(el);
+        });
+      }
+    }).catch(() => { listEl.textContent = 'unavailable'; });
+  }
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const show = panel.style.display === 'none';
+    panel.style.display = show ? '' : 'none';
+    if (show) refresh();
+  });
+})();
+</script>
+<script>
+// ---- Packet 7E: permissions & skills panel (real backend, typed states).
+// Beginner view: Restricted/Unrestricted + plain-language grants + risk warning.
+// Advanced view: capability check, expiry, provenance, audit. Every mutating
+// control posts to the real /api/permissions backend with confirmed:true only
+// after an explicit confirm() dialog; all text is rendered via textContent.
+(function(){
+  const panel = document.getElementById('permspanel');
+  const link = document.getElementById('permslink');
+  const st = document.getElementById('perms-status');
+  const grantsEl = document.getElementById('perm-grants');
+  const skillsEl = document.getElementById('perm-skills');
+  const effEl = document.getElementById('perm-effective');
+  const audEl = document.getElementById('perm-audit');
+  let data = null;
+
+  function btn(label, title, onClick){
+    const b = document.createElement('button');
+    b.textContent = label; b.title = title || '';
+    b.className = 'quiet-action';
+    b.style.cssText = 'padding:2px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-left:8px;';
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function line(text, style){
+    const d = document.createElement('div');
+    d.textContent = text;
+    if(style) d.style.cssText = style;
+    return d;
+  }
+  function setStatus(t, kind){
+    st.textContent = t;
+    st.style.color = kind === 'err' ? 'var(--danger)' : (kind === 'ok' ? 'var(--success)' : 'var(--muted)');
+  }
+  async function post(body){
+    const res = await vbApi('/api/permissions',
+      { method:'POST', body: JSON.stringify(body) });
+    const out = res.body || {};
+    if (res.authRequired){ setStatus('not paired — open /token-setup', 'err'); refresh(); return out; }
+    if(out.state === 'OK') setStatus('ok', 'ok');
+    else setStatus((out.detail || out.code || out.state || res.error || res.status) + '', 'err');
+    refresh();
+    return out;
+  }
+  function ask(promptText){
+    return window.confirm(promptText);
+  }
+  function scopesFromInput(){
+    return document.getElementById('perm-scopes').value.split(',').map(s=>s.trim()).filter(Boolean);
+  }
+  function renderGrants(){
+    grantsEl.replaceChildren();
+    const gs = (data && data.grants) || [];
+    if(!gs.length){ grantsEl.appendChild(line('No grants — restricted mode denies everything not explicitly granted.', 'color:var(--muted);')); return; }
+    gs.forEach(g => {
+      const d = line('▸ ' + g.capability + ' · ' + (g.scopes||[]).join(', ') +
+        (g.expires_at ? ' · expires ' + new Date(g.expires_at*1000).toLocaleString() : ' · no expiry'));
+      d.appendChild(btn('revoke', 'Revoke this grant', async () => {
+        if(!ask('Revoke grant ' + g.capability + '?')) return;
+        await post({ action:'revoke', grant_id: g.id, confirmed: true });
+      }));
+      grantsEl.appendChild(d);
+    });
+  }
+  function renderSkills(){
+    skillsEl.replaceChildren();
+    const ss = (data && data.skills) || [];
+    if(!ss.length){ skillsEl.appendChild(line('No skills installed. Use `voicebridge skills install <manifest.json>` or the CLI.', 'color:var(--muted);')); return; }
+    ss.forEach(s => {
+      const d = line('▸ ' + s.skill_id + ' v' + s.manifest.version + ' · ' + s.status +
+        (s.manifest.license ? ' · ' + s.manifest.license : ''));
+      if(s.status === 'staged' || s.status === 'disabled')
+        d.appendChild(btn('enable', 'Enable this skill', async () => {
+          if(!ask('Enable skill ' + s.skill_id + '? Its declared capabilities become active in their scopes.')) return;
+          await post({ action:'skill-enable', skill_id: s.skill_id, confirmed: true });
+        }));
+      if(s.status === 'active')
+        d.appendChild(btn('disable', 'Disable this skill', async () => {
+          if(!ask('Disable skill ' + s.skill_id + '?')) return;
+          await post({ action:'skill-disable', skill_id: s.skill_id, confirmed: true });
+        }));
+      d.appendChild(btn('remove', 'Remove this skill', async () => {
+        if(!ask('Remove skill ' + s.skill_id + '? (backed up, reversible)')) return;
+        await post({ action:'skill-remove', skill_id: s.skill_id, confirmed: true });
+      }));
+      d.appendChild(btn('rollback', 'Roll back to previous state', async () => {
+        if(!ask('Roll back skill ' + s.skill_id + '?')) return;
+        await post({ action:'skill-rollback', skill_id: s.skill_id, confirmed: true });
+      }));
+      skillsEl.appendChild(d);
+    });
+  }
+  function renderAudit(){
+    audEl.replaceChildren();
+    const a = (data && data.audit) || [];
+    if(!a.length){ audEl.appendChild(line('audit: (empty)')); return; }
+    a.slice().reverse().forEach(e => {
+      audEl.appendChild(line('· ' + new Date(e.ts*1000).toLocaleString() + ' ' + e.action +
+        ' (' + (e.actor||'') + ')'));
+    });
+  }
+  function refresh(){
+    vbApi('/api/permissions').then(res => {
+      const d = res.body || {};
+      data = d;
+      if (res.authRequired){ setStatus('not paired — open /token-setup', 'err'); return; }
+      if(d.state !== 'OK'){ setStatus('unavailable: ' + (d.detail||d.state||res.error), 'err'); return; }
+      setStatus('mode: ' + d.mode + ((d.mode_scopes||[]).length ? ' · scopes: ' + d.mode_scopes.join(', ') : '') +
+        (d.mode_expires_at ? ' · until ' + new Date(d.mode_expires_at*1000).toLocaleString() : ''), 'ok');
+      renderGrants(); renderSkills(); renderAudit();
+    }).catch(() => setStatus('unavailable (bridge offline)', 'err'));
+  }
+  document.getElementById('perm-restricted').addEventListener('click', async () => {
+    if(!ask('Switch to Restricted mode? Only explicitly granted capabilities and scopes will work.')) return;
+    await post({ action:'set-mode', mode:'restricted', confirmed: true });
+  });
+  document.getElementById('perm-unrestricted').addEventListener('click', async () => {
+    const scopes = scopesFromInput();
+    if(!scopes.length){ setStatus('choose at least one scope first', 'err'); return; }
+    if(!ask('Enable Unrestricted mode in scopes: ' + scopes.join(', ') + '? It pre-authorizes routine non-destructive work there; it never bypasses hard-deny, audit, isolation, or confirmation for sensitive actions.')) return;
+    await post({ action:'set-mode', mode:'unrestricted', scopes: scopes, ttl: 3600, confirmed: true });
+  });
+  document.getElementById('perm-reset').addEventListener('click', async () => {
+    if(!ask('Reset permissions: return to Restricted and revoke ALL grants?')) return;
+    await post({ action:'reset', confirmed: true });
+  });
+  document.getElementById('perm-check-btn').addEventListener('click', async () => {
+    const cap = document.getElementById('perm-check-cap').value.trim();
+    if(!cap) return;
+    const res = await vbApi('/api/permissions');
+    const d = res.body || {};
+    effEl.textContent = 'check runs on the backend policy; see `voicebridge permissions check ' + cap + '` for the full decision.';
+  });
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const show = panel.style.display === 'none';
+    panel.style.display = show ? '' : 'none';
+    if (show) refresh();
+  });
+})();
+</script>
+<script>
+// ---- Packet 8C: canonical reports panel (real authenticated backend).
+// All message-derived text is rendered via textContent (never innerHTML);
+// source links are created as real <a> elements only when the API validated
+// them as safe https; search + platform filters are client-side over the
+// index; detail shows items/evidence/ack/export/print.
+(function(){
+  const panel = document.getElementById('reportspanel');
+  const link = document.getElementById('reportslink');
+  const listEl = document.getElementById('reports-list');
+  const qEl = document.getElementById('reports-q');
+  let data = null, filter = '';
+
+  function btn(label, title, onClick){
+    const b = document.createElement('button');
+    b.textContent = label; b.title = title || '';
+    b.className = 'quiet-action';
+    b.style.cssText = 'padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;margin-left:6px;';
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function srcLink(url, label){
+    if(!url) return null;
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = label;
+    a.className = 'tap-target';
+    a.style.cssText = 'color:var(--primary);';
+    return a;
+  }
+  async function fetchJson(path){
+    const r = await vbApi(path);
+    if(!r.ok) throw new Error(r.authRequired ? 'not paired — open /token-setup' : ('HTTP ' + (r.status || 'network')));
+    return r.body;
+  }
+  function renderCards(){
+    listEl.replaceChildren();
+    const reports = (data && data.reports) || [];
+    const q = (qEl.value || '').trim().toLowerCase();
+    const shown = reports.filter(r => {
+      if(filter && !(r.platforms || []).includes(filter)) return false;
+      if(!q) return true;
+      return (r.report_id + ' ' + (r.summary || '')).toLowerCase().includes(q);
+    });
+    if(!shown.length){
+      listEl.appendChild(document.createTextNode(
+        'No reports yet. Run a communications scan to create a canonical bundle.'));
+      return;
+    }
+    shown.forEach(r => {
+      const card = document.createElement('div');
+      card.style.cssText = 'background:var(--surface-soft);border:1px solid var(--line);border-radius:8px;padding:8px;margin:6px 0;';
+      const head = document.createElement('div');
+      head.style.cssText = 'display:flex;justify-content:space-between;gap:8px;';
+      const id = document.createElement('span');
+      id.textContent = r.report_id + (r.acknowledged ? ' ✓' : '');
+      const st = document.createElement('span');
+      st.textContent = (r.status || '').toUpperCase();
+      st.style.cssText = 'color:' + (r.status === 'success' ? 'var(--success)'
+        : (r.status === 'partial' ? 'var(--warning)' : 'var(--danger)'));
+      head.appendChild(id); head.appendChild(st);
+      const meta = document.createElement('div');
+      meta.style.cssText = 'color:var(--muted);font-size:11px;margin:2px 0;';
+      meta.textContent = 'new ' + r.new_count + ' · ' + (r.platforms || []).join(', ')
+        + ' · ' + new Date(r.created_at * 1000).toLocaleString();
+      const foot = document.createElement('div');
+      foot.appendChild(btn('view', 'Open report detail', () => openDetail(r.report_id)));
+      foot.appendChild(btn('export', 'Download bundle (.zip)', async () => {
+        const bin = await vbFetchBinary('/api/reports/export/' + encodeURIComponent(r.report_id));
+        if (bin.ok && bin.blob) {
+          vbDownload(bin.blob, r.report_id + '.zip');
+        } else {
+          addMsg('meta', '· export ' + (bin.authRequired ? 'not paired' : 'failed (' + (bin.status || 0) + ')'));
+        }
+      }));
+      card.appendChild(head); card.appendChild(meta); card.appendChild(foot);
+      listEl.appendChild(card);
+    });
+  }
+  function openDetail(rid){
+    fetchJson('/api/reports/' + encodeURIComponent(rid)).then(d => {
+      const rep = d.report;
+      const assetByItem = {};
+      (rep.assets || []).forEach(a => { assetByItem[a.item_identity] = a.asset_id; });
+      listEl.replaceChildren();
+      listEl.appendChild(btn('← back', 'Back to report list', load));
+      const head = document.createElement('h3'); head.textContent = 'Report ' + rid;
+      listEl.appendChild(head);
+      const meta = document.createElement('div');
+      meta.style.cssText = 'color:var(--muted);font-size:12px;';
+      meta.textContent = (rep.status || '').toUpperCase() + ' · new ' + rep.new_count
+        + ' · ' + new Date(rep.created_at * 1000).toLocaleString()
+        + (rep.acknowledged ? ' · acknowledged' : '');
+      listEl.appendChild(meta);
+      const sum = document.createElement('div');
+      sum.textContent = 'Summary: ' + (rep.summary || '—');
+      sum.style.cssText = 'margin:6px 0;';
+      listEl.appendChild(sum);
+      (rep.items || []).forEach(it => {
+        const row = document.createElement('div');
+        row.style.cssText = 'border-top:1px solid var(--line);padding:6px 0;';
+        const line = document.createElement('div');
+        line.textContent = (it.sender || '') + ' — ' + (it.subject || it.preview || '')
+          + ' [' + it.read_state + '] ' + (it.ts_raw || '');
+        row.appendChild(line);
+        const ev = document.createElement('div');
+        ev.textContent = 'evidence: ' + it.evidence_status;
+        ev.style.cssText = 'color:var(--muted);font-size:11px;';
+        row.appendChild(ev);
+        const s = srcLink(it.safe_url, 'source');
+        if(s) row.appendChild(s);
+        const aid = assetByItem[it.identity];
+        if(aid){
+          const img = document.createElement('img');
+          img.alt = 'scoped screenshot thumbnail';
+          img.style.cssText = 'max-width:220px;border-radius:6px;margin-top:4px;display:block;';
+          row.appendChild(img);
+          // Authenticated asset: fetch with the header token, display via a
+          // temporary blob object URL, and revoke it once decoded.
+          vbFetchBinary('/api/reports/' + encodeURIComponent(rid) + '/assets/' + encodeURIComponent(aid)).then(ar => {
+            if (ar.ok && ar.blob) {
+              const url = URL.createObjectURL(ar.blob);
+              img.onload = () => { try { URL.revokeObjectURL(url); } catch (e) {} };
+              img.onerror = () => { try { URL.revokeObjectURL(url); } catch (e) {} };
+              img.src = url;
+            } else {
+              img.alt = 'evidence unavailable';
+            }
+          });
+        }
+        listEl.appendChild(row);
+      });
+      const actions = document.createElement('div');
+      actions.style.cssText = 'margin-top:10px;';
+      actions.appendChild(btn('acknowledge', 'Mark acknowledged', async () => {
+        await vbApi('/api/reports/' + encodeURIComponent(rid) + '/ack',
+          { method: 'POST', body: '{}' });
+        load();
+      }));
+      actions.appendChild(btn('print', 'Open print view', async () => {
+        const r = await vbFetchBinary('/api/reports/' + encodeURIComponent(rid) + '/html');
+        if (r.ok && r.blob) {
+          vbOpenBinary(r.blob);
+        } else {
+          addMsg('meta', '· print view ' + (r.authRequired ? 'not paired' : 'failed (' + (r.status || 0) + ')'));
+        }
+      }));
+      listEl.appendChild(actions);
+    }).catch(() => { listEl.textContent = 'report detail unavailable'; });
+  }
+  function load(){
+    fetchJson('/api/reports').then(d => { data = d; renderCards(); })
+      .catch(() => { listEl.textContent = 'reports unavailable (bridge offline)'; });
+    // Packet 8D: pending notification count (redacted metadata only).
+    fetchJson('/api/notifications').then(n => {
+      const badge = document.getElementById('notif-badge');
+      if (n && n.pending > 0) {
+        badge.textContent = n.pending + ' new';
+        badge.style.display = '';
+      } else if (badge) { badge.style.display = 'none'; }
+    }).catch(() => {});
+  }
+  qEl.addEventListener('input', renderCards);
+  document.querySelectorAll('#reportspanel button[data-p]').forEach(b => {
+    b.addEventListener('click', () => { filter = b.getAttribute('data-p'); load(); });
+  });
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const show = panel.style.display === 'none';
+    panel.style.display = show ? '' : 'none';
+    if (show) load();
+  });
+})();
+</script>
+</body></html>

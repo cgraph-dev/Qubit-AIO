@@ -1,0 +1,13 @@
+{
+  "name": "qubit-brand",
+  "label": "Qubit Brand",
+  "description": "Qubit product identity (header mark + rebrand styles). Qubit-owned addition; upstream names stay only in legal/provenance records.",
+  "icon": "sparkles",
+  "version": "1.0.0",
+  "tab": {"path": "/qubit-brand", "hidden": true},
+  "slots": ["header-left", "docs:top"],
+  "entry": "qubit-brand.js",
+  "css": null,
+  "has_api": false,
+  "source": "qubit-overlay"
+}

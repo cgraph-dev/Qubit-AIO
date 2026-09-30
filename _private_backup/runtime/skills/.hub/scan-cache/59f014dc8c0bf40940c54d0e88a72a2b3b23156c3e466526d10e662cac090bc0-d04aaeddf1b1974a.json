@@ -1,0 +1,71 @@
+{
+  "bundle_hash": "sha256:59f014dc8c0bf40940c54d0e88a72a2b3b23156c3e466526d10e662cac090bc0",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/devops/hermes-s6-container-supervision",
+  "verdict": "dangerous",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "proc_access",
+      "severity": "high",
+      "category": "traversal",
+      "file": "SKILL.md",
+      "line": 94,
+      "match": "docker exec <c> sh -c 'cat /proc/1/comm; readlink /proc/1/exe'",
+      "description": "references /proc filesystem (process introspection)"
+    },
+    {
+      "pattern_id": "setuid_setgid",
+      "severity": "critical",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 52,
+      "match": "\u2502   \u2502   \u251c\u2500\u2500 run         (\"#!/command/with-contenv sh ... exec s6-setuidgid hermes hermes -p coder gateway run\")",
+      "description": "setuid/setgid (privilege escalation mechanism)"
+    },
+    {
+      "pattern_id": "setuid_setgid",
+      "severity": "critical",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 70,
+      "match": "| `docker/main-wrapper.sh` | The container's CMD. Routes user args, drops to hermes via `s6-setuidgid`, exec's the ch...",
+      "description": "setuid/setgid (privilege escalation mechanism)"
+    },
+    {
+      "pattern_id": "setuid_setgid",
+      "severity": "critical",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 85,
+      "match": "So we use the s6-overlay-native CMD pattern via the dispatcher: `ENTRYPOINT [\"/opt/hermes/docker/entrypoint-dispatch....",
+      "description": "setuid/setgid (privilege escalation mechanism)"
+    },
+    {
+      "pattern_id": "setuid_setgid",
+      "severity": "critical",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 127,
+      "match": "2. Drop to hermes via `s6-setuidgid hermes` at the top of run (unless you specifically need root).",
+      "description": "setuid/setgid (privilege escalation mechanism)"
+    },
+    {
+      "pattern_id": "setuid_setgid",
+      "severity": "critical",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 154,
+      "match": "The cont-init reconciler runs as hermes (`s6-setuidgid hermes` in `02-reconcile-profiles`). If a profile dir ends up ...",
+      "description": "setuid/setgid (privilege escalation mechanism)"
+    }
+  ],
+  "rules": [
+    "proc_access",
+    "setuid_setgid"
+  ],
+  "scanned_at": "2026-09-23T02:50:41.722250+00:00",
+  "summary": "hermes-s6-container-supervision: dangerous \u2014 6 finding(s) in privilege_escalation, traversal",
+  "fresh": true
+}

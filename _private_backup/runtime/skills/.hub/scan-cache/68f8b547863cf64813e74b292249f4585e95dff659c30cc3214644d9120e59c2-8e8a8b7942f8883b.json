@@ -1,0 +1,215 @@
+{
+  "bundle_hash": "sha256:68f8b547863cf64813e74b292249f4585e95dff659c30cc3214644d9120e59c2",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/productivity/siyuan",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 21,
+      "match": "prompt: SiYuan instance URL (default http://127.0.0.1:6806)",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 36,
+      "match": "SIYUAN_URL=http://127.0.0.1:6806",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 38,
+      "match": "`SIYUAN_URL` defaults to `http://127.0.0.1:6806` if not set.",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 45,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/...\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 86,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/search/fullTextSearchBlock\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 97,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/query/sql\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 110,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/block/getBlockKramdown\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 119,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/block/getChildBlocks\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 128,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/filetree/getHPathByID\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 137,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/attr/getBlockAttrs\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 146,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/notebook/lsNotebooks\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 155,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/filetree/listDocsByPath\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 164,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/filetree/createDocWithMd\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 177,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/notebook/createNotebook\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 186,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/block/appendBlock\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 201,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/block/updateBlock\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 214,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/filetree/renameDocByID\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 225,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/attr/setBlockAttrs\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 240,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/block/deleteBlock\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 252,
+      "match": "curl -s -X POST \"${SIYUAN_URL:-http://127.0.0.1:6806}/api/export/exportMdContent\" \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 297,
+      "match": "SIYUAN_URL: \"http://127.0.0.1:6806\"",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hermes_config_ref",
+      "severity": "low",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 290,
+      "match": "# In ~/.hermes/config.yaml under mcp_servers:",
+      "description": "references Hermes configuration files (informational; only modification intent is scored)"
+    }
+  ],
+  "rules": [
+    "hardcoded_ip_port",
+    "hermes_config_ref"
+  ],
+  "scanned_at": "2026-09-23T02:51:02.448649+00:00",
+  "summary": "siyuan: safe \u2014 22 finding(s) in network, persistence",
+  "fresh": true
+}

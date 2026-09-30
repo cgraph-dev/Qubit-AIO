@@ -1,0 +1,25 @@
+{
+  "bundle_hash": "sha256:c064bcf08baea8e5827c3f73e12a8a0a108e8bc232b4bb758c6a308983d7dfc1",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/pinecone",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 45,
+      "match": "pip install pinecone",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:50.769127+00:00",
+  "summary": "pinecone: safe \u2014 1 finding(s) in supply_chain",
+  "fresh": true
+}

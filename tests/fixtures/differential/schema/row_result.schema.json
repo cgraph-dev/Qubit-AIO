@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qubit.local/schemas/differential/row_result.schema.json",
+  "title": "Differential row result (INTERFACE v1.2)",
+  "description": "One result object per inventory row returned by run_inventory. Mirrors the v1.1 Row-result schema in /tmp/qubit-differential/INTERFACE.md plus the Plan section 8/15 evidence fields and the v1.2 transport/reference additions. v1.3 adds the optional voice result keys resolved_operation, confirmation_required and voice_detail, and the voice transport value. additionalProperties is intentionally open: results also carry runner bookkeeping such as qubit_payload, qubit_raw_result_hash and missing_evidence. The v1.2/v1.3 keys are optional (never required) because the runner only emits them on rows whose adapter exposes that transport/reference/voice evidence; the required list stays consistent with the runner.",
+  "type": "object",
+  "required": [
+    "capability_id",
+    "declared_disposition",
+    "disposition",
+    "executed",
+    "qubit_executed",
+    "reference_executed",
+    "fixture_present",
+    "adapter_mock",
+    "refused",
+    "unsafe_normalizers",
+    "visual_only",
+    "voice_mismatch",
+    "persistence_diff",
+    "secret_in_artifact",
+    "production_caller",
+    "diagnostics",
+    "operator_prerequisite",
+    "upstream_result_hash",
+    "qubit_result_hash",
+    "fixture_hash",
+    "unclassifiable",
+    "voice_utterance",
+    "dashboard_route",
+    "dashboard_control",
+    "request_schema",
+    "broker_policy_decision",
+    "runtime_provider",
+    "store_state_assertion",
+    "output_event_assertion",
+    "error_codes",
+    "retry_recovery_proof",
+    "audit_receipt_proof",
+    "security_resource_proof",
+    "package_proof",
+    "response_headers",
+    "screenshot_ref",
+    "dom_snapshot_ref",
+    "a11y_snapshot_ref",
+    "raw_hash"
+  ],
+  "properties": {
+    "capability_id": {"type": "string", "minLength": 1},
+    "declared_disposition": {"$ref": "#/$defs/disposition"},
+    "disposition": {"$ref": "#/$defs/disposition"},
+    "executed": {"type": "boolean"},
+    "qubit_executed": {"type": "boolean"},
+    "reference_executed": {"type": "boolean"},
+    "fixture_present": {"type": "boolean"},
+    "adapter_mock": {"type": "boolean"},
+    "refused": {"type": "boolean"},
+    "unsafe_normalizers": {"type": "array", "items": {"type": "string"}},
+    "visual_only": {"type": "boolean"},
+    "voice_mismatch": {"type": "boolean"},
+    "persistence_diff": {"type": "boolean"},
+    "secret_in_artifact": {"type": "boolean"},
+    "production_caller": {"type": ["string", "null"]},
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "kind", "detail"],
+        "properties": {
+          "path": {"type": "string"},
+          "kind": {"type": "string"},
+          "detail": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "operator_prerequisite": {"type": ["string", "null"]},
+    "upstream_result_hash": {"$ref": "#/$defs/hashOrNull"},
+    "qubit_result_hash": {"$ref": "#/$defs/hashOrNull"},
+    "fixture_hash": {"$ref": "#/$defs/hashOrNull"},
+    "unclassifiable": {"type": "boolean"},
+    "state_changing": {
+      "type": ["boolean", "null"],
+      "description": "Whether the row's fixture was declared state_changing."
+    },
+    "state_changing_skipped": {
+      "type": ["boolean", "null"],
+      "description": "True when a state_changing fixture was not executed because allow_state_changing was not opted in."
+    },
+    "state_changing_reason": {
+      "type": ["string", "array", "null"],
+      "items": {"type": "string"},
+      "description": "Optional. Why the row/fixture was classified state-changing, or why a state-changing row was skipped. Absent/null when not applicable."
+    },
+    "host_allowlist_violation": {
+      "type": ["boolean", "null"],
+      "description": "Optional. True when a transport adapter attempted a host outside the env-derived allowlist (SSRF guard). Absent/null when no transport request executed."
+    },
+    "redacted": {
+      "type": ["boolean", "null"],
+      "description": "Optional. True when secret-shaped values in this row's payload/detail were redacted before emission."
+    },
+    "byte_parity": {
+      "type": ["boolean", "null"],
+      "description": "Whether the compared payloads matched byte-for-byte (before normalizers). Null when no byte-comparable payload exists."
+    },
+    "voice_utterance": {"type": ["string", "object", "array", "null"]},
+    "resolved_operation": {
+      "type": ["string", "object", "array", "null"],
+      "description": "Optional. Canonical operation a voice/utterance row actually resolved to (the runner's voice_operation). Absent/null on non-voice rows or when unresolved."
+    },
+    "confirmation_required": {
+      "type": ["boolean", "null"],
+      "description": "Optional. Whether the resolved voice operation staged a confirmation before execution. Absent/null when not applicable."
+    },
+    "voice_detail": {
+      "type": ["string", "object", "array", "null"],
+      "description": "Optional. Additional voice evidence (identity, confirmation, cancel/expiry/replay detail). Absent/null when not applicable."
+    },
+    "dashboard_route": {"type": ["string", "object", "array", "null"]},
+    "dashboard_control": {"type": ["string", "object", "array", "null"]},
+    "request_schema": {"type": ["string", "object", "array", "null"]},
+    "broker_policy_decision": {"type": ["string", "object", "array", "null"]},
+    "runtime_provider": {"type": ["string", "object", "array", "null"]},
+    "store_state_assertion": {"type": ["string", "object", "array", "null"]},
+    "output_event_assertion": {"type": ["string", "object", "array", "null"]},
+    "error_codes": {"type": ["array", "null"], "items": {"type": "string"}},
+    "retry_recovery_proof": {"type": ["string", "object", "array", "null"]},
+    "audit_receipt_proof": {"type": ["string", "object", "array", "null"]},
+    "security_resource_proof": {"type": ["string", "object", "array", "null"]},
+    "package_proof": {"type": ["string", "object", "array", "null"]},
+    "response_headers": {"type": ["object", "null"]},
+    "screenshot_ref": {"type": ["string", "object", "null"]},
+    "dom_snapshot_ref": {"type": ["string", "object", "null"]},
+    "a11y_snapshot_ref": {"type": ["string", "object", "null"]},
+    "raw_hash": {"$ref": "#/$defs/hashOrNull"},
+    "transport": {"enum": ["cli", "http", "sse", "ws", "rpc", "voice", null]},
+    "headers": {"type": ["object", "null"]},
+    "events": {"type": ["array", "null"]},
+    "persisted_state": {},
+    "reference_commit": {"type": ["string", "null"]},
+    "reference_version": {"type": ["string", "null"]},
+    "reference_pinned": {"type": ["boolean", "null"]},
+    "unpinned_references": {"type": ["array", "null"], "items": {"type": "string"}},
+    "disposition_basis": {"type": ["string", "object", "array", "null"]},
+    "references": {
+      "type": ["object", "null"],
+      "description": "Per-project reference execution bookkeeping, keyed by hermes|openclaw. Always emitted ({} when none declared).",
+      "additionalProperties": {"$ref": "#/$defs/referenceInfo"}
+    },
+    "reference_provenance": {
+      "type": ["object", "null"],
+      "description": "INTERFACE v1.2 reference provenance: {<project>: {bin, version, commit, pinned}}.",
+      "additionalProperties": {"$ref": "#/$defs/referenceProvenance"}
+    },
+    "reference_payloads": {
+      "type": ["object", "null"],
+      "description": "Raw (un-normalized) payload of each executed reference, keyed by project.",
+      "additionalProperties": true
+    },
+    "reference_result_hash": {"$ref": "#/$defs/hashOrNull"},
+    "reference_determinism": {
+      "type": ["object", "null"],
+      "description": "Optional. Result of the reference determinism check for this row: whether it was checked, whether the reference is stable across runs, and why. Absent/null when the row declared no reference.",
+      "required": ["checked", "stable", "reason"],
+      "properties": {
+        "checked": {"type": "boolean", "description": "True when the runner actually performed the determinism check."},
+        "stable": {"type": "boolean", "description": "True when the reference payload is reproducible across runs (no unpinned nondeterminism detected)."},
+        "reason": {"type": ["string", "null"], "description": "Why the reference is or is not considered stable; null/empty when no reason is recorded."}
+      },
+      "additionalProperties": true
+    },
+    "qubit_payload": {"type": ["object", "null"]},
+    "qubit_raw_result_hash": {"$ref": "#/$defs/hashOrNull"},
+    "missing_evidence": {"type": ["array", "null"], "items": {"type": "string"}},
+    "disposition_note": {"type": ["string", "null"]},
+    "http_status": {"type": ["integer", "null"]},
+    "duration_ms": {"type": ["integer", "null"]}
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "disposition": {
+      "enum": ["PASS", "FAIL", "SAFE_EQUIVALENT", "OPERATOR_ONLY", "OPEN"]
+    },
+    "hashOrNull": {
+      "type": ["string", "null"],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "referenceProvenance": {
+      "type": "object",
+      "properties": {
+        "bin": {"type": ["string", "null"], "description": "Resolved binary path or URL (env-var-derived; never a secret)."},
+        "version": {"type": ["string", "null"]},
+        "commit": {"type": ["string", "null"]},
+        "pinned": {"type": ["boolean", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "referenceInfo": {
+      "type": "object",
+      "properties": {
+        "project": {"enum": ["hermes", "openclaw"]},
+        "executed": {"type": "boolean"},
+        "binary": {"type": ["string", "null"]},
+        "reason": {"type": ["string", "null"]},
+        "reference_version": {"type": ["string", "null"]},
+        "reference_commit": {"type": ["string", "null"]},
+        "reference_pinned": {"type": ["boolean", "null"]},
+        "argv": {"type": ["array", "null"], "items": {"type": "string"}},
+        "result_hash": {"$ref": "#/$defs/hashOrNull"},
+        "raw_result_hash": {"$ref": "#/$defs/hashOrNull"}
+      },
+      "additionalProperties": true
+    }
+  }
+}

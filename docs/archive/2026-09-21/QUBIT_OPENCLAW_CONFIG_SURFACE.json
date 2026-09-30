@@ -1,0 +1,13 @@
+{
+ "counts": {
+  "channel": 3740,
+  "core": 2444,
+  "plugin": 4215
+ },
+ "description": "Deterministic category inventory of the pinned OpenClaw configuration schema (core/channel/plugin path counts). The pinned repo commits only counts and a sha256 (not the path list), so Qubit records the supported-surface disposition by category rather than inventing per-path mappings to a runtime it does not run.",
+ "schema": "qubit-openclaw-config-surface/1",
+ "source_file": "docs/.generated/config-baseline.counts.json",
+ "source_revision": "3928bad9badfcb6c7d140530435e806fb8092190",
+ "source_tag": "v2026.9.2",
+ "total": 10399
+}

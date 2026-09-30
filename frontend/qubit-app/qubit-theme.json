@@ -1,0 +1,81 @@
+{
+  "name": "qubit",
+  "label": "Qubit Command",
+  "description": "Qubit graphite/navy command console with signal-lime and electric-cyan accents",
+  "palette": {
+    "background": {
+      "hex": "#10141c",
+      "alpha": 1
+    },
+    "midground": {
+      "hex": "#e8f0e4",
+      "alpha": 1
+    },
+    "foreground": {
+      "hex": "#ffffff",
+      "alpha": 0
+    },
+    "warmGlow": "rgba(163, 230, 53, 0.28)",
+    "noiseOpacity": 0.6
+  },
+  "typography": {
+    "fontSans": "\"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+    "fontMono": "\"JetBrains Mono\", ui-monospace, \"SF Mono\", Menlo, Consolas, monospace",
+    "fontDisplay": "\"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+    "baseSize": "15px",
+    "lineHeight": "1.55",
+    "letterSpacing": "-0.005em"
+  },
+  "layout": {
+    "radius": "0.5rem",
+    "density": "comfortable"
+  },
+  "layoutVariant": "standard",
+  "terminalBackground": "#0b0e13",
+  "terminalForeground": "#d7e3d0",
+  "colorOverrides": {
+    "card": "#161b24",
+    "cardForeground": "#e8f0e4",
+    "popover": "#131820",
+    "popoverForeground": "#e8f0e4",
+    "primary": "#a3e635",
+    "primaryForeground": "#10141c",
+    "secondary": "#1c232e",
+    "secondaryForeground": "#e8f0e4",
+    "muted": "#1c232e",
+    "mutedForeground": "#aab6a4",
+    "accent": "#202836",
+    "accentForeground": "#e8f0e4",
+    "destructive": "#e5484d",
+    "destructiveForeground": "#ffffff",
+    "success": "#4ade80",
+    "warning": "#f5a524",
+    "border": "rgba(232, 240, 228, 0.14)",
+    "input": "rgba(232, 240, 228, 0.20)",
+    "ring": "#a3e635"
+  },
+  "seriesColors": {
+    "inputTokenAccent": "#22d3ee",
+    "outputTokenAccent": "#a3e635"
+  },
+  "componentStyles": {
+    "header": {
+      "background": "linear-gradient(180deg, rgba(163,230,53,0.06), transparent 70%), var(--background-base)",
+      "borderImage": "none"
+    },
+    "sidebar": {
+      "background": "linear-gradient(180deg, rgba(34,211,238,0.05), transparent 45%), var(--background-base)",
+      "borderImage": "none"
+    },
+    "tab": {
+      "clipPath": "none"
+    }
+  },
+  "assets": {},
+  "swatchColors": [
+    "#10141c",
+    "#2a3342",
+    "#a3e635"
+  ],
+  "customCSS": "/* Qubit Command visual system - overlay theme (no vendored file is edited).\n   Loaded through the dashboard's own theming API: applyTheme() injects this\n   string into a single <style id=\"hermes-theme-custom-css\"> tag. Static\n   import inspection reads it textually, never executing it. */\n:root{\n  --qubit-lime:#a3e635;--qubit-cyan:#22d3ee;--qubit-graphite:#10141c;\n  --qubit-navy:#0b0e13;--qubit-panel:#161b24;\n  --qubit-hairline:rgba(163,230,53,.16);\n  --qubit-glow:0 0 0 1px rgba(163,230,53,.25),0 8px 32px rgba(0,0,0,.45);\n  --qubit-ease:cubic-bezier(.23,1,.32,1);\n}\n.qubit-brandmark{font-weight:800;letter-spacing:.045em}\n/* Hide the sidebar's built-in wordmark; the Qubit brand plugin renders the Qubit mark in that header slot. The mobile top bar keeps its own Qubit wordmark (no duplicate: the brand plugin slot only renders inside the sidebar header, not the lg:hidden top bar). */\ndiv.flex.h-14.shrink-0 span.text-midground.font-bold{display:none!important}\n::selection{background:rgba(163,230,53,.30);color:#fff}\nhtml{scrollbar-color:rgba(163,230,53,.35) transparent}\n*::-webkit-scrollbar{width:10px;height:10px}\n*::-webkit-scrollbar-thumb{background:rgba(163,230,53,.28);border-radius:999px;border:2px solid transparent;background-clip:padding-box}\n*::-webkit-scrollbar-thumb:hover{background:rgba(163,230,53,.45);background-clip:padding-box}\n/* Accessibility: always-visible keyboard focus, no mouse-only surprise outlines. */\n:where(a,button,[role=\"button\"],input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid var(--qubit-lime);outline-offset:2px;border-radius:6px}\n:where(a,button,[role=\"button\"]):focus:not(:focus-visible){outline:none}\n/* Motion: purposeful easing, and fully disabled for reduced-motion users. */\n@media (prefers-reduced-motion:no-preference){\n  a,button,[role=\"button\"],.transition{transition-timing-function:var(--qubit-ease)}\n  .qubit-live-dot{animation:qubit-pulse 1.6s ease-in-out infinite}\n}\n@keyframes qubit-pulse{0%,100%{opacity:.35}50%{opacity:1}}\n@keyframes qubit-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}\n@keyframes qubit-recover{0%{transform:translateY(2px);opacity:.4}100%{transform:none;opacity:1}}\n/* Loading / streaming state. */\n[aria-busy=\"true\"],[data-state=\"loading\"],.qubit-loading{position:relative}\n[aria-busy=\"true\"]::after,[data-state=\"loading\"]::after,.qubit-loading::after{content:\"\";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(90deg,transparent,rgba(163,230,53,.10),transparent);background-size:200% 100%;animation:qubit-shimmer 1.4s linear infinite;pointer-events:none}\n/* Empty state - dashed Qubit surface, never a dead blank box. */\n[data-state=\"empty\"],.qubit-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;min-height:8rem;color:var(--color-muted-foreground);border:1px dashed var(--qubit-hairline);border-radius:var(--radius);padding:1.25rem;text-align:center}\n/* Degraded / unavailable - cyan informational rail. */\n[data-state=\"degraded\"],[data-state=\"unavailable\"],.qubit-degraded{border-left:3px solid var(--qubit-cyan);background:rgba(34,211,238,.06);padding-left:.75rem}\n/* Approval / pending confirmation - lime attention rail + glow. */\n[data-state=\"pending\"],[data-state=\"awaiting-approval\"],.qubit-approval{border-left:3px solid var(--qubit-lime);background:rgba(163,230,53,.08);box-shadow:var(--qubit-glow)}\n/* Cancellation / emergency stop - red rail. */\n[data-state=\"cancelled\"],[data-state=\"estop\"],.qubit-cancelled{border-left:3px solid #e5484d;background:rgba(229,72,77,.08)}\n/* Recovery / retry - amber rail with an entrance that respects motion settings. */\n[data-state=\"recovering\"],[data-state=\"retry\"],.qubit-recovering{border-left:3px solid #f5a524;background:rgba(245,165,36,.08);animation:qubit-recover .3s var(--qubit-ease)}\n/* Outcome chips. */\n.qubit-success{color:#4ade80}.qubit-warning{color:#f5a524}.qubit-danger{color:#e5484d}\n/* Responsive: keep desktop density, enlarge targets + text on narrow / touch. */\n@media (max-width:768px){\n  :root{--theme-base-size:15.5px}\n  aside#app-sidebar{width:min(16rem,86vw)}\n}\n@media (pointer:coarse){\n  button,[role=\"button\"],a[href],input[type=\"checkbox\"],input[type=\"radio\"],select{min-height:44px;min-width:44px}\n  nav a{padding-top:.5rem;padding-bottom:.5rem}\n}\n@media (prefers-contrast:more){\n  :root{--qubit-hairline:rgba(163,230,53,.55);--color-border:rgba(232,240,228,.45)}\n}\n@media (forced-colors:active){\n  :where(a,button,[role=\"button\"]):focus-visible{outline:2px solid Highlight}\n}\n@media (min-width:1600px){main{max-width:none}}"
+}

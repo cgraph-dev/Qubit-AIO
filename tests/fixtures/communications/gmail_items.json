@@ -1,0 +1,52 @@
+{
+  "_synthetic": true,
+  "_comment": "Synthetic sanitized Gmail rows for Packet 8A contract tests. No real senders, subjects, or message bodies. adapter-version and platform are pinned.",
+  "platform": "gmail",
+  "adapter": "gmail_cdp",
+  "adapter_version": "8a-1",
+  "account_scope": "synth-gmail-a",
+  "items": [
+    {
+      "source_item_id": "syn-msg-0001",
+      "thread_id": "syn-thread-1001",
+      "sender": "Synthetic Sender Alpha",
+      "display_name": "Alpha (synthetic)",
+      "subject": "Synthetic subject alpha",
+      "preview": "This is a synthetic preview body for alpha.",
+      "time_raw": "2026-08-01T08:00:00+03:00",
+      "ts_normalized": "2026-08-01T05:00:00Z",
+      "unread": true,
+      "read_state": "unread",
+      "safe_url": "https://mail.google.com/mail/u/0/#search/syn-msg-0001",
+      "evidence_status": "not_available"
+    },
+    {
+      "source_item_id": "syn-msg-0002",
+      "thread_id": "syn-thread-1002",
+      "sender": "Synthetic Sender Bravo",
+      "display_name": "Bravo (synthetic)",
+      "subject": "Synthetic subject bravo",
+      "preview": "This is a synthetic preview body for bravo.",
+      "time_raw": "2026-08-02T10:30:00+03:00",
+      "ts_normalized": "2026-08-02T07:30:00Z",
+      "unread": false,
+      "read_state": "read",
+      "safe_url": "https://mail.google.com/mail/u/0/#search/syn-msg-0002",
+      "evidence_status": "not_available"
+    },
+    {
+      "source_item_id": "syn-msg-0003",
+      "thread_id": "syn-thread-1003",
+      "sender": "Synthetic Sender Charlie",
+      "display_name": "Charlie (synthetic)",
+      "subject": "Synthetic subject charlie",
+      "preview": "This is a synthetic preview body for charlie.",
+      "time_raw": "2026-08-03T09:15:00+03:00",
+      "ts_normalized": "2026-08-03T06:15:00Z",
+      "unread": null,
+      "read_state": "unknown",
+      "safe_url": "https://mail.google.com/mail/u/0/#search/syn-msg-0003",
+      "evidence_status": "not_available"
+    }
+  ]
+}

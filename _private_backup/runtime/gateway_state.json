@@ -1,0 +1,1 @@
+{"pid":263808,"kind":"qubit-gateway","argv":["qubit-gateway"],"start_time":731837,"gateway_state":"running","exit_reason":null,"restart_requested":false,"active_agents":0,"platforms":{},"session_store":{"status":"ok"},"updated_at":"2026-09-29T07:21:39.053750+00:00","code_sha":null,"code_version":"0.21.1","qubit_home":"/home/trick/.local/state/qubit-voicebridge/runtime"}

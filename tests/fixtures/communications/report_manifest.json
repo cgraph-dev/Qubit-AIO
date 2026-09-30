@@ -1,0 +1,24 @@
+{
+  "_synthetic": true,
+  "_comment": "Synthetic canonical report manifest for Packet 8A. Produced by ReportManifest.create().as_dict().",
+  "report_id": "report_synth_0001",
+  "schema_version": 1,
+  "created_at": 1785052800.0,
+  "window_start": 1784966400.0,
+  "window_end": 1785052800.0,
+  "status": "success",
+  "new_count": 3,
+  "generated_analysis": true,
+  "analysis_disclaimer": "Generated analysis is produced by the local model and cites item IDs only; it may err.",
+  "retention_days": 90,
+  "summary": "Synthetic summary: 3 new synthetic items across synthetic accounts.",
+  "platforms": ["gmail", "instagram", "messenger"],
+  "accounts": ["synth-gmail-a", "synth-ig-a", "synth-messenger-a"],
+  "item_identities": [
+    "gmail:synth-gmail-a:syn-msg-0001",
+    "instagram:synth-ig-a:syn-ig-thread-2001",
+    "messenger:synth-messenger-a:syn-msgr-thread-3001"
+  ],
+  "assets": [],
+  "partial_failures": []
+}

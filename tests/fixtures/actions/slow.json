@@ -1,0 +1,8 @@
+{
+  "_comment": "Packet 8F synthetic SLOW adapter outcome (simulation only). A delay_s > 0 lets cancellation/resource-bound tests observe an in-flight action; the outcome is otherwise OK.",
+  "act.browser.search": {
+    "state": "OK",
+    "detail": "slow bounded search",
+    "delay_s": 1.5
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "fixture_id": "drift.plugins.catalog",
+  "family": "dashboard",
+  "command": null,
+  "request": null,
+  "normalizers": [
+    "generated_hash"
+  ],
+  "expected": {},
+  "interface_disposition": "SAFE_EQUIVALENT",
+  "qubit": {
+    "path": "voicebridge/plugin_runtime.py:589",
+    "caller": "list_plugins",
+    "approval": null,
+    "mapping_status": "VERIFIED"
+  },
+  "hermes": {
+    "path": "ui/src/pages/plugins/catalog.ts:1",
+    "symbol": "PluginCatalog",
+    "mapping_status": "UNVERIFIED"
+  },
+  "openclaw": {
+    "path": null,
+    "symbol": null,
+    "mapping_status": "N/A"
+  },
+  "notes": "Visual-drift A27: the Hermes /plugins catalog lists plugin rows with per-row INSTALL; the Qubit catalog is served by the canonical plugin runtime registry (voicebridge/plugin_runtime.py:589 list_plugins, consumed by frontend/qubit-web/src/pages/PluginsPage.tsx). The proof type is a real Python test reference: tests/test_backend_routes_integration8u.py::test_plugin_hub_and_install_use_plugin_runtime exercises the plugin hub + install through the shared plugin runtime, and tests/test_plugins_skills8u.py::test_list_plugins_exposes_install_catalog asserts the real install catalog. This fixture declares only a Qubit mapping (no command/request), so its disposition is resolved from the linked test, never from an invented execution.",
+  "evidence": {
+    "dashboard_route": "/plugins",
+    "dashboard_control": "catalog + INSTALL",
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "request_schema": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "store_state_assertion": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qubit VoiceBridge — Pair device</title>
+<style>
+ body{font:15px/1.6 system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
+ .box{background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;padding:28px;max-width:420px;width:90%}
+ input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface-soft);color:var(--text);font-size:14px}
+ button{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:var(--primary);color:#10120a;font-size:15px;cursor:pointer}
+ .ok{color:var(--success)}.err{color:var(--danger)}.muted{color:var(--muted);font-size:13px}
+</style><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body><a class="skip-link" href="#main-content">Skip to main content</a><main class="box" id="main-content" tabindex="-1">
+<h1><span class="brand-mark" aria-hidden="true">Q</span> Pair this device</h1>
+<nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals">Approvals</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a href="/docs">Docs</a><a href="/token-setup" aria-current="page">Pair device</a></nav>
+<p class="muted">Copy the dashboard token from the Qubit PC<br>(the <code>webui.token</code> value in <code>~/.config/qubit-voicebridge/voice.yaml</code>).<br>
+It is stored only in this browser's localStorage.</p>
+<details class="help-panel"><summary>Pairing steps</summary><div><ol><li>On the Qubit PC, open <code>~/.config/qubit-voicebridge/voice.yaml</code> and copy the <code>webui.token</code> value.</li><li>Paste it below and choose Save &amp; test. The bridge checks the token before it is saved.</li><li>If your previous token worked, it is kept until the new one is accepted.</li></ol></div></details>
+<label class="sr-only" for="tok">Dashboard token</label>
+<input id="tok" type="password" placeholder="dashboard token" autocomplete="off">
+<button onclick="save()">Save &amp; test</button>
+<p id="msg" role="status" aria-live="polite"></p>
+<script src="/static/vb.js"></script>
+<script>
+async function save(){
+  const t=document.getElementById('tok').value.trim();
+  const msg=document.getElementById('msg');
+  if(!t){ msg.className='err'; msg.textContent='Enter the dashboard token first.'; return; }
+  // Packet 8L: TEST the candidate token with the X-Api-Token request header
+  // BEFORE saving. The previous working token is preserved when the candidate
+  // is invalid, expired, or the bridge is unreachable. The token is never
+  // placed in a URL.
+  const r=await vbApiTest('', t);
+  if(r.status===200){
+    localStorage.setItem('vdb_token', t);
+    msg.className='ok'; msg.textContent='Paired ✓ — you can now open /activity or /';
+    setTimeout(()=>location.href='/activity',800);
+  }
+  else if(r.status===401){
+    msg.className='err'; msg.textContent='Token rejected (401) — your previous token was kept.';
+  }
+  else{
+    msg.className='err'; msg.textContent='Bridge unavailable (' + (r.status||0) + ') — your previous token was kept.';
+  }
+}
+</script></main></body></html>

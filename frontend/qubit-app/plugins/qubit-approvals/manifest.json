@@ -1,0 +1,13 @@
+{
+  "name": "qubit-approvals",
+  "label": "Qubit Approvals",
+  "description": "Pending-confirmation banner on the shared journal (same records as CLI `qubit approvals`, voice yes/no, classic dashboard). Qubit-owned addition.",
+  "icon": "shield-check",
+  "version": "1.0.0",
+  "tab": {"path": "/qubit-approvals", "hidden": true},
+  "slots": ["header-banner"],
+  "entry": "qubit-approvals.js",
+  "css": null,
+  "has_api": true,
+  "source": "qubit-overlay"
+}

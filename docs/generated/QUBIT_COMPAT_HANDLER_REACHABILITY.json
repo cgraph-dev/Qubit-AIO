@@ -1,0 +1,1217 @@
+{
+ "schema": "qubit-compat-handler-reachability/1",
+ "decision": "owner architecture decision 2026-09-17",
+ "matrix": "docs/generated/QUBIT_ROUTE_OWNERSHIP.json",
+ "counts": {
+  "production_referenced": 38,
+  "route_test_reachable": 30,
+  "registration_only": 2,
+  "test_referenced": 2
+ },
+ "registered_untested": [
+  "h_local_models_job_show",
+  "h_plugin_asset"
+ ],
+ "delete_candidates": [],
+ "dead_module_functions": [],
+ "rows": [
+  {
+   "handler": "ckpt",
+   "defined": false,
+   "routes": [
+    "GET /api/ops/checkpoints.*"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/session_compaction.py": [
+     "136: ckpt = _row_to_checkpoint(row)",
+     "139: return ckpt",
+     "225: ckpt = find_checkpoint(store, session_id, checkpoint_id)",
+     "252: ckpt = find_checkpoint(store, session_id, checkpoint_id)",
+     "226: if ckpt is None:",
+     "230: messages = checkpoint_messages(store, ckpt)",
+     "245: \"sessionId\": new_sid, \"checkpoint\": ckpt,",
+     "253: if ckpt is None:",
+     "257: messages = checkpoint_messages(store, ckpt)",
+     "265: \"checkpoint\": ckpt,",
+     "137: if ckpt[\"sessionId\"] not in lineage(store, session_id):",
+     "241: \"_branched_from\": ckpt[\"sessionId\"],",
+     "242: \"_compaction_checkpoint\": ckpt[\"id\"],",
+     "237: model=ckpt.get(\"model\"),"
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_openclaw_family_sessions_compaction9u.py": [
+     "171: ckpt = compacted[\"checkpoint\"][\"id\"]",
+     "209: ckpt = compacted[\"checkpoint\"][\"id\"]",
+     "174: {\"sessionKey\": sid, \"checkpointId\": ckpt})",
+     "178: {\"sessionKey\": sid, \"checkpointId\": ckpt,",
+     "195: {\"sessionKey\": sid, \"checkpointId\": ckpt,",
+     "211: {\"sessionKey\": sid, \"checkpointId\": ckpt,"
+    ]
+   }
+  },
+  {
+   "handler": "config_save",
+   "defined": true,
+   "routes": [
+    "PUT /api/config"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "778: return HC.config_save(cfg, {}, body, {})"
+    ],
+    "voicebridge/gateway/openclaw_handlers/scheduler_media.py": [
+     "123: code, out = config_save(cfg, {}, body, {})"
+    ],
+    "voicebridge/gateway/openclaw_handlers/system.py": [
+     "317: code, out = config_save(cfg, {}, body, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "cron_create",
+   "defined": true,
+   "routes": [
+    "POST /api/cron/jobs"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "916: return HC.cron_create(cfg, {}, body, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_cron_banner_settle9u.py": [
+     "44: code, out = HC.cron_create(cfg, {},"
+    ],
+    "tests/test_ui_audit_followups9u.py": [
+     "56: staged = HC.cron_create(",
+     "60: code, done = HC.cron_create("
+    ]
+   }
+  },
+  {
+   "handler": "cron_delete",
+   "defined": true,
+   "routes": [
+    "DELETE /api/cron/jobs/(?P<id>[^/]+)"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "923: return HC.cron_delete(cfg, {}, {\"confirm\": True},"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "cron_update",
+   "defined": true,
+   "routes": [
+    "PUT /api/cron/jobs/(?P<id>[^/]+)"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "920: return HC.cron_update("
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "delivery",
+   "defined": false,
+   "routes": [
+    "GET /api/cron/delivery-targets"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/schedules.py": [
+     "1771: delivery = _deliver_result(cfg, conn, job, run_id, outcome, stop,",
+     "1776: \"delivery\": delivery})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_w9_held_back_port_wave.py": [
+     "32: delivery = __import__(\"tools.bot_live_delivery\", fromlist=[\"x\"])",
+     "56: delivery = __import__(\"tools.bot_live_delivery\", fromlist=[\"x\"])",
+     "37: record = delivery.deliver_to_live_owner(home, owner, \"hello\", delivery_id=\"a\" * 32)",
+     "39: assert delivery.has_mailbox(home)",
+     "43: claimed = delivery.claim_pending_delivery(home, owner)",
+     "46: receipt = delivery.complete_delivery(home, \"a\" * 32, status=\"settled\", reply=\"done\")",
+     "60: delivery.deliver_to_live_owner(home, owner, \"one\", delivery_id=\"b\" * 32)",
+     "52: delivery.complete_delivery(home, \"a\" * 32, status=\"failed\")",
+     "62: delivery.deliver_to_live_owner(home, owner, \"two\", delivery_id=\"b\" * 32)",
+     "41: assert delivery.deliver_to_live_owner(home, owner, \"hello\", delivery_id=\"a\" * 32)[\"status\"] == \"queued\"",
+     "48: assert delivery.read_delivery_result(home, \"a\" * 32)[\"status\"] == \"settled\"",
+     "50: assert delivery.complete_delivery(home, \"a\" * 32, status=\"settled\", reply=\"done\")[\"reply\"] == \"done\""
+    ],
+    "tests/test_schedule_delivery8u.py": [
+     "139: delivery = out[\"results\"][0][\"delivery\"]",
+     "167: delivery = out[\"results\"][0][\"delivery\"]",
+     "186: delivery = out[\"results\"][0][\"delivery\"]",
+     "234: delivery = out[\"results\"][0][\"delivery\"]",
+     "255: delivery = out[\"results\"][0][\"delivery\"]",
+     "140: assert delivery[\"state\"] == \"UNAVAILABLE\"",
+     "141: assert delivery[\"delivered\"] == 0",
+     "168: assert delivery[\"state\"] == \"UNAVAILABLE\"",
+     "187: assert delivery[\"state\"] == \"UNAVAILABLE\"",
+     "235: assert delivery[\"state\"] == \"PARTIAL\"",
+     "236: assert delivery[\"delivered\"] == 1",
+     "256: assert delivery[\"state\"] == \"UNAVAILABLE\"",
+     "142: assert delivery[\"targets\"][0][\"code\"] == \"MSG_NO_CREDENTIAL\"",
+     "169: assert delivery[\"targets\"][0][\"code\"] == \"MSG_TRANSPORT_UNAVAILABLE\"",
+     "188: assert delivery[\"targets\"][0][\"code\"] == SC.DELIVERY_UNAVAILABLE_CODE",
+     "257: assert delivery[\"targets\"][0][\"code\"] == SC.DELIVERY_ESTOP_CODE"
+    ],
+    "tests/test_webhook_ingress8u.py": [
+     "54: if delivery:",
+     "55: h[\"X-Qubit-Delivery\"] = delivery"
+    ]
+   }
+  },
+  {
+   "handler": "env_delete",
+   "defined": true,
+   "routes": [
+    "DELETE /api/env"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/gateway/openclaw_handlers/system.py": [
+     "295: code, body = env_delete(cfg, {}, {\"name\": name, \"confirm\": confirmed}, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "env_write",
+   "defined": true,
+   "routes": [
+    "PUT /api/env"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/gateway/openclaw_handlers/system.py": [
+     "282: code, body = env_write(cfg, {}, {\"name\": name, \"value\": value,"
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_models_repair9u.py": [
+     "286: patched_qc.env_write(",
+     "293: patched_qc.env_write(",
+     "302: code, out = patched_qc.env_write("
+    ],
+    "tests/test_custom_endpoints_authority9u.py": [
+     "150: code, out = HC.env_write("
+    ]
+   }
+  },
+  {
+   "handler": "font",
+   "defined": false,
+   "routes": [
+    "GET /api/dashboard/font"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/gateway/openclaw_handlers/users.py": [
+     "161: _c1, font = h_font(cfg, {}, {}, {})",
+     "164: \"font\": str(font.get(\"font\") or \"system\"),"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_analytics",
+   "defined": true,
+   "routes": [
+    "GET /api/analytics",
+    "GET /api/analytics/usage"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_analytics_models",
+   "defined": true,
+   "routes": [
+    "GET /api/analytics/models"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_audio_voice_config",
+   "defined": true,
+   "routes": [
+    "GET /api/audio/voice-config"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_auth_me",
+   "defined": true,
+   "routes": [
+    "GET /api/auth/me"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/gateway/openclaw_handlers/users.py": [
+     "100: _status, body = h_auth_me(cfg, {}, {}, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_chat_stream",
+   "defined": true,
+   "routes": [
+    "POST /api/qubit/chat/stream"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/webui.py": [
+     "1790: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_voice_e2e_hermetic9u.py": [
+     "194: events = _parse_sse(list(HC.h_chat_stream(",
+     "489: ev_a = _parse_sse(list(HC.h_chat_stream(",
+     "505: ev_b = _parse_sse(list(HC.h_chat_stream(",
+     "269: events = _parse_sse(list(HC.h_chat_stream("
+    ],
+    "tests/test_chat_voice_e2e9u.py": [
+     "162: frames = list(HC.h_chat_stream(cfg, {}, {\"text\": \"greet me\",",
+     "425: list(HC.h_chat_stream(cfg, {}, {\"text\": \"voice turn\", \"session\": \"rc\"},",
+     "203: events = _parse_sse(list(HC.h_chat_stream(",
+     "414: list(HC.h_chat_stream(cfg, {}, {\"text\": \"voice turn\","
+    ],
+    "tests/test_qubit_chat_reasoning_refusal9u.py": [
+     "33: iterator = HC.h_chat_stream(",
+     "55: iterator = HC.h_chat_stream("
+    ]
+   }
+  },
+  {
+   "handler": "h_computer_use_status",
+   "defined": true,
+   "routes": [
+    "GET /api/tools/computer-use/status"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_config",
+   "defined": true,
+   "routes": [
+    "GET /api/config"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_config_defaults",
+   "defined": true,
+   "routes": [
+    "GET /api/config/defaults"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_config_schema",
+   "defined": true,
+   "routes": [
+    "GET /api/config/schema"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_egress_status",
+   "defined": true,
+   "routes": [
+    "GET /api/egress/status"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_git_base_branches",
+   "defined": true,
+   "routes": [
+    "GET /api/git/base-branches"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_git_branches",
+   "defined": true,
+   "routes": [
+    "GET /api/git/branches"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_git_file_diff",
+   "defined": true,
+   "routes": [
+    "GET /api/git/review/diff",
+    "GET /api/git/file-diff"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_git_review_commit_context",
+   "defined": true,
+   "routes": [
+    "GET /api/git/review/commit-context"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_git_review_list",
+   "defined": true,
+   "routes": [
+    "GET /api/git/review/list"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_git_review_rev_parse",
+   "defined": true,
+   "routes": [
+    "GET /api/git/review/rev-parse"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_git_status",
+   "defined": true,
+   "routes": [
+    "GET /api/git/status"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_git_worktrees",
+   "defined": true,
+   "routes": [
+    "GET /api/git/worktrees"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_health",
+   "defined": true,
+   "routes": [
+    "GET /api/health"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_hooks_create",
+   "defined": true,
+   "routes": [
+    "POST /api/ops/hooks"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "792: return HC.h_hooks_create(cfg, {}, {**dict(payload or {}),"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_hooks_update",
+   "defined": true,
+   "routes": [
+    "PUT /api/ops/hooks"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "806: return HC.h_hooks_update(cfg, {}, {**dict(payload or {}),"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_learning_graph",
+   "defined": true,
+   "routes": [
+    "GET /api/learning/graph"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_learning_node",
+   "defined": true,
+   "routes": [
+    "GET /api/learning/node"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_local_models_catalog",
+   "defined": true,
+   "routes": [
+    "GET /api/local-models/catalog"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_local_models_hardware",
+   "defined": true,
+   "routes": [
+    "GET /api/local-models/hardware"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_local_models_job_show",
+   "defined": true,
+   "routes": [
+    "GET /api/local-models/jobs/(?P<id>[^/]+)"
+   ],
+   "classification": "registration_only",
+   "route_test_reachable": false,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_local_models_jobs",
+   "defined": true,
+   "routes": [
+    "GET /api/local-models/jobs"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_local_models_search",
+   "defined": true,
+   "routes": [
+    "GET /api/local-models/search"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_local_models_search_files",
+   "defined": true,
+   "routes": [
+    "GET /api/local-models/search/files"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_local_models_status",
+   "defined": true,
+   "routes": [
+    "GET /api/local-models/status"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_login_page",
+   "defined": true,
+   "routes": [
+    "GET /login"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_logs",
+   "defined": true,
+   "routes": [
+    "GET /api/logs"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_memory",
+   "defined": true,
+   "routes": [
+    "GET /api/memory",
+    "GET /api/memory/provider"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_model_auxiliary",
+   "defined": true,
+   "routes": [
+    "GET /api/model/auxiliary"
+   ],
+   "classification": "test_referenced",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {
+    "tests/test_provider_catalog_options.py": [
+     "164: status, body = QC.h_model_auxiliary(cfg, {}, {}, {})"
+    ]
+   }
+  },
+  {
+   "handler": "h_model_moa",
+   "defined": true,
+   "routes": [
+    "GET /api/model/moa"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_model_recommended_default",
+   "defined": true,
+   "routes": [
+    "GET /api/model/recommended-default"
+   ],
+   "classification": "test_referenced",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {
+    "tests/test_provider_catalog_options.py": [
+     "146: status, body = QC.h_model_recommended_default(",
+     "154: status, body = QC.h_model_recommended_default("
+    ]
+   }
+  },
+  {
+   "handler": "h_plugin_achievements",
+   "defined": false,
+   "routes": [
+    "GET /api/plugins/qubit-achievements/achievements"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/plugin_runtime.py": [
+     "469: code, payload = _HP.h_plugin_achievements(cfg, {}, {}, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_plugin_achievements_rescan",
+   "defined": false,
+   "routes": [
+    "POST /api/plugins/qubit-achievements/rescan"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/plugin_runtime.py": [
+     "473: code, payload = _HP.h_plugin_achievements_rescan(cfg, {}, {}, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_plugin_achievements_scan_status",
+   "defined": false,
+   "routes": [
+    "GET /api/plugins/qubit-achievements/scan-status"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/plugin_runtime.py": [
+     "471: code, payload = _HP.h_plugin_achievements_scan_status(cfg, {}, {}, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_plugin_asset",
+   "defined": true,
+   "routes": [
+    "GET /dashboard-plugins/(?P<plugin_name>[^/]+)/(?P<file_path>.+)"
+   ],
+   "classification": "registration_only",
+   "route_test_reachable": false,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_plugin_kanban_boards_create",
+   "defined": true,
+   "routes": [
+    "POST /api/plugins/kanban/boards"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "966: return HC.h_plugin_kanban_boards_create("
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_kanban_native_write9u.py": [
+     "38: code, out = QC.h_plugin_kanban_boards_create(",
+     "44: code, out = QC.h_plugin_kanban_boards_create("
+    ]
+   }
+  },
+  {
+   "handler": "h_plugin_kanban_tasks_create",
+   "defined": true,
+   "routes": [
+    "POST /api/plugins/kanban/tasks"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "969: return HC.h_plugin_kanban_tasks_create("
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_kanban_native_write9u.py": [
+     "58: code, out = QC.h_plugin_kanban_tasks_create(",
+     "73: code, out = QC.h_plugin_kanban_tasks_create(",
+     "104: _, out = QC.h_plugin_kanban_tasks_create(",
+     "126: code, out = QC.h_plugin_kanban_tasks_create("
+    ],
+    "tests/test_kanban_split_store9u.py": [
+     "46: code, out = HC.h_plugin_kanban_tasks_create("
+    ]
+   }
+  },
+  {
+   "handler": "h_plugin_kanban_tasks_patch",
+   "defined": true,
+   "routes": [
+    "PATCH /api/plugins/kanban/tasks/(?P<task_id>[^/]+)"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "972: return HC.h_plugin_kanban_tasks_patch("
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_kanban_native_write9u.py": [
+     "77: code, out = QC.h_plugin_kanban_tasks_patch(",
+     "82: code, out = QC.h_plugin_kanban_tasks_patch("
+    ]
+   }
+  },
+  {
+   "handler": "h_power",
+   "defined": true,
+   "routes": [
+    "GET /api/power"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/webui.py": [
+     "2831: code, out = _HC.h_power(self.app.orch.cfg,"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_terminal_backends",
+   "defined": true,
+   "routes": [
+    "GET /api/tools/terminal/backends"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_theme_set",
+   "defined": true,
+   "routes": [
+    "PUT /api/dashboard/theme"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/gateway/openclaw_handlers/users.py": [
+     "191: _c, out = h_theme_set(cfg, {}, {\"theme\": entries.get(\"theme\")}, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_themes",
+   "defined": true,
+   "routes": [
+    "GET /api/dashboard/themes"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/gateway/openclaw_handlers/users.py": [
+     "162: _c2, themes = h_themes(cfg, {}, {}, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "hooks_delete",
+   "defined": true,
+   "routes": [
+    "DELETE /api/ops/hooks"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "799: return HC.hooks_delete(cfg, {}, {**dict(payload or {}),"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "mcp_auth",
+   "defined": true,
+   "routes": [
+    "POST /api/mcp/servers/(?P<id>[^/]+)/auth"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "878: return HC.mcp_auth("
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_mcp_skill_banner_settle_wave21.py": [
+     "150: code, staged = HC.mcp_auth(cfg, {}, {\"name\": \"authsrv\","
+    ]
+   }
+  },
+  {
+   "handler": "mcp_create",
+   "defined": true,
+   "routes": [
+    "POST /api/mcp/servers"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "870: return HC.mcp_create(cfg, {}, body, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_mcp_skill_banner_settle_wave21.py": [
+     "113: code, staged = HC.mcp_create(",
+     "145: code, out = HC.mcp_create("
+    ],
+    "tests/test_mcp_invoke_canonical_wave21.py": [
+     "172: code, out = HC.mcp_create("
+    ]
+   }
+  },
+  {
+   "handler": "mcp_delete",
+   "defined": true,
+   "routes": [
+    "DELETE /api/mcp/servers/(?P<id>[^/]+)"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "872: return HC.mcp_delete(cfg, {}, {\"confirm\": True, \"name\": name},"
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_mcp_skill_banner_settle_wave21.py": [
+     "133: code, staged = HC.mcp_delete(cfg, {}, {\"name\": \"probe\"}, {\"id\": \"probe\"})"
+    ]
+   }
+  },
+  {
+   "handler": "mcp_set_enabled",
+   "defined": true,
+   "routes": [
+    "POST /api/mcp/servers/(?P<id>[^/]+)/enabled",
+    "PUT /api/mcp/servers/(?P<id>[^/]+)/enabled"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "875: return HC.mcp_set_enabled("
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_mcp_skill_banner_settle_wave21.py": [
+     "125: code, staged = HC.mcp_set_enabled(cfg, {}, {\"enabled\": True},"
+    ]
+   }
+  },
+  {
+   "handler": "msg_update",
+   "defined": true,
+   "routes": [
+    "PUT /api/messaging/platforms/(?P<id>[^/]+)"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "821: return HC.msg_update(cfg, {}, body,"
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_audit_wave_2026_09_23_messaging_device.py": [
+     "64: code, staged = HC.msg_update(cfg, {}, {\"enabled\": True},",
+     "96: code, staged = HC.msg_update("
+    ]
+   }
+  },
+  {
+   "handler": "power_action",
+   "defined": true,
+   "routes": [
+    "POST /api/power"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/webui.py": [
+     "3455: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "skill_create",
+   "defined": true,
+   "routes": [
+    "POST /api/skills"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "833: return HC.skill_create(cfg, {}, body, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_skill_catalog_authority9u.py": [
+     "192: code, staged = HC.skill_create(cfg, {}, dict(payload), {})",
+     "194: code, done = HC.skill_create("
+    ]
+   }
+  },
+  {
+   "handler": "skill_delete",
+   "defined": true,
+   "routes": [
+    "DELETE /api/skills"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "851: return HC.skill_delete("
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_mcp_skill_banner_settle_wave21.py": [
+     "99: code, staged = HC.skill_delete(cfg, {\"name\": \"demo\"}, {\"name\": \"demo\"}, {})"
+    ],
+    "tests/test_skill_catalog_authority9u.py": [
+     "199: code, staged = HC.skill_delete(cfg, {\"name\": \"routed\"}, {}, {})",
+     "201: code, done = HC.skill_delete(",
+     "207: code, missing = HC.skill_delete(cfg, {\"name\": \"ghost\", \"confirm\": True},"
+    ]
+   }
+  },
+  {
+   "handler": "skill_update",
+   "defined": true,
+   "routes": [
+    "PUT /api/skills/content"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "847: return HC.skill_update("
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_mcp_skill_banner_settle_wave21.py": [
+     "76: code, staged = HC.skill_update(cfg, {}, {\"name\": \"demo\", \"content\": new},"
+    ],
+    "tests/test_skill_catalog_authority9u.py": [
+     "167: code, staged = HC.skill_update(cfg, {}, {\"name\": \"demo\", \"content\": new},",
+     "172: code, done = HC.skill_update(",
+     "178: code, done = HC.skill_update("
+    ]
+   }
+  },
+  {
+   "handler": "webhooks_delete",
+   "defined": true,
+   "routes": [
+    "DELETE /api/webhooks/(?P<id>[^/]+)"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "950: return HC.webhooks_delete(cfg, {}, {\"confirm\": True, \"id\": sid},"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "webhooks_enable",
+   "defined": true,
+   "routes": [
+    "POST /api/webhooks/enable"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "945: return HC.webhooks_enable(cfg, {}, {\"confirm\": True}, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "webhooks_enabled",
+   "defined": true,
+   "routes": [
+    "PUT /api/webhooks/(?P<id>[^/]+)/enabled"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "947: return HC.webhooks_enabled(cfg, {}, {\"confirm\": True, \"id\": sid},"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "webhooks_retry",
+   "defined": true,
+   "routes": [
+    "POST /api/webhooks/(?P<id>[^/]+)/retry"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "954: \"webhook_retry\": HC.webhooks_retry}.get(action)"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "webhooks_rotate",
+   "defined": true,
+   "routes": [
+    "POST /api/webhooks/(?P<id>[^/]+)/rotate"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "952: handler = {\"webhook_rotate\": HC.webhooks_rotate,"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "webhooks_test",
+   "defined": true,
+   "routes": [
+    "POST /api/webhooks/(?P<id>[^/]+)/test"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "953: \"webhook_test\": HC.webhooks_test,"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  }
+ ]
+}

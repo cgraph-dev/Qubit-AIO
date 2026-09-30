@@ -1,0 +1,81 @@
+{
+  "bundle_hash": "sha256:86334ae63b0b58b1712766cf3894bb896f6424794a201fe384da6e963a181c29",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/gaming/minecraft-modpack-server",
+  "verdict": "caution",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "persistence_cron",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 173,
+      "match": "(crontab -l 2>/dev/null | grep -v \"minecraft/backup.sh\"; echo \"0 * * * * $HOME/minecraft-server/backup.sh >> $HOME/mi...",
+      "description": "modifies cron jobs"
+    },
+    {
+      "pattern_id": "unicode_escape_chain",
+      "severity": "medium",
+      "category": "obfuscation",
+      "file": "SKILL.md",
+      "line": 71,
+      "match": "motd=\\u00a7b\\u00a7lServer Name \\u00a7r\\u00a78| \\u00a7aModpack Name",
+      "description": "chain of unicode escapes (possible obfuscation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 48,
+      "match": "- Minecraft 1.21+ \u2192 Java 21: `sudo apt install openjdk-21-jre-headless`",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 49,
+      "match": "- Minecraft 1.18-1.20 \u2192 Java 17: `sudo apt install openjdk-17-jre-headless`",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 50,
+      "match": "- Minecraft 1.16 and below \u2192 Java 8: `sudo apt install openjdk-8-jre-headless`",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 128,
+      "match": "sudo ufw allow 25565/tcp comment \"Minecraft Server\"",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 130,
+      "match": "Check with: `sudo ufw status | grep 25565`",
+      "description": "uses sudo (privilege escalation)"
+    }
+  ],
+  "rules": [
+    "persistence_cron",
+    "sudo_usage",
+    "unicode_escape_chain"
+  ],
+  "scanned_at": "2026-09-23T02:50:44.487618+00:00",
+  "summary": "minecraft-modpack-server: caution \u2014 7 finding(s) in obfuscation, persistence, privilege_escalation",
+  "fresh": true
+}

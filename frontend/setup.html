@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qubit VoiceBridge — Setup</title>
+<style>
+ body{font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px;max-width:900px}
+ h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
+ .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+ button{margin:4px 8px 4px 0;padding:6px 14px;border-radius:6px;border:0;cursor:pointer;min-height:44px}
+ .ok{background:var(--primary);color:#10120a}.warn{background:var(--warning);color:#201a0a}.no{background:var(--danger);color:#201010}
+ .muted{color:var(--muted)}.err{color:var(--danger)}
+ .tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:6px}
+ .tag.READY,.tag.SUCCESS,.tag.OK{background:var(--success)}
+ .tag.DENIED,.tag.FAILED,.tag.BLOCKED{background:var(--danger)}
+ .tag.DEGRADED,.tag.PARTIAL,.tag.PENDING{background:var(--warning)}
+ .tag.MISSING,.tag.UNAVAILABLE,.tag.CANCELLED,.tag.SKIPPED{background:var(--faint)}
+ .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+ .advanced{display:none} .advanced.open{display:block}
+ a{color:var(--primary)} code{background:var(--surface-soft);padding:1px 4px;border-radius:4px}
+ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+ @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+ @media (max-width: 380px){body{padding:12px}button{width:100%;margin-right:0}}
+ li{margin-bottom:6px}
+</style><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<main id="main-content" tabindex="-1">
+<h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit VoiceBridge</h1>
+<div class="muted">Setup &amp; health · every state comes from the backend; nothing here guesses readiness. <button class="warn" onclick="toggleAdvanced()">Advanced</button></div>
+<nav class="page-nav" aria-label="Primary">
+ <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals">Approvals</a><a href="/settings">Settings</a><a href="/setup" aria-current="page">Setup</a><a href="/system">System</a><a href="/docs">Docs</a><a class="nav-utility" href="/token-setup">Pair device</a>
+</nav>
+
+<h2>First-run checklist</h2>
+<div class="card"><div id="checklist" role="status" aria-live="polite">Loading…</div>
+<div class="row"><button class="ok" onclick="loadChecklist(false)">Refresh</button><button onclick="loadChecklist(true)">Offline mode</button></div></div>
+
+<h2>Installation health</h2>
+<div class="card"><div id="health" role="status" aria-live="polite">Loading…</div>
+<div class="row"><button class="ok" onclick="loadHealth()">Refresh health</button></div></div>
+
+<h2>Fix what is missing</h2>
+<div class="card"><div id="repair" role="status" aria-live="polite">Loading…</div>
+<div class="row"><button class="warn" onclick="previewRun()">Preview setup run</button></div>
+<div id="runout" aria-live="polite"></div></div>
+
+<div class="advanced">
+<h2>Advanced — apply, diagnostics, recovery</h2>
+<div class="card"><p class="muted">Applying changes needs two explicit approvals in the dialog. Services are never restarted silently; downloads, desktop links, and data moves each ask first.</p>
+<div class="row"><button class="warn" onclick="applyRun()">Apply setup run (asks twice)</button>
+<button onclick="loadDiagnostics()">Redacted diagnostics</button>
+<button onclick="loadAudit()">Change timeline</button></div>
+<div id="advout" aria-live="polite"></div></div>
+</div>
+</main>
+<script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function tag(st){return '<span class="tag '+esc(st)+'">'+esc(st)+'</span>';}
+function show(id,html){document.getElementById(id).innerHTML=html;}
+function toggleAdvanced(){document.querySelector('.advanced').classList.toggle('open');}
+function api(path,opts){return window.vbApi(path,opts);}
+async function loadChecklist(offline){
+ show('checklist','Loading…');
+ var r = await api('/api/setup/checklist'+(offline?'?offline=1':''));
+ if(r.authRequired){show('checklist',tag('UNAVAILABLE')+' pair this dashboard first');return;}
+ var b=r.body||{}; var h='<p>Overall '+tag(b.state||'UNKNOWN')+' — '+esc(b.next||'')+'</p><ol>';
+ (b.steps||[]).forEach(function(s){h+='<li>'+esc(s.id)+' '+tag(s.state||'?')+' '+esc(s.detail||'')+'<br><span class="muted">Next: '+esc(s.next||'—')+'</span></li>';});
+ h+='</ol>';
+ if(b.resume&&b.resume.last_step){h+='<p class="muted">Resumes after '+esc(b.resume.last_step)+' ('+esc(b.resume.last_state||'')+')</p>';}
+ show('checklist',h);
+}
+async function loadHealth(){
+ show('health','Loading…');
+ var r = await api('/api/setup/health');
+ if(r.authRequired){show('health',tag('UNAVAILABLE')+' pair this dashboard first');return;}
+ var b=r.body||{};
+ var h='<p>'+esc((b.product&&b.product.name)||'Qubit')+' '+esc((b.product&&b.product.version)||'')+'</p><ul>';
+ ['platform','dependencies','models','provider','credentials','audio','asr_tts','browser_cdp','timer','permissions','storage','service','migration'].forEach(function(k){
+   var v=b[k]; if(v===undefined)return;
+   var st=(v&&v.state)||(typeof v==='object'?'READY':'?');
+   h+='<li>'+esc(k)+' '+tag(st)+'</li>';
+ });
+ h+='</ul><p class="muted">Values are references and typed states only — never keys, tokens, or private content.</p>';
+ show('health',h);
+}
+async function loadRepair(){
+ var r = await api('/api/setup/checklist');
+ var b=r.body||{};
+ show('repair','<p class="muted">Open the checklist above for the ordered fix list, or preview a setup run.</p>');
+}
+async function previewRun(){
+ show('runout','Loading preview…');
+ var r = await api('/api/setup/run',{method:'POST',body:'{}'});
+ renderRun(r.body);
+}
+function applyRun(){
+ if(!window.confirm('Apply the staged setup run? This may download files and change local configuration (never services).'))return;
+ if(!window.confirm('Confirm again: proceed with the setup run?'))return;
+ api('/api/setup/run',{method:'POST',body:JSON.stringify({apply:true,confirm:true})}).then(function(r){renderRun(r.body);loadChecklist(false);});
+}
+function renderRun(b){
+ b=b||{}; var h='<p>Run '+tag(b.state||'UNKNOWN')+'</p><ol>';
+ (b.receipts||[]).forEach(function(r){h+='<li>'+esc(r.step)+' '+tag(r.state||'?')+' '+esc(r.detail||'')+'</li>';});
+ h+='</ol><p class="muted">'+esc(b.rollback||'')+'</p>';
+ show('runout',h);
+}
+async function loadDiagnostics(){
+ show('advout','Loading…');
+ var r = await api('/api/setup/diagnostics');
+ var b=r.body||{};
+ var h='<p>Bundle '+tag('READY')+' · generated '+esc(new Date((b.generated_at||0)*1000).toLocaleString())+'</p><ul>';
+ (b.checks||[]).forEach(function(c){h+='<li>'+esc(c.name)+' '+tag(c.state||'?')+' '+esc(c.detail||'')+'</li>';});
+ h+='</ul><p class="muted">'+esc((b.hints||[]).join(' · '))+'</p>';
+ show('advout',h);
+}
+async function loadAudit(){
+ show('advout','The change timeline lives in the CLI: <code>voicebridge setup audit</code> (bounded, redacted, local).');
+}
+loadChecklist(false); loadHealth(); loadRepair();
+</script>
+</body></html>

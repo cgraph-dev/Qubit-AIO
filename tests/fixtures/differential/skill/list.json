@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "fixture_id": "skill.verified.list",
+  "family": "skill",
+  "command": {
+    "argv": [
+      "voicebridge",
+      "skills",
+      "list"
+    ],
+    "stdin": null,
+    "env": {}
+  },
+  "request": null,
+  "normalizers": [
+    "timestamp",
+    "generated_hash",
+    "product_branding"
+  ],
+  "expected": {
+    "exit_code": 0
+  },
+  "qubit": {
+    "path": "voicebridge/verified_skills/store.py:59",
+    "caller": "VerifiedSkillStore.list",
+    "approval": null
+  },
+  "hermes": {
+    "path": "qubit_cli/web_routers/skills.py:344",
+    "symbol": "get_skills",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/skills/library/service.ts:75",
+    "symbol": "listSkillLibrary",
+    "mapping_status": "VERIFIED"
+  },
+  "references": {
+    "hermes": {
+      "kind": "cli",
+      "argv": [
+        "hermes",
+        "skills",
+        "list"
+      ],
+      "env": {},
+      "equivalent_kind": "exact_equivalent",
+      "expectation": "PASS",
+      "notes": "Lists skills (lazy-creates hub audit/taps on first run).",
+      "pinned_commit": "2237be355906fbe6065ce1815711eee52b2d646e"
+    },
+    "openclaw": {
+      "kind": "cli",
+      "argv": [
+        "openclaw",
+        "skills",
+        "list",
+        "--json"
+      ],
+      "env": {},
+      "equivalent_kind": "exact_equivalent",
+      "expectation": "PASS",
+      "notes": "Lists available skills as JSON.",
+      "pinned_commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
+    }
+  },
+  "disposition": "PASS",
+  "notes": "Verified-skill manifest list contract (install staged disabled; lifecycle is journaled). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/skills.py:344 (get_skills); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/skills/library/service.ts:75 (listSkillLibrary). Side-effect-free reference invocation(s) declared and pinnable: `hermes skills list` (2237be355906fbe6065ce1815711eee52b2d646e, exact_equivalent); `openclaw skills list --json` (3a9d69db306cd7f081e06254cb89c4bcc14a7107, exact_equivalent). The declared `hermes` reference is pinned: the pinned wrapper's probed `--version` prints `Hermes Agent v0.21.1 (2026.9.7) \u00b7 upstream <varies> \u00b7 local 2237be35 (+1 carried commit)`, and the `2237be35` token is a prefix of the contractual pin 2237be355906fbe6065ce1815711eee52b2d646e, so the runner's `_reference_is_pinned` resolves pinned=true from `--version` alone. No `pinned=false` override is declared and this fixture claims PASS. The pinned openclaw reference(s) (3a9d69db306cd7f081e06254cb89c4bcc14a7107) remain byte-comparable where declared.",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "argv": [
+        "voicebridge",
+        "skills",
+        "list"
+      ]
+    },
+    "broker_policy_decision": "install staged disabled; lifecycle journaled",
+    "runtime_provider": null,
+    "store_state_assertion": "verified-skill manifest store",
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    },
+    "test_ids": [
+      "tests/test_packet8p.py::test_concurrent_submits_are_safe"
+    ]
+  },
+  "test_ids": [
+    "tests/test_packet8p.py::test_concurrent_submits_are_safe"
+  ]
+}

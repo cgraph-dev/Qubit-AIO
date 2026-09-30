@@ -1,0 +1,5696 @@
+{
+ "schema": "qubit-controls-e2e/1",
+ "generated_by": "scripts/controls_e2e_audit.py",
+ "generated_at": "2026-09-25T00:35:46+0300",
+ "target": "http://127.0.0.1:8890",
+ "mode": "real browser (Playwright Chromium, headless)",
+ "target_policy": {
+  "loopback_only": true,
+  "forbidden": [
+   "127.0.0.1:9119",
+   "[::1]:9119",
+   "localhost:9119",
+   "~/.hermes"
+  ],
+  "no_deletes_of_user_data": true,
+  "no_estop": true,
+  "no_service_restart": true
+ },
+ "pages": [
+  "/skills",
+  "/plugins",
+  "/mcp",
+  "/models",
+  "/profiles",
+  "/config",
+  "/env",
+  "/sessions",
+  "/files",
+  "/logs",
+  "/channels",
+  "/webhooks",
+  "/pairing",
+  "/system"
+ ],
+ "counts": {
+  "total": 96,
+  "E2E_PASS": 84,
+  "E2E_GATED": 4,
+  "E2E_FAIL": 2,
+  "E2E_SKIP": 6
+ },
+ "counts_by_page": {
+  "/skills": {
+   "E2E_PASS": 9
+  },
+  "/plugins": {
+   "E2E_PASS": 8,
+   "E2E_GATED": 1
+  },
+  "/mcp": {
+   "E2E_PASS": 5,
+   "E2E_FAIL": 1
+  },
+  "/models": {
+   "E2E_PASS": 8
+  },
+  "/profiles": {
+   "E2E_PASS": 5
+  },
+  "/config": {
+   "E2E_PASS": 6
+  },
+  "/env": {
+   "E2E_PASS": 6
+  },
+  "/sessions": {
+   "E2E_PASS": 12,
+   "E2E_SKIP": 1
+  },
+  "/files": {
+   "E2E_PASS": 2,
+   "E2E_SKIP": 1,
+   "E2E_GATED": 1
+  },
+  "/logs": {
+   "E2E_PASS": 8
+  },
+  "/channels": {
+   "E2E_PASS": 4,
+   "E2E_GATED": 1
+  },
+  "/webhooks": {
+   "E2E_PASS": 2,
+   "E2E_FAIL": 1
+  },
+  "/pairing": {
+   "E2E_PASS": 1,
+   "E2E_GATED": 1,
+   "E2E_SKIP": 2
+  },
+  "/system": {
+   "E2E_PASS": 8,
+   "E2E_SKIP": 2
+  }
+ },
+ "controls": [
+  {
+   "page": "/skills",
+   "control": "skills_search",
+   "action": "fill the header Search with 'voice'",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "skill list filtered by search term",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/skills",
+   "control": "skills_category_filter",
+   "action": "click the 'Security' category filter",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "category filter applied (heading=Security)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/skills",
+   "control": "skills_toolset_tab",
+   "action": "click the TOOLSETS panel entry",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "toolsets grid rendered",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/skills",
+   "control": "skills_toolset_configure",
+   "action": "click Configure on the first toolset",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/tools/toolsets/web/config",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "name": "web",
+      "qubit_counterpart": "CLI `qubit capability` + dashboard Settings (classic)"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "toolset config drawer opened",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/skills",
+   "control": "skills_browse_hub",
+   "action": "click BROWSE HUB",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/skills/hub/sources",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "qubit_counterpart": "CLI `qubit skills list`"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "hub browser landing rendered",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/skills",
+   "control": "skills_hub_details",
+   "action": "click Details on a hub result",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/skills/hub/preview",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "name": "qubit-boards",
+      "qubit_counterpart": "CLI `qubit skills show <id>`",
+      "description": "Kanban boards and cards on the canonical store (same backend as qubit kanban CLI and voice)."
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "skill detail dialog opened",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/skills",
+   "control": "skills_toggle_roundtrip",
+   "action": "flip the first skill switch off, then restore via API + reload",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/skills",
+     "status": 200
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/skills/toggle",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "name": "1password",
+      "enabled": false
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "Disable skill: say yes to confirm. skill_id 1password Say yes to confirm.",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "91f71f9a23594721bed5da2c1fe92263"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/skills/toggle",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "name": "1password",
+      "enabled": false,
+      "confirmation_id": "91f71f9a23594721bed5da2c1fe92263"
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "Disable skill: say yes to confirm. skill_id 1password Say yes to confirm.",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "783af5a7bf0044a5a126cfb806417c4b"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/ops/confirm",
+     "status": 200,
+     "payload": {
+      "confirmation_id": "91f71f9a23594721bed5da2c1fe92263"
+     },
+     "response": {
+      "ok": true,
+      "code": null,
+      "detail": "Done.",
+      "state": "executed"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/skills",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/skills",
+     "status": 200
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/skills/toggle",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "name": "1password",
+      "enabled": true,
+      "confirm": true
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "Enable skill: say yes to confirm. skill_id 1password Say yes to confirm.",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "ab6b6a2442c747689ebc6667ff9490d4"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/ops/confirm",
+     "status": 200,
+     "payload": {
+      "confirmation_id": "ab6b6a2442c747689ebc6667ff9490d4"
+     },
+     "response": {
+      "ok": true,
+      "code": null,
+      "detail": "Done.",
+      "state": "executed"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/skills/toggle",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "name": "1password",
+      "enabled": true,
+      "confirmation_id": "ab6b6a2442c747689ebc6667ff9490d4"
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "Enable skill: say yes to confirm. skill_id 1password Say yes to confirm.",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "57073ed5d1304d3abcf1524a57159f30"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/skills",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": {
+       "id": "default",
+       "brain": "default",
+       "model": "deepseek-v4-flash",
+       "provider": ""
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles/active",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "default"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/config",
+     "status": 200,
+     "response": {
+      "model": "deepseek-v4-flash"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/themes",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "qubit"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/font",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/skills",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/tools/toolsets",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/skills",
+     "status": 200
+    }
+   ],
+   "policy": "typed gate CONFIRM_REQUIRED",
+   "state_change": "toggled 1 skill(s) off, restored to the pre-run enabled map",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "staged typed gate then confirmed (settled)",
+   "notes": "disable then restore (net-zero)",
+   "browser": true
+  },
+  {
+   "page": "/skills",
+   "control": "skills_new_skill_dialog",
+   "action": "click New skill, then cancel the editor",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "skill editor dialog opened then cancelled",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/skills",
+   "control": "skills_learn_dialog",
+   "action": "click Learn a skill, then cancel",
+   "request": [],
+   "policy": "allowed",
+   "state_change": "learn-a-skill dialog opened then cancelled",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/plugins",
+   "control": "plugins_catalog_search",
+   "action": "type 'kanban' into the catalog search",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins/catalog",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "state": "OK",
+      "count": 2
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "catalog filtered by query",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/plugins",
+   "control": "plugins_catalog_source_filter",
+   "action": "select the 'bundled' catalog source",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins/catalog",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "state": "OK",
+      "count": 0
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins/catalog",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "state": "OK",
+      "count": 2
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "catalog source facet applied then reset",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/plugins",
+   "control": "plugins_catalog_details",
+   "action": "expand Details on the first catalog row",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins/catalog/kanban",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "state": "OK"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "catalog detail expanded",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/plugins",
+   "control": "plugins_reload",
+   "action": "click RELOAD PLUGINS",
+   "request": [
+    {
+     "method": "POST",
+     "path": "/agent/api/dashboard/plugins/reload",
+     "status": 200,
+     "code": "PLUGIN_RELOAD_LOCAL_REREAD",
+     "payload": {
+      "confirm": true
+     },
+     "response": {
+      "ok": true,
+      "code": "PLUGIN_RELOAD_LOCAL_REREAD"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins/catalog",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "state": "OK",
+      "count": 2
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins/hub",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "plugin store + catalog reload requested",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/plugins",
+   "control": "plugins_catalog_toggle",
+   "action": "toggle a catalog plugin's enable/disable, then restore",
+   "request": [
+    {
+     "method": "POST",
+     "path": "/agent/api/dashboard/agent-plugins/browser-browserbase/disable",
+     "status": 200,
+     "payload": {
+      "confirm": true
+     },
+     "response": {
+      "ok": true,
+      "name": "browser-browserbase"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins/hub",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/dashboard/agent-plugins/browser-browserbase/enable",
+     "status": 200,
+     "payload": {
+      "confirm": true
+     },
+     "response": {
+      "ok": true,
+      "name": "browser-browserbase"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "catalog plugin browser-browserbase disabled then enabled",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "same-plugin enable/disable round-trip (net-zero)",
+   "browser": true
+  },
+  {
+   "page": "/plugins",
+   "control": "plugins_pinned_search",
+   "action": "type 'github' into the pinned-index search",
+   "request": [],
+   "policy": "allowed",
+   "state_change": "pinned index filtered",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/plugins",
+   "control": "plugins_rescan",
+   "action": "click the header Rescan/Refresh control",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins/rescan",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "count": 10
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins/hub",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "dashboard rescan requested",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/plugins",
+   "control": "plugins_install_empty_validation",
+   "action": "click INSTALL with an empty identifier",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "empty-identifier install validated client-side",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/plugins",
+   "control": "plugins_memory_provider_select",
+   "action": "open the memory-provider select and switch/reset it",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/memory/providers/byterover/config",
+     "status": 403,
+     "code": "MEMORY_LOCAL_ONLY",
+     "response": {
+      "ok": false,
+      "code": "MEMORY_LOCAL_ONLY",
+      "detail": "no memory provider 'byterover'; qubit-local is the only store and cloud sync is refused by policy",
+      "state": "UNAVAILABLE",
+      "qubit_counterpart": "Memory page search + CLI `qubit memory`"
+     }
+    }
+   ],
+   "policy": "typed gate MEMORY_LOCAL_ONLY",
+   "state_change": "memory provider select switched then reset to default",
+   "reload_persist": null,
+   "disposition": "E2E_GATED",
+   "detail": "typed refusal MEMORY_LOCAL_ONLY (counterpart path)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/mcp",
+   "control": "mcp_add_server_modal",
+   "action": "click ADD SERVER, then cancel the modal",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "Add Server modal opened then closed",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/mcp",
+   "control": "mcp_test_connection",
+   "action": "click Test connection on the cgraph-graft server",
+   "request": [
+    {
+     "method": "POST",
+     "path": "/agent/api/mcp/servers/cgraph-graft/test",
+     "status": 200,
+     "code": "MCP_CONNECT_FAILED",
+     "response": {
+      "ok": true,
+      "code": "MCP_CONNECT_FAILED",
+      "detail": "MCP stdio server failed to start: [Errno 2] No such file or directory: 'graft'",
+      "state": "UNREACHABLE",
+      "name": "cgraph-graft"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "connection test requested for cgraph-graft (verdict=MCP_CONNECT_FAILED)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "backend verdict MCP_CONNECT_FAILED",
+   "browser": true
+  },
+  {
+   "page": "/mcp",
+   "control": "mcp_toggle_enabled",
+   "action": "click Disable then Enable on the MCP server",
+   "request": [
+    {
+     "method": "PUT",
+     "path": "/agent/api/mcp/servers/cgraph-graft/enabled",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "enabled": false
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "changing MCP server 'cgraph-graft' enabled state requires explicit confirmation: re-send with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "3d68cd69c985460b9ce52c2625fc0bc4"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/mcp/servers/cgraph-graft/enabled",
+     "status": 200,
+     "payload": {
+      "enabled": false,
+      "confirmation_id": "3d68cd69c985460b9ce52c2625fc0bc4"
+     },
+     "response": {
+      "ok": true,
+      "name": "cgraph-graft",
+      "enabled": false,
+      "qubit_counterpart": "CLI `qubit mcp servers`"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/mcp/servers/cgraph-graft/enabled",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "enabled": true
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "changing MCP server 'cgraph-graft' enabled state requires explicit confirmation: re-send with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "60b02ef1444f460180f12939f468d756"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/mcp/servers/cgraph-graft/enabled",
+     "status": 200,
+     "payload": {
+      "enabled": true,
+      "confirmation_id": "60b02ef1444f460180f12939f468d756"
+     },
+     "response": {
+      "ok": true,
+      "name": "cgraph-graft",
+      "enabled": true,
+      "qubit_counterpart": "CLI `qubit mcp servers`"
+     }
+    }
+   ],
+   "policy": "typed gate CONFIRM_REQUIRED",
+   "state_change": "MCP server enable toggled then restored",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "staged typed gate then confirmed (settled)",
+   "notes": "disable/enable round-trip (net-zero)",
+   "browser": true
+  },
+  {
+   "page": "/mcp",
+   "control": "mcp_invoke_tool",
+   "action": "open Invoke, run graft_find_code, then close",
+   "request": [
+    {
+     "method": "POST",
+     "path": "/agent/api/mcp/servers/cgraph-graft/invoke",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "tool": "graft_find_code",
+      "args": {
+       "query": "Harness"
+      }
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "mcp.invoke requires explicit --confirm or a human approval id",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": ""
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/mcp/servers/cgraph-graft/invoke",
+     "status": 400,
+     "code": "MCP_CONNECT_FAILED",
+     "payload": {
+      "tool": "graft_find_code",
+      "args": {
+       "query": "Harness"
+      },
+      "confirm": true
+     },
+     "response": {
+      "ok": false,
+      "code": "MCP_CONNECT_FAILED",
+      "detail": "MCP stdio server failed to start: [Errno 2] No such file or directory: 'graft'"
+     }
+    }
+   ],
+   "policy": "typed gate CONFIRM_REQUIRED",
+   "state_change": "tool invoke returned no result panel",
+   "reload_persist": null,
+   "disposition": "E2E_FAIL",
+   "detail": "client error 400 MCP_CONNECT_FAILED on /agent/api/mcp/servers/cgraph-graft/invoke",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/mcp",
+   "control": "mcp_delete_cancel",
+   "action": "click Delete then Cancel the confirmation",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "delete confirmation cancelled (no deletion)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/mcp",
+   "control": "mcp_catalog_bootstrap_details",
+   "action": "expand the bootstrap details on a catalog entry",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "catalog bootstrap details expanded",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/models",
+   "control": "models_period_7d",
+   "action": "click the 7D period button",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/analytics/models",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/model/auxiliary",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/terminal/profiles",
+     "status": 200
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "analytics window switched to 7d",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/models",
+   "control": "models_period_90d",
+   "action": "click the 90D period button",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/analytics/models",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/model/auxiliary",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/terminal/profiles",
+     "status": 200
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "analytics window switched to 90d",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/models",
+   "control": "models_period_30d",
+   "action": "click the 30D period button (restore)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/analytics/models",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/model/auxiliary",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/terminal/profiles",
+     "status": 200
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "analytics window restored to 30d",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/models",
+   "control": "models_change_main_picker",
+   "action": "click CHANGE (main model); close the picker without applying",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/model/options",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "provider": "opencode-go",
+      "model": "deepseek-v4-flash"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "main-model picker opened then cancelled",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/models",
+   "control": "models_configure_aux",
+   "action": "click CONFIGURE; close the auxiliary modal",
+   "request": [],
+   "policy": "allowed",
+   "state_change": "auxiliary-tasks modal opened then cancelled",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/models",
+   "control": "models_aux_reset_cancel",
+   "action": "open CONFIGURE, click Reset all, cancel the confirmation",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "aux reset confirmation opened and cancelled (no write)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/models",
+   "control": "models_use_as_menu",
+   "action": "open a model card's USE AS menu, then close",
+   "request": [],
+   "policy": "allowed",
+   "state_change": "USE AS menu opened then closed",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/models",
+   "control": "models_profile_use_as",
+   "action": "click Use as on the active model profile",
+   "request": [
+    {
+     "method": "PUT",
+     "path": "/agent/api/terminal/profile",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "profile_id": "qubit-go"
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "setting the /chat model profile to 'qubit-go' requires explicit confirmation: re-PUT with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "80583a23b14b4105bfa192ea935b6b26"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/terminal/profile",
+     "status": 200,
+     "code": "OK",
+     "payload": {
+      "profile_id": "qubit-go",
+      "confirmation_id": "80583a23b14b4105bfa192ea935b6b26"
+     },
+     "response": {
+      "ok": true,
+      "code": "OK",
+      "detail": "",
+      "qubit_counterpart": "CLI `qubit profile model list`",
+      "profile_id": "qubit-go"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/model/auxiliary",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/terminal/profiles",
+     "status": 200
+    }
+   ],
+   "policy": "typed gate CONFIRM_REQUIRED",
+   "state_change": "active model profile re-applied (net-zero)",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "staged typed gate then confirmed (settled)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/profiles",
+   "control": "profiles_build_navigate",
+   "action": "click BUILD (profile builder)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": {
+       "id": "default",
+       "brain": "default",
+       "model": "deepseek-v4-flash",
+       "provider": ""
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles/active",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "default"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/config",
+     "status": 200,
+     "response": {
+      "model": "deepseek-v4-flash"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/themes",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "qubit"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/font",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": {
+       "id": "default",
+       "brain": "default",
+       "model": "deepseek-v4-flash",
+       "provider": ""
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles/active",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "default"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "navigated to /profiles/new then returned",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/profiles",
+   "control": "profiles_create_delete",
+   "action": "create 'e2e-audit-prof' via CREATE, reload, delete via actions menu",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/model/options",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "provider": "opencode-go",
+      "model": "deepseek-v4-flash"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/profiles",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "name": "e2e-audit-prof",
+      "clone_from": null,
+      "clone_all": false,
+      "no_skills": false
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "profile 'e2e-audit-prof' creation writes a new profile home; re-POST with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "eddcba42d3014cde98c00cd686e1bb4e"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/profiles",
+     "status": null,
+     "payload": {
+      "name": "e2e-audit-prof",
+      "clone_from": null,
+      "clone_all": false,
+      "no_skills": false,
+      "confirmation_id": "eddcba42d3014cde98c00cd686e1bb4e"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": {
+       "id": "default",
+       "brain": "default",
+       "model": "deepseek-v4-flash",
+       "provider": ""
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": {
+       "id": "default",
+       "brain": "default",
+       "model": "deepseek-v4-flash",
+       "provider": ""
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles/active",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "default"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/config",
+     "status": 200,
+     "response": {
+      "model": "deepseek-v4-flash"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/themes",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "qubit"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/font",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": {
+       "id": "default",
+       "brain": "default",
+       "model": "deepseek-v4-flash",
+       "provider": ""
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles/active",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "default"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": {
+       "id": "default",
+       "brain": "default",
+       "model": "deepseek-v4-flash",
+       "provider": ""
+      }
+     }
+    },
+    {
+     "method": "DELETE",
+     "path": "/agent/api/profiles/e2e-audit-prof",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "profile 'e2e-audit-prof' deletion removes its home; re-POST with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "26555ba21f814d3fa796cdbe34884f08"
+     }
+    },
+    {
+     "method": "DELETE",
+     "path": "/agent/api/profiles/e2e-audit-prof",
+     "status": 200,
+     "payload": {
+      "confirm": true
+     },
+     "response": {
+      "ok": true,
+      "name": "e2e-audit-prof",
+      "qubit_counterpart": "CLI `qubit agent profile delete`"
+     }
+    }
+   ],
+   "policy": "typed gate CONFIRM_REQUIRED",
+   "state_change": "temp profile created, verified on reload, deleted",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "staged typed gate then confirmed (settled)",
+   "notes": "cleaned up: False",
+   "browser": true
+  },
+  {
+   "page": "/profiles",
+   "control": "profiles_actions_menu",
+   "action": "open a profile's actions menu",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "profile actions menu opened",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/profiles",
+   "control": "profiles_soul_editor",
+   "action": "open the profile SOUL editor, then cancel",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles/default/soul",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "SOUL editor opened (read) then cancelled",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/profiles",
+   "control": "profiles_desc_editor",
+   "action": "open the profile description editor, then cancel",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "description editor opened then cancelled",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/config",
+   "control": "config_category_tab",
+   "action": "click the Agent category tab",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "Agent category tab selected",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/config",
+   "control": "config_search",
+   "action": "type 'cache' into the config search",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "config fields filtered by search",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/config",
+   "control": "config_save_confirm",
+   "action": "click SAVE then confirm in the in-app dialog (unchanged config)",
+   "request": [
+    {
+     "method": "PUT",
+     "path": "/agent/api/config",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "config": {
+       "model": "deepseek-v4-flash",
+       "providers": {},
+       "fallback_providers": [],
+       "credential_pool_strategies": {},
+       "toolsets": [
+        "Qubit-cli",
+        "kanban"
+       ],
+       "database": {
+        "journal_mode": "wal",
+        "wal_autocheckpoint": null,
+        "journal_size_limit": null
+       },
+       "runtime": {
+        "nofile_soft_limit": 4096
+       },
+       "max_concurrent_sessions": null,
+       "max_live_sessions": 16,
+       "session": {
+        "terminal_continue": true
+       },
+       "agent": {
+        "max_turns": 90,
+        "budget_warning_ratio": null,
+        "run_budget_seconds": null,
+        "gateway_timeout": 1800,
+        "gateway_turn_lease_timeout": 5,
+        "agent_cache": {
+         "max_size": 128,
+         "idle_ttl_secs": 3600,
+         "memory_high_mb": "auto",
+         "max_evictions_per_pass": 16,
+         "protect_recent": 8
+        },
+        "restart_drain_timeout": 180,
+        "cron_drain_timeout": 30,
+        "restart_after_turn_timeout": 1800,
+        "build_wait_timeout": 600,
+        "api_max_retries": 3,
+        "empty_response_guard": {
+         "enabled": true,
+         "cost_threshold_usd": 0.25
+        },
+        "service_tier": "",
+        "fast_auto_seconds": 60,
+        "tool_use_enforcement": "auto",
+        "execution_guidance": "auto",
+        "intent_ack_continuation": "auto",
+        "stall_guards": true,
+        "task_completion_guidance": true,
+        "parallel_tool_call_guidance": true,
+        "environment_probe": true,
+        "bot_mode_protocol": true,
+        "environment_hint": "",
+        "coding_context": "auto",
+        "coding_instructions": "",
+        "verify_guidance": true,
+        "max_verify_nudges": 3,
+        "verify_on_stop": false,
+        "gateway_timeout_warning": 900,
+        "clarify_timeout": 600,
+        "gateway_notify_interval": 180,
+        "session_stall_timeout": 300,
+        "sanitizer_heal_escalation_threshold": 3,
+        "reconnect_attention_after": 7200,
+        "gateway_auto_continue_freshness": 3600,
+        "gateway_startup_restore_drain_timeout": 30,
+        "gateway_startup_warmup_timeout": 20,
+        "local_stream_stale_timeout": 900,
+        "image_input_mode": "auto",
+        "disabled_toolsets": [],
+        "reasoning_overrides": {},
+        "reasoning_echo": false,
+        "turn_liveness": {
+         "timeout_s": 600,
+         "poll_s": 15
+        },
+        "verbose": false,
+        "reasoning_effort": "none"
+       },
+       "terminal": {
+        "backend": "local",
+        "modal_mode": "auto",
+        "degraded_mode": "warn",
+        "cwd": ".",
+        "temp_dir": "",
+        "font_family": "",
+        "timeout": 180,
+        "daemon_term_grace_seconds": 2,
+        "oneshot_completion_wait_seconds": 600,
+        "env_passthrough": [],
+        "home_mode": "auto",
+        "shell_init_files": [],
+        "auto_source_bashrc": true,
+        "docker_image": "nikolaik/python-nodejs:python3.11-nodejs20",
+        "docker_forward_env": [],
+        "docker_env": {},
+        "singularity_image": "docker://nikolaik/python-nodejs:python3.11-nodejs20",
+        "modal_image": "nikolaik/python-nodejs:python3.11-nodejs20",
+        "daytona_image": "nikolaik/python-nodejs:python3.11-nodejs20",
+        "vercel_runtime": "node24",
+        "container_cpu": 1,
+        "container_memory": 5120,
+        "container_disk": 51200,
+        "container_persistent": true,
+        "docker_volumes": [],
+        "docker_mount_cwd_to_workspace": false,
+        "docker_network": true,
+        "docker_extra_args": [],
+        "docker_shm_size": "1g",
+        "docker_run_as_host_user": false,
+        "docker_snap_compat": false,
+        "docker_shared_container_key": "\u00abredacted\u00bb",
+        "persistent_shell": true
+       },
+       "web": {
+        "backend": "",
+        "search_backend": "",
+        "extract_backend": "",
+        "extract_char_limit": 15000,
+        "keyless_fallback": true,
+        "keyless_rescue": true,
+        "provider_tier": {},
+        "cache_enabled": true,
+        "cache_ttl_minutes": 20,
+        "cache_exempt_hosts": []
+       },
+       "browser": {
+        "backend": "",
+        "inactivity_timeout": 120,
+        "command_timeout": 30,
+        "snapshot_threshold": 15000,
+        "record_sessions": false,
+        "headed": false,
+        "allow_private_urls": false,
+        "engine": "auto",
+        "auto_local_for_private_urls": true,
+        "cdp_url": "",
+        "use_real_profile": false,
+        "real_profile_autoclose": false,
+        "real_profile_pin": "",
+        "allow_unsafe_evaluate": false,
+        "restrict_evaluate": false,
+        "dialog_policy": "must_respond",
+        "dialog_timeout_s": 300,
+        "camofox": {
+         "managed_persistence": false,
+         "user_id": "",
+         "session_key": "\u00abredacted\u00bb",
+         "adopt_existing_tab": false,
+         "rewrite_loopback_urls": false,
+         "loopback_host_alias": "host.docker.internal"
+        },
+        "extension_control": {
+         "enabled": false,
+         "developer_mode": false
+        }
+       },
+       "checkpoints": {
+        "enabled": true,
+        "max_snapshots": 20,
+        "max_total_size_mb": 500,
+        "max_file_size_mb": 10,
+        "auto_prune": true,
+        "retention_days": 7,
+        "min_interval_hours": 24,
+        "delete_orphans": true
+       },
+       "context_file_max_chars": null,
+       "context_file_read_timeout": 5,
+       "file_read_max_chars": 100000,
+       "mcp_discovery_timeout": 1.5,
+       "mcp_single_query_discovery_timeout": 15,
+       "mcp": {
+        "auto_reload_on_config_change": true
+       },
+       "tool_output": {
+        "max_bytes": 50000,
+        "max_lines": 2000,
+        "max_line_length": 2000
+       },
+       "tool_loop_guardrails": {
+        "warnings_enabled": true,
+        "hard_stop_enabled": false,
+        "non_interactive_hard_stop_enabled": true,
+        "warn_after": {
+         "exact_failure": 2,
+         "same_tool_failure": 3,
+         "idempotent_no_progress": 2
+        },
+        "hard_stop_after": {
+         "exact_failure": 5,
+         "same_tool_failure": 8,
+         "idempotent_no_progress": 5
+        },
+        "loop_caps": {
+         "max_web_searches": 50,
+         "max_subagents": 50
+        }
+       },
+       "compression": {
+        "enabled": true,
+        "checkpoint_required": false,
+        "progress_notices": false,
+        "threshold": 0.5,
+        "threshold_tokens": "\u00abredacted\u00bb",
+        "target_ratio": 0.2,
+        "tail_mode": "lean",
+        "protect_last_n": 20,
+        "min_tail_user_messages": 1,
+        "max_attempts": 3,
+        "proactive_prune_tokens": "\u00abredacted\u00bb",
+        "proactive_prune_min_result_chars": 8000,
+        "proactive_prune_min_reclaim_tokens": "\u00abredacted\u00bb",
+        "micro_compact": false,
+        "micro_compact_every_n_turns": 1,
+        "micro_compact_defrag_threshold_tokens": "\u00abredacted\u00bb",
+        "hygiene_hard_message_limit": 400,
+        "hygiene_timeout_seconds": 30,
+        "hygiene_total_ceiling_seconds": 600,
+        "hygiene_failure_cooldown_seconds": 300,
+        "hygiene_max_turn_hold_seconds": 10,
+        "context_timeout_seconds": 120,
+        "context_total_ceiling_seconds": 600,
+        "protect_first_n": 3,
+        "abort_on_summary_failure": false,
+        "codex_gpt55_autoraise": true,
+        "codex_gpt55_autoraise_notice": true,
+        "codex_app_server_auto": "native",
+        "codex_responses_native": false,
+        "codex_responses_compact_threshold": null,
+        "in_place": true,
+        "model_thresholds": {},
+        "idle_compact_after_seconds": 0
+       },
+       "prompt_caching": {
+        "cache_ttl": "5m"
+       },
+       "openrouter": {
+        "response_cache": true,
+        "response_cache_ttl": 300,
+        "min_coding_score": 0.65
+       },
+       "bedrock": {
+        "region": "",
+        "discovery": {
+         "enabled": true,
+         "provider_filter": [],
+         "refresh_interval": 3600
+        },
+        "guardrail": {
+         "guardrail_identifier": "",
+         "guardrail_version": "",
+         "stream_processing_mode": "async",
+         "trace": "disabled"
+        }
+       },
+       "auxiliary": {
+        "transient_retries": 2,
+        "free_only": false,
+        "openrouter_model": "",
+        "stream_only_base_urls": [],
+        "vision": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 120,
+         "extra_body": {},
+         "reasoning_effort": "",
+         "download_timeout": 30
+        },
+        "compression": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 120,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "skills_hub": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 30,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "approval": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 30,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "review": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "api_mode": ""
+        },
+        "mcp": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 30,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "title_generation": {
+         "enabled": true,
+         "provider": "auto",
+         "model": "",
+         "prefer_fast_model": false,
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 30,
+         "extra_body": {},
+         "reasoning_effort": "",
+         "language": ""
+        },
+        "memory_query_rewrite": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 8,
+         "extra_body": {}
+        },
+        "tts_audio_tags": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 30,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "triage_specifier": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 120,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "kanban_decomposer": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 180,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "profile_describer": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 60,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "goal_judge": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 60,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "curator": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 600,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "monitor": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 60,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "background_review": {
+         "enabled": true,
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 120,
+         "extra_body": {},
+         "reasoning_effort": "",
+         "max_input_tokens": "\u00abredacted\u00bb"
+        },
+        "moa_reference": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 900,
+         "extra_body": {}
+        },
+        "moa_aggregator": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 900,
+         "extra_body": {}
+        }
+       },
+       "display": {
+        "compact": false,
+        "personality": "",
+        "resume_display": "full",
+        "resume_exchanges": 10,
+        "resume_max_user_chars": 300,
+        "resume_max_assistant_chars": 200,
+        "resume_max_assistant_lines": 3,
+        "resume_skip_tool_only": true,
+        "busy_input_mode": "interrupt",
+        "busy_steer_ack_enabled": true,
+        "cli_multiline_shortcuts": true,
+        "interface": "cli",
+        "tui_auto_resume_recent": false,
+        "resume_last_session": true,
+        "tui_agents_nudge": true,
+        "bell_on_complete": true,
+        "bell_on_prompt": false,
+        "show_reasoning": true,
+        "reasoning_full": false,
+        "memory_notifications": "on",
+        "background_process_notifications": "concise",
+        "streaming": true,
+        "timestamps": true,
+        "timestamp_format": "%H:%M",
+        "final_response_markdown": "strip",
+        "persistent_output": true,
+        "persistent_output_max_lines": 200,
+        "cli_rebuild_scrollback_on_redraw": false,
+        "persist_prompts": true,
+        "inline_diffs": true,
+        "file_mutation_verifier": true,
+        "credits_notices": true,
+        "turn_completion_explainer": true,
+        "show_cost": true,
+        "battery": false,
+        "focus_view": false,
+        "focus_saved_tool_progress": "all",
+        "skin": "default",
+        "language": "en",
+        "tui_status_indicator": "kaomoji",
+        "cli_refresh_interval": 1,
+        "user_message_preview": {
+         "first_lines": 2,
+         "last_lines": 2
+        },
+        "interim_assistant_messages": true,
+        "show_commentary": true,
+        "tool_progress_command": false,
+        "tool_preview_length": 0,
+        "friendly_tool_labels": true,
+        "turn_summary": true,
+        "spinner_token_flow": "\u00abredacted\u00bb",
+        "tool_progress_grouping": "accumulate",
+        "status_phrases": {},
+        "reasoning_style": "code",
+        "ephemeral_system_ttl": 0,
+        "platforms": {
+         "telegram": {
+          "streaming": true
+         },
+         "discord": {
+          "streaming": false
+         },
+         "slack": {
+          "streaming": false
+         },
+         "wecom": {
+          "streaming": true
+         }
+        },
+        "runtime_footer": {
+         "enabled": false,
+         "fields": [
+          "model",
+          "context_pct",
+          "cwd"
+         ]
+        },
+        "status_bar": {
+         "fields": []
+        },
+        "copy_shortcut": "auto",
+        "pet": {
+         "enabled": false,
+         "slug": "",
+         "render_mode": "auto",
+         "scale": 0.33,
+         "unicode_cols": 0
+        },
+        "tool_progress_overrides": {},
+        "tool_progress": "all",
+        "cleanup_progress": false,
+        "long_running_notifications": true,
+        "busy_ack_detail": true
+       },
+       "dashboard": {
+        "theme": "default",
+        "turn_isolation": false,
+        "compute_host_heartbeat_secs": 15,
+        "compute_host_respawn_max": 3,
+        "show_token_analytics": "\u00abredacted\u00bb",
+        "trusted_proxies": [],
+        "ws_ping_interval": 20,
+        "ws_ping_timeout": 20,
+        "ws_orphan_reap_grace_s": 20,
+        "ws_orphan_activity_stale_s": 600,
+        "startup_orphan_sweep": true,
+        "oauth": {
+         "client_id": "",
+         "portal_url": ""
+        },
+        "basic_auth": {
+         "username": "",
+         "password_hash": "\u00abredacted\u00bb",
+         "password": "\u00abredacted\u00bb",
+         "secret": "\u00abredacted\u00bb",
+         "session_ttl_seconds": 0
+        },
+        "drain_auth": {
+         "scope": "drain",
+         "min_secret_chars": "\u00abredacted\u00bb"
+        },
+        "public_url": ""
+       },
+       "privacy": {
+        "redact_pii": true
+       },
+       "tts": {
+        "provider": "edge",
+        "edge": {
+         "voice": "en-US-AriaNeural"
+        },
+        "elevenlabs": {
+         "voice_id": "pNInz6obpgDQGcFmaJgB",
+         "model_id": "eleven_multilingual_v2"
+        },
+        "openai": {
+         "model": "gpt-4o-mini-tts",
+         "voice": "alloy"
+        },
+        "gemini": {
+         "model": "gemini-2.5-flash-preview-tts",
+         "voice": "Kore",
+         "audio_tags": false,
+         "persona_prompt_file": ""
+        },
+        "xai": {
+         "voice_id": "eve",
+         "language": "en",
+         "speed": 1,
+         "auto_speech_tags": false,
+         "optimize_streaming_latency": 0,
+         "sample_rate": 24000,
+         "bit_rate": 128000
+        },
+        "mistral": {
+         "model": "voxtral-mini-tts-2603",
+         "voice_id": "c69964a6-ab8b-4f8a-9465-ec0925096ec8"
+        },
+        "minimax": {
+         "model": "speech-02-hd",
+         "voice_id": "English_expressive_narrator"
+        },
+        "kittentts": {
+         "model": "KittenML/kitten-tts-nano-0.8-int8",
+         "voice": "Jasper"
+        },
+        "neutts": {
+         "ref_audio": "",
+         "ref_text": "",
+         "model": "neuphonic/neutts-air-q4-gguf",
+         "device": "cpu"
+        },
+        "piper": {
+         "voice": "en_US-lessac-medium"
+        },
+        "deepinfra": {
+         "model": "",
+         "voice": "default"
+        }
+       },
+       "stt": {
+        "enabled": true,
+        "echo_transcripts": true,
+        "language": "en",
+        "cloud_trim_silence": true,
+        "cloud_trim_threshold_db": -40,
+        "cloud_trim_keep_ms": 300,
+        "local": {
+         "model": "base",
+         "language": "",
+         "initial_prompt": "",
+         "vad": true,
+         "vad_min_silence_ms": 500,
+         "no_speech_prob_threshold": 0.6,
+         "logprob_threshold": -1,
+         "unload_after_idle_seconds": 0
+        },
+        "groq": {
+         "model": "whisper-large-v3-turbo",
+         "language": ""
+        },
+        "openai": {
+         "model": "whisper-1",
+         "language": ""
+        },
+        "mistral": {
+         "model": "voxtral-mini-latest",
+         "language": ""
+        },
+        "xai": {
+         "language": ""
+        },
+        "elevenlabs": {
+         "model_id": "scribe_v2",
+         "language_code": "",
+         "tag_audio_events": false,
+         "diarize": false
+        },
+        "deepinfra": {
+         "model": ""
+        }
+       },
+       "voice": {
+        "input_engine": "auto",
+        "record_key": "\u00abredacted\u00bb",
+        "submit_mode": "direct",
+        "max_recording_seconds": 120,
+        "auto_tts": false,
+        "client_direct": true,
+        "beep_enabled": true,
+        "beep_volume": 0.3,
+        "thinking_sound": true,
+        "silence_threshold": 200,
+        "silence_duration": 3,
+        "barge_in": true,
+        "barge_in_grace_seconds": 0.5,
+        "barge_in_threshold_multiplier": 3,
+        "stop_phrases": [
+         "stop"
+        ]
+       },
+       "wake_word": {
+        "enabled": false,
+        "surface": "auto",
+        "input_device": null,
+        "capture": "auto",
+        "provider": "openwakeword",
+        "phrase": "hey qubit",
+        "sensitivity": 0.6,
+        "confirmation_frames": 3,
+        "start_new_session": true,
+        "profile_routing": true,
+        "openwakeword": {
+         "model": "hey_hermes",
+         "inference_framework": ""
+        },
+        "sherpa": {
+         "model_dir": ""
+        },
+        "porcupine": {
+         "keyword": "jarvis"
+        }
+       },
+       "human_delay": {
+        "mode": "off",
+        "min_ms": 800,
+        "max_ms": 2500
+       },
+       "context": {
+        "engine": "compressor",
+        "memory_trim": {
+         "enabled": true,
+         "cooldown_seconds": 60,
+         "log_every_n": 1,
+         "info_log_min_delta_mb": 0
+        }
+       },
+       "memory": {
+        "memory_enabled": true,
+        "user_profile_enabled": true,
+        "write_approval": false,
+        "memory_char_limit": 2200,
+        "user_char_limit": 1375,
+        "nudge_interval": 10,
+        "provider": "",
+        "flush_min_turns": 6
+       },
+       "delegation": {
+        "model": "",
+        "provider": "",
+        "fallback_providers": null,
+        "base_url": "",
+        "api_key": "\u00abredacted\u00bb",
+        "api_mode": "",
+        "request_overrides": {},
+        "compression_threshold_tokens": "\u00abredacted\u00bb",
+        "inherit_mcp_toolsets": true,
+        "max_iterations": 250,
+        "max_summary_chars": 24000,
+        "child_timeout_seconds": 0,
+        "reasoning_effort": "",
+        "max_concurrent_children": 10,
+        "independent_completions": false,
+        "max_spawn_depth": 1,
+        "orchestrator_enabled": true,
+        "subagent_auto_approve": false,
+        "surface_child_process_notifications": false
+       },
+       "prefill_messages_file": "",
+       "goals": {
+        "max_turns": 20
+       },
+       "loops": {
+        "min_interval_seconds": 30,
+        "max_ticks": 100,
+        "self_paced_floor_seconds": 60,
+        "self_paced_ceiling_seconds": 900
+       },
+       "moa": {
+        "default_preset": "default",
+        "active_preset": "",
+        "save_traces": false,
+        "trace_dir": "",
+        "privacy_filter": "",
+        "presets": {
+         "default": {
+          "reference_models": [
+           {
+            "model": "gpt-5.5",
+            "provider": "openai-codex"
+           },
+           {
+            "model": "deepseek/deepseek-v4-pro",
+            "provider": "openrouter"
+           }
+          ],
+          "aggregator": {
+           "provider": "openrouter",
+           "model": "anthropic/claude-opus-4.8"
+          },
+          "enabled": true
+         }
+        }
+       },
+       "skills": {
+        "external_dirs": [],
+        "create_dir": "",
+        "project_discovery": true,
+        "trusted_project_dirs": [],
+        "template_vars": true,
+        "inline_shell": false,
+        "inline_shell_timeout": 10,
+        "guard_agent_created": false,
+        "tier1_advisory": true,
+        "write_approval": false,
+        "ledger": true,
+        "creation_nudge_interval": 15,
+        "disabled": []
+       },
+       "curator": {
+        "enabled": true,
+        "interval_hours": 168,
+        "min_idle_hours": 2,
+        "stale_after_days": 14,
+        "archive_after_days": 30,
+        "consolidate": false,
+        "prune_builtins": true,
+        "archive_ttl_days": 0,
+        "backup": {
+         "enabled": true,
+         "keep": 5
+        }
+       },
+       "honcho": {},
+       "timezone": "Europe/Bucharest",
+       "slack": {
+        "require_mention": true,
+        "free_response_channels": "",
+        "allowed_channels": "",
+        "require_mention_channels": "",
+        "ignore_other_user_mentions": false,
+        "thread_require_mention": false,
+        "channel_prompts": {}
+       },
+       "discord": {
+        "require_mention": true,
+        "free_response_channels": "",
+        "allowed_channels": "",
+        "auto_thread": true,
+        "thread_require_mention": false,
+        "bots_require_inline_mention": false,
+        "history_backfill": true,
+        "history_backfill_limit": 50,
+        "missed_message_backfill": {
+         "enabled": false,
+         "channels": "",
+         "window_seconds": 21600,
+         "limit": 100,
+         "max_dispatches": 10
+        },
+        "reactions": true,
+        "websocket_liveness_interval_seconds": 15,
+        "websocket_liveness_failure_threshold": 2,
+        "websocket_heartbeat_ack_max_age_seconds": 60,
+        "websocket_max_latency_seconds": 30,
+        "channel_prompts": {},
+        "dm_role_auth_guild": "",
+        "server_actions": "",
+        "allow_any_attachment": false,
+        "max_attachment_bytes": 33554432,
+        "approval_mentions": false,
+        "voice_channel_inactivity_timeout_seconds": 300,
+        "voice_playback_timeout_seconds": 120,
+        "voice_fx": {
+         "enabled": false,
+         "ambient_enabled": true,
+         "ambient_path": "",
+         "ambient_gain": 0.18,
+         "duck_gain": 0.06,
+         "speech_gain": 1,
+         "ack_enabled": true,
+         "ack_phrases": [
+          "Let me look into that.",
+          "One moment.",
+          "Checking on that now.",
+          "Give me a sec.",
+          "On it."
+         ]
+        }
+       },
+       "whatsapp": {},
+       "telegram": {
+        "reactions": false,
+        "channel_prompts": {},
+        "allowed_chats": "",
+        "extra": {
+         "rich_messages": true,
+         "rich_drafts": false
+        }
+       },
+       "mattermost": {
+        "require_mention": true,
+        "free_response_channels": "",
+        "allowed_channels": "",
+        "channel_prompts": {}
+       },
+       "matrix": {
+        "require_mention": true,
+        "free_response_rooms": "",
+        "allowed_rooms": ""
+       },
+       "approvals": {
+        "mode": "smart",
+        "timeout": 60,
+        "cron_mode": "deny",
+        "single_query_mode": "deny",
+        "unattended_mode": "deny",
+        "smart_policy": "",
+        "denial_breaker_threshold": 3,
+        "deny": [],
+        "mcp_reload_confirm": true,
+        "destructive_slash_confirm": true
+       },
+       "command_allowlist": [],
+       "quick_commands": {},
+       "platform_hints": {},
+       "plugins": {
+        "hook_callback_timeout": 30,
+        "allow_deprecated_imports": false,
+        "enabled": [
+         "chronos",
+         "platforms/line",
+         "web-parallel"
+        ],
+        "disabled": [
+         "browser-browser-use"
+        ]
+       },
+       "hooks": {},
+       "hooks_auto_accept": false,
+       "personalities": {},
+       "security": {
+        "allow_private_urls": false,
+        "redact_secrets": "\u00abredacted\u00bb",
+        "allow_data_training_tiers_noninteractive": false,
+        "approval": {
+         "transport": "builtin",
+         "transport_fallback": "deny"
+        },
+        "protected_instruction_files": true,
+        "protected_instruction_extra_patterns": [],
+        "tirith_enabled": true,
+        "tirith_path": "tirith",
+        "tirith_timeout": 5,
+        "tirith_fail_open": true,
+        "website_blocklist": {
+         "enabled": false,
+         "domains": [],
+         "shared_files": []
+        },
+        "acked_advisories": [],
+        "allow_lazy_installs": true
+       },
+       "cron": {
+        "allow_agent_scheduling": false,
+        "preflight": true,
+        "model_drift_guard": true,
+        "model": "",
+        "model_provider": "",
+        "provider": "",
+        "chronos": {
+         "portal_url": "",
+         "callback_url": "",
+         "expected_audience": "",
+         "nas_jwks_url": ""
+        },
+        "wrap_response": true,
+        "delivery": {
+         "notify": true
+        },
+        "mirror_delivery": false,
+        "max_parallel_jobs": null,
+        "output_retention": 50,
+        "script_timeout_seconds": 3600,
+        "session_db_timeout_seconds": 10,
+        "media_send_timeout_seconds": 300
+       },
+       "kanban": {
+        "auto_subscribe_on_create": true,
+        "dispatch_in_gateway": true,
+        "review_dispatch": true,
+        "dispatch_interval_seconds": 60,
+        "failure_limit": 2,
+        "worker_log_rotate_bytes": 2097152,
+        "worker_log_backup_count": 1,
+        "orchestrator_profile": "",
+        "default_assignee": "",
+        "max_in_progress": null,
+        "max_in_progress_per_profile": null,
+        "auto_decompose": true,
+        "auto_decompose_per_tick": 3,
+        "dispatch_stale_timeout_seconds": 14400,
+        "reconcile_orphans": true,
+        "done_sub_retention_days": 30
+       },
+       "bot_mode": {
+        "envelope_ttl_seconds": 900,
+        "turn_wait_seconds": 120
+       },
+       "code_execution": {
+        "mode": "project",
+        "kernel_idle_timeout": 1800,
+        "max_session_kernels": 4,
+        "timeout": 300,
+        "max_tool_calls": 50
+       },
+       "tools": {
+        "tool_search": {
+         "enabled": "auto",
+         "threshold_pct": 10,
+         "search_default_limit": 5,
+         "max_search_limit": 20,
+         "listing": "auto",
+         "listing_max_tokens": "\u00abredacted\u00bb"
+        }
+       },
+       "logging": {
+        "level": "DEBUG",
+        "max_size_mb": 5,
+        "backup_count": 3
+       },
+       "model_catalog": {
+        "enabled": true,
+        "url": "",
+        "ttl_minutes": 20,
+        "providers": {}
+       },
+       "model_overrides": {},
+       "models_dev": {
+        "url": ""
+       },
+       "network": {
+        "force_ipv4": false
+       },
+       "monitoring": {
+        "install_id": "",
+        "gateway_health_export": {
+         "enabled": false,
+         "metrics_enabled": true,
+         "diagnostic_events_enabled": true,
+         "warning_error_events_enabled": true,
+         "export_interval_seconds": 60,
+         "logs_export_interval_seconds": 5,
+         "resource_attributes": {
+          "service.name": "Qubit-gateway",
+          "deployment.environment.name": "production",
+          "service": {
+           "name": "Qubit-gateway"
+          },
+          "deployment": {
+           "environment": {
+            "name": "production"
+           }
+          }
+         }
+        },
+        "export": {
+         "otlp": {
+          "enabled": false,
+          "endpoint": "",
+          "headers_env": {}
+         }
+        }
+       },
+       "gateway": {
+        "multiplex_profile_allowlist": null,
+        "signal_interrupt_grace_timeout": 1,
+        "delivery_ledger": true,
+        "platform_connect_timeout": 30,
+        "loop_watchdog": true,
+        "loop_watchdog_probe_interval_s": 30,
+        "loop_watchdog_probe_timeout_s": 10,
+        "loop_watchdog_max_strikes": 3,
+        "startup_watchdog": true,
+        "startup_watchdog_timeout_seconds": 300,
+        "write_sessions_json": true,
+        "scale_to_zero": {
+         "idle_timeout_minutes": 2
+        },
+        "restart_loop_guard": {
+         "max_restarts": 3,
+         "window_seconds": 60,
+         "max_gap_seconds": 300
+        },
+        "respawn_storm": {
+         "max_starts": 5,
+         "window_seconds": 120
+        },
+        "message_timestamps": {
+         "enabled": false
+        },
+        "max_inbound_media_bytes": 134217728,
+        "trust_env": true,
+        "strict": false,
+        "media_delivery_allow_dirs": [],
+        "trust_recent_files": true,
+        "trust_recent_files_seconds": 600,
+        "api_server": {
+         "max_concurrent_runs": 10
+        }
+       },
+       "streaming": {
+        "enabled": false,
+        "transport": "auto",
+        "edit_interval": 0.8,
+        "buffer_threshold": 24,
+        "cursor": " \u2589",
+        "fresh_final_after_seconds": 0
+       },
+       "sessions": {
+        "auto_prune": false,
+        "retention_days": 90,
+        "auto_archive": false,
+        "auto_archive_days": 3,
+        "vacuum_after_prune": true,
+        "min_vacuum_interval_days": 30,
+        "min_interval_hours": 24,
+        "fts_optimize_notice": "advise",
+        "cjk_fts": true,
+        "search_slow_ms": 1000,
+        "max_resume_messages": 20000,
+        "max_export_messages": 20000,
+        "write_json_snapshots": false
+       },
+       "onboarding": {
+        "seen": {
+         "tool_progress_prompt": true
+        },
+        "profile_build": "ask"
+       },
+       "telemetry": {
+        "shared_metrics": {
+         "enabled": false,
+         "send": false,
+         "endpoint": ""
+        }
+       },
+       "doctor": {
+        "live_probe_timeout": 10
+       },
+       "updates": {
+        "check": true,
+        "pre_update_backup": "quick",
+        "backup_keep": 5,
+        "non_interactive_local_changes": "stash",
+        "auto_switch_parked_branch": true,
+        "parked_branch_strategy": "switch",
+        "refresh_cua_driver": true
+       },
+       "lsp": {
+        "enabled": true,
+        "wait_mode": "document",
+        "wait_timeout": 5,
+        "install_strategy": "auto",
+        "idle_timeout": 600,
+        "servers": {}
+       },
+       "x_search": {
+        "model": "grok-4.5",
+        "reasoning_effort": null,
+        "timeout_seconds": 180,
+        "retries": 2
+       },
+       "secrets": "\u00abredacted\u00bb",
+       "paste_collapse_threshold": 5,
+       "paste_collapse_threshold_fallback": 5,
+       "paste_collapse_char_threshold": 2000,
+       "computer_use": {
+        "cua_telemetry": false,
+        "native_wayland": false,
+        "max_image_dimension": 1456,
+        "capture_after_mode": "som",
+        "no_overlay": null,
+        "permission_mode": "standard",
+        "capability_manifest": "",
+        "allow_unsigned_driver": false
+       },
+       "proxy": {
+        "enabled": false,
+        "tunnel_port": 9090,
+        "auto_install": true,
+        "credential_source": "[REDACTED]",
+        "enforce_on_docker": true,
+        "allow_env_fallback": false,
+        "upstream_deny_cidrs": null,
+        "extra_allowed_hosts": []
+       },
+       "desktop": {
+        "repo_scan_enabled": true,
+        "repo_scan_roots": [],
+        "repo_scan_exclude_paths": [],
+        "electron_flags": [],
+        "ozone_platform_hint": "auto",
+        "disable_gpu": "auto",
+        "password_store": "\u00abredacted\u00bb",
+        "manage_launcher_entry": true,
+        "macos_signing_identity": "",
+        "auto_continue": {
+         "enabled": true,
+         "freshness_minutes": 15,
+         "max_attempts": 2
+        }
+       },
+       "nous": {
+        "keepalive_interval_seconds": 900,
+        "anthropic_wire": "chat"
+       },
+       "vertex": {
+        "project_id": "",
+        "region": "global"
+       },
+       "local_runtime": {
+        "enabled": false,
+        "tag": "b10679",
+        "backend": "auto",
+        "models_max": 4,
+        "port": 0,
+        "detect_ports": []
+       },
+       "vad": {
+        "enabled": false
+       },
+       "mcp_servers": {
+        "cgraph-graft": {
+         "command": "graft",
+         "args": [
+          "mcp",
+          "/home/trick/Projects/Repos/CGraph Umbrella"
+         ],
+         "enabled": true,
+         "capabilities": [
+          "graft_find_code",
+          "graft_find_all",
+          "graft_trace_calls",
+          "graft_file_api",
+          "graft_repo_map"
+         ]
+        }
+       },
+       "group_sessions_per_user": true,
+       "known_plugin_toolsets": {
+        "cli": [
+         "spotify"
+        ]
+       },
+       "model_context_length": 0
+      }
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "config write stages through the Qubit settings console: re-POST with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "87297da4df834b51a747f70bbf6d9be2"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/config",
+     "status": 200,
+     "payload": {
+      "config": {
+       "model": "deepseek-v4-flash",
+       "providers": {},
+       "fallback_providers": [],
+       "credential_pool_strategies": {},
+       "toolsets": [
+        "Qubit-cli",
+        "kanban"
+       ],
+       "database": {
+        "journal_mode": "wal",
+        "wal_autocheckpoint": null,
+        "journal_size_limit": null
+       },
+       "runtime": {
+        "nofile_soft_limit": 4096
+       },
+       "max_concurrent_sessions": null,
+       "max_live_sessions": 16,
+       "session": {
+        "terminal_continue": true
+       },
+       "agent": {
+        "max_turns": 90,
+        "budget_warning_ratio": null,
+        "run_budget_seconds": null,
+        "gateway_timeout": 1800,
+        "gateway_turn_lease_timeout": 5,
+        "agent_cache": {
+         "max_size": 128,
+         "idle_ttl_secs": 3600,
+         "memory_high_mb": "auto",
+         "max_evictions_per_pass": 16,
+         "protect_recent": 8
+        },
+        "restart_drain_timeout": 180,
+        "cron_drain_timeout": 30,
+        "restart_after_turn_timeout": 1800,
+        "build_wait_timeout": 600,
+        "api_max_retries": 3,
+        "empty_response_guard": {
+         "enabled": true,
+         "cost_threshold_usd": 0.25
+        },
+        "service_tier": "",
+        "fast_auto_seconds": 60,
+        "tool_use_enforcement": "auto",
+        "execution_guidance": "auto",
+        "intent_ack_continuation": "auto",
+        "stall_guards": true,
+        "task_completion_guidance": true,
+        "parallel_tool_call_guidance": true,
+        "environment_probe": true,
+        "bot_mode_protocol": true,
+        "environment_hint": "",
+        "coding_context": "auto",
+        "coding_instructions": "",
+        "verify_guidance": true,
+        "max_verify_nudges": 3,
+        "verify_on_stop": false,
+        "gateway_timeout_warning": 900,
+        "clarify_timeout": 600,
+        "gateway_notify_interval": 180,
+        "session_stall_timeout": 300,
+        "sanitizer_heal_escalation_threshold": 3,
+        "reconnect_attention_after": 7200,
+        "gateway_auto_continue_freshness": 3600,
+        "gateway_startup_restore_drain_timeout": 30,
+        "gateway_startup_warmup_timeout": 20,
+        "local_stream_stale_timeout": 900,
+        "image_input_mode": "auto",
+        "disabled_toolsets": [],
+        "reasoning_overrides": {},
+        "reasoning_echo": false,
+        "turn_liveness": {
+         "timeout_s": 600,
+         "poll_s": 15
+        },
+        "verbose": false,
+        "reasoning_effort": "none"
+       },
+       "terminal": {
+        "backend": "local",
+        "modal_mode": "auto",
+        "degraded_mode": "warn",
+        "cwd": ".",
+        "temp_dir": "",
+        "font_family": "",
+        "timeout": 180,
+        "daemon_term_grace_seconds": 2,
+        "oneshot_completion_wait_seconds": 600,
+        "env_passthrough": [],
+        "home_mode": "auto",
+        "shell_init_files": [],
+        "auto_source_bashrc": true,
+        "docker_image": "nikolaik/python-nodejs:python3.11-nodejs20",
+        "docker_forward_env": [],
+        "docker_env": {},
+        "singularity_image": "docker://nikolaik/python-nodejs:python3.11-nodejs20",
+        "modal_image": "nikolaik/python-nodejs:python3.11-nodejs20",
+        "daytona_image": "nikolaik/python-nodejs:python3.11-nodejs20",
+        "vercel_runtime": "node24",
+        "container_cpu": 1,
+        "container_memory": 5120,
+        "container_disk": 51200,
+        "container_persistent": true,
+        "docker_volumes": [],
+        "docker_mount_cwd_to_workspace": false,
+        "docker_network": true,
+        "docker_extra_args": [],
+        "docker_shm_size": "1g",
+        "docker_run_as_host_user": false,
+        "docker_snap_compat": false,
+        "docker_shared_container_key": "\u00abredacted\u00bb",
+        "persistent_shell": true
+       },
+       "web": {
+        "backend": "",
+        "search_backend": "",
+        "extract_backend": "",
+        "extract_char_limit": 15000,
+        "keyless_fallback": true,
+        "keyless_rescue": true,
+        "provider_tier": {},
+        "cache_enabled": true,
+        "cache_ttl_minutes": 20,
+        "cache_exempt_hosts": []
+       },
+       "browser": {
+        "backend": "",
+        "inactivity_timeout": 120,
+        "command_timeout": 30,
+        "snapshot_threshold": 15000,
+        "record_sessions": false,
+        "headed": false,
+        "allow_private_urls": false,
+        "engine": "auto",
+        "auto_local_for_private_urls": true,
+        "cdp_url": "",
+        "use_real_profile": false,
+        "real_profile_autoclose": false,
+        "real_profile_pin": "",
+        "allow_unsafe_evaluate": false,
+        "restrict_evaluate": false,
+        "dialog_policy": "must_respond",
+        "dialog_timeout_s": 300,
+        "camofox": {
+         "managed_persistence": false,
+         "user_id": "",
+         "session_key": "\u00abredacted\u00bb",
+         "adopt_existing_tab": false,
+         "rewrite_loopback_urls": false,
+         "loopback_host_alias": "host.docker.internal"
+        },
+        "extension_control": {
+         "enabled": false,
+         "developer_mode": false
+        }
+       },
+       "checkpoints": {
+        "enabled": true,
+        "max_snapshots": 20,
+        "max_total_size_mb": 500,
+        "max_file_size_mb": 10,
+        "auto_prune": true,
+        "retention_days": 7,
+        "min_interval_hours": 24,
+        "delete_orphans": true
+       },
+       "context_file_max_chars": null,
+       "context_file_read_timeout": 5,
+       "file_read_max_chars": 100000,
+       "mcp_discovery_timeout": 1.5,
+       "mcp_single_query_discovery_timeout": 15,
+       "mcp": {
+        "auto_reload_on_config_change": true
+       },
+       "tool_output": {
+        "max_bytes": 50000,
+        "max_lines": 2000,
+        "max_line_length": 2000
+       },
+       "tool_loop_guardrails": {
+        "warnings_enabled": true,
+        "hard_stop_enabled": false,
+        "non_interactive_hard_stop_enabled": true,
+        "warn_after": {
+         "exact_failure": 2,
+         "same_tool_failure": 3,
+         "idempotent_no_progress": 2
+        },
+        "hard_stop_after": {
+         "exact_failure": 5,
+         "same_tool_failure": 8,
+         "idempotent_no_progress": 5
+        },
+        "loop_caps": {
+         "max_web_searches": 50,
+         "max_subagents": 50
+        }
+       },
+       "compression": {
+        "enabled": true,
+        "checkpoint_required": false,
+        "progress_notices": false,
+        "threshold": 0.5,
+        "threshold_tokens": "\u00abredacted\u00bb",
+        "target_ratio": 0.2,
+        "tail_mode": "lean",
+        "protect_last_n": 20,
+        "min_tail_user_messages": 1,
+        "max_attempts": 3,
+        "proactive_prune_tokens": "\u00abredacted\u00bb",
+        "proactive_prune_min_result_chars": 8000,
+        "proactive_prune_min_reclaim_tokens": "\u00abredacted\u00bb",
+        "micro_compact": false,
+        "micro_compact_every_n_turns": 1,
+        "micro_compact_defrag_threshold_tokens": "\u00abredacted\u00bb",
+        "hygiene_hard_message_limit": 400,
+        "hygiene_timeout_seconds": 30,
+        "hygiene_total_ceiling_seconds": 600,
+        "hygiene_failure_cooldown_seconds": 300,
+        "hygiene_max_turn_hold_seconds": 10,
+        "context_timeout_seconds": 120,
+        "context_total_ceiling_seconds": 600,
+        "protect_first_n": 3,
+        "abort_on_summary_failure": false,
+        "codex_gpt55_autoraise": true,
+        "codex_gpt55_autoraise_notice": true,
+        "codex_app_server_auto": "native",
+        "codex_responses_native": false,
+        "codex_responses_compact_threshold": null,
+        "in_place": true,
+        "model_thresholds": {},
+        "idle_compact_after_seconds": 0
+       },
+       "prompt_caching": {
+        "cache_ttl": "5m"
+       },
+       "openrouter": {
+        "response_cache": true,
+        "response_cache_ttl": 300,
+        "min_coding_score": 0.65
+       },
+       "bedrock": {
+        "region": "",
+        "discovery": {
+         "enabled": true,
+         "provider_filter": [],
+         "refresh_interval": 3600
+        },
+        "guardrail": {
+         "guardrail_identifier": "",
+         "guardrail_version": "",
+         "stream_processing_mode": "async",
+         "trace": "disabled"
+        }
+       },
+       "auxiliary": {
+        "transient_retries": 2,
+        "free_only": false,
+        "openrouter_model": "",
+        "stream_only_base_urls": [],
+        "vision": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 120,
+         "extra_body": {},
+         "reasoning_effort": "",
+         "download_timeout": 30
+        },
+        "compression": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 120,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "skills_hub": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 30,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "approval": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 30,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "review": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "api_mode": ""
+        },
+        "mcp": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 30,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "title_generation": {
+         "enabled": true,
+         "provider": "auto",
+         "model": "",
+         "prefer_fast_model": false,
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 30,
+         "extra_body": {},
+         "reasoning_effort": "",
+         "language": ""
+        },
+        "memory_query_rewrite": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 8,
+         "extra_body": {}
+        },
+        "tts_audio_tags": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 30,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "triage_specifier": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 120,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "kanban_decomposer": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 180,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "profile_describer": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 60,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "goal_judge": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 60,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "curator": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 600,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "monitor": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 60,
+         "extra_body": {},
+         "reasoning_effort": ""
+        },
+        "background_review": {
+         "enabled": true,
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 120,
+         "extra_body": {},
+         "reasoning_effort": "",
+         "max_input_tokens": "\u00abredacted\u00bb"
+        },
+        "moa_reference": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 900,
+         "extra_body": {}
+        },
+        "moa_aggregator": {
+         "provider": "auto",
+         "model": "",
+         "base_url": "",
+         "api_key": "\u00abredacted\u00bb",
+         "timeout": 900,
+         "extra_body": {}
+        }
+       },
+       "display": {
+        "compact": false,
+        "personality": "",
+        "resume_display": "full",
+        "resume_exchanges": 10,
+        "resume_max_user_chars": 300,
+        "resume_max_assistant_chars": 200,
+        "resume_max_assistant_lines": 3,
+        "resume_skip_tool_only": true,
+        "busy_input_mode": "interrupt",
+        "busy_steer_ack_enabled": true,
+        "cli_multiline_shortcuts": true,
+        "interface": "cli",
+        "tui_auto_resume_recent": false,
+        "resume_last_session": true,
+        "tui_agents_nudge": true,
+        "bell_on_complete": true,
+        "bell_on_prompt": false,
+        "show_reasoning": true,
+        "reasoning_full": false,
+        "memory_notifications": "on",
+        "background_process_notifications": "concise",
+        "streaming": true,
+        "timestamps": true,
+        "timestamp_format": "%H:%M",
+        "final_response_markdown": "strip",
+        "persistent_output": true,
+        "persistent_output_max_lines": 200,
+        "cli_rebuild_scrollback_on_redraw": false,
+        "persist_prompts": true,
+        "inline_diffs": true,
+        "file_mutation_verifier": true,
+        "credits_notices": true,
+        "turn_completion_explainer": true,
+        "show_cost": true,
+        "battery": false,
+        "focus_view": false,
+        "focus_saved_tool_progress": "all",
+        "skin": "default",
+        "language": "en",
+        "tui_status_indicator": "kaomoji",
+        "cli_refresh_interval": 1,
+        "user_message_preview": {
+         "first_lines": 2,
+         "last_lines": 2
+        },
+        "interim_assistant_messages": true,
+        "show_commentary": true,
+        "tool_progress_command": false,
+        "tool_preview_length": 0,
+        "friendly_tool_labels": true,
+        "turn_summary": true,
+        "spinner_token_flow": "\u00abredacted\u00bb",
+        "tool_progress_grouping": "accumulate",
+        "status_phrases": {},
+        "reasoning_style": "code",
+        "ephemeral_system_ttl": 0,
+        "platforms": {
+         "telegram": {
+          "streaming": true
+         },
+         "discord": {
+          "streaming": false
+         },
+         "slack": {
+          "streaming": false
+         },
+         "wecom": {
+          "streaming": true
+         }
+        },
+        "runtime_footer": {
+         "enabled": false,
+         "fields": [
+          "model",
+          "context_pct",
+          "cwd"
+         ]
+        },
+        "status_bar": {
+         "fields": []
+        },
+        "copy_shortcut": "auto",
+        "pet": {
+         "enabled": false,
+         "slug": "",
+         "render_mode": "auto",
+         "scale": 0.33,
+         "unicode_cols": 0
+        },
+        "tool_progress_overrides": {},
+        "tool_progress": "all",
+        "cleanup_progress": false,
+        "long_running_notifications": true,
+        "busy_ack_detail": true
+       },
+       "dashboard": {
+        "theme": "default",
+        "turn_isolation": false,
+        "compute_host_heartbeat_secs": 15,
+        "compute_host_respawn_max": 3,
+        "show_token_analytics": "\u00abredacted\u00bb",
+        "trusted_proxies": [],
+        "ws_ping_interval": 20,
+        "ws_ping_timeout": 20,
+        "ws_orphan_reap_grace_s": 20,
+        "ws_orphan_activity_stale_s": 600,
+        "startup_orphan_sweep": true,
+        "oauth": {
+         "client_id": "",
+         "portal_url": ""
+        },
+        "basic_auth": {
+         "username": "",
+         "password_hash": "\u00abredacted\u00bb",
+         "password": "\u00abredacted\u00bb",
+         "secret": "\u00abredacted\u00bb",
+         "session_ttl_seconds": 0
+        },
+        "drain_auth": {
+         "scope": "drain",
+         "min_secret_chars": "\u00abredacted\u00bb"
+        },
+        "public_url": ""
+       },
+       "privacy": {
+        "redact_pii": true
+       },
+       "tts": {
+        "provider": "edge",
+        "edge": {
+         "voice": "en-US-AriaNeural"
+        },
+        "elevenlabs": {
+         "voice_id": "pNInz6obpgDQGcFmaJgB",
+         "model_id": "eleven_multilingual_v2"
+        },
+        "openai": {
+         "model": "gpt-4o-mini-tts",
+         "voice": "alloy"
+        },
+        "gemini": {
+         "model": "gemini-2.5-flash-preview-tts",
+         "voice": "Kore",
+         "audio_tags": false,
+         "persona_prompt_file": ""
+        },
+        "xai": {
+         "voice_id": "eve",
+         "language": "en",
+         "speed": 1,
+         "auto_speech_tags": false,
+         "optimize_streaming_latency": 0,
+         "sample_rate": 24000,
+         "bit_rate": 128000
+        },
+        "mistral": {
+         "model": "voxtral-mini-tts-2603",
+         "voice_id": "c69964a6-ab8b-4f8a-9465-ec0925096ec8"
+        },
+        "minimax": {
+         "model": "speech-02-hd",
+         "voice_id": "English_expressive_narrator"
+        },
+        "kittentts": {
+         "model": "KittenML/kitten-tts-nano-0.8-int8",
+         "voice": "Jasper"
+        },
+        "neutts": {
+         "ref_audio": "",
+         "ref_text": "",
+         "model": "neuphonic/neutts-air-q4-gguf",
+         "device": "cpu"
+        },
+        "piper": {
+         "voice": "en_US-lessac-medium"
+        },
+        "deepinfra": {
+         "model": "",
+         "voice": "default"
+        }
+       },
+       "stt": {
+        "enabled": true,
+        "echo_transcripts": true,
+        "language": "en",
+        "cloud_trim_silence": true,
+        "cloud_trim_threshold_db": -40,
+        "cloud_trim_keep_ms": 300,
+        "local": {
+         "model": "base",
+         "language": "",
+         "initial_prompt": "",
+         "vad": true,
+         "vad_min_silence_ms": 500,
+         "no_speech_prob_threshold": 0.6,
+         "logprob_threshold": -1,
+         "unload_after_idle_seconds": 0
+        },
+        "groq": {
+         "model": "whisper-large-v3-turbo",
+         "language": ""
+        },
+        "openai": {
+         "model": "whisper-1",
+         "language": ""
+        },
+        "mistral": {
+         "model": "voxtral-mini-latest",
+         "language": ""
+        },
+        "xai": {
+         "language": ""
+        },
+        "elevenlabs": {
+         "model_id": "scribe_v2",
+         "language_code": "",
+         "tag_audio_events": false,
+         "diarize": false
+        },
+        "deepinfra": {
+         "model": ""
+        }
+       },
+       "voice": {
+        "input_engine": "auto",
+        "record_key": "\u00abredacted\u00bb",
+        "submit_mode": "direct",
+        "max_recording_seconds": 120,
+        "auto_tts": false,
+        "client_direct": true,
+        "beep_enabled": true,
+        "beep_volume": 0.3,
+        "thinking_sound": true,
+        "silence_threshold": 200,
+        "silence_duration": 3,
+        "barge_in": true,
+        "barge_in_grace_seconds": 0.5,
+        "barge_in_threshold_multiplier": 3,
+        "stop_phrases": [
+         "stop"
+        ]
+       },
+       "wake_word": {
+        "enabled": false,
+        "surface": "auto",
+        "input_device": null,
+        "capture": "auto",
+        "provider": "openwakeword",
+        "phrase": "hey qubit",
+        "sensitivity": 0.6,
+        "confirmation_frames": 3,
+        "start_new_session": true,
+        "profile_routing": true,
+        "openwakeword": {
+         "model": "hey_hermes",
+         "inference_framework": ""
+        },
+        "sherpa": {
+         "model_dir": ""
+        },
+        "porcupine": {
+         "keyword": "jarvis"
+        }
+       },
+       "human_delay": {
+        "mode": "off",
+        "min_ms": 800,
+        "max_ms": 2500
+       },
+       "context": {
+        "engine": "compressor",
+        "memory_trim": {
+         "enabled": true,
+         "cooldown_seconds": 60,
+         "log_every_n": 1,
+         "info_log_min_delta_mb": 0
+        }
+       },
+       "memory": {
+        "memory_enabled": true,
+        "user_profile_enabled": true,
+        "write_approval": false,
+        "memory_char_limit": 2200,
+        "user_char_limit": 1375,
+        "nudge_interval": 10,
+        "provider": "",
+        "flush_min_turns": 6
+       },
+       "delegation": {
+        "model": "",
+        "provider": "",
+        "fallback_providers": null,
+        "base_url": "",
+        "api_key": "\u00abredacted\u00bb",
+        "api_mode": "",
+        "request_overrides": {},
+        "compression_threshold_tokens": "\u00abredacted\u00bb",
+        "inherit_mcp_toolsets": true,
+        "max_iterations": 250,
+        "max_summary_chars": 24000,
+        "child_timeout_seconds": 0,
+        "reasoning_effort": "",
+        "max_concurrent_children": 10,
+        "independent_completions": false,
+        "max_spawn_depth": 1,
+        "orchestrator_enabled": true,
+        "subagent_auto_approve": false,
+        "surface_child_process_notifications": false
+       },
+       "prefill_messages_file": "",
+       "goals": {
+        "max_turns": 20
+       },
+       "loops": {
+        "min_interval_seconds": 30,
+        "max_ticks": 100,
+        "self_paced_floor_seconds": 60,
+        "self_paced_ceiling_seconds": 900
+       },
+       "moa": {
+        "default_preset": "default",
+        "active_preset": "",
+        "save_traces": false,
+        "trace_dir": "",
+        "privacy_filter": "",
+        "presets": {
+         "default": {
+          "reference_models": [
+           {
+            "model": "gpt-5.5",
+            "provider": "openai-codex"
+           },
+           {
+            "model": "deepseek/deepseek-v4-pro",
+            "provider": "openrouter"
+           }
+          ],
+          "aggregator": {
+           "provider": "openrouter",
+           "model": "anthropic/claude-opus-4.8"
+          },
+          "enabled": true
+         }
+        }
+       },
+       "skills": {
+        "external_dirs": [],
+        "create_dir": "",
+        "project_discovery": true,
+        "trusted_project_dirs": [],
+        "template_vars": true,
+        "inline_shell": false,
+        "inline_shell_timeout": 10,
+        "guard_agent_created": false,
+        "tier1_advisory": true,
+        "write_approval": false,
+        "ledger": true,
+        "creation_nudge_interval": 15,
+        "disabled": []
+       },
+       "curator": {
+        "enabled": true,
+        "interval_hours": 168,
+        "min_idle_hours": 2,
+        "stale_after_days": 14,
+        "archive_after_days": 30,
+        "consolidate": false,
+        "prune_builtins": true,
+        "archive_ttl_days": 0,
+        "backup": {
+         "enabled": true,
+         "keep": 5
+        }
+       },
+       "honcho": {},
+       "timezone": "Europe/Bucharest",
+       "slack": {
+        "require_mention": true,
+        "free_response_channels": "",
+        "allowed_channels": "",
+        "require_mention_channels": "",
+        "ignore_other_user_mentions": false,
+        "thread_require_mention": false,
+        "channel_prompts": {}
+       },
+       "discord": {
+        "require_mention": true,
+        "free_response_channels": "",
+        "allowed_channels": "",
+        "auto_thread": true,
+        "thread_require_mention": false,
+        "bots_require_inline_mention": false,
+        "history_backfill": true,
+        "history_backfill_limit": 50,
+        "missed_message_backfill": {
+         "enabled": false,
+         "channels": "",
+         "window_seconds": 21600,
+         "limit": 100,
+         "max_dispatches": 10
+        },
+        "reactions": true,
+        "websocket_liveness_interval_seconds": 15,
+        "websocket_liveness_failure_threshold": 2,
+        "websocket_heartbeat_ack_max_age_seconds": 60,
+        "websocket_max_latency_seconds": 30,
+        "channel_prompts": {},
+        "dm_role_auth_guild": "",
+        "server_actions": "",
+        "allow_any_attachment": false,
+        "max_attachment_bytes": 33554432,
+        "approval_mentions": false,
+        "voice_channel_inactivity_timeout_seconds": 300,
+        "voice_playback_timeout_seconds": 120,
+        "voice_fx": {
+         "enabled": false,
+         "ambient_enabled": true,
+         "ambient_path": "",
+         "ambient_gain": 0.18,
+         "duck_gain": 0.06,
+         "speech_gain": 1,
+         "ack_enabled": true,
+         "ack_phrases": [
+          "Let me look into that.",
+          "One moment.",
+          "Checking on that now.",
+          "Give me a sec.",
+          "On it."
+         ]
+        }
+       },
+       "whatsapp": {},
+       "telegram": {
+        "reactions": false,
+        "channel_prompts": {},
+        "allowed_chats": "",
+        "extra": {
+         "rich_messages": true,
+         "rich_drafts": false
+        }
+       },
+       "mattermost": {
+        "require_mention": true,
+        "free_response_channels": "",
+        "allowed_channels": "",
+        "channel_prompts": {}
+       },
+       "matrix": {
+        "require_mention": true,
+        "free_response_rooms": "",
+        "allowed_rooms": ""
+       },
+       "approvals": {
+        "mode": "smart",
+        "timeout": 60,
+        "cron_mode": "deny",
+        "single_query_mode": "deny",
+        "unattended_mode": "deny",
+        "smart_policy": "",
+        "denial_breaker_threshold": 3,
+        "deny": [],
+        "mcp_reload_confirm": true,
+        "destructive_slash_confirm": true
+       },
+       "command_allowlist": [],
+       "quick_commands": {},
+       "platform_hints": {},
+       "plugins": {
+        "hook_callback_timeout": 30,
+        "allow_deprecated_imports": false,
+        "enabled": [
+         "chronos",
+         "platforms/line",
+         "web-parallel"
+        ],
+        "disabled": [
+         "browser-browser-use"
+        ]
+       },
+       "hooks": {},
+       "hooks_auto_accept": false,
+       "personalities": {},
+       "security": {
+        "allow_private_urls": false,
+        "redact_secrets": "\u00abredacted\u00bb",
+        "allow_data_training_tiers_noninteractive": false,
+        "approval": {
+         "transport": "builtin",
+         "transport_fallback": "deny"
+        },
+        "protected_instruction_files": true,
+        "protected_instruction_extra_patterns": [],
+        "tirith_enabled": true,
+        "tirith_path": "tirith",
+        "tirith_timeout": 5,
+        "tirith_fail_open": true,
+        "website_blocklist": {
+         "enabled": false,
+         "domains": [],
+         "shared_files": []
+        },
+        "acked_advisories": [],
+        "allow_lazy_installs": true
+       },
+       "cron": {
+        "allow_agent_scheduling": false,
+        "preflight": true,
+        "model_drift_guard": true,
+        "model": "",
+        "model_provider": "",
+        "provider": "",
+        "chronos": {
+         "portal_url": "",
+         "callback_url": "",
+         "expected_audience": "",
+         "nas_jwks_url": ""
+        },
+        "wrap_response": true,
+        "delivery": {
+         "notify": true
+        },
+        "mirror_delivery": false,
+        "max_parallel_jobs": null,
+        "output_retention": 50,
+        "script_timeout_seconds": 3600,
+        "session_db_timeout_seconds": 10,
+        "media_send_timeout_seconds": 300
+       },
+       "kanban": {
+        "auto_subscribe_on_create": true,
+        "dispatch_in_gateway": true,
+        "review_dispatch": true,
+        "dispatch_interval_seconds": 60,
+        "failure_limit": 2,
+        "worker_log_rotate_bytes": 2097152,
+        "worker_log_backup_count": 1,
+        "orchestrator_profile": "",
+        "default_assignee": "",
+        "max_in_progress": null,
+        "max_in_progress_per_profile": null,
+        "auto_decompose": true,
+        "auto_decompose_per_tick": 3,
+        "dispatch_stale_timeout_seconds": 14400,
+        "reconcile_orphans": true,
+        "done_sub_retention_days": 30
+       },
+       "bot_mode": {
+        "envelope_ttl_seconds": 900,
+        "turn_wait_seconds": 120
+       },
+       "code_execution": {
+        "mode": "project",
+        "kernel_idle_timeout": 1800,
+        "max_session_kernels": 4,
+        "timeout": 300,
+        "max_tool_calls": 50
+       },
+       "tools": {
+        "tool_search": {
+         "enabled": "auto",
+         "threshold_pct": 10,
+         "search_default_limit": 5,
+         "max_search_limit": 20,
+         "listing": "auto",
+         "listing_max_tokens": "\u00abredacted\u00bb"
+        }
+       },
+       "logging": {
+        "level": "DEBUG",
+        "max_size_mb": 5,
+        "backup_count": 3
+       },
+       "model_catalog": {
+        "enabled": true,
+        "url": "",
+        "ttl_minutes": 20,
+        "providers": {}
+       },
+       "model_overrides": {},
+       "models_dev": {
+        "url": ""
+       },
+       "network": {
+        "force_ipv4": false
+       },
+       "monitoring": {
+        "install_id": "",
+        "gateway_health_export": {
+         "enabled": false,
+         "metrics_enabled": true,
+         "diagnostic_events_enabled": true,
+         "warning_error_events_enabled": true,
+         "export_interval_seconds": 60,
+         "logs_export_interval_seconds": 5,
+         "resource_attributes": {
+          "service.name": "Qubit-gateway",
+          "deployment.environment.name": "production",
+          "service": {
+           "name": "Qubit-gateway"
+          },
+          "deployment": {
+           "environment": {
+            "name": "production"
+           }
+          }
+         }
+        },
+        "export": {
+         "otlp": {
+          "enabled": false,
+          "endpoint": "",
+          "headers_env": {}
+         }
+        }
+       },
+       "gateway": {
+        "multiplex_profile_allowlist": null,
+        "signal_interrupt_grace_timeout": 1,
+        "delivery_ledger": true,
+        "platform_connect_timeout": 30,
+        "loop_watchdog": true,
+        "loop_watchdog_probe_interval_s": 30,
+        "loop_watchdog_probe_timeout_s": 10,
+        "loop_watchdog_max_strikes": 3,
+        "startup_watchdog": true,
+        "startup_watchdog_timeout_seconds": 300,
+        "write_sessions_json": true,
+        "scale_to_zero": {
+         "idle_timeout_minutes": 2
+        },
+        "restart_loop_guard": {
+         "max_restarts": 3,
+         "window_seconds": 60,
+         "max_gap_seconds": 300
+        },
+        "respawn_storm": {
+         "max_starts": 5,
+         "window_seconds": 120
+        },
+        "message_timestamps": {
+         "enabled": false
+        },
+        "max_inbound_media_bytes": 134217728,
+        "trust_env": true,
+        "strict": false,
+        "media_delivery_allow_dirs": [],
+        "trust_recent_files": true,
+        "trust_recent_files_seconds": 600,
+        "api_server": {
+         "max_concurrent_runs": 10
+        }
+       },
+       "streaming": {
+        "enabled": false,
+        "transport": "auto",
+        "edit_interval": 0.8,
+        "buffer_threshold": 24,
+        "cursor": " \u2589",
+        "fresh_final_after_seconds": 0
+       },
+       "sessions": {
+        "auto_prune": false,
+        "retention_days": 90,
+        "auto_archive": false,
+        "auto_archive_days": 3,
+        "vacuum_after_prune": true,
+        "min_vacuum_interval_days": 30,
+        "min_interval_hours": 24,
+        "fts_optimize_notice": "advise",
+        "cjk_fts": true,
+        "search_slow_ms": 1000,
+        "max_resume_messages": 20000,
+        "max_export_messages": 20000,
+        "write_json_snapshots": false
+       },
+       "onboarding": {
+        "seen": {
+         "tool_progress_prompt": true
+        },
+        "profile_build": "ask"
+       },
+       "telemetry": {
+        "shared_metrics": {
+         "enabled": false,
+         "send": false,
+         "endpoint": ""
+        }
+       },
+       "doctor": {
+        "live_probe_timeout": 10
+       },
+       "updates": {
+        "check": true,
+        "pre_update_backup": "quick",
+        "backup_keep": 5,
+        "non_interactive_local_changes": "stash",
+        "auto_switch_parked_branch": true,
+        "parked_branch_strategy": "switch",
+        "refresh_cua_driver": true
+       },
+       "lsp": {
+        "enabled": true,
+        "wait_mode": "document",
+        "wait_timeout": 5,
+        "install_strategy": "auto",
+        "idle_timeout": 600,
+        "servers": {}
+       },
+       "x_search": {
+        "model": "grok-4.5",
+        "reasoning_effort": null,
+        "timeout_seconds": 180,
+        "retries": 2
+       },
+       "secrets": "\u00abredacted\u00bb",
+       "paste_collapse_threshold": 5,
+       "paste_collapse_threshold_fallback": 5,
+       "paste_collapse_char_threshold": 2000,
+       "computer_use": {
+        "cua_telemetry": false,
+        "native_wayland": false,
+        "max_image_dimension": 1456,
+        "capture_after_mode": "som",
+        "no_overlay": null,
+        "permission_mode": "standard",
+        "capability_manifest": "",
+        "allow_unsigned_driver": false
+       },
+       "proxy": {
+        "enabled": false,
+        "tunnel_port": 9090,
+        "auto_install": true,
+        "credential_source": "[REDACTED]",
+        "enforce_on_docker": true,
+        "allow_env_fallback": false,
+        "upstream_deny_cidrs": null,
+        "extra_allowed_hosts": []
+       },
+       "desktop": {
+        "repo_scan_enabled": true,
+        "repo_scan_roots": [],
+        "repo_scan_exclude_paths": [],
+        "electron_flags": [],
+        "ozone_platform_hint": "auto",
+        "disable_gpu": "auto",
+        "password_store": "\u00abredacted\u00bb",
+        "manage_launcher_entry": true,
+        "macos_signing_identity": "",
+        "auto_continue": {
+         "enabled": true,
+         "freshness_minutes": 15,
+         "max_attempts": 2
+        }
+       },
+       "nous": {
+        "keepalive_interval_seconds": 900,
+        "anthropic_wire": "chat"
+       },
+       "vertex": {
+        "project_id": "",
+        "region": "global"
+       },
+       "local_runtime": {
+        "enabled": false,
+        "tag": "b10679",
+        "backend": "auto",
+        "models_max": 4,
+        "port": 0,
+        "detect_ports": []
+       },
+       "vad": {
+        "enabled": false
+       },
+       "mcp_servers": {
+        "cgraph-graft": {
+         "command": "graft",
+         "args": [
+          "mcp",
+          "/home/trick/Projects/Repos/CGraph Umbrella"
+         ],
+         "enabled": true,
+         "capabilities": [
+          "graft_find_code",
+          "graft_find_all",
+          "graft_trace_calls",
+          "graft_file_api",
+          "graft_repo_map"
+         ]
+        }
+       },
+       "group_sessions_per_user": true,
+       "known_plugin_toolsets": {
+        "cli": [
+         "spotify"
+        ]
+       },
+       "model_context_length": 0
+      },
+      "confirmation_id": "87297da4df834b51a747f70bbf6d9be2"
+     },
+     "response": {
+      "ok": true,
+      "count": 810,
+      "qubit_counterpart": "dashboard Settings (classic) + CLI config profiles"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/config",
+     "status": 200,
+     "response": {
+      "model": "deepseek-v4-flash"
+     }
+    }
+   ],
+   "policy": "typed gate CONFIRM_REQUIRED",
+   "state_change": "settings save staged then confirmed (net-zero values)",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "staged typed gate then confirmed (settled)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/config",
+   "control": "config_reset_cancel",
+   "action": "open the reset-to-defaults confirmation, then cancel",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "reset-to-defaults confirmation opened and cancelled (no write)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/config",
+   "control": "config_export",
+   "action": "click the Export control (downloads JSON)",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "config exported as qubit-config.json",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/config",
+   "control": "config_timezone",
+   "action": "open the timezone listbox and re-select the current value",
+   "request": [],
+   "policy": "allowed",
+   "state_change": "timezone re-selected to current value Europe/Bucharest (net-zero)",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/env",
+   "control": "env_toggle_advanced",
+   "action": "click Hide/Show Advanced",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "advanced keys visibility toggled",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/env",
+   "control": "env_expand_provider",
+   "action": "expand a provider group",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "provider group expanded",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/env",
+   "control": "env_set_cancel",
+   "action": "click Set on a key, then Cancel",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "key edit opened then cancelled (no write)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/env",
+   "control": "env_custom_key_validation",
+   "action": "type an invalid custom key name",
+   "request": [],
+   "policy": "allowed",
+   "state_change": "invalid custom-key name rejected client-side (message=True, add-disabled=True)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/env",
+   "control": "env_custom_key_add_cancel",
+   "action": "add a custom key name, then cancel before saving",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "custom key staged for edit then cancelled (no write)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/env",
+   "control": "env_clear_cancel",
+   "action": "click Clear on a set key, then cancel the confirmation",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "clear-key confirmation opened and cancelled (no deletion)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_overview",
+   "action": "load /sessions (Overview view with stats + recent cards)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions/stats",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "overview stats + recent-sessions cards rendered (stats total=309)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_history_view",
+   "action": "click the History radio (full session list)",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "History list rendered (40 actionable rows)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_search",
+   "action": "fill the History search, then clear",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions/search",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "search filtered the list, then cleared",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_category_radio",
+   "action": "click Automation then All (net-zero)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions/empty/count",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "count": 9
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions/empty/count",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "count": 9
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "category Automation applied then reset to All (mid_len=932)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_source_filter",
+   "action": "pick a session source, then reset to Any",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions/empty/count",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "count": 9
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions/empty/count",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "count": 9
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "source facet 'Session source: Qubit-chat' toggled then restored (re-checked=true)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_expand_row",
+   "action": "expand the first session row, then collapse",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions/20260925_000034_bd6ebc/messages",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "first row expanded (messages fetched) then collapsed",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_export",
+   "action": "click Export on the first row (downloads JSON)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions/20260925_000034_bd6ebc/export",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "session exported as session-20260925_000034_bd6ebc.json",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_rename_cancel",
+   "action": "open Rename on the first row, then cancel (no write)",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "rename editor opened then cancelled (PUTs issued: 0; no write)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_delete_cancel",
+   "action": "open the row delete confirmation, then cancel (no deletion)",
+   "request": [],
+   "policy": "allowed",
+   "state_change": "delete confirmation opened then cancelled (DELETEs issued: 0; nothing deleted)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_prune_cancel",
+   "action": "open Prune-old-sessions, then cancel (no deletion)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "prune dialog opened then cancelled (no prune)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_pagination",
+   "action": "page forward then back in History",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions/empty/count",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "count": 9
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions/empty/count",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "count": 9
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "paged forward then back (offset round-trip)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_import_cancel",
+   "action": "click Import sessions, cancel the file chooser (no import)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/sessions",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "import file chooser opened then cancelled (no import)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/sessions",
+   "control": "sessions_restore_skip",
+   "action": "restore archived session (withheld: would mutate user data)",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "restore not exercised",
+   "reload_persist": null,
+   "disposition": "E2E_SKIP",
+   "detail": "restoring an archived row would mutate user data with no temp session available",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/files",
+   "control": "files_refresh",
+   "action": "click Refresh files",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/files",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "detail": "no active project folder; register one with `qubit project add-folder`"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "file listing re-requested",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/files",
+   "control": "files_upload_create_withheld",
+   "action": "upload/create (withheld: no approved project root)",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "upload/create correctly disabled: no active project folder (registering one would mutate user config)",
+   "reload_persist": null,
+   "disposition": "E2E_SKIP",
+   "detail": "honest empty state; CREATE disabled=False",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/files",
+   "control": "files_path_policy",
+   "action": "read a path outside the approved root (expect FILES_OUTSIDE_ROOT)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/files",
+     "status": 400,
+     "code": "FILES_OUTSIDE_ROOT",
+     "response": {
+      "ok": false,
+      "code": "FILES_OUTSIDE_ROOT",
+      "detail": "path is outside the approved project folders; register it with `qubit project add-folder` first"
+     }
+    }
+   ],
+   "policy": "unexpected",
+   "state_change": "filesystem confinement enforced; no listing outside the approved root returned",
+   "reload_persist": null,
+   "disposition": "E2E_GATED",
+   "detail": "path outside approved roots refused with typed code FILES_OUTSIDE_ROOT (browser-context read)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/files",
+   "control": "files_empty_state",
+   "action": "verify the honest empty listing",
+   "request": [],
+   "policy": "unexpected",
+   "state_change": "dropzone + empty listing rendered honestly",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/logs",
+   "control": "logs_search",
+   "action": "fill log search, then clear",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "log search filtered lines, then cleared",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/logs",
+   "control": "logs_file_tab",
+   "action": "switch log file ERRORS then AGENT",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "log file tab ERRORS shown then restored to AGENT",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/logs",
+   "control": "logs_level_filter",
+   "action": "filter level WARNING then ALL",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "level filter WARNING applied then reset to ALL",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/logs",
+   "control": "logs_page_size",
+   "action": "switch page size 200 then 50",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "page size 200 applied then restored to 50",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/logs",
+   "control": "logs_older_newer",
+   "action": "load Older lines, then Newer back",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "older page loaded then returned to newest",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/logs",
+   "control": "logs_line_detail",
+   "action": "expand the first log line",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "first log line detail expanded",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/logs",
+   "control": "logs_export",
+   "action": "click Export log lines (downloads file)",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "logs exported as agent.log",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/logs",
+   "control": "logs_refresh",
+   "action": "click Refresh",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/logs",
+     "status": 200
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "log view refreshed",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/channels",
+   "control": "channels_configure_cancel",
+   "action": "open a platform CONFIGURE dialog, then cancel",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "platform config dialog opened then cancelled",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/channels",
+   "control": "channels_test",
+   "action": "click Test on the first platform",
+   "request": [
+    {
+     "method": "POST",
+     "path": "/agent/api/messaging/platforms/telegram/test",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "detail": "credential/transport link state; no message sent",
+      "state": "no_account"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "platform connection test requested (honest verdict recorded)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/channels",
+   "control": "channels_enable_stage_deny",
+   "action": "click Enable, cancel, deny the staged gate (no write)",
+   "request": [
+    {
+     "method": "PUT",
+     "path": "/agent/api/messaging/platforms/telegram",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "enabled": true
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "changing messaging channel 'telegram' requires explicit confirmation: re-PUT with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "f271497d7b6643a4b37c2dd0c5318fa5"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/ops/cancel",
+     "status": 200,
+     "payload": {
+      "confirmation_id": "f271497d7b6643a4b37c2dd0c5318fa5"
+     },
+     "response": {
+      "ok": true,
+      "code": null,
+      "detail": "Cancelled 1 pending confirmation(s).",
+      "state": "executed"
+     }
+    }
+   ],
+   "policy": "typed gate CONFIRM_REQUIRED",
+   "state_change": "platform enable staged then denied (no write)",
+   "reload_persist": true,
+   "disposition": "E2E_GATED",
+   "detail": "typed gate staged on enable; denied via /api/ops/cancel (receipts=1, settled=True, staged_this_action=1)",
+   "notes": "nothing executed; switch state unchanged",
+   "browser": true
+  },
+  {
+   "page": "/channels",
+   "control": "channels_restart_stage_deny",
+   "action": "click RESTART GATEWAY, cancel + deny (no restart)",
+   "request": [],
+   "policy": "allowed",
+   "state_change": "restart confirmation cancelled (pid unchanged=True)",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "restart confirmation dialog shown and cancelled; no mutation (the write is sent only after confirm)",
+   "notes": "gateway left running by policy",
+   "browser": true
+  },
+  {
+   "page": "/channels",
+   "control": "channels_manual_setup",
+   "action": "open MANUAL SETUP, then dismiss",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "manual-setup panel opened then dismissed",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/webhooks",
+   "control": "webhooks_dialog_cancel",
+   "action": "open NEW SUBSCRIPTION, then cancel",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "new-subscription dialog opened then cancelled",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/webhooks",
+   "control": "webhooks_create_delete",
+   "action": "create 'e2e-audit-hook', reload, delete it",
+   "request": [
+    {
+     "method": "POST",
+     "path": "/agent/api/webhooks",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "id": "e2e-audit-hook",
+      "url": "http://127.0.0.1:9/e2e-audit",
+      "events": [
+       "task.completed"
+      ],
+      "secret_ref": "\u00abredacted\u00bb"
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "creating webhook subscription 'e2e-audit-hook' requires explicit confirmation: re-POST with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "94e28dfc13164e839ddf35bcc9ff13fb"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/ops/confirm",
+     "status": 400,
+     "code": "CONFIRM_UNSUPPORTED",
+     "payload": {
+      "confirmation_id": "94e28dfc13164e839ddf35bcc9ff13fb"
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_UNSUPPORTED",
+      "detail": "No executable Qubit backend for 'webhook_create'; cancel it instead.",
+      "state": "failed"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": {
+       "id": "default",
+       "brain": "default",
+       "model": "deepseek-v4-flash",
+       "provider": ""
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles/active",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "default"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/config",
+     "status": 200,
+     "response": {
+      "model": "deepseek-v4-flash"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/themes",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "qubit"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/font",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/ops/cancel",
+     "status": 200,
+     "payload": {
+      "confirmation_id": "94e28dfc13164e839ddf35bcc9ff13fb"
+     },
+     "response": {
+      "ok": true,
+      "code": null,
+      "detail": "Cancelled 1 pending confirmation(s).",
+      "state": "executed"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    }
+   ],
+   "policy": "typed gate CONFIRM_REQUIRED",
+   "state_change": "temp subscription was not created",
+   "reload_persist": null,
+   "disposition": "E2E_FAIL",
+   "detail": "UI create staged a typed gate but the confirmation is not executable (CONFIRM_UNSUPPORTED: No executable Qubit backend for 'webhook_create'; cancel it instead.); create never completed",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/webhooks",
+   "control": "webhooks_lifecycle",
+   "action": "rotate/test/deliveries/retry/toggle on temp sub, delete it",
+   "request": [
+    {
+     "method": "POST",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "payload": {
+      "id": "e2e-audit-hook",
+      "url": "http://127.0.0.1:9/e2e-audit",
+      "events": [
+       "task.completed"
+      ],
+      "secret_ref": "\u00abredacted\u00bb",
+      "confirm": true
+     },
+     "response": {
+      "ok": true,
+      "name": "e2e-audit-hook",
+      "enabled": true,
+      "description": ""
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": {
+       "id": "default",
+       "brain": "default",
+       "model": "deepseek-v4-flash",
+       "provider": ""
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/profiles/active",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "default"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/plugins",
+     "status": 200
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/config",
+     "status": 200,
+     "response": {
+      "model": "deepseek-v4-flash"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/themes",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "active": "qubit"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/dashboard/font",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/webhooks/e2e-audit-hook/rotate",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "rotating the signing secret for 'e2e-audit-hook' requires explicit confirmation: re-POST with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "ee370139558b4e4b9ddbf76449e5a6f6"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/webhooks/e2e-audit-hook/rotate",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "state": "OK"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/webhooks/e2e-audit-hook/test",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "sending a real signed test delivery to 'e2e-audit-hook' requires explicit confirmation: re-POST with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "cb77c64c403b42278e761c2effe01c19"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/webhooks/e2e-audit-hook/test",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "state": "OK",
+      "error": "<urlopen error [Errno 111] Connection refused>",
+      "verdict": "FAILED"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks/e2e-audit-hook/deliveries",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "state": "OK",
+      "count": 15
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/webhooks/e2e-audit-hook/retry",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "retrying the last failed delivery for 'e2e-audit-hook' requires explicit confirmation: re-POST with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "71c58d4f1b834bf7b4aebde2d5e86480"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/webhooks/e2e-audit-hook/retry",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "state": "OK",
+      "error": "<urlopen error [Errno 111] Connection refused>",
+      "verdict": "FAILED"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/webhooks/e2e-audit-hook/enabled",
+     "status": 200,
+     "payload": {
+      "enabled": false,
+      "confirm": true
+     },
+     "response": {
+      "ok": true,
+      "name": "e2e-audit-hook",
+      "enabled": false
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/agent/api/webhooks/e2e-audit-hook/enabled",
+     "status": 200,
+     "payload": {
+      "enabled": true,
+      "confirm": true
+     },
+     "response": {
+      "ok": true,
+      "name": "e2e-audit-hook",
+      "enabled": true
+     }
+    },
+    {
+     "method": "DELETE",
+     "path": "/agent/api/webhooks/e2e-audit-hook",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "deleting webhook subscription 'e2e-audit-hook' requires explicit confirmation: re-DELETE with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "fde824d0499445ef92bafac778cbc285"
+     }
+    },
+    {
+     "method": "DELETE",
+     "path": "/agent/api/webhooks/e2e-audit-hook",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "name": "e2e-audit-hook"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/webhooks",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "enabled": true
+     }
+    }
+   ],
+   "policy": "typed gate CONFIRM_REQUIRED",
+   "state_change": "temp-sub lifecycle: ['deliveries', 'retried', 'rotated', 'tested'] + enable round-trip + deleted",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "staged typed gate then confirmed (settled)",
+   "notes": "temp artifact cleaned up",
+   "browser": true
+  },
+  {
+   "page": "/pairing",
+   "control": "pairing_list",
+   "action": "load /pairing (pending + approved queues)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/pairing",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "pairing queues rendered (1 pending)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/pairing",
+   "control": "pairing_approve_stage_deny",
+   "action": "click APPROVE, deny the staged gate (nobody approved)",
+   "request": [
+    {
+     "method": "POST",
+     "path": "/agent/api/pairing/approve",
+     "status": 409,
+     "code": "CONFIRM_REQUIRED",
+     "payload": {
+      "platform": "qubit",
+      "request_id": "pair_d5fdbc8c5b27b9d5"
+     },
+     "response": {
+      "ok": false,
+      "code": "CONFIRM_REQUIRED",
+      "detail": "pairing approve requires explicit confirmation: re-POST with {\"confirm\": true}",
+      "state": "NEEDS_CONFIRMATION",
+      "qubit_counterpart": "pending-approvals banner (POST /api/ops/confirm) + CLI `qubit approvals respond` + voice yes",
+      "confirmation_id": "cc4ed3e824db49f1af184e70186c72ad"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/agent/api/ops/cancel",
+     "status": 200,
+     "payload": {
+      "confirmation_id": "cc4ed3e824db49f1af184e70186c72ad"
+     },
+     "response": {
+      "ok": true,
+      "code": null,
+      "detail": "Cancelled 1 pending confirmation(s).",
+      "state": "executed"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/agent/api/pairing",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "typed gate CONFIRM_REQUIRED",
+   "state_change": "pairing approve staged then denied (no approval)",
+   "reload_persist": true,
+   "disposition": "E2E_GATED",
+   "detail": "approve staged a typed gate; denied via /api/ops/cancel (receipts=1); nobody approved",
+   "notes": "unknown probe user left unapproved by policy",
+   "browser": true
+  },
+  {
+   "page": "/pairing",
+   "control": "pairing_clear_pending_skip",
+   "action": "clear pending (withheld: would delete live request)",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "clear-pending not exercised",
+   "reload_persist": null,
+   "disposition": "E2E_SKIP",
+   "detail": "CLEAR PENDING uses window.confirm (auto-accepted by the harness) and would delete the live pending request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/pairing",
+   "control": "pairing_revoke_skip",
+   "action": "revoke approved user (withheld/empty)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/pairing",
+     "status": 200,
+     "response": {
+      "ok": true
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "no approved users to revoke",
+   "reload_persist": null,
+   "disposition": "E2E_SKIP",
+   "detail": "revoke affordance absent (queue empty)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/system",
+   "control": "system_gateway_status",
+   "action": "load /system (host + gateway status)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/system/stats",
+     "status": 200
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "system + gateway status rendered (gateway_live=True, host_os=Linux)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/system",
+   "control": "system_gateway_restart_deny",
+   "action": "click RESTART, cancel + deny (no restart)",
+   "request": [],
+   "policy": "typed gate GATEWAY_CONFIRM_REQUIRED",
+   "state_change": "restart confirmation cancelled (pid unchanged=True)",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "restart confirmation dialog shown and cancelled; no mutation",
+   "notes": "gateway left running by policy",
+   "browser": true
+  },
+  {
+   "page": "/system",
+   "control": "system_gateway_start_deny",
+   "action": "click START, cancel + deny (no start)",
+   "request": [],
+   "policy": "typed gate GATEWAY_CONFIRM_REQUIRED",
+   "state_change": "start confirmation cancelled (gateway reachable=True)",
+   "reload_persist": true,
+   "disposition": "E2E_PASS",
+   "detail": "start confirmation shown and cancelled; gateway state unchanged",
+   "notes": "gateway left as-is by policy",
+   "browser": true
+  },
+  {
+   "page": "/system",
+   "control": "system_gateway_stop_deny",
+   "action": "click STOP, cancel + deny (no stop)",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "STOP disabled (gateway not running via this control)",
+   "reload_persist": null,
+   "disposition": "E2E_SKIP",
+   "detail": "gateway STOP correctly disabled by policy",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/system",
+   "control": "system_estop_display",
+   "action": "verify e-stop is displayed and unlatched (never latch)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/power",
+     "status": 200,
+     "response": {
+      "state": "OK"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "e-stop control visible and NOT latched (power read ok=True); never clicked by policy",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/system",
+   "control": "system_doctor",
+   "action": "click Run doctor (diagnostics action)",
+   "request": [
+    {
+     "method": "POST",
+     "path": "/agent/api/ops/doctor",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "code": null,
+      "detail": "Done: state DEGRADED.",
+      "state": "executed",
+      "name": "doctor"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "doctor action executed (result shown=False)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/system",
+   "control": "system_update_check",
+   "action": "click Check for updates (read-only)",
+   "request": [
+    {
+     "method": "GET",
+     "path": "/agent/api/qubit/update/check",
+     "status": 200,
+     "response": {
+      "ok": true,
+      "detail": "",
+      "state": "OK"
+     }
+    }
+   ],
+   "policy": "allowed",
+   "state_change": "update check requested (read-only; never applied; install=git-checkout)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "real backend request",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/system",
+   "control": "system_hooks_cancel",
+   "action": "open NEW HOOK, then cancel (no hook created)",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "new-hook dialog opened then cancelled (no hook)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/system",
+   "control": "system_prune_cancel",
+   "action": "open checkpoint Prune, then cancel (no deletion)",
+   "request": [],
+   "policy": "client-side (no network)",
+   "state_change": "checkpoint Prune disabled (nothing to prune)",
+   "reload_persist": null,
+   "disposition": "E2E_SKIP",
+   "detail": "Prune correctly disabled by the backend",
+   "notes": "",
+   "browser": true
+  },
+  {
+   "page": "/system",
+   "control": "system_addkey_cancel",
+   "action": "open credential Add key, then cancel (no write)",
+   "request": [],
+   "policy": "allowed",
+   "state_change": "credential add opened then cancelled (POSTs issued: 0; no credential written)",
+   "reload_persist": null,
+   "disposition": "E2E_PASS",
+   "detail": "client-side control; DOM state changed (no network)",
+   "notes": "",
+   "browser": true
+  }
+ ],
+ "findings": [
+  {
+   "page": "/mcp",
+   "control": "mcp_invoke_tool",
+   "disposition": "E2E_FAIL",
+   "detail": "client error 400 MCP_CONNECT_FAILED on /agent/api/mcp/servers/cgraph-graft/invoke"
+  },
+  {
+   "page": "/webhooks",
+   "control": "webhooks_create_delete",
+   "disposition": "E2E_FAIL",
+   "detail": "UI create staged a typed gate but the confirmation is not executable (CONFIRM_UNSUPPORTED: No executable Qubit backend for 'webhook_create'; cancel it instead.); create never completed"
+  }
+ ],
+ "gated": [
+  {
+   "page": "/plugins",
+   "control": "plugins_memory_provider_select",
+   "detail": "typed refusal MEMORY_LOCAL_ONLY (counterpart path)"
+  },
+  {
+   "page": "/files",
+   "control": "files_path_policy",
+   "detail": "path outside approved roots refused with typed code FILES_OUTSIDE_ROOT (browser-context read)"
+  },
+  {
+   "page": "/channels",
+   "control": "channels_enable_stage_deny",
+   "detail": "typed gate staged on enable; denied via /api/ops/cancel (receipts=1, settled=True, staged_this_action=1)"
+  },
+  {
+   "page": "/pairing",
+   "control": "pairing_approve_stage_deny",
+   "detail": "approve staged a typed gate; denied via /api/ops/cancel (receipts=1); nobody approved"
+  }
+ ],
+ "skipped": [
+  {
+   "page": "/sessions",
+   "control": "sessions_restore_skip",
+   "detail": "restoring an archived row would mutate user data with no temp session available"
+  },
+  {
+   "page": "/files",
+   "control": "files_upload_create_withheld",
+   "detail": "honest empty state; CREATE disabled=False"
+  },
+  {
+   "page": "/pairing",
+   "control": "pairing_clear_pending_skip",
+   "detail": "CLEAR PENDING uses window.confirm (auto-accepted by the harness) and would delete the live pending request"
+  },
+  {
+   "page": "/pairing",
+   "control": "pairing_revoke_skip",
+   "detail": "revoke affordance absent (queue empty)"
+  },
+  {
+   "page": "/system",
+   "control": "system_gateway_stop_deny",
+   "detail": "gateway STOP correctly disabled by policy"
+  },
+  {
+   "page": "/system",
+   "control": "system_prune_cancel",
+   "detail": "Prune correctly disabled by the backend"
+  }
+ ],
+ "page_audit_errors": [],
+ "limitations": [
+  "All controls are driven through the served SPA with a real Chromium browser; requests are captured from the page's own traffic at the moment of the action.",
+  "Client-side-only controls (tabs, filters, validation, modal open/cancel) legitimately issue no network request; they are marked E2E_PASS on an observed DOM state change.",
+  "Confirm-gated destructive controls are either driven to a full stage->confirm settle or cancelled cleanly; config save is a net-zero round-trip (the loaded tree is re-submitted unchanged).",
+  "E2E_SKIP marks controls not safely executable (operator/external or destructive-avoid), not failures.",
+  "The MCP catalog install and env/oauth/provider writes are not executed (operator-gated / would mutate user data).",
+  "The artifact's only volatile field is generated_at."
+ ]
+}

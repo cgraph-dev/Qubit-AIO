@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qubit.local/schemas/differential/row.schema.json",
+  "title": "Differential inventory Row (INTERFACE v1.2)",
+  "description": "One capability row consumed by scripts/differential_parity.py. Mirrors the frozen Row schema in /tmp/qubit-differential/INTERFACE.md plus the v1.2 evidence/transport fields (all optional). additionalProperties is intentionally open: the runner merges _ROW_DEFAULTS and adds bookkeeping keys (unclassifiable, declared_disposition_raw).",
+  "type": "object",
+  "required": [
+    "capability_id",
+    "family",
+    "upstream_project",
+    "disposition",
+    "test_ids",
+    "trace_refs",
+    "normalizations"
+  ],
+  "properties": {
+    "capability_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9_]+)+$",
+      "description": "Stable unique id; must equal the fixture_id it exercises."
+    },
+    "family": {
+      "enum": [
+        "cli", "api", "rpc", "ws", "sse", "provider", "session", "memory",
+        "file", "project", "skill", "plugin", "mcp", "cron", "gateway",
+        "messaging", "browser", "desktop", "board", "task", "media", "acp",
+        "webhook", "auth", "approval", "recovery", "dashboard", "voice"
+      ]
+    },
+    "upstream_project": {"enum": ["hermes", "openclaw", "qubit"]},
+    "upstream_commit": {"type": ["string", "null"]},
+    "upstream_path": {"type": ["string", "null"]},
+    "upstream_symbol": {"type": ["string", "null"]},
+    "upstream_hash": {"$ref": "#/$defs/hashOrNull"},
+    "qubit_path": {"type": ["string", "null"]},
+    "qubit_symbol": {"type": ["string", "null"]},
+    "disposition": {"enum": ["PASS", "FAIL", "SAFE_EQUIVALENT", "OPERATOR_ONLY", "OPEN"]},
+    "command": {"type": ["string", "null"]},
+    "fixture": {"type": ["string", "null"]},
+    "fixture_hash": {"$ref": "#/$defs/hashOrNull"},
+    "upstream_result_hash": {"$ref": "#/$defs/hashOrNull"},
+    "qubit_result_hash": {"$ref": "#/$defs/hashOrNull"},
+    "test_ids": {"type": "array", "items": {"type": "string"}},
+    "trace_refs": {"type": "array", "items": {"type": "string"}},
+    "operator_prerequisite": {"type": ["string", "null"]},
+    "rollback_ref": {"type": ["string", "null"]},
+    "normalizations": {"$ref": "#/$defs/normalizerList"},
+    "voice_utterance": {"type": ["string", "object", "array", "null"]},
+    "dashboard_route": {"type": ["string", "object", "array", "null"]},
+    "dashboard_control": {"type": ["string", "object", "array", "null"]},
+    "request_schema": {"type": ["string", "object", "array", "null"]},
+    "broker_policy_decision": {"type": ["string", "object", "array", "null"]},
+    "runtime_provider": {"type": ["string", "object", "array", "null"]},
+    "store_state_assertion": {"type": ["string", "object", "array", "null"]},
+    "output_event_assertion": {"type": ["string", "object", "array", "null"]},
+    "error_codes": {"type": ["array", "null"], "items": {"type": "string"}},
+    "retry_recovery_proof": {"type": ["string", "object", "array", "null"]},
+    "audit_receipt_proof": {"type": ["string", "object", "array", "null"]},
+    "security_resource_proof": {"type": ["string", "object", "array", "null"]},
+    "package_proof": {"type": ["string", "object", "array", "null"]},
+    "response_headers": {"type": ["object", "null"]},
+    "screenshot_ref": {"type": ["string", "object", "null"]},
+    "dom_snapshot_ref": {"type": ["string", "object", "null"]},
+    "a11y_snapshot_ref": {"type": ["string", "object", "null"]},
+    "raw_hash": {"$ref": "#/$defs/hashOrNull"},
+    "transport": {"enum": ["cli", "http", "sse", "ws", "rpc", "voice", null]},
+    "headers": {"type": ["object", "null"]},
+    "events": {"type": ["array", "null"]},
+    "persisted_state": {},
+    "reference_commit": {"type": ["string", "null"]},
+    "reference_version": {"type": ["string", "null"]},
+    "reference_pinned": {"type": ["boolean", "null"]},
+    "unpinned_references": {"type": ["array", "null"], "items": {"type": "string"}},
+    "disposition_basis": {"type": ["string", "object", "array", "null"]}
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "hashOrNull": {
+      "type": ["string", "null"],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "normalizerList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "timestamp", "uuid", "temp_path", "pid", "session_token",
+          "generated_hash", "product_branding"
+        ]
+      }
+    }
+  }
+}

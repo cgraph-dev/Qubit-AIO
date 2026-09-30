@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qubit VoiceBridge — Activity</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 14px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  .wrap { max-width:820px; margin:0 auto; padding:16px; position:relative; z-index:1; }
+  header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+  h1 { font-size:18px; margin:0; }
+  a { color:var(--primary); text-decoration:none; }
+  .sub { font-size:12px; color:var(--muted); }
+  #bar { font-size:12px; color:var(--muted); margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  #bar input, #bar select { padding:4px 6px; background:var(--surface-soft); border:1px solid var(--line-strong); color:var(--text); border-radius:6px; font-size:12px; }
+  #bar button { padding:4px 8px; background:var(--surface-raised); border:1px solid var(--line-strong); color:var(--text); border-radius:6px; cursor:pointer; font-size:12px; }
+  .legend { font-size:11px; color:var(--muted); margin-bottom:10px; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  .legend b { color:var(--text); }
+  .item { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:8px 0; background:var(--surface); animation: badge-in .18s ease-out both; }
+  @keyframes badge-in { from { opacity:0; transform: translateY(4px); } }
+  .item .t { font-size:11px; color:var(--muted); margin-bottom:4px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; border:1px solid transparent; }
+  .b-asked { background:rgb(216 243 106 / 10%); color:var(--primary); border-color:rgb(216 243 106 / 35%); }
+  .b-decided { background:rgb(240 197 107 / 10%); color:var(--warning); border-color:rgb(240 197 107 / 35%); }
+  .b-answered { background:rgb(165 223 123 / 10%); color:var(--success); border-color:rgb(165 223 123 / 35%); }
+  .b-running { background:rgb(169 170 161 / 8%); color:var(--muted); border-color:rgb(169 170 161 / 25%); }
+  .b-failed { background:rgb(255 129 120 / 10%); color:var(--danger); border-color:rgb(255 129 120 / 35%); }
+  .b-report { background:rgb(216 243 106 / 14%); color:var(--primary-strong); border-color:rgb(216 243 106 / 40%); }
+  .b-system { background:var(--surface-soft); color:var(--muted); border-color:var(--line); }
+  .route { color:var(--warning); font-size:11px; }
+  .detail { font-size:11px; color:var(--muted); }
+  .text { white-space:pre-wrap; margin-top:4px; }
+  .summary { color:var(--text); background:var(--surface); border-radius:6px; padding:6px 8px; margin-top:6px; white-space:pre-wrap; }
+  #empty { color:var(--faint); text-align:center; margin-top:40px; }
+</style><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<main class="wrap" id="main-content" tabindex="-1">
+  <header>
+    <div>
+      <h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit VoiceBridge — Activity</h1>
+      <div class="sub">Live timeline — what you said, how it was handled, and what was spoken back. Newest first.</div>
+    </div>
+    <nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity" aria-current="page">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals">Approvals</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a href="/docs">Docs</a><a class="nav-utility" href="/token-setup">Pair device</a></nav>
+  </header>
+  <div class="legend">
+    <b>Badges — what each means:</b><br>
+    <span class="badge b-asked">You said</span> — your speech or typed message &nbsp;
+    <span class="badge b-decided">Routed to…</span> — which Qubit lane handled it (agent / worker / browser / local) &nbsp;
+    <span class="badge b-answered">Answered</span> — reply spoken back (≤40 words) &nbsp;
+    <span class="badge b-running">Working…</span> — task dispatched and still running &nbsp;
+    <span class="badge b-report">Report saved</span> — full detailed report on disk &nbsp;
+    <span class="badge b-failed">Failed</span> — error or no speech detected<br>
+    <span style="opacity:.85">Tip: filter to <i>You said</i> or <i>Answered</i> for a clean read.</span>
+  </div>
+  <div id="bar"><span id="conn" aria-live="polite">connecting…</span> · <span id="count">—</span> · <label>show <select id="kindFilter"><option value="">all — everything</option><option value="asked">You said</option><option value="answered">Answered</option><option value="decided">Routed</option><option value="running">Working</option><option value="report">Reports</option><option value="failed">Failed</option></select></label> <label class="sr-only" for="q">Search activity</label><input id="q" placeholder="search…" style="margin-left:8px;"> <button id="pauseBtn" type="button">pause</button></div>
+  <div id="feed"><div id="empty">waiting for activity…</div></div>
+</main>
+<script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
+<script>
+// Token comes ONLY from localStorage via the shared helper (frontend/vb.js).
+// API base is same-origin by default; vbResolveBase() returns the explicitly
+// saved pairing base only — an attacker-controlled ?api= query string is never
+// honored or persisted.
+vbResolveBase();
+const feed = document.getElementById('feed');
+let paused=false;
+document.getElementById('pauseBtn').addEventListener('click', ()=>{ paused=!paused; document.getElementById('pauseBtn').textContent=paused?'resume':'pause'; });
+function fmt(ts){ const d = new Date(ts*1000); return d.toLocaleTimeString(); }
+function humanBadge(it){
+  const kind=(it.kind||'').toLowerCase();
+  const route=(it.route||'').toLowerCase();
+  if (kind==='fail' || kind==='error' || route==='error') return ['failed','Failed'];
+  if (kind==='user' || kind==='asked') return ['asked','You said'];
+  if (kind==='raw_report' || kind==='report') return ['report','Report saved'];
+  if (kind==='routing' || kind==='decided') { const dest=(it.route||it.detail||'').toString().split(/\s+/)[0]; if(dest) return ['decided','Routed to '+window.vbRouteLabel(dest)]; return ['decided','Routed']; }
+  if (kind==='summary' || kind==='done' || kind==='answered') return ['answered','Answered'];
+  if (kind==='status' || kind==='running' || kind==='interrupt' || kind==='hotkey') return ['running','Working…'];
+  if (kind==='system') return ['system','System'];
+  if (kind) return ['system', kind];
+  return ['system','Event'];
+}
+function badgeClass(kind){ const m={asked:'asked',decided:'decided',answered:'answered',running:'running',report:'report',failed:'failed',system:'system'}; return m[kind]||'system'; }
+// DOM-built item cards: every value is rendered via textContent (no innerHTML).
+function itemCard(it){
+  const [hbKind, hbText] = humanBadge(it);
+  const head = vbBuild('span', null, fmt(it.ts));
+  head.appendChild(vbBuild('span', {class:'badge b-'+badgeClass(hbKind)}, hbText));
+  if (it.route) head.appendChild(vbBuild('span', {class:'route'}, '· '+window.vbRouteLabel(it.route)));
+  if (it.conf!=null && it.conf!=='') head.appendChild(vbBuild('span', {class:'detail'}, '· conf '+it.conf));
+  if (it.latency_s!=null) head.appendChild(vbBuild('span', {class:'detail'}, '· '+it.latency_s+'s'));
+  const t = vbBuild('div', {class:'t'}, head);
+  const body = vbBuild('div', {class:'item'}, t);
+  if (it.text) body.appendChild(vbBuild('div', {class:'text'}, String(it.text)));
+  if (it.summary) body.appendChild(vbBuild('div', {class:'summary'}, String(it.summary)));
+  if (it.detail) body.appendChild(vbBuild('div', {class:'detail', style:'margin-top:4px'}, String(it.detail)));
+  if (it.raw) {
+    const rawText = typeof it.raw === 'string' ? it.raw : JSON.stringify(it.raw, null, 2);
+    const pre = vbBuild('div', {class:'raw', style:'margin-top:4px'}, rawText);
+    body.appendChild(vbBuild('details', {style:'margin-top:6px'},
+      vbBuild('summary', {style:'font-size:11px;color:var(--muted);cursor:pointer'}, 'full report / raw'), pre));
+  }
+  return body;
+}
+function emptyState(text){
+  const el = vbBuild('div', {id:'empty'}, text);
+  vbClear(feed); feed.appendChild(el);
+}
+function render(items){
+  const kindFilter=document.getElementById('kindFilter').value;
+  const q=(document.getElementById('q').value||'').toLowerCase();
+  let filtered=items;
+  if(kindFilter) filtered=filtered.filter(it=> humanBadge(it)[0]===kindFilter);
+  if(q) filtered=filtered.filter(it=> JSON.stringify(it).toLowerCase().includes(q));
+  document.getElementById('count').textContent = filtered.length + '/' + items.length + ' items';
+  if(!filtered.length){ emptyState(items.length ? 'no matches' : 'waiting for activity…'); return; }
+  vbClear(feed);
+  filtered.forEach(it => feed.appendChild(itemCard(it)));
+}
+async function refreshStatus(){
+  const res = await vbApi('/api/status');
+  if (res.ok && res.body && res.body.sticky_route) {
+    document.getElementById('conn').textContent += ' · sticky→'+res.body.sticky_route;
+  }
+}
+async function refresh(){
+  if(paused) return;
+  const res = await vbApi('/api/activity?limit=200');
+  if (res.authRequired) { vbStatus('conn', 'not paired — open /token-setup', 'degraded'); return; }
+  if (!res.ok || !res.body || !Array.isArray(res.body.items)) {
+    vbStatus('conn', 'offline', 'offline'); return;
+  }
+  vbStatus('conn', 'live · '+(res.body.items||[]).length+' items', 'live');
+  render(res.body.items || []);
+}
+document.getElementById('kindFilter').addEventListener('change', ()=>refresh());
+document.getElementById('q').addEventListener('input', ()=>refresh());
+setInterval(refresh, 2000); setInterval(refreshStatus, 5000); refresh(); refreshStatus();
+</script>
+</body></html>

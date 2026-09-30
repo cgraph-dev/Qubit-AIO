@@ -1,0 +1,26 @@
+# Portable operator-local launcher overrides for local PC actions (Packet 8K).
+#
+# This EXAMPLE is shipped in the wheel so a fresh install can discover the
+# mechanism. It contains NO machine-specific paths. Copy it to
+# ~/.config/qubit-voicebridge/local-actions.yaml (honouring
+# $XDG_CONFIG_HOME) and set YOUR launcher targets / project roots / screenshot
+# directory. Without that file the installed package uses portable generic
+# defaults (launchers by name, home-directory file/screenshot dirs).
+#
+# Format:
+#   app_targets:
+#     <app>: [argv, ...]          # launcher command for "open <app>"
+#   project_roots:
+#     <spoken name>: <path>       # "open <name> in vscode"
+#   screenshot_dir: <path>        # screenshot output directory
+
+app_targets:
+  editor: ["xdg-open", "~/Projects"]
+  vscode: ["code", "~/Projects"]
+  files: ["xdg-open", "~"]
+  # fl studio: ["wine", "/path/to/FL64.exe"]
+
+project_roots:
+  myapp: "~/Projects/myapp"
+
+screenshot_dir: "~/Pictures"

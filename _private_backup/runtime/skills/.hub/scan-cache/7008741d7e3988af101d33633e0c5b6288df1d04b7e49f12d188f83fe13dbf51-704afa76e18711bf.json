@@ -1,0 +1,35 @@
+{
+  "bundle_hash": "sha256:7008741d7e3988af101d33633e0c5b6288df1d04b7e49f12d188f83fe13dbf51",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/llava",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 51,
+      "match": "pip install -e .",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 47,
+      "match": "git clone https://github.com/haotian-liu/LLaVA",
+      "description": "clones a git repository at runtime"
+    }
+  ],
+  "rules": [
+    "git_clone",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:49.470278+00:00",
+  "summary": "llava: safe \u2014 2 finding(s) in supply_chain",
+  "fresh": true
+}

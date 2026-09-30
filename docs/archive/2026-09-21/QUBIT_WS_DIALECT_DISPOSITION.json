@@ -1,0 +1,60 @@
+{
+  "schema": "qubit-ws-dialect-disposition/2",
+  "description": "Explicit, behavior-verified disposition of the vendored Hermes tui_gateway WebSocket JSON-RPC dialect. Qubit runs ONE event path (SSE + REST) and ONE session/broker authority on the single listener. The upstream /api/ws dialect is a sidecar that drives the tui_gateway agent process and binds a SECOND session id ('both transports bind to the same session id'); serving it would add a second chat/event authority alongside Qubit's broker. It is therefore a typed SAFE_EQUIVALENT refusal whose counterpart is exercised by tests/test_ws_dialect_disposition.py. The WS ticket mint (/api/auth/ws-ticket) is genuinely implemented on the single listener (scoped, single-use tickets).",
+  "listener": "the existing ThreadingHTTPServer (voicebridge/webui.py); no second listener, port, or authority",
+  "owner_approval": {
+    "approved": true,
+    "approved_by": "Qubit owner",
+    "date": "2026-09-19",
+    "authority": "Owner directive (2026-09-19): either implement the required /api/ws behavior through the single Qubit listener or record an explicit owner-approved typed safe equivalent with evidence. Implementing the tui_gateway dialect would add the second session/event authority the guardrails forbid, so the owner approved the typed SAFE_EQUIVALENT refusal below.",
+    "approved_scope": "GET /api/ws tui_gateway JSON-RPC dialect on the single Qubit listener",
+    "counterpart_proof": "GET /api/events (SSE) + POST /api/qubit/chat + POST /api/qubit/chat/stream; POST /api/auth/ws-ticket (scope pty|rpc, single-use)",
+    "refusal_is_typed": true,
+    "refusal_surface": "HTTP 426 Upgrade Required (WebSocket upgrade) / HTTP 403 (plain) with the JSON code WS_SINGLE_PATH; never a bare close or 404 on the SPA path /agent/api/ws",
+    "evidence": [
+      "voicebridge/hermes_compat.py GATED entry for GET /api/ws (code WS_SINGLE_PATH)",
+      "voicebridge/webui.py HERMES_WS_GATE_CODES / HERMES_WS_GATE_DETAIL",
+      "tests/test_ws_dialect_disposition.py"
+    ]
+  },
+  "surfaces": [
+    {
+      "upstream": "hermes_cli/web_routers/chat_ws.py",
+      "dialect": "tui_gateway JSON-RPC over WebSocket",
+      "method": "GET",
+      "path": "/api/ws",
+      "disposition": "SAFE_EQUIVALENT",
+      "owner_approval": true,
+      "code": "WS_SINGLE_PATH",
+      "qubit_counterpart": "GET /api/events (SSE) + POST /api/qubit/chat and /api/qubit/chat/stream",
+      "evidence": "voicebridge/hermes_compat.py GATED entry for GET /api/ws",
+      "verified_by": "tests/test_ws_dialect_disposition.py",
+      "rationale": "Upstream /api/ws drives the tui_gateway sidecar and binds its own session id; Qubit keeps one broker/session/event path. The counterpart is proven reachable on the same listener."
+    },
+    {
+      "upstream": "hermes_cli/web_routers/chat_ws.py",
+      "dialect": "tui_gateway ws ticket mint",
+      "method": "POST",
+      "path": "/agent/api/auth/ws-ticket",
+      "disposition": "IMPLEMENTED",
+      "code": "",
+      "qubit_counterpart": "POST /api/auth/ws-ticket with scope=pty|rpc mints Qubit's own short-lived single-use ticket",
+      "evidence": "voicebridge/webui.py _hermes_api ws-ticket mint (scope pty|rpc, single-use)",
+      "verified_by": "tests/test_ws_dialect_disposition.py",
+      "rationale": "Qubit serves the WS ticket handshake on the single listener; the vendor dialect ticket is not needed."
+    },
+    {
+      "upstream": "tui_gateway/server.py",
+      "dialect": "server method registry (JSON-RPC)",
+      "method": "GET",
+      "path": "/api/ws",
+      "disposition": "SAFE_EQUIVALENT",
+      "owner_approval": true,
+      "code": "WS_SINGLE_PATH",
+      "qubit_counterpart": "GET /agent/api/events (SSE) + POST /agent/api/qubit/chat",
+      "evidence": "voicebridge/hermes_compat.py GATED pattern /api/ws (the SPA /agent prefix is stripped before dispatch, so /agent/api/ws maps to the same gate)",
+      "verified_by": "tests/test_ws_dialect_disposition.py",
+      "rationale": "The SPA reaches the same single event path through the /agent prefix; the tui_gateway method registry is not mounted as a second authority."
+    }
+  ]
+}

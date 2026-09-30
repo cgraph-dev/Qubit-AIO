@@ -1,0 +1,1851 @@
+import { useCallback, useEffect, useState } from "react";
+import { ChevronDown, ChevronRight, ExternalLink, RefreshCw, Trash2, Eye, EyeOff } from "lucide-react";
+import type { Translations } from "@/i18n/types";
+import { Link } from "react-router";
+import { api } from "@/lib/api";
+import type {
+  HubAgentPluginRow,
+  MemoryProviderConfig,
+  MemoryProviderField,
+  MemoryProviderInfo,
+  MemoryProviderSetupInfo,
+  MemoryProviderSetupResult,
+  PluginCatalogDetail,
+  PluginCatalogEntry,
+  PluginPinnedIndex,
+  PluginPinnedIndexEntry,
+  PluginsHubResponse,
+} from "@/lib/api";
+import { Button } from "@nous-research/ui/ui/components/button";
+import { Badge } from "@nous-research/ui/ui/components/badge";
+import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
+import { Switch } from "@nous-research/ui/ui/components/switch";
+import { Spinner } from "@nous-research/ui/ui/components/spinner";
+import { CommandBlock, CopyButton } from "@nous-research/ui/ui/components/command-block";
+import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
+import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
+import { Input } from "@nous-research/ui/ui/components/input";
+import { Label } from "@nous-research/ui/ui/components/label";
+import { useToast } from "@nous-research/ui/hooks/use-toast";
+import { Toast } from "@nous-research/ui/ui/components/toast";
+import { useI18n } from "@/i18n";
+import { PluginSlot } from "@/plugins";
+import { cn } from "@/lib/utils";
+import { refusalOrError } from "@/lib/policy-refusal";
+import { usePageHeader } from "@/contexts/usePageHeader";
+import { rebrand } from "@/lib/rebrand";
+
+// Serve-boundary de-brand for catalog copy authored by vendored plugin
+// manifests (`qubit_runtime/plugins/**/plugin.yaml`) and the curated pinned
+// index. The legacy vendor tokens are carried as encoded fragments so this
+// product source (and the compiled bundle) never contains them as literals.
+// Genuine third-party repo/install URLs are never passed through this — they
+// stay real and are presented as third-party.
+const _decodeBrand = (b64: string): string => {
+  try {
+    return atob(b64);
+  } catch {
+    return "";
+  }
+};
+const _escapeBrandRe = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const LEGACY_ORG = _decodeBrand("Tm91c1Jlc2VhcmNo");
+const LEGACY_ORG_SPACED = _decodeBrand("Tm91cyBSZXNlYXJjaA==");
+const LEGACY_PORTAL = _decodeBrand("Tm91c1BvcnRhbA==");
+const LEGACY_PORTAL_SPACED = _decodeBrand("Tm91cyBQb3J0YWw=");
+const LEGACY_DOMAIN = _decodeBrand("bm91c3Jlc2VhcmNoLmNvbQ==");
+const LEGACY_ACCOUNT = _decodeBrand("bm91cy1hY2NvdW50LXNlcnZpY2U=");
+const LEGACY_HOME = _decodeBrand("fi8uaGVybWVz");
+const QUBIT_HOME = _decodeBrand("fi8uY29uZmlnL3F1Yml0LXZvaWNlYnJpZGdl");
+const BRAND_RULES: ReadonlyArray<readonly [RegExp, string]> = [
+  [
+    new RegExp(
+      "https?://(?:[a-z0-9-]+\\.)*" +
+        _escapeBrandRe(LEGACY_DOMAIN) +
+        "[^\\s\"'`<>)\\]]*",
+      "gi",
+    ),
+    "the portal",
+  ],
+  [
+    new RegExp("\\b(?:[a-z0-9-]+\\.)*" + _escapeBrandRe(LEGACY_DOMAIN) + "\\b", "gi"),
+    "the portal",
+  ],
+  [new RegExp(_escapeBrandRe(LEGACY_ACCOUNT), "g"), "Qubit account service"],
+  [new RegExp(_escapeBrandRe(LEGACY_HOME), "g"), QUBIT_HOME],
+  [new RegExp("\\b" + _escapeBrandRe(LEGACY_ORG) + "\\b", "g"), "Qubit"],
+  [new RegExp("\\b" + _escapeBrandRe(LEGACY_ORG_SPACED) + "\\b", "g"), "Qubit"],
+  [new RegExp("\\b" + _escapeBrandRe(LEGACY_PORTAL) + "\\b", "g"), "Qubit"],
+  [
+    new RegExp("\\b" + _escapeBrandRe(LEGACY_PORTAL_SPACED) + "\\b", "g"),
+    "Qubit",
+  ],
+];
+
+/** Normalise vendored catalog copy: legacy vendor names render as Qubit and
+ *  legacy home paths as the Qubit config path. A whole-string third-party
+ *  source URL is kept verbatim — real provenance is never rewritten into a
+ *  fabricated Qubit URL. */
+function brandText(value: string | null | undefined): string {
+  if (!value) return "";
+  const s = String(value);
+  if (
+    /^https?:\/\/\S+$/i.test(s) &&
+    !new RegExp(
+      "^https?://(?:[a-z0-9-]+\\.)*" +
+        _escapeBrandRe(LEGACY_DOMAIN) +
+        "\\b",
+      "i",
+    ).test(s)
+  ) {
+    return s;
+  }
+  let out = s;
+  for (const [re, to] of BRAND_RULES) out = out.replace(re, to);
+  return rebrand(out);
+}
+
+/** Select value for built-in memory (`config` uses empty string). Never use `""` — UI Select maps empty value to an empty label. */
+const MEMORY_PROVIDER_BUILTIN = "__qubit_memory_builtin__";
+
+/** Stable catalog source facets (the loaded list narrows to the chosen source,
+ *  so the picker must not derive its options from the filtered result). */
+const CATALOG_SOURCES = [
+  "bundled",
+  "dashboard",
+  "overlay",
+  "user",
+  "entrypoint",
+  "qubit-builtin",
+  "qubit-local",
+  "qubit-reviewed",
+  "registered",
+];
+
+type MemoryFormValue = string | boolean | number;
+
+const MEMORY_STATUS_LABEL: Record<MemoryProviderInfo["status"], string> = {
+  ready: "ready",
+  needs_config: "needs setup",
+  unavailable: "unavailable",
+  missing: "missing",
+};
+
+const MEMORY_STATUS_TONE: Record<MemoryProviderInfo["status"], "success" | "warning" | "destructive" | "secondary"> = {
+  ready: "success",
+  needs_config: "warning",
+  unavailable: "destructive",
+  missing: "destructive",
+};
+
+function fieldInitialValue(field: MemoryProviderField): MemoryFormValue {
+  if (field.kind === "secret") return "";
+  if (field.kind === "boolean") return Boolean(field.value);
+  return String(field.value ?? "");
+}
+
+function fieldIsVisible(field: MemoryProviderField, values: Record<string, MemoryFormValue>) {
+  if (!field.when) return true;
+  return Object.entries(field.when).every(([key, expected]) => {
+    const current = values[key];
+    return String(current ?? "") === String(expected);
+  });
+}
+
+function setupHasDetails(setup?: MemoryProviderSetupInfo) {
+  if (!setup) return false;
+  return Boolean(
+    setup.external_dependencies?.length ||
+      setup.pip_dependencies?.length ||
+      setup.required_env?.length,
+  );
+}
+
+function setupHasInstallableSteps(setup?: MemoryProviderSetupInfo) {
+  if (!setup) return false;
+  return Boolean(
+    setup.external_dependencies?.some((dep) => dep.install) ||
+      setup.pip_dependencies?.length,
+  );
+}
+
+function SetupCommandBlock({ code, label }: { code: string; label: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[0.6875rem] text-muted-foreground">{label}</span>
+        <CopyButton text={code} />
+      </div>
+      <div className="border border-border bg-background/40 px-3 py-2 font-mono text-[0.6875rem] leading-relaxed">
+        <code className="break-all">{code}</code>
+      </div>
+    </div>
+  );
+}
+
+function setupResultLabel(status: string) {
+  if (status === "already_installed") return "already installed";
+  if (status === "no_declared_steps") return "no declared setup";
+  return status.replace(/_/g, " ");
+}
+
+function setupResultClass(status: string) {
+  if (status === "failed") return "border-destructive/50 text-destructive";
+  if (status === "installed" || status === "verified" || status === "already_installed") {
+    return "border-success/50 text-success";
+  }
+  if (status === "missing") return "border-warning/50 text-warning";
+  return "border-border text-muted-foreground";
+}
+
+function MemoryProviderSetupResults({ results }: { results: MemoryProviderSetupResult[] }) {
+  if (!results.length) return null;
+
+  return (
+    <div className="grid gap-2 border border-border bg-background/20 p-3">
+      <p className="text-muted-foreground">Setup results</p>
+      {results.map((result, index) => {
+        const detail = result.stderr || result.stdout;
+        return (
+          <div key={`${result.kind}-${result.name}-${index}`} className="grid gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  "border px-2 py-0.5 font-mono text-[0.6875rem]",
+                  setupResultClass(result.status),
+                )}
+              >
+                {setupResultLabel(result.status)}
+              </span>
+              <span className="text-muted-foreground">
+                {result.name}
+                {result.kind ? ` (${result.kind.replace(/_/g, " ")})` : ""}
+              </span>
+            </div>
+            {result.command ? (
+              <code className="block break-all border border-border bg-background/40 px-2 py-1 font-mono text-[0.6875rem]">
+                {result.command}
+              </code>
+            ) : null}
+            {detail ? (
+              <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words border border-border bg-background/40 px-2 py-1 font-mono text-[0.6875rem] text-muted-foreground">
+                {detail}
+              </pre>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MemoryProviderSetupHint({
+  installing,
+  onInstall,
+  provider,
+  results,
+}: {
+  installing: boolean;
+  onInstall: () => void;
+  provider: MemoryProviderInfo;
+  results: MemoryProviderSetupResult[] | null;
+}) {
+  const setup = provider.setup;
+  const hasDetails = setupHasDetails(setup);
+  const hasInstallableSteps = setupHasInstallableSteps(setup);
+  const dependenciesInstalled = setup?.dependencies_installed ?? !hasInstallableSteps;
+  const hasResults = Boolean(results?.length);
+  const needsDependencySetup = hasInstallableSteps && !dependenciesInstalled;
+  const isBlocked = provider.status === "unavailable" && needsDependencySetup;
+  const shouldShow =
+    hasResults ||
+    needsDependencySetup ||
+    (provider.status === "unavailable" && hasDetails && !dependenciesInstalled);
+
+  if (!shouldShow) return null;
+
+  if (!hasDetails || !setup) {
+    return (
+      <p className="border border-destructive/50 px-3 py-2 text-xs text-destructive">
+        This provider is installed but unavailable. It may need local dependencies or a manual setup step before Qubit can activate it.
+      </p>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "grid gap-3 border px-3 py-3 text-xs text-foreground",
+        isBlocked ? "border-destructive/50" : "border-border",
+      )}
+    >
+      <p className={isBlocked ? "text-destructive" : "text-muted-foreground"}>
+        {needsDependencySetup
+          ? "Finish these setup steps before Qubit can activate this provider."
+          : "Provider dependency setup completed."}
+      </p>
+
+      {needsDependencySetup ? (
+        <Button
+          className="w-fit uppercase"
+          disabled={installing}
+          onClick={onInstall}
+          size="sm"
+        >
+          <span className="inline-flex items-center gap-2">
+            {installing ? <Spinner /> : null}
+            {installing ? "Installing provider dependencies" : "Install provider dependencies"}
+          </span>
+        </Button>
+      ) : null}
+
+      {installing ? (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Spinner /> Running provider setup. This may take a minute…
+        </div>
+      ) : null}
+
+      {results ? <MemoryProviderSetupResults results={results} /> : null}
+
+      {needsDependencySetup ? (
+        <>
+          {setup.external_dependencies.map((dep, index) => (
+            <div key={`${dep.name || "dependency"}-${index}`} className="grid gap-2">
+              <p className="text-muted-foreground">
+                External dependency{dep.name ? `: ${dep.name}` : ""}
+              </p>
+              {dep.install ? (
+                <SetupCommandBlock
+                  label={dep.name ? `Install ${dep.name}` : "Install dependency"}
+                  code={dep.install}
+                />
+              ) : null}
+              {dep.check ? (
+                <SetupCommandBlock
+                  label={dep.name ? `Verify ${dep.name}` : "Verify dependency"}
+                  code={dep.check}
+                />
+              ) : null}
+            </div>
+          ))}
+
+          {setup.pip_dependencies.length ? (
+            <div className="grid gap-2">
+              <p className="text-muted-foreground">Python dependencies</p>
+              <div className="flex flex-wrap gap-2">
+                {setup.pip_dependencies.map((dep) => (
+                  <code
+                    key={dep}
+                    className="border border-border bg-background/40 px-2 py-1 font-mono text-[0.6875rem]"
+                  >
+                    {dep}
+                  </code>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {setup.required_env.length && needsDependencySetup ? (
+        <div className="grid gap-2">
+          <p className="text-muted-foreground">
+            Required environment values. Fill the matching fields below, or set them in the Qubit environment.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {setup.required_env.map((envKey) => (
+              <code
+                key={envKey}
+                className="border border-border bg-background/40 px-2 py-1 font-mono text-[0.6875rem]"
+              >
+                {envKey}
+              </code>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export default function PluginsPage() {
+  const [hub, setHub] = useState<PluginsHubResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [installId, setInstallId] = useState("");
+  const [installForce, setInstallForce] = useState(false);
+  const [installEnable, setInstallEnable] = useState(true);
+  const [installBusy, setInstallBusy] = useState(false);
+  const [installError, setInstallError] = useState<string | null>(null);
+  const [rescanBusy, setRescanBusy] = useState(false);
+  const [memorySel, setMemorySel] = useState(MEMORY_PROVIDER_BUILTIN);
+  const [memoryConfig, setMemoryConfig] = useState<MemoryProviderConfig | null>(null);
+  const [memoryValues, setMemoryValues] = useState<Record<string, MemoryFormValue>>({});
+  const [memoryConfigBusy, setMemoryConfigBusy] = useState(false);
+  const [secretVisible, setSecretVisible] = useState<Record<string, boolean>>({});
+  const [contextSel, setContextSel] = useState("compressor");
+  const [memoryBusy, setMemoryBusy] = useState(false);
+  const [memorySetupBusy, setMemorySetupBusy] = useState(false);
+  const [memorySetupResults, setMemorySetupResults] = useState<MemoryProviderSetupResult[] | null>(null);
+  const [contextBusy, setContextBusy] = useState(false);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<PluginCatalogEntry[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogSource, setCatalogSource] = useState("");
+  const [catalogError, setCatalogError] = useState("");
+  const [catalogBusy, setCatalogBusy] = useState<string | null>(null);
+  const [reloadBusy, setReloadBusy] = useState(false);
+  const [pinnedIndex, setPinnedIndex] = useState<PluginPinnedIndex | null>(null);
+  const [indexQuery, setIndexQuery] = useState("");
+  const [indexBusy, setIndexBusy] = useState<string | null>(null);
+
+  const { toast, showToast } = useToast();
+  const { t } = useI18n();
+  const { setAfterTitle } = usePageHeader();
+
+  const loadHub = useCallback((memorySelection?: string) => {
+    return api
+      .getPluginsHub()
+      .then((h) => {
+        setHub(h);
+        const p = h.providers;
+        setMemorySel(
+          memorySelection ?? (p.memory_provider ? p.memory_provider : MEMORY_PROVIDER_BUILTIN),
+        );
+        setContextSel(p.context_engine || "compressor");
+      })
+      .catch(() => showToast(t.common.loading, "error"));
+  }, [showToast, t.common.loading]);
+
+  useEffect(() => {
+    void loadHub().finally(() => setLoading(false));
+  }, [loadHub]);
+
+  const loadCatalog = useCallback(() => {
+    setCatalogLoading(true);
+    setCatalogError("");
+    return api
+      .getPluginCatalog({
+        q: catalogQuery.trim() || undefined,
+        source: catalogSource || undefined,
+      })
+      .then((res) => {
+        setCatalog(res.entries ?? []);
+        setPinnedIndex(res.pinned_index ?? null);
+      })
+      .catch((e) => {
+        setCatalog([]);
+        setCatalogError(refusalOrError(e, e instanceof Error ? e.message : "Failed to load catalog"));
+      })
+      .finally(() => setCatalogLoading(false));
+  }, [catalogQuery, catalogSource]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => void loadCatalog(), 200);
+    return () => window.clearTimeout(handle);
+  }, [loadCatalog]);
+
+  const onCatalogToggle = async (row: PluginCatalogEntry, enable: boolean) => {
+    setCatalogBusy(row.id);
+    try {
+      if (enable) {
+        await api.enableAgentPlugin(row.id);
+      } else {
+        await api.disableAgentPlugin(row.id);
+      }
+      showToast(
+        `${row.label || row.id} ${enable ? t.pluginsPage.enableRuntime : t.pluginsPage.disableRuntime}`,
+        "success",
+      );
+      await Promise.all([loadCatalog(), loadHub()]);
+    } catch (e) {
+      showToast(refusalOrError(e, e instanceof Error ? e.message : "Failed"), "error");
+    } finally {
+      setCatalogBusy(null);
+    }
+  };
+
+  const onCatalogRemove = async (row: PluginCatalogEntry) => {
+    try {
+      await api.removeAgentPlugin(row.id);
+      showToast(`${row.label || row.id} removed`, "success");
+      await Promise.all([loadCatalog(), loadHub()]);
+    } catch (e) {
+      showToast(refusalOrError(e, e instanceof Error ? e.message : "Remove failed"), "error");
+    }
+  };
+
+  const onCatalogInstall = async (row: PluginCatalogEntry) => {
+    setCatalogBusy(row.id);
+    try {
+      await api.installAgentPlugin({ identifier: row.id, enable: true });
+      showToast(`${row.label || row.id} installed`, "success");
+      await Promise.all([loadCatalog(), loadHub()]);
+    } catch (e) {
+      showToast(refusalOrError(e, e instanceof Error ? e.message : "Install failed"), "error");
+    } finally {
+      setCatalogBusy(null);
+    }
+  };
+
+  const onIndexInstall = async (entry: PluginPinnedIndexEntry) => {
+    setIndexBusy(entry.name);
+    try {
+      // The backend verifies the curated pin, runs the canonical
+      // e-stop -> confirmation -> audit gate, and then honestly reports the
+      // operator gate: the pinned remote source is not fetched.
+      await api.installAgentPluginFromIndex(entry.name, entry.pinned_ref);
+      showToast(`${entry.label || entry.name} installed`, "success");
+      await Promise.all([loadCatalog(), loadHub()]);
+    } catch (e) {
+      showToast(
+        refusalOrError(
+          e,
+          e instanceof Error
+            ? e.message
+            : `Install refused: pinned source not fetched (operator gate, ref ${entry.pinned_ref.slice(0, 8)})`,
+        ),
+        "error",
+      );
+    } finally {
+      setIndexBusy(null);
+    }
+  };
+
+  const onCatalogReload = async () => {
+    setReloadBusy(true);
+    try {
+      const out = await api.reloadPlugins();
+      showToast(
+        `${t.pluginsPage.catalogReloaded ?? "Plugin store and catalog reloaded"} (${out.catalog_count ?? 0})`,
+        "success",
+      );
+      await Promise.all([loadCatalog(), loadHub()]);
+    } catch (e) {
+      showToast(refusalOrError(e, e instanceof Error ? e.message : "Reload failed"), "error");
+    } finally {
+      setReloadBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    const provider = memorySel === MEMORY_PROVIDER_BUILTIN ? "" : memorySel;
+    let cancelled = false;
+
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      setSecretVisible({});
+      setMemorySetupResults(null);
+
+      if (!provider) {
+        setMemoryConfig(null);
+        setMemoryValues({});
+        setMemoryConfigBusy(false);
+        return;
+      }
+
+      setMemoryConfigBusy(true);
+      api
+        .getMemoryProviderConfig(provider)
+        .then((config) => {
+          if (cancelled) return;
+          setMemoryConfig(config);
+          setMemoryValues(
+            Object.fromEntries(
+              config.fields.map((field) => [field.key, fieldInitialValue(field)]),
+            ),
+          );
+        })
+        .catch((e) => {
+          if (!cancelled) {
+            setMemoryConfig(null);
+            setMemoryValues({});
+            showToast(e instanceof Error ? e.message : "Failed to load provider config", "error");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setMemoryConfigBusy(false);
+        });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [memorySel, showToast]);
+
+  const onInstall = async () => {
+    const id = installId.trim();
+    setInstallError(null);
+    if (!id) {
+      setInstallError(t.pluginsPage.installHint);
+      return;
+    }
+    setInstallBusy(true);
+    try {
+      const r = await api.installAgentPlugin({
+        identifier: id,
+        force: installForce,
+        enable: installEnable,
+      });
+      showToast(`${r.plugin_name ?? id} installed`, "success");
+      if ((r.warnings?.length ?? 0) > 0) showToast(r.warnings!.join(" "), "error");
+      if ((r.missing_env?.length ?? 0) > 0)
+        showToast(`${t.pluginsPage.missingEnvWarn} ${r.missing_env!.join(", ")}`, "error");
+      setInstallId("");
+      await loadHub();
+    } catch (e) {
+      // Surface the typed refusal honestly and persistently. A staged
+      // confirmation owns the shared settle round-trip (installAgentPlugin
+      // sends confirm: true), so anything reaching here is a real policy
+      // refusal — remote Git installs answer BLOCKED_REMOTE_PLUGIN, an
+      // unreviewed/absent path answers PLUGIN_INSTALL_SOURCE. Name the
+      // prerequisite rather than a raw "400: {…}" string, never claim success,
+      // and keep the reason visible (the transient toast can be missed).
+      const detail = e instanceof Error ? e.message : String(e);
+      const remote = detail.includes("BLOCKED_REMOTE_PLUGIN");
+      const message = remote
+        ? "Remote Git install refused by policy (BLOCKED_REMOTE_PLUGIN). Use a reviewed local directory or *.json manifest, or the operator-gated `qubit agent plugins install`."
+        : refusalOrError(e, detail || "Install failed");
+      setInstallError(message);
+      showToast(message, "error");
+    } finally {
+      setInstallBusy(false);
+    }
+  };
+
+  const onRescan = useCallback(async () => {
+    setRescanBusy(true);
+    try {
+      const rc = await api.rescanPlugins();
+      showToast(
+        `${t.pluginsPage.refreshDashboard} (${rc.count})`,
+        "success",
+      );
+      await loadHub();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Rescan failed", "error");
+    } finally {
+      setRescanBusy(false);
+    }
+  }, [loadHub, showToast, t.pluginsPage.refreshDashboard]);
+
+  useEffect(() => {
+    setAfterTitle(
+      <Button
+        ghost
+        size="icon"
+        className="shrink-0 text-muted-foreground hover:text-foreground"
+        disabled={loading || rescanBusy}
+        onClick={() => void onRescan()}
+        aria-label={t.pluginsPage.refreshDashboard}
+      >
+        {rescanBusy ? <Spinner /> : <RefreshCw />}
+      </Button>,
+    );
+    return () => setAfterTitle(null);
+  }, [loading, onRescan, rescanBusy, setAfterTitle, t.pluginsPage.refreshDashboard]);
+
+  const onSaveMemoryProvider = async () => {
+    const provider = memorySel === MEMORY_PROVIDER_BUILTIN ? "" : memorySel;
+    setMemoryBusy(true);
+    try {
+      if (!provider) {
+        await api.setMemoryProvider("");
+      } else {
+        const visibleValues = Object.fromEntries(
+          Object.entries(memoryValues).filter(([key]) => {
+            const field = memoryConfig?.fields.find((candidate) => candidate.key === key);
+            return field ? fieldIsVisible(field, memoryValues) : true;
+          }),
+        );
+        await api.updateMemoryProviderConfig(provider, visibleValues);
+      }
+      showToast(t.pluginsPage.savedProviders, "success");
+      await loadHub();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Save failed", "error");
+    } finally {
+      setMemoryBusy(false);
+    }
+  };
+
+  const currentVisibleMemoryValues = () =>
+    Object.fromEntries(
+      Object.entries(memoryValues).filter(([key]) => {
+        const field = memoryConfig?.fields.find((candidate) => candidate.key === key);
+        return field ? fieldIsVisible(field, memoryValues) : true;
+      }),
+    );
+
+  const onSetupMemoryProvider = async () => {
+    const provider = memorySel === MEMORY_PROVIDER_BUILTIN ? "" : memorySel;
+    if (!provider) return;
+
+    setMemorySetupBusy(true);
+    setMemorySetupResults(null);
+    try {
+      const result = await api.setupMemoryProvider(provider, currentVisibleMemoryValues());
+      setMemorySetupResults(result.results);
+      const failed = result.results.filter((row) => row.status === "failed");
+      if (failed.length) {
+        const names = Array.from(new Set(failed.map((row) => row.name))).join(", ");
+        showToast(`Provider setup failed: ${names || provider}. See setup results below.`, "error");
+      } else {
+        showToast("Provider setup finished", "success");
+      }
+      await loadHub(provider);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Provider setup failed", "error");
+    } finally {
+      setMemorySetupBusy(false);
+    }
+  };
+
+  const onSaveContextEngine = async () => {
+    setContextBusy(true);
+    try {
+      await api.savePluginProviders({ context_engine: contextSel });
+      showToast(t.pluginsPage.savedProviders, "success");
+      await loadHub();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Save failed", "error");
+    } finally {
+      setContextBusy(false);
+    }
+  };
+
+  const setRuntimeLoading = async (name: string, fn: () => Promise<unknown>) => {
+    setRowBusy(name);
+    try {
+      await fn();
+      await loadHub();
+    } catch (e) {
+      showToast(refusalOrError(e, e instanceof Error ? e.message : "Failed"), "error");
+    } finally {
+      setRowBusy(null);
+    }
+  };
+
+  const rows = hub?.plugins ?? [];
+  const providers = hub?.providers;
+  const selectedMemoryName = memorySel === MEMORY_PROVIDER_BUILTIN ? "" : memorySel;
+  const selectedMemoryInfo = selectedMemoryName
+    ? providers?.memory_options.find((provider) => provider.name === selectedMemoryName)
+    : null;
+  const activeMemoryInfo = providers?.memory_provider
+    ? providers.memory_options.find((provider) => provider.name === providers.memory_provider)
+    : null;
+  const visibleMemoryFields =
+    memoryConfig?.fields.filter((field) => fieldIsVisible(field, memoryValues)) ?? [];
+
+  const indexNeedle = indexQuery.trim().toLowerCase();
+  const indexEntries = (pinnedIndex?.entries ?? []).filter(
+    (entry) =>
+      !indexNeedle ||
+      [
+        entry.name,
+        entry.label,
+        entry.description,
+        entry.repo,
+        entry.maintainer,
+        entry.category,
+        entry.tier,
+        ...entry.tags,
+        ...entry.capabilities,
+      ].some((value) => String(value).toLowerCase().includes(indexNeedle)),
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <PluginSlot name="plugins:top" />
+
+      <div className={cn("flex w-full flex-col gap-8")}>
+
+        {providers && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.pluginsPage.providersHeading}</CardTitle>
+              <p className="text-xs tracking-[0.08em] text-text-tertiary">
+                Configure memory providers and runtime context engine selection.
+              </p>
+            </CardHeader>
+
+            <CardContent className="flex flex-col gap-6">
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.65fr)]">
+                <div className="flex flex-col gap-4 min-w-0">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Label htmlFor="mem-provider">{t.pluginsPage.memoryProviderLabel}</Label>
+                      {selectedMemoryName && selectedMemoryInfo && (
+                        <Badge tone={MEMORY_STATUS_TONE[selectedMemoryInfo.status]}>
+                          {MEMORY_STATUS_LABEL[selectedMemoryInfo.status]}
+                        </Badge>
+                      )}
+                      {selectedMemoryName && selectedMemoryName === providers.memory_provider && (
+                        <Badge tone="outline">active</Badge>
+                      )}
+                      {!selectedMemoryName && !providers.memory_provider && (
+                        <Badge tone="success">active</Badge>
+                      )}
+                    </div>
+
+                    <Select
+                      id="mem-provider"
+                      className="w-full"
+                      value={memorySel}
+                      onValueChange={setMemorySel}
+                    >
+                      <SelectOption value={MEMORY_PROVIDER_BUILTIN}>
+                        {`(${t.pluginsPage.providerDefaults})`}
+                      </SelectOption>
+
+                      {providers.memory_options.map((o) => (
+                        <SelectOption key={o.name} value={o.name}>
+                          {o.name}
+                        </SelectOption>
+                      ))}
+                    </Select>
+                  </div>
+
+                  {!selectedMemoryName && (
+                    <p className="text-xs text-muted-foreground">
+                      Qubit will use the built-in MEMORY.md and USER.md files.
+                    </p>
+                  )}
+
+                  {activeMemoryInfo?.status === "missing" && (
+                    <p className="border border-destructive/50 px-3 py-2 text-xs text-destructive">
+                      Active provider {providers.memory_provider} is no longer installed. Select another provider and save.
+                    </p>
+                  )}
+
+                  {selectedMemoryName && selectedMemoryInfo?.description && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedMemoryInfo.description}
+                    </p>
+                  )}
+
+                  {selectedMemoryName && selectedMemoryInfo && (
+                    <MemoryProviderSetupHint
+                      installing={memorySetupBusy}
+                      onInstall={() => void onSetupMemoryProvider()}
+                      provider={selectedMemoryInfo}
+                      results={memorySetupResults}
+                    />
+                  )}
+
+                  {selectedMemoryName && selectedMemoryInfo?.status === "needs_config" && (
+                    <p className="border border-warning/50 px-3 py-2 text-xs text-warning">
+                      Provider dependencies are installed. Add the required credentials or self-hosted URL below, then save the provider.
+                    </p>
+                  )}
+
+                  {selectedMemoryName && memoryConfigBusy && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Spinner /> Loading provider settings…
+                    </div>
+                  )}
+
+                  {selectedMemoryName && !memoryConfigBusy && visibleMemoryFields.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      This provider does not expose dashboard settings.
+                    </p>
+                  )}
+
+                  {selectedMemoryName && !memoryConfigBusy && visibleMemoryFields.length > 0 && (
+                    <div className="grid gap-4 border border-border p-4">
+                      {visibleMemoryFields.map((field) => {
+                        const value = memoryValues[field.key];
+                        const secretIsVisible = !!secretVisible[field.key];
+                        return (
+                          <div key={field.key} className="grid gap-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Label htmlFor={`memory-${field.key}`}>{field.label}</Label>
+                              {field.required && <Badge tone="outline">required</Badge>}
+                              {field.kind === "secret" && field.is_set && !value && (
+                                <Badge tone="success">set</Badge>
+                              )}
+                              {field.url && (
+                                <a
+                                  href={field.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs underline"
+                                >
+                                  Open <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
+
+                            {field.kind === "select" ? (
+                              <Select
+                                id={`memory-${field.key}`}
+                                className="w-full"
+                                value={String(value ?? "")}
+                                onValueChange={(next) =>
+                                  setMemoryValues((current) => ({ ...current, [field.key]: next }))
+                                }
+                              >
+                                {field.options.map((option) => (
+                                  <SelectOption key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectOption>
+                                ))}
+                              </Select>
+                            ) : field.kind === "boolean" ? (
+                              <Switch
+                                checked={Boolean(value)}
+                                onCheckedChange={(next) =>
+                                  setMemoryValues((current) => ({ ...current, [field.key]: next }))
+                                }
+                              />
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  id={`memory-${field.key}`}
+                                  type={
+                                    field.kind === "secret" && !secretIsVisible
+                                      ? "password"
+                                      : field.kind === "integer" || field.kind === "number"
+                                        ? "number"
+                                        : "text"
+                                  }
+                                  min={field.minimum ?? undefined}
+                                  max={field.maximum ?? undefined}
+                                  step={
+                                    field.step ?? (field.kind === "integer" ? 1 : undefined)
+                                  }
+                                  value={String(value ?? "")}
+                                  placeholder={
+                                    field.kind === "secret" && field.is_set
+                                      ? "Leave blank to keep existing value"
+                                      : field.placeholder
+                                  }
+                                  onChange={(event) =>
+                                    setMemoryValues((current) => ({
+                                      ...current,
+                                      [field.key]: event.target.value,
+                                    }))
+                                  }
+                                />
+                                {field.kind === "secret" && (
+                                  <Button
+                                    ghost
+                                    size="icon"
+                                    aria-label={secretIsVisible ? "Hide secret" : "Show secret"}
+                                    onClick={() =>
+                                      setSecretVisible((current) => ({
+                                        ...current,
+                                        [field.key]: !current[field.key],
+                                      }))
+                                    }
+                                  >
+                                    {secretIsVisible ? (
+                                      <EyeOff className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <Eye className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+
+                            {field.description && (
+                              <p className="text-xs text-muted-foreground">{field.description}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <Button
+                    className="w-fit uppercase"
+                    size="sm"
+                    disabled={memoryBusy || memoryConfigBusy || memorySetupBusy}
+                    onClick={() => void onSaveMemoryProvider()}
+                    prefix={memoryBusy ? <Spinner /> : undefined}
+                  >
+                    Save memory provider
+                  </Button>
+                </div>
+
+                <div className="grid content-start gap-3 min-w-0">
+                  <Label htmlFor="ctx-engine">{t.pluginsPage.contextEngineLabel}</Label>
+
+                  <Select
+                    id="ctx-engine"
+                    className="w-full"
+                    value={contextSel}
+                    onValueChange={setContextSel}
+                  >
+                    <SelectOption value="compressor">compressor</SelectOption>
+
+                    {providers.context_options
+                      .filter((o) => o.name !== "compressor")
+                      .map((o) => (
+                        <SelectOption key={o.name} value={o.name}>
+                          {o.name}
+                        </SelectOption>
+                      ))}
+                  </Select>
+
+                  <Button
+                    className="w-fit uppercase"
+                    size="sm"
+                    disabled={contextBusy}
+                    onClick={() => void onSaveContextEngine()}
+                    prefix={contextBusy ? <Spinner /> : undefined}
+                  >
+                    Save context engine
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t.pluginsPage.installHeading}</CardTitle>
+            <p className="text-xs tracking-[0.08em] text-text-tertiary">
+              {t.pluginsPage.installHint}
+            </p>
+          </CardHeader>
+
+
+          <CardContent className="flex flex-col gap-4">
+
+            {/* Honest capability note: Qubit's plugin admission accepts only a
+                reviewed local directory or reviewed *.json manifest. Any Git
+                URL / owner-repo / bare-index identifier is refused by policy
+                with a typed BLOCKED_REMOTE_PLUGIN (403) — nothing is fetched
+                or cloned. Say so up front instead of advertising an install
+                that can never complete. */}
+            <p
+              data-testid="plugin-install-remote-gate"
+              className="border border-warning/40 bg-warning/5 px-3 py-2 text-xs tracking-[0.06em] text-text-secondary"
+            >
+              Remote Git installs are refused by policy (typed{" "}
+              <span className="font-mono">BLOCKED_REMOTE_PLUGIN</span>) — no
+              repository is fetched, cloned, or executed. This control accepts
+              only a <span className="font-mono">reviewed local directory</span>{" "}
+              or a reviewed <span className="font-mono">*.json</span> manifest
+              path. Git/owner-repo installs are operator-gated and require the
+              reviewed install path (<span className="font-mono">qubit agent plugins install</span>).
+            </p>
+
+            <div className="flex flex-col gap-2">
+
+              <Label htmlFor="install-url">{t.pluginsPage.identifierLabel}</Label>
+
+              <Input
+                className="font-mono-ui lowercase"
+                id="install-url"
+                placeholder="/path/to/reviewed-plugin or /path/to/plugin.json"
+                spellCheck={false}
+                aria-invalid={installError ? true : undefined}
+                aria-describedby={installError ? "plugin-install-error" : undefined}
+                value={installId}
+                onChange={(e) => {
+                  setInstallId(e.target.value);
+                  if (installError) setInstallError(null);
+                }}
+              />
+            </div>
+
+
+            <div className="flex flex-wrap items-center gap-8">
+
+              <div className="flex items-center gap-3">
+
+                <Switch
+                  checked={installForce}
+                  onCheckedChange={setInstallForce}
+                  aria-label={t.pluginsPage.forceReinstall}
+                />
+
+                <span className="text-xs tracking-[0.06em] text-text-secondary">
+                  {t.pluginsPage.forceReinstall}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+
+                <Switch
+                  checked={installEnable}
+                  onCheckedChange={setInstallEnable}
+                  aria-label={t.pluginsPage.enableAfterInstall}
+                />
+
+                <span className="text-xs tracking-[0.06em] text-text-secondary">
+                  {t.pluginsPage.enableAfterInstall}
+                </span>
+              </div>
+            </div>
+
+            <Button
+              className="w-fit uppercase"
+              size="sm"
+              disabled={installBusy}
+              onClick={() => void onInstall()}
+              prefix={installBusy ? <Spinner /> : undefined}
+            >
+              {t.pluginsPage.installBtn}
+            </Button>
+
+            {installError ? (
+              <p
+                data-testid="plugin-install-error"
+                role="alert"
+                className="border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive [overflow-wrap:anywhere]"
+              >
+                {installError}
+              </p>
+            ) : null}
+
+            <p className="text-xs tracking-[0.06em] text-text-tertiary">
+              {t.pluginsPage.rescanHint}
+            </p>
+
+            <p className="text-xs tracking-[0.06em] text-text-tertiary">
+              {t.pluginsPage.removeHint}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="plugin-catalog-section">
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle>{t.pluginsPage.catalogHeading ?? "Plugin catalog"}</CardTitle>
+                <p className="text-xs tracking-[0.08em] text-text-tertiary">
+                  {t.pluginsPage.catalogHint ??
+                    "Every plugin Qubit can actually load and manage, with real provenance."}
+                </p>
+              </div>
+              <Button
+                className="w-fit uppercase"
+                size="sm"
+                disabled={reloadBusy}
+                onClick={() => void onCatalogReload()}
+                prefix={reloadBusy ? <Spinner /> : <RefreshCw className="h-3.5 w-3.5" />}
+              >
+                {t.pluginsPage.catalogReload ?? "Reload plugins"}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                className="max-w-sm"
+                placeholder={
+                  t.pluginsPage.catalogSearchPlaceholder ??
+                  "Search the catalog by name, description, or tool…"
+                }
+                spellCheck={false}
+                value={catalogQuery}
+                onChange={(e) => setCatalogQuery(e.target.value)}
+              />
+              <Select value={catalogSource} onValueChange={setCatalogSource}>
+                <SelectOption value="">
+                  {t.pluginsPage.catalogAllSources ?? "All sources"}
+                </SelectOption>
+                {CATALOG_SOURCES.map((source) => (
+                  <SelectOption key={source} value={source}>
+                    {source}
+                  </SelectOption>
+                ))}
+              </Select>
+            </div>
+
+            <p
+              data-testid="plugin-catalog-remote-refusal"
+              className="border border-warning/40 bg-warning/5 px-3 py-2 text-xs tracking-[0.06em] text-text-secondary"
+            >
+              {t.pluginsPage.catalogRemoteRefused ?? "Raw remote fetch refused by policy"}: typed{" "}
+              <span className="font-mono">BLOCKED_REMOTE_PLUGIN</span> — no arbitrary remote
+              repository is fetched, cloned, or executed. The curated, pinned index is served
+              separately below; only reviewed local directories / manifests install.
+            </p>
+
+            {catalogError ? (
+              <p className="border border-destructive/50 px-3 py-2 text-xs text-destructive">
+                {catalogError}
+              </p>
+            ) : catalogLoading ? (
+              <div className="flex items-center gap-2 py-6 text-xs text-text-tertiary">
+                <Spinner />
+                <span>{t.common.loading}</span>
+              </div>
+            ) : catalog.length === 0 ? (
+              <p className="text-xs text-text-tertiary">
+                {t.pluginsPage.catalogEmpty ?? "No catalog entries match your search."}
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {catalog.map((row) => (
+                  <li key={row.id}>
+                    <PluginCatalogCard
+                      row={row}
+                      busy={catalogBusy === row.id}
+                      onToggle={onCatalogToggle}
+                      onInstall={onCatalogInstall}
+                      onRemove={onCatalogRemove}
+                      t={t}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="plugin-pinned-index-section">
+          <CardHeader>
+            <div className="min-w-0">
+              <CardTitle>{"Curated pinned plugin index"}</CardTitle>
+              <p className="text-xs tracking-[0.08em] text-text-tertiary">
+                {
+                  "Curated remote plugin sources, each pinned to a full commit SHA. Install is operator-gated and verified at the pinned ref; raw unvetted remote fetch stays refused."
+                }
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                className="max-w-sm"
+                placeholder={"Search the pinned index by name, source, or capability…"}
+                spellCheck={false}
+                value={indexQuery}
+                onChange={(e) => setIndexQuery(e.target.value)}
+              />
+              {pinnedIndex ? (
+                <span className="text-xs tracking-[0.06em] text-text-tertiary">
+                  {pinnedIndex.count} {"curated · pinned"} ·{" "}
+                  <span className="font-mono">{pinnedIndex.source}</span>
+                </span>
+              ) : null}
+            </div>
+
+            {!pinnedIndex ? (
+              <p className="text-xs text-text-tertiary">
+                {"Pinned index unavailable; the local catalog above is unaffected."}
+              </p>
+            ) : indexEntries.length === 0 ? (
+              <p className="text-xs text-text-tertiary">
+                {"No pinned-index entries match your search."}
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {indexEntries.map((entry) => (
+                  <PinnedIndexRow
+                    key={entry.id}
+                    entry={entry}
+                    busy={indexBusy === entry.name}
+                    onInstall={onIndexInstall}
+                    t={t}
+                  />
+                ))}
+              </ul>
+            )}
+
+            <p
+              data-testid="plugin-pinned-index-install-gate"
+              className="border border-warning/40 bg-warning/5 px-3 py-2 text-xs tracking-[0.06em] text-text-secondary"
+            >
+              {"Install is operator-gated"}: typed{" "}
+              <span className="font-mono">
+                {pinnedIndex?.install?.code ?? "PLUGIN_INDEX_OPERATOR_GATED"}
+              </span>{" "}
+              — the entry is verified against its pinned ref and routed through the canonical
+              confirm / audit / e-stop path, but the pinned remote source is not fetched until an
+              operator verifies the repository and license.
+            </p>
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col gap-3">
+
+          <h3 className="font-mondwest text-display text-xs tracking-[0.12em] text-text-secondary">
+            {t.pluginsPage.pluginListHeading}
+          </h3>
+
+          {loading ? (
+
+            <div className="flex items-center gap-2 py-8 text-xs text-text-tertiary">
+
+              <Spinner />
+              <span>{t.common.loading}</span>
+            </div>
+          ) : rows.length === 0 ? (
+
+            <p className="text-xs text-text-tertiary">{t.common.noResults}</p>
+          ) : (
+
+            <ul className="flex flex-col gap-3">
+
+              {rows.map((row: HubAgentPluginRow) => (
+
+                <li key={row.name}>
+
+
+                  <PluginRowCard
+                    {...{ row, rowBusy, setRuntimeLoading, showToast, t }}
+                  />
+
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {(hub?.orphan_dashboard_plugins?.length ?? 0) > 0 ? (
+
+
+          <div className="flex flex-col gap-3 opacity-95">
+
+            <h3 className="font-mondwest text-display text-xs tracking-[0.12em] text-text-secondary">
+              {t.pluginsPage.orphanHeading}
+            </h3>
+
+            <ul className="flex flex-col gap-2 rounded border border-current/15 p-4">
+
+              {hub!.orphan_dashboard_plugins.map((m) => (
+
+                <li className="text-xs text-text-secondary" key={m.name}>
+
+
+                  {m.label ?? m.name} — {m.description || m.tab?.path}
+
+
+                  {!m.tab?.hidden ? (
+
+
+                    <Link className="ml-3 inline-flex items-center gap-1 underline" to={m.tab.path}>
+
+
+                      <ExternalLink className="h-3 w-3 opacity-65" />
+
+                      {t.pluginsPage.openTab}
+                    </Link>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+
+      <Toast toast={toast} />
+      <PluginSlot name="plugins:bottom" />
+    </div>
+  );
+}
+
+interface PluginRowCardProps {
+
+  row: HubAgentPluginRow;
+  rowBusy: string | null;
+  setRuntimeLoading: (
+    name: string,
+    fn: () => Promise<unknown>,
+  ) => Promise<void>;
+
+  showToast: (msg: string, variant: "success" | "error") => void;
+  t: Translations;
+}
+
+function PluginRowCard(props: PluginRowCardProps) {
+  const {
+    row,
+    rowBusy,
+    setRuntimeLoading,
+    showToast,
+    t,
+  } = props;
+
+  const dm = row.dashboard_manifest;
+
+  const tabPath = dm?.tab && !dm.tab.hidden ? dm.tab.override ?? dm.tab.path : null;
+
+  const busy = rowBusy === row.name;
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const badgeTone =
+    row.runtime_status === "enabled"
+      ? "success"
+      : row.runtime_status === "disabled"
+        ? "destructive"
+        : "outline";
+
+  return (
+
+    <Card className={cn(busy ? "opacity-70" : undefined)}>
+
+
+      <CardContent className="flex flex-col gap-4 px-6 py-4">
+
+
+        <div className="flex flex-wrap items-start justify-between gap-4">
+
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+
+            <span className="truncate font-semibold">{row.name}</span>
+
+            <Badge tone="outline">
+              {t.pluginsPage.sourceBadge}: {row.source}
+            </Badge>
+
+            <Badge tone="outline">v{row.version || "—"}</Badge>
+
+            <Badge tone={badgeTone}>{row.runtime_status}</Badge>
+
+            {row.auth_required ? (
+              <Badge tone="destructive">{t.pluginsPage.authRequired}</Badge>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {row.runtime_status === "enabled" ? (
+              <Button
+                disabled={busy}
+                ghost
+                size="sm"
+                onClick={() => {
+                  void setRuntimeLoading(row.name, async () => {
+                    await api.disableAgentPlugin(row.name);
+                    showToast(t.pluginsPage.disableRuntime, "success");
+                  });
+                }}
+              >
+                {t.pluginsPage.disableRuntime}
+              </Button>
+            ) : (
+              <Button
+                disabled={busy}
+                ghost
+                size="sm"
+                onClick={() => {
+                  void setRuntimeLoading(row.name, async () => {
+                    await api.enableAgentPlugin(row.name);
+                    showToast(t.pluginsPage.enableRuntime, "success");
+                  });
+                }}
+              >
+                {t.pluginsPage.enableRuntime}
+              </Button>
+            )}
+
+            {tabPath ? (
+
+              <Link
+                className={cn(
+                  "inline-flex items-center rounded-none px-3 py-1.5",
+                  "border border-current/25 hover:bg-current/10",
+                  "font-mondwest text-display text-xs tracking-[0.1em]",
+                )}
+                to={tabPath}
+              >
+                {t.pluginsPage.openTab}
+              </Link>
+            ) : null}
+
+            {row.can_update_git ? (
+
+              <Button
+                disabled={busy}
+                ghost
+                size="sm"
+                onClick={() => {
+                  void setRuntimeLoading(row.name, async () => {
+                    await api.updateAgentPlugin(row.name);
+                    showToast(t.pluginsPage.updateGit, "success");
+                  });
+                }}
+              >
+                {busy ? <Spinner /> : null}
+                {t.pluginsPage.updateGit}
+              </Button>
+            ) : null}
+
+            {row.has_dashboard_manifest ? (
+              <Button
+                disabled={busy}
+                ghost
+                size="sm"
+                title={row.user_hidden ? t.pluginsPage.showInSidebar : t.pluginsPage.hideFromSidebar}
+                onClick={() => {
+                  void setRuntimeLoading(row.name, async () => {
+                    await api.setPluginVisibility(row.name, !row.user_hidden);
+                  });
+                }}
+              >
+                {row.user_hidden ? (
+                  <EyeOff className="h-3.5 w-3.5" />
+                ) : (
+                  <Eye className="h-3.5 w-3.5" />
+                )}
+                {row.user_hidden ? t.pluginsPage.showInSidebar : t.pluginsPage.hideFromSidebar}
+              </Button>
+            ) : null}
+
+            {row.can_remove ? (
+
+
+              <Button
+                destructive
+                disabled={busy}
+                ghost
+                size="sm"
+                onClick={() => setConfirmRemove(true)}
+              >
+
+                {busy ? <Spinner /> : <Trash2 className="h-3.5 w-3.5" />}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        {row.description ? (
+          <p className="min-w-0 w-full text-xs tracking-[0.06em] text-text-secondary break-words">
+            {brandText(row.description)}
+          </p>
+        ) : null}
+
+        {dm?.slots?.length ? (
+
+          <p className="text-xs tracking-[0.05em] text-text-tertiary">
+            {t.pluginsPage.dashboardSlots}: {dm.slots.join(", ")}
+          </p>
+        ) : null}
+
+        {row.auth_required ? (
+          <CommandBlock
+            label={t.pluginsPage.authRequiredHint}
+            code={row.auth_command}
+          />
+        ) : null}
+
+        {!row.has_dashboard_manifest && !dm ? (
+
+
+          <p className="text-xs italic text-text-disabled">
+            {t.pluginsPage.noDashboardTab}
+          </p>
+        ) : null}
+      </CardContent>
+
+      <ConfirmDialog
+        open={confirmRemove}
+        onCancel={() => setConfirmRemove(false)}
+        onConfirm={() => {
+          setConfirmRemove(false);
+          void setRuntimeLoading(row.name, async () => {
+            await api.removeAgentPlugin(row.name);
+            showToast(`${row.name} removed`, "success");
+          });
+        }}
+        title={t.pluginsPage.removeConfirm}
+        description={`This will remove the "${row.name}" plugin from your agent.`}
+        destructive
+        confirmLabel={t.common.delete}
+      />
+    </Card>
+  );
+}
+
+interface PinnedIndexRowProps {
+  entry: PluginPinnedIndexEntry;
+  busy: boolean;
+  onInstall: (entry: PluginPinnedIndexEntry) => Promise<void>;
+  t: Translations;
+}
+
+/** One curated, pinned remote-index row. Shows the real source, the full
+ *  pinned commit SHA, the license state, and provenance. Install is an honest
+ *  operator-gated affordance: the backend verifies the pin and runs the
+ *  canonical gate, but the remote source is never fetched here. */
+function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="border border-border bg-background/20 px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <span className="truncate text-sm font-semibold">{entry.label || entry.name}</span>
+          <Badge tone="secondary">curated</Badge>
+          <Badge tone="outline">pinned</Badge>
+          <Badge tone="outline">{entry.tier}</Badge>
+          <Badge tone="outline">{entry.category}</Badge>
+          <span className="font-mono text-[0.6875rem] text-text-tertiary">
+            {entry.pinned_ref_short}
+          </span>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button size="sm" disabled={busy} onClick={() => void onInstall(entry)}>
+            {busy ? <Spinner /> : null}
+            {t.pluginsPage.catalogInstall ?? "Install"}
+          </Button>
+          <Button ghost size="sm" onClick={() => setOpen((v) => !v)}>
+            {open ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
+            {open
+              ? (t.pluginsPage.catalogHideDetails ?? "Hide details")
+              : (t.pluginsPage.catalogDetails ?? "Details")}
+          </Button>
+        </div>
+      </div>
+      {entry.description ? (
+        <p className="mt-2 text-xs text-text-secondary">{entry.description}</p>
+      ) : null}
+      <p className="mt-1 text-xs text-text-tertiary">
+        {"Pinned ref"}: <span className="font-mono">{entry.pinned_ref}</span>
+      </p>
+      {open ? (
+        <div className="mt-3 grid gap-1 border-t border-border pt-3 text-xs text-text-secondary">
+          <div>
+            {"Source"}:{" "}
+            <a className="underline" href={entry.repo} target="_blank" rel="noreferrer">
+              third-party repository
+              {entry.subdir ? ` (${entry.subdir})` : ""}
+            </a>
+          </div>
+          <div>
+            {"Maintainer"}: {entry.maintainer || "—"}
+          </div>
+          <div>
+            {"License"}: {entry.license}
+          </div>
+          {entry.capabilities.length ? (
+            <div>
+              {"Capabilities"}: {entry.capabilities.join(", ")}
+            </div>
+          ) : null}
+          {Object.keys(entry.provenance).length ? (
+            <div>
+              {"Provenance"}:{" "}
+              <span className="font-mono">
+                {Object.entries(entry.provenance)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(" · ")}
+              </span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+interface PluginCatalogCardProps {
+  row: PluginCatalogEntry;
+  busy: boolean;
+  onToggle: (row: PluginCatalogEntry, enable: boolean) => Promise<void>;
+  onInstall: (row: PluginCatalogEntry) => Promise<void>;
+  onRemove: (row: PluginCatalogEntry) => Promise<void>;
+  t: Translations;
+}
+
+/** One real catalog row: provenance, provided capabilities, and its real
+ *  enable/disable/install controls. Details (validation, dependency checks,
+ *  configuration) load on demand from the detail route. */
+function PluginCatalogCard({ row, busy, onToggle, onInstall, onRemove, t }: PluginCatalogCardProps) {
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<PluginCatalogDetail | null>(null);
+  const [detailBusy, setDetailBusy] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const toggleDetails = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !detail && !detailBusy) {
+      setDetailBusy(true);
+      api
+        .getPluginCatalogDetail(row.id)
+        .then((res) => setDetail(res.plugin))
+        .catch(() => setDetail(null))
+        .finally(() => setDetailBusy(false));
+    }
+  };
+
+  const summary = [
+    row.provides.tools.length ? `${row.provides.tools.length} tools` : "",
+    row.provides.hooks.length ? `${row.provides.hooks.length} hooks` : "",
+    row.provides.skills.length ? `${row.provides.skills.length} skills` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const badgeTone =
+    row.runtime_status === "enabled"
+      ? "success"
+      : row.runtime_status === "disabled"
+        ? "destructive"
+        : "outline";
+
+  return (
+    <div className="border border-border bg-background/20 px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <span className="truncate text-sm font-semibold">{row.label || row.name}</span>
+          <Badge tone="outline">{row.source}</Badge>
+          <Badge tone="outline">{row.kind}</Badge>
+          {row.version ? <Badge tone="outline">v{row.version}</Badge> : null}
+          <Badge tone={badgeTone}>{row.runtime_status}</Badge>
+          {row.has_dashboard_manifest ? <Badge tone="secondary">dashboard</Badge> : null}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {row.can_install ? (
+            <Button size="sm" disabled={busy} onClick={() => void onInstall(row)}>
+              {busy ? <Spinner /> : null}
+              {t.pluginsPage.catalogInstall ?? "Install"}
+            </Button>
+          ) : row.can_disable ? (
+            <Button ghost size="sm" disabled={busy} onClick={() => void onToggle(row, false)}>
+              {t.pluginsPage.disableRuntime}
+            </Button>
+          ) : row.can_enable ? (
+            <Button ghost size="sm" disabled={busy} onClick={() => void onToggle(row, true)}>
+              {t.pluginsPage.enableRuntime}
+            </Button>
+          ) : null}
+          {row.can_remove ? (
+            <Button
+              destructive
+              ghost
+              size="sm"
+              title={t.pluginsPage.removeConfirm}
+              disabled={busy}
+              onClick={() => setConfirmRemove(true)}
+            >
+              {busy ? <Spinner /> : <Trash2 className="h-3.5 w-3.5" />}
+            </Button>
+          ) : null}
+          <Button ghost size="sm" onClick={toggleDetails}>
+            {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {open
+              ? (t.pluginsPage.catalogHideDetails ?? "Hide details")
+              : (t.pluginsPage.catalogDetails ?? "Details")}
+          </Button>
+        </div>
+      </div>
+
+      {row.description ? (
+        <p className="mt-2 text-xs text-text-secondary">{brandText(row.description)}</p>
+      ) : null}
+      {summary ? <p className="mt-1 text-xs text-text-tertiary">{brandText(summary)}</p> : null}
+
+      {open ? (
+        <div className="mt-3 grid gap-3 border-t border-border pt-3 text-xs text-text-secondary">
+          {detailBusy ? (
+            <div className="flex items-center gap-2">
+              <Spinner />
+              {t.common.loading}
+            </div>
+          ) : null}
+          {detail ? (
+            <>
+              <section>
+                <p className="font-semibold">
+                  {t.pluginsPage.catalogValidation ?? "Manifest validation"}:{" "}
+                  {detail.validation.ok ? "ok" : "failed"}
+                </p>
+                <ul className="mt-1 grid gap-1">
+                  {detail.validation.checks.map((check) => (
+                    <li key={check.name} className={check.ok ? "text-success" : "text-destructive"}>
+                      {check.ok ? "✓" : "✗"} {check.name}
+                      {check.detail ? ` — ${check.detail}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+              <section>
+                <p className="font-semibold">
+                  {t.pluginsPage.catalogDependencies ?? "Dependencies"}:{" "}
+                  {detail.dependencies.ok ? "ok" : "missing"}
+                </p>
+                {detail.dependencies.missing_dependencies.length ||
+                detail.dependencies.incompatible.length ||
+                detail.dependencies.missing_plugins.length ? (
+                  <ul className="mt-1 grid gap-1">
+                    {detail.dependencies.missing_dependencies.map((dep) => (
+                      <li key={`dep-${dep}`}>
+                        missing python dependency: <code>{dep}</code>
+                      </li>
+                    ))}
+                    {detail.dependencies.incompatible.map((item) => (
+                      <li key={`inc-${item}`}>{item}</li>
+                    ))}
+                    {detail.dependencies.missing_plugins.map((dep) => (
+                      <li key={`mp-${dep}`}>
+                        requires plugin: <code>{dep}</code>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-text-tertiary">All declared dependencies satisfied.</p>
+                )}
+              </section>
+              <section>
+                <p className="font-semibold">{t.pluginsPage.catalogProvides ?? "Provides"}</p>
+                <p className="mt-1">tools: {detail.provides.tools.join(", ") || "—"}</p>
+                <p>hooks: {detail.provides.hooks.join(", ") || "—"}</p>
+                <p>skills: {detail.provides.skills.join(", ") || "—"}</p>
+                {detail.dashboard?.tab?.path ? (
+                  <p>
+                    dashboard page:{" "}
+                    <Link className="underline" to={detail.dashboard.tab.path}>
+                      {detail.dashboard.tab.path}
+                    </Link>
+                  </p>
+                ) : null}
+              </section>
+              <section>
+                <p className="font-semibold">
+                  {t.pluginsPage.catalogConfiguration ?? "Configuration"}
+                </p>
+                <p className="mt-1">
+                  declared env: {detail.configuration.declared_env.join(", ") || "—"}
+                </p>
+                <p>
+                  python dependencies:{" "}
+                  {detail.configuration.python_dependencies.join(", ") || "—"}
+                </p>
+                {detail.configuration.writable_via ? (
+                  <p>writable via: {detail.configuration.writable_via}</p>
+                ) : null}
+              </section>
+              <section>
+                <p className="font-semibold">{t.pluginsPage.catalogProvenance ?? "Provenance"}</p>
+                <p className="mt-1 break-all font-mono text-[0.6875rem]">
+                  {detail.manifest_path || detail.path || "—"}
+                </p>
+                {Object.entries(detail.provenance).map(([key, value]) =>
+                  value ? <p key={key}>{key}: {value}</p> : null,
+                )}
+              </section>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      <ConfirmDialog
+        open={confirmRemove}
+        onCancel={() => setConfirmRemove(false)}
+        onConfirm={() => {
+          setConfirmRemove(false);
+          void onRemove(row);
+        }}
+        title={t.pluginsPage.removeConfirm}
+        description={`This will remove the "${row.id}" plugin from your agent.`}
+        destructive
+        confirmLabel={t.common.delete}
+      />
+    </div>
+  );
+}

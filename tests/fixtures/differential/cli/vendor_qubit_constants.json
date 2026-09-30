@@ -1,0 +1,28 @@
+{
+  "command": null,
+  "expected": {},
+  "family": "cli",
+  "fixture_id": "cli.vendor.qubit_constants",
+  "hermes": {
+    "path": "qubit_constants.py:1",
+    "symbol": "qubit_constants"
+  },
+  "normalizers": [],
+  "notes": "Vendor-parity behavioral probe (B1): executes the vendored module qubit_constants through qubit_runtime.ensure_path() and compares the behavioral descriptor against the pinned reference root. Never PASS on byte identity alone; QUBIT_DIFFERENTIAL_VENDOR_REF_ROOT unset => OPERATOR_ONLY.",
+  "openclaw": {
+    "path": null,
+    "symbol": null
+  },
+  "qubit": {
+    "approval": null,
+    "caller": "ensure_path",
+    "path": "voicebridge/qubit_runtime.py:237"
+  },
+  "request": {
+    "kind": "vendor",
+    "module": "qubit_constants",
+    "symbol": "get_qubit_home"
+  },
+  "schema_version": 1,
+  "transport": "vendor"
+}

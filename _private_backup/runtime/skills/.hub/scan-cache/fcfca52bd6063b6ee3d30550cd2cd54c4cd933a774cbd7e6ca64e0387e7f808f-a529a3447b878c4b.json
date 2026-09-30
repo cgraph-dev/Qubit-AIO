@@ -1,0 +1,34 @@
+{
+  "bundle_hash": "sha256:fcfca52bd6063b6ee3d30550cd2cd54c4cd933a774cbd7e6ca64e0387e7f808f",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/clip",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 45,
+      "match": "pip install git+https://github.com/openai/CLIP.git",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 46,
+      "match": "pip install torch torchvision ftfy regex tqdm",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:47.213616+00:00",
+  "summary": "clip: safe \u2014 2 finding(s) in supply_chain",
+  "fresh": true
+}
