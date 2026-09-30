@@ -3,7 +3,7 @@
  * one tab per bot; a second open refocuses the existing tab.
  */
 
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@qubit/plugin-sdk'
 
 import { botSelectionKey } from './data'
 import { botsText } from './i18n'

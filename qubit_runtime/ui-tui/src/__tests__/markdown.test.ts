@@ -1,7 +1,7 @@
 import { PassThrough } from 'stream'
 
-import { Box, renderSync } from '@hermes/ink'
-import { stripAnsi } from '@hermes/shared/ansi'
+import { Box, renderSync } from '@qubit/ink'
+import { stripAnsi } from '@qubit/shared/ansi'
 import chalk from 'chalk'
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -339,7 +339,7 @@ describe('Md link labels', () => {
 
 describe('renderTable CJK width alignment', () => {
   it('column starts share the same display offset across CJK rows', async () => {
-    const { stringWidth } = await import('@hermes/ink')
+    const { stringWidth } = await import('@qubit/ink')
 
     const md = [
       '| 配置 | Config | 状态 |',

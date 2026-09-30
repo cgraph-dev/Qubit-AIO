@@ -2,7 +2,7 @@ import {
   buildHermesWebSocketUrl,
   type ModelOptionProvider,
   type ModelOptionsResult,
-} from "@hermes/shared";
+} from "@qubit/shared";
 
 import { dashboardServingProfile } from "./profile-bootstrap";
 

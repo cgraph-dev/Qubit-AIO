@@ -8,8 +8,8 @@
  * with.
  */
 
-import * as sdk from '@hermes/plugin-sdk'
-import { host } from '@hermes/plugin-sdk'
+import * as sdk from '@qubit/plugin-sdk'
+import { host } from '@qubit/plugin-sdk'
 
 import { $botMeta, botMetaKey, botOwner, persistBotMetaSnapshot } from './data'
 import { botsText } from './i18n'

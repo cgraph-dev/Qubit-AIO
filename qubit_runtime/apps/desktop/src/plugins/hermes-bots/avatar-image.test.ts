@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 const { request } = vi.hoisted(() => ({ request: vi.fn() }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return { atom, host: { request } }

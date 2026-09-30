@@ -9,9 +9,9 @@
  * it once on mount so a bot the user never opened still shows real state.
  */
 
-import { Codicon, host, useValue } from '@hermes/plugin-sdk'
-import type { RpcEvent } from '@hermes/plugin-sdk'
-import type { ProfileGroupRoute } from '@hermes/plugin-sdk'
+import { Codicon, host, useValue } from '@qubit/plugin-sdk'
+import type { RpcEvent } from '@qubit/plugin-sdk'
+import type { ProfileGroupRoute } from '@qubit/plugin-sdk'
 import { useEffect, useMemo } from 'react'
 
 import { $lastRoster } from './data'

@@ -10,7 +10,7 @@
  * touch stay below, in `group-panes.ts`.
  */
 
-import * as sdk from '@hermes/plugin-sdk'
+import * as sdk from '@qubit/plugin-sdk'
 import {
   atom,
   Button,
@@ -33,7 +33,7 @@ import {
   ToggleRow,
   useI18n,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@qubit/plugin-sdk'
 import type { ClipboardEvent, DragEvent, ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 

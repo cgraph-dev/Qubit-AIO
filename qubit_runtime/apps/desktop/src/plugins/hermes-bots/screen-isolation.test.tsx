@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import type { RosterRow } from './types'
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { useStore } = await import('@nanostores/react')
   const { onGatewayEvent } = await import('../../contrib/events')
 
@@ -40,7 +40,7 @@ vi.mock('./i18n', () => ({
 }))
 vi.mock('./screen-open', () => ({ openBotScreen: vi.fn() }))
 
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@qubit/plugin-sdk'
 
 // Exercise the real event bus in this integration test, not a copied dispatcher.
 // eslint-disable-next-line no-restricted-imports

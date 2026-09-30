@@ -1,4 +1,4 @@
-import type { ModelOptionProvider } from '@hermes/shared'
+import type { ModelOptionProvider } from '@qubit/shared'
 import { describe, expect, it } from 'vitest'
 
 import {

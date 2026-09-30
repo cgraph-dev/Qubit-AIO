@@ -12,8 +12,8 @@
  * attaches is bounded to a few rapid retries before the error state.
  */
 
-import { Button, Codicon, EmptyState, GlyphSpinner, host, Tip, useValue } from '@hermes/plugin-sdk'
-import type { RpcEvent } from '@hermes/plugin-sdk'
+import { Button, Codicon, EmptyState, GlyphSpinner, host, Tip, useValue } from '@qubit/plugin-sdk'
+import type { RpcEvent } from '@qubit/plugin-sdk'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useBots } from './i18n'

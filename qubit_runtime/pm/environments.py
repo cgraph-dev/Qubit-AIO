@@ -331,6 +331,50 @@ def activate_dependencies(project_root: Path) -> None:
             return  # External/Nix interpreter owns its original sys.path.
     if not selected.is_dir():
         raise RuntimeError(f"dependency environment has no site-packages: {selected}")
+    env_version = venv_python_version(environment)
+    running_version = (sys.version_info.major, sys.version_info.minor)
+    if env_version is not None and (env_version[0], env_version[1]) != running_version:
+        # Fail-closed: a dependency environment built for another interpreter
+        # MUST NOT shadow this process's packages. Its C-extension modules
+        # resolve to the wrong ABI and every import breaks (observed: a 3.14
+        # env activated under the 3.12 dev venv killed the TUI gateway child
+        # with "No module named 'pydantic_core._pydantic_core'"). Keep this
+        # interpreter's own packages and drop the foreign entries instead of
+        # poisoning sys.path / PYTHONPATH.
+        try:
+            selected_resolved = str(selected.resolve())
+        except OSError:
+            selected_resolved = str(selected)
+
+        def _is_foreign(entry: str) -> bool:
+            if not entry:
+                return False
+            try:
+                return Path(entry).resolve() == Path(selected_resolved)
+            except OSError:
+                return entry == selected_resolved
+
+        sys.path[:] = [entry for entry in sys.path if not _is_foreign(str(entry))]
+        python_path = os.environ.get("PYTHONPATH", "")
+        if python_path:
+            kept = [e for e in python_path.split(os.pathsep) if not _is_foreign(e)]
+            if kept:
+                os.environ["PYTHONPATH"] = os.pathsep.join(kept)
+            else:
+                os.environ.pop("PYTHONPATH", None)
+        global _ABI_MISMATCH_WARNED
+        try:
+            already_warned = _ABI_MISMATCH_WARNED
+        except NameError:
+            already_warned = False
+        if not already_warned:
+            _ABI_MISMATCH_WARNED = True
+            print(f"qubit: dependency environment {environment} targets "
+                  f"Python {env_version[0]}.{env_version[1]} but this process runs "
+                  f"{running_version[0]}.{running_version[1]}; keeping this "
+                  f"interpreter's own packages (run `qubit pm repair` to rebuild "
+                  f"the environment)", file=sys.stderr)
+        return
     import site
 
     sys.path[:] = [entry for entry in sys.path

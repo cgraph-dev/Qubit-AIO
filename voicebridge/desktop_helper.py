@@ -143,10 +143,13 @@ class HelperClient:
 
     def ask(self, text: str, request_id: str = "") -> str:
         """Ask the Qubit brain a question and return its answer (no tools)."""
-        out = self._request("POST", "/api/voice-edit/ask",
-                            {"text": text, "request_id": request_id},
-                            timeout=90.0)
-        return str(out.get("answer", "") or "")
+        return str(self.ask_result(text, request_id).get("answer", "") or "")
+
+    def ask_result(self, text: str, request_id: str = "") -> Dict[str, Any]:
+        """Ask and return the full result (answer + whether it was spoken)."""
+        return self._request("POST", "/api/voice-edit/ask",
+                             {"text": text, "request_id": request_id},
+                             timeout=90.0)
 
     def speak(self, text: str) -> bytes:
         """Render ``text`` with the ONE local TTS authority (returns WAV bytes)."""
@@ -973,8 +976,15 @@ class DesktopHelper:
     def _answer_question(self, question: str, *, mode: str = "answer") -> None:
         """Ask the Qubit brain, display the answer, and speak it aloud."""
         self._ui_status("processing", "answering…")
+        spoken = False
         try:
-            reply = self.client.ask(question, self.request_id)
+            if hasattr(self.client, "ask_result"):
+                out = self.client.ask_result(question, self.request_id)
+                reply = str(out.get("answer", "") or "")
+                # The service streams the speech itself; don't double-play.
+                spoken = bool(out.get("spoken"))
+            else:  # compatibility seam (older/fake clients)
+                reply = self.client.ask(question, self.request_id)
         except HelperError as exc:
             self._ui_error(exc.code, exc.detail)
             return
@@ -992,9 +1002,11 @@ class DesktopHelper:
             "privacy_mode": "local", "injection_suspected": False,
             "facts_dropped": [], "elapsed_ms": 0,
             "target_app": (self.snapshot.app_class if self.snapshot else "")})
-        # Voice conversation: speak the answer (one TTS authority).
+        # Voice conversation: the service streams the speech; only fall back
+        # to helper-side playback when it did not.
         self._history(mode, question, reply)
-        self._speak(reply)
+        if not spoken:
+            self._speak(reply)
 
     def _speak(self, text: str) -> None:
         """Speak ``text`` through the service's TTS, played locally.

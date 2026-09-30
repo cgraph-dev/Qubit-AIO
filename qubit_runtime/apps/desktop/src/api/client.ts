@@ -1,4 +1,4 @@
-import { JsonRpcGatewayClient } from '@hermes/shared'
+import { JsonRpcGatewayClient } from '@qubit/shared'
 import { map, type MapStore } from 'nanostores'
 
 import type { HermesApiRequest } from '@/global'

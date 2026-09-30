@@ -1,4 +1,4 @@
-import { createCronTriggerController, type CronTriggerController } from '@hermes/shared'
+import { createCronTriggerController, type CronTriggerController } from '@qubit/shared'
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import type * as React from 'react'

@@ -1,4 +1,4 @@
-import { compactNumber } from '@hermes/shared'
+import { compactNumber } from '@qubit/shared'
 
 import { getUsageAnalytics, type McpTestResult, type ProfileScope } from '@/hermes'
 import type { Translations } from '@/i18n'

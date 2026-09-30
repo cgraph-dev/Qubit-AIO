@@ -20,7 +20,7 @@ import {
   host,
   RowButton,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@qubit/plugin-sdk'
 import { useEffect, useMemo, useState } from 'react'
 
 import { $botMeta, $lastRoster, botHandle, botRosterKey, saveBotMeta } from './data'

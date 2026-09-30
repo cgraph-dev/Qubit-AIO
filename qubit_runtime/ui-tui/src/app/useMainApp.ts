@@ -7,9 +7,9 @@ import {
   useSelection,
   useStdout,
   useTerminalTitle
-} from '@hermes/ink'
-import type { SessionControlSnapshot } from '@hermes/shared/gateway-events'
-import { JSON_RPC_METHOD_NOT_FOUND, type ServerRequest } from '@hermes/shared/json-rpc-channel'
+} from '@qubit/ink'
+import type { SessionControlSnapshot } from '@qubit/shared/gateway-events'
+import { JSON_RPC_METHOD_NOT_FOUND, type ServerRequest } from '@qubit/shared/json-rpc-channel'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 

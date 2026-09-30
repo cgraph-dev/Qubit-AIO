@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
   SearchField,
   Tip
-} from '@hermes/plugin-sdk'
+} from '@qubit/plugin-sdk'
 
 import { botSourceStatus } from './data'
 import type { useBots } from './i18n'

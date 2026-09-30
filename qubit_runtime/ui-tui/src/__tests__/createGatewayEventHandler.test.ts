@@ -1,4 +1,4 @@
-import type { ConnectionOperationTarget } from '@hermes/shared/gateway-events'
+import type { ConnectionOperationTarget } from '@qubit/shared/gateway-events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {

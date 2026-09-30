@@ -97,7 +97,7 @@ test.skipIf(process.env.HERMES_TEST_REAL_SERVE !== '1' || process.platform === '
         bundle: true,
         platform: 'browser',
         format: 'iife',
-        alias: { '@': join(desktop, 'src'), '@hermes/shared': join(repo, 'apps/shared/src') },
+        alias: { '@': join(desktop, 'src'), '@qubit/shared': join(repo, 'apps/shared/src') },
         define: { 'import.meta.env': '{}', 'import.meta.hot': 'undefined' }
       })
       writeFileSync(

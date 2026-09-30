@@ -703,6 +703,41 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       });
   }, [messages]);
 
+  // Route-to-/chat + read-and-report: the local brain reads this session's
+  // canonical transcript (which includes /chat terminal turns — one shared
+  // store) and reports back here. Composed client-side over the same
+  // backend endpoints the transcript view uses; the summary turn itself runs
+  // on the local brain through the shared chat transport like any turn.
+  const summarizeSession = useCallback(() => {
+    if (busy) return;
+    setError(null);
+    api
+      .getChatSessionMessages(session, 100)
+      .then((res) => {
+        const rows = Array.isArray(res?.messages) ? res.messages : [];
+        const lines = rows
+          .map((m: { role?: string; content?: unknown; text?: unknown }) => {
+            const body = String(m.content ?? m.text ?? "").trim();
+            if (!body) return "";
+            return `${m.role === "user" ? "USER" : "ASSISTANT"}: ${body}`;
+          })
+          .filter(Boolean)
+          .slice(-40);
+        if (!lines.length) {
+          setError("[SUMMARIZE] no transcript rows to report on");
+          return;
+        }
+        send(
+          `Report on this chat session (${session}): read the transcript below and summarize what happened, what was decided, and what is still open. Transcript:\n${lines.join("\n")}`,
+        );
+      })
+      .catch((err: unknown) => {
+        setError(
+          `[SUMMARIZE] ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+  }, [api, busy, send, session, setError]);
+
   // A43: load the canonical runtime inventory + agent logs for the overlay.
   const loadDebug = useCallback(() => {
     setDebugState("loading");
@@ -1502,6 +1537,24 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             >
               {copyState === "copied" ? "copied" : "copy last response"}
             </Button>
+            <Button
+              ghost
+              size="sm"
+              onClick={summarizeSession}
+              disabled={busy || messages.length === 0}
+              prefix={<FileText className="h-3.5 w-3.5" />}
+              aria-label="Ask the local brain to report on this session"
+            >
+              summarize
+            </Button>
+            <a
+              href={`/chat?resume=${encodeURIComponent(session)}`}
+              aria-label="Continue this session in the /chat terminal"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-midground hover:bg-midground/10"
+            >
+              <Terminal className="h-3.5 w-3.5" />
+              open in /chat
+            </a>
           </div>
         </section>
 

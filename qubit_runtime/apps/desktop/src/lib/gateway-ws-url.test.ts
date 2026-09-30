@@ -1,4 +1,4 @@
-import { GatewayReauthRequiredError, isGatewayReauthRequired, resolveGatewayWsUrl } from '@hermes/shared'
+import { GatewayReauthRequiredError, isGatewayReauthRequired, resolveGatewayWsUrl } from '@qubit/shared'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { HermesConnection } from '@/global'

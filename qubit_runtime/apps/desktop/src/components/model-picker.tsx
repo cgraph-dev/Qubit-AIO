@@ -1,5 +1,5 @@
-import type { ModelOptionProvider, ModelPricing } from '@hermes/shared'
-import { fuzzyRank, modelSearchText } from '@hermes/shared'
+import type { ModelOptionProvider, ModelPricing } from '@qubit/shared'
+import { fuzzyRank, modelSearchText } from '@qubit/shared'
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { type ReactElement, useMemo, useRef, useState } from 'react'

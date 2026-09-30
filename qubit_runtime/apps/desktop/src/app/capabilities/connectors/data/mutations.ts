@@ -1,4 +1,4 @@
-import type { ConnectionAnswer, ConnectorPolicyGetResult } from '@hermes/shared'
+import type { ConnectionAnswer, ConnectorPolicyGetResult } from '@qubit/shared'
 import { useCallback, useRef, useState } from 'react'
 
 import type { ProfileScope } from '@/hermes'

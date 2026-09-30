@@ -1,4 +1,4 @@
-import { atom, host } from '@hermes/plugin-sdk'
+import { atom, host } from '@qubit/plugin-sdk'
 import { useEffect } from 'react'
 
 import { $lastRoster } from './data'

@@ -6,7 +6,7 @@
  * on routing.ts, for the owner descriptors it dispatches through.
  */
 
-import { atom, host, queryClient, useQuery, useValue } from '@hermes/plugin-sdk'
+import { atom, host, queryClient, useQuery, useValue } from '@qubit/plugin-sdk'
 
 import { botsText } from './i18n'
 import { displayName } from './labels'

@@ -19,7 +19,7 @@ const sockets = vi.hoisted(
 const rfbs = vi.hoisted(() => [] as Array<{ emit: (type: string, detail?: unknown) => void; viewOnly?: boolean }>)
 const retention = vi.hoisted(() => ({ held: 0 }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { useStore } = await import('@nanostores/react')
   const { onGatewayEvent } = await import('../../contrib/events')
 

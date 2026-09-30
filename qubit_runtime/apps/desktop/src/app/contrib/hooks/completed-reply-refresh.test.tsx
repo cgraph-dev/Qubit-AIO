@@ -1,5 +1,5 @@
 import { useAuiState } from '@assistant-ui/react'
-import type { GatewayEvent } from '@hermes/shared'
+import type { GatewayEvent } from '@qubit/shared'
 import { useStore } from '@nanostores/react'
 import { QueryClient } from '@tanstack/react-query'
 import { act, cleanup, render, screen } from '@testing-library/react'

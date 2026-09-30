@@ -1,4 +1,4 @@
-import type { PromptSubmitResult } from '@hermes/shared'
+import type { PromptSubmitResult } from '@qubit/shared'
 import { type MutableRefObject, useCallback } from 'react'
 
 import { PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/hermes'

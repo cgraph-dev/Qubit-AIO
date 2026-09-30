@@ -1,4 +1,4 @@
-import { JSON_RPC_METHOD_NOT_FOUND } from '@hermes/shared'
+import { JSON_RPC_METHOD_NOT_FOUND } from '@qubit/shared'
 
 /** True when a JSON-RPC call failed because the backend predates the method.
  *  The gateway answers -32601 (`tui_gateway/server.py::dispatch`) and the

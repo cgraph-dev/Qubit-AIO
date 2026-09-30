@@ -183,7 +183,7 @@ test('web rejects missing icons and compiler failures without publishing stale s
 function tuiSource(source) {
   put(source, 'package.json', '{"private":true}')
   put(source, 'ui-tui/package.json', '{"type":"module"}')
-  put(source, 'ui-tui/src/entry.tsx', '#!/usr/bin/env node\nimport { answer } from "@hermes/ink"; console.log(answer);')
+  put(source, 'ui-tui/src/entry.tsx', '#!/usr/bin/env node\nimport { answer } from "@qubit/ink"; console.log(answer);')
   put(source, 'ui-tui/packages/hermes-ink/src/entry-exports.ts', 'import devtools from "react-devtools-core"; devtools.initialize(); export const answer: string = "prepared source";')
 }
 

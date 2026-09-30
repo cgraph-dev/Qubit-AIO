@@ -6,7 +6,7 @@ import {
   JSON_RPC_METHOD_NOT_FOUND,
   JsonRpcGatewayError,
   reconnectBackoffDelayMs
-} from '@hermes/shared'
+} from '@qubit/shared'
 import { useEffect, useRef } from 'react'
 
 import { createGatewayEventDedupe } from '@/app/gateway/gateway-event-dedupe'

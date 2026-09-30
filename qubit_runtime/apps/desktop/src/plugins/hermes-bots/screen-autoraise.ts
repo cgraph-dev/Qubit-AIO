@@ -8,7 +8,7 @@
  * What counts as "started driving": a live `tool.start` for a screen tool
  * (computer_use, the browser tools) on a session the bot owns. Live means
  * arriving on the socket now; replayed history never opens anything — the
- * reconnect replay in `@hermes/shared` re-dispatches parked frames, so a
+ * reconnect replay in `@qubit/shared` re-dispatches parked frames, so a
  * seq-gated ring is not enough and the wake is also rate-limited per bot.
  *
  * Fencing rules, in order:
@@ -21,8 +21,8 @@
  * viewer only grabs keys when the human takes over.
  */
 
-import { host } from '@hermes/plugin-sdk'
-import type { RpcEvent } from '@hermes/plugin-sdk'
+import { host } from '@qubit/plugin-sdk'
+import type { RpcEvent } from '@qubit/plugin-sdk'
 
 import { $botMeta, $lastRoster, botSelectionKey } from './data'
 import { botRosterMeta, resolveBotConnectionRoute } from './routing'

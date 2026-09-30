@@ -6,7 +6,7 @@
  * Mode.
  */
 
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@qubit/plugin-sdk'
 
 import type { Attachment, AttachmentKind } from './types'
 

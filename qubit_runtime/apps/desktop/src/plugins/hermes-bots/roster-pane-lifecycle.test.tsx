@@ -27,7 +27,7 @@ const { hostMock, mergeServerMeta, trackInboundActivity } = vi.hoisted(() => ({
   trackInboundActivity: vi.fn()
 }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
   const { useQuery } = await import('@tanstack/react-query')
 

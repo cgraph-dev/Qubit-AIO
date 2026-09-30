@@ -1,5 +1,5 @@
 import type { ToolCallMessagePartProps } from '@assistant-ui/react'
-import type { ConnectionTargetState, ConnectorsConnectResult } from '@hermes/shared'
+import type { ConnectionTargetState, ConnectorsConnectResult } from '@qubit/shared'
 import { useStore } from '@nanostores/react'
 import { type RefObject, useEffect, useMemo, useRef, useState } from 'react'
 

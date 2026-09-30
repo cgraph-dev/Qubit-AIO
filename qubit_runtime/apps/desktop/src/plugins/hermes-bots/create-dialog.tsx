@@ -35,7 +35,7 @@ import {
   Textarea,
   useI18n,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@qubit/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 
 import { avatarColor, blobatarSvg, botAppearance, BotFace } from './avatar'

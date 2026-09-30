@@ -1,6 +1,6 @@
-import { stripAnsi } from '@hermes/shared/ansi'
-import { compactNumber } from '@hermes/shared/format'
-import type { ToolLabel } from '@hermes/shared/gateway-events'
+import { stripAnsi } from '@qubit/shared/ansi'
+import { compactNumber } from '@qubit/shared/format'
+import type { ToolLabel } from '@qubit/shared/gateway-events'
 
 import {
   LIVE_RENDER_MAX_CHARS,

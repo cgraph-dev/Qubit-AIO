@@ -20,7 +20,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { blobatarSvgMock } = vi.hoisted(() => ({ blobatarSvgMock: vi.fn() }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {
@@ -151,7 +151,7 @@ describe('rendering a blob face', () => {
 describe('an SDK that predates blobatarSvg', () => {
   it('renders the legacy deterministic shape instead of nothing', async () => {
     vi.resetModules()
-    vi.doMock('@hermes/plugin-sdk', async () => {
+    vi.doMock('@qubit/plugin-sdk', async () => {
       const { atom } = await import('nanostores')
 
       return {

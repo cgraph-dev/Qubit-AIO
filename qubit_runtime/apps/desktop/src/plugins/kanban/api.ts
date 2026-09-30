@@ -25,7 +25,7 @@ import {
   type PluginTranslate,
   queryClient,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@qubit/plugin-sdk'
 
 // Native completion notification.
 import { bindCompletionNotify, type CompletionEvent, onKanbanEventsFrame } from './completion-notify'

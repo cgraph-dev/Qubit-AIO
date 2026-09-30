@@ -1,5 +1,5 @@
 {
-  "name": "hermes-tui",
+  "name": "qubit-tui",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -19,8 +19,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@hermes/ink": "file:./packages/qubit-ink",
-    "@hermes/shared": "file:../apps/shared",
+    "@qubit/ink": "file:./packages/qubit-ink",
+    "@qubit/shared": "file:../apps/shared",
     "@nanostores/react": "1.1.0",
     "ink-text-input": "6.0.0",
     "nanostores": "1.4.2",
@@ -30,7 +30,7 @@
   },
   "overrides": {
     "ink-text-input": {
-      "ink": "npm:@hermes/ink@0.0.1"
+      "ink": "file:./packages/qubit-ink"
     }
   },
   "devDependencies": {

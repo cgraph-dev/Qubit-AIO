@@ -1,4 +1,4 @@
-import { compactNumber } from '@hermes/shared'
+import { compactNumber } from '@qubit/shared'
 import { useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'

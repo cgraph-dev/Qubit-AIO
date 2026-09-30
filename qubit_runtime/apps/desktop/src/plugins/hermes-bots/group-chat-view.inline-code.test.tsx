@@ -14,7 +14,7 @@ import { translateBots } from './i18n-test-helper'
 // wrapper, so only the room's own `[data-slot='group-chat-message-content']`
 // rule in the real stylesheet can theme it: the cascade decides, not a regex
 // over the source text.
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { pluginSdkMock, createGroupGateway } = await import('./group-test-utils')
   const base = await pluginSdkMock(createGroupGateway().host)
 

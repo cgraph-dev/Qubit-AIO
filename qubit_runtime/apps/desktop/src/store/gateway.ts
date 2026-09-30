@@ -7,7 +7,7 @@ import {
   registryBackendScopeKey,
   resolveGatewayWsUrl,
   type ServerRequest
-} from '@hermes/shared'
+} from '@qubit/shared'
 import { atom } from 'nanostores'
 
 import type { HermesConnection } from '@/global'

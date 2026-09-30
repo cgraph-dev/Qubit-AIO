@@ -4,7 +4,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import type { HermesSkin, SkinColors } from '@hermes/shared/skin'
+import type { HermesSkin, SkinColors } from '@qubit/shared/skin'
 import { parse } from 'yaml'
 
 const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/

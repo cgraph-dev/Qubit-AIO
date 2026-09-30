@@ -8,7 +8,7 @@
  * surface has to import a sibling surface to know what is selected.
  */
 
-import { atom, host } from '@hermes/plugin-sdk'
+import { atom, host } from '@qubit/plugin-sdk'
 
 import { botRosterKey, botSelectionKey } from './data'
 import { getPluginCtx } from './shared'

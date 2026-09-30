@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { storage } = vi.hoisted(() => ({ storage: new Map<string, unknown>() }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return { atom, host: {} }

@@ -10,7 +10,7 @@ import type { RosterRow } from './types'
 const opened: string[] = []
 let meta: Record<string, { screenAutoOpen?: boolean }> = {}
 
-vi.mock('@hermes/plugin-sdk', () => ({ host: { onEvent: () => () => undefined } }))
+vi.mock('@qubit/plugin-sdk', () => ({ host: { onEvent: () => () => undefined } }))
 vi.mock('./data', () => ({
   $botMeta: { get: () => meta },
   $lastRoster: { get: () => roster },

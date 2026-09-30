@@ -1,4 +1,4 @@
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@qubit/plugin-sdk'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
@@ -37,7 +37,7 @@ const mocks = vi.hoisted(() => ({
   notify: vi.fn()
 }))
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@qubit/plugin-sdk', async importOriginal => {
   const sdk = await importOriginal<typeof HermesSdk>()
 
   return {

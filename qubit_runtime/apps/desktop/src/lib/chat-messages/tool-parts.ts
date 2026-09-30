@@ -1,4 +1,4 @@
-import type { ToolLabel } from '@hermes/shared'
+import type { ToolLabel } from '@qubit/shared'
 
 import { TOOL_LABELS_ARG } from '@/lib/connector-tools'
 import { firstStringField, normalize } from '@/lib/text'

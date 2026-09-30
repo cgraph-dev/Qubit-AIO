@@ -9591,13 +9591,18 @@ def h_themes(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_theme_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """PUT /api/dashboard/theme -> real persisted theme selection."""
-    name = str(b.get("theme", "qubit") or "qubit").strip() or "qubit"
+    """PUT /api/dashboard/theme -> real persisted theme selection.
+
+    Any theme from ``themes_response`` (the vendored built-ins + the Qubit
+    overlay) persists through the canonical prefs store, mirroring the
+    reference (which writes ``dashboard.theme`` into config). Unknown names
+    are a typed refusal, never a silent keep-current.
+    """
+    name = str(b.get("theme", "") or "").strip()
     available = {t.get("name") for t in themes_response(cfg).get("themes", [])}
-    if name not in available:
-        return _ok(ok=True, theme="qubit", persisted=False,
-                   detail=f"only the Qubit theme ships in this packet; "
-                          f"{name!r} is not installed (session keeps qubit)")
+    if not name or name not in available:
+        return 400, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"theme {name!r} is not installed"}
     prefs = _prefs(cfg)
     prefs["theme"] = name
     try:
@@ -14853,15 +14858,47 @@ def plugins_response() -> Dict[str, Any]:
 
 
 def themes_response(cfg: Any) -> Dict[str, Any]:
+    """GET /api/dashboard/themes -> the real vendored built-ins + Qubit overlay.
+
+    1:1 with the reference: the vendored ``_BUILTIN_DASHBOARD_THEMES`` (the
+    same set Hermes serves) with the Qubit-owned ``qubit`` overlay appended.
+    The frontend owns every definition (``frontend/qubit-web/src/themes/
+    presets.ts`` for the built-ins, ``qubit-theme.json`` for the overlay);
+    the backend lists the names and persists the selection, never invents a
+    theme. A fork miss still serves the overlay instead of an empty list.
+    """
+    themes: List[Dict[str, Any]] = []
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.web_server_dashboard import (  # type: ignore
+            _BUILTIN_DASHBOARD_THEMES)
+        for t in _BUILTIN_DASHBOARD_THEMES or []:
+            if isinstance(t, dict) and t.get("name"):
+                themes.append({"name": str(t["name"]),
+                               "label": str(t.get("label") or t["name"]),
+                               "description": str(t.get("description") or "")})
+    except Exception:  # noqa: BLE001 - overlay theme must survive a fork miss
+        pass
     theme_path = OVERLAY_DIR / "qubit-theme.json"
     try:
         definition = json.loads(theme_path.read_text())
     except (OSError, ValueError):
         definition = {}
-    active = "qubit" if definition else "default"
-    themes = [{"name": "qubit", "label": "Qubit Command",
-               "description": "Qubit graphite/navy with signal-lime accents",
-               "definition": definition}] if definition else []
+    if definition:
+        themes.append({"name": "qubit", "label": "Qubit Command",
+                       "description": "Qubit graphite/navy with signal-lime accents",
+                       "definition": definition})
+    names = {t.get("name") for t in themes}
+    try:
+        stored = str(_prefs(cfg).get("theme", "") or "").strip()
+    except Exception:  # noqa: BLE001 - prefs miss falls back to default
+        stored = ""
+    if stored in names:
+        active = stored
+    elif "qubit" in names:
+        active = "qubit"
+    else:
+        active = themes[0]["name"] if themes else "default"
     return {"active": active, "themes": themes}
 
 

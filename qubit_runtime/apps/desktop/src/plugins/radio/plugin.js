@@ -2,7 +2,7 @@ import {
   atom, Button, createBudgetedLoop, GlyphSpinner, icons, Popover, PopoverContent, PopoverTrigger,
   RowButton, SearchField, STATUSBAR_AREAS, Tip, usePluginI18n,
   useQuery, useValue
-} from '@hermes/plugin-sdk'
+} from '@qubit/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 

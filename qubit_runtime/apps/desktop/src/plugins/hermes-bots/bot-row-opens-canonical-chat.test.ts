@@ -27,7 +27,7 @@ vi.mock('./canonical-chat', () => ({
   PROFILE_SESSION_LIST_LIMIT: 200
 }))
 
-const { host } = await import('@hermes/plugin-sdk')
+const { host } = await import('@qubit/plugin-sdk')
 const { $openBotChat, $selectedBot } = await import('./bot-state')
 const { openRosterBot, trackInboundActivity } = await import('./roster-actions')
 const { $selectedStoredSessionId } = await import('@/store/session')

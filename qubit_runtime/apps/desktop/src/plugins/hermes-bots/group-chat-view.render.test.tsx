@@ -7,7 +7,7 @@ import { translateBots } from './i18n-test-helper'
 // Room bodies go through the shell's message renderer (the 1:1 chat's code
 // card + `MEDIA:` transform) when the SDK exports it. The stub records what the
 // room handed it so the test asserts the wiring, not the renderer's output.
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { pluginSdkMock, createGroupGateway } = await import('./group-test-utils')
   const base = await pluginSdkMock(createGroupGateway().host)
 

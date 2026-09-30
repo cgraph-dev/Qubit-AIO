@@ -5,8 +5,8 @@ import type {
   ConnectorErrorReason,
   RpcMethods,
   ToolsChange
-} from '@hermes/shared'
-import { JsonRpcGatewayError } from '@hermes/shared'
+} from '@qubit/shared'
+import { JsonRpcGatewayError } from '@qubit/shared'
 
 import type { ProfileScope } from '@/hermes'
 import { requestGatewayForAgent } from '@/store/gateway'

@@ -3,7 +3,7 @@ import type {
   ConnectionSettleReason,
   ConnectionUpdatePayload,
   ConnectorsConnectResult
-} from '@hermes/shared'
+} from '@qubit/shared'
 import { atom } from 'nanostores'
 
 import type { ProfileScope } from '@/hermes'

@@ -7,9 +7,9 @@
  * the top-level `await Promise.all([...])` in src/entry.tsx — the user
  * sees only 141 bytes of ANSI reset sequences and a blank screen forever.
  *
- * Root cause: re-exporting `ink-text-input` from `@hermes/ink`'s
+ * Root cause: re-exporting `ink-text-input` from `@qubit/ink`'s
  * entry-exports drags the upstream `ink` package into the bundle. That
- * `ink` graph and our in-tree `@hermes/ink` graph reference each other
+ * `ink` graph and our in-tree `@qubit/ink` graph reference each other
  * via React/`ink-text-input`, producing the circular async cycle that
  * `__esm` cannot resolve.
  *

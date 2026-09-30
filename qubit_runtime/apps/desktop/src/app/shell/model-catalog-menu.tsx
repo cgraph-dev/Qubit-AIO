@@ -1,5 +1,5 @@
-import type { ModelOptionProvider, ModelOptionsResult } from '@hermes/shared'
-import { DEFAULT_REASONING_EFFORT } from '@hermes/shared'
+import type { ModelOptionProvider, ModelOptionsResult } from '@qubit/shared'
+import { DEFAULT_REASONING_EFFORT } from '@qubit/shared'
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import {

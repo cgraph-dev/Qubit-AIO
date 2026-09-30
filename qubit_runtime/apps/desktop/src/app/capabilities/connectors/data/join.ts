@@ -7,7 +7,7 @@ import type {
   McpRuntimeStatus,
   McpServerRuntimeRow,
   McpServerSummary
-} from '@hermes/shared'
+} from '@qubit/shared'
 
 import type { McpCatalogEntry } from '@/hermes'
 import { connectorTitle } from '@/lib/connector-tools'

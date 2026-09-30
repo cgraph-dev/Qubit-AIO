@@ -23,8 +23,8 @@ import {
   PALETTE_AREA,
   SIDEBAR_PROFILE_GROUP_HEADER_AREA,
   translateNow
-} from '@hermes/plugin-sdk'
-import type { ChatEmptyProps, PluginContext, ProfileGroupRoute } from '@hermes/plugin-sdk'
+} from '@qubit/plugin-sdk'
+import type { ChatEmptyProps, PluginContext, ProfileGroupRoute } from '@qubit/plugin-sdk'
 
 import { startFaceClock, stopFaceClock } from './avatar'
 import {

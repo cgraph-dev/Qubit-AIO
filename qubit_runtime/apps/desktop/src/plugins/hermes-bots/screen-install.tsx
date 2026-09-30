@@ -9,8 +9,8 @@
  * a fresh status the caller uses to flip the pane to "Start screen".
  */
 
-import { Button, Codicon, GlyphSpinner, host } from '@hermes/plugin-sdk'
-import type { RpcEvent } from '@hermes/plugin-sdk'
+import { Button, Codicon, GlyphSpinner, host } from '@qubit/plugin-sdk'
+import type { RpcEvent } from '@qubit/plugin-sdk'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useBots } from './i18n'

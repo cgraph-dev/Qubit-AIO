@@ -13,7 +13,7 @@ import type { DisplayStatus } from './screen-connection'
 import type * as ScreenConnection from './screen-connection'
 import type { RosterRow } from './types'
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { useStore } = await import('@nanostores/react')
   const { onGatewayEvent } = await import('../../contrib/events')
 

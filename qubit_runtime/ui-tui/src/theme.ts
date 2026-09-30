@@ -1,5 +1,5 @@
-import { contrastRatio, ensureContrast, mix, parseColor, relativeLuminance, toHex } from '@hermes/shared/color'
-import type { SkinBranding, SkinColors } from '@hermes/shared/skin'
+import { contrastRatio, ensureContrast, mix, parseColor, relativeLuminance, toHex } from '@qubit/shared/color'
+import type { SkinBranding, SkinColors } from '@qubit/shared/skin'
 
 import { desaturate, grayOf, liftForContrast } from './lib/color.js'
 
@@ -69,7 +69,7 @@ export interface Theme {
 
 // ── Color math ───────────────────────────────────────────────────────
 //
-// Generic color computation lives in @hermes/shared/color (the primitives,
+// Generic color computation lives in @qubit/shared/color (the primitives,
 // shared with the desktop) and lib/color.ts (TUI-only lifts and re-toning);
 // this file keeps only the ANSI-256 remapping that is specific to the
 // limited-palette Apple Terminal path. contrastRatio/ensureContrast are
@@ -151,8 +151,8 @@ function circularDistance(a: number, b: number): number {
   return Math.min(distance, 1 - distance)
 }
 
-// Mirrors @hermes/ink's colorize.ts. Keep local: app code compiles from
-// ui-tui/src, while @hermes/ink is bundled separately from packages/.
+// Mirrors @qubit/ink's colorize.ts. Keep local: app code compiles from
+// ui-tui/src, while @qubit/ink is bundled separately from packages/.
 function richEightBitColorNumber(red: number, green: number, blue: number): number {
   const [, saturation, lightness] = rgbToHsl(red, green, blue)
 

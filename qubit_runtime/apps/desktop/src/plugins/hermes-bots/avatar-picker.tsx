@@ -15,7 +15,7 @@ import {
   SegmentedControl,
   Textarea,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@qubit/plugin-sdk'
 import { useState } from 'react'
 
 import {

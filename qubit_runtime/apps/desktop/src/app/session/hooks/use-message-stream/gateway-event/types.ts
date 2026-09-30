@@ -1,4 +1,4 @@
-import type { GatewayEvent, PersistedTurn } from '@hermes/shared'
+import type { GatewayEvent, PersistedTurn } from '@qubit/shared'
 import type { QueryClient } from '@tanstack/react-query'
 import type { MutableRefObject } from 'react'
 

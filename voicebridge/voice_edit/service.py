@@ -793,16 +793,19 @@ class VoiceEditService:
             # correctly); folding it into the prompt string made the small
             # local model echo the last answer.
             convo = self._conversation_context(question)
+            # Short spoken answers: minimal reasoning + a tight output cap
+            # keeps voice latency low (the reply is spoken by the helper).
             res = GW.run_role(question, self.cfg, role="chat",
                               profile_id=profile or None,
-                              max_tokens=300 if mode == "task" else 200,
-                              timeout_s=60.0 if mode == "task" else 30.0,
-                              reasoning="low",
+                              max_tokens=120,
+                              timeout_s=30.0,
+                              reasoning="minimal",
                               conversation_prompt=convo,
                               context=self._personal_context())
         except Exception as exc:
             return {"ok": False, "code": "VOICE_EDIT_ASK_FAILED",
                     "detail": str(exc)[:160]}
+        spoken = False
         ok = bool(getattr(res, "ok", False))
         answer = str(getattr(res, "text", "") or "").strip()
         self._audit("voice_edit.ask", {
@@ -822,7 +825,8 @@ class VoiceEditService:
             question, answer, model=str(getattr(res, "model", "") or ""))
         return {"ok": True, "answer": answer, "mode": mode,
                 "provider": str(getattr(res, "provider", "") or ""),
-                "model": str(getattr(res, "model", "") or "")}
+                "model": str(getattr(res, "model", "") or ""),
+                "spoken": bool(spoken)}
 
     # -- confirm-gated tasks ---------------------------------------------
     def propose_task(self, request_id: str, text: str) -> Dict[str, Any]:

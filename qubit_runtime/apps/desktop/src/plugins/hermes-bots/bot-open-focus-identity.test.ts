@@ -17,7 +17,7 @@
  * Ported from tests/bot-open-focus-identity.test.mjs.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@qubit/plugin-sdk'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { RosterRow } from './types'
@@ -27,7 +27,7 @@ const { ackStoredSessionId, openBotCanonicalChat } = vi.hoisted(() => ({
   openBotCanonicalChat: vi.fn()
 }))
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@qubit/plugin-sdk', async importOriginal => {
   const sdk = await importOriginal<typeof HermesSdk>()
 
   return { ...sdk, ackStoredSessionId }

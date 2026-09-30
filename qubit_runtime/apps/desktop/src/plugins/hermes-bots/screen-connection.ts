@@ -10,8 +10,8 @@
  * voice playback opens `/api/audio/speak-stream` beside `/api/ws`.
  */
 
-import { host, resolveSiblingWsUrl } from '@hermes/plugin-sdk'
-import type { DisplayLease, PluginProfileRoute, RpcEvent } from '@hermes/plugin-sdk'
+import { host, resolveSiblingWsUrl } from '@qubit/plugin-sdk'
+import type { DisplayLease, PluginProfileRoute, RpcEvent } from '@qubit/plugin-sdk'
 
 import { resolveBotConnectionRoute } from './routing'
 import type { RosterRow } from './types'
@@ -22,7 +22,7 @@ export type {
   DisplayObserveResult,
   DisplayStatus,
   DisplayThumbnailResult as DisplayThumbnail
-} from '@hermes/plugin-sdk'
+} from '@qubit/plugin-sdk'
 
 /** This window's identity for one attach: the minted id plus its lease-payload hash. */
 export interface ScreenViewer {

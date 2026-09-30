@@ -13,7 +13,7 @@ import type { RosterRow } from './types'
 
 const calls = vi.hoisted(() => [] as string[])
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { onGatewayEvent } = await import('../../contrib/events')
 
   return {
@@ -60,7 +60,7 @@ vi.mock('./i18n', () => ({
   })
 }))
 
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@qubit/plugin-sdk'
 
 // eslint-disable-next-line no-restricted-imports
 import { emitGatewayEvent } from '../../contrib/events'

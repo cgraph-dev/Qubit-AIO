@@ -1,4 +1,4 @@
-import type { ConnectionRequestPayload, ToolLabel } from '@hermes/shared'
+import type { ConnectionRequestPayload, ToolLabel } from '@qubit/shared'
 
 import type { ToolResultMetadata } from '@/lib/tool-result-metadata'
 

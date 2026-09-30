@@ -5,7 +5,7 @@ import { durableGroupChatMembers, groupMemberKey } from './group-membership'
 import { parseGroupChatMentions, resolveGroupResponders, unaddressedGroupMentions } from './group-rounds'
 import type { GroupMember, GroupMessage } from './types'
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@qubit/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {

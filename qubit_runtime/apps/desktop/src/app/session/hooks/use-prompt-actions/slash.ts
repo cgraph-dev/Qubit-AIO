@@ -1,5 +1,5 @@
-import { skillInvocationText } from '@hermes/shared'
-import { parseCommandDispatch, parseSlashCommand } from '@hermes/shared'
+import { skillInvocationText } from '@qubit/shared'
+import { parseCommandDispatch, parseSlashCommand } from '@qubit/shared'
 import { type MutableRefObject, useCallback, useRef } from 'react'
 
 import { prepareDefaultNewSession } from '@/app/session/new-session-route'

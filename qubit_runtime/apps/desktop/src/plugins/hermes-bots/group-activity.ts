@@ -7,7 +7,7 @@
  * can record into it without a cycle.
  */
 
-import { atom } from '@hermes/plugin-sdk'
+import { atom } from '@qubit/plugin-sdk'
 
 import { $groupChats, groupSpeakerLabel } from './group-chat'
 import type { GroupActivityEvent, GroupActivityKind } from './types'

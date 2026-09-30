@@ -1,5 +1,5 @@
-import { Box, Text, useInput, useStdout } from '@hermes/ink'
-import type { SessionListResult, SessionListRow } from '@hermes/shared/gateway-events'
+import { Box, Text, useInput, useStdout } from '@qubit/ink'
+import type { SessionListResult, SessionListRow } from '@qubit/shared/gateway-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { sessionScopedModelArg } from '../domain/slash.js'

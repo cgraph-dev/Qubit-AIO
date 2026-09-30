@@ -1,4 +1,4 @@
-import type { ModelOptionsResult } from '@hermes/shared'
+import type { ModelOptionsResult } from '@qubit/shared'
 
 import type {
   AnalyticsResponse,

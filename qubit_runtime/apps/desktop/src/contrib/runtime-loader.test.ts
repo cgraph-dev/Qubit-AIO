@@ -365,7 +365,7 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
 
     try {
       const source = `
-        import { host } from '@hermes/plugin-sdk'
+        import { host } from '@qubit/plugin-sdk'
         export default {
           id: 'runtime-event-reload',
           register() {
@@ -636,13 +636,13 @@ describe('specifier scanning is limited to code (strings/comments never load-blo
       ;(globalThis as unknown as { __captured?: string }).__captured = undefined
 
       const id = await loadRuntimePlugin(
-        `const doc = "from '@hermes/plugin-sdk'"
+        `const doc = "from '@qubit/plugin-sdk'"
 export default { id: 'quoted-spec', register: () => { globalThis.__captured = doc } }`,
         'quoted-spec'
       )
 
       expect(id).toBe('quoted-spec')
-      expect((globalThis as unknown as { __captured?: string }).__captured).toBe("from '@hermes/plugin-sdk'")
+      expect((globalThis as unknown as { __captured?: string }).__captured).toBe("from '@qubit/plugin-sdk'")
     } finally {
       unloadRuntimePlugin('quoted-spec')
       delete (globalThis as unknown as { __captured?: string }).__captured
@@ -656,7 +656,7 @@ export default { id: 'quoted-spec', register: () => { globalThis.__captured = do
 
     try {
       const id = await loadRuntimePlugin(
-        "import { host } from '@hermes/plugin-sdk'\nexport default { id: 'real-mapped', register() { void host } }",
+        "import { host } from '@qubit/plugin-sdk'\nexport default { id: 'real-mapped', register() { void host } }",
         'real-mapped'
       )
 
@@ -705,7 +705,7 @@ describe('register() failure isolation', () => {
 
     try {
       const source = `
-        import { host } from '@hermes/plugin-sdk'
+        import { host } from '@qubit/plugin-sdk'
         export default {
           id: 'register-throw',
           register() {
@@ -932,7 +932,7 @@ describe('loader hardening: hangs, leaks, duplicate ids, stale incarnations', ()
     counters.__staleHits = 0
 
     let source = `
-      import { host } from '@hermes/plugin-sdk'
+      import { host } from '@qubit/plugin-sdk'
       export default {
         id: 'stale',
         register() { host.onEvent('bot_relay.outbox.pending', () => { globalThis.__staleHits++ }) }
