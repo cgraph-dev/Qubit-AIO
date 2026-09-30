@@ -630,6 +630,63 @@ class VoiceEditService:
                 "discarded_interim_only": not req.applied,
                 "request_id": request_id}
 
+    def _voice_session(self) -> str:
+        """The stable session id for the spoken conversation.
+
+        A dedicated session keeps the voice dialogue coherent instead of
+        mixing it with unrelated dashboard/chat turns (and test probes) in the
+        shared default session; it is still the SAME one canonical store.
+        """
+        try:
+            from ..agent import resolve_session_id
+            return resolve_session_id(self.cfg, "voice-chat")
+        except Exception:
+            return "voice-chat"
+
+    def _conversation_context(self, pending: str) -> str:
+        """Bounded prior-turn context from the ONE canonical session store.
+
+        Reuses :func:`voicebridge.agent._session_context` (the same
+        ``context_policy`` window ``/qubit-chat`` and the worker turns use), so
+        a spoken follow-up sees what was just said instead of starting blank.
+        """
+        try:
+            from ..agent import _session_context
+            store = self._canonical_store()
+            if store is None:
+                return ""
+            text, _meta = _session_context(store, self._voice_session(),
+                                           self.cfg, pending)
+            return str(text or "")
+        except Exception:  # noqa: BLE001 - context is additive, non-fatal
+            return ""
+
+    def _personal_context(self) -> str:
+        """The operator's canonical personal knowledge (bounded).
+
+        Grounds a spoken answer so the model never invents facts about the
+        user (the local system prompt says not to, but it needs the facts).
+        Reads the same ``USER.md`` / ``MEMORY.md`` the orchestrator's context
+        compiler feeds the local chat model.
+        """
+        try:
+            from pathlib import Path
+            root = Path(self.cfg.state_dir())
+            for base in (root / "runtime" / "memories", root / "memories"):
+                if not base.is_dir():
+                    continue
+                parts = []
+                for name in ("USER.md", "MEMORY.md"):
+                    f = base / name
+                    if f.is_file():
+                        parts.append(f.read_text(
+                            encoding="utf-8", errors="replace")[:4000])
+                if parts:
+                    return "\n\n".join(parts)
+        except Exception:  # noqa: BLE001 - additive, never fatal
+            pass
+        return ""
+
     def _known_model_profile(self, profile_id: str) -> bool:
         """True when ``profile_id`` names a real configured model profile.
 
@@ -697,11 +754,14 @@ class VoiceEditService:
                 "escalate": bool(profile)})
         try:
             from ..providers import gateway as GW
+            convo = self._conversation_context(question)
             res = GW.run_role(question, self.cfg, role="chat",
                               profile_id=profile or None,
                               max_tokens=300 if mode == "task" else 200,
                               timeout_s=60.0 if mode == "task" else 30.0,
-                              reasoning="low")
+                              reasoning="low",
+                              conversation_prompt=convo,
+                              context=self._personal_context())
         except Exception as exc:
             return {"ok": False, "code": "VOICE_EDIT_ASK_FAILED",
                     "detail": str(exc)[:160]}
