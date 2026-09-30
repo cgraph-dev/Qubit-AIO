@@ -75,7 +75,11 @@ class PreviewOverlay:
         self.root.title("Qubit Voice Edit")
         self.root.configure(bg=_BG)
         self.root.attributes("-topmost", True)
-        self.root.protocol("WM_DELETE_WINDOW", lambda: self._act("cancel"))
+        # The window-manager close button must always dismiss the window,
+        # even when the helper has nothing to cancel (idle state): it used
+        # to only notify "cancel", which an idle state machine drops, leaving
+        # the window stuck on screen.
+        self.root.protocol("WM_DELETE_WINDOW", self._close_button)
         self.root.bind("<Escape>", lambda e: self._act("cancel"))
         # Keyboard shortcuts so the preview is usable without a pointer and can
         # be driven by the helper's own automation/tests.
@@ -160,6 +164,19 @@ class PreviewOverlay:
 
     def _act(self, action: str, payload: Optional[Dict[str, Any]] = None):
         self._on_action(action, payload or {})
+
+    def _close_button(self) -> None:
+        """WM_DELETE_WINDOW (title-bar X): hide first, then notify cancel.
+
+        Hiding is unconditional — the helper re-shows the window whenever
+        there is actually something to review. Runs on the Tk thread, like
+        every other window-manager callback.
+        """
+        try:
+            self.hide()
+        except Exception:
+            pass
+        self._act("cancel")
 
     def _submit_edit(self) -> None:
         text = self._edit_entry.get("1.0", "end-1c")
