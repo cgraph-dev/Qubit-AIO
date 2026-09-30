@@ -118,7 +118,8 @@ def test_runtime_slot_uses_single_key_convention(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     # A stale Frankenstein slot (mixed keys from successive switches) is
-    # rebuilt from scratch: one convention, no leftovers.
+    # rebuilt from scratch under the single-key convention: ``default`` only,
+    # no ``model``/``name`` leftovers for the vendored normalizer to fight.
     path = qubit_runtime.runtime_home_for_cfg(cfg) / "config.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(
@@ -130,5 +131,5 @@ def test_runtime_slot_uses_single_key_convention(tmp_path, monkeypatch):
         cfg, provider="ollama", model="qubit-spark17",
         base_url="", key_ref="") is True
     node = yaml.safe_load(path.read_text(encoding="utf-8"))["model"]
-    assert node == {"provider": "ollama", "model": "qubit-spark17",
+    assert node == {"provider": "ollama",
                     "default": "qubit-spark17"}, node
