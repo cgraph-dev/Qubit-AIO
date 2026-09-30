@@ -26,6 +26,7 @@ state no runtime consumer read; this replaces it with the real apply.
 """
 from __future__ import annotations
 
+import os
 import re
 import time
 from pathlib import Path
@@ -255,6 +256,88 @@ def _slug_model_id(provider: str, model: str) -> str:
     return slug_endpoint_id(f"{provider}-{model}", fallback="model")
 
 
+def _runtime_env_value(cfg: Any, name: str) -> str:
+    """Read a NON-SECRET value (a base URL) from the process env or runtime .env.
+
+    Only ``*_BASE_URL`` values are read here; secret values are never read
+    (credentials stay references). Used to resolve a provider's endpoint the
+    same way the vendored runtime does (``<PROVIDER>_BASE_URL``).
+    """
+    val = os.environ.get(name, "").strip()
+    if val:
+        return val
+    try:
+        from .. import config as _config
+        text = Path(_config.canonical_runtime_env_path()).read_text(errors="replace")
+    except Exception:  # noqa: BLE001 - missing/unreadable .env -> unresolved
+        return ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+        k, sep, v = line.partition("=")
+        if sep and k.strip() == name:
+            return v.strip().strip('"').strip("'")
+    return ""
+
+
+def _provider_overlay(provider: str) -> Any:
+    """The vendored provider deployment overlay (base-url env/override), or None."""
+    try:
+        from .. import qubit_runtime as _qr
+        _qr.ensure_path()
+        from qubit_cli import providers as _P  # type: ignore
+        return _P.HERMES_OVERLAYS.get(str(provider or "").strip())
+    except Exception:  # noqa: BLE001 - fork unavailable -> caller falls back
+        return None
+
+
+def _provider_base_url(cfg: Any, provider: str) -> str:
+    """Resolve a known provider's endpoint exactly as the vendored runtime does.
+
+    ``HERMES_OVERLAYS[provider].base_url_env_var`` (e.g. ``OPENCODE_GO_BASE_URL``)
+    first, then a non-virtual ``base_url_override``, then the generic
+    ``<SLUG>_BASE_URL`` convention. Empty when nothing resolves.
+    """
+    ov = _provider_overlay(provider)
+    if ov is not None:
+        env_name = str(getattr(ov, "base_url_env_var", "") or "")
+        if env_name:
+            v = _runtime_env_value(cfg, env_name)
+            if v:
+                return v
+        override = str(getattr(ov, "base_url_override", "") or "")
+        if override and "://" in override and not override.startswith(
+                ("moa://", "acp://")):
+            return override
+    slug_env = str(provider or "").strip().upper().replace("-", "_") + "_BASE_URL"
+    return _runtime_env_value(cfg, slug_env)
+
+
+def _provider_key_ref(cfg: Any, provider: str) -> str:
+    """Resolve a provider's credential reference from its env var NAME(s).
+
+    Returns ``env:<NAME>`` when a candidate key var is set (name-only check;
+    the secret VALUE is never read), else ``""``. Candidates are the overlay's
+    ``extra_env_vars`` plus the ``<SLUG>_API_KEY`` convention.
+    """
+    ov = _provider_overlay(provider)
+    extra = tuple(getattr(ov, "extra_env_vars", ()) or ()) if ov is not None else ()
+    slug = str(provider or "").strip().upper().replace("-", "_")
+    candidates = list(extra) + [f"{slug}_API_KEY"]
+    try:
+        from .. import env_store
+        present = env_store.present_names(cfg)
+    except Exception:  # noqa: BLE001 - no store -> no resolvable key
+        return ""
+    for name in candidates:
+        if name and name in present:
+            return f"env:{name}"
+    return ""
+
+
 def select_model(cfg: Any, provider: str, model: str, *,
                  base_url: str = "", key_ref: str = "",
                  confirm: bool = True) -> Dict[str, Any]:
@@ -286,6 +369,17 @@ def select_model(cfg: Any, provider: str, model: str, *,
     if not pid:
         pid = _slug_model_id(provider, model)
     local = _is_local_url(base_url)
+    if not local and not base_url:
+        # Resolve a known provider's endpoint the way the vendored runtime does
+        # (overlay base_url_env_var / "<SLUG>_BASE_URL"), so a catalog pick of a
+        # built-in provider (opencode-go, opencode-zen, …) needs no hand-typed
+        # endpoint — 1:1 with the reference's provider/model switch.
+        base_url = _provider_base_url(cfg, provider)
+    if not local and not key_ref:
+        # Likewise resolve the credential REFERENCE from the provider's env var
+        # NAME (e.g. OPENCODE_GO_API_KEY -> env:OPENCODE_GO_API_KEY); the value
+        # is never read or stored.
+        key_ref = _provider_key_ref(cfg, provider)
     if not local and not base_url:
         return {"ok": False, "code": "MODEL_ENDPOINT_REQUIRED",
                 "detail": (f"provider {provider!r} has no configured base_url; "

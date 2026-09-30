@@ -229,7 +229,7 @@ afterEach(async () => {
 });
 
 describe("Qubit TerminalChatPage right-side panel", () => {
-  it("renders the complementary panel with the terminal model picker", async () => {
+  it("renders the complementary panel without the extra terminal-model card", async () => {
     await renderTerminal();
     await vi.waitFor(() => expect(panel()).not.toBeNull());
 
@@ -237,17 +237,12 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(el.getAttribute("role")).toBe("complementary");
     // aria-label is the shared ChatPage "Model & tools" landmark label.
     expect(el.getAttribute("aria-label")).toBe("Model & tools");
+    // Parity with Hermes: model switching lives in the MODEL card, not a
+    // separate "Chat terminal model / Set default" card.
+    expect(el.querySelector('[data-testid="terminal-model-card"]')).toBeNull();
     expect(
-      el.querySelector('[data-testid="terminal-model-card"]'),
-    ).not.toBeNull();
-
-    const picker = el.querySelector<HTMLSelectElement>(
-      '[data-testid="terminal-profile-picker"]',
-    )!;
-    expect(picker).not.toBeNull();
-    await vi.waitFor(() => expect(picker.options.length).toBe(3));
-    const options = Array.from(picker.options).map((o) => o.value);
-    expect(options).toEqual(["qubit-brain4", "qubit-model", "qubit-go"]);
+      el.querySelector('[data-testid="terminal-profile-picker"]'),
+    ).toBeNull();
   });
 
   it("mounts the lazy ChatSidebar and the session list in the panel", async () => {
@@ -332,23 +327,14 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(unverified.textContent).toContain("ctx unverified");
   });
 
-  it("drives the real terminal profile picker (select -> wsTicket)", async () => {
+  it("exposes model switching through the MODEL card, not a second picker", async () => {
     await renderTerminal();
-    await vi.waitFor(() =>
-      expect(
-        container.querySelector('[data-testid="terminal-profile-picker"]'),
-      ).not.toBeNull(),
-    );
-    const picker = container.querySelector<HTMLSelectElement>(
-      '[data-testid="terminal-profile-picker"]',
-    )!;
-    expect(picker.value).toBe("qubit-model");
-
-    await act(async () => {
-      picker.value = "qubit-go";
-      picker.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    expect(apiMocks.wsTicket).toHaveBeenCalledWith("qubit-go");
+    // The lazy ChatSidebar (which owns the MODEL card + `/api/model/set`)
+    // resolves through Suspense; the extra terminal-profile picker is gone.
+    await vi.waitFor(() => expect(sidebarMount).toHaveBeenCalled());
+    expect(
+      container.querySelector('[data-testid="terminal-profile-picker"]'),
+    ).toBeNull();
   });
 
   it("resumes the ?resume session in the PTY WebSocket URL", async () => {

@@ -3616,6 +3616,121 @@ def h_platforms(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                platforms=rows)
 
 
+def _run_onboarding(cfg: Any, fn_name: str, *args: Any,
+                    model_name: Optional[str] = None,
+                    model_body: Optional[Dict[str, Any]] = None,
+                    model_pos: int = 0
+                    ) -> Tuple[int, Any]:
+    """Run a vendored channel-onboarding coroutine, mapping failures honestly.
+
+    Delegates to the real implementation (``qubit_cli.web_routers.messaging``,
+    ported 1:1 from the reference): WhatsApp spawns the local pairing process
+    whose QR the dashboard polls; Telegram drives the hosted pairing service.
+    A vendored ``HTTPException`` becomes its (status, detail); anything else
+    is ``_fail``. The QR scan itself is the confirmation, mirroring the
+    reference (no second confirm gate on apply).
+    """
+    import asyncio
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.web_routers import messaging as _M
+    except Exception as exc:
+        return _fail(exc)
+    try:
+        fn = getattr(_M, fn_name)
+        call_args = list(args)
+        if model_name is not None:
+            model_cls = getattr(_M, model_name)
+            known = set(getattr(model_cls, "model_fields", {}) or {})
+            raw = dict(model_body or {})
+            filtered = {k: v for k, v in raw.items() if k in known} if known else raw
+            call_args.insert(max(0, min(model_pos, len(call_args))),
+                             model_cls(**filtered))
+        out = asyncio.run(fn(*call_args))
+    except Exception as exc:
+        status = getattr(exc, "status_code", None)
+        if isinstance(status, int):
+            return status, {"ok": False, "code": "ONBOARDING_FAILED",
+                            "detail": _redact(str(getattr(exc, "detail", exc)))[:400]}
+        return _fail(exc)
+    if isinstance(out, dict):
+        out = dict(out)
+        out.setdefault("ok", True)
+        return 200, out
+    return 200, {"ok": True, "result": out}
+
+
+def _ob_body(b: Dict[str, Any], q: Dict[str, str]) -> Dict[str, Any]:
+    body = dict(b or {})
+    if "profile" not in body and q.get("profile"):
+        body["profile"] = q.get("profile")
+    return body
+
+
+def h_wa_ob_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    """POST /api/messaging/whatsapp/onboarding/start -> real pairing session."""
+    return _run_onboarding(cfg, "start_whatsapp_onboarding",
+                           model_name="WhatsAppOnboardingStart",
+                           model_body=_ob_body(b, q))
+
+
+def h_wa_ob_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/messaging/whatsapp/onboarding/{id} -> QR/status poll."""
+    return _run_onboarding(cfg, "get_whatsapp_onboarding_status",
+                           p.get("pairing_id", ""))
+
+
+def h_wa_ob_apply(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    """POST /api/messaging/whatsapp/onboarding/{id}/apply -> save + restart."""
+    return _run_onboarding(cfg, "apply_whatsapp_onboarding",
+                           p.get("pairing_id", ""),
+                           _ob_body(b, q).get("profile") or q.get("profile"),
+                           model_name="WhatsAppOnboardingApply",
+                           model_body=_ob_body(b, q), model_pos=1)
+
+
+def h_wa_ob_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """DELETE /api/messaging/whatsapp/onboarding/{id} -> cancel pairing."""
+    return _run_onboarding(cfg, "cancel_whatsapp_onboarding",
+                           p.get("pairing_id", ""))
+
+
+def h_tg_ob_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    """POST /api/messaging/telegram/onboarding/start -> real pairing session."""
+    return _run_onboarding(cfg, "start_telegram_onboarding",
+                           model_name="TelegramOnboardingStart",
+                           model_body=_ob_body(b, q))
+
+
+def h_tg_ob_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/messaging/telegram/onboarding/{id} -> QR/status poll."""
+    return _run_onboarding(cfg, "get_telegram_onboarding_status",
+                           p.get("pairing_id", ""))
+
+
+def h_tg_ob_apply(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    """POST /api/messaging/telegram/onboarding/{id}/apply -> save + restart."""
+    return _run_onboarding(cfg, "apply_telegram_onboarding",
+                           p.get("pairing_id", ""),
+                           _ob_body(b, q).get("profile") or q.get("profile"),
+                           model_name="TelegramOnboardingApply",
+                           model_body=_ob_body(b, q), model_pos=1)
+
+
+def h_tg_ob_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """DELETE /api/messaging/telegram/onboarding/{id} -> cancel pairing."""
+    return _run_onboarding(cfg, "cancel_telegram_onboarding",
+                           p.get("pairing_id", ""))
+
+
 def h_memory(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/memory -> live local memory store status (MemoryStatus shape)."""
@@ -7744,6 +7859,14 @@ _r("GET", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_show")
 _r("POST", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_mutate")
 _r("GET", r"/api/messaging/platforms", "h_platforms")
 _r("PUT", r"/api/messaging/platforms/(?P<id>[^/]+)", "msg_update")
+_r("POST", r"/api/messaging/whatsapp/onboarding/start", "h_wa_ob_start")
+_r("GET", r"/api/messaging/whatsapp/onboarding/(?P<pairing_id>[^/]+)", "h_wa_ob_status")
+_r("POST", r"/api/messaging/whatsapp/onboarding/(?P<pairing_id>[^/]+)/apply", "h_wa_ob_apply")
+_r("DELETE", r"/api/messaging/whatsapp/onboarding/(?P<pairing_id>[^/]+)", "h_wa_ob_cancel")
+_r("POST", r"/api/messaging/telegram/onboarding/start", "h_tg_ob_start")
+_r("GET", r"/api/messaging/telegram/onboarding/(?P<pairing_id>[^/]+)", "h_tg_ob_status")
+_r("POST", r"/api/messaging/telegram/onboarding/(?P<pairing_id>[^/]+)/apply", "h_tg_ob_apply")
+_r("DELETE", r"/api/messaging/telegram/onboarding/(?P<pairing_id>[^/]+)", "h_tg_ob_cancel")
 _r("GET", r"/api/memory", "h_memory")
 _r("GET", r"/api/memory/provider", "h_memory")
 _r("GET", r"/api/analytics", "h_analytics")
@@ -7770,7 +7893,7 @@ _r("POST", r"/api/gateway/drain", "h_gateway_drain")
 _r("GET", r"/api/gateway/migrate/plan", "h_gateway_migrate_plan")
 # Reference ``GET /api/host/identity`` (web_routers/status.py:122): proves WHO
 # owns this port. Served on the session-token-gated ``/agent`` compat surface
-# (``webui._qubit_api`` enforces ``X-Hermes-Session-Token`` before dispatch), so
+# (``webui._qubit_api`` enforces ``X-Qubit-Session-Token`` before dispatch), so
 # the reference's per-route ``_require_token`` is the same one gate.
 _r("GET", r"/api/host/identity", "h_host_identity")
 # The redacted OAuth provider catalog is registered in the GATED authority table
@@ -8244,15 +8367,6 @@ GATED: List[Dict[str, Any]] = [
     # ``mem_prov``.
     ("GET", r"/api/memory/providers/[^/]+/oauth/status", _NO_OAUTH),
     ("GET", r"/api/memory/providers/.*", "mem_prov"),
-    ("GET", r"/api/messaging/.*/onboarding.*", _g("ONBOARDING_GUIDED",
-        "Channel onboarding runs as guided manual enrollment, not an automatic token flow.",
-        "CLI `qubit auth login` + msg account ops")),
-    ("DELETE", r"/api/messaging/.*/onboarding.*", _g("ONBOARDING_GUIDED",
-        "Channel onboarding runs as guided manual enrollment, not an automatic token flow.",
-        "CLI `qubit auth login` + msg account ops")),
-    ("POST", r"/api/messaging/.*/onboarding.*", _g("ONBOARDING_GUIDED",
-        "Channel onboarding runs as guided manual enrollment, not an automatic token flow.",
-        "CLI `qubit auth login` + msg account ops")),
     ("POST", r"/api/messaging/platforms/(?P<id>[^/]+)/test", "h_msg_test_live"),
     ("POST", r"/api/mcp/servers/(?P<name>[^/]+)/test", "h_mcp_test_local"),
     ("PUT", r"/api/tools/toolsets/[^/]+/.+", "toolset_write"),
@@ -11877,11 +11991,19 @@ def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "env reference value required"}
     if not env_store.is_reference(value):
-        return _gate("SECRET_WRITE_REFUSED",
-                     "Env writes accept env:/vault:/file: references only, "
-                     "never secret values; store the secret in the OS "
-                     "keyring/manager.",
-                     "CLI `qubit auth login` (manual-handoff enrollment)")
+        # 1:1 with the reference Keys page: a pasted raw secret is written to
+        # the canonical runtime ``.env`` (secrets only), never refused. The
+        # value is stored, never echoed or logged; ``is_set`` flips on the
+        # next read. Confirm-gated + audited by the guard above.
+        try:
+            res = env_store.write_secret(cfg, name, value)
+        except ValueError as exc:
+            return 400, {"ok": False, "code": "ENV_VALUE_INVALID",
+                         "detail": _redact(str(exc))[:300]}
+        except Exception as exc:
+            return _fail(exc)
+        return _ok(ok=True, name=name, state="SET",
+                   qubit_counterpart="CLI `qubit auth status` (names only)")
     try:
         res = env_store.set_ref(cfg, name, value)
     except ValueError as exc:
@@ -11925,9 +12047,11 @@ def env_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "qubit_counterpart": "CLI `qubit auth unset <NAME>`"}
     try:
         res = env_store.remove_ref(cfg, name)
+        secret = env_store.remove_secret(cfg, name)
     except Exception as exc:
         return _fail(exc)
-    return _ok(ok=True, name=name, removed=res["removed"], count=res["count"],
+    return _ok(ok=True, name=name, removed=res["removed"] or secret["removed"],
+               count=res["count"],
                qubit_counterpart="CLI `qubit auth status` (names only)")
 
 
@@ -14792,7 +14916,12 @@ HANDLERS: Dict[str, Handler] = {
     "h_cron_job_runs": h_cron_job_runs,
     "h_logs": h_logs, "h_system_stats": h_system_stats, "h_mcp": h_mcp,
     "h_pairing_list": h_pairing_list, "h_webhooks_list": h_webhooks_list,
-    "h_platforms": h_platforms, "h_memory": h_memory,
+    "h_platforms": h_platforms,
+    "h_wa_ob_start": h_wa_ob_start, "h_wa_ob_status": h_wa_ob_status,
+    "h_wa_ob_apply": h_wa_ob_apply, "h_wa_ob_cancel": h_wa_ob_cancel,
+    "h_tg_ob_start": h_tg_ob_start, "h_tg_ob_status": h_tg_ob_status,
+    "h_tg_ob_apply": h_tg_ob_apply, "h_tg_ob_cancel": h_tg_ob_cancel,
+    "h_memory": h_memory,
     "h_analytics": h_analytics, "h_files": h_files, "h_gateway": h_gateway,
     "h_gateway_migrate_plan": h_gateway_migrate_plan,
     "h_host_identity": h_host_identity,

@@ -19,13 +19,12 @@ import "@xterm/xterm/css/xterm.css";
 import { PanelRightClose, PanelRightOpen, RotateCcw } from "lucide-react";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { api } from "@/lib/api";
-import type { TerminalProfileInfo, WsTicketGrant } from "@/lib/api";
+import type { WsTicketGrant } from "@/lib/api";
 import { WsTicketError } from "@/lib/api";
 import { terminalRefusalCopy } from "@/lib/terminal-errors";
 import { useProfileScope } from "@/contexts/useProfileScope";
 import { useI18n } from "@/i18n";
 import { ChatSessionList } from "@/components/ChatSessionList";
-import { ChatToolsSummary } from "@/components/ChatToolsSummary";
 
 // Lazily loaded so the informational dashboard event SSE stream (opened by
 // ChatSidebar) is code-split out of the base chunk — same pattern as
@@ -88,9 +87,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   );
   const [notice, setNotice] = useState<string | null>(null);
   const [grant, setGrant] = useState<WsTicketGrant | null>(null);
-  const [profiles, setProfiles] = useState<TerminalProfileInfo[]>([]);
-  const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
-  const [savingDefault, setSavingDefault] = useState(false);
+  // The profile the terminal last resolved (from the ticket grant); used when
+  // minting the next ticket and in refusal copy. Not rendered as a picker —
+  // model switching lives in the MODEL card (`/api/model/set`), like Hermes.
   const selectedRef = useRef<string | null>(null);
   // Right-side panel (model control + status + sessions), collapsible and open
   // by default, matching the Qubit `/qubit-chat` ChatPage panel.
@@ -190,7 +189,6 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
         setGrant(ticket);
         if (ticket.profile_id) {
           selectedRef.current = ticket.profile_id;
-          setSelectedProfile(ticket.profile_id);
         }
         const ws = new WebSocket(
           terminalWsUrl(ticket.ticket, cols, rows, resumeRef.current),
@@ -255,63 +253,6 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     resumeRef.current = resumeParam;
     connectRef.current();
   }, [resumeParam]);
-
-  // Model profiles for the picker (non-secret summaries with the guard
-  // verdict each). A failing list never blocks the terminal open: the
-  // ticket mint carries the real refusal.
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getTerminalProfiles()
-      .then((rows) => {
-        if (cancelled) return;
-        setProfiles(rows);
-        const current =
-          rows.find((r) => r.default) ??
-          rows.find((r) => r.meets_floor) ??
-          rows[0] ??
-          null;
-        if (current && selectedRef.current === null) {
-          selectedRef.current = current.id;
-          setSelectedProfile(current.id);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setProfiles([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleSelectProfile = (id: string) => {
-    selectedRef.current = id;
-    setSelectedProfile(id);
-    connect(id);
-  };
-
-  const handleSaveDefault = () => {
-    const id = selectedRef.current;
-    if (!id || savingDefault) return;
-    setSavingDefault(true);
-    setNotice(null);
-    api
-      .setTerminalProfile(id, (detail) => window.confirm(detail))
-      .then((res) => {
-        setProfiles((prev) =>
-          prev.map((r) => ({ ...r, default: r.id === res.profile_id })),
-        );
-        if (!res.meets_floor) {
-          setNotice(
-            `Saved '${res.profile_id}' as the /chat default, but it does ` +
-              `not meet the context floor — the terminal will refuse until ` +
-              `its window or credentials are fixed.`,
-          );
-        }
-      })
-      .catch((e: unknown) => setNotice(String(e)))
-      .finally(() => setSavingDefault(false));
-  };
 
   useEffect(() => {
     const el = hostRef.current;
@@ -490,49 +431,6 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             aria-label={modelToolsLabel}
             className="flex max-h-[50vh] min-h-0 shrink-0 flex-col gap-3 overflow-hidden lg:h-full lg:max-h-none lg:w-60"
           >
-            <section
-              aria-label="Terminal model"
-              data-testid="terminal-model-card"
-              className="flex shrink-0 flex-col gap-1.5 rounded-lg border border-current/15 bg-background-base/60 p-2"
-            >
-              <span className="text-display text-xs tracking-wider text-text-tertiary">
-                {t.app.nav.chat} terminal model
-              </span>
-              {profiles.length > 0 ? (
-                <select
-                  aria-label="Terminal model profile"
-                  data-testid="terminal-profile-picker"
-                  className="min-w-0 w-full truncate rounded border border-current/15 bg-background-base/60 px-1 py-0.5 text-xs text-text-secondary"
-                  value={selectedProfile ?? ""}
-                  onChange={(e) => handleSelectProfile(e.target.value)}
-                >
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.id} · {p.provider}/{p.model}
-                      {p.context_tokens > 0
-                        ? ` · ${(p.context_tokens / 1000).toFixed(0)}k ctx`
-                        : ""}
-                      {p.meets_floor ? "" : " · below floor"}
-                      {p.has_credential ? "" : " · no credential"}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
-              <Button
-                size="sm"
-                outlined
-                aria-label="Use selected profile for /chat"
-                onClick={handleSaveDefault}
-                disabled={!selectedProfile || savingDefault}
-              >
-                {savingDefault ? "Saving…" : "Set default"}
-              </Button>
-              <span className="text-[0.6875rem] leading-snug text-text-tertiary">
-                Sets <span className="font-mono">terminal.profile</span> for
-                this terminal. The model above the sessions list is the chat
-                model (<span className="font-mono">model.default</span>).
-              </span>
-            </section>
             <div className="shrink-0">
               <Suspense fallback={<div aria-hidden="true" className="h-24" />}>
                 {/* The MODEL card must show the model the terminal actually
@@ -552,10 +450,6 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 />
               </Suspense>
             </div>
-            {/* Read-only summary of the real tools/skills/plugins/MCP
-                registries. Independent of the PTY child: a failed fetch
-                renders a short note and never blocks the terminal. */}
-            <ChatToolsSummary profile={scopedProfile} />
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
