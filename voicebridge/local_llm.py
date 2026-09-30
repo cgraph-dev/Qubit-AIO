@@ -383,7 +383,10 @@ def _chat_payload(text: str, conversation_prompt: str, model: str,
         "model": model,
         "stream": stream,
         "keep_alive": -1,          # canonical contract: always resident
-        "options": {"num_predict": max_tokens, "temperature": 0.4,
+        # Thinking models otherwise leak their chain-of-thought into the reply
+        # (and burn the token budget); voice answers must be just the answer.
+        "think": False,
+        "options": {"num_predict": max_tokens, "temperature": 0.7,
                     "num_ctx": num_ctx,
                     "top_p": 0.9},
         "messages": [
