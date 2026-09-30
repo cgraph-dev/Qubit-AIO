@@ -118,10 +118,14 @@ def _tts_set_provider(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
         raise GatewayError(
             _BAD,
             f"unknown TTS provider {provider!r}; one of {', '.join(TTS_PROVIDERS)}")
-    body = {"config": {"tts": {"provider": provider}},
-            "confirm": _sm_bool(params, "confirm", "confirmed")}
+    confirm = _sm_bool(params, "confirm", "confirmed")
+    body = {"config": {"tts": {"provider": provider}}, "confirm": confirm}
     code, out = config_save(cfg, {}, body, {})
-    if code >= 400:
+    # ``CONFIG_NO_FIELDS`` means the provider already equals the requested value
+    # (the settings writer reports an all-unchanged body as nothing-to-apply).
+    # With confirmation that is an idempotent success; without it, the write was
+    # still unconfirmed and must stay a typed refusal.
+    if code >= 400 and not (out.get("code") == "CONFIG_NO_FIELDS" and confirm):
         raise GatewayError(str(out.get("code", "CONFIG_WRITE_FAILED")),
                            str(out.get("detail", ""))[:300])
     return {"state": "OK", "provider": provider,
