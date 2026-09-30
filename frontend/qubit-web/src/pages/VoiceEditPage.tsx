@@ -211,13 +211,19 @@ export default function VoiceEditPage() {
   const [wakeRms, setWakeRms] = useState("0.0018");
   const [wakeEngine, setWakeEngine] = useState("auto");
   const [wakeKws, setWakeKws] = useState("0.25");
+  const [wakeAsrFallback, setWakeAsrFallback] = useState(true);
+  const [wakeAsrFallbackMaxS, setWakeAsrFallbackMaxS] = useState("8");
 
   // per-app mapping: new-row draft (app class + action)
   const [newApp, setNewApp] = useState("");
   const [newAction, setNewAction] = useState("rewrite");
 
-  // advanced: STT engine text is drafted, saved on blur/Enter (like detail cues)
+  // advanced: STT engine text is drafted, saved on blur/Enter (like detail cues).
+  // service_url / stt_ws_url are PUT-only (the GET view never echoes them),
+  // so they stay blank-until-edited drafts in this session.
   const [sttEngine, setSttEngine] = useState("");
+  const [serviceUrl, setServiceUrl] = useState("");
+  const [sttWsUrl, setSttWsUrl] = useState("");
 
   // voice activity log
   const [logEvents, setLogEvents] = useState<VoiceLogEntry[]>([]);
@@ -262,11 +268,16 @@ export default function VoiceEditPage() {
     setWakeRms(String(w.rms_gate ?? 0.0018));
     setWakeEngine(w.engine ?? "auto");
     setWakeKws(String(w.kws_threshold ?? 0.25));
+    setWakeAsrFallback(w.asr_fallback !== false);
+    setWakeAsrFallbackMaxS(String(w.asr_fallback_max_s ?? 8));
   }, [settings?.wake]);
 
   useEffect(() => {
     setSttEngine(settings?.stt_engine ?? "");
-  }, [settings?.stt_engine]);
+    // PUT-only keys: adopt them only if a future backend echoes them back.
+    if (settings?.service_url !== undefined) setServiceUrl(settings.service_url ?? "");
+    if (settings?.stt_ws_url !== undefined) setSttWsUrl(settings.stt_ws_url ?? "");
+  }, [settings?.stt_engine, settings?.service_url, settings?.stt_ws_url]);
 
   useEffect(() => {
     let cancelled = false;
@@ -324,11 +335,16 @@ export default function VoiceEditPage() {
     );
     const eng = wakeEngine === "kws" || wakeEngine === "asr" ? wakeEngine : "auto";
     const phrase = wakePhrase.trim().slice(0, 60) || "hey qubit";
+    const asrMaxS = clampVoiceEditNumber(
+      Number(wakeAsrFallbackMaxS),
+      WAKE_LIMITS.asrFallbackMaxS.min, WAKE_LIMITS.asrFallbackMaxS.max,
+    );
     setWakeSilence(String(silence));
     setWakeRms(String(rms));
     setWakeKws(String(kws));
     setWakeEngine(eng);
     setWakePhrase(phrase);
+    setWakeAsrFallbackMaxS(String(asrMaxS));
     return update(
       {
         wake: {
@@ -340,11 +356,13 @@ export default function VoiceEditPage() {
           rms_gate: rms,
           engine: eng,
           kws_threshold: kws,
+          asr_fallback: wakeAsrFallback,
+          asr_fallback_max_s: asrMaxS,
         },
       },
       "wake settings saved",
     );
-  }, [update, settings?.wake?.enabled, wakePhrase, wakeSilence, wakeRms, wakeEngine, wakeKws]);
+  }, [update, settings?.wake?.enabled, wakePhrase, wakeSilence, wakeRms, wakeEngine, wakeKws, wakeAsrFallback, wakeAsrFallbackMaxS]);
 
   const runPreview = useCallback(async () => {
     setBusy(true);
@@ -557,6 +575,36 @@ export default function VoiceEditPage() {
                     : null}
                 </span>
               </label>
+              <label className="text-sm">
+                ASR fallback for spotter misses
+                <input
+                  type="checkbox"
+                  className="mt-1 block"
+                  data-testid="voice-edit-wake-asr-fallback"
+                  checked={wakeAsrFallback}
+                  onChange={(e) => setWakeAsrFallback(e.target.checked)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  When the spotter misses, transcribe short utterances once
+                  and match the wake phrase (local only).
+                </span>
+              </label>
+              <label className="text-sm">
+                Fallback max length (s)
+                <input
+                  type="number"
+                  min={WAKE_LIMITS.asrFallbackMaxS.min}
+                  max={WAKE_LIMITS.asrFallbackMaxS.max}
+                  step="1"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-wake-asr-fallback-max-s"
+                  value={wakeAsrFallbackMaxS}
+                  onChange={(e) => setWakeAsrFallbackMaxS(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Only utterances this long get a fallback probe (2–25).
+                </span>
+              </label>
             </div>
             <button
               type="button"
@@ -567,6 +615,9 @@ export default function VoiceEditPage() {
             >
               Save wake settings
             </button>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Wake-word changes take effect after the desktop helper restarts.
+            </p>
             <label className="mt-2 flex items-center gap-2 text-sm">
               Brain routing (local model decides ambiguous commands)
               <input
@@ -614,7 +665,8 @@ export default function VoiceEditPage() {
                   <option value="toggle">toggle Right-Ctrl</option>
                 </select>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Hold to talk, or press once to start and stop.
+                  Hold to talk, or press once to start and stop. Takes effect
+                  after the helper restarts.
                 </span>
               </label>
               <label className="text-sm">
@@ -1145,8 +1197,9 @@ export default function VoiceEditPage() {
             </summary>
             <p className="mb-3 mt-1 text-xs text-muted-foreground">
               Timing and behavior knobs. Values clamp to the backend ranges on
-              save. Infra endpoints (service_url, stt_ws_url) stay API-only —
-              they name helper infrastructure, not something to edit here.
+              save. Helper-connection endpoints below name helper
+              infrastructure — blank uses the built-in default; changes take
+              effect after the helper restarts.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm">
@@ -1267,6 +1320,46 @@ export default function VoiceEditPage() {
                 </select>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Fallback action when no command is recognized.
+                </span>
+              </label>
+              <label className="text-sm">
+                Helper service URL
+                <input
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-service-url"
+                  placeholder="blank = built-in default"
+                  value={serviceUrl}
+                  onChange={(e) => setServiceUrl(e.target.value)}
+                  onBlur={() => void update({ service_url: serviceUrl })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void update({ service_url: serviceUrl });
+                    }
+                  }}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Helper-connection endpoint for the desktop helper; blank uses
+                  the built-in default. Takes effect after the helper restarts.
+                </span>
+              </label>
+              <label className="text-sm">
+                Helper STT socket URL
+                <input
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-stt-ws-url"
+                  placeholder="blank = built-in default"
+                  value={sttWsUrl}
+                  onChange={(e) => setSttWsUrl(e.target.value)}
+                  onBlur={() => void update({ stt_ws_url: sttWsUrl })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void update({ stt_ws_url: sttWsUrl });
+                    }
+                  }}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Helper-connection endpoint for streaming STT; blank uses the
+                  built-in default. Takes effect after the helper restarts.
                 </span>
               </label>
             </div>

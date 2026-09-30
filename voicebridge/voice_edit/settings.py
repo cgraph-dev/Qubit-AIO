@@ -26,9 +26,15 @@ SETTINGS_KEYS = ("routing", "local_profile", "api_profile", "allow_api",
                  "brain_router", "brain_timeout_s", "wake", "block_fullscreen",
                  "beep", "debug_log", "mic_gain", "mic_target_peak",
                  "release_tail_ms", "noise_suppression", "disable_key_repeat",
-                 "answer_questions", "text_commands", "capture_source", "agc",
+                 "text_commands", "capture_source", "agc",
                  "speak_answers", "history_panel", "chat_model",
                  "detail_model", "detail_cues", "voice_recent_turns")
+# NOTE: "answer_questions" was removed from persistence+view (2026-09-30): it
+# persisted with zero readers repo-wide, and wiring a service consumer would
+# contradict the honest-UI invariant (no control may act without a rendered
+# checkbox). A stored ``voice_edit.answer_questions`` key is still tolerated
+# on read (never rejected, never deleted by a merge); it is simply no longer
+# written, validated, or surfaced.
 
 
 def _kws_available(cfg: Any) -> bool:
@@ -100,10 +106,48 @@ def _sync_live_cfg(cfg: Any, patch: Dict[str, Any]) -> None:
             node = {}
             data[section] = node
         for k, v in values.items():
+            if section == "voice_edit" and k == "per_app" and isinstance(
+                    v, dict) and not v:
+                # PUT per_app:{} clears stored mappings (a merge would keep
+                # them); anything else still deep-merges per key.
+                node.pop("per_app", None)
+                continue
             if isinstance(v, dict) and isinstance(node.get(k), dict):
                 node[k] = {**node[k], **v}
             else:
                 node[k] = v
+    _invalidate_llm_caches(patch)
+
+
+def _invalidate_llm_caches(patch: Dict[str, Any]) -> None:
+    """Drop lazy local-runner caches after an intent.local_llm.* change.
+
+    Clears in-memory snapshots only (the local style snapshot and the
+    runner-contract digest cache); in-flight requests and the file authority
+    are untouched, so new turns pick up fresh temperature/think/model values
+    with no restart.
+    """
+    try:
+        intent = patch.get("intent")
+    except Exception:
+        return
+    if not isinstance(intent, dict):
+        return
+    llm = intent.get("local_llm")
+    runner = intent.get("runner")
+    if not (isinstance(llm, dict) and llm) and not (
+            isinstance(runner, dict) and runner):
+        return
+    try:
+        from ..local_llm import reset_style_cache
+        reset_style_cache()
+    except Exception:
+        pass
+    try:
+        from ..runner_contract import reset_cache
+        reset_cache()
+    except Exception:
+        pass
 
 
 def list_local_models(cfg: Any) -> list:
@@ -204,8 +248,6 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
         "disable_key_repeat": bool(_read_cfg(cfg, "voice_edit",
                                              "disable_key_repeat",
                                              default=True)),
-        "answer_questions": bool(_read_cfg(cfg, "voice_edit",
-                                           "answer_questions", default=True)),
         "text_commands": bool(_read_cfg(cfg, "voice_edit", "text_commands",
                                         default=False)),
         "capture_source": str(_read_cfg(cfg, "voice_edit", "capture_source",
@@ -252,6 +294,11 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
             "kws_threshold": float(_read_cfg(cfg, "voice_edit", "wake",
                                              "kws_threshold", default=0.25) or
                                    0.25),
+            "asr_fallback": _read_cfg(cfg, "voice_edit", "wake",
+                                        "asr_fallback", default=True) is not False,
+            "asr_fallback_max_s": float(_read_cfg(
+                cfg, "voice_edit", "wake", "asr_fallback_max_s",
+                default=8.0) or 8.0),
             "kws_available": _kws_available(cfg),
         },
         "prompts": defaults,
@@ -331,6 +378,18 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                                          f"wake.{k} must be a number")
         if "kws_threshold" in clean_wake:
             clean_wake["kws_threshold"] = max(0.05, min(clean_wake["kws_threshold"], 0.9))
+        if "asr_fallback" in wake:
+            clean_wake["asr_fallback"] = bool(wake["asr_fallback"])
+        if "asr_fallback_max_s" in wake:
+            try:
+                clean_wake["asr_fallback_max_s"] = float(
+                    wake["asr_fallback_max_s"])
+            except (TypeError, ValueError):
+                from .schema import VoiceEditError
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     "wake.asr_fallback_max_s must be a number")
+            clean_wake["asr_fallback_max_s"] = max(
+                2.0, min(clean_wake["asr_fallback_max_s"], 25.0))
         for k in ("silence_ms", "rms_gate", "arm_window_s", "max_s"):
             if k in wake:
                 try:
@@ -389,7 +448,7 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
         raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                              "no recognised settings in request")
     for key in ("beep", "debug_log", "block_fullscreen", "noise_suppression",
-                "disable_key_repeat", "answer_questions", "text_commands",
+                "disable_key_repeat", "text_commands",
                 "speak_answers", "history_panel", "agc"):
         if key in clean:
             clean[key] = bool(clean[key])
@@ -485,6 +544,12 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
     if llm_patch:
         patch["intent"] = {"local_llm": llm_patch}
     merged = _deep_merge(data, patch)
+    if "per_app" in clean and clean["per_app"] == {}:
+        # PUT per_app:{} clears stored per-app mappings (a deep merge would
+        # silently keep them); the live-cfg sync deletes the node too.
+        ve = merged.get("voice_edit")
+        if isinstance(ve, dict):
+            ve.pop("per_app", None)
     bak = _write_yaml(path, merged)
     _sync_live_cfg(cfg, patch)
     return bak

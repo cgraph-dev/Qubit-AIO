@@ -11,6 +11,12 @@ non-wake transcript is discarded immediately and never persisted. The monitor
 pauses whenever a Right-Ctrl session is active so the two never both own the
 microphone input.
 
+KWS misses get a bounded ASR-gated fallback probe: the spotter is deaf to some
+voices at every threshold while local ASR hears them fine, so a short segment
+with no keyword hit is transcribed once and matched against the wake aliases.
+Long segments are skipped (the spotter-hit path still covers them when it
+fires). Disable with ``wake.asr_fallback: false``.
+
 Protocol:
 * the wake phrase is stripped from the transcript; the remainder is the command
   ("Hey Qubit, type this for me: X" -> "type this for me: X");
@@ -171,7 +177,8 @@ class WakeMonitor:
         self._transcribe = transcribe
         # Wake engine: a dedicated keyword spotter when available (default),
         # else the ASR-phrase fallback. The spotter never transcribes; ASR runs
-        # only for the utterance that triggered the keyword.
+        # for the utterance that triggered the keyword, plus one bounded
+        # fallback probe per short KWS-miss segment (see _asr_fallback_allows).
         self.engine = str(_cfg(cfg, "voice_edit", "wake", "engine",
                                default="auto") or "auto").lower()
         self._kws = kws
@@ -359,9 +366,16 @@ class WakeMonitor:
                             pass
                     with self._lock:
                         armed = time.monotonic() < self._armed_until
-                    # With a keyword spotter, ASR runs ONLY for the utterance
-                    # that fired the keyword (or the armed follow-up).
                     if not hit and not armed:
+                        # ASR-gated fallback for KWS misses: the spotter is
+                        # deaf to some voices at every threshold while local
+                        # ASR hears them fine. A bounded probe keeps the cost
+                        # honest (short wake utterances only); a fallback hit
+                        # emits through the same strip/arm path as asr-engine
+                        # mode, and a miss is discarded, never typed.
+                        if _asr_fallback_allows(self.cfg, pcm):
+                            _trace("asr_fallback_probe", bytes=len(pcm))
+                            self._handle_segment(pcm, forced=False)
                         continue
                 self._handle_segment(pcm, forced=hit)
         finally:
@@ -447,6 +461,33 @@ def _mic_target_peak(cfg: Any, default: float = 0.6) -> float:
             return float(default)
         except Exception:
             return 0.6
+
+
+def _asr_fallback_allows(cfg: Any, pcm: bytes) -> bool:
+    """Whether a KWS-miss segment gets one ASR-gated fallback probe.
+
+    Default ON: ``wake.asr_fallback`` (bool, default True). The probe is
+    bounded to short utterances — ``wake.asr_fallback_max_s`` seconds
+    (default 8.0, clamped 2..25) of 16 kHz mono s16 — because a wake phrase
+    with its command is short; a long segment is skipped (the spotter-hit
+    path still covers it when the spotter fires). Never raises: unreadable
+    config falls back to the defaults.
+    """
+    try:
+        on = _cfg(cfg, "voice_edit", "wake", "asr_fallback", default=True)
+        if on is None:
+            on = True
+        if not bool(on):
+            return False
+    except Exception:
+        pass
+    try:
+        max_s = float(_cfg(cfg, "voice_edit", "wake", "asr_fallback_max_s",
+                            default=8.0) or 8.0)
+    except Exception:
+        max_s = 8.0
+    max_s = max(2.0, min(max_s, 25.0))
+    return len(pcm) <= int(max_s * 16000 * 2)
 
 
 def _maybe_ns_filter(pcm: bytes, cfg: Any) -> bytes:

@@ -373,12 +373,24 @@ def _user_content(text: str, conversation_prompt: str, context: str,
 _STYLE_CACHE: Dict[str, Any] = {}
 
 
+def reset_style_cache() -> None:
+    """Forget the cached (temperature, think) snapshot.
+
+    Called after an ``intent.local_llm.*`` settings PUT so new turns use the
+    fresh values with no restart; clears the lazy snapshot only, never
+    in-flight state.
+    """
+    _STYLE_CACHE.clear()
+
+
 def _local_style() -> "tuple[float, bool]":
     """(temperature, think) for local chat from ``intent.local_llm.*``.
 
-    Cached for the process; a config change takes effect on service restart
-    (config is the authority, not a code literal). Defaults keep the varied,
-    no-chain-of-thought voice behaviour when the keys are absent.
+    Cached per process and invalidated by :func:`reset_style_cache` (wired
+    to the settings PUT path), so a config change takes effect on the next
+    turn without a service restart. Config is the authority, not a literal;
+    defaults keep the varied, no-chain-of-thought voice behaviour when the
+    keys are absent.
     """
     cached = _STYLE_CACHE.get("v")
     if cached is not None:

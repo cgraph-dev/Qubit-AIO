@@ -329,7 +329,9 @@ def test_ask_escalation_unknown_target_stays_local(monkeypatch):
     monkeypatch.setattr(GW, "run_role",
                         lambda prompt, cfg, **kw: (calls.update(kw), FakeRes())[1])
     out = svc.ask("hello", request_id="r-3", mode="chat")
-    assert out["ok"] and calls.get("profile_id") is None
+    # Unknown API target degrades to the local profile (never the resolver
+    # default): ask() always passes an explicit profile_id now.
+    assert out["ok"] and calls.get("profile_id") == "qubit-brain4"
     esc = [d for op, d in audits if op == "voice_edit.escalation"]
     assert esc and esc[-1].get("escalate") is False
     assert esc[-1].get("reason") == "unknown_api_target"
@@ -351,7 +353,9 @@ def test_ask_local_routing_never_escalates(monkeypatch):
     monkeypatch.setattr(GW, "run_role",
                         lambda prompt, cfg, **kw: (calls.update(kw), FakeRes())[1])
     svc.ask("hello", request_id="r-4", mode="chat")
-    assert calls.get("profile_id") is None
+    # routing=local resolves the local profile explicitly (default
+    # qubit-brain4) instead of falling through to the resolver default.
+    assert calls.get("profile_id") == "qubit-brain4"
     assert not [d for op, d in audits if op == "voice_edit.escalation"]
 
 

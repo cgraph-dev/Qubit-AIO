@@ -66,6 +66,11 @@ export interface VoiceEditSettings {
   default_action?: string;
   asr_device?: string;
   stt_engine?: string;
+  /** Helper-connection endpoints (PUT-only: accepted by update_voice_edit and
+   *  persisted under voice_edit.*, but not echoed by the GET settings view,
+   *  so the page treats them as blank-until-edited drafts). */
+  service_url?: string;
+  stt_ws_url?: string;
   stt_mode?: SttMode;
   stt_model?: SttModel;
   router?: VoiceRouter;
@@ -124,6 +129,10 @@ export interface VoiceEditSettings {
     kws_threshold?: number;
     /** True when a local KWS model bundle is present (read-only). */
     kws_available?: boolean;
+    /** Fall back to ASR verification when KWS is unsure (backend default true). */
+    asr_fallback?: boolean;
+    /** ASR fallback listen window, seconds (backend default 8). */
+    asr_fallback_max_s?: number;
   };
   prompts: PromptRow[];
   per_app: Record<string, string>;
@@ -214,6 +223,7 @@ export const WAKE_LIMITS = {
   silenceMs: { min: 300, max: 5000 },
   rmsGate: { min: 0.0005, max: 0.2 },
   kwsThreshold: { min: 0.05, max: 0.9 },
+  asrFallbackMaxS: { min: 2, max: 25 },
 } as const;
 
 export function clampVoiceEditNumber(v: number, lo: number, hi: number): number {

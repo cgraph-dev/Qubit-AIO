@@ -106,6 +106,17 @@ def _pcm_to_float(np: Any, pcm: bytes, sample_rate: int) -> Any:
     return np.ascontiguousarray(audio)
 
 
+_OOM_MARKERS = ("out of memory", "out-of-memory", "OOM",
+                "cudaErrorMemoryAllocation", "BFCArena",
+                "memory for requested buffer")
+
+
+def _looks_like_oom(exc: BaseException) -> bool:
+    """Heuristic: did this fail for lack of VRAM (not a broken install)?"""
+    text = str(exc)
+    return any(marker.lower() in text.lower() for marker in _OOM_MARKERS)
+
+
 def _default_loader(cfg: Any, model_name: str, pcm: bytes,
                     sample_rate: int) -> AccurateResult:
     """Decode a whole utterance with the vendored faster-whisper provider.
@@ -131,14 +142,27 @@ def _default_loader(cfg: Any, model_name: str, pcm: bytes,
     try:
         model = _get_or_load_local_model(model_id, {})
     except Exception as exc:
-        return AccurateResult(
-            ok=False, reason=_reason(f"faster-whisper load failed: {exc}"))
+        # A full GPU is routine on 8 GB cards shared with Ollama + the
+        # streaming engine: retry the load on CPU instead of failing the
+        # rescore (finals tolerate CPU latency; realtime never uses this).
+        if _looks_like_oom(exc):
+            try:
+                from tools.transcription_tools import (
+                    _replace_cached_model_on_cpu)
+                model = _replace_cached_model_on_cpu(model_id)
+            except Exception as exc2:
+                return AccurateResult(
+                    ok=False,
+                    reason=_reason(f"faster-whisper oom, cpu retry failed: {exc2}"))
+        else:
+            return AccurateResult(
+                ok=False, reason=_reason(f"faster-whisper load failed: {exc}"))
     audio = _pcm_to_float(np, pcm, sample_rate)
     kwargs = build_local_transcribe_kwargs()
     try:
         segments, _info = model.transcribe(audio, **kwargs)
     except Exception as exc:
-        if not _looks_like_cuda_lib_error(exc):
+        if not (_looks_like_cuda_lib_error(exc) or _looks_like_oom(exc)):
             return AccurateResult(
                 ok=False,
                 reason=_reason(f"faster-whisper transcribe failed: {exc}"))

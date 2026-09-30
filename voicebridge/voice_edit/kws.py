@@ -1,9 +1,10 @@
 """Local keyword-spotter wake engine (sherpa-onnx KWS).
 
 A dedicated ~3.3M-parameter streaming keyword spotter listens for the wake
-phrase only. It is tiny on CPU, needs no network, and is far more reliable than
-trying to catch a wake phrase in ASR transcripts: the expensive ASR runs only
-for the utterance that actually contained the keyword.
+phrase only. It is tiny on CPU, needs no network, and gates the expensive ASR:
+ASR runs for the utterance that contained the keyword, plus one bounded
+fallback probe per short KWS-miss segment (``wake.asr_fallback``), because the
+spotter is deaf to some voices at every threshold while local ASR hears them.
 
 This is a *keyword spotter*, not a transcription engine: it never produces text
 and is not a second ASR authority. It feeds the same command path as Right-Ctrl.

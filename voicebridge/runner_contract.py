@@ -82,8 +82,14 @@ _LOGGED_KEYS: set = set()
 
 
 def reset_cache() -> None:
-    """Test/diagnostic hook: forget cached contracts."""
+    """Test/diagnostic hook: forget cached contracts.
+
+    Clears both the per-key resolution log and the stored digests, so a
+    settings PUT that changes the model/URL (wired through the settings
+    sync) takes effect on the next resolve with no restart.
+    """
     _LOGGED_KEYS.clear()
+    _KNOWN_DIGESTS.clear()
 
 
 def _walk(node: Any, *path: str) -> Any:

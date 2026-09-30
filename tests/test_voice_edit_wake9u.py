@@ -189,7 +189,15 @@ class SeqMic:
         pass
 
 
-def test_kws_loop_runs_asr_only_on_keyword_hit():
+def test_kws_loop_hit_plus_bounded_fallback_probes():
+    """Keyword hit emits; each short KWS-miss burst gets one ASR probe.
+
+    Contract change (ASR-gated fallback, default ON): the spotter is deaf
+    to some voices at every threshold while local ASR hears them, so a
+    miss no longer means the segment is dropped unread. The hit burst runs
+    ASR forced; each short miss burst runs one fallback probe through the
+    same strip/arm path.
+    """
     calls = []
 
     def transcribe(pcm):
@@ -204,14 +212,14 @@ def test_kws_loop_runs_asr_only_on_keyword_hit():
                          silent_frame(), silent_frame()] * 3),
                     transcribe=transcribe, kws=FakeKws(hits=1))
     m.start()
-    for _ in range(60):
-        if commands:
+    for _ in range(120):
+        if len(commands) >= 3:
             break
         import time as _t
         _t.sleep(0.05)
     m.stop()
-    assert commands == ["type this for me: hi"]
-    assert len(calls) == 1  # ASR ran exactly once (the keyword utterance)
+    assert commands == ["type this for me: hi"] * 3
+    assert len(calls) == 3  # hit ASR + one fallback probe per miss burst
 
 
 def test_real_kws_model_detects_phrase_if_installed():
@@ -283,3 +291,73 @@ def test_kws_resets_after_a_hit():
     _run_loop(m, lambda: bool(commands))
     assert commands == ["what's the time"]
     assert kws.resets == 1, kws.resets
+
+
+def test_asr_fallback_fires_on_kws_miss():
+    """A KWS miss is not a dropped segment: one bounded ASR probe runs.
+
+    The spotter never fires (wrong voice for the model) but local ASR
+    hears the wake phrase — the fallback emits through the same
+    strip/arm path as asr-engine mode instead of discarding the segment.
+    """
+    from voicebridge.voice_edit.wake import _asr_fallback_allows
+    assert _asr_fallback_allows(FakeCfg(), b"\x00" * 9600) is True
+    commands = []
+    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+                    is_busy=lambda: False,
+                    mic_factory=lambda: SeqMic(
+                        [loud_frame(), loud_frame()] + [silent_frame()] * 4),
+                    transcribe=lambda pcm: "hey qubit what's the time",
+                    kws=FakeKws(hits=0))
+    _run_loop(m, lambda: bool(commands))
+    assert commands == ["what's the time"]
+
+
+def test_asr_fallback_disabled_never_transcribes_misses():
+    """Opt-out restores the old gate: misses are dropped without ASR."""
+    from voicebridge.voice_edit.wake import _asr_fallback_allows
+    cfg = FakeCfg(wake={"enabled": True, "asr_fallback": False})
+    assert _asr_fallback_allows(cfg, b"\x00" * 9600) is False
+    # A long segment is skipped even with the fallback on (bounded probe).
+    assert _asr_fallback_allows(FakeCfg(), b"\x00" * 32000 * 26) is False
+    calls = []
+    m = WakeMonitor(cfg, on_command=lambda c: None,
+                    is_busy=lambda: False,
+                    mic_factory=lambda: SeqMic(
+                        [loud_frame(), loud_frame()] + [silent_frame()] * 4),
+                    transcribe=lambda pcm: calls.append(1) or "hey qubit go",
+                    kws=FakeKws(hits=0))
+    _run_loop(m, lambda: len(calls) > 0, timeout_s=2.0)
+    assert calls == []
+
+
+def test_wake_fallback_keys_round_trip_through_settings_put(tmp_path):
+    """The new wake keys persist via PUT, clamp, and reflect in the view."""
+    from voicebridge.voice_edit import settings as settings_mod
+
+    p = tmp_path / "voice.yaml"
+    p.write_text("voice_edit:\n  enabled: true\n")
+
+    class Cfg:
+        def __init__(self):
+            self.data = {"voice_edit": {"enabled": True}}
+            self.path = p
+
+        def get(self, *path, default=None):
+            node = self.data
+            for seg in path:
+                if isinstance(node, dict) and seg in node:
+                    node = node[seg]
+                else:
+                    return default
+            return node
+
+    cfg = Cfg()
+    view = settings_mod.settings_view(cfg)
+    assert view["wake"]["asr_fallback"] is True
+    assert view["wake"]["asr_fallback_max_s"] == 8.0
+    settings_mod.update_voice_edit(
+        cfg, {"wake": {"asr_fallback": False, "asr_fallback_max_s": 99}})
+    view = settings_mod.settings_view(cfg)
+    assert view["wake"]["asr_fallback"] is False
+    assert view["wake"]["asr_fallback_max_s"] == 25.0  # clamped, not stored raw

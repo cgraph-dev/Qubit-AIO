@@ -166,3 +166,97 @@ def test_accurate_models_are_the_documented_names():
 
 def test_is_available_is_a_bool_and_does_not_raise():
     assert isinstance(is_available(FakeCfg()), bool)
+
+
+# ---------------------------------------------------------------------------
+# GPU-OOM -> CPU retry in the default loader (8 GB shared cards)
+# ---------------------------------------------------------------------------
+class _FakeSeg:
+    def __init__(self, text):
+        self.text = text
+
+
+class _FakeInfo:
+    language = "en"
+
+
+class _FakeCpuModel:
+    def __init__(self):
+        self.calls = 0
+
+    def transcribe(self, audio, **kwargs):
+        self.calls += 1
+        return [_FakeSeg("hello qubit")], _FakeInfo()
+
+
+def _stub_vendored(monkeypatch, *, load_exc=None, transcribe_exc=None):
+    """Stub the lazily-imported ``tools.*`` provider inside asr_accurate."""
+    import sys
+    import types
+    from voicebridge.voice_edit import asr_accurate as acc
+
+    monkeypatch.setattr(acc, "_preload_cuda", lambda: None)
+    monkeypatch.setattr(acc, "_ensure_runtime_path", lambda: None)
+    monkeypatch.setattr(acc, "_offline_model_id",
+                        lambda cfg, name: name)
+    cpu_model = _FakeCpuModel()
+    state = {"cpu_loads": 0}
+
+    local = types.ModuleType("tools.transcription_local")
+    local._normalize_local_model = lambda name: name
+    local.build_local_transcribe_kwargs = lambda *a, **k: {}
+    local._join_confident_segments = (
+        lambda segs, cfg: " ".join(getattr(s, "text", "") for s in segs))
+    local._looks_like_cuda_lib_error = lambda exc: False
+    tools_pkg = types.ModuleType("tools")
+    tools_pkg.__path__ = []
+    monkeypatch.setitem(sys.modules, "tools", tools_pkg)
+    monkeypatch.setitem(sys.modules, "tools.transcription_local", local)
+
+    tools_mod = types.ModuleType("tools.transcription_tools")
+
+    def _get_or_load(model_id, cfg):
+        if load_exc is not None:
+            raise load_exc
+        model = _FakeCpuModel()
+        if transcribe_exc is not None:
+            def _boom(audio, **kw):
+                raise transcribe_exc
+            model.transcribe = _boom
+        return model
+
+    def _replace_on_cpu(model_id):
+        state["cpu_loads"] += 1
+        return cpu_model
+
+    tools_mod._get_or_load_local_model = _get_or_load
+    tools_mod._replace_cached_model_on_cpu = _replace_on_cpu
+    monkeypatch.setitem(sys.modules, "tools.transcription_tools", tools_mod)
+    return cpu_model, state
+
+
+def test_default_loader_retries_on_cpu_after_load_oom(monkeypatch):
+    """A VRAM-exhausted load must not fail the rescore: retry on CPU."""
+    from voicebridge.voice_edit import asr_accurate as acc
+
+    cpu_model, state = _stub_vendored(
+        monkeypatch, load_exc=RuntimeError("CUDA out of memory: BFCArena"))
+    pcm = b"\x01\x00" * 16000  # 1 s of 16 kHz mono s16
+    out = acc._default_loader(FakeCfg(), "small", pcm, 16000)
+    assert out.ok is True and out.text == "hello qubit"
+    assert state["cpu_loads"] == 1
+    assert cpu_model.calls == 1
+
+
+def test_default_loader_retries_on_cpu_after_transcribe_oom(monkeypatch):
+    """An OOM raised mid-transcribe (lazy CUDA init) also retries on CPU."""
+    from voicebridge.voice_edit import asr_accurate as acc
+
+    cpu_model, state = _stub_vendored(
+        monkeypatch,
+        transcribe_exc=RuntimeError("cudaErrorMemoryAllocation failed"))
+    pcm = b"\x01\x00" * 16000
+    out = acc._default_loader(FakeCfg(), "small", pcm, 16000)
+    assert out.ok is True and out.text == "hello qubit"
+    assert state["cpu_loads"] == 1
+    assert cpu_model.calls == 1

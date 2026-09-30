@@ -90,6 +90,12 @@ def resolve_capture_device(cfg: Any) -> str:
     echo-cancel output is ~8x quieter than the raw interface and the plain
     device already carries AGC on top, so ``auto`` uses the raw source; the
     ``aec`` mode is available when echo cancellation is specifically wanted.
+
+    ``voice_edit.noise_suppression`` does NOT change the selected device:
+    ``auto`` keeps the raw source and layers the software NS/AGC stage
+    (``apply_capture_filter``, applied by the capture callers on the captured
+    frames) on top instead — see ``capture_params()`` for the observable
+    device + stage pair.
     """
     try:
         explicit = str(cfg.get("voice_edit", "asr_device", default="") or "")

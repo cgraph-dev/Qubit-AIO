@@ -225,3 +225,127 @@ def test_auto_send_headless_typed_refusal_never_crashes():
     assert ad.last_auto_send == outcome
     # Flag off headless is still just disabled, never an error.
     assert ad.maybe_auto_send(None) == "disabled"
+
+
+# ---------------------------------------------------------------------------
+# 1b. noise_suppression is consumed on the wake capture path (new wiring)
+# ---------------------------------------------------------------------------
+
+def _wake_monitor(cfg) -> "W.WakeMonitor":
+    return W.WakeMonitor(cfg, on_command=lambda cmd: None,
+                         is_busy=lambda: False,
+                         transcribe=lambda pcm: pcm)
+
+
+def test_wake_ns_filter_off_leaves_pcm_untouched():
+    pcm = _noisy_pcm()
+    assert W._maybe_ns_filter(pcm, FakeCfg({"voice_edit": {}})) == pcm
+    assert W._maybe_ns_filter(pcm, None) == pcm
+    assert W._maybe_ns_filter(b"", FakeCfg(
+        {"voice_edit": {"noise_suppression": True}})) == b""
+
+
+def test_wake_ns_filter_on_changes_noisy_utterance():
+    pcm = _noisy_pcm()
+    out = W._maybe_ns_filter(
+        pcm, FakeCfg({"voice_edit": {"noise_suppression": True}}))
+    assert out != pcm
+    assert len(out) == len(pcm)
+
+
+def test_wake_do_transcribe_receives_filtered_pcm_when_ns_on():
+    pcm = _noisy_pcm()
+    seen: list = []
+    mon_on = W.WakeMonitor(
+        FakeCfg({"voice_edit": {"noise_suppression": True}}),
+        on_command=lambda cmd: None, is_busy=lambda: False,
+        transcribe=lambda got: seen.append(got) or "")
+    mon_on._do_transcribe(pcm)
+    assert seen and seen[0] != pcm  # filter ran before transcription
+    seen_off: list = []
+    mon_off = W.WakeMonitor(
+        FakeCfg({"voice_edit": {}}),
+        on_command=lambda cmd: None, is_busy=lambda: False,
+        transcribe=lambda got: seen_off.append(got) or "")
+    mon_off._do_transcribe(pcm)
+    assert seen_off and seen_off[0] == pcm  # flag off: byte-identical
+
+
+def test_wake_new_mic_honours_configured_target_peak():
+    mon_cfg = _wake_monitor(FakeCfg({"voice_edit": {"mic_target_peak": 0.9}}))
+    mic = mon_cfg._new_mic()
+    assert abs(mic.target_peak - 0.9) < 1e-9
+    mon_default = _wake_monitor(FakeCfg({"voice_edit": {}}))
+    assert mon_default._new_mic().target_peak == 0.5
+
+
+# ---------------------------------------------------------------------------
+# 1c. Right-Ctrl path (voicebridge.desktop_helper): NS frame filter +
+#     configured target_peak on the mic and STT factories
+# ---------------------------------------------------------------------------
+
+class _FakeMic:
+    def __init__(self, frames):
+        self._frames = list(frames)
+        self.started = False
+        self.stopped = False
+
+    def start(self):
+        self.started = True
+
+    def stop(self):
+        self.stopped = True
+
+    def read_frame(self, timeout=0.5):
+        return self._frames.pop(0) if self._frames else None
+
+
+def test_ns_filter_mic_passthrough_off_by_construction():
+    from voicebridge.desktop_helper import _NsFilterMic
+    pcm = _noisy_pcm()
+    mic = _FakeMic([pcm, b""])
+    filt = _NsFilterMic(mic)
+    assert filt.read_frame() != pcm  # wrapper always filters (only installed when ON)
+    assert filt.started is False
+    filt.start()
+    assert mic.started is True
+    filt.stop()
+    assert mic.stopped is True
+
+
+def test_ns_filter_mic_never_raises_and_preserves_empty():
+    from voicebridge.desktop_helper import _NsFilterMic
+    mic = _FakeMic([None, b"", b"\x00"])
+    filt = _NsFilterMic(mic)
+    assert filt.read_frame() is None
+    assert filt.read_frame() == b""
+    assert filt.read_frame() == b"\x00"
+
+
+def test_desktop_helper_factories_honour_configured_target_peak():
+    from voicebridge.desktop_helper import _mic_target_peak
+    assert _mic_target_peak(
+        FakeCfg({"voice_edit": {"mic_target_peak": 0.9}})) == 0.9
+    assert _mic_target_peak(FakeCfg({"voice_edit": {}})) == 0.5
+    assert _mic_target_peak(FakeCfg(
+        {"voice_edit": {"mic_target_peak": 99}})) == 0.95  # clamped
+    assert _mic_target_peak(None) == 0.5
+
+
+def test_default_mic_factory_passes_target_peak():
+    import voicebridge.desktop_helper as DH
+    seen = {}
+
+    class _Mic:
+        def __init__(self, **kw):
+            seen.update(kw)
+
+    mon = DH.DesktopHelper.__new__(DH.DesktopHelper)
+    mon.cfg = FakeCfg({"voice_edit": {"mic_target_peak": 0.9}})
+    orig = DH.ParecMic
+    try:
+        DH.ParecMic = _Mic
+        mon._default_mic_factory()
+    finally:
+        DH.ParecMic = orig
+    assert abs(seen.get("target_peak", 0) - 0.9) < 1e-9

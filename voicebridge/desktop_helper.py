@@ -64,6 +64,47 @@ def _read_cfg(cfg: Any, *path: str, default: Any = None) -> Any:
         return default
 
 
+def _mic_target_peak(cfg: Any, default: float = 0.5) -> float:
+    """Configured ``voice_edit.mic_target_peak`` (clamped 0.05..0.95).
+
+    Mirrors ``voice_edit.wake._mic_target_peak`` for the Right-Ctrl path so
+    both capture paths share one value. Unreadable cfg → ``default``.
+    """
+    try:
+        raw = _read_cfg(cfg, "voice_edit", "mic_target_peak", default=None)
+        if raw is None:
+            return default
+        return max(0.05, min(float(raw), 0.95))
+    except Exception:
+        return default
+
+
+class _NsFilterMic:
+    """Wrap a mic; run the software NS/AGC stage on every frame read.
+
+    Only installed when ``voice_edit.noise_suppression`` is on (see
+    ``DesktopHelper._transcribe``). OFF → never constructed. Never raises out
+    of ``read_frame``: a filter fault returns the raw frame. Everything except
+    ``read_frame`` delegates to the wrapped mic.
+    """
+
+    def __init__(self, mic: Any) -> None:
+        self._mic = mic
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.__dict__["_mic"], name)
+
+    def read_frame(self, timeout: float = 0.5) -> Optional[bytes]:
+        frame = self._mic.read_frame(timeout)
+        if not frame:
+            return frame
+        try:
+            from .voice_edit.noise import apply_capture_filter
+            return apply_capture_filter(frame, True)
+        except Exception:
+            return frame
+
+
 class HelperClient:
     """Thin authenticated HTTP client for the voice-edit service."""
 
@@ -213,6 +254,7 @@ class DesktopHelper:
             url=str(_read_cfg(cfg, "voice_edit", "stt_ws_url", default="") or
                     "") or self._default_ws_url(),
             ticket=ticket,
+            target_peak=_mic_target_peak(cfg),
             engine=str(_read_cfg(cfg, "voice_edit", "stt_engine", default="") or "")))
         self._notify = notify
         self.state = self.IDLE
@@ -310,6 +352,7 @@ class DesktopHelper:
         gain = float(_read_cfg(self.cfg, "voice_edit", "mic_gain",
                                default=12.0) or 12.0)
         return ParecMic(device=device, gain=gain,
+                        target_peak=_mic_target_peak(self.cfg),
                         agc=bool(_read_cfg(self.cfg, "voice_edit", "agc",
                                            default=True)))
 
@@ -737,6 +780,18 @@ class DesktopHelper:
             return
         _trace("transcribe.ticket_ok", ticket_len=len(ticket))
         base_mic = self._mic_factory()
+        # Honest consumer of ``voice_edit.noise_suppression`` on the
+        # Right-Ctrl path: when ON, every captured frame runs through the
+        # software NS/AGC stage before either STT consumer (the streaming
+        # socket reads filtered frames live; the accurate pass decodes the
+        # filtered buffer). OFF → mic untouched. Mirrors the wake path
+        # (``voice_edit.wake._maybe_ns_filter``) at frame granularity.
+        try:
+            from .voice_edit.noise import enabled as _ns_on
+            if _ns_on(self.cfg):
+                base_mic = _NsFilterMic(base_mic)
+        except Exception:
+            pass
         # In accurate mode the streaming socket still drives live interim
         # partials; the wrapper records every frame so the same audio can be
         # decoded once by faster-whisper after release.

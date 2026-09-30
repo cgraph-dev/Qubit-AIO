@@ -2095,3 +2095,123 @@ peaks healthy, detector instant on TTS, zero hits ever).
   there). `:9119` untouched.
 - **To the owner:** say "hey qubit" — if it beeps now, the chain is proven
   on your voice; report misses/false beeps either way.
+
+## 49. Upstream muse outage moved slots to working models — 2026-09-30
+
+**No milestone claimed. No code changed (runtime state only).** Owner reports:
+agent stopped talking back; rewrite ("Funny"/LLM) does nothing.
+
+- **Single root cause: `muse-spark-1.3-contributor` is rejected upstream.**
+  `opencode-go` endpoint + key healthy (deepseek turns OK twice); the muse
+  model returns `400 ModelProtocolUnsupported` even for trivial prompts, all
+  id variants, after working hours earlier (`MUSE_OK`). Upstream
+  retired/renamed/moved it — not a routing bug (local spark17/spark4 paths
+  proven working through the same gateway).
+- **Why everything broke at once:** main slot + terminal pin both pointed
+  at muse → voice turns failed (nothing to speak) and rewrite (auto route
+  to default) failed `MALFORMED_RESPONSE`. "Type this" kept working (no
+  model needed) — matching the report exactly.
+- **Slots moved (operator intent: local default, big model for /chat):**
+  main `qubit-spark17`, terminal pin `qubit-go` (deepseek, guard OK 200k).
+  Verified: default turn `VOICEBACK_OK` (local/spark17), rewrite path OK,
+  ticket boots deepseek, model/info spark17. Service restarted.
+- **Hygiene:** a key prefix (`oc_sk_61…`) was printed to local shell output
+  during diagnosis (own machine logs only) — rotate the key at convenience.
+- **Still open:** "hey qubit" never fires (KWS acoustic weakness, §47–§48;
+  frame math fixed, detector proven on TTS, deaf on live voice at any
+  threshold); GPU at ~7.7/8 GB (whisper CPU-fallback added §49-code? no —
+  added in the uncommitted OOM Trotter? SEE NOTE). Voice `local_profile`
+  churn observed (`brain4`→`spark17` by hand/UI between reads).
+
+## 50. Voice-final fix wave — wake fallback, OOM tests, slot repair, STT bias — 2026-10-01
+
+**No milestone claimed.** All items proven by command + observed output below.
+Branch `voice-final`; concurrent MCP + skills lanes active in the same worktree
+(their files left uncommitted: `scripts/web_search.py`,
+`scripts/perplexity_search.py`, `McpPage.tsx`, `mcp_client.py`,
+`mcp_servers.py`, `test_qubit_routes_parity8u.py`, the `qubit_compat.py`
+h_logs/MCP hunks — qubit_compat grew 80→431 diff lines mid-session).
+
+- **Fix 1 — ASR-gated fallback listener (the owner-authorized option that does
+  not touch the threshold).** KWS-miss segments no longer drop unread: one
+  bounded local-only ASR probe per short segment (`wake.asr_fallback`,
+  default ON; `wake.asr_fallback_max_s`, default 8 s, clamped 2–25), through
+  the same strip/beep/emit/arm path as asr-engine mode; misses still discard,
+  never type. Privacy holds (on-device accurate/streaming only, same as the
+  existing asr-engine mode). Kill-switch `wake.asr_fallback: false` restores
+  the old gate. Files: `wake.py` (`_asr_fallback_allows` + loop + docstrings),
+  `kws.py` docstring, `settings.py` (view + PUT validation), `voiceEdit.ts`
+  (`WAKE_LIMITS.asrFallbackMaxS`), `VoiceEditPage.tsx` (checkbox + seconds +
+  save wiring), bundle rebuilt (git-ignored `qubit-dist`, new testids live).
+  Tests: reconciled `test_kws_loop_runs_asr_only_on_keyword_hit` to the new
+  contract (hit + one probe per miss burst), +2 loop invariants (fallback
+  fires on miss / disabled never transcribes + long segments skipped) +1
+  settings PUT round-trip (persist + clamp 99→25 + view reflects).
+  `test_voice_edit_wake9u.py` **21 passed**. Live: settings view
+  `asr_fallback: True, max_s: 8.0`, helper `wake_live: true, engine: kws`.
+  **Still needs the owner on cue:** say "hey qubit" — report fires AND which
+  path (`kws.hit` vs fallback `wake.command` without hit in events.jsonl).
+  Larger-KWS-model eval deliberately NOT done (nothing to evaluate against
+  without the owner's voice; TTS proves the chain, not the acoustic match).
+- **Fix 2 — whisper OOM→CPU retry is real and now test-pinned (answers the
+  §49 SEE NOTE: yes, it was the uncommitted Trotter; committed this wave).**
+  `_default_loader` retries on CPU after a load-time OOM and after a
+  mid-transcribe OOM (same `_replace_cached_model_on_cpu` singleton the
+  vendored path uses). 2 new hermetic tests in `test_asr_accurate9u.py`
+  (stubbed vendored provider; OOM on load / OOM mid-transcribe → ok=True on
+  CPU, exactly 1 CPU load). File **16 passed**. GPU at proof time: 2017/8192
+  MiB, 46% — no pressure, no OOMs observed this session.
+- **Fix 3 — upstream volatility: muse confirmed dead on the canonical path,
+  slots repaired.** `run_role(profile_id=opencode-go-muse-…)` →
+  `MALFORMED_RESPONSE` / `ModelProtocolUnsupported` (not a routing bug).
+  Working via the same path: spark17 (`local/qubit-spark17` SPARK17_OK),
+  spark4 (SPARK4_OK), brain4 (BRAIN4_OK), deepseek
+  (`opencode-go/deepseek-v4-flash` DEEPSEEK_OK). Both slots had drifted BACK
+  to the dead muse model (runtime `model.default` + `terminal.profile`);
+  moved via the sanctioned writers (`select_model` + explicit pin write,
+  backups `/tmp/runtime-config.pre-slotfix.yaml`,
+  `/tmp/voice.pre-slotfix.yaml`): main `ollama/qubit-spark17` (single
+  `default` key), pin `qubit-go`. No hardcoded retired IDs in
+  `voicebridge/` code (grep clean). Note: CLI `qubit agent -m <local>`
+  still resolves through the API provider ("Model is unavailable") — a
+  CLI-resolution quirk, not model death; the canonical gateway path (what
+  voice + both chats use) is proven per tier above.
+- **Fix 4 — slot discipline holds.** Every write rebuilt the node
+  (`_persist_runtime_model` single-key + tripwire; `_write_terminal_profile_
+  locked` atomic + backup); live slot `{provider: ollama, default:
+  spark17}`, no `model`-key merge.
+- **STT live proof + vocabulary lever.** Piper "Hello Qubit…" → real WS
+  ticket path → server `stt.final` `engine: accurate, rescore: accurate`,
+  punctuated (audit chars match). Both engines rendered "Cupid" for this
+  TTS voice (one ambiguous phoneme; no vocabulary bias anywhere) — fixed
+  with the §46-deferred lever, now live: `stt.local.initial_prompt =
+  'Qubit, hey Qubit, voice assistant.'` (runtime `config.yaml` state only,
+  revertible by clearing the key) → re-probe: **'Hello Qubit, …'
+  correct**. Note: `SttClient.engine_reported` keeps the FIRST engine seen
+  (streaming `stt.started`), so it reads nemotron even when the rescore
+  wins — client reporting quirk, the `stt.final.engine` + audit are the
+  authority.
+- **Fix 5 — CDP: owner command, no code.** `qubit doctor` still
+  `MISSING browser_cdp` (nothing on 9222; user's snap Chromium runs without
+  the flag). The approved launcher (`monitor.optional_launch`) REFUSES a
+  competing instance while their browser runs — by design, do not touch
+  their process. Owner action: quit Chromium, relaunch with
+  `--remote-debugging-port=9222` (same profile, loopback only), or enable
+  `communications.monitor.cdp_launch: true` + `qubit monitor launch` for
+  future boots. `cdp_launch` deliberately left OFF by this session.
+- **Fix 6 — as-is:** mail registry empty, computer-control DISABLED by
+  policy, no captcha built (unasked). Nothing changed.
+- **Fix 7 — pre-existing failures:** `test_packet7d` branding case fails
+  identically on pristine HEAD (proven via stash) — other lane's scope.
+  `test_compat_authority9u` 12/12 + `test_overlay_regressions` 11/11 green
+  (incl. b4_06).
+- **Evidence:** focused 366 passed / 0 failed / 0 skipped (150 model/bridge/
+  parity + 216 STT/wake/voice-edit/logs, incl. 5 new tests); frontend `tsc`
+  clean + vitest **518 passed**; `qubit doctor` green except `browser_cdp`;
+  all 3 services active; `/chat` 200; `:9119` untouched; no secrets in git
+  (key-rotation reminder from §49 stands).
+- **Committed this wave (voice lane only):** the §37 voice-edit code (was
+  uncommitted: service/routing/cache/desktop-helper/local_llm/runner/
+  asr-OOM/noise/settings/frontend + its 2 test files) + this wave's wake
+  fallback, OOM tests, and this STATUS entry. Left uncommitted (other
+  lanes): listed at top.

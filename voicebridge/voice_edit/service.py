@@ -425,11 +425,27 @@ class VoiceEditService:
                     target_application=req.target_app, transcript=transcript,
                     router="brain")
         if cmd.needs_clarification:
-            req.command = cmd
-            self._audit("voice_edit.clarify", {
-                "request_id": req.request_id, "chars": req.selection.char_count})
-            return {"ok": True, "mode": "clarify", "question": cmd.clarification,
-                    "request_id": req.request_id, "command": cmd.to_wire()}
+            fallback = self._default_action_fallback(transcript)
+            if not fallback:
+                req.command = cmd
+                self._audit("voice_edit.clarify", {
+                    "request_id": req.request_id,
+                    "chars": req.selection.char_count})
+                return {"ok": True, "mode": "clarify",
+                        "question": cmd.clarification,
+                        "request_id": req.request_id,
+                        "command": cmd.to_wire()}
+            # The router yielded no action and nothing was spoken: run the
+            # configured default action instead of asking a question the
+            # operator cannot answer with speech alone.
+            cmd = EditCommand(
+                action=fallback, style=cmd.style,
+                selected_text=req.original, request_id=req.request_id,
+                session_id=req.session_id,
+                target_application=req.target_app, transcript=transcript,
+                router="default_action")
+            self._audit("voice_edit.default_action", {
+                "request_id": req.request_id, "action": fallback})
 
         # Prefer a per-application action override when the user set one.
         if not action_override:
@@ -827,16 +843,46 @@ class VoiceEditService:
             return True, f"routing={routing}"
         return False, f"routing={routing}"
 
+    def _local_profile(self) -> str:
+        """Configured local model profile for non-escalated turns."""
+        return str(_read_cfg(self.cfg, "voice_edit", "local_profile",
+                             default="qubit-brain4") or "qubit-brain4")
+
+    def _default_action_fallback(self, transcript: str) -> str:
+        """Configured default action when the router yields no action.
+
+        Applies ONLY when nothing was actually spoken (empty transcript): a
+        real utterance the parser cannot map still gets a clarifying
+        question, never a silent substitution. Returns "" when the default
+        is "clarify" (the shipped default — behavior unchanged) or invalid.
+        """
+        if (transcript or "").strip():
+            return ""
+        try:
+            from .schema import ACTIONS
+        except Exception:
+            return ""
+        fallback = str(_read_cfg(self.cfg, "voice_edit", "default_action",
+                                 default="clarify") or "clarify")
+        if fallback == "clarify" or fallback not in ACTIONS:
+            return ""
+        return fallback
+
     def ask(self, text: str, *, request_id: str = "",
             mode: str = "answer") -> Dict[str, Any]:
         """Answer a spoken question/chat turn through the one Qubit brain.
 
         Used by the desktop helper so a question spoken while a text field is
         focused reaches the brain and returns an answer instead of typing the
-        question into the field. Never uses tools; the local profile (Brain4)
-        is the default, so no egress is required. When the recorded routing
-        decision escalates (``routing=api`` / a task under ``auto``), the
-        configured API profile is used and the decision is audited.
+        question into the field. Never uses tools. The configured local
+        profile (Brain4) is the default, so no egress is required: a
+        non-escalated turn resolves the local profile explicitly (the same
+        local runner the transform path uses) instead of falling through to
+        the resolver default, which is an API profile that fails closed on
+        stock config. When the recorded routing decision escalates
+        (``routing=api`` / a task under ``auto``), the configured API profile
+        is used and the decision is audited; an escalation with no configured
+        target degrades to local, never to the resolver default.
         """
         question = (text or "").strip()
         if not question:
@@ -858,10 +904,19 @@ class VoiceEditService:
                 # A configured target that is not a real model profile must not
                 # be handed to run_role; stay local and record the decision.
                 profile, escalate, why = "", False, "unknown_api_target"
+            elif not profile:
+                # Escalation recorded but no API target configured: stay
+                # local instead of falling through to the resolver default.
+                escalate, why = False, "no_api_profile"
             self._audit("voice_edit.escalation", {
                 "request_id": request_id, "mode": mode, "reason": why,
                 "profile": profile or "(none configured)",
                 "escalate": bool(profile)})
+        if not escalate:
+            # Non-escalated turns (routing=local, or auto answer/chat) run on
+            # the configured local profile — never profile None (the resolver
+            # default, an API profile that fails closed on stock config).
+            profile = self._local_profile()
         try:
             from ..providers import gateway as GW
             # Conversation memory: pass the bounded prior transcript as the
