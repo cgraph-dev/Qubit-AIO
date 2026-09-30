@@ -26,7 +26,7 @@ SETTINGS_KEYS = ("routing", "local_profile", "api_profile", "allow_api",
                  "brain_router", "brain_timeout_s", "wake", "block_fullscreen",
                  "beep", "debug_log", "mic_gain", "mic_target_peak",
                  "release_tail_ms", "noise_suppression", "disable_key_repeat",
-                 "answer_questions", "text_commands", "capture_source",
+                 "answer_questions", "text_commands", "capture_source", "agc",
                  "speak_answers", "history_panel", "chat_model",
                  "detail_model", "detail_cues", "voice_recent_turns")
 
@@ -210,6 +210,7 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
                                         default=False)),
         "capture_source": str(_read_cfg(cfg, "voice_edit", "capture_source",
                                         default="auto") or "auto"),
+        "agc": bool(_read_cfg(cfg, "voice_edit", "agc", default=True)),
         "speak_answers": bool(_read_cfg(cfg, "voice_edit", "speak_answers",
                                         default=True)),
         "history_panel": bool(_read_cfg(cfg, "voice_edit", "history_panel",
@@ -389,7 +390,7 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                              "no recognised settings in request")
     for key in ("beep", "debug_log", "block_fullscreen", "noise_suppression",
                 "disable_key_repeat", "answer_questions", "text_commands",
-                "speak_answers", "history_panel"):
+                "speak_answers", "history_panel", "agc"):
         if key in clean:
             clean[key] = bool(clean[key])
     for key in ("mic_gain", "mic_target_peak"):

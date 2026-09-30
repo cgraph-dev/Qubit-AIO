@@ -98,9 +98,9 @@ const TTS_PROVIDER_HELP: Record<TtsProvider, string> = {
 };
 
 const CAPTURE_SOURCE_HELP: Record<string, string> = {
-  auto: "Let Qubit choose — echo cancellation when the system offers it.",
-  raw: "Unprocessed device input; best for a clean external microphone.",
-  aec: "Acoustic echo cancellation; removes speaker output the mic re-hears.",
+  auto: "Browser-grade capture: noise suppression + high-pass + auto gain (what Firefox does).",
+  raw: "Unprocessed device input; loudest but noisiest — good only for a clean external mic.",
+  aec: "Processed source with echo cancellation; removes speaker output the mic re-hears.",
 };
 
 /** A select over the local models actually installed on this machine.
@@ -124,7 +124,17 @@ function ModelSelect({
   help: string;
   onChange: (value: string) => void;
 }) {
-  const installed = models.some((m) => m.name === value);
+  // Ollama lists tags as `name:latest` while the config stores `name`; match
+  // and de-duplicate on the base name so a configured model never looks
+  // "not installed" just because of the `:tag` suffix.
+  const base = (s: string) => s.split(":")[0];
+  const seen = new Map<string, LocalModel>();
+  for (const m of models) {
+    const b = base(m.name);
+    if (b && !seen.has(b)) seen.set(b, { name: b, size_bytes: m.size_bytes });
+  }
+  const opts = [...seen.values()];
+  const installed = !value || opts.some((m) => m.name === base(value));
   return (
     <label className="text-sm">
       {label}
@@ -138,7 +148,7 @@ function ModelSelect({
         {value && !installed ? (
           <option value={value}>{value} (not installed on this machine)</option>
         ) : null}
-        {models.map((m) => (
+        {opts.map((m) => (
           <option key={m.name} value={m.name}>
             {m.name} ({formatModelSize(m.size_bytes)})
           </option>
@@ -577,7 +587,7 @@ export default function VoiceEditPage() {
                   value={captureSource}
                   onChange={(e) => void update({ capture_source: e.target.value })}
                 >
-                  <option value="auto">Auto (echo-cancel when available)</option>
+                  <option value="auto">Auto (browser-grade AGC + noise suppression)</option>
                   <option value="raw">Raw device input</option>
                   <option value="aec">Echo cancellation</option>
                 </select>
