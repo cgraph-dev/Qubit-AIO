@@ -150,11 +150,11 @@ class VoiceEditService:
         if not answer:
             return
         try:
-            from ..agent import _persist_session_turn, resolve_session_id
+            from ..agent import _persist_session_turn
             store = self._canonical_store()
             if store is None:
                 return
-            sid = resolve_session_id(self.cfg, None)
+            sid = self._voice_session()
             _persist_session_turn(store, sid, "user", question,
                                   model=model or None)
             _persist_session_turn(store, sid, "assistant", answer,
@@ -238,7 +238,12 @@ class VoiceEditService:
                                         default=False)),
             "request_ttl_s": self.ttl(),
             "active_requests": len(self._reqs),
-            "privacy": "no selected text is logged or persisted",
+            "privacy": (
+                "debug logging is ON: spoken transcript and dictated text "
+                "are recorded locally"
+                if _dbg.enabled(self.cfg)
+                else "no selected text is logged or persisted"
+            ),
         }
 
     def begin(self, *, session_id: str = "", request_id: str = "",
@@ -630,37 +635,6 @@ class VoiceEditService:
                 "discarded_interim_only": not req.applied,
                 "request_id": request_id}
 
-    def _voice_session(self) -> str:
-        """The stable session id for the spoken conversation.
-
-        A dedicated session keeps the voice dialogue coherent instead of
-        mixing it with unrelated dashboard/chat turns (and test probes) in the
-        shared default session; it is still the SAME one canonical store.
-        """
-        try:
-            from ..agent import resolve_session_id
-            return resolve_session_id(self.cfg, "voice-chat")
-        except Exception:
-            return "voice-chat"
-
-    def _conversation_context(self, pending: str) -> str:
-        """Bounded prior-turn context from the ONE canonical session store.
-
-        Reuses :func:`voicebridge.agent._session_context` (the same
-        ``context_policy`` window ``/qubit-chat`` and the worker turns use), so
-        a spoken follow-up sees what was just said instead of starting blank.
-        """
-        try:
-            from ..agent import _session_context
-            store = self._canonical_store()
-            if store is None:
-                return ""
-            text, _meta = _session_context(store, self._voice_session(),
-                                           self.cfg, pending)
-            return str(text or "")
-        except Exception:  # noqa: BLE001 - context is additive, non-fatal
-            return ""
-
     def _personal_context(self) -> str:
         """The operator's canonical personal knowledge (bounded).
 
@@ -686,6 +660,66 @@ class VoiceEditService:
         except Exception:  # noqa: BLE001 - additive, never fatal
             pass
         return ""
+
+    def _voice_session(self) -> str:
+        """The stable session id for the spoken conversation.
+
+        A dedicated session keeps the voice dialogue coherent instead of
+        mixing it with unrelated dashboard/chat turns (and test probes) in the
+        shared default session; it is still the SAME one canonical store.
+        """
+        try:
+            from ..agent import resolve_session_id
+            return resolve_session_id(self.cfg, "voice-chat")
+        except Exception:
+            return "voice-chat"
+
+    def _conversation_context(self, pending: str) -> str:
+        """Recency-weighted prior-turn context from the ONE canonical store.
+
+        The most recent turns are rendered verbatim and LAST, with an explicit
+        "the last user line is the current topic / resolve pronouns to it"
+        directive; older turns are folded into a short background gist. This
+        keeps a follow-up ("and what is it known for?") anchored to the current
+        subject instead of an older, louder topic.
+        """
+        try:
+            store = self._canonical_store()
+            if store is None:
+                return ""
+            msgs = [m for m in
+                    store.messages(self._voice_session(), limit=200)
+                    .get("messages", [])
+                    if isinstance(m, dict)
+                    and str(m.get("content") or "").strip()]
+            if not msgs:
+                return ""
+            try:
+                recent_n = int(_read_cfg(self.cfg, "voice_edit",
+                                         "voice_recent_turns",
+                                         default=10) or 10)
+            except (TypeError, ValueError):
+                recent_n = 10
+            recent_n = max(2, min(recent_n, 40))
+            recent = msgs[-recent_n:]
+            older = msgs[:-recent_n]
+            parts: list = []
+            if older:
+                gist = " | ".join(
+                    f"{'U' if m.get('role') == 'user' else 'Q'}: "
+                    f"{' '.join(str(m.get('content', '')).split())[:70]}"
+                    for m in older[-12:])
+                parts.append("[earlier background — NOT the current topic]\n"
+                             + gist)
+            parts.append("[most recent turns — the LAST user line is the "
+                         "CURRENT topic; resolve 'it'/'that' to it]")
+            for m in recent:
+                role = "User" if m.get("role") == "user" else "Qubit"
+                txt = " ".join(str(m.get("content", "")).split())[:800]
+                parts.append(f"{role}: {txt}")
+            return "\n".join(parts)
+        except Exception:  # noqa: BLE001 - context is additive, non-fatal
+            return ""
 
     def _known_model_profile(self, profile_id: str) -> bool:
         """True when ``profile_id`` names a real configured model profile.
@@ -754,6 +788,10 @@ class VoiceEditService:
                 "escalate": bool(profile)})
         try:
             from ..providers import gateway as GW
+            # Conversation memory: pass the bounded prior transcript as the
+            # structured conversation_prompt (the adapter formats dialogue
+            # correctly); folding it into the prompt string made the small
+            # local model echo the last answer.
             convo = self._conversation_context(question)
             res = GW.run_role(question, self.cfg, role="chat",
                               profile_id=profile or None,
@@ -838,7 +876,8 @@ class VoiceEditService:
         # one canonical session store (inside run_session) and are audited.
         try:
             from .tool_task import run_tool_task
-            res = run_tool_task(self.cfg, clean, estop_engaged=self._estop)
+            res = run_tool_task(self.cfg, clean, confirmed=True,
+                                estop_engaged=self._estop)
         except Exception as exc:
             code = str(getattr(exc, "code", "") or "VOICE_EDIT_TASK_FAILED")
             self._audit("voice_edit.task.error", {
@@ -859,7 +898,9 @@ class VoiceEditService:
         if not ok:
             return {"ok": False, "mode": "task_result",
                     "code": str(res.get("code") or "VOICE_EDIT_TASK_EMPTY"),
-                    "detail": str(res.get("detail", "") or "")[:200]}
+                    "detail": str(res.get("detail", "") or "")[:200],
+                    "reply": reply, "tool_used": tool_used,
+                    "task_text": clean, "request_id": request_id}
         return {"ok": True, "mode": "task_result", "reply": reply,
                 "tool_used": tool_used, "task_text": clean,
                 "request_id": request_id,

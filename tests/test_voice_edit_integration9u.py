@@ -187,6 +187,7 @@ def test_task_refuses_without_confirm_and_runs_with_confirm(monkeypatch):
     def fake_run(cfg, text, **kw):
         calls["text"] = text
         calls["tool"] = kw.get("execute_tool_fn")
+        calls["confirmed"] = kw.get("confirmed")
         return {"state": "OK", "reply": "Found 3 results.",
                 "tool_used": "web.search", "session": "s1"}
 
@@ -198,6 +199,7 @@ def test_task_refuses_without_confirm_and_runs_with_confirm(monkeypatch):
     assert out["reply"] == "Found 3 results."
     assert out["tool_used"] == "web.search"
     assert calls["text"] == "search the web for qubits"
+    assert calls["confirmed"] is True
     assert any(op == "voice_edit.task.run" for op, _ in audits)
     assert any(op == "voice_edit.task.result" for op, _ in audits)
 
@@ -212,6 +214,21 @@ def test_task_confirm_refusal_audited_but_not_run(monkeypatch):
         svc.task("do something", confirm=False)
     assert ran["n"] == 0
     assert any(op == "voice_edit.task.confirm_required" for op, _ in audits)
+
+
+# ---------------------------------------------------------------------------
+# truthful privacy status
+# ---------------------------------------------------------------------------
+def test_status_privacy_reflects_debug_log():
+    svc_off, _ = _service()
+    assert svc_off.status()["privacy"] == \
+        "no selected text is logged or persisted"
+
+    svc_on, _ = _service(cfg=_cfg(debug_log=True))
+    privacy = svc_on.status()["privacy"]
+    assert privacy != "no selected text is logged or persisted"
+    low = privacy.lower()
+    assert "logging" in low and "record" in low
 
 
 def test_execute_tool_dispatches_through_the_broker(monkeypatch):
@@ -366,6 +383,10 @@ class FakeHelperClient:
     def ask(self, text, rid=""):
         self.calls.append(("ask", text, rid))
         return "The answer."
+
+    def speak(self, text):
+        self.calls.append(("speak", text))
+        return b""
 
     def cancel(self, rid):
         return {}

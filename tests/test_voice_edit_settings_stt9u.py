@@ -51,6 +51,13 @@ def _cfg(tmp_path: Path) -> FakeCfg:
     return FakeCfg({"voice_edit": {"enabled": True}}, path=p)
 
 
+def _fresh_cfg(tmp_path: Path) -> FakeCfg:
+    """A second, untouched config target for export -> import round-trips."""
+    p = tmp_path / "voice2.yaml"
+    p.write_text("voice_edit:\n  enabled: true\n")
+    return FakeCfg({"voice_edit": {"enabled": True}}, path=p)
+
+
 # ---------------------------------------------------------------------------
 # defaults
 # ---------------------------------------------------------------------------
@@ -201,3 +208,80 @@ def test_import_rejects_invalid_values(tmp_path, key, value):
     assert exc.value.code == "VOICE_EDIT_BAD_SETTINGS"
     # nothing persisted through the failed import
     assert key not in p2.read_text()
+
+
+# ---------------------------------------------------------------------------
+# default action: export and import agree on the ``default_prompt`` wire key
+# ---------------------------------------------------------------------------
+def test_export_emits_default_prompt_not_default_action(tmp_path):
+    cfg = _cfg(tmp_path)
+    settings_mod.update_voice_edit(cfg, {"default_action": "summarize"})
+    exported = settings_mod.export_settings(cfg)
+    # The public/exported key is ``default_prompt`` (what settings_view returns);
+    # the persisted ``default_action`` key must not leak into the export.
+    assert exported["settings"]["default_prompt"] == "summarize"
+    assert "default_action" not in exported["settings"]
+
+
+def test_export_import_round_trips_default_prompt(tmp_path):
+    cfg = _cfg(tmp_path)
+    settings_mod.update_voice_edit(cfg, {"default_action": "summarize"})
+    exported = settings_mod.export_settings(cfg)
+
+    cfg2 = _fresh_cfg(tmp_path)
+    settings_mod.import_settings(cfg2, exported)
+    assert settings_mod.settings_view(cfg2)["default_prompt"] == "summarize"
+    # ... persisted under the canonical internal key.
+    assert "default_action: summarize" in cfg2.path.read_text()
+
+
+def test_import_accepts_legacy_default_action_key(tmp_path):
+    cfg = _fresh_cfg(tmp_path)
+    settings_mod.import_settings(cfg, {"settings": {"default_action": "email"}})
+    assert settings_mod.settings_view(cfg)["default_prompt"] == "email"
+
+
+def test_import_accepts_default_prompt_wire_key(tmp_path):
+    cfg = _fresh_cfg(tmp_path)
+    settings_mod.import_settings(cfg, {"settings": {"default_prompt": "shorten"}})
+    assert settings_mod.settings_view(cfg)["default_prompt"] == "shorten"
+
+
+@pytest.mark.parametrize("key", ["default_prompt", "default_action"])
+def test_import_rejects_invalid_default_action(tmp_path, key):
+    cfg = _fresh_cfg(tmp_path)
+    with pytest.raises(VoiceEditError) as exc:
+        settings_mod.import_settings(cfg, {"settings": {key: "bogus"}})
+    assert exc.value.code == "VOICE_EDIT_BAD_SETTINGS"
+    assert "bogus" not in cfg.path.read_text()
+
+
+@pytest.mark.parametrize("key", ["default_prompt", "default_action"])
+def test_update_rejects_invalid_default_action(tmp_path, key):
+    cfg = _cfg(tmp_path)
+    with pytest.raises(VoiceEditError) as exc:
+        settings_mod.update_voice_edit(cfg, {key: "bogus"})
+    assert exc.value.code == "VOICE_EDIT_BAD_SETTINGS"
+
+
+def test_export_import_round_trips_new_keys_including_default_prompt(tmp_path):
+    cfg = _cfg(tmp_path)
+    settings_mod.update_voice_edit(cfg, {
+        "stt_mode": "accurate",
+        "stt_model": "small",
+        "router": "deterministic",
+        "asr_device": "qubit_aec",
+        "stt_engine": "nemotron-560ms",
+        "default_action": "humanize",
+    })
+    exported = settings_mod.export_settings(cfg)
+
+    cfg2 = _fresh_cfg(tmp_path)
+    settings_mod.import_settings(cfg2, exported)
+    view = settings_mod.settings_view(cfg2)
+    assert view["stt_mode"] == "accurate"
+    assert view["stt_model"] == "small"
+    assert view["router"] == "deterministic"
+    assert view["asr_device"] == "qubit_aec"
+    assert view["stt_engine"] == "nemotron-560ms"
+    assert view["default_prompt"] == "humanize"

@@ -10,6 +10,7 @@ Each action returns a short spoken status string.
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -180,6 +181,41 @@ def _a_open_project(params: Dict[str, Any]) -> str:
         return f"Could not open VS Code: {exc}"
 
 
+def _screenshot_candidates(out: str) -> List[List[str]]:
+    """Ordered on-PATH backends, each writing exactly to ``out``.
+
+    ``import`` is X11-only and requires ``DISPLAY``; the ``xwd | convert``
+    fallback requires both binaries. Only what actually exists on PATH is
+    offered, so a missing tool is never invoked.
+    """
+    candidates: List[List[str]] = []
+    if shutil.which("gnome-screenshot"):
+        candidates.append(["gnome-screenshot", "-f", out])
+    if shutil.which("scrot"):
+        candidates.append(["scrot", out])
+    if shutil.which("spectacle"):
+        candidates.append(["spectacle", "-b", "-n", "-o", out])
+    if shutil.which("grim"):
+        candidates.append(["grim", out])
+    if shutil.which("maim"):
+        candidates.append(["maim", out])
+    if os.environ.get("DISPLAY") and shutil.which("import"):
+        candidates.append(["import", "-window", "root", out])
+    if shutil.which("xwd") and shutil.which("convert"):
+        cmd = "xwd -root -silent | convert xwd:- %s" % shlex.quote(out)
+        candidates.append(["sh", "-c", cmd])
+    return candidates
+
+
+def _screenshot_written(out: str) -> bool:
+    """True only when a real, non-empty file exists at ``out``."""
+    p = Path(out)
+    try:
+        return p.is_file() and p.stat().st_size > 0
+    except OSError:
+        return False
+
+
 def _a_screenshot(_: Dict[str, Any]) -> str:
     d = _screenshot_dir()
     try:
@@ -187,13 +223,22 @@ def _a_screenshot(_: Dict[str, Any]) -> str:
     except OSError:
         return "Screenshot folder unavailable."
     out = str(d / ("screenshot-%s.png" % __import__("time").strftime("%Y%m%d-%H%M%S")))
-    if shutil.which("gnome-screenshot"):
-        _run(["gnome-screenshot", "-f", out])
-    elif shutil.which("scrot"):
-        _run(["scrot", out])
-    else:
-        return "No screenshot tool found."
-    return "Screenshot saved."
+    for argv in _screenshot_candidates(out):
+        try:
+            _run(argv)
+        except Exception:
+            pass
+        if _screenshot_written(out):
+            return "Screenshot saved."
+        # drop an empty/partial artifact so the next backend starts clean
+        try:
+            p = Path(out)
+            if p.exists() and p.stat().st_size == 0:
+                p.unlink()
+        except OSError:
+            pass
+    return ("No screenshot tool found "
+            "(install scrot/gnome-screenshot/ImageMagick).")
 
 
 # --- YouTube playback state + controls ------------------------------------

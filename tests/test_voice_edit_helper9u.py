@@ -71,6 +71,10 @@ class FakeClient:
         self.calls.append(("ticket",))
         return "ticket-123"
 
+    def speak(self, text):
+        self.calls.append(("speak", text))
+        return b""
+
     def transform(self, rid, transcript):
         self.calls.append(("transform", rid, transcript))
         if self._mode == "dictate":

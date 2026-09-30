@@ -295,6 +295,11 @@ class VoiceRouter:
             elif _looks_like_question(task):
                 d = RouteDecision("answer", reason="question", task_text=task,
                                   intent=intent)
+            elif self._strong_task_signal(task):
+                # A genuine actionable request that merely contained a system
+                # keyword ("help me write a python function") is still a task.
+                d = RouteDecision("task", reason="system_non_actionable_action",
+                                  task_text=task, intent=intent)
             else:
                 d = RouteDecision("chat", reason="system_non_actionable",
                                   task_text=task, intent=intent)
@@ -312,6 +317,21 @@ class VoiceRouter:
 
     def _heuristic_kind(self, text: str) -> str:
         return "agent" if _ACTION_VERB_RE.search(text or "") else "conversation"
+
+    def _strong_task_signal(self, text: str) -> bool:
+        """A strong task hint from the shared classifier (score >= 1.0).
+
+        Reuses the ONE classifier's own ``_task_hint_score`` when exposed;
+        a classifier that does not expose it yields no signal (conservative),
+        so a pleasantry that merely matched a system keyword stays chat.
+        """
+        clf = self._classifier
+        if clf is None or not hasattr(clf, "_task_hint_score"):
+            clf = self._get_classifier()
+        try:
+            return float(clf._task_hint_score(text)) >= 1.0
+        except Exception:
+            return False
 
     # -- rule 7 ----------------------------------------------------------
     def _apply_escalation(self, d: RouteDecision) -> None:

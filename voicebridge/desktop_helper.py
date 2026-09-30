@@ -148,6 +148,16 @@ class HelperClient:
                             timeout=90.0)
         return str(out.get("answer", "") or "")
 
+    def speak(self, text: str) -> bytes:
+        """Render ``text`` with the ONE local TTS authority (returns WAV bytes)."""
+        import base64
+        out = self._request("POST", "/api/audio/speak", {"text": text},
+                            timeout=60.0)
+        url = str(out.get("data_url", "") or "")
+        if not url.startswith("data:audio/"):
+            return b""
+        return base64.b64decode(url.split(",", 1)[1])
+
     def mint_stt_ticket(self) -> str:
         out = self._request("POST", "/api/auth/ws-ticket", {"scope": "stt"},
                             timeout=10)
@@ -232,6 +242,8 @@ class DesktopHelper:
         self._final_engine = ""
         # A staged actionable task awaiting an explicit confirmation.
         self._pending_task: Dict[str, Any] = {}
+        # True while Qubit is speaking its reply (voice conversation).
+        self._speaking = False
         # Accurate-model prewarm readiness (explicit, not blind): the background
         # prewarm sets the event/state, and the first activation waits for it
         # with a bounded timeout so the user is never left waiting blind.
@@ -294,7 +306,9 @@ class DesktopHelper:
         device = _noise.resolve_capture_device(self.cfg)
         gain = float(_read_cfg(self.cfg, "voice_edit", "mic_gain",
                                default=12.0) or 12.0)
-        return ParecMic(device=device, gain=gain)
+        return ParecMic(device=device, gain=gain,
+                        agc=bool(_read_cfg(self.cfg, "voice_edit", "agc",
+                                           default=True)))
 
     def _default_ws_url(self) -> str:
         base = resolve_service_base(self.cfg)
@@ -335,6 +349,7 @@ class DesktopHelper:
                 self.cfg, on_command=self.on_wake_command,
                 is_busy=lambda: (self.state in (self.LISTENING,
                                                 self.PROCESSING)
+                                 or getattr(self, "_speaking", False)
                                  or self._fullscreen_active()))
             if self._wake.enabled():
                 self._wake.start()
@@ -541,6 +556,26 @@ class DesktopHelper:
 
     def _ui_error(self, code: str, detail: str) -> None:
         self._ui(self.overlay.show_error, code, detail)
+
+    def _history(self, kind: str, heard: str, result: str) -> None:
+        """Append one interaction to the panel's persistent history.
+
+        Shows the panel (without stealing keyboard focus) when
+        ``voice_edit.history_panel`` is on, so the user can see what was heard
+        and what happened after the text has been inserted/sent.
+        """
+        try:
+            import time as _t
+            ts = _t.strftime("%H:%M:%S")
+            h = " ".join(str(heard or "").split())[:160]
+            r = " ".join(str(result or "").split())[:240]
+            line = f"{ts}  {kind}: heard {h!r} -> {r!r}"
+            self._ui(self.overlay.append_history, line)
+            if bool(_read_cfg(self.cfg, "voice_edit", "history_panel",
+                              default=True)):
+                self._ui(self.overlay.show)
+        except Exception:
+            pass
 
     # -- capture / listening --------------------------------------------
     def _warm_timeout_s(self) -> float:
@@ -853,6 +888,8 @@ class DesktopHelper:
             self.state = self.PREVIEW
             self._preview = out
             self._ui_preview(out)
+            self._history("edit", text,
+                          str((out.get("detected") or {}).get("action", "")))
         else:
             self._ui_error(str(out.get("code", "VOICE_EDIT_ERROR")),
                            str(out.get("detail", "")))
@@ -925,6 +962,8 @@ class DesktopHelper:
                 "facts_dropped": [], "elapsed_ms": 0, "target_app": ""}
             self._ui_preview(self._preview)
             self._notify_status("Qubit", reply[:200])
+            self._history("task", text, reply)
+            self._speak(reply)
             return
         self._ui_error(str(out.get("code", "VOICE_EDIT_TASK_EMPTY")),
                        str(out.get("detail", "")))
@@ -932,7 +971,7 @@ class DesktopHelper:
         self._finish_error()
 
     def _answer_question(self, question: str, *, mode: str = "answer") -> None:
-        """Ask the Qubit brain and display the answer in the overlay."""
+        """Ask the Qubit brain, display the answer, and speak it aloud."""
         self._ui_status("processing", "answering…")
         try:
             reply = self.client.ask(question, self.request_id)
@@ -953,6 +992,52 @@ class DesktopHelper:
             "privacy_mode": "local", "injection_suspected": False,
             "facts_dropped": [], "elapsed_ms": 0,
             "target_app": (self.snapshot.app_class if self.snapshot else "")})
+        # Voice conversation: speak the answer (one TTS authority).
+        self._history(mode, question, reply)
+        self._speak(reply)
+
+    def _speak(self, text: str) -> None:
+        """Speak ``text`` through the service's TTS, played locally.
+
+        Best-effort and non-fatal: a TTS/playback failure never changes the
+        answer that was already shown. Disable with ``voice_edit.speak_answers``.
+        """
+        if not text or not bool(_read_cfg(self.cfg, "voice_edit",
+                                          "speak_answers", default=True)):
+            return
+        import os
+        import shutil
+        import subprocess
+        import tempfile
+        try:
+            wav = self.client.speak(str(text)[:600])
+        except HelperError as exc:
+            _trace("speak_error", code=exc.code)
+            return
+        if not wav:
+            return
+        player = "paplay" if shutil.which("paplay") else (
+            "aplay" if shutil.which("aplay") else "")
+        if not player:
+            return
+        path = ""
+        self._speaking = True
+        try:
+            fd, path = tempfile.mkstemp(suffix=".wav", prefix="qubit-answer-")
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(wav)
+            _trace("speak", chars=len(text))
+            subprocess.run([player, path], timeout=90, check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as exc:  # never fatal
+            _trace("speak_failed", detail=str(exc)[:120])
+        finally:
+            self._speaking = False
+            if path:
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
 
     def _insert_dictation(self, text: str) -> None:
         if not text:
@@ -968,6 +1053,8 @@ class DesktopHelper:
             _trace("insert.blocked_fullscreen", chars=len(text))
             self._ui_status("error",
                             "fullscreen window: text copied to clipboard")
+            self._history("dictate", self._transcript,
+                          "(blocked: fullscreen — copied to clipboard)")
             self._finish_error()
             return
         if self.snapshot is not None and self.snapshot.window_id:
@@ -979,11 +1066,14 @@ class DesktopHelper:
                **(_dbg.text_fields(self.cfg, inserted=text)))
         if res.ok:
             self._ui_status("done", "dictation inserted")
+            self._history("dictate", self._transcript, text)
         else:
             # Truthful fallback: put the text on the clipboard.
             self.desktop.set_clipboard(text)
             self._ui_status(
                 "error", f"{res.code}: text copied to clipboard instead")
+            self._history("dictate", self._transcript,
+                          f"(failed {res.code}: copied to clipboard)")
         self._finish_error()
 
     # -- preview actions --------------------------------------------------

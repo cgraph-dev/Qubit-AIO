@@ -112,7 +112,10 @@ def handle(cfg: Any, method: str, api_path: str,
                 _require_body_str(body, "text"),
                 confirm=bool(body.get("confirm", False)),
                 request_id=_require_body_str(body, "request_id"))
-            return (200 if out.get("ok") else 409), out
+            # A well-formed task outcome is 200 even when the tool itself
+            # reported a typed failure (e.g. web search unconfigured); the
+            # confirm-required refusal is a VoiceEditError -> 409 above.
+            return 200, out
         if path == "/api/voice-edit/session" and method == "POST":
             out = svc.begin(session_id=_require_body_str(body, "session_id"),
                             request_id=_require_body_str(body, "request_id"),

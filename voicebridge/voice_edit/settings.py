@@ -20,13 +20,14 @@ from .schema import ACTIONS
 
 SETTINGS_KEYS = ("routing", "local_profile", "api_profile", "allow_api",
                  "confirm_before_replace", "auto_send", "insertion_method",
-                 "default_action", "enabled", "asr_device", "stt_engine",
-                 "stt_mode", "stt_model", "router",
+                 "default_action", "default_prompt", "enabled", "asr_device",
+                 "stt_engine", "stt_mode", "stt_model", "router",
                  "hotkey_mode", "service_url", "stt_ws_url", "request_ttl_s",
                  "brain_router", "brain_timeout_s", "wake", "block_fullscreen",
                  "beep", "debug_log", "mic_gain", "mic_target_peak",
                  "release_tail_ms", "noise_suppression", "disable_key_repeat",
-                 "answer_questions", "text_commands", "capture_source")
+                 "answer_questions", "text_commands", "capture_source",
+                 "speak_answers", "history_panel")
 
 
 def _kws_available(cfg: Any) -> bool:
@@ -183,6 +184,10 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
                                         default=False)),
         "capture_source": str(_read_cfg(cfg, "voice_edit", "capture_source",
                                         default="auto") or "auto"),
+        "speak_answers": bool(_read_cfg(cfg, "voice_edit", "speak_answers",
+                                        default=True)),
+        "history_panel": bool(_read_cfg(cfg, "voice_edit", "history_panel",
+                                        default=True)),
         "wake": {
             "enabled": bool(_read_cfg(cfg, "voice_edit", "wake", "enabled",
                                       default=False)),
@@ -212,6 +217,21 @@ def _validate_action(action: str) -> str:
         raise VoiceEditError("VOICE_EDIT_UNKNOWN_ACTION",
                              f"unknown action {a!r}")
     return a
+
+
+def _validate_setting_action(action: Any) -> str:
+    """Validate a default-action *setting*.
+
+    Reuses the shared :func:`_validate_action`, but reports a malformed setting
+    as ``VOICE_EDIT_BAD_SETTINGS`` (the code every other bad settings value in
+    ``update_voice_edit`` uses).  ``_validate_action`` keeps raising
+    ``VOICE_EDIT_UNKNOWN_ACTION`` where it names a prompt key.
+    """
+    from .schema import VoiceEditError
+    try:
+        return _validate_action(action)
+    except VoiceEditError as exc:
+        raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS", exc.detail) from exc
 
 
 def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
@@ -288,7 +308,8 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
         raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                              "no recognised voice_edit settings in request")
     for key in ("beep", "debug_log", "block_fullscreen", "noise_suppression",
-                "disable_key_repeat", "answer_questions", "text_commands"):
+                "disable_key_repeat", "answer_questions", "text_commands",
+                "speak_answers", "history_panel"):
         if key in clean:
             clean[key] = bool(clean[key])
     for key in ("mic_gain", "mic_target_peak"):
@@ -310,8 +331,16 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
             from .schema import VoiceEditError
             raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                                  "release_tail_ms must be a number")
+    # The default action has one public wire key (``default_prompt``, matching
+    # ``settings_view``/``export_settings``) and one persisted key
+    # (``default_action``).  Accept either and persist under ``default_action``;
+    # whichever name is supplied is validated by the shared action check, and
+    # ``default_prompt`` wins if both are present.
     if "default_action" in clean:
-        clean["default_action"] = _validate_action(clean["default_action"])
+        clean["default_action"] = _validate_setting_action(clean["default_action"])
+    if "default_prompt" in clean:
+        clean["default_action"] = _validate_setting_action(clean["default_prompt"])
+        clean.pop("default_prompt", None)
     if "routing" in clean and str(clean["routing"]) not in ("local", "api", "auto"):
         from .schema import VoiceEditError
         raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
@@ -410,8 +439,8 @@ def import_settings(cfg: Any, payload: Dict[str, Any]) -> Path:
         if isinstance(src, dict):
             for k in ("routing", "local_profile", "api_profile", "allow_api",
                       "confirm_before_replace", "auto_send", "insertion_method",
-                      "default_action", "asr_device", "stt_engine", "stt_mode",
-                      "stt_model", "router"):
+                      "default_action", "default_prompt", "asr_device",
+                      "stt_engine", "stt_mode", "stt_model", "router"):
                 if k in src:
                     update[k] = src[k]
     user_prompts = payload.get("user_prompts") or {}
