@@ -293,6 +293,8 @@ def _get(port, path):
 
 
 def test_served_spa_shell_and_plugins_are_qubit_branded(tmp_path):
+    if not DIST.is_dir():
+        pytest.skip("frontend/qubit-dist not built in this checkout")
     ui, port = _start_webui(tmp_path)
     try:
         status, ctype, body = _get(port, "/chat")
