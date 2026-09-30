@@ -635,20 +635,70 @@ class VoiceEditService:
                 "discarded_interim_only": not req.applied,
                 "request_id": request_id}
 
+    _OLLAMA_TAGS: Dict[str, Any] = {}
+
+    def _ollama_installed(self) -> set:
+        """Names of locally installed Ollama models (cached ~30s)."""
+        import json
+        import time as _t
+        import urllib.request
+        now = _t.monotonic()
+        cached = self._OLLAMA_TAGS.get("v")
+        if cached and now - cached[0] < 30:
+            return cached[1]
+        try:
+            from ..runner_contract import resolve as _rc
+            base = (_rc(self.cfg).url or "http://127.0.0.1:11434").rstrip("/")
+            with urllib.request.urlopen(base + "/api/tags", timeout=3) as r:
+                names = {str(m.get("name", "")) for m in
+                         (json.loads(r.read().decode()).get("models") or [])}
+        except Exception:
+            names = set()
+        if names:
+            self._OLLAMA_TAGS["v"] = (now, names)
+        return names
+
+    def _select_model(self, configured: Any) -> str:
+        """Resolve a spoken-answer model, portably.
+
+        ``""`` or ``"auto"`` -> the machine's configured local model (the
+        provider resolver). A configured name is used only when it is actually
+        installed; otherwise we fall back so a weaker/stronger PC, or a missing
+        model, still works with no code change.
+        """
+        name = str(configured or "").strip()
+        if not name or name.lower() == "auto":
+            return ""
+        installed = self._ollama_installed()
+        if not installed:
+            return name  # cannot verify; let the runner try it
+        if name in installed or any(i.split(":")[0] == name for i in installed):
+            return name
+        return ""  # configured but not installed -> portable fallback
+
     def _style_for(self, question: str) -> "tuple[int, str, str]":
         """(max_tokens, reasoning, style_instruction) for a spoken answer.
 
         Short, simple questions get one natural sentence; an explicit ask for
-        detail ("explain", "in detail", "report", "why", "steps") gets room
-        for a fuller answer. The instruction also tells the model to vary its
-        wording so replies don't sound like a recording.
+        detail gets room for a fuller answer. The cue list is
+        ``voice_edit.detail_cues`` (optional) plus a sensible default; the
+        instruction also tells the model to vary its wording.
         """
         import re
-        detail = bool(re.search(
+        cues = _read_cfg(self.cfg, "voice_edit", "detail_cues", default=None)
+        extra = ""
+        if isinstance(cues, (list, tuple)) and cues:
+            extra = "|".join(re.escape(str(c).strip()) for c in cues
+                             if str(c).strip())
+        pattern = (
             r"\b(explain|in detail|details?|report|why|how (do|does|to)|steps?|"
             r"describe|elaborate|compare|summari[sz]e|walk me through|"
-            r"tell me (more|about)|pros and cons|breakdown)\b",
-            question or "", re.I))
+            r"tell me (more|about)|pros and cons|breakdown|"
+            # creative asks need the stronger model (the fast small one is weak)
+            r"joke|story|poem|riddle|funny|laugh|rhyme|invent|imagine|"
+            r"roleplay|pretend|write me|compose"
+            + (f"|{extra}" if extra else "") + r")\b")
+        detail = bool(re.search(pattern, question or "", re.I))
         if detail:
             return 500, "medium", (
                 "Answer in a clear, well-structured way with the key points. "
@@ -824,18 +874,18 @@ class VoiceEditService:
             # for a fuller answer. A per-turn style hint discourages repeating
             # stock openers/closers.
             max_tokens, reasoning, style = self._style_for(question)
-            # The provider resolver pins the chat profile; pick the spoken
-            # model explicitly so simple turns use the fast small model and an
-            # explicit "explain/in detail/report" gets the stronger 4B.
-            # Override with voice_edit.chat_model / voice_edit.detail_model.
+            # Model selection is config-driven and portable. An empty value or
+            # "auto" uses the machine's configured local model (the provider
+            # resolver); a configured name is used only if it is actually
+            # installed, else we fall back to the configured model. So a weak
+            # PC, a strong PC, or a missing model all keep working.
             if reasoning == "medium":
-                model_override = str(_read_cfg(
-                    self.cfg, "voice_edit", "detail_model",
-                    default="qubit-spark4") or "")
+                model_override = self._select_model(
+                    _read_cfg(self.cfg, "voice_edit", "detail_model",
+                              default=""))
             else:
-                model_override = str(_read_cfg(
-                    self.cfg, "voice_edit", "chat_model",
-                    default="qubit-spark17") or "")
+                model_override = self._select_model(
+                    _read_cfg(self.cfg, "voice_edit", "chat_model", default=""))
             ctx = self._personal_context()
             if style:
                 ctx = f"{ctx}\n\nSTYLE: {style}" if ctx else f"STYLE: {style}"

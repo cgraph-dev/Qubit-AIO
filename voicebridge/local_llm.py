@@ -370,6 +370,32 @@ def _user_content(text: str, conversation_prompt: str, context: str,
     return user_content + f"\nUser: {text} /no_think"
 
 
+_STYLE_CACHE: Dict[str, Any] = {}
+
+
+def _local_style() -> "tuple[float, bool]":
+    """(temperature, think) for local chat from ``intent.local_llm.*``.
+
+    Cached for the process; a config change takes effect on service restart
+    (config is the authority, not a code literal). Defaults keep the varied,
+    no-chain-of-thought voice behaviour when the keys are absent.
+    """
+    cached = _STYLE_CACHE.get("v")
+    if cached is not None:
+        return cached
+    temp, think = 0.7, False
+    try:
+        from .config import Config
+        cfg = Config.load()
+        temp = float(cfg.get("intent", "local_llm", "temperature",
+                             default=0.7) or 0.7)
+        think = bool(cfg.get("intent", "local_llm", "think", default=False))
+    except Exception:  # noqa: BLE001 - defaults are safe
+        pass
+    _STYLE_CACHE["v"] = (temp, think)
+    return temp, think
+
+
 def _chat_payload(text: str, conversation_prompt: str, model: str,
                   max_tokens: int, context: str, stream: bool,
                   num_ctx: Optional[int] = None) -> Dict[str, Any]:
@@ -379,14 +405,16 @@ def _chat_payload(text: str, conversation_prompt: str, model: str,
     if num_ctx is None:
         from .runner_contract import resolve
         num_ctx = resolve().num_ctx
+    temperature, think = _local_style()
     return {
         "model": model,
         "stream": stream,
         "keep_alive": -1,          # canonical contract: always resident
         # Thinking models otherwise leak their chain-of-thought into the reply
         # (and burn the token budget); voice answers must be just the answer.
-        "think": False,
-        "options": {"num_predict": max_tokens, "temperature": 0.7,
+        # Configurable via intent.local_llm.think.
+        "think": think,
+        "options": {"num_predict": max_tokens, "temperature": temperature,
                     "num_ctx": num_ctx,
                     "top_p": 0.9},
         "messages": [

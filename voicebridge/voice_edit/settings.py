@@ -27,7 +27,8 @@ SETTINGS_KEYS = ("routing", "local_profile", "api_profile", "allow_api",
                  "beep", "debug_log", "mic_gain", "mic_target_peak",
                  "release_tail_ms", "noise_suppression", "disable_key_repeat",
                  "answer_questions", "text_commands", "capture_source",
-                 "speak_answers", "history_panel")
+                 "speak_answers", "history_panel", "chat_model",
+                 "detail_model", "detail_cues", "voice_recent_turns")
 
 
 def _kws_available(cfg: Any) -> bool:
@@ -188,6 +189,15 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
                                         default=True)),
         "history_panel": bool(_read_cfg(cfg, "voice_edit", "history_panel",
                                         default=True)),
+        "chat_model": str(_read_cfg(cfg, "voice_edit", "chat_model",
+                                    default="") or ""),
+        "detail_model": str(_read_cfg(cfg, "voice_edit", "detail_model",
+                                      default="") or ""),
+        "detail_cues": list(_read_cfg(cfg, "voice_edit", "detail_cues",
+                                      default=[]) or []),
+        "voice_recent_turns": int(_read_cfg(cfg, "voice_edit",
+                                            "voice_recent_turns",
+                                            default=4) or 4),
         "wake": {
             "enabled": bool(_read_cfg(cfg, "voice_edit", "wake", "enabled",
                                       default=False)),
@@ -375,6 +385,25 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
             from .schema import VoiceEditError
             raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                                  "request_ttl_s must be a number")
+    for key in ("chat_model", "detail_model"):
+        if key in clean:
+            clean[key] = str(clean[key] or "").strip()[:120]
+    if "detail_cues" in clean:
+        cues = clean["detail_cues"]
+        if not isinstance(cues, (list, tuple)):
+            from .schema import VoiceEditError
+            raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                 "detail_cues must be a list of words")
+        clean["detail_cues"] = [str(c).strip() for c in cues
+                                if str(c).strip()][:40]
+    if "voice_recent_turns" in clean:
+        try:
+            clean["voice_recent_turns"] = int(
+                max(2, min(int(clean["voice_recent_turns"]), 40)))
+        except (TypeError, ValueError):
+            from .schema import VoiceEditError
+            raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                 "voice_recent_turns must be a number")
     path = _config_path(cfg)
     data = _load_yaml(path)
     merged = _deep_merge(data, {"voice_edit": clean})
