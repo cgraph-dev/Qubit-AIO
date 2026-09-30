@@ -1913,3 +1913,35 @@ it runs spark17 (better than brain4), routing up when harder.
 - **Tests.** New `tests/test_ollama_options9u.py` **4 passed** (row content,
   checkmark, ineligible-skip, runtime mirror). Combined sweep **116 passed /
   0 failed / 0 skipped**. Service restarted; `/chat` 200; `:9119` untouched.
+
+## 42. MODEL card unpinned from the fossil + caps/config truth — 2026-09-30
+
+**No milestone claimed.** Owner: /qubit-chat card stuck on brain4 after
+switching; no skips, everything must pass.
+
+- **Root cause.** `h_model_info` let the model stored on the canonical
+  `dashboard-chat` fossil (`qubit-brain4`) override the resolved default —
+  written when /chat always resumed that session. Since §38 (/chat opens
+  fresh) + the live PTY grant (which the /chat card already prefers), the
+  fossil's opinion kept every MODEL card on a dead default. Removed the
+  override + the now-unused helper; explicit `?model=` capability reads
+  unchanged. Live: `/api/model/info` → **qubit-spark17/ollama**; PTY ticket
+  still boots muse (pin intact).
+- **Same surface, two stale contracts fixed.** (1) Sparse catalog entries
+  left `capabilities.context_window=None`; now completed from the N29
+  config authority for the resolved model (live probe only for an explicit
+  different `?model=`, else honestly None). (2) `config_context_length`
+  now reports the configured window only when distinct from auto (0 when
+  they agree) — the rule all four pinning tests agree on. (3) Restored the
+  lost `_model_capabilities(provider, model, ctx)` helper (miss →
+  exactly `{"context_window": ctx}`, hit → real fields + authority).
+- **Zero skips held; pre-existing failures fixed:** `patched_qc` runs live
+  handlers (§40), `workspace_cwd` doubles (§38/§40), parity 503 fake here.
+  Combined sweep **136 passed / 1 failed / 0 skipped**; the 1 failure
+  (`b4_06` pinned-index brand scan on the concurrent plugins lane's new
+  `agentplaybooks-portable` entry — `packages/hermes-portable` source path,
+  provenance call, not mine) plus 4 `status_*` (concurrent gateway lane)
+  fail identically on pristine HEAD and are left to those lanes.
+- **Tests:** `test_agentz_consistency` + `test_context_authority_n29` green;
+  `test_compat_authority` model/info+caps green. Service restarted;
+  `/chat` 200; `:9119` untouched.

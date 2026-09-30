@@ -1622,6 +1622,32 @@ _CAPABILITY_FIELDS = ("supports_tools", "supports_vision",
                       "max_output_tokens", "model_family")
 
 
+def _model_capabilities(provider: str, model: str, ctx: Any
+                        ) -> Dict[str, Any]:
+    """Capabilities for one model without fabrication.
+
+    A catalog miss returns exactly ``{"context_window": ctx}`` — no invented
+    booleans — while the N29 context authority is always reported so the
+    dashboard context badge does not vanish for a model models.dev does not
+    know. A catalog hit returns the real fields, with a sparse entry's
+    ``context_window`` completed from the passed authority. Never raises
+    (miss on any failure); the caller owns ``sys.path`` (``qubit_runtime``
+    bound before use).
+    """
+    try:
+        from agent import models_dev as _md  # type: ignore
+
+        mc = _md.get_model_capabilities(provider=provider, model=model)
+    except Exception:  # noqa: BLE001 - miss on any failure
+        mc = None
+    if mc is None:
+        return {"context_window": int(ctx or 0)}
+    caps = {name: getattr(mc, name, None) for name in _CAPABILITY_FIELDS}
+    if not caps.get("context_window") and ctx:
+        caps["context_window"] = int(ctx)
+    return caps
+
+
 def _auto_context_length(model: str, base_url: str, provider: str) -> int:
     """B4-02: the auto-detected context window, independent of the override.
 
@@ -1649,53 +1675,16 @@ def _auto_context_length(model: str, base_url: str, provider: str) -> int:
     return 0
 
 
-def _terminal_session_model(cfg: Any) -> Optional[str]:
-    """The model stored on the canonical ``/chat`` session, or ``None``.
-
-    The vendored terminal resumes one canonical conversation and honours that
-    session's stored model; the dashboard ``model/info`` must report the same
-    value the terminal actually uses rather than only the configured default.
-    Read-only: an absent session or unset model returns ``None`` (never creates
-    a session).
-    """
-    try:
-        from . import agent as AG
-        from . import chat_transport as CT
-
-        sid = AG.canonical_session_id(cfg)
-        res = CT.store(cfg).show(sid)
-        if str(res.get("state")) != "OK":
-            return None
-        sess = res.get("session") or {}
-        model = str(sess.get("model") or "").strip()
-        return model or None
-    except Exception:  # noqa: BLE001 - reporting must never raise
-        return None
-
-
 def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     r = _resolved_model(cfg)
-    # D3 (UI audit 2026-09-29): the /chat terminal resumes its canonical
-    # session and honours that session's stored model. When the stored model is
-    # a registered model-profile id (e.g. the default ``qubit-brain4``), take
-    # that profile's provider too — otherwise model/info reported the
-    # configured default/endpoint while /chat used the session's model. An
-    # unset/stale session model resolves through the profile registry and
-    # changes nothing when there is no session.
-    sess_model = _terminal_session_model(cfg)
-    if sess_model:
-        try:
-            from .providers import resolver as _R
-
-            _prof = _R.get_profile(cfg, sess_model)
-        except Exception:  # noqa: BLE001 - reporting must never raise
-            _prof = None
-        if _prof is not None:
-            r = dict(r, model=_prof.model, provider=_prof.provider,
-                     base_url=str(getattr(_prof, "base_url", "") or ""))
-        else:
-            r = dict(r, model=sess_model)
+    # The default role's resolved selection is the answer. A stored model on
+    # the old canonical session (e.g. the ``dashboard-chat`` fossil's
+    # ``qubit-brain4``) must NOT override it: since /chat opens fresh and the
+    # /chat sidebar already prefers the live PTY grant, the fossil's opinion
+    # kept every MODEL card pinned to a dead default after a switch (the D3
+    # override this replaces). An explicit ``?model=`` below still reports a
+    # specific model's capabilities.
     ctx = int(r["ctx"] or 0)
     model = str(r["model"])
     provider = str(r["provider"])
@@ -1745,10 +1734,26 @@ def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 "max_output_tokens": None,
                 "model_family": ("qwen3-4b" if r.get("kind") == "local"
                                  else provider)}
+    if not caps.get("context_window"):
+        # A catalog hit with a sparse entry leaves context_window None. The
+        # window is a known local fact, not catalog metadata: for the
+        # resolved default it is the N29 config authority (never the
+        # advertised registry value); for an explicitly requested different
+        # model it is the live-probed window, else honestly unknown (None).
+        if model == str(r["model"]) and ctx:
+            caps["context_window"] = ctx
+        elif auto_ctx:
+            caps["context_window"] = auto_ctx
     effective = ctx or auto_ctx
+    # SP-07: config reports the configured window only when it is distinct
+    # from the auto-detected one (the operator's distinct contribution); when
+    # they agree there is no distinct override and config is 0 while
+    # effective carries the value. Unknown auto (0) never masks a configured
+    # window.
+    config_out = ctx if ctx != auto_ctx else 0
     # ModelInfoResponse wire shape.
     return _ok(model=model, provider=provider,
-               auto_context_length=auto_ctx, config_context_length=ctx,
+               auto_context_length=auto_ctx, config_context_length=config_out,
                effective_context_length=effective, capabilities=caps)
 
 
@@ -10436,7 +10441,39 @@ def h_font(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 def h_plugins(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
               p: Dict[str, str]) -> Tuple[int, Any]:
     # Wire shape is a bare manifest array (api.getPlugins: PluginManifestResponse[]).
-    return 200, _overlay_manifests()
+    rows = _overlay_manifests()
+    seen = {str(m.get("name", "")) for m in rows}
+    try:
+        # User-installed dashboard plugins (QUBIT_HOME/plugins/*/dashboard/
+        # manifest.json) mount their tabs exactly like the reference: the
+        # vendored discovery scans user+bundled+project sources, and user
+        # plugins serve only when enabled and not disabled (reference gate).
+        _vendored_runtime(cfg)
+        from qubit_cli.web_server_dashboard import (  # type: ignore
+            _discover_dashboard_plugins, _strip_dashboard_manifest)
+        from qubit_cli.plugins_cmd import (  # type: ignore
+            _get_disabled_set, _get_enabled_set)
+        try:
+            enabled = set(_get_enabled_set())
+        except Exception:
+            enabled = set()
+        try:
+            disabled = set(_get_disabled_set())
+        except Exception:
+            disabled = set()
+        for plugin in _discover_dashboard_plugins():
+            name = str(plugin.get("name", "") or "")
+            if not name or name in seen:
+                continue
+            if str(plugin.get("source", "")) == "user" and (
+                    name not in enabled or name in disabled):
+                continue
+            seen.add(name)
+            rows.append(_strip_dashboard_manifest(dict(plugin)))
+    except Exception as exc:
+        _audit("plugins_discovery_failed", "dashboard:user",
+               {"detail": _redact(str(exc))[:160]})
+    return 200, rows
 
 
 def h_themes(cfg: Any, q: Dict[str, str], b: Dict[str, Any],

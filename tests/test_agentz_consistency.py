@@ -75,34 +75,35 @@ def _go_cfg(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Item 1 — model/info reports the model the /chat terminal actually uses
+# Item 1 — model/info reports the resolved default, never a stale session row
 # ---------------------------------------------------------------------------
-def test_model_info_reports_terminal_session_model(tmp_path, monkeypatch):
+def test_model_info_ignores_stale_canonical_session_model(tmp_path,
+                                                          monkeypatch):
     from voicebridge import agent as AG
     from voicebridge import chat_transport as CT
     from voicebridge import qubit_compat as HC
 
     cfg = _go_cfg(tmp_path, monkeypatch)
-    # The terminal resumes its canonical session; seed a stored model that
-    # differs from the configured default (the stale-session case).
+    # A fossil canonical session stores a model that differs from the live
+    # default (the pre-fresh-/chat world, where the terminal always resumed
+    # it). model/info must report the resolved selection anyway.
     store = CT.store(cfg)
     assert store.ensure(AG.canonical_session_id(cfg),
                         model="deepseek-v4.1-flash")["state"] == "OK"
-    assert HC._terminal_session_model(cfg) == "deepseek-v4.1-flash"
 
     code, info = HC.h_model_info(cfg, {}, {}, {})
     assert code == 200, info
-    assert info["model"] == "deepseek-v4.1-flash"
+    assert info["model"] == "deepseek-v4-flash"
     assert info["effective_context_length"] == 200000
     # N29 authority is preserved — never the advertised 1M registry value.
     assert info["capabilities"]["context_window"] == 200000
 
 
-def test_model_info_without_session_uses_resolved_default(tmp_path, monkeypatch):
+def test_model_info_without_session_uses_resolved_default(tmp_path,
+                                                          monkeypatch):
     from voicebridge import qubit_compat as HC
 
     cfg = _go_cfg(tmp_path, monkeypatch)
-    assert HC._terminal_session_model(cfg) is None
     code, info = HC.h_model_info(cfg, {}, {}, {})
     assert code == 200, info
     assert info["model"] == "deepseek-v4-flash"
