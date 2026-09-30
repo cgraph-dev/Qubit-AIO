@@ -289,6 +289,28 @@ describe("ChatSidebar SSE event feed", () => {
     );
   });
 
+  it("shows live from the terminal grant while the events feed is still connecting", async () => {
+    // The MODEL pill reports the model, not the SSE reader: with a resolved
+    // PTY grant the terminal session runs that model even when the events
+    // stream never opens (fetch hangs -> state stays "connecting").
+    const { ChatSidebar } = await import("./ChatSidebar");
+    fetchMock.mockImplementationOnce(() => new Promise(() => {}));
+
+    await render(
+      <ChatSidebar
+        channel="chat-1"
+        terminalModel={{
+          provider: "opencode-go",
+          model: "muse-spark-1.3-contributor",
+        }}
+      />,
+    );
+    await flushMicrotasks();
+
+    expect(container.textContent).toContain("live");
+    expect(container.textContent).not.toContain("connecting");
+  });
+
   it("adds no nested <aside> landmark — the chat side panel owns the one (drift A31)", async () => {
     const { ChatSidebar } = await import("./ChatSidebar");
 

@@ -420,6 +420,12 @@ export function ChatSidebar({
     ? `${terminalModel.provider ? `${terminalModel.provider}/` : ""}${terminalModel.model}`
     : "";
   const modelName = terminalModelName || effectiveModel || "—";
+  // The pill next to the model name reports the MODEL, not the events feed:
+  // a resolved PTY grant means the terminal session runs that model, even
+  // while the SSE reader is still (re)connecting. Without a grant (qubit-chat)
+  // the reader state is all we have.
+  const badgeLabel = terminalModelName ? "live" : STATE_LABEL[state];
+  const badgeTone = terminalModelName ? "success" : STATE_TONE[state];
   const modelLabel = modelName.split("/").slice(-1)[0] ?? "—";
   const banner = error;
 
@@ -458,8 +464,8 @@ export function ChatSidebar({
           </Button>
         </div>
 
-        <Badge tone={STATE_TONE[state]} className="shrink-0">
-          {STATE_LABEL[state]}
+        <Badge tone={badgeTone} className="shrink-0">
+          {badgeLabel}
         </Badge>
       </Card>
 
