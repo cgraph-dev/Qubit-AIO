@@ -227,6 +227,7 @@ class WakeMonitor:
         device = resolve_capture_device(self.cfg)
         gain = float(_cfg(self.cfg, "voice_edit", "mic_gain", default=12.0) or 12.0)
         return ParecMic(device=device, frame_ms=300, gain=gain,
+                        target_peak=_mic_target_peak(self.cfg, default=0.5),
                         agc=bool(_cfg(self.cfg, "voice_edit", "agc",
                                       default=True)))
 
@@ -245,7 +246,8 @@ class WakeMonitor:
                 try:
                     from .stt_client import transcribe_accurate
                     text, fail = transcribe_accurate(
-                        self.cfg, _normalize_pcm(pcm))
+                        self.cfg, _normalize_pcm(
+                            pcm, target_peak=_mic_target_peak(self.cfg)))
                 except Exception as exc:
                     fail = str(exc)[:160] or "accurate failed"
                 if text.strip():
@@ -261,8 +263,9 @@ class WakeMonitor:
             return ""
         url = _ws_url(self.cfg)
         engine = str(_cfg(self.cfg, "voice_edit", "stt_engine", default="") or "")
-        client = SttClient(url=url, ticket=ticket, engine=engine)
-        pcm = _normalize_pcm(pcm)
+        client = SttClient(url=url, ticket=ticket, engine=engine,
+                           target_peak=_mic_target_peak(self.cfg, default=0.5))
+        pcm = _normalize_pcm(pcm, target_peak=_mic_target_peak(self.cfg))
         ev = threading.Event()
         mic = BufferMic(pcm, on_exhausted=lambda: ev.set())
         try:
@@ -412,6 +415,26 @@ class WakeMonitor:
                 self.on_command(cmd)
             except Exception as exc:
                 self.last_error = str(exc)[:160]
+
+
+def _mic_target_peak(cfg: Any, default: float = 0.6) -> float:
+    """Configured ``voice_edit.mic_target_peak``, clamped to 0.05..0.95.
+
+    Mirrors the ``update_voice_edit`` clamp in settings.py (not imported to
+    avoid a cycle). Absent/unparseable → ``default`` (0.6 preserves the
+    historical ``_normalize_pcm`` default; capture clients pass 0.5 to match
+    the settings default and the ``ParecMic`` constructor default).
+    """
+    try:
+        raw = _cfg(cfg, "voice_edit", "mic_target_peak", default=None)
+        if raw is None:
+            return float(default)
+        return max(0.05, min(float(raw), 0.95))
+    except Exception:
+        try:
+            return float(default)
+        except Exception:
+            return 0.6
 
 
 def _normalize_pcm(pcm: bytes, target_peak: float = 0.6,

@@ -62,6 +62,8 @@ export interface VoiceEditSettings {
   auto_send: boolean;
   insertion_method: string;
   default_prompt: string;
+  /** Persisted default action (wire key is `default_prompt`; accepted either way). */
+  default_action?: string;
   asr_device?: string;
   stt_engine?: string;
   stt_mode?: SttMode;
@@ -70,6 +72,8 @@ export interface VoiceEditSettings {
   hotkey_mode?: string;
   request_ttl_s?: number;
   brain_router?: boolean;
+  /** Brain-router classify timeout, seconds (backend default 4.0). */
+  brain_timeout_s?: number;
   block_fullscreen?: boolean;
   beep?: boolean;
   debug_log?: boolean;
@@ -83,6 +87,8 @@ export interface VoiceEditSettings {
   /** Automatic gain control on the captured mic signal. */
   agc?: boolean;
   release_tail_ms?: number;
+  /** Ignore OS key-repeat while Right-Ctrl is held. */
+  disable_key_repeat?: boolean;
   // ── Brain / model (per-machine local model + API routing) ──────────
   /** The machine's configured local model (`intent.local_llm.model`); "" = auto. */
   local_model?: string;
@@ -112,6 +118,12 @@ export interface VoiceEditSettings {
     phrase: string;
     silence_ms: number;
     rms_gate: number;
+    /** Wake-word engine: auto|kws|asr (backend default "auto"). */
+    engine?: string;
+    /** Keyword-spotting accept threshold 0.05..0.9 (backend default 0.25). */
+    kws_threshold?: number;
+    /** True when a local KWS model bundle is present (read-only). */
+    kws_available?: boolean;
   };
   prompts: PromptRow[];
   per_app: Record<string, string>;
@@ -173,6 +185,40 @@ export interface VoiceLogResponse {
     last_error: VoiceLogEntry | null;
     last_event: VoiceLogEntry | null;
   };
+}
+
+/** Every transform action the settings API accepts for per-app pins and the
+ *  default prompt (mirrors `voice_edit/schema.py::ACTIONS`). */
+export const VOICE_EDIT_ACTIONS: string[] = [
+  "rewrite",
+  "clarify",
+  "humanize",
+  "professionalize",
+  "make_funny",
+  "shorten",
+  "expand",
+  "summarize",
+  "correct_grammar",
+  "translate",
+  "bullet_points",
+  "email",
+  "technical",
+  "casual",
+  "improve_prompt",
+  "custom_transform",
+  "dictate_text",
+];
+
+/** Backend clamps from `voice_edit/settings.py::update_voice_edit`. */
+export const WAKE_LIMITS = {
+  silenceMs: { min: 300, max: 5000 },
+  rmsGate: { min: 0.0005, max: 0.2 },
+  kwsThreshold: { min: 0.05, max: 0.9 },
+} as const;
+
+export function clampVoiceEditNumber(v: number, lo: number, hi: number): number {
+  if (!Number.isFinite(v)) return lo;
+  return Math.min(hi, Math.max(lo, v));
 }
 
 export const voiceEdit = {

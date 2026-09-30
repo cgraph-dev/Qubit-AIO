@@ -10,6 +10,9 @@ import { VoiceEditPreview } from "@/components/VoiceEditPreview";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import {
   voiceEdit,
+  VOICE_EDIT_ACTIONS,
+  clampVoiceEditNumber,
+  WAKE_LIMITS,
   type LocalModel,
   type PromptRow,
   type TransformPreview,
@@ -98,7 +101,7 @@ const TTS_PROVIDER_HELP: Record<TtsProvider, string> = {
 };
 
 const CAPTURE_SOURCE_HELP: Record<string, string> = {
-  auto: "Browser-grade capture: noise suppression + high-pass + auto gain (what Firefox does).",
+  auto: "Default device source (same as Raw). Choose Echo cancellation to record from the filtered source.",
   raw: "Unprocessed device input; loudest but noisiest — good only for a clean external mic.",
   aec: "Processed source with echo cancellation; removes speaker output the mic re-hears.",
 };
@@ -202,6 +205,20 @@ export default function VoiceEditPage() {
   // brain section: comma-separated detail cues, edited as free text
   const [detailCues, setDetailCues] = useState("");
 
+  // wake sub-editors: drafted locally, saved as one merged wake:{...} PUT
+  const [wakePhrase, setWakePhrase] = useState("hey qubit");
+  const [wakeSilence, setWakeSilence] = useState("900");
+  const [wakeRms, setWakeRms] = useState("0.0018");
+  const [wakeEngine, setWakeEngine] = useState("auto");
+  const [wakeKws, setWakeKws] = useState("0.25");
+
+  // per-app mapping: new-row draft (app class + action)
+  const [newApp, setNewApp] = useState("");
+  const [newAction, setNewAction] = useState("rewrite");
+
+  // advanced: STT engine text is drafted, saved on blur/Enter (like detail cues)
+  const [sttEngine, setSttEngine] = useState("");
+
   // voice activity log
   const [logEvents, setLogEvents] = useState<VoiceLogEntry[]>([]);
   const [logErrors, setLogErrors] = useState(0);
@@ -236,6 +253,20 @@ export default function VoiceEditPage() {
   useEffect(() => {
     setDetailCues((settings?.detail_cues ?? []).join(", "));
   }, [settings?.detail_cues]);
+
+  useEffect(() => {
+    const w = settings?.wake;
+    if (!w) return;
+    setWakePhrase(w.phrase ?? "hey qubit");
+    setWakeSilence(String(w.silence_ms ?? 900));
+    setWakeRms(String(w.rms_gate ?? 0.0018));
+    setWakeEngine(w.engine ?? "auto");
+    setWakeKws(String(w.kws_threshold ?? 0.25));
+  }, [settings?.wake]);
+
+  useEffect(() => {
+    setSttEngine(settings?.stt_engine ?? "");
+  }, [settings?.stt_engine]);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,6 +306,45 @@ export default function VoiceEditPage() {
     },
     [],
   );
+
+  // Wake sub-editors save as one merged wake:{...} PUT, clamped to the
+  // backend ranges (settings.py::update_voice_edit). Partial merge is safe:
+  // the backend deep-merges the wake object.
+  const saveWake = useCallback(() => {
+    const silence = Math.round(
+      clampVoiceEditNumber(
+        Number(wakeSilence), WAKE_LIMITS.silenceMs.min, WAKE_LIMITS.silenceMs.max,
+      ),
+    );
+    const rms = clampVoiceEditNumber(
+      Number(wakeRms), WAKE_LIMITS.rmsGate.min, WAKE_LIMITS.rmsGate.max,
+    );
+    const kws = clampVoiceEditNumber(
+      Number(wakeKws), WAKE_LIMITS.kwsThreshold.min, WAKE_LIMITS.kwsThreshold.max,
+    );
+    const eng = wakeEngine === "kws" || wakeEngine === "asr" ? wakeEngine : "auto";
+    const phrase = wakePhrase.trim().slice(0, 60) || "hey qubit";
+    setWakeSilence(String(silence));
+    setWakeRms(String(rms));
+    setWakeKws(String(kws));
+    setWakeEngine(eng);
+    setWakePhrase(phrase);
+    return update(
+      {
+        wake: {
+          ...(settings?.wake?.enabled !== undefined
+            ? { enabled: settings.wake.enabled }
+            : {}),
+          phrase,
+          silence_ms: silence,
+          rms_gate: rms,
+          engine: eng,
+          kws_threshold: kws,
+        },
+      },
+      "wake settings saved",
+    );
+  }, [update, settings?.wake?.enabled, wakePhrase, wakeSilence, wakeRms, wakeEngine, wakeKws]);
 
   const runPreview = useCallback(async () => {
     setBusy(true);
@@ -406,6 +476,97 @@ export default function VoiceEditPage() {
               The segment is transcribed locally by the same engine and only the
               wake phrase triggers a command; other speech is discarded.
             </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="voice-edit-wake-settings">
+              <label className="text-sm">
+                Wake phrase
+                <input
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-wake-phrase"
+                  placeholder="hey qubit"
+                  value={wakePhrase}
+                  onChange={(e) => setWakePhrase(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Spoken phrase that triggers a command (max 60 chars).
+                </span>
+              </label>
+              <label className="text-sm">
+                Wake engine
+                <select
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-wake-engine"
+                  value={wakeEngine}
+                  onChange={(e) => setWakeEngine(e.target.value)}
+                >
+                  <option value="auto">auto</option>
+                  <option value="kws">kws (keyword spotter)</option>
+                  <option value="asr">asr (transcript match)</option>
+                </select>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Auto picks the spotter when its model bundle is present.
+                </span>
+              </label>
+              <label className="text-sm">
+                End-of-speech silence (ms)
+                <input
+                  type="number"
+                  min={WAKE_LIMITS.silenceMs.min}
+                  max={WAKE_LIMITS.silenceMs.max}
+                  step="50"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-wake-silence"
+                  value={wakeSilence}
+                  onChange={(e) => setWakeSilence(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Silence that ends the wake segment (300–5000).
+                </span>
+              </label>
+              <label className="text-sm">
+                Voice floor (RMS gate)
+                <input
+                  type="number"
+                  min={WAKE_LIMITS.rmsGate.min}
+                  max={WAKE_LIMITS.rmsGate.max}
+                  step="0.0001"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-wake-rms"
+                  value={wakeRms}
+                  onChange={(e) => setWakeRms(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Frames quieter than this count as silence (0.0005–0.2).
+                </span>
+              </label>
+              <label className="text-sm">
+                Spotter threshold
+                <input
+                  type="number"
+                  min={WAKE_LIMITS.kwsThreshold.min}
+                  max={WAKE_LIMITS.kwsThreshold.max}
+                  step="0.01"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-wake-kws"
+                  value={wakeKws}
+                  onChange={(e) => setWakeKws(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Lower hears more (0.05–0.9).
+                  {settings?.wake?.kws_available === false
+                    ? " No local spotter bundle — auto falls back to transcript match."
+                    : null}
+                </span>
+              </label>
+            </div>
+            <button
+              type="button"
+              className="mt-2 rounded border border-border px-3 py-1 text-xs"
+              data-testid="voice-edit-wake-save"
+              disabled={busy}
+              onClick={() => void saveWake()}
+            >
+              Save wake settings
+            </button>
             <label className="mt-2 flex items-center gap-2 text-sm">
               Brain routing (local model decides ambiguous commands)
               <input
@@ -434,6 +595,7 @@ export default function VoiceEditPage() {
                 Local profile
                 <input
                   className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-local-profile"
                   value={settings.local_profile}
                   onChange={(e) => void update({ local_profile: e.target.value })}
                 />
@@ -519,8 +681,107 @@ export default function VoiceEditPage() {
                     void update({ noise_suppression: e.target.checked })
                   }
                 />
-                Noise suppression / echo cancel (match browser capture)
+                Noise suppression (applies on next helper start)
               </label>
+            </div>
+          </section>
+
+          <section
+            className="rounded-lg border border-border p-4"
+            data-testid="voice-edit-per-app"
+          >
+            <h2 className="text-sm font-semibold">Per-app actions</h2>
+            <p className="mb-3 mt-1 text-xs text-muted-foreground">
+              Pin one transform action per application (matched on the focused
+              window class, lower-cased). An empty pin is inert — the spoken
+              command decides. Deleting a row clears its pin.
+            </p>
+            {Object.keys(settings.per_app ?? {}).filter((k) => (settings.per_app ?? {})[k]).length === 0 ? (
+              <p className="mb-2 text-xs text-muted-foreground" data-testid="voice-edit-per-app-empty">
+                No per-app pins.
+              </p>
+            ) : (
+              <ul className="mb-2 flex flex-col gap-1">
+                {Object.entries(settings.per_app ?? {})
+                  .filter(([, v]) => v)
+                  .map(([app, action]) => (
+                    <li
+                      key={app}
+                      className="flex items-center gap-2 text-sm"
+                      data-testid={`voice-edit-per-app-row-${app}`}
+                    >
+                      <code className="rounded bg-muted px-1">{app}</code>
+                      <span className="text-muted-foreground">→ {action}</span>
+                      <button
+                        type="button"
+                        className="rounded border border-border px-2 py-0.5 text-xs"
+                        data-testid={`voice-edit-per-app-delete-${app}`}
+                        disabled={busy}
+                        onClick={() =>
+                          void update(
+                            { per_app: { ...(settings.per_app ?? {}), [app]: "" } },
+                            `cleared pin for ${app}`,
+                          )
+                        }
+                      >
+                        Delete
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            )}
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="text-sm">
+                App class
+                <input
+                  className="mt-1 w-40 rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-per-app-new-app"
+                  placeholder="e.g. firefox"
+                  value={newApp}
+                  onChange={(e) => setNewApp(e.target.value)}
+                />
+              </label>
+              <label className="text-sm">
+                Action
+                <select
+                  className="mt-1 rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-per-app-new-action"
+                  value={newAction}
+                  onChange={(e) => setNewAction(e.target.value)}
+                >
+                  {VOICE_EDIT_ACTIONS.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="rounded border border-border px-3 py-1 text-xs"
+                data-testid="voice-edit-per-app-add"
+                disabled={busy || !newApp.trim()}
+                onClick={() => {
+                  const app = newApp.trim().toLowerCase();
+                  if (!app) return;
+                  setNewApp("");
+                  void update(
+                    { per_app: { ...(settings.per_app ?? {}), [app]: newAction } },
+                    `pinned ${app} to ${newAction}`,
+                  );
+                }}
+              >
+                Add pin
+              </button>
+              <button
+                type="button"
+                className="rounded border border-border px-3 py-1 text-xs"
+                data-testid="voice-edit-per-app-clear"
+                disabled={busy}
+                onClick={() => void update({ per_app: {} }, "cleared all per-app pins")}
+              >
+                Clear all
+              </button>
             </div>
           </section>
 
@@ -587,7 +848,7 @@ export default function VoiceEditPage() {
                   value={captureSource}
                   onChange={(e) => void update({ capture_source: e.target.value })}
                 >
-                  <option value="auto">Auto (browser-grade AGC + noise suppression)</option>
+                  <option value="auto">Auto (default source)</option>
                   <option value="raw">Raw device input</option>
                   <option value="aec">Echo cancellation</option>
                 </select>
@@ -874,6 +1135,166 @@ export default function VoiceEditPage() {
               include sensitive speech, so leave it off unless troubleshooting.
             </p>
           </Section>
+
+          <details
+            className="rounded-lg border border-border p-4"
+            data-testid="voice-edit-advanced"
+          >
+            <summary className="cursor-pointer text-sm font-semibold">
+              Advanced
+            </summary>
+            <p className="mb-3 mt-1 text-xs text-muted-foreground">
+              Timing and behavior knobs. Values clamp to the backend ranges on
+              save. Infra endpoints (service_url, stt_ws_url) stay API-only —
+              they name helper infrastructure, not something to edit here.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm">
+                Request lifetime (s)
+                <input
+                  type="number"
+                  min="30"
+                  max="3600"
+                  step="1"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-request_ttl_s"
+                  value={settings.request_ttl_s ?? 300}
+                  onChange={(e) =>
+                    void update({
+                      request_ttl_s: clampVoiceEditNumber(Number(e.target.value), 30, 3600),
+                    })
+                  }
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  How long a voice request stays valid (30–3600).
+                </span>
+              </label>
+              <label className="text-sm">
+                Brain timeout (s)
+                <input
+                  type="number"
+                  min="1"
+                  max="60"
+                  step="0.5"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-brain_timeout_s"
+                  value={settings.brain_timeout_s ?? 4}
+                  onChange={(e) =>
+                    void update({ brain_timeout_s: Number(e.target.value) })
+                  }
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  How long the brain router may take to disambiguate (default 4).
+                </span>
+              </label>
+              <label className="text-sm">
+                Release tail (ms)
+                <input
+                  type="number"
+                  min="0"
+                  max="2000"
+                  step="50"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-release_tail_ms"
+                  value={settings.release_tail_ms ?? 500}
+                  onChange={(e) =>
+                    void update({
+                      release_tail_ms: Math.round(
+                        clampVoiceEditNumber(Number(e.target.value), 0, 2000),
+                      ),
+                    })
+                  }
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Mic stream kept open after key release (0–2000).
+                </span>
+              </label>
+              <label className="text-sm">
+                Mic target peak
+                <input
+                  type="number"
+                  min="0.05"
+                  max="0.95"
+                  step="0.05"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-mic_target_peak"
+                  value={settings.mic_target_peak ?? 0.5}
+                  onChange={(e) =>
+                    void update({
+                      mic_target_peak: clampVoiceEditNumber(Number(e.target.value), 0.05, 0.95),
+                    })
+                  }
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Capture level target (0.05–0.95).
+                </span>
+              </label>
+              <label className="text-sm">
+                STT engine override
+                <input
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-stt_engine"
+                  placeholder="blank = configured default"
+                  value={sttEngine}
+                  onChange={(e) => setSttEngine(e.target.value)}
+                  onBlur={() => void update({ stt_engine: sttEngine })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void update({ stt_engine: sttEngine });
+                    }
+                  }}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Engine name override; blank uses the configured default.
+                </span>
+              </label>
+              <label className="text-sm">
+                Default action
+                <select
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-default_prompt"
+                  value={settings.default_prompt ?? ""}
+                  onChange={(e) => void update({ default_prompt: e.target.value })}
+                >
+                  {!(settings.default_prompt ?? "") ? (
+                    <option value="">—</option>
+                  ) : null}
+                  {VOICE_EDIT_ACTIONS.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Fallback action when no command is recognized.
+                </span>
+              </label>
+            </div>
+            <div className="mt-3 flex flex-col gap-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  data-testid="voice-edit-disable_key_repeat"
+                  checked={Boolean(settings.disable_key_repeat)}
+                  onChange={(e) =>
+                    void update({ disable_key_repeat: e.target.checked })
+                  }
+                />
+                Ignore OS key-repeat while Right-Ctrl is held
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  data-testid="voice-edit-text_commands"
+                  checked={Boolean(settings.text_commands)}
+                  onChange={(e) =>
+                    void update({ text_commands: e.target.checked })
+                  }
+                />
+                Treat bare speech without a selection as dictation
+              </label>
+            </div>
+          </details>
 
           <section className="rounded-lg border border-border p-4">
             <h2 className="mb-3 text-sm font-semibold">Default prompts</h2>

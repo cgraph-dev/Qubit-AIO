@@ -340,11 +340,21 @@ class SttClient:
     """One streaming STT request against the existing STT WebSocket."""
 
     def __init__(self, *, url: str, ticket: str, opener: Optional[Callable] = None,
-                 engine: str = "", sample_rate: int = 16000) -> None:
+                 engine: str = "", sample_rate: int = 16000,
+                 target_peak: float = 0.5) -> None:
         self.url = self._with_ticket(url, ticket)
         self.ticket = ticket
         self.engine = engine
         self.sample_rate = sample_rate
+        # Configured capture level (``voice_edit.mic_target_peak``), clamped to
+        # 0.05..0.95 like settings.py. Carried so the caller (wake) and the
+        # streaming client share one value; frame leveling itself stays
+        # mic-side (ParecMic AGC) and utterance-side (``_normalize_pcm``).
+        # Default 0.5 preserves the historical behavior when not passed.
+        try:
+            self.target_peak = max(0.05, min(float(target_peak), 0.95))
+        except Exception:
+            self.target_peak = 0.5
         self._opener = opener
         self.partials: List[str] = []
         self.final_text = ""

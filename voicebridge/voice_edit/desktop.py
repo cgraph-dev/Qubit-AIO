@@ -84,6 +84,10 @@ class DesktopAdapter:
         self._last_backup: Optional[ClipboardBackup] = None
         self._last_key_error = ""
         self._set_owner: Optional[Any] = None
+        # Outcome of the last auto_send step: "disabled" | "sent" |
+        # "headless:<code>" | "failed:<code>". Unit-observable proof of what
+        # the auto_send flag did after an insert.
+        self.last_auto_send: str = "disabled"
 
     # -- process plumbing ------------------------------------------------
     @staticmethod
@@ -338,6 +342,48 @@ class DesktopAdapter:
             return "Control_L+Shift_L+v" if self._tool("xdotool") else "shift+Insert"
         return "Control_L+v"
 
+    def _press_enter(self) -> bool:
+        """Synthesize a single Enter keystroke. Never raises."""
+        try:
+            if self.session()["x11"] and self._tool("xdotool"):
+                rc, _, err = self._run(["xdotool", "key", "Return"],
+                                       timeout=_RUN_TIMEOUT, env=self._env)
+                if rc != 0:
+                    self._last_key_error = (err or b"")[-160:].decode(
+                        "utf-8", "replace")
+                return rc == 0
+            if self._tool("wtype"):
+                rc, _, _ = self._run(["wtype", "-k", "Return"],
+                                     timeout=_RUN_TIMEOUT, env=self._env)
+                return rc == 0
+            return False
+        except Exception:
+            return False
+
+    def maybe_auto_send(self, cfg: Any = None) -> str:
+        """Press Enter once when ``voice_edit.auto_send`` is on.
+
+        Returns "disabled" (flag off/absent), "sent" (Enter pressed exactly
+        once), or a typed refusal "headless:<code>" / "failed:<code>" — never
+        raises, never crashes headless. Recorded on ``self.last_auto_send``.
+        """
+        try:
+            if not auto_send_enabled(cfg):
+                self.last_auto_send = "disabled"
+                return self.last_auto_send
+            sess = self.session()
+            if not sess.get("x11") and sess.get("session_type") != "wayland":
+                self.last_auto_send = f"headless:{AUTO_SEND_UNAVAILABLE}"
+                return self.last_auto_send
+            if self._press_enter():
+                self.last_auto_send = "sent"
+            else:
+                self.last_auto_send = f"failed:{AUTO_SEND_UNAVAILABLE}"
+            return self.last_auto_send
+        except Exception:
+            self.last_auto_send = f"failed:{AUTO_SEND_UNAVAILABLE}"
+            return self.last_auto_send
+
     def _type_text(self, text: str) -> bool:
         if self.session()["x11"] and self._tool("xdotool"):
             rc, _, _ = self._run(["xdotool", "type", "--clearmodifiers",
@@ -480,13 +526,18 @@ class DesktopAdapter:
             or "clipboard_paste")
         if method in ("typed", "simulated_typing"):
             ok = self._type_text(text)
-            return InsertionResult(
-                ok=ok, code="" if ok else "VOICE_EDIT_TYPE_FAILED",
-                detail="" if ok else "simulated typing failed",
-                method="typed", app_class=snapshot.app_class,
-                focus_restored=True,
-                clipboard_restored=True,
-                reason="" if ok else "the desktop refused synthetic keystrokes")
+            if not ok:
+                return InsertionResult(
+                    ok=ok, code="VOICE_EDIT_TYPE_FAILED",
+                    detail="simulated typing failed",
+                    method="typed", app_class=snapshot.app_class,
+                    focus_restored=True,
+                    clipboard_restored=True,
+                    reason="the desktop refused synthetic keystrokes")
+            return self._with_auto_send(
+                InsertionResult(
+                    ok=True, method="typed", app_class=snapshot.app_class,
+                    focus_restored=True, clipboard_restored=True), cfg)
         # clipboard paste
         if self._clip_tool() is None:
             return InsertionResult(
@@ -518,11 +569,27 @@ class DesktopAdapter:
                 method="clipboard_paste", app_class=snapshot.app_class,
                 clipboard_restored=restored,
                 reason="the desktop refused synthetic keystrokes")
-        return InsertionResult(
-            ok=True, method="terminal_paste" if self.is_terminal(
-                snapshot.app_class) else "clipboard_paste",
-            app_class=snapshot.app_class, focus_restored=True,
-            clipboard_restored=restored)
+        return self._with_auto_send(
+            InsertionResult(
+                ok=True, method="terminal_paste" if self.is_terminal(
+                    snapshot.app_class) else "clipboard_paste",
+                app_class=snapshot.app_class, focus_restored=True,
+                clipboard_restored=restored), cfg)
+
+    def _with_auto_send(self, res: InsertionResult,
+                        cfg: Any = None) -> InsertionResult:
+        """Apply the auto_send step to an already-successful insert result.
+
+        The insert itself is untouched (still ok=True); the Enter outcome is
+        recorded in ``reason`` and ``self.last_auto_send``. When the flag is
+        off this is a no-op returning ``res`` unchanged.
+        """
+        auto = self.maybe_auto_send(cfg)
+        if auto == "sent":
+            res.reason = "auto_send: Enter sent"
+        elif auto != "disabled":
+            res.reason = f"auto_send skipped ({auto})"
+        return res
 
     def revert_last(self, snapshot: SelectionSnapshot, cfg: Any = None) -> InsertionResult:
         if not self.verify_focus(snapshot):
@@ -547,4 +614,17 @@ def _cfg(cfg: Any, *path: str, default: Any = None) -> Any:
         return default
 
 
-__all__ = ["DesktopAdapter", "ClipboardBackup"]
+#: Typed code used when auto_send cannot press Enter (headless or no key tool).
+AUTO_SEND_UNAVAILABLE = "VOICE_EDIT_AUTO_SEND_UNAVAILABLE"
+
+
+def auto_send_enabled(cfg: Any) -> bool:
+    """Live ``voice_edit.auto_send`` flag. Absent/unreadable → False."""
+    try:
+        return bool(_cfg(cfg, "voice_edit", "auto_send", default=False))
+    except Exception:
+        return False
+
+
+__all__ = ["DesktopAdapter", "ClipboardBackup", "auto_send_enabled",
+           "AUTO_SEND_UNAVAILABLE"]
