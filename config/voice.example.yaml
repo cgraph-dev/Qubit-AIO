@@ -239,3 +239,39 @@ agent_runtime:
 #   channel: stable                     # stable | beta | canary
 #   # repo_root: ""                     # checkout to inspect (defaults to repo)
 #   # backup_dir: ""                    # default: <XDG state>/qubit-voicebridge/backups/update
+
+# ---------------------------------------------------------------------------
+# Voice typing + voice chat (Qubit overlay; all optional, nothing hardcoded).
+# Portable by design: models resolve from THIS config + your local Ollama, so
+# a weak PC or a powerful one works with no code change. Empty/"auto" uses the
+# machine's configured local model, and a configured-but-missing model falls
+# back — so a lower-end or higher-end machine is never stuck on ours.
+# voice_edit:
+#   enabled: true
+#   chat_model: ""            # ""/"auto" = intent.local_llm.model; else a tag
+#                             # e.g. a small model on a weak PC / big on a good one
+#   detail_model: ""          # model for "explain / in detail / report / joke"
+#   detail_cues: []           # extra words that mean "give the full answer"
+#   voice_recent_turns: 4     # prior turns the voice chat sees
+#   stt_mode: accurate        # accurate (faster-whisper) | streaming
+#   stt_model: small          # tiny|base|small|medium|large-v3
+#   router: deterministic     # deterministic | brain
+#   capture_source: auto      # auto (browser-grade AGC/NS) | raw | aec
+#   agc: true                 # speech-aware auto gain on the mic
+#   mic_gain: 12.0
+#   speak_answers: true       # speak replies aloud
+#   history_panel: true       # show the overlay history
+#
+# Local chat wording (applies to the voice brain; both configurable):
+# intent:
+#   local_llm:
+#     temperature: 0.7        # higher = more varied, human answers
+#     think: false            # false = no chain-of-thought in replies
+#
+# Text-to-speech voice (all configurable):
+# tts:
+#   provider: piper           # piper (fast) | kokoro (natural, slower) |
+#                             # edge (natural, cloud) | hybrid | openai
+#   voice: en_US-amy-medium
+#   kokoro:
+#     voice_sid: 1            # Kokoro voice (0..10)
