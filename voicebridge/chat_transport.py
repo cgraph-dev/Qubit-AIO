@@ -766,6 +766,88 @@ def _release_cancel(session_id: str, ev: threading.Event) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Shared turn decision (Wave A Task 1 — classify once, no behavior change yet)
+# ---------------------------------------------------------------------------
+def _intent_cfg(cfg: Any) -> Dict[str, Any]:
+    """Plain-dict ``intent`` section for the shared classifier.
+
+    Tests pass a plain dict (plan behavior: ``cfg.get("intent", {})``);
+    production passes the Config object, whose ``section("intent")`` is the
+    same mapping the voice orchestrator builds its own Classifier from.
+    """
+    if cfg is None:
+        return {}
+    if isinstance(cfg, dict):
+        sub = cfg.get("intent", {})
+        return dict(sub) if isinstance(sub, dict) else {}
+    section = getattr(cfg, "section", None)
+    if callable(section):
+        try:
+            sub = section("intent")
+            return dict(sub) if isinstance(sub, dict) else {}
+        except Exception:  # noqa: BLE001 - degraded to defaults, never fatal
+            return {}
+    return {}
+
+
+def decide_turn_action(text: Any, *, cfg: Any = None,
+                       intent: Any = None) -> Dict[str, Any]:
+    """Pure classification: map text -> one action dict. No side effects.
+
+    The single classification both the ``/qubit-chat`` turn path and the
+    voice orchestrator's ``_route_intent`` use (log-only there for now):
+    classify once through the same
+    :class:`voicebridge.intent.classifier.Classifier`, then project the
+    Intent kind onto the turn action later waves execute
+    (``answer_local`` / ``web_search`` / ``local_action`` / ``registry`` /
+    ``agent_task`` / ``clarify`` / ``refuse``).
+
+    Never touches a store, the broker, or a model directly; an ambiguous
+    input may consult the locally-configured classifier LLM exactly as the
+    voice path already does for the same utterance (localhost only).
+    """
+    from .intent.classifier import Classifier
+    from .intent.state import ConfirmationState, ConversationState
+
+    raw = str(text or "")
+    if not raw.strip():
+        return {"action": "clarify", "kind": "clarify", "task_text": raw,
+                "params": {}, "reason": "empty turn"}
+    if intent is None:
+        clf = Classifier(_intent_cfg(cfg), ConfirmationState(),
+                         ConversationState())
+        intent = clf.classify(raw)
+    low = raw.lower()
+    reason = str(getattr(intent, "reason", None) or "")
+    task_text = str(getattr(intent, "task_text", None) or raw)
+    params = getattr(intent, "params", None) or {}
+    if not isinstance(params, dict):
+        params = {}
+    kind = str(getattr(intent, "kind", None) or "conversation")
+    if kind == "local":
+        return {"action": "local_action", "kind": kind,
+                "task_text": task_text, "params": dict(params),
+                "reason": reason}
+    if "perplexity" in low or reason.startswith("weather/forecast"):
+        return {"action": "web_search", "kind": "conversation",
+                "task_text": task_text or raw, "params": {},
+                "reason": reason}
+    if kind == "conversation":
+        return {"action": "answer_local", "kind": kind,
+                "task_text": task_text or raw, "params": {},
+                "reason": reason}
+    if kind in ("coding", "agent"):
+        return {"action": "agent_task", "kind": kind,
+                "task_text": task_text or raw, "params": dict(params),
+                "reason": reason}
+    if kind == "clarify":
+        return {"action": "clarify", "kind": kind,
+                "task_text": raw, "params": {}, "reason": reason}
+    return {"action": "refuse", "kind": kind,
+            "task_text": raw, "params": {}, "reason": reason}
+
+
+# ---------------------------------------------------------------------------
 # Turn (non-streaming)
 # ---------------------------------------------------------------------------
 def turn(cfg: Any, text: str, *, session: Optional[str] = None,

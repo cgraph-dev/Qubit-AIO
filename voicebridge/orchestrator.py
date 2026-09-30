@@ -3261,6 +3261,15 @@ class VoiceOrchestrator:
                             self.sticky_route.bump()
                             # fall through to normal coding dispatch with browser hint
 
+        # Wave A Task 1: unified turn decision (log-only; every dispatch
+        # branch below is unchanged — the same helper /qubit-chat routes
+        # through, so the two paths classify once).
+        from . import chat_transport as CT
+        decided = CT.decide_turn_action(text, cfg=self.cfg,
+                                        intent=intent)
+        log_event("routing.unified", action=decided["action"],
+                  kind=decided["kind"], reason=decided["reason"][:160])
+
         # queued-task confirmation: answer to "should I start the queued task?"
         if self._queued_confirm:
             self._answer_queued_confirm(text)
