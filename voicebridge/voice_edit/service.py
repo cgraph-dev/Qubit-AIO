@@ -635,6 +635,32 @@ class VoiceEditService:
                 "discarded_interim_only": not req.applied,
                 "request_id": request_id}
 
+    def _personal_context(self) -> str:
+        """The operator's canonical personal knowledge (bounded).
+
+        Grounds a spoken answer so the model never invents facts about the
+        user (the local system prompt says not to, but it needs the facts).
+        Reads the same ``USER.md`` / ``MEMORY.md`` the orchestrator's context
+        compiler feeds the local chat model.
+        """
+        try:
+            from pathlib import Path
+            root = Path(self.cfg.state_dir())
+            for base in (root / "runtime" / "memories", root / "memories"):
+                if not base.is_dir():
+                    continue
+                parts = []
+                for name in ("USER.md", "MEMORY.md"):
+                    f = base / name
+                    if f.is_file():
+                        parts.append(f.read_text(
+                            encoding="utf-8", errors="replace")[:4000])
+                if parts:
+                    return "\n\n".join(parts)
+        except Exception:  # noqa: BLE001 - additive, never fatal
+            pass
+        return ""
+
     def _voice_session(self) -> str:
         """The stable session id for the spoken conversation.
 
@@ -649,20 +675,49 @@ class VoiceEditService:
             return "voice-chat"
 
     def _conversation_context(self, pending: str) -> str:
-        """Bounded prior-turn context from the ONE canonical session store.
+        """Recency-weighted prior-turn context from the ONE canonical store.
 
-        Reuses :func:`voicebridge.agent._session_context` (the same
-        ``context_policy`` window ``/qubit-chat`` and the worker turns use), so
-        a spoken follow-up sees what was just said instead of starting blank.
+        The most recent turns are rendered verbatim and LAST, with an explicit
+        "the last user line is the current topic / resolve pronouns to it"
+        directive; older turns are folded into a short background gist. This
+        keeps a follow-up ("and what is it known for?") anchored to the current
+        subject instead of an older, louder topic.
         """
         try:
-            from ..agent import _session_context
             store = self._canonical_store()
             if store is None:
                 return ""
-            text, _meta = _session_context(store, self._voice_session(),
-                                           self.cfg, pending)
-            return str(text or "")
+            msgs = [m for m in
+                    store.messages(self._voice_session(), limit=200)
+                    .get("messages", [])
+                    if isinstance(m, dict)
+                    and str(m.get("content") or "").strip()]
+            if not msgs:
+                return ""
+            try:
+                recent_n = int(_read_cfg(self.cfg, "voice_edit",
+                                         "voice_recent_turns",
+                                         default=10) or 10)
+            except (TypeError, ValueError):
+                recent_n = 10
+            recent_n = max(2, min(recent_n, 40))
+            recent = msgs[-recent_n:]
+            older = msgs[:-recent_n]
+            parts: list = []
+            if older:
+                gist = " | ".join(
+                    f"{'U' if m.get('role') == 'user' else 'Q'}: "
+                    f"{' '.join(str(m.get('content', '')).split())[:70]}"
+                    for m in older[-12:])
+                parts.append("[earlier background — NOT the current topic]\n"
+                             + gist)
+            parts.append("[most recent turns — the LAST user line is the "
+                         "CURRENT topic; resolve 'it'/'that' to it]")
+            for m in recent:
+                role = "User" if m.get("role") == "user" else "Qubit"
+                txt = " ".join(str(m.get("content", "")).split())[:800]
+                parts.append(f"{role}: {txt}")
+            return "\n".join(parts)
         except Exception:  # noqa: BLE001 - context is additive, non-fatal
             return ""
 
@@ -733,16 +788,18 @@ class VoiceEditService:
                 "escalate": bool(profile)})
         try:
             from ..providers import gateway as GW
-            # Conversation memory: fold the bounded prior transcript so a
-            # follow-up ("more details") keeps the subject.
+            # Conversation memory: pass the bounded prior transcript as the
+            # structured conversation_prompt (the adapter formats dialogue
+            # correctly); folding it into the prompt string made the small
+            # local model echo the last answer.
             convo = self._conversation_context(question)
-            prompt = (f"Recent conversation:\n{convo}\n\nUser: {question}"
-                      if convo else question)
-            res = GW.run_role(prompt, self.cfg, role="chat",
+            res = GW.run_role(question, self.cfg, role="chat",
                               profile_id=profile or None,
                               max_tokens=300 if mode == "task" else 200,
                               timeout_s=60.0 if mode == "task" else 30.0,
-                              reasoning="low")
+                              reasoning="low",
+                              conversation_prompt=convo,
+                              context=self._personal_context())
         except Exception as exc:
             return {"ok": False, "code": "VOICE_EDIT_ASK_FAILED",
                     "detail": str(exc)[:160]}
