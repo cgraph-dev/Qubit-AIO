@@ -1965,6 +1965,8 @@ export const api = {
         }),
       confirm,
     ),
+  getConfigEffective: () =>
+    fetchJSON<ConfigEffectiveResponse>("/api/config/effective"),
   updateQubit: () =>
     // The System page gates this behind its own confirm dialog, so the user
     // consent already happened: send confirm=true (the backend refuses with
@@ -3053,6 +3055,17 @@ export interface MessagingPlatformsResponse {
   env_path: string;
   gateway_start_command: string;
   platforms: MessagingPlatform[];
+}
+
+export interface ConfigEffectiveResponse {
+  ok: boolean;
+  verdict: "active" | "stale" | "unknown";
+  newest_config_write: string | null;
+  services: Record<
+    string,
+    { state: string; running: boolean | null; boot: string | null }
+  >;
+  detail: string;
 }
 
 export interface MessagingPlatformUpdate {

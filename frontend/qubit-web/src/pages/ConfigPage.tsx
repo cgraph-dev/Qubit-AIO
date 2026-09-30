@@ -144,6 +144,8 @@ export default function ConfigPage() {
   // offers the gateway restart. Cleared on reload.
   const [restartNeeded, setRestartNeeded] = useState(false);
   const [restarting, setRestarting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyNote, setVerifyNote] = useState("");
   const saveDecisionRef = useRef<((ok: boolean) => void) | null>(null);
   const { toast, showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -562,6 +564,41 @@ export default function ConfigPage() {
               }}
             >
               {restarting ? "Restarting…" : "Restart gateway"}
+            </Button>
+            <Button
+              size="sm"
+              className="uppercase"
+              disabled={verifying}
+              onClick={() => {
+                setVerifying(true);
+                setVerifyNote("");
+                api
+                  .getConfigEffective()
+                  .then((res) => {
+                    const stale = Object.entries(res.services || {})
+                      .filter(([, s]) => s.state === "stale")
+                      .map(([name]) => name);
+                    if (res.verdict === "active") {
+                      showToast("Verified live everywhere.", "success");
+                      setVerifyNote("Verified live everywhere.");
+                      setRestartNeeded(false);
+                    } else {
+                      const msg =
+                        stale.length > 0
+                          ? `Still stale: ${stale.join(", ")}. Restart, then verify again.`
+                          : `Verify inconclusive (${res.verdict}).`;
+                      showToast(msg, "error");
+                      setVerifyNote(msg);
+                    }
+                  })
+                  .catch((e) => {
+                    showToast(`Verify failed: ${e}`, "error");
+                    setVerifyNote(`Verify failed: ${e}`);
+                  })
+                  .finally(() => setVerifying(false));
+              }}
+            >
+              {verifying ? "Verifying…" : "Verify"}
             </Button>
           </CardContent>
         </Card>

@@ -1886,3 +1886,30 @@ still ran deepseek.
 - **Combined: 112 passed / 0 failed / 0 skipped** across follow/repair/
   bridge/new-chat/context-floor/profiles/pty-ws/ops-confirm/parity.
   Service restarted (local-pick path live); `/chat` HTTP 200; `:9119` untouched.
+
+## 41. Ollama in the model picker + /qubit-chat on spark17 — 2026-09-30
+
+**No milestone claimed.** Owner: /qubit-chat must offer the local models;
+it runs spark17 (better than brain4), routing up when harder.
+
+- **Picker gap (real).** `GET /api/model/options` listed only API providers
+  (moa/copilot/opencode-zen/opencode-go) — the vendored builder injects a
+  local row solely for the managed llamacpp runtime's staged GGUFs, so the
+  Ollama tier was unpickable. New Qubit-owned `_ollama_options_row`
+  (`qubit_compat.py`): registered, enabled, chat-eligible LOCAL profiles
+  (brain4 shipped default always qualifies; Spark 1.7B/4B registered this
+  wave with `ollama show` ctx 1048576), checkmark from the canonical active
+  profile. Live: `ollama | Ollama (local) | [brain4, spark17, spark4] |
+  current: True`.
+- **Local picks mirrored.** `select_model`'s local branch now mirrors the
+  runtime model slot (like the remote path), and a one-time mirror fixed
+  the double-checkmark (vendored context still named muse while the
+  resolver had moved on) — single `CURRENT: ollama`, top-level agrees.
+- **Live state.** Main slot `qubit-spark17` (`/qubit-chat` default turn →
+  `local/qubit-spark17`, proven); terminal pin stays muse; voice keeps last
+  night's wiring (spark17 brain/runner/summarizer, spark4 detail, API
+  escalation). Old sessions/logs checked: store holds 09-19 tests + today's
+  runs; TUI log shows today's Muse API turns; no contradicting routing.
+- **Tests.** New `tests/test_ollama_options9u.py` **4 passed** (row content,
+  checkmark, ineligible-skip, runtime mirror). Combined sweep **116 passed /
+  0 failed / 0 skipped**. Service restarted; `/chat` 200; `:9119` untouched.

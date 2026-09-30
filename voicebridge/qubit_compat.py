@@ -64,6 +64,12 @@ def audit_event(op: str, actor: str, detail: Dict[str, Any]) -> None:
     _audit(op, actor, detail)
 
 
+# Dashboard process boot (wall clock, recorded at import ≈ process start).
+# Used by h_config_effective to prove whether this process postdates the
+# newest config write. Never mutated.
+_DASHBOARD_BOOT_WALL = time.time()
+
+
 def _estop(cfg: Any) -> bool:
     # Fail closed: if the single e-stop authority cannot be read, treat the
     # system as stopped rather than allowing a mutating path to proceed.
@@ -1385,6 +1391,126 @@ def h_config_defaults(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _fail(exc)
 
 
+def _parse_systemd_timestamp(raw: Any) -> Optional[float]:
+    """Parse ``systemctl show`` timestamps fail-closed (None when unparseable).
+
+    Values look like ``Wed 2026-09-30 20:43:47 EEST``; the trailing zone
+    abbreviation is libc-dependent, so it is stripped and the naive stamp is
+    interpreted in local time (both ends of the comparison are local).
+    """
+    try:
+        text = str(raw or "").strip()
+        if not text or text.lower() in ("n/a", "unknown"):
+            return None
+        naive = text.rsplit(" ", 1)[0]
+        import datetime as _dt
+        parsed = _dt.datetime.strptime(naive, "%a %Y-%m-%d %H:%M:%S")
+        return float(time.mktime(parsed.timetuple()))
+    except Exception:
+        return None
+
+
+def _newest_config_write(cfg: Any) -> Optional[float]:
+    """Newest mtime across the three config stores (None when none exist)."""
+    candidates = []
+    try:
+        from .config import canonical_config_dir
+        candidates.append(canonical_config_dir() / "voice.yaml")
+    except Exception:
+        pass
+    try:
+        candidates.append(Path(_config_overrides_read_path(cfg)))
+    except Exception:
+        pass
+    try:
+        from . import qubit_runtime as QR
+        candidates.append(Path(QR.runtime_home_for_cfg(cfg)) / "config.yaml")
+    except Exception:
+        pass
+    newest: Optional[float] = None
+    for cand in candidates:
+        try:
+            if cand.is_file():
+                mtime = cand.stat().st_mtime
+                newest = mtime if newest is None else max(newest, mtime)
+        except Exception:
+            continue
+    return newest
+
+
+def h_config_effective(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/config/effective -> is the running fleet on the latest config?
+
+    Compares the newest config-store write against each serving process's
+    boot: the dashboard itself (import-time wall clock) and the gateway unit
+    (``systemctl show`` start stamp via the supervisor). ``fresh`` means the
+    process booted after the newest write, so it provably serves current
+    values; ``stale`` names what still needs a restart; ``unknown`` is
+    reported honestly when a stamp is unavailable. Read-only, no mutation.
+    """
+    try:
+        newest = _newest_config_write(cfg)
+        services: Dict[str, Any] = {
+            "qubit-voicebridge": {"boot": _DASHBOARD_BOOT_WALL,
+                                  "running": True},
+        }
+        try:
+            from . import gateway_supervisor as GS
+            gw = GS.status(cfg) or {}
+            gw_boot = _parse_systemd_timestamp(
+                gw.get("started_at") or gw.get("active_enter_timestamp"))
+            services["qubit-gateway"] = {
+                "boot": gw_boot,
+                "running": bool(gw.get("running", False)),
+            }
+        except Exception:
+            services["qubit-gateway"] = {"boot": None, "running": None}
+
+        def _freshness(boot: Any) -> str:
+            if newest is None:
+                return "fresh"
+            if not isinstance(boot, (int, float)):
+                return "unknown"
+            return "fresh" if float(boot) >= float(newest) else "stale"
+
+        for _name, _info in services.items():
+            if _info.get("running") is False:
+                _info["state"] = "stopped"
+            else:
+                _info["state"] = _freshness(_info.get("boot"))
+        states = [v["state"] for v in services.values()]
+        if all(s == "fresh" for s in states):
+            verdict = "active"
+        elif any(s == "stale" for s in states):
+            verdict = "stale"
+        else:
+            verdict = "unknown"
+        import datetime as _dt
+        return 200, {
+            "ok": True,
+            "verdict": verdict,
+            "newest_config_write": (
+                _dt.datetime.fromtimestamp(newest).isoformat()
+                if newest else None),
+            "services": {
+                name: {
+                    "state": info["state"],
+                    "running": info.get("running"),
+                    "boot": (_dt.datetime.fromtimestamp(info["boot"]).isoformat()
+                             if isinstance(info.get("boot"), (int, float))
+                             else None),
+                }
+                for name, info in services.items()
+            },
+            "detail": ("every serving process booted after the newest config "
+                       "write" if verdict == "active" else
+                       "restart the stale service(s), then verify again"),
+        }
+    except Exception as exc:
+        return _fail(exc)
+
+
 def h_config_schema(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/config/schema -> real ``{fields, category_order}`` descriptors.
@@ -1626,6 +1752,45 @@ def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                effective_context_length=effective, capabilities=caps)
 
 
+def _ollama_options_row(cfg: Any) -> Optional[Dict[str, Any]]:
+    """Qubit-owned Ollama row for the model picker (``/api/model/options``).
+
+    The vendored builder only knows the managed llamacpp runtime's staged
+    GGUFs, so Qubit's Ollama tier (brain, Spark 1.7B/4B) was invisible in
+    every MODEL picker and local models could not be chosen in /qubit-chat.
+    This row lists the registered, enabled, chat-eligible LOCAL profiles —
+    exactly the set ``POST /api/model/set`` can activate — with the checkmark
+    resolved from the canonical active profile (not the vendored context, so
+    it never disagrees with the MODEL card). ``authenticated`` is
+    reachability, same rationale as the vendored local row: no credential
+    exists for loopback Ollama. ``None`` when no local profile qualifies.
+    """
+    try:
+        from .providers import resolver as R
+
+        profiles = [p for p in R.load_profiles(cfg)
+                    if p.kind == R.LOCAL and p.enabled
+                    and "chat" in (p.roles or ["chat"])]
+        if not profiles:
+            return None
+        try:
+            current = str(R.get_active_profile(cfg).get("active") or "")
+        except Exception:  # noqa: BLE001 - unreadable active: no checkmark
+            current = ""
+        ids = [p.id for p in profiles]
+        models: List[str] = []
+        for p in profiles:
+            if p.model not in models:
+                models.append(p.model)
+        return {"slug": "ollama", "name": "Ollama (local)",
+                "models": models, "total_models": len(models),
+                "is_current": current in ids, "is_user_defined": False,
+                "source": "qubit-ollama", "authenticated": True,
+                "auth_type": "local", "warning": None}
+    except Exception:  # noqa: BLE001 - options must never 500 on Ollama
+        return None
+
+
 def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/model/options -> the real vendored provider/model catalogue.
@@ -1658,7 +1823,23 @@ def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         )
     except Exception as exc:
         return _fail(exc)
-    return _ok(**_strip_provider_secret_fields(payload or {}))
+    payload = payload or {}
+    # Qubit-owned Ollama row (registered LOCAL profiles). The vendored
+    # builder cannot see the Ollama tier; without this, /qubit-chat's MODEL
+    # card offered no local model. Skipped when empty or when a vendored
+    # local row already owns the surface.
+    try:
+        rows = payload.get("providers")
+        if isinstance(rows, list):
+            seen = {str(r.get("slug") or "").lower() for r in rows
+                    if isinstance(r, dict)}
+            if not seen & {"ollama", "llamacpp"}:
+                ollama_row = _ollama_options_row(cfg)
+                if ollama_row is not None:
+                    payload["providers"] = [*rows, ollama_row]
+    except Exception:  # noqa: BLE001 - additive row never breaks options
+        pass
+    return _ok(**_strip_provider_secret_fields(payload))
 
 
 def h_model_recommended_default(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -2791,11 +2972,22 @@ def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        "enable": bool(b.get("enable", True))})
     if guard is not None:
         return guard
+    secrets = {str(s.name) for s in specs if getattr(s, "secret", False)}
     refs: Dict[str, str] = {}
+    inline: Dict[str, str] = {}
     try:
         for key, value in given.items():
-            ES.write_secret(cfg, str(key), str(value or ""))
-            refs[str(key)] = f"env:{key}"
+            if key in secrets:
+                ES.write_secret(cfg, str(key), str(value or ""))
+                refs[str(key)] = f"env:{key}"
+            else:
+                # Non-secret values are inlined into the transport fields
+                # (mirroring the reference: URL templates like
+                # ``${N8N_MCP_SERVER_URL}`` resolve at install). They also
+                # enter the runtime .env so a reinstall round-trips.
+                ES.write_secret(cfg, str(key), str(value or ""))
+                inline[str(key)] = str(value or "")
+                refs[str(key)] = f"env:{key}"
     except ValueError as exc:
         return 400, {"ok": False, "code": "MCP_ENV_REQUIRED",
                      "detail": _redact(str(exc))[:200],
@@ -2804,11 +2996,18 @@ def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     fields: Dict[str, Any] = {"transport": transport, "enabled": True,
                               "source": "mcp-catalog"}
     if transport == "http":
-        fields["url"] = str(getattr(entry.transport, "url", "") or "")
+        url = str(getattr(entry.transport, "url", "") or "")
+        for key, value in inline.items():
+            url = url.replace("${" + key + "}", value)
+        fields["url"] = url
     else:
-        fields["command"] = str(
-            getattr(entry.transport, "command", "") or "")
-        fields["args"] = list(getattr(entry.transport, "args", None) or [])
+        command = str(getattr(entry.transport, "command", "") or "")
+        args = list(getattr(entry.transport, "args", None) or [])
+        for key, value in inline.items():
+            command = command.replace("${" + key + "}", value)
+            args = [a.replace("${" + key + "}", value) for a in args]
+        fields["command"] = command
+        fields["args"] = args
     if refs:
         fields["env"] = refs
     if _truthy(b.get("enable", True)) is False:
@@ -8064,6 +8263,7 @@ _r("DELETE", r"/api/sessions/empty", "sessions_empty_delete")
 _r("GET", r"/api/config", "h_config")
 _r("GET", r"/api/config/schema", "h_config_schema")
 _r("GET", r"/api/config/defaults", "h_config_defaults")
+_r("GET", r"/api/config/effective", "h_config_effective")
 _r("GET", r"/api/egress/status", "h_egress_status")
 _r("GET", r"/api/model/info", "h_model_info")
 _r("GET", r"/api/model/recommended-default", "h_model_recommended_default")
@@ -15493,6 +15693,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_session_timeline": h_session_timeline,
     "h_session_messages_around": h_session_messages_around,
     "h_config": h_config, "h_config_defaults": h_config_defaults,
+    "h_config_effective": h_config_effective,
     "h_config_schema": h_config_schema, "h_model_info": h_model_info,
     "h_model_recommended_default": h_model_recommended_default,
     "h_model_options": h_model_options, "h_model_moa": h_model_moa,

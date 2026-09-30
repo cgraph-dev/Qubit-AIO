@@ -453,6 +453,12 @@ def select_model(cfg: Any, provider: str, model: str, *,
         if active.get("state") != "OK":
             return {"ok": False, "code": active.get("code", "ACTIVATE_FAILED"),
                     "detail": active.get("detail", "could not activate profile")}
+        # Mirror the runtime model slot like the remote path does, so the
+        # vendored picker context and runtime readers agree on the local
+        # selection (otherwise they keep reporting the previous API model).
+        _persist_runtime_model(cfg, provider=reuse_profile.provider,
+                               model=reuse_profile.model,
+                               base_url="", key_ref="")
         return {"ok": True, "active": pid, "profile_id": pid,
                 "provider": reuse_profile.provider,
                 "model": reuse_profile.model, "kind": R.LOCAL,
