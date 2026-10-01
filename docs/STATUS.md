@@ -2306,3 +2306,23 @@ continued back-to-back.
   gap; if the drone persists with everything off, it's the hardware
   chain (then gain staging: peaks already clip at 1.0). Report what you
   hear vs what the mic hears.
+
+## 54. PC fans confirmed as the drone; software path exhausted — 2026-10-01
+
+**No milestone claimed. No code changed.** Owner hears only PC fans.
+
+- **Ruled out in code:** `noise_suppression` is OFF and wouldn't help —
+  its downward gate sits at 0.004 RMS vs the 0.09 drone. The ParecMic
+  AGC provably does NOT pump steady noise (adapts `_noise_rms` up, then
+  decays to unity below `floor = noise*2.5`). High-pass proven futile
+  (§53). Gain changes can't help (ratio, not level).
+- **Load picture:** GPU 5.4/8 GB resident (1447+498+264+3226 MiB),
+  load avg 4.5 — this diagnostic session + resident Ollama/nemotron/
+  whisper keep the fans working; idle will be quieter when testing ends.
+  Chain clips at 1.0 (over-gained; wrecks KWS/ASR too).
+- **Owner actions (physical, in order):** (1) AT2020 close to the mouth
+  (15–20 cm) with its REAR toward the PC (cardioid null ≈ 15–20 dB
+  rejection); (2) Scarlett hardware gain down until speech peaks ≈ -12
+  dB, no clipping; (3) quiet fan curve / less background load for tests.
+  Wake is proven end-to-end (fires on TTS through the same chain) — it
+  needs a quiet gap, which exists when the machine idles.
