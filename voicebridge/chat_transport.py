@@ -966,6 +966,128 @@ def _branch_receipt(action: str, *, task: Any = None,
             "model": model}
 
 
+# ---------------------------------------------------------------------------
+# T4 — staged-confirm settle on affirmative follow-up
+# ---------------------------------------------------------------------------
+#: Pure-affirmation utterances that settle (never stage) when the session
+#: holds a pending staged registry confirmation. Kept short/literal so a
+#: longer message that merely contains "yes" never settles — only a
+#: follow-up that IS an affirmation does. The settle runs through the SAME
+#: shared journal path (``voice_commands.confirm_pending`` on the session's
+#: latest pending record), never a fresh classify, never auto-execution.
+_AFFIRMATIVE_PHRASES = frozenset({
+    "yes", "yeah", "yep", "yup", "y",
+    "confirm", "confirmed", "confirm it", "confirm yes", "yes confirm",
+    "do it", "yes do it", "do it please", "please do", "please do it",
+    "go ahead", "proceed", "ok", "okay", "sure", "yes please",
+    "affirmative", "approved",
+})
+
+
+def _is_affirmative(text: Any) -> bool:
+    """True when the turn text is a bare affirmation (nothing else)."""
+    raw = str(text or "").strip().lower()
+    if not raw:
+        return False
+    cleaned = re.sub(r"[^\w\s]", " ", raw)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if not cleaned or len(cleaned) > 40:
+        return False
+    return cleaned in _AFFIRMATIVE_PHRASES
+
+
+def _pending_registry(cfg: Any, sid: str) -> list:
+    """Read-only pending staged registry confirmations for one chat session.
+
+    Uses the existing shared-journal primitives only
+    (``make_ctx``/``_journal``/``_pending_for`` — the same durable
+    ``approvals.jsonl`` journal ``voice_say`` stages into and
+    ``confirm_pending`` settles from). No new store, no write, never raises:
+    an unreadable journal degrades to no pending so the turn falls through
+    to its normal path.
+    """
+    try:
+        from . import voice_commands as VC
+
+        ctx = VC.make_ctx(cfg, actor="dashboard:user", session=sid,
+                          source="user")
+        journal = VC._journal(cfg)
+        return list(VC._pending_for(ctx, journal))
+    except Exception:  # noqa: BLE001 - degraded to no-pending, never fatal
+        return []
+
+
+def _settle_affirmed(cfg: Any, st: Any, sid: str) -> Dict[str, Any]:
+    """Settle the session's latest pending staged confirmation once.
+
+    Called only after an affirmative follow-up on a session with pending
+    staged work. Settles through ``voice_commands.confirm_pending`` (the
+    same settle-once journal path the OPS confirm route delegates to), so
+    the confirmation_id comes from the pending record — never a fresh
+    classify. A backend failure (e.g. CDP down) surfaces its typed code
+    (``BROWSER_UNAVAILABLE``/``CDP_UNAVAILABLE``); an expired/foreign id
+    surfaces typed ``NO_CONFIRMATION``. Nothing is ever fake-executed and
+    nothing executes without this affirmation.
+    """
+    from . import voice_commands as VC
+
+    ctx = VC.make_ctx(cfg, actor="dashboard:user", session=sid,
+                      source="user")
+    try:
+        outcome = VC.confirm_pending(ctx)
+    except Exception as exc:  # noqa: BLE001 - typed, redacted
+        _audit("turn_registry_confirm_error", session=sid,
+               error=str(exc))
+        return {"ok": False, "state": "FAILED", "code": "REGISTRY_ERROR",
+                "detail": _redact(str(exc))[:200], "session_id": sid,
+                "route": "registry"}
+    kind = str(getattr(outcome, "kind", "") or "")
+    speech = str(getattr(outcome, "speech", "") or "")
+    receipt = dict(getattr(outcome, "receipt", None) or {})
+    entry = getattr(outcome, "entry", None)
+    entry_id = str(getattr(entry, "id", "") or "") if entry is not None \
+        else ""
+    if kind == "executed":
+        if speech:
+            st.append(sid, "assistant", speech,
+                      meta={"route": "registry",
+                            "entry": entry_id or None})
+        _audit("turn_registry_confirmed", session=sid, entry=entry_id)
+        result: Dict[str, Any] = {
+            "ok": True, "text": speech, "reply": speech,
+            "session_id": sid, "session": sid, "route": "registry",
+            "entry": entry_id}
+        base = dict(receipt)
+        base.setdefault("route", "registry")
+        base.setdefault("task", None)
+        base.setdefault("sources", [])
+        base.setdefault("model", _branch_model(cfg))
+        result["receipt"] = base
+        return result
+    code = str(receipt.get("code") or "")
+    if not code:
+        low = speech.lower()
+        if "nothing to confirm" in low:
+            code = "NOTHING_PENDING"
+        elif "confirmation is gone" in low:
+            code = "NO_CONFIRMATION"
+        elif "stale" in low:
+            code = "STALE_OP"
+        else:
+            code = "REFUSED" if kind == "refused" else "REGISTRY_FAILED"
+    detail = (speech or "registry execution failed; nothing was "
+              "fabricated")[:300]
+    if speech:
+        st.append(sid, "assistant", speech,
+                  meta={"route": "registry", "entry": entry_id or None,
+                        "failed": True})
+    _audit("turn_registry_confirm_failed", session=sid, entry=entry_id,
+           code=code)
+    return {"ok": False, "state": "FAILED", "code": code,
+            "detail": detail, "session_id": sid, "route": "registry",
+            "entry": entry_id}
+
+
 def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
     """Wave C Task 2: execute a web answer, never chatter about searching."""
     from . import orchestrator as ORC
@@ -1301,6 +1423,28 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
                 "detail": str(exc)[:200]}
     clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
     st = store(cfg)
+    # T4: an affirmative follow-up ("yes"/"confirm"/"do it") on a session
+    # with a pending staged registry confirmation settles THAT record
+    # through the same shared journal path — never a fresh classify (which
+    # would chatter "I will open the browser…" and execute nothing).
+    # Non-affirmative text and affirmatives with nothing pending keep the
+    # legacy path byte-for-byte (no auto-execution without affirmation).
+    if clean and _is_affirmative(clean):
+        _probe = str(session or DEFAULT_SESSION).strip()[:80] \
+            or DEFAULT_SESSION
+        if _pending_registry(cfg, _probe):
+            created = _resolve_session(st, session, model=None)
+            if created.get("state") != "OK":
+                return {"ok": False, "state": "FAILED",
+                        "code": created.get("code"),
+                        "detail": created.get("detail", "")}
+            sid = created["session"]["id"]
+            appended = st.append(sid, "user", clean)
+            if appended.get("state") != "OK":
+                return {"ok": False, "state": "FAILED",
+                        "code": appended.get("code"),
+                        "detail": appended.get("detail", "")}
+            return _settle_affirmed(cfg, st, sid)
     decided = _decide_branch(clean, cfg)
     if decided.get("action") in BRANCH_ACTIONS:
         created = _resolve_session(st, session, model=None)
@@ -1885,6 +2029,30 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                "detail": created.get("detail", "")}
         return
     sid = created["session"]["id"]
+    # T4: same affirmative-settle as turn() — a bare "yes" with pending
+    # staged work settles that record instead of reclassifying into chatter.
+    if clean and _is_affirmative(clean) and _pending_registry(cfg, sid):
+        started = time.monotonic()
+        yield {"event": "start", "session_id": sid, "session": sid,
+               "route": "registry"}
+        appended = st.append(sid, "user", clean)
+        if appended.get("state") != "OK":
+            yield {"event": "error", "code": appended.get("code"),
+                   "detail": appended.get("detail", ""), "session_id": sid}
+            return
+        res = _settle_affirmed(cfg, st, sid)
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        if not res.get("ok"):
+            yield {"event": "error", "code": res.get("code", "BRANCH_FAILED"),
+                   "detail": res.get("detail", ""), "session_id": sid,
+                   "route": "registry", "elapsed_ms": elapsed_ms}
+            return
+        text_out = str(res.get("text") or res.get("reply") or "")
+        yield {"event": "delta", "text": text_out, "session_id": sid}
+        yield {"event": "done", "ok": True, "reply": text_out,
+               "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
+               "receipt": res.get("receipt")}
+        return
     decided = _decide_branch(clean, cfg)
     if decided.get("action") in BRANCH_ACTIONS:
         yield from _stream_branch(cfg, st, sid, clean, decided,
