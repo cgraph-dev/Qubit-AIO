@@ -436,6 +436,249 @@ def answer_web_query(cfg: Any, text: str,
             "sources": _extract_sources(answer), "code": "OK"}
 
 
+class TaskLaunchDenied(Exception):
+    """Typed refusal to launch a headless worker task (code + detail).
+
+    Raised by :func:`launch_task` when the task must not run: empty text,
+    missing config, latched e-stop, safety denial, dry-run, or a
+    confirmation requirement. Callers translate it to a typed envelope —
+    never a silent drop, never an auto-confirmed execution.
+    """
+
+    def __init__(self, code: str, detail: str = "") -> None:
+        super().__init__(detail or code)
+        self.code = str(code or "TASK_DENIED")
+        self.detail = str(detail or code)
+
+
+#: In-flight headless task boxes (Wave C Task 5): session_key ->
+#: {"event": threading.Event, "result": dict|None, "cancel": bool}.
+#: Bounded so abandoned keys cannot grow the map without limit.
+_TASK_BOXES: Dict[str, Dict[str, Any]] = {}
+_TASK_BOX_LOCK = threading.Lock()
+_TASK_BOX_CAP = 64
+
+
+def _task_session_key(cfg: Any, session: Any) -> str:
+    """Resolve the worker session key for a headless task (never raises)."""
+    requested = str(session or "").strip()[:80]
+    if not requested:
+        fn = getattr(cfg, "session_key", None)
+        try:
+            requested = str(fn(f"chat-task-{uuid.uuid4().hex[:8]}")) \
+                if callable(fn) else f"chat-task-{uuid.uuid4().hex[:8]}"
+        except Exception:  # noqa: BLE001 - fall back to a bare key
+            requested = f"chat-task-{uuid.uuid4().hex[:8]}"
+    return _resolve_agent_session(cfg, requested)
+
+
+def _task_tool_backend(cfg: Any) -> Any:
+    """Planner-tool backend behind the shared broker (mirrors _agent_tool).
+
+    Both ``local.*`` and read-only ``web.*`` resolve through the SAME
+    registry/policy/e-stop/confirmation junction the voice worker uses, with
+    the TRUE origin (``source="model"``) so MUTATING/DESTRUCTIVE tools stay
+    confirm-gated and the audit trail stays honest. Unknown tools fail
+    closed. This is the module-level twin of
+    ``VoiceOrchestrator._agent_tool`` for headless (non-voice) dispatch —
+    same calls, no orchestrator instance required.
+    """
+    from .broker import build_host_broker, register_web_tools
+
+    broker = build_host_broker(cfg=cfg)
+    try:
+        register_web_tools(broker, cfg=cfg)
+    except Exception:  # noqa: BLE001 - web tools are additive, never fatal
+        pass
+
+    def _run(tool: str, args: Dict[str, Any]) -> str:
+        name = str(tool or "")
+        if name.startswith("local."):
+            if local_actions.ACTIONS.get(name[len("local."):]) is None:
+                raise ValueError(f"unknown agent tool {name!r}")
+        elif not name.startswith("web."):
+            raise ValueError(f"unknown agent tool {name!r}")
+        res = broker.execute(name, dict(args or {}), source="model",
+                             session=_cfg_session(cfg))
+        if res.denied:
+            raise DispatchBlocked(res.denied, name)
+        if not res.ok:
+            raise RuntimeError(res.error or f"{name} failed")
+        return res.output
+
+    return _run
+
+
+def launch_task(task_text: str, session: Any = None, *,
+                cfg: Any = None, model: Optional[str] = None) -> str:
+    """Dispatch a headless worker task; return its session key (wrapper).
+
+    The exact ``run_worker_task`` chain without the voice instance: safety
+    verdict -> session resolve -> ``WorkerGuard.run("agent.session",
+    agent.run_session(...), source="user")`` in a daemon thread so the
+    caller (``chat_transport`` turn/stream) can emit progress while it runs.
+    :func:`wait_task` collects the outcome. No mic/ASR/TTS, no speech, no
+    progress thread — the worker, guard, broker junction, and summarizer
+    path are the same ones the voice dispatch uses.
+
+    Raises :class:`TaskLaunchDenied` on any pre-execution refusal
+    (e-stop latched = zero worker invocations). ``model`` is accepted for
+    signature parity and recorded on the box; worker model selection stays
+    with the agent path.
+    """
+    from .broker import estop_engaged as _estop_engaged
+
+    text = str(task_text or "").strip()
+    if not text:
+        raise TaskLaunchDenied("MALFORMED", "task needs non-empty text")
+    if cfg is None:
+        raise TaskLaunchDenied("NO_CONFIG",
+                               "headless task needs a config (fail-closed)")
+    try:
+        if bool(_estop_engaged(cfg)):
+            raise TaskLaunchDenied(
+                "EMERGENCY_STOP",
+                "emergency stop latched; task refused before launch")
+    except TaskLaunchDenied:
+        raise
+    except Exception:  # noqa: BLE001 - an unreadable latch fails closed
+        raise TaskLaunchDenied("POWER_UNAVAILABLE",
+                               "could not read the e-stop latch")
+    try:
+        section = cfg.section("safety") \
+            if hasattr(cfg, "section") else {}
+        verdict = SafetyPolicy(
+            dict(section) if isinstance(section, dict) else {}).check(text)
+    except Exception:  # noqa: BLE001 - verdict fault fails closed below
+        verdict = None
+    if verdict is not None and bool(getattr(verdict, "blocked", False)):
+        raise TaskLaunchDenied(
+            "BLOCKED",
+            str(getattr(verdict, "deny_reason", "") or "blocked")[:200])
+    if verdict is not None and bool(getattr(verdict, "dry_run", False)):
+        raise TaskLaunchDenied("DRY_RUN",
+                               "dry-run mode: nothing was dispatched")
+    if verdict is not None and bool(getattr(verdict, "require_confirm",
+                                            False)):
+        raise TaskLaunchDenied(
+            "SAFETY_CONFIRM_REQUIRED",
+            str(getattr(verdict, "confirm_reason", "")
+                or "needs confirmation")[:200])
+    key = _task_session_key(cfg, session)
+    box: Dict[str, Any] = {"event": threading.Event(), "result": None,
+                           "cancel": False, "model": model or ""}
+    with _TASK_BOX_LOCK:
+        _TASK_BOXES[key] = box
+        while len(_TASK_BOXES) > _TASK_BOX_CAP:
+            oldest = next(iter(_TASK_BOXES))
+            if oldest == key:
+                break
+            _TASK_BOXES.pop(oldest, None)
+
+    def _estop() -> bool:
+        try:
+            return bool(_estop_engaged(cfg))
+        except Exception:  # noqa: BLE001 - unreadable latch stops the run
+            return True
+
+    def _cancelled() -> bool:
+        return bool(box.get("cancel", False))
+
+    def _run() -> None:
+        try:
+            guard = WorkerGuard(cfg, engine=None)
+            res = guard.run(
+                "agent.session",
+                lambda: _agent_run_session(
+                    cfg, text, session=key,
+                    execute_tool=_task_tool_backend(cfg),
+                    cancelled=_cancelled,
+                    estop_engaged=_estop),
+                source="user", correlation_id=key)
+            box["result"] = res if isinstance(res, dict) else {
+                "state": "FAILED", "code": "WORKER_MALFORMED",
+                "detail": "worker returned a non-dict outcome"}
+        except AgentDenied as exc:
+            box["result"] = {
+                "state": "UNAVAILABLE",
+                "code": str(getattr(exc, "code", "") or "AGENT_DENIED"),
+                "detail": str(exc)[:200]}
+        except DispatchBlocked as exc:
+            box["result"] = {
+                "state": "UNAVAILABLE",
+                "code": str(getattr(exc, "code", "") or "DISPATCH_BLOCKED"),
+                "detail": str(exc)[:200]}
+        except Exception as exc:  # noqa: BLE001 - typed, collected by wait
+            box["result"] = {
+                "state": "UNAVAILABLE",
+                "code": str(getattr(exc, "code", "") or "WORKER_ERROR"),
+                "detail": str(exc)[:200]}
+        finally:
+            try:
+                box["event"].set()
+            except Exception:
+                pass
+
+    threading.Thread(target=_run, name=f"chat-task-{key[:24]}",
+                     daemon=True).start()
+    log_event("worker.dispatch", session_key=key, task=text[:300],
+              route="qubit-chat")
+    return key
+
+
+def wait_task(session_key: str, timeout_s: float = 300, *,
+              cancel: Any = None) -> Dict[str, Any]:
+    """Collect a :func:`launch_task` outcome (blocking, slice-polled).
+
+    Returns ``{"status", "reply", ...}``: ``done`` (worker reply),
+    ``error`` (typed code + detail), ``cancelled`` (cancel flag observed —
+    the worker thread sees it through its ``cancelled`` hook and stops),
+    ``timeout`` (still running; call again to keep waiting), or
+    ``unknown`` (no such key). ``cancel`` is an optional zero-arg callable;
+    when it fires the box is flagged and ``cancelled`` is returned without
+    fabricating a summary. Polls in 0.2 s slices so stream callers can emit
+    progress between slices.
+    """
+    key = str(session_key or "")
+    with _TASK_BOX_LOCK:
+        box = _TASK_BOXES.get(key)
+    if box is None:
+        return {"status": "unknown", "reply": "",
+                "code": "UNKNOWN_TASK",
+                "detail": f"no headless task {key!r}"}
+    event = box.get("event")
+    deadline = time.monotonic() + max(0.5, float(timeout_s or 300))
+    while True:
+        try:
+            if cancel is not None and bool(cancel()):
+                box["cancel"] = True
+                return {"status": "cancelled", "reply": "",
+                        "detail": "cancelled while waiting for the worker"}
+        except Exception:  # noqa: BLE001 - a broken cancel probe is ignored
+            pass
+        try:
+            done = bool(event.wait(0.2)) if event is not None else True
+        except Exception:  # noqa: BLE001 - treat a broken event as done
+            done = True
+        if done:
+            break
+        if time.monotonic() >= deadline:
+            return {"status": "timeout", "reply": "",
+                    "detail": f"task {key!r} still running after "
+                              f"{timeout_s}s; poll again"}
+    res = box.get("result") or {}
+    if not isinstance(res, dict):
+        return {"status": "error", "reply": "",
+                "code": "WORKER_MALFORMED",
+                "detail": "worker returned a non-dict outcome"}
+    if res.get("state") == "OK":
+        return {"status": "done", "reply": str(res.get("reply", "")),
+                "session": key}
+    return {"status": "error", "reply": str(res.get("detail", "") or ""),
+            "code": str(res.get("code", "WORKER_ERROR")),
+            "detail": str(res.get("detail", "") or "")[:300]}
+
+
 def _interrupt_decision_prompt(old_task: str, new_request: str) -> str:
     """Build the prompt handed to the agent after an interrupt: it decides
     whether to continue the paused work or switch to the user's new request."""

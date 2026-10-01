@@ -832,6 +832,26 @@ def decide_turn_action(text: Any, *, cfg: Any = None,
         return {"action": "web_search", "kind": "conversation",
                 "task_text": task_text or raw, "params": {},
                 "reason": reason}
+    # Voice-registry match (Wave C Task 4): a concrete dashboard/voice
+    # command ("open youtube in the browser", "close that tab") executes
+    # through the shared registry instead of chattering or delegating to a
+    # worker. ``resolve`` is a pure registry lookup — no side effects, so
+    # this stays a pure classification. Never shadows the pinned
+    # local/web branches above; never raises (a broken registry degrades
+    # to the kind mapping below).
+    try:
+        from . import voice_commands as _VC
+
+        _res = _VC.resolve(raw)
+        if getattr(_res, "kind", None) == "match" and \
+                getattr(_res, "entry", None) is not None:
+            _eid = str(getattr(_res.entry, "id", "") or "")
+            return {"action": "registry", "kind": kind,
+                    "task_text": task_text or raw, "params": dict(params),
+                    "reason": f"registry:{_eid}" if _eid else reason,
+                    "entry": _eid}
+    except Exception:  # noqa: BLE001 - degraded to kind mapping, never fatal
+        pass
     if kind == "conversation":
         return {"action": "answer_local", "kind": kind,
                 "task_text": task_text or raw, "params": {},
@@ -848,8 +868,364 @@ def decide_turn_action(text: Any, *, cfg: Any = None,
 
 
 # ---------------------------------------------------------------------------
-# Turn (non-streaming)
+# Wave C branches (Tasks 2-5) — execute inside turn()/stream_turn()
 # ---------------------------------------------------------------------------
+#: Actions that execute through a Wave C branch instead of the model path.
+BRANCH_ACTIONS = ("web_search", "local_action", "registry", "agent_task")
+
+
+def _cfg_flag(cfg: Any, *path: str, default: Any = True) -> Any:
+    """Read one config flag without crashing on a plain-dict test cfg."""
+    try:
+        get = getattr(cfg, "get", None)
+        if callable(get):
+            return get(*path, default=default)
+    except TypeError:
+        try:
+            node: Any = cfg
+            for key in path:
+                node = node.get(key) if isinstance(node, dict) else None
+            return default if node is None else node
+        except Exception:  # noqa: BLE001 - degraded to default
+            pass
+    except Exception:  # noqa: BLE001 - degraded to default
+        pass
+    return default
+
+
+def _summarizer_cfg(cfg: Any) -> Any:
+    """Summarizer node for :func:`summarizer.summarize` (same as voice)."""
+    if cfg is None:
+        return {}
+    if isinstance(cfg, dict):
+        sub = cfg.get("summarizer", {})
+        return dict(sub) if isinstance(sub, dict) else {}
+    section = getattr(cfg, "section", None)
+    if callable(section):
+        try:
+            return section("summarizer")
+        except Exception:  # noqa: BLE001 - degraded to defaults
+            return {}
+    return {}
+
+
+def _summarize_report(reply: str, cfg: Any) -> str:
+    """Spoken summary of a worker report — bulletproof like the voice path.
+
+    Copies the ``_handle_agent_result`` fallback chain: a summarizer failure
+    clips the raw report instead of hiding it or fabricating a summary.
+    """
+    try:
+        from .summarizer import summarize
+
+        spoken = summarize(reply, _summarizer_cfg(cfg))
+        if str(spoken or "").strip():
+            return str(spoken).strip()
+    except Exception as exc:  # noqa: BLE001 - clipped report, never hidden
+        _audit("task_summarize_failed", error=str(exc))
+    try:
+        from .summarizer import clamp_words as _cw, _strip_markdown as _sm
+
+        return _cw(_sm(reply or ""),
+                   40) or "Task finished — check the full report on " \
+                          "the dashboard."
+    except Exception:  # noqa: BLE001 - last-resort literal, never empty
+        return "Task finished — check the full report on the dashboard."
+
+
+def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
+    """Wave C Task 2: execute a web answer, never chatter about searching."""
+    from . import orchestrator as ORC
+
+    try:
+        web = ORC.answer_web_query(cfg, task_text)
+    except Exception as exc:  # noqa: BLE001 - typed, never fabricated
+        _audit("turn_web_error", session=sid, error=str(exc))
+        return {"ok": False, "state": "FAILED", "code": "WEB_UNAVAILABLE",
+                "detail": _redact(str(exc))[:200], "session_id": sid,
+                "route": "web"}
+    if not isinstance(web, dict) or not web.get("ok"):
+        code = str((web or {}).get("code") or "WEB_UNAVAILABLE")
+        detail = str((web or {}).get("answer") or "")[:200] or \
+            "web search unavailable; nothing was fabricated"
+        _audit("turn_web_unavailable", session=sid, code=code)
+        return {"ok": False, "state": "FAILED", "code": code,
+                "detail": detail, "session_id": sid, "route": "web"}
+    answer = str(web.get("answer") or "")
+    sources = [str(s) for s in (web.get("sources") or []) if str(s).strip()]
+    body = answer + ("\n\nSources:\n" + "\n".join(sources) if sources else "")
+    st.append(sid, "assistant", body,
+              meta={"route": "web", "sources": sources or None})
+    _audit("turn_web", session=sid, sources=len(sources))
+    return {"ok": True, "text": answer, "reply": answer, "sources": sources,
+            "session_id": sid, "session": sid, "route": "web"}
+
+
+def _turn_local(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
+    """Wave C Task 3: PC action through the canonical broker junction.
+
+    Same path as ``VoiceOrchestrator._handle_local``: ``local.match`` for
+    the action, the destructive screen first, then
+    ``broker.execute("local.<name>", ...)`` on a host broker carrying the
+    full registry/policy/confirmation/e-stop junction (Packet 8O: no
+    direct ``LA.execute`` fallback — a disabled broker fails closed).
+    """
+    from .local import actions as LA
+
+    # Destructive screen FIRST (orchestrator Packet 4D): destruction text
+    # never takes the whitelist — it confirm-gates even when no action
+    # pattern matches, so a destructive turn can neither execute nor be
+    # mistaken for a plain no-match.
+    try:
+        from .safety.destructive_screen import screen_destructive
+
+        if bool(screen_destructive(task_text).matched):
+            _audit("turn_local_confirm", session=sid, action="?")
+            return {"ok": False, "state": "UNAVAILABLE",
+                    "code": "CONFIRM_REQUIRED",
+                    "detail": "destructive local action needs confirmation; "
+                              "nothing was executed",
+                    "session_id": sid, "route": "local"}
+    except Exception:  # noqa: BLE001 - an unreadable screen fails closed
+        return {"ok": False, "state": "FAILED", "code": "LOCAL_SCREEN_ERROR",
+                "detail": "could not screen the action; nothing was executed",
+                "session_id": sid, "route": "local"}
+    try:
+        m = LA.match(task_text)
+    except Exception as exc:  # noqa: BLE001 - typed, never executed blind
+        return {"ok": False, "state": "FAILED", "code": "LOCAL_MATCH_ERROR",
+                "detail": _redact(str(exc))[:200], "session_id": sid,
+                "route": "local"}
+    if m is None:
+        return {"ok": False, "state": "FAILED", "code": "LOCAL_NO_MATCH",
+                "detail": "no local action matched; nothing was executed",
+                "session_id": sid, "route": "local"}
+    if not _cfg_flag(cfg, "local", "enabled", default=True):
+        _audit("turn_local_disabled", session=sid, action=m.name)
+        return {"ok": False, "state": "UNAVAILABLE", "code": "LOCAL_DISABLED",
+                "detail": "local actions are disabled; nothing was executed",
+                "session_id": sid, "route": "local"}
+    try:
+        from .broker import build_host_broker
+
+        broker = build_host_broker(cfg=cfg)
+        res = broker.execute(f"local.{m.name}", dict(m.params or {}),
+                             source="user", session=sid,
+                             utterance=task_text)
+    except Exception as exc:  # noqa: BLE001 - typed, redacted
+        _audit("turn_local_error", session=sid, action=m.name,
+               error=str(exc))
+        return {"ok": False, "state": "FAILED", "code": "LOCAL_ERROR",
+                "detail": _redact(str(exc))[:200], "session_id": sid,
+                "route": "local"}
+    if res.denied == "CONFIRMATION_REQUIRED":
+        _audit("turn_local_confirm", session=sid, action=m.name)
+        return {"ok": False, "state": "UNAVAILABLE",
+                "code": "CONFIRM_REQUIRED",
+                "detail": "destructive local action needs confirmation; "
+                          "nothing was executed",
+                "session_id": sid, "route": "local"}
+    if res.denied:
+        _audit("turn_local_denied", session=sid, action=m.name,
+               code=res.denied)
+        return {"ok": False, "state": "FAILED", "code": str(res.denied),
+                "detail": "that action was blocked by the safety policy; "
+                          "nothing was executed",
+                "session_id": sid, "route": "local"}
+    msg = res.output if res.ok else (
+        f"Action failed: {res.error}" if res.error else "")
+    st.append(sid, "assistant", msg,
+              meta={"route": "local", "action": m.name})
+    _audit("turn_local", session=sid, action=m.name, ok=bool(res.ok))
+    if not res.ok:
+        return {"ok": False, "state": "FAILED", "code": "LOCAL_FAILED",
+                "detail": _redact(msg)[:300], "session_id": sid,
+                "route": "local"}
+    return {"ok": True, "text": msg, "reply": msg, "session_id": sid,
+            "session": sid, "route": "local", "action": m.name}
+
+
+def _turn_registry(cfg: Any, st: Any, sid: str,
+                   task_text: str) -> Dict[str, Any]:
+    """Wave C Task 4: browser/voice command via the shared voice pipeline.
+
+    Executes through ``voice_commands.voice_say`` — the SAME production op
+    dispatcher (registry resolve -> dashboard_ops/confirm pipeline,
+    one journal, one settle-once path) the CLI, dashboard, and voice turn
+    use, with the same broker/session/confirmation context shape as
+    ``handle_turn`` (``actor="dashboard:user"``, chat session id,
+    ``source="user"``). No new authority, no new CDP client.
+    """
+    from . import voice_commands as VC
+
+    try:
+        out = VC.voice_say(cfg, task_text, actor="dashboard:user",
+                           session=sid, source="user")
+    except Exception as exc:  # noqa: BLE001 - typed, redacted
+        _audit("turn_registry_error", session=sid, error=str(exc))
+        return {"ok": False, "state": "FAILED", "code": "REGISTRY_ERROR",
+                "detail": _redact(str(exc))[:200], "session_id": sid,
+                "route": "registry"}
+    if not isinstance(out, dict):
+        return {"ok": False, "state": "FAILED", "code": "REGISTRY_MALFORMED",
+                "detail": "registry returned a non-dict outcome",
+                "session_id": sid, "route": "registry"}
+    state = str(out.get("state") or "")
+    speech = str(out.get("speech") or out.get("detail") or "")
+    entry = str(out.get("route") or out.get("entry") or "")
+    if state == "needs-confirm":
+        _audit("turn_registry_confirm", session=sid, entry=entry)
+        return {"ok": False, "state": "UNAVAILABLE",
+                "code": "CONFIRM_REQUIRED",
+                "detail": (speech or "this action needs confirmation; "
+                           "nothing was executed")[:300],
+                "confirmation_id": out.get("confirmation_id"),
+                "session_id": sid, "route": "registry", "entry": entry}
+    if state in ("clarify", "ambiguous", "unknown"):
+        if speech:
+            st.append(sid, "assistant", speech,
+                      meta={"route": "clarify", "entry": entry or None})
+        return {"ok": True, "text": speech, "reply": speech,
+                "session_id": sid, "session": sid, "route": "clarify",
+                "candidates": out.get("candidates", [])}
+    if state in ("failed", "refused", "error") or not speech:
+        code = str(out.get("code") or ("REFUSED" if state == "refused"
+                                       else "REGISTRY_FAILED"))
+        detail = (speech or str(out.get("detail") or ""))[:300] or \
+            "registry execution failed; nothing was fabricated"
+        if speech:
+            st.append(sid, "assistant", speech,
+                      meta={"route": "registry", "entry": entry or None,
+                            "failed": True})
+        _audit("turn_registry_failed", session=sid, entry=entry, code=code)
+        return {"ok": False, "state": "FAILED", "code": code,
+                "detail": detail, "session_id": sid, "route": "registry",
+                "entry": entry}
+    st.append(sid, "assistant", speech,
+              meta={"route": "registry", "entry": entry or None})
+    _audit("turn_registry", session=sid, entry=entry)
+    result: Dict[str, Any] = {
+        "ok": True, "text": speech, "reply": speech, "session_id": sid,
+        "session": sid, "route": "registry", "entry": entry}
+    if out.get("receipt"):
+        result["receipt"] = out["receipt"]
+    return result
+
+
+def _finish_task(cfg: Any, st: Any, sid: str, key: str,
+                 res: Dict[str, Any]) -> Dict[str, Any]:
+    """Complete a headless task wait: persist + shape the turn outcome.
+
+    Shared by the blocking turn and the streaming variant. A cancelled or
+    e-stopped build records the cancellation — never a phantom "done"
+    summary. A finished build persists the FULL raw report (same rule as
+    the voice ``_handle_agent_result``) while the spoken/text field carries
+    the Spark summary.
+    """
+    status = str((res or {}).get("status") or "error")
+    if status == "cancelled":
+        st.append(sid, "assistant",
+                  f"Task {key} cancelled — nothing was applied after "
+                  f"the stop.",
+                  meta={"route": "task", "task": key, "phase": "cancelled"})
+        _audit("turn_task_cancelled", session=sid, task=key)
+        return {"ok": True, "text": "cancelled", "reply": "cancelled",
+                "session_id": sid, "session": sid, "route": "task",
+                "task": key, "status": "cancelled"}
+    if status != "done":
+        detail = str((res or {}).get("reply") or
+                     (res or {}).get("detail") or status)[:300]
+        code = str((res or {}).get("code") or "TASK_FAILED")
+        st.append(sid, "assistant", f"Task {key} {status}: {detail}",
+                  meta={"route": "task", "task": key, "phase": status})
+        _audit("turn_task_failed", session=sid, task=key, code=code)
+        return {"ok": False, "state": "FAILED", "code": code,
+                "detail": detail, "session_id": sid, "session": sid,
+                "route": "task", "task": key, "status": status}
+    reply = str((res or {}).get("reply") or "")
+    spoken = _summarize_report(reply, cfg)
+    st.append(sid, "assistant", reply + f"\n\n_Task {key}: done_",
+              meta={"route": "task", "task": key, "phase": "report"})
+    _audit("turn_task_done", session=sid, task=key,
+           report_chars=len(reply))
+    return {"ok": True, "text": spoken, "reply": spoken, "report": reply,
+            "session_id": sid, "session": sid, "route": "task", "task": key,
+            "status": "done"}
+
+
+def _turn_task(cfg: Any, st: Any, sid: str, task_text: str, *,
+               timeout_s: Optional[float] = None,
+               cancel: Optional[Callable[[], bool]] = None) -> Dict[str, Any]:
+    """Wave C Task 5: delegate a build to the /chat worker, report back.
+
+    ``launch_task`` runs the exact voice worker chain headlessly; the turn
+    blocks with cancel checks, then the Spark summary (never a phantom)
+    lands in this transcript. E-stop latched refuses before launch with
+    zero worker invocations.
+    """
+    from . import orchestrator as ORC
+
+    try:
+        key = ORC.launch_task(task_text, session=sid, cfg=cfg)
+    except ORC.TaskLaunchDenied as exc:
+        state = "UNAVAILABLE" if exc.code in (
+            "EMERGENCY_STOP", "BLOCKED", "SAFETY_CONFIRM_REQUIRED",
+            "DRY_RUN") else "FAILED"
+        _audit("turn_task_refused", session=sid, code=exc.code)
+        return {"ok": False, "state": state, "code": exc.code,
+                "detail": str(exc.detail)[:200], "session_id": sid,
+                "session": sid, "route": "task"}
+    except Exception as exc:  # noqa: BLE001 - typed, redacted
+        _audit("turn_task_launch_error", session=sid, error=str(exc))
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_LAUNCH_FAILED",
+                "detail": _redact(str(exc))[:200], "session_id": sid,
+                "session": sid, "route": "task"}
+    st.append(sid, "assistant",
+              f"Working on it in /chat (task {key}). I'll report back here.",
+              meta={"route": "task", "task": key, "phase": "started"})
+    res = ORC.wait_task(key, timeout_s=float(timeout_s or 300.0),
+                        cancel=cancel)
+    return _finish_task(cfg, st, sid, key, res)
+
+
+def _branch_dispatch(cfg: Any, st: Any, sid: str, decided: Dict[str, Any],
+                     *, timeout_s: Optional[float] = None,
+                     cancel: Optional[Callable[[], bool]] = None
+                     ) -> Dict[str, Any]:
+    """Run one Wave C branch dict -> turn outcome (single dispatch)."""
+    action = str((decided or {}).get("action") or "answer_local")
+    task_text = str((decided or {}).get("task_text") or "")
+    if action == "web_search":
+        return _turn_web(cfg, st, sid, task_text)
+    if action == "local_action":
+        return _turn_local(cfg, st, sid, task_text)
+    if action == "registry":
+        return _turn_registry(cfg, st, sid, task_text)
+    if action == "agent_task":
+        return _turn_task(cfg, st, sid, task_text, timeout_s=timeout_s,
+                          cancel=cancel)
+    return {"ok": False, "state": "FAILED", "code": "BRANCH_UNKNOWN",
+            "detail": f"no branch for action {action!r}",
+            "session_id": sid}
+
+
+def _decide_branch(text: str, cfg: Any) -> Dict[str, Any]:
+    """Classify one turn for Wave C branching (never raises).
+
+    A classifier fault degrades to ``answer_local`` so the turn keeps the
+    legacy model path instead of failing a chat on a routing error.
+    """
+    try:
+        decided = decide_turn_action(text, cfg=cfg)
+        if isinstance(decided, dict) and decided.get("action"):
+            return decided
+    except Exception as exc:  # noqa: BLE001 - degraded, audited
+        _audit("turn_decide_failed", error=str(exc))
+    return {"action": "answer_local", "kind": "conversation",
+            "task_text": text, "params": {}, "reason": "decide-failed"}
+
+
 def turn(cfg: Any, text: str, *, session: Optional[str] = None,
          model: Optional[str] = None, timeout_s: Optional[float] = None,
          cancel: Optional[Callable[[], bool]] = None,
@@ -861,6 +1237,12 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
     ``reasoning`` (None/minimal/low/medium/high/max) is validated FIRST so
     an unknown level fails typed before any session/message write, then
     threaded as a real per-request output budget to the resolved model.
+
+    Wave C: a classified ``web_search`` / ``local_action`` / ``registry`` /
+    ``agent_task`` turn executes through its branch (shared web path,
+    broker-backed local action, shared voice registry, headless /chat
+    worker) instead of the model path. Anything else keeps the legacy
+    model flow byte-for-byte.
     """
     if _estop(cfg):
         return {"ok": False, "state": "UNAVAILABLE", "code": "EMERGENCY_STOP",
@@ -875,13 +1257,31 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
     except Exception as exc:
         return {"ok": False, "state": "FAILED", "code": "REASONING_INVALID",
                 "detail": str(exc)[:200]}
+    clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
+    st = store(cfg)
+    decided = _decide_branch(clean, cfg)
+    if decided.get("action") in BRANCH_ACTIONS:
+        created = _resolve_session(st, session, model=None)
+        if created.get("state") != "OK":
+            return {"ok": False, "state": "FAILED",
+                    "code": created.get("code"),
+                    "detail": created.get("detail", "")}
+        sid = created["session"]["id"]
+        if not clean:
+            return {"ok": False, "state": "FAILED", "code": "MALFORMED",
+                    "detail": "turn needs non-empty text", "session_id": sid}
+        appended = st.append(sid, "user", clean)
+        if appended.get("state") != "OK":
+            return {"ok": False, "state": "FAILED",
+                    "code": appended.get("code"),
+                    "detail": appended.get("detail", "")}
+        return _branch_dispatch(cfg, st, sid, decided, timeout_s=timeout_s,
+                                cancel=cancel)
     routed = resolve_route(cfg, model, session=session, role=role)
     if not routed.get("ok"):
         return routed
     resolved_model = routed["model"]
 
-    clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
-    st = store(cfg)
     created = _resolve_session(st, session, model=resolved_model)
     if created.get("state") != "OK":
         return {"ok": False, "state": "FAILED", "code": created.get("code"),
@@ -1265,6 +1665,133 @@ def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
            "elapsed_ms": res.get("elapsed_ms"), "receipt": receipt}
 
 
+def _stream_branch(cfg: Any, st: Any, sid: str, clean: str,
+                   decided: Dict[str, Any], *,
+                   timeout_s: Optional[float] = None,
+                   cancel: Optional[Callable[[], bool]] = None
+                   ) -> Iterator[Dict[str, Any]]:
+    """Stream one Wave C branch as start -> delta -> done (never fake).
+
+    The user row is already persisted by the caller. Web/local/registry
+    execute synchronously and stream as a single truthful delta (the plan
+    forbids a fake token-by-token search narrative). A build task streams
+    ``progress`` frames while the worker runs, then the full ``report`` as
+    the final delta; old clients ignore the unknown ``progress`` event.
+    """
+    action = str((decided or {}).get("action") or "")
+    task_text = str((decided or {}).get("task_text") or clean)
+    appended = st.append(sid, "user", clean)
+    if appended.get("state") != "OK":
+        yield {"event": "error", "code": appended.get("code"),
+               "detail": appended.get("detail", ""), "session_id": sid}
+        return
+    started = time.monotonic()
+    yield {"event": "start", "session_id": sid, "session": sid,
+           "route": action, "message": appended.get("message")}
+    if action == "agent_task":
+        yield from _stream_task(cfg, st, sid, task_text, started,
+                                timeout_s=timeout_s, cancel=cancel)
+        return
+    res = _branch_dispatch(cfg, st, sid, decided, timeout_s=timeout_s,
+                           cancel=cancel)
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    if not res.get("ok"):
+        yield {"event": "error", "code": res.get("code", "BRANCH_FAILED"),
+               "detail": res.get("detail", ""), "session_id": sid,
+               "route": action, "elapsed_ms": elapsed_ms}
+        return
+    text = str(res.get("text") or res.get("reply") or "")
+    yield {"event": "delta", "text": text, "session_id": sid}
+    receipt: Dict[str, Any] = {"runtime": "qubit-chat-branch",
+                               "route": action, "streaming": True,
+                               "path": "voicebridge.chat_transport"
+                                       "._stream_branch"}
+    for key in ("sources", "entry", "action", "candidates"):
+        if res.get(key) not in (None, "", []):
+            receipt[key] = res[key]
+    yield {"event": "done", "ok": True, "reply": text,
+           "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
+           "receipt": receipt}
+
+
+def _stream_task(cfg: Any, st: Any, sid: str, task_text: str, started: float,
+                 *, timeout_s: Optional[float] = None,
+                 cancel: Optional[Callable[[], bool]] = None
+                 ) -> Iterator[Dict[str, Any]]:
+    """Stream a headless build: progress frames, then the Spark report."""
+    from . import orchestrator as ORC
+
+    try:
+        key = ORC.launch_task(task_text, session=sid, cfg=cfg)
+    except ORC.TaskLaunchDenied as exc:
+        yield {"event": "error", "code": exc.code,
+               "detail": str(exc.detail)[:200], "session_id": sid,
+               "route": "agent_task"}
+        return
+    except Exception as exc:  # noqa: BLE001 - typed, redacted
+        yield {"event": "error", "code": "TASK_LAUNCH_FAILED",
+               "detail": _redact(str(exc))[:200], "session_id": sid,
+               "route": "agent_task"}
+        return
+    st.append(sid, "assistant",
+              f"Working on it in /chat (task {key}). I'll report back here.",
+              meta={"route": "task", "task": key, "phase": "started"})
+    yield {"event": "progress", "task": key, "status": "working",
+           "detail": "worker started", "session_id": sid}
+    budget = float(timeout_s or 300.0)
+    deadline = time.monotonic() + max(5.0, budget)
+    res: Dict[str, Any] = {"status": "timeout", "reply": ""}
+    while True:
+        try:
+            if cancel is not None and bool(cancel()):
+                res = ORC.wait_task(key, timeout_s=0.5, cancel=cancel)
+                break
+        except Exception:  # noqa: BLE001 - a broken cancel probe is ignored
+            pass
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            res = {"status": "timeout", "reply": "",
+                   "detail": "task still running; poll again"}
+            break
+        res = ORC.wait_task(key, timeout_s=min(5.0, remaining),
+                            cancel=cancel)
+        status = str((res or {}).get("status") or "")
+        if status in ("done", "error", "cancelled"):
+            break
+        if status == "unknown":
+            break
+        elapsed = int((time.monotonic() - started) * 1000)
+        yield {"event": "progress", "task": key, "status": "working",
+               "detail": f"still working ({elapsed // 1000}s)",
+               "session_id": sid, "elapsed_ms": elapsed}
+    if str((res or {}).get("status") or "") == "timeout" and \
+            time.monotonic() < deadline:
+        res = ORC.wait_task(key, timeout_s=max(0.5, deadline -
+                                               time.monotonic()),
+                            cancel=cancel)
+    out = _finish_task(cfg, st, sid, key, res)
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    if not out.get("ok"):
+        yield {"event": "error", "code": out.get("code", "TASK_FAILED"),
+               "detail": out.get("detail", ""), "session_id": sid,
+               "route": "task", "task": key, "elapsed_ms": elapsed_ms}
+        return
+    if out.get("status") == "cancelled":
+        yield {"event": "cancelled", "session_id": sid,
+               "elapsed_ms": elapsed_ms, "route": "task", "task": key}
+        return
+    yield {"event": "progress", "task": key, "status": "done",
+           "detail": "worker finished", "session_id": sid,
+           "elapsed_ms": elapsed_ms}
+    report = str(out.get("report") or out.get("text") or "")
+    yield {"event": "delta", "text": report, "session_id": sid}
+    yield {"event": "done", "ok": True, "reply": report,
+           "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
+           "receipt": {"runtime": "qubit-chat-worker", "route": "task",
+                       "streaming": True, "task": key,
+                       "path": "voicebridge.chat_transport._stream_task"}}
+
+
 def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
          model: Optional[str] = None, timeout_s: Optional[float] = None,
          cancel: Optional[Callable[[], bool]] = None,
@@ -1280,6 +1807,10 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     synthesized when the model fails. ``reasoning`` is validated before any
     session write and threaded as a real output budget on both the local
     streaming worker and the remote path.
+
+    Wave C: classified branch turns stream through ``_stream_branch``
+    (single truthful delta; build tasks add ``progress`` frames + the full
+    ``report`` delta) instead of the model worker.
     """
     try:
         from .local_llm import normalize_reasoning_level
@@ -1294,6 +1825,23 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                                                        role=role)
     if refusal is not None:
         yield refusal
+        return
+    # Wave C branches run before any model path (local or remote): a web,
+    # local, registry, or build turn never needs the chat model, so a dead
+    # or below-floor model must not block it — and a remote-routed session
+    # must still execute/confirm/delegate instead of chattering.
+    clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
+    st = store(cfg)
+    created = _resolve_session(st, session, model=resolved_model)
+    if created.get("state") != "OK":
+        yield {"event": "error", "code": created.get("code"),
+               "detail": created.get("detail", "")}
+        return
+    sid = created["session"]["id"]
+    decided = _decide_branch(clean, cfg)
+    if decided.get("action") in BRANCH_ACTIONS:
+        yield from _stream_branch(cfg, st, sid, clean, decided,
+                                  timeout_s=timeout_s, cancel=cancel)
         return
     routed_probe = resolve_route(cfg, model, session=session, role=role)
     if routed_probe.get("kind") in ("api", "realtime", "plugin"):
