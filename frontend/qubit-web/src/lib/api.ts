@@ -765,7 +765,7 @@ export class WsTicketError extends Error {
  *  real model-profile registry (`GET /api/terminal/profiles` +
  *  `PUT /api/terminal/profile`); a provider/model pair with no registered
  *  profile is a typed refusal, never a fabricated success. Auxiliary task
- *  pins are not offered by the compat layer. */
+ *  pins persist into the runtime config's `auxiliary` section. */
 export class ModelAssignmentError extends Error {
   readonly code: string;
   readonly detail: string;
@@ -1286,8 +1286,10 @@ export const api = {
    * default, so every one of the ~54 catalog providers threw
    * `UNKNOWN_MODEL_PROFILE` and could never be selected.
    *
-   * Auxiliary task pins are still not offered by the compat layer
-   * (`AUX_PIN_REFUSED`); surface that typed refusal instead of a fake success.
+   * Auxiliary task pins write through the same route (scope:"auxiliary" +
+   * task): the compat layer persists them into the runtime config's
+   * `auxiliary` section like the reference, and returns the upstream
+   * `confirm_required` envelope for expensive picks.
    */
   setModelAssignment: async (
     body: ModelAssignmentRequest,
@@ -1296,18 +1298,12 @@ export const api = {
   ): Promise<ModelAssignmentResponse> => {
     void confirm;
     const scope = (body.scope || "main").toLowerCase();
-    if (scope !== "main") {
-      throw new ModelAssignmentError(
-        "AUX_PIN_REFUSED",
-        "auxiliary task pins are not offered; the main model profile owns routing",
-      );
-    }
     const res = await fetchJSON<
       ModelAssignmentResponse & { code?: string; detail?: string }
     >(appendProfileParam("/api/model/set", profile), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, scope: "main" }),
+      body: JSON.stringify({ ...body, scope }),
     }).catch((err: unknown) => {
       // fetchJSON throws a plain `"<status>: <json>"` Error on a typed 4xx.
       // Re-surface the backend's typed code so callers can discriminate a
@@ -1490,6 +1486,7 @@ export const api = {
       clone_all?: boolean;
       no_skills?: boolean;
       description?: string;
+      clone_channels?: boolean;
       provider?: string;
       model?: string;
       mcp_servers?: McpServerCreate[];
@@ -3658,6 +3655,14 @@ export interface ChatStreamEvent {
   reply?: string;
   code?: string;
   detail?: string;
+  /** Wave C build-task key (`progress` frames + task `done` receipts). */
+  task?: string;
+  /** Wave C build-task status (`working` | `done`). */
+  status?: string;
+  /** Wave C branch route (`web` | `local` | `registry` | `task` | …). */
+  route?: string;
+  /** Wave C web-branch source URLs (done receipt). */
+  sources?: string[];
   session_id?: string;
   session?: string;
   elapsed_ms?: number;
@@ -3667,6 +3672,9 @@ export interface ChatStreamEvent {
     model?: string;
     runtime?: string;
     path?: string;
+    route?: string;
+    task?: string;
+    sources?: string[];
     reasoning_applied?: { level?: string; max_tokens?: number | null };
   };
 }
@@ -3674,6 +3682,8 @@ export interface ChatStreamEvent {
 export interface ChatStreamHandlers {
   onStart?: (event: ChatStreamEvent) => void;
   onDelta?: (text: string, event: ChatStreamEvent) => void;
+  /** Wave C build-task progress (`progress` frames share the SSE reader). */
+  onProgress?: (event: ChatStreamEvent) => void;
   onDone?: (event: ChatStreamEvent) => void;
   onError?: (event: ChatStreamEvent) => void;
   onCancelled?: (event: ChatStreamEvent) => void;
@@ -3746,6 +3756,9 @@ export async function streamChatTurn(
             break;
           case "delta":
             handlers.onDelta?.(event.text ?? "", event);
+            break;
+          case "progress":
+            handlers.onProgress?.(event);
             break;
           case "done":
             handlers.onDone?.(event);

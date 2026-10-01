@@ -48,6 +48,7 @@ import { useSearchParams } from "react-router";
 
 import { ChatSessionList } from "@/components/ChatSessionList";
 import { ChatSessionArtifacts } from "@/components/ChatSessionArtifacts";
+import { Markdown } from "@/components/Markdown";
 import { firstImageFromClipboard } from "@/lib/chatImagePaste";
 
 // Lazily loaded so the informational dashboard event WebSocket (opened by
@@ -86,6 +87,19 @@ interface ChatMessage {
   /** A36: tool/system rows are rendered distinctly, not as assistant prose. */
   kind?: "message" | "tool";
   toolName?: string;
+  /** Wave C/D1: a finished /chat-worker build report (markdown + sources). */
+  report?: boolean;
+  /** Wave C web-branch source URLs, rendered under the reply. */
+  sources?: string[];
+  /** Wave C build-task key this message reports on. */
+  taskKey?: string;
+}
+
+/** Wave C/D1: live /chat-worker build state from `progress` stream frames. */
+interface TaskProgress {
+  key: string;
+  status: string;
+  detail?: string;
 }
 
 /** A36: map a tool name to a bounded icon (no per-tool registry invented). */
@@ -326,6 +340,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const [streamingText, setStreamingText] = useState("");
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // D1 Task 5: the live /chat-worker build card. Set from `progress` frames,
+  // marked done from the task `done` receipt; cleared on the next send.
+  const [taskProgress, setTaskProgress] = useState<TaskProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryText, setRetryText] = useState<string | null>(null);
   // Live transcription (one controller for browser/local/terminal). The
@@ -391,6 +408,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const attachInputRef = useRef<HTMLInputElement | null>(null);
 
   const rightCtrlHeldRef = useRef(false);
+  // D1 Task 6: mirrored into state so the listener status line re-renders.
+  // Same source as the push-to-talk gate below — no new backend route.
+  const [rightCtrlHeld, setRightCtrlHeld] = useState(false);
   // Controller text projection: the last committed string already merged into
   // the composer, and the last browser final already auto-sent (Chrome keeps
   // its proven send-on-final behavior).
@@ -528,6 +548,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       setVoiceNotice(null);
       setBusy(true);
       setStreamingText("");
+      setTaskProgress(null);
       setMessages((prev) => prev.concat([{ role: "user", text }]));
 
       abortRef.current?.abort();
@@ -536,6 +557,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
 
       // SSE turn on the shared chat transport: deltas render live, the final
       // reply is persisted server-side, and a typed error is surfaced as-is.
+      // Wave C build turns also emit `progress` frames (task card) and finish
+      // with a full-report delta + a `done` receipt carrying route/sources.
       // The reasoning selector rides along (null = session preference, which
       // the server resolves from the persisted session metadata).
       streamChatTurn(
@@ -545,14 +568,43 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             if (controller.signal.aborted) return;
             setStreamingText((prev) => prev + delta);
           },
+          onProgress: (event) => {
+            if (controller.signal.aborted) return;
+            const key = event.task ?? "";
+            if (!key) return;
+            setTaskProgress({
+              key,
+              status: event.status ?? "working",
+              detail: event.detail,
+            });
+          },
           onDone: (event) => {
             if (controller.signal.aborted) return;
+            const route = event.receipt?.route ?? event.route;
+            const sources = event.receipt?.sources ?? event.sources;
+            const taskKey = event.receipt?.task ?? event.task;
+            if (route === "task" && taskKey) {
+              setTaskProgress((prev) =>
+                prev && prev.key === taskKey
+                  ? { ...prev, status: "done", detail: "worker finished" }
+                  : { key: taskKey, status: "done", detail: "worker finished" },
+              );
+            }
             setMessages((prev) =>
               prev.concat([
                 {
                   role: "assistant",
                   text: event.reply ?? "",
                   meta: streamMeta(event),
+                  // The task `done` delta already carries the full Spark
+                  // report text; flag it so it renders through the shared
+                  // markdown renderer with its task key attached.
+                  report: route === "task" && Boolean(taskKey),
+                  taskKey: taskKey,
+                  sources:
+                    Array.isArray(sources) && sources.length > 0
+                      ? sources.filter((s): s is string => typeof s === "string")
+                      : undefined,
                 },
               ]),
             );
@@ -560,6 +612,15 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           },
           onError: (event) => {
             if (controller.signal.aborted) return;
+            setTaskProgress((prev) =>
+              prev && prev.status === "working"
+                ? {
+                    ...prev,
+                    status: "error",
+                    detail: event.detail ?? event.code ?? "task failed",
+                  }
+                : prev,
+            );
             setError(
               `[${event.code ?? "TURN_FAILED"}] ${event.detail ?? "turn failed"}`,
             );
@@ -568,6 +629,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           },
           onCancelled: () => {
             if (controller.signal.aborted) return;
+            setTaskProgress((prev) =>
+              prev && prev.status === "working"
+                ? { ...prev, status: "cancelled", detail: "turn cancelled" }
+                : prev,
+            );
             setStreamingText("");
             setVoiceNotice("turn cancelled — the shared backend aborted it");
           },
@@ -881,7 +947,6 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     void controller.cancel();
     setVoiceNotice("recognition cancelled — interim text discarded");
   }, [controller]);
-
   const voiceActive =
     voice.state === "starting" ||
     voice.state === "listening" ||
@@ -913,12 +978,14 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       if (event.code !== "ControlRight" || event.repeat) return;
       if (rightCtrlHeldRef.current) return;
       rightCtrlHeldRef.current = true;
+      setRightCtrlHeld(true);
       startVoice();
     };
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.code !== "ControlRight") return;
       if (!rightCtrlHeldRef.current) return;
       rightCtrlHeldRef.current = false;
+      setRightCtrlHeld(false);
       stopVoice();
     };
     window.addEventListener("keydown", onKeyDown, true);
@@ -1130,6 +1197,34 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 fallback: {voiceFallback}
               </span>
             ) : null}
+            {/* D1 Task 6: listener state bound to the existing voice-state
+                source (held key + controller snapshot + config engine +
+                availability reason). No new backend route. */}
+            <span
+              data-testid="listener-state"
+              data-listening={
+                desktopHelperLive || rightCtrlHeld || voiceActive
+                  ? "listening"
+                  : "idle"
+              }
+              title={
+                rightCtrlReason ?? voiceFallback ?? "voice listener state"
+              }
+            >
+              Right-Ctrl:{" "}
+              <span className="font-mono">
+                {desktopHelperLive
+                  ? "desktop helper"
+                  : rightCtrlHeld || voiceActive
+                    ? "listening"
+                    : "idle"}
+              </span>
+              {" | "}engine:{" "}
+              <span className="font-mono">{inputEngine}</span>
+              {rightCtrlReason ?? voiceFallback
+                ? ` (${rightCtrlReason ?? voiceFallback})`
+                : ""}
+            </span>
             {voiceNotice ? (
               <span data-testid="voice-notice">{voiceNotice}</span>
             ) : null}
@@ -1311,8 +1406,46 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                       </div>
                     )}
                     <div className="whitespace-pre-wrap break-words">
-                      {message.text}
+                      {message.report ? (
+                        <Markdown content={message.text} />
+                      ) : (
+                        message.text
+                      )}
                     </div>
+                    {message.taskKey ? (
+                      <div
+                        data-testid="message-task-key"
+                        className="mt-1 text-xs text-text-tertiary"
+                      >
+                        task <span className="font-mono">{message.taskKey}</span>
+                        {message.report ? " · Spark report" : ""}
+                      </div>
+                    ) : null}
+                    {message.sources && message.sources.length > 0 ? (
+                      <div
+                        data-testid="message-sources"
+                        className="mt-1 text-xs text-text-tertiary"
+                      >
+                        <span className="font-semibold">Sources:</span>{" "}
+                        {message.sources.map((src, i) => (
+                          <span key={`${i}-${src}`}>
+                            {i > 0 ? ", " : ""}
+                            {/^https?:\/\//i.test(src) ? (
+                              <a
+                                href={src}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline underline-offset-2"
+                              >
+                                {src}
+                              </a>
+                            ) : (
+                              <span className="font-mono">{src}</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                     {message.kind !== "tool" && message.role === "assistant" ? (
                       <SandboxedHtmlPreview html={message.text} />
                     ) : null}
@@ -1323,6 +1456,37 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                     ) : null}
                   </li>
                 ))}
+                {taskProgress ? (
+                  <li
+                    data-testid="task-progress"
+                    data-status={taskProgress.status}
+                    className="mr-6 rounded-lg border border-accent/40 bg-accent/5 px-3 py-2 text-sm"
+                    aria-live="polite"
+                  >
+                    <div className="mb-1 flex items-center gap-2 text-xs font-semibold tracking-wide text-text-secondary">
+                      {taskProgress.status === "working" ? (
+                        <Spinner className="shrink-0" />
+                      ) : null}
+                      <span>
+                        {taskProgress.status === "working"
+                          ? "Working in /chat"
+                          : taskProgress.status === "done"
+                            ? "Build finished — Spark report below"
+                            : taskProgress.status === "cancelled"
+                              ? "Build cancelled"
+                              : "Build failed"}
+                      </span>
+                      <span className="font-mono font-normal text-text-tertiary">
+                        {taskProgress.key}
+                      </span>
+                    </div>
+                    {taskProgress.detail ? (
+                      <div className="whitespace-pre-wrap break-words text-xs text-text-tertiary">
+                        {taskProgress.detail}
+                      </div>
+                    ) : null}
+                  </li>
+                ) : null}
                 {busy && streamingText ? (
                   <li
                     data-state="streaming"
