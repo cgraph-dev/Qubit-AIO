@@ -286,37 +286,61 @@ def send_gmail_compose(ctx, address, body, dry_run):
     ok(f"gmail sent to {address}")
 
 
-def send_gmail(ctx, to, _href, body, dry_run):
-    if "@" in (to or ""):
-        send_gmail_compose(ctx, to.strip(), body, dry_run)
-        return
-    row = ctx.js(
+def _gmail_find_row(ctx, to):
+    """First inbox row from `to` with its thread id, or None."""
+    return ctx.js(
         "(() => { const rows=[...document.querySelectorAll('tr.zA')]; const "
         "needle=__TO__; for (const r of rows) { "
         "const who=(r.querySelector('.yW')?.textContent||'').toLowerCase(); "
         "if (who.includes(needle)) { const log=r.getAttribute('jslog')||''; "
         "let m=/thread-f:(\\d+)/.exec(log); if(!m){ try{ const b=/1:([A-Za-z0-9"
-        "+/=]+)/.exec(log); if(b){ const dec=atob(b[1]); const m2=/#thread-f:"
+        "+/=\\-_]+)/.exec(log); if(b){ const dec=atob(b[1]); const m2=/#thread-f:"
         "(\\d+)/.exec(dec); if(m2) m=m2; } }catch(e){} } return m ? "
         "{tid:m[1], who:r.querySelector('.yW')?.textContent||''} : null; } } "
         "return null; })()".replace("__TO__", json.dumps(to.lower())))
+
+
+def send_gmail(ctx, to, _href, body, dry_run):
+    if "@" in (to or ""):
+        send_gmail_compose(ctx, to.strip(), body, dry_run)
+        return
+    row = _gmail_find_row(ctx, to)
+    if row is None:
+        # Maybe sitting inside a thread: go back to the list and retry once.
+        ctx.cmd("Page.navigate",
+                {"url": "https://mail.google.com/mail/u/0/#inbox"})
+        import time as _t
+        _t.sleep(6)
+        row = _gmail_find_row(ctx, to)
     if not row or not row.get("tid"):
         fail("SEND_RECIPIENT_GONE",
              f"no gmail row from {to!r} with a thread id")
-    ctx.cmd("Page.navigate",
-            {"url": f"https://mail.google.com/mail/u/0/#inbox/{row['tid']}"})
+    # Direct thread-URL navigation falls back to the inbox (numeric
+    # thread-f ids are not URL ids) — open with a row click instead.
+    opened = ctx.js(
+        "(() => { const rows=[...document.querySelectorAll('tr.zA')]; const "
+        "needle=__TO__; for (const r of rows) { "
+        "const who=(r.querySelector('.yW')?.textContent||'').toLowerCase(); "
+        "if (who.includes(needle)) { const s=r.querySelector('.bog'); "
+        "(s||r).click(); return 'clicked'; } } "
+        "return ''; })()".replace("__TO__", json.dumps(to.lower())))
+    if not opened:
+        fail("SEND_THREAD_UNCHANGED", "could not click the gmail row")
+    import time as _t2
+    _t2.sleep(5)
     reply = ctx.wait_js(
         "(() => { const bs=[...document.querySelectorAll("
-        "'[role=\"button\"]')]; const b=bs.find(x=>{const l=("
-        "x.getAttribute('aria-label')||'').toLowerCase(); return l==="
-        "'reply'||l.startsWith('reply ');}); return b?'yes':''; })()", 15)
+        "'[role=\"button\"],[role=\"link\"]')]; const b=bs.find(x=>{const l=("
+        "x.getAttribute('aria-label')||x.textContent||'').trim().toLowerCase();"
+        " return l==='reply'||l.startsWith('reply ');}); return b?'yes':''; })()",
+        15)
     if not reply:
         fail("SEND_NO_COMPOSER", "thread opened but no Reply button found")
     ctx.js(
         "(() => { const bs=[...document.querySelectorAll("
-        "'[role=\"button\"]')]; const b=bs.find(x=>{const l=("
-        "x.getAttribute('aria-label')||'').toLowerCase(); return l==="
-        "'reply'||l.startsWith('reply ');}); if(b) b.click(); })()")
+        "'[role=\"button\"],[role=\"link\"]')]; const b=bs.find(x=>{const l=("
+        "x.getAttribute('aria-label')||x.textContent||'').trim().toLowerCase();"
+        " return l==='reply'||l.startsWith('reply ');}); if(b) b.click(); })()")
     comp = ctx.wait_js(
         "(() => { const els=[...document.querySelectorAll("
         "'div[role=\"textbox\"]')]; const vis=els.filter(e=>{const r=e."

@@ -2604,6 +2604,31 @@ DISABLED; raw sends never fire freely.
 - **Still needs the owner:** Gmail CLI account; gmail-thread reply
   discovery; messenger live ping retry when that tab settles.
 
+## 65. Replies fully wired: messenger SENT + gmail reply proven — 2026-10-01
+
+**No milestone claimed.** Owner: everything must open + reply by voice.
+
+- **Messenger LIVE SEND delivered.** Pro Nume thread recovered; the
+  designated test ping (`"Qubit voice test — please ignore this
+  message"`) sent via the confirm-chain sender → `{"ok": true,
+  "SENT"}` (composer emptied post-Enter; bare Enter sends on
+  Messenger). Owner can verify in the thread.
+- **Gmail thread-reply closed (dry-run proven).** Two discoveries:
+  (1) numeric `thread-f` jslog IDs do NOT open via URL (inbox
+  fallback) — threads open **only via row click** (synthetic click
+  works); (2) Reply/Forward live on the **thread bottom bar**
+  (aria-label-or-text match — the earlier aria-only probe missed).
+  `send_gmail` now: find row → click → Reply → fill → verify →
+  Send-button/Ctrl+Enter → verify closed; `--dry-run` proven on the
+  ChatGPT thread (opened, filled, cleared, inbox restored). Base64url
+  (`-_`) jslog fix included. Compose-new path unchanged.
+- **Voice wiring already live** (§62): drafts stage with resolved
+  hrefs; ambiguous/unreachable answer honestly; DESTRUCTIVE broker
+  grant on "yes". No service restart needed (script-only changes).
+- **Still needs the owner:** Gmail CLI account (fallback); a Gmail
+  SEND designation (replies proven only to dry-run — nothing ever
+  sent); IG/messenger further sends on their word.
+
 ## 63. CDP back; readers green, messenger re-proven, sends pending — 2026-10-01
 
 **No milestone claimed. No code changed (short verification only — the
