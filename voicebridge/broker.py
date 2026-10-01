@@ -893,6 +893,10 @@ _ACTION_TIERS = {
     "window_close": Tier.MUTATING,
     # destructive: irreversible deletion
     "empty_trash": Tier.DESTRUCTIVE,
+    # destructive: an outbound message cannot be unsent (owner-authorized
+    # narrow reply path only: dictated + confirmed + audited; general
+    # computer-control stays disabled)
+    "send_message": Tier.DESTRUCTIVE,
 }
 
 _ACTION_EFFECTS = {
@@ -902,6 +906,7 @@ _ACTION_EFFECTS = {
     "clipboard": "reads clipboard contents",
     "window_close": "closes the active window (unsaved work may be lost)",
     "empty_trash": "permanently empties the trash",
+    "send_message": "sends a dictated, confirmed message (cannot be unsent)",
 }
 
 

@@ -915,6 +915,72 @@ class VoiceEditService:
 
     _YT_URL_RE = None  # compiled lazily (see _youtube_url)
 
+    def _reply_draft(self, question: str) -> Any:
+        """Stage a voice reply draft (nothing sent, nothing staged yet).
+
+        Parses channel/recipient/body, resolves the recipient fresh
+        (gmail rows, messenger hrefs, instagram names). Returns
+        ``("draft", (canonical, summary))`` on exactly-one match,
+        ``("unknown", names)`` when the read succeeded but nobody
+        matches, ``("unavailable", channel)`` when the read itself
+        failed (browser busy — never let the brain narrate a phantom
+        action), or None to fall through (unparseable). Never raises.
+        Sending happens only after voice "yes" through the
+        confirm-gated task path.
+        """
+        from . import send as _S
+        parsed = _S.parse_reply(question or "")
+        if parsed is None:
+            return None
+        channel = parsed["channel"]
+        try:
+            if parsed.get("address"):
+                addr = parsed["address"]
+                canonical = _S.build_draft(channel, addr, f"addr:{addr}",
+                                           parsed["body"])
+                body = parsed["body"]
+                preview = (body[:80] + "…") if len(body) > 80 else body
+                summary = (f"Email {addr}: '{preview}' — say yes to send, "
+                           f"no to cancel.")
+                return ("draft", (canonical, summary))
+            if channel == "gmail":
+                rows = self._read_gmail_rows()
+                if rows is None:
+                    return ("unavailable", channel)
+                dicts = [{"sender": s} for s, _t in rows]
+            elif channel == "messenger":
+                dicts = self._run_social_script("read_messenger.py")
+                if dicts is None:
+                    return ("unavailable", channel)
+            else:
+                dicts = self._run_social_script("read_instagram.py")
+                if dicts is None:
+                    return ("unavailable", channel)
+            hit = _S.resolve(channel, parsed["to_hint"],
+                             readers={channel: lambda: dicts})
+            if hit is None:
+                names = []
+                for it in dicts or []:
+                    if isinstance(it, dict):
+                        n = str(it.get("name") or it.get("sender") or ""
+                                ).strip()[:30]
+                    elif isinstance(it, (list, tuple)) and it:
+                        n = str(it[0] or "").strip()[:30]
+                    else:
+                        n = ""
+                    if n:
+                        names.append(n)
+                return ("unknown", names[:6])
+            name, href = hit
+            canonical = _S.build_draft(channel, name, href, parsed["body"])
+            body = parsed["body"]
+            preview = (body[:80] + "…") if len(body) > 80 else body
+            summary = (f"Reply to {name} on {channel}: "
+                       f"'{preview}' — say yes to send, no to cancel.")
+            return ("draft", (canonical, summary))
+        except Exception:
+            return None
+
     def _skill_answer(self, question: str) -> "tuple[str, str]":
         """Skill-backed answers: mail digest, YouTube summary.
 
@@ -1008,46 +1074,62 @@ class VoiceEditService:
         if _re.search(r"\bmessenger\b|\bfacebook\b|\bfb\b", q, _re.IGNORECASE):
             rows = self._run_social_script("read_messenger.py")
             if rows:
-                bits = [f"{n[:40]} — {p[:100]}" for n, p in rows[:4]]
-                return ("Messenger: " + "; ".join(bits) + ".", "skill-social")
+                bits = []
+                for it in rows[:4]:
+                    n = str(it.get("name") or "").strip()[:40]
+                    p = str(it.get("preview") or it.get("text") or ""
+                            ).strip()[:100]
+                    if n or p:
+                        bits.append(f"{n or 'unknown'} — {p or '(no preview)'}")
+                if bits:
+                    return ("Messenger: " + "; ".join(bits) + ".",
+                            "skill-social")
             return "", ""
         if _re.search(r"\binstagram\b|\binsta\b", q, _re.IGNORECASE):
             rows = self._run_social_script("read_instagram.py")
             if rows:
-                bits = [f"{n[:40]} — {p[:100]}" for n, p in rows[:4]]
-                return ("Instagram: " + "; ".join(bits) + ".", "skill-social")
+                bits = []
+                for it in rows[:4]:
+                    n = str(it.get("name") or "").strip()[:40]
+                    p = str(it.get("preview") or it.get("text") or ""
+                            ).strip()[:100]
+                    if n or p:
+                        bits.append(f"{n or 'unknown'} — {p or '(no preview)'}")
+                if bits:
+                    return ("Instagram: " + "; ".join(bits) + ".",
+                            "skill-social")
             return "", ""
         return "", ""
 
     def _run_social_script(self, name: str) -> Any:
-        """Run a social reader script; ``[(name, preview)]`` or None."""
+        """Raw JSON list from a social reader script (dicts), or None.
+
+        One retry on transport failure: the CDP socket flakes while the
+        owner drives the browser. Never raises.
+        """
         import json as _json
         import subprocess as _sp
         import sys as _sys
+        import time as _time
         script = self._skill_script(
             f"communication/social-inbox-check/scripts/{name}")
         if not script:
             return None
-        try:
-            proc = _sp.run([_sys.executable, script, "3"],
-                           capture_output=True, text=True, timeout=45)
-            if proc.returncode != 0:
-                return None
-            data = _json.loads(proc.stdout or "")
-            if not isinstance(data, list):
-                return None
-            out = []
-            for it in data:
-                if not isinstance(it, dict):
-                    continue
-                title = str(it.get("name") or it.get("sender") or "").strip()
-                prev = str(it.get("preview") or it.get("text")
-                           or it.get("subject") or "").strip()
-                if title or prev:
-                    out.append((title or "unknown", prev or "(no preview)"))
-            return out or None
-        except Exception:
-            return None
+        for attempt in (1, 2):
+            try:
+                proc = _sp.run([_sys.executable, script, "3"],
+                               capture_output=True, text=True, timeout=45)
+                if proc.returncode == 0:
+                    data = _json.loads(proc.stdout or "")
+                    return data if isinstance(data, list) else None
+            except Exception:
+                pass
+            if attempt == 1:
+                try:
+                    _time.sleep(2)
+                except Exception:
+                    pass
+        return None
 
     def _skill_script(self, relative: str) -> str:
         """Absolute path of a skill helper script under QUBIT_HOME, or ""."""
@@ -1065,23 +1147,36 @@ class VoiceEditService:
     def _read_gmail_rows(self) -> Any:
         """Top inbox rows via the logged-in Chromium session (CDP).
 
-        Runs the skill's `read_gmail.py` (bounded 45 s); returns
-        ``[(sender, subject)]`` or ``None`` when CDP is down, no Gmail
-        tab is open, or nothing parses. Never raises.
+        Runs the skill's `read_gmail.py` (bounded 45 s, one retry on
+        transport flake); returns ``[(sender, subject)]`` or ``None``
+        when CDP is down, no Gmail tab is open, or nothing parses.
+        Never raises.
         """
         import json as _json
         import subprocess as _sp
         import sys as _sys
+        import time as _time
         script = self._skill_script(
             "communication/social-inbox-check/scripts/read_gmail.py")
         if not script:
             return None
+        for attempt in (1, 2):
+            try:
+                proc = _sp.run([_sys.executable, script, "3"],
+                               capture_output=True, text=True, timeout=45)
+                if proc.returncode == 0:
+                    break
+            except Exception:
+                proc = None
+            if attempt == 1:
+                try:
+                    _time.sleep(2)
+                except Exception:
+                    pass
+        else:
+            return None
         try:
-            proc = _sp.run([_sys.executable, script, "3"],
-                           capture_output=True, text=True, timeout=45)
-            if proc.returncode != 0:
-                return None
-            data = _json.loads(proc.stdout or "")
+            data = _json.loads((proc.stdout if proc else "") or "")
             rows = data if isinstance(data, list) else []
             out = []
             for it in rows:
@@ -1260,6 +1355,42 @@ class VoiceEditService:
             raise VoiceEditError("VOICE_EDIT_EMPTY_QUESTION",
                                  "no question to answer")
         self._require_estop_clear()
+        staged = self._reply_draft(question)
+        if staged is not None:
+            kind, payload = staged
+            if kind == "draft":
+                canonical, summary = payload
+                self._audit("voice_edit.reply.staged", {
+                    "request_id": request_id, "mode": mode,
+                    "chars": len(question),
+                    **(_dbg.text_fields(self.cfg, draft=summary))})
+                return {"ok": True, "mode": "task",
+                        "requires_confirmation": True,
+                        "task_text": canonical, "summary": summary,
+                        "request_id": request_id,
+                        "detail": "confirm to send this reply"}
+            if kind == "unavailable":
+                self._audit("voice_edit.reply.unavailable", {
+                    "request_id": request_id, "mode": mode,
+                    "chars": len(question)})
+                answer = (f"I can't reach {payload} right now — the "
+                          f"browser tab is busy. Try again in a moment.")
+                self._remember_ask_exchange(question, answer,
+                                            model="skill-social")
+                return {"ok": True, "answer": answer, "mode": mode,
+                        "provider": "local", "model": "skill-social",
+                        "spoken": False}
+            names = ", ".join(payload) if payload else "nobody found"
+            self._audit("voice_edit.reply.unknown", {
+                "request_id": request_id, "mode": mode,
+                "chars": len(question)})
+            answer = (f"I couldn't find that person — recent chats show: "
+                      f"{names}. Who exactly should I reply to?")
+            self._remember_ask_exchange(question, answer,
+                                        model="skill-social")
+            return {"ok": True, "answer": answer, "mode": mode,
+                    "provider": "local", "model": "skill-social",
+                    "spoken": False}
         direct = self._direct_fact_answer(question)
         if direct:
             self._audit("voice_edit.ask", {

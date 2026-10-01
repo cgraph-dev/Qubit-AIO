@@ -2540,6 +2540,48 @@ logged in): voice must read everything + reply as needed.
 - **Tests:** 3 new (messenger/instagram digest without brain,
   reply-verb fallthrough). Sweep **231** green; services restarted.
 
+## 62. Voice replies: draft→confirm→send chain built — 2026-10-01
+
+**No milestone claimed.** Owner: "do it" (voice reads + replies everywhere).
+Standing owner authorization recorded here: **narrow reply-sending is
+APPROVED** — own accounts, dictated content, voice-"yes" confirmed,
+audited, re-verified at send time. General computer-control stays
+DISABLED; raw sends never fire freely.
+
+- **Chain (all existing junctions, no side channels):** voice
+  "reply to X saying Y" → `send.parse_reply` → fresh resolve →
+  `ask()` returns task-mode + human summary → helper speaks it
+  ("Reply to X on Y: '…' — say yes to send") → "yes" → `task()` →
+  `run_tool_task` fast path → `local.send_message` (**DESTRUCTIVE**
+  tier, broker mints a user-issued grant) → channel sender →
+  spoken receipt. Drafts are canonical `reply|ch|to|href|body`
+  (no re-interpretation); send re-resolves and refuses on change.
+- **Senders (`scripts/send_social.py`, repo-owned, CDP):** messenger
+  thread composer (verified selector), IG thread (row-click open),
+  gmail thread-reply (jslog thread-id incl. base64 form) + gmail
+  compose-new via `view=cm` URL (no selector hunting). Every step
+  typed-fails closed; `--dry-run` fills+verifies+clears, never sends.
+- **Two real bugs found live:** (1) JS ASI trap — multi-line
+  `return\n r.width` returned undefined, emptying every match;
+  single-line JS only now. (2) My own paren typo `})())` — caught by
+  the new **node --check guard** (`test_send_social9u`, hermetic).
+  `click_at` now sends hover + buttons flags.
+- **Proven live:** messenger dry-run (fill+verify+clear on the open
+  E2EE thread); gmail compose-new dry-run (To verified, cleared);
+  draft staging for address-gmail; ambiguity ("2 GitHubs") +
+  unreachable-tab honesty (no phantom brain promises — the brain
+  narrated "I will reply…" twice during WS flakes; now typed).
+  Gmail thread-reply Reply-button discovery incomplete (shortcuts off,
+  wrong-⋮ clicked and closed); IG thread-open flaky while the owner
+  drives the page (typed, zero side effects).
+- **Tests:** 138 across send/actions/broker/tool-task/integration
+  (parse/draft/match/resolve/execute/mapping/tier/confirm-dispatch).
+  Services restarted.
+- **Needs the owner:** (1) a live-SEND test target (which thread may
+  receive a test ping — nothing sends until designated); (2) Gmail
+  CLI account for the himalaya fallback (still zero accounts);
+  (3) gmail-thread + IG-thread live-fire when the tabs are still.
+
 ## 60. Voice mail via the logged-in browser session (CDP) — 2026-10-01
 
 **No milestone claimed.** Owner: the Chromium profile holds everything

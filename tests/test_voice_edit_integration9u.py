@@ -634,6 +634,48 @@ def test_parse_envelopes_is_defensive():
     assert VoiceEditService._parse_envelopes('{"envelopes": []}') == []
 
 
+def test_ask_reply_stages_draft_for_confirmation(monkeypatch):
+    svc, audits = _service()
+    _no_brain(monkeypatch)
+    monkeypatch.setattr(
+        svc, "_run_social_script",
+        lambda name: [{"name": "Pro Nume",
+                       "href": "https://www.messenger.com/t/1/",
+                       "preview": "hi"}])
+    out = svc.ask("reply to Pro Nume on messenger saying hello there",
+                  request_id="d-1", mode="answer")
+    assert out["ok"] and out["mode"] == "task"
+    assert out["requires_confirmation"] is True
+    assert out["task_text"] == (
+        "reply|messenger|Pro Nume|https://www.messenger.com/t/1/|hello there")
+    assert "Pro Nume" in out["summary"] and "hello there" in out["summary"]
+    assert any(op == "voice_edit.reply.staged" for op, _d in audits)
+
+
+def test_ask_reply_ambiguous_names_people_without_brain(monkeypatch):
+    svc, _audits = _service()
+    _no_brain(monkeypatch)
+    monkeypatch.setattr(
+        svc, "_run_social_script",
+        lambda name: [{"name": "Pro Nume", "href": "h1"},
+                      {"name": "Pro Other", "href": "h2"}])
+    out = svc.ask("reply to pro on messenger saying hi", request_id="d-2",
+                  mode="answer")
+    assert out["ok"] and "couldn't find" in out["answer"]
+    assert "Pro Nume" in out["answer"] and "Pro Other" in out["answer"]
+    assert out["model"] == "skill-social"
+
+
+def test_ask_reply_unreachable_names_no_phantom_promise(monkeypatch):
+    svc, _audits = _service()
+    _no_brain(monkeypatch)
+    monkeypatch.setattr(svc, "_run_social_script", lambda name: None)
+    out = svc.ask("reply to Pro Nume on messenger saying hi",
+                  request_id="d-3", mode="answer")
+    assert out["ok"] and "can't reach messenger" in out["answer"]
+    assert out["model"] == "skill-social"
+
+
 # ---------------------------------------------------------------------------
 # ask() social read intents (messenger / instagram, read-only)
 # ---------------------------------------------------------------------------
@@ -642,7 +684,8 @@ def test_ask_messenger_reads_digest_without_brain(monkeypatch):
     _no_brain(monkeypatch)
     monkeypatch.setattr(
         svc, "_run_social_script",
-        lambda name: [("Pro Nume", "The audio call ended.")] if name.endswith(
+        lambda name: [{"name": "Pro Nume",
+                       "preview": "The audio call ended."}] if name.endswith(
             "messenger.py") else (_ for _ in ()).throw(
                 AssertionError("wrong script")))
     out = svc.ask("any new messenger chats?", request_id="s-1", mode="answer")
@@ -655,7 +698,7 @@ def test_ask_instagram_reads_digest_without_brain(monkeypatch):
     _no_brain(monkeypatch)
     monkeypatch.setattr(
         svc, "_run_social_script",
-        lambda name: [("tr.cky", "hey")] if name.endswith(
+        lambda name: [{"name": "tr.cky", "text": "hey"}] if name.endswith(
             "instagram.py") else (_ for _ in ()).throw(
                 AssertionError("wrong script")))
     out = svc.ask("check my instagram dms", request_id="s-2", mode="answer")

@@ -592,6 +592,26 @@ def _a_bluetooth_toggle(_: Dict[str, Any]) -> str:
     return "Bluetooth control not found."
 
 
+def _a_send_message(params: Dict[str, Any]) -> str:
+    """Send a staged voice-reply draft (confirm-gated upstream).
+
+    Accepts ONLY the canonical ``reply|<channel>|<to>|<href>|<body>``
+    draft built by the voice layer (never free text — the broker tier
+    still demands a user-issued confirmation). Re-resolution at send
+    time refuses silently-changed targets. Raises ValueError with a
+    typed ``CODE: detail`` message on any refusal/failure.
+    """
+    from ..voice_edit import send as _send
+    draft = _send.parse_draft(str((params or {}).get("draft") or ""))
+    if draft is None:
+        raise ValueError("SEND_MALFORMED: not a staged reply draft")
+    out = _send.execute(draft, dry_run=False)
+    if not out.get("ok"):
+        raise ValueError(f"{out.get('code', 'SEND_FAILED')}: "
+                         f"{out.get('detail', '')}"[:220])
+    return f"Sent to {draft['to']} on {draft['channel']}."
+
+
 # ---------------------------------------------------------------------------
 ACTIONS: Dict[str, LocalAction] = {
     "volume_up": LocalAction("volume_up", "raise speaker volume", _a_volume_up,
@@ -680,6 +700,11 @@ ACTIONS: Dict[str, LocalAction] = {
                                   r"\bwhat('s| is) today('s)? (date|day)\b",
                                   r"\bwhat time is it\b",
                                   r"\b(current )?(date|time)\b"]),
+    "send_message": LocalAction("send_message",
+                        "send a staged voice-reply draft (confirm-gated)",
+                        _a_send_message,
+                        patterns=[r"^reply\|(gmail|messenger|instagram)\|"],
+                        confirm=True),
 }
 
 APP_NAMES = {
@@ -697,6 +722,11 @@ def match(text: str) -> Optional[ActionMatch]:
     """Return the first matching local action, or None."""
     low = text.lower().strip()
     import re as _re
+    # Staged voice-reply drafts are machine text (reply|<channel>|...):
+    # route them before any fuzzy matcher can claim the words inside.
+    if _re.match(r"^reply\|(gmail|messenger|instagram)\|", low):
+        return ActionMatch(name="send_message", params={"draft": text.strip()},
+                           text=text)
     # Youtube CONTROL verbs (pause/stop/resume/next/close + music/youtube) take
     # priority over "play youtube": "pause the youtube music" must not be routed
     # to play_youtube (which also matches the bare 'youtube music' substring).
