@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
@@ -254,6 +255,20 @@ def _validate(tool: Any, args: Any, confidence: Any,
         requires_confirmation=False)
 
 
+# Bounded resilience (Lane A1): the local planner model is slow when the
+# GPU is busy, and one 8s timeout used to kill a whole headless build
+# (worker got steps=0 promise-only -> typed TASK_NO_BUILD). The planner
+# retries ONCE on transient transport codes only, with a short backoff
+# and a load-aware (longer) timeout on the retry. Validation semantics
+# are untouched: unknown tools / undeclared args / low confidence still
+# fail closed to a typed no-decision, and persistent outage returns None
+# (never raises to the caller).
+_RETRYABLE_CODES = frozenset({"TIMEOUT", "PROVIDER_OUTAGE"})
+PLANNER_MAX_ATTEMPTS = 2
+PLANNER_RETRY_BACKOFF_S = 0.5
+PLANNER_RETRY_TIMEOUT_FACTOR = 1.5
+
+
 def plan(text: str, *, cfg: Any = None,
          url: str = "http://127.0.0.1:11434",
          model: Optional[str] = None, timeout_s: float = 8.0,
@@ -261,17 +276,45 @@ def plan(text: str, *, cfg: Any = None,
     """One canonical-contract LLM call producing a validated proposal or a
     typed no-decision (None). The effective ``tool`` profile is resolved by
     ``providers.resolver`` and executed through ``providers.gateway.run``
-    (local route, full JSON Schema, temp 0)."""
+    (local route, full JSON Schema, temp 0).
+
+    Transient transport failures (TIMEOUT/PROVIDER_OUTAGE) are retried
+    once with backoff and a longer timeout; anything else fails closed
+    immediately. Never raises for provider outages.
+    """
     from .providers import gateway as _gateway
 
-    res = _gateway.run_role(
-        text, cfg, role="tool", max_tokens=1024, timeout_s=timeout_s,
-        local_mode="chat_raw", messages=build_messages(
-            text, PLANNER_BUILD_TOOLS if is_build_task(text) else None),
-        structured_schema=_schema_for(text), options={"temperature": 0.0})
-    if not res.ok:
-        log.info("planner.unavailable error=%s code=%s",
-                 res.message[:120], res.code)
+    messages = build_messages(
+        text, PLANNER_BUILD_TOOLS if is_build_task(text) else None)
+    schema = _schema_for(text)
+    res = None
+    attempt_timeout = timeout_s
+    for attempt in range(PLANNER_MAX_ATTEMPTS):
+        try:
+            res = _gateway.run_role(
+                text, cfg, role="tool", max_tokens=1024,
+                timeout_s=attempt_timeout,
+                local_mode="chat_raw", messages=messages,
+                structured_schema=schema, options={"temperature": 0.0})
+        except Exception as exc:  # fail closed, retry once like an outage
+            log.info("planner.unavailable error=%s code=PROVIDER_OUTAGE "
+                     "attempt=%d", str(exc)[:120], attempt + 1)
+            if attempt + 1 >= PLANNER_MAX_ATTEMPTS:
+                return None
+            time.sleep(PLANNER_RETRY_BACKOFF_S)
+            attempt_timeout = timeout_s * PLANNER_RETRY_TIMEOUT_FACTOR
+            continue
+        if res.ok:
+            break
+        log.info("planner.unavailable error=%s code=%s attempt=%d",
+                 res.message[:120], res.code, attempt + 1)
+        if res.code not in _RETRYABLE_CODES:
+            return None
+        if attempt + 1 >= PLANNER_MAX_ATTEMPTS:
+            return None
+        time.sleep(PLANNER_RETRY_BACKOFF_S)
+        attempt_timeout = timeout_s * PLANNER_RETRY_TIMEOUT_FACTOR
+    if res is None or not res.ok:
         return None
     try:
         parsed = json.loads(res.text)
