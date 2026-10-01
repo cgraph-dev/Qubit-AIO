@@ -792,6 +792,51 @@ def _canonical_agent_session(cfg: Any) -> str:
     return _resolve_agent_session(cfg, None)
 
 
+def append_voice_exchange(session_id: str, user_text: str, assistant_text: str,
+                          *, cfg: Any, model: str = "",
+                          route: str = "voice") -> Dict[str, Any]:
+    """Append one voice exchange to the ONE shared chat store (Task 6).
+
+    Resolves exactly ``chat_transport.store(cfg)`` — the same factory the
+    ``/qubit-chat`` turn path writes — on the same session id, so a spoken
+    turn and a typed turn render in one transcript with one audit lineage.
+    The per-request ctx mirror (``_last_web_summary``/``_last_web_route``)
+    stays a read projection; this is the write path. ``speak()`` stays the
+    single TTS exit (nothing here synthesizes audio).
+
+    Best-effort: a store fault is audited and typed, never raised, so a
+    persistence failure can never change a turn result. Existing
+    ``agent._persist_session_turn`` primitive only — no new store.
+    """
+    try:
+        from . import chat_transport as CT
+
+        st = CT.store(cfg)
+        sid = str(session_id or "").strip()[:80]
+        if not sid:
+            from .agent import canonical_session_id
+
+            sid = canonical_session_id(cfg)
+        from .agent import _persist_session_turn
+
+        _persist_session_turn(st, sid, "user", user_text or "",
+                              model=model or None)
+        _persist_session_turn(st, sid, "assistant", assistant_text or "",
+                              model=model or None)
+        try:
+            log_event("voice.append_exchange", session=sid, route=route)
+        except Exception:
+            pass
+        return {"state": "OK", "session_id": sid}
+    except Exception as exc:  # noqa: BLE001 - additive, non-fatal
+        try:
+            log_event("voice.append_exchange_failed", error=str(exc)[:160])
+        except Exception:
+            pass
+        return {"state": "FAILED", "code": "VOICE_APPEND_FAILED",
+                "detail": str(exc)[:200]}
+
+
 def _operator_name(cfg: Any) -> str:
     """Resolve the operator's name from local knowledge — never baked in code.
 
@@ -1781,26 +1826,19 @@ class VoiceOrchestrator:
         """Record one voice exchange in the in-memory state AND the one store.
 
         The in-memory rolling :class:`~voicebridge.intent.state.ConversationState`
-        is unchanged (same turns, same cap). The canonical chat store is written
-        best-effort so a spoken turn is visible to ``/qubit-chat`` (and a chat
-        turn is visible to voice on the next turn). A store fault never changes
-        the turn result or the return contract.
+        is unchanged (same turns, same cap). The canonical chat store write
+        goes through :func:`append_voice_exchange` — the same session-store
+        function (same ``chat_transport.store(cfg)``, same session id) the
+        ``/qubit-chat`` turn path appends through — so a spoken turn is
+        visible to ``/qubit-chat`` (and a chat turn is visible to voice on
+        the next turn). A store fault never changes the turn result or the
+        return contract.
         """
         with _conv_lock:
             self.conversation.add("user", user_text)
             self.conversation.add("assistant", reply)
-        store = self._voice_store()
-        if store is None:
-            return
-        try:
-            from .agent import _persist_session_turn
-            sid = _canonical_agent_session(self.cfg)
-            _persist_session_turn(store, sid, "user", user_text,
-                                  model=model or None)
-            _persist_session_turn(store, sid, "assistant", reply,
-                                  model=model or None)
-        except Exception as exc:  # noqa: BLE001 - additive, non-fatal
-            log_event("conversation.store.persist_error", error=str(exc)[:160])
+        append_voice_exchange(_canonical_agent_session(self.cfg), user_text,
+                              reply, cfg=self.cfg, model=model)
 
     def process_web_utterance(self, text: str) -> dict:
         """Phone/web roundtrip: route like the mic but return data, not audio.
@@ -2444,7 +2482,8 @@ class VoiceOrchestrator:
             self.task.clear()
             self._handle_agent_result(session_key,
                                       str(res.get("reply", "")),
-                                      "ok", time.time() - t0)
+                                      "ok", time.time() - t0,
+                                      task_text=task_text)
 
         threading.Thread(target=_worker, daemon=True,
                          name="worker-session").start()
@@ -2456,7 +2495,7 @@ class VoiceOrchestrator:
         return ""
 
     def _handle_agent_result(self, session_key: str, reply: str, status: str,
-                             elapsed_s: float) -> None:
+                             elapsed_s: float, task_text: str = "") -> None:
         # Always journal + persist the FULL raw report first — summary/speech must never hide it.
         try:
             log_event("worker.result", session_key=session_key, status=status,
@@ -2524,6 +2563,15 @@ class VoiceOrchestrator:
             self.shared.append_agent_report(summary, raw=reply, provider="qubit", session_key=session_key)
         except Exception:
             pass
+        # Task 6: the voice task result also lands in the shared chat
+        # transcript (same store, canonical session) so /qubit-chat shows
+        # what voice built. Best-effort; speak() below stays the one exit.
+        try:
+            append_voice_exchange(
+                _canonical_agent_session(self.cfg), task_text, reply,
+                cfg=self.cfg, model=self._current_model(), route="worker")
+        except Exception as exc:  # noqa: BLE001 - additive, non-fatal
+            log_event("worker.result.store_error", error=str(exc)[:160])
         try:
             self.feed_push({"kind": "summary", "text": "Agent task",
                             "summary": summary, "route": "worker", "raw": reply[:50000]})

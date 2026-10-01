@@ -933,6 +933,39 @@ def _summarize_report(reply: str, cfg: Any) -> str:
         return "Task finished — check the full report on the dashboard."
 
 
+# ---------------------------------------------------------------------------
+# Wave D2 Task 6 — uniform branch receipt shape {route, task, sources, model}
+# ---------------------------------------------------------------------------
+def _branch_model(cfg: Any) -> Optional[str]:
+    """Best-effort surface default for branch receipts (never raises)."""
+    try:
+        return configured_model(cfg)
+    except Exception:  # noqa: BLE001 - degraded to None, never fatal
+        return None
+
+
+def _branch_receipt(action: str, *, task: Any = None,
+                    sources: Any = None, model: Any = None,
+                    cfg: Any = None) -> Dict[str, Any]:
+    """Uniform receipt shape for every branch turn.
+
+    Every branch outcome carries ``{route, task, sources, model}`` (plus the
+    runtime marker) so the transcript/audit lineage reads the same no matter
+    which path executed — the ``/qubit-chat`` typed turn, the voice turn, or
+    the stream variant. ``task`` is free-form user text, so it is redacted
+    (a turn receipt must never carry a raw secret); ``model`` falls back to
+    the surface default when the branch ran without one.
+    """
+    if model is None and cfg is not None:
+        model = _branch_model(cfg)
+    return {"runtime": "qubit-chat-branch",
+            "path": "voicebridge.chat_transport",
+            "route": str(action or ""),
+            "task": _redact(task)[:200] if task else None,
+            "sources": [str(s) for s in (sources or [])],
+            "model": model}
+
+
 def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
     """Wave C Task 2: execute a web answer, never chatter about searching."""
     from . import orchestrator as ORC
@@ -958,7 +991,9 @@ def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
               meta={"route": "web", "sources": sources or None})
     _audit("turn_web", session=sid, sources=len(sources))
     return {"ok": True, "text": answer, "reply": answer, "sources": sources,
-            "session_id": sid, "session": sid, "route": "web"}
+            "session_id": sid, "session": sid, "route": "web",
+            "receipt": _branch_receipt("web", task=task_text,
+                                       sources=sources, cfg=cfg)}
 
 
 def _turn_local(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
@@ -1042,7 +1077,8 @@ def _turn_local(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
                 "detail": _redact(msg)[:300], "session_id": sid,
                 "route": "local"}
     return {"ok": True, "text": msg, "reply": msg, "session_id": sid,
-            "session": sid, "route": "local", "action": m.name}
+            "session": sid, "route": "local", "action": m.name,
+            "receipt": _branch_receipt("local", task=task_text, cfg=cfg)}
 
 
 def _turn_registry(cfg: Any, st: Any, sid: str,
@@ -1107,8 +1143,13 @@ def _turn_registry(cfg: Any, st: Any, sid: str,
     result: Dict[str, Any] = {
         "ok": True, "text": speech, "reply": speech, "session_id": sid,
         "session": sid, "route": "registry", "entry": entry}
-    if out.get("receipt"):
-        result["receipt"] = out["receipt"]
+    base = out.get("receipt") if isinstance(out.get("receipt"), dict) else {}
+    receipt = dict(base)
+    receipt.setdefault("route", "registry")
+    receipt.setdefault("task", _redact(task_text)[:200] if task_text else None)
+    receipt.setdefault("sources", [])
+    receipt.setdefault("model", _branch_model(cfg))
+    result["receipt"] = receipt
     return result
 
 
@@ -1150,7 +1191,8 @@ def _finish_task(cfg: Any, st: Any, sid: str, key: str,
            report_chars=len(reply))
     return {"ok": True, "text": spoken, "reply": spoken, "report": reply,
             "session_id": sid, "session": sid, "route": "task", "task": key,
-            "status": "done"}
+            "status": "done",
+            "receipt": _branch_receipt("task", task=key, cfg=cfg)}
 
 
 def _turn_task(cfg: Any, st: Any, sid: str, task_text: str, *,
@@ -1704,6 +1746,10 @@ def _stream_branch(cfg: Any, st: Any, sid: str, clean: str,
     yield {"event": "delta", "text": text, "session_id": sid}
     receipt: Dict[str, Any] = {"runtime": "qubit-chat-branch",
                                "route": action, "streaming": True,
+                               "task": _redact(task_text)[:200]
+                               if task_text else None,
+                               "sources": [],
+                               "model": _branch_model(cfg),
                                "path": "voicebridge.chat_transport"
                                        "._stream_branch"}
     for key in ("sources", "entry", "action", "candidates"):
@@ -1788,7 +1834,8 @@ def _stream_task(cfg: Any, st: Any, sid: str, task_text: str, started: float,
     yield {"event": "done", "ok": True, "reply": report,
            "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
            "receipt": {"runtime": "qubit-chat-worker", "route": "task",
-                       "streaming": True, "task": key,
+                       "streaming": True, "task": key, "sources": [],
+                       "model": _branch_model(cfg),
                        "path": "voicebridge.chat_transport._stream_task"}}
 
 
