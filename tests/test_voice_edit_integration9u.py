@@ -632,3 +632,54 @@ def test_parse_envelopes_is_defensive():
     assert rows == [("a@b.c", "Hi")]
     assert VoiceEditService._parse_envelopes("not json") is None
     assert VoiceEditService._parse_envelopes('{"envelopes": []}') == []
+
+
+# ---------------------------------------------------------------------------
+# ask() social read intents (messenger / instagram, read-only)
+# ---------------------------------------------------------------------------
+def test_ask_messenger_reads_digest_without_brain(monkeypatch):
+    svc, _audits = _service()
+    _no_brain(monkeypatch)
+    monkeypatch.setattr(
+        svc, "_run_social_script",
+        lambda name: [("Pro Nume", "The audio call ended.")] if name.endswith(
+            "messenger.py") else (_ for _ in ()).throw(
+                AssertionError("wrong script")))
+    out = svc.ask("any new messenger chats?", request_id="s-1", mode="answer")
+    assert out["ok"] and "Pro Nume" in out["answer"]
+    assert out["model"] == "skill-social"
+
+
+def test_ask_instagram_reads_digest_without_brain(monkeypatch):
+    svc, _audits = _service()
+    _no_brain(monkeypatch)
+    monkeypatch.setattr(
+        svc, "_run_social_script",
+        lambda name: [("tr.cky", "hey")] if name.endswith(
+            "instagram.py") else (_ for _ in ()).throw(
+                AssertionError("wrong script")))
+    out = svc.ask("check my instagram dms", request_id="s-2", mode="answer")
+    assert out["ok"] and "tr.cky" in out["answer"]
+    assert out["model"] == "skill-social"
+
+
+def test_ask_reply_verbs_fall_through_to_brain(monkeypatch):
+    svc, _audits = _service()
+    monkeypatch.setattr(
+        svc, "_run_social_script",
+        lambda name: (_ for _ in ()).throw(
+            AssertionError("reads must not run for replies")))
+
+    class FakeRes:
+        ok = True
+        text = "brain handles replies"
+        provider = "local"
+        model = "qubit-brain4"
+        code = ""
+        message = ""
+
+    import voicebridge.providers.gateway as GW
+    monkeypatch.setattr(GW, "run_role", lambda prompt, cfg, **kw: FakeRes())
+    out = svc.ask("reply to Pro Nume on messenger", request_id="s-3",
+                  mode="answer")
+    assert out["ok"] and out["answer"] == "brain handles replies"

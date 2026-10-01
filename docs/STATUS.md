@@ -2514,6 +2514,32 @@ fast the weather, the time, things about me" before.
   documented CLI flags but unprovable until an account exists; the
   degradation path is live-proven.
 
+## 61. Social reads live: gmail + messenger + instagram via voice — 2026-10-01
+
+**No milestone claimed.** Owner reopened Chromium (CDP up, all tabs
+logged in): voice must read everything + reply as needed.
+
+- **Verified first:** `:9222` answers 12 tabs (Gmail inbox, Messenger
+  E2EE thread, IG direct); `qubit doctor` `browser_cdp` OK; all three
+  skill readers run live with real data (Gmail: OLX terms, GitHub sudo
+  code, Greptile perms; Messenger: 2 unread + previews; IG threads).
+- **Built (`service.py::_social_answer`, after youtube):**
+  messenger/facebook + instagram read-intents (check/new/unread/… verbs)
+  → the skill's `read_messenger.py` / `read_instagram.py` over CDP
+  (45 s bound) → deterministic spoken digest (`model: skill-social`,
+  no brain). Gmail read now resolves through the CDP layer too (was
+  degradation, now live).
+- **Replies deliberately NOT wired:** send/reply/write verbs fall
+  through — sending needs confirm-gated agent execution AND
+  computer-control is DISABLED by policy (Packet 8V); no sender script
+  exists (skill ships readers only). Reading is complete; replying
+  needs a policy + sender decision first.
+- **Live proof (real ask path):** "check my email" → Latest 3 Gmail
+  (OLX/GitHub×2); "any new messenger chats?" → 2 unread + previews;
+  "check my instagram dms" → 3 threads. All deterministic, no model.
+- **Tests:** 3 new (messenger/instagram digest without brain,
+  reply-verb fallthrough). Sweep **231** green; services restarted.
+
 ## 60. Voice mail via the logged-in browser session (CDP) — 2026-10-01
 
 **No milestone claimed.** Owner: the Chromium profile holds everything

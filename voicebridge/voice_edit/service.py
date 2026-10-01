@@ -938,6 +938,9 @@ class VoiceEditService:
         url = self._youtube_url(q)
         if url:
             return self._youtube_answer(url)
+        social = self._social_answer(q)
+        if social:
+            return social
         return "", ""
 
     def _gmail_configured(self) -> bool:
@@ -982,6 +985,69 @@ class VoiceEditService:
             bits.append(f"{subject[:80]} from {sender[:40]}")
         return (f"Latest {len(list(rows)[:5])} in Gmail: "
                 + "; ".join(bits) + ".")
+
+    def _social_answer(self, question: str) -> "tuple[str, str]":
+        """Spoken digests for Messenger / Instagram via logged-in tabs.
+
+        Read-only DOM extraction over CDP (the skill's reader scripts);
+        send/reply/write verbs fall through (sending is confirm-gated
+        agent territory AND computer-control is DISABLED by policy).
+        Returns ``(answer, "skill-social")`` or ``("", "")``. Never raises.
+        """
+        import re as _re
+        q = (question or "").strip()
+        if not q:
+            return "", ""
+        if _re.search(r"\b(send|reply|write|answer back|respond)\b",
+                       q, _re.IGNORECASE):
+            return "", ""
+        verbs = (r"\b(check|new|unread|any|latest|recent|read|show|messages"
+                 r"|chats|dms|direct|inbox)\b")
+        if not _re.search(verbs, q, _re.IGNORECASE):
+            return "", ""
+        if _re.search(r"\bmessenger\b|\bfacebook\b|\bfb\b", q, _re.IGNORECASE):
+            rows = self._run_social_script("read_messenger.py")
+            if rows:
+                bits = [f"{n[:40]} — {p[:100]}" for n, p in rows[:4]]
+                return ("Messenger: " + "; ".join(bits) + ".", "skill-social")
+            return "", ""
+        if _re.search(r"\binstagram\b|\binsta\b", q, _re.IGNORECASE):
+            rows = self._run_social_script("read_instagram.py")
+            if rows:
+                bits = [f"{n[:40]} — {p[:100]}" for n, p in rows[:4]]
+                return ("Instagram: " + "; ".join(bits) + ".", "skill-social")
+            return "", ""
+        return "", ""
+
+    def _run_social_script(self, name: str) -> Any:
+        """Run a social reader script; ``[(name, preview)]`` or None."""
+        import json as _json
+        import subprocess as _sp
+        import sys as _sys
+        script = self._skill_script(
+            f"communication/social-inbox-check/scripts/{name}")
+        if not script:
+            return None
+        try:
+            proc = _sp.run([_sys.executable, script, "3"],
+                           capture_output=True, text=True, timeout=45)
+            if proc.returncode != 0:
+                return None
+            data = _json.loads(proc.stdout or "")
+            if not isinstance(data, list):
+                return None
+            out = []
+            for it in data:
+                if not isinstance(it, dict):
+                    continue
+                title = str(it.get("name") or it.get("sender") or "").strip()
+                prev = str(it.get("preview") or it.get("text")
+                           or it.get("subject") or "").strip()
+                if title or prev:
+                    out.append((title or "unknown", prev or "(no preview)"))
+            return out or None
+        except Exception:
+            return None
 
     def _skill_script(self, relative: str) -> str:
         """Absolute path of a skill helper script under QUBIT_HOME, or ""."""
