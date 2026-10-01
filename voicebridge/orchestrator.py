@@ -298,8 +298,10 @@ def _web_env_key(cfg: Any, name: str) -> str:
 
     Mirrors ``VoiceOrchestrator._env_key`` without needing an instance:
     the configured ``intent.deepseek_env`` path (or the canonical
-    ``~/.config/qubit-voicebridge/.env``), plus ``os.environ``. The legacy
-    ``~/.hermes/.env`` is never consulted. Values are never logged.
+    ``~/.config/qubit-voicebridge/.env``), then the canonical runtime
+    ``.env`` (``<state_dir>/runtime/.env`` — the KEYS-page store), plus
+    ``os.environ``. The legacy ``~/.hermes/.env`` is never consulted.
+    Values are never logged.
     """
     candidates = []
     try:
@@ -311,6 +313,13 @@ def _web_env_key(cfg: Any, name: str) -> str:
         candidates.append(configured.strip())
     else:
         candidates.append("~/.config/qubit-voicebridge/.env")
+    try:
+        from .config import canonical_runtime_env_path as _runtime_env_path
+        _runtime_env = str(_runtime_env_path())
+    except Exception:  # noqa: BLE001 - unresolvable path means skip it
+        _runtime_env = ""
+    if _runtime_env and _runtime_env not in candidates:
+        candidates.append(_runtime_env)
     for candidate in candidates:
         env_path = Path(candidate).expanduser()
         try:
@@ -3286,10 +3295,12 @@ class VoiceOrchestrator:
         """Read a KEY from the canonical Qubit env file (or environment).
 
         Canonical: ``~/.config/qubit-voicebridge/.env`` (or the configured
-        ``intent.deepseek_env`` path), plus ``os.environ``. The operator's
-        legacy ``~/.hermes/.env`` is **never** consulted — ``~/.hermes`` is
-        read-only migration input, never a runtime credential fallback
-        (DECISIONS #9/#17). Values are never logged.
+        ``intent.deepseek_env`` path), then the canonical runtime ``.env``
+        (``<state_dir>/runtime/.env`` — the KEYS-page store), plus
+        ``os.environ``. The operator's legacy ``~/.hermes/.env`` is
+        **never** consulted — ``~/.hermes`` is read-only migration input,
+        never a runtime credential fallback (DECISIONS #9/#17). Values are
+        never logged.
         """
         candidates = []
         configured = str(self.cfg.get("intent", "deepseek_env", default="") or "")
@@ -3297,6 +3308,13 @@ class VoiceOrchestrator:
             candidates.append(configured.strip())
         else:
             candidates.append("~/.config/qubit-voicebridge/.env")
+        try:
+            from .config import canonical_runtime_env_path as _runtime_env_path
+            _runtime_env = str(_runtime_env_path())
+        except Exception:  # noqa: BLE001 - unresolvable path means skip it
+            _runtime_env = ""
+        if _runtime_env and _runtime_env not in candidates:
+            candidates.append(_runtime_env)
         for candidate in candidates:
             env_path = Path(candidate).expanduser()
             try:
