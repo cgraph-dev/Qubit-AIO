@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
@@ -52,6 +53,51 @@ PLANNER_TOOLS: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# File-build tools for headless build tasks ONLY. These are MUTATING
+# broker capabilities (confirm-gated, path-confined, reversible) — never
+# part of the reversible-only shortlist above. The narrowest reusable op
+# is ``local.files_upload`` (:func:`voicebridge.file_patch.write_bytes`
+# behind ``broker.register_file_patch``): one whole-file write inside an
+# approved project root, bounded base64 payload, durable backup. The
+# backend (orchestrator ``_task_tool_backend``) accepts exactly these
+# names; keep both sides in sync.
+PLANNER_BUILD_TOOLS: Dict[str, Dict[str, Any]] = {
+    "local.files_upload": {
+        "args": {
+            "target_path": {"type": "string"},
+            "content_base64": {"type": "string"},
+        },
+        "required": ["target_path", "content_base64"],
+        "summary": "create one file with the given bytes (base64) inside "
+                   "the approved project folder (confirm-gated, reversible)",
+        "requires_confirmation": True,
+    },
+}
+
+# A build task is a page-build request. The gate runs on the REQUEST text
+# (the headless frame appended by the orchestrator mentions files in its
+# instructions, so the frame tail is stripped first — otherwise every
+# framed turn would qualify).
+_BUILD_TASK_RE = re.compile(
+    r"\b(webs?ite|web\s?pages?|web\s?apps?|landing\s?pages?|"
+    r"one[- ]pagers?|\.html?)\b",
+    re.IGNORECASE)
+_FRAME_MARKER = "\n\nHeadless build instructions:"
+
+# Decoded file-payload ceiling for a planner proposal (256 KiB — enough
+# for a one-page site; the broker enforces its own larger cap).
+MAX_BUILD_BYTES = 256 * 1024
+
+
+def _request_text(text: str) -> str:
+    """The user request without the headless build-frame tail."""
+    return str(text or "").split(_FRAME_MARKER)[0]
+
+
+def is_build_task(text: str) -> bool:
+    """True when the request asks for a page-build (file tools allowed)."""
+    return bool(_BUILD_TASK_RE.search(_request_text(text)))
+
 MIN_CONFIDENCE = 0.60
 
 # "none" MUST be a valid enum choice: without it, structured outputs force
@@ -81,25 +127,102 @@ class TypedProposal:
     requires_confirmation: bool = False
 
 
-def build_messages(text: str) -> list:
+def build_messages(text: str,
+                   extra: Optional[Dict[str, Dict[str, Any]]] = None) -> list:
+    tools = dict(sorted(PLANNER_TOOLS.items()))
+    if extra:
+        tools.update(sorted(extra.items()))
     tool_lines = "\n".join(
         f'- {name}: {spec["summary"]} args={json.dumps(spec["args"])}'
-        for name, spec in sorted(PLANNER_TOOLS.items()))
+        for name, spec in tools.items())
     system = (
         "You convert a user request into ONE tool proposal as compact JSON "
         "matching the provided schema (tool, arguments, confidence). Pick a "
         "tool ONLY if the request clearly maps to it; otherwise answer with "
-        '{"tool": "none"}. Never invent tools or argument names.')
+        '{"tool": "none"}. Never invent tools or argument names. '
+        "The local.files_upload tool creates a real file: put the destination "
+        "filename in target_path and the complete file bytes as base64 in "
+        "content_base64.")
     user = (f"Available tools:\n{tool_lines}\n\n"
-            f"Request: {text[:400]}\n\nTool proposal:")
+            f"Request: {_request_text(text)[:400]}\n\nTool proposal:")
     return [{"role": "system", "content": system},
             {"role": "user", "content": user}]
 
 
+def _schema_for(text: str) -> Dict[str, Any]:
+    """Planner schema: build tools listed only for build tasks."""
+    names = sorted(PLANNER_TOOLS)
+    if is_build_task(text):
+        names = sorted(set(names) | set(PLANNER_BUILD_TOOLS))
+    return {
+        "type": "object",
+        "properties": {
+            "tool": {"type": "string", "enum": names + ["none"]},
+            "arguments": {"type": "object"},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        },
+        "required": ["tool", "confidence"],
+        "additionalProperties": False,
+    }
+
+
+def _check_build_args(tool: str, args: Dict[str, Any]) -> bool:
+    """Shape-check a file-build proposal (base64, bounded, non-empty)."""
+    import base64 as _b64
+
+    for k in ("target_path", "content_base64"):
+        v = args.get(k)
+        if not isinstance(v, str) or not v.strip():
+            log.info("planner.no_decision reason=missing_required "
+                     "tool=%s arg=%s", tool, k)
+            return False
+    try:
+        raw = _b64.b64decode(args["content_base64"], validate=True)
+    except Exception:
+        log.info("planner.no_decision reason=bad_base64 tool=%s", tool)
+        return False
+    if not raw or len(raw) > MAX_BUILD_BYTES:
+        log.info("planner.no_decision reason=build_size tool=%s", tool)
+        return False
+    return True
+
+
 def _validate(tool: Any, args: Any, confidence: Any,
-             text: str) -> Optional[TypedProposal]:
+              text: str) -> Optional[TypedProposal]:
     if tool in (None, "none", ""):
         return None                      # honest no-tool outcome
+    if tool in PLANNER_BUILD_TOOLS:
+        if not is_build_task(text):
+            log.info("planner.no_decision reason=build_tool_non_build "
+                     "tool=%s", tool)
+            return None                  # file tools need a build request
+        spec = PLANNER_BUILD_TOOLS[tool]
+        args = args if isinstance(args, dict) else {}
+        allowed = set(spec["args"])
+        extra = set(args) - allowed
+        if extra:
+            log.info("planner.no_decision reason=undeclared_args tool=%s",
+                     tool)
+            return None
+        for k in spec.get("required", []):
+            v = args.get(k)
+            if not isinstance(v, str) or not v.strip():
+                log.info("planner.no_decision reason=missing_required "
+                         "tool=%s arg=%s", tool, k)
+                return None
+        if not _check_build_args(tool, args):
+            return None
+        try:
+            conf = float(confidence)
+        except (TypeError, ValueError):
+            conf = MIN_CONFIDENCE
+        if conf < MIN_CONFIDENCE:
+            return None                  # low confidence never acts
+        return TypedProposal(
+            tool=tool, version="1.0.0",
+            arguments={k: v for k, v in args.items()},
+            confidence=round(min(conf, 1.0), 3),
+            requires_confirmation=True)
     if tool not in PLANNER_TOOLS:
         log.info("planner.no_decision reason=unknown_tool tool=%s", tool)
         return None                      # unknown/out-of-scope: fail closed
@@ -142,9 +265,10 @@ def plan(text: str, *, cfg: Any = None,
     from .providers import gateway as _gateway
 
     res = _gateway.run_role(
-        text, cfg, role="tool", max_tokens=256, timeout_s=timeout_s,
-        local_mode="chat_raw", messages=build_messages(text),
-        structured_schema=PLANNER_SCHEMA, options={"temperature": 0.0})
+        text, cfg, role="tool", max_tokens=1024, timeout_s=timeout_s,
+        local_mode="chat_raw", messages=build_messages(
+            text, PLANNER_BUILD_TOOLS if is_build_task(text) else None),
+        structured_schema=_schema_for(text), options={"temperature": 0.0})
     if not res.ok:
         log.info("planner.unavailable error=%s code=%s",
                  res.message[:120], res.code)

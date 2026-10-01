@@ -472,6 +472,35 @@ def _task_session_key(cfg: Any, session: Any) -> str:
     return _resolve_agent_session(cfg, requested)
 
 
+def _checked_file_receipt(name: str, output: Any) -> str:
+    """Fail closed on a brokered file-op refusal envelope.
+
+    The confined file executors (``broker.register_file_patch``) answer a
+    JSON envelope — ``{"ok": true, "receipt": ...}`` on a real write,
+    ``{"ok": false, "code", "detail"}`` on a typed refusal (outside-root,
+    confirm-required, conflict, ...). The broker reports the child run
+    itself as success either way, so without this check a refused write
+    would read as a tool success and the worker could report a phantom
+    file. A refusal envelope raises a typed ``RuntimeError`` carrying the
+    code (the worker records it as a tool failure, never a done file).
+    Non-envelope output passes through unchanged.
+    """
+    import json as _json
+
+    text = output if isinstance(output, str) else str(output)
+    try:
+        env = _json.loads(text)
+    except Exception:
+        return text
+    if not isinstance(env, dict) or "ok" not in env:
+        return text
+    if env.get("ok") is True:
+        return text
+    code = str(env.get("code") or "FILE_OP_FAILED")
+    detail = str(env.get("detail") or name)
+    raise RuntimeError(f"{code}: {detail}"[:500])
+
+
 def _task_tool_backend(cfg: Any) -> Any:
     """Planner-tool backend behind the shared broker (mirrors _agent_tool).
 
@@ -482,19 +511,36 @@ def _task_tool_backend(cfg: Any) -> Any:
     closed. This is the module-level twin of
     ``VoiceOrchestrator._agent_tool`` for headless (non-voice) dispatch —
     same calls, no orchestrator instance required.
+
+    File builds reuse the confined broker op ``local.files_upload``
+    (``broker.register_file_patch`` → ``file_patch.write_bytes``:
+    path-confined under an approved project root, bounded, reversible from
+    a durable backup) — never an invented writer, never a raw open. The
+    accepted file-tool names mirror ``planner.PLANNER_BUILD_TOOLS``. A
+    refusal envelope (outside-root, confirm-gated, conflict) raises typed
+    via :func:`_checked_file_receipt` so a refused write can never report
+    a phantom file.
     """
-    from .broker import build_host_broker, register_web_tools
+    from .broker import (build_host_broker, register_file_patch,
+                         register_web_tools)
 
     broker = build_host_broker(cfg=cfg)
+    for _register in (register_web_tools, register_file_patch):
+        try:
+            _register(broker, cfg=cfg)
+        except Exception:  # noqa: BLE001 - extra tools are additive
+            pass
     try:
-        register_web_tools(broker, cfg=cfg)
-    except Exception:  # noqa: BLE001 - web tools are additive, never fatal
-        pass
+        from .planner import PLANNER_BUILD_TOOLS as _build_tools
+        _file_build_tools = frozenset(_build_tools)
+    except Exception:  # noqa: BLE001 - fail closed to the one known tool
+        _file_build_tools = frozenset({"local.files_upload"})
 
     def _run(tool: str, args: Dict[str, Any]) -> str:
         name = str(tool or "")
         if name.startswith("local."):
-            if local_actions.ACTIONS.get(name[len("local."):]) is None:
+            if local_actions.ACTIONS.get(name[len("local."):]) is None \
+                    and name not in _file_build_tools:
                 raise ValueError(f"unknown agent tool {name!r}")
         elif not name.startswith("web."):
             raise ValueError(f"unknown agent tool {name!r}")
@@ -504,6 +550,8 @@ def _task_tool_backend(cfg: Any) -> Any:
             raise DispatchBlocked(res.denied, name)
         if not res.ok:
             raise RuntimeError(res.error or f"{name} failed")
+        if name in _file_build_tools:
+            return _checked_file_receipt(name, res.output)
         return res.output
 
     return _run
@@ -529,7 +577,12 @@ def _frame_build_task(text: str) -> str:
         "Headless build instructions: do the work with your tools now. "
         "When the request needs files (a website, a document, code), "
         "create real files with your tools and name every file you "
-        "created in your final reply. Never reply with only a promise, "
+        "created in your final reply. The local.files_upload tool creates "
+        "a file: target_path is the destination filename inside the "
+        "approved project folder, content_base64 is the complete file "
+        "bytes as base64. A refused or confirmation-gated write is a "
+        "typed outcome — report it, never claim the file. Never reply "
+        "with only a promise, "
         "a plan, or a description of what you would do — a reply that "
         "only says you will do something, with no tool call and no "
         "created file, is recorded as a typed build failure.")

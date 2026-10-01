@@ -379,3 +379,167 @@ def test_stream_task_progress_then_report(monkeypatch):
     assert "progress" in kinds, kinds
     assert kinds[-1] == "done", kinds
     assert "worker-9u-4" in fake.texts("test-task-stream-9u")
+
+
+# --- T5 follow-up: headless build worker creates files via the brokered,
+# path-confined ``local.files_upload`` op (never an invented writer). ---
+
+import base64 as _b64mod
+
+
+def _fake_broker_host(monkeypatch, result):
+    """Swap the broker factory behind _task_tool_backend for a double."""
+    from voicebridge import broker as _BK
+
+    calls = []
+
+    class _FakeBroker:
+        def execute(self, capability, args, **kw):
+            calls.append((capability, dict(args), kw.get("source")))
+            return result
+
+    monkeypatch.setattr(
+        _BK, "build_host_broker",
+        lambda *a, **kw: _FakeBroker())
+    monkeypatch.setattr(
+        _BK, "register_web_tools", lambda broker, cfg=None: ())
+    monkeypatch.setattr(
+        _BK, "register_file_patch", lambda broker, cfg=None: ())
+    return calls
+
+
+def test_task_backend_file_upload_receipt_names_file(monkeypatch):
+    """The backend accepts the planner file-build tool and the receipt
+    names the created file."""
+    from voicebridge import broker as _BK
+    from voicebridge import orchestrator as ORC
+
+    envelope = ('{"ok": true, "receipt": '
+                '{"target": "hello.html", "bytes_after": 18}}')
+    calls = _fake_broker_host(
+        monkeypatch, _BK.ExecResult(ok=True, output=envelope))
+    run = ORC._task_tool_backend(cfg=None)
+    out = run("local.files_upload",
+              {"target_path": "hello.html",
+               "content_base64": _b64mod.b64encode(b"<h1>hi</h1>").decode()})
+    assert "hello.html" in out, out
+    assert calls and calls[0][0] == "local.files_upload", calls
+    assert calls[0][2] == "model", calls  # TRUE origin: stays gated
+
+
+def test_task_backend_outside_root_is_typed_refusal(monkeypatch):
+    """A refused file write (outside-root envelope) raises typed — it can
+    never report a phantom file."""
+    from voicebridge import broker as _BK
+    from voicebridge import orchestrator as ORC
+
+    envelope = ('{"ok": false, "code": "FILE_PATCH_OUTSIDE_ROOT", '
+                '"detail": "target is outside the approved project folders"}')
+    _fake_broker_host(monkeypatch, _BK.ExecResult(ok=True, output=envelope))
+    run = ORC._task_tool_backend(cfg=None)
+    try:
+        run("local.files_upload",
+            {"target_path": "/tmp/evil.html",
+             "content_base64": _b64mod.b64encode(b"x").decode()})
+    except RuntimeError as exc:
+        assert "FILE_PATCH_OUTSIDE_ROOT" in str(exc), exc
+    else:
+        raise AssertionError("outside-root write must raise typed")
+
+
+def test_task_backend_file_upload_stays_confirm_gated(monkeypatch):
+    """MUTATING file tools stay confirm-gated on the model path: a broker
+    confirmation denial surfaces as DispatchBlocked, never a write."""
+    from voicebridge import broker as _BK
+    from voicebridge import orchestrator as ORC
+    from voicebridge.dispatch_guard import DispatchBlocked
+
+    _fake_broker_host(
+        monkeypatch, _BK.ExecResult(ok=False,
+                                    denied="CONFIRMATION_REQUIRED"))
+    run = ORC._task_tool_backend(cfg=None)
+    try:
+        run("local.files_upload",
+            {"target_path": "hello.html",
+             "content_base64": _b64mod.b64encode(b"<h1>hi</h1>").decode()})
+    except DispatchBlocked as exc:
+        assert "CONFIRMATION_REQUIRED" in str(exc.code), exc.code
+    else:
+        raise AssertionError("ungated model write must be blocked")
+
+
+def test_task_backend_unknown_tool_still_refused(monkeypatch):
+    """The wider backend keeps failing closed on undeclared tools."""
+    from voicebridge import broker as _BK
+    from voicebridge import orchestrator as ORC
+
+    _fake_broker_host(monkeypatch, _BK.ExecResult(ok=True, output="x"))
+    run = ORC._task_tool_backend(cfg=None)
+    for bad in ("local.nope_not_real", "file.write_text", "shell.run"):
+        try:
+            run(bad, {})
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"{bad} must be refused")
+
+
+def test_planner_build_tool_only_for_build_tasks():
+    """File-build proposals validate for page-build requests only; every
+    other request keeps the reversible-only discipline (no-decision)."""
+    from voicebridge import planner as PL
+
+    good = {"target_path": "hello.html",
+            "content_base64": _b64mod.b64encode(b"<h1>hi</h1>").decode()}
+    prop = PL._validate("local.files_upload", dict(good), 0.9,
+                        "make a one-page website that says hello")
+    assert prop is not None, "build task must propose the file tool"
+    assert prop.tool == "local.files_upload", prop
+    assert prop.requires_confirmation is True, prop
+    # Non-build requests: no file tool, even well-formed.
+    assert PL._validate("local.files_upload", dict(good), 0.9,
+                        "turn up the volume") is None
+    assert PL._validate("local.files_upload", dict(good), 0.9,
+                        "make me an app that tracks expenses") is None
+    # Malformed build proposals still fail closed.
+    assert PL._validate("local.files_upload",
+                        {"target_path": "hello.html",
+                         "content_base64": "!!!not-base64!!!"},
+                        0.9, "make a one-page website") is None
+    assert PL._validate("local.files_upload",
+                        {"target_path": "hello.html"}, 0.9,
+                        "make a one-page website") is None
+    # The frame tail alone must not qualify a non-build request.
+    assert PL.is_build_task(
+        "turn up the volume\n\nHeadless build instructions: website") \
+        is False
+
+
+def test_headless_build_chain_file_tool_done_names_file(monkeypatch):
+    """Real launch/wait chain where the worker builds via the brokered
+    file tool: done with a report naming the file."""
+    from voicebridge import broker as _BK
+    from voicebridge import orchestrator as ORC
+    from voicebridge.config import Config
+
+    envelope = ('{"ok": true, "receipt": '
+                '{"target": "hello.html", "bytes_after": 18}}')
+    _fake_broker_host(monkeypatch, _BK.ExecResult(ok=True, output=envelope))
+
+    def _builder_session(cfg, text, **kw):
+        out = kw["execute_tool"](
+            "local.files_upload",
+            {"target_path": "hello.html",
+             "content_base64": _b64mod.b64encode(
+                 b"<h1>hello</h1>").decode()})
+        assert "hello.html" in out, out
+        return {"state": "OK", "reply": "Created hello.html."}
+
+    monkeypatch.setattr(
+        "voicebridge.orchestrator._agent_run_session", _builder_session)
+    cfg = Config.load()
+    key = ORC.launch_task("make a one-page website that says hello",
+                          session="test-buildfile-9u", cfg=cfg)
+    res = ORC.wait_task(key, timeout_s=30)
+    assert res.get("status") == "done", res
+    assert "hello.html" in res.get("reply", ""), res
