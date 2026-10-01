@@ -2369,6 +2369,20 @@ never typed or answered.
 - **Owner protocol:** beep → speak the command within ~12 s; report
   typed/answered vs silence.
 
+## 57. Wake WORKS end-to-end — owner-confirmed — 2026-10-01
+
+**No milestone claimed.** Owner: "it works".
+
+- **Journal proof:** `wake.command` (27 chars) → `helper.answer` chat
+  506 chars; `wake.command` (35) → **`helper.insert` 17 chars (typed
+  into the app)**; `wake.command` (42) → `helper.answer` 123 chars.
+  Hear → beep → command → type + answer, all on the live helper.
+- **Standing notes:** the firing path is the ASR fallback (KWS itself
+  remains acoustically deaf — 3 hits ever; larger-model eval still open
+  if the owner wants it); `MEMORY.md` stale lines still owner-pending
+  (§51); fan drone returns whenever the machine works hard (geometry/
+  gain guidance in §54 stands).
+
 ## 55. Dashboard full-page audit: no fantasy UI; 2 dead restart buttons fixed — 2026-10-01
 
 **No milestone claimed. Code changed (2 one-line fixes, unverified by build).**
