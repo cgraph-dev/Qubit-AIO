@@ -2350,6 +2350,25 @@ room voiced, so every segment timed out at 25 s and always exceeded the
   silence. Commit + push below; concurrent MCP lane still active in the
   tree (their files untouched).
 
+## 56. Wake fires; 6 s arm window expired before the command — 2026-10-01
+
+**No milestone claimed. No code changed (config state only).** Owner heard
+the beep ("it works when I say hey qubit") but "type for me something"
+never typed or answered.
+
+- **Journal proof (debug text on):** two discarded transcripts from the
+  live helper — `"Write this for me, 1 plus 1 equals 25."` (38 chars)
+  then `"Type this for me, 1 plus 1 equals 2."` (36 chars). ASR heard
+  PERFECTLY; both arrived unarmed (no "hey qubit" prefix, outside the
+  6 s `arm_window_s`) so the loop discarded them. The beep had armed a
+  window that expired while the owner formulated the test sentence.
+- **Fix:** `wake.arm_window_s` 6 → **12 s** (`voice.yaml` state;
+  validation already accepts the key; helper restarted). One-breath form
+  (`"hey qubit, type this for me: …"`) never needed the window and keeps
+  working.
+- **Owner protocol:** beep → speak the command within ~12 s; report
+  typed/answered vs silence.
+
 ## 55. Dashboard full-page audit: no fantasy UI; 2 dead restart buttons fixed — 2026-10-01
 
 **No milestone claimed. Code changed (2 one-line fixes, unverified by build).**
