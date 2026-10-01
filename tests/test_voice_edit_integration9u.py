@@ -557,6 +557,7 @@ def test_ask_weather_failure_falls_through_to_brain(monkeypatch):
 def test_ask_mail_without_account_answers_setup_without_brain(monkeypatch):
     svc, audits = _service()
     _no_brain(monkeypatch)
+    monkeypatch.setattr(svc, "_read_gmail_rows", lambda: None)
     monkeypatch.setattr(svc, "_gmail_configured", lambda: False)
     out = svc.ask("do I have any new mail?", request_id="m-1", mode="answer")
     assert out["ok"] and "No mail account is connected yet" in out["answer"]
@@ -566,6 +567,7 @@ def test_ask_mail_without_account_answers_setup_without_brain(monkeypatch):
 def test_ask_mail_with_account_reads_deterministic_digest(monkeypatch):
     svc, _audits = _service()
     _no_brain(monkeypatch)
+    monkeypatch.setattr(svc, "_read_gmail_rows", lambda: None)
     monkeypatch.setattr(svc, "_gmail_configured", lambda: True)
     monkeypatch.setattr(
         svc, "_gmail_envelopes",
@@ -574,6 +576,22 @@ def test_ask_mail_with_account_reads_deterministic_digest(monkeypatch):
     out = svc.ask("check my gmail inbox", request_id="m-2", mode="answer")
     assert out["ok"] and "Q3 planning" in out["answer"]
     assert "boss@example.com" in out["answer"]
+    assert out["model"] == "skill-mail"
+
+
+def test_ask_mail_prefers_logged_in_browser_session(monkeypatch):
+    svc, _audits = _service()
+    _no_brain(monkeypatch)
+    monkeypatch.setattr(
+        svc, "_read_gmail_rows",
+        lambda: [("boss@example.com", "Q3 planning")])
+
+    def _boom():
+        raise AssertionError("himalaya must not run when CDP answers")
+
+    monkeypatch.setattr(svc, "_gmail_configured", _boom)
+    out = svc.ask("check my email", request_id="m-3", mode="answer")
+    assert out["ok"] and "Q3 planning" in out["answer"]
     assert out["model"] == "skill-mail"
 
 

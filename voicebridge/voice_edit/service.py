@@ -951,21 +951,84 @@ class VoiceEditService:
             return False
 
     def _mail_answer(self) -> "tuple[str, str]":
-        """Spoken inbox digest, or the honest not-connected answer."""
+        """Spoken inbox digest, or the honest not-connected answer.
+
+        Source priority follows the skill docs: the logged-in browser
+        session (CDP `read_gmail.py`) first, the himalaya CLI account
+        second. Unconfigured everywhere → the setup answer naming
+        `himalaya account configure` (and the browser relaunch needed
+        for CDP). Never raises.
+        """
+        rows = self._read_gmail_rows()
+        if rows:
+            return self._spoken_digest(rows), "skill-mail"
         if not self._gmail_configured():
             return ("No mail account is connected yet, so I can't read "
-                    "your mail. Run `himalaya account configure` in a "
-                    "terminal then ask me again.", "skill-mail")
-        rows = self._gmail_envelopes()
-        if rows is None:
+                    "your mail. Either keep Gmail open in Chromium "
+                    "relaunched with --remote-debugging-port=9222, or run "
+                    "`himalaya account configure` in a terminal, then ask "
+                    "me again.", "skill-mail")
+        env = self._gmail_envelopes()
+        if env is None:
             return "", ""  # fetch failed: fall through to the brain
-        if not rows:
+        if not env:
             return ("Your Gmail inbox is empty.", "skill-mail")
+        return self._spoken_digest(env), "skill-mail"
+
+    @staticmethod
+    def _spoken_digest(rows: Any) -> str:
         bits = []
-        for sender, subject in rows[:5]:
+        for sender, subject in list(rows)[:5]:
             bits.append(f"{subject[:80]} from {sender[:40]}")
-        return (f"Latest {len(rows[:5])} in Gmail: "
-                + "; ".join(bits) + ".", "skill-mail")
+        return (f"Latest {len(list(rows)[:5])} in Gmail: "
+                + "; ".join(bits) + ".")
+
+    def _skill_script(self, relative: str) -> str:
+        """Absolute path of a skill helper script under QUBIT_HOME, or ""."""
+        from pathlib import Path as _Path
+        try:
+            from .. import qubit_runtime as _HR
+            cand = _Path(_HR.runtime_home_for_cfg(self.cfg)).joinpath(
+                *(["skills"] + str(relative).split("/")))
+            if cand.is_file():
+                return str(cand)
+        except Exception:
+            pass
+        return ""
+
+    def _read_gmail_rows(self) -> Any:
+        """Top inbox rows via the logged-in Chromium session (CDP).
+
+        Runs the skill's `read_gmail.py` (bounded 45 s); returns
+        ``[(sender, subject)]`` or ``None`` when CDP is down, no Gmail
+        tab is open, or nothing parses. Never raises.
+        """
+        import json as _json
+        import subprocess as _sp
+        import sys as _sys
+        script = self._skill_script(
+            "communication/social-inbox-check/scripts/read_gmail.py")
+        if not script:
+            return None
+        try:
+            proc = _sp.run([_sys.executable, script, "3"],
+                           capture_output=True, text=True, timeout=45)
+            if proc.returncode != 0:
+                return None
+            data = _json.loads(proc.stdout or "")
+            rows = data if isinstance(data, list) else []
+            out = []
+            for it in rows:
+                if not isinstance(it, dict):
+                    continue
+                subj = str(it.get("subject") or "").strip()
+                sender = str(it.get("sender") or "").strip()
+                if subj or sender:
+                    out.append((sender or "unknown sender",
+                                subj or "(no subject)"))
+            return out or None
+        except Exception:
+            return None
 
     def _gmail_envelopes(self) -> Any:
         """Newest envelopes via the himalaya CLI (bounded, read-only).

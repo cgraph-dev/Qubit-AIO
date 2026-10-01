@@ -2513,3 +2513,32 @@ fast the weather, the time, things about me" before.
   their Gmail credential) — the listing path is implemented against the
   documented CLI flags but unprovable until an account exists; the
   degradation path is live-proven.
+
+## 60. Voice mail via the logged-in browser session (CDP) — 2026-10-01
+
+**No milestone claimed.** Owner: the Chromium profile holds everything
+(Gmail logged in); the skill docs name the path — implemented per docs.
+
+- **Doc truth (`social-inbox-check/SKILL.md`):** voice "check my email"
+  → `read_gmail.py 3` over CDP against the Qubit Chromium profile, DOM
+  selectors, JSON out. Verified present: `read_gmail.py` (+ messenger/
+  instagram readers, `browser_ensure.sh` — **NOT run**: it pkills the
+  browser and would spawn a profile-locked second instance; owner's
+  process untouched).
+- **Login verified read-only:** Gmail SID/`__Secure-1PSID`/3PSID +
+  mail.google.com cookies present in the profile (copied the Cookies
+  file, queried the copy) — the session is live in the browser.
+- **Blocker unchanged: CDP is DOWN.** `:9222` refused on every probed
+  port; both running Chromes lack `--remote-debugging-port` (launch-time
+  only — nothing can attach to a running instance). The voice mail
+  intent now layers per the docs: CDP reader → himalaya CLI →
+  setup answer (which names BOTH the browser relaunch and
+  `himalaya account configure`). Live-proven degradation with CDP down.
+- **Owner action (exact):** quit Chromium COMPLETELY, then:
+  `DISPLAY=:0 /snap/bin/chromium --user-data-dir=/home/trick/snap/
+  chromium/common/chromium --profile-directory=Default
+  --remote-debugging-port=9222 --remote-allow-origins=*`
+  (from the skill doc). Keep a Gmail tab open. Then "check my email"
+  reads the inbox aloud — no code change needed on our side.
+- **Tests:** CDP-priority + deterministic digest (GW raises if called);
+  sweep **228** green; services restarted.
