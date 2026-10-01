@@ -2370,7 +2370,6 @@ never typed or answered.
   typed/answered vs silence.
 
 ## 57. Wake WORKS end-to-end — owner-confirmed — 2026-10-01
-
 **No milestone claimed.** Owner: "it works".
 
 - **Journal proof:** `wake.command` (27 chars) → `helper.answer` chat
@@ -2445,3 +2444,35 @@ behind our §55 gaps.
   `GET/PUT /api/config/raw` (`analytics.py:33-52`) and a real `/api/pty`
   spawning `hermes --tui` (`chat_ws.py:438`) — Qubit refuses both by policy
   (SECRET_NEVER_SERVED, PTY_NO_SHELL) and offers streaming chat instead.
+
+## 58. Voice answers: live clock + weather wired into ask() — 2026-10-01
+
+**No milestone claimed.** Owner: instant answers regressed — brain4 says
+"no real-time weather data" for Bucharest weather; "it was answering
+fast the weather, the time, things about me" before.
+
+- **Root cause:** `ask()` never uses tools and the local tier has no
+  clock: weather/time questions reach brain4 bare, which stonewalls.
+  Proven live: injected LIVE FACTS ("Bucharest: 14°C…", clock) did NOT
+  move brain4 — it repeated the refusal with the reading in its prompt.
+  Deterministic intents must not go through the model at all.
+- **Fix (`service.py`):** `_live_facts` (machine clock always, one line;
+  live wttr.in read via existing `scripts/weather.py` on weather intent,
+  10 s timeout, failure degrades to "") + `_direct_fact_answer`
+  (weather/time regex → verbatim answer, `model: live-facts`, audited,
+  remembered to the chat session; everything else falls through to the
+  brain with the facts in context). `scripts/weather.py` city strip now
+  drops "right" ("Bucharest right now" parsed city "Bucharest right" →
+  wttr 500 — found live). No model consulted on the direct path.
+- **Live proof (real gateway path):** weather → "Bucharest: 14°C (feels
+  9°C), Clear, wind 15 km/h NE, humidity 39%. Today 13-21°C."; time →
+  "It is Thursday 03:53." Services restarted for the owner.
+- **Tests:** 5 new (facts wiring ×2, direct weather/time without brain,
+  failure fallthrough) + reconciled 2 stale doubles that asked "what
+  time is it" expecting a brain answer. File 21 + routing-cache green;
+  sweep 223 across the voice-edit family green (211 + 12 gpu/wake8u).
+- **Scope honesty:** "things about me" works via USER.md (proven); Gmail/
+  YouTube were never instant-answer capabilities — they live on the
+  skill/agent path (gmail skill verified by the skills lane) and need
+  accounts/CLIs at use time. Egress note: weather intent does one no-key
+  wttr.in GET (the point of live data); everything else stays local.

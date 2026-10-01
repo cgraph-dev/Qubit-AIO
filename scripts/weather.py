@@ -5,7 +5,7 @@ import sys, json, urllib.request, urllib.parse, re
 def wttr_forecast(query: str) -> str:
     m = re.search(r"weather\s+(?:in|for|at|near)?\s*([A-Za-z\s'\-]+)", query, re.I)
     city = (m.group(1).strip() if m else query).strip()
-    city = re.sub(r"\b(today|tomorrow|tommorrow|tommorow|now|please|thanks|corest)\b.*", "", city, flags=re.I).strip()
+    city = re.sub(r"\b(today|tomorrow|tommorrow|tommorow|now|right|please|thanks|corest)\b.*", "", city, flags=re.I).strip()
     # mangled ASR "Corest" -> Bucharest fallback
     if not city or len(city) < 3 or "corest" in query.lower() or "search was" in query.lower():
         # if query mentions weather at all, assume Bucharest (user's timezone)

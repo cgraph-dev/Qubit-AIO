@@ -305,7 +305,9 @@ def test_ask_escalation_routes_to_a_known_api_profile(monkeypatch):
 
     import voicebridge.providers.gateway as GW
     monkeypatch.setattr(GW, "run_role", fake_run_role)
-    out = svc.ask("what time is it", request_id="r-2", mode="chat")
+    # A non-fact question (clock/weather intents answer directly without
+    # the brain) still escalates through the brain path unchanged.
+    out = svc.ask("summarize this for me", request_id="r-2", mode="chat")
     assert out["ok"] and out["answer"].startswith("It's 14:20")
     assert calls.get("profile_id") == "qubit-api"
     assert any(op == "voice_edit.escalation" for op, _ in audits)
@@ -469,3 +471,81 @@ def test_helper_dictate_types_verbatim():
                                   "transcript": "hello world"})
     h._process_transcript("Qubit, type this for me: hello world")
     assert h.desktop.inserted == ["hello world"]
+
+
+# ---------------------------------------------------------------------------
+# ask() live facts (clock always, weather on intent, failures degrade)
+# ---------------------------------------------------------------------------
+def test_live_facts_clock_always_weather_only_on_intent(monkeypatch):
+    svc, _audits = _service()
+    monkeypatch.setattr(svc, "_live_weather",
+                        lambda q: (_calls.append(q), "Bucharest: 18°C")[1])
+    _calls = []
+    facts = svc._live_facts("what time is it")
+    assert "Current local time:" in facts
+    assert _calls == []  # no weather probe without intent
+    facts = svc._live_facts("What's the weather in Bucharest right now?")
+    assert "Current local time:" in facts
+    assert "Bucharest: 18°C" in facts
+    assert _calls == ["What's the weather in Bucharest right now?"]
+
+
+def test_live_weather_failure_degrades_to_empty(monkeypatch):
+    import subprocess
+    svc, _audits = _service()
+
+    def _boom(*a, **k):
+        raise OSError("no network")
+
+    monkeypatch.setattr(subprocess, "run", _boom)
+    assert svc._live_weather("weather in Bucharest") == ""
+    assert svc._live_facts("weather?") != ""  # clock still present
+
+
+# ---------------------------------------------------------------------------
+# ask() direct factual answers (no model consulted)
+# ---------------------------------------------------------------------------
+def _no_brain(monkeypatch):
+    import voicebridge.providers.gateway as GW
+
+    def _boom(prompt, cfg, **kw):
+        raise AssertionError("brain must not be consulted for facts")
+
+    monkeypatch.setattr(GW, "run_role", _boom)
+
+
+def test_ask_answers_weather_directly_without_brain(monkeypatch):
+    svc, audits = _service()
+    _no_brain(monkeypatch)
+    monkeypatch.setattr(svc, "_live_weather", lambda q: "Bucharest: 14°C, Clear.")
+    out = svc.ask("What's the weather in Bucharest right now?",
+                  request_id="w-1", mode="answer")
+    assert out["ok"] and out["answer"] == "Bucharest: 14°C, Clear."
+    assert out["model"] == "live-facts"
+    assert any(op == "voice_edit.ask" for op, _d in audits)
+
+
+def test_ask_answers_time_directly_without_brain(monkeypatch):
+    svc, _audits = _service()
+    _no_brain(monkeypatch)
+    out = svc.ask("What time is it?", request_id="t-1", mode="answer")
+    assert out["ok"] and out["answer"].startswith("It is ")
+    assert out["model"] == "live-facts"
+
+
+def test_ask_weather_failure_falls_through_to_brain(monkeypatch):
+    svc, _audits = _service()
+    monkeypatch.setattr(svc, "_live_weather", lambda q: "")
+
+    class FakeRes:
+        ok = True
+        text = "brain fallback"
+        provider = "local"
+        model = "qubit-brain4"
+        code = ""
+        message = ""
+
+    import voicebridge.providers.gateway as GW
+    monkeypatch.setattr(GW, "run_role", lambda prompt, cfg, **kw: FakeRes())
+    out = svc.ask("weather in Bucharest?", request_id="w-2", mode="answer")
+    assert out["ok"] and out["answer"] == "brain fallback"

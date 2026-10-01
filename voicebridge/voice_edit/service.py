@@ -868,6 +868,79 @@ class VoiceEditService:
             return ""
         return fallback
 
+    def _live_facts(self, question: str) -> str:
+        """Live facts the small local brain cannot know (clock, weather).
+
+        The answer path never uses tools, so time/date questions and
+        weather questions fail on a bare local model. This injects two
+        cheap, bounded, local-first facts into the prompt context instead:
+        the machine clock (always — one line, no egress) and a live
+        wttr.in read via the existing ``scripts/weather.py`` (weather
+        intent only, 10 s timeout, no key). A script failure yields "",
+        and the brain answers from its weights as before. Never raises.
+        """
+        import re as _re
+        import time as _time
+        q = (question or "").strip()
+        if not q:
+            return ""
+        lines = []
+        try:
+            now = _time.strftime("%A %Y-%m-%d %H:%M %Z")
+            if now.strip():
+                lines.append(f"Current local time: {now}.")
+        except Exception:
+            pass
+        if _re.search(r"\bweather\b|\bforecast\b", q, _re.IGNORECASE):
+            lines.append(self._live_weather(q))
+        return "\n".join(l for l in lines if l)
+
+    def _live_weather(self, question: str) -> str:
+        """One bounded call to the existing weather script (no key)."""
+        import subprocess as _sp
+        import sys as _sys
+        from pathlib import Path as _Path
+        try:
+            script = (_Path(__file__).resolve().parents[2]
+                      / "scripts" / "weather.py")
+            if not script.is_file():
+                return ""
+            proc = _sp.run([_sys.executable, str(script), question],
+                           capture_output=True, text=True, timeout=10)
+            if proc.returncode != 0:
+                return ""
+            return str(proc.stdout or "").strip()
+        except Exception:
+            return ""
+
+    def _direct_fact_answer(self, question: str) -> str:
+        """Deterministic answers for clock/weather (no model in the loop).
+
+        The small local brain ignores injected facts and emits stock
+        refusals ("I don't have real-time weather data") even with the
+        reading in its prompt. Facts don't need a model: a weather
+        question with a live script reading, or a time question with the
+        machine clock, is answered verbatim. Anything else (or a failed
+        weather read) returns "" and the turn falls through to the brain
+        with the same facts in context. Never raises.
+        """
+        import re as _re
+        import time as _time
+        q = (question or "").strip()
+        if not q:
+            return ""
+        if _re.search(r"\bweather\b|\bforecast\b", q, _re.IGNORECASE):
+            return self._live_weather(q)
+        if _re.search(r"\bwhat time\b|\bcurrent time\b|\btime is it\b"
+                      r"|\bwhat day is it\b|\bwhat date\b"
+                      r"|\bwhat's today\b|\bwhat is today\b",
+                      q, _re.IGNORECASE):
+            try:
+                return f"It is {_time.strftime('%A %H:%M')}."
+            except Exception:
+                return ""
+        return ""
+
     def ask(self, text: str, *, request_id: str = "",
             mode: str = "answer") -> Dict[str, Any]:
         """Answer a spoken question/chat turn through the one Qubit brain.
@@ -889,6 +962,17 @@ class VoiceEditService:
             raise VoiceEditError("VOICE_EDIT_EMPTY_QUESTION",
                                  "no question to answer")
         self._require_estop_clear()
+        direct = self._direct_fact_answer(question)
+        if direct:
+            self._audit("voice_edit.ask", {
+                "request_id": request_id, "mode": mode,
+                "chars": len(question), "ok": True,
+                "answer_chars": len(direct), "provider": "local",
+                "model": "live-facts"})
+            self._remember_ask_exchange(question, direct, model="live-facts")
+            return {"ok": True, "answer": direct, "mode": mode,
+                    "provider": "local", "model": "live-facts",
+                    "spoken": False}
         escalate, why = self._escalate_for(mode)
         profile = ""
         if escalate:
@@ -942,6 +1026,11 @@ class VoiceEditService:
                 model_override = self._select_model(
                     _read_cfg(self.cfg, "voice_edit", "chat_model", default=""))
             ctx = self._personal_context()
+            live = self._live_facts(question)
+            if live:
+                directive = ("LIVE FACTS (current, answer from these; "
+                             "never claim no live data when they are present):")
+                ctx = f"{ctx}\n\n{directive}\n{live}" if ctx else f"{directive}\n{live}"
             if style:
                 ctx = f"{ctx}\n\nSTYLE: {style}" if ctx else f"STYLE: {style}"
             res = GW.run_role(question, self.cfg, role="chat",

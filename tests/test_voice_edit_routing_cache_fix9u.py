@@ -184,7 +184,9 @@ def test_ask_under_routing_local_uses_local_profile_no_escalation(monkeypatch):
     cfg = _ve_cfg(routing="local", api_profile="", allow_api=True)
     store = FakeStore()
     svc, audits = _svc(cfg, session_store=store)
-    out = svc.ask("what time is it?", request_id="r-local", mode="answer")
+    # A non-fact question (clock/weather intents answer directly without
+    # the brain) still resolves the local profile with no escalation.
+    out = svc.ask("summarize this for me", request_id="r-local", mode="answer")
     assert out["ok"] is True and out["answer"] == "local answer"
     assert out["provider"] == "local"
     assert seen.get("profile_id") == "qubit-brain4"
