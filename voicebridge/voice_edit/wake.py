@@ -290,6 +290,7 @@ class WakeMonitor:
         ep = EnergyEndpointer(
             silence_ms=int(_cfg(self.cfg, "voice_edit", "wake", "silence_ms",
                                 default=900) or 900),
+            max_s=_wake_max_s(self.cfg),
             rms_gate=float(_cfg(self.cfg, "voice_edit", "wake", "rms_gate",
                                 default=0.0018) or 0.0018))
         try:
@@ -463,6 +464,23 @@ def _mic_target_peak(cfg: Any, default: float = 0.6) -> float:
             return float(default)
         except Exception:
             return 0.6
+
+
+def _wake_max_s(cfg: Any, default: float = 8.0) -> float:
+    """Longest wake segment in seconds (default 8.0, clamped 2..25).
+
+    A continuously-voiced room must not accumulate one unbounded segment:
+    capping at the fallback probe bound means EVERY completed segment fits
+    a probe, so nothing is ever silently skipped for length. A deliberate
+    "hey qubit" after a short pause still opens its own segment (silence
+    ends the previous one), so the cap only bounds the noisy case.
+    """
+    try:
+        v = float(_cfg(cfg, "voice_edit", "wake", "max_s",
+                       default=default) or default)
+    except Exception:
+        v = default
+    return max(2.0, min(v, 25.0))
 
 
 def _asr_fallback_allows(cfg: Any, pcm: bytes) -> bool:

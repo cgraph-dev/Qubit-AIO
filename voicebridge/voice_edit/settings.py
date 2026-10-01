@@ -299,6 +299,9 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
             "asr_fallback_max_s": float(_read_cfg(
                 cfg, "voice_edit", "wake", "asr_fallback_max_s",
                 default=8.0) or 8.0),
+            "max_s": float(_read_cfg(
+                cfg, "voice_edit", "wake", "max_s",
+                default=8.0) or 8.0),
             "kws_available": _kws_available(cfg),
         },
         "prompts": defaults,
@@ -390,6 +393,8 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                                      "wake.asr_fallback_max_s must be a number")
             clean_wake["asr_fallback_max_s"] = max(
                 2.0, min(clean_wake["asr_fallback_max_s"], 25.0))
+        if "max_s" in clean_wake:
+            clean_wake["max_s"] = max(2.0, min(clean_wake["max_s"], 25.0))
         for k in ("silence_ms", "rms_gate", "arm_window_s", "max_s"):
             if k in wake:
                 try:

@@ -2326,3 +2326,89 @@ continued back-to-back.
   dB, no clipping; (3) quiet fan curve / less background load for tests.
   Wake is proven end-to-end (fires on TTS through the same chain) — it
   needs a quiet gap, which exists when the machine idles.
+
+## 55. Segment cap 25 s → 8 s: every segment now fits a probe — 2026-10-01
+
+**No milestone claimed.** Owner moved mic / re-aimed / adjusted gain, still
+silent; journal showed unbroken 25 s cadence (`asr_fallback_skip`,
+796800 B) with peaks 0.5 — the owner's own repeated attempts keep the
+room voiced, so every segment timed out at 25 s and always exceeded the
+8 s probe bound (silently skipped, pre-trace).
+
+- **Fix:** `EnergyEndpointer` now takes `max_s` from `wake.max_s`
+  (default **8.0**, clamped 2–25; exposed in the settings view + PUT
+  validation, same range as the probe bound). A continuously-voiced room
+  yields an 8 s segment every 8 s instead of one endless blob, and every
+  completed segment fits the fallback probe — the length-skip path is
+  effectively dead. A deliberate phrase after a ~1 s pause still opens
+  its own silence-bounded segment, so the cap only binds the noisy case.
+- **Tests:** `_wake_max_s` default/clamps + endpointer completes at frame
+  26–28 of continuous voicing and fits the probe byte bound; file 23/23,
+  settings suite green. Helper restarted; live view confirms `max_s: 8.0`.
+- **Owner protocol:** pause ~2 s, say "hey qubit" once clearly, pause —
+  expect the double-beep (fallback path) within ~10 s; report beep vs
+  silence. Commit + push below; concurrent MCP lane still active in the
+  tree (their files untouched).
+
+## 55. Dashboard full-page audit: no fantasy UI; 2 dead restart buttons fixed — 2026-10-01
+
+**No milestone claimed. Code changed (2 one-line fixes, unverified by build).**
+Owner asked every dashboard page/button verified press→backend. Five parallel
+audits covered all 22 real pages (Chat, Qubit Chat, Terminal `/chat`, Sessions,
+Files, Analytics, Models, Logs, Cron, Skills, Plugins, MCP, Channels, Webhooks,
+Pairing, Profiles, ProfileBuilder, Env==Keys, Config, System, Docs, VoiceEdit,
+Agents) — every control traced page → `api.ts` URL → `_r()` route in
+`voicebridge/qubit_compat.py` or handler in `voicebridge/webui.py`.
+
+- **No MISSING/FAKE found.** Every button resolves to a real implemented
+  handler (383 `_r` routes). Remaining gates are intentional and honestly
+  surfaced: secret reveal + raw-YAML (SECRET_NEVER_SERVED), aux-pin writes
+  (AUX_PIN_REFUSED), token-analytics display gate, plugin-update refusal,
+  Agents mutations (desktop-app surface, in-page notice), confirm-gated
+  mutations (409 round-trip).
+- **Fixed (were dead on press):** `ChannelsPage.tsx:314` and
+  `WebhooksPage.tsx:183` called bare `api.restartGateway()` with no confirm
+  callback, so the supervisor's 409 GATEWAY_CONFIRM_REQUIRED always refused
+  and the button only ever toasted failure. Both now pass `() => true`
+  (button press IS the confirmation — same pattern as
+  `enableWebhooks(() => true)`); System page already used its ConfirmDialog.
+- **Known, left as-is:** profile-create POSTs without confirm (409 + partial
+  field loss, disclosed in-page at `ProfilesPage.tsx:454-464`); `POST
+  /api/auth/ws-ticket` works via `webui.py:1747` but keeps a stale GATED
+  label in compat (`:8959`); Analytics page hidden unless
+  `dashboard.show_token_analytics=true`.
+
+## 56. Fresh-Hermes readout: 3 Qubit-invented gates diverge from upstream — 2026-10-01
+
+**No milestone claimed. No code changed (read-only on the reference).**
+Read the live reference (`hermes dashboard :9119`, source
+`/home/trick/.hermes/hermes-agent/`, untouched) to learn the correct behavior
+behind our §55 gaps.
+
+- **Restart (our fix validated, gate is ours):** upstream
+  `restartGateway: () => POST /api/gateway/restart` with no body
+  (`web/src/lib/api.ts:1041-1042`); backend executes, no confirm
+  (`hermes_cli/web_routers/actions.py:140-141`); upstream ChannelsPage calls
+  it bare (`:273`). Qubit's 409 GATEWAY_CONFIRM_REQUIRED is a Qubit
+  invention — our `() => true` settle restores the outcome; dropping the
+  server gate entirely would be full parity (owner call).
+- **Aux-model pins (real gap):** upstream `POST /api/model/set` accepts
+  `scope: main|auxiliary` and writes both (`models.py:275-312`). Qubit
+  refuses non-main with 400 AUX_PIN_REFUSED server-side AND throws
+  client-side (`api.ts:1298-1304`). Fix pointer: mirror upstream's
+  auxiliary write in `h_model_set`, remove the client throw.
+- **Profile create (real gap):** upstream `POST /api/profiles` takes full
+  `ProfileCreate` (clone_from/clone_all/no_skills/description/clone_channels
+  + provider/model validated + mcp_servers, all best-effort, no confirm;
+  `profiles.py:704-754`). Qubit confirm-gates and drops fields (Brain
+  principal only). Fix pointer: extend `h_profile_create` per upstream.
+- **Not gaps (upstream agrees with us):** token-analytics hidden unless
+  `dashboard.show_token_analytics=true` is verbatim upstream
+  (`AnalyticsPage.tsx:412-425,494-517`); `POST /api/auth/ws-ticket` is a
+  real authed ticket mint upstream too (`dashboard_auth/routes.py:458`,
+  tickets `ws_tickets.py:5`) — so our compat GATED label (`:8959`) is stale
+  while `webui.py:1747` serves it for real.
+- **Deliberate divergences (don't "fix"):** upstream serves raw
+  `GET/PUT /api/config/raw` (`analytics.py:33-52`) and a real `/api/pty`
+  spawning `hermes --tui` (`chat_ws.py:438`) — Qubit refuses both by policy
+  (SECRET_NEVER_SERVED, PTY_NO_SHELL) and offers streaming chat instead.

@@ -361,3 +361,29 @@ def test_wake_fallback_keys_round_trip_through_settings_put(tmp_path):
     view = settings_mod.settings_view(cfg)
     assert view["wake"]["asr_fallback"] is False
     assert view["wake"]["asr_fallback_max_s"] == 25.0  # clamped, not stored raw
+
+
+def test_wake_max_s_defaults_and_clamps():
+    """Segment cap defaults to the probe bound and stays in 2..25 s."""
+    from voicebridge.voice_edit.wake import _wake_max_s
+    assert _wake_max_s(FakeCfg()) == 8.0
+    assert _wake_max_s(FakeCfg(wake={"enabled": True, "max_s": 99})) == 25.0
+    assert _wake_max_s(FakeCfg(wake={"enabled": True, "max_s": 0.5})) == 2.0
+    assert _wake_max_s(FakeCfg(wake={"enabled": True, "max_s": 12})) == 12.0
+
+
+def test_endpointer_completes_continuous_voicing_at_max_s():
+    """A never-silent room yields bounded segments, not one endless blob.
+
+    Regression: with the 25 s default cap, continuous voicing (fans, TTS
+    feedback, repeated attempts) completed only 25 s segments that always
+    exceeded the probe bound and were silently skipped — wake could never
+    fire. At the 8 s cap every completed segment fits a probe.
+    """
+    from voicebridge.voice_edit.wake import _wake_max_s
+    ep = EnergyEndpointer(rms_gate=0.008, max_s=_wake_max_s(FakeCfg()))
+    states = [ep.add_frame(loud_frame()) for _ in range(40)]
+    assert states[-1] == "done"
+    first_done = states.index("done") + 1
+    assert 26 <= first_done <= 28  # 8 s / 300 ms frames
+    assert first_done * 9600 <= int(8.0 * 16000 * 2)  # fits the probe bound
