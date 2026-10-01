@@ -522,7 +522,18 @@ def _checked_file_receipt(name: str, output: Any) -> str:
     raise RuntimeError(f"{code}: {detail}"[:500])
 
 
-def _task_tool_backend(cfg: Any) -> Any:
+#: Broker denial codes that mean "the worker proposed a file write the user
+#: has not approved yet" (T5). Only these two gate codes stage a chat
+#: confirmation — any other denial (expired/replayed/target-mismatch/...)
+#: stays a typed tool failure, never a presentable approval.
+_TASK_CONFIRM_CODES = frozenset({
+    "CONFIRMATION_REQUIRED",
+    "CONFIRMATION_SOURCE_FORBIDDEN",
+})
+
+
+def _task_tool_backend(cfg: Any,
+                       grant: Optional[Dict[str, Any]] = None) -> Any:
     """Planner-tool backend behind the shared broker (mirrors _agent_tool).
 
     Both ``local.*`` and read-only ``web.*`` resolve through the SAME
@@ -533,6 +544,14 @@ def _task_tool_backend(cfg: Any) -> Any:
     ``VoiceOrchestrator._agent_tool`` for headless (non-voice) dispatch —
     same calls, no orchestrator instance required.
 
+    ``grant`` is None on the first worker pass (every file-build call stays
+    model-origin and confirm-gated). After the user confirms the exact
+    staged proposal in chat, the settle path re-invokes the SAME backend
+    with ``grant={"confirmation_id": <staged id>}`` so the one blocked
+    file-build call re-executes as ``source="user"`` with the staged
+    approval id — the digest-bound single-use journal record the chat turn
+    staged for those exact args. No other tool is ever granted.
+
     File builds reuse the confined broker op ``local.files_upload``
     (``broker.register_file_patch`` → ``file_patch.write_bytes``:
     path-confined under an approved project root, bounded, reversible from
@@ -541,6 +560,11 @@ def _task_tool_backend(cfg: Any) -> Any:
     refusal envelope (outside-root, confirm-gated, conflict) raises typed
     via :func:`_checked_file_receipt` so a refused write can never report
     a phantom file.
+
+    Blocked file-build proposals are recorded on ``_run.pending``
+    (in-memory only — full args stay out of logs/receipts) so
+    :func:`wait_task` can surface them as ``needs-confirm`` instead of a
+    dead-end error.
     """
     from .broker import (build_host_broker, register_file_patch,
                          register_web_tools)
@@ -557,6 +581,10 @@ def _task_tool_backend(cfg: Any) -> Any:
     except Exception:  # noqa: BLE001 - fail closed to the one known tool
         _file_build_tools = frozenset({"local.files_upload"})
 
+    _grant_cid = ""
+    if isinstance(grant, dict):
+        _grant_cid = str(grant.get("confirmation_id") or "").strip()
+
     def _run(tool: str, args: Dict[str, Any]) -> str:
         name = str(tool or "")
         if name.startswith("local."):
@@ -565,9 +593,22 @@ def _task_tool_backend(cfg: Any) -> Any:
                 raise ValueError(f"unknown agent tool {name!r}")
         elif not name.startswith("web."):
             raise ValueError(f"unknown agent tool {name!r}")
-        res = broker.execute(name, dict(args or {}), source="model",
-                             session=_cfg_session(cfg))
+        if name in _file_build_tools and _grant_cid:
+            res = broker.execute(name, dict(args or {}), source="user",
+                                 confirmation_id=_grant_cid,
+                                 session=_cfg_session(cfg))
+        else:
+            res = broker.execute(name, dict(args or {}), source="model",
+                                 session=_cfg_session(cfg))
         if res.denied:
+            if name in _file_build_tools \
+                    and str(res.denied) in _TASK_CONFIRM_CODES:
+                # In-memory only: the exact args are needed to re-execute
+                # under the staged grant (digest-bound), and they may carry
+                # file bytes — never logged, never put in a receipt.
+                _run.pending.append({"tool": name,
+                                     "args": dict(args or {}),
+                                     "code": str(res.denied)})
             raise DispatchBlocked(res.denied, name)
         if not res.ok:
             raise RuntimeError(res.error or f"{name} failed")
@@ -575,6 +616,7 @@ def _task_tool_backend(cfg: Any) -> Any:
             return _checked_file_receipt(name, res.output)
         return res.output
 
+    _run.pending = []  # type: ignore[attr-defined]
     return _run
 
 
@@ -610,7 +652,8 @@ def _frame_build_task(text: str) -> str:
 
 
 def launch_task(task_text: str, session: Any = None, *,
-                cfg: Any = None, model: Optional[str] = None) -> str:
+                cfg: Any = None, model: Optional[str] = None,
+                grant: Optional[Dict[str, Any]] = None) -> str:
     """Dispatch a headless worker task; return its session key (wrapper).
 
     The exact ``run_worker_task`` chain without the voice instance: safety
@@ -620,6 +663,14 @@ def launch_task(task_text: str, session: Any = None, *,
     :func:`wait_task` collects the outcome. No mic/ASR/TTS, no speech, no
     progress thread — the worker, guard, broker junction, and summarizer
     path are the same ones the voice dispatch uses.
+
+    ``grant`` (``{"confirmation_id": <staged id>}``) arms the worker's tool
+    backend so file-build calls execute as ``source="user"`` under that
+    staged approval. It is only ever supplied by the chat settle path after
+    an affirmative follow-up — never minted here, never a fresh classify.
+    Without it every file-build call stays model-origin and confirm-gated,
+    and the blocked proposal is recorded for :func:`wait_task` to surface
+    as ``needs-confirm``.
 
     Raises :class:`TaskLaunchDenied` on any pre-execution refusal
     (e-stop latched = zero worker invocations). ``model`` is accepted for
@@ -665,8 +716,10 @@ def launch_task(task_text: str, session: Any = None, *,
             str(getattr(verdict, "confirm_reason", "")
                 or "needs confirmation")[:200])
     key = _task_session_key(cfg, session)
+    backend = _task_tool_backend(cfg, grant=grant)
     box: Dict[str, Any] = {"event": threading.Event(), "result": None,
-                           "cancel": False, "model": model or ""}
+                           "cancel": False, "model": model or "",
+                           "pending": backend.pending}
     with _TASK_BOX_LOCK:
         _TASK_BOXES[key] = box
         while len(_TASK_BOXES) > _TASK_BOX_CAP:
@@ -691,7 +744,7 @@ def launch_task(task_text: str, session: Any = None, *,
                 "agent.session",
                 lambda: _agent_run_session(
                     cfg, _frame_build_task(text), session=key,
-                    execute_tool=_task_tool_backend(cfg),
+                    execute_tool=backend,
                     cancelled=_cancelled,
                     estop_engaged=_estop),
                 source="user", correlation_id=key)
@@ -731,13 +784,19 @@ def wait_task(session_key: str, timeout_s: float = 300, *,
     """Collect a :func:`launch_task` outcome (blocking, slice-polled).
 
     Returns ``{"status", "reply", ...}``: ``done`` (worker reply),
-    ``error`` (typed code + detail), ``cancelled`` (cancel flag observed —
-    the worker thread sees it through its ``cancelled`` hook and stops),
-    ``timeout`` (still running; call again to keep waiting), or
-    ``unknown`` (no such key). ``cancel`` is an optional zero-arg callable;
-    when it fires the box is flagged and ``cancelled`` is returned without
-    fabricating a summary. Polls in 0.2 s slices so stream callers can emit
-    progress between slices.
+    ``needs-confirm`` (the worker proposed a confirmation-gated file write:
+    ``pending`` carries the blocked ``{tool, args, code}`` so the chat turn
+    can stage it as a user confirmation instead of ending typed
+    need-confirmation forever), ``error`` (typed code + detail),
+    ``cancelled`` (cancel flag observed — the worker thread sees it through
+    its ``cancelled`` hook and stops), ``timeout`` (still running; call
+    again to keep waiting), or ``unknown`` (no such key). ``cancel`` is an
+    optional zero-arg callable; when it fires the box is flagged and
+    ``cancelled`` is returned without fabricating a summary. Polls in
+    0.2 s slices so stream callers can emit progress between slices.
+
+    The ``pending`` args travel in memory only (they may carry file bytes)
+    — callers must redact before persisting, auditing, or replying.
     """
     key = str(session_key or "")
     with _TASK_BOX_LOCK:
@@ -771,6 +830,26 @@ def wait_task(session_key: str, timeout_s: float = 300, *,
         return {"status": "error", "reply": "",
                 "code": "WORKER_MALFORMED",
                 "detail": "worker returned a non-dict outcome"}
+    pending = box.get("pending") or []
+    proposal = pending[0] if isinstance(pending, list) and pending else None
+    if proposal is not None and isinstance(proposal, dict):
+        # The worker proposed a file write the user has not approved yet.
+        # Surface it for the chat turn to stage — never a dead-end error,
+        # never a phantom done. Any partial receipts travel along so the
+        # turn can report what already landed.
+        out_nc: Dict[str, Any] = {"status": "needs-confirm",
+                                   "code": "TASK_CONFIRM_REQUIRED",
+                                   "detail": str(res.get("detail", "")
+                                                 or res.get("reply", "")
+                                                 or "worker proposed a file "
+                                                    "write needing "
+                                                    "confirmation"),
+                                   "pending": proposal,
+                                   "session": key}
+        for _receipt_key in ("steps", "tool_used", "reply"):
+            if res.get(_receipt_key) not in (None, ""):
+                out_nc[_receipt_key] = res.get(_receipt_key)
+        return out_nc
     if res.get("state") == "OK":
         out: Dict[str, Any] = {"status": "done",
                                "reply": str(res.get("reply", "")),
@@ -786,6 +865,80 @@ def wait_task(session_key: str, timeout_s: float = 300, *,
     return {"status": "error", "reply": str(res.get("detail", "") or ""),
             "code": str(res.get("code", "WORKER_ERROR")),
             "detail": str(res.get("detail", "") or "")[:300]}
+
+
+def task_blocked_proposal(session_key: str) -> Optional[Dict[str, Any]]:
+    """Return the first blocked file-build proposal for a headless task.
+
+    In-memory args (never logged by this helper — callers must redact).
+    ``None`` when the key is unknown, finished without blocks, or the box
+    was evicted/restarted (the settle path reports that typed, never
+    executes blind).
+    """
+    key = str(session_key or "")
+    with _TASK_BOX_LOCK:
+        box = _TASK_BOXES.get(key)
+        pending = list((box or {}).get("pending") or [])
+    if not pending or not isinstance(pending[0], dict):
+        return None
+    return dict(pending[0])
+
+
+def task_execute_granted(cfg: Any, tool: str, args: Dict[str, Any],
+                         confirmation_id: str) -> Dict[str, Any]:
+    """Execute one blocked file-build step under the user's staged approval.
+
+    The settle half of the T5 confirm flow: the SAME broker/backend the
+    worker proposed through, now with ``source="user"`` and the staged
+    approval id the chat turn minted for these exact args — one broker
+    path, digest-bound, single-use, expiring. E-stop latched refuses before
+    any execution (typed ``EMERGENCY_STOP``, zero invocations). The
+    refusal envelope still raises typed via :func:`_checked_file_receipt`,
+    so an outside-root write stays refused even with a grant
+    (path confinement is never granted away).
+
+    Returns ``{"ok": True, "output": <receipt envelope>}`` or a typed
+    ``{"ok": False, "code", "detail"}`` — never a phantom success.
+    """
+    from .broker import estop_engaged as _estop_engaged
+
+    name = str(tool or "")
+    cid = str(confirmation_id or "").strip()
+    if cfg is None:
+        return {"ok": False, "code": "NO_CONFIG",
+                "detail": "granted file execution needs a config "
+                          "(fail-closed)"}
+    if not cid:
+        return {"ok": False, "code": "MALFORMED",
+                "detail": "granted file execution needs a confirmation id"}
+    try:
+        if bool(_estop_engaged(cfg)):
+            return {"ok": False, "code": "EMERGENCY_STOP",
+                    "detail": "emergency stop latched; granted write refused "
+                              "before execution"}
+    except Exception:  # noqa: BLE001 - an unreadable latch fails closed
+        return {"ok": False, "code": "POWER_UNAVAILABLE",
+                "detail": "could not read the e-stop latch"}
+    try:
+        out = _task_tool_backend(
+            cfg, grant={"confirmation_id": cid})(name, dict(args or {}))
+    except DispatchBlocked as exc:
+        return {"ok": False, "code": str(exc.code or "DISPATCH_BLOCKED"),
+                "detail": str(exc.detail or exc.code or
+                               "grant refused")[:200]}
+    except ValueError as exc:
+        return {"ok": False, "code": "UNKNOWN_TOOL",
+                "detail": str(exc)[:200]}
+    except RuntimeError as exc:
+        text = str(exc)[:300]
+        code, _, rest = text.partition(":")
+        code = code.strip() or "FILE_OP_FAILED"
+        return {"ok": False, "code": code,
+                "detail": (rest.strip() or text)[:300]}
+    except Exception as exc:  # noqa: BLE001 - typed, never fabricated
+        return {"ok": False, "code": "WORKER_ERROR",
+                "detail": str(exc)[:200]}
+    return {"ok": True, "output": out}
 
 
 def _interrupt_decision_prompt(old_task: str, new_request: str) -> str:

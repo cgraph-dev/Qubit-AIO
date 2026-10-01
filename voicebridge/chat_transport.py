@@ -1088,6 +1088,287 @@ def _settle_affirmed(cfg: Any, st: Any, sid: str) -> Dict[str, Any]:
             "entry": entry_id}
 
 
+# ---------------------------------------------------------------------------
+# T5 — user-confirmed headless builds complete with files
+# ---------------------------------------------------------------------------
+#: Journal TTL for a staged build-file confirmation (same 120 s budget as
+#: the broker default and the voice confirm TTL — one convention).
+_TASK_CONFIRM_TTL_S = 120.0
+
+
+def _task_journal(cfg: Any) -> Any:
+    """The canonical confirmation journal for staged build writes.
+
+    The same durable ``approvals.jsonl`` authority the broker and the voice
+    confirm path settle through — never a second store. ``None`` when the
+    state dir is unresolvable (hermetic callers) so staging fails typed
+    instead of writing somewhere surprising.
+    """
+    try:
+        state_dir = cfg.state_dir() if hasattr(cfg, "state_dir") else None
+    except Exception:  # noqa: BLE001 - degraded to unavailable, never fatal
+        return None
+    if not state_dir:
+        return None
+    try:
+        from .approvals import ApprovalJournal
+
+        return ApprovalJournal(Path(state_dir) / "approvals.jsonl",
+                               default_ttl_s=_TASK_CONFIRM_TTL_S)
+    except Exception:  # noqa: BLE001 - degraded to unavailable, never fatal
+        return None
+
+
+def _task_build_capabilities() -> frozenset:
+    """File-write capabilities a build turn may stage (confined writers)."""
+    try:
+        from . import file_patch as _FP
+
+        return frozenset({
+            _FP.capability_name(),
+            _FP.mkdir_capability_name(),
+            _FP.delete_capability_name(),
+            _FP.write_bytes_capability_name(),
+        })
+    except Exception:  # noqa: BLE001 - fail closed to the one known tool
+        return frozenset({"local.files_upload"})
+
+
+def _pending_task(cfg: Any, sid: str) -> list:
+    """Read-only pending staged build-file confirmations for one session.
+
+    Same contract as :func:`_pending_registry`: the shared durable journal,
+    filtered to the confined file-write capabilities staged for this chat
+    session. No write, never raises — an unreadable journal degrades to no
+    pending so the turn falls through to its normal path.
+    """
+    journal = _task_journal(cfg)
+    if journal is None:
+        return []
+    try:
+        items = journal.pending()
+    except Exception:  # noqa: BLE001 - degraded to no-pending, never fatal
+        return []
+    try:
+        caps = _task_build_capabilities()
+    except Exception:  # noqa: BLE001 - degraded to no-pending, never fatal
+        return []
+    return [a for a in items
+            if str(getattr(a, "capability", "")) in caps
+            and isinstance(getattr(a, "meta", None), dict)
+            and a.meta.get("session") == sid]
+
+
+def _stage_task_proposal(cfg: Any, sid: str, key: str,
+                         res: Dict[str, Any]) -> Dict[str, Any]:
+    """Stage a worker-proposed file write as a user confirmation (T5).
+
+    Mints one digest-bound, single-use, expiring journal record for the
+    exact blocked ``{tool, args}`` the worker proposed — the same envelope
+    shape as :func:`_turn_registry` (``CONFIRM_REQUIRED`` +
+    ``confirmation_id``). Nothing is executed here; the write happens only
+    in :func:`_settle_task_affirmed` after a bare affirmation, through the
+    one broker path with ``source="user"`` and this id. Full args stay in
+    the in-memory task box (keyed by the worker session in the journal
+    meta); the journal carries only the digest plus redacted file identity
+    — never file bytes, never a secret.
+    """
+    pending = (res or {}).get("pending")
+    if not isinstance(pending, dict) or not pending.get("tool"):
+        _audit("turn_task_confirm_malformed", session=sid, task=key)
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_FAILED",
+                "detail": "worker asked for confirmation but named no file "
+                          "write; nothing was staged",
+                "session_id": sid, "session": sid, "route": "task",
+                "task": key}
+    tool = str(pending.get("tool") or "")
+    args = dict(pending.get("args") or {})
+    if tool not in _task_build_capabilities():
+        _audit("turn_task_confirm_refused", session=sid, task=key,
+               tool=tool)
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_REFUSED",
+                "detail": f"worker proposed {tool!r}, which is not a "
+                          "confined file write; nothing was staged",
+                "session_id": sid, "session": sid, "route": "task",
+                "task": key}
+    journal = _task_journal(cfg)
+    if journal is None:
+        _audit("turn_task_confirm_unavailable", session=sid, task=key)
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_UNAVAILABLE",
+                "detail": "confirmation journal unavailable; the proposed "
+                          "write was not staged and nothing was executed",
+                "session_id": sid, "session": sid, "route": "task",
+                "task": key}
+    try:
+        from .capabilities import _args_digest
+
+        digest = _args_digest(args)
+    except Exception:  # noqa: BLE001 - typed, never staged blind
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_FAILED",
+                "detail": "could not bind the proposed write; nothing was "
+                          "staged",
+                "session_id": sid, "session": sid, "route": "task",
+                "task": key}
+    target = _redact(str(args.get("target_path") or ""))[:120] or tool
+    try:
+        blob_len = len(str(args.get("content_base64") or ""))
+    except Exception:  # noqa: BLE001 - size is advisory only
+        blob_len = 0
+    size = f"~{blob_len * 3 // 4} bytes" if blob_len else "unknown size"
+    summary = (f"qubit-chat build: write {target} ({size}) — "
+               f"say yes to confirm")[:300]
+    try:
+        item = journal.create(tool, summary, ttl_s=_TASK_CONFIRM_TTL_S,
+                              args_digest=digest, issued_by="user",
+                              session=sid, task_key=key, target=target)
+    except Exception as exc:  # noqa: BLE001 - typed, redacted
+        _audit("turn_task_confirm_error", session=sid, task=key,
+               error=str(exc))
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_FAILED",
+                "detail": _redact(str(exc))[:200], "session_id": sid,
+                "session": sid, "route": "task", "task": key}
+    _audit("turn_task_confirm_staged", session=sid, task=key,
+           target=target)
+    return {"ok": False, "state": "UNAVAILABLE",
+            "code": "CONFIRM_REQUIRED",
+            "detail": (f"Worker proposed writing {target} ({size}). Say "
+                       f"yes to confirm — nothing was written yet."),
+            "confirmation_id": item.id, "session_id": sid, "session": sid,
+            "route": "task", "task": key}
+
+
+def _settle_task_affirmed(cfg: Any, st: Any, sid: str) -> Dict[str, Any]:
+    """Settle the session's latest staged build-file confirmation once.
+
+    Called only after a bare affirmation on a session with a pending staged
+    build write (the T4 ``_is_affirmative`` check — reused, not duplicated).
+    Approves the journal record, then executes the EXACT blocked call
+    through the one broker path with ``source="user"`` and the staged id
+    (digest-bound, single-use, expiring). Expired/denied/lost approvals are
+    typed failures — never a phantom done, never an execution without the
+    affirmation. On success the turn completes done-with-file with a report
+    naming the created file.
+    """
+    from . import orchestrator as ORC
+
+    journal = _task_journal(cfg)
+    if journal is None:
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_UNAVAILABLE",
+                "detail": "confirmation journal unavailable; nothing was "
+                          "executed",
+                "session_id": sid, "route": "task"}
+    pending = _pending_task(cfg, sid)
+    if not pending:
+        return {"ok": False, "state": "FAILED", "code": "NOTHING_PENDING",
+                "detail": "there is no pending build write to confirm",
+                "session_id": sid, "route": "task"}
+    target_item = pending[-1]
+    cid = str(getattr(target_item, "id", "") or "")
+    # A denial/expiry decided elsewhere (dashboard Approvals page, TTL)
+    # wins over worker state: re-read the record so the race maps typed.
+    fresh = journal.get(cid)
+    if fresh is None:
+        return {"ok": False, "state": "FAILED", "code": "NO_CONFIRMATION",
+                "detail": "that confirmation is gone; nothing was executed",
+                "session_id": sid, "route": "task"}
+    if str(getattr(fresh, "state", "") or "") == "denied":
+        _audit("turn_task_confirm_denied", session=sid)
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_DENIED",
+                "detail": "that build write was denied; nothing was executed",
+                "session_id": sid, "route": "task"}
+    if str(getattr(fresh, "state", "") or "") == "aborted":
+        _audit("turn_task_confirm_expired", session=sid)
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_EXPIRED",
+                "detail": "that build confirmation expired; nothing was "
+                          "executed — ask again",
+                "session_id": sid, "route": "task"}
+    tool = str(getattr(fresh, "capability", "") or "")
+    meta = getattr(fresh, "meta", None) or {}
+    task_key = str(meta.get("task_key") or "")
+    proposal = ORC.task_blocked_proposal(task_key) if task_key else None
+    if proposal is None or str(proposal.get("tool") or "") != tool:
+        try:
+            journal.respond(cid, "deny")
+        except Exception:  # noqa: BLE001 - cleanup is best-effort
+            pass
+        _audit("turn_task_confirm_lost", session=sid, task=task_key)
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_LOST",
+                "detail": "the approved build is no longer available (worker "
+                          "state expired); nothing was executed — ask again",
+                "session_id": sid, "route": "task"}
+    try:
+        approved = journal.respond(cid, "approve")
+    except (KeyError, ValueError) as exc:
+        _audit("turn_task_confirm_gone", session=sid, code="NO_CONFIRMATION")
+        return {"ok": False, "state": "FAILED", "code": "NO_CONFIRMATION",
+                "detail": _redact(str(exc))[:200] or
+                          "that confirmation is gone; nothing was executed",
+                "session_id": sid, "route": "task"}
+    except Exception as exc:  # noqa: BLE001 - typed, redacted
+        _audit("turn_task_confirm_error", session=sid, error=str(exc))
+        return {"ok": False, "state": "FAILED", "code": "TASK_CONFIRM_FAILED",
+                "detail": _redact(str(exc))[:200], "session_id": sid,
+                "route": "task"}
+    if str(getattr(approved, "state", "") or "") == "denied":
+        _audit("turn_task_confirm_denied", session=sid)
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_DENIED",
+                "detail": "that build write was denied; nothing was executed",
+                "session_id": sid, "route": "task"}
+    if str(getattr(approved, "state", "") or "") == "aborted":
+        _audit("turn_task_confirm_expired", session=sid)
+        return {"ok": False, "state": "FAILED",
+                "code": "TASK_CONFIRM_EXPIRED",
+                "detail": "that build confirmation expired; nothing was "
+                          "executed — ask again",
+                "session_id": sid, "route": "task"}
+    out = ORC.task_execute_granted(cfg, tool, dict(proposal.get("args")
+                                                   or {}), cid)
+    if not out.get("ok"):
+        try:
+            journal.abort(cid)
+        except Exception:  # noqa: BLE001 - explicit outcome, best-effort
+            pass
+        code = str(out.get("code") or "TASK_CONFIRM_FAILED")
+        detail = str(out.get("detail") or "granted write failed")[:300]
+        st.append(sid, "assistant",
+                  f"Build write failed ({code}): {detail}",
+                  meta={"route": "task", "phase": "failed"})
+        _audit("turn_task_confirm_failed", session=sid, code=code)
+        return {"ok": False, "state": "FAILED", "code": code,
+                "detail": detail, "session_id": sid, "session": sid,
+                "route": "task"}
+    import json as _json
+
+    receipt: Dict[str, Any] = {}
+    try:
+        env = _json.loads(str(out.get("output") or ""))
+        if isinstance(env, dict) and isinstance(env.get("receipt"), dict):
+            receipt = dict(env["receipt"])
+    except Exception:  # noqa: BLE001 - the write happened; name the tool
+        pass
+    target = str(receipt.get("target") or meta.get("target") or tool)
+    report = (f"Built {target} — file written and confirmed.")
+    st.append(sid, "assistant", report + f"\n\n_Task {task_key}: done_",
+              meta={"route": "task", "task": task_key, "phase": "report"})
+    _audit("turn_task_confirm_done", session=sid, task=task_key,
+           target=target)
+    return {"ok": True, "text": report, "reply": report, "report": report,
+            "session_id": sid, "session": sid, "route": "task",
+            "task": task_key, "status": "done",
+            "confirmation_id": cid,
+            "receipt": _branch_receipt("task", task=task_key, cfg=cfg)}
+
+
 def _ddg_web_fallback(query: str) -> Optional[Dict[str, Any]]:
     """No-key DDG fallback for the web branch (read-only search, no side effects).
 
@@ -1365,14 +1646,38 @@ _ACTION_RE = re.compile(
     r"|\b(files?|drafts?|reports?|artifacts?)\b",
     re.IGNORECASE)
 
-#: File/path evidence strong enough to outweigh promise phrasing: a reply
-#: that both promises AND names a created file/path is treated as a report
-#: (the receipts path remains the strong proof; this keeps a file-naming
-#: worker honest without letting bare "I will build…" through).
-_FILE_RE = re.compile(
+#: Concrete file identity: an extension filename or an on-disk path. A reply
+#: naming one with no tool receipts behind it never counts — naming the file
+#: is not creating it (live phantoms 2026-10-01: "Working on hello.html …"
+#: and "I created hello.html …", both zero tool calls, zero files). Genuine
+#: tool-built work always carries ``steps``/``tool_used`` receipts (proven
+#: against the real worker session), which return True before this check.
+_FILELIKE_RE = re.compile(
     r"[A-Za-z0-9_][A-Za-z0-9_.\-]*\.(html?|js|jsx|ts|tsx|css|json|md|"
     r"txt|py|png|jpe?g|pdf)\b"
     r"|/(?:[\w.\-]+/)+[\w.\-]+",
+    re.IGNORECASE)
+
+#: Progress chatter with no acted work behind it. A worker reply matching one
+#: of these with no tool receipts and no past-tense acted verb is the proven
+#: phantom-done shape ("Working on hello.html inside the project folder.",
+#: zero files — the filename mention alone satisfied the old action regex).
+#: A reply that ALSO carries a past-tense acted verb ("Working on it —
+#: created hello.html") still counts as a report.
+_PROGRESS_RES = (
+    re.compile(r"\bworking on\b", re.IGNORECASE),
+    re.compile(r"\blooking into\b", re.IGNORECASE),
+    re.compile(r"\bchecking( on| into)?\b", re.IGNORECASE),
+    re.compile(r"\bgetting started\b", re.IGNORECASE),
+    re.compile(r"\bstarting (on|with|to)\b", re.IGNORECASE),
+)
+
+#: Past-tense acted verbs: the completion-evidence half of _ACTION_RE. A
+#: progress-phrased reply carrying one of these ("created", "built", ...)
+#: is a report, not chatter.
+_PAST_ACTED_RE = re.compile(
+    r"\b(built|created|wrote|written|saved|added|finished|completed|"
+    r"updated|generated|streamed|delivered|attached|done)\b",
     re.IGNORECASE)
 
 
@@ -1383,8 +1688,12 @@ def _worker_acted(reply: str, res: Dict[str, Any]) -> bool:
     broker): ``steps > 0`` or a non-empty ``tool_used`` from the
     ``wait_task`` outcome. A promise-phrased reply ("I will…", "let me…")
     with no created-file evidence behind it never counts, even when it
-    borrows the build noun. Otherwise the reply text itself must carry
-    concrete completion evidence (:data:`_ACTION_RE`).
+    borrows the build noun. Progress chatter ("Working on hello.html…")
+    with no past-tense acted verb never counts either. And a concrete file
+    identity (an extension filename or path) with no receipts never counts
+    — naming the file is not creating it; genuine tool-built work always
+    carries receipts. Otherwise the reply text itself must carry concrete
+    completion evidence (:data:`_ACTION_RE`).
     """
     try:
         if int((res or {}).get("steps") or 0) > 0:
@@ -1394,8 +1703,17 @@ def _worker_acted(reply: str, res: Dict[str, Any]) -> bool:
     if str((res or {}).get("tool_used") or "").strip():
         return True
     text = str(reply or "")
-    if any(rx.search(text) for rx in _PROMISE_RES) \
-            and not _FILE_RE.search(text):
+    # Future-tense phrasing ("I will…", "I'll create…") never counts without
+    # receipts — naming the file is not creating it (live phantom
+    # 2026-10-01: "I'll create hello.html", zero tool calls, zero files).
+    # With receipts the outcome already returned True above, so no
+    # file-mention exception is needed here.
+    if any(rx.search(text) for rx in _PROMISE_RES):
+        return False
+    if any(rx.search(text) for rx in _PROGRESS_RES) \
+            and not _PAST_ACTED_RE.search(text):
+        return False
+    if _FILELIKE_RE.search(text):
         return False
     return bool(_ACTION_RE.search(text))
 
@@ -1508,6 +1826,11 @@ def _turn_task(cfg: Any, st: Any, sid: str, task_text: str, *,
               meta={"route": "task", "task": key, "phase": "started"})
     res = ORC.wait_task(key, timeout_s=float(timeout_s or 300.0),
                         cancel=cancel)
+    # T5: the worker proposed a confirmation-gated file write — stage it as
+    # a user confirmation (CONFIRM_REQUIRED + confirmation_id, same pattern
+    # as _turn_registry) instead of ending typed need-confirmation forever.
+    if str((res or {}).get("status") or "") == "needs-confirm":
+        return _stage_task_proposal(cfg, sid, key, res)
     return _finish_task(cfg, st, sid, key, res)
 
 
@@ -1603,6 +1926,23 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
                         "code": appended.get("code"),
                         "detail": appended.get("detail", "")}
             return _settle_affirmed(cfg, st, sid)
+        # T5: same bare-affirmation check — a "yes" with a pending staged
+        # build write settles THAT record (user-issued grant, one broker
+        # path), never a fresh classify. Non-affirmative text keeps the
+        # legacy path byte-for-byte (no auto-execution without affirmation).
+        if _pending_task(cfg, _probe):
+            created = _resolve_session(st, session, model=None)
+            if created.get("state") != "OK":
+                return {"ok": False, "state": "FAILED",
+                        "code": created.get("code"),
+                        "detail": created.get("detail", "")}
+            sid = created["session"]["id"]
+            appended = st.append(sid, "user", clean)
+            if appended.get("state") != "OK":
+                return {"ok": False, "state": "FAILED",
+                        "code": appended.get("code"),
+                        "detail": appended.get("detail", "")}
+            return _settle_task_affirmed(cfg, st, sid)
     decided = _decide_branch(clean, cfg)
     if decided.get("action") in BRANCH_ACTIONS:
         created = _resolve_session(st, session, model=None)
@@ -2104,7 +2444,7 @@ def _stream_task(cfg: Any, st: Any, sid: str, task_text: str, started: float,
         res = ORC.wait_task(key, timeout_s=min(5.0, remaining),
                             cancel=cancel)
         status = str((res or {}).get("status") or "")
-        if status in ("done", "error", "cancelled"):
+        if status in ("done", "error", "cancelled", "needs-confirm"):
             break
         if status == "unknown":
             break
@@ -2117,6 +2457,19 @@ def _stream_task(cfg: Any, st: Any, sid: str, task_text: str, started: float,
         res = ORC.wait_task(key, timeout_s=max(0.5, deadline -
                                                time.monotonic()),
                             cancel=cancel)
+    # T5: stream the staged confirmation like the blocking turn does — a
+    # needs-confirm worker outcome is a CONFIRM_REQUIRED error event (with
+    # the confirmation_id), never a silent hang or a phantom done.
+    if str((res or {}).get("status") or "") == "needs-confirm":
+        staged = _stage_task_proposal(cfg, sid, key, res)
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        yield {"event": "error", "code": staged.get("code",
+                                                   "CONFIRM_REQUIRED"),
+               "detail": staged.get("detail", ""), "session_id": sid,
+               "route": "task", "task": key, "elapsed_ms": elapsed_ms,
+               **({"confirmation_id": staged["confirmation_id"]}
+                  if staged.get("confirmation_id") else {})}
+        return
     out = _finish_task(cfg, st, sid, key, res)
     elapsed_ms = int((time.monotonic() - started) * 1000)
     if not out.get("ok"):
@@ -2204,6 +2557,29 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
             yield {"event": "error", "code": res.get("code", "BRANCH_FAILED"),
                    "detail": res.get("detail", ""), "session_id": sid,
                    "route": "registry", "elapsed_ms": elapsed_ms}
+            return
+        text_out = str(res.get("text") or res.get("reply") or "")
+        yield {"event": "delta", "text": text_out, "session_id": sid}
+        yield {"event": "done", "ok": True, "reply": text_out,
+               "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
+               "receipt": res.get("receipt")}
+        return
+    # T5: same affirmative-settle as turn() for staged build writes.
+    if clean and _is_affirmative(clean) and _pending_task(cfg, sid):
+        started = time.monotonic()
+        yield {"event": "start", "session_id": sid, "session": sid,
+               "route": "task"}
+        appended = st.append(sid, "user", clean)
+        if appended.get("state") != "OK":
+            yield {"event": "error", "code": appended.get("code"),
+                   "detail": appended.get("detail", ""), "session_id": sid}
+            return
+        res = _settle_task_affirmed(cfg, st, sid)
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        if not res.get("ok"):
+            yield {"event": "error", "code": res.get("code", "BRANCH_FAILED"),
+                   "detail": res.get("detail", ""), "session_id": sid,
+                   "route": "task", "elapsed_ms": elapsed_ms}
             return
         text_out = str(res.get("text") or res.get("reply") or "")
         yield {"event": "delta", "text": text_out, "session_id": sid}
