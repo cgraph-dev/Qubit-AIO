@@ -308,6 +308,47 @@ def run_registry_op(cfg: Any, op_id: str, args: Dict[str, Any], *,
     return out
 
 
+def _confirm_registry_across_sessions(cfg: Any, confirmation_id: str, *,
+                                       actor: str = "dashboard:user",
+                                       session: str = "dashboard"):
+    """Settle a live voice confirmation staged under a different session.
+
+    Voice stages under the chat session while the canonical confirm API
+    confirms as ``session="dashboard"``; the session-scoped lookup then
+    misses a live record. The id is single-use target-bound (journal
+    ``respond`` + the executed-once guard), so settling by id across
+    sessions is safe. TTL/expiry/single-use hold: unknown, expired, or
+    already-settled ids return None and the caller keeps the typed
+    NO_CONFIRMATION. Actor/audit are preserved through the same
+    ``VC.confirm_pending`` path (no auto-execute: only the named id).
+    """
+    from . import voice_commands as VC
+
+    try:
+        journal = _journal(cfg)
+        target = journal.get(confirmation_id)
+    except Exception:
+        return None
+    if target is None:
+        return None
+    if not str(getattr(target, "capability", "") or "").startswith("voice."):
+        return None
+    try:
+        live = {a.id for a in journal.pending()}
+    except Exception:
+        return None
+    if confirmation_id not in live:
+        return None
+    staged_session = record_session(cfg, confirmation_id)
+    if staged_session == session:
+        return None
+    try:
+        return VC.confirm_pending(
+            _dashboard_ctx(cfg, actor, staged_session), confirmation_id)
+    except Exception:
+        return None
+
+
 def confirm_registry_op(cfg: Any, confirmation_id: str, *,
                         actor: str = "dashboard:user",
                         session: str = "dashboard") -> Dict[str, Any]:
@@ -319,6 +360,11 @@ def confirm_registry_op(cfg: Any, confirmation_id: str, *,
     except Exception as exc:
         return {"state": "failed", "code": "CONFIRM_ERROR",
                 "detail": _redact(str(exc))[:200]}
+    if outcome.kind == "failed" and confirmation_id:
+        cross = _confirm_registry_across_sessions(
+            cfg, confirmation_id, actor=actor, session=session)
+        if cross is not None:
+            outcome = cross
     out: Dict[str, Any] = {"state": outcome.kind, "speech": outcome.speech}
     if outcome.receipt:
         out["receipt"] = outcome.receipt
