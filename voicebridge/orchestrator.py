@@ -297,22 +297,34 @@ def _web_env_key(cfg: Any, name: str) -> str:
     """Read a KEY for the shared web path (canonical file or environment).
 
     Mirrors ``VoiceOrchestrator._env_key`` without needing an instance:
-    the configured ``intent.deepseek_env`` path (or the canonical
-    ``~/.config/qubit-voicebridge/.env``), then the canonical runtime
-    ``.env`` (``<state_dir>/runtime/.env`` — the KEYS-page store), plus
-    ``os.environ``. The legacy ``~/.hermes/.env`` is never consulted.
-    Values are never logged.
+    for ``PERPLEXITY_*`` names the configured ``intent.perplexity_env``
+    path is consulted first, then the configured ``intent.deepseek_env``
+    path (or the canonical ``~/.config/qubit-voicebridge/.env``), then
+    the canonical runtime ``.env`` (``<state_dir>/runtime/.env`` — the
+    KEYS-page store), plus ``os.environ``. Non-perplexity names skip the
+    ``perplexity_env`` candidate (deepseek behavior identical). The legacy
+    ``~/.hermes/.env`` is never consulted. Values are never logged.
     """
     candidates = []
+    try:
+        if str(name or "").startswith("PERPLEXITY_"):
+            perplexity_configured = str(
+                _cfg_get(cfg, "intent", "perplexity_env", default="") or "")
+            if perplexity_configured.strip():
+                candidates.append(perplexity_configured.strip())
+    except Exception:  # noqa: BLE001 - fall back to the deepseek path
+        pass
     try:
         configured = str(
             _cfg_get(cfg, "intent", "deepseek_env", default="") or "")
     except Exception:  # noqa: BLE001 - fall back to the canonical path
         configured = ""
     if configured.strip():
-        candidates.append(configured.strip())
+        if configured.strip() not in candidates:
+            candidates.append(configured.strip())
     else:
-        candidates.append("~/.config/qubit-voicebridge/.env")
+        if "~/.config/qubit-voicebridge/.env" not in candidates:
+            candidates.append("~/.config/qubit-voicebridge/.env")
     try:
         from .config import canonical_runtime_env_path as _runtime_env_path
         _runtime_env = str(_runtime_env_path())
@@ -3297,17 +3309,29 @@ class VoiceOrchestrator:
         Canonical: ``~/.config/qubit-voicebridge/.env`` (or the configured
         ``intent.deepseek_env`` path), then the canonical runtime ``.env``
         (``<state_dir>/runtime/.env`` — the KEYS-page store), plus
-        ``os.environ``. The operator's legacy ``~/.hermes/.env`` is
-        **never** consulted — ``~/.hermes`` is read-only migration input,
-        never a runtime credential fallback (DECISIONS #9/#17). Values are
-        never logged.
+        ``os.environ``. For ``PERPLEXITY_*`` names the configured
+        ``intent.perplexity_env`` path is consulted first (deepseek
+        behavior identical for all other names). The operator's legacy
+        ``~/.hermes/.env`` is **never** consulted — ``~/.hermes`` is
+        read-only migration input, never a runtime credential fallback
+        (DECISIONS #9/#17). Values are never logged.
         """
         candidates = []
+        try:
+            if str(name or "").startswith("PERPLEXITY_"):
+                perplexity_configured = str(
+                    self.cfg.get("intent", "perplexity_env", default="") or "")
+                if perplexity_configured.strip():
+                    candidates.append(perplexity_configured.strip())
+        except Exception:  # noqa: BLE001 - fall back to the deepseek path
+            pass
         configured = str(self.cfg.get("intent", "deepseek_env", default="") or "")
         if configured.strip():
-            candidates.append(configured.strip())
+            if configured.strip() not in candidates:
+                candidates.append(configured.strip())
         else:
-            candidates.append("~/.config/qubit-voicebridge/.env")
+            if "~/.config/qubit-voicebridge/.env" not in candidates:
+                candidates.append("~/.config/qubit-voicebridge/.env")
         try:
             from .config import canonical_runtime_env_path as _runtime_env_path
             _runtime_env = str(_runtime_env_path())
