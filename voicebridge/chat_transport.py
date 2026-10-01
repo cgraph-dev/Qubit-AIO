@@ -1810,7 +1810,7 @@ def _turn_task(cfg: Any, st: Any, sid: str, task_text: str, *,
     except ORC.TaskLaunchDenied as exc:
         state = "UNAVAILABLE" if exc.code in (
             "EMERGENCY_STOP", "BLOCKED", "SAFETY_CONFIRM_REQUIRED",
-            "DRY_RUN") else "FAILED"
+            "DRY_RUN", "TASK_INFLIGHT") else "FAILED"
         _audit("turn_task_refused", session=sid, code=exc.code)
         return {"ok": False, "state": state, "code": exc.code,
                 "detail": str(exc.detail)[:200], "session_id": sid,

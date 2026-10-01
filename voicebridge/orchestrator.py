@@ -716,11 +716,40 @@ def launch_task(task_text: str, session: Any = None, *,
             str(getattr(verdict, "confirm_reason", "")
                 or "needs confirmation")[:200])
     key = _task_session_key(cfg, session)
+    with _TASK_BOX_LOCK:
+        # Idempotency guard (one worker per session): a second launch for
+        # the same worker key while the first is still running would
+        # overwrite _TASK_BOXES[key] and orphan the first thread — two
+        # workers, one box, one unattributable extra build turn. Refuse
+        # typed instead, pointing at the running key, before any broker
+        # side effect. A finished box (event set, or event-less) may be
+        # replaced by a fresh launch.
+        existing = _TASK_BOXES.get(key)
+        if existing is not None:
+            _ev = existing.get("event")
+            if _ev is not None and not bool(_ev.is_set()):
+                raise TaskLaunchDenied(
+                    "TASK_INFLIGHT",
+                    f"a build task is already running for this session "
+                    f"(task {key}); wait for it or cancel before "
+                    f"relaunching")
     backend = _task_tool_backend(cfg, grant=grant)
     box: Dict[str, Any] = {"event": threading.Event(), "result": None,
                            "cancel": False, "model": model or "",
                            "pending": backend.pending}
     with _TASK_BOX_LOCK:
+        # Re-check under the insert lock: a concurrent launch may have
+        # won the box between the fail-fast probe above and this insert.
+        # The loser refuses typed; the winner owns the single worker.
+        existing = _TASK_BOXES.get(key)
+        if existing is not None:
+            _ev = existing.get("event")
+            if _ev is not None and not bool(_ev.is_set()):
+                raise TaskLaunchDenied(
+                    "TASK_INFLIGHT",
+                    f"a build task is already running for this session "
+                    f"(task {key}); wait for it or cancel before "
+                    f"relaunching")
         _TASK_BOXES[key] = box
         while len(_TASK_BOXES) > _TASK_BOX_CAP:
             oldest = next(iter(_TASK_BOXES))

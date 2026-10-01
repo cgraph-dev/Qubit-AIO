@@ -1049,3 +1049,95 @@ def test_future_promise_naming_file_is_typed_no_build(monkeypatch):
                   session="test-task-future-9u")
     assert out.get("ok") is False, out
     assert out.get("code") == "TASK_NO_BUILD", out
+
+
+# --- Double-launch guard: one worker per session (t5-live extra-turn hunt).
+#
+# Audit: every single turn/stream call launches at most once (_turn_task and
+# _stream_task each call launch_task exactly once; the affirmative settle
+# path executes via task_execute_granted and never launches; retry_last is
+# model-only). The double-execution vector is cross-request: two rapid
+# turns on the same chat session resolve to the SAME _TASK_BOXES key, so
+# the second launch overwrote the first box and orphaned its thread — two
+# workers, one box, one unattributable extra build turn. The guard below
+# refuses the second launch typed (TASK_INFLIGHT naming the running key);
+# a finished box may still be replaced by a fresh sequential launch.
+
+
+def test_second_launch_while_inflight_is_typed(monkeypatch):
+    """Two rapid launches for one session start ONE worker; the second
+    refuses typed TASK_INFLIGHT naming the running key. After the first
+    finishes, the same session may launch again (same deterministic key)."""
+    import threading as _th
+    from voicebridge import orchestrator as ORC
+    from voicebridge.config import Config
+
+    release = _th.Event()
+    started = _th.Event()
+
+    def _blocking_session(cfg, text, **kw):
+        started.set()
+        assert release.wait(30), "worker never released"
+        return {"state": "OK", "reply": "Built hello.html.",
+                "steps": 1, "tool_used": "local.files_upload"}
+
+    monkeypatch.setattr(
+        "voicebridge.orchestrator._agent_run_session", _blocking_session)
+    cfg = Config.load()
+    key1 = ORC.launch_task("make a one-page website that says hello",
+                          session="test-inflight-9u", cfg=cfg)
+    assert key1, key1
+    assert started.wait(10), "first worker never started"
+    try:
+        ORC.launch_task("make a one-page website that says hello",
+                       session="test-inflight-9u", cfg=cfg)
+    except ORC.TaskLaunchDenied as exc:
+        assert exc.code == "TASK_INFLIGHT", exc.code
+        assert key1 in exc.detail, exc.detail
+    else:
+        raise AssertionError("second concurrent launch must be refused")
+    finally:
+        release.set()
+    res = ORC.wait_task(key1, timeout_s=30)
+    assert res.get("status") == "done", res
+    # Sequential reuse still works: a finished box is replaceable.
+    key2 = ORC.launch_task("make another page", session="test-inflight-9u",
+                           cfg=cfg)
+    assert key2 == key1, (key1, key2)
+    res2 = ORC.wait_task(key2, timeout_s=30)
+    assert res2.get("status") == "done", res2
+
+
+def test_turn_while_inflight_returns_typed_without_launching(monkeypatch):
+    """A second turn on a session with a running worker gets typed
+    TASK_INFLIGHT (UNAVAILABLE, retryable-busy) — the planted box is
+    untouched, no duplicate worker starts, no phantom starter row."""
+    import threading as _th
+    from voicebridge import broker as _BK
+    from voicebridge import chat_transport as CT
+    from voicebridge import orchestrator as ORC
+
+    fake = _FakeStore()
+    _hermetic(monkeypatch, fake)
+    _agent_task_decision(monkeypatch)
+    monkeypatch.setattr(_BK, "estop_engaged", lambda cfg=None: False)
+    sid = "test-task-inflight-turn-9u"
+    key = ORC._task_session_key({}, sid)
+    planted = {"event": _th.Event(), "result": None, "cancel": False,
+               "model": "", "pending": []}
+    ORC._TASK_BOXES[key] = planted
+    before = {t.name for t in _th.enumerate()}
+    try:
+        out = CT.turn({}, "make me an app that tracks expenses",
+                      session=sid)
+    finally:
+        assert ORC._TASK_BOXES.get(key) is planted, \
+            "in-flight box must never be overwritten by a second turn"
+    assert out.get("ok") is False, out
+    assert out.get("code") == "TASK_INFLIGHT", out
+    assert out.get("route") == "task", out
+    assert out.get("state") == "UNAVAILABLE", out
+    assert key in str(out.get("detail", "")), out
+    after = {t.name for t in _th.enumerate()} - before
+    assert not any(n.startswith("chat-task-") for n in after), after
+    assert "Working on it" not in fake.texts(sid), fake.texts(sid)
