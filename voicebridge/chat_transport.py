@@ -1088,6 +1088,51 @@ def _settle_affirmed(cfg: Any, st: Any, sid: str) -> Dict[str, Any]:
             "entry": entry_id}
 
 
+def _ddg_web_fallback(query: str) -> Optional[Dict[str, Any]]:
+    """No-key DDG fallback for the web branch (read-only search, no side effects).
+
+    Reuses the existing bridge function ``scripts.web_search.ddg_search``
+    (``ddgs`` library) — never shells out, never invents an HTTP client, never
+    touches the Perplexity path. Verified: ``ddg_search``/``ddg_answer`` contact
+    only DDG; the sole ``~/.hermes`` reference in ``scripts/web_search.py`` is
+    the unused-on-this-path ``_HERMES`` constant for the Perplexity fallback
+    script (never opened here).
+
+    Returns ``{"answer", "sources"}`` with >=1 real result URL, else None
+    (caller keeps typed WEB_UNAVAILABLE — nothing fabricated).
+    """
+    try:
+        from scripts.web_search import ddg_search
+    except Exception as exc:  # noqa: BLE001 - typed, audited by caller
+        _audit("turn_web_ddg_import_failed", error=str(exc)[:120])
+        return None
+    try:
+        rs = ddg_search(query, max_results=5)
+    except Exception as exc:  # noqa: BLE001 - typed, never fabricated
+        _audit("turn_web_ddg_failed", error=str(exc)[:120])
+        return None
+    if not isinstance(rs, list) or not rs:
+        return None
+    lines = []
+    sources = []
+    for r in rs:
+        if not isinstance(r, dict):
+            continue
+        href = str(r.get("href") or "").strip()
+        title = str(r.get("title") or "").strip()
+        body = str(r.get("body") or "").strip()
+        if href:
+            sources.append(href)
+        if title:
+            lines.append(f"{title}: {body}" if body else title)
+        if len(lines) >= 4:
+            break
+    if not lines or not sources:
+        return None
+    return {"answer": _redact("\n".join(lines))[:2000],
+            "sources": sources}
+
+
 def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
     """Wave C Task 2: execute a web answer, never chatter about searching."""
     from . import orchestrator as ORC
@@ -1096,16 +1141,32 @@ def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
         web = ORC.answer_web_query(cfg, task_text)
     except Exception as exc:  # noqa: BLE001 - typed, never fabricated
         _audit("turn_web_error", session=sid, error=str(exc))
-        return {"ok": False, "state": "FAILED", "code": "WEB_UNAVAILABLE",
-                "detail": _redact(str(exc))[:200], "session_id": sid,
-                "route": "web"}
+        web = {"ok": False, "code": "WEB_UNAVAILABLE", "answer": str(exc)[:200]}
     if not isinstance(web, dict) or not web.get("ok"):
         code = str((web or {}).get("code") or "WEB_UNAVAILABLE")
         detail = str((web or {}).get("answer") or "")[:200] or \
             "web search unavailable; nothing was fabricated"
         _audit("turn_web_unavailable", session=sid, code=code)
-        return {"ok": False, "state": "FAILED", "code": code,
-                "detail": detail, "session_id": sid, "route": "web"}
+        fb = _ddg_web_fallback(task_text)
+        if fb is None:
+            return {"ok": False, "state": "FAILED", "code": code,
+                    "detail": detail, "session_id": sid, "route": "web"}
+        answer = str(fb.get("answer") or "")
+        sources = [str(s) for s in (fb.get("sources") or [])
+                   if str(s).strip()]
+        if not answer.strip() or not sources:
+            return {"ok": False, "state": "FAILED", "code": code,
+                    "detail": detail, "session_id": sid, "route": "web"}
+        body = answer + "\n\nSources:\n" + "\n".join(sources)
+        st.append(sid, "assistant", body,
+                  meta={"route": "web", "sources": sources or None,
+                        "fallback": "ddg"})
+        _audit("turn_web_ddg", session=sid, sources=len(sources))
+        return {"ok": True, "text": answer, "reply": answer,
+                "sources": sources, "session_id": sid, "session": sid,
+                "route": "web",
+                "receipt": _branch_receipt("web", task=task_text,
+                                           sources=sources, cfg=cfg)}
     answer = str(web.get("answer") or "")
     sources = [str(s) for s in (web.get("sources") or []) if str(s).strip()]
     body = answer + ("\n\nSources:\n" + "\n".join(sources) if sources else "")

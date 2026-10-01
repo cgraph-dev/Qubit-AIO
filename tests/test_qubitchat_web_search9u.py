@@ -155,3 +155,125 @@ def test_chat_perplexity_delegates_to_shared_path(monkeypatch):
     s.cfg = _TestCfg(_PP_FRONTIER)
     bound = ORC.VoiceOrchestrator._chat_perplexity.__get__(s)
     assert bound("use perplexity to search test") == "shared answer"
+
+
+class _FakeChatStore:
+    """Minimal chat_transport store double (append only, hermetic)."""
+
+    def __init__(self):
+        self.rows = []
+
+    def append(self, sid, role, content, *, meta=None, model=None,
+               timestamp=None):
+        self.rows.append({"sid": sid, "role": role, "content": content,
+                          "meta": meta or {}})
+        return {"state": "OK",
+                "message": {"role": role, "content": content},
+                "message_count": len(self.rows)}
+
+
+def test_turn_web_perplexity_ok_still_wins(monkeypatch):
+    """Perplexity-ok answers directly; the DDG fallback never runs."""
+    from voicebridge import chat_transport as CT
+    from voicebridge import orchestrator as ORC
+
+    monkeypatch.setattr(
+        ORC, "answer_web_query",
+        lambda cfg, text, **kw: {"ok": True, "answer": "Perplexity answer",
+                                 "sources": ["https://example/aion2"],
+                                 "code": "OK"})
+
+    def _boom(query):
+        raise AssertionError("DDG fallback must not run when Perplexity wins")
+
+    monkeypatch.setattr(CT, "_ddg_web_fallback", _boom)
+    fake = _FakeChatStore()
+    out = CT._turn_web({}, fake, "ddg-9u-1",
+                       "use perplexity to search when Aion 2 will release")
+    assert out.get("ok") is True, out
+    assert out.get("text") == "Perplexity answer", out
+    assert out.get("sources") == ["https://example/aion2"], out
+    assert out.get("route") == "web", out
+    receipt = out.get("receipt") or {}
+    assert receipt.get("route") == "web", receipt
+    assert receipt.get("sources") == ["https://example/aion2"], receipt
+    assert "model" in receipt, receipt
+
+
+def test_turn_web_perplexity_down_ddg_ok_answers_with_sources(monkeypatch):
+    """Perplexity-down + DDG-ok answers with real DDG result URLs as sources."""
+    from voicebridge import chat_transport as CT
+    from voicebridge import orchestrator as ORC
+
+    monkeypatch.setattr(
+        ORC, "answer_web_query",
+        lambda cfg, text, **kw: {"ok": False, "code": "WEB_UNAVAILABLE",
+                                 "answer": "perplexity key missing"})
+    monkeypatch.setattr(
+        CT, "_ddg_web_fallback",
+        lambda query: {"answer": "Aion 2: Q4 2026.",
+                       "sources": ["https://example/aion2",
+                                   "https://example/aion2-b"]})
+    fake = _FakeChatStore()
+    out = CT._turn_web({}, fake, "ddg-9u-2",
+                       "use perplexity to search when Aion 2 will release")
+    assert out.get("ok") is True, out
+    assert "Aion 2" in out.get("text", ""), out
+    assert out.get("sources") == ["https://example/aion2",
+                                  "https://example/aion2-b"], out
+    assert out.get("route") == "web", out
+    receipt = out.get("receipt") or {}
+    assert receipt.get("route") == "web", receipt
+    assert receipt.get("sources") == ["https://example/aion2",
+                                      "https://example/aion2-b"], receipt
+    assert "model" in receipt, receipt
+    # Persisted transcript carries the sources (no fabrication).
+    assert any("https://example/aion2" in str(r.get("content", ""))
+               for r in fake.rows), fake.rows
+
+
+def test_turn_web_both_down_stays_web_unavailable(monkeypatch):
+    """Both layers down → typed WEB_UNAVAILABLE, nothing fabricated."""
+    from voicebridge import chat_transport as CT
+    from voicebridge import orchestrator as ORC
+
+    monkeypatch.setattr(
+        ORC, "answer_web_query",
+        lambda cfg, text, **kw: {"ok": False, "code": "WEB_UNAVAILABLE",
+                                 "answer": "perplexity key missing"})
+    monkeypatch.setattr(CT, "_ddg_web_fallback", lambda query: None)
+    fake = _FakeChatStore()
+    out = CT._turn_web({}, fake, "ddg-9u-3",
+                       "use perplexity to search when Aion 2 will release")
+    assert out.get("ok") is False, out
+    assert out.get("code") == "WEB_UNAVAILABLE", out
+    assert out.get("route") == "web", out
+    assert fake.rows == [], fake.rows
+
+
+def test_stream_web_fallback_mirrors_single_delta(monkeypatch):
+    """Stream variant mirrors: single truthful delta + sources, no narrative."""
+    from voicebridge import chat_transport as CT
+    from voicebridge import orchestrator as ORC
+
+    monkeypatch.setattr(
+        ORC, "answer_web_query",
+        lambda cfg, text, **kw: {"ok": False, "code": "WEB_UNAVAILABLE",
+                                 "answer": "perplexity key missing"})
+    monkeypatch.setattr(
+        CT, "_ddg_web_fallback",
+        lambda query: {"answer": "Aion 2: Q4 2026.",
+                       "sources": ["https://example/aion2"]})
+    fake = _FakeChatStore()
+    decided = {"action": "web_search",
+               "task_text": "use perplexity to search when Aion 2 will release"}
+    events = list(CT._stream_branch({}, fake, "ddg-9u-4",
+                                    "use perplexity to search when Aion 2 will release",
+                                    decided))
+    kinds = [e.get("event") for e in events]
+    assert kinds[0] == "start", events
+    assert kinds.count("delta") == 1, events
+    done = [e for e in events if e.get("event") == "done"]
+    assert len(done) == 1 and done[0].get("ok") is True, events
+    assert (done[0].get("receipt") or {}).get("sources") == \
+        ["https://example/aion2"], events
