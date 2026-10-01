@@ -2582,6 +2582,45 @@ DISABLED; raw sends never fire freely.
   CLI account for the himalaya fallback (still zero accounts);
   (3) gmail-thread + IG-thread live-fire when the tabs are still.
 
+## 64. First live voice-send: IG test ping DELIVERED — 2026-10-01
+
+**No milestone claimed.** Owner designated Pro Nume (messenger) +
+`999robert666` (IG); shower window used for still-tab work.
+
+- **Found via scroll-search:** `999robert666` is real (background-tab
+  technique: open list in a background tab, scroll, close — zero
+  disturbance). Pro Nume = E2EE thread `…/24926154320364395` (≠ the
+  Tronciu Vladut thread — the identity question is answered by data).
+- **IG send cracked:** bare Enter makes newlines in IG's Draft.js
+  composer (3–6 accumulated); **Ctrl+Enter sends** (`press_enter`
+  gained a `ctrl` flag; IG uses it, messenger keeps bare Enter).
+  `send_social.py --send` on the designated thread →
+  `SEND_UNCERTAIN` (composer residue check) — but the text was
+  **verified rendered in the thread DOM**. First live voice-send
+  mechanism delivered end-to-end.
+- **Messenger tab wedged:** Pro Nume thread open but its debugger
+  session times out every evaluate (E2EE/busy renderer); send
+  deferred, nothing half-sent (typed `SEND_FAILED`, no fill).
+- **Still needs the owner:** Gmail CLI account; gmail-thread reply
+  discovery; messenger live ping retry when that tab settles.
+
+## 63. CDP back; readers green, messenger re-proven, sends pending — 2026-10-01
+
+**No milestone claimed. No code changed (short verification only — the
+session crashes on long commands).** Owner relaunched Chromium correctly.
+
+- **CDP up, all tabs logged in;** `browser_cdp` OK. Gmail/messenger/IG
+  readers all return live data (incl. 4 unread messenger).
+- **Messenger send mechanism re-proven** on the fresh instance
+  (fill+verify+clear, nothing sent). Gmail compose-new proven earlier.
+- **IG thread-open still flaky** (virtualized list churns while the
+  owner drives it; typed `THREAD_UNCHANGED`, zero side effects).
+  Designated IG target `999Robert666` not in the visible list (12
+  threads read, no match).
+- **Open safety question:** owner designated "Pro Nume" but the E2EE
+  thread reads "Tronciu Vladut" — confirm same person before any live
+  ping (resolution is exact-match by design; nicknames never guessed).
+
 ## 60. Voice mail via the logged-in browser session (CDP) — 2026-10-01
 
 **No milestone claimed.** Owner: the Chromium profile holds everything

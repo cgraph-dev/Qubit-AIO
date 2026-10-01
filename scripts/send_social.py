@@ -93,6 +93,9 @@ class Ctx:
                   "windowsVirtualKeyCode": 13}
         if ctrl:
             params["modifiers"] = 2
+        # NOTE: Instagram's Draft.js composer treats a bare Enter as a
+        # newline — it sends only on Ctrl+Enter. Messenger sends on a
+        # bare Enter. Callers pass the channel-appropriate flag.
         self.cmd("Input.dispatchKeyEvent",
                  dict(params, type="rawKeyDown"))
         self.cmd("Input.dispatchKeyEvent", dict(params, type="keyDown"))
@@ -210,7 +213,7 @@ def send_instagram(ctx, to, _href, body, dry_run):
         ctx.clear_composer(
             "document.querySelector('[contenteditable=\"true\"]')")
         ok(f"composer for {to!r} verified and cleared, nothing sent")
-    ctx.press_enter()
+    ctx.press_enter(ctrl=True)
     time.sleep(3)
     rest = ctx.js(
         "(() => { const c=document.querySelector("
