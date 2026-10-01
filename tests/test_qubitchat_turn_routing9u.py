@@ -22,7 +22,12 @@ def test_decide_weather_is_web_search():
 
 def test_decide_build_app_is_agent_task():
     from voicebridge import chat_transport as CT
-    d = CT.decide_turn_action("make me an app that tracks expenses", cfg={})
+    # task_score 1.0 -> pure-heuristic coding, no LLM round-trip. A bare
+    # "make me an app …" (score 0.0) reaches the temperature/load-dependent
+    # local classifier and flakes under a busy ollama.
+    d = CT.decide_turn_action(
+        "build me an expense tracking app with a database and api endpoints",
+        cfg={})
     assert d["action"] == "agent_task", d
 
 

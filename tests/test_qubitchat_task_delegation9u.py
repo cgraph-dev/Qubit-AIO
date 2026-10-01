@@ -51,11 +51,17 @@ def _hermetic(monkeypatch, fake):
 
 def _agent_task_decision(monkeypatch):
     """Pin the branch deterministically (decide itself is covered by the
-    routing suite; here the wiring under test is launch/wait/summarize)."""
+    routing suite; here the wiring under test is launch/wait/summarize).
+
+    Explicit agent delegation ("ask qubit to …") is a pure-regex
+    classifier path — a bare "make me an app …" reaches the
+    temperature/load-dependent local LLM and flakes under a busy ollama
+    (LLM timeout -> heuristic fallback -> not agent_task).
+    """
     from voicebridge import chat_transport as CT
 
     decided = CT.decide_turn_action(
-        "make me an app that tracks expenses", cfg={})
+        "ask qubit to make me an app that tracks expenses", cfg={})
     assert decided["action"] == "agent_task", decided
     monkeypatch.setattr(
         CT, "decide_turn_action", lambda text, **kw: dict(decided))
