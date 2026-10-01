@@ -8,13 +8,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from voicebridge.voice_edit.wake import (BufferMic, EnergyEndpointer,
-                                         WakeMonitor, strip_wake)
+                                         WakeMonitor, is_prompt_echo,
+                                         strip_wake)
 
 
 class FakeCfg:
-    def __init__(self, wake=None):
+    def __init__(self, wake=None, stt_local=None):
         self._d = {"voice_edit": {"beep": False,
-                                  "wake": wake or {"enabled": True}}}
+                                   "wake": wake or {"enabled": True}}}
+        if stt_local is not None:
+            self._d.setdefault("stt", {})["local"] = stt_local
 
     def get(self, *p, default=None):
         node = self._d
@@ -132,6 +135,26 @@ def test_empty_transcript_is_discarded():
     m, commands = _monitor([""])
     m._handle_segment(b"\x00" * 9600)
     assert commands == []
+
+
+def test_prompt_echo_is_discarded_not_fired():
+    # faster-whisper parrots stt.local.initial_prompt on room noise; the
+    # echo contains "hey Qubit" and false-fired the wake path 235x live.
+    cfg = FakeCfg(stt_local={"initial_prompt": "Qubit, hey Qubit, voice assistant."})
+    assert is_prompt_echo(cfg, "Qubit, hey Qubit, voice assistant.")
+    assert is_prompt_echo(cfg, "qubit hey qubit voice assistant")
+    assert not is_prompt_echo(cfg, "hey qubit, what's the weather")
+    assert not is_prompt_echo(cfg, "hey qubit")
+    commands = []
+    m = WakeMonitor(cfg, on_command=commands.append,
+                    is_busy=lambda: False,
+                    transcribe=lambda pcm: "Qubit, hey Qubit, voice assistant.")
+    m._handle_segment(b"\x00" * 9600)
+    assert commands == []
+
+
+def test_prompt_echo_off_without_configured_prompt():
+    assert not is_prompt_echo(FakeCfg(), "hey qubit, voice assistant")
 
 
 class FakeKws:

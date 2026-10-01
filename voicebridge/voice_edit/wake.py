@@ -83,6 +83,31 @@ def strip_wake(text: str, aliases: Optional[List[str]] = None) -> Optional[str]:
     return None
 
 
+def _normalize_echo(text: str) -> str:
+    return re.sub(r"\s+", " ",
+                  re.sub(r"[^\w\s]", "", (text or "").lower())).strip()
+
+
+def is_prompt_echo(cfg: Any, text: str) -> bool:
+    """True when a transcript merely parrots the whisper initial_prompt.
+
+    faster-whisper is primed with ``stt.local.initial_prompt`` as vocabulary
+    bias; on room noise it hallucinates that exact string back (observed live
+    235×: "Qubit, hey Qubit, voice assistant."). The echo contains "hey
+    Qubit", so without this guard it false-fires the wake path (beep +
+    spoken greeting) on silence. A real utterance is never exactly the
+    prompt, so equality (case/punctuation-insensitive) is a safe discard.
+    """
+    try:
+        prompt = str(_cfg(cfg, "stt", "local", "initial_prompt",
+                           default="") or "")
+    except Exception:
+        return False
+    if not prompt.strip() or not (text or "").strip():
+        return False
+    return _normalize_echo(text) == _normalize_echo(prompt)
+
+
 class EnergyEndpointer:
     """Very cheap RMS endpointer (no model load; one pass per frame)."""
 
@@ -402,6 +427,9 @@ class WakeMonitor:
                **(_dbg.text_fields(self.cfg, text=text)))
         if not text:
             return
+        if is_prompt_echo(self.cfg, text):
+            _trace("prompt_echo_skip", chars=len(text))
+            return  # whisper parroted its initial_prompt on noise: hallucination
         now = time.monotonic()
         with self._lock:
             armed = now < self._armed_until
