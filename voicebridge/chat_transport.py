@@ -1275,6 +1275,70 @@ def _turn_registry(cfg: Any, st: Any, sid: str,
     return result
 
 
+# ---------------------------------------------------------------------------
+# T5 — build-task acceptance (promise-only replies are typed failures)
+# ---------------------------------------------------------------------------
+#: Future-tense promise phrasing with no acted work behind it. A worker reply
+#: matching one of these with no tool receipts and no action evidence is the
+#: proven phantom-done shape ("I will make a one-page website…", zero files).
+_PROMISE_RES = (
+    re.compile(r"\bi\s+will\b", re.IGNORECASE),
+    re.compile(r"\bi['\u2019]ll\b", re.IGNORECASE),
+    re.compile(r"\bi['\u2019]m\s+going\s+to\b", re.IGNORECASE),
+    re.compile(r"\blet\s+me\b", re.IGNORECASE),
+    re.compile(r"\bi\s+can\s+(make|create|build|help|do)\b", re.IGNORECASE),
+)
+
+#: Concrete completion evidence: past-tense acted verbs, the build noun,
+#: created-file names, on-disk paths, or file/draft/report nouns. A reply
+#: carrying any of these (or worker tool receipts) is a report, not a
+#: promise. Note ``build`` alone only counts when no promise phrasing is
+#: present (see :func:`_worker_acted`): "Pin probe build." is a report,
+#: "I will build a website" with no file behind it is not.
+_ACTION_RE = re.compile(
+    r"\b(built|created|wrote|written|saved|added|finished|completed|"
+    r"updated|generated|streamed|delivered|attached|done|build)\b"
+    r"|[A-Za-z0-9_][A-Za-z0-9_.\-]*\.(html?|js|jsx|ts|tsx|css|json|md|"
+    r"txt|py|png|jpe?g|pdf)\b"
+    r"|/(?:[\w.\-]+/)+[\w.\-]+"
+    r"|\b(files?|drafts?|reports?|artifacts?)\b",
+    re.IGNORECASE)
+
+#: File/path evidence strong enough to outweigh promise phrasing: a reply
+#: that both promises AND names a created file/path is treated as a report
+#: (the receipts path remains the strong proof; this keeps a file-naming
+#: worker honest without letting bare "I will build…" through).
+_FILE_RE = re.compile(
+    r"[A-Za-z0-9_][A-Za-z0-9_.\-]*\.(html?|js|jsx|ts|tsx|css|json|md|"
+    r"txt|py|png|jpe?g|pdf)\b"
+    r"|/(?:[\w.\-]+/)+[\w.\-]+",
+    re.IGNORECASE)
+
+
+def _worker_acted(reply: str, res: Dict[str, Any]) -> bool:
+    """True when the worker reply shows acted work, not chatter.
+
+    Tool receipts win outright (the worker ran something through the
+    broker): ``steps > 0`` or a non-empty ``tool_used`` from the
+    ``wait_task`` outcome. A promise-phrased reply ("I will…", "let me…")
+    with no created-file evidence behind it never counts, even when it
+    borrows the build noun. Otherwise the reply text itself must carry
+    concrete completion evidence (:data:`_ACTION_RE`).
+    """
+    try:
+        if int((res or {}).get("steps") or 0) > 0:
+            return True
+    except (TypeError, ValueError):
+        pass
+    if str((res or {}).get("tool_used") or "").strip():
+        return True
+    text = str(reply or "")
+    if any(rx.search(text) for rx in _PROMISE_RES) \
+            and not _FILE_RE.search(text):
+        return False
+    return bool(_ACTION_RE.search(text))
+
+
 def _finish_task(cfg: Any, st: Any, sid: str, key: str,
                  res: Dict[str, Any]) -> Dict[str, Any]:
     """Complete a headless task wait: persist + shape the turn outcome.
@@ -1284,6 +1348,12 @@ def _finish_task(cfg: Any, st: Any, sid: str, key: str,
     summary. A finished build persists the FULL raw report (same rule as
     the voice ``_handle_agent_result``) while the spoken/text field carries
     the Spark summary.
+
+    T5 acceptance: a ``done`` worker reply with no sign of action (no tool
+    receipts, no created-file evidence, no concrete completion report) is
+    a typed build failure (``TASK_NO_BUILD`` for a promise-only reply,
+    ``TASK_NO_ACTION`` otherwise) — never ``ok:true``. The delegation
+    plumbing reports what the worker did; only acted work counts as done.
     """
     status = str((res or {}).get("status") or "error")
     if status == "cancelled":
@@ -1306,6 +1376,33 @@ def _finish_task(cfg: Any, st: Any, sid: str, key: str,
                 "detail": detail, "session_id": sid, "session": sid,
                 "route": "task", "task": key, "status": status}
     reply = str((res or {}).get("reply") or "")
+    if not reply.strip():
+        detail = "worker finished with no reply; nothing was built"
+        st.append(sid, "assistant", f"Task {key} failed (TASK_NO_ACTION): "
+                  f"{detail}",
+                  meta={"route": "task", "task": key, "phase": "failed"})
+        _audit("turn_task_no_action", session=sid, task=key)
+        return {"ok": False, "state": "FAILED", "code": "TASK_NO_ACTION",
+                "detail": detail, "session_id": sid, "session": sid,
+                "route": "task", "task": key, "status": "failed"}
+    if not _worker_acted(reply, res):
+        if any(rx.search(reply) for rx in _PROMISE_RES):
+            code = "TASK_NO_BUILD"
+            detail = ("worker promised a build but built nothing "
+                      f"({ _redact(reply)[:160]}); no tool ran and no file "
+                      "was created")
+        else:
+            code = "TASK_NO_ACTION"
+            detail = ("worker reply shows no tool or file action "
+                      f"({_redact(reply)[:160]}); nothing was built")
+        st.append(sid, "assistant", f"Task {key} failed ({code}): {detail}",
+                  meta={"route": "task", "task": key, "phase": "failed"})
+        _audit("turn_task_no_build" if code == "TASK_NO_BUILD"
+               else "turn_task_no_action",
+               session=sid, task=key, code=code)
+        return {"ok": False, "state": "FAILED", "code": code,
+                "detail": detail, "session_id": sid, "session": sid,
+                "route": "task", "task": key, "status": "failed"}
     spoken = _summarize_report(reply, cfg)
     st.append(sid, "assistant", reply + f"\n\n_Task {key}: done_",
               meta={"route": "task", "task": key, "phase": "report"})

@@ -509,6 +509,32 @@ def _task_tool_backend(cfg: Any) -> Any:
     return _run
 
 
+#: Build-task framing for the headless worker (T5). The worker runs a weak
+#: local model with a planner that only proposes reversible local/web tools,
+#: so an unframed "make a website" turn comes back as chatter ("I will
+#: make…") with zero files while the turn reports done. The frame demands
+#: real tool-built files named in the final reply — and declares a
+#: promise-only reply a failure the turn acceptance records as typed.
+def _frame_build_task(text: str) -> str:
+    """Frame a headless build turn so the worker must act, not chatter.
+
+    Pure prompt discipline (no model surgery, no hard-coded model ids — the
+    worker model stays with the agent path): the frame travels with the
+    task text into ``_agent_run_session`` only. The audit trail keeps the
+    raw user text (see ``launch_task``).
+    """
+    clean = str(text or "").strip()
+    return (
+        f"{clean}\n\n"
+        "Headless build instructions: do the work with your tools now. "
+        "When the request needs files (a website, a document, code), "
+        "create real files with your tools and name every file you "
+        "created in your final reply. Never reply with only a promise, "
+        "a plan, or a description of what you would do — a reply that "
+        "only says you will do something, with no tool call and no "
+        "created file, is recorded as a typed build failure.")
+
+
 def launch_task(task_text: str, session: Any = None, *,
                 cfg: Any = None, model: Optional[str] = None) -> str:
     """Dispatch a headless worker task; return its session key (wrapper).
@@ -590,7 +616,7 @@ def launch_task(task_text: str, session: Any = None, *,
             res = guard.run(
                 "agent.session",
                 lambda: _agent_run_session(
-                    cfg, text, session=key,
+                    cfg, _frame_build_task(text), session=key,
                     execute_tool=_task_tool_backend(cfg),
                     cancelled=_cancelled,
                     estop_engaged=_estop),
@@ -672,8 +698,17 @@ def wait_task(session_key: str, timeout_s: float = 300, *,
                 "code": "WORKER_MALFORMED",
                 "detail": "worker returned a non-dict outcome"}
     if res.get("state") == "OK":
-        return {"status": "done", "reply": str(res.get("reply", "")),
-                "session": key}
+        out: Dict[str, Any] = {"status": "done",
+                               "reply": str(res.get("reply", "")),
+                               "session": key}
+        # T5 acceptance needs the worker receipts: a "done" reply with no
+        # tool call and no created file is a promise, not a build. Steps /
+        # tool_used travel here so ``chat_transport._finish_task`` can fail
+        # it typed instead of reporting ok:true.
+        for _receipt_key in ("steps", "tool_used"):
+            if res.get(_receipt_key) not in (None, ""):
+                out[_receipt_key] = res.get(_receipt_key)
+        return out
     return {"status": "error", "reply": str(res.get("detail", "") or ""),
             "code": str(res.get("code", "WORKER_ERROR")),
             "detail": str(res.get("detail", "") or "")[:300]}

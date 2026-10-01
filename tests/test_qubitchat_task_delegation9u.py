@@ -235,6 +235,126 @@ def test_launch_task_requires_cfg():
         raise AssertionError("launch_task(cfg=None) must refuse fail-closed")
 
 
+def test_agent_task_promise_only_is_typed_no_build(monkeypatch):
+    """T5: a promise-only worker reply is a typed build failure, never ok done.
+
+    Proven live failure: POST /agent/api/qubit/chat/stream
+    {"text": "make a one-page website that says hello"} streamed
+    start -> progress -> delta("I will make a one-page website…") ->
+    done(ok:true). Zero drafts, zero files. Delegation worked; acceptance
+    did not: any non-empty reply counted as "done".
+    """
+    from voicebridge import chat_transport as CT
+
+    fake = _FakeStore()
+    _hermetic(monkeypatch, fake)
+    _agent_task_decision(monkeypatch)
+    monkeypatch.setattr(
+        "voicebridge.orchestrator.launch_task",
+        lambda task, session=None, **kw: "worker-9u-5")
+    monkeypatch.setattr(
+        "voicebridge.orchestrator.wait_task",
+        lambda key, timeout_s=300, **kw: {
+            "status": "done",
+            "reply": "I will make a one-page website that says hello."})
+
+    def _boom(reply, cfg=None):
+        raise AssertionError("summarizer must not run on a promise-only reply")
+
+    monkeypatch.setattr("voicebridge.summarizer.summarize", _boom)
+    out = CT.turn({}, "make me an app that tracks expenses",
+                  session="test-task-promise-9u")
+    assert out.get("ok") is False, out
+    assert out.get("code") == "TASK_NO_BUILD", out
+    assert out.get("route") == "task", out
+    assert out.get("status") != "done", out
+    transcript = fake.texts("test-task-promise-9u")
+    assert "I will make a one-page website" in transcript, transcript
+
+
+def test_agent_task_empty_reply_is_typed_no_action(monkeypatch):
+    """T5: a worker that finishes with no reply is TASK_NO_ACTION, not done."""
+    from voicebridge import chat_transport as CT
+
+    fake = _FakeStore()
+    _hermetic(monkeypatch, fake)
+    _agent_task_decision(monkeypatch)
+    monkeypatch.setattr(
+        "voicebridge.orchestrator.launch_task",
+        lambda task, session=None, **kw: "worker-9u-6")
+    monkeypatch.setattr(
+        "voicebridge.orchestrator.wait_task",
+        lambda key, timeout_s=300, **kw: {"status": "done", "reply": "   "})
+
+    def _boom(reply, cfg=None):
+        raise AssertionError("summarizer must not run on an empty reply")
+
+    monkeypatch.setattr("voicebridge.summarizer.summarize", _boom)
+    out = CT.turn({}, "make me an app that tracks expenses",
+                  session="test-task-empty-9u")
+    assert out.get("ok") is False, out
+    assert out.get("code") == "TASK_NO_ACTION", out
+    assert out.get("route") == "task", out
+
+
+def test_agent_task_tool_receipts_report_done(monkeypatch):
+    """T5: a worker with tool/file receipts reports done with the report."""
+    from voicebridge import chat_transport as CT
+
+    fake = _FakeStore()
+    _hermetic(monkeypatch, fake)
+    _agent_task_decision(monkeypatch)
+    monkeypatch.setattr(
+        "voicebridge.orchestrator.launch_task",
+        lambda task, session=None, **kw: "worker-9u-7")
+    monkeypatch.setattr(
+        "voicebridge.orchestrator.wait_task",
+        lambda key, timeout_s=300, **kw: {
+            "status": "done",
+            "reply": "Created hello.html with the greeting page.",
+            "steps": 1, "tool_used": "local.files_upload"})
+    monkeypatch.setattr(
+        "voicebridge.summarizer.summarize",
+        lambda reply, cfg=None: "Created hello.html.")
+    out = CT.turn({}, "make me an app that tracks expenses",
+                  session="test-task-receipts-9u")
+    assert out.get("ok") is True, out
+    assert out.get("route") == "task", out
+    assert out.get("status") == "done", out
+    assert out.get("report") == \
+        "Created hello.html with the greeting page.", out
+    assert out.get("text") == "Created hello.html.", out
+
+
+def test_stream_task_promise_only_errors_never_done(monkeypatch):
+    """T5 (stream): promise-only worker output ends in error, never done."""
+    from voicebridge import chat_transport as CT
+
+    fake = _FakeStore()
+    _hermetic(monkeypatch, fake)
+    _agent_task_decision(monkeypatch)
+    monkeypatch.setattr(
+        "voicebridge.orchestrator.launch_task",
+        lambda task, session=None, **kw: "worker-9u-8")
+    monkeypatch.setattr(
+        "voicebridge.orchestrator.wait_task",
+        lambda key, timeout_s=300, **kw: {
+            "status": "done",
+            "reply": "I will make a one-page website that says hello."})
+    monkeypatch.setattr(
+        "voicebridge.summarizer.summarize",
+        lambda reply, cfg=None: "must never be spoken")
+    events = list(CT._stream_task({}, fake, "test-task-streampromise-9u",
+                                  "make me an app",
+                                  __import__("time").monotonic(),
+                                  timeout_s=10))
+    kinds = [e.get("event") for e in events]
+    assert "error" in kinds, kinds
+    assert kinds[-1] == "error", kinds
+    assert "done" not in kinds, kinds
+    assert events[-1].get("code") == "TASK_NO_BUILD", events[-1]
+
+
 def test_stream_task_progress_then_report(monkeypatch):
     from voicebridge import chat_transport as CT
 
