@@ -2476,3 +2476,40 @@ fast the weather, the time, things about me" before.
   skill/agent path (gmail skill verified by the skills lane) and need
   accounts/CLIs at use time. Egress note: weather intent does one no-key
   wttr.in GET (the point of live data); everything else stays local.
+
+## 59. Voice skill intents: mail digest + YouTube summaries — 2026-10-01
+
+**No milestone claimed.** Owner: "do it" (voice Q&A for gmail/youtube).
+
+- **Inventory truth:** YouTube skill = transcript fetcher for a given URL
+  (no key; works today). Gmail = himalaya CLI installed (`~/.local/bin`,
+  v2.1.0) but **zero accounts anywhere** (no `~/.config/himalaya/
+  config.toml`, `msg account-list` empty) — there is no mailbox to read
+  until the owner connects one. `qubit msg inbox` is Qubit's own gateway
+  inbox, not Gmail — not wired.
+- **Built (`service.py::_skill_answer`, tried after direct facts):**
+  mail intent (read/check verbs only — send/draft/reply fall through to
+  the agent path) → unconfigured: honest spoken setup answer naming
+  `himalaya account configure` (`model: skill-mail`); configured:
+  bounded `himalaya envelope list -s 5 --json` → deterministic spoken
+  digest (subjects+senders, no brain, no bodies). YouTube intent (URL in
+  the question) → `fetch_transcript.py --text-only` (25 s bound,
+  truncated 6000) → local summary → spoken. `youtube-transcript-api`
+  installed into the venv per the skill doc.
+- **Prompt lesson (proven live):** spark17 echoed the instruction
+  ("(answers from the transcript…)") on an instruction-first prompt;
+  transcript-first/question-last on the **detail tier (spark4)**
+  summarizes correctly.
+- **Live proof:** mail → "No mail account is connected yet…" (correct
+  for today's state); YouTube rickroll → "This is the lyrics to 'Never
+  Gonna Give You Up,' the song by Rick Astley." (spark4, real
+  transcript → real summary). Latency note: fetch+summary can take
+  15–60 s on voice — inherent, reported.
+- **Tests:** 4 new (setup answer, deterministic digest, YT summary,
+  defensive envelope parse) + 1 reconciled double (`mail` was missing
+  from the intent alternation — caught by the new test). Sweep **227**
+  voice-edit/STT green; services restarted.
+- **Owner action for live mail:** `himalaya account configure` (needs
+  their Gmail credential) — the listing path is implemented against the
+  documented CLI flags but unprovable until an account exists; the
+  degradation path is live-proven.

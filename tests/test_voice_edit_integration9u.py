@@ -549,3 +549,68 @@ def test_ask_weather_failure_falls_through_to_brain(monkeypatch):
     monkeypatch.setattr(GW, "run_role", lambda prompt, cfg, **kw: FakeRes())
     out = svc.ask("weather in Bucharest?", request_id="w-2", mode="answer")
     assert out["ok"] and out["answer"] == "brain fallback"
+
+
+# ---------------------------------------------------------------------------
+# ask() skill-backed answers (mail digest, YouTube summary)
+# ---------------------------------------------------------------------------
+def test_ask_mail_without_account_answers_setup_without_brain(monkeypatch):
+    svc, audits = _service()
+    _no_brain(monkeypatch)
+    monkeypatch.setattr(svc, "_gmail_configured", lambda: False)
+    out = svc.ask("do I have any new mail?", request_id="m-1", mode="answer")
+    assert out["ok"] and "No mail account is connected yet" in out["answer"]
+    assert out["model"] == "skill-mail"
+
+
+def test_ask_mail_with_account_reads_deterministic_digest(monkeypatch):
+    svc, _audits = _service()
+    _no_brain(monkeypatch)
+    monkeypatch.setattr(svc, "_gmail_configured", lambda: True)
+    monkeypatch.setattr(
+        svc, "_gmail_envelopes",
+        lambda: [("boss@example.com", "Q3 planning"),
+                 ("news@example.com", "Weekly digest")])
+    out = svc.ask("check my gmail inbox", request_id="m-2", mode="answer")
+    assert out["ok"] and "Q3 planning" in out["answer"]
+    assert "boss@example.com" in out["answer"]
+    assert out["model"] == "skill-mail"
+
+
+def test_ask_youtube_summarizes_without_fact_path(monkeypatch):
+    svc, _audits = _service()
+    monkeypatch.setattr(
+        VoiceEditService, "_youtube_script",
+        lambda self: "/tmp/never-called.py")
+
+    import voicebridge.providers.gateway as GW
+
+    class FakeRes:
+        ok = True
+        text = "A song about never giving up."
+        provider = "local"
+        model = "qubit-spark17"
+        code = ""
+        message = ""
+
+    monkeypatch.setattr(GW, "run_role",
+                        lambda prompt, cfg, **kw: FakeRes())
+    import subprocess as _sp
+
+    class _Done:
+        returncode = 0
+        stdout = "Never gonna give you up " * 50
+
+    monkeypatch.setattr(_sp, "run", lambda *a, **k: _Done())
+    out = svc.ask("summarize https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                  request_id="y-1", mode="answer")
+    assert out["ok"] and out["answer"] == "A song about never giving up."
+    assert out["model"] == "qubit-spark17"
+
+
+def test_parse_envelopes_is_defensive():
+    rows = VoiceEditService._parse_envelopes(
+        '[{"subject": "Hi", "from": {"address": "a@b.c"}}]')
+    assert rows == [("a@b.c", "Hi")]
+    assert VoiceEditService._parse_envelopes("not json") is None
+    assert VoiceEditService._parse_envelopes('{"envelopes": []}') == []

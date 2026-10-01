@@ -913,6 +913,175 @@ class VoiceEditService:
         except Exception:
             return ""
 
+    _YT_URL_RE = None  # compiled lazily (see _youtube_url)
+
+    def _skill_answer(self, question: str) -> "tuple[str, str]":
+        """Skill-backed answers: mail digest, YouTube summary.
+
+        Returns ``(answer, model)``; ``("", "")`` falls through to the
+        brain. Mail is deterministic (envelope subjects, no brain); a
+        YouTube URL is fetched then summarized by the local brain. Send/
+        draft/reply mail verbs are NEVER handled here (confirm-gated
+        agent territory). Never raises.
+        """
+        import re as _re
+        q = (question or "").strip()
+        if not q:
+            return "", ""
+        if _re.search(r"\b(e-?mail|gmail|inbox|mailbox|mail)\b", q, _re.IGNORECASE):
+            if _re.search(r"\b(send|compose|write|draft|reply|forward)\b",
+                           q, _re.IGNORECASE):
+                return "", ""
+            if _re.search(r"\b(check|new|unread|any|latest|recent|read|show"
+                           r"|inbox|mailbox|waiting)\b", q, _re.IGNORECASE):
+                return self._mail_answer()
+        url = self._youtube_url(q)
+        if url:
+            return self._youtube_answer(url)
+        return "", ""
+
+    def _gmail_configured(self) -> bool:
+        """A Gmail-capable connector exists (himalaya account file)."""
+        from pathlib import Path as _Path
+        import os as _os
+        try:
+            return (_Path(_os.path.expanduser("~/.config/himalaya"))
+                    .joinpath("config.toml").is_file())
+        except Exception:
+            return False
+
+    def _mail_answer(self) -> "tuple[str, str]":
+        """Spoken inbox digest, or the honest not-connected answer."""
+        if not self._gmail_configured():
+            return ("No mail account is connected yet, so I can't read "
+                    "your mail. Run `himalaya account configure` in a "
+                    "terminal then ask me again.", "skill-mail")
+        rows = self._gmail_envelopes()
+        if rows is None:
+            return "", ""  # fetch failed: fall through to the brain
+        if not rows:
+            return ("Your Gmail inbox is empty.", "skill-mail")
+        bits = []
+        for sender, subject in rows[:5]:
+            bits.append(f"{subject[:80]} from {sender[:40]}")
+        return (f"Latest {len(rows[:5])} in Gmail: "
+                + "; ".join(bits) + ".", "skill-mail")
+
+    def _gmail_envelopes(self) -> Any:
+        """Newest envelopes via the himalaya CLI (bounded, read-only).
+
+        Returns a list of ``(sender, subject)`` or ``None`` on any
+        failure (never raises, never fabricates). Empty list = connected
+        but no mail.
+        """
+        import shutil as _sh
+        import subprocess as _sp
+        try:
+            exe = _sh.which("himalaya")
+            if not exe:
+                from pathlib import Path as _Path
+                import os as _os
+                cand = _Path(_os.path.expanduser("~/.local/bin/himalaya"))
+                exe = str(cand) if cand.is_file() else ""
+            if not exe:
+                return None
+            proc = _sp.run([exe, "envelope", "list", "-s", "5", "--json",
+                            "--log-level", "off"],
+                           capture_output=True, text=True, timeout=15)
+            if proc.returncode != 0:
+                return None
+            return self._parse_envelopes(proc.stdout or "")
+        except Exception:
+            return None
+
+    @staticmethod
+    def _parse_envelopes(raw: str) -> Any:
+        """Parse himalaya envelope JSON defensively (shape varies).
+
+        Returns ``[(sender, subject)]``; ``None`` when nothing parseable
+        (fetch-level failure is reported upstream by returncode).
+        """
+        import json as _json
+        try:
+            data = _json.loads(raw or "")
+        except Exception:
+            return None
+        items = data if isinstance(data, list) else data.get("envelopes",
+                  data.get("messages", [])) if isinstance(data, dict) else []
+        rows = []
+        for it in items if isinstance(items, list) else []:
+            if not isinstance(it, dict):
+                continue
+            subj = str(it.get("subject") or "").strip()
+            sender = ""
+            for key in ("from", "sender", "from_address", "author"):
+                val = it.get(key)
+                if isinstance(val, dict):
+                    val = val.get("address") or val.get("name") or ""
+                if val:
+                    sender = str(val).strip()
+                    break
+            if subj or sender:
+                rows.append((sender or "unknown sender", subj or "(no subject)"))
+        return rows
+
+    @staticmethod
+    def _youtube_url(question: str) -> str:
+        """First YouTube URL in the question, or ""."""
+        import re as _re
+        m = _re.search(r"https?://(?:www\.)?(?:youtube\.com/(?:watch\?[^\s]*"
+                       r"|shorts/\S+|embed/\S+)|youtu\.be/\S+)",
+                       question or "", _re.IGNORECASE)
+        return (m.group(0).rstrip(").,!?;:") if m else "")
+
+    def _youtube_script(self) -> str:
+        """Absolute path of the vendored transcript fetcher, or ""."""
+        from pathlib import Path as _Path
+        try:
+            from .. import qubit_runtime as _HR
+            home = _Path(_HR.runtime_home_for_cfg(self.cfg))
+            cand = (home / "skills" / "media" / "youtube-content"
+                    / "scripts" / "fetch_transcript.py")
+            if cand.is_file():
+                return str(cand)
+        except Exception:
+            pass
+        return ""
+
+    def _youtube_answer(self, url: str) -> "tuple[str, str]":
+        """Fetch a public-video transcript, summarize locally, speak it."""
+        import subprocess as _sp
+        import sys as _sys
+        script = self._youtube_script()
+        if not script:
+            return "", ""
+        try:
+            proc = _sp.run([_sys.executable, script, url, "--text-only"],
+                           capture_output=True, text=True, timeout=25)
+            if proc.returncode != 0:
+                return "", ""
+            text = str(proc.stdout or "").strip()
+            if not text:
+                return "", ""
+        except Exception:
+            return "", ""
+        try:
+            from ..providers import gateway as GW
+            model_override = self._select_model(
+                _read_cfg(self.cfg, "voice_edit", "detail_model", default=""))
+            res = GW.run_role(
+                f"Video transcript:\n{text[:6000]}\n\nWhat is this video "
+                f"about? Answer in two short spoken sentences.",
+                self.cfg, role="chat", profile_id=self._local_profile(),
+                model=model_override,
+                max_tokens=200, timeout_s=60)
+            answer = str(getattr(res, "text", "") or "").strip()
+            if getattr(res, "ok", False) and answer:
+                return answer, str(getattr(res, "model", "") or "local")
+        except Exception:
+            pass
+        return "", ""
+
     def _direct_fact_answer(self, question: str) -> str:
         """Deterministic answers for clock/weather (no model in the loop).
 
@@ -972,6 +1141,18 @@ class VoiceEditService:
             self._remember_ask_exchange(question, direct, model="live-facts")
             return {"ok": True, "answer": direct, "mode": mode,
                     "provider": "local", "model": "live-facts",
+                    "spoken": False}
+        skill_answer, skill_model = self._skill_answer(question)
+        if skill_answer:
+            self._audit("voice_edit.ask", {
+                "request_id": request_id, "mode": mode,
+                "chars": len(question), "ok": True,
+                "answer_chars": len(skill_answer), "provider": "local",
+                "model": skill_model})
+            self._remember_ask_exchange(question, skill_answer,
+                                        model=skill_model)
+            return {"ok": True, "answer": skill_answer, "mode": mode,
+                    "provider": "local", "model": skill_model,
                     "spoken": False}
         escalate, why = self._escalate_for(mode)
         profile = ""
