@@ -99,6 +99,21 @@ const AgentsPage = lazy(() => import("@/pages/AgentsPage"));
 const ChatPage = lazy(() => import("@/pages/ChatPage"));
 const TerminalChatPage = lazy(() => import("@/pages/TerminalChatPage"));
 const VoiceEditPage = lazy(() => import("@/pages/VoiceEditPage"));
+// Qubit family pages (integrator lane): separate Qubit surfaces wired to the
+// gateway backends through GET/POST/PUT /api/qubit/<family>/<action>.
+const AgentWorkspacePage = lazy(() => import("@/pages/AgentWorkspacePage"));
+const NodesPage = lazy(() => import("@/pages/NodesPage"));
+const DevicesPage = lazy(() => import("@/pages/DevicesPage"));
+const SessionOpsPage = lazy(() => import("@/pages/SessionOpsPage"));
+const WorktreesPage = lazy(() => import("@/pages/WorktreesPage"));
+const CheckpointsPage = lazy(() => import("@/pages/CheckpointsPage"));
+const BoardAdminPage = lazy(() => import("@/pages/BoardAdminPage"));
+const TaskInboxPage = lazy(() => import("@/pages/TaskInboxPage"));
+const TalkPage = lazy(() => import("@/pages/TalkPage"));
+const SchedulerMediaPage = lazy(() => import("@/pages/SchedulerMediaPage"));
+const SkillsReviewPage = lazy(() => import("@/pages/SkillsReviewPage"));
+const McpCallsPage = lazy(() => import("@/pages/McpCallsPage"));
+const UsersAdminPage = lazy(() => import("@/pages/UsersAdminPage"));
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useI18n } from "@/i18n";
@@ -196,6 +211,19 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/env": EnvPage,
   "/docs": DocsPage,
   "/voice-edit": VoiceEditPage,
+  "/agent-workspace": AgentWorkspacePage,
+  "/nodes": NodesPage,
+  "/devices": DevicesPage,
+  "/session-ops": SessionOpsPage,
+  "/worktrees": WorktreesPage,
+  "/checkpoints": CheckpointsPage,
+  "/qubit-board-admin": BoardAdminPage,
+  "/qubit-task-inbox": TaskInboxPage,
+  "/qubit-talk": TalkPage,
+  "/qubit-scheduler": SchedulerMediaPage,
+  "/admin/skills-review": SkillsReviewPage,
+  "/admin/mcp-calls": McpCallsPage,
+  "/admin/users": UsersAdminPage,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
@@ -246,6 +274,19 @@ const BUILTIN_NAV_REST: NavItem[] = [
     icon: BookOpen,
   },
   { path: "/voice-edit", label: "Voice Editing", icon: Sparkles },
+  { path: "/agent-workspace", label: "Agent Workspace", icon: Code },
+  { path: "/nodes", label: "Nodes", icon: Globe },
+  { path: "/devices", label: "Devices", icon: Shield },
+  { path: "/session-ops", label: "Session Ops", icon: Activity },
+  { path: "/worktrees", label: "Worktrees", icon: FolderOpen },
+  { path: "/checkpoints", label: "Checkpoints", icon: Database },
+  { path: "/qubit-board-admin", label: "Board Admin", icon: Star },
+  { path: "/qubit-task-inbox", label: "Task Inbox", icon: Heart },
+  { path: "/qubit-talk", label: "Talk", icon: MessageSquare },
+  { path: "/qubit-scheduler", label: "Scheduler", icon: Clock },
+  { path: "/admin/skills-review", label: "Skills Review", icon: Package },
+  { path: "/admin/mcp-calls", label: "MCP Calls", icon: Plug },
+  { path: "/admin/users", label: "Users", icon: Users },
 ];
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {

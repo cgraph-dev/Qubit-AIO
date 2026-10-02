@@ -23,6 +23,8 @@ import hashlib
 import json
 import os
 import re
+import secrets
+import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
@@ -2009,6 +2011,69 @@ def h_model_auxiliary(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _fail(exc)
 
 
+def _model_set_auxiliary(cfg: Any, b: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/model/set scope=auxiliary -> real per-task pin write.
+
+    Ported from the reference ``web_routers/models.py:set_model_assignment``
+    + ``web_server_config._apply_aux_assignment_sync`` (both vendored in
+    ``qubit_runtime``): writes the Qubit runtime config's ``auxiliary``
+    section, which new sessions pick up. ``task`` empty = pin all slots,
+    ``__reset__`` = every slot back to auto. Never serves credentials: an
+    ``api_key`` in the body is a typed refusal (secrets live in .env / the
+    Keys store, never config.yaml). An expensive-model pick returns the
+    upstream ``confirm_required`` envelope; the caller re-POSTs with
+    ``confirm_expensive_model`` (the Models dialog already does).
+    """
+    task = str(b.get("task") or "").strip().lower()
+    provider = str(b.get("provider") or "").strip()
+    model = str(b.get("model") or "").strip()
+    base_url = str(b.get("base_url") or "").strip()
+    if b.get("api_key"):
+        return 400, {"ok": False, "code": "CREDENTIALS_NOT_IN_CONFIG",
+                     "detail": "aux api_key is not stored in config.yaml; put "
+                               "the key in Keys (.env) and pin provider/model only"}
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.web_server_config import (  # type: ignore
+            _AUX_TASK_SLOTS, _UNSET, _apply_aux_assignment_sync,
+        )
+    except Exception as exc:
+        return _fail(exc)
+    if task and task != "__reset__" and task not in _AUX_TASK_SLOTS:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": f"unknown auxiliary task: {task}"}
+    if task != "__reset__" and not provider:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "provider required for auxiliary"}
+    if model and not _truthy(b.get("confirm_expensive_model")):
+        try:
+            from qubit_cli.model_selection_guards import (  # type: ignore
+                combined_selection_warning,
+            )
+            warning = combined_selection_warning(
+                model, provider=provider or None, base_url=base_url or None)
+        except Exception:  # noqa: BLE001 - pricing lookup is best-effort
+            warning = None
+        if warning is not None:
+            return 200, {"ok": False, "scope": "auxiliary",
+                         "provider": provider, "model": model,
+                         "confirm_required": True,
+                         "confirm_message": warning.message}
+    effort = b.get("reasoning_effort") if "reasoning_effort" in b else _UNSET
+    try:
+        from qubit_cli.config import load_config  # type: ignore
+        out = _apply_aux_assignment_sync(
+            load_config(), provider, model, task, base_url, "",
+            reasoning_effort=effort)
+    except Exception as exc:  # noqa: BLE001
+        status = getattr(exc, "status_code", None)
+        detail = _redact(str(getattr(exc, "detail", exc)))[:300]
+        if status == 400:
+            return 400, {"ok": False, "code": "MALFORMED", "detail": detail}
+        return _fail(exc)
+    return 200, out
+
+
 def h_model_moa(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     # MoaConfigResponse wire shape; MoA is superseded by the ordered-fallback
@@ -2026,11 +2091,12 @@ def h_model_moa(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import dashboard_ops as OPS
-    scope = str(b.get("scope", "main") or "main")
+    scope = str(b.get("scope", "main") or "main").lower()
+    if scope == "auxiliary":
+        return _model_set_auxiliary(cfg, b)
     if scope != "main":
-        return 400, {"ok": False, "code": "AUX_PIN_REFUSED",
-                     "detail": "auxiliary task pins are not offered; the main "
-                               "profile owns routing"}
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "scope must be 'main' or 'auxiliary'"}
     model = str(b.get("model") or "")
     if not model:
         return 400, {"ok": False, "code": "MALFORMED",
@@ -2938,24 +3004,78 @@ def _cron_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
 
 def h_logs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import dashboard_ops as OPS
+    """GET /api/logs -> full LogsResponse contract, no proxy required.
+
+    Degraded-mode fallback for the vendored ``get_logs`` reader: serves the
+    SAME wire shape (``{file, lines, offset, limit, returned, has_more,
+    next_offset}``) from the same journal files, so the Logs page keeps its
+    file/level/component/search filters and Older/Newer paging even when the
+    in-process proxy is down. Unknown file/component are typed 400s,
+    mirroring the primary. (The retired branch served 5 lines truncated to
+    160 chars with no pagination fields, which rendered the page nearly
+    empty whenever the proxy degraded.)
+    """
+    file = str(q.get("file", "agent") or "agent")
     try:
         limit = max(1, min(int(q.get("limit", q.get("lines", "100")) or "100"), 500))
     except ValueError:
         limit = 100
-    out = OPS.run_op(cfg, "logs", {"limit": limit},
-                     actor="dashboard:user", session="dashboard")
-    res = _res(out) or {}
-    rows = res.get("logs", []) if isinstance(res, dict) else []
-    lines = []
-    for r in rows if isinstance(rows, list) else []:
-        lines.append(r if isinstance(r, str) else _redact(json.dumps(r))[:500])
-    # LogsResponse wire shape (web/src/lib/api.ts).
     try:
-        fname = str(Path(cfg.state_dir()) / "webui_events.jsonl")
-    except Exception:
-        fname = "webui_events.jsonl"
-    return _ok(file=fname, lines=lines)
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except ValueError:
+        offset = 0
+    level = q.get("level") or None
+    component = q.get("component") or None
+    search = q.get("search") or None
+    profile = q.get("profile") or None
+    try:
+        from . import qubit_runtime as _HR
+        _HR.ensure_path()
+        from qubit_cli.logs import _read_tail, LOG_FILES
+        try:
+            from qubit_logging import COMPONENT_PREFIXES
+        except ImportError:
+            COMPONENT_PREFIXES = {}
+        log_name = LOG_FILES.get(file)
+        if not log_name:
+            return 400, {"ok": False, "code": "UNKNOWN_LOG_FILE",
+                         "detail": f"Unknown log file: {file}"}
+        try:
+            from qubit_cli.web_server_profiles import _config_profile_scope
+            from qubit_constants import get_qubit_home
+            with _config_profile_scope(profile):
+                log_path = get_qubit_home() / "logs" / log_name
+        except Exception:
+            log_path = _HR.runtime_home_for_cfg(cfg) / "logs" / log_name
+        empty = {"file": file, "lines": [], "offset": offset, "limit": limit,
+                 "returned": 0, "has_more": False, "next_offset": None}
+        if not log_path.exists():
+            return _ok(**empty)
+        min_level = level if level and level.upper() != "ALL" else None
+        comp_prefixes = None
+        if component and component.lower() != "all":
+            comp_prefixes = COMPONENT_PREFIXES.get(component)
+            if comp_prefixes is None:
+                return 400, {"ok": False, "code": "UNKNOWN_COMPONENT",
+                             "detail": f"Unknown component: {component}"}
+        # One matching line past the page proves has_more; never guessed.
+        read_n = 2000 if search else max(1, offset + limit + 1)
+        result = _read_tail(log_path, read_n,
+                            has_filters=bool(min_level or comp_prefixes or search),
+                            min_level=min_level,
+                            component_prefixes=comp_prefixes)
+        if search:
+            needle = search.lower()
+            result = [line for line in result if needle in line.lower()]
+        end = len(result) - offset
+        page = result[max(0, end - limit):end] if end > 0 else []
+        has_more = limit > 0 and (len(result) - offset - limit) > 0
+        lines = [_redact(line) for line in page]
+        return _ok(file=file, lines=lines, offset=offset, limit=limit,
+                   returned=len(page), has_more=has_more,
+                   next_offset=(offset + len(page)) if has_more else None)
+    except Exception as exc:
+        return _fail(exc)
 
 
 def h_system_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -7378,7 +7498,8 @@ def h_profile_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         path = P.create_profile(
             name=name, clone_from=clone_from, clone_all=clone_all,
             clone_config=clone_config, no_skills=no_skills,
-            description=description or None)
+            description=description or None,
+            clone_channels=bool(b.get("clone_channels")))
     except FileExistsError as exc:
         return 400, {"ok": False, "code": "PROFILE_EXISTS",
                      "detail": _redact(str(exc))[:300],
@@ -8412,6 +8533,13 @@ _r("POST", r"/api/mcp/servers/(?P<id>[^/]+)/enabled", "mcp_set_enabled")
 _r("PUT", r"/api/mcp/servers/(?P<id>[^/]+)/enabled", "mcp_set_enabled")
 _r("GET", r"/api/mcp/servers/(?P<id>[^/]+)/auth", "mcp_auth_status")
 _r("POST", r"/api/mcp/servers/(?P<id>[^/]+)/auth", "mcp_auth")
+# Qubit MCP OAuth family (dashboard login, parity with the reference
+# dashboard OAuth). The provider callback is served publicly by webui
+# (no dashboard token by design) and never reaches this table.
+_r("GET", r"/api/mcp/oauth/flows", "mcp_oauth_flows_list")
+_r("GET", r"/api/mcp/oauth/flows/(?P<id>[^/]+)", "mcp_oauth_flow_status")
+_r("DELETE", r"/api/mcp/oauth/flows/(?P<id>[^/]+)", "mcp_oauth_flow_cancel")
+_r("GET", r"/api/mcp/oauth/callback/(?P<server_name>.+)", "mcp_oauth_callback")
 _r("GET", r"/api/mcp/catalog", "h_mcp_catalog_live")
 # Catalog install registers the reviewed entry's transport + declared
 # credentials (closed schema, secrets to the runtime .env only) — no code is
@@ -8938,10 +9066,9 @@ GATED: List[Dict[str, Any]] = [
     ("GET", r"/api/providers/oauth", "h_providers_oauth"),
     # The live login family (start/submit/poll/cancel/disconnect) is
     # implemented above (owner decision: port the device-code dance 1:1), so
-    # no blanket POST/poll gate remains here. MCP OAuth flows and the memory
-    # memory-provider OAuth status stay manual-handoff (separate surfaces).
-    ("GET", r"/api/mcp/oauth/flows", _NO_OAUTH),
-    ("GET", r"/api/mcp/oauth/flows/[^/]+", _NO_OAUTH),
+    # no blanket POST/poll gate remains here. The memory-provider OAuth
+    # status stays manual-handoff (separate surface); the MCP OAuth family
+    # is implemented above (Qubit OAuth family) with its own routes.
     # Curator pause/run are real implemented routes above; they are no longer
     # gated here.
     ("GET", r"/api/ops/backup/download", _g("BACKUP_PASSPHRASE",
@@ -9047,8 +9174,6 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/cron/fire", _NO_CRON_FIRE),
     ("POST", r"/api/profiles/sessions/pull-requests", _NO_PROFILE_PR),
     ("POST", r"/api/memory/providers/[^/]+/oauth/start", _NO_OAUTH),
-    ("DELETE", r"/api/mcp/oauth/flows/[^/]+", _NO_OAUTH),
-    ("GET", r"/api/mcp/oauth/callback.*", _NO_OAUTH),
     # Vendored kanban dashboard plugin: reads are served by
     # voicebridge/qubit_plugins.py; task mutations stay on the shared Qubit
     # confirmation/broker path (`qubit kanban` + approvals) rather than the
@@ -11421,17 +11546,14 @@ def mcp_auth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/mcp/servers/{id}/auth -> record a credential reference.
 
-    The SPA's "Authenticate" button posts an empty body when the server's
-    ``auth`` is ``oauth``. Answering every such call with the same 403
-    ``OAUTH_MANUAL_HANDOFF`` made the button a dead end with no path forward.
-    The reference ``auth_mcp_server`` starts a live OAuth flow and hands the
-    browser the authorization URL
-    (``qubit_runtime/qubit_cli/web_routers/mcp.py:194``); Qubit's
-    reference-only credential policy has no server-side token store to receive
-    one, so this returns an actionable **200 manual handoff** (state
-    ``MANUAL_HANDOFF``) carrying the server's real registered endpoint and the
-    exact CLI reference to enroll — never a 403 dead end and never a fabricated
-    "authenticated". A ``vault:/env:/file:`` reference in the body still writes
+    The SPA's "Authenticate" button posts an empty body, which starts a live
+    dashboard OAuth login (the Qubit OAuth family below, same semantics as
+    the reference ``auth_mcp_server``:
+    ``qubit_runtime/qubit_cli/web_routers/mcp.py:194``) and hands the
+    browser the authorization URL. Tokens land in the vendored per-home
+    ``mcp-tokens/`` store; only an ``oauth:<server>`` reference is bridged
+    into the Qubit registry — raw tokens are never accepted here. A
+    ``vault:/env:/file:`` reference in the body still writes the credential
     the credential reference through the confirmed path.
     """
     from . import mcp_servers as MS
@@ -11441,25 +11563,7 @@ def mcp_auth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "detail": "server name required"}
     ref = str(b.get("reference", b.get("token", b.get("value", ""))) or "")
     if not ref:
-        row = next((s for s in MS.list_servers(cfg).get("servers", [])
-                    if s.get("name") == name), None)
-        if row is None:
-            return 404, {"ok": False, "code": "MCP_NOT_FOUND",
-                         "detail": f"no registered server {name!r}"}
-        auth_mode = str(row.get("auth") or "none")
-        endpoint = str(row.get("url") or "") or None
-        return 200, {
-            "ok": True, "state": "MANUAL_HANDOFF",
-            "code": "MCP_OAUTH_MANUAL_HANDOFF",
-            "name": name, "auth": auth_mode, "endpoint": endpoint,
-            "reference_required": True,
-            "reference_kinds": ["vault:", "env:", "file:"],
-            "detail": "Qubit performs no server-side OAuth token dance; enroll "
-                      "the credential out-of-band and POST a "
-                      "vault:/env:/file: reference here.",
-            "qubit_counterpart": "CLI `qubit auth login` + "
-                                 "`qubit mcp servers` (references only)",
-        }
+        return mcp_oauth_start(cfg, q, b, p)
     guard = _compat_confirm(
         cfg, "mcp_server_auth",
         f"recording a credential reference for {name!r} requires explicit "
@@ -11489,6 +11593,296 @@ def mcp_auth_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     ref = (row.get("env") or {}).get("MCP_AUTH", "")
     return _ok(ok=True, name=name, auth=row.get("auth", "none"),
                reference_set=bool(ref), reference=ref or None)
+
+
+# ---------------------------------------------------------------------------
+# Qubit MCP OAuth family (parity with the reference dashboard OAuth login).
+# Hermes is Hermes, Qubit is Qubit: separate agents, but every reference
+# capability works here. The flow machinery (DashboardOAuthFlow, the probe
+# worker, the token store) is reused in-process from the vendored runtime;
+# the routes, the public loopback callback, and the registry bridge below
+# are Qubit's own. Tokens live in ONE store (the vendored per-home
+# ``mcp-tokens/``); the Qubit registry carries only an ``oauth:<server>``
+# reference that :mod:`voicebridge.mcp_client` resolves (read-only,
+# fail-closed on absent/expired).
+# ---------------------------------------------------------------------------
+_MCP_OAUTH_MAX_PENDING = 8  # mirrors vendored _MAX_PENDING_MCP_OAUTH_FLOWS
+_MCP_OAUTH_FLOW_TTL = 15 * 60  # mirrors vendored _MCP_DASHBOARD_OAUTH_TTL
+_MCP_OAUTH_URL_WAIT = 30.0
+
+_OAUTH_PUBLIC_BASE: Optional[str] = None  # set by webui at serve time
+
+
+def set_oauth_public_base(base: str) -> None:
+    """Pin the public dashboard base used for OAuth redirect URIs."""
+    global _OAUTH_PUBLIC_BASE
+    _OAUTH_PUBLIC_BASE = str(base or "").rstrip("/")
+
+
+def _mcp_oauth_flows():
+    """Vendored OAuth flow registry (imported lazily, no startup cost).
+
+    The registry dict itself lives in the vendored runtime so the worker
+    thread and every handler share it; the guard lock is Qubit-owned
+    (mirrors the reference router's own ``_mcp_oauth_flows_lock``).
+    """
+    from . import qubit_runtime as _HR
+    _HR.ensure_path()
+    from qubit_cli.web_server_mcp import _mcp_oauth_flows
+    return _mcp_oauth_flows, _MCP_OAUTH_FLOWS_LOCK
+
+
+_MCP_OAUTH_FLOWS_LOCK = threading.Lock()
+
+
+def _gc_mcp_oauth_flows(flows: Any, lock: Any) -> None:
+    cutoff = time.time() - _MCP_OAUTH_FLOW_TTL
+    with lock:
+        for fid in [fid for fid, fl in flows.items()
+                    if getattr(fl, "created_at", 0) < cutoff]:
+            flows.pop(fid, None)
+
+
+def _flow_snapshot(flow: Any) -> Dict[str, Any]:
+    snap = flow.snapshot()
+    snap["tools"] = list(getattr(flow, "tools", []) or [])
+    return snap
+
+
+def mcp_oauth_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/mcp/servers/{id}/auth (empty body) -> start dashboard OAuth.
+
+    Hands the browser an authorization URL exactly like the reference
+    ``auth_mcp_server``: stdio servers 400 (env keys, not OAuth), servers
+    already on an API-key reference 400 (POST the reference instead),
+    unknown servers 404, duplicate in-progress flow 409, >8 live flows 429.
+    """
+    from . import mcp_servers as MS
+    name = str(p.get("id", "") or b.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MCP_BAD_INPUT",
+                     "detail": "server name required"}
+    row = next((s for s in MS.list_servers(cfg).get("servers", [])
+                if s.get("name") == name), None)
+    if row is None:
+        return 404, {"ok": False, "code": "MCP_NOT_FOUND",
+                     "detail": f"no registered server {name!r}"}
+    url = str(row.get("url") or "")
+    if not url:
+        return 400, {"ok": False, "code": "MCP_STDIO_NO_OAUTH",
+                     "detail": "stdio servers authenticate via env keys, "
+                              "not OAuth; POST a vault:/env:/file: reference"}
+    existing = str((row.get("env") or {}).get("MCP_AUTH", "") or "")
+    if existing and not existing.startswith("oauth:"):
+        return 400, {"ok": False, "code": "MCP_HEADER_AUTH",
+                     "detail": "this server uses header/API-key auth, not "
+                              "OAuth; POST a credential reference instead"}
+    try:
+        from . import qubit_runtime as _HR
+        _HR.ensure_path()
+        from qubit_cli.web_server_mcp import _run_dashboard_mcp_oauth
+        from tools.mcp_dashboard_oauth import DashboardOAuthFlow
+        flows, lock = _mcp_oauth_flows()
+    except Exception as exc:
+        return _fail(exc)
+    _gc_mcp_oauth_flows(flows, lock)
+    try:
+        flow_home = str(_HR.runtime_home_for_cfg(cfg))
+    except Exception:
+        try:
+            flow_home = str(_HR.default_home())
+        except Exception as exc:
+            return _fail(exc)
+    base = _OAUTH_PUBLIC_BASE or "http://127.0.0.1:8890"
+    from urllib.parse import quote as _quote
+    redirect_uri = (f"{base}/api/mcp/oauth/callback/{_quote(name, safe='')}")
+    probe_cfg = {"transport": "http", "url": url, "auth": "oauth"}
+    flow = DashboardOAuthFlow(
+        flow_id=secrets.token_urlsafe(24), server_name=name,
+        profile=(q.get("profile") or None), qubit_home=flow_home,
+        redirect_uri=redirect_uri, reconnect_live=True,
+    )
+    with lock:
+        live = [f for f in flows.values() if not f.worker_done]
+        if len(live) >= _MCP_OAUTH_MAX_PENDING:
+            return 429, {"ok": False, "code": "MCP_OAUTH_BUSY",
+                         "detail": "too many MCP OAuth flows in progress"}
+        if any(f.server_name == name and f.qubit_home == flow_home
+               for f in live):
+            return 409, {"ok": False, "code": "MCP_OAUTH_IN_PROGRESS",
+                         "detail": f"MCP OAuth for {name!r} is already "
+                                  "in progress"}
+        flows[flow.flow_id] = flow
+    threading.Thread(target=_run_dashboard_mcp_oauth, args=(flow, probe_cfg),
+                     daemon=True, name=f"mcp-oauth-{name}").start()
+    deadline = time.time() + _MCP_OAUTH_URL_WAIT
+    while time.time() < deadline:
+        snap = _flow_snapshot(flow)
+        if snap.get("authorization_url") or snap.get("status") == "error":
+            break
+        time.sleep(0.2)
+    snap = _flow_snapshot(flow)
+    _audit("mcp_oauth_start", "dashboard:user",
+           {"name": name, "flow": flow.flow_id[:16],
+            "status": snap.get("status", "")})
+    return _ok(**snap)
+
+
+def _bridge_mcp_oauth_ref(cfg: Any, name: str) -> bool:
+    """Point the Qubit registry at the vendored OAuth token (once).
+
+    Stores ``env.MCP_AUTH = "oauth:<server>"`` + ``auth = "oauth"`` so the
+    Test button and voice invocations resolve the dashboard-obtained token.
+    Returns True when a write happened.
+    """
+    from . import mcp_servers as MS
+    try:
+        data = MS._load(cfg)
+    except Exception:
+        return False
+    rec = (data.get("servers") or {}).get(name)
+    if not isinstance(rec, dict):
+        return False
+    want = f"oauth:{name}"
+    env = dict(rec.get("env") or {})
+    if env.get("MCP_AUTH") == want and rec.get("auth") == "oauth":
+        return False
+    env["MCP_AUTH"] = want
+    rec["env"] = env
+    rec["auth"] = "oauth"
+    rec["updated_at"] = time.time()
+    try:
+        MS._save(cfg, data)
+    except Exception:
+        return False
+    _audit("mcp_oauth_bridged", "dashboard:user", {"name": name})
+    return True
+
+
+def mcp_oauth_flows_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/oauth/flows -> live flow snapshots."""
+    try:
+        flows, lock = _mcp_oauth_flows()
+    except Exception as exc:
+        return _fail(exc)
+    _gc_mcp_oauth_flows(flows, lock)
+    with lock:
+        items = [_flow_snapshot(f) for f in flows.values()]
+    return _ok(flows=items, count=len(items))
+
+
+def mcp_oauth_flow_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/oauth/flows/{id} -> poll one flow.
+
+    On ``approved`` the vendored token is bridged into the Qubit registry
+    (once) so Test/voice resolve it immediately.
+    """
+    fid = str(p.get("id", "") or "")
+    try:
+        flows, lock = _mcp_oauth_flows()
+    except Exception as exc:
+        return _fail(exc)
+    _gc_mcp_oauth_flows(flows, lock)
+    flow = flows.get(fid)
+    if flow is None:
+        return 404, {"ok": False, "code": "MCP_OAUTH_GONE",
+                     "detail": "OAuth flow not found or expired"}
+    snap = _flow_snapshot(flow)
+    if snap.get("status") == "approved":
+        try:
+            _bridge_mcp_oauth_ref(cfg, str(snap.get("server_name") or ""))
+        except Exception:
+            pass
+    return _ok(**snap)
+
+
+def mcp_oauth_callback(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/oauth/callback/{server} -> JSON view of the landing.
+
+    Real browsers are served HTML by the public webui branch (no dashboard
+    token by design); this dispatch variant carries the same semantics over
+    JSON so the route resolves on every prefix (``/agent/api/...`` included)
+    and stays covered by dispatch tests.
+    """
+    q = q or {}
+    code, html = mcp_oauth_deliver(str(p.get("server_name", "") or ""), q)
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = re.sub(r"\s+", " ", text).strip()
+    if q.get("error"):
+        state = "failed"
+    elif code == 200:
+        state = "received"
+    elif code == 409:
+        state = "replayed"
+    else:
+        state = "expired"
+    return code, {"ok": code == 200, "state": state,
+                  "server": str(p.get("server_name", "") or ""),
+                  "detail": text}
+
+
+def mcp_oauth_flow_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/mcp/oauth/flows/{id} -> cancel an in-flight flow."""
+    fid = str(p.get("id", "") or "")
+    try:
+        flows, lock = _mcp_oauth_flows()
+    except Exception as exc:
+        return _fail(exc)
+    flow = flows.get(fid)
+    if flow is None:  # expired/GC'd is the goal state of a cancel
+        return _ok(ok=True, status="expired")
+    try:
+        flow.mark_error("Cancelled by user", cancelled=True)
+    except TypeError:  # older vendored signature without `cancelled`
+        flow.mark_error("Cancelled by user")
+    return _ok(ok=True, status=_flow_snapshot(flow).get("status"))
+
+
+def mcp_oauth_deliver(server_name: str,
+                      q: Dict[str, str]) -> Tuple[int, str]:
+    """Provider redirect landing (public: no dashboard token by design).
+
+    Matches the reference callback semantics: state-checked delivery to the
+    waiting flow, typed HTML pages for expired/invalid/failed callbacks.
+    """
+    server_name = str(server_name or "")
+    try:
+        flows, lock = _mcp_oauth_flows()
+    except Exception as exc:
+        return 500, (f"<h1>OAuth unavailable</h1><p>{str(exc)[:160]}</p>")
+    _gc_mcp_oauth_flows(flows, lock)
+    state = q.get("state")
+    with lock:
+        candidates = [f for f in flows.values()
+                      if f.server_name == server_name
+                      and f.status == "authorization_required"]
+    flow = next(
+        (c for c in candidates
+         if c.expected_state is not None and state is not None
+         and secrets.compare_digest(c.expected_state, state)),
+        None,
+    )
+    if flow is None:
+        return 404, ("<h1>OAuth flow expired</h1>"
+                     "<p>Return to Qubit and try again.</p>")
+    try:
+        flow.deliver_callback(code=q.get("code"), state=state,
+                              error=q.get("error"), iss=q.get("iss"))
+    except ValueError as exc:
+        msg = str(exc)
+        return ((409 if "already received" in msg else 400),
+                "<h1>OAuth callback rejected</h1>"
+                "<p>The callback was invalid or already used.</p>")
+    if q.get("error"):
+        return 400, ("<h1>Authorization failed</h1>"
+                     "<p>Return to Qubit for details.</p>")
+    return 200, ("<h1>Authorization received</h1>"
+                 "<p>You can close this tab and return to Qubit.</p>")
 
 
 def webhooks_enable(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -15765,6 +16159,10 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "mcp_set_enabled": mcp_set_enabled,
     "mcp_auth": mcp_auth,
     "mcp_auth_status": mcp_auth_status,
+    "mcp_oauth_flows_list": mcp_oauth_flows_list,
+    "mcp_oauth_flow_status": mcp_oauth_flow_status,
+    "mcp_oauth_flow_cancel": mcp_oauth_flow_cancel,
+    "mcp_oauth_callback": mcp_oauth_callback,
     "mcp_invoke": mcp_invoke,
     "webhooks_enable": webhooks_enable,
     "webhooks_enabled": webhooks_enabled,
@@ -16178,3 +16576,546 @@ def dispatch(cfg: Any, method: str, path: str,
         return _fail(exc)
     _audit("served", actor, {"route": f"{method} {path}", "code": str(code)})
     return code, out
+
+
+# ---------------------------------------------------------------------------
+# Qubit family bridge (integrator lane): /api/qubit/<family>/<action>
+# ---------------------------------------------------------------------------
+#
+# The five page-builder lanes shipped 13 Qubit pages + five per-family client
+# modules (ocFamilyAgentsApi, ocFamilySessionsApi, ocFamilyBoardApi,
+# ocFamilyTalkApi, ocFamilyAdminApi) with top-of-file ROUTES manifests. This
+# section is the single wiring owner: a GENERIC bridge that serves every
+# manifest path verbatim and delegates each call to the already-registered
+# gateway registry method behind it
+# (``voicebridge.gateway.rpc.default_registry`` — the one in-process registry
+# the CLI, dashboard, and voice surfaces share). No dynamic imports, no new
+# stores, no new backends.
+#
+# Contract (the same shape the sibling h_* handlers use):
+# * actor is always "dashboard:user"; the shared dispatcher audits the call.
+# * reads ("read") execute immediately through the registry.
+# * mutations ("mutation") are e-stop gated, then confirm-gated through the
+#   shared journal: without explicit confirmation (or a consumable
+#   confirmation_id staged by a prior call) the answer is a typed 409 with a
+#   real confirmation_id; re-POST with {"confirm": true} (or the staged id)
+#   executes exactly once through the registry with confirmed=True.
+# * direct writes ("write") execute immediately but stay e-stop gated (they
+#   mirror an underlying handler that is itself unconfirmed, e.g. the
+#   font/theme preference writes behind users.prefs.set).
+# * unknown family/action (or a wrong HTTP method) is a typed 404 — never a
+#   dynamic import, never a fabricated success.
+# * a manifest path with no registered gateway method behind it answers the
+#   honest typed gate recorded in its entry (never invented behavior).
+#
+# Reused, never duplicated: the session picker (GET /api/sessions), the
+# worktree roster (GET /api/git/worktrees, GET /api/git/branches), and the
+# checkpoint journal (GET /api/ops/checkpoints, POST
+# /api/ops/checkpoints/prune) already exist and the pages call them directly.
+
+# One row per manifest path. "action" is the path remainder under
+# /api/qubit/<family>/; "{id}" matches exactly one non-empty segment (its
+# value is passed through as "id"). "aliases" renames caller keys to the
+# gateway method's parameter names (applied simultaneously from the original
+# body, so two renames can never collide); the gateway backend stays
+# authoritative and validates everything.
+_QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
+    # -- agent-workspace (ocFamilyAgentsApi) --
+    {"family": "agent-workspace", "action": "list", "methods": ["GET"],
+     "gateway": "agents.workspace.list", "kind": "read"},
+    {"family": "agent-workspace", "action": "get", "methods": ["GET"],
+     "gateway": "agents.workspace.get", "kind": "read"},
+    {"family": "agent-workspace", "action": "run-status", "methods": ["GET"],
+     "gateway": "agent.wait", "kind": "read"},
+    # -- nodes (ocFamilyAgentsApi) --
+    {"family": "nodes", "action": "list", "methods": ["GET"],
+     "gateway": "node.list", "kind": "read"},
+    {"family": "nodes", "action": "describe", "methods": ["GET"],
+     "gateway": "node.describe", "kind": "read"},
+    {"family": "nodes", "action": "enroll", "methods": ["POST"],
+     "gateway": "node.pair.approve", "kind": "mutation",
+     "aliases": {"node_id": "name", "label": "name"}},
+    {"family": "nodes", "action": "approve", "methods": ["POST"],
+     "gateway": "node.pair.approve", "kind": "mutation",
+     "aliases": {"node_id": "name"}},
+    {"family": "nodes", "action": "revoke", "methods": ["POST"],
+     "gateway": "node.pair.reject", "kind": "mutation"},
+    {"family": "nodes", "action": "remove", "methods": ["POST"],
+     "gateway": "node.pair.remove", "kind": "mutation"},
+    {"family": "nodes", "action": "capabilities", "methods": ["GET"],
+     "gateway": "node.pluginSurface.refresh", "kind": "read"},
+    {"family": "nodes", "action": "dispatch", "methods": ["POST"],
+     "gateway": "node.invoke", "kind": "mutation",
+     "aliases": {"task": "capability"}},
+    {"family": "nodes", "action": "rename", "methods": ["POST"],
+     "gateway": "node.rename", "kind": "mutation"},
+    # -- devices (ocFamilyAgentsApi) --
+    {"family": "devices", "action": "setup-status", "methods": ["GET"],
+     "gateway": "device.pair.setupStatus", "kind": "read"},
+    {"family": "devices", "action": "setup-code-mint", "methods": ["POST"],
+     "gateway": "device.pair.setupCode", "kind": "mutation",
+     "aliases": {"ttl_seconds": "ttl_s"}},
+    {"family": "devices", "action": "pairings", "methods": ["GET"],
+     "gateway": "device.pair.list", "kind": "read"},
+    {"family": "devices", "action": "approve", "methods": ["POST"],
+     "gateway": "device.pair.approve", "kind": "mutation",
+     "aliases": {"pairing_id": "code"}},
+    {"family": "devices", "action": "reject", "methods": ["POST"],
+     "gateway": "device.pair.reject", "kind": "mutation",
+     "aliases": {"pairing_id": "code_id"}},
+    {"family": "devices", "action": "remove", "methods": ["POST"],
+     "gateway": "device.pair.remove", "kind": "mutation",
+     "aliases": {"pairing_id": "code_id"}},
+    {"family": "devices", "action": "token-rotate", "methods": ["POST"],
+     "gateway": "device.token.rotate", "kind": "mutation",
+     "aliases": {"pairing_id": "id"}},
+    {"family": "devices", "action": "token-revoke", "methods": ["POST"],
+     "gateway": "device.token.revoke", "kind": "mutation",
+     "aliases": {"pairing_id": "id"}},
+    {"family": "devices", "action": "enroll", "methods": ["POST"],
+     "gateway": "device.pair.approve", "kind": "mutation",
+     "aliases": {"setup_code_id": "code"}},
+    {"family": "devices", "action": "identity", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "DEVICE_IDENTITY_UNAVAILABLE",
+              "detail": "no registered gateway method serves device "
+                        "identity cards; pairings are the canonical read",
+              "counterpart": "GET /api/qubit/devices/pairings "
+                             "(device.pair.list)"}},
+    # -- session-ops (ocFamilySessionsApi) --
+    {"family": "session-ops", "action": "reset", "methods": ["POST"],
+     "gateway": "sessions.reset", "kind": "mutation"},
+    {"family": "session-ops", "action": "rewind", "methods": ["POST"],
+     "gateway": "sessions.rewind", "kind": "mutation"},
+    {"family": "session-ops", "action": "compact", "methods": ["POST"],
+     "gateway": "sessions.compact", "kind": "mutation"},
+    {"family": "session-ops", "action": "fork", "methods": ["POST"],
+     "gateway": "sessions.fork", "kind": "mutation"},
+    {"family": "session-ops", "action": "branch-switch", "methods": ["POST"],
+     "gateway": "sessions.branches.switch", "kind": "mutation",
+     "aliases": {"target": "branch_id"}},
+    {"family": "session-ops", "action": "compaction-branch",
+     "methods": ["POST"], "gateway": "sessions.compaction.branch",
+     "kind": "mutation"},
+    {"family": "session-ops", "action": "compaction-restore",
+     "methods": ["POST"], "gateway": "sessions.compaction.restore",
+     "kind": "mutation"},
+    {"family": "session-ops", "action": "cleanup-empty", "methods": ["POST"],
+     "gateway": "sessions.cleanup", "kind": "mutation"},
+    {"family": "session-ops", "action": "goals-set", "methods": ["POST"],
+     "gateway": "sessions.goal.update", "kind": "mutation",
+     "aliases": {"goals": "goal"}},
+    {"family": "session-ops", "action": "goals-clear", "methods": ["POST"],
+     "gateway": "sessions.goal.clear", "kind": "mutation"},
+    {"family": "session-ops", "action": "suggestions", "methods": ["GET"],
+     "gateway": "session.suggestions.list", "kind": "read"},
+    {"family": "session-ops", "action": "suggestions-add",
+     "methods": ["POST"], "gateway": "session.suggestions.add",
+     "kind": "mutation"},
+    {"family": "session-ops", "action": "suggestions-resolve",
+     "methods": ["POST"], "gateway": "session.suggestions.resolve",
+     "kind": "mutation"},
+    {"family": "session-ops", "action": "groups", "methods": ["GET"],
+     "gateway": "sessions.groups.list", "kind": "read"},
+    {"family": "session-ops", "action": "groups-create", "methods": ["POST"],
+     "gateway": "sessions.groups.put", "kind": "mutation"},
+    {"family": "session-ops", "action": "groups-rename", "methods": ["POST"],
+     "gateway": "sessions.groups.rename", "kind": "mutation",
+     "aliases": {"group_id": "name", "name": "to"}},
+    {"family": "session-ops", "action": "groups-delete", "methods": ["POST"],
+     "gateway": "sessions.groups.delete", "kind": "mutation",
+     "aliases": {"group_id": "name"}},
+    {"family": "session-ops", "action": "companion-ask", "methods": ["POST"],
+     "gateway": "sessions.companion.ask", "kind": "read"},
+    {"family": "session-ops", "action": "companion-state", "methods": ["GET"],
+     "gateway": "sessions.companion.state", "kind": "read"},
+    {"family": "session-ops", "action": "companion-reset",
+     "methods": ["POST"], "gateway": "sessions.companion.reset",
+     "kind": "mutation"},
+    # -- worktrees (ocFamilySessionsApi; roster reads reuse /api/git/*) --
+    {"family": "worktrees", "action": "create", "methods": ["POST"],
+     "gateway": "worktrees.create", "kind": "mutation",
+     "name_from_path": True},
+    {"family": "worktrees", "action": "remove", "methods": ["POST"],
+     "gateway": "worktrees.remove", "kind": "mutation"},
+    {"family": "worktrees", "action": "restore", "methods": ["POST"],
+     "gateway": "worktrees.restore", "kind": "mutation",
+     "name_from_path": True},
+    {"family": "worktrees", "action": "prune", "methods": ["POST"],
+     "gateway": "worktrees.gc", "kind": "mutation"},
+    # -- checkpoints (ocFamilySessionsApi; journal reads reuse /api/ops/*) --
+    # Journal checkpoints are verify-only by design (no restore path); no
+    # gateway method is registered behind create/verify, so both answer the
+    # honest gate. Port candidate for a follow-up lane: register gateway
+    # methods over voicebridge/checkpoints.py, then map these rows to them.
+    {"family": "checkpoints", "action": "create", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "CHECKPOINTS_JOURNAL_VERIFY_ONLY",
+              "detail": "no registered gateway method creates journal "
+                        "checkpoints; the journal surface is verify-only",
+              "counterpart": "GET /api/ops/checkpoints (the checkpoint "
+                             "journal) + POST /api/ops/checkpoints/prune"}},
+    {"family": "checkpoints", "action": "verify", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "CHECKPOINTS_JOURNAL_VERIFY_ONLY",
+              "detail": "no registered gateway method verifies one journal "
+                        "checkpoint by id; the journal surface is verify-only",
+              "counterpart": "GET /api/ops/checkpoints (the checkpoint "
+                             "journal)"}},
+    # -- board (ocFamilyBoardApi; tab mutations fold into board.update) --
+    {"family": "board", "action": "tabs", "methods": ["GET"],
+     "gateway": "board.get", "kind": "read"},
+    {"family": "board", "action": "tab_create", "methods": ["POST"],
+     "gateway": "board.update", "kind": "mutation",
+     "board_op": "tab_create"},
+    {"family": "board", "action": "tab_rename", "methods": ["POST"],
+     "gateway": "board.update", "kind": "mutation",
+     "board_op": "tab_update_title"},
+    {"family": "board", "action": "tab_move", "methods": ["POST"],
+     "gateway": "board.update", "kind": "mutation",
+     "board_op": "tab_update_position"},
+    {"family": "board", "action": "tab_delete", "methods": ["POST"],
+     "gateway": "board.update", "kind": "mutation",
+     "board_op": "tab_delete"},
+    {"family": "board", "action": "widgets", "methods": ["GET"],
+     "gateway": "board.get", "kind": "read"},
+    {"family": "board", "action": "widget_add", "methods": ["POST"],
+     "gateway": "board.widget.put", "kind": "mutation"},
+    {"family": "board", "action": "widget_remove", "methods": ["POST"],
+     "gateway": "board.update", "kind": "mutation",
+     "board_op": "widget_remove"},
+    {"family": "board", "action": "roster", "methods": ["GET"],
+     "gateway": "board.widget.grant", "kind": "read"},
+    {"family": "board", "action": "role_grant", "methods": ["POST"],
+     "gateway": "board.widget.grant", "kind": "mutation"},
+    {"family": "board", "action": "log", "methods": ["GET"],
+     "gateway": "board.event", "kind": "read"},
+    # -- task (ocFamilyBoardApi) --
+    {"family": "task", "action": "ledger", "methods": ["GET"],
+     "gateway": "task.history", "kind": "read"},
+    {"family": "task", "action": "suggestions", "methods": ["GET"],
+     "gateway": "task.suggestions", "kind": "read"},
+    {"family": "task", "action": "cancel", "methods": ["POST"],
+     "gateway": "tasks.cancel", "kind": "mutation"},
+    {"family": "task", "action": "retry", "methods": ["POST"],
+     "gateway": "tasks.retry", "kind": "mutation"},
+    # -- talk (ocFamilyTalkApi; realtime rows are never called) --
+    {"family": "talk", "action": "mode", "methods": ["GET"],
+     "gateway": "talk.mode", "kind": "read"},
+    {"family": "talk", "action": "catalog", "methods": ["GET"],
+     "gateway": "talk.catalog", "kind": "read"},
+    {"family": "talk", "action": "config", "methods": ["GET"],
+     "gateway": "talk.config", "kind": "read"},
+    {"family": "talk", "action": "voicewake", "methods": ["GET"],
+     "gateway": "voicewake.get", "kind": "read"},
+    {"family": "talk", "action": "client-steer", "methods": ["POST"],
+     "gateway": "talk.client.steer", "kind": "mutation"},
+    {"family": "talk", "action": "client-transcript", "methods": ["POST"],
+     "gateway": "talk.client.transcript", "kind": "mutation"},
+    {"family": "talk", "action": "client-tool-call", "methods": ["POST"],
+     "gateway": "talk.client.toolCall", "kind": "mutation"},
+    {"family": "talk", "action": "speak", "methods": ["POST"],
+     "gateway": "talk.speak", "kind": "mutation"},
+    # -- scheduler (ocFamilyTalkApi) --
+    {"family": "scheduler", "action": "cron-update", "methods": ["POST"],
+     "gateway": "cron.update", "kind": "mutation"},
+    {"family": "scheduler", "action": "tts-set-provider", "methods": ["POST"],
+     "gateway": "tts.setProvider", "kind": "mutation"},
+    {"family": "scheduler", "action": "tts-enable", "methods": ["POST"],
+     "gateway": "tts.enable", "kind": "mutation"},
+    {"family": "scheduler", "action": "tts-disable", "methods": ["POST"],
+     "gateway": "tts.disable", "kind": "mutation"},
+    {"family": "scheduler", "action": "tts-set-persona", "methods": ["POST"],
+     "gateway": "tts.setPersona", "kind": "mutation"},
+    {"family": "scheduler", "action": "suspend-prepare", "methods": ["GET"],
+     "gateway": "gateway.suspend.prepare", "kind": "read"},
+    {"family": "scheduler", "action": "suspend-resume", "methods": ["GET"],
+     "gateway": "gateway.suspend.resume", "kind": "read"},
+    {"family": "scheduler", "action": "tasks-cancel", "methods": ["POST"],
+     "gateway": "tasks.cancel", "kind": "mutation"},
+    {"family": "scheduler", "action": "tasks-retry", "methods": ["POST"],
+     "gateway": "tasks.retry", "kind": "mutation"},
+    # -- skills-review (ocFamilyAdminApi) --
+    {"family": "skills-review", "action": "proposals", "methods": ["GET"],
+     "gateway": "skills.proposals.list", "kind": "read"},
+    {"family": "skills-review", "action": "proposals", "methods": ["POST"],
+     "gateway": "skills.proposals.create", "kind": "mutation"},
+    {"family": "skills-review", "action": "proposals/{id}",
+     "methods": ["GET"], "gateway": "skills.proposals.inspect",
+     "kind": "read"},
+    {"family": "skills-review", "action": "history-status",
+     "methods": ["GET"], "gateway": "skills.proposals.historyStatus",
+     "kind": "read"},
+    {"family": "skills-review", "action": "proposals/{id}/apply",
+     "methods": ["POST"], "gateway": "skills.proposals.apply",
+     "kind": "mutation"},
+    {"family": "skills-review", "action": "proposals/{id}/reject",
+     "methods": ["POST"], "gateway": "skills.proposals.reject",
+     "kind": "mutation"},
+    {"family": "skills-review", "action": "proposals/{id}/quarantine",
+     "methods": ["POST"], "gateway": "skills.proposals.quarantine",
+     "kind": "mutation"},
+    {"family": "skills-review", "action": "proposals/{id}/revise",
+     "methods": ["POST"], "gateway": "skills.proposals.revise",
+     "kind": "mutation"},
+    {"family": "skills-review", "action": "proposals/{id}/update",
+     "methods": ["POST"], "gateway": "skills.proposals.update",
+     "kind": "mutation"},
+    {"family": "skills-review", "action": "proposals/{id}/request-revision",
+     "methods": ["POST"], "gateway": "skills.proposals.requestRevision",
+     "kind": "mutation"},
+    {"family": "skills-review", "action": "events", "methods": ["GET"],
+     "gateway": "skills.proposals.events.list", "kind": "read",
+     "aliases": {"after": "after_sequence"}},
+    {"family": "skills-review", "action": "curator/pin", "methods": ["POST"],
+     "gateway": "skills.curator.pin", "kind": "mutation"},
+    {"family": "skills-review", "action": "curator/unpin",
+     "methods": ["POST"], "gateway": "skills.curator.unpin",
+     "kind": "mutation"},
+    {"family": "skills-review", "action": "curator/restore",
+     "methods": ["POST"], "gateway": "skills.curator.restore",
+     "kind": "mutation"},
+    # -- mcp-calls (ocFamilyAdminApi) --
+    {"family": "mcp-calls", "action": "call-tool", "methods": ["POST"],
+     "gateway": "mcp.app.callTool", "kind": "mutation"},
+    {"family": "mcp-calls", "action": "resources", "methods": ["GET"],
+     "gateway": "mcp.app.listResources", "kind": "read"},
+    {"family": "mcp-calls", "action": "resources/read", "methods": ["GET"],
+     "gateway": "mcp.app.readResource", "kind": "read"},
+    # -- users (ocFamilyAdminApi; single-operator adapter) --
+    {"family": "users", "action": "list", "methods": ["GET"],
+     "gateway": "users.list", "kind": "read"},
+    {"family": "users", "action": "self", "methods": ["GET"],
+     "gateway": "users.self", "kind": "read"},
+    {"family": "users", "action": "mentionable", "methods": ["GET"],
+     "gateway": "users.mentionable", "kind": "read"},
+    {"family": "users", "action": "prefs", "methods": ["GET"],
+     "gateway": "users.prefs.get", "kind": "read"},
+    {"family": "users", "action": "prefs", "methods": ["PUT"],
+     "gateway": "users.prefs.set", "kind": "write"},
+    {"family": "users", "action": "auth-links", "methods": ["GET"],
+     "gateway": "users.listAuthLinks", "kind": "read"},
+    {"family": "users", "action": "model-accounts", "methods": ["GET"],
+     "gateway": "users.listModelAccounts", "kind": "read"},
+    {"family": "users", "action": "select-model-account",
+     "methods": ["POST"], "gateway": "users.selectModelAccount",
+     "kind": "mutation"},
+    {"family": "users", "action": "link-auth-profile", "methods": ["POST"],
+     "gateway": "users.linkAuthProfile", "kind": "mutation"},
+    {"family": "users", "action": "unlink-auth-profile", "methods": ["POST"],
+     "gateway": "users.unlinkAuthProfile", "kind": "mutation"},
+    {"family": "users", "action": "auth-connect-catalog", "methods": ["GET"],
+     "gateway": "users.authConnect.catalog", "kind": "read"},
+]
+
+_NAME_LIKE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+def _qubit_family_match(family: str, rest: str,
+                        method: str) -> Tuple[Optional[Dict[str, Any]], str]:
+    """Match a bridge remainder against the allowlist (verbatim, no imports).
+
+    Returns (entry, id) — the allowlist row plus the "{id}" segment value
+    ("" when the template has none). Unknown family/action is (None, "").
+    """
+    segs = [s for s in str(rest or "").split("/") if s not in ("", ".")]
+    if not segs or ".." in segs:
+        return None, ""
+    for entry in _QUBIT_FAMILY_BRIDGE:
+        if entry["family"] != family or method not in entry["methods"]:
+            continue
+        tsegs = str(entry["action"]).split("/")
+        if len(tsegs) != len(segs):
+            continue
+        seen = ""
+        ok = True
+        for tseg, seg in zip(tsegs, segs):
+            if tseg == "{id}":
+                if not seg:
+                    ok = False
+                    break
+                seen = seg
+            elif tseg != seg:
+                ok = False
+                break
+        if ok:
+            return entry, seen
+    return None, ""
+
+
+def _qubit_family_http(code: Any) -> int:
+    """Map a gateway error code to its honest HTTP status (never 2xx)."""
+    c = str(code or "")
+    if ("NOT_FOUND" in c or c.endswith("_GONE") or c == "STORE_MISSING"
+            or "UNKNOWN" in c or c == "AGENT_NOT_FOUND"):
+        return 404
+    if "BAD_PARAMS" in c or "MALFORMED" in c:
+        return 400
+    if ("OPERATOR_REQUIRED" in c or "OPERATOR_OWNED" in c
+            or c == "EMERGENCY_STOP"):
+        return 403
+    if "CONFIRM" in c:
+        return 409
+    return 400
+
+
+def _qubit_family_params(entry: Dict[str, Any], q: Dict[str, str],
+                         b: Dict[str, Any], pid: str) -> Dict[str, Any]:
+    """Build the gateway params: query + body + path id, aliases applied.
+
+    Aliases rename caller keys to the gateway method's parameter names,
+    applied simultaneously from the original body so two renames can never
+    collide. The gateway backend stays authoritative and validates everything.
+    """
+    params: Dict[str, Any] = {}
+    if isinstance(q, dict):
+        params.update(q)
+    body = b if isinstance(b, dict) else {}
+    aliases = entry.get("aliases") or {}
+    renamed: Dict[str, Any] = {}
+    for key, value in body.items():
+        target = aliases.get(key, key)
+        if target not in renamed and target not in params:
+            renamed[target] = value
+    params.update(renamed)
+    if pid and "id" not in params:
+        params["id"] = pid
+    board_op = entry.get("board_op")
+    if board_op:
+        board = str(params.get("board", "") or "main")
+        tab_id = str(params.get("tabId", params.get("tab_id", "")) or "")
+        title = str(params.get("title", "") or "")
+        if board_op == "tab_create":
+            params["ops"] = [{"kind": "tab_create", "tabId": tab_id,
+                              "title": title}]
+        elif board_op == "tab_update_title":
+            params["ops"] = [{"kind": "tab_update", "tabId": tab_id,
+                              "title": title}]
+        elif board_op == "tab_update_position":
+            try:
+                position = int(params.get("position", 0))
+            except (TypeError, ValueError):
+                position = 0
+            params["ops"] = [{"kind": "tab_update", "tabId": tab_id,
+                              "position": position}]
+        elif board_op == "tab_delete":
+            params["ops"] = [{"kind": "tab_delete", "tabId": tab_id}]
+        elif board_op == "widget_remove":
+            params["ops"] = [{"kind": "widget_remove",
+                              "name": str(params.get("id", "") or "")}]
+        params["board"] = board
+    if entry.get("name_from_path") and "name" not in params:
+        raw = str(params.get("path", "") or "")
+        if _NAME_LIKE_RE.match(raw):
+            params["name"] = raw
+    return params
+
+
+def _qubit_family_gateway_call(cfg: Any, entry: Dict[str, Any],
+                               params: Dict[str, Any]
+                               ) -> Tuple[int, Dict[str, Any]]:
+    """Run one allowlisted gateway method; GatewayErrors become typed HTTP."""
+    from .gateway.gateway_ws import GatewayError
+    from .gateway.rpc import default_registry
+
+    method = str(entry["gateway"] or "")
+    try:
+        registry = default_registry()
+        if method not in registry.names():
+            return 500, {"ok": False, "code": "FAMILY_METHOD_NOT_REGISTERED",
+                         "detail": f"gateway method {method!r} is not "
+                                   "registered; nothing was executed",
+                         "gateway_method": method}
+        result = registry.handle(cfg, method, params)
+    except GatewayError as exc:
+        return _qubit_family_http(exc.code), {
+            "ok": False, "code": exc.code,
+            "detail": _redact(exc.message)[:300],
+            "gateway_method": method}
+    except Exception as exc:
+        return _fail(exc)
+    if not isinstance(result, dict):
+        result = {"result": result}
+    return 200, _jsonable(result)
+
+
+def _qubit_family_dispatch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str], http_method: str
+                           ) -> Tuple[int, Dict[str, Any]]:
+    """Shared bridge core: allowlist -> confirm gate -> registry delegate."""
+    family = str((p or {}).get("family", "") or "")
+    rest = str((p or {}).get("rest", "") or "")
+    entry, pid = _qubit_family_match(family, rest, http_method)
+    if entry is None:
+        return 404, {"ok": False, "code": "FAMILY_UNKNOWN_ACTION",
+                     "detail": f"no Qubit family route for {http_method} "
+                               f"/api/qubit/{family}/{rest}",
+                     "qubit_counterpart": "the five family manifests "
+                                          "(ocFamily*Api ROUTES)"}
+    kind = str(entry.get("kind", "read") or "read")
+    if entry.get("gateway") is None:
+        gate = entry.get("gate") or {}
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": gate.get("code", "FAMILY_GATE"),
+                     "detail": gate.get("detail", "no backend behind "
+                                                  "this family path"),
+                     "qubit_counterpart": gate.get("counterpart", ""),
+                     "owner": "qubit-policy",
+                     "rollback": "read-only; nothing to roll back"}
+    params = _qubit_family_params(entry, q, b, pid)
+    if kind in ("mutation", "write"):
+        if _estop(cfg):
+            return 403, {"ok": False, "state": "UNAVAILABLE",
+                         "code": "EMERGENCY_STOP",
+                         "detail": "emergency stop latched; mutation refused",
+                         "owner": "qubit-policy",
+                         "rollback": "nothing changed; nothing to roll back"}
+        if kind == "mutation":
+            safe = {k: v for k, v in params.items()
+                    if isinstance(v, (str, int, float, bool)) or v is None}
+            guard = _compat_confirm(
+                cfg, f"family.{family}.{entry['action']}",
+                f"family {family}/{entry['action']} requires explicit "
+                "confirmation: re-POST with {\"confirm\": true}",
+                q, b, payload=safe)
+            if guard is not None:
+                return guard
+        params["confirmed"] = True
+        params["confirmation_id"] = str(
+            params.get("confirmation_id", "") or "")
+        params["requested_by"] = "dashboard:user"
+    else:
+        params.setdefault("requested_by", "dashboard:user")
+    return _qubit_family_gateway_call(cfg, entry, params)
+
+
+def h_qubit_family_get(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/<family>/<action> -> allowlisted gateway read."""
+    return _qubit_family_dispatch(cfg, q, b, p, "GET")
+
+
+def h_qubit_family_post(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/<family>/<action> -> confirm-gated gateway delegate."""
+    return _qubit_family_dispatch(cfg, q, b, p, "POST")
+
+
+def h_qubit_family_put(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/qubit/<family>/<action> -> direct gateway write (prefs)."""
+    return _qubit_family_dispatch(cfg, q, b, p, "PUT")
+
+
+HANDLERS["h_qubit_family_get"] = h_qubit_family_get
+HANDLERS["h_qubit_family_post"] = h_qubit_family_post
+HANDLERS["h_qubit_family_put"] = h_qubit_family_put
+
+for _qfb_family in sorted({e["family"] for e in _QUBIT_FAMILY_BRIDGE}):
+    _qfb_methods = sorted({m for e in _QUBIT_FAMILY_BRIDGE
+                           if e["family"] == _qfb_family for m in e["methods"]})
+    for _qfb_method in _qfb_methods:
+        _r(_qfb_method,
+           r"/api/qubit/(?P<family>" + _qfb_family + r")/(?P<rest>.+)",
+           "h_qubit_family_" + _qfb_method.lower())
+del _qfb_family, _qfb_methods, _qfb_method
