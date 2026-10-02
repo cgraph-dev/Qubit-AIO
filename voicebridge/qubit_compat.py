@@ -17053,6 +17053,178 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
      "gateway": "viking.bot_sessions", "kind": "read"},
     {"family": "viking", "action": "skills", "methods": ["GET"],
      "gateway": "viking.skills", "kind": "read"},
+    # -- bot (ocFamilyBotApi; 24 rows with paths verbatim) --
+    # Thread list/get read the canonical chat-session store (pinned
+    # sessions.list/get); turns run/cancel through the one conversation turn
+    # path (conversations.turn/turn.cancel); task rows delegate to the shared
+    # ledger (tasks.list/get, task.history) and the live run primitives
+    # (tasks.cancel/retry). Ideas list reads the ledger-derived suggestion
+    # inbox (task.suggestions); goals list reads the schedule store
+    # (cron.list); alerts read run history (cron.runs); the computer console
+    # is a read-only status probe (computer.status). The rest have no
+    # registered backend and keep honest typed gates: the follow-up queue and
+    # per-thread drafts live in the open page (no server inbox/store), there
+    # is no durable task-launch or pause/resume gateway method, Bot
+    # Intelligence persistence has no writer, goal/watch records carry no
+    # cron schedule fields, and rich cards are session file artifacts with no
+    # sessionless index.
+    {"family": "bot", "action": "thread-list", "methods": ["GET"],
+     "gateway": "sessions.list", "kind": "read"},
+    {"family": "bot", "action": "thread-get", "methods": ["GET"],
+     "gateway": "sessions.get", "kind": "read",
+     "aliases": {"thread": "session_id"}},
+    {"family": "bot", "action": "turn-send", "methods": ["POST"],
+     "gateway": "conversations.turn", "kind": "mutation",
+     "aliases": {"thread": "session"}},
+    {"family": "bot", "action": "turn-stop", "methods": ["POST"],
+     "gateway": "conversations.turn.cancel", "kind": "mutation",
+     "aliases": {"thread": "session"}},
+    {"family": "bot", "action": "followups-queue", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "BOT_FOLLOWUPS_LOCAL_ONLY",
+              "detail": "follow-ups queue in the open page; no server inbox "
+                        "exists and nothing is queued",
+              "counterpart": "the open Qubit Bot page holds the follow-up "
+                             "queue (stopping preserves the draft)"}},
+    {"family": "bot", "action": "drafts-save", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "BOT_DRAFTS_LOCAL_ONLY",
+              "detail": "per-thread drafts stay mounted client-side; no "
+                        "server draft store exists and nothing is saved",
+              "counterpart": "the open Qubit Bot page keeps the draft "
+                             "(survives navigation)"}},
+    {"family": "bot", "action": "tasks-list", "methods": ["GET"],
+     "gateway": "tasks.list", "kind": "read"},
+    {"family": "bot", "action": "tasks-get", "methods": ["GET"],
+     "gateway": "tasks.get", "kind": "read",
+     "aliases": {"lookup": "taskId"}},
+    {"family": "bot", "action": "tasks-launch", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "BOT_TASKS_LAUNCH_UNWIRED",
+              "detail": "no durable task-launch gateway method is "
+                        "registered; nothing is launched",
+              "counterpart": "POST /api/qubit/bot/turn-send (a turn from a "
+                             "session) or the voice delegated turn"}},
+    {"family": "bot", "action": "tasks-pause", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "BOT_TASKS_PAUSE_UNWIRED",
+              "detail": "no task-pause gateway method is registered; "
+                        "nothing is paused",
+              "counterpart": "POST /api/qubit/bot/tasks-cancel (by receipt "
+                             "or live session)"}},
+    {"family": "bot", "action": "tasks-resume", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "BOT_TASKS_RESUME_UNWIRED",
+              "detail": "no task-resume gateway method is registered; "
+                        "nothing is resumed",
+              "counterpart": "POST /api/qubit/bot/tasks-retry (exact-args "
+                             "receipt retry or last chat turn)"}},
+    {"family": "bot", "action": "tasks-cancel", "methods": ["POST"],
+     "gateway": "tasks.cancel", "kind": "mutation"},
+    {"family": "bot", "action": "tasks-retry", "methods": ["POST"],
+     "gateway": "tasks.retry", "kind": "mutation"},
+    {"family": "bot", "action": "tasks-receipts", "methods": ["GET"],
+     "gateway": "task.history", "kind": "read"},
+    {"family": "bot", "action": "ideas-list", "methods": ["GET"],
+     "gateway": "task.suggestions", "kind": "read"},
+    {"family": "bot", "action": "ideas-accept", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "BOT_IDEAS_ACCEPT_UNWIRED",
+              "detail": "Bot Intelligence persistence has no writer; no "
+                        "idea is accepted and no worker is launched",
+              "counterpart": "POST /api/qubit/bot/tasks-launch (delegated "
+                             "worker, when wired)"}},
+    {"family": "bot", "action": "ideas-edit", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "BOT_IDEAS_EDIT_UNWIRED",
+              "detail": "Bot Intelligence persistence has no writer; no "
+                        "idea record is edited",
+              "counterpart": "memory workspace notes (read-only here)"}},
+    {"family": "bot", "action": "ideas-dismiss", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "BOT_IDEAS_DISMISS_UNWIRED",
+              "detail": "Bot Intelligence persistence has no writer; no "
+                        "idea record is dismissed",
+              "counterpart": "memory workspace notes (read-only here)"}},
+    {"family": "bot", "action": "goals-list", "methods": ["GET"],
+     "gateway": "cron.list", "kind": "read"},
+    {"family": "bot", "action": "goals-set", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "BOT_GOALS_SET_UNWIRED",
+              "detail": "goal records carry no cron schedule fields "
+                        "(name/when/task); nothing is scheduled",
+              "counterpart": "POST /api/cron/jobs (canonical schedule "
+                             "create, confirm-gated)"}},
+    {"family": "bot", "action": "watches-set", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "BOT_WATCHES_SET_UNWIRED",
+              "detail": "watch records carry no cron schedule fields "
+                        "(name/when/task); nothing is scheduled",
+              "counterpart": "POST /api/cron/jobs (canonical schedule "
+                             "create, confirm-gated)"}},
+    {"family": "bot", "action": "alerts-list", "methods": ["GET"],
+     "gateway": "cron.runs", "kind": "read"},
+    {"family": "bot", "action": "computer-status", "methods": ["GET"],
+     "gateway": "computer.status", "kind": "read"},
+    {"family": "bot", "action": "cards-get", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "BOT_CARDS_UNWIRED",
+              "detail": "rich cards are session file artifacts with no "
+                        "sessionless index; nothing is read",
+              "counterpart": "session file artifacts (artifacts.get needs "
+                             "a session key) + GET /api/qubit/bot/"
+                             "tasks-receipts"}},
+    # -- harness (ocFamilyHarnessApi; 12 rows with paths verbatim) --
+    # The harness roster reads the canonical worker roster (pinned
+    # agents.list); plugins read the managed catalog (pinned plugins.list);
+    # tasks read/cancel through the shared ledger primitives (tasks.list,
+    # tasks.cancel); sessions create/resume/inspect through the canonical
+    # session store (sessions.create, sessions.catalog.continue,
+    # sessions.get — the polling stream snapshot is the same session read);
+    # session files list through the per-session draft store
+    # (sessions.files.list); single artifacts read through the confined
+    # workspace file host (workspace.files, default inspect action). The
+    # curated starter-kit list has no backend, and task submit carries no
+    # session for the turn path — both keep honest typed gates.
+    {"family": "harness", "action": "harnesses", "methods": ["GET"],
+     "gateway": "agents.list", "kind": "read"},
+    {"family": "harness", "action": "starter_kits", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "HARNESS_STARTER_KITS_UNWIRED",
+              "detail": "the curated starter-kit list has no backend; "
+                        "nothing is listed",
+              "counterpart": "none yet (static curated list is a "
+                             "follow-up, not a live backend)"}},
+    {"family": "harness", "action": "plugins", "methods": ["GET"],
+     "gateway": "plugins.list", "kind": "read"},
+    {"family": "harness", "action": "tasks", "methods": ["GET"],
+     "gateway": "tasks.list", "kind": "read"},
+    {"family": "harness", "action": "task_submit", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "HARNESS_TASK_SUBMIT_UNWIRED",
+              "detail": "task submit carries no session for the turn path "
+                        "and no sessionless runner is registered; nothing "
+                        "is submitted",
+              "counterpart": "POST /api/qubit/harness/session_create "
+                             "(canonical session) then a turn from that "
+                             "session"}},
+    {"family": "harness", "action": "task_cancel", "methods": ["POST"],
+     "gateway": "tasks.cancel", "kind": "mutation"},
+    {"family": "harness", "action": "session_create", "methods": ["POST"],
+     "gateway": "sessions.create", "kind": "mutation",
+     "aliases": {"title": "name"}},
+    {"family": "harness", "action": "session_resume", "methods": ["POST"],
+     "gateway": "sessions.catalog.continue", "kind": "mutation"},
+    {"family": "harness", "action": "session_inspect", "methods": ["GET"],
+     "gateway": "sessions.get", "kind": "read",
+     "aliases": {"session": "session_id"}},
+    {"family": "harness", "action": "stream", "methods": ["GET"],
+     "gateway": "sessions.get", "kind": "read",
+     "aliases": {"session": "session_id"}},
+    {"family": "harness", "action": "files", "methods": ["GET"],
+     "gateway": "sessions.files.list", "kind": "read"},
+    {"family": "harness", "action": "artifact_get", "methods": ["GET"],
+     "gateway": "workspace.files", "kind": "read"},
     # -- webchat (ocFamilyWebchatApi; reuse-only — no bridge rows) --
     # Every webchat capability reuses an existing chat endpoint (sessions
     # list/create/history, POST /api/qubit/chat + /stream); NEEDS_BRIDGE is
@@ -17117,12 +17289,18 @@ def _qubit_family_params(entry: Dict[str, Any], q: Dict[str, str],
     Aliases rename caller keys to the gateway method's parameter names,
     applied simultaneously from the original body so two renames can never
     collide. The gateway backend stays authoritative and validates everything.
+    Aliases also apply to query keys (GET reads carry their selector in the
+    query string, e.g. ``?lookup=`` -> ``taskId``); a caller key that already
+    matches a gateway name passes through untouched.
     """
     params: Dict[str, Any] = {}
-    if isinstance(q, dict):
-        params.update(q)
-    body = b if isinstance(b, dict) else {}
     aliases = entry.get("aliases") or {}
+    if isinstance(q, dict):
+        for key, value in q.items():
+            target = aliases.get(key, key)
+            if target not in params:
+                params[target] = value
+    body = b if isinstance(b, dict) else {}
     renamed: Dict[str, Any] = {}
     for key, value in body.items():
         target = aliases.get(key, key)

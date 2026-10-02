@@ -68,6 +68,16 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/qubit-tasks": "Qubit Tasks",
   "/qubit-memory": "Qubit Memory Backends",
   "/webchat": "Qubit WebChat",
+  // Integrator lane 3: the Bot / Harness Router / Open Viking console.
+  // Page-documented paths (the pages link to these); titles match each
+  // page's own heading.
+  "/qubit-bot": "Qubit Bot",
+  "/harness-router": "Harness Router",
+  "/open-viking": "Open Viking",
+  "/open-viking/retrieval": "Retrieval",
+  "/open-viking/uploads": "Uploads",
+  "/open-viking/agent-hub": "Agent Hub",
+  "/open-viking/resources": "Resources",
 };
 
 export function resolvePageTitle(

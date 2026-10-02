@@ -24,6 +24,7 @@ import {
   Activity,
   BarChart3,
   BookOpen,
+  Bot,
   Clock,
   Code,
   Cpu,
@@ -37,6 +38,7 @@ import {
   KeyRound,
   Menu,
   MessageSquare,
+  Network,
   Package,
   PanelLeftClose,
   PanelLeftOpen,
@@ -44,14 +46,18 @@ import {
   Puzzle,
   Radio,
   RotateCw,
+  Search,
   Settings,
   Shield,
   ShieldCheck,
+  Ship,
   Sparkles,
   Star,
   Terminal,
+  Upload,
   Users,
   Webhook,
+  Workflow,
   Wrench,
   X,
   Zap,
@@ -122,6 +128,24 @@ const TaskflowsPage = lazy(() => import("@/pages/TaskflowsPage"));
 const TasksPage = lazy(() => import("@/pages/TasksPage"));
 const MemoryBackendsPage = lazy(() => import("@/pages/MemoryBackendsPage"));
 const WebChatPage = lazy(() => import("@/pages/WebChatPage"));
+// Qubit Bot + Harness Router + Open Viking console (integrator lane 3):
+// built pages that were never registered — routes/nav land here, the single
+// wiring owner for the sidebar route table.
+const QubitBotPage = lazy(() => import("@/pages/QubitBotPage"));
+const HarnessRouterPage = lazy(() => import("@/pages/HarnessRouterPage"));
+const OpenVikingPage = lazy(() => import("@/pages/OpenVikingPage"));
+const OpenVikingRetrievalPage = lazy(
+  () => import("@/pages/OpenVikingRetrievalPage"),
+);
+const OpenVikingUploadsPage = lazy(
+  () => import("@/pages/OpenVikingUploadsPage"),
+);
+const OpenVikingAgentHubPage = lazy(
+  () => import("@/pages/OpenVikingAgentHubPage"),
+);
+const OpenVikingResourcesPage = lazy(
+  () => import("@/pages/OpenVikingResourcesPage"),
+);
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useI18n } from "@/i18n";
@@ -237,6 +261,15 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/qubit-tasks": TasksPage,
   "/qubit-memory": MemoryBackendsPage,
   "/webchat": WebChatPage,
+  // Integrator lane 3: page-documented paths (the pages link to these;
+  // short aliases like /bot or /viking serve no in-page link and stay out).
+  "/qubit-bot": QubitBotPage,
+  "/harness-router": HarnessRouterPage,
+  "/open-viking": OpenVikingPage,
+  "/open-viking/retrieval": OpenVikingRetrievalPage,
+  "/open-viking/uploads": OpenVikingUploadsPage,
+  "/open-viking/agent-hub": OpenVikingAgentHubPage,
+  "/open-viking/resources": OpenVikingResourcesPage,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
@@ -305,26 +338,54 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/qubit-tasks", label: "Qubit Tasks", icon: FileText },
   { path: "/qubit-memory", label: "Qubit Memory Backends", icon: Database },
   { path: "/webchat", label: "Qubit WebChat", icon: MessageSquare },
+  { path: "/qubit-bot", label: "Qubit Bot", icon: Bot },
+  { path: "/harness-router", label: "Harness Router", icon: Workflow },
+  // Open Viking submenu group (integrator lane 3): the parent console plus
+  // its four sub-pages. Children render indented under the parent entry
+  // (see SidebarNavGroup); the parent path stays exactly-highlighted so a
+  // child route does not light up both rows.
+  {
+    path: "/open-viking",
+    label: "Open Viking",
+    icon: Ship,
+    exactEnd: true,
+    children: [
+      { path: "/open-viking/retrieval", label: "Retrieval", icon: Search },
+      { path: "/open-viking/uploads", label: "Uploads", icon: Upload },
+      { path: "/open-viking/agent-hub", label: "Agent Hub", icon: Network },
+      {
+        path: "/open-viking/resources",
+        label: "Resources",
+        icon: BookOpen,
+      },
+    ],
+  },
 ];
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   Activity,
   BarChart3,
+  Bot,
   Clock,
   Cpu,
   FileText,
   FolderOpen,
   KeyRound,
   MessageSquare,
+  Network,
   Package,
+  Search,
   Settings,
+  Ship,
   Puzzle,
   Sparkles,
   Terminal,
   Globe,
   Database,
   Shield,
+  Upload,
   Users,
+  Workflow,
   Wrench,
   Zap,
   Heart,
@@ -740,16 +801,27 @@ export default function App() {
               aria-label={t.app.navigation}
             >
               <ul className="flex flex-col">
-                {sidebarNav.coreItems.map((item) => (
-                  <SidebarNavLink
-                    closeMobile={closeMobile}
-                    collapsed={isDesktopCollapsed}
-                    item={item}
-                    key={item.path}
-                    t={t}
-                    tooltipWarmRef={tooltipWarmRef}
-                  />
-                ))}
+                {sidebarNav.coreItems.map((item) =>
+                  item.children && item.children.length > 0 ? (
+                    <SidebarNavGroup
+                      closeMobile={closeMobile}
+                      collapsed={isDesktopCollapsed}
+                      item={item}
+                      key={item.path}
+                      t={t}
+                      tooltipWarmRef={tooltipWarmRef}
+                    />
+                  ) : (
+                    <SidebarNavLink
+                      closeMobile={closeMobile}
+                      collapsed={isDesktopCollapsed}
+                      item={item}
+                      key={item.path}
+                      t={t}
+                      tooltipWarmRef={tooltipWarmRef}
+                    />
+                  ),
+                )}
               </ul>
 
               {sidebarNav.pluginItems.length > 0 && (
@@ -938,6 +1010,7 @@ function SidebarNavLink({
   item,
   tooltipWarmRef,
   t,
+  nested = false,
 }: SidebarNavLinkProps) {
   const { path, label, labelKey, icon: Icon } = item;
   const [hovered, setHovered] = useState(false);
@@ -962,7 +1035,7 @@ function SidebarNavLink({
     >
       <NavLink
         to={path}
-        end={path === "/sessions"}
+        end={item.exactEnd ?? path === "/sessions"}
         onClick={closeMobile}
         aria-label={collapsed ? navLabel : undefined}
         onFocus={collapsed ? showTooltip : undefined}
@@ -971,6 +1044,9 @@ function SidebarNavLink({
           cn(
             "group/nav relative flex items-center gap-3",
             "px-5 py-2.5",
+            // Submenu children sit one indent in (tailwind-merge keeps the
+            // later pl over px-5's left padding).
+            nested && "pl-10",
             "font-sans text-display uppercase text-sm tracking-[0.12em]",
             "whitespace-nowrap transition-colors cursor-pointer",
             "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-midground",
@@ -1015,6 +1091,49 @@ function SidebarNavLink({
         <SidebarTooltip anchor={tooltipAnchor} label={navLabel} warmRef={tooltipWarmRef} />
       )}
     </li>
+  );
+}
+
+/**
+ * Sidebar submenu group (integrator lane 3: the Open Viking group). The
+ * parent stays a real page link rendered exactly like a top-level entry;
+ * children render indented beneath it via the shared SidebarNavLink (nested
+ * indent, prefix matching). No expand/collapse state — the group is static,
+ * so deep-links and sidebar highlighting can never disagree.
+ */
+function SidebarNavGroup({
+  closeMobile,
+  collapsed,
+  item,
+  tooltipWarmRef,
+  t,
+}: SidebarNavLinkProps) {
+  const children = item.children ?? [];
+  return (
+    <>
+      <SidebarNavLink
+        closeMobile={closeMobile}
+        collapsed={collapsed}
+        item={item}
+        t={t}
+        tooltipWarmRef={tooltipWarmRef}
+      />
+      <li aria-label={`${item.label} subpages`}>
+        <ul className="flex flex-col">
+          {children.map((child) => (
+            <SidebarNavLink
+              closeMobile={closeMobile}
+              collapsed={collapsed}
+              item={child}
+              key={child.path}
+              nested
+              t={t}
+              tooltipWarmRef={tooltipWarmRef}
+            />
+          ))}
+        </ul>
+      </li>
+    </>
   );
 }
 
@@ -1531,6 +1650,12 @@ interface NavItem {
   label: string;
   labelKey?: string;
   path: string;
+  // Optional submenu children (integrator lane 3: the Open Viking group).
+  // The parent stays a real page link; children render indented beneath it.
+  children?: NavItem[];
+  // Force exact-path matching for a group parent so a child route does not
+  // light up both rows (the shared link defaults to prefix matching).
+  exactEnd?: boolean;
 }
 
 interface SidebarIconWithTooltipProps {
@@ -1546,6 +1671,7 @@ interface SidebarNavLinkProps {
   item: NavItem;
   t: Translations;
   tooltipWarmRef: TooltipWarmRef;
+  nested?: boolean;
 }
 
 interface SidebarSystemActionsProps {

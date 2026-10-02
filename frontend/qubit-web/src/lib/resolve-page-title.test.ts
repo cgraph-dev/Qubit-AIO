@@ -85,4 +85,17 @@ describe("resolvePageTitle", () => {
     expect(resolvePageTitle("/qubit-memory", t, [])).toBe("Qubit Memory Backends");
     expect(resolvePageTitle("/webchat", t, [])).toBe("Qubit WebChat");
   });
+
+  it("resolves the Bot / Harness Router / Open Viking console titles", () => {
+    // Integrator lane 3: page-documented paths, titles match each page's
+    // own heading (the Viking children use their short h1s).
+    expect(resolvePageTitle("/qubit-bot", t, [])).toBe("Qubit Bot");
+    expect(resolvePageTitle("/harness-router", t, [])).toBe("Harness Router");
+    expect(resolvePageTitle("/open-viking", t, [])).toBe("Open Viking");
+    expect(resolvePageTitle("/open-viking/retrieval", t, [])).toBe("Retrieval");
+    expect(resolvePageTitle("/open-viking/uploads", t, [])).toBe("Uploads");
+    expect(resolvePageTitle("/open-viking/agent-hub", t, [])).toBe("Agent Hub");
+    expect(resolvePageTitle("/open-viking/resources", t, [])).toBe("Resources");
+    expect(resolvePageTitle("/open-viking/uploads/", t, [])).toBe("Uploads");
+  });
 });

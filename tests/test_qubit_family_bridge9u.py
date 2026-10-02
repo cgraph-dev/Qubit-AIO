@@ -540,3 +540,220 @@ def test_viking_bot_sessions_and_skills_read(tmp_path, monkeypatch):
     code, out = HC.dispatch(cfg, "GET", "/api/qubit/viking/skills", {}, {})
     assert code == 200, out
     assert "skills" in out.get("result", out), out
+
+
+# -- integrator lane 3 (Bot + HarnessRouter pages) ---------------------------
+# The 24 bot rows delegate to the canonical session store (threads), the one
+# conversation turn path (turns), the shared ledger (tasks/ideas/alerts),
+# the schedule store (goals), and the read-only computer probe (console).
+# The 12 harness rows delegate to the worker roster (agents.list), the
+# managed plugin catalog, the ledger, the session store, the per-session
+# draft store (files), and the confined workspace host (artifact_get).
+# Rows with no registered backend keep honest typed gates (never 2xx).
+
+
+def test_bot_thread_rows_read_the_session_store(tmp_path, monkeypatch):
+    """GET bot/thread-list reads; thread-get delegates (?thread= aliased)."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/thread-list",
+                            {}, {})
+    assert code == 200, out
+    assert "sessions" in out.get("result", out), out
+    # no selector -> the gateway's typed bad-params (delegation, not 404)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/thread-get",
+                            {}, {})
+    assert code == 400, out
+    assert "BAD_PARAMS" in str(out.get("code", "")), out
+    # ?thread= reaches the canonical store (unknown id -> typed not-found)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/thread-get",
+                            {"thread": "bridge-probe-nosuch"}, {})
+    assert code == 200, out
+    assert out.get("code") == "SESSION_NOT_FOUND", out
+
+
+def test_bot_turn_rows_stage_then_execute(tmp_path, monkeypatch):
+    """POST bot/turn-send + turn-stop stage 409; stop executes honestly."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/bot/turn-send",
+                               {}, {"text": "bridge probe",
+                                    "thread": "bridge-probe-nosuch"})
+    assert code == 409, staged
+    assert staged.get("code") == "CONFIRM_REQUIRED", staged
+    assert staged.get("confirmation_id"), staged
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/bot/turn-stop",
+                               {}, {"thread": "bridge-probe-nosuch"})
+    assert code == 409, staged
+    assert staged.get("confirmation_id"), staged
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/bot/turn-stop",
+                            {}, {"thread": "bridge-probe-nosuch",
+                                 "confirm": True})
+    assert code == 200, out
+    assert out.get("code") == "CONVERSATIONS_LOCAL_SESSION_CANCEL", out
+
+
+def test_bot_task_rows_live(tmp_path, monkeypatch):
+    """Bot tasks-list/get/receipts read the ledger; cancel executes."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/tasks-list",
+                            {}, {})
+    assert code == 200, out
+    assert "tasks" in out.get("result", out), out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/tasks-get",
+                            {"lookup": "bridge-probe-nosuch"}, {})
+    assert code == 200, out
+    assert out.get("code") == "TASK_NOT_FOUND", out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/tasks-receipts",
+                            {}, {})
+    assert code == 200, out
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/bot/tasks-cancel",
+                               {}, {"session": "bridge-probe-nosuch"})
+    assert code == 409, staged
+    assert staged.get("confirmation_id"), staged
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/bot/tasks-cancel",
+                            {}, {"session": "bridge-probe-nosuch",
+                                 "confirm": True})
+    assert code == 200, out
+    assert out.get("cancelled") is False, out
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/bot/tasks-retry",
+                               {}, {"session": "bridge-probe-nosuch"})
+    assert code == 409, staged
+    assert staged.get("confirmation_id"), staged
+
+
+def test_bot_inbox_console_rows_live(tmp_path, monkeypatch):
+    """Bot ideas-list/goals-list/alerts-list/computer-status are live."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/ideas-list",
+                            {}, {})
+    assert code == 200, out
+    assert "suggestions" in out.get("result", out), out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/goals-list",
+                            {}, {})
+    assert code == 200, out
+    assert "jobs" in out.get("result", out), out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/alerts-list",
+                            {}, {})
+    assert code == 200, out
+    assert "runs" in out.get("result", out), out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/computer-status",
+                            {}, {})
+    assert code == 200, out
+    assert out.get("control", {}).get("control", out.get("control")) \
+        is not None, out
+
+
+def test_bot_gate_rows_are_typed_403(tmp_path, monkeypatch):
+    """Bot rows with no backend gate honestly (never 2xx, never staged)."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    gates = {
+        "/api/qubit/bot/followups-queue": "BOT_FOLLOWUPS_LOCAL_ONLY",
+        "/api/qubit/bot/drafts-save": "BOT_DRAFTS_LOCAL_ONLY",
+        "/api/qubit/bot/tasks-launch": "BOT_TASKS_LAUNCH_UNWIRED",
+        "/api/qubit/bot/tasks-pause": "BOT_TASKS_PAUSE_UNWIRED",
+        "/api/qubit/bot/tasks-resume": "BOT_TASKS_RESUME_UNWIRED",
+        "/api/qubit/bot/ideas-accept": "BOT_IDEAS_ACCEPT_UNWIRED",
+        "/api/qubit/bot/ideas-edit": "BOT_IDEAS_EDIT_UNWIRED",
+        "/api/qubit/bot/ideas-dismiss": "BOT_IDEAS_DISMISS_UNWIRED",
+        "/api/qubit/bot/goals-set": "BOT_GOALS_SET_UNWIRED",
+        "/api/qubit/bot/watches-set": "BOT_WATCHES_SET_UNWIRED",
+        "/api/qubit/bot/cards-get": "BOT_CARDS_UNWIRED",
+    }
+    for path, want in gates.items():
+        method = "GET" if path.endswith("cards-get") else "POST"
+        code, out = HC.dispatch(cfg, method, path, {}, {"probe": True})
+        assert code == 403, (path, out)
+        assert out.get("code") == want, (path, out)
+        assert out.get("qubit_counterpart"), (path, out)
+
+
+def test_harness_roster_catalog_task_rows_live(tmp_path, monkeypatch):
+    """Harness harnesses/plugins/tasks read live backends."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/harness/harnesses",
+                            {}, {})
+    assert code == 200, out
+    assert "agents" in out.get("result", out), out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/harness/plugins",
+                            {}, {})
+    assert code == 200, out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/harness/tasks",
+                            {}, {})
+    assert code == 200, out
+    assert "tasks" in out.get("result", out), out
+
+
+def test_harness_session_rows_live(tmp_path, monkeypatch):
+    """Harness session_create/resume stage then execute; inspect reads."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, staged = HC.dispatch(cfg, "POST",
+                               "/api/qubit/harness/session_create", {},
+                               {"harness": "local", "title": "lane3-probe"})
+    assert code == 409, staged
+    assert staged.get("confirmation_id"), staged
+    code, out = HC.dispatch(cfg, "POST",
+                            "/api/qubit/harness/session_create", {},
+                            {"harness": "local", "title": "lane3-probe",
+                             "confirm": True})
+    assert code == 200, out
+    sid = (out.get("session", {}) or {}).get("id", "")
+    assert sid, out
+    code, out = HC.dispatch(cfg, "GET",
+                            "/api/qubit/harness/session_inspect",
+                            {"session": sid}, {})
+    assert code == 200, out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/harness/stream",
+                            {"session": sid}, {})
+    assert code == 200, out
+    code, staged = HC.dispatch(cfg, "POST",
+                               "/api/qubit/harness/session_resume", {},
+                               {"session": sid})
+    assert code == 409, staged
+    code, out = HC.dispatch(cfg, "POST",
+                            "/api/qubit/harness/session_resume", {},
+                            {"session": sid, "confirm": True})
+    assert code == 200, out
+    code, staged = HC.dispatch(cfg, "POST",
+                               "/api/qubit/harness/task_cancel", {},
+                               {"session": "bridge-probe-nosuch"})
+    assert code == 409, staged
+    assert staged.get("confirmation_id"), staged
+
+
+def test_harness_gate_and_typed_rows(tmp_path, monkeypatch):
+    """Harness starter_kits/task_submit gate; files/artifact delegate."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/harness/starter_kits",
+                            {}, {})
+    assert code == 403, out
+    assert out.get("code") == "HARNESS_STARTER_KITS_UNWIRED", out
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/harness/task_submit",
+                            {}, {"prompt": "probe", "harness": "local"})
+    assert code == 403, out
+    assert out.get("code") == "HARNESS_TASK_SUBMIT_UNWIRED", out
+    assert "session_create" in str(out.get("qubit_counterpart", "")), out
+    # files without a session is the gateway's typed bad-params (not a 404)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/harness/files",
+                            {"task": "t1"}, {})
+    assert code == 400, out
+    assert "BAD_PARAMS" in str(out.get("code", "")), out
+    # artifact_get with no path reaches the confined host (typed, not 404)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/harness/artifact_get",
+                            {}, {})
+    assert code == 200, out
+    assert out.get("code") == "NO_ACTIVE_PROJECT", out
