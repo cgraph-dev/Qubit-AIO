@@ -193,15 +193,21 @@ commands in this session, never copied. No `M1`/`M2`/`VERIFIED` claimed.
   Live totals re-verified: 40 non-test page modules, 39 route-table lines
   in `App.tsx`, 304 `<Button` controls, 150 `api.*` call sites, 131 bridge
   rows over 17 families, 387 `_r(` registrations.
-- **Canvas/hooks backends: pages committed, backends in-flight.** The I1
-  canvas page commit (`3bf2c6d8`) exists in git log. Backend truth is
-  unchanged from §8: no canvas file host or node-presentation backend is
-  registered (every canvas row answers an honest typed gate); flows
-  `hooks` reads the real hook catalog while hook enable/disable stays an
-  honest gate. The confined static-host and hooks-backend follow-ups are
-  unbuilt.
-- **Turn-time detection: in-flight.** No I2 commit is present in git log.
-- **Brand sweep: pending.** No I3 sweep commit is present in git log.
+- **Canvas/hooks backends: BUILT (`8f64f04e`, live-proven).** Confined canvas
+  host under state-home `canvas/` (traversal/absolute/oversize refused,
+  byte-identical round-trip, audit event) + flows hooks on the schedules
+  store (enable/disable flips, programs list); bridge rows flipped live.
+  One adjacent find for the webui lane: `_redact_served` redacts any
+  `preview` key, so `preview_url` serves `[REDACTED]` over HTTP (page
+  ignores the field — nothing broken).
+- **Turn-time detection: BUILT (`1261bb2e`).** Provider-gateway classifies
+  dead-model errors to typed `MODEL_UNAVAILABLE_TURN` (names dead model +
+  working slot, no auto-fallback, slot never moved). Generic 400/404
+  behavior unchanged.
+- **Brand sweep: DONE (`4cdc8396` — 1 real leak fixed in TaskflowsPage:4).**
+  Remaining brand failures belong elsewhere: `TerminalChatPage.tsx:121`
+  (another lane's committed line) and the packet7d pyproject case (needs
+  the owner ruling below, not code).
 - **20 architecture rows still OPEN pending owner** (listed in §6 —
   `agents.*`, `cron.scratch.*`, `mentions.*`, `skills.proposals.*`,
   `skills.upload.*`, `taskSuggestions.*`, `tasks.dismiss`,
