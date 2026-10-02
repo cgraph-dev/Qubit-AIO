@@ -1,7 +1,7 @@
 /**
  * TaskflowsPage — route `/qubit-taskflows`.
  *
- * SEPARATE Qubit-branded page for OpenClaw Taskflow/standing-orders/hooks
+ * SEPARATE Qubit-branded page for taskflow/standing-orders/hooks
  * semantics (upstream `docs/automation/{taskflow,standing-orders,hooks}.md`),
  * ported onto the existing `schedules.*` backend. This page does NOT extend
  * `/qubit-scheduler` (owner's separation rule): the scheduler stays the
