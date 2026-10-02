@@ -32,10 +32,10 @@ import { fetchJSON, runMutationWithConfirm } from "@/lib/api";
 import { refusalOrError } from "@/lib/policy-refusal";
 
 // ── ROUTES manifest ──────────────────────────────────────────────────────
-// Desired Qubit namespace. No `/api/qubit/memory/*` route exists server-side
-// today, so EVERY row is NEEDS-BRIDGE: the client calls the live canonical
-// path in `via` until a bridge route is implemented. Nothing here is fetched
-// from a path that does not exist.
+// Qubit namespace, served by family_memory.py (aliases over the canonical
+// local surface). The client keeps calling the live canonical path in
+// `via` (same store, same data); `bridge: "LIVE"` records that every
+// `/api/qubit/memory/*` row is served too.
 
 export type MemoryAction =
   | "status"
@@ -48,18 +48,18 @@ export interface MemoryRoute {
   action: MemoryAction;
   method: "GET" | "POST";
   path: string;
-  /** Live canonical path the client calls until the bridge route exists. */
+  /** Live canonical path the client calls (same store the bridge serves). */
   via: string;
-  bridge: "NEEDS-BRIDGE";
+  bridge: "LIVE";
 }
 
 /** Every path + method this family client wants, under `/api/qubit/memory/`. */
 export const ROUTES: ReadonlyArray<MemoryRoute> = [
-  { action: "status", method: "GET", path: "/api/qubit/memory/status", via: "GET /api/memory", bridge: "NEEDS-BRIDGE" },
-  { action: "provider", method: "GET", path: "/api/qubit/memory/provider", via: "GET /api/memory", bridge: "NEEDS-BRIDGE" },
-  { action: "provider_config", method: "GET", path: "/api/qubit/memory/provider-config", via: "GET /api/memory/providers/<id>/config", bridge: "NEEDS-BRIDGE" },
-  { action: "provider_set", method: "POST", path: "/api/qubit/memory/provider-set", via: "PUT /api/memory/provider", bridge: "NEEDS-BRIDGE" },
-  { action: "probe", method: "GET", path: "/api/qubit/memory/probe", via: "GET /api/memory/providers/qubit-local", bridge: "NEEDS-BRIDGE" },
+  { action: "status", method: "GET", path: "/api/qubit/memory/status", via: "GET /api/memory", bridge: "LIVE" },
+  { action: "provider", method: "GET", path: "/api/qubit/memory/provider", via: "GET /api/memory", bridge: "LIVE" },
+  { action: "provider_config", method: "GET", path: "/api/qubit/memory/provider-config", via: "GET /api/memory/providers/<id>/config", bridge: "LIVE" },
+  { action: "provider_set", method: "POST", path: "/api/qubit/memory/provider-set", via: "PUT /api/memory/provider", bridge: "LIVE" },
+  { action: "probe", method: "GET", path: "/api/qubit/memory/probe", via: "GET /api/memory/providers/qubit-local", bridge: "LIVE" },
 ];
 
 export function routePath(action: MemoryAction): MemoryRoute | undefined {

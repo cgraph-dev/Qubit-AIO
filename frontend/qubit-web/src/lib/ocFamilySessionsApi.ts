@@ -452,7 +452,7 @@ export function createCheckpoint(
 ): Promise<FamilyResult> {
   return postConfirm<FamilyResult>(
     "/api/qubit/checkpoints/create",
-    { session_id: sessionId },
+    { session: sessionId },
     confirm,
   );
 }
@@ -461,7 +461,7 @@ export function verifyCheckpoint(
   checkpointId: string,
 ): Promise<CheckpointVerifyResponse> {
   return fetchJSON<CheckpointVerifyResponse>(
-    `/api/qubit/checkpoints/verify?checkpoint_id=${encodeURIComponent(checkpointId)}`,
+    `/api/qubit/checkpoints/verify?id=${encodeURIComponent(checkpointId)}`,
   );
 }
 

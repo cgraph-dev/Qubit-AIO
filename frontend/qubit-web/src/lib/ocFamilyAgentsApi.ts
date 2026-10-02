@@ -398,6 +398,6 @@ export function enrollDevice(
 /** Read a device identity card (devices.identity). Metadata only, no secrets. */
 export function getDeviceIdentity(deviceId: string): Promise<{ identity: DeviceIdentity }> {
   return fetchJSON<{ identity: DeviceIdentity }>(
-    `/api/qubit/devices/identity?device_id=${encodeURIComponent(deviceId)}`,
+    `/api/qubit/devices/identity?id=${encodeURIComponent(deviceId)}`,
   );
 }

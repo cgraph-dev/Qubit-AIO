@@ -79,6 +79,13 @@ const ONESHOT_JOB = {
 function mockList(jobs: unknown[] = [STANDING_JOB, ONESHOT_JOB]) {
   return async (url: string) => {
     if (url === "/api/cron/jobs") return jobs;
+    if (url === "/api/qubit/flows/hooks")
+      return {
+        hooks: [
+          { name: "session-memory", enabled: true },
+          { name: "command-logger", enabled: false },
+        ],
+      };
     throw new Error(`unexpected GET: ${url}`);
   };
 }
@@ -117,17 +124,22 @@ describe("TaskflowsPage", () => {
     expect(hrefs).toContain("/qubit-task-inbox");
   });
 
-  it("renders hooks as disabled-with-reason (NEEDS-BRIDGE)", async () => {
+  it("renders hooks with live guard states and staged enable", async () => {
     await renderPage();
     await waitFor(() => document.querySelector('[aria-label="hook-row-session-memory"]') !== null);
-    const enable = document.querySelector(
-      'button[aria-label="hook-enable-session-memory"]',
-    ) as HTMLButtonElement;
-    expect(enable.disabled).toBe(true);
-    expect(enable.title).toMatch("NEEDS-BRIDGE");
-    expect(document.querySelector('[aria-label="disabled-flow-flows.hook_enable"]')?.textContent).toMatch(
-      "NEEDS-BRIDGE",
+    await waitFor(
+      () => document.querySelector('[aria-label="hook-state-command-logger"]')?.textContent === "disabled",
     );
+    expect(document.querySelector('[aria-label="hook-state-session-memory"]')?.textContent).toBe("enabled");
+    const enable = document.querySelector(
+      'button[aria-label="hook-enable-command-logger"]',
+    ) as HTMLButtonElement;
+    expect(enable.disabled).toBe(false);
+    expect(enable.title).toMatch("Enable this hook");
+    const disableOn = document.querySelector(
+      'button[aria-label="hook-disable-session-memory"]',
+    ) as HTMLButtonElement;
+    expect(disableOn.disabled).toBe(false);
   });
 
   it("deletes assert staged-then-settle", async () => {

@@ -3866,8 +3866,10 @@ def h_webhooks_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
 # (``:266``) / ``_messaging_platform_payload`` (``:196``). Qubit supplies the
 # per-platform state from its own reference-only store and account/link registry
 # instead of the fork's ``.env``/gateway state, so GET and PUT share ONE store.
-# Credentials stay reference-only: ``env:``/``vault:``/``file:`` references are
-# accepted; a raw secret is a typed ``CHANNEL_ENV_REFERENCE_ONLY`` refusal.
+# Credentials accept a Hermes-style raw paste or an ``env:``/``vault:``/``file:``
+# reference. A pasted raw secret is written straight to the gateway ``.env``
+# on confirm (never persisted in the dashboard store, never logged); the store
+# keeps only the ``env:KEY`` marker.
 _MSG_PLATFORM_STORE = "msg-platforms.json"
 _MSG_PLATFORM_SCHEMA = "qubit-msg-platforms/1"
 _MSG_REF_PREFIXES = ("env:", "vault:", "ref:", "file:")
@@ -12049,10 +12051,13 @@ def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     Ported from the vendored ``web_routers/messaging.py:update_messaging_platform``
     (``:826``): the id is a catalog platform id (``_require_platform``) and the
     body is ``MessagingPlatformUpdate`` (``enabled`` + ``env``/``clear_env``).
-    Qubit keeps credentials reference-only, so ``env`` values must be
-    ``env:``/``vault:``/``file:`` references (a raw secret is a typed
-    ``CHANNEL_ENV_REFERENCE_ONLY`` refusal) and the write lands in the SAME
-    store :func:`h_platforms` reads (``msg-platforms.json``). A Qubit account
+    Hermes parity: a pasted raw secret is accepted exactly like the reference
+    Channels form. On confirm the raw value is written straight to the gateway
+    ``.env`` through the vendored writer — it is never persisted in
+    ``msg-platforms.json``, never staged in the confirm journal, and never
+    logged. The dashboard store, the staged confirm payload, and the audit
+    trail carry only the ``env:KEY`` marker. ``env:``/``file:`` references
+    resolve server-side through the bridge as before. A Qubit account
     id (legacy CLI shape) still routes to ``messaging.account_update`` but has
     no env-write path.
     """
@@ -12084,32 +12089,41 @@ def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             "detail": "env keys are not configurable for this platform: "
                       + ", ".join(bad_keys + bad_clear),
             "qubit_counterpart": "GET /api/messaging/platforms (env_vars)"}
-    # Credential policy: secret-shaped fields are references only, never a raw
-    # secret value. Non-secret fields (allowlists, URLs, account ids) are
-    # directly configurable, mirroring the reference's per-field secret
-    # metadata (``is_password``); an accepted reference is fine for any field.
-    raw_keys = sorted(
-        k for k, v in env_in.items()
-        if _platform_env_is_secret(k) and not _platform_allowed_ref(v))
-    if raw_keys:
-        return _gate(
-            "CHANNEL_ENV_REFERENCE_ONLY",
-            "Channel credential fields are secret references and are never "
-            "written by the dashboard; store env:/vault:/file: references "
-            "instead.",
-            "CLI `qubit messaging accounts` / `qubit auth login` "
-            "(reference-only)")
+    # Hermes parity: a pasted raw secret is accepted, not refused. Secret-shaped
+    # fields with a raw (non-reference) value are diverted below: the value is
+    # written straight to the gateway ``.env`` on confirm, while the dashboard
+    # store, the staged confirm payload, and the audit trail see only the
+    # ``env:KEY`` marker. Non-secret fields (allowlists, URLs, account ids)
+    # pass through verbatim, as the reference allows.
+    raw_secret_keys = sorted(
+        str(k) for k, v in env_in.items()
+        if _platform_env_is_secret(str(k)) and str(v or "").strip()
+        and not _platform_allowed_ref(v))
+    store_env: Dict[str, Any] = {
+        str(k): (f"env:{k}" if str(k) in raw_secret_keys else v)
+        for k, v in env_in.items()
+    }
     detail = (f"changing messaging channel {pid!r} requires explicit "
               "confirmation: re-PUT with {\"confirm\": true}")
     guard = _compat_confirm(
         cfg, "messaging.platform_update", detail, q, b,
         payload={"id": pid, "enabled": enabled,
-                 "env": {str(k): str(v) for k, v in env_in.items()},
+                 "env": {str(k): str(v) for k, v in store_env.items()},
                  "clear_env": [str(k) for k in clear_in]})
     if guard is not None:
         return guard
     try:
-        _platform_store_update(cfg, pid, enabled=enabled, env=env_in,
+        if raw_secret_keys:
+            from . import qubit_runtime as QR
+            QR.ensure_path()
+            try:
+                QR.use_qubit_home(cfg)
+            except Exception:  # noqa: BLE001 - cfg-scoped home is best-effort
+                pass
+            from qubit_cli.config import save_env_value  # type: ignore
+            for key in raw_secret_keys:
+                save_env_value(key, str(env_in[key]).strip())
+        _platform_store_update(cfg, pid, enabled=enabled, env=store_env,
                                clear=clear_in)
         if kind == "account":
             M.account_update(cfg, pid,
@@ -12127,7 +12141,11 @@ def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # are resolved server-side and never returned here.
     bridge: Dict[str, Any] = {}
     if kind == "catalog":
-        refs: Dict[str, Any] = {str(k): v for k, v in env_in.items()}
+        # Markers, never raw values: a pasted secret was already written to
+        # the gateway `.env` above, so the bridge resolves `env:KEY` against
+        # it. Handing the bridge a raw value would fail resolution and make
+        # it DELETE the just-saved key.
+        refs: Dict[str, Any] = {str(k): v for k, v in store_env.items()}
         for k in clear_in:
             refs.setdefault(str(k), "")
         try:
@@ -16689,12 +16707,7 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
      "gateway": "device.pair.approve", "kind": "mutation",
      "aliases": {"setup_code_id": "code"}},
     {"family": "devices", "action": "identity", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "DEVICE_IDENTITY_UNAVAILABLE",
-              "detail": "no registered gateway method serves device "
-                        "identity cards; pairings are the canonical read",
-              "counterpart": "GET /api/qubit/devices/pairings "
-                             "(device.pair.list)"}},
+     "gateway": "device.identity", "kind": "read"},
     # -- session-ops (ocFamilySessionsApi) --
     {"family": "session-ops", "action": "reset", "methods": ["POST"],
      "gateway": "sessions.reset", "kind": "mutation"},
@@ -16757,24 +16770,13 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
     {"family": "worktrees", "action": "prune", "methods": ["POST"],
      "gateway": "worktrees.gc", "kind": "mutation"},
     # -- checkpoints (ocFamilySessionsApi; journal reads reuse /api/ops/*) --
-    # Journal checkpoints are verify-only by design (no restore path); no
-    # gateway method is registered behind create/verify, so both answer the
-    # honest gate. Port candidate for a follow-up lane: register gateway
-    # methods over voicebridge/checkpoints.py, then map these rows to them.
+    # Qubit-native integrity checkpoints (``family_checkpoints``): create
+    # records transcript + workspace hashes into the same shadow store the
+    # journal reads; verify recomputes every hash (OK / DRIFT verdict).
     {"family": "checkpoints", "action": "create", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "CHECKPOINTS_JOURNAL_VERIFY_ONLY",
-              "detail": "no registered gateway method creates journal "
-                        "checkpoints; the journal surface is verify-only",
-              "counterpart": "GET /api/ops/checkpoints (the checkpoint "
-                             "journal) + POST /api/ops/checkpoints/prune"}},
+     "gateway": "checkpoints.create", "kind": "mutation"},
     {"family": "checkpoints", "action": "verify", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "CHECKPOINTS_JOURNAL_VERIFY_ONLY",
-              "detail": "no registered gateway method verifies one journal "
-                        "checkpoint by id; the journal surface is verify-only",
-              "counterpart": "GET /api/ops/checkpoints (the checkpoint "
-                             "journal)"}},
+     "gateway": "checkpoints.verify", "kind": "read"},
     # -- board (ocFamilyBoardApi; tab mutations fold into board.update) --
     {"family": "board", "action": "tabs", "methods": ["GET"],
      "gateway": "board.get", "kind": "read"},
@@ -16978,54 +16980,24 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
     {"family": "flows", "action": "hook_disable", "methods": ["POST"],
      "gateway": "hooks.disable", "kind": "mutation"},
     {"family": "flows", "action": "cancel", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "FLOWS_CANCEL_UNWIRED",
-              "detail": "no sticky taskflow-cancel backend exists; nothing "
-                        "is cancelled",
-              "counterpart": "DELETE /api/cron/jobs/{id} or POST "
-                             "/api/cron/jobs/{id}/pause (confirm-gated)"}},
+     "gateway": "flows.cancel", "kind": "mutation"},
     {"family": "flows", "action": "programs", "methods": ["GET"],
      "gateway": "flows.programs", "kind": "read"},
     # -- memory (ocFamilyMemoryApi; 5 rows verbatim) --
-    # Status-only reality: the live status is served today at the canonical
-    # GET /api/memory paths (qubit-local, the only provider); no writer is
-    # invented behind the /api/qubit/memory/* namespace, so every row answers
-    # the honest memory-provider gate. provider_set carries the verbatim
-    # MEMORY_LOCAL_ONLY refusal the canonical PUT emits for non-local names.
+    # Qubit-native reality: the /api/qubit/memory/* namespace is served by
+    # ``voicebridge/family_memory.py`` as an alias over the canonical local
+    # surface (GET /api/memory and friends). qubit-local is the only
+    # provider; provider-set persists qubit-local only.
     {"family": "memory", "action": "status", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "MEMORY_BRIDGE_UNWIRED",
-              "detail": "the /api/qubit/memory/* namespace has no backend; "
-                        "the live status is served at the canonical path",
-              "counterpart": "GET /api/memory (qubit-local, the only "
-                             "provider)"}},
+     "gateway": "memory.status", "kind": "read"},
     {"family": "memory", "action": "provider", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "MEMORY_BRIDGE_UNWIRED",
-              "detail": "the /api/qubit/memory/* namespace has no backend; "
-                        "the live status is served at the canonical path",
-              "counterpart": "GET /api/memory (qubit-local, the only "
-                             "provider)"}},
+     "gateway": "memory.provider", "kind": "read"},
     {"family": "memory", "action": "provider-config", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "MEMORY_BRIDGE_UNWIRED",
-              "detail": "the /api/qubit/memory/* namespace has no backend; "
-                        "provider config is served at the canonical path",
-              "counterpart": "GET /api/memory/providers/<id>/config "
-                             "(qubit-local only)"}},
+     "gateway": "memory.provider_config", "kind": "read"},
     {"family": "memory", "action": "provider-set", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "MEMORY_LOCAL_ONLY",
-              "detail": "qubit-local is the only memory provider; cloud "
-                        "sync is refused by policy",
-              "counterpart": "PUT /api/memory/provider (persists "
-                             "qubit-local only)"}},
+     "gateway": "memory.provider_set", "kind": "mutation"},
     {"family": "memory", "action": "probe", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "MEMORY_BRIDGE_UNWIRED",
-              "detail": "the /api/qubit/memory/* namespace has no backend; "
-                        "the live probe is served at the canonical path",
-              "counterpart": "GET /api/memory/providers/qubit-local"}},
+     "gateway": "memory.probe", "kind": "read"},
     # -- viking (ocFamilyVikingApi; 9 rows with paths verbatim) --
     # Served by the LOCAL context engine (``voicebridge/context_store.py`` —
     # Qubit-owned state-home ``context/`` root: user/agent/resources/skills
@@ -17062,14 +17034,14 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
     # inbox (task.suggestions); goals list reads the schedule store
     # (cron.list); alerts read run history (cron.runs); the computer console
     # is a read-only status probe (computer.status). The rest have no
-    # registered backend and keep honest typed gates: the follow-up queue and
-    # per-thread drafts live in the open page (no server inbox/store). The
-    # rest is wired through ``family_bot_harness``: launch/pause/resume on
-    # the durable worker path (pause flags the worker box, resume
-    # relaunches the kept prompt), ideas list/edit/dismiss on a durable
-    # overlay over the read-only ledger derivation, goals list/set on a
-    # durable goal sidecar beside the cron store, and card lookup on the
-    # session file artifacts (direct <session>/<name> or bounded scan).
+    # registered backend: everything is server-backed. The rest is wired
+    # through ``family_bot_harness``: launch/pause/resume on the durable worker path (pause flags the worker
+    # box, resume relaunches the kept prompt), follow-ups and per-thread
+    # drafts on the durable console sidecar (the open page mirrors them
+    # locally), ideas list/edit/dismiss on a durable overlay over the
+    # read-only ledger derivation, goals list/set on a durable goal sidecar
+    # beside the cron store, and card lookup on the session file artifacts
+    # (direct <session>/<name> or bounded scan).
     {"family": "bot", "action": "thread-list", "methods": ["GET"],
      "gateway": "sessions.list", "kind": "read"},
     {"family": "bot", "action": "thread-get", "methods": ["GET"],
@@ -17082,19 +17054,9 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
      "gateway": "conversations.turn.cancel", "kind": "mutation",
      "aliases": {"thread": "session"}},
     {"family": "bot", "action": "followups-queue", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "BOT_FOLLOWUPS_LOCAL_ONLY",
-              "detail": "follow-ups queue in the open page; no server inbox "
-                        "exists and nothing is queued",
-              "counterpart": "the open Qubit Bot page holds the follow-up "
-                             "queue (stopping preserves the draft)"}},
+     "gateway": "bot.followups_queue", "kind": "mutation"},
     {"family": "bot", "action": "drafts-save", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "BOT_DRAFTS_LOCAL_ONLY",
-              "detail": "per-thread drafts stay mounted client-side; no "
-                        "server draft store exists and nothing is saved",
-              "counterpart": "the open Qubit Bot page keeps the draft "
-                             "(survives navigation)"}},
+     "gateway": "bot.drafts_save", "kind": "mutation"},
     {"family": "bot", "action": "tasks-list", "methods": ["GET"],
      "gateway": "tasks.list", "kind": "read"},
     {"family": "bot", "action": "tasks-get", "methods": ["GET"],
@@ -17344,6 +17306,16 @@ def _ensure_family_backends(registry: Any) -> None:
 
     for _name, _fn in dict(
             getattr(_FBH, "BOT_HARNESS_GATEWAY_METHODS", {})).items():
+        registry.register(_name, _fn)
+    from . import family_memory as _FMEM
+
+    for _name, _fn in dict(
+            getattr(_FMEM, "MEMORY_GATEWAY_METHODS", {})).items():
+        registry.register(_name, _fn)
+    from . import family_checkpoints as _FCK
+
+    for _name, _fn in dict(
+            getattr(_FCK, "CHECKPOINTS_GATEWAY_METHODS", {})).items():
         registry.register(_name, _fn)
 
 

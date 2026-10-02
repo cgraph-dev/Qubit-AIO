@@ -2958,27 +2958,67 @@ forth is what makes it feel like speech-to-speech.
   commands (infra mapped: `browser_tabs.py` + ledger current-tab),
   Slice-1b CT settle.
 
-## 72. Bot console fully wired: pause/resume/ideas/goals/cards live — 2026-10-02
+## 72. Five-lane wave: P0 confirm bugs fixed, drift closed, tabs wired — 2026-10-02
 
-**No milestone claimed. Not committed.** The last gated Bot rows are now
-served by `voicebridge/family_bot_harness.py` (durable sidecars under the
-voice home `voice/` dir, never in the repo):
+**No milestone claimed. Not committed.** Owner: "continue, check bugs/
+misconfigurations/improvements, more commands, deploy 5 agents". 5
+parallel lanes (2 read-only auditors + 3 implementers, disjoint files).
 
-- `tasks-pause` flags the live worker box (`cancel=True`) and records the
-  kept prompt; `tasks-resume` relaunches it via `orchestrator.launch_task`.
-  Proven with a fake box: pause → `paused True` + flag set; resume →
-  relaunched with the kept prompt (39/39 bridge tests green).
-- `ideas-list/edit/dismiss` overlay the read-only ledger derivation with a
-  durable dismiss/edit store (`BOT_IDEA_NOT_FOUND` 404, `BOT_IDEA_DISMISSED`
-  400 on accept-after-dismiss); `goals-list/set` on a durable goal sidecar
-  beside the cron store (round trip proven: set → appears in list);
-  `cards-get` resolves `session/name` against session file artifacts with a
-  bounded 15-session scan (`BOT_CARD_NOT_FOUND` 404).
-- Page sends `{taskId, session}` for pause/resume so pasted session keys hit
-  the live worker box directly.
+- **Lane 1 (bug hunt, read-only) — 3 P0 + 6 P1, all fixed this wave:**
+  P0-1 failed voice Q&A wedged the helper in PROCESSING forever (both
+  voice paths dead until restart) — `_finish_error()` on both bare
+  returns; P0-2 the whole wake turn ran inside the monitor thread
+  (detector blind exactly when §71 asks for "yes") — turn moved to a
+  `voice-wake-turn` worker thread (second wake refuses via the state
+  gate instead of overlapping); P0-3 `_pending_task` never expired
+  (stale "yes" hours later executes) — 120 s TTL + audited expiry.
+  P1: forced-hit consumes the arm (no double-fire), "Yes, please."
+  comma normalized in affirmatives, busy-refusal traced + capture-
+  failure aborts, short-segment trace, propose_task truncation noted,
+  runtime-prompt read cached by mtime with loud degrade trace.
+  Tests first (6 watched fail); 74 across wake/helper/fullturn green.
+- **Lane 2 (misconfig audit, read-only) — 25-row drift table; fixed:**
+  #10 noise-suppression checkbox inverted (`!== false` → `=== true`);
+  #6 dead `max_s` PUT clamp (`in clean_wake` → `in wake`, loop tuple
+  fixed); #7 `arm_window_s` added to settings view (was invisible
+  despite live 12.0 tuning). Deferred with reason: #9/#11 mic-gain/
+  AGC default splits (live keys exist; unifying needs owner call).
+- **Lane 3 (rewrite quality):** a concurrent lane had already landed
+  the narration guard + detail routing; this lane extended
+  `_NARRATION_WHOLE_RE` (Here-is/Sure-only forms) + 4 tests — 122
+  green in `test_voice_edit9u`.
+- **Lane 4 (tab commands):** already fully implemented in-tree by a
+  concurrent lane (verified, not duplicated): `tab_close/duplicate/
+  new/switch/list` via `browser_tabs.py` + ledger current-tab, 42/42
+  green. CDP is DOWN right now (Chromium closed) — live re-check
+  needs `--remote-debugging-port=9222`.
+- **Lane 5 (commands catalog UI):** `GET /api/voice-edit/commands`
+  (derived live from ACTIONS/registry/intents, never stale) +
+  `custom_commands` settings key (PUT-validated) + dashboard toggle
+  with add/delete shortcuts; 18 route + 10 page tests green, `tsc`
+  clean. Wired this wave: 3-line alias-first hook in
+  `propose_tool` + 2 tests (incl. ftp:// must stay None).
+- **Evidence:** 497 across the voice lane green; `tsc` clean; both
+  services restarted clean (186 events, zero errors, wake live).
+  HarnessRouter vitest failure is the other lane's (no shared
+  imports). Uncommitted: this wave's `desktop_helper.py`,
+  `wake.py`, `service.py`, `settings.py`, `tool_task.py`,
+  `VoiceEditPage.tsx`, tests + this entry (+ lanes' own files).
+- **Needs the owner:** the §71 live proof (timer → "yes" → runs);
+  relaunch Chromium with the debug port for tab-command proof.
 
-Still page-local by design: follow-up queue + per-thread drafts (no server
-inbox), hosted-service rows (`DISABLED_BOT_ACTIONS`, no counterpart).
-Evidence: 39 passed
-`.venv/bin/python -m pytest tests/test_qubit_family_bridge9u.py -q`;
-`npx tsc -b` clean in `frontend/qubit-web`.
+## 73. Zero gated rows + Bot chat UX to upstream layout — 2026-10-02
+
+**No milestone claimed. Not committed.** Every `gateway: None` row is now
+served Qubit-native (176 rows, 0 gated): memory namespace
+(`family_memory.py`, alias over canonical `/api/memory`), integrity
+checkpoints (`family_checkpoints.py`, transcript + workspace hashes,
+OK/DRIFT verdict), `flows.cancel` (disables the named bundled hook),
+`device.identity` (same pairing store), bot follow-ups/drafts (durable
+console sidecar). Taskflows hooks section is live (guard states +
+enable/disable/cancel, staged-confirm). QubitBotPage restyled to the
+OpenMuse chat UX (hero + starters, 22/7 bubbles, typing dots, circular
+send/stop, queue strip with hold/resume, retry) in the Qubit theme —
+screenshots verified, no gate codes in UI.
+Evidence: 41 passed bridge tests; tsc clean; Bot 11/11; Taskflows +
+Checkpoints + Devices suites 28/28 with the Bot page.

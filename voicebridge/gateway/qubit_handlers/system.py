@@ -871,6 +871,26 @@ def _sys_device_pair_list(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
             "authority": "voicebridge.pairing (codes + accepted DM pairings)"}
 
 
+def _sys_device_identity(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    from ... import pairing as P
+    from ..gateway_ws import GatewayError
+
+    target = str(params.get("id", params.get("device", "")) or "").strip()
+    if not target:
+        raise GatewayError("DEVICE_ID_REQUIRED",
+                           "devices/identity needs a device id")
+    try:
+        state = P._load(cfg)
+    except P.PairingError as exc:
+        raise GatewayError(str(exc.code), str(exc))
+    rec = P._resolve_record(state, target)
+    if rec is None:
+        raise GatewayError("DEVICE_NOT_FOUND",
+                           f"no paired device {target!r}")
+    return {"state": "OK", "identity": P._public(rec),
+            "authority": "voicebridge.pairing (same store as pairings)"}
+
+
 def _sys_device_pair_approve(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
     from ... import pairing as P
 
@@ -1163,6 +1183,7 @@ def register(registry: Any) -> None:
     registry.register("device.pair.setupCode", _sys_device_pair_setup_code)
     registry.register("device.pair.setupStatus", _sys_device_pair_setup_status)
     registry.register("device.pair.list", _sys_device_pair_list)
+    registry.register("device.identity", _sys_device_identity)
     registry.register("device.pair.approve", _sys_device_pair_approve)
     registry.register("device.pair.reject", _sys_device_pair_reject)
     registry.register("device.pair.remove", _sys_device_pair_remove)

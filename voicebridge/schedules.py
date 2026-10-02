@@ -2108,12 +2108,27 @@ def _gw_programs(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 #: Gateway method name -> handler (registered onto each bridge registry by the
-#: family bridge in ``voicebridge/qubit_compat.py`` — the one wiring owner).
+#: family bridge in ``voicebridge/qubit_compat.py`` — the one wiring
+#: owner).
 #: ``hooks.status`` keeps its canonical pinned handler in
-#: ``voicebridge/gateway/rpc.py``; these three are the newly-wired rows.
+#: ``voicebridge/gateway/rpc.py``; ``flows.cancel`` disables the named flow
+#: hook (confirm-gated by the family bridge).
+def _gw_flow_cancel(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    name = str(params.get("name", params.get("flow", "")) or "").strip()
+    if not name:
+        from .gateway.gateway_ws import GatewayError
+        raise GatewayError("FLOW_NAME_REQUIRED",
+                           "flows/cancel needs a flow hook name")
+    return disable_flow_hook(
+        cfg, name,
+        requested_by=str(params.get("requested_by", "") or "dashboard:user"),
+        confirmed=True)
+
+
 FLOWS_GATEWAY_METHODS = {
     "flows.hooks": _gw_hooks,
     "hooks.enable": _gw_hook_enable,
     "hooks.disable": _gw_hook_disable,
     "flows.programs": _gw_programs,
+    "flows.cancel": _gw_flow_cancel,
 }

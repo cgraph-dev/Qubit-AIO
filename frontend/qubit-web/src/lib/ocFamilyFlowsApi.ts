@@ -12,16 +12,17 @@
  *   → cron-backed durable flows (`schedules.*` rows). Managed vs mirrored sync
  *   modes are a view concern: recurring schedules render as standing orders,
  *   `run_at` schedules as one-shots.
- * - Hooks (`hooks list/enable/disable`, the 5 bundled hooks) have NO backend
- *   route in Qubit — they render from {@link HOOK_CATALOG} (verbatim from the
- *   upstream bundled-hooks table) with enable/disable marked NEEDS-BRIDGE.
+ * - Hooks (`hooks list/enable/disable`, the 5 bundled hooks) are served by
+ *   the family bridge (`voicebridge/schedules.py` flow-hooks region);
+ *   `cancel` disables the named hook. They render from {@link HOOK_CATALOG}
+ *   (verbatim from the upstream bundled-hooks table) with live guard states.
  * - The ephemeral-suggestion registry is NOT here by design — that refusal
  *   lives on `/qubit-task-inbox`.
  *
  * Reads go through `fetchJSON`; every mutation goes through the shared
  * staged-confirmation round-trip (`runMutationWithConfirm`), never a faked
  * success. Routes already served by the backend reuse the existing cron paths
- * (see {@link ROUTES} rows with `backend: "cron"`); rows with
+ * (see {@link ROUTES} rows with `backend: "cron"` or `"live"`); rows with
  * `backend: "needs-bridge"` are new `/api/qubit/flows/<action>` paths with no
  * backend route yet — the page renders those controls disabled-with-reason.
  */
@@ -34,14 +35,14 @@ export type ConfirmFn = (detail: string) => boolean | Promise<boolean>;
 // ── ROUTES manifest ──────────────────────────────────────────────────────
 
 export type RouteMethod = "GET" | "POST" | "PUT" | "DELETE";
-export type RouteBackend = "cron" | "needs-bridge";
+export type RouteBackend = "cron" | "live" | "needs-bridge";
 
 export interface FlowRoute {
   family: "flows";
   action: string;
   method: RouteMethod;
   path: string;
-  /** "cron" = served today (reuse, don't duplicate); "needs-bridge" = no backend route yet. */
+  /** "cron" = served today (reuse, don't duplicate); "live" = served by the family bridge; "needs-bridge" = no backend route yet. */
   backend: RouteBackend;
 }
 
@@ -49,7 +50,8 @@ export interface FlowRoute {
  * Every path + method this family client addresses. Cron rows reuse the
  * existing `qubit_compat` cron routes (`h_cron_jobs`, `cron_create`,
  * `cron_update`, `cron_delete`, `cron_pause`/`cron_resume`/`cron_trigger`);
- * `/api/qubit/flows/*` rows are NEEDS-BRIDGE until a backend route exists.
+ * `/api/qubit/flows/*` hook rows are served by the family bridge
+ * (`voicebridge/schedules.py` flow-hooks region).
  */
 export const ROUTES: ReadonlyArray<FlowRoute> = [
   // Existing backend (voicebridge.schedules.* via qubit_compat cron routes).
@@ -70,24 +72,24 @@ export const ROUTES: ReadonlyArray<FlowRoute> = [
     path: "/api/cron/blueprints/instantiate",
     backend: "cron",
   },
-  // NEEDS-BRIDGE: no backend route serves these yet.
-  { family: "flows", action: "hooks", method: "GET", path: "/api/qubit/flows/hooks", backend: "needs-bridge" },
+  // Live bridge rows (family bridge over the schedules hooks region).
+  { family: "flows", action: "hooks", method: "GET", path: "/api/qubit/flows/hooks", backend: "live" },
   {
     family: "flows",
     action: "hook_enable",
     method: "POST",
     path: "/api/qubit/flows/hook_enable",
-    backend: "needs-bridge",
+    backend: "live",
   },
   {
     family: "flows",
     action: "hook_disable",
     method: "POST",
     path: "/api/qubit/flows/hook_disable",
-    backend: "needs-bridge",
+    backend: "live",
   },
-  { family: "flows", action: "cancel", method: "POST", path: "/api/qubit/flows/cancel", backend: "needs-bridge" },
-  { family: "flows", action: "programs", method: "GET", path: "/api/qubit/flows/programs", backend: "needs-bridge" },
+  { family: "flows", action: "cancel", method: "POST", path: "/api/qubit/flows/cancel", backend: "live" },
+  { family: "flows", action: "programs", method: "GET", path: "/api/qubit/flows/programs", backend: "live" },
 ];
 
 export function routePath(action: string): FlowRoute | undefined {
@@ -261,7 +263,58 @@ export function deleteFlow(id: string, confirm: ConfirmFn): Promise<unknown> {
   );
 }
 
-// ── hooks: catalog data only (enable/disable NEEDS-BRIDGE) ──────────────
+// ── bundled flow hooks (live bridge rows) ────────────────────────────────
+
+export interface HookState {
+  name: string;
+  enabled: boolean;
+}
+
+function asHookState(value: unknown): HookState | null {
+  if (typeof value !== "object" || value === null) return null;
+  const row = value as Record<string, unknown>;
+  const name = typeof row.name === "string" ? row.name : "";
+  if (!name) return null;
+  return { name, enabled: row.enabled === true };
+}
+
+/** Live hook guard states from the schedules hooks-guard table. */
+export async function listHookStates(): Promise<HookState[]> {
+  const payload = await fetchJSON<unknown>("/api/qubit/flows/hooks");
+  const rows = asRowList(asRecord(payload).hooks ?? payload);
+  const out: HookState[] = [];
+  for (const row of rows) {
+    const state = asHookState(row);
+    if (state) out.push(state);
+  }
+  return out;
+}
+
+/** Enable a bundled flow hook (staged-confirm). */
+export function enableHook(name: string, confirm: ConfirmFn): Promise<unknown> {
+  return runMutationWithConfirm(
+    () => post("/api/qubit/flows/hook_enable", { name }),
+    confirm,
+  );
+}
+
+/** Disable a bundled flow hook (staged-confirm). */
+export function disableHook(name: string, confirm: ConfirmFn): Promise<unknown> {
+  return runMutationWithConfirm(
+    () => post("/api/qubit/flows/hook_disable", { name }),
+    confirm,
+  );
+}
+
+/** Cancel a flow: disables the named bundled flow hook (staged-confirm). */
+export function cancelFlowHook(name: string, confirm: ConfirmFn): Promise<unknown> {
+  return runMutationWithConfirm(
+    () => post("/api/qubit/flows/cancel", { name }),
+    confirm,
+  );
+}
+
+// ── hooks: catalog data + live guard states ───────────────────────────────
 
 export interface HookRow {
   name: string;
@@ -271,9 +324,9 @@ export interface HookRow {
 
 /**
  * Verbatim from the upstream bundled-hooks table
- * (`docs/automation/hooks.md` → "Bundled hooks"). Client-side data only:
- * Qubit has no backend hooks route, so the page renders enable/disable as
- * disabled-with-reason rows pointing at the NEEDS-BRIDGE routes above.
+ * (`docs/automation/hooks.md` → "Bundled hooks"). Guard states come from the
+ * live bridge (`listHookStates`); enable/disable/cancel post to the family
+ * bridge (staged-confirm).
  */
 export const HOOK_CATALOG: ReadonlyArray<HookRow> = [
   {
@@ -315,24 +368,6 @@ export interface DisabledFlowAction {
  * there is no backend route to refuse); counterparts name the real surface.
  */
 export const DISABLED_FLOW_ACTIONS: ReadonlyArray<DisabledFlowAction> = [
-  {
-    action: "flows.hook_enable",
-    code: "NEEDS-BRIDGE",
-    reason: "No backend hooks route exists yet (/api/qubit/flows/hook_enable).",
-    counterpart: "Cron-backed flows below (enable/disable works today)",
-  },
-  {
-    action: "flows.hook_disable",
-    code: "NEEDS-BRIDGE",
-    reason: "No backend hooks route exists yet (/api/qubit/flows/hook_disable).",
-    counterpart: "Cron-backed flows below (enable/disable works today)",
-  },
-  {
-    action: "flows.cancel",
-    code: "NEEDS-BRIDGE",
-    reason: "Sticky taskflow-cancel intent has no backend route (/api/qubit/flows/cancel).",
-    counterpart: "Delete the durable flow (confirm-gated) or pause it",
-  },
   {
     action: "flows.suggestions",
     code: "TASK_INBOX_ONLY",

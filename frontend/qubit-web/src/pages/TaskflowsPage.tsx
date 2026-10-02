@@ -12,8 +12,8 @@
  *   action + confirm), enable/disable toggle (honest: the backend's
  *   `cron_update` takes the full mutation, so the row's fields ride along
  *   unchanged with only `enabled` flipped), trigger-now, delete (confirm).
- * - Hooks: the 5 upstream bundled hooks as catalog data with enable/disable
- *   rendered disabled-with-reason (NEEDS-BRIDGE — no backend route).
+ * - Hooks: the 5 upstream bundled hooks with live guard states and
+ *   enable/disable/cancel on the family bridge (staged-confirm).
  * - Honest scope: durable flows only. No ephemeral-suggestion registry —
  *   that refusal lives on `/qubit-task-inbox`.
  *
@@ -26,12 +26,17 @@ import { useCallback, useEffect, useState } from "react";
 import {
   DISABLED_FLOW_ACTIONS,
   HOOK_CATALOG,
+  cancelFlowHook,
   createFlow,
   deleteFlow,
+  disableHook,
+  enableHook,
   listFlows,
+  listHookStates,
   setFlowEnabled,
   triggerFlowNow,
   type FlowRow,
+  type HookState,
 } from "@/lib/ocFamilyFlowsApi";
 import { refusalOrError } from "@/lib/policy-refusal";
 
@@ -51,6 +56,7 @@ function formatResult(value: unknown): string {
 
 export default function TaskflowsPage() {
   const [flows, setFlows] = useState<FlowRow[]>([]);
+  const [hookStates, setHookStates] = useState<HookState[]>([]);
   const [newName, setNewName] = useState("");
   const [newSchedule, setNewSchedule] = useState("");
   const [newPrompt, setNewPrompt] = useState("");
@@ -64,6 +70,11 @@ export default function TaskflowsPage() {
       setFlows(await listFlows());
     } catch (e) {
       setErrorText(refusalOrError(e, `Load failed: ${e}`));
+    }
+    try {
+      setHookStates(await listHookStates());
+    } catch (e) {
+      setErrorText(refusalOrError(e, `Hooks load failed: ${e}`));
     }
   }, []);
 
@@ -314,39 +325,76 @@ export default function TaskflowsPage() {
       <section aria-label="hooks" className="rounded border p-4">
         <h2 className="text-sm font-semibold">Hooks ({HOOK_CATALOG.length})</h2>
         <p className="mt-1 text-sm">
-          Event-driven hooks have no backend route yet — enable/disable is
-          disabled with its reason below.
+          Event-driven hooks on the live bridge — enable/disable flips the
+          guard immediately (staged-confirm).
         </p>
         <ul className="mt-2 flex flex-col gap-2">
-          {HOOK_CATALOG.map((hook) => (
+          {HOOK_CATALOG.map((hook) => {
+            const live = hookStates.find((s) => s.name === hook.name);
+            const enabled = live?.enabled === true;
+            return (
             <li key={hook.name} aria-label={`hook-row-${hook.name}`} className="rounded border p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold">{hook.name}</span>
                 <span className="text-xs">{hook.events.join(", ")}</span>
+                <span className="text-xs" aria-label={`hook-state-${hook.name}`}>
+                  {live ? (enabled ? "enabled" : "disabled") : "state unknown"}
+                </span>
               </div>
               <p className="mt-1 text-xs">{hook.description}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   aria-label={`hook-enable-${hook.name}`}
-                  disabled
-                  title="NEEDS-BRIDGE: no backend hooks route (/api/qubit/flows/hook_enable)"
+                  disabled={busy || enabled}
+                  title={enabled ? "Hook is already enabled" : "Enable this hook"}
                   className="rounded border px-2 py-1 text-xs disabled:opacity-50"
+                  onClick={() =>
+                    setPending({
+                      title: "Enable hook",
+                      detail: `Enable hook ${hook.name}?`,
+                      run: () => enableHook(hook.name, () => true),
+                    })
+                  }
                 >
-                  Enable (needs bridge)
+                  Enable
                 </button>
                 <button
                   type="button"
                   aria-label={`hook-disable-${hook.name}`}
-                  disabled
-                  title="NEEDS-BRIDGE: no backend hooks route (/api/qubit/flows/hook_disable)"
+                  disabled={busy || !enabled}
+                  title={!enabled ? "Hook is already disabled" : "Disable this hook"}
                   className="rounded border px-2 py-1 text-xs disabled:opacity-50"
+                  onClick={() =>
+                    setPending({
+                      title: "Disable hook",
+                      detail: `Disable hook ${hook.name}?`,
+                      run: () => disableHook(hook.name, () => true),
+                    })
+                  }
                 >
-                  Disable (needs bridge)
+                  Disable
+                </button>
+                <button
+                  type="button"
+                  aria-label={`hook-cancel-${hook.name}`}
+                  disabled={busy || !enabled}
+                  title="Cancel this flow (disables the hook)"
+                  className="rounded border px-2 py-1 text-xs disabled:opacity-50"
+                  onClick={() =>
+                    setPending({
+                      title: "Cancel flow",
+                      detail: `Cancel flow for hook ${hook.name}? This disables the hook.`,
+                      run: () => cancelFlowHook(hook.name, () => true),
+                    })
+                  }
+                >
+                  Cancel flow
                 </button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
         <ul className="mt-2 flex flex-col gap-1">
           {DISABLED_FLOW_ACTIONS.map((row) => (

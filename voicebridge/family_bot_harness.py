@@ -277,6 +277,8 @@ _CONSOLE_FILE = "bot_console.json"
 _MAX_GOALS = 200
 _MAX_PAUSED = 50
 _MAX_OVERLAY = 500
+_MAX_FOLLOWUPS = 200
+_MAX_DRAFTS = 100
 _CARD_SCAN_SESSIONS = 15
 
 
@@ -292,7 +294,7 @@ def _console_path(cfg: Any) -> Optional[Any]:
 
 def _console_load(cfg: Any) -> Dict[str, Any]:
     skel = {"paused": {}, "ideas": {"dismissed": [], "edits": {}},
-            "goals": []}
+            "goals": [], "followups": [], "drafts": {}}
     path = _console_path(cfg)
     if path is None:
         return skel
@@ -307,11 +309,15 @@ def _console_load(cfg: Any) -> Dict[str, Any]:
     paused = data.get("paused")
     ideas = data.get("ideas")
     goals = data.get("goals")
+    followups = data.get("followups")
+    drafts = data.get("drafts")
     return {
         "paused": paused if isinstance(paused, dict) else {},
         "ideas": ideas if isinstance(ideas, dict) else
         {"dismissed": [], "edits": {}},
         "goals": goals if isinstance(goals, list) else [],
+        "followups": followups if isinstance(followups, list) else [],
+        "drafts": drafts if isinstance(drafts, dict) else {},
     }
 
 
@@ -746,6 +752,59 @@ def _gw_bot_cards_get(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
 #: the family bridge in ``voicebridge/qubit_compat.py`` — the one wiring
 #: owner). Mutations execute only after the family's staged confirm
 #: round-trip (409 before confirm, exactly-once after).
+def _gw_bot_followups_queue(cfg: Any,
+                            params: Dict[str, Any]) -> Dict[str, Any]:
+    text = str(params.get("text", params.get("prompt", "")) or "").strip()
+    if not text:
+        messages = params.get("messages", [])
+        if isinstance(messages, list):
+            text = "\n".join(str(m) for m in messages)[:4000].strip()
+    if not text:
+        raise _gateway_error("BOT_FOLLOWUP_BAD_PARAMS",
+                             "followups-queue needs text to queue")
+    state = _console_load(cfg)
+    queue = state.get("followups")
+    if not isinstance(queue, list):
+        queue = []
+        state["followups"] = queue
+    item = {"text": text[:4000],
+            "thread": str(params.get("thread", "") or "")[:200],
+            "queued_at": time.time()}
+    queue.append(item)
+    del queue[:max(0, len(queue) - _MAX_FOLLOWUPS)]
+    state["followups"] = queue
+    _console_save(cfg, state)
+    return {"state": "OK", "queued": item, "count": len(queue),
+            "authority": "durable follow-up inbox in the Qubit state dir; "
+                         "the open page mirrors it locally"}
+
+
+def _gw_bot_drafts_save(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    thread = str(params.get("thread", "") or "").strip()
+    text = str(params.get("text", params.get("draft", "")) or "")
+    if not thread:
+        raise _gateway_error("BOT_DRAFT_BAD_PARAMS",
+                             "drafts-save needs a thread key")
+    state = _console_load(cfg)
+    drafts = state.get("drafts")
+    if not isinstance(drafts, dict):
+        drafts = {}
+        state["drafts"] = drafts
+    if text:
+        if len(drafts) >= _MAX_DRAFTS and thread not in drafts:
+            drafts.pop(next(iter(drafts)), None)
+        drafts[thread] = {"text": text[:20000],
+                          "saved_at": time.time()}
+    else:
+        drafts.pop(thread, None)
+    state["drafts"] = drafts
+    _console_save(cfg, state)
+    return {"state": "OK", "thread": thread,
+            "saved": bool(text),
+            "authority": "durable per-thread draft store in the Qubit "
+                         "state dir; the open page mirrors it locally"}
+
+
 BOT_HARNESS_GATEWAY_METHODS = {
     "bot.tasks_launch": _gw_bot_tasks_launch,
     "bot.tasks_pause": _gw_bot_tasks_pause,
@@ -758,6 +817,8 @@ BOT_HARNESS_GATEWAY_METHODS = {
     "bot.goals_set": _gw_bot_goals_set,
     "bot.watches_set": _gw_bot_watches_set,
     "bot.cards_get": _gw_bot_cards_get,
+    "bot.followups_queue": _gw_bot_followups_queue,
+    "bot.drafts_save": _gw_bot_drafts_save,
     "harness.task_submit": _gw_harness_task_submit,
     "harness.starter_kits": _gw_harness_starter_kits,
 }

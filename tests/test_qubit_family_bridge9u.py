@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Dict
 
 import pytest
 
@@ -114,18 +115,18 @@ def test_staged_plus_confirm_executes(tmp_path, monkeypatch):
 
 
 def test_honest_gate_without_registered_method(tmp_path, monkeypatch):
-    """Manifest paths with no gateway method behind them stay typed gates."""
+    """Unknown ids behind live rows stay typed 404s (never fake 200s)."""
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     code, out = HC.dispatch(cfg, "GET", "/api/qubit/devices/identity",
-                            {"device_id": "d1"}, {})
-    assert code == 403, out
-    assert out.get("code") == "DEVICE_IDENTITY_UNAVAILABLE", out
+                            {"id": "no-such-device-zzz"}, {})
+    assert code == 404, out
+    assert out.get("code") == "DEVICE_NOT_FOUND", out
     code, out = HC.dispatch(cfg, "GET", "/api/qubit/checkpoints/verify",
-                            {"checkpoint_id": "c1"}, {})
-    assert code == 403, out
-    assert out.get("code") == "CHECKPOINTS_JOURNAL_VERIFY_ONLY", out
+                            {"id": "nosuch/0000"}, {})
+    assert code == 404, out
+    assert out.get("code") == "CHECKPOINT_NOT_FOUND", out
 
 
 # -- second wave (canvas, tasks, flows, memory, webchat) --------------------
@@ -205,12 +206,10 @@ def test_flows_hooks_read_executes(tmp_path, monkeypatch):
 
 
 def test_flows_hook_rows_live_except_cancel_gate(tmp_path, monkeypatch):
-    """hook_enable/hook_disable/programs are live (lane I1); only cancel gates.
+    """hook_enable/hook_disable/programs/cancel are all live (Qubit-native).
 
-    Reconciled from the gate-pinning version: enable/disable flip the
-    schedules hooks-guard table and programs reads recurring schedules, so a
-    403 here would be a stale refusal. `cancel` has no sticky
-    taskflow-cancel backend and keeps its honest typed gate.
+    `cancel` disables the named bundled flow hook (confirm-gated); the hook
+    is re-enabled at the end so the hermetic env is left untouched.
     """
     from voicebridge import qubit_compat as HC
 
@@ -219,11 +218,18 @@ def test_flows_hook_rows_live_except_cancel_gate(tmp_path, monkeypatch):
                                {}, {"name": "command-logger"})
     assert code == 409, staged
     assert staged.get("code") == "CONFIRM_REQUIRED", staged
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/flows/cancel", {},
+                               {"name": "command-logger"})
+    assert code == 409, staged
+    assert staged.get("code") == "CONFIRM_REQUIRED", staged
     code, out = HC.dispatch(cfg, "POST", "/api/qubit/flows/cancel", {},
-                            {"flow_id": "f1"})
-    assert code == 403, out
-    assert out.get("code") == "FLOWS_CANCEL_UNWIRED", out
-    assert "cron" in str(out.get("qubit_counterpart", "")), out
+                            {"name": "command-logger", "confirm": True})
+    assert code == 200, out
+    assert out.get("result", out).get("hook", {}).get("enabled") is False, out
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/flows/hook_enable", {},
+                            {"name": "command-logger", "confirm": True})
+    assert code == 200, out
+    assert out.get("result", out).get("hook", {}).get("enabled") is True, out
     code, out = HC.dispatch(cfg, "GET", "/api/qubit/flows/programs", {}, {})
     assert code == 200, out
     assert "programs" in out.get("result", out), out
@@ -254,17 +260,16 @@ def test_canvas_rows_are_live_mappings(tmp_path, monkeypatch):
 
 
 def test_memory_rows_are_typed_gates(tmp_path, monkeypatch):
-    """All 5 memory rows gate on the memory-provider gate (no writer)."""
+    """All 5 memory rows are live Qubit-native aliases (qubit-local only)."""
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     code, out = HC.dispatch(cfg, "GET", "/api/qubit/memory/status", {}, {})
-    assert code == 403, out
-    assert out.get("code") == "MEMORY_BRIDGE_UNWIRED", out
-    assert "/api/memory" in str(out.get("qubit_counterpart", "")), out
+    assert code == 200, out
+    assert out.get("result", out).get("active") == "qubit-local", out
     code, out = HC.dispatch(cfg, "POST", "/api/qubit/memory/provider-set",
-                            {}, {"provider": "qubit-local"})
-    assert code == 403, out
+                            {}, {"provider": "cloud-x", "confirm": True})
+    assert code == 400, out
     assert out.get("code") == "MEMORY_LOCAL_ONLY", out
 
 
@@ -655,16 +660,50 @@ def test_bot_gate_rows_are_typed_403(tmp_path, monkeypatch):
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    gates = {
-        "/api/qubit/bot/followups-queue": "BOT_FOLLOWUPS_LOCAL_ONLY",
-        "/api/qubit/bot/drafts-save": "BOT_DRAFTS_LOCAL_ONLY",
-    }
+    gates: Dict[str, str] = {}
     for path, want in gates.items():
         method = "GET" if path.endswith("cards-get") else "POST"
         code, out = HC.dispatch(cfg, method, path, {}, {"probe": True})
         assert code == 403, (path, out)
         assert out.get("code") == want, (path, out)
-        assert out.get("qubit_counterpart"), (path, out)
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/bot/followups-queue",
+                            {}, {"probe": True})
+    assert code == 409, out
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/bot/drafts-save",
+                            {}, {"probe": True})
+    assert code == 409, out
+
+
+def test_bot_followups_drafts_round_trip(tmp_path, monkeypatch):
+    """Follow-ups queue and per-thread drafts persist server-side."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+
+    def stage_exec(path, body):
+        code, out = HC.dispatch(cfg, "POST", path, {}, dict(body))
+        assert code == 409, (path, out)
+        cid = out.get("confirmation_id")
+        assert cid, (path, out)
+        return HC.dispatch(cfg, "POST", path, {},
+                           dict(body, confirm=True, confirmation_id=cid))
+
+    code, out = stage_exec("/api/qubit/bot/followups-queue",
+                           {"text": "check the build", "thread": "t1"})
+    assert code == 200, out
+    res = out.get("result", out)
+    assert res.get("queued", {}).get("text") == "check the build", out
+    assert res.get("count") == 1, out
+
+    code, out = stage_exec("/api/qubit/bot/drafts-save",
+                           {"thread": "t1", "text": "half-written reply"})
+    assert code == 200, out
+    assert out.get("result", out).get("saved") is True, out
+
+    code, out = stage_exec("/api/qubit/bot/drafts-save",
+                           {"thread": "t1", "text": ""})
+    assert code == 200, out
+    assert out.get("result", out).get("saved") is False, out
 
 
 def test_bot_harness_wired_rows_live(tmp_path, monkeypatch):
@@ -790,6 +829,79 @@ def test_bot_pause_resume_worker_box(tmp_path, monkeypatch):
     assert res.get("session") == "probe-worker-2", out
     assert res.get("resumed_from") == "probe-worker-1", out
     assert launched.get("prompt") == "do the thing", launched
+
+
+def test_memory_checkpoints_flows_devices_rows_live(tmp_path, monkeypatch):
+    """Memory namespace, integrity checkpoints, flow cancel, device id."""
+    from voicebridge import qubit_compat as HC
+    from voicebridge.qubit_session_store import QubitSessionStore
+
+    cfg = _cfg(tmp_path, monkeypatch)
+
+    def stage_exec(path, body):
+        code, out = HC.dispatch(cfg, "POST", path, {}, dict(body))
+        assert code == 409, (path, out)
+        cid = out.get("confirmation_id")
+        assert cid, (path, out)
+        return HC.dispatch(cfg, "POST", path, {},
+                           dict(body, confirm=True, confirmation_id=cid))
+
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/memory/status", {}, {})
+    assert code == 200, out
+    assert out.get("result", out).get("active") == "qubit-local", out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/memory/provider", {}, {})
+    assert code == 200, out
+    assert out.get("result", out).get("provider") == "qubit-local", out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/memory/provider-config",
+                            {}, {})
+    assert code == 200, out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/memory/probe", {}, {})
+    assert code == 200, out
+    code, out = stage_exec("/api/qubit/memory/provider-set",
+                           {"active": "qubit-local"})
+    assert code == 200, out
+    assert out.get("result", out).get("active") == "qubit-local", out
+    code, out = stage_exec("/api/qubit/memory/provider-set",
+                           {"active": "cloud-x"})
+    assert code == 400, out
+    assert out.get("code") == "MEMORY_LOCAL_ONLY", out
+
+    store = QubitSessionStore(cfg)
+    created = store.create("probe session", session_id="probe-ckpt-1")
+    assert created.get("state") == "OK", created
+    code, out = stage_exec("/api/qubit/checkpoints/create",
+                           {"session": "probe-ckpt-1", "note": "t0"})
+    assert code == 200, out
+    ident = out.get("result", out).get("checkpoint", {}).get("id")
+    assert ident, out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/checkpoints/verify",
+                            {"id": ident}, {})
+    assert code == 200, out
+    assert out.get("result", out).get("verdict") == "OK", out
+    store.append("probe-ckpt-1", "user", "drift line")
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/checkpoints/verify",
+                            {"id": ident}, {})
+    assert code == 200, out
+    res = out.get("result", out)
+    assert res.get("verdict") == "DRIFT", out
+    assert res.get("transcript_match") is False, out
+
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/flows/hooks", {}, {})
+    assert code == 200, out
+    hooks = out.get("result", out).get("hooks", [])
+    assert hooks, out
+    name = str(hooks[0].get("name", ""))
+    code, out = stage_exec("/api/qubit/flows/cancel", {"name": name})
+    assert code == 200, out
+    assert out.get("result", out).get("hook", {}).get("enabled") is False, out
+    code, out = stage_exec("/api/qubit/flows/hook_enable", {"name": name})
+    assert code == 200, out
+    assert out.get("result", out).get("hook", {}).get("enabled") is True, out
+
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/devices/identity",
+                            {"id": "no-such-device-zzz"}, {})
+    assert code == 404, out
+    assert out.get("code") == "DEVICE_NOT_FOUND", out
 
 
 def test_harness_roster_catalog_task_rows_live(tmp_path, monkeypatch):

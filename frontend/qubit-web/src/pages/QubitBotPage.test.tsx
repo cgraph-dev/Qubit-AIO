@@ -178,7 +178,9 @@ function text(): string {
 
 function clickButton(label: string) {
   const btn = Array.from(container!.querySelectorAll("button")).find(
-    (b) => (b.textContent ?? "").trim() === label,
+    (b) =>
+      (b.textContent ?? "").trim() === label ||
+      b.getAttribute("aria-label") === label,
   ) as HTMLElement | null;
   expect(btn, `button ${label}`).not.toBeNull();
   act(() => {
@@ -208,7 +210,7 @@ describe("QubitBotPage", () => {
     expect(botMocks.getBotComputerStatus).toHaveBeenCalled();
     const t = text();
     expect(t).toContain("Qubit Bot");
-    expect(t).toContain("thread-1");
+    expect(t).toContain("Main");
     expect(t).toContain("task-1");
     expect(t).toContain("idea-1");
     expect(t).toContain("goal-1");
@@ -236,24 +238,29 @@ describe("QubitBotPage", () => {
     await flush();
     setInputById("bot-composer", "hello bot");
     await flush();
-    clickButton("Send");
+    clickButton("Send message");
     await flush();
     expect(botMocks.sendBotTurn).toHaveBeenCalledTimes(1);
     const [input] = botMocks.sendBotTurn.mock.calls[0];
     expect(input).toMatchObject({ text: "hello bot" });
   });
 
-  it("queues follow-ups in order and sends them back to the composer", async () => {
+  it("queues follow-ups locally in order and resumes them on demand", async () => {
     renderPage();
     await flush();
     setInputById("bot-followup", "second question");
     await flush();
     clickButton("Queue");
     await flush();
-    expect(botMocks.queueBotFollowups).toHaveBeenCalledTimes(1);
+    // The follow-up queue lives in the open page (BOT_FOLLOWUPS_LOCAL_ONLY):
+    // Queue holds it locally without a bridge call.
+    expect(botMocks.queueBotFollowups).not.toHaveBeenCalled();
     expect(text()).toContain("second question");
     clickButton("Send queued messages");
     await flush();
+    expect(botMocks.sendBotTurn).toHaveBeenCalledTimes(1);
+    const [input] = botMocks.sendBotTurn.mock.calls[0];
+    expect(input).toMatchObject({ text: "second question" });
   });
 
   it("looks up a task and shows its plan", async () => {
