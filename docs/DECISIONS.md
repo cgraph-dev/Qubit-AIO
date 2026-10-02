@@ -55,9 +55,9 @@ archived contract is preserved, not edited.
 ## Owner decisions in force (2026-09-22, session 2)
 
 10. **Real Qubit-owned gateway (authoritative).** Qubit must provide a real
-    Qubit-owned gateway with Hermes-equivalent **status, start, stop, restart,
+    Qubit-owned gateway with reference-equivalent **status, start, stop, restart,
     supervision, audit, confirmation, e-stop, failure, and recovery** behavior.
-    The gateway is Qubit-owned — **Hermes must not be the authority** — and it
+    The gateway is Qubit-owned — **the reference install must not be the authority** — and it
     must **not** create a separate product authority: all gateway control flows
     through the one broker / policy / audit / confirmation / e-stop path.
 11. **Sanctioned update interface.** The update surface is exactly:
