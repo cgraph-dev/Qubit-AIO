@@ -176,6 +176,55 @@ no browser tabs driven, no model slots moved.
   enable/disable + programs registry (no hooks backend; cron covers real
   scheduling); memory writers beyond qubit-local (local-only policy — the
   gate IS the product); webchat needs nothing (reuse verified live).
-  Concurrent lanes' uncommitted dirt (MCP, skills, SessionOps/Profiles/
-  Checkpoints/Worktrees rewrites) was read, not touched, and stays
-  uncommitted for those lanes.
+   Concurrent lanes' uncommitted dirt (MCP, skills, SessionOps/Profiles/
+   Checkpoints/Worktrees rewrites) was read, not touched, and stays
+   uncommitted for those lanes.
+
+## 9. Final status — family build + readiness (2026-10-02, docs lane I5)
+
+Docs-only lane: no code changed, no other docs touched, no generated
+artifacts touched. Every number below was re-verified by running the count
+commands in this session, never copied. No `M1`/`M2`/`VERIFIED` claimed.
+
+- **Family build committed.** Second-wave integrator `8afed7c2` (bridge
+  131 rows / 17 families, 5 App routes/nav, rebuilt bundle) and builders
+  `3bf2c6d8` (canvas), `54adf37b` (tasks), `f676f0ee` (taskflows),
+  `81507d20` (memory-backends), `cd645a7c` (webchat) are all in git log.
+  Live totals re-verified: 40 non-test page modules, 39 route-table lines
+  in `App.tsx`, 304 `<Button` controls, 150 `api.*` call sites, 131 bridge
+  rows over 17 families, 387 `_r(` registrations.
+- **Canvas/hooks backends: pages committed, backends in-flight.** The I1
+  canvas page commit (`3bf2c6d8`) exists in git log. Backend truth is
+  unchanged from §8: no canvas file host or node-presentation backend is
+  registered (every canvas row answers an honest typed gate); flows
+  `hooks` reads the real hook catalog while hook enable/disable stays an
+  honest gate. The confined static-host and hooks-backend follow-ups are
+  unbuilt.
+- **Turn-time detection: in-flight.** No I2 commit is present in git log.
+- **Brand sweep: pending.** No I3 sweep commit is present in git log.
+- **20 architecture rows still OPEN pending owner** (listed in §6 —
+  `agents.*`, `cron.scratch.*`, `mentions.*`, `skills.proposals.*`,
+  `skills.upload.*`, `taskSuggestions.*`, `tasks.dismiss`,
+  `users.{setDisplayName,setRole}`, `voicewake.*`). A typed refusal is
+  never a working capability; each needs individual owner approval.
+- **Jev still gated.** Activation stays BLOCKED on M4 per the Jev routing
+  plan; no Jev surface was built or wired by any family lane.
+- **Upstream model outages are external, not Qubit defects.** Upstream
+  volatility already forced the guard in `8f1c4f74` (model select refuses
+  dead upstream models, slot unchanged); slots stay pinned to working
+  tiers until the owner makes the pin call below.
+
+**Honest readiness — proven working vs needs the owner.** Proven: 13
+first-wave + 5 second-wave family pages on their own Qubit-branded
+routes, served verbatim through the 131-row allowlist bridge (live reads
+200 per family, mutations net-zero 409 with staged-confirm settle,
+unknown family/action typed 404); nothing to create on pages or top-level
+CLI; Jev boundary holds. Needs the owner: (1) the `packet7d` ruling —
+  its branding case fails identically on pristine HEAD, so it is a
+  scope/policy call, not a lane fix; (2) the upstream pin call — which
+  model to pin after the muse retirement (deepseek vs local tier); (3)
+  the MCP/skills lanes' uncommitted files (visible in `git status`,
+  owned by their concurrent lanes — not touched here); (4) Chromium flag
+  persistence — CDP needs `--remote-debugging-port=9222` on every browser
+  launch (or an explicit `cdp_launch` opt-in); (5) the sudo-gated
+  disk/snap items, which no unprivileged lane can close.

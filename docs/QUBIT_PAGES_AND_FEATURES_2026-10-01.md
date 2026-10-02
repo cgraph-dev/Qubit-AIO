@@ -387,7 +387,7 @@ Skills + plugins + review: `skills`, `bundles`, `plugins`, `curator`,
 `monitoring`, `claw` (migration helpers), `acp`, `profile`, `completion`,
 `dashboard`, `serve`, `desktop`, `logs`, `prompt-size`.
 
-## 5. Totals (verified by command)
+## 5. Totals (verified by command — re-verified 2026-10-02, all counts unchanged)
 
 | What | Count | Command |
 |---|---|---|
