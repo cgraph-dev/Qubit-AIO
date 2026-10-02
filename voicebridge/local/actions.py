@@ -13,6 +13,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -491,6 +492,188 @@ def _a_system_stats(_: Dict[str, Any]) -> str:
     except Exception as exc: return f"Stats failed: {exc}"
 
 
+def _documents_dir() -> Path:
+    d = Path.home() / "Documents"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _open_in_editor(path: Optional[Path] = None,
+                    editor: str = "") -> str:
+    """Open a document (or a blank page) in the LOCAL text editor.
+
+    Default is the operating system's own ``.txt`` editor (Ubuntu Text
+    Editor/gedit via ``xdg-open``, Notepad on Windows) — never an IDE.
+    VS Code opens only when explicitly requested (``editor="vscode"``);
+    when it is requested but missing, the default opens instead and the
+    reply says so honestly. Never raises; failures are honest strings,
+    and the caller audits. Returns the opened target description.
+    """
+    want_vscode = str(editor or "").strip().lower() == "vscode"
+    if want_vscode and shutil.which("code"):
+        target = str(path) if path is not None else str(Path.home())
+        try:
+            subprocess.Popen(["code", target], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+            return str(path) if path is not None else "a blank VS Code window"
+        except Exception as exc:
+            return f"could not open ({exc})".rstrip(".") + "."
+    if want_vscode:
+        note = "VS Code isn't installed, opened the default editor instead. "
+    else:
+        note = ""
+    try:
+        if sys.platform == "win32":
+            if path is not None:
+                os.startfile(str(path))  # noqa: S606 - operator's own file
+            else:
+                subprocess.Popen(["notepad"], stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+            return note + (str(path) if path is not None else "a blank page")
+        if path is not None:
+            subprocess.Popen(["xdg-open", str(path)],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+            return note + str(path)
+        for binary in ("gnome-text-editor", "gedit", "kate", "mousepad",
+                       "xed"):
+            if shutil.which(binary):
+                subprocess.Popen([binary], stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+                return note + "a blank page"
+        return (note + "no local text editor found — say 'create a text "
+                "document' and I'll make a file instead.")
+    except Exception as exc:
+        return note + f"could not open ({exc})".rstrip(".") + "."
+
+
+def _a_create_document(params: Dict[str, Any]) -> str:
+    """'create (and open) a text document [called X]' -> make + open it.
+
+    Scoped to ``~/Documents`` (bounded slug or timestamp name, ``.txt``),
+    then opened in the editor so the operator can write immediately.
+    Creation is reversible and audited; opening never executes content.
+    """
+    import datetime as _dt
+    import re as _re
+    raw = str(params.get("name") or "").strip()
+    slug = _re.sub(r"[^a-z0-9]+", "-", raw.lower()).strip("-")[:40]
+    if not slug:
+        slug = "note-" + _dt.datetime.now().strftime("%Y%m%d-%H%M")
+    target = _documents_dir() / f"{slug}.txt"
+    try:
+        if not target.exists():
+            target.write_text("", encoding="utf-8")
+    except Exception as exc:
+        return f"Could not create {target.name}: {exc}."
+    editor = str(params.get("editor") or "")
+    opened = _open_in_editor(target, editor)
+    if opened.startswith("could not open"):
+        return f"Created {target.name} in Documents, but {opened}"
+    if "isn't installed" in opened:
+        return f"Created {target.name}. {opened}"
+    return f"Created {target.name} and opened it in the editor."
+
+
+#: Spoken site names -> canonical URLs (generic, operator-neutral).
+_SITE_SHORTCUTS = {
+    "youtube": "https://www.youtube.com",
+    "gmail": "https://mail.google.com",
+    "mail": "https://mail.google.com",
+    "messenger": "https://www.messenger.com",
+    "instagram": "https://www.instagram.com",
+    "facebook": "https://www.facebook.com",
+    "github": "https://github.com",
+    "google": "https://www.google.com",
+    "duckduckgo": "https://duckduckgo.com",
+    "wikipedia": "https://www.wikipedia.org",
+    "dexonline": "https://dexonline.ro",
+}
+
+_OPEN_VERBS = r"(?:open|launch|go to|visit)"
+
+
+def _normalize_website_url(raw: str) -> str:
+    """Spoken site reference -> https URL, or "" when unresolvable."""
+    import re as _re
+    t = (raw or "").strip().strip("\"'.,)")
+    low = t.lower()
+    for word in sorted(_SITE_SHORTCUTS, key=len, reverse=True):
+        if _re.search(r"\b" + _re.escape(word) + r"\b", low):
+            return _SITE_SHORTCUTS[word]
+    # An explicit non-http(s) scheme is never upgraded to https — that
+    # would launch something other than what was said.
+    m_scheme = _re.search(r"\b([a-z][a-z0-9+.-]*)://", low)
+    if m_scheme and m_scheme.group(1) not in ("http", "https"):
+        return ""
+    m = _re.search(r"(https?://\S+|www\.\S+|[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)", low)
+    if not m:
+        return ""
+    url = m.group(1).strip("\"'.,)")
+    if url.startswith("www."):
+        url = "https://" + url
+    elif "://" not in url:
+        url = "https://" + url
+    return url
+
+
+def _a_open_website(params: Dict[str, Any]) -> str:
+    """'open <site>' -> open the URL in the browser (read-only navigation).
+
+    Only http(s) URLs ever launch; anything else (file://, javascript:,
+    unresolvable names) is an honest refusal with zero side effects.
+    """
+    import urllib.parse as _up
+    url = str(params.get("url") or "")
+    try:
+        parts = _up.urlparse(url)
+    except Exception:
+        parts = None
+    if parts is None or parts.scheme not in ("http", "https") \
+            or "." not in (parts.netloc or ""):
+        return ("I can't open that — give me a website address "
+                "(like github.com) and I'll open it in the browser.")
+    try:
+        subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
+    except Exception as exc:
+        return f"Could not open {url}: {exc}."
+    return f"Opened {url} in the browser."
+
+
+def _a_open_document(params: Dict[str, Any]) -> str:
+    """'open [the] text document [called X]' -> open it for writing.
+
+    A named document is searched under ``~/Documents`` (exact then
+    containing match, ``.txt`` assumed); a missing name is answered
+    honestly, never guessed. No name opens a blank editor.
+    """
+    name = str(params.get("name") or "").strip().lower()
+    editor = str(params.get("editor") or "")
+    if name:
+        docs = _documents_dir()
+        cands = sorted(docs.glob("*.txt"))
+        hit = next((p for p in cands if p.stem.lower() == name), None)
+        if hit is None:
+            hit = next((p for p in cands if name in p.stem.lower()), None)
+        if hit is None:
+            known = ", ".join(p.name for p in cands[:10]) or "no saved notes"
+            return (f"I couldn't find {name!r} in Documents "
+                    f"({known}). Say 'create a text document' to make one.")
+        opened = _open_in_editor(hit, editor)
+        if opened.startswith("could not open"):
+            return f"Found {hit.name}, but {opened}"
+        if "isn't installed" in opened:
+            return f"Found {hit.name}. {opened}"
+        return f"Opened {hit.name} in the editor."
+    opened = _open_in_editor(None, editor)
+    if opened.startswith("could not open"):
+        return f"{opened.capitalize()}"
+    if "isn't installed" in opened:
+        return f"{opened.capitalize()}"
+    return "Opened a blank page in the local text editor — say what to write."
+
+
 def _a_quick_note(params: Dict[str, Any]) -> str:
     text = params.get("note", "").strip()
     if not text:
@@ -592,6 +775,188 @@ def _a_bluetooth_toggle(_: Dict[str, Any]) -> str:
     return "Bluetooth control not found."
 
 
+# --- Browser tabs (voice over the loopback CDP authority) -------------------
+# All browser effects go through voicebridge.browser_tabs (loopback CDP only;
+# personal profiles never touched). Mutations pass confirmed=True because the
+# voice task path already said yes before the turn runs. Replies state what
+# happened (opened/closed/duplicated/switched + tab title), never phantom work.
+_TAB_UNREACHABLE_CODES = frozenset({"CDP_UNAVAILABLE", "BROWSER_UNAVAILABLE"})
+_TABS_UNREACHABLE = ("The browser isn't reachable right now — open Chromium "
+                     "with remote debugging on, then try again.")
+
+
+def _tabs_cfg():
+    """Live config for the tab handlers (lazy: keeps this module import-light).
+
+    Never imports service/desktop_helper: Config.load() is the same loader
+    every backend surface uses.
+    """
+    try:
+        from ..config import Config
+        return Config.load()
+    except Exception as exc:
+        log_event("local.tabs.config_error", error=str(exc)[:160])
+        return None
+
+
+def _tab_label(page: Dict[str, Any], limit: int = 60) -> str:
+    title = str((page or {}).get("title") or "").strip()
+    if title:
+        return title[:limit]
+    url = str((page or {}).get("url") or "")
+    if not url or "about:blank" in url:
+        return "blank tab"
+    return url[:limit]
+
+
+def _tabs_resolve(name: str):
+    """Resolve a tab via the authority's fuzzy matcher (ledger current-tab +
+    ambiguity fail-closed). Returns (cfg, page) or (None, reply-on-failure)."""
+    from .. import browser_tabs as _bt
+    cfg = _tabs_cfg()
+    if cfg is None:
+        return None, "Browser control isn't configured on this machine."
+    try:
+        return cfg, _bt._resolve_target(cfg, name)
+    except _bt.BrowserTabsError as exc:
+        if exc.code in _TAB_UNREACHABLE_CODES:
+            return None, _TABS_UNREACHABLE
+        if exc.code == _bt.BAD_INPUT_CODE:
+            # Ambiguity fail-closed: the detail already lists candidates.
+            return None, f"Several tabs match — {exc.detail[:200]} Which one?"
+        if name:
+            return None, f"I couldn't find an open tab matching '{name[:60]}'."
+        return None, "There are no open tabs to use."
+
+
+def _a_tab_close(params: Dict[str, Any]) -> str:
+    """'close this/the tab [called X]' -> close the resolved tab (one only)."""
+    from .. import browser_tabs as _bt
+    if (params or {}).get("all"):
+        return ("I can only close one tab at a time — "
+                "say which tab to close.")
+    name = str((params or {}).get("target") or "").strip()
+    cfg, page_or_reply = _tabs_resolve(name)
+    if page_or_reply is None or isinstance(page_or_reply, str):
+        return page_or_reply
+    page = page_or_reply
+    label = _tab_label(page)
+    try:
+        res = _bt.close(cfg, str(page.get("id", "")),
+                        requested_by="voice:user", confirmed=True)
+    except _bt.BrowserTabsError as exc:
+        if exc.code in _TAB_UNREACHABLE_CODES:
+            return _TABS_UNREACHABLE
+        return f"I couldn't close {label}: {exc.detail[:160]}."
+    if not isinstance(res, dict) or res.get("state") != "OK":
+        detail = str((res or {}).get("detail") or "refused")[:160]
+        return f"I couldn't close {label}: {detail}."
+    return f"Closed {label}."
+
+
+def _a_tab_duplicate(params: Dict[str, Any]) -> str:
+    """'duplicate this/the tab [X]' -> open the same URL in a new tab."""
+    from .. import browser_tabs as _bt
+    name = str((params or {}).get("target") or "").strip()
+    cfg, page_or_reply = _tabs_resolve(name)
+    if page_or_reply is None or isinstance(page_or_reply, str):
+        return page_or_reply
+    page = page_or_reply
+    label = _tab_label(page)
+    url = str(page.get("url") or "")
+    try:
+        res = _bt.open(cfg, url, requested_by="voice:user", confirmed=True)
+    except _bt.BrowserTabsError as exc:
+        if exc.code in _TAB_UNREACHABLE_CODES:
+            return _TABS_UNREACHABLE
+        if exc.code == _bt.BAD_INPUT_CODE:
+            return f"'{label}' has no web address I can duplicate."
+        return f"I couldn't duplicate {label}: {exc.detail[:160]}."
+    if not isinstance(res, dict) or res.get("state") != "OK":
+        detail = str((res or {}).get("detail") or "refused")[:160]
+        return f"I couldn't duplicate {label}: {detail}."
+    return f"Duplicated {label} in a new tab."
+
+
+def _a_tab_new(params: Dict[str, Any]) -> str:
+    """'new tab' / 'open a new tab' -> a blank tab.
+
+    browser_tabs.open() is http(s)-only by policy, and a blank tab carries no
+    URL, so this calls the same loopback endpoint open() uses (PUT /json/new,
+    no url query) with the same gates: e-stop, ledger remember, audit.
+    """
+    from .. import browser_tabs as _bt
+    from .. import cdp as _cdp
+    cfg = _tabs_cfg()
+    if cfg is None:
+        return "Browser control isn't configured on this machine."
+    if _bt.estop_engaged(cfg):
+        return "Emergency stop is latched; opening a tab is refused."
+    try:
+        created = _cdp.http_json("PUT", "/json/new")
+    except _cdp.CdpError as exc:
+        if exc.code == _cdp.UNAVAILABLE_CODE:
+            return _TABS_UNREACHABLE
+        return f"I couldn't open a new tab: {exc.detail[:160]}."
+    if not isinstance(created, dict) or not created.get("id"):
+        return "The browser didn't open a new tab."
+    tid = str(created["id"])
+    try:
+        _bt._remember(cfg, tid)
+    except Exception:
+        pass
+    log_event("browser_tabs.open", actor="voice:user", target=tid)
+    return "Opened a new blank tab."
+
+
+def _a_tab_switch(params: Dict[str, Any]) -> str:
+    """'switch to/go to [the] X tab' -> bring the resolved tab to front."""
+    from .. import browser_tabs as _bt
+    name = str((params or {}).get("target") or "").strip()
+    if not name:
+        return "Which tab should I switch to?"
+    cfg, page_or_reply = _tabs_resolve(name)
+    if page_or_reply is None or isinstance(page_or_reply, str):
+        return page_or_reply
+    page = page_or_reply
+    label = _tab_label(page)
+    try:
+        res = _bt.activate(cfg, str(page.get("id", "")),
+                           requested_by="voice:user", confirmed=True)
+    except _bt.BrowserTabsError as exc:
+        if exc.code in _TAB_UNREACHABLE_CODES:
+            return _TABS_UNREACHABLE
+        return f"I couldn't switch to {label}: {exc.detail[:160]}."
+    if not isinstance(res, dict) or res.get("state") != "OK":
+        detail = str((res or {}).get("detail") or "refused")[:160]
+        return f"I couldn't switch to {label}: {detail}."
+    return f"Switched to {label}."
+
+
+def _a_tab_list(params: Dict[str, Any]) -> str:
+    """'what tabs are open' -> spoken 'N tabs: title1, title2…'."""
+    from .. import browser_tabs as _bt
+    cfg = _tabs_cfg()
+    if cfg is None:
+        return "Browser control isn't configured on this machine."
+    try:
+        out = _bt.tabs(cfg)
+    except _bt.BrowserTabsError as exc:
+        if exc.code in _TAB_UNREACHABLE_CODES:
+            return _TABS_UNREACHABLE
+        return f"I couldn't list the tabs: {exc.detail[:160]}."
+    if not isinstance(out, dict) or out.get("state") != "OK":
+        return _TABS_UNREACHABLE
+    rows = [r for r in (out.get("tabs") or []) if isinstance(r, dict)]
+    if not rows:
+        return "No browser tabs are open."
+    names = [_tab_label(r, 40) or "untitled tab" for r in rows[:7]]
+    extra = len(rows) - len(names)
+    tail = f", and {extra} more" if extra > 0 else ""
+    plural = "s" if len(rows) != 1 else ""
+    return f"{len(rows)} tab{plural} open: {', '.join(names)}{tail}."
+
+
 def _a_send_message(params: Dict[str, Any]) -> str:
     """Send a staged voice-reply draft (confirm-gated upstream).
 
@@ -616,19 +981,25 @@ def _a_send_message(params: Dict[str, Any]) -> str:
 ACTIONS: Dict[str, LocalAction] = {
     "volume_up": LocalAction("volume_up", "raise speaker volume", _a_volume_up,
                              patterns=[r"\b(volume|sound|audio|speaker)[s]?\s+(up|louder|increase|raise|boost)\b",
-                                       r"\b(raise|increase|boost)\s+(the\s+)?(volume|sound)\b",
-                                       r"\bturn (it |the (volume|sound) )?up\b"]),
+                                       r"\b(raise|increase|boost)\s+(the\s+)?(volume|sound|audio|speaker)\b",
+                                       r"\bmake (it|the volume) louder\b",
+                                       r"\bturn (it|them|the (volume|sound|audio|speaker)) up\b",
+                                       r"\bturn up (the )?(volume|sound|audio|speaker)\b"]),
     "volume_down": LocalAction("volume_down", "lower speaker volume", _a_volume_down,
                                patterns=[r"\b(volume|sound|audio|speaker)[s]?\s+(down|lower|decrease|reduce|quieter)\b",
-                                         r"\b(lower|decrease|reduce)\s+(the\s+)?(volume|sound)\b",
-                                         r"\bturn (it |the (volume|sound) )?down\b"]),
+                                         r"\b(lower|decrease|reduce)\s+(the\s+)?(volume|sound|audio|speaker)\b",
+                                         r"\bmake (it|the volume) quieter\b",
+                                         r"\bturn (it|them|the (volume|sound|audio|speaker)) down\b",
+                                         r"\bturn down (the )?(volume|sound|audio|speaker)\b"]),
     "volume_mute": LocalAction("volume_mute", "toggle speaker mute", _a_volume_mute,
                                patterns=[r"\b(mute|unmute) (the )?(speaker|sound|volume)\b",
-                                         r"\b(speaker|sound) (mute|off)\b"]),
+                                         r"\b(speaker|sound) (mute|off)\b",
+                                         r"^\s*(un)?mute\s*$"]),
     "mic_mute": LocalAction("mic_mute", "toggle microphone mute", _a_mic_mute,
-                            patterns=[r"\b(mute|unmute) (the )?(microphone|mic)\b"]),
+                            patterns=[r"\b(mute|unmute) (the |my )?(microphone|mic)\b",
+                                      r"\b(microphone|mic) (is )?(mute|muted|off)\b"]),
     "open_app": LocalAction("open_app", "launch an application", _a_open_app,
-                             patterns=[r"\b(open|launch|start|run) (the )?(browser|editor|vscode|cursor|chromium|terminal|discord|telegram|files|file-manager|file manager|fl studio|spotify)\b"]),
+                             patterns=[r"\b(open|launch|start|run) (the )?(browser|editor|vscode|cursor|chromium|terminal|discord|telegram|files|file-manager|file manager|fl studio|spotify|chrome|firefox|code|console)\b"]),
     # Project names are operator-local (config/local-actions.yaml
     # ``project_roots``); the patterns stay generic so no personal project
     # names are baked into the shipped product source.
@@ -636,12 +1007,45 @@ ACTIONS: Dict[str, LocalAction] = {
                                patterns=[r"\b(open|launch|start) (the )?([a-z0-9][\w.-]*) (in|with|using) (vs ?code|the editor|editor)\b",
                                          r"\bopen ([a-z0-9][\w.-]*) (in|with|using) (vs ?code|editor)\b",
                                          r"\b(open|launch) (the )?([a-z0-9][\w.-]*) project\b"]),
+    "create_document": LocalAction("create_document", "create and open a text document", _a_create_document,
+                                   patterns=[r"\b(create|make)( me)? (a |the )?(new )?(text |txt )?(document|file|note)\b",
+                                             r"\b(create|make)\b.{0,24}?\b(new )?(text |txt )?(document|file|note)\b"]),
+    "tab_new": LocalAction("tab_new", "open a new blank browser tab", _a_tab_new,
+                         patterns=[r"\bopen (a )?new (blank )?tab\b",
+                                   r"\b(create|make)( me)?( a)? new (blank )?tab\b",
+                                   r"^\s*(please\s+)?(open\s+)?(a\s+)?new (blank )?tab\s*\.?\s*$"]),
+    "tab_list": LocalAction("tab_list", "list the open browser tabs", _a_tab_list,
+                         patterns=[r"\bwhat tabs( are open)?\b",
+                                   r"\bhow many tabs( are open)?\b",
+                                   r"\bwhich tabs( are open)?\b",
+                                   r"\blist (my |open |browser )?tabs\b",
+                                   r"\bshow (me )?(my |open |browser |all )?tabs\b"]),
+    "tab_switch": LocalAction("tab_switch", "switch to a browser tab", _a_tab_switch,
+                         patterns=[r"\b(switch to|go to|show|bring|focus)\b.{0,40}?\btabs?\b",
+                                   r"\bswitch (to|back|tabs?)\b(?!\S*\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b)"]),
+    "tab_duplicate": LocalAction("tab_duplicate", "duplicate a browser tab", _a_tab_duplicate,
+                         patterns=[r"\b(duplicate|dupe)\b.{0,40}?\btabs?\b"]),
+    "tab_close": LocalAction("tab_close", "close a browser tab", _a_tab_close,
+                         patterns=[r"\bclose\b.{0,30}?\btabs?\b"]),
+    "window_close": LocalAction("window_close", "close the active window", _a_window_close,
+                         patterns=[r"\bclose (this |the |current )?window\b"]),
+    "open_website": LocalAction("open_website", "open a website in the browser", _a_open_website,
+                                patterns=[r"\b(?:open|launch|go to|visit)\b.{0,30}?\b(https?://\S+|(?<!://)www\.\S+|(?<!://)[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)",
+                                            r"\b(?:open|launch|go to|visit) (the )?(youtube|gmail|mail|messenger|instagram|facebook|github|google|duckduckgo|wikipedia|dexonline)\b"]),
+    "open_document": LocalAction("open_document", "open a text document for writing", _a_open_document,
+                                 patterns=[r"\bopen (a |the |this |that |my |new )+(text |txt )?(document|file|note)\b(?![\w-])",
+                                           r"\bopen (text |txt )(document|note)\b(?![\w-])",
+                                           r"\bopen (a |the |my )?new (text |txt )?(document|file|note)\b(?![\w-])",
+                                           r"\bopen\b.{0,30}?\b(documents?|notes?|files?|txt)\b(?![\w-])"]),
     "screenshot": LocalAction("screenshot", "take a screenshot", _a_screenshot,
-                              patterns=[r"\b(take|grab) (a |an? )?(screenshot|screen ?shot)\b"]),
+                               patterns=[r"\b(take|grab) (a |an? )?(screenshot|screen ?shot)\b",
+                                         r"\bscreenshots?\b"]),
     "clipboard": LocalAction("clipboard", "read the clipboard", _a_clipboard,
-                             patterns=[r"\b(read|what'?s on|what is on) (the )?clipboard\b"]),
+                             patterns=[r"\b(read|what'?s on|what is on) (the )?clipboard\b",
+                                       r"\b(show|display|open) (the )?clipboard\b"]),
     "play_youtube": LocalAction("play_youtube", "play a YouTube song/video", _a_play_youtube_params,
-                                patterns=[r"\b(play|put on|queue|start a|i want to (hear|watch|listen to)|listen to|turn on)\b",
+                                patterns=[r"\b(play|put on|queue|listen to|i want to (hear|watch|listen to))\b",
+                                          r"\b(turn on|start a)\b.{0,24}?\b(music|songs?|videos?|tunes?|mix|playlist|youtube)\b",
                                           r"\b(?!pause\b|stop\b|resume\b|close\b|next\b).*\byoutube music\b",
                                           r"\b(play|queue|listen to)\b.*\b(music|song|youtube music|video)\b",
                                           r"\bplay\s+(?!the\s+(music|media|song|video)|it\b|pause|whatever|some|game|football|chess)\b"]),
@@ -656,7 +1060,7 @@ ACTIONS: Dict[str, LocalAction] = {
     "youtube_next": LocalAction("youtube_next", "play the next youtube result", _a_youtube_next,
                                 # media noun REQUIRED: bare "next" hijacked phrases
                                 # like "forecast for the next seven days"
-                                patterns=[r"\b(next|skip)\s+(the\s+)?(song|video|track|one|result|youtube)\b",
+                                patterns=[r"\b(next|skip)\s+(the\s+|this\s+|that\s+)?(song|video|track|one|result|youtube)\b",
                                           r"\b(youtube|music|video)(?:'s)?\s+next\b"],
                                 confirm=False),
     "youtube_stop": LocalAction("youtube_stop", "stop youtube playback and close tabs", _a_youtube_stop,
@@ -670,31 +1074,35 @@ ACTIONS: Dict[str, LocalAction] = {
     "brightness_up": LocalAction("brightness_up", "raise screen brightness", _a_brightness_up,
                         patterns=[r"\b(brightness|screen brightness|display brightness|backlight)\s+(up|higher|brighter|increase|raise|boost)\b",
                                   r"\b(increase|raise|boost)\s+(the\s+)?(brightness|backlight)\b",
+                                  r"\bturn\s+(up\s+)?(the\s+)?(brightness|backlight|screen)(\s+up)?\b",
                                   r"\bbrighter\b"]),
     "brightness_down": LocalAction("brightness_down", "lower screen brightness", _a_brightness_down,
                         patterns=[r"\b(brightness|screen brightness|display brightness|backlight)\s+(down|lower|dimmer|decrease|reduce|dim)\b",
                                   r"\b(lower|decrease|reduce|dim)\s+(the\s+)?(brightness|backlight)\b",
+                                  r"\bturn\s+(down\s+)?(the\s+)?(brightness|backlight|screen)(\s+down)?\b",
                                   r"\b(dimmer|dim the screen)\b"]),
     "system_stats": LocalAction("system_stats", "report CPU/RAM/disk stats", _a_system_stats,
-                        patterns=[r"\b(system stats|system status|how'?s the system|resource usage|cpu usage|memory usage|disk usage)\b",
+                        patterns=[r"\b(system stats|system status|how'?s the system|how is the system|resource usage|cpu usage|memory usage|disk usage)\b",
                                   r"\b(how much (ram|memory|cpu|disk))\b",
                                   r"\b(battery (level|status|percent))\b"]),
-    "quick_note": LocalAction("quick_note", "save a quick note", _a_quick_note,
-                        patterns=[r"\b(note (that|this)|remember (that|this)|write down|jot down|save (a )?note)\b",
-                                  r"\b(remind me (to |that )?)\b"]),
     "timer": LocalAction("timer", "set a timer", _a_timer,
                         patterns=[r"\b(set (a )?timer (for )?|start (a )?timer)\b",
                                   r"\b(timer for |remind me in )\s*\d+\s*(minute|minutes|min|mins|second|seconds)\b"]),
-    "window_close": LocalAction("window_close", "close the active window", _a_window_close,
-                        patterns=[r"\b(close (this |the |current )?(window|tab))\b"]),
+    "quick_note": LocalAction("quick_note", "save a quick note", _a_quick_note,
+                        patterns=[r"\b(note (that|this)|remember (that|this)|write down|jot down|save (a )?note)\b",
+                                  r"\b(take a note|make a note)\b",
+                                  r"\b(remind me (to |that )?)\b"]),
     "find_file": LocalAction("find_file", "find a file by name", _a_find_file,
                         patterns=[r"\b(find|locate|search for) (a |the )?file\b",
-                                  r"\bwhere is (the )?file\b"]),
+                                  r"\bwhere is (the )?file\b",
+                                  r"\b(find|locate)\b.{0,24}?\bfile\b"]),
     "empty_trash": LocalAction("empty_trash", "empty the trash", _a_empty_trash,
-                        patterns=[r"\b(empty (the )?trash|clear (the )?trash|empty (the )?bin)\b"]),
+                        patterns=[r"\b(empty (the )?trash|clear (the )?trash|empty (the )?bin)\b",
+                                  r"\btake out the trash\b"]),
     "bluetooth_toggle": LocalAction("bluetooth_toggle", "toggle bluetooth", _a_bluetooth_toggle,
-                        patterns=[r"\b(toggle bluetooth|bluetooth (on|off))\b",
-                                  r"\b(turn bluetooth (on|off))\b"]),
+                                patterns=[r"\b(toggle bluetooth|bluetooth (on|off))\b",
+                                          r"\b(turn bluetooth (on|off))\b",
+                                          r"\b(turn (on|off) bluetooth)\b"]),
     "time_date": LocalAction("time_date", "say date and time", _a_time_date,
                         patterns=[r"\bwhat (day|date|time) is (it|today)\b",
                                   r"\bwhat('s| is) today('s)? (date|day)\b",
@@ -730,8 +1138,27 @@ def match(text: str) -> Optional[ActionMatch]:
     # Youtube CONTROL verbs (pause/stop/resume/next/close + music/youtube) take
     # priority over "play youtube": "pause the youtube music" must not be routed
     # to play_youtube (which also matches the bare 'youtube music' substring).
+    # Window/tab intents beat the YouTube-control pre-check below: "close this
+    # tab" and "close this window" both contain close+this, which would
+    # otherwise route to youtube_stop's bare "close this" branch. A tab word
+    # WITH a music noun ("close the youtube tabs") stays a YouTube intent.
+    _is_window_tab_intent = (
+        _re.search(r"\bwindow\b", low)
+        or (_re.search(r"\btabs?\b", low)
+            and not _re.search(r"\b(youtube|music|song|video)\b", low))
+    )
+    # A play verb BEFORE any control verb means "play ...", not control:
+    # "play next song videos" must play, while "pause then play" stays
+    # control-first. Positions decide; ties keep control priority.
+    _play_at = [_m.start() for _m in
+                _re.finditer(r"\b(play|put on|queue|listen to)\b", low)]
+    _ctl_at = [_m.start() for _m in
+               _re.finditer(r"\b(pause|stop|resume|continue|close|shut|skip|next|unpause|unmute|quit|hold)\b", low)]
+    _play_first = bool(_play_at) and (not _ctl_at or min(_play_at) < min(_ctl_at))
     if _re.search(r"\b(pause|stop|resume|continue|close|shut|skip|next|unpause|unmute|quit|hold)\b", low) \
-            and _re.search(r"\b(youtube|music|song|video|it|this)\b", low):
+            and _re.search(r"\b(youtube|music|song|video|it|this)\b", low) \
+            and not _is_window_tab_intent \
+            and not _play_first:
         for name in ("youtube_pause", "youtube_resume", "youtube_next", "youtube_stop"):
             act = ACTIONS.get(name)
             for pat in act.patterns:
@@ -761,6 +1188,8 @@ def match(text: str) -> Optional[ActionMatch]:
                 elif name == "quick_note":
                     import re as _re
                     m2 = _re.search(r"(?:note (?:that|this)|remember (?:that|this)|write down|jot down|save (?:a )?note|remind me (?:to |that )?)(.*)", low)
+                    if not m2:
+                        m2 = _re.search(r"(?:take a note|make a note)[, ]+(.*)", low)
                     if m2:
                         params["note"] = m2.group(1).strip(" :,-") or text
                     else:
@@ -781,7 +1210,54 @@ def match(text: str) -> Optional[ActionMatch]:
                     if m2:
                         params["query"] = m2.group(1).strip(" \"'.)")
                     else:
-                        params["query"] = ""
+                        m3 = _re.search(r"(?:find|locate)\s+(.+?)\s+file\b", low)
+                        if m3:
+                            params["query"] = m3.group(1).strip(" \"'.)")
+                        else:
+                            params["query"] = ""
+                elif name in ("create_document", "open_document"):
+                    import re as _re
+                    m2 = _re.search(
+                        r"(?:called|named|titled|for)\s+(.+?)\s*$", low)
+                    if m2:
+                        params["name"] = m2.group(1).strip(" \"'.)")
+                    else:
+                        params["name"] = ""
+                    if not params["name"] and name == "open_document":
+                        # Loose named-open ("open the shopping list
+                        # document"): the words between the opener and the
+                        # doc noun are the name.
+                        m3 = _re.search(
+                            r"\bopen\b\s+(.*?)\s*(?:text\s+|txt\s+)?"
+                            r"(?:documents?|files?|notes?|txt)\b", low)
+                        cand = (m3.group(1) or "") if m3 else ""
+                        cand = _re.sub(
+                            r"\b(a|the|this|that|my|new|text|txt|in|vs|code)\b",
+                            "", cand).strip(" ,.-")
+                        params["name"] = cand
+                    # VS Code opens only when explicitly named; otherwise the
+                    # operating system's own .txt editor handles the file.
+                    if _re.search(r"\bvs\s*code\b|\bin\s+code\b|\bwith\s+code\b",
+                                  low):
+                        params["editor"] = "vscode"
+                    else:
+                        params["editor"] = ""
+                elif name in ("tab_close", "tab_duplicate", "tab_switch"):
+                    import re as _re
+                    if name == "tab_close" and _re.search(r"\ball\b", low) \
+                            and _re.search(r"\btabs?\b", low):
+                        # "close all tabs": one-tab primitive only — the
+                        # handler answers honestly without touching CDP.
+                        params["all"] = True
+                        params["target"] = ""
+                    else:
+                        stripped = _re.sub(
+                            r"\b(close|duplicate|dupe|switch|go|show|bring|focus|back|to|on|the|this|that|these|those|current|my|browser|tabs?|called|named|titled|please|front|a|an)\b",
+                            " ", low)
+                        params["target"] = _re.sub(
+                            r"\s+", " ", stripped).strip(" .,-")
+                elif name == "open_website":
+                    params["url"] = _normalize_website_url(low)
                 elif name == "play_youtube":
                     import re as _re
                     # Strip leading verb + casual fillers, and any leading "youtube music".
@@ -792,11 +1268,15 @@ def match(text: str) -> Optional[ActionMatch]:
                         "", low, flags=_re.I).strip()
                     # Drop leading "youtube music" / "youtube".
                     q = _re.sub(r"^(youtube music|youtube)\s+", "", q, flags=_re.I).strip()
+                    q1 = q
                     # Drop trailing "on youtube / music / video / a song / the song".
                     q = _re.sub(r"\s+(on\s+)?(youtube music|youtube|music|some music|a song|the song|this song|a video|a track|media)\s*$", "", q, flags=_re.I).strip(" .,")
                     # Drop leading "some lofi"/"the song NAME" filler.
                     q = _re.sub(r"^(some|the)\s*(song|music|video|track)?\s*", "", q).strip(" .,")
-                    params["query"] = q or text
+                    # Never strip down to nothing and fall back to the raw
+                    # utterance (which resurrects the verb): prefer the
+                    # post-verb query ("some music" is a fine search).
+                    params["query"] = q or q1 or text
                     params["text"] = text
                 elif name in ("youtube_pause", "youtube_resume", "youtube_next", "youtube_stop", "yt_mode"):
                     params["query"] = text

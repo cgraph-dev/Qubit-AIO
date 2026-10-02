@@ -27,8 +27,9 @@ SETTINGS_KEYS = ("routing", "local_profile", "api_profile", "allow_api",
                  "beep", "debug_log", "mic_gain", "mic_target_peak",
                  "release_tail_ms", "noise_suppression", "disable_key_repeat",
                  "text_commands", "capture_source", "agc",
-                 "speak_answers", "history_panel", "chat_model",
-                 "detail_model", "detail_cues", "voice_recent_turns")
+                  "speak_answers", "history_panel", "chat_model",
+                  "detail_model", "detail_cues", "voice_recent_turns",
+                  "verbatim_transcript", "custom_commands")
 # NOTE: "answer_questions" was removed from persistence+view (2026-09-30): it
 # persisted with zero readers repo-wide, and wiring a service consumer would
 # contradict the honest-UI invariant (no control may act without a rendered
@@ -255,7 +256,9 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
         "agc": bool(_read_cfg(cfg, "voice_edit", "agc", default=True)),
         "speak_answers": bool(_read_cfg(cfg, "voice_edit", "speak_answers",
                                         default=True)),
-        "history_panel": bool(_read_cfg(cfg, "voice_edit", "history_panel",
+        "verbatim_transcript": bool(_read_cfg(cfg, "voice_edit",
+                                              "verbatim_transcript",
+                                              default=False)),        "history_panel": bool(_read_cfg(cfg, "voice_edit", "history_panel",
                                         default=True)),
         "chat_model": str(_read_cfg(cfg, "voice_edit", "chat_model",
                                     default="") or ""),
@@ -291,6 +294,8 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
                                         default=0.0018) or 0.0018),
             "engine": str(_read_cfg(cfg, "voice_edit", "wake", "engine",
                                     default="auto") or "auto"),
+            "vad": str(_read_cfg(cfg, "voice_edit", "wake", "vad",
+                                 default="auto") or "auto"),
             "kws_threshold": float(_read_cfg(cfg, "voice_edit", "wake",
                                              "kws_threshold", default=0.25) or
                                    0.25),
@@ -302,10 +307,15 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
             "max_s": float(_read_cfg(
                 cfg, "voice_edit", "wake", "max_s",
                 default=8.0) or 8.0),
+            "arm_window_s": float(_read_cfg(
+                cfg, "voice_edit", "wake", "arm_window_s",
+                default=6.0) or 6.0),
             "kws_available": _kws_available(cfg),
         },
         "prompts": defaults,
         "per_app": per_app,
+        "custom_commands": list(
+            _read_cfg(cfg, "voice_edit", "custom_commands", default=[]) or []),
         "prompt_versions": {a: s.version for a, s in DEFAULT_PROMPTS.items()},
     }
 
@@ -371,6 +381,13 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                 raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                                      "wake.engine must be auto|kws|asr")
             clean_wake["engine"] = eng
+        if "vad" in wake:
+            vad = str(wake["vad"]).strip().lower()
+            if vad not in ("auto", "silero", "webrtc", "energy"):
+                from .schema import VoiceEditError
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     "wake.vad must be auto|silero|webrtc|energy")
+            clean_wake["vad"] = vad
         for k in ("kws_threshold", "kws_score"):
             if k in wake:
                 try:
@@ -393,9 +410,15 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                                      "wake.asr_fallback_max_s must be a number")
             clean_wake["asr_fallback_max_s"] = max(
                 2.0, min(clean_wake["asr_fallback_max_s"], 25.0))
-        if "max_s" in clean_wake:
+        if "max_s" in wake:
+            try:
+                clean_wake["max_s"] = float(wake["max_s"])
+            except (TypeError, ValueError):
+                from .schema import VoiceEditError
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     "wake.max_s must be a number")
             clean_wake["max_s"] = max(2.0, min(clean_wake["max_s"], 25.0))
-        for k in ("silence_ms", "rms_gate", "arm_window_s", "max_s"):
+        for k in ("silence_ms", "rms_gate", "arm_window_s"):
             if k in wake:
                 try:
                     clean_wake[k] = float(wake[k])
@@ -417,6 +440,9 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                                  "per_app must be an object")
         clean["per_app"] = {str(k).lower(): (_validate_action(v) if v else "")
                             for k, v in per_app.items()}
+    if "custom_commands" in update:
+        from .custom_commands import validate_aliases
+        clean["custom_commands"] = validate_aliases(update["custom_commands"])
     from .schema import VoiceEditError
     # Cross-section knobs (models + TTS + local wording). These live under
     # tts.* / intent.local_llm.* in the config (portable, not Qubit-specific),
@@ -454,7 +480,8 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                              "no recognised settings in request")
     for key in ("beep", "debug_log", "block_fullscreen", "noise_suppression",
                 "disable_key_repeat", "text_commands",
-                "speak_answers", "history_panel", "agc"):
+                "speak_answers", "history_panel", "agc",
+                "verbatim_transcript"):
         if key in clean:
             clean[key] = bool(clean[key])
     for key in ("mic_gain", "mic_target_peak"):
@@ -617,7 +644,8 @@ def import_settings(cfg: Any, payload: Dict[str, Any]) -> Path:
             for k in ("routing", "local_profile", "api_profile", "allow_api",
                       "confirm_before_replace", "auto_send", "insertion_method",
                       "default_action", "default_prompt", "asr_device",
-                      "stt_engine", "stt_mode", "stt_model", "router"):
+                      "stt_engine", "stt_mode", "stt_model", "router",
+                      "custom_commands"):
                 if k in src:
                     update[k] = src[k]
     user_prompts = payload.get("user_prompts") or {}

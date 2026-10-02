@@ -13,6 +13,7 @@ apply step re-verifies focus before touching the desktop.
 """
 from __future__ import annotations
 
+import re as _re_module
 import threading
 import time
 import uuid
@@ -26,6 +27,30 @@ from .parser import extract_dictation, parse, strip_dictation_cue
 from .schema import (EditCommand, InsertionResult, SelectionSnapshot,
                      TransformResult, VoiceEditError)
 from .transform import TransformEngine, digest_text
+
+
+#: Brain answers that are polite refusals, never real answers. A refusal is
+#: never the desired final answer, so these escalate to the full agent turn
+#: (worst case the full turn refuses too and the brain answer is kept).
+#: Kept tight and substring-based: the cost of a false positive is only a
+#: slower (still valid) full turn, never a wrong action.
+_BRAIN_REFUSAL_RES = (
+    _re_module.compile(r"\bi\s*(can'?t|cannot|couldn'?t)\b", _re_module.IGNORECASE),
+    _re_module.compile(r"\bi'?m\s+not\s+able\s+to\b", _re_module.IGNORECASE),
+    _re_module.compile(r"\bi'?m\s+unable\s+to\b", _re_module.IGNORECASE),
+    _re_module.compile(r"\b(don'?t|do\s+not)\s+have\s+(the\s+ability|access|real-?time)",
+                       _re_module.IGNORECASE),
+    _re_module.compile(r"\bno\s+real-?time\b", _re_module.IGNORECASE),
+    _re_module.compile(r"\bas\s+an\s+ai\b", _re_module.IGNORECASE),
+)
+
+
+def _looks_like_brain_refusal(text: str) -> bool:
+    """True when a brain answer reads as a refusal rather than an answer."""
+    t = str(text or "")
+    if not t.strip():
+        return False
+    return any(rx.search(t) for rx in _BRAIN_REFUSAL_RES)
 
 REQUEST_TTL_S = 300.0
 
@@ -891,7 +916,7 @@ class VoiceEditService:
                 lines.append(f"Current local time: {now}.")
         except Exception:
             pass
-        if _re.search(r"\bweather\b|\bforecast\b", q, _re.IGNORECASE):
+        if _re.search(r"\bweather\b|\bforecast\b|\btemperature\b|\btemp\b", q, _re.IGNORECASE):
             lines.append(self._live_weather(q))
         return "\n".join(l for l in lines if l)
 
@@ -1322,7 +1347,7 @@ class VoiceEditService:
         q = (question or "").strip()
         if not q:
             return ""
-        if _re.search(r"\bweather\b|\bforecast\b", q, _re.IGNORECASE):
+        if _re.search(r"\bweather\b|\bforecast\b|\btemperature\b|\btemp\b", q, _re.IGNORECASE):
             return self._live_weather(q)
         if _re.search(r"\bwhat time\b|\bcurrent time\b|\btime is it\b"
                       r"|\bwhat day is it\b|\bwhat date\b"
@@ -1494,6 +1519,16 @@ class VoiceEditService:
             "provider": str(getattr(res, "provider", "") or ""),
             "model": str(getattr(res, "model", "") or ""),
             **(_dbg.text_fields(self.cfg, question=question, answer=answer))})
+        # Decision 26: the tool-less brain is no longer the ceiling. When it
+        # fails, stays silent, or answers with a polite refusal, the question
+        # gets a second chance through the same persisted agent turn
+        # /qubit-chat uses (branches + worker + voice-local model). A working
+        # brain answer returns exactly as before.
+        if not ok or not answer or _looks_like_brain_refusal(answer):
+            full = self._full_turn_answer(question, request_id=request_id,
+                                          mode=mode)
+            if full is not None:
+                return full
         if not ok or not answer:
             return {"ok": False,
                     "code": str(getattr(res, "code", "") or
@@ -1508,6 +1543,72 @@ class VoiceEditService:
                 "model": str(getattr(res, "model", "") or ""),
                 "spoken": bool(spoken)}
 
+    def _full_turn_answer(self, question: str, *, request_id: str = "",
+                            mode: str = "answer") -> Optional[Dict[str, Any]]:
+        """Decision-26 fallback: answer through the full agent turn.
+
+        Dispatches through ``chat_transport.turn`` — the same persisted,
+        broker/policy/audit/confirm/e-stop turn ``/qubit-chat`` uses, with
+        its web/local/registry/agent_task branches and the voice-local
+        model. The turn persists itself to the canonical voice session, so
+        the caller must NOT also ``_remember_ask_exchange`` (that would
+        double-write the exchange). Returns the ask-shaped dict, or None
+        when the full turn cannot answer (caller keeps the brain outcome).
+
+        Staged confirmations (``CONFIRM_REQUIRED`` + ``confirmation_id``)
+        deliberately fall through to None: voice "yes" settles through the
+        service task path, which cannot settle a chat-transport-staged
+        confirmation yet (Slice-1b) — speaking an unsettleable "say yes"
+        would be a lie, so the brain answer stands instead.
+        """
+        try:
+            from .. import chat_transport as CT
+        except Exception as exc:
+            self._audit("voice_edit.full_turn_error", {
+                "request_id": request_id, "error": f"import: {exc}"[:160]})
+            return None
+        try:
+            model = self._select_model(
+                _read_cfg(self.cfg, "voice_edit", "chat_model", default=""))
+            res = CT.turn(self.cfg, question, session="voice-chat",
+                          model=model or None, actor="voice:user",
+                          timeout_s=120.0)
+        except Exception as exc:
+            self._audit("voice_edit.full_turn_error", {
+                "request_id": request_id, "chars": len(question),
+                "error": str(exc)[:160]})
+            return None
+        if not isinstance(res, dict):
+            self._audit("voice_edit.full_turn_malformed", {
+                "request_id": request_id})
+            return None
+        if res.get("ok"):
+            text = str(res.get("reply") or res.get("text") or "").strip()
+            if text:
+                self._audit("voice_edit.ask", {
+                    "request_id": request_id, "mode": mode,
+                    "chars": len(question), "ok": True,
+                    "answer_chars": len(text), "provider": "local",
+                    "model": "full-turn",
+                    **(_dbg.text_fields(self.cfg, question=question,
+                                        answer=text))})
+                return {"ok": True, "answer": text, "mode": mode,
+                        "provider": "local", "model": "full-turn",
+                        "spoken": False}
+            self._audit("voice_edit.full_turn_empty", {
+                "request_id": request_id})
+            return None
+        code = str(res.get("code") or "")
+        if code == "CONFIRM_REQUIRED":
+            self._audit("voice_edit.full_turn_staged", {
+                "request_id": request_id, "code": code,
+                "confirmation_id": str(res.get("confirmation_id") or "")})
+            return None
+        self._audit("voice_edit.full_turn_unok", {
+            "request_id": request_id, "code": code,
+            "detail": str(res.get("detail") or "")[:160]})
+        return None
+
     # -- confirm-gated tasks ---------------------------------------------
     def propose_task(self, request_id: str, text: str) -> Dict[str, Any]:
         """Stage an actionable request; NOTHING executes before confirmation."""
@@ -1517,12 +1618,16 @@ class VoiceEditService:
             raise VoiceEditError("VOICE_EDIT_EMPTY_TASK", "no task to propose")
         if len(clean) > 2000:
             clean = clean[:2000]
+            truncated = True
+        else:
+            truncated = False
         req.task_text = clean
         self._audit("voice_edit.task.proposed", {
             "request_id": req.request_id, "chars": len(clean),
             **(_dbg.text_fields(self.cfg, task=clean))})
+        summary = clean + (" (truncated to 2000 chars)" if truncated else "")
         return {"ok": True, "mode": "task", "requires_confirmation": True,
-                "task_text": clean, "summary": clean,
+                "task_text": clean, "summary": summary,
                 "request_id": req.request_id,
                 "detail": "confirm to run this task"}
 

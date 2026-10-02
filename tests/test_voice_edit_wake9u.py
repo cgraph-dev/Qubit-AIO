@@ -153,8 +153,129 @@ def test_prompt_echo_is_discarded_not_fired():
     assert commands == []
 
 
-def test_prompt_echo_off_without_configured_prompt():
+def test_prompt_echo_off_without_configured_prompt(monkeypatch):
+    import voicebridge.voice_edit.wake as wake_mod
+    monkeypatch.setattr(wake_mod, "_runtime_initial_prompt", lambda: "")
     assert not is_prompt_echo(FakeCfg(), "hey qubit, voice assistant")
+
+
+def test_prompt_echo_catches_partial_prompt_parrot():
+    # Live 2026-10-02: the fallback probe transcribed room noise as
+    # "hey Qubit, voice assistant." (a trimmed parrot of the whisper
+    # initial_prompt) and it FIRED as a command 100+ times, because the
+    # guard only caught byte-exact equality. Any transcript made solely
+    # of wake + prompt vocabulary that carries prompt filler is an echo.
+    cfg = FakeCfg(stt_local={"initial_prompt": "Qubit, hey Qubit, voice assistant."})
+    assert is_prompt_echo(cfg, "hey Qubit, voice assistant.")
+    assert is_prompt_echo(cfg, "Qubit voice assistant")
+    assert is_prompt_echo(cfg, "voice assistant hey qubit")
+    # Bare wake with no filler still arms the next utterance (not an echo).
+    assert not is_prompt_echo(cfg, "Hey Qubit,")
+    # Real content beyond wake + prompt vocabulary is never an echo.
+    assert not is_prompt_echo(cfg, "hey qubit, what's the weather")
+    assert not is_prompt_echo(cfg, "hey qubit, voice assistant, tell me the time")
+
+
+def test_prompt_echo_reads_live_runtime_prompt(monkeypatch):
+    # The whisper initial_prompt lives in the RUNTIME config.yaml
+    # (stt.local.initial_prompt), not in voice.yaml — the guard read only
+    # the voice tree, so it NEVER fired live (0 skips in 11,247 probes).
+    import voicebridge.voice_edit.wake as wake_mod
+    monkeypatch.setattr(wake_mod, "_runtime_initial_prompt",
+                        lambda: "Qubit, hey Qubit, voice assistant.")
+    assert is_prompt_echo(FakeCfg(), "hey Qubit, voice assistant.")
+    assert not is_prompt_echo(FakeCfg(), "hey qubit, what's the weather")
+
+
+def test_partial_parrot_segment_emits_no_command():
+    commands = []
+    m = WakeMonitor(FakeCfg(
+        stt_local={"initial_prompt": "Qubit, hey Qubit, voice assistant."}),
+        on_command=commands.append, is_busy=lambda: False,
+        transcribe=lambda pcm: "hey Qubit, voice assistant.")
+    m._handle_segment(b"\x00" * 9600)
+    assert commands == []
+
+
+def test_wake_vad_key_round_trips_through_settings_put(tmp_path):
+    # wake.vad selects the segmentation backend: auto (neural when
+    # available, else energy) | silero | webrtc | energy.
+    from voicebridge.voice_edit import settings as settings_mod
+    from voicebridge.voice_edit.schema import VoiceEditError
+    import pytest
+
+    p = tmp_path / "voice.yaml"
+    p.write_text("voice_edit:\n  enabled: true\n")
+
+    class Cfg:
+        def __init__(self):
+            self.data = {"voice_edit": {"enabled": True}}
+            self.path = p
+
+        def get(self, *path, default=None):
+            node = self.data
+            for seg in path:
+                if isinstance(node, dict) and seg in node:
+                    node = node[seg]
+                else:
+                    return default
+            return node
+
+    cfg = Cfg()
+    assert settings_mod.settings_view(cfg)["wake"]["vad"] == "auto"
+    settings_mod.update_voice_edit(cfg, {"wake": {"vad": "silero"}})
+    assert settings_mod.settings_view(cfg)["wake"]["vad"] == "silero"
+    with pytest.raises(VoiceEditError):
+        settings_mod.update_voice_edit(cfg, {"wake": {"vad": "neural-net-9000"}})
+
+
+def test_monitor_uses_injected_segmenter():
+    # The segmentation backend is injectable (same pattern as mic_factory
+    # / transcribe / kws): a fake segmenter drives the loop end to end.
+    seen = []
+
+    class FakeSegmenter:
+        def __init__(self):
+            self.calls = 0
+
+        def reset(self):
+            pass
+
+        def add_frame(self, pcm):
+            self.calls += 1
+            seen.append(len(pcm))
+            return "done" if self.calls == 2 else "speech"
+
+    commands = []
+    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+                    is_busy=lambda: False,
+                    mic_factory=lambda: SeqMic([loud_frame()] * 4),
+                    transcribe=lambda pcm: "hey qubit what's the time",
+                    kws=FakeKws(hits=0),
+                    segmenter_factory=lambda cfg: FakeSegmenter())
+    _run_loop(m, lambda: bool(commands))
+    assert commands == ["what's the time"]
+    assert seen and all(n == 9600 for n in seen)
+
+
+def test_auto_vad_falls_back_to_energy_when_neural_unavailable(monkeypatch):
+    import voicebridge.voice_edit.wake as wake_mod
+    from voicebridge.voice_edit.wake import EnergyEndpointer, _make_segmenter
+    monkeypatch.setattr(wake_mod, "_build_audio_segmenter",
+                        lambda cfg: (_ for _ in ()).throw(RuntimeError("no model")))
+    seg = _make_segmenter(FakeCfg(wake={"enabled": True, "vad": "auto"}))
+    assert isinstance(seg, EnergyEndpointer)
+
+
+def test_make_segmenter_prefers_neural_when_available(monkeypatch):
+    import voicebridge.voice_edit.wake as wake_mod
+    from voicebridge.voice_edit.wake import _make_segmenter
+    sentinel = object()
+    monkeypatch.setattr(wake_mod, "_build_audio_segmenter",
+                        lambda cfg: sentinel)
+    assert _make_segmenter(FakeCfg(wake={"enabled": True})) is sentinel
+    assert _make_segmenter(
+        FakeCfg(wake={"enabled": True, "vad": "silero"})) is sentinel
 
 
 class FakeKws:
@@ -228,7 +349,11 @@ def test_kws_loop_hit_plus_bounded_fallback_probes():
         return "hey qubit type this for me: hi"
 
     commands = []
-    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+    # Synthetic constant-tone frames carry energy but no speech spectrum,
+    # so these KWS/fallback-logic tests pin the energy segmenter; neural
+    # selection is covered by test_make_segmenter_prefers_neural.
+    m = WakeMonitor(FakeCfg(wake={"enabled": True, "vad": "energy"}),
+                    on_command=commands.append,
                     is_busy=lambda: False,
                     mic_factory=lambda: SeqMic(
                         [loud_frame(), loud_frame(), silent_frame(),
@@ -290,7 +415,8 @@ def test_kws_context_survives_non_hit_segments():
     systematically missed (first occurrence missed, repetitions caught).
     """
     kws = FakeKws(hits=0)
-    m = WakeMonitor(FakeCfg(), on_command=lambda c: None,
+    m = WakeMonitor(FakeCfg(wake={"enabled": True, "vad": "energy"}),
+                    on_command=lambda c: None,
                     is_busy=lambda: False,
                     mic_factory=lambda: SeqMic(
                         [loud_frame(), loud_frame()] + [silent_frame()] * 4
@@ -305,7 +431,8 @@ def test_kws_resets_after_a_hit():
     """A hit still latches-clear so one phrase cannot double-fire."""
     kws = FakeKws(hits=1)
     commands = []
-    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+    m = WakeMonitor(FakeCfg(wake={"enabled": True, "vad": "energy"}),
+                    on_command=commands.append,
                     is_busy=lambda: False,
                     mic_factory=lambda: SeqMic(
                         [loud_frame(), loud_frame()] + [silent_frame()] * 4),
@@ -326,7 +453,8 @@ def test_asr_fallback_fires_on_kws_miss():
     from voicebridge.voice_edit.wake import _asr_fallback_allows
     assert _asr_fallback_allows(FakeCfg(), b"\x00" * 9600) is True
     commands = []
-    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+    m = WakeMonitor(FakeCfg(wake={"enabled": True, "vad": "energy"}),
+                    on_command=commands.append,
                     is_busy=lambda: False,
                     mic_factory=lambda: SeqMic(
                         [loud_frame(), loud_frame()] + [silent_frame()] * 4),
@@ -339,7 +467,8 @@ def test_asr_fallback_fires_on_kws_miss():
 def test_asr_fallback_disabled_never_transcribes_misses():
     """Opt-out restores the old gate: misses are dropped without ASR."""
     from voicebridge.voice_edit.wake import _asr_fallback_allows
-    cfg = FakeCfg(wake={"enabled": True, "asr_fallback": False})
+    cfg = FakeCfg(wake={"enabled": True, "asr_fallback": False,
+                        "vad": "energy"})
     assert _asr_fallback_allows(cfg, b"\x00" * 9600) is False
     # A long segment is skipped even with the fallback on (bounded probe).
     assert _asr_fallback_allows(FakeCfg(), b"\x00" * 32000 * 26) is False
@@ -410,3 +539,66 @@ def test_endpointer_completes_continuous_voicing_at_max_s():
     first_done = states.index("done") + 1
     assert 26 <= first_done <= 28  # 8 s / 300 ms frames
     assert first_done * 9600 <= int(8.0 * 16000 * 2)  # fits the probe bound
+
+
+def test_wake_loop_prepends_preroll_before_speech_onset():
+    # Soft onsets ("hey" starting mid-frame) were clipped: the loop only
+    # buffered frames AFTER the endpointer flipped to speech, so up to
+    # ~300 ms of the utterance start never reached ASR (Right-Ctrl never
+    # clips — it records from keypress). The loop keeps 600 ms of
+    # pre-roll and prepends it when a segment opens.
+    captured = []
+    commands = []
+
+    def transcribe(pcm):
+        captured.append(len(pcm))
+        return "hey qubit what's the time"
+
+    m = WakeMonitor(FakeCfg(wake={"enabled": True, "vad": "energy"}),
+                    on_command=commands.append, is_busy=lambda: False,
+                    mic_factory=lambda: SeqMic(
+                        [silent_frame(), silent_frame(),
+                         loud_frame(), loud_frame()] + [silent_frame()] * 4),
+                    transcribe=transcribe, kws=FakeKws(hits=0))
+    _run_loop(m, lambda: bool(commands))
+    assert commands == ["what's the time"]
+    # 2 pre-roll + 2 loud + 3 trailing-silence frames (900 ms to done).
+    assert captured == [7 * 9600], captured
+
+
+def test_expect_reply_rearms_for_the_answer():
+    # Conversational confirm: after Qubit speaks a "say yes" prompt, a bare
+    # "yes" (no wake prefix) must be accepted. The arm window started at
+    # the original wake and expires during brain+TTS latency, so the
+    # helper re-arms explicitly when it asks something.
+    import time as _t
+    m, _ = _monitor([""])
+    m._armed_until = 0.0
+    m.expect_reply()
+    assert _t.monotonic() < m._armed_until
+    m.expect_reply(timeout_s=30.0)
+    assert m._armed_until - _t.monotonic() > 20.0
+
+
+def test_expect_reply_leads_to_command_without_wake():
+    commands = []
+    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+                    is_busy=lambda: False,
+                    transcribe=lambda pcm: "yes")
+    m.expect_reply()
+    m._handle_segment(b"\x00" * 9600)
+    assert commands == ["yes"]
+
+
+def test_forced_hit_consumes_armed_window():
+    # P1-4: the KWS-forced branch never cleared the arm, so one intent
+    # (bare wake + KWS-hit turn) emitted twice.
+    import time as _t
+    commands = []
+    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+                    is_busy=lambda: False,
+                    transcribe=lambda pcm: "hey qubit what's the time")
+    m._armed_until = _t.monotonic() + 12.0
+    m._handle_segment(b"\x00" * 9600, forced=True)
+    assert commands == ["what's the time"]
+    assert m._armed_until == 0.0

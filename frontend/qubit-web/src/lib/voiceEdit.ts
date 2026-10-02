@@ -52,6 +52,46 @@ export interface LocalModel {
   size_bytes: number;
 }
 
+/** One user-defined voice alias (`voice_edit.custom_commands`). */
+export interface CustomCommand {
+  phrase: string;
+  action: string;
+  target: string;
+}
+
+/** Actions an alias may target (mirrors `custom_commands.CUSTOM_ACTIONS`). */
+export const CUSTOM_COMMAND_ACTIONS: string[] = [
+  "open_website",
+  "play_youtube",
+  "open_app",
+  "open_document",
+];
+
+export interface VoiceCommandExample {
+  text: string;
+  verified: boolean;
+}
+
+export interface VoiceCommandItem {
+  name: string;
+  desc: string;
+  examples: VoiceCommandExample[];
+  confirm: boolean;
+}
+
+export interface VoiceCommandGroup {
+  id: string;
+  title: string;
+  intro: string;
+  items: VoiceCommandItem[];
+}
+
+export interface VoiceCommandsCatalog {
+  groups: VoiceCommandGroup[];
+  custom_commands: CustomCommand[];
+  custom_actions: string[];
+}
+
 export interface VoiceEditSettings {
   enabled: boolean;
   routing: "local" | "api" | "auto";
@@ -133,9 +173,17 @@ export interface VoiceEditSettings {
     asr_fallback?: boolean;
     /** ASR fallback listen window, seconds (backend default 8). */
     asr_fallback_max_s?: number;
+    /** Longest wake segment, seconds, clamped 2..25 (backend default 8). */
+    max_s?: number;
+    /** Segmentation backend: auto|silero|webrtc|energy (backend default "auto"). */
+    vad?: string;
   };
+  /** Chrome-style transcripts: lowercase, no punctuation (backend default false). */
+  verbatim_transcript?: boolean;
   prompts: PromptRow[];
   per_app: Record<string, string>;
+  /** User-defined aliases; absent on older backends (treat as []). */
+  custom_commands?: CustomCommand[];
   prompt_versions: Record<string, string>;
 }
 
@@ -224,6 +272,7 @@ export const WAKE_LIMITS = {
   rmsGate: { min: 0.0005, max: 0.2 },
   kwsThreshold: { min: 0.05, max: 0.9 },
   asrFallbackMaxS: { min: 2, max: 25 },
+  maxS: { min: 2, max: 25 },
 } as const;
 
 export function clampVoiceEditNumber(v: number, lo: number, hi: number): number {
@@ -240,6 +289,9 @@ export const voiceEdit = {
   /** Locally installed models on THIS machine (Ollama) for the model pickers. */
   models: () =>
     fetchJSON<{ models: LocalModel[] }>("/api/voice-edit/models"),
+  /** Browsable command catalog, derived live from the backend registries. */
+  commands: () =>
+    fetchJSON<{ ok: boolean } & VoiceCommandsCatalog>("/api/voice-edit/commands"),
   saveSettings: (update: Record<string, unknown>) =>
     fetchJSON<{ settings: VoiceEditSettings }>("/api/voice-edit/settings", {
       method: "PUT",

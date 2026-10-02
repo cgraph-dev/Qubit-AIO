@@ -5,9 +5,44 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VoiceEditSettings } from "@/lib/voiceEdit";
 
+const CATALOG = {
+  ok: true,
+  groups: [
+    {
+      id: "local",
+      title: "This machine (local actions)",
+      intro: "",
+      items: [
+        {
+          name: "open_website",
+          desc: "open a website in the browser",
+          examples: [{ text: "open youtube", verified: true }],
+          confirm: false,
+        },
+      ],
+    },
+    {
+      id: "dictation",
+      title: "Dictation & edits",
+      intro: "",
+      items: [
+        {
+          name: "dictate",
+          desc: "type words verbatim",
+          examples: [{ text: "Qubit, type this for me: buy milk", verified: true }],
+          confirm: false,
+        },
+      ],
+    },
+  ],
+  custom_commands: [],
+  custom_actions: ["open_website", "play_youtube", "open_app", "open_document"],
+};
+
 const mocks = vi.hoisted(() => ({
   settings: vi.fn(),
   log: vi.fn(),
+  commands: vi.fn(),
   saveSettings: vi.fn(),
   restore: vi.fn(),
   exportSettings: vi.fn(),
@@ -84,6 +119,7 @@ beforeEach(() => {
     ],
     summary: { count: 2, errors: 0, last_error: null, last_event: null },
   });
+  mocks.commands.mockResolvedValue(CATALOG);
 });
 
 afterEach(() => {
@@ -200,6 +236,90 @@ describe("VoiceEditPage", () => {
       await Promise.resolve();
     });
     expect(mocks.saveSettings).toHaveBeenCalledWith({ router: "brain" });
+  });
+
+  it("renders the live commands catalog with example phrases", async () => {
+    mocks.settings.mockResolvedValue({ settings: settings() });
+    const { default: VoiceEditPage } = await import("./VoiceEditPage");
+    await act(async () => root.render(<VoiceEditPage />));
+    await flush();
+    expect(mocks.commands).toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="voice-edit-commands"]')).toBeTruthy();
+    expect(container.textContent).toContain("open_website");
+    expect(container.textContent).toContain("open youtube");
+  });
+
+  function setInput(el: HTMLInputElement, value: string) {
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    setter?.call(el, value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  it("adds a custom shortcut through the settings PUT", async () => {
+    mocks.settings.mockResolvedValue({ settings: settings() });
+    mocks.saveSettings.mockResolvedValue({ settings: settings() });
+    const { default: VoiceEditPage } = await import("./VoiceEditPage");
+    await act(async () => root.render(<VoiceEditPage />));
+    await flush();
+    const phrase = container.querySelector(
+      '[data-testid="voice-edit-alias-phrase"]',
+    ) as HTMLInputElement;
+    const target = container.querySelector(
+      '[data-testid="voice-edit-alias-target"]',
+    ) as HTMLInputElement;
+    await act(async () => {
+      setInput(phrase, "open my dashboard");
+      setInput(target, "https://example.com");
+      await Promise.resolve();
+    });
+    const add = container.querySelector(
+      '[data-testid="voice-edit-alias-add"]',
+    ) as HTMLButtonElement;
+    expect(add.disabled).toBe(false);
+    await act(async () => {
+      add.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mocks.saveSettings).toHaveBeenCalledWith({
+      custom_commands: [
+        {
+          phrase: "open my dashboard",
+          action: "open_website",
+          target: "https://example.com",
+        },
+      ],
+    });
+  });
+
+  it("deletes a custom shortcut through the settings PUT", async () => {
+    const alias = {
+      phrase: "open my dashboard",
+      action: "open_website",
+      target: "https://example.com",
+    };
+    mocks.settings.mockResolvedValue({ settings: settings() });
+    mocks.commands.mockResolvedValue({ ...CATALOG, custom_commands: [alias] });
+    mocks.saveSettings.mockResolvedValue({ settings: settings() });
+    const { default: VoiceEditPage } = await import("./VoiceEditPage");
+    await act(async () => root.render(<VoiceEditPage />));
+    await flush();
+    expect(
+      container.querySelector('[data-testid="voice-edit-alias-row-0"]'),
+    ).toBeTruthy();
+    const del = container.querySelector(
+      '[data-testid="voice-edit-alias-delete-0"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      del.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mocks.saveSettings).toHaveBeenCalledWith({ custom_commands: [] });
+    mocks.commands.mockResolvedValue(CATALOG);
   });
 
   it("shows a dictation transcript from the try-it panel", async () => {

@@ -119,6 +119,9 @@ def handle(cfg: Any, method: str, api_path: str,
             # reported a typed failure (e.g. web search unconfigured); the
             # confirm-required refusal is a VoiceEditError -> 409 above.
             return 200, out
+        if path == "/api/voice-edit/commands" and method in ("GET", "HEAD"):
+            from .custom_commands import build_catalog
+            return _ok(**build_catalog(cfg))
         if path == "/api/voice-edit/session" and method == "POST":
             out = svc.begin(session_id=_require_body_str(body, "session_id"),
                             request_id=_require_body_str(body, "request_id"),

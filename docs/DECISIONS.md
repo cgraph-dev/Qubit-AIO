@@ -182,3 +182,18 @@ archived contract is preserved, not edited.
     interface contract is regenerated at the merge freeze. No `VERIFIED` /
     `CODE_READY` / parity claim; the merge is a tracked workstream. Full text:
     `docs/QUBIT_OWNER_AMENDMENT_2026-09-25_PIN_AND_1TO1.md`.
+
+## Owner decisions in force (2026-10-02)
+
+26. **Voice has full /chat capability (no limited voice track).** `/qubit-chat`,
+    Right-Ctrl, and the wake command must be able to do **everything `/chat`
+    and the terminal can do — and more, never less**. The local low model
+    stays the default for speed, but the capability set must remain the full
+    one: voice has full permission over all Qubit capabilities and features
+    (tools, skills, files, sessions, cron, plugins, MCP, browser, terminal —
+    every surface /chat reaches). The limited voice track (tool-less `ask()`,
+    the `local.*`/`web.*` whitelist as the ceiling) is superseded: voice
+    turns dispatch through the same full agent turn path /chat uses, on the
+    same broker / policy / audit / confirmation / e-stop authority path.
+    Destructive tool calls stay confirm-gated per the existing policy unless
+    the owner rules otherwise.

@@ -387,7 +387,9 @@ def test_transform_auto_records_api_fallback():
     res = TransformEngine(runner=runner).transform(cfg, cmd)
     assert res.ok and res.provider == "openai"
     assert "retried on configured API" in res.detail
-    assert calls == [None, "frontier-x"]
+    # Auto tries the explicit local default first (detail tier when set,
+    # else the local profile), then the configured API on failure.
+    assert calls == ["qubit-brain4", "frontier-x"]
 
 
 def test_transform_detects_dropped_facts():
@@ -1083,3 +1085,173 @@ def test_ask_default_path_resolves_canonical_store(monkeypatch):
     out = svc.ask("q", request_id="r4")
     assert out["answer"] == "canonical answer"
     assert [t[1] for t in store.turns] == ["user", "assistant"]
+
+
+def test_transform_prefers_detail_tier_over_speed_tier():
+    # Live 2026-10-02: transforms ran on local_profile (spark17 1.7B),
+    # which narrates ("I'm processing the text:...") instead of
+    # rewriting despite the output-only guardrail. Rewriting is careful
+    # work: it uses the detail tier when configured, the local tier
+    # otherwise. Speed-tier chat answers are unaffected.
+    from voicebridge.voice_edit.transform import TransformEngine
+    seen = {}
+
+    def runner(cfg, **kw):
+        seen.update(kw)
+        return FakeResult(text="Rewritten.")
+
+    cfg = enabled_cfg(routing="local", local_profile="qubit-spark17",
+                      detail_model="qubit-spark4")
+    cmd = parser.parse("rewrite this", selected_text="hello")
+    res = TransformEngine(runner=runner).transform(cfg, cmd)
+    assert res.ok and seen["profile_id"] == "qubit-spark4", seen
+
+
+def test_transform_falls_back_to_local_without_detail_tier():
+    from voicebridge.voice_edit.transform import TransformEngine
+    seen = {}
+
+    def runner(cfg, **kw):
+        seen.update(kw)
+        return FakeResult(text="Rewritten.")
+
+    cfg = enabled_cfg(routing="local", local_profile="qubit-spark17")
+    cmd = parser.parse("rewrite this", selected_text="hello")
+    res = TransformEngine(runner=runner).transform(cfg, cmd)
+    assert res.ok and seen["profile_id"] == "qubit-spark17", seen
+
+
+def test_transform_auto_mode_also_prefers_detail_tier():
+    from voicebridge.voice_edit.transform import TransformEngine
+    seen = {}
+
+    def runner(cfg, **kw):
+        seen.update(kw)
+        return FakeResult(text="Rewritten.")
+
+    cfg = enabled_cfg(routing="auto", local_profile="qubit-spark17",
+                      detail_model="qubit-spark4")
+    cmd = parser.parse("rewrite this", selected_text="hello")
+    res = TransformEngine(runner=runner).transform(cfg, cmd)
+    assert res.ok and seen["profile_id"] == "qubit-spark4", seen
+
+
+# ---------------------------------------------------------------------------
+# narration guard (TDD: these fail until transform.py gains the guard)
+# ---------------------------------------------------------------------------
+def test_strip_narration_preamble_strips_lead_when_rewrite_follows():
+    from voicebridge.voice_edit.transform import strip_narration_preamble
+    raw = "I'm processing your text. The cat sat on the mat."
+    assert strip_narration_preamble(raw) == "The cat sat on the mat."
+    raw2 = "I will provide the rewrite below:\nThe cat sat on the mat."
+    assert strip_narration_preamble(raw2) == "The cat sat on the mat."
+
+
+def test_strip_narration_preamble_keeps_genuine_first_person():
+    from voicebridge.voice_edit.transform import strip_narration_preamble
+    genuine = "I went to the store yesterday."
+    assert strip_narration_preamble(genuine) == genuine
+
+
+def test_transform_strips_narration_preamble_keeps_rewrite():
+    cfg = enabled_cfg()
+    cmd = parser.parse("rewrite this", selected_text="hello world")
+    raw = "I'm processing your request. Hello world, rewritten clearly."
+    res = TransformEngine(runner=lambda *a, **k: FakeResult(text=raw)).transform(
+        cfg, cmd)
+    assert res.ok
+    assert res.text == "Hello world, rewritten clearly."
+    assert "processing" not in res.text
+
+
+def test_transform_narration_only_fails_without_api():
+    cfg = enabled_cfg(routing="local")
+    cmd = parser.parse("rewrite this", selected_text="hello world")
+    res = TransformEngine(runner=lambda *a, **k: FakeResult(
+        text="I'm processing your request and will respond shortly.")).transform(
+        cfg, cmd)
+    assert res.ok is False and res.code == "VOICE_EDIT_NARRATION_ONLY"
+
+
+def test_transform_narration_only_falls_back_to_api_in_auto():
+    calls = []
+
+    def runner(cfg, **kw):
+        calls.append(kw["profile_id"])
+        if kw["profile_id"] == "frontier-x":
+            return FakeResult(text="Clean rewrite.", provider="openai",
+                              model="gpt-x", locality="external")
+        return FakeResult(text="I'll respond with the rewrite in a moment.")
+
+    cfg = enabled_cfg(routing="auto", allow_api=True, api_profile="frontier-x")
+    cmd = parser.parse("rewrite this", selected_text="hello world")
+    res = TransformEngine(runner=runner).transform(cfg, cmd)
+    assert res.ok and res.text == "Clean rewrite."
+    assert calls == ["qubit-brain4", "frontier-x"]
+    assert "narration" in res.detail.lower()
+
+
+def test_clarify_narration_shares_guard():
+    from voicebridge.voice_edit.transform import is_narration_only
+    assert is_narration_only(
+        "I'm processing your request and will respond shortly.") is True
+    assert is_narration_only("Do the thing clearly.") is False
+    cfg = enabled_cfg()
+    cmd = parser.parse("make it clearer", selected_text="do the thing")
+    assert cmd.action == "clarify"
+    res = TransformEngine(runner=lambda *a, **k: FakeResult(
+        text="Sure, here is the clearer version: Do the thing clearly.")).transform(
+        cfg, cmd)
+    assert res.ok and res.text == "Do the thing clearly."
+
+
+def test_is_narration_only_covers_here_is_and_sure_forms():
+    from voicebridge.voice_edit.transform import is_narration_only
+    for narration in (
+        "Here is the rewritten version.",
+        "Here is the clearer version of your text.",
+        "Sure, I can help with that.",
+        "Sure, here is the rewrite.",
+    ):
+        assert is_narration_only(narration) is True, narration
+    # Genuine content is never narration, even when it starts similarly.
+    assert is_narration_only("Here is my idea for the launch.") is False
+    assert is_narration_only("Sure thing, let's meet at noon.") is False
+    assert is_narration_only("Do the thing clearly.") is False
+
+
+def test_transform_here_is_only_fails_without_api():
+    cfg = enabled_cfg(routing="local")
+    cmd = parser.parse("rewrite this", selected_text="hello world")
+    res = TransformEngine(runner=lambda *a, **k: FakeResult(
+        text="Here is the rewritten version.")).transform(cfg, cmd)
+    assert res.ok is False and res.code == "VOICE_EDIT_NARRATION_ONLY"
+
+
+def test_transform_sure_only_falls_back_to_api_in_auto():
+    calls = []
+
+    def runner(cfg, **kw):
+        calls.append(kw["profile_id"])
+        if kw["profile_id"] == "frontier-x":
+            return FakeResult(text="Clean rewrite.", provider="openai",
+                              model="gpt-x", locality="external")
+        return FakeResult(text="Sure, I can help with that.")
+
+    cfg = enabled_cfg(routing="auto", allow_api=True, api_profile="frontier-x")
+    cmd = parser.parse("rewrite this", selected_text="hello world")
+    res = TransformEngine(runner=runner).transform(cfg, cmd)
+    assert res.ok and res.text == "Clean rewrite."
+    assert calls == ["qubit-brain4", "frontier-x"]
+
+
+def test_clarify_here_is_only_shares_guard():
+    from voicebridge.voice_edit.transform import is_narration_only
+    assert is_narration_only("Here is the clearer version.") is True
+    cfg = enabled_cfg()
+    cmd = parser.parse("make it clearer", selected_text="do the thing")
+    assert cmd.action == "clarify"
+    res = TransformEngine(runner=lambda *a, **k: FakeResult(
+        text="Sure, here is the clearer version: Do the thing clearly.")).transform(
+        cfg, cmd)
+    assert res.ok and res.text == "Do the thing clearly."

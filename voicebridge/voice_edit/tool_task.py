@@ -192,6 +192,14 @@ def propose_tool(cfg: Any, text: str) -> Optional[dict]:
     if not clean:
         return None
     try:
+        from .custom_commands import match_alias
+        hit = match_alias(clean, cfg)
+    except Exception:  # noqa: BLE001 - aliases never break built-ins
+        hit = None
+    if hit is not None and _la_has_action(str(hit.get("name") or "")):
+        return {"tool": f"local.{hit['name']}",
+                "args": dict(hit.get("params") or {})}
+    try:
         from ..local import actions as _la
         match = _la.match(clean)
     except Exception:  # noqa: BLE001 - a failed matcher never guesses

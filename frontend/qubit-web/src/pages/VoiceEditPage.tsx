@@ -11,12 +11,16 @@ import { copyTextToClipboard } from "@/lib/clipboard";
 import {
   voiceEdit,
   VOICE_EDIT_ACTIONS,
+  CUSTOM_COMMAND_ACTIONS,
   clampVoiceEditNumber,
   WAKE_LIMITS,
+  type CustomCommand,
   type LocalModel,
   type PromptRow,
   type TransformPreview,
   type TtsProvider,
+  type VoiceCommandGroup,
+  type VoiceCommandsCatalog,
   type VoiceEditSettings,
   type VoiceLogEntry,
 } from "@/lib/voiceEdit";
@@ -183,9 +187,190 @@ function Section({
   );
 }
 
+/** Browsable voice-commands catalog + user aliases (collapsed by default).
+ *  The catalog is derived live from the backend registries
+ *  (`GET /api/voice-edit/commands`); aliases persist through the existing
+ *  settings PUT (`custom_commands`) with a full-list replace. */
+function VoiceCommandsSection({
+  catalog,
+  busy,
+  onAdd,
+  onDelete,
+  aliasPhrase,
+  setAliasPhrase,
+  aliasAction,
+  setAliasAction,
+  aliasTarget,
+  setAliasTarget,
+}: {
+  catalog: VoiceCommandsCatalog | null;
+  busy: boolean;
+  onAdd: (entry: CustomCommand) => void;
+  onDelete: (phrase: string) => void;
+  aliasPhrase: string;
+  setAliasPhrase: (v: string) => void;
+  aliasAction: string;
+  setAliasAction: (v: string) => void;
+  aliasTarget: string;
+  setAliasTarget: (v: string) => void;
+}) {
+  const groups: VoiceCommandGroup[] = catalog?.groups ?? [];
+  const aliases: CustomCommand[] = catalog?.custom_commands ?? [];
+  const actions: string[] =
+    catalog?.custom_actions?.length ? catalog.custom_actions : CUSTOM_COMMAND_ACTIONS;
+  const canAdd =
+    !busy && aliasPhrase.trim().length > 0 && aliasTarget.trim().length > 0;
+  return (
+    <details
+      className="rounded-lg border border-border p-4"
+      data-testid="voice-edit-commands"
+    >
+      <summary
+        className="cursor-pointer text-sm font-semibold"
+        data-testid="voice-edit-commands-toggle"
+      >
+        Voice commands
+      </summary>
+      <p className="mb-3 mt-1 text-xs text-muted-foreground">
+        Everything the voice path understands, read live from the backend.
+        Your own shortcuts (“aliases”) match first — say the phrase and the
+        action runs with your target.
+      </p>
+      {groups.length === 0 ? (
+        <p className="mb-2 text-xs text-muted-foreground">
+          Catalog unavailable — the commands endpoint did not answer.
+        </p>
+      ) : (
+        groups.map((g) => (
+          <div key={g.id} className="mb-3" data-testid={`voice-commands-group-${g.id}`}>
+            <h3 className="text-sm font-semibold">{g.title}</h3>
+            {g.intro ? (
+              <p className="mb-1 text-xs text-muted-foreground">{g.intro}</p>
+            ) : null}
+            <ul className="flex flex-col gap-1">
+              {g.items.map((item) => (
+                <li
+                  key={item.name}
+                  className="text-sm"
+                  data-testid={`voice-command-${g.id}-${item.name}`}
+                >
+                  <code className="rounded bg-muted px-1">{item.name}</code>
+                  <span className="text-muted-foreground"> — {item.desc}</span>
+                  {item.confirm ? (
+                    <span className="ml-1 text-xs text-amber-600">(asks first)</span>
+                  ) : null}
+                  {item.examples.length > 0 ? (
+                    <span className="block pl-2 text-xs text-muted-foreground">
+                      Try:{" "}
+                      {item.examples.map((ex, i) => (
+                        <span key={i}>
+                          {i > 0 ? "; " : ""}
+                          <em>“{ex.text}”</em>
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      )}
+      <div className="mt-2 border-t border-border pt-3">
+        <h3 className="text-sm font-semibold">My shortcuts</h3>
+        {aliases.length === 0 ? (
+          <p
+            className="mb-2 text-xs text-muted-foreground"
+            data-testid="voice-edit-aliases-empty"
+          >
+            No shortcuts yet — add one below.
+          </p>
+        ) : (
+          <ul className="mb-2 flex flex-col gap-1">
+            {aliases.map((a, i) => (
+              <li
+                key={`${a.phrase}-${i}`}
+                className="flex items-center gap-2 text-sm"
+                data-testid={`voice-edit-alias-row-${i}`}
+              >
+                <em>“{a.phrase}”</em>
+                <span className="text-muted-foreground">
+                  → {a.action} ({a.target})
+                </span>
+                <button
+                  type="button"
+                  className="rounded border border-border px-2 py-0.5 text-xs"
+                  data-testid={`voice-edit-alias-delete-${i}`}
+                  disabled={busy}
+                  onClick={() => onDelete(a.phrase)}
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-sm">
+            Say
+            <input
+              className="mt-1 w-44 rounded border border-border bg-background p-1"
+              data-testid="voice-edit-alias-phrase"
+              placeholder="e.g. open my dashboard"
+              value={aliasPhrase}
+              onChange={(e) => setAliasPhrase(e.target.value)}
+            />
+          </label>
+          <label className="text-sm">
+            Do
+            <select
+              className="mt-1 rounded border border-border bg-background p-1"
+              data-testid="voice-edit-alias-action"
+              value={aliasAction}
+              onChange={(e) => setAliasAction(e.target.value)}
+            >
+              {actions.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            Target
+            <input
+              className="mt-1 w-44 rounded border border-border bg-background p-1"
+              data-testid="voice-edit-alias-target"
+              placeholder="URL, app, song, note…"
+              value={aliasTarget}
+              onChange={(e) => setAliasTarget(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="rounded border border-border px-3 py-1 text-xs"
+            data-testid="voice-edit-alias-add"
+            disabled={!canAdd}
+            onClick={() =>
+              onAdd({
+                phrase: aliasPhrase.trim(),
+                action: aliasAction,
+                target: aliasTarget.trim(),
+              })
+            }
+          >
+            Add shortcut
+          </button>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 export default function VoiceEditPage() {
   const [settings, setSettings] = useState<VoiceEditSettings | null>(null);
   const [models, setModels] = useState<LocalModel[]>([]);
+  const [catalog, setCatalog] = useState<VoiceCommandsCatalog | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -213,10 +398,17 @@ export default function VoiceEditPage() {
   const [wakeKws, setWakeKws] = useState("0.25");
   const [wakeAsrFallback, setWakeAsrFallback] = useState(true);
   const [wakeAsrFallbackMaxS, setWakeAsrFallbackMaxS] = useState("8");
+  const [wakeMaxS, setWakeMaxS] = useState("8");
+  const [wakeVad, setWakeVad] = useState("auto");
 
   // per-app mapping: new-row draft (app class + action)
   const [newApp, setNewApp] = useState("");
   const [newAction, setNewAction] = useState("rewrite");
+
+  // custom alias drafts (phrase + action + target)
+  const [aliasPhrase, setAliasPhrase] = useState("");
+  const [aliasAction, setAliasAction] = useState(CUSTOM_COMMAND_ACTIONS[0]);
+  const [aliasTarget, setAliasTarget] = useState("");
 
   // advanced: STT engine text is drafted, saved on blur/Enter (like detail cues).
   // service_url / stt_ws_url are PUT-only (the GET view never echoes them),
@@ -251,10 +443,26 @@ export default function VoiceEditPage() {
     }
   }, []);
 
+  // The commands catalog is derived live on the backend; a failure must
+  // never block the settings form — the section just shows a fallback note.
+  const loadCommands = useCallback(async () => {
+    try {
+      const out = await voiceEdit.commands();
+      setCatalog({
+        groups: out.groups ?? [],
+        custom_commands: out.custom_commands ?? [],
+        custom_actions: out.custom_actions ?? [],
+      });
+    } catch {
+      setCatalog(null);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
     void loadModels();
-  }, [load, loadModels]);
+    void loadCommands();
+  }, [load, loadModels, loadCommands]);
 
   useEffect(() => {
     setDetailCues((settings?.detail_cues ?? []).join(", "));
@@ -270,6 +478,8 @@ export default function VoiceEditPage() {
     setWakeKws(String(w.kws_threshold ?? 0.25));
     setWakeAsrFallback(w.asr_fallback !== false);
     setWakeAsrFallbackMaxS(String(w.asr_fallback_max_s ?? 8));
+    setWakeMaxS(String(w.max_s ?? 8));
+    setWakeVad(w.vad ?? "auto");
   }, [settings?.wake]);
 
   useEffect(() => {
@@ -318,6 +528,41 @@ export default function VoiceEditPage() {
     [],
   );
 
+  // Aliases persist as a full-list replace through the existing settings
+  // PUT (the backend validates each row and echoes the cleaned list).
+  const currentAliases = useCallback(
+    (): CustomCommand[] =>
+      catalog?.custom_commands ?? settings?.custom_commands ?? [],
+    [catalog, settings],
+  );
+
+  const addAlias = useCallback(
+    async (entry: CustomCommand) => {
+      const next = [
+        ...currentAliases().filter(
+          (a) => a.phrase.toLowerCase() !== entry.phrase.toLowerCase(),
+        ),
+        entry,
+      ];
+      await update({ custom_commands: next }, `saved shortcut “${entry.phrase}”`);
+      setAliasPhrase("");
+      setAliasTarget("");
+      await loadCommands();
+    },
+    [currentAliases, update, loadCommands],
+  );
+
+  const deleteAlias = useCallback(
+    async (phrase: string) => {
+      const next = currentAliases().filter(
+        (a) => a.phrase.toLowerCase() !== phrase.toLowerCase(),
+      );
+      await update({ custom_commands: next }, `deleted shortcut “${phrase}”`);
+      await loadCommands();
+    },
+    [currentAliases, update, loadCommands],
+  );
+
   // Wake sub-editors save as one merged wake:{...} PUT, clamped to the
   // backend ranges (settings.py::update_voice_edit). Partial merge is safe:
   // the backend deep-merges the wake object.
@@ -339,12 +584,19 @@ export default function VoiceEditPage() {
       Number(wakeAsrFallbackMaxS),
       WAKE_LIMITS.asrFallbackMaxS.min, WAKE_LIMITS.asrFallbackMaxS.max,
     );
+    const maxS = clampVoiceEditNumber(
+      Number(wakeMaxS),
+      WAKE_LIMITS.maxS.min, WAKE_LIMITS.maxS.max,
+    );
+    const vad = wakeVad === "silero" || wakeVad === "webrtc" || wakeVad === "energy" ? wakeVad : "auto";
     setWakeSilence(String(silence));
     setWakeRms(String(rms));
     setWakeKws(String(kws));
     setWakeEngine(eng);
     setWakePhrase(phrase);
     setWakeAsrFallbackMaxS(String(asrMaxS));
+    setWakeMaxS(String(maxS));
+    setWakeVad(vad);
     return update(
       {
         wake: {
@@ -358,11 +610,13 @@ export default function VoiceEditPage() {
           kws_threshold: kws,
           asr_fallback: wakeAsrFallback,
           asr_fallback_max_s: asrMaxS,
+          max_s: maxS,
+          vad,
         },
       },
       "wake settings saved",
     );
-  }, [update, settings?.wake?.enabled, wakePhrase, wakeSilence, wakeRms, wakeEngine, wakeKws, wakeAsrFallback, wakeAsrFallbackMaxS]);
+  }, [update, settings?.wake?.enabled, wakePhrase, wakeSilence, wakeRms, wakeEngine, wakeKws, wakeAsrFallback, wakeAsrFallbackMaxS, wakeMaxS, wakeVad]);
 
   const runPreview = useCallback(async () => {
     setBusy(true);
@@ -605,6 +859,39 @@ export default function VoiceEditPage() {
                   Only utterances this long get a fallback probe (2–25).
                 </span>
               </label>
+              <label className="text-sm">
+                Segmentation (VAD)
+                <select
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-wake-vad"
+                  value={wakeVad}
+                  onChange={(e) => setWakeVad(e.target.value)}
+                >
+                  <option value="auto">auto (neural when available)</option>
+                  <option value="silero">silero (neural)</option>
+                  <option value="webrtc">webrtc</option>
+                  <option value="energy">energy (legacy gate)</option>
+                </select>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Neural segmentation ignores fan/machine drone; energy hears it.
+                </span>
+              </label>
+              <label className="text-sm">
+                Longest segment (s)
+                <input
+                  type="number"
+                  min={WAKE_LIMITS.maxS.min}
+                  max={WAKE_LIMITS.maxS.max}
+                  step="1"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-edit-wake-max-s"
+                  value={wakeMaxS}
+                  onChange={(e) => setWakeMaxS(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Continuously-voiced audio is cut here so every segment fits a probe (2–25).
+                </span>
+              </label>
             </div>
             <button
               type="button"
@@ -728,7 +1015,7 @@ export default function VoiceEditPage() {
                 <input
                   type="checkbox"
                   data-testid="voice-edit-noise"
-                  checked={settings.noise_suppression !== false}
+                  checked={settings.noise_suppression === true}
                   onChange={(e) =>
                     void update({ noise_suppression: e.target.checked })
                   }
@@ -910,6 +1197,17 @@ export default function VoiceEditPage() {
               </label>
             </div>
             <div className="mt-3 flex flex-col gap-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  data-testid="voice-edit-verbatim"
+                  checked={Boolean(settings.verbatim_transcript)}
+                  onChange={(e) =>
+                    void update({ verbatim_transcript: e.target.checked })
+                  }
+                />
+                Verbatim transcripts (lowercase, no punctuation — exactly what was heard)
+              </label>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -1449,31 +1747,38 @@ export default function VoiceEditPage() {
               <button
                 type="button"
                 className="rounded border border-border px-3 py-1 text-xs"
-                onClick={() => void update({}, "defaults restored").then(load)}
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    const out = await voiceEdit.restore();
+                    setSettings(out.settings);
+                    setStatus("defaults restored");
+                    setError("");
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : String(e));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
               >
                 Restore all defaults
               </button>
             </div>
           </section>
 
-          <section className="rounded-lg border border-border p-4" data-testid="voice-edit-commands">
-            <h2 className="mb-2 text-sm font-semibold">Voice commands</h2>
-            <ul className="list-disc pl-5 text-sm text-muted-foreground">
-              <li>
-                Type text: <em>“Qubit, type this for me: your text here”</em> —
-                inserts your words verbatim (replaces the selection if any).
-              </li>
-              <li>
-                Rewrite the selection: <em>“make this clearer”</em>,{" "}
-                <em>“fix the grammar”</em>, <em>“make it shorter”</em>,{" "}
-                <em>“turn this into bullet points”</em>, <em>“translate to
-                English”</em>, <em>“make this professional”</em>,{" "}
-                <em>“summarize this”</em>, <em>“improve the prompt without
-                changing the requirements”</em>.
-              </li>
-              <li>No selection: ordinary dictation is inserted at the cursor.</li>
-            </ul>
-          </section>
+          <VoiceCommandsSection
+            catalog={catalog}
+            busy={busy}
+            onAdd={(entry) => void addAlias(entry)}
+            onDelete={(phrase) => void deleteAlias(phrase)}
+            aliasPhrase={aliasPhrase}
+            setAliasPhrase={setAliasPhrase}
+            aliasAction={aliasAction}
+            setAliasAction={setAliasAction}
+            aliasTarget={aliasTarget}
+            setAliasTarget={setAliasTarget}
+          />
 
           <section className="rounded-lg border border-border p-4">
             <h2 className="mb-3 text-sm font-semibold">Try it (this page)</h2>

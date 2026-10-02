@@ -169,6 +169,88 @@ def test_unknown_request_route_404(cfg, svc):
     assert status == 404 and payload["code"] == "VOICE_EDIT_UNKNOWN_REQUEST"
 
 
+def test_commands_catalog_lists_real_actions(cfg, svc):
+    status, payload = routes.handle(cfg, "GET", "/api/voice-edit/commands", {})
+    assert status == 200
+    assert payload["ok"] is True
+    groups = {g["id"]: g for g in payload["groups"]}
+    assert {"dictation", "local", "router", "skills"} <= set(groups)
+    local_items = {i["name"]: i for i in groups["local"]["items"]}
+    assert "open_website" in local_items
+    assert local_items["open_website"]["examples"], "every action needs examples"
+    assert payload["custom_commands"] == []
+    assert set(payload["custom_actions"]) == {
+        "open_website", "play_youtube", "open_app", "open_document"}
+
+
+def test_commands_catalog_derived_from_live_actions(cfg, svc):
+    status, payload = routes.handle(cfg, "GET", "/api/voice-edit/commands", {})
+    assert status == 200
+    from voicebridge.local import actions as _actions
+    local_items = {
+        i["name"]: i
+        for g in payload["groups"] if g["id"] == "local" for i in g["items"]
+    }
+    # Every registered local action appears with its real desc (never stale).
+    for name, act in _actions.ACTIONS.items():
+        assert local_items[name]["desc"] == act.desc
+
+
+def test_custom_commands_reject_junk(cfg, svc):
+    for junk in ({"phrase": "", "action": "open_website", "target": "x"},
+                 {"phrase": "x" * 81, "action": "open_website", "target": "x"},
+                 {"phrase": "open it", "action": "rm_rf", "target": "x"},
+                 {"phrase": "open it", "action": "open_website", "target": ""}):
+        status, payload = routes.handle(cfg, "PUT", "/api/voice-edit/settings",
+                                        {"custom_commands": [junk]})
+        assert status == 400, junk
+        assert payload["code"] == "VOICE_EDIT_BAD_SETTINGS"
+
+
+def test_custom_commands_roundtrip(cfg, svc):
+    alias = {"phrase": "open my dashboard", "action": "open_website",
+             "target": "https://example.com"}
+    status, payload = routes.handle(cfg, "PUT", "/api/voice-edit/settings",
+                                    {"custom_commands": [alias]})
+    assert status == 200
+    assert payload["settings"]["custom_commands"] == [alias]
+    status, payload = routes.handle(cfg, "GET", "/api/voice-edit/commands", {})
+    assert status == 200
+    assert payload["custom_commands"] == [alias]
+
+
+def test_match_alias_first_hit_wins_case_insensitive(cfg):
+    from voicebridge.voice_edit.custom_commands import match_alias
+    aliases = [{"phrase": "Open My Dashboard", "action": "open_website",
+                "target": "https://example.com"}]
+    hit = match_alias("hey qubit, open my dashboard please", aliases)
+    assert hit is not None and hit["name"] == "open_website"
+    assert hit["params"]["url"] == "https://example.com"
+    assert match_alias("something unrelated here", aliases) is None
+
+
+def test_match_alias_param_mapping_per_action():
+    from voicebridge.voice_edit.custom_commands import match_alias
+    assert match_alias("play bedtime tunes", [
+        {"phrase": "bedtime tunes", "action": "play_youtube",
+         "target": "lofi hip hop"}])["params"]["query"] == "lofi hip hop"
+    assert match_alias("start work mail", [
+        {"phrase": "work mail", "action": "open_app",
+         "target": "browser"}])["params"]["app"] == "browser"
+    assert match_alias("show meeting notes", [
+        {"phrase": "meeting notes", "action": "open_document",
+         "target": "meeting"}])["params"]["name"] == "meeting"
+
+
+def test_match_alias_longest_phrase_wins():
+    from voicebridge.voice_edit.custom_commands import match_alias
+    aliases = [{"phrase": "dashboard", "action": "open_app", "target": "browser"},
+               {"phrase": "open my dashboard", "action": "open_website",
+                "target": "https://example.com"}]
+    hit = match_alias("open my dashboard", aliases)
+    assert hit is not None and hit["name"] == "open_website"
+
+
 def test_disabled_route_403(tmp_path, monkeypatch):
     p = tmp_path / "voice.yaml"
     p.write_text("voice_edit:\n  enabled: false\n")

@@ -26,6 +26,7 @@ import argparse
 import json
 import os
 import queue
+import re
 import sys
 import threading
 import time
@@ -50,6 +51,12 @@ def _trace(stage: str, **fields: Any) -> None:
         pass
 
 
+#: How long a staged "say yes" confirmation stays valid. Voice confirmations
+#: bind intent to recency: the arm window gates the reply to seconds, and this
+#: TTL is the backstop for re-woken or hotkey confirmations.
+_PENDING_TASK_TTL_S = 120.0
+
+
 class HelperError(Exception):
     def __init__(self, code: str, detail: str = "") -> None:
         super().__init__(detail or code)
@@ -62,6 +69,39 @@ def _read_cfg(cfg: Any, *path: str, default: Any = None) -> Any:
         return cfg.get(*path, default=default)
     except Exception:
         return default
+
+
+def verbatim_transcript(text: Any, cfg_or_enabled: Any = False) -> str:
+    """Chrome-style transcript: exactly what was heard.
+
+    Lowercase, no punctuation, words/numbers/diacritics kept
+    (hyphens split into spaces, intra-word apostrophes kept). Routing is
+    punctuation-independent (the parser strips separators itself), so the
+    normalized form is safe to route, display, and dictate. Honours
+    ``voice_edit.verbatim_transcript`` (default OFF — transcripts keep
+    the engine's punctuation and casing); OFF returns the input
+    unchanged. Never raises.
+    """
+    raw = str(text or "")
+    try:
+        if hasattr(cfg_or_enabled, "get"):
+            on = _read_cfg(cfg_or_enabled, "voice_edit",
+                           "verbatim_transcript", default=False)
+            on = False if on is None else bool(on)
+        else:
+            on = bool(cfg_or_enabled)
+    except Exception:
+        on = False
+    if not on:
+        return raw
+    try:
+        t = raw.lower()
+        t = re.sub(r"[-–—]", " ", t)
+        t = re.sub(r"[^\w\s']", "", t, flags=re.UNICODE)
+        t = " ".join(t.split()).strip(" '")
+        return t
+    except Exception:
+        return raw
 
 
 def _mic_target_peak(cfg: Any, default: float = 0.5) -> float:
@@ -755,17 +795,52 @@ class DesktopHelper:
 
         Runs the SAME begin/capture/transform path as Right-Ctrl; only the
         audio source differs (the wake monitor, not the hold-to-talk mic).
+        The turn itself runs on a worker thread: the whole wake turn (HTTP
+        + model + blocking TTS + agent) used to park inside the monitor
+        loop's thread, blinding the detector for the entire turn — exactly
+        when conversational confirm asks the user to answer.
         """
         cmd = (command or "").strip()
         if not cmd:
             return
         if not self._open_request():
+            _trace("wake.turn_refused", state=self.state)
             return
-        self._capture_selection()
-        _trace("wake.command", chars=len(cmd), request_id=self.request_id,
-               **(_dbg.text_fields(self.cfg, command=cmd)))
-        self._transcript = cmd
-        self._process_transcript(cmd)
+        # Claim the turn so a second wake command refuses (via
+        # _open_request) instead of overlapping agent turns and TTS.
+        self.state = self.PROCESSING
+        cmd = verbatim_transcript(cmd, self.cfg)
+        if not cmd:
+            self._finish_error()
+            return
+        # The wake path never streamed interim partials, so the heard words
+        # jumped straight to the answer with no text preview. Show them now,
+        # on the same status surface Right-Ctrl partials use.
+        self._safe_show()
+        self._ui_status("heard", cmd[-160:])
+        worker = threading.Thread(target=self._wake_turn, args=(cmd,),
+                                  daemon=True, name="voice-wake-turn")
+        self._wake_thread = worker
+        worker.start()
+
+    def _wake_turn(self, cmd: str) -> None:
+        """Body of one wake turn (worker thread, never the monitor loop)."""
+        try:
+            if not self._capture_selection():
+                self._ui_status("idle", "capture failed")
+                self._finish_error()
+                return
+            _trace("wake.command", chars=len(cmd),
+                   request_id=self.request_id,
+                   **(_dbg.text_fields(self.cfg, command=cmd)))
+            self._transcript = cmd
+            self._process_transcript(cmd)
+        except Exception as exc:
+            _trace("wake.turn_error", detail=str(exc)[:160])
+            try:
+                self._finish_error()
+            except Exception:
+                pass
 
     def _transcribe(self) -> None:
         _trace("transcribe.start", request_id=self.request_id)
@@ -857,7 +932,8 @@ class DesktopHelper:
         if stream_error and not (final or "").strip():
             self._on_stt_error(stream_error.code, stream_error.detail)
             return
-        self._transcript = (final or "").strip()
+        self._transcript = verbatim_transcript((final or "").strip(),
+                                                   self.cfg)
         _trace("transcript", request_id=self.request_id,
                chars=len(self._transcript),
                **(_dbg.text_fields(self.cfg, text=self._transcript)))
@@ -895,6 +971,20 @@ class DesktopHelper:
         # A staged task (mode "task") is confirm-gated: the next utterance is
         # only honored if it is an affirmative/negative confirmation.
         if self._pending_task:
+            staged_at = 0.0
+            try:
+                staged_at = float(self._pending_task.get("staged_at", 0.0))
+            except (TypeError, ValueError):
+                staged_at = 0.0
+            if time.monotonic() - staged_at > _PENDING_TASK_TTL_S:
+                # P0-3: confirmations must bind intent to recency — a "yes"
+                # hours later in an unrelated context must never execute a
+                # stale destructive-tier task.
+                _trace("task.expired", request_id=self.request_id)
+                self._pending_task = {}
+                self._ui_status("idle", "confirmation expired — say it again")
+                self._finish_error()
+                return
             if self._affirmative(text):
                 task = str(self._pending_task.get("text", "") or "")
                 self._pending_task = {}
@@ -934,6 +1024,9 @@ class DesktopHelper:
         elif mode == "clarify":
             self._ui_status("clarify", str(out.get("question", "")))
             self._notify_status("Qubit", str(out.get("question", "")))
+            self._speak(str(out.get("question", "")))
+            self._await_reply(str(out.get("question", "")) or
+                              "answer the question aloud")
             # A clarification asks the user to speak again: return to IDLE so
             # the next activation starts a fresh session (staying in PROCESSING
             # swallowed every subsequent PTT).
@@ -955,16 +1048,43 @@ class DesktopHelper:
 
     @staticmethod
     def _affirmative(text: str) -> bool:
+        # Whisper emits conversational punctuation ("Yes, please.") while
+        # verbatim mode strips it — match on the alphanumeric core either
+        # way so a politely-phrased confirmation never silently discards a
+        # staged task.
         low = (text or "").strip().lower().strip(" .,!?:;")
-        return low in ("yes", "yeah", "yep", "confirm", "confirmed", "do it",
-                       "go ahead", "run it", "ok", "okay", "sure", "proceed",
-                       "yes please", "confirm task", "run the task")
+        low = re.sub(r"[^a-z0-9 ]", "", low)
+        return low in ("yes", "yeah", "yep", "yup", "confirm", "confirmed",
+                       "do it", "go ahead", "run it", "ok", "okay", "sure",
+                       "proceed", "yes please", "confirm task", "run the task")
 
     @staticmethod
     def _negative(text: str) -> bool:
         low = (text or "").strip().lower().strip(" .,!?:;")
-        return low in ("no", "nope", "cancel", "stop", "don't", "dont",
+        low = re.sub(r"[^a-z0-9 ]", "", low)
+        return low in ("no", "nope", "nah", "cancel", "stop", "dont",
                        "never mind", "nevermind", "abort", "no thanks")
+
+    def _await_reply(self, what: str = "reply") -> None:
+        """Keep the mic waiting for the user's spoken answer.
+
+        Called whenever the helper asks something aloud (a "say yes"
+        confirmation, a clarification question): re-arms the wake listener
+        (whose window started at the original wake and expired during
+        brain/TTS latency) so a bare answer routes without needing
+        "hey qubit" again. Never raises; a missing/dead wake listener
+        simply leaves Right-Ctrl as the answer path.
+        """
+        try:
+            wake = getattr(self, "_wake", None)
+            if wake is not None and hasattr(wake, "expect_reply"):
+                wake.expect_reply()
+        except Exception:
+            pass
+        try:
+            self._ui_status("listening", what)
+        except Exception:
+            pass
 
     def _propose_task(self, out: Dict[str, Any]) -> None:
         """Stage a confirm-gated task and ask for confirmation (never runs it)."""
@@ -973,7 +1093,8 @@ class DesktopHelper:
             self._ui_status("error", "nothing to run")
             self._finish_error()
             return
-        self._pending_task = {"text": task, "request_id": self.request_id}
+        self._pending_task = {"text": task, "request_id": self.request_id,
+                                "staged_at": time.monotonic()}
         _trace("task.proposed", chars=len(task), request_id=self.request_id,
                **(_dbg.text_fields(self.cfg, task=task)))
         self.state = self.PREVIEW
@@ -987,6 +1108,8 @@ class DesktopHelper:
         self._ui_preview(self._preview)
         self._ui_status("clarify", "confirm to run the task")
         self._notify_status("Qubit", f"Confirm task: {task[:200]}")
+        self._speak(f"{task[:200]}. Say yes to run it, or no to cancel.")
+        self._await_reply("say yes to run, no to cancel")
 
     def _run_task(self, text: str) -> None:
         """Run a confirmed task through the one agent turn path (never typed)."""
@@ -1042,9 +1165,11 @@ class DesktopHelper:
                 reply = self.client.ask(question, self.request_id)
         except HelperError as exc:
             self._ui_error(exc.code, exc.detail)
+            self._finish_error()
             return
         if not reply:
             self._ui_status("error", "no answer")
+            self._finish_error()
             return
         _trace("answer", mode=mode, chars=len(reply),
                **(_dbg.text_fields(self.cfg, answer=reply)))

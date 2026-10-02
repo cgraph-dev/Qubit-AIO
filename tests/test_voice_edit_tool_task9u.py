@@ -134,3 +134,22 @@ def test_run_tool_task_passes_confirmed_down(monkeypatch):
     out = TT.run_tool_task(object(), "raise the volume", confirmed=True)
     assert seen.get("confirmed") is True
     assert out["state"] == "OK"
+
+def test_propose_tool_prefers_custom_alias():
+    # Dashboard "My shortcuts": a user alias shadows built-ins (longest
+    # phrase wins inside match_alias; validated at PUT time).
+    class Cfg:
+        def get(self, *p, default=None):
+            if p == ("voice_edit", "custom_commands"):
+                return [{"phrase": "focus page", "action": "open_website",
+                         "target": "https://focus.example.com"}]
+            return default
+
+    out = TT.propose_tool(Cfg(), "open my focus page")
+    assert out == {"tool": "local.open_website",
+                   "args": {"url": "https://focus.example.com"}}
+
+
+def test_propose_tool_without_aliases_unchanged():
+    assert TT.propose_tool(None, "open github.com")["tool"] == \
+        "local.open_website"

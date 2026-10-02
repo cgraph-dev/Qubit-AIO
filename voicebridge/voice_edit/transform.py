@@ -128,6 +128,92 @@ def _strip_model_wrapper(text: str) -> str:
     return t
 
 
+# Meta-commentary from small local models that narrate ("I'm processing...")
+# instead of rewriting, despite the output-only policy. The existing
+# _strip_model_wrapper handles labelled heads ("Here is ...:" on its own
+# line, "Corrected version:"); this guard handles the unlabelled narration
+# class: a leading first-person preamble when the rewritten text follows
+# (strip it), or a narration-only output with no rewrite at all (fail so the
+# API-fallback chain engages instead of returning narration as the rewrite).
+_NARRATION_MARKERS = (
+    "i'm processing", "i am processing",
+    "i'll respond", "i will respond",
+    "i'll provide", "i will provide",
+    "i'm working", "i am working",
+    "let me ",
+    "one moment", "just a moment", "give me a moment",
+    "here is", "here's", "sure,",
+)
+
+
+def _has_narration_marker(head: str) -> bool:
+    low = (head or "").lower()
+    return any(m in low for m in _NARRATION_MARKERS)
+
+
+# A whole output that is one narration statement and nothing else (single
+# sentence so a "marker + real rewrite" output never matches: the sentence
+# break before the rewrite defeats the full-string anchor). The "here is" /
+# "sure" branches only match announcement/offer shapes ("Here is the rewritten
+# version.", "Sure, I can help with that.") so genuine content that happens
+# to start the same way ("Here is my idea for the launch.", "Sure thing,
+# let's meet at noon.") still passes through as the rewrite.
+_NARRATION_WHOLE_RE = re.compile(
+    r"^\s*(?:"
+    r"i(?:'m| am)\s+(?:processing|working on|getting|preparing|rewriting|"
+    r"handling|looking at)\b"
+    r"|i(?:'ll| will)\s+(?:respond|provide|rewrite|reply|get back to you|"
+    r"take care of)\b"
+    r"|let me\s+(?:process|rewrite|work on|take|just)\b"
+    r"|(?:just\s+)?(?:one|a)\s+moment\b|give me a (?:moment|second)\b"
+    r"|here(?:'s| is| are)\s+(?:the\s+)?(?:rewrit\w*|correct\w*|improv\w*|"
+    r"concise|clearer|better|updat\w*|summar\w*|translat\w*|result|"
+    r"version|email|draft|bullet)\b"
+    r"|here\s+(?:you go|it is|we go|you are)\b"
+    r"|sure,?\s+(?:i can help|here(?:'s| is| are)|i(?:'ll| will)|let me|"
+    r"(?:just\s+)?(?:one|a)\s+moment|give me a (?:moment|second)|"
+    r"absolutely|of course|no problem|happy to help)\b"
+    r")[^.!?\n]{0,160}[.!?]?\s*$",
+    re.IGNORECASE)
+
+
+def strip_narration_preamble(text: str) -> str:
+    """Remove leading meta-commentary when the rewritten text follows it.
+
+    Two forms: a narration head ending in ':' ("I will provide the rewrite
+    below:\\n<rewrite>", "Sure, here is the clearer version: <rewrite>") and
+    a leading narration sentence ("I'm processing your text. <rewrite>").
+    Returns the input unchanged when there is no narration lead, or when
+    nothing follows the preamble (that is the narration-only case, handled
+    by is_narration_only). Genuine first-person rewrites without a narration
+    marker are never touched.
+    """
+    t = text or ""
+    while True:
+        # Form A: narration head up to the first colon, rewrite after it.
+        m = re.match(r"^\s*(.{1,160}?):\s*(.+)$", t, re.DOTALL)
+        if m and _has_narration_marker(m.group(1)):
+            t = m.group(2).strip()
+            continue
+        # Form B: leading narration sentence, rewrite after it.
+        m = re.match(r"^\s*([^.!?\n]{1,200}[.!?])\s+(.+)$", t, re.DOTALL)
+        if m and _has_narration_marker(m.group(1)):
+            t = m.group(2).strip()
+            continue
+        return t
+
+
+def is_narration_only(text: str) -> bool:
+    """True when the whole output is meta-commentary with no rewrite in it."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    rest = strip_narration_preamble(t).strip()
+    if not rest:
+        return True
+    return bool(_NARRATION_WHOLE_RE.match(rest))
+
+
 def _read_cfg(cfg: Any, *path: str, default: Any = None) -> Any:
     try:
         return cfg.get(*path, default=default)
@@ -142,6 +228,12 @@ def _routing_settings(cfg: Any) -> Dict[str, Any]:
         "local_profile": str(_read_cfg(cfg, "voice_edit", "local_profile",
                                        default="qubit-brain4") or
                              "qubit-brain4"),
+        # Rewriting is careful work, not speed work: the detail tier
+        # (usually a bigger local model) handles transforms when
+        # configured, the local tier otherwise. Chat answers keep the
+        # fast local tier.
+        "detail_model": str(_read_cfg(cfg, "voice_edit", "detail_model",
+                                      default="") or ""),
         "api_profile": str(_read_cfg(cfg, "voice_edit", "api_profile",
                                      default="") or ""),
         "allow_api": bool(_read_cfg(cfg, "voice_edit", "allow_api",
@@ -218,8 +310,8 @@ class TransformEngine:
 
         profile_id: Optional[str] = None
         fallback_note = ""
-        if mode == "local":
-            profile_id = settings["local_profile"]
+        if mode in ("local", "auto"):
+            profile_id = settings["detail_model"] or settings["local_profile"]
         elif mode == "api":
             if not settings["allow_api"]:
                 return TransformResult(
@@ -285,6 +377,77 @@ class TransformEngine:
                 prompt_version=rendered["prompt_version"],
                 injection_suspected=injection)
 
+        # Narration-only output: the model talked about rewriting instead of
+        # rewriting. In auto mode retry once on the configured API (recorded,
+        # never silent); otherwise fail loudly so narration is never
+        # returned as the rewrite.
+        if is_narration_only(out):
+            if (mode == "auto" and settings["allow_api"]
+                    and settings["api_profile"]):
+                fallback_note = ("local model returned narration only; "
+                                 "retried on configured API")
+                res = self._invoke(cfg, system=rendered["system"],
+                                   user=rendered["user"],
+                                   profile_id=settings["api_profile"],
+                                   timeout_s=settings["timeout_s"],
+                                   cancel=cancel)
+                elapsed_ms = int((time.monotonic() - started) * 1000)
+                details = getattr(res, "details", None) or {}
+                if isinstance(details, dict):
+                    locality = str(details.get("locality", "") or "")
+                if not getattr(res, "ok", False):
+                    return TransformResult(
+                        ok=False, code=str(getattr(res, "code", "MODEL_ERROR")
+                                           or "MODEL_ERROR"),
+                        detail=str(getattr(res, "message", "")
+                                   or "model refused")[:200],
+                        action=getattr(cmd, "action", ""),
+                        style=getattr(cmd, "style", ""),
+                        provider=str(getattr(res, "provider", "") or ""),
+                        model=str(getattr(res, "model", "") or ""),
+                        elapsed_ms=elapsed_ms, privacy_mode=mode,
+                        prompt_version=rendered["prompt_version"],
+                        injection_suspected=injection)
+                out = _strip_model_wrapper(
+                    str(getattr(res, "text", "") or ""))
+                if not out.strip() or is_narration_only(out):
+                    return TransformResult(
+                        ok=False, code="VOICE_EDIT_NARRATION_ONLY",
+                        detail="model returned narration instead of a "
+                               "rewrite, including on the API retry",
+                        action=getattr(cmd, "action", ""),
+                        style=getattr(cmd, "style", ""),
+                        provider=str(getattr(res, "provider", "") or ""),
+                        model=str(getattr(res, "model", "") or ""),
+                        elapsed_ms=elapsed_ms, privacy_mode=mode,
+                        prompt_version=rendered["prompt_version"],
+                        injection_suspected=injection)
+            else:
+                return TransformResult(
+                    ok=False, code="VOICE_EDIT_NARRATION_ONLY",
+                    detail="model returned narration instead of a rewrite; "
+                           "nothing was fabricated",
+                    action=getattr(cmd, "action", ""),
+                    style=getattr(cmd, "style", ""),
+                    provider=str(getattr(res, "provider", "") or ""),
+                    model=str(getattr(res, "model", "") or ""),
+                    elapsed_ms=elapsed_ms, privacy_mode=mode,
+                    prompt_version=rendered["prompt_version"],
+                    injection_suspected=injection)
+
+        # A narration preamble with the rewrite after it: keep the rewrite.
+        out = strip_narration_preamble(out)
+        if not out.strip():
+            return TransformResult(
+                ok=False, code="VOICE_EDIT_EMPTY_RESULT",
+                detail="model returned no text; nothing was fabricated",
+                action=getattr(cmd, "action", ""), model=str(
+                    getattr(res, "model", "") or ""),
+                provider=str(getattr(res, "provider", "") or ""),
+                elapsed_ms=elapsed_ms, privacy_mode=mode,
+                prompt_version=rendered["prompt_version"],
+                injection_suspected=injection)
+
         dropped: List[str] = []
         if getattr(cmd, "preserve_facts", True) and \
                 getattr(cmd, "action", "") != "translate":
@@ -304,4 +467,5 @@ class TransformEngine:
             detail=fallback_note)
 
 
-__all__ = ["TransformEngine", "digest_text", "MAX_INPUT_CHARS"]
+__all__ = ["TransformEngine", "digest_text", "MAX_INPUT_CHARS",
+           "strip_narration_preamble", "is_narration_only"]

@@ -180,6 +180,13 @@ def _run(helper, *, hold=True):
         helper.on_hotkey("ptt_end")
 
 
+def _join_wake_turn(h, timeout=10):
+    """on_wake_command processes async (P0-2 worker thread): wait for it."""
+    th = getattr(h, "_wake_thread", None)
+    if th is not None:
+        th.join(timeout=timeout)
+
+
 def test_helper_disabled_refuses(monkeypatch):
     h, overlay, client, desktop = _helper(monkeypatch)
     h.cfg = FakeCfg({"voice_edit": {"enabled": False}})
@@ -199,6 +206,7 @@ def test_helper_selection_flow_shows_preview(monkeypatch):
 def test_wake_command_runs_the_same_session_and_transform(monkeypatch):
     h, overlay, client, desktop = _helper(monkeypatch)
     h.on_wake_command("type this for me: hello world")
+    _join_wake_turn(h)
     assert ("begin",) in client.calls
     assert ("capture", "req-1") in client.calls
     assert ("transform", "req-1", "type this for me: hello world") in client.calls
@@ -207,6 +215,7 @@ def test_wake_command_runs_the_same_session_and_transform(monkeypatch):
                                               mode="dictate",
                                               final="")
     h2.on_wake_command("hello world")
+    _join_wake_turn(h2)
     assert desktop2.inserted == ["hello world"]
 
 
@@ -426,3 +435,159 @@ def test_start_heartbeat_reports_stt_warm(monkeypatch):
     finally:
         h.shutdown()
 
+
+
+def test_wake_command_shows_heard_text_preview(monkeypatch):
+    # Wake had no live transcript surface: Right-Ctrl streams interim
+    # partials into the status line, but a wake turn jumped straight to
+    # the answer. The heard words must appear the moment they arrive.
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h.on_wake_command("Hey Qubit, what is the weather?")
+    _join_wake_turn(h)
+    heard = [d for s, d in overlay.statuses if "Hey Qubit" in d]
+    assert heard, overlay.statuses
+    assert "weather" in heard[0]
+    # Default (verbatim off): routing receives the transcript as heard.
+    assert ("transform", "req-1",
+            "Hey Qubit, what is the weather?") in client.calls
+
+
+def test_wake_command_preview_honours_verbatim(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h.cfg = FakeCfg({"voice_edit": {"enabled": True,
+                                    "verbatim_transcript": True}})
+    h.on_wake_command("Hey Qubit, what is the weather?")
+    _join_wake_turn(h)
+    heard = [d for s, d in overlay.statuses if "hey qubit" in d]
+    assert heard, overlay.statuses
+    assert ("transform", "req-1",
+            "hey qubit what is the weather") in client.calls
+
+
+def test_verbatim_transcript_normalization():
+    # Chrome-style: exactly what was heard — lowercase, no punctuation,
+    # words and numbers kept, diacritics preserved.
+    assert dh.verbatim_transcript("Hey Qubit, Type THIS: Hello, World!",
+                                  True) == "hey qubit type this hello world"
+    assert dh.verbatim_transcript("1 plus 1 equals 2.", True) == \
+        "1 plus 1 equals 2"
+    assert dh.verbatim_transcript("don't stop", True) == "don't stop"
+    assert dh.verbatim_transcript("București, vreme?", True) == \
+        "bucurești vreme"
+    assert dh.verbatim_transcript("", True) == ""
+    # Disabled (the product default) -> input untouched.
+    assert dh.verbatim_transcript("Hey Qubit!") == "Hey Qubit!"
+    assert dh.verbatim_transcript("Hey Qubit!", False) == "Hey Qubit!"
+
+
+def test_verbatim_setting_round_trips(tmp_path):
+    from voicebridge.voice_edit import settings as settings_mod
+    p = tmp_path / "voice.yaml"
+    p.write_text("voice_edit:\n  enabled: true\n")
+
+    class Cfg:
+        def __init__(self):
+            self.data = {"voice_edit": {"enabled": True}}
+            self.path = p
+
+        def get(self, *path, default=None):
+            node = self.data
+            for seg in path:
+                if isinstance(node, dict) and seg in node:
+                    node = node[seg]
+                else:
+                    return default
+            return node
+
+    cfg = Cfg()
+    assert settings_mod.settings_view(cfg)["verbatim_transcript"] is False
+    settings_mod.update_voice_edit(cfg, {"verbatim_transcript": True})
+    assert settings_mod.settings_view(cfg)["verbatim_transcript"] is True
+
+
+def test_propose_task_arms_wake_for_yes(monkeypatch):
+    # Staging "say yes" is useless if the mic isn't waiting: the arm
+    # window from the original wake expired during brain latency.
+    h, overlay, client, desktop = _helper(monkeypatch)
+    armed = []
+    h._wake = type("W", (), {"expect_reply": lambda self, **kw: armed.append(kw)})()
+    h._propose_task({"task_text": "open a text document", "summary": "s"})
+    assert armed, "wake must be re-armed when asking for confirmation"
+    assert any("yes" in d.lower() for _, d in overlay.statuses), overlay.statuses
+
+
+def test_clarify_arms_wake_for_answer(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch, mode="clarify")
+    armed = []
+    h._wake = type("W", (), {"expect_reply": lambda self, **kw: armed.append(kw)})()
+    h._process_transcript("make this")
+    assert armed, "a clarify question must also wait for the answer"
+
+
+def test_affirmative_variants():
+    assert DesktopHelper_affirmative("yup")
+    assert DesktopHelper_affirmative("nah") is False
+
+
+def DesktopHelper_affirmative(text):
+    import voicebridge.desktop_helper as _dh
+    return _dh.DesktopHelper._affirmative(text)
+
+
+def test_answer_failure_resets_state_to_idle(monkeypatch):
+    # P0-1: a failed ask left the helper in PROCESSING forever — wake
+    # busy_skips forever and Right-Ctrl refuses. Both voice paths bricked
+    # until helper restart.
+    from voicebridge.desktop_helper import HelperError
+    h, overlay, client, desktop = _helper(monkeypatch)
+    def _boom(text, request_id):
+        raise HelperError("VOICE_EDIT_ASK_FAILED", "brain down")
+    client.ask_result = _boom
+    h.state = h.PROCESSING
+    h._answer_question("will this work", mode="answer")
+    assert h.state == h.IDLE, h.state
+    assert overlay.errors, "the failure must still surface"
+
+
+def test_pending_task_expires(monkeypatch):
+    # P0-3: a staged confirm lived forever — "yes" hours later in an
+    # unrelated context would execute a stale destructive-tier task.
+    import time as _t
+    h, overlay, client, desktop = _helper(monkeypatch)
+    ran = []
+    client.task = lambda text, **kw: ran.append(text) or {"ok": True}
+    h._pending_task = {"text": "delete everything", "request_id": "old",
+                       "staged_at": _t.monotonic() - 9999.0}
+    h._process_transcript("yes")
+    assert ran == [], "a stale confirmation must never execute"
+    assert h._pending_task == {}, "expiry must clear the stage"
+
+
+def test_wake_turn_runs_off_monitor_thread(monkeypatch):
+    # P0-2: the whole wake turn (HTTP + model + blocking TTS + agent)
+    # ran inside WakeMonitor._loop's thread — the detector was blind for
+    # the entire turn, exactly when §71 asks the user to answer.
+    import time as _t
+    import threading as _th
+    h, overlay, client, desktop = _helper(monkeypatch, mode="answer")
+    def _asked(text, rid):
+        client.calls.append(("ask_result", text))
+        return {"answer": "done", "spoken": True}
+    client.ask_result = _asked
+    t0 = _t.monotonic()
+    h.on_wake_command("hey qubit what time is it")
+    dt = _t.monotonic() - t0
+    assert dt < 2.0, f"on_wake_command blocked {dt:.1f}s on the caller thread"
+    for th in list(_th.enumerate()):
+        if th.name == "voice-wake-turn":
+            th.join(timeout=10)
+    assert any(c[0] == "ask_result" for c in client.calls), client.calls
+
+
+def test_yes_with_comma_confirms():
+    # P1-5: whisper emits "Yes, please." — inner comma missed the exact
+    # set and the staged task was silently discarded as a new command.
+    import voicebridge.desktop_helper as _dh
+    assert _dh.DesktopHelper._affirmative("Yes, please.")
+    assert _dh.DesktopHelper._affirmative("No, thanks.") is False
+    assert _dh.DesktopHelper._negative("No, thanks.")
