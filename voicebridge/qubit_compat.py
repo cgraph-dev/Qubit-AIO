@@ -16584,7 +16584,10 @@ def dispatch(cfg: Any, method: str, path: str,
 #
 # The five page-builder lanes shipped 13 Qubit pages + five per-family client
 # modules (ocFamilyAgentsApi, ocFamilySessionsApi, ocFamilyBoardApi,
-# ocFamilyTalkApi, ocFamilyAdminApi) with top-of-file ROUTES manifests. This
+# ocFamilyTalkApi, ocFamilyAdminApi) with top-of-file ROUTES manifests, and
+# the second wave added 5 more pages + four more manifests (ocFamilyCanvasApi,
+# ocFamilyTasksApi, ocFamilyFlowsApi, ocFamilyMemoryApi; ocFamilyWebchatApi is
+# reuse-only with no bridge rows). This
 # section is the single wiring owner: a GENERIC bridge that serves every
 # manifest path verbatim and delegates each call to the already-registered
 # gateway registry method behind it
@@ -16906,6 +16909,177 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
      "gateway": "users.unlinkAuthProfile", "kind": "mutation"},
     {"family": "users", "action": "auth-connect-catalog", "methods": ["GET"],
      "gateway": "users.authConnect.catalog", "kind": "read"},
+    # -- canvas (ocFamilyCanvasApi; 9 rows verbatim) --
+    # No canvas file host or node-presentation backend is registered: every
+    # row answers an honest typed gate (never invented behavior). Reads are
+    # kind=read, the six POST rows kind=mutation (confirm-gated shape — the
+    # gate answers 403 before any confirm is staged). Follow-up for a
+    # builder lane: a confined static host for GET /__qubit__/canvas/*
+    # reusing the plugin-asset precedent (resolve_plugin_asset); until then
+    # the preview frame stays a pure URL-string builder client-side.
+    {"family": "canvas", "action": "list", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "CANVAS_HOST_UNWIRED",
+              "detail": "no canvas file host is registered; nothing is "
+                        "listed",
+              "counterpart": "none yet — follow-up: confined static host "
+                             "GET /__qubit__/canvas/* reusing the "
+                             "plugin-asset precedent (resolve_plugin_asset)"}},
+    {"family": "canvas", "action": "get", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "CANVAS_HOST_UNWIRED",
+              "detail": "no canvas file host is registered; nothing is read",
+              "counterpart": "none yet — follow-up: confined static host "
+                             "GET /__qubit__/canvas/* reusing the "
+                             "plugin-asset precedent (resolve_plugin_asset)"}},
+    {"family": "canvas", "action": "live", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "CANVAS_HOST_UNWIRED",
+              "detail": "no canvas file host is registered; no live-reload "
+                        "state is reported",
+              "counterpart": "none yet — follow-up: confined static host "
+                             "GET /__qubit__/canvas/* reusing the "
+                             "plugin-asset precedent (resolve_plugin_asset)"}},
+    {"family": "canvas", "action": "add", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "CANVAS_HOST_UNWIRED",
+              "detail": "no canvas file host is registered; nothing is "
+                        "written",
+              "counterpart": "none yet — follow-up: brokered path-confined "
+                             "write behind this bridge row"}},
+    {"family": "canvas", "action": "remove", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "CANVAS_HOST_UNWIRED",
+              "detail": "no canvas file host is registered; nothing is "
+                        "removed",
+              "counterpart": "none yet — follow-up: brokered path-confined "
+                             "write behind this bridge row"}},
+    {"family": "canvas", "action": "present", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "CANVAS_PRESENT_UNWIRED",
+              "detail": "no node-presentation backend is registered; nothing "
+                        "is shown on any node",
+              "counterpart": "the node roster reads "
+                             "(GET /api/qubit/nodes/list, node.list) for "
+                             "identity; no presentation backend exists"}},
+    {"family": "canvas", "action": "hide", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "CANVAS_PRESENT_UNWIRED",
+              "detail": "no node-presentation backend is registered; nothing "
+                        "is hidden on any node",
+              "counterpart": "the node roster reads "
+                             "(GET /api/qubit/nodes/list, node.list) for "
+                             "identity; no presentation backend exists"}},
+    {"family": "canvas", "action": "navigate", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "CANVAS_PRESENT_UNWIRED",
+              "detail": "no node-presentation backend is registered; nothing "
+                        "is opened on any node",
+              "counterpart": "the node roster reads "
+                             "(GET /api/qubit/nodes/list, node.list) for "
+                             "identity; no presentation backend exists"}},
+    {"family": "canvas", "action": "snapshot", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "CANVAS_PRESENT_UNWIRED",
+              "detail": "no node-presentation backend is registered; no "
+                        "screenshot proof is captured",
+              "counterpart": "the node roster reads "
+                             "(GET /api/qubit/nodes/list, node.list) for "
+                             "identity; no presentation backend exists"}},
+    # -- tasks (ocFamilyTasksApi; 4 rows with paths verbatim) --
+    # Delegates to the already-registered tasks.* gateway methods, which run
+    # the shared ledger (task_ledger.list_tasks/show) and the live run
+    # primitives (actions.ActionStore.cancel/retry, chat_transport by
+    # session). `dismiss` has no path by design (REFUSED-NEVER-WIRED) and
+    # gets no bridge row — the page renders TASKS_DISMISS_REFUSAL verbatim.
+    {"family": "tasks", "action": "list", "methods": ["GET"],
+     "gateway": "tasks.list", "kind": "read"},
+    {"family": "tasks", "action": "get", "methods": ["GET"],
+     "gateway": "tasks.get", "kind": "read",
+     "aliases": {"lookup": "taskId"}},
+    {"family": "tasks", "action": "cancel", "methods": ["POST"],
+     "gateway": "tasks.cancel", "kind": "mutation"},
+    {"family": "tasks", "action": "retry", "methods": ["POST"],
+     "gateway": "tasks.retry", "kind": "mutation"},
+    # -- flows (ocFamilyFlowsApi; the 5 needs-bridge rows verbatim) --
+    # The 11 cron rows reuse the existing /api/cron/* routes (no bridge rows
+    # needed). `hooks` reads the real hook catalog (hooks.status); enable /
+    # disable / cancel / programs have no backend and answer honest gates
+    # whose counterparts name the real surface.
+    {"family": "flows", "action": "hooks", "methods": ["GET"],
+     "gateway": "hooks.status", "kind": "read"},
+    {"family": "flows", "action": "hook_enable", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "FLOWS_HOOKS_UNWIRED",
+              "detail": "no backend hooks route exists; no hook is enabled",
+              "counterpart": "GET /api/qubit/flows/hooks (hooks.status) "
+                             "for the catalog + cron-backed flows "
+                             "(GET /api/cron/jobs) for real scheduling"}},
+    {"family": "flows", "action": "hook_disable", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "FLOWS_HOOKS_UNWIRED",
+              "detail": "no backend hooks route exists; no hook is disabled",
+              "counterpart": "GET /api/qubit/flows/hooks (hooks.status) "
+                             "for the catalog + cron-backed flows "
+                             "(GET /api/cron/jobs) for real scheduling"}},
+    {"family": "flows", "action": "cancel", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "FLOWS_CANCEL_UNWIRED",
+              "detail": "no sticky taskflow-cancel backend exists; nothing "
+                        "is cancelled",
+              "counterpart": "DELETE /api/cron/jobs/{id} or POST "
+                             "/api/cron/jobs/{id}/pause (confirm-gated)"}},
+    {"family": "flows", "action": "programs", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "FLOWS_PROGRAMS_UNWIRED",
+              "detail": "no standing-order programs registry exists; the "
+                        "durable-flow list is the programs view",
+              "counterpart": "GET /api/cron/jobs (recurring schedules "
+                             "render as standing orders)"}},
+    # -- memory (ocFamilyMemoryApi; 5 rows verbatim) --
+    # Status-only reality: the live status is served today at the canonical
+    # GET /api/memory paths (qubit-local, the only provider); no writer is
+    # invented behind the /api/qubit/memory/* namespace, so every row answers
+    # the honest memory-provider gate. provider_set carries the verbatim
+    # MEMORY_LOCAL_ONLY refusal the canonical PUT emits for non-local names.
+    {"family": "memory", "action": "status", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "MEMORY_BRIDGE_UNWIRED",
+              "detail": "the /api/qubit/memory/* namespace has no backend; "
+                        "the live status is served at the canonical path",
+              "counterpart": "GET /api/memory (qubit-local, the only "
+                             "provider)"}},
+    {"family": "memory", "action": "provider", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "MEMORY_BRIDGE_UNWIRED",
+              "detail": "the /api/qubit/memory/* namespace has no backend; "
+                        "the live status is served at the canonical path",
+              "counterpart": "GET /api/memory (qubit-local, the only "
+                             "provider)"}},
+    {"family": "memory", "action": "provider-config", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "MEMORY_BRIDGE_UNWIRED",
+              "detail": "the /api/qubit/memory/* namespace has no backend; "
+                        "provider config is served at the canonical path",
+              "counterpart": "GET /api/memory/providers/<id>/config "
+                             "(qubit-local only)"}},
+    {"family": "memory", "action": "provider-set", "methods": ["POST"],
+     "gateway": None, "kind": "mutation",
+     "gate": {"code": "MEMORY_LOCAL_ONLY",
+              "detail": "qubit-local is the only memory provider; cloud "
+                        "sync is refused by policy",
+              "counterpart": "PUT /api/memory/provider (persists "
+                             "qubit-local only)"}},
+    {"family": "memory", "action": "probe", "methods": ["GET"],
+     "gateway": None, "kind": "read",
+     "gate": {"code": "MEMORY_BRIDGE_UNWIRED",
+              "detail": "the /api/qubit/memory/* namespace has no backend; "
+                        "the live probe is served at the canonical path",
+              "counterpart": "GET /api/memory/providers/qubit-local"}},
+    # -- webchat (ocFamilyWebchatApi; reuse-only — no bridge rows) --
+    # Every webchat capability reuses an existing chat endpoint (sessions
+    # list/create/history, POST /api/qubit/chat + /stream); NEEDS_BRIDGE is
+    # empty by design, so no allowlist rows are added here.
 ]
 
 _NAME_LIKE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -17050,8 +17224,8 @@ def _qubit_family_dispatch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 404, {"ok": False, "code": "FAMILY_UNKNOWN_ACTION",
                      "detail": f"no Qubit family route for {http_method} "
                                f"/api/qubit/{family}/{rest}",
-                     "qubit_counterpart": "the five family manifests "
-                                          "(ocFamily*Api ROUTES)"}
+                      "qubit_counterpart": "the ten family manifests "
+                                           "(ocFamily*Api ROUTES)"}
     kind = str(entry.get("kind", "read") or "read")
     if entry.get("gateway") is None:
         gate = entry.get("gate") or {}

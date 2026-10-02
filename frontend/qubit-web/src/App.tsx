@@ -114,6 +114,14 @@ const SchedulerMediaPage = lazy(() => import("@/pages/SchedulerMediaPage"));
 const SkillsReviewPage = lazy(() => import("@/pages/SkillsReviewPage"));
 const McpCallsPage = lazy(() => import("@/pages/McpCallsPage"));
 const UsersAdminPage = lazy(() => import("@/pages/UsersAdminPage"));
+// Qubit family pages, second wave (integrator lane): separate Qubit surfaces
+// wired to the gateway backends through GET/POST /api/qubit/<family>/<action>
+// (webchat reuses the existing chat endpoints, no bridge rows).
+const CanvasPage = lazy(() => import("@/pages/CanvasPage"));
+const TaskflowsPage = lazy(() => import("@/pages/TaskflowsPage"));
+const TasksPage = lazy(() => import("@/pages/TasksPage"));
+const MemoryBackendsPage = lazy(() => import("@/pages/MemoryBackendsPage"));
+const WebChatPage = lazy(() => import("@/pages/WebChatPage"));
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useI18n } from "@/i18n";
@@ -224,6 +232,11 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/admin/skills-review": SkillsReviewPage,
   "/admin/mcp-calls": McpCallsPage,
   "/admin/users": UsersAdminPage,
+  "/canvas": CanvasPage,
+  "/qubit-taskflows": TaskflowsPage,
+  "/qubit-tasks": TasksPage,
+  "/qubit-memory": MemoryBackendsPage,
+  "/webchat": WebChatPage,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
@@ -287,6 +300,11 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/admin/skills-review", label: "Skills Review", icon: Package },
   { path: "/admin/mcp-calls", label: "MCP Calls", icon: Plug },
   { path: "/admin/users", label: "Users", icon: Users },
+  { path: "/canvas", label: "Qubit Canvas", icon: Eye },
+  { path: "/qubit-taskflows", label: "Qubit Taskflows", icon: Zap },
+  { path: "/qubit-tasks", label: "Qubit Tasks", icon: FileText },
+  { path: "/qubit-memory", label: "Qubit Memory Backends", icon: Database },
+  { path: "/webchat", label: "Qubit WebChat", icon: MessageSquare },
 ];
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {

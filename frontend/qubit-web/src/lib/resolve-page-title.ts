@@ -63,6 +63,11 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/admin/skills-review": "Skills Review Queue",
   "/admin/mcp-calls": "Gateway MCP Calls",
   "/admin/users": "Operator & Credentials",
+  "/canvas": "Qubit Canvas",
+  "/qubit-taskflows": "Qubit Taskflows",
+  "/qubit-tasks": "Qubit Tasks",
+  "/qubit-memory": "Qubit Memory Backends",
+  "/webchat": "Qubit WebChat",
 };
 
 export function resolvePageTitle(

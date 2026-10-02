@@ -77,4 +77,12 @@ describe("resolvePageTitle", () => {
     expect(resolvePageTitle("/admin/mcp-calls", t, [])).toBe("Gateway MCP Calls");
     expect(resolvePageTitle("/admin/users", t, [])).toBe("Operator & Credentials");
   });
+
+  it("resolves the second-wave family pages to proper Qubit product titles", () => {
+    expect(resolvePageTitle("/canvas", t, [])).toBe("Qubit Canvas");
+    expect(resolvePageTitle("/qubit-taskflows", t, [])).toBe("Qubit Taskflows");
+    expect(resolvePageTitle("/qubit-tasks", t, [])).toBe("Qubit Tasks");
+    expect(resolvePageTitle("/qubit-memory", t, [])).toBe("Qubit Memory Backends");
+    expect(resolvePageTitle("/webchat", t, [])).toBe("Qubit WebChat");
+  });
 });
