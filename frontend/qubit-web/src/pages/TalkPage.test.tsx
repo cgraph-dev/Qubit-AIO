@@ -202,6 +202,24 @@ describe("TalkPage", () => {
     expect(text()).toContain("talk.client.steer settled");
   });
 
+  it("mirrors the upstream talk layout: status strip plus Talk options panel", async () => {
+    renderPage();
+    await flush();
+    const status = container!.querySelector('[aria-label="Talk status"]');
+    expect(status, "talk status strip").not.toBeNull();
+    expect(status!.textContent).toContain("Mode local-stt-tts");
+    const options = container!.querySelector('[aria-label="Talk options"]');
+    expect(options, "talk options panel").not.toBeNull();
+    expect(options!.textContent).toContain("Voice");
+    expect(options!.textContent).toContain("speech-out-default");
+    expect(options!.textContent).toContain("Model");
+    expect(options!.textContent).toContain("Advanced");
+    // The Advanced disclosure reports the resolved speech config read-only.
+    expect(options!.textContent).toContain("Speech-in");
+    expect(options!.textContent).toContain("Speech-out");
+    expect(options!.textContent).toContain("Audio");
+  });
+
   it("never fetches a voice-edit path", async () => {
     renderPage();
     await flush();

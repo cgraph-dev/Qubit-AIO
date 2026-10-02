@@ -209,6 +209,16 @@ describe("SchedulerMediaPage", () => {
     expect(refused.length).toBeGreaterThanOrEqual(12);
   });
 
+  it("mirrors the upstream scheduler layout: summary strip on top", async () => {
+    renderPage();
+    await flush();
+    const summary = container!.querySelector('[aria-label="Scheduler summary"]');
+    expect(summary, "scheduler summary strip").not.toBeNull();
+    expect(summary!.textContent).toContain("Schedule");
+    expect(summary!.textContent).toContain("Speech");
+    expect(summary!.textContent).toContain("Power");
+  });
+
   it("never fetches a voice-edit path", async () => {
     renderPage();
     await flush();

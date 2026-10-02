@@ -1,7 +1,14 @@
 /**
  * Talk console (route /qubit-talk).
  *
- * The local speech path the main voice surfaces intentionally do not cover:
+ * Layout mirrors the upstream talk UI (`ui/src/ui/views/chat.ts`
+ * realtime-talk block + `ui/src/ui/chat/realtime-talk.ts` session
+ * lifecycle), rebranded to the Qubit voice: a live talk-status strip on
+ * top, then the Talk options panel (Voice / Model primary row plus an
+ * Advanced disclosure over the resolved speech config), then the client
+ * writes, the read-only wake status, and the disabled-with-reason rows.
+ *
+ * Behavior is unchanged from the Qubit backend contract below:
  * the talk mode read (`talk.mode`), the speech-profile catalog + resolved
  * config (`talk.catalog` / `talk.config`), the client steer / transcript /
  * tool-call writes through the canonical session + broker (confirm-gated),
@@ -186,13 +193,45 @@ export default function TalkPage() {
 
   const profiles = Array.isArray(catalog?.profiles) ? catalog.profiles : [];
 
+  const wakeEngine =
+    typeof wake?.engine === "string" && wake.engine ? wake.engine : null;
+
+  const statusText =
+    modeState === "loading" || wakeState === "loading"
+      ? "Connecting…"
+      : modeState === "error"
+        ? (modeError ?? "Talk mode failed to load")
+        : wakeState === "error"
+          ? (wakeError ?? "Wake status failed to load")
+          : [
+              asText(mode?.effectiveMode) ? `Mode ${asText(mode?.effectiveMode)}` : null,
+              wakeEngine ? `wake ${wakeEngine}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Talk console ready";
+
+  const statusIsError = modeState === "error" || wakeState === "error";
+
+  const speechOut =
+    config?.speech_out && typeof config.speech_out === "object"
+      ? (config.speech_out as Record<string, unknown>)
+      : null;
+  const speechIn =
+    config?.speech_in && typeof config.speech_in === "object"
+      ? (config.speech_in as Record<string, unknown>)
+      : null;
+  const audioStatus =
+    config?.audio && typeof config.audio === "object"
+      ? (config.audio as Record<string, unknown>)
+      : null;
+
   return (
     <div className={cn("flex min-h-0 w-full min-w-0 flex-1 flex-col gap-3 pt-1 sm:pt-2")}>
       <div className="flex items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-medium tracking-[0.08em]">Talk console</h2>
           <p className="text-xs text-text-tertiary">
-            Local speech mode, profile catalog, and client writes through the canonical session.
+            Voice and speech settings, profile catalog, and client writes through the canonical session.
           </p>
         </div>
         <Button
@@ -219,6 +258,28 @@ export default function TalkPage() {
           {error}
         </p>
       ) : null}
+
+      {/* ── talk status strip (live, read-only; mirrors upstream talk-status) ── */}
+      <section
+        aria-label="Talk status"
+        className="border border-border bg-background-base/60 px-3 py-2"
+      >
+        <p
+          role={statusIsError ? "alert" : "status"}
+          className={cn(
+            "text-xs",
+            statusIsError ? "text-destructive" : "text-text-secondary",
+          )}
+        >
+          {modeState === "loading" || wakeState === "loading" ? (
+            <span className="flex items-center gap-2">
+              <Spinner className="shrink-0" /> {statusText}
+            </span>
+          ) : (
+            statusText
+          )}
+        </p>
+      </section>
 
       {/* ── talk.mode (read-only) ── */}
       <section
@@ -266,6 +327,63 @@ export default function TalkPage() {
         {asText(mode?.detail) ? (
           <p className="mt-1 text-[0.6875rem] text-text-tertiary">{asText(mode?.detail)}</p>
         ) : null}
+      </section>
+
+      {/* ── Talk options (read-only; mirrors upstream talk-options panel) ── */}
+      <section
+        aria-label="Talk options"
+        className="border border-border bg-background-base/60 px-3 py-2"
+      >
+        <h3 className="text-xs font-medium text-text-secondary">Talk options</h3>
+        <div className="mt-1 grid grid-cols-1 gap-1 text-xs text-text-secondary sm:grid-cols-3">
+          <div>
+            <dt className="text-text-tertiary">Voice</dt>
+            <dd className="font-mono">
+              {profiles.length === 0
+                ? "—"
+                : profiles
+                    .map((p, i) => asText(p.id) || `profile ${i}`)
+                    .join(", ")}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-text-tertiary">Model</dt>
+            <dd className="font-mono">{asText(mode?.effectiveMode) || "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-text-tertiary">Wake engine (read-only)</dt>
+            <dd className="font-mono">{wakeEngine ?? "—"}</dd>
+          </div>
+        </div>
+        <details className="mt-1">
+          <summary className="cursor-pointer text-xs text-text-secondary">Advanced</summary>
+          <div className="mt-1 grid grid-cols-1 gap-1 text-xs text-text-secondary sm:grid-cols-3">
+            <div>
+              <dt className="text-text-tertiary">Speech-in</dt>
+              <dd className="font-mono">
+                {speechIn
+                  ? Object.keys(speechIn).slice(0, 4).join(", ") || "resolved"
+                  : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-text-tertiary">Speech-out</dt>
+              <dd className="font-mono">
+                {speechOut
+                  ? Object.keys(speechOut).slice(0, 4).join(", ") || "resolved"
+                  : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-text-tertiary">Audio</dt>
+              <dd className="font-mono">
+                {audioStatus
+                  ? Object.keys(audioStatus).slice(0, 4).join(", ") || "resolved"
+                  : "—"}
+              </dd>
+            </div>
+          </div>
+        </details>
       </section>
 
       {/* ── talk.catalog + talk.config (read-only) ── */}

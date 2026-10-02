@@ -1,12 +1,18 @@
 /**
  * Scheduler + media console (route /qubit-scheduler).
  *
- * The scheduling/speech/power/task-control surface the main product pages
- * intentionally do not cover: the enabled-only schedule toggle
- * (`cron.update`), the TTS provider/enable/disable/persona writes through the
- * canonical speech profiles (confirm-gated), the power-state reads
- * (`gateway.suspend.prepare` / `gateway.suspend.resume`), and task
- * cancel/retry by receipt or session (confirm-gated).
+ * Layout mirrors the upstream scheduler UI (`ui/src/ui/views/cron.ts`),
+ * rebranded to the Qubit voice: a summary strip on top (Schedule /
+ * Speech / Power + refresh), then the schedule workspace (the enabled-only
+ * toggle), the speech-profile form, the read-only power state, the task
+ * cancel/retry history lane, and the disabled-with-reason rows.
+ *
+ * Behavior is unchanged from the Qubit backend contract below:
+ * the enabled-only schedule toggle (`cron.update`), the TTS provider/
+ * enable/disable/persona writes through the canonical speech profiles
+ * (confirm-gated), the power-state reads (`gateway.suspend.prepare` /
+ * `gateway.suspend.resume`), and task cancel/retry by receipt or session
+ * (confirm-gated).
  *
  * Everything without a local counterpart — per-job scratch, the suspend
  * handoff, the portal proxy, suggestion registry, dismiss registries, and the
@@ -172,6 +178,43 @@ export default function SchedulerMediaPage() {
           {error}
         </p>
       ) : null}
+
+      {/* ── summary strip (live, read-only; mirrors upstream cron-summary-strip) ── */}
+      <section
+        aria-label="Scheduler summary"
+        className="border border-border bg-background-base/60 px-3 py-2"
+      >
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
+          <div>
+            <span className="text-text-tertiary">Schedule </span>
+            <span
+              className={cn(
+                "font-mono",
+                cronEnabled ? "text-text-secondary" : "text-destructive",
+              )}
+            >
+              {cronEnabled ? "Yes" : "No"}
+            </span>
+          </div>
+          <div>
+            <span className="text-text-tertiary">Speech </span>
+            <span className="font-mono text-text-secondary">{ttsProvider}</span>
+          </div>
+          <div>
+            <span className="text-text-tertiary">Power </span>
+            <span className="font-mono text-text-secondary">
+              {powerState === "loading"
+                ? "…"
+                : powerState === "error"
+                  ? "unavailable"
+                  : "reported"}
+            </span>
+          </div>
+          <span className="ml-auto text-text-tertiary">
+            {powerError ?? (notice ? "settled" : "")}
+          </span>
+        </div>
+      </section>
 
       {/* ── cron.update (enabled-only) ── */}
       <section
