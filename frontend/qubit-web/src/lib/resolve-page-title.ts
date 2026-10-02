@@ -46,6 +46,23 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/qubit-boards": "Qubit Boards",
   "/qubit-runtime": "Runtime Inventory",
   "/voice-edit": "Voice Editing",
+  // Family pages without an i18n nav key or plugin tab: the naive path
+  // fallback mangles them ("/agent-workspace" → "Agent-workspace",
+  // "/admin/skills-review" → "Admin/skills-review"). Titles match each
+  // page's own heading, Qubit-branded for the header.
+  "/agent-workspace": "Qubit Agent Workspace",
+  "/nodes": "Qubit Nodes",
+  "/devices": "Qubit Devices",
+  "/session-ops": "Qubit Session Ops",
+  "/worktrees": "Qubit Worktrees",
+  "/checkpoints": "Qubit Checkpoints",
+  "/qubit-board-admin": "Qubit Board Admin",
+  "/qubit-task-inbox": "Qubit Task Inbox",
+  "/qubit-talk": "Qubit Talk & Voice Routing",
+  "/qubit-scheduler": "Qubit Scheduler & Media",
+  "/admin/skills-review": "Skills Review Queue",
+  "/admin/mcp-calls": "Gateway MCP Calls",
+  "/admin/users": "Operator & Credentials",
 };
 
 export function resolvePageTitle(
