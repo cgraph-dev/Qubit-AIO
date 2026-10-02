@@ -204,44 +204,53 @@ def test_flows_hooks_read_executes(tmp_path, monkeypatch):
     assert "catalog" in out, out
 
 
-def test_flows_gated_rows_are_typed_gates(tmp_path, monkeypatch):
-    """hook_enable/hook_disable/cancel/programs answer honest typed gates."""
+def test_flows_hook_rows_live_except_cancel_gate(tmp_path, monkeypatch):
+    """hook_enable/hook_disable/programs are live (lane I1); only cancel gates.
+
+    Reconciled from the gate-pinning version: enable/disable flip the
+    schedules hooks-guard table and programs reads recurring schedules, so a
+    403 here would be a stale refusal. `cancel` has no sticky
+    taskflow-cancel backend and keeps its honest typed gate.
+    """
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    code, out = HC.dispatch(cfg, "POST", "/api/qubit/flows/hook_enable", {},
-                            {"name": "command-logger"})
-    assert code == 403, out
-    assert out.get("code") == "FLOWS_HOOKS_UNWIRED", out
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/flows/hook_enable",
+                               {}, {"name": "command-logger"})
+    assert code == 409, staged
+    assert staged.get("code") == "CONFIRM_REQUIRED", staged
     code, out = HC.dispatch(cfg, "POST", "/api/qubit/flows/cancel", {},
                             {"flow_id": "f1"})
     assert code == 403, out
     assert out.get("code") == "FLOWS_CANCEL_UNWIRED", out
     assert "cron" in str(out.get("qubit_counterpart", "")), out
     code, out = HC.dispatch(cfg, "GET", "/api/qubit/flows/programs", {}, {})
-    assert code == 403, out
-    assert out.get("code") == "FLOWS_PROGRAMS_UNWIRED", out
+    assert code == 200, out
+    assert "programs" in out.get("result", out), out
 
 
-def test_canvas_rows_are_typed_gates(tmp_path, monkeypatch):
-    """All 9 canvas rows gate honestly (no file host invented).
+def test_canvas_rows_are_live_mappings(tmp_path, monkeypatch):
+    """All 9 canvas rows are live on the confined host (lane I1).
 
-    Mutations gate before any confirm is staged (403, not 409).
+    Reconciled from the gate-pinning version: reads execute, mutations stage
+    409 before any confirm is staged (never 403).
     """
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     code, out = HC.dispatch(cfg, "GET", "/api/qubit/canvas/list", {}, {})
-    assert code == 403, out
-    assert out.get("code") == "CANVAS_HOST_UNWIRED", out
-    code, out = HC.dispatch(cfg, "POST", "/api/qubit/canvas/add", {},
-                            {"path": "probe.md", "content": "probe"})
-    assert code == 403, out
-    assert out.get("code") == "CANVAS_HOST_UNWIRED", out
-    code, out = HC.dispatch(cfg, "POST", "/api/qubit/canvas/present", {},
-                            {"node_id": "n1", "entry": "/__qubit__/canvas/a"})
-    assert code == 403, out
-    assert out.get("code") == "CANVAS_PRESENT_UNWIRED", out
+    assert code == 200, out
+    assert "files" in out.get("result", out), out
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/canvas/add", {},
+                               {"path": "probe.md", "content": "probe"})
+    assert code == 409, staged
+    assert staged.get("code") == "CONFIRM_REQUIRED", staged
+    assert staged.get("confirmation_id"), staged
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/canvas/present", {},
+                               {"node_id": "n1",
+                                "entry": "/__qubit__/canvas/a"})
+    assert code == 409, staged
+    assert staged.get("code") == "CONFIRM_REQUIRED", staged
 
 
 def test_memory_rows_are_typed_gates(tmp_path, monkeypatch):
@@ -270,3 +279,169 @@ def test_webchat_has_no_bridge_rows(tmp_path, monkeypatch):
     code, out = HC.dispatch(cfg, "GET", "/api/qubit/chat/sessions",
                             {"limit": "1", "offset": "0"}, {})
     assert code == 200, out
+
+
+# -- lane I1 (canvas confined host + flows hooks backend) --------------------
+# The 9 canvas rows and 3 flows rows are live mappings now (only flows/cancel
+# keeps its honest gate — no sticky taskflow-cancel backend exists). The two
+# gate-pinning tests above were reconciled to the live contract in place.
+
+
+def test_canvas_list_and_live_read_live(tmp_path, monkeypatch):
+    """GET canvas/list + live serve the confined host root state."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/canvas/list", {}, {})
+    assert code == 200, out
+    inner = out.get("result", out)
+    assert inner.get("root") == "state-home canvas/", out
+    assert "files" in inner, out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/canvas/live", {}, {})
+    assert code == 200, out
+    assert out.get("result", out).get("live_reload") is False, out
+
+
+def test_canvas_add_staged_then_executes_and_get_roundtrip(tmp_path,
+                                                           monkeypatch):
+    """POST canvas/add stages 409, then executes; GET returns exact bytes."""
+    import base64 as _b64
+
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    body = {"path": "bridge-probe.md", "content": "bridge probe bytes"}
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/canvas/add", {},
+                               dict(body))
+    assert code == 409, staged
+    assert staged.get("code") == "CONFIRM_REQUIRED", staged
+    assert staged.get("confirmation_id"), staged
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/canvas/add", {},
+                            {**body, "confirm": True})
+    assert code == 200, out
+    inner = out.get("result", out)
+    assert inner.get("state") == "OK", out
+    assert inner.get("size") == len("bridge probe bytes"), out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/canvas/get",
+                            {"path": "bridge-probe.md"}, {})
+    assert code == 200, out
+    inner = out.get("result", out)
+    assert _b64.b64decode(inner["data_base64"]).decode("utf-8") == \
+        "bridge probe bytes", out
+    assert inner["sha256"] == out.get("result", out).get("sha256"), out
+
+
+def test_canvas_remove_staged_then_executes(tmp_path, monkeypatch):
+    """POST canvas/remove stages 409, then removes exactly once."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/canvas/add", {},
+                            {"path": "bridge-gone.md", "content": "x",
+                             "confirm": True})
+    assert code == 200, out
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/canvas/remove",
+                               {}, {"path": "bridge-gone.md"})
+    assert code == 409, staged
+    assert staged.get("confirmation_id"), staged
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/canvas/remove", {},
+                            {"path": "bridge-gone.md", "confirm": True})
+    assert code == 200, out
+    assert out.get("result", out).get("removed") == "bridge-gone.md", out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/canvas/get",
+                            {"path": "bridge-gone.md"}, {})
+    assert code == 404, out
+
+
+def test_canvas_present_hide_navigate_snapshot_staged_then_execute(
+        tmp_path, monkeypatch):
+    """The four presentation rows stage 409, then resolve on confined ops."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/canvas/add", {},
+                            {"path": "deck.md", "content": "# deck",
+                             "confirm": True})
+    assert code == 200, out
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/canvas/present",
+                               {}, {"node_id": "n1",
+                                    "entry": "/__qubit__/canvas/deck.md"})
+    assert code == 409, staged
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/canvas/present", {},
+                            {"node_id": "n1",
+                             "entry": "/__qubit__/canvas/deck.md",
+                             "confirm": True})
+    assert code == 200, out
+    assert out.get("result", out).get("preview_url", "").endswith(
+        "/__qubit__/canvas/deck.md"), out
+    for action, payload in (
+            ("hide", {"node_id": "n1"}),
+            ("navigate", {"node_id": "n1",
+                          "entry": "/__qubit__/canvas/deck.md"}),
+            ("snapshot", {"node_id": "n1"})):
+        code, staged = HC.dispatch(cfg, "POST",
+                                   f"/api/qubit/canvas/{action}", {},
+                                   dict(payload))
+        assert code == 409, (action, staged)
+        code, out = HC.dispatch(cfg, "POST",
+                                f"/api/qubit/canvas/{action}", {},
+                                {**payload, "confirm": True})
+        assert code == 200, (action, out)
+    snap = out.get("result", out)
+    assert snap.get("count") == 1 and "no screenshot" in snap.get(
+        "proof", ""), snap
+
+
+def test_flows_hooks_list_shows_five_bundled(tmp_path, monkeypatch):
+    """GET flows/hooks serves the 5 bundled hooks with guard state."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/flows/hooks", {}, {})
+    assert code == 200, out
+    inner = out.get("result", out)
+    assert [h["name"] for h in inner["hooks"]] == [
+        "session-memory", "bootstrap-extra-files", "command-logger",
+        "compaction-notifier", "boot-md"], out
+    assert "catalog" in inner, out
+
+
+def test_flows_hook_enable_disable_roundtrip_net_zero(tmp_path, monkeypatch):
+    """hook_enable stages then flips on; hook_disable flips back (net-zero)."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/flows/hook_enable",
+                               {}, {"name": "command-logger"})
+    assert code == 409, staged
+    assert staged.get("confirmation_id"), staged
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/flows/hook_enable",
+                            {}, {"name": "command-logger", "confirm": True})
+    assert code == 200, out
+    assert out.get("result", out)["hook"]["enabled"] is True, out
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/flows/hook_disable",
+                            {}, {"name": "command-logger", "confirm": True})
+    assert code == 200, out
+    assert out.get("result", out)["hook"]["enabled"] is False, out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/flows/hooks", {}, {})
+    assert all(h["enabled"] is False
+               for h in out.get("result", out)["hooks"]), out
+
+
+def test_flows_programs_read_live(tmp_path, monkeypatch):
+    """GET flows/programs serves the stored program list (recurring only)."""
+    from voicebridge import qubit_compat as HC
+    from voicebridge import schedules as S
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    S.create_job(cfg, "bridge-standing", "echo hi", "every 60 minutes",
+                 confirmed=True)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/flows/programs", {}, {})
+    assert code == 200, out
+    inner = out.get("result", out)
+    assert "bridge-standing" in [p["name"] for p in inner["programs"]], out
+    assert all(p["kind"] == "standing-order"
+               for p in inner["programs"]), out
+
+
+# (flows/cancel gate covered by test_flows_hook_rows_live_except_cancel_gate)

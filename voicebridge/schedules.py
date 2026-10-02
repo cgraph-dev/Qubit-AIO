@@ -1912,3 +1912,208 @@ def _automation_tick(cfg: Any, *, now: Optional[float],
         return {"state": "FAILED", "code": RUNTIME_CODE,
                 "detail": redact_spec(str(exc))[:300],
                 "heartbeats": 0, "processed": 0, "results": []}
+
+
+# ------------------------------------------------- flows hooks (named guards)
+# The taskflows page renders five bundled hooks (ported verbatim from the
+# upstream bundled-hooks table, ``docs/automation/hooks.md`` — the same table
+# the ``ocFamilyFlowsApi`` client cites) with enable/disable controls. A hook
+# here is a named schedule-guard: a stored enabled flip in this same
+# ``schedules.db`` store (``hooks`` table — no new DB, no new store), not an
+# execution subscription (shell hooks stay disarmed in ``voicebridge/hooks.py``,
+# which this region never executes). ``programs`` is the stored program list:
+# recurring jobs (interval/daily/cron) rendered as standing orders, read from
+# the same jobs table. One-shot ``once`` jobs never render as programs.
+
+#: The five bundled flow hooks (metadata only; the flip is stored per name).
+BUNDLED_FLOW_HOOKS = (
+    {"name": "session-memory",
+     "description": "Saves session context to <workspace>/memory/",
+     "events": ("command:new", "command:reset")},
+    {"name": "bootstrap-extra-files",
+     "description": "Injects additional bootstrap files from glob patterns",
+     "events": ("agent:bootstrap",)},
+    {"name": "command-logger",
+     "description": "Logs all commands to the commands log",
+     "events": ("command",)},
+    {"name": "compaction-notifier",
+     "description": "Sends visible chat notices when session compaction "
+                    "starts/ends",
+     "events": ("session:compact:before", "session:compact:after")},
+    {"name": "boot-md",
+     "description": "Runs BOOT.md from the active workspace when the "
+                    "gateway starts",
+     "events": ("gateway:startup",)},
+)
+
+HOOK_NOT_FOUND_CODE = "SCHEDULES_HOOK_NOT_FOUND"
+
+HOOKS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS hooks (
+  name TEXT PRIMARY KEY,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  updated_at REAL NOT NULL DEFAULT 0,
+  updated_by TEXT NOT NULL DEFAULT ''
+);
+"""
+
+
+def _migrate_hooks(conn: sqlite3.Connection) -> None:
+    """Ensure the ``hooks`` guard table exists in the schedules store."""
+    conn.executescript(HOOKS_SCHEMA)
+
+
+def _bundled_hook_names() -> List[str]:
+    return [str(h["name"]) for h in BUNDLED_FLOW_HOOKS]
+
+
+def _check_hook_name(name: str) -> str:
+    text = str(name or "").strip().lower()
+    if text not in _bundled_hook_names():
+        raise SchedulesError(
+            HOOK_NOT_FOUND_CODE,
+            f"unknown flow hook {str(name or '')[:60]!r}; bundled hooks: "
+            + ", ".join(_bundled_hook_names()))
+    return text
+
+
+def list_flow_hooks(cfg: Any) -> Dict[str, Any]:
+    """List the five bundled flow hooks with their stored guard flips."""
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_hooks(conn)
+        rows = {r["name"]: r for r in conn.execute(
+            "SELECT * FROM hooks").fetchall()}
+        hooks = []
+        for bundled in BUNDLED_FLOW_HOOKS:
+            rec = rows.get(str(bundled["name"]))
+            hooks.append({"name": str(bundled["name"]),
+                          "description": str(bundled["description"]),
+                          "events": list(bundled["events"]),
+                          "enabled": bool(rec["enabled"]) if rec else False})
+        for name in sorted(set(rows) - set(_bundled_hook_names())):
+            rec = rows[name]
+            hooks.append({"name": name, "description": "",
+                          "events": [],
+                          "enabled": bool(rec["enabled"])})
+        return {"state": "OK", "hooks": hooks, "count": len(hooks),
+                "catalog": [dict(h, events=list(h["events"]))
+                            for h in BUNDLED_FLOW_HOOKS],
+                "authority": "voicebridge.schedules (hooks guard table)"}
+    finally:
+        conn.close()
+
+
+def _set_flow_hook(cfg: Any, name: str, enabled: bool, *,
+                   requested_by: str = "dashboard:user",
+                   confirmed: bool = False,
+                   body: Optional[Dict[str, Any]] = None,
+                   query: Optional[Dict[str, Any]] = None,
+                   op: str = "enable") -> Dict[str, Any]:
+    if not (confirmed or confirm_requested(body=body, query=query)):
+        raise SchedulesError(CONFIRM_CODE,
+                             f"flow hook {op} requires explicit --confirm")
+    clean = _check_hook_name(name)
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_hooks(conn)
+        conn.execute(
+            "INSERT INTO hooks (name, enabled, updated_at, updated_by) "
+            "VALUES (?,?,?,?) "
+            "ON CONFLICT(name) DO UPDATE SET enabled=excluded.enabled, "
+            "updated_at=excluded.updated_at, updated_by=excluded.updated_by",
+            (clean, 1 if enabled else 0, _now(), requested_by))
+        conn.commit()
+        _audit(f"hook_{op}", requested_by, {"hook": clean})
+        listing = list_flow_hooks(cfg)
+        hook = next(h for h in listing["hooks"] if h["name"] == clean)
+        return {"state": "OK", "hook": hook,
+                "authority": "voicebridge.schedules (hooks guard table)"}
+    finally:
+        conn.close()
+
+
+def enable_flow_hook(cfg: Any, name: str, *,
+                     requested_by: str = "dashboard:user",
+                     confirmed: bool = False,
+                     body: Optional[Dict[str, Any]] = None,
+                     query: Optional[Dict[str, Any]] = None
+                     ) -> Dict[str, Any]:
+    """Flip a bundled flow-hook guard on (confirmation required)."""
+    return _set_flow_hook(cfg, name, True, requested_by=requested_by,
+                          confirmed=confirmed, body=body, query=query,
+                          op="enable")
+
+
+def disable_flow_hook(cfg: Any, name: str, *,
+                      requested_by: str = "dashboard:user",
+                      confirmed: bool = False,
+                      body: Optional[Dict[str, Any]] = None,
+                      query: Optional[Dict[str, Any]] = None
+                      ) -> Dict[str, Any]:
+    """Flip a bundled flow-hook guard off (confirmation required)."""
+    return _set_flow_hook(cfg, name, False, requested_by=requested_by,
+                          confirmed=confirmed, body=body, query=query,
+                          op="disable")
+
+
+def list_programs(cfg: Any) -> Dict[str, Any]:
+    """List stored programs: recurring jobs rendered as standing orders."""
+    listing = list_jobs(cfg, limit=LIST_MAX)
+    programs = []
+    for job in listing.get("jobs", []):
+        kind = str(job.get("kind", "") or "")
+        if kind not in ("interval", "daily", "cron"):
+            continue
+        if kind == "interval":
+            schedule = f"every {job.get('interval_min')} minutes"
+        elif kind == "daily":
+            schedule = (f"daily {int(job.get('hour', 0)):02d}:"
+                        f"{int(job.get('minute', 0)):02d}")
+        else:
+            schedule = str(job.get("cron_expr", "") or "")
+        programs.append({"id": job["id"], "name": job["name"],
+                         "kind": "standing-order", "schedule": schedule,
+                         "enabled": bool(job.get("enabled", True)),
+                         "next_run_at": job.get("next_run_at"),
+                         "raw_kind": kind})
+    return {"state": "OK", "programs": programs, "count": len(programs),
+            "authority": "voicebridge.schedules (recurring jobs render as "
+                         "standing orders)"}
+
+
+# ------------------------------------------------- flows gateway entry points
+def _gw_hooks(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    return list_flow_hooks(cfg)
+
+
+def _gw_hook_enable(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    return enable_flow_hook(
+        cfg, str(params.get("name", "") or ""),
+        requested_by=str(params.get("requested_by", "") or "dashboard:user"),
+        confirmed=bool(params.get("confirmed", False)))
+
+
+def _gw_hook_disable(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    return disable_flow_hook(
+        cfg, str(params.get("name", "") or ""),
+        requested_by=str(params.get("requested_by", "") or "dashboard:user"),
+        confirmed=bool(params.get("confirmed", False)))
+
+
+def _gw_programs(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    return list_programs(cfg)
+
+
+#: Gateway method name -> handler (registered onto each bridge registry by the
+#: family bridge in ``voicebridge/qubit_compat.py`` — the one wiring owner).
+#: ``hooks.status`` keeps its canonical pinned handler in
+#: ``voicebridge/gateway/rpc.py``; these three are the newly-wired rows.
+FLOWS_GATEWAY_METHODS = {
+    "flows.hooks": _gw_hooks,
+    "hooks.enable": _gw_hook_enable,
+    "hooks.disable": _gw_hook_disable,
+    "flows.programs": _gw_programs,
+}

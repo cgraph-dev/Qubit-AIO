@@ -16910,82 +16910,34 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
     {"family": "users", "action": "auth-connect-catalog", "methods": ["GET"],
      "gateway": "users.authConnect.catalog", "kind": "read"},
     # -- canvas (ocFamilyCanvasApi; 9 rows verbatim) --
-    # No canvas file host or node-presentation backend is registered: every
-    # row answers an honest typed gate (never invented behavior). Reads are
-    # kind=read, the six POST rows kind=mutation (confirm-gated shape — the
-    # gate answers 403 before any confirm is staged). Follow-up for a
-    # builder lane: a confined static host for GET /__qubit__/canvas/*
-    # reusing the plugin-asset precedent (resolve_plugin_asset); until then
-    # the preview frame stays a pure URL-string builder client-side.
+    # Served by the confined canvas file host
+    # (``voicebridge/files/canvas_host.py`` — Qubit-owned state-home
+    # ``canvas/`` root, ``resolve().is_relative_to()`` confinement reusing the
+    # plugin-asset precedent). Reads execute immediately; the six POST rows are
+    # confirm-gated mutations through the shared journal (409 before any
+    # confirm is staged, exactly-once execute after).
     {"family": "canvas", "action": "list", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "CANVAS_HOST_UNWIRED",
-              "detail": "no canvas file host is registered; nothing is "
-                        "listed",
-              "counterpart": "none yet — follow-up: confined static host "
-                             "GET /__qubit__/canvas/* reusing the "
-                             "plugin-asset precedent (resolve_plugin_asset)"}},
+     "gateway": "canvas.list", "kind": "read"},
     {"family": "canvas", "action": "get", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "CANVAS_HOST_UNWIRED",
-              "detail": "no canvas file host is registered; nothing is read",
-              "counterpart": "none yet — follow-up: confined static host "
-                             "GET /__qubit__/canvas/* reusing the "
-                             "plugin-asset precedent (resolve_plugin_asset)"}},
+     "gateway": "canvas.get", "kind": "read"},
     {"family": "canvas", "action": "live", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "CANVAS_HOST_UNWIRED",
-              "detail": "no canvas file host is registered; no live-reload "
-                        "state is reported",
-              "counterpart": "none yet — follow-up: confined static host "
-                             "GET /__qubit__/canvas/* reusing the "
-                             "plugin-asset precedent (resolve_plugin_asset)"}},
+     "gateway": "canvas.live", "kind": "read"},
     {"family": "canvas", "action": "add", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "CANVAS_HOST_UNWIRED",
-              "detail": "no canvas file host is registered; nothing is "
-                        "written",
-              "counterpart": "none yet — follow-up: brokered path-confined "
-                             "write behind this bridge row"}},
+     "gateway": "canvas.add", "kind": "mutation"},
     {"family": "canvas", "action": "remove", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "CANVAS_HOST_UNWIRED",
-              "detail": "no canvas file host is registered; nothing is "
-                        "removed",
-              "counterpart": "none yet — follow-up: brokered path-confined "
-                             "write behind this bridge row"}},
+     "gateway": "canvas.remove", "kind": "mutation"},
     {"family": "canvas", "action": "present", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "CANVAS_PRESENT_UNWIRED",
-              "detail": "no node-presentation backend is registered; nothing "
-                        "is shown on any node",
-              "counterpart": "the node roster reads "
-                             "(GET /api/qubit/nodes/list, node.list) for "
-                             "identity; no presentation backend exists"}},
+     "gateway": "canvas.present", "kind": "mutation",
+     "aliases": {"nodeId": "node_id"}},
     {"family": "canvas", "action": "hide", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "CANVAS_PRESENT_UNWIRED",
-              "detail": "no node-presentation backend is registered; nothing "
-                        "is hidden on any node",
-              "counterpart": "the node roster reads "
-                             "(GET /api/qubit/nodes/list, node.list) for "
-                             "identity; no presentation backend exists"}},
+     "gateway": "canvas.hide", "kind": "mutation",
+     "aliases": {"nodeId": "node_id"}},
     {"family": "canvas", "action": "navigate", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "CANVAS_PRESENT_UNWIRED",
-              "detail": "no node-presentation backend is registered; nothing "
-                        "is opened on any node",
-              "counterpart": "the node roster reads "
-                             "(GET /api/qubit/nodes/list, node.list) for "
-                             "identity; no presentation backend exists"}},
+     "gateway": "canvas.navigate", "kind": "mutation",
+     "aliases": {"nodeId": "node_id"}},
     {"family": "canvas", "action": "snapshot", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "CANVAS_PRESENT_UNWIRED",
-              "detail": "no node-presentation backend is registered; no "
-                        "screenshot proof is captured",
-              "counterpart": "the node roster reads "
-                             "(GET /api/qubit/nodes/list, node.list) for "
-                             "identity; no presentation backend exists"}},
+     "gateway": "canvas.snapshot", "kind": "mutation",
+     "aliases": {"nodeId": "node_id"}},
     # -- tasks (ocFamilyTasksApi; 4 rows with paths verbatim) --
     # Delegates to the already-registered tasks.* gateway methods, which run
     # the shared ledger (task_ledger.list_tasks/show) and the live run
@@ -17003,25 +16955,18 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
      "gateway": "tasks.retry", "kind": "mutation"},
     # -- flows (ocFamilyFlowsApi; the 5 needs-bridge rows verbatim) --
     # The 11 cron rows reuse the existing /api/cron/* routes (no bridge rows
-    # needed). `hooks` reads the real hook catalog (hooks.status); enable /
-    # disable / cancel / programs have no backend and answer honest gates
-    # whose counterparts name the real surface.
+    # needed). `hooks` reads the five bundled flow hooks with their stored
+    # guard flips (flows.hooks); enable / disable flip the schedules
+    # hooks-guard table (hooks.enable/disable);
+    # programs reads recurring schedules as standing orders (flows.programs).
+    # `cancel` has no sticky taskflow-cancel backend and keeps its honest gate
+    # (counterpart: DELETE /api/cron/jobs/{id} or pause).
     {"family": "flows", "action": "hooks", "methods": ["GET"],
-     "gateway": "hooks.status", "kind": "read"},
+     "gateway": "flows.hooks", "kind": "read"},
     {"family": "flows", "action": "hook_enable", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "FLOWS_HOOKS_UNWIRED",
-              "detail": "no backend hooks route exists; no hook is enabled",
-              "counterpart": "GET /api/qubit/flows/hooks (hooks.status) "
-                             "for the catalog + cron-backed flows "
-                             "(GET /api/cron/jobs) for real scheduling"}},
+     "gateway": "hooks.enable", "kind": "mutation"},
     {"family": "flows", "action": "hook_disable", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "FLOWS_HOOKS_UNWIRED",
-              "detail": "no backend hooks route exists; no hook is disabled",
-              "counterpart": "GET /api/qubit/flows/hooks (hooks.status) "
-                             "for the catalog + cron-backed flows "
-                             "(GET /api/cron/jobs) for real scheduling"}},
+     "gateway": "hooks.disable", "kind": "mutation"},
     {"family": "flows", "action": "cancel", "methods": ["POST"],
      "gateway": None, "kind": "mutation",
      "gate": {"code": "FLOWS_CANCEL_UNWIRED",
@@ -17030,12 +16975,7 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
               "counterpart": "DELETE /api/cron/jobs/{id} or POST "
                              "/api/cron/jobs/{id}/pause (confirm-gated)"}},
     {"family": "flows", "action": "programs", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "FLOWS_PROGRAMS_UNWIRED",
-              "detail": "no standing-order programs registry exists; the "
-                        "durable-flow list is the programs view",
-              "counterpart": "GET /api/cron/jobs (recurring schedules "
-                             "render as standing orders)"}},
+     "gateway": "flows.programs", "kind": "read"},
     # -- memory (ocFamilyMemoryApi; 5 rows verbatim) --
     # Status-only reality: the live status is served today at the canonical
     # GET /api/memory paths (qubit-local, the only provider); no writer is
@@ -17185,6 +17125,56 @@ def _qubit_family_params(entry: Dict[str, Any], q: Dict[str, str],
     return params
 
 
+_CANVAS_HOST_MODULE_NAME = "voicebridge.canvas_host"
+
+
+def _canvas_host_module() -> Any:
+    """Load the canvas host backend by file path (never a dotted import).
+
+    ``voicebridge/files/canvas_host.py`` sits next to the live
+    ``voicebridge/files.py`` module, so the dotted path ``voicebridge.files.
+    canvas_host`` cannot resolve (``files.py`` wins the submodule lookup — a
+    package there would shadow the scoped-inspection module the whole backend
+    imports). The file is loaded once by path under a distinct module name;
+    the implementation is unchanged.
+    """
+    import importlib.util
+    import sys
+    from pathlib import Path as _Path
+
+    existing = sys.modules.get(_CANVAS_HOST_MODULE_NAME)
+    if existing is not None:
+        return existing
+    path = _Path(__file__).resolve().parent / "files" / "canvas_host.py"
+    spec = importlib.util.spec_from_file_location(
+        _CANVAS_HOST_MODULE_NAME, str(path))
+    if spec is None or spec.loader is None:
+        raise ImportError(
+            "canvas host module not found at files/canvas_host.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[_CANVAS_HOST_MODULE_NAME] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _ensure_family_backends(registry: Any) -> None:
+    """Register the canvas + flows bridge backends on one registry instance.
+
+    ``default_registry()`` builds a fresh instance per call, so the bridge —
+    the one wiring owner for these families — ensures its own rows here.
+    Every handler delegates to its canonical backend module (the confined
+    canvas host / the schedules hooks region); nothing is invented and no
+    other registry consumer changes.
+    """
+    from . import schedules as _SCH
+
+    canvas = _canvas_host_module()
+    for _name, _fn in dict(getattr(canvas, "GATEWAY_METHODS", {})).items():
+        registry.register(_name, _fn)
+    for _name, _fn in dict(getattr(_SCH, "FLOWS_GATEWAY_METHODS", {})).items():
+        registry.register(_name, _fn)
+
+
 def _qubit_family_gateway_call(cfg: Any, entry: Dict[str, Any],
                                params: Dict[str, Any]
                                ) -> Tuple[int, Dict[str, Any]]:
@@ -17195,6 +17185,7 @@ def _qubit_family_gateway_call(cfg: Any, entry: Dict[str, Any],
     method = str(entry["gateway"] or "")
     try:
         registry = default_registry()
+        _ensure_family_backends(registry)
         if method not in registry.names():
             return 500, {"ok": False, "code": "FAMILY_METHOD_NOT_REGISTERED",
                          "detail": f"gateway method {method!r} is not "
