@@ -483,6 +483,23 @@ def embed_texts(texts: Any, cfg: Any = None, *, role: str = "embedding",
         num_gpu=num_gpu)
 
 
+def _working_slot_summary(cfg: Any) -> str:
+    """Human-readable still-working slot for a dead-model refusal (read-only).
+
+    Best-effort resolver read only: never raises, never writes, never moves
+    the slot. Failover policy is an owner call, so the typed error names the
+    working slot without switching to it.
+    """
+    try:
+        from . import resolver as _resolver
+        eff = _resolver.resolve(cfg, role=_resolver.DEFAULT_ROLE)
+        return (f"{eff.provider}/{eff.model} "
+                f"(profile {eff.profile_id!r})")
+    except Exception:  # noqa: BLE001 - summary is best-effort
+        pass
+    return "the shipped local default"
+
+
 def run(req: ProviderRequest, cfg: Any,
         catalog: Optional[ProviderCatalog] = None,
         transport: Optional[_frontier.Transport] = None,
@@ -800,6 +817,13 @@ def run(req: ProviderRequest, cfg: Any,
     if not res.ok:
         # Auto route falls back to local with truthful identity; explicit
         # frontier returns the typed failure (no fake cloud text).
+        if res.code == "MODEL_UNAVAILABLE_TURN" and requested != "auto":
+            # Turn-time dead model: typed error only. Name the dead model
+            # (already in res.message) plus the still-working slot, without
+            # moving the slot and without a silent fallback.
+            res.message = (f"{res.message} — still serving default turns: "
+                           f"{_working_slot_summary(cfg)}")
+            return res
         if requested == "auto":
             fb = _local_complete(req.prompt, cfg, min(req.max_tokens, policy.max_tokens))
             # Preserve local text but mark fallback truthfully.

@@ -81,6 +81,64 @@ def _looks_like_refusal(body: Dict[str, Any]) -> bool:
     return any(m in hay for m in _REFUSAL_MARKERS)
 
 
+# Turn-time dead-model markers (G1 residual): a model the registry lists but
+# upstream rejects at turn time (e.g. muse-spark resolves statically, then
+# ModelProtocolUnsupported on use). These must surface as a typed
+# MODEL_UNAVAILABLE_TURN, never as generic MALFORMED_RESPONSE. Matching is
+# separator-insensitive (camelCase / snake_case / kebab-case all compact to
+# the same run of letters) and limited to the three dead-model classes —
+# protocol-unsupported, unavailable, not-found — so ordinary 400s stay
+# MALFORMED_RESPONSE.
+_DEAD_MODEL_COMPACT_MARKERS = (
+    "modelprotocolunsupported",
+    "modelunavailable",
+    "modelnotfound",
+    "nosuchmodel",
+    "modeldoesnotexist",
+    "modelisunavailable",
+)
+
+_DEAD_MODEL_LOOSE_MARKERS = (
+    "unknown model",
+    "model not found",
+    "no such model",
+    "model does not exist",
+    "unsupported model",
+    "model is unavailable",
+)
+
+
+def _looks_like_dead_model(body: Dict[str, Any]) -> bool:
+    """True when an error body names a dead/retired/unknown model."""
+    import re as _re
+
+    try:
+        hay = json.dumps(body)[:2000].lower()
+    except Exception:
+        return False
+    if any(m in hay for m in _DEAD_MODEL_LOOSE_MARKERS):
+        return True
+    compact = _re.sub(r"[^a-z]", "", hay)
+    return any(m in compact for m in _DEAD_MODEL_COMPACT_MARKERS)
+
+
+def _dead_model_result(provider: str, model: str,
+                       body: Dict[str, Any]) -> "ProviderResult":
+    """Typed turn-time refusal for a dead model (slot never auto-moved).
+
+    Names the dead provider/model identity; the caller (gateway) appends the
+    still-working slot. No fallback, no retry: failover policy is an owner
+    call, so this is a typed error only.
+    """
+    return ProviderResult(ok=False, code="MODEL_UNAVAILABLE_TURN",
+                          message=(f"model {provider}/{model} is unavailable "
+                                   f"at turn time ({json.dumps(body)[:200]}); "
+                                   "the configured slot is unchanged — pick "
+                                   "a working model explicitly"),
+                          provider=provider, model=model,
+                          identity=f"{provider}/{model}")
+
+
 def _extract_text(body: Dict[str, Any]) -> tuple[str, int, int, str, bool]:
     """Returns (text, prompt_tokens, completion_tokens, finish_reason,
     has_reasoning) or raises ValueError.
@@ -195,6 +253,9 @@ class FrontierClient:
                                       provider=self.provider, model=self.model,
                                       identity=f"{self.provider}/{self.model}")
             if status == 404:
+                if _looks_like_dead_model(body):
+                    return _dead_model_result(self.provider, self.model,
+                                              body)
                 return ProviderResult(ok=False, code="NOT_CONFIGURED",
                                       message="endpoint or model not found "
                                               f"(http 404 at {self.provider})",
@@ -217,6 +278,9 @@ class FrontierClient:
                                       provider=self.provider, model=self.model,
                                       identity=f"{self.provider}/{self.model}")
             if status in (400, 422):
+                if _looks_like_dead_model(body):
+                    return _dead_model_result(self.provider, self.model,
+                                              body)
                 return ProviderResult(ok=False, code="MALFORMED_RESPONSE",
                                       message=json.dumps(body)[:300],
                                       provider=self.provider, model=self.model,
