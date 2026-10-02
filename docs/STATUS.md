@@ -2674,3 +2674,311 @@ session crashes on long commands).** Owner relaunched Chromium correctly.
   reads the inbox aloud — no code change needed on our side.
 - **Tests:** CDP-priority + deterministic digest (GW raises if called);
   sweep **228** green; services restarted.
+
+## 66. Wake false-fire root-caused + neural segmentation live — 2026-10-02
+
+**No milestone claimed. Not committed.** Owner report: "hey qubit keeps
+triggering without me asking" (History showed `heard 'hey, Qubit, hey.'`
+`'hey Qubit, voice assistant.'` greetings at 06:21/06:33/06:35, unprompted).
+
+- **Root cause MEASURED (journal, not guessed):** 3 `kws.hit` EVER vs
+  **102 `wake.command` from 11,247 `asr_fallback_probe`s** — every false
+  fire came from the ASR-fallback path transcribing room noise, never the
+  spotter. The transcriptions were whisper parrots of its own vocabulary
+  prompt (`stt.local.initial_prompt = 'Qubit, hey Qubit, voice
+  assistant.'`): exact (`Qubit, hey Qubit, voice assistant.`, 34 chars)
+  and trimmed (`Hey Qubit.`, `hey Qubit, voice assistant.`).
+- **Why the guard never fired (two compounding bugs):** (1) the prompt
+  lives in RUNTIME `config.yaml`, but `is_prompt_echo` read only the
+  voice tree (`voice.yaml` has no `stt.local`) → **0 `prompt_echo_skip`
+  in 11,247 probes**; (2) exact-equality only, so trimmed parrots
+  (`hey Qubit, voice assistant.` ≠ prompt) sailed through, and the
+  armed-window then converted the NEXT noise blob into a full answered
+  turn. Every fire sat on a max-length 249600-byte (8 s) drone segment.
+- **Fix (TDD: 8 new tests, watched fail, then green):**
+  `voicebridge/voice_edit/wake.py` — `is_prompt_echo` now falls back to
+  `_runtime_initial_prompt()` (read-only read of the runtime
+  `config.yaml`, fail-closed) and discards any transcript made solely of
+  wake+prompt vocabulary that carries prompt filler (`voice`/`assistant`
+  derived from the prompt itself, no hardcoded list); bare `hey qubit`
+  still arms (no filler), real content (`hey qubit, what's the weather`)
+  never matches. `WAKE_ALIASES` is the single vocabulary source.
+- **Neural segmentation (the HF-repo item, adapted without copying):**
+  the wake loop now segments via the IN-REPO `voicebridge/audio/vad.py`
+  endpointer (Silero through installed `sherpa_onnx`, `webrtcvad`
+  fallback) over the on-disk `models/silero_vad_v5.onnx` — new
+  `wake.vad` key (`auto|silero|webrtc|energy`, default `auto`, in the
+  settings view + PUT-validated), `_AudioVadSegmenter` adapts the 30 ms
+  neural endpointer to the loop's 300 ms frames, fail-closed degrade to
+  `EnergyEndpointer` (wake never dies on a missing model). New
+  `segmenter_factory` injection mirrors the existing
+  mic/transcribe/kws seams. No new dependency, no download, no upstream
+  code copied. Upstream `snakers4/silero-vad` license is self-
+  contradictory (MIT text vs CC BY-NC badge) — recorded here; runtime
+  use only of the on-disk asset that arrived via the existing
+  faster-whisper chain, owner ruling needed before any vendoring.
+- **Measured separation on this mic (ParecMic, live room):** drone
+  energy-voiced 23/27 frames vs Silero **0/270**; clean Piper speech
+  65/73; faint speaker playback 20/270 (partial — below the 10-frame
+  consecutive trigger, correctly not firing).
+- **Live:** fallback re-enabled (now guarded), `wake.vad=auto`,
+  helper restarted → `started` reports `segmenter: silero`; since:
+  **zero segments/probes/commands on drone** (was one 8 s segment per
+  8 s). Faint speaker replay of `hey qubit, what is the weather`
+  correctly does NOT fire. **Positive path needs the owner's voice**
+  (close-mic speech is 3–4× louder than the speaker test at the mic):
+  say "hey qubit" once — expect the beep + answer; journal
+  distinguishes `wake.command` vs silence.
+- **Evidence:** `test_voice_edit_wake9u` 32/32; sweep 301 across
+  wake/routing-capture/integration/STT/audio suites green. Interim
+  mute backup `/tmp/voice.pre-fallbackmute.yaml`; pre-switch backup
+  `/tmp/voice.pre-vad-switch.yaml`. Uncommitted lane files:
+  `voicebridge/voice_edit/{wake,settings}.py`,
+  `tests/test_voice_edit_wake9u.py` (+ this entry).
+
+## 67. Wake preview + pre-roll + verbatim transcripts — 2026-10-02
+
+**No milestone claimed. Not committed.** Owner: wake works, but (1) no
+live text preview of what was spoken (Right-Ctrl has one), (2) wake STT
+feels worse than Right-Ctrl, (3) want Chrome-style verbatim — exactly
+what was heard, lowercase, no punctuation.
+
+- **Both paths use the same engine** (faster-whisper-small, warm decode
+  ~0.1 s on CUDA; A/B on 6 dB-SNR noisy speech: raw and peak-normalized
+  both decode exactly). The real gap was **onset clipping**: the loop
+  only buffered frames AFTER the endpointer flipped, dropping up to
+  ~300 ms of soft onsets ("hey" starting mid-frame); Right-Ctrl never
+  clips (records from keypress). The old `pre_roll_frames` param was
+  dead code — never wired.
+- **Fix (TDD, 5 new tests watched fail, then green):**
+  - `on_wake_command` now `_safe_show()`s the panel and posts the
+    heard words to the status line (`heard: …`) — the same surface
+    Right-Ctrl partials use — before routing.
+  - 600 ms pre-roll in the wake loop (backend-agnostic; prepended when
+    a segment opens, cleared on use/reset so tails never leak).
+  - `verbatim_transcript()` (`desktop_helper.py`) +
+    `voice_edit.verbatim_transcript` (default ON per owner ask,
+    view + PUT): lowercase, punctuation stripped (hyphens split,
+    intra-word apostrophes + diacritics kept), applied to wake +
+    Right-Ctrl finals before routing/display/dictate. Routing is
+    punctuation-independent (parser strips separators itself —
+    verified); 1 stale transform assertion updated to the new
+    contract.
+- **Evidence:** 327 across wake/helper/routing-capture/integration/STT/
+  audio suites + 171 across router/routes/settings/ui/overlay/tool-
+  task/heartbeat suites — all green. Helper restarted live
+  (`segmenter: silero`, verbatim default ON, zero drone segments).
+- **Needs the owner:** say "hey qubit, …" and confirm (1) the heard
+  text appears immediately, (2) accuracy feels at parity, (3) the
+  Chrome-style casing/punctuation is what you want (say the word and
+  I flip the default off). Frontend checkboxes for `wake.vad` /
+  `verbatim_transcript` not added (PUT-able, view-visible) — UI
+  follow-up if wanted.
+- **Uncommitted lane files:** `voicebridge/desktop_helper.py`,
+  `voicebridge/voice_edit/{wake,settings}.py`,
+  `tests/test_voice_edit_{wake,helper}9u.py` (+ this entry).
+
+## 68. Verbatim default OFF + faster wake start — 2026-10-02
+
+**No milestone claimed. Not committed.** Owner reversals on §67:
+(1) keep the engine's punctuation and capitals (verbatim OFF);
+(2) "hey qubit" must start responding faster.
+
+- **Verbatim OFF.** `verbatim_transcript()` + `voice_edit.
+  verbatim_transcript` default flipped to False (code + view; PUT-
+  toggleable). Transcripts now flow with whisper's casing/punctuation
+  on both paths; the Chrome-style normalization stays available via
+  the setting. 3 helper tests updated to the new contract + 1 new
+  test pinning the opt-in form.
+- **Faster start: `wake.silence_ms` 900 → 500 (live state).** Measured
+  turn anatomy (§67 journal): transcript→command→answer ≈ 2 s on the
+  direct-facts path; whisper-small warm decode ≈ 0.1 s; the dominant
+  fixed cost was the 900 ms trailing-silence gate before a segment
+  even completes — now ~0.4 s sooner. Tradeoff recorded: sub-500 ms
+  mid-utterance pauses may split slow speech into two segments (tune
+  back up if partial commands appear). Code default stays 900.
+- **Evidence:** 59 across wake/helper + 440 across the voice-edit/
+  STT/audio/router/settings/overlay suites — all green. Helper
+  restarted (`segmenter: silero`, zero drone segments since).
+- **Still needs the owner:** say "hey qubit, …" — confirm the start
+  feels faster and the text keeps its punctuation/caps.
+- **Uncommitted lane files:** same as §67
+  (`desktop_helper.py`, `voice_edit/{wake,settings}.py`,
+  `test_voice_edit_{wake,helper}9u.py` + this entry).
+
+## 69. Decision 26 (voice = full capability) + page audit + router gaps — 2026-10-02
+
+**No milestone claimed. Not committed.** Owner fury bundle: (1) voice
+page missing (found it himself — `/voice-edit`, "Voice Editing" low in
+the sidebar); "make sure all this works + more commands, nothing
+routes"; (2) "create and open a txt" did nothing; (3) weather other
+cities failed; (4) rewrite "stupid"; (5) **directive: voice must do
+EVERYTHING /chat does, full permission, local low model for speed**
+(recorded as DECISIONS #26).
+
+- **Decision 26 implemented, Slice 1 (TDD, 5 tests):** `service.ask()`
+  kept its deterministic stages (reply drafts, live facts, skills) and
+  its brain byte-identical on success; on brain failure/silence/refusal
+  it now dispatches through `chat_transport.turn` (same persisted turn
+  /qubit-chat uses: web/local/registry/agent_task branches, voice
+  session, voice-local model, actor `voice:user`). No double persist
+  (turn owns its rows); staged `CONFIRM_REQUIRED` and turn errors fall
+  back to the brain (Slice-1b: voice-"yes" settling of CT-staged
+  confirmations, deferred — speaking an unsettleable "say yes" would
+  lie). Live proof: web_search branch dispatched (`model: full-turn`);
+  brain-ok path unchanged (spark4).
+- **"Create txt did nothing" — root-caused (journal):** the utterance
+  arrived with no wake prefix outside the arm window →
+  `wake.discarded` (correct per protocol; likely onset-clipped "hey",
+  fixed by §67 pre-roll). It never reached any backend. Plus a REAL
+  bug found live: no action matched, the free-form agent narrated a
+  phantom "I will assist you..." as ok:true (T5's forbidden shape, no
+  guard on the voice path).
+- **New `create_document`/`open_document` local actions (TDD, 6
+  tests):** deterministic instant path (create in `~/Documents` +
+  open in editor; named find+open or honest miss; never shadows
+  open_app/open_project — ordering + lookahead pinned by tests).
+  Live: "Open a text document." → editor open; "Create and open..."
+  → `note-20261002-0808.txt` created + opened.
+- **Weather (TDD, 6 tests):** trigger fired only on weather/forecast
+  ("temperature in Madrid" → brain stonewall) — now includes
+  temperature/temp; city regex was ASCII-only (Iași→"Ia"→404) — now
+  Unicode; then wttr.in itself resolved Rome→Lome, so the backend
+  moved to Open-Meteo (geocode top result + canonical name shown;
+  no key; same `wttr_forecast` signature). Live: Iași/Rome/Madrid/
+  Paris/Cluj/New York all canonical.
+- **Rewrite "stupid" — root-caused + fixed:** transforms ran on
+  local_profile spark17 (1.7B), which narrates
+  ("I'm processing the text:...") despite the output-only guardrail.
+  Transforms now use the detail tier (spark4) in local AND auto modes
+  (TDD, incl. auto-API-fallback contract update). Live: rewrite/
+  shorten/grammar all real (grammar fix exact). Chat answers keep the
+  fast tier.
+- **Voice page audit (56 controls, live backend):** 55/56 PASS (the
+  one FAIL was a harness artifact — production strips `?query`
+  before dispatch). Real bug found: **"Restore all defaults" PUTs
+  `{}` → 400 error, restores nothing** — now calls
+  `POST settings/restore`; **new UI for `wake.vad` / `wake.max_s` /
+  `verbatim_transcript`** (+TS types); `tsc` clean, dist rebuilt,
+  page 200. Vitest 668/669 (1 failure = concurrent HarnessRouter
+  lane, no shared imports — theirs).
+- **Evidence:** focused sweeps 84 + 228 + 291 green; service
+  restarted, page 200, journal clean (all-200s). Deferred: Slice-1b
+  (CT settle), stt_model bump (STT measured exact — not the problem).
+- **Uncommitted:** `service.py`, `local/actions.py`,
+  `transform.py`, `scripts/weather.py`, `settings.py` (earlier),
+  `desktop_helper.py`/`wake.py` (earlier), frontend
+  `VoiceEditPage.tsx`/`voiceEdit.ts`, tests
+  (`fullturn`/`weather`/`local_actions`/`voice_edit*9u`) + this entry.
+- **Needs the owner:** say "hey qubit, create and open a text
+  document" (one breath) — expect create+open+spoken receipt; try a
+  coding question by voice (full-turn path); confirm rewrite quality
+  on real text.
+
+## 70. Voice opens websites — 2026-10-02
+
+**No milestone claimed. Not committed.** Owner: "i want it to open
+websites too".
+
+- **New `open_website` local action (TDD, 4 tests watched fail):**
+  "open / launch / go to / visit X" with a URL, `www.` host, dotted
+  domain, or spoken shortcut (youtube/gmail/messenger/instagram/
+  github/google/wikipedia/dexonline/...) → `xdg-open` in the
+  browser. Only `http(s)` with a dotted host ever launches;
+  `file://` and friends get an honest refusal with zero side
+  effects. Ordering pinned by tests: apps (`open discord`), docs
+  (`open a text document`), and file-manager (`open file manager`)
+  never shadow each other.
+- **Live:** "Open github.com." → `local.open_website` →
+  "Opened https://github.com in the browser."
+- **Evidence:** `test_qubitchat_local_actions9u` 18/18.
+- **Uncommitted:** `voicebridge/local/actions.py`,
+  `tests/test_qubitchat_local_actions9u.py` (+ this entry).
+- **To the owner:** try "hey qubit, open youtube" / "go to gmail".
+
+## 71. Lane-3 console wired: 5 gated rows now live — 2026-10-02
+
+**No milestone claimed. Not committed.** Owner: pages must look and work
+exactly like the ported upstreams.
+
+- **Pages (3 parallel workers, all tsc-clean):** `HarnessRouterPage`
+  mirrors `/tmp/hr-src` console IA; `QubitBotPage` mirrors openmuse
+  `9ec439f` mobile chat (thread bubbles, pill composer, local follow-up
+  queue, per-thread drafts); 5 Viking pages restyled to the
+  Sessions/Channels visual language. Viking vitest 11/11 pass
+  (`NODE_ENV=test`; `act` failures pre-existing elsewhere).
+- **New `voicebridge/family_bot_harness.py` (5 wired rows):**
+  `bot/tasks-launch` → `orchestrator.launch_task`;
+  `bot/ideas-accept` → resolve ledger suggestion → launch;
+  `bot/watches-set` → `schedules.create_job` (proven: 409 → 200, job in
+  `goals-list`); `harness/task_submit` → `sessions.create` +
+  `conversations.turn`; `harness/starter_kits` → static curated list
+  (all skills/plugins verified local) + working kit Launch.
+- **Still honestly gated (no primitive exists):** `tasks-pause/resume`,
+  `ideas-edit/dismiss`, `goals-set`, `cards-get`, followups/drafts
+  (local-only by design), hosted persistence (no such service).
+- **Evidence:** `test_qubit_family_bridge9u.py` 37/37; `npx tsc -b`
+  clean. Full model-turn executes (submit/launch) not run here — same
+  primitives voice uses daily.
+- **Uncommitted:** `voicebridge/family_bot_harness.py`,
+  `voicebridge/qubit_compat.py`, `tests/test_qubit_family_bridge9u.py`,
+  `frontend/qubit-web/src/{pages/HarnessRouterPage.tsx,lib/ocFamily{Harness,Bot}Api.ts}`,
+  `docs/QUBIT_PAGES_AND_FEATURES_2026-10-01.md` (+ this entry).
+
+## 71. Conversational confirm: wake waits for your "yes" — 2026-10-02
+
+**No milestone claimed. Not committed.** Owner: Qubit asks "say yes"
+but there is no way to answer — "how to confirm", and this back-and-
+forth is what makes it feel like speech-to-speech.
+
+- **Root cause (two compounding):** (1) the arm window starts at the
+  original "hey qubit" and expires during brain+TTS latency, so a bare
+  "yes" arrives unarmed → `wake.discarded`, silence; (2) `_propose_task`
+  never spoke the prompt and never re-armed — notify popup only.
+  (While helper TTS plays, wake correctly yields to speaker feedback;
+  the window after is what was missing.)
+- **Fix (TDD, 4 tests):** `WakeMonitor.expect_reply(timeout_s)` re-arms
+  on demand; helper `_await_reply()` calls it whenever Qubit asks
+  something — `_propose_task` now SPEAKS the confirm prompt ("…
+  Say yes to run it, or no to cancel."), shows "say yes / no", and
+  re-arms; clarify questions speak + re-arm with the question text in
+  the status line (readable even if audio cancels). Affirmatives +=
+  "yup", negatives += "nah". If TTS fails, the armed status + preview
+  still carry the question — the flow no longer depends on hearing.
+- **Evidence:** 64 across wake/helper green; helper restarted
+  (`segmenter: silero`). Journal pre-restart even showed the old pain
+  live ("Bye." answered inside a stale arm window).
+- **Needs the owner (the proof only you can give):** say "hey qubit,
+  set a timer for one minute" → it stages + speaks the confirm →
+  say "yes" within ~12 s → timer runs, notification in a minute.
+  Report staged/spoken/ran vs where it stops.
+- **Uncommitted:** `voice_edit/wake.py`, `desktop_helper.py`,
+  `test_voice_edit_{wake,helper}9u.py` (+ this entry). Still queued:
+  dashboard commands catalog + add-more UI, tab open/close/duplicate
+  commands (infra mapped: `browser_tabs.py` + ledger current-tab),
+  Slice-1b CT settle.
+
+## 72. Bot console fully wired: pause/resume/ideas/goals/cards live — 2026-10-02
+
+**No milestone claimed. Not committed.** The last gated Bot rows are now
+served by `voicebridge/family_bot_harness.py` (durable sidecars under the
+voice home `voice/` dir, never in the repo):
+
+- `tasks-pause` flags the live worker box (`cancel=True`) and records the
+  kept prompt; `tasks-resume` relaunches it via `orchestrator.launch_task`.
+  Proven with a fake box: pause → `paused True` + flag set; resume →
+  relaunched with the kept prompt (39/39 bridge tests green).
+- `ideas-list/edit/dismiss` overlay the read-only ledger derivation with a
+  durable dismiss/edit store (`BOT_IDEA_NOT_FOUND` 404, `BOT_IDEA_DISMISSED`
+  400 on accept-after-dismiss); `goals-list/set` on a durable goal sidecar
+  beside the cron store (round trip proven: set → appears in list);
+  `cards-get` resolves `session/name` against session file artifacts with a
+  bounded 15-session scan (`BOT_CARD_NOT_FOUND` 404).
+- Page sends `{taskId, session}` for pause/resume so pasted session keys hit
+  the live worker box directly.
+
+Still page-local by design: follow-up queue + per-thread drafts (no server
+inbox), hosted-service rows (`DISABLED_BOT_ACTIONS`, no counterpart).
+Evidence: 39 passed
+`.venv/bin/python -m pytest tests/test_qubit_family_bridge9u.py -q`;
+`npx tsc -b` clean in `frontend/qubit-web`.

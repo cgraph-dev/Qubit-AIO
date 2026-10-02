@@ -19,8 +19,9 @@
  * Every path lives under `/api/qubit/bot/<action>` (see {@link ROUTES});
  * reads go through `fetchJSON`, mutations through the shared
  * staged-confirmation round-trip (`runMutationWithConfirm`). All rows are
- * `NEEDS-BRIDGE`: no backend route exists yet — the bridge ports each onto
- * the named existing Qubit backend. Nothing here invents a transport: no new
+ * `LIVE`: the bridge serves the row (family_bot_harness methods plus the
+ * pre-existing registry rows); `NEEDS-BRIDGE` rows are never called.
+ * Nothing here invents a transport: no new
  * HTTP/CDP clients, no raw sockets; computer state is read through the
  * existing `voicebridge.computer_use` status surface.
  *
@@ -85,7 +86,7 @@ export type BotFamilyAction =
   | "computer-status"
   | "cards-get";
 export type RouteMethod = "GET" | "POST";
-export type RouteStatus = "NEEDS-BRIDGE";
+export type RouteStatus = "NEEDS-BRIDGE" | "LIVE";
 
 export interface BotFamilyRoute {
   family: "bot";
@@ -174,7 +175,7 @@ export const ROUTES: ReadonlyArray<BotFamilyRoute> = [
     action: "tasks-launch",
     method: "POST",
     path: "/api/qubit/bot/tasks-launch",
-    status: "NEEDS-BRIDGE",
+    status: "LIVE",
     counterpart: "voicebridge.orchestrator.launch_task (durable delegated worker, headless)",
   },
   {
@@ -182,16 +183,16 @@ export const ROUTES: ReadonlyArray<BotFamilyRoute> = [
     action: "tasks-pause",
     method: "POST",
     path: "/api/qubit/bot/tasks-pause",
-    status: "NEEDS-BRIDGE",
-    counterpart: "voicebridge.actions.ActionStore pause-equivalent / schedules pause (confirm-gated)",
+    status: "LIVE",
+    counterpart: "worker box cancel flag + durable pause sidecar (confirm-gated)",
   },
   {
     family: "bot",
     action: "tasks-resume",
     method: "POST",
     path: "/api/qubit/bot/tasks-resume",
-    status: "NEEDS-BRIDGE",
-    counterpart: "voicebridge.actions.ActionStore retry / schedules resume (confirm-gated)",
+    status: "LIVE",
+    counterpart: "kept prompt relaunched via orchestrator.launch_task (confirm-gated)",
   },
   {
     family: "bot",
@@ -224,15 +225,15 @@ export const ROUTES: ReadonlyArray<BotFamilyRoute> = [
     action: "ideas-list",
     method: "GET",
     path: "/api/qubit/bot/ideas-list",
-    status: "NEEDS-BRIDGE",
-    counterpart: "memory workspace notes + skill suggestions (read-only)",
+    status: "LIVE",
+    counterpart: "ledger suggestions + durable dismiss/edit overlay (read-only)",
   },
   {
     family: "bot",
     action: "ideas-accept",
     method: "POST",
     path: "/api/qubit/bot/ideas-accept",
-    status: "NEEDS-BRIDGE",
+    status: "LIVE",
     counterpart: "tasks-launch with the idea prompt (delegated worker)",
   },
   {
@@ -240,39 +241,39 @@ export const ROUTES: ReadonlyArray<BotFamilyRoute> = [
     action: "ideas-edit",
     method: "POST",
     path: "/api/qubit/bot/ideas-edit",
-    status: "NEEDS-BRIDGE",
-    counterpart: "memory note update for the idea record (confirm-gated)",
+    status: "LIVE",
+    counterpart: "durable overlay edit for the idea record (confirm-gated)",
   },
   {
     family: "bot",
     action: "ideas-dismiss",
     method: "POST",
     path: "/api/qubit/bot/ideas-dismiss",
-    status: "NEEDS-BRIDGE",
-    counterpart: "memory note dismissal for the idea record (confirm-gated)",
+    status: "LIVE",
+    counterpart: "durable overlay dismissal for the idea record (confirm-gated)",
   },
   {
     family: "bot",
     action: "goals-list",
     method: "GET",
     path: "/api/qubit/bot/goals-list",
-    status: "NEEDS-BRIDGE",
-    counterpart: "schedules store + memory workspace notes (read-only)",
+    status: "LIVE",
+    counterpart: "durable goal sidecar + schedules store (read-only)",
   },
   {
     family: "bot",
     action: "goals-set",
     method: "POST",
     path: "/api/qubit/bot/goals-set",
-    status: "NEEDS-BRIDGE",
-    counterpart: "schedules cron create/update for the goal watch (confirm-gated)",
+    status: "LIVE",
+    counterpart: "durable goal sidecar record (confirm-gated)",
   },
   {
     family: "bot",
     action: "watches-set",
     method: "POST",
     path: "/api/qubit/bot/watches-set",
-    status: "NEEDS-BRIDGE",
+    status: "LIVE",
     counterpart: "schedules cron create/update + change-alert watch (confirm-gated)",
   },
   {
@@ -296,8 +297,8 @@ export const ROUTES: ReadonlyArray<BotFamilyRoute> = [
     action: "cards-get",
     method: "GET",
     path: "/api/qubit/bot/cards-get",
-    status: "NEEDS-BRIDGE",
-    counterpart: "task artifacts (plan / comparison / finance / report, read-only)",
+    status: "LIVE",
+    counterpart: "session file artifacts, direct or bounded scan (read-only)",
   },
 ];
 
@@ -790,14 +791,24 @@ export async function launchBotTask(
   );
 }
 
-/** Pause a delegated task (confirm-gated). */
-export async function pauseBotTask(taskId: string, confirm?: ConfirmPrompt): Promise<unknown> {
-  return mutate("tasks-pause", { taskId }, confirm);
+/** Pause a delegated task by receipt, task id, or live session (confirm-gated). */
+export async function pauseBotTask(
+  target: { taskId?: string; receiptId?: string; session?: string } | string,
+  confirm?: ConfirmPrompt,
+): Promise<unknown> {
+  const body =
+    typeof target === "string" ? { taskId: target, session: target } : target;
+  return mutate("tasks-pause", body, confirm);
 }
 
 /** Resume a paused delegated task (confirm-gated). */
-export async function resumeBotTask(taskId: string, confirm?: ConfirmPrompt): Promise<unknown> {
-  return mutate("tasks-resume", { taskId }, confirm);
+export async function resumeBotTask(
+  target: { taskId?: string; receiptId?: string; session?: string } | string,
+  confirm?: ConfirmPrompt,
+): Promise<unknown> {
+  const body =
+    typeof target === "string" ? { taskId: target, session: target } : target;
+  return mutate("tasks-resume", body, confirm);
 }
 
 /**

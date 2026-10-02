@@ -17063,11 +17063,13 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
     # (cron.list); alerts read run history (cron.runs); the computer console
     # is a read-only status probe (computer.status). The rest have no
     # registered backend and keep honest typed gates: the follow-up queue and
-    # per-thread drafts live in the open page (no server inbox/store), there
-    # is no durable task-launch or pause/resume gateway method, Bot
-    # Intelligence persistence has no writer, goal/watch records carry no
-    # cron schedule fields, and rich cards are session file artifacts with no
-    # sessionless index.
+    # per-thread drafts live in the open page (no server inbox/store). The
+    # rest is wired through ``family_bot_harness``: launch/pause/resume on
+    # the durable worker path (pause flags the worker box, resume
+    # relaunches the kept prompt), ideas list/edit/dismiss on a durable
+    # overlay over the read-only ledger derivation, goals list/set on a
+    # durable goal sidecar beside the cron store, and card lookup on the
+    # session file artifacts (direct <session>/<name> or bounded scan).
     {"family": "bot", "action": "thread-list", "methods": ["GET"],
      "gateway": "sessions.list", "kind": "read"},
     {"family": "bot", "action": "thread-get", "methods": ["GET"],
@@ -17099,26 +17101,11 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
      "gateway": "tasks.get", "kind": "read",
      "aliases": {"lookup": "taskId"}},
     {"family": "bot", "action": "tasks-launch", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "BOT_TASKS_LAUNCH_UNWIRED",
-              "detail": "no durable task-launch gateway method is "
-                        "registered; nothing is launched",
-              "counterpart": "POST /api/qubit/bot/turn-send (a turn from a "
-                             "session) or the voice delegated turn"}},
+     "gateway": "bot.tasks_launch", "kind": "mutation"},
     {"family": "bot", "action": "tasks-pause", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "BOT_TASKS_PAUSE_UNWIRED",
-              "detail": "no task-pause gateway method is registered; "
-                        "nothing is paused",
-              "counterpart": "POST /api/qubit/bot/tasks-cancel (by receipt "
-                             "or live session)"}},
+     "gateway": "bot.tasks_pause", "kind": "mutation"},
     {"family": "bot", "action": "tasks-resume", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "BOT_TASKS_RESUME_UNWIRED",
-              "detail": "no task-resume gateway method is registered; "
-                        "nothing is resumed",
-              "counterpart": "POST /api/qubit/bot/tasks-retry (exact-args "
-                             "receipt retry or last chat turn)"}},
+     "gateway": "bot.tasks_resume", "kind": "mutation"},
     {"family": "bot", "action": "tasks-cancel", "methods": ["POST"],
      "gateway": "tasks.cancel", "kind": "mutation"},
     {"family": "bot", "action": "tasks-retry", "methods": ["POST"],
@@ -17126,54 +17113,25 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
     {"family": "bot", "action": "tasks-receipts", "methods": ["GET"],
      "gateway": "task.history", "kind": "read"},
     {"family": "bot", "action": "ideas-list", "methods": ["GET"],
-     "gateway": "task.suggestions", "kind": "read"},
+     "gateway": "bot.ideas_list", "kind": "read"},
     {"family": "bot", "action": "ideas-accept", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "BOT_IDEAS_ACCEPT_UNWIRED",
-              "detail": "Bot Intelligence persistence has no writer; no "
-                        "idea is accepted and no worker is launched",
-              "counterpart": "POST /api/qubit/bot/tasks-launch (delegated "
-                             "worker, when wired)"}},
+     "gateway": "bot.ideas_accept", "kind": "mutation"},
     {"family": "bot", "action": "ideas-edit", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "BOT_IDEAS_EDIT_UNWIRED",
-              "detail": "Bot Intelligence persistence has no writer; no "
-                        "idea record is edited",
-              "counterpart": "memory workspace notes (read-only here)"}},
+     "gateway": "bot.ideas_edit", "kind": "mutation"},
     {"family": "bot", "action": "ideas-dismiss", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "BOT_IDEAS_DISMISS_UNWIRED",
-              "detail": "Bot Intelligence persistence has no writer; no "
-                        "idea record is dismissed",
-              "counterpart": "memory workspace notes (read-only here)"}},
+     "gateway": "bot.ideas_dismiss", "kind": "mutation"},
     {"family": "bot", "action": "goals-list", "methods": ["GET"],
-     "gateway": "cron.list", "kind": "read"},
+     "gateway": "bot.goals_list", "kind": "read"},
     {"family": "bot", "action": "goals-set", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "BOT_GOALS_SET_UNWIRED",
-              "detail": "goal records carry no cron schedule fields "
-                        "(name/when/task); nothing is scheduled",
-              "counterpart": "POST /api/cron/jobs (canonical schedule "
-                             "create, confirm-gated)"}},
+     "gateway": "bot.goals_set", "kind": "mutation"},
     {"family": "bot", "action": "watches-set", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "BOT_WATCHES_SET_UNWIRED",
-              "detail": "watch records carry no cron schedule fields "
-                        "(name/when/task); nothing is scheduled",
-              "counterpart": "POST /api/cron/jobs (canonical schedule "
-                             "create, confirm-gated)"}},
+     "gateway": "bot.watches_set", "kind": "mutation"},
     {"family": "bot", "action": "alerts-list", "methods": ["GET"],
      "gateway": "cron.runs", "kind": "read"},
     {"family": "bot", "action": "computer-status", "methods": ["GET"],
      "gateway": "computer.status", "kind": "read"},
     {"family": "bot", "action": "cards-get", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "BOT_CARDS_UNWIRED",
-              "detail": "rich cards are session file artifacts with no "
-                        "sessionless index; nothing is read",
-              "counterpart": "session file artifacts (artifacts.get needs "
-                             "a session key) + GET /api/qubit/bot/"
-                             "tasks-receipts"}},
+     "gateway": "bot.cards_get", "kind": "read"},
     # -- harness (ocFamilyHarnessApi; 12 rows with paths verbatim) --
     # The harness roster reads the canonical worker roster (pinned
     # agents.list); plugins read the managed catalog (pinned plugins.list);
@@ -17183,31 +17141,20 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
     # sessions.get — the polling stream snapshot is the same session read);
     # session files list through the per-session draft store
     # (sessions.files.list); single artifacts read through the confined
-    # workspace file host (workspace.files, default inspect action). The
-    # curated starter-kit list has no backend, and task submit carries no
-    # session for the turn path — both keep honest typed gates.
+    # workspace file host (workspace.files, default inspect action). Starter
+    # kits are the static curated list (``family_bot_harness`` — every named
+    # skill/plugin exists locally); task submit composes session_create +
+    # turn on the canonical session authority.
     {"family": "harness", "action": "harnesses", "methods": ["GET"],
      "gateway": "agents.list", "kind": "read"},
     {"family": "harness", "action": "starter_kits", "methods": ["GET"],
-     "gateway": None, "kind": "read",
-     "gate": {"code": "HARNESS_STARTER_KITS_UNWIRED",
-              "detail": "the curated starter-kit list has no backend; "
-                        "nothing is listed",
-              "counterpart": "none yet (static curated list is a "
-                             "follow-up, not a live backend)"}},
+     "gateway": "harness.starter_kits", "kind": "read"},
     {"family": "harness", "action": "plugins", "methods": ["GET"],
      "gateway": "plugins.list", "kind": "read"},
     {"family": "harness", "action": "tasks", "methods": ["GET"],
      "gateway": "tasks.list", "kind": "read"},
     {"family": "harness", "action": "task_submit", "methods": ["POST"],
-     "gateway": None, "kind": "mutation",
-     "gate": {"code": "HARNESS_TASK_SUBMIT_UNWIRED",
-              "detail": "task submit carries no session for the turn path "
-                        "and no sessionless runner is registered; nothing "
-                        "is submitted",
-              "counterpart": "POST /api/qubit/harness/session_create "
-                             "(canonical session) then a turn from that "
-                             "session"}},
+     "gateway": "harness.task_submit", "kind": "mutation"},
     {"family": "harness", "action": "task_cancel", "methods": ["POST"],
      "gateway": "tasks.cancel", "kind": "mutation"},
     {"family": "harness", "action": "session_create", "methods": ["POST"],
@@ -17392,6 +17339,11 @@ def _ensure_family_backends(registry: Any) -> None:
 
     for _name, _fn in dict(
             getattr(_CTX, "VIKING_GATEWAY_METHODS", {})).items():
+        registry.register(_name, _fn)
+    from . import family_bot_harness as _FBH
+
+    for _name, _fn in dict(
+            getattr(_FBH, "BOT_HARNESS_GATEWAY_METHODS", {})).items():
         registry.register(_name, _fn)
 
 
