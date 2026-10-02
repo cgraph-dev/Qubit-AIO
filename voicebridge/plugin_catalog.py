@@ -70,8 +70,8 @@ INDEX_INSTALL_PREREQUISITE = (
     "only curated entries install, and only at their pinned ref")
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 #: Local memo of index rows proven uninstallable (e.g. the upstream YAML's
-#: subdir does not exist at the pinned SHA — upstream data drift Hermes would
-#: hit identically). Keyed ``"<name>\0<pin>"`` -> reason. A failed install
+#: subdir does not exist at the pinned SHA — upstream data drift the reference
+#: would hit identically). Keyed ``"<name>\0<pin>"`` -> reason. A failed install
 #: teaches the catalog instead of failing the same way forever.
 _KNOWN_BAD_FILENAME = "plugin-index-known-bad.json"
 _SUBDIR_MISSING_MARK = "does not exist in the repository"
@@ -749,7 +749,7 @@ def install_from_index(cfg: Any, catalog_name: str, *, ref: str = "",
             f"plugin scan blocked install of {upstream!r}: {exc}") from exc
     except PluginOperationError as exc:
         # Upstream data drift (e.g. the YAML's subdir does not exist at the
-        # pinned SHA — Hermes fails the identical install the identical way):
+        # pinned SHA — the reference fails the identical install the identical way):
         # teach the catalog so the row shows BROKEN with the reason instead
         # of failing the same way on every retry.
         if _SUBDIR_MISSING_MARK in str(exc):

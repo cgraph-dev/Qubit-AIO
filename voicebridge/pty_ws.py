@@ -332,7 +332,7 @@ def _default_spawn(cols: int, rows: int, resume: str, profile: str,
     #  (1) merge the ONE Qubit MCP registry into the runtime home config.yaml so
     #      the TUI sees the same configured servers (additive/atomic/backed up);
     #  (2) ensure an explicit resume target in the canonical store so the TUI
-    #      resumes a real transcript; an empty resume means FRESH (Hermes
+    #      resumes a real transcript; an empty resume means FRESH (reference
     #      parity — no RESUME env, the TUI forges a new session via
     #      session.create instead of reopening dashboard-chat).
     from . import terminal_bridge as TB

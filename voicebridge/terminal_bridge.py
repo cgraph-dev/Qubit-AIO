@@ -15,7 +15,7 @@ surface before that terminal is spawned:
 * **One conversation** — an explicit ``?resume=<id>`` terminal session is
   ensured in the canonical store (:func:`voicebridge.agent.resolve_session_id`
   verbatim path) so the vendored TUI resumes the transcript the other
-  surfaces write. An empty resume means FRESH (Hermes parity): no row is
+   surfaces write. An empty resume means FRESH (reference parity): no row is
   ensured and no resume env is emitted, so the TUI forges a new session.
 
 No PTY is created, no server is connected, and no credential is resolved here.
@@ -219,7 +219,7 @@ def canonical_terminal_session(cfg: Any, requested: Optional[str] = None
                                ) -> Dict[str, Any]:
     """Resolve the ``/chat`` session to a resume target, or fresh when empty.
 
-    Hermes parity (``hermes_cli/web_routers/chat_ws.py`` + ``web_server_chat``):
+    Reference parity (``hermes_cli/web_routers/chat_ws.py`` + ``web_server_chat``):
     an empty ``resume`` means a FRESH chat — no ``HERMES_TUI_RESUME`` env, so
     the vendored TUI forges a brand-new session via ``session.create``. Only an
     explicit non-empty id is kept verbatim (and ensured in the canonical store
