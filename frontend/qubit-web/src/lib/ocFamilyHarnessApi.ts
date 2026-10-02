@@ -22,7 +22,10 @@
  * Port mapping (existing Qubit backends the bridge must wire these to):
  * - harnesses/tasks onto `WorkerGuard` `agent.session` roster + the planner
  *   tool backends + the `codex-runtime` port.
- * - task_submit/task_cancel onto the read-only task ledger
+ * - task_submit onto `harness.task_submit` (`family_bot_harness.py`):
+ *   composes the canonical session create (`sessions.create`) with one
+ *   real agent turn (`conversations.turn`) — exactly the counterpart the
+ *   old typed gate named. task_cancel onto the read-only task ledger
  *   (`voicebridge/task_ledger.py`: `list_tasks` / `show`) for history plus
  *   `voicebridge.actions.ActionStore.cancel` (by receipt) /
  *   `voicebridge.chat_transport.cancel` (by session) for live work — the same
@@ -31,8 +34,11 @@
  *   store (the same store the Sessions page reads).
  * - files/artifact_get onto the brokered file ops (`local.files_*` —
  *   path-confined, confirm + audit + e-stop).
- * - starter_kits/plugins onto the local curated kit list and the real plugin
- *   catalog (read-only rows; remote install stays operator-gated).
+ * - starter_kits onto `harness.starter_kits` (`family_bot_harness.py`):
+ *   the static curated kit list (every named skill/plugin exists
+ *   locally); kit Launch submits the kit starter prompt through the real
+ *   `task_submit` row. plugins onto the real plugin catalog (read-only
+ *   rows; remote install stays operator-gated).
  *
  * The upstream reference harness is deliberately NOT wired: upstream supports
  * it, Qubit neither renders nor routes it (no row, no path, no fallback).
@@ -181,6 +187,36 @@ export function routePath(action: HarnessFamilyAction): HarnessFamilyRoute | und
   return ROUTES.find((r) => r.action === action);
 }
 
+/**
+ * Bridge gate codes the page treats as "honestly disabled-with-reason"
+ * (verified against the `qubit_compat.py` harness manifest: both rows answer
+ * 403 with these codes, never 2xx and never a payload).
+ */
+export const HARNESS_STARTER_KITS_GATE = "HARNESS_STARTER_KITS_UNWIRED";
+export const HARNESS_TASK_SUBMIT_GATE = "HARNESS_TASK_SUBMIT_UNWIRED";
+
+/**
+ * Pull a `HARNESS_*_UNWIRED` gate code out of a caught bridge error, or null
+ * when the failure is anything else (network, 409 staging, typed 4xx).
+ * Reads the raw body first (`ApiError.body` carries the compat envelope),
+ * then falls back to the human message.
+ */
+export function bridgeGateOf(err: unknown): string | null {
+  const texts: string[] = [];
+  if (err && typeof err === "object") {
+    const rec = err as Record<string, unknown>;
+    if (typeof rec.body === "string") texts.push(rec.body);
+    if (err instanceof Error && err.message) texts.push(err.message);
+  } else if (typeof err === "string") {
+    texts.push(err);
+  }
+  for (const text of texts) {
+    const hit = /HARNESS_[A-Z0-9]+_UNWIRED/.exec(text);
+    if (hit) return hit[0];
+  }
+  return null;
+}
+
 function getUrl(action: Extract<HarnessFamilyAction, "harnesses" | "starter_kits" | "plugins" | "tasks">): string;
 function getUrl(
   action: "session_inspect" | "stream" | "files" | "artifact_get",
@@ -217,6 +253,7 @@ export interface QubitHarness {
   backend?: string;
   state?: string;
   description?: string;
+  prompt?: string;
 }
 
 export interface QubitHarnessFailure {
@@ -275,9 +312,10 @@ export function normalizeHarness(row: Record<string, unknown>): QubitHarness {
   return {
     id: str(row.id ?? row.harness_id ?? row.harnessId ?? row.name),
     kind,
-    backend: str(row.backend ?? row.runtime ?? row.provider) || undefined,
+    backend: str(row.backend ?? row.runtime ?? row.provider ?? row.route) || undefined,
     state: str(row.state ?? row.status) || undefined,
     description: str(row.description ?? row.summary ?? row.title) || undefined,
+    prompt: str(row.prompt) || undefined,
   };
 }
 
@@ -285,7 +323,7 @@ export function normalizeHarnesses(payload: unknown): QubitHarness[] {
   if (!payload || typeof payload !== "object") return [];
   const env = payload as Record<string, unknown>;
   const inner = (env.result ?? env) as Record<string, unknown>;
-  return asArray(inner.harnesses ?? inner.items ?? inner.rows)
+  return asArray(inner.harnesses ?? inner.items ?? inner.rows ?? inner.kits ?? inner.agents ?? inner.plugins)
     .map(normalizeHarness)
     .filter((h) => h.id !== "");
 }

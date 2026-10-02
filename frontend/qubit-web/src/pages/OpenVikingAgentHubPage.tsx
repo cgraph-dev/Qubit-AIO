@@ -5,11 +5,22 @@
  * and skills catalog via `@/lib/ocFamilyVikingApi` (`bot_sessions`,
  * `skills_list`). Read-only; each panel degrades independently — a
  * bridge row that still 404s renders honestly disabled with reason.
+ *
+ * Visual language matches SessionsPage/ChannelsPage: the layout owns the
+ * page title (see ROUTE_TITLES), so this page renders no `h1`; panels
+ * are `Card`s and page loading is a centered `Spinner`.
  */
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
-import { ArrowLeft, Bot, Wrench } from "lucide-react";
+import { Bot, Wrench } from "lucide-react";
+import { Badge } from "@nous-research/ui/ui/components/badge";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@nous-research/ui/ui/components/card";
+import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import {
   isBridgeRowMissing,
   listVikingBotSessions,
@@ -74,66 +85,109 @@ export default function OpenVikingAgentHubPage() {
     };
   }, []);
 
-  return (
-    <div className="flex flex-col gap-4 p-4" data-testid="open-viking-agent-hub-page">
-      <header className="flex items-center gap-3">
-        <Link to="/open-viking" className="flex items-center gap-1 text-sm hover:underline">
-          <ArrowLeft className="h-4 w-4" aria-hidden /> Open Viking
-        </Link>
-        <h1 className="text-xl font-semibold">Agent Hub</h1>
-      </header>
+  if (state === "loading") {
+    return (
+      <div
+        className="flex items-center justify-center py-24"
+        data-testid="open-viking-agent-hub-page"
+      >
+        <Spinner className="text-2xl text-primary" aria-label="Loading agent hub" />
+      </div>
+    );
+  }
 
-      {state === "loading" && <p className="text-sm text-muted-foreground">Loading…</p>}
-      {state === "error" && <p className="text-sm text-destructive">{error}</p>}
+  return (
+    <div className="flex flex-col gap-6" data-testid="open-viking-agent-hub-page">
+      <p className="text-xs text-muted-foreground">
+        Bot sessions and skills from the local context engine.
+      </p>
+
+      {state === "error" && (
+        <p className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
       {state === "done" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-md border p-3" aria-label="Bot sessions">
-            <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              <Bot className="h-4 w-4" aria-hidden /> VikingBot sessions ({sessions.length})
-            </h2>
-            {sessionsMissing ? (
-              <p className="text-sm text-muted-foreground" data-testid="viking-sessions-unavailable">
-                Bot-sessions bridge row missing — the J1 lane has not landed it yet.
-              </p>
-            ) : sessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No bot sessions.</p>
-            ) : (
-              <ul className="flex flex-col gap-2" data-testid="viking-bot-sessions">
-                {sessions.map((s) => (
-                  <li key={s.id} className="rounded border p-2 text-sm">
-                    <p className="font-medium">{s.title || s.id}</p>
-                    <p className="font-mono text-xs text-muted-foreground">{s.id}</p>
-                    {s.state && <p className="text-xs text-muted-foreground">state: {s.state}</p>}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <Card aria-label="Bot sessions">
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle>
+                <span className="flex items-center gap-2">
+                  <Bot className="h-4 w-4" aria-hidden /> Bot sessions
+                </span>
+              </CardTitle>
+              <Badge tone="secondary" className="text-xs tabular-nums">
+                {sessionsMissing ? "—" : sessions.length}
+              </Badge>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {sessionsMissing ? (
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="viking-sessions-unavailable"
+                >
+                  Bot sessions couldn't be loaded — try Refresh.
+                </p>
+              ) : sessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No bot sessions.</p>
+              ) : (
+                <ul className="flex flex-col gap-2" data-testid="viking-bot-sessions">
+                  {sessions.map((s) => (
+                    <li key={s.id} className="border border-border p-2 text-sm">
+                      <p className="font-medium">{s.title || s.id}</p>
+                      <p className="font-courier text-xs text-muted-foreground">
+                        {s.id}
+                      </p>
+                      {s.state && (
+                        <p className="text-xs text-muted-foreground">
+                          state: {s.state}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
 
-          <section className="rounded-md border p-3" aria-label="Skills">
-            <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              <Wrench className="h-4 w-4" aria-hidden /> Skills ({skills.length})
-            </h2>
-            {skillsMissing ? (
-              <p className="text-sm text-muted-foreground" data-testid="viking-skills-unavailable">
-                Skills bridge row missing — the J1 lane has not landed it yet.
-              </p>
-            ) : skills.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No skills.</p>
-            ) : (
-              <ul className="flex flex-col gap-2" data-testid="viking-skills">
-                {skills.map((s) => (
-                  <li key={s.id} className="rounded border p-2 text-sm">
-                    <p className="font-medium">{s.title || s.id}</p>
-                    {s.description && (
-                      <p className="text-xs text-muted-foreground">{s.description}</p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <Card aria-label="Skills">
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle>
+                <span className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4" aria-hidden /> Skills
+                </span>
+              </CardTitle>
+              <Badge tone="secondary" className="text-xs tabular-nums">
+                {skillsMissing ? "—" : skills.length}
+              </Badge>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {skillsMissing ? (
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="viking-skills-unavailable"
+                >
+                  Skills couldn't be loaded — try Refresh.
+                </p>
+              ) : skills.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No skills.</p>
+              ) : (
+                <ul className="flex flex-col gap-2" data-testid="viking-skills">
+                  {skills.map((s) => (
+                    <li key={s.id} className="border border-border p-2 text-sm">
+                      <p className="font-medium">{s.title || s.id}</p>
+                      {s.description && (
+                        <p className="text-xs text-muted-foreground break-words">
+                          {s.description}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

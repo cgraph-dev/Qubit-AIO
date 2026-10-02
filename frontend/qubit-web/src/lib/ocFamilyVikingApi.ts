@@ -243,6 +243,31 @@ export function normalizeContextTree(payload: unknown): Partial<Record<VikingCon
   const inner = (isRecord(payload.result) ? payload.result : payload) as Record<string, unknown>;
   const tree = isRecord(inner.tree) ? inner.tree : inner;
   const out: Partial<Record<VikingContextGroup, VikingContextNode[]>> = {};
+  // Backend shape: `{ groups: [{ key, label, nodes: [...] }] }` where the
+  // key is the engine section (`user`, `agent`, `resources`, `skills`, …).
+  // Older/test payloads key nodes directly by UI group name; accept both.
+  const GROUP_KEY_ALIASES: Record<string, VikingContextGroup> = {
+    user: "user_memories",
+    agent: "bot",
+    resources: "resources",
+    skills: "skills",
+    peers: "peers",
+    entities: "entities",
+    preferences: "preferences",
+    profiles: "profiles",
+    sessions: "sessions",
+  };
+  const groups = Array.isArray(tree.groups) ? tree.groups : null;
+  if (groups) {
+    for (const g of groups) {
+      if (!isRecord(g)) continue;
+      const alias = GROUP_KEY_ALIASES[str(g.key)];
+      if (!alias) continue;
+      const rows = asArray(g.nodes);
+      if (rows.length > 0) out[alias] = rows.map(normalizeNode);
+    }
+    return out;
+  }
   for (const { key } of VIKING_CONTEXT_GROUPS) {
     const rows = asArray(tree[key]);
     if (rows.length > 0) out[key] = rows.map(normalizeNode);

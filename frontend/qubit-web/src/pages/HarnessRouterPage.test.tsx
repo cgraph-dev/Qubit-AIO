@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 /**
- * HarnessRouterPage — mocked harness-switch + cancel assertions.
+ * HarnessRouterPage — console IA: index dashboard, harness detail (submit
+ * switch + cancel), kits and plugins views.
  *
  * Mocks the `/api/qubit/harness/*` family at the fetch boundary (no backend
  * needed): pins that the task submit carries the switched harness id and
- * that Cancel posts the task id to `task_cancel`.
+ * that Cancel posts the task id to `task_cancel`. View navigation is driven
+ * through the sidebar like the upstream console (dashboard row, harness
+ * folders, Starter Kits, Plugins).
  */
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -58,6 +61,14 @@ function query(sel: string): HTMLElement {
   return el as HTMLElement;
 }
 
+function queryButtonText(text: string): HTMLElement {
+  const found = Array.from(container.querySelectorAll("button")).find(
+    (b) => (b.textContent ?? "").includes(text),
+  );
+  if (!found) throw new Error(`missing button ${text}`);
+  return found as HTMLElement;
+}
+
 async function renderPage() {
   const { default: HarnessRouterPage } = await import("./HarnessRouterPage");
   container = document.createElement("div");
@@ -66,6 +77,13 @@ async function renderPage() {
   await act(async () => root.render(<HarnessRouterPage /> as ReactNode));
   await waitFor(() => Boolean(container.querySelector('[data-testid="harness-router-page"]')));
   await waitFor(() => Boolean(container.querySelector('[data-testid="harness-qubit-worker"]')));
+}
+
+async function openHarness(id: string) {
+  await act(async () => {
+    query(`[data-testid="harness-${id}"]`).click();
+  });
+  await waitFor(() => Boolean(container.querySelector('[data-testid="section-submit-task"]')));
 }
 
 beforeEach(() => {
@@ -100,13 +118,25 @@ describe("HarnessRouterPage", () => {
     await renderPage();
     expect(container.querySelector('[data-testid="harness-qubit-worker"]')).toBeTruthy();
     expect(container.querySelector('[data-testid="harness-qubit-codex"]')).toBeTruthy();
-    expect(container.querySelector('[data-testid="kit-qubit-starter-docs"]')).toBeTruthy();
-    expect(container.querySelector('[data-testid="plugin-qubit-plugin-kanban"]')).toBeTruthy();
+    await act(async () => {
+      queryButtonText("Starter Kits").click();
+    });
+    await waitFor(() => Boolean(container.querySelector('[data-testid="kit-qubit-starter-docs"]')));
+    await act(async () => {
+      queryButtonText("Plugins").click();
+    });
+    await waitFor(() => Boolean(container.querySelector('[data-testid="plugin-qubit-plugin-kanban"]')));
+    await act(async () => {
+      queryButtonText("Dashboard").click();
+    });
+    await waitFor(() => Boolean(container.querySelector('[data-testid="harness-qubit-worker"]')));
+    await openHarness("qubit-worker");
     expect(container.querySelector('[data-testid="task-task-1"]')).toBeTruthy();
   });
 
   it("submits with the switched harness", async () => {
     await renderPage();
+    await openHarness("qubit-worker");
     const prompt = query('[data-testid="harness-task-prompt"]') as HTMLInputElement;
     await act(async () => {
       prompt.focus();
@@ -132,6 +162,7 @@ describe("HarnessRouterPage", () => {
 
   it("cancels a task by id", async () => {
     await renderPage();
+    await openHarness("qubit-worker");
     await act(async () => {
       query('[data-testid="cancel-task-1"]').click();
     });
