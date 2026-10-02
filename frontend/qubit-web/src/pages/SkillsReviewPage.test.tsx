@@ -159,6 +159,36 @@ describe("SkillsReviewPage", () => {
     expect(apiMocks.listProposalEvents).toHaveBeenCalled();
   });
 
+  it("lifecycle tabs filter the queue through the same list endpoint", async () => {
+    await renderPage();
+    await waitFor(() => byTestId("sr-tab-pending") !== null);
+    expect(byTestId("sr-tab-all")).not.toBeNull();
+    expect(byTestId("sr-tab-quarantined")).not.toBeNull();
+    expect(byTestId("sr-tab-stale")).not.toBeNull();
+    const callsBefore = apiMocks.listProposals.mock.calls.length;
+    await act(async () => {
+      byTestId("sr-tab-pending")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    await waitFor(() => apiMocks.listProposals.mock.calls.length > callsBefore);
+    const last =
+      apiMocks.listProposals.mock.calls[apiMocks.listProposals.mock.calls.length - 1];
+    expect(last[0]).toBe("pending");
+  });
+
+  it("refresh re-reads the queue through the same list endpoint", async () => {
+    await renderPage();
+    await waitFor(() => byTestId("sr-refresh") !== null);
+    const callsBefore = apiMocks.listProposals.mock.calls.length;
+    await act(async () => {
+      byTestId("sr-refresh")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    await waitFor(() => apiMocks.listProposals.mock.calls.length > callsBefore);
+  });
+
   it("refusal rows are disabled and show the exact prerequisite", async () => {
     await renderPage();
     await waitFor(() => byTestId("sr-row-skill-a") !== null);

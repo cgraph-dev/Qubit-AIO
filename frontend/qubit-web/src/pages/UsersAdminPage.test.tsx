@@ -149,6 +149,36 @@ describe("UsersAdminPage", () => {
     expect(byTestId("users-auth-handoff")?.textContent).toContain("qubit auth login");
   });
 
+  it("summary stats render the real store counts", async () => {
+    apiMocks.listOperators.mockResolvedValue({
+      state: "OK",
+      profiles: [{ id: "local-operator" }],
+      count: 1,
+    });
+    apiMocks.listModelAccounts.mockResolvedValue({
+      state: "OK",
+      accounts: [{ profile_id: "p1" }],
+      count: 1,
+      active: "p1",
+    });
+    await renderPage();
+    await waitFor(() => byTestId("users-stats") !== null);
+    expect(byTestId("users-stat-operators")?.textContent).toContain("1");
+    expect(byTestId("users-stat-accounts")?.textContent).toContain("1");
+  });
+
+  it("refresh re-reads the operator stores", async () => {
+    await renderPage();
+    await waitFor(() => byTestId("users-refresh") !== null);
+    const callsBefore = apiMocks.getOperatorSelf.mock.calls.length;
+    await act(async () => {
+      byTestId("users-refresh")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    await waitFor(() => apiMocks.getOperatorSelf.mock.calls.length > callsBefore);
+  });
+
   it("display-name/role/avatar/email/GitHub/auth-start are disabled with reasons", async () => {
     await renderPage();
     await waitFor(() => byTestId("users-operator-card") !== null);

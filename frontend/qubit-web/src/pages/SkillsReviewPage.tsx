@@ -1,6 +1,11 @@
 /**
  * Skills review queue (`/admin/skills-review`).
  *
+ * Mirrors the upstream skill workshop board (lifecycle tabs + proposal queue
+ * + inspect detail + revision dialog) and the upstream skills card (header
+ * with refresh, filter row with a shown-count, grouped rows with status
+ * chips, detail with overview tabs), rebranded to Qubit voice.
+ *
  * The verified-skill proposals surface the main Skills page intentionally
  * does not cover: the pending queue (list/inspect rows), the owner-gated
  * verdicts (Apply / Reject / Quarantine / Revise / Update-staged /
@@ -33,6 +38,28 @@ import { refusalOrError } from "@/lib/policy-refusal";
 
 /** Button press IS the confirmation (same pattern as the product pages). */
 const CONFIRM_YES = () => true;
+
+/**
+ * Lifecycle tabs mirror the upstream workshop board tabs. "all" maps to the
+ * empty filter (unfiltered queue).
+ */
+const STATUS_TABS = [
+  { id: "all", label: "All", status: "" },
+  { id: "pending", label: "Pending", status: "pending" },
+  { id: "applied", label: "Applied", status: "applied" },
+  { id: "rejected", label: "Rejected", status: "rejected" },
+  { id: "quarantined", label: "Quarantined", status: "quarantined" },
+  { id: "stale", label: "Stale", status: "stale" },
+] as const;
+
+function statusChipClass(status: unknown): string {
+  if (status === "applied") return "text-success";
+  if (status === "pending") return "text-warning";
+  if (status === "rejected" || status === "quarantined" || status === "stale") {
+    return "text-destructive";
+  }
+  return "text-muted-foreground";
+}
 
 function errText(e: unknown, fallback: string): string {
   return refusalOrError(e, `${fallback}: ${e instanceof Error ? e.message : String(e)}`);
@@ -83,6 +110,14 @@ export default function SkillsReviewPage() {
   }, [refresh]);
 
   const handleFilter = () => void refresh(statusFilter.trim());
+
+  const handleTab = (status: string) => {
+    setStatusFilter(status);
+    void refresh(status);
+  };
+
+  const activeTab = (status: string): boolean =>
+    (statusFilter.trim() || "") === status;
 
   const handleInspect = async (id: string) => {
     setInspecting(true);
@@ -148,13 +183,25 @@ export default function SkillsReviewPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="skills-review-page">
-      <header>
-        <h1 className="text-base font-semibold">Skills review queue</h1>
-        <p className="text-xs text-muted-foreground">
-          Pending verified-skill proposals: inspect, then Apply / Reject /
-          Quarantine. Reads via the content half; verdicts via the
-          mutations half (owner-gated, button press confirms).
-        </p>
+      {/* ── Card header: title + sub + refresh (upstream skills card) ── */}
+      <header className="flex flex-wrap items-start justify-between gap-2 rounded-none border border-border p-4">
+        <div>
+          <h1 className="text-base font-semibold">Skills review queue</h1>
+          <p className="text-xs text-muted-foreground">
+            Pending verified-skill proposals: inspect, then Apply / Reject /
+            Quarantine. Reads via the content half; verdicts via the
+            mutations half (owner-gated, button press confirms).
+          </p>
+        </div>
+        <button
+          type="button"
+          data-testid="sr-refresh"
+          className="h-8 border border-border px-3 text-xs uppercase"
+          disabled={loading}
+          onClick={() => void refresh(statusFilter.trim())}
+        >
+          {loading ? "Loading…" : "Refresh"}
+        </button>
       </header>
 
       {error && (
@@ -164,8 +211,29 @@ export default function SkillsReviewPage() {
       )}
       {notice && <p className="text-xs text-success">{notice}</p>}
 
-      {/* ── Queue filter + list ── */}
-      <section className="flex flex-col gap-2 rounded-none border border-border p-4">
+      {/* ── Queue card: lifecycle tabs + filter row + rows ── */}
+      <section className="flex flex-col gap-3 rounded-none border border-border p-4">
+        {/* Lifecycle tabs (upstream workshop board) */}
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Proposal status">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab(tab.status)}
+              data-testid={`sr-tab-${tab.id}`}
+              className={`border px-2 py-1 text-xs uppercase ${
+                activeTab(tab.status)
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border text-muted-foreground"
+              }`}
+              onClick={() => void handleTab(tab.status)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="sr-status" className="text-xs text-muted-foreground">
             Status filter
@@ -187,7 +255,7 @@ export default function SkillsReviewPage() {
             Filter
           </button>
           <span className="text-xs text-muted-foreground" data-testid="sr-count">
-            {loading ? "Loading…" : `${count} proposal${count === 1 ? "" : "s"}`}
+            {loading ? "Loading…" : `${count} shown`}
           </span>
           {journal && (
             <span className="text-xs text-muted-foreground" title={journal}>
@@ -214,7 +282,9 @@ export default function SkillsReviewPage() {
                 >
                   <code className="font-mono text-xs">{id || "(unidentified)"}</code>
                   {typeof p.status === "string" && (
-                    <span className="text-xs text-muted-foreground">{p.status}</span>
+                    <span className={`text-xs ${statusChipClass(p.status)}`}>
+                      {p.status}
+                    </span>
                   )}
                   <span className="ml-auto flex flex-wrap gap-1">
                     <button
@@ -287,39 +357,57 @@ export default function SkillsReviewPage() {
         </div>
       </section>
 
-      {/* ── Inspect detail + revise / update-staged / request-revision ── */}
+      {/* ── Inspect detail (upstream skills detail: header + overview) ── */}
       {selected && selectedId && (
         <section
           className="flex flex-col gap-2 rounded-none border border-border p-4"
           data-testid="sr-detail"
         >
-          <h2 className="text-sm font-medium">
-            Inspect: <code className="font-mono">{selectedId}</code>
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-medium">
+              <span
+                aria-hidden="true"
+                className={`inline-block h-2 w-2 rounded-full ${
+                  typeof selected.status === "string" &&
+                  (selected.status === "applied"
+                    ? "bg-success"
+                    : selected.status === "pending"
+                      ? "bg-warning"
+                      : "bg-destructive")
+                }`}
+              />
+              Inspect: <code className="font-mono">{selectedId}</code>
+              {typeof selected.status === "string" && (
+                <span className={`text-xs ${statusChipClass(selected.status)}`}>
+                  {selected.status}
+                </span>
+              )}
+            </h2>
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                data-testid="sr-events-open"
+                className="border border-border px-2 py-1 text-xs"
+                onClick={() => void openEvents(selectedId)}
+              >
+                Events
+              </button>
+              <button
+                type="button"
+                data-testid="sr-detail-close"
+                className="border border-border px-2 py-1 text-xs"
+                onClick={() => {
+                  setSelected(null);
+                  setSelectedId(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
           <pre className="max-h-64 overflow-auto border border-border bg-background/40 p-2 font-mono text-xs">
             {JSON.stringify(selected, null, 2)}
           </pre>
-          <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              data-testid="sr-events-open"
-              className="border border-border px-2 py-1 text-xs"
-              onClick={() => void openEvents(selectedId)}
-            >
-              Events
-            </button>
-            <button
-              type="button"
-              data-testid="sr-detail-close"
-              className="border border-border px-2 py-1 text-xs"
-              onClick={() => {
-                setSelected(null);
-                setSelectedId(null);
-              }}
-            >
-              Close
-            </button>
-          </div>
 
           <label htmlFor="sr-payload" className="text-xs text-muted-foreground">
             Revision payload (JSON object — used by Revise and Update-staged)

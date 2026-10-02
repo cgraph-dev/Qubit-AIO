@@ -1,6 +1,11 @@
 /**
  * MCP calls (`/admin/mcp-calls`).
  *
+ * Mirrors the upstream MCP view (summary header, operator-commands card,
+ * configured-server rows with enable/probe affordances) and the upstream
+ * debug view's manual-RPC card (method select + params JSON + call +
+ * result), rebranded to Qubit voice.
+ *
  * The direct-call half of the MCP surface the main MCP page does not
  * duplicate: invoke one tool on a configured server (server + tool +
  * args, confirm-gated), list resources, and read one resource by URI.
@@ -21,6 +26,17 @@ import { refusalOrError } from "@/lib/policy-refusal";
 
 /** Button press IS the confirmation (same pattern as the product pages). */
 const CONFIRM_YES = () => true;
+
+/**
+ * Operator commands mirror the upstream MCP operator-commands card,
+ * rebranded to the Qubit CLI.
+ */
+const OPERATOR_COMMANDS = [
+  "qubit mcp status --verbose",
+  "qubit mcp doctor --probe",
+  "qubit mcp login <name>",
+  "qubit mcp reload",
+] as const;
 
 function errText(e: unknown, fallback: string): string {
   return refusalOrError(e, `${fallback}: ${e instanceof Error ? e.message : String(e)}`);
@@ -118,14 +134,24 @@ export default function McpCallsPage() {
     }
   };
 
+  const resourceRows = resources?.resources ?? [];
+
   return (
     <div className="flex flex-col gap-4" data-testid="mcp-calls-page">
-      <header>
-        <h1 className="text-base font-semibold">MCP calls</h1>
-        <p className="text-xs text-muted-foreground">
-          Call one tool on a configured server, list resources, read one
-          resource. Tool calls are confirm-gated; button press confirms.
-        </p>
+      {/* ── Card header (upstream MCP summary header) ── */}
+      <header className="flex flex-wrap items-start justify-between gap-2 rounded-none border border-border p-4">
+        <div>
+          <h1 className="text-base font-semibold">MCP calls</h1>
+          <p className="text-xs text-muted-foreground">
+            Call one tool on a configured server, list resources, read one
+            resource. Tool calls are confirm-gated; button press confirms.
+          </p>
+        </div>
+        <span className="text-xs text-muted-foreground" data-testid="mc-summary">
+          {resourceRows.length > 0
+            ? `${resourceRows.length} resource${resourceRows.length === 1 ? "" : "s"} listed`
+            : "no listing yet"}
+        </span>
       </header>
 
       {error && (
@@ -135,9 +161,31 @@ export default function McpCallsPage() {
       )}
       {notice && <p className="text-xs text-success">{notice}</p>}
 
-      {/* ── Call tool ── */}
+      {/* ── Operator commands (upstream MCP operator-commands card) ── */}
+      <section
+        className="flex flex-col gap-2 rounded-none border border-border p-4"
+        data-testid="mc-op-commands"
+      >
+        <h2 className="text-sm font-medium">MCP operator commands</h2>
+        <p className="text-xs text-muted-foreground">
+          Status, diagnostics, auth, probing, and runtime reload — run in the
+          operator&apos;s own shell.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {OPERATOR_COMMANDS.map((cmd) => (
+            <code key={cmd} className="border border-border px-2 py-1 font-mono text-xs">
+              {cmd}
+            </code>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Manual call (upstream debug manual-RPC card) ── */}
       <section className="flex flex-col gap-2 rounded-none border border-border p-4">
         <h2 className="text-sm font-medium">Call tool</h2>
+        <p className="text-xs text-muted-foreground">
+          Method and params, invoked through the confirm round-trip.
+        </p>
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="mc-server" className="text-xs text-muted-foreground">
             Server
@@ -168,6 +216,7 @@ export default function McpCallsPage() {
         <textarea
           id="mc-args"
           data-testid="mc-args"
+          rows={6}
           className="min-h-[80px] border border-border bg-background px-2 py-1 font-mono text-xs"
           value={argsText}
           onChange={(e) => setArgsText(e.target.value)}
@@ -221,14 +270,14 @@ export default function McpCallsPage() {
         {resLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
         {resources && (
           <ul data-testid="mc-resources-list" className="flex flex-col gap-1">
-            {(resources.resources ?? []).length === 0 ? (
+            {resourceRows.length === 0 ? (
               <li className="text-xs text-muted-foreground">
                 {resources.code ? `${resources.code}: ` : ""}
                 {typeof resources.state === "string" ? `${resources.state} — ` : ""}
                 No resources exposed.
               </li>
             ) : (
-              (resources.resources ?? []).map((r, i) => (
+              resourceRows.map((r, i) => (
                 <li key={i} className="border border-border px-2 py-1 font-mono text-xs">
                   {JSON.stringify(r)}
                 </li>

@@ -1,6 +1,11 @@
 /**
  * Operator admin (`/admin/users`).
  *
+ * Mirrors the upstream nodes view (summary stats header, Devices card with
+ * pending/paired groups and refresh, list rows with status chips) and the
+ * upstream agents view (card-per-panel layout with a header action),
+ * rebranded to Qubit voice.
+ *
  * Qubit single-operator adapter — Qubit has no multi-user module. The one
  * loopback operator identity is read-only; dashboard font/theme prefs are
  * the real persisted preference store; credentials stay references-only
@@ -9,7 +14,7 @@
  * Display name, role, avatar, email, GitHub, and auth-start are
  * policy-refused: disabled with the exact prerequisite.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AUTH_LOGIN_HANDOFF,
   DISABLED_USERS_ACTIONS,
@@ -64,9 +69,9 @@ export default function UsersAdminPage() {
   const [selectSession, setSelectSession] = useState("");
   const [selectAccount, setSelectAccount] = useState("");
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.allSettled([
+  const load = useCallback(async () => {
+    setLoading(true);
+    const rows = await Promise.allSettled([
       getOperatorSelf(),
       listOperators(),
       listMentionable(),
@@ -74,33 +79,34 @@ export default function UsersAdminPage() {
       listAuthLinks(),
       listModelAccounts(),
       authConnectCatalog(),
-    ]).then((rows) => {
-      if (cancelled) return;
-      const [s, l, m, p, a, ma, c] = rows;
-      if (s.status === "fulfilled") setSelf(s.value.profile);
-      if (l.status === "fulfilled") setRoster(l.value.profiles ?? []);
-      if (m.status === "fulfilled") setMentionable(m.value.mentionable ?? []);
-      if (p.status === "fulfilled") {
-        setPrefs(p.value.entries ?? {});
-        setFont(String(p.value.entries?.font ?? ""));
-        setTheme(String(p.value.entries?.theme ?? ""));
-      }
-      if (a.status === "fulfilled") setLinks(a.value.links ?? []);
-      if (ma.status === "fulfilled") {
-        setAccounts(ma.value.accounts ?? []);
-        setActiveAccount(String(ma.value.active ?? ""));
-      }
-      if (c.status === "fulfilled") setCatalog(c.value.providers ?? []);
-      const failed = rows.find((r) => r.status === "rejected");
-      if (failed && failed.status === "rejected") {
-        setError(errText(failed.reason, "Operator admin failed to load"));
-      }
-      setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
+    ]);
+    const [s, l, m, p, a, ma, c] = rows;
+    if (s.status === "fulfilled") setSelf(s.value.profile);
+    if (l.status === "fulfilled") setRoster(l.value.profiles ?? []);
+    if (m.status === "fulfilled") setMentionable(m.value.mentionable ?? []);
+    if (p.status === "fulfilled") {
+      setPrefs(p.value.entries ?? {});
+      setFont(String(p.value.entries?.font ?? ""));
+      setTheme(String(p.value.entries?.theme ?? ""));
+    }
+    if (a.status === "fulfilled") setLinks(a.value.links ?? []);
+    if (ma.status === "fulfilled") {
+      setAccounts(ma.value.accounts ?? []);
+      setActiveAccount(String(ma.value.active ?? ""));
+    }
+    if (c.status === "fulfilled") setCatalog(c.value.providers ?? []);
+    const failed = rows.find((r) => r.status === "rejected");
+    if (failed && failed.status === "rejected") {
+      setError(errText(failed.reason, "Operator admin failed to load"));
+    } else {
+      setError(null);
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const refreshPrefsLinks = async () => {
     try {
@@ -144,13 +150,25 @@ export default function UsersAdminPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="users-admin-page">
-      <header>
-        <h1 className="text-base font-semibold">Operator admin</h1>
-        <p className="text-xs text-muted-foreground" data-testid="users-adapter-label">
-          Qubit single-operator adapter (no upstream users module): one
-          loopback operator, persisted dashboard prefs, reference-only
-          credentials.
-        </p>
+      {/* ── Card header + summary stats (upstream nodes summary header) ── */}
+      <header className="flex flex-wrap items-start justify-between gap-2 rounded-none border border-border p-4">
+        <div>
+          <h1 className="text-base font-semibold">Operator admin</h1>
+          <p className="text-xs text-muted-foreground" data-testid="users-adapter-label">
+            Qubit single-operator adapter (no upstream users module): one
+            loopback operator, persisted dashboard prefs, reference-only
+            credentials.
+          </p>
+        </div>
+        <button
+          type="button"
+          data-testid="users-refresh"
+          className="h-8 border border-border px-3 text-xs uppercase"
+          disabled={loading}
+          onClick={() => void load()}
+        >
+          {loading ? "Loading…" : "Refresh"}
+        </button>
       </header>
 
       {error && (
@@ -160,9 +178,48 @@ export default function UsersAdminPage() {
       )}
       {notice && <p className="text-xs text-success">{notice}</p>}
 
-      {/* ── Operator identity (read-only) ── */}
+      {/* ── Summary stats (real counts from the loaded stores) ── */}
+      <section
+        className="flex flex-wrap gap-4 rounded-none border border-border p-4"
+        data-testid="users-stats"
+        aria-label="Operator summary"
+      >
+        <div>
+          <div className="text-xs uppercase text-muted-foreground">Operators</div>
+          <div className="font-mono text-sm" data-testid="users-stat-operators">
+            {roster.length}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-muted-foreground">Mentionable</div>
+          <div className="font-mono text-sm" data-testid="users-stat-mentionable">
+            {mentionable.length}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-muted-foreground">Credential refs</div>
+          <div className="font-mono text-sm" data-testid="users-stat-links">
+            {links.length}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-muted-foreground">Model accounts</div>
+          <div className="font-mono text-sm" data-testid="users-stat-accounts">
+            {accounts.length}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Operator identity (read-only; upstream Devices-card groups) ── */}
       <section className="flex flex-col gap-2 rounded-none border border-border p-4">
-        <h2 className="text-sm font-medium">Operator (read-only)</h2>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-medium">Operator (read-only)</h2>
+            <p className="text-xs text-muted-foreground">
+              Paired operator identity and who can be mentioned.
+            </p>
+          </div>
+        </div>
         {loading ? (
           <p className="text-xs text-muted-foreground">Loading…</p>
         ) : (
@@ -184,6 +241,22 @@ export default function UsersAdminPage() {
               Roster: {roster.length} operator{roster.length === 1 ? "" : "s"} ·{" "}
               Mentionable: {mentionable.length}
             </p>
+            {roster.length > 0 && (
+              <ul data-testid="users-roster" className="flex flex-col gap-1">
+                {roster.map((op, i) => (
+                  <li
+                    key={String(op.id ?? i)}
+                    className="border border-border px-2 py-1 font-mono text-xs"
+                  >
+                    {String(op.displayName ?? op.id ?? `operator-${i}`)}
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {String(op.role ?? "operator")} · paired
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </section>

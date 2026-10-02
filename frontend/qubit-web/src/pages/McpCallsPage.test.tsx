@@ -128,6 +128,20 @@ describe("McpCallsPage", () => {
     expect(apiMocks.readMcpResource).toHaveBeenCalledWith("graft", "u1");
   });
 
+  it("operator commands card names the Qubit CLI surface", async () => {
+    await renderPage();
+    const card = byTestId("mc-op-commands");
+    expect(card).not.toBeNull();
+    for (const cmd of [
+      "qubit mcp status --verbose",
+      "qubit mcp doctor --probe",
+      "qubit mcp login <name>",
+      "qubit mcp reload",
+    ]) {
+      expect(card?.textContent).toContain(cmd);
+    }
+  });
+
   it("templates + update-model-context are disabled with the exact prerequisite", async () => {
     await renderPage();
     const { DISABLED_MCP_ACTIONS } = await import("@/lib/ocFamilyAdminApi");
