@@ -172,8 +172,45 @@ class _FakeChatStore:
                 "message_count": len(self.rows)}
 
 
-def test_turn_web_perplexity_ok_still_wins(monkeypatch):
-    """Perplexity-ok answers directly; the DDG fallback never runs."""
+def test_turn_web_ddg_ok_wins_without_paid_call(monkeypatch):
+    """Free-first (default): DDG-ok answers directly; Perplexity never runs.
+
+    Reconciliation 2026-10-02 (free-first lane): this replaces the old
+    ``test_turn_web_perplexity_ok_still_wins`` (paid-first contract). With
+    no ``intent.web_paid_first`` flag the no-key DDG layer runs first and
+    a hit wins, so a working paid key spends no quota a free search
+    covers. The paid layer must not execute (boom on call).
+    """
+    from voicebridge import chat_transport as CT
+    from voicebridge import orchestrator as ORC
+
+    def _boom(cfg, text, **kw):
+        raise AssertionError("paid path must not run when DDG wins")
+
+    monkeypatch.setattr(ORC, "answer_web_query", _boom)
+    monkeypatch.setattr(
+        CT, "_ddg_web_fallback",
+        lambda query: {"answer": "Aion 2: Q4 2026.",
+                       "sources": ["https://example/aion2"]})
+    fake = _FakeChatStore()
+    out = CT._turn_web({}, fake, "ddg-9u-1",
+                       "use perplexity to search when Aion 2 will release")
+    assert out.get("ok") is True, out
+    assert out.get("text") == "Aion 2: Q4 2026.", out
+    assert out.get("sources") == ["https://example/aion2"], out
+    assert out.get("route") == "web", out
+    receipt = out.get("receipt") or {}
+    assert receipt.get("route") == "web", receipt
+    assert receipt.get("sources") == ["https://example/aion2"], receipt
+    assert "model" in receipt, receipt
+
+
+def test_turn_web_paid_first_flag_restores_paid_order(monkeypatch):
+    """Opt-out: ``intent.web_paid_first: true`` tries paid first again.
+
+    New contract 2026-10-02 (free-first lane): the owner can flip the
+    order back. Paid-ok answers directly and the DDG fallback never runs.
+    """
     from voicebridge import chat_transport as CT
     from voicebridge import orchestrator as ORC
 
@@ -188,7 +225,8 @@ def test_turn_web_perplexity_ok_still_wins(monkeypatch):
 
     monkeypatch.setattr(CT, "_ddg_web_fallback", _boom)
     fake = _FakeChatStore()
-    out = CT._turn_web({}, fake, "ddg-9u-1",
+    out = CT._turn_web({"intent": {"web_paid_first": True}}, fake,
+                       "ddg-9u-1b",
                        "use perplexity to search when Aion 2 will release")
     assert out.get("ok") is True, out
     assert out.get("text") == "Perplexity answer", out
@@ -201,7 +239,9 @@ def test_turn_web_perplexity_ok_still_wins(monkeypatch):
 
 
 def test_turn_web_perplexity_down_ddg_ok_answers_with_sources(monkeypatch):
-    """Perplexity-down + DDG-ok answers with real DDG result URLs as sources."""
+    """DDG-miss order note: free-first tries DDG first, so DDG-ok wins here
+    without the paid layer; the paid-down mock stands in for the fallback
+    attempt when DDG misses (pinned by the next test's flag case)."""
     from voicebridge import chat_transport as CT
     from voicebridge import orchestrator as ORC
 
@@ -230,6 +270,34 @@ def test_turn_web_perplexity_down_ddg_ok_answers_with_sources(monkeypatch):
     # Persisted transcript carries the sources (no fabrication).
     assert any("https://example/aion2" in str(r.get("content", ""))
                for r in fake.rows), fake.rows
+
+
+def test_turn_web_ddg_miss_falls_back_to_paid(monkeypatch):
+    """DDG-miss → paid layer attempted (paid wins when DDG has nothing).
+
+    New contract 2026-10-02 (free-first lane): the paid fallback still
+    fires when the free layer misses, so a DDG outage does not lose the
+    paid capability the owner already configured.
+    """
+    from voicebridge import chat_transport as CT
+    from voicebridge import orchestrator as ORC
+
+    monkeypatch.setattr(
+        ORC, "answer_web_query",
+        lambda cfg, text, **kw: {"ok": True, "answer": "Perplexity answer",
+                                 "sources": ["https://example/aion2"],
+                                 "code": "OK"})
+    monkeypatch.setattr(CT, "_ddg_web_fallback", lambda query: None)
+    fake = _FakeChatStore()
+    out = CT._turn_web({}, fake, "ddg-9u-2b",
+                       "use perplexity to search when Aion 2 will release")
+    assert out.get("ok") is True, out
+    assert out.get("text") == "Perplexity answer", out
+    assert out.get("sources") == ["https://example/aion2"], out
+    assert out.get("route") == "web", out
+    receipt = out.get("receipt") or {}
+    assert receipt.get("route") == "web", receipt
+    assert "model" in receipt, receipt
 
 
 def test_turn_web_both_down_stays_web_unavailable(monkeypatch):

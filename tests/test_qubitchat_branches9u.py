@@ -59,6 +59,10 @@ def test_web_branch_executes_with_sources(monkeypatch):
                                  "answer": "Aion 2 releases Q4 2026.",
                                  "sources": ["https://example/aion2"],
                                  "code": "OK"})
+    # Reconciliation 2026-10-02 (free-first lane): the turn now tries the
+    # no-key DDG layer first, so this hermetic test pins DDG to a miss —
+    # the paid mock above then executes, with no network touched.
+    monkeypatch.setattr(CT, "_ddg_web_fallback", lambda query: None)
     out = CT.turn({}, "use perplexity api to search when Aion 2 will release",
                   session="test-branch-web-9u")
     assert out.get("ok") is True, out

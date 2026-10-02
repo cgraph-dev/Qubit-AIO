@@ -1414,30 +1414,76 @@ def _ddg_web_fallback(query: str) -> Optional[Dict[str, Any]]:
             "sources": sources}
 
 
+def _web_paid_first(cfg: Any) -> bool:
+    """Owner flag ``intent.web_paid_first`` (default False = free-first).
+
+    Free-first (default): the no-key DDG fallback runs FIRST and a paid
+    Perplexity call is only attempted when DDG misses — so a configured
+    paid key never spends quota a free search could have covered. Setting
+    ``intent.web_paid_first: true`` restores the paid-first order
+    (Perplexity first, DDG as fallback). Read-only; any unreadable value
+    degrades to False (free-first). Never touches a key.
+    """
+    try:
+        return bool(_cfg_flag(cfg, "intent", "web_paid_first",
+                              default=False))
+    except Exception:  # noqa: BLE001 - degraded to free-first, never fatal
+        return False
+
+
 def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
-    """Wave C Task 2: execute a web answer, never chatter about searching."""
+    """Wave C Task 2: execute a web answer, never chatter about searching.
+
+    Free-first order (default; see :func:`_web_paid_first`): the no-key
+    DDG fallback runs first and wins without any paid call; the paid
+    Perplexity path (``orchestrator.answer_web_query``) runs only when
+    DDG misses. With ``intent.web_paid_first: true`` the order flips back
+    (paid first, DDG as fallback). Both layers down stays a typed
+    ``WEB_UNAVAILABLE`` — nothing is fabricated, and no key is ever logged
+    (audits carry session/code/counts only). Both orders return the same
+    receipt shape ``{route: web, sources, model}``.
+    """
     from . import orchestrator as ORC
 
-    try:
-        web = ORC.answer_web_query(cfg, task_text)
-    except Exception as exc:  # noqa: BLE001 - typed, never fabricated
-        _audit("turn_web_error", session=sid, error=str(exc))
-        web = {"ok": False, "code": "WEB_UNAVAILABLE", "answer": str(exc)[:200]}
-    if not isinstance(web, dict) or not web.get("ok"):
-        code = str((web or {}).get("code") or "WEB_UNAVAILABLE")
-        detail = str((web or {}).get("answer") or "")[:200] or \
-            "web search unavailable; nothing was fabricated"
-        _audit("turn_web_unavailable", session=sid, code=code)
-        fb = _ddg_web_fallback(task_text)
-        if fb is None:
-            return {"ok": False, "state": "FAILED", "code": code,
-                    "detail": detail, "session_id": sid, "route": "web"}
+    paid_first = _web_paid_first(cfg)
+
+    def _paid_attempt() -> Dict[str, Any]:
+        try:
+            web = ORC.answer_web_query(cfg, task_text)
+        except Exception as exc:  # noqa: BLE001 - typed, never fabricated
+            _audit("turn_web_error", session=sid, error=str(exc))
+            web = {"ok": False, "code": "WEB_UNAVAILABLE",
+                   "answer": str(exc)[:200]}
+        return web if isinstance(web, dict) else {
+            "ok": False, "code": "WEB_UNAVAILABLE", "answer": ""}
+
+    def _paid_ok(web: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if not web.get("ok"):
+            return None
+        answer = str(web.get("answer") or "")
+        sources = [str(s) for s in (web.get("sources") or [])
+                   if str(s).strip()]
+        if not answer.strip():
+            return None
+        body = answer + ("\n\nSources:\n" + "\n".join(sources)
+                         if sources else "")
+        st.append(sid, "assistant", body,
+                  meta={"route": "web", "sources": sources or None})
+        _audit("turn_web", session=sid, sources=len(sources))
+        return {"ok": True, "text": answer, "reply": answer,
+                "sources": sources, "session_id": sid, "session": sid,
+                "route": "web",
+                "receipt": _branch_receipt("web", task=task_text,
+                                           sources=sources, cfg=cfg)}
+
+    def _free_ok(fb: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(fb, dict):
+            return None
         answer = str(fb.get("answer") or "")
         sources = [str(s) for s in (fb.get("sources") or [])
                    if str(s).strip()]
         if not answer.strip() or not sources:
-            return {"ok": False, "state": "FAILED", "code": code,
-                    "detail": detail, "session_id": sid, "route": "web"}
+            return None
         body = answer + "\n\nSources:\n" + "\n".join(sources)
         st.append(sid, "assistant", body,
                   meta={"route": "web", "sources": sources or None,
@@ -1448,16 +1494,26 @@ def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
                 "route": "web",
                 "receipt": _branch_receipt("web", task=task_text,
                                            sources=sources, cfg=cfg)}
-    answer = str(web.get("answer") or "")
-    sources = [str(s) for s in (web.get("sources") or []) if str(s).strip()]
-    body = answer + ("\n\nSources:\n" + "\n".join(sources) if sources else "")
-    st.append(sid, "assistant", body,
-              meta={"route": "web", "sources": sources or None})
-    _audit("turn_web", session=sid, sources=len(sources))
-    return {"ok": True, "text": answer, "reply": answer, "sources": sources,
-            "session_id": sid, "session": sid, "route": "web",
-            "receipt": _branch_receipt("web", task=task_text,
-                                       sources=sources, cfg=cfg)}
+
+    layers = ("paid", "free") if paid_first else ("free", "paid")
+    paid_detail = ""
+    paid_code = "WEB_UNAVAILABLE"
+    for layer in layers:
+        if layer == "free":
+            hit = _free_ok(_ddg_web_fallback(task_text))
+            if hit is not None:
+                return hit
+        else:
+            web = _paid_attempt()
+            hit = _paid_ok(web)
+            if hit is not None:
+                return hit
+            paid_code = str(web.get("code") or "WEB_UNAVAILABLE")
+            paid_detail = str(web.get("answer") or "")[:200]
+    detail = paid_detail or "web search unavailable; nothing was fabricated"
+    _audit("turn_web_unavailable", session=sid, code=paid_code)
+    return {"ok": False, "state": "FAILED", "code": paid_code,
+            "detail": detail, "session_id": sid, "route": "web"}
 
 
 def _turn_local(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
