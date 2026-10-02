@@ -184,6 +184,17 @@ describe("DevicesPage status + pairings", () => {
     await act(async () => identity.click());
     await waitFor(() => (container.textContent ?? "").includes("scopes: chat"));
   });
+
+  it("groups pairings into Pending and Paired like the upstream devices card", async () => {
+    await renderDevicesPage();
+    expect(container.querySelector('[aria-label="Device pairings card"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Pending device pairings"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Paired devices"]')).not.toBeNull();
+    const pendingList = container.querySelector('[aria-label="Pending device pairings"]');
+    const pairedList = container.querySelector('[aria-label="Paired devices"]');
+    expect(pendingList?.textContent).toContain("pair-1");
+    expect(pairedList?.textContent).toContain("pair-2");
+  });
 });
 
 describe("DevicesPage confirm-gated approve (staged-then-settle)", () => {

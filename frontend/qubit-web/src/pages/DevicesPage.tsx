@@ -4,6 +4,11 @@
  * approve/reject/remove, confirm-gated token rotate/revoke, enroll plus the
  * device identity card. Secret values are never displayed: presence is shown
  * as stored/not-stored badges plus metadata only.
+ *
+ * Layout mirrors the upstream nodes-devices card hierarchy (status card +
+ * pairing-requests card with Pending/Paired groups + token rows + enroll
+ * card + identity card), translated into Qubit voice. Every backend call,
+ * confirm-gating, and disabled-with-reason row is wired exactly as before.
  */
 import { useCallback, useEffect, useState } from "react";
 
@@ -149,6 +154,121 @@ export default function DevicesPage() {
     [pendingConfirm],
   );
 
+  const renderPairingRow = (p: DevicePairing) => (
+    <li
+      key={p.id}
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-border bg-background-base/60 px-3 py-2 text-xs"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="font-mono text-text-secondary">{p.id}</div>
+        <div className="text-text-tertiary">{p.label}</div>
+        <div className="mt-0.5 text-text-tertiary">
+          channel: {p.kind} · state: {p.state}
+        </div>
+        <div className="text-text-tertiary">
+          secret: {p.secret_set ? "stored" : "not stored"}
+        </div>
+      </div>
+      {p.manageable ? (
+        <span className="ml-auto flex flex-wrap items-center gap-1">
+          <Button
+            ghost
+            size="sm"
+            onClick={() =>
+              mutate("Approve", `approve:${p.id}`, (confirm) =>
+                approveDevicePairing(p.id, confirm),
+              )
+            }
+            disabled={busy === `approve:${p.id}`}
+            aria-label={`Approve pairing ${p.id}`}
+          >
+            {busy === `approve:${p.id}` ? <Spinner /> : "approve"}
+          </Button>
+          <Button
+            ghost
+            size="sm"
+            onClick={() =>
+              mutate("Reject", `reject:${p.id}`, (confirm) =>
+                rejectDevicePairing(p.id, confirm),
+              )
+            }
+            disabled={busy === `reject:${p.id}`}
+            aria-label={`Reject pairing ${p.id}`}
+          >
+            {busy === `reject:${p.id}` ? <Spinner /> : "reject"}
+          </Button>
+          <Button
+            ghost
+            size="sm"
+            onClick={() =>
+              mutate("Remove", `remove:${p.id}`, (confirm) =>
+                removeDevicePairing(p.id, confirm),
+              )
+            }
+            disabled={busy === `remove:${p.id}`}
+            aria-label={`Remove pairing ${p.id}`}
+          >
+            {busy === `remove:${p.id}` ? <Spinner /> : "remove"}
+          </Button>
+          <Button
+            ghost
+            size="sm"
+            onClick={() =>
+              mutate("Token rotate", `rotate:${p.id}`, (confirm) =>
+                rotateDeviceToken(p.id, confirm),
+              )
+            }
+            disabled={busy === `rotate:${p.id}`}
+            aria-label={`Rotate token for ${p.id}`}
+          >
+            {busy === `rotate:${p.id}` ? <Spinner /> : "rotate token"}
+          </Button>
+          <Button
+            ghost
+            size="sm"
+            onClick={() =>
+              mutate("Token revoke", `revoke:${p.id}`, (confirm) =>
+                revokeDeviceToken(p.id, confirm),
+              )
+            }
+            disabled={busy === `revoke:${p.id}`}
+            aria-label={`Revoke token for ${p.id}`}
+          >
+            {busy === `revoke:${p.id}` ? <Spinner /> : "revoke token"}
+          </Button>
+          <Button
+            ghost
+            size="sm"
+            onClick={() => showIdentity(p.id)}
+            aria-label={`Show identity for ${p.id}`}
+          >
+            identity
+          </Button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          disabled
+          data-state="refused"
+          title={p.manage_reason ?? "This pairing cannot be managed from the dashboard."}
+          aria-label={`Manage pairing ${p.id} unavailable`}
+          aria-disabled="true"
+          className="ml-auto cursor-not-allowed border border-border px-2 py-1 text-xs text-text-tertiary opacity-60"
+        >
+          manage unavailable
+        </button>
+      )}
+      {p.manageable ? null : (
+        <span className="w-full text-text-tertiary">
+          {p.manage_reason ?? "This pairing cannot be managed from the dashboard."}
+        </span>
+      )}
+    </li>
+  );
+
+  const pending = pairings.filter((p) => p.state === "pending");
+  const paired = pairings.filter((p) => p.state !== "pending");
+
   return (
     <div className={cn("flex min-h-0 w-full min-w-0 flex-1 flex-col gap-3 pt-1 sm:pt-2")}>
       <div className="flex items-center justify-between gap-2">
@@ -195,6 +315,9 @@ export default function DevicesPage() {
         className="border border-border bg-background-base/60 px-3 py-2"
       >
         <h3 className="text-xs font-medium text-text-secondary">Mint setup code</h3>
+        <p className="text-[0.6875rem] text-text-tertiary">
+          Label, scopes, and expiry for the next setup code.
+        </p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <input
             type="text"
@@ -240,134 +363,66 @@ export default function DevicesPage() {
         ) : null}
       </section>
 
-      {pairingsState === "loading" ? (
-        <p className="flex items-center gap-2 text-sm text-text-tertiary">
-          <Spinner className="shrink-0" /> Loading pairings…
-        </p>
-      ) : pairingsState === "error" ? (
-        <p role="alert" className="text-sm text-destructive">
-          {pairingsError}
-        </p>
-      ) : pairings.length === 0 ? (
-        <p className="text-sm text-text-tertiary">No pairings reported.</p>
-      ) : (
-        <ul className="flex flex-col gap-1" aria-label="Device pairings">
-          {pairings.map((p) => (
-            <li
-              key={p.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-border bg-background-base/60 px-3 py-2 text-xs"
-            >
-              <span className="font-mono text-text-secondary">{p.id}</span>
-              <span className="text-text-tertiary">{p.label}</span>
-              <span className="text-text-tertiary">channel: {p.kind}</span>
-              <span className="text-text-tertiary">state: {p.state}</span>
-              <span className="text-text-tertiary">
-                secret: {p.secret_set ? "stored" : "not stored"}
-              </span>
-              {p.manageable ? (
-                <span className="ml-auto flex flex-wrap items-center gap-1">
-                  <Button
-                    ghost
-                    size="sm"
-                    onClick={() =>
-                      mutate("Approve", `approve:${p.id}`, (confirm) =>
-                        approveDevicePairing(p.id, confirm),
-                      )
-                    }
-                    disabled={busy === `approve:${p.id}`}
-                    aria-label={`Approve pairing ${p.id}`}
-                  >
-                    {busy === `approve:${p.id}` ? <Spinner /> : "approve"}
-                  </Button>
-                  <Button
-                    ghost
-                    size="sm"
-                    onClick={() =>
-                      mutate("Reject", `reject:${p.id}`, (confirm) =>
-                        rejectDevicePairing(p.id, confirm),
-                      )
-                    }
-                    disabled={busy === `reject:${p.id}`}
-                    aria-label={`Reject pairing ${p.id}`}
-                  >
-                    {busy === `reject:${p.id}` ? <Spinner /> : "reject"}
-                  </Button>
-                  <Button
-                    ghost
-                    size="sm"
-                    onClick={() =>
-                      mutate("Remove", `remove:${p.id}`, (confirm) =>
-                        removeDevicePairing(p.id, confirm),
-                      )
-                    }
-                    disabled={busy === `remove:${p.id}`}
-                    aria-label={`Remove pairing ${p.id}`}
-                  >
-                    {busy === `remove:${p.id}` ? <Spinner /> : "remove"}
-                  </Button>
-                  <Button
-                    ghost
-                    size="sm"
-                    onClick={() =>
-                      mutate("Token rotate", `rotate:${p.id}`, (confirm) =>
-                        rotateDeviceToken(p.id, confirm),
-                      )
-                    }
-                    disabled={busy === `rotate:${p.id}`}
-                    aria-label={`Rotate token for ${p.id}`}
-                  >
-                    {busy === `rotate:${p.id}` ? <Spinner /> : "rotate token"}
-                  </Button>
-                  <Button
-                    ghost
-                    size="sm"
-                    onClick={() =>
-                      mutate("Token revoke", `revoke:${p.id}`, (confirm) =>
-                        revokeDeviceToken(p.id, confirm),
-                      )
-                    }
-                    disabled={busy === `revoke:${p.id}`}
-                    aria-label={`Revoke token for ${p.id}`}
-                  >
-                    {busy === `revoke:${p.id}` ? <Spinner /> : "revoke token"}
-                  </Button>
-                  <Button
-                    ghost
-                    size="sm"
-                    onClick={() => showIdentity(p.id)}
-                    aria-label={`Show identity for ${p.id}`}
-                  >
-                    identity
-                  </Button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  data-state="refused"
-                  title={p.manage_reason ?? "This pairing cannot be managed from the dashboard."}
-                  aria-label={`Manage pairing ${p.id} unavailable`}
-                  aria-disabled="true"
-                  className="ml-auto cursor-not-allowed border border-border px-2 py-1 text-xs text-text-tertiary opacity-60"
-                >
-                  manage unavailable
-                </button>
-              )}
-              {p.manageable ? null : (
-                <span className="w-full text-text-tertiary">
-                  {p.manage_reason ?? "This pairing cannot be managed from the dashboard."}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <section
+        aria-label="Device pairings card"
+        className="border border-border bg-background-base/60 px-3 py-2"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-xs font-medium text-text-secondary">Devices</h3>
+            <p className="text-[0.6875rem] text-text-tertiary">
+              Pairing requests + role tokens.
+            </p>
+          </div>
+          {pairingsState === "error" && pairingsError ? (
+            <p role="alert" className="text-xs text-destructive">
+              {pairingsError}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mt-2" role="group" aria-label="Device pairings">
+          {pairingsState === "loading" ? (
+            <p className="flex items-center gap-2 text-sm text-text-tertiary">
+              <Spinner className="shrink-0" /> Loading pairings…
+            </p>
+          ) : pairingsState === "error" ? (
+            <p role="alert" className="text-sm text-destructive">
+              {pairingsError}
+            </p>
+          ) : pairings.length === 0 ? (
+            <p className="text-sm text-text-tertiary">No paired devices.</p>
+          ) : (
+            <>
+              {pending.length > 0 ? (
+                <div className="mt-1">
+                  <p className="mb-1 text-[0.6875rem] text-text-tertiary">Pending</p>
+                  <ul className="flex flex-col gap-1" aria-label="Pending device pairings">
+                    {pending.map(renderPairingRow)}
+                  </ul>
+                </div>
+              ) : null}
+              {paired.length > 0 ? (
+                <div className="mt-2">
+                  <p className="mb-1 text-[0.6875rem] text-text-tertiary">Paired</p>
+                  <ul className="flex flex-col gap-1" aria-label="Paired devices">
+                    {paired.map(renderPairingRow)}
+                  </ul>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      </section>
 
       <section
         aria-label="Enroll device form"
         className="border border-border bg-background-base/60 px-3 py-2"
       >
         <h3 className="text-xs font-medium text-text-secondary">Enroll device</h3>
+        <p className="text-[0.6875rem] text-text-tertiary">
+          Redeem a setup code id with an optional label.
+        </p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <input
             type="text"

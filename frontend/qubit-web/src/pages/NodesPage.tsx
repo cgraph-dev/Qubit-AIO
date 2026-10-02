@@ -4,6 +4,11 @@
  * refresh, dispatch with confirmation, and rename with confirmation plus a
  * re-enroll warning. Unmanageable rows render disabled with their reason and
  * never fire. There are no message-gateway controls on this page.
+ *
+ * Layout mirrors the upstream nodes view hierarchy (toolbar + form card +
+ * roster card with live-link rows + detail card), translated into Qubit voice.
+ * Every backend call, confirm-gating, and disabled-with-reason row is wired
+ * exactly as before.
  */
 import { useCallback, useEffect, useState } from "react";
 
@@ -151,6 +156,9 @@ export default function NodesPage() {
         className="border border-border bg-background-base/60 px-3 py-2"
       >
         <h3 className="text-xs font-medium text-text-secondary">Enroll node</h3>
+        <p className="text-[0.6875rem] text-text-tertiary">
+          Add a node by id with an optional label.
+        </p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <input
             type="text"
@@ -187,105 +195,136 @@ export default function NodesPage() {
         </div>
       </section>
 
-      {state === "loading" ? (
-        <p className="flex items-center gap-2 text-sm text-text-tertiary">
-          <Spinner className="shrink-0" /> Loading nodes…
-        </p>
-      ) : state === "error" ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : nodes.length === 0 ? (
-        <p className="text-sm text-text-tertiary">No nodes reported.</p>
-      ) : (
-        <ul className="flex flex-col gap-1" aria-label="Node roster">
-          {nodes.map((n) => (
-            <li
-              key={n.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-border bg-background-base/60 px-3 py-2 text-xs"
-            >
-              <span className="font-mono text-text-secondary">{n.id}</span>
-              {n.name ? <span className="text-text-tertiary">{n.name}</span> : null}
-              {n.state ? (
-                <span className="text-text-tertiary">state: {n.state}</span>
-              ) : null}
-              <span className="ml-auto flex flex-wrap items-center gap-1">
-                <Button
-                  ghost
-                  size="sm"
-                  onClick={() => describe(n.id)}
-                  aria-label={`Describe node ${n.id}`}
+      <section
+        aria-label="Node roster card"
+        className="border border-border bg-background-base/60 px-3 py-2"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-xs font-medium text-text-secondary">Nodes</h3>
+            <p className="text-[0.6875rem] text-text-tertiary">
+              {authority || "Enrolled nodes and live links."}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-2">
+          {state === "loading" ? (
+            <p className="flex items-center gap-2 text-sm text-text-tertiary">
+              <Spinner className="shrink-0" /> Loading nodes…
+            </p>
+          ) : state === "error" ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : nodes.length === 0 ? (
+            <p className="text-sm text-text-tertiary">No nodes found.</p>
+          ) : (
+            <ul className="flex flex-col gap-1" aria-label="Node roster">
+              {nodes.map((n) => (
+                <li
+                  key={n.id}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-border bg-background-base/60 px-3 py-2 text-xs"
                 >
-                  describe
-                </Button>
-                {n.manageable ? (
-                  <>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-text-secondary">{n.id}</div>
+                    <div className="text-text-tertiary">
+                      {[n.name, n.state ? `state: ${n.state}` : ""]
+                        .filter((part): part is string => typeof part === "string" && part.length > 0)
+                        .join(" · ") || "—"}
+                    </div>
+                    {n.state ? (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        <span className="border border-border px-1.5 py-0.5 text-[0.6875rem] text-text-tertiary">
+                          {n.state}
+                        </span>
+                        <span
+                          className={cn(
+                            "border border-border px-1.5 py-0.5 text-[0.6875rem]",
+                            n.manageable ? "text-text-secondary" : "text-text-tertiary",
+                          )}
+                        >
+                          {n.manageable ? "manageable" : "not manageable"}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="ml-auto flex flex-wrap items-center gap-1">
                     <Button
                       ghost
                       size="sm"
-                      onClick={() =>
-                        mutate("Approve", `approve:${n.id}`, (confirm) =>
-                          approveNode(n.id, confirm),
-                        )
-                      }
-                      disabled={busy === `approve:${n.id}`}
-                      aria-label={`Approve node ${n.id}`}
+                      onClick={() => describe(n.id)}
+                      aria-label={`Describe node ${n.id}`}
                     >
-                      {busy === `approve:${n.id}` ? <Spinner /> : "approve"}
+                      describe
                     </Button>
-                    <Button
-                      ghost
-                      size="sm"
-                      onClick={() =>
-                        mutate("Revoke", `revoke:${n.id}`, (confirm) =>
-                          revokeNode(n.id, confirm),
-                        )
-                      }
-                      disabled={busy === `revoke:${n.id}`}
-                      aria-label={`Revoke node ${n.id}`}
-                    >
-                      {busy === `revoke:${n.id}` ? <Spinner /> : "revoke"}
-                    </Button>
-                    <Button
-                      ghost
-                      size="sm"
-                      onClick={() =>
-                        mutate("Remove", `remove:${n.id}`, (confirm) =>
-                          removeNode(n.id, confirm),
-                        )
-                      }
-                      disabled={busy === `remove:${n.id}`}
-                      aria-label={`Remove node ${n.id}`}
-                    >
-                      {busy === `remove:${n.id}` ? <Spinner /> : "remove"}
-                    </Button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    disabled
-                    data-state="refused"
-                    title={n.manage_reason ?? "This node cannot be managed from the dashboard."}
-                    aria-label={`Manage node ${n.id} unavailable`}
-                    aria-disabled="true"
-                    className="cursor-not-allowed border border-border px-2 py-1 text-xs text-text-tertiary opacity-60"
-                  >
-                    manage unavailable
-                  </button>
-                )}
-              </span>
-              {n.manageable ? null : (
-                <span className="w-full text-text-tertiary">
-                  {n.manage_reason ?? "This node cannot be managed from the dashboard."}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      {authority ? (
-        <p className="text-[0.6875rem] text-text-tertiary">{authority}</p>
-      ) : null}
+                    {n.manageable ? (
+                      <>
+                        <Button
+                          ghost
+                          size="sm"
+                          onClick={() =>
+                            mutate("Approve", `approve:${n.id}`, (confirm) =>
+                              approveNode(n.id, confirm),
+                            )
+                          }
+                          disabled={busy === `approve:${n.id}`}
+                          aria-label={`Approve node ${n.id}`}
+                        >
+                          {busy === `approve:${n.id}` ? <Spinner /> : "approve"}
+                        </Button>
+                        <Button
+                          ghost
+                          size="sm"
+                          onClick={() =>
+                            mutate("Revoke", `revoke:${n.id}`, (confirm) =>
+                              revokeNode(n.id, confirm),
+                            )
+                          }
+                          disabled={busy === `revoke:${n.id}`}
+                          aria-label={`Revoke node ${n.id}`}
+                        >
+                          {busy === `revoke:${n.id}` ? <Spinner /> : "revoke"}
+                        </Button>
+                        <Button
+                          ghost
+                          size="sm"
+                          onClick={() =>
+                            mutate("Remove", `remove:${n.id}`, (confirm) =>
+                              removeNode(n.id, confirm),
+                            )
+                          }
+                          disabled={busy === `remove:${n.id}`}
+                          aria-label={`Remove node ${n.id}`}
+                        >
+                          {busy === `remove:${n.id}` ? <Spinner /> : "remove"}
+                        </Button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        data-state="refused"
+                        title={n.manage_reason ?? "This node cannot be managed from the dashboard."}
+                        aria-label={`Manage node ${n.id} unavailable`}
+                        aria-disabled="true"
+                        className="cursor-not-allowed border border-border px-2 py-1 text-xs text-text-tertiary opacity-60"
+                      >
+                        manage unavailable
+                      </button>
+                    )}
+                  </div>
+                  {n.manageable ? null : (
+                    <span className="w-full text-text-tertiary">
+                      {n.manage_reason ?? "This node cannot be managed from the dashboard."}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
 
       {selectedId ? (
         <section
@@ -293,6 +332,9 @@ export default function NodesPage() {
           className="border border-border bg-background-base/60 px-3 py-2"
         >
           <h3 className="font-mono text-xs text-text-secondary">{selectedId}</h3>
+          <p className="text-[0.6875rem] text-text-tertiary">
+            Detail, capabilities, dispatch, and rename.
+          </p>
           {detailError ? (
             <p role="alert" className="mt-1 text-xs text-destructive">
               {detailError}

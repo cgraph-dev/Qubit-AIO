@@ -168,6 +168,17 @@ describe("NodesPage roster + describe", () => {
       (container.textContent ?? "").includes("may require re-enrollment"),
     );
   });
+
+  it("mirrors the upstream card hierarchy (enroll card, roster card, live-link rows)", async () => {
+    await renderNodesPage();
+    expect(container.querySelector('[aria-label="Enroll node form"]')).not.toBeNull();
+    const card = container.querySelector('[aria-label="Node roster card"]');
+    expect(card).not.toBeNull();
+    // The card header shows the backend authority when present, else the
+    // live-links subtitle.
+    expect(card?.textContent).toMatch(/live links|read-only node roster/);
+    expect(card?.querySelector('[aria-label="Node roster"]')).not.toBeNull();
+  });
 });
 
 describe("NodesPage confirm-gated approve (staged-then-settle)", () => {

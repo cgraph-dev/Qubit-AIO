@@ -128,6 +128,10 @@ describe("AgentWorkspacePage browse (agents.workspace.list/get)", () => {
 
   it("checks run status (agent.wait)", async () => {
     await renderWorkspacePage();
+    const runTab = container.querySelector(
+      '[aria-label="Show run status panel"]',
+    ) as HTMLButtonElement;
+    await act(async () => runTab.click());
     const input = container.querySelector('[aria-label="Run id"]') as HTMLInputElement;
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
@@ -149,5 +153,22 @@ describe("AgentWorkspacePage browse (agents.workspace.list/get)", () => {
     const gated = container.querySelector('[data-state="gated"]');
     expect(gated).not.toBeNull();
     expect(gated?.textContent).toContain("read-only browse");
+  });
+
+  it("switches between the files and run status panels like the upstream tab bar", async () => {
+    await renderWorkspacePage();
+    expect(container.querySelector('[aria-label="Workspace files"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Run id"]')).toBeNull();
+    const runTab = container.querySelector(
+      '[aria-label="Show run status panel"]',
+    ) as HTMLButtonElement;
+    await act(async () => runTab.click());
+    expect(container.querySelector('[aria-label="Run id"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Workspace files"]')).toBeNull();
+    const filesTab = container.querySelector(
+      '[aria-label="Show workspace files panel"]',
+    ) as HTMLButtonElement;
+    await act(async () => filesTab.click());
+    expect(container.querySelector('[aria-label="Workspace files"]')).not.toBeNull();
   });
 });
