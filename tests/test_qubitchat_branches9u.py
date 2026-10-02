@@ -76,6 +76,12 @@ def test_web_branch_failure_is_typed(monkeypatch):
         "voicebridge.orchestrator.answer_web_query",
         lambda cfg, text, **kw: {"ok": False, "answer": "",
                                  "sources": [], "code": "WEB_UNAVAILABLE"})
+    # Both providers down: the no-key DDG fallback must also miss for the
+    # typed failure contract to hold (fallback-fires is pinned in
+    # Both providers down: the no-key DDG fallback must also miss for the
+    # typed failure contract to hold (fallback-fires is pinned in
+    # test_qubitchat_web_search9u.py; this file stays hermetic/no-network).
+    monkeypatch.setattr(CT, "_ddg_web_fallback", lambda query: None)
     out = CT.turn({}, "use perplexity api to search when Aion 2 will release",
                   session="test-branch-webfail-9u")
     assert out.get("ok") is False, out
