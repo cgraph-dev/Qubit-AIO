@@ -118,7 +118,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // "New chat" mints a genuinely NEW session on the canonical store (the same
   // store the sessions list and transcript read) and resumes it, so the
   // terminal opens a fresh transcript instead of re-opening an old one.
-  // The implicit first load (no `?resume=`) is FRESH by design (Hermes
+  // The implicit first load (no `?resume=`) is FRESH by design (upstream
   // parity): the server emits no resume env, so the vendored TUI forges a
   // brand-new session instead of resuming `dashboard-chat`.
   // A failed mint falls back to a fresh canonical-default PTY with a notice.
