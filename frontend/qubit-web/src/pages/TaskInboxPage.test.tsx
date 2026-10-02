@@ -88,6 +88,18 @@ function setNativeValue(el: HTMLInputElement, value: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+function setSelectValue(el: HTMLSelectElement, value: string) {
+  const proto = window.HTMLSelectElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function columnTitles(): string[] {
+  return [...container.querySelectorAll(".workboard-column__header h2")].map(
+    (h) => h.textContent?.trim() ?? "",
+  );
+}
+
 function buttonByText(text: string): HTMLButtonElement | null {
   return (
     [...document.querySelectorAll("button")].find(
@@ -157,6 +169,85 @@ describe("TaskInboxPage", () => {
       expect.objectContaining({ receiptId: "rc-9" }),
       expect.any(Function),
     );
+  });
+
+  it("mirrors the upstream workboard shell: toolbar, health strip, columns", async () => {
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("Summarize inbox") ?? false);
+    expect(container.querySelector("section.workboard")).not.toBeNull();
+    expect(container.querySelector(".workboard-main")).not.toBeNull();
+    expect(container.querySelector(".workboard-toolbar")).not.toBeNull();
+    expect(container.querySelector(".workboard-toolbar__filters")).not.toBeNull();
+    expect(container.querySelector(".workboard-toolbar__actions")).not.toBeNull();
+    expect(container.querySelector("#task-inbox-search")).not.toBeNull();
+    expect(container.querySelector("#task-inbox-view")).not.toBeNull();
+    const health = container.querySelector(".workboard-health");
+    expect(health).not.toBeNull();
+    expect(health!.querySelector('[aria-label="1 Ledger entries"]')).not.toBeNull();
+    expect(health!.querySelector('[aria-label="1 Suggestions"]')).not.toBeNull();
+    expect(columnTitles()).toEqual([
+      "Task ledger",
+      "Suggestions (read-only)",
+      "Cancel / retry via receipt or session",
+      "Mentions (disabled with reason)",
+      "Suggestion writes (disabled with reason)",
+    ]);
+    expect(container.textContent).toContain("Last refreshed");
+  });
+
+  it("search filters rows and shows the upstream empty state", async () => {
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("Summarize inbox") ?? false);
+    setNativeValue(
+      container.querySelector("#task-inbox-search") as HTMLInputElement,
+      "zzz-no-match",
+    );
+    await waitFor(() => container.querySelector(".workboard-empty-state") !== null);
+    expect(container.querySelector(".workboard-empty-state")!.textContent).toContain(
+      "No inbox entries match this filter",
+    );
+    setNativeValue(container.querySelector("#task-inbox-search") as HTMLInputElement, "");
+    await waitFor(() => container.querySelector(".workboard-empty-state") === null);
+    expect(container.textContent).toContain("Summarize inbox");
+  });
+
+  it("view preset and health strip narrow the data columns", async () => {
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("Summarize inbox") ?? false);
+    setSelectValue(
+      container.querySelector("#task-inbox-view") as HTMLSelectElement,
+      "suggestions",
+    );
+    await waitFor(() => {
+      const titles = columnTitles();
+      return titles.includes("Suggestions (read-only)") && !titles.includes("Task ledger");
+    });
+    // Controls + gated columns stay reachable in every preset.
+    expect(columnTitles()).toContain("Cancel / retry via receipt or session");
+    const tasksPill = container.querySelector(
+      ".workboard-health__item--tasks",
+    ) as HTMLButtonElement;
+    await act(async () => tasksPill.click());
+    await waitFor(() => {
+      const titles = columnTitles();
+      return titles.includes("Task ledger") && !titles.includes("Suggestions (read-only)");
+    });
+  });
+
+  it("hide-empty hides the emptied data column", async () => {
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("Summarize inbox") ?? false);
+    // "weekly" matches only the suggestion row.
+    setNativeValue(
+      container.querySelector("#task-inbox-search") as HTMLInputElement,
+      "weekly",
+    );
+    await waitFor(() => container.textContent?.includes("File the weekly report") ?? false);
+    await act(async () => (container.querySelector("#task-inbox-hide-empty") as HTMLInputElement).click());
+    await waitFor(() => {
+      const titles = columnTitles();
+      return titles.includes("Suggestions (read-only)") && !titles.includes("Task ledger");
+    });
   });
 
   it.each([

@@ -97,6 +97,18 @@ function setNativeValue(el: HTMLInputElement, value: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+function setSelectValue(el: HTMLSelectElement, value: string) {
+  const proto = window.HTMLSelectElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function columnTitles(): string[] {
+  return [...container.querySelectorAll(".workboard-column__header h2")].map(
+    (h) => h.textContent?.trim() ?? "",
+  );
+}
+
 function buttonByText(text: string): HTMLButtonElement | null {
   return (
     [...document.querySelectorAll("button")].find(
@@ -174,6 +186,84 @@ describe("BoardAdminPage", () => {
       "Later",
       expect.any(Function),
     );
+  });
+
+  it("mirrors the upstream workboard shell: toolbar, health strip, columns", async () => {
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("ideas") ?? false);
+    // Upstream section hierarchy.
+    expect(container.querySelector("section.workboard")).not.toBeNull();
+    expect(container.querySelector(".workboard-main")).not.toBeNull();
+    expect(container.querySelector(".workboard-toolbar")).not.toBeNull();
+    expect(container.querySelector(".workboard-toolbar__filters")).not.toBeNull();
+    expect(container.querySelector(".workboard-toolbar__actions")).not.toBeNull();
+    expect(container.querySelector("#board-admin-search")).not.toBeNull();
+    expect(container.querySelector("#board-admin-view")).not.toBeNull();
+    // Health strip counts from the real family client payloads.
+    const health = container.querySelector(".workboard-health");
+    expect(health).not.toBeNull();
+    expect(health!.querySelector('[aria-label="1 Tabs"]')).not.toBeNull();
+    expect(health!.querySelector('[aria-label="1 Widgets"]')).not.toBeNull();
+    expect(health!.querySelector('[aria-label="1 Grants"]')).not.toBeNull();
+    expect(health!.querySelector('[aria-label="1 Events"]')).not.toBeNull();
+    // One column per section, header h2 + visible count.
+    expect(columnTitles()).toEqual(["Tabs", "Widgets", "Roles", "Board log"]);
+    expect(container.querySelector(".workboard-board--comfortable")).not.toBeNull();
+    expect(container.textContent).toContain("Last refreshed");
+  });
+
+  it("search filters rows and shows the upstream empty state", async () => {
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("ideas") ?? false);
+    setNativeValue(
+      container.querySelector("#board-admin-search") as HTMLInputElement,
+      "zzz-no-match",
+    );
+    await waitFor(() => container.querySelector(".workboard-empty-state") !== null);
+    expect(container.querySelector(".workboard-empty-state")!.textContent).toContain(
+      "No sections match this filter",
+    );
+    setNativeValue(container.querySelector("#board-admin-search") as HTMLInputElement, "");
+    await waitFor(() => container.querySelector(".workboard-empty-state") === null);
+    expect(container.textContent).toContain("ideas");
+  });
+
+  it("view preset and health strip narrow to one column", async () => {
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("ideas") ?? false);
+    setSelectValue(container.querySelector("#board-admin-view") as HTMLSelectElement, "widgets");
+    await waitFor(() => {
+      const titles = columnTitles();
+      return titles.length === 1 && titles[0] === "Widgets";
+    });
+    // Toggling the Tabs health pill filters to tabs; toggling again restores all.
+    const tabsPill = container.querySelector(
+      '.workboard-health__item--tabs',
+    ) as HTMLButtonElement;
+    await act(async () => tabsPill.click());
+    await waitFor(() => columnTitles().length === 1 && columnTitles()[0] === "Tabs");
+    await act(async () => tabsPill.click());
+    await waitFor(() => columnTitles().length === 4);
+  });
+
+  it("hide-empty hides empty sections and the layout toggle switches density", async () => {
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("ideas") ?? false);
+    // "shopping" matches only the widget row.
+    setNativeValue(
+      container.querySelector("#board-admin-search") as HTMLInputElement,
+      "shopping",
+    );
+    await waitFor(() => (container.textContent?.includes("Shopping list") ?? false));
+    await act(async () => (container.querySelector("#board-admin-hide-empty") as HTMLInputElement).click());
+    await waitFor(() => {
+      const titles = columnTitles();
+      return titles.length === 1 && titles[0] === "Widgets";
+    });
+    await act(async () => buttonByText("Compact")!.click());
+    expect(container.querySelector(".workboard-board--compact")).not.toBeNull();
+    await act(async () => buttonByText("Comfortable")!.click());
+    expect(container.querySelector(".workboard-board--comfortable")).not.toBeNull();
   });
 
   it.each([
