@@ -76,6 +76,12 @@ def _app_targets() -> Dict[str, List[str]]:
         "discord": ["discord"],
         "telegram": ["telegram-desktop"],
         "spotify": ["spotify"],
+        # Batch-2 desktop shortcuts: present on this host (shutil.which
+        # verified); the handler refuses honestly where the binary is absent.
+        "calculator": ["gnome-calculator"],
+        "settings": ["gnome-control-center"],
+        "system monitor": ["gnome-system-monitor"],
+        "clocks": ["gnome-clocks"],
     }
     targets.update(_OPERATOR.get("app_targets") or {})
     targets.setdefault("editor", ["xdg-open", home])
@@ -142,12 +148,22 @@ def _a_mic_mute(_: Dict[str, Any]) -> str:
     return "Microphone mute toggled."
 
 
+#: Desktop shortcuts whose launcher binary may be absent: the handler
+#: refuses honestly instead of raising FileNotFoundError. Existing entries
+#: keep their launch-attempt behavior (their tests mock Popen, not PATH).
+_APP_REQUIRE_BINARY = frozenset(
+    {"calculator", "settings", "system monitor", "clocks"})
+
+
 def _a_open_app(params: Dict[str, Any]) -> str:
     app = params.get("app", "")
     targets = _app_targets()
     argv = targets.get(app)
     if not argv:
         return f"I don't have a launcher for {app or 'that'}."
+    if app in _APP_REQUIRE_BINARY and not shutil.which(argv[0]):
+        return (f"{app} isn't installed "
+                f"(missing {argv[0]}).")
     try:
         subprocess.Popen(_expanded(argv), stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL)
@@ -674,6 +690,39 @@ def _a_open_document(params: Dict[str, Any]) -> str:
     return "Opened a blank page in the local text editor — say what to write."
 
 
+#: Spoken folder names -> directory under $HOME opened in Files.
+#: "downloads" alone implies the folder; "documents" needs an explicit
+#: folder/directory word (a bare "open documents" stays an editor intent).
+_FOLDERS = {"downloads": "Downloads", "documents": "Documents"}
+
+
+def _a_open_folder(params: Dict[str, Any]) -> str:
+    """'open downloads' / 'open documents folder' -> Files at that dir.
+
+    Read-only navigation (no editor, no content touched). Never raises;
+    failures are honest strings.
+    """
+    which = str((params or {}).get("folder") or "").strip().lower()
+    if which not in _FOLDERS:
+        return "Which folder should I open — Downloads or Documents?"
+    label = _FOLDERS[which]
+    path = Path.home() / label
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return f"{label} folder unavailable."
+    try:
+        if sys.platform == "win32":
+            os.startfile(str(path))  # noqa: S606 - operator's own folder
+        else:
+            subprocess.Popen(["xdg-open", str(path)],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+    except Exception as exc:
+        return f"Could not open {label}: {exc}."
+    return f"Opened {label}."
+
+
 def _a_quick_note(params: Dict[str, Any]) -> str:
     text = params.get("note", "").strip()
     if not text:
@@ -977,6 +1026,29 @@ def _a_send_message(params: Dict[str, Any]) -> str:
     return f"Sent to {draft['to']} on {draft['channel']}."
 
 
+def _a_compound(params: Dict[str, Any]) -> str:
+    """Run each step (re-matched deterministically) in order; join replies."""
+    raw = str((params or {}).get("steps") or "")
+    halves = [h.strip(" .,") for h in raw.split(_COMPOUND_STEPS_SEP)]
+    halves = [h for h in halves if h]
+    if len(halves) < 2:
+        return "I didn't catch the steps to run — say each one on its own."
+    # Two-phase: validate every half BEFORE any side effect, so a stale
+    # half can never leave step 1 done and step 2 refused.
+    planned = [_match_single(h) for h in halves]
+    if any(m is None or m.name == "compound"
+           or not _compoundable((m.name,)) for m in planned):
+        return "I couldn't run those together — say each one on its own."
+    outs: List[str] = []
+    for m in planned:
+        act = ACTIONS.get(m.name)
+        try:
+            outs.append(act.fn(m.params))
+        except Exception as exc:
+            outs.append(f"({m.name} failed: {exc})")
+    return " ".join(o for o in outs if o)
+
+
 # ---------------------------------------------------------------------------
 ACTIONS: Dict[str, LocalAction] = {
     "volume_up": LocalAction("volume_up", "raise speaker volume", _a_volume_up,
@@ -999,7 +1071,8 @@ ACTIONS: Dict[str, LocalAction] = {
                             patterns=[r"\b(mute|unmute) (the |my )?(microphone|mic)\b",
                                       r"\b(microphone|mic) (is )?(mute|muted|off)\b"]),
     "open_app": LocalAction("open_app", "launch an application", _a_open_app,
-                             patterns=[r"\b(open|launch|start|run) (the )?(browser|editor|vscode|cursor|chromium|terminal|discord|telegram|files|file-manager|file manager|fl studio|spotify|chrome|firefox|code|console)\b"]),
+                             patterns=[r"^\s*(please\s+)?(open|launch|start)\s+(the\s+|my\s+)?files?\s*\.?\s*$",
+                                       r"\b(open|launch|start|run) (the )?(browser|editor|vscode|cursor|chromium|terminal|discord|telegram|files|file-manager|file manager|fl studio|spotify|chrome|firefox|code|console|calculator|settings|system monitor|system-monitor|clocks?)\b"]),
     # Project names are operator-local (config/local-actions.yaml
     # ``project_roots``); the patterns stay generic so no personal project
     # names are baked into the shipped product source.
@@ -1032,6 +1105,9 @@ ACTIONS: Dict[str, LocalAction] = {
     "open_website": LocalAction("open_website", "open a website in the browser", _a_open_website,
                                 patterns=[r"\b(?:open|launch|go to|visit)\b.{0,30}?\b(https?://\S+|(?<!://)www\.\S+|(?<!://)[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)",
                                             r"\b(?:open|launch|go to|visit) (the )?(youtube|gmail|mail|messenger|instagram|facebook|github|google|duckduckgo|wikipedia|dexonline)\b"]),
+    "open_folder": LocalAction("open_folder", "open Downloads/Documents in Files", _a_open_folder,
+                             patterns=[r"\b(open|launch|show|go to)\b.{0,30}?\bdownloads?\b",
+                                       r"\b(open|launch|show|go to)\b.{0,30}?\bdocuments?\s+(folder|directory|dir)\b"]),
     "open_document": LocalAction("open_document", "open a text document for writing", _a_open_document,
                                  patterns=[r"\bopen (a |the |this |that |my |new )+(text |txt )?(document|file|note)\b(?![\w-])",
                                            r"\bopen (text |txt )(document|note)\b(?![\w-])",
@@ -1108,10 +1184,11 @@ ACTIONS: Dict[str, LocalAction] = {
                                   r"\bwhat('s| is) today('s)? (date|day)\b",
                                   r"\bwhat time is it\b",
                                   r"\b(current )?(date|time)\b"]),
+    "compound": LocalAction("compound", "run two voice commands together, in order", _a_compound,
+                         patterns=[]),
     "send_message": LocalAction("send_message",
                         "send a staged voice-reply draft (confirm-gated)",
-                        _a_send_message,
-                        patterns=[r"^reply\|(gmail|messenger|instagram)\|"],
+                        _a_send_message,                        patterns=[r"^reply\|(gmail|messenger|instagram)\|"],
                         confirm=True),
 }
 
@@ -1121,13 +1198,83 @@ APP_NAMES = {
     "cursor": "cursor",
     "terminal": "terminal", "console": "terminal", "discord": "discord",
     "telegram": "telegram", "files": "files", "file manager": "files",
-    "file-manager": "files",
+    "file-manager": "files", "file": "files",
     "fl studio": "fl studio", "fl": "fl studio", "spotify": "spotify",
+    "calculator": "calculator", "settings": "settings",
+    "system monitor": "system monitor", "system-monitor": "system monitor",
+    "clock": "clocks", "clocks": "clocks",
 }
 
 
+# --- Compound "A and B" commands -------------------------------------------
+# Both halves must be known commands; they run in order and the replies join.
+# Shape note (checked against voice_edit/tool_task.py + broker.py, read-only):
+# ``propose_tool`` accepts any ACTIONS name with scalar ``params``, and the
+# broker registers every ACTIONS entry with a scalar-only arg validator — so
+# the steps travel as ONE plain string (re-split + re-matched at execute).
+# A nested list/dict shape would be refused by the validator, and changing
+# the broker is out of scope: no compound marker outside this module.
+# Safety: a half that needs a broker grant (MUTATING/DESTRUCTIVE tier) is
+# never folded in — the whole utterance falls through (None) to the agent
+# path, which confirm-gates it. No partial execution, no grant bypass.
+_COMPOUND_SPLIT_RE = r"\s+(?:and then|and|then)\s+"
+_COMPOUND_STEPS_SEP = "\n"
+
+#: Fallback when the broker tier table cannot be imported (same-process
+#: import failure): mirrors broker._ACTION_TIERS' non-reversible names.
+_NON_COMPOUNDABLE_FALLBACK = frozenset(
+    {"send_message", "empty_trash", "window_close"})
+
+
+def _compoundable(names) -> bool:
+    """True only when every named action runs without a broker grant."""
+    try:
+        from ..broker import _ACTION_TIERS
+        from ..capabilities import Tier
+        allowed = (Tier.READ_ONLY, Tier.REVERSIBLE)
+        return all(
+            _ACTION_TIERS.get(n, Tier.REVERSIBLE) in allowed for n in names)
+    except Exception:
+        return all(n not in _NON_COMPOUNDABLE_FALLBACK for n in names)
+
+
 def match(text: str) -> Optional[ActionMatch]:
-    """Return the first matching local action, or None."""
+    """Return the first matching local action, or None.
+
+    A two-command utterance ("A and B" / "A and then B" / "A then B") where
+    BOTH halves are known, grant-free commands matches as one ``compound``
+    action that runs both in order. Anything else keeps the single-match
+    contract below exactly (fail-closed: unknown or grant-gated halves fall
+    back to the whole-string single match, or to None).
+    """
+    import re as _re
+    raw = (text or "").strip()
+    # Staged voice-reply drafts are machine text: never split them, even if
+    # the dictated body contains " and " — they route as one draft below.
+    if raw and _re.match(r"^reply\|(gmail|messenger|instagram)\|",
+                         raw.lower()):
+        return _match_single(text)
+    if raw and _re.search(r"\s+(?:and then|and|then)\s+", raw, flags=_re.I):
+        parts = [_p.strip(" .,") for _p in
+                 _re.split(_COMPOUND_SPLIT_RE, raw, flags=_re.I)]
+        parts = [p for p in parts if p]
+        if len(parts) >= 2:
+            singles = [_match_single(p) for p in parts]
+            if all(s is not None for s in singles):
+                if _compoundable(tuple(s.name for s in singles)):
+                    return ActionMatch(
+                        name="compound",
+                        params={"steps": _COMPOUND_STEPS_SEP.join(parts)},
+                        text=text)
+                # Every half known but one needs a grant: fall through to
+                # the agent path (which confirm-gates) — never a lossy
+                # single, never a partial execution.
+                return None
+    return _match_single(text)
+
+
+def _match_single(text: str) -> Optional[ActionMatch]:
+    """Return the first matching local action, or None (no splitting)."""
     low = text.lower().strip()
     import re as _re
     # Staged voice-reply drafts are machine text (reply|<channel>|...):
@@ -1256,6 +1403,9 @@ def match(text: str) -> Optional[ActionMatch]:
                             " ", low)
                         params["target"] = _re.sub(
                             r"\s+", " ", stripped).strip(" .,-")
+                elif name == "open_folder":
+                    params["folder"] = ("downloads" if "download" in low
+                                        else "documents")
                 elif name == "open_website":
                     params["url"] = _normalize_website_url(low)
                 elif name == "play_youtube":

@@ -581,3 +581,190 @@ def test_documents_open_in_vscode_when_named(monkeypatch, tmp_path):
     assert m.params.get("editor") == "vscode", m.params
     LA.execute(m)
     assert calls and calls[0][0] == "code", calls
+
+
+# --- Batch 2: bare file, folders, compounds, desktop app shortcuts --------
+
+def test_bare_open_file_routes_to_file_manager():
+    for phrase in ("open file", "open files", "open the file",
+                   "open my files", "please open file"):
+        m = LA.match(phrase)
+        assert m is not None and m.name == "open_app", (phrase, m)
+        assert m.params.get("app") == "files", (phrase, m.params)
+
+
+def test_bare_open_file_does_not_steal_documents_or_managers():
+    assert LA.match("open file manager").name == "open_app"
+    assert LA.match("open file-manager").name == "open_app"
+    assert LA.match("open my notes file").name == "open_document"
+    assert LA.match("open the shopping list document").name == "open_document"
+    assert LA.match("open a text document").name == "open_document"
+
+
+def test_bare_open_file_opens_home_in_files(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(
+        subprocess, "Popen",
+        lambda argv, **kw: (calls.append(argv), _DummyProc())[1])
+    # Hermetic: ignore this machine's operator-local files-target override.
+    monkeypatch.setattr(LA, "_OPERATOR", {})
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    m = LA.match("open file")
+    assert m is not None and m.name == "open_app", m
+    out = LA.execute(m)
+    assert calls and calls[0] == ["xdg-open", str(tmp_path)], calls
+    assert "opening" in out.lower(), out
+
+
+def test_open_downloads_routes_to_files_folder():
+    for phrase in ("open downloads", "open the downloads folder",
+                   "open downloads folder", "open my downloads"):
+        m = LA.match(phrase)
+        assert m is not None and m.name == "open_folder", (phrase, m)
+        assert m.params.get("folder") == "downloads", (phrase, m.params)
+
+
+def test_open_documents_folder_routes_to_files_folder():
+    for phrase in ("open documents folder", "open the documents directory"):
+        m = LA.match(phrase)
+        assert m is not None and m.name == "open_folder", (phrase, m)
+        assert m.params.get("folder") == "documents", (phrase, m.params)
+
+
+def test_folder_action_does_not_shadow_named_documents():
+    assert LA.match("open the shopping list document").name == "open_document"
+    assert LA.match("open my notes file").name == "open_document"
+    assert LA.match("open a text document").name == "open_document"
+    assert LA.match("find recipe file").name == "find_file"
+
+
+def test_open_folder_executes_files_target(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(
+        subprocess, "Popen",
+        lambda argv, **kw: (calls.append(argv), _DummyProc())[1])
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    m = LA.match("open downloads")
+    assert m is not None and m.name == "open_folder"
+    out = LA.execute(m)
+    assert calls and calls[0][:2] == ["xdg-open", str(tmp_path / "Downloads")], \
+        calls
+    assert "download" in out.lower(), out
+
+
+class _RunOut:
+    stdout = ""
+
+
+def test_compound_two_safe_commands_run_both_in_order(monkeypatch):
+    runs = []
+    pops = []
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda argv, **kw: (runs.append(argv), _RunOut())[1])
+    monkeypatch.setattr(
+        subprocess, "Popen",
+        lambda argv, **kw: (pops.append(argv), _DummyProc())[1])
+    m = LA.match("turn the volume up and open youtube")
+    assert m is not None and m.name == "compound", m
+    out = LA.execute(m)
+    assert runs and runs[0][:2] == ["pactl", "set-sink-volume"], runs
+    assert pops and pops[0][:2] == ["xdg-open", "https://www.youtube.com"], \
+        pops
+    assert "volume up" in out.lower(), out
+    assert "youtube.com" in out, out
+
+
+def test_compound_mute_then_lock(monkeypatch):
+    runs = []
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda argv, **kw: (runs.append(argv), _RunOut())[1])
+    m = LA.match("mute the speaker then lock the screen")
+    assert m is not None and m.name == "compound", m
+    out = LA.execute(m)
+    assert any(a[:2] == ["pactl", "set-sink-mute"] for a in runs), runs
+    assert any(a[:2] == ["loginctl", "lock-session"] for a in runs), runs
+    assert "mute" in out.lower() and "lock" in out.lower(), out
+
+
+def test_compound_params_are_scalar():
+    # The broker's arg validator refuses non-scalar args: compound steps
+    # travel as one plain string so local.compound fits the existing shape.
+    m = LA.match("turn the volume up and open youtube")
+    assert m is not None and m.name == "compound", m
+    for v in m.params.values():
+        assert isinstance(v, str), m.params
+
+
+def test_compound_partial_match_falls_back_to_single():
+    # "create" alone is not a command: the whole keeps create_document routing.
+    m = LA.match("create and open a new text file so i can write something")
+    assert m is not None and m.name == "create_document", m
+
+
+def test_compound_unknown_half_falls_back_to_single():
+    m = LA.match("turn the volume up and frobnicate wildly")
+    assert m is not None and m.name == "volume_up", m
+
+
+def test_compound_with_destructive_half_falls_through():
+    # No partial execution, no lossy single: the agent path confirm-gates it.
+    assert LA.match("empty the trash and lock the screen") is None
+    assert LA.match("lock the screen and empty the trash") is None
+
+
+def test_pause_then_play_is_not_compound():
+    m = LA.match("pause then play")
+    assert m is None or m.name != "compound", m
+
+
+_APP_SHORTCUTS = [
+    ("open calculator", "calculator", "gnome-calculator"),
+    ("open settings", "settings", "gnome-control-center"),
+    ("open system monitor", "system monitor", "gnome-system-monitor"),
+    ("open clock", "clocks", "gnome-clocks"),
+    ("open clocks", "clocks", "gnome-clocks"),
+]
+
+
+@pytest.mark.parametrize("phrase,canon,binary", _APP_SHORTCUTS)
+def test_desktop_app_shortcuts_route(phrase, canon, binary):
+    m = LA.match(phrase)
+    assert m is not None and m.name == "open_app", (phrase, m)
+    assert m.params.get("app") == canon, (phrase, m.params)
+
+
+@pytest.mark.parametrize("phrase,canon,binary", _APP_SHORTCUTS)
+def test_desktop_app_shortcuts_execute_mocked(monkeypatch, phrase, canon,
+                                              binary):
+    calls = []
+    monkeypatch.setattr(
+        subprocess, "Popen",
+        lambda argv, **kw: (calls.append(argv), _DummyProc())[1])
+    monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
+    m = LA.match(phrase)
+    assert m is not None and m.name == "open_app", phrase
+    out = LA.execute(m)
+    assert calls and calls[0][0] == binary, (phrase, calls)
+    assert "opening" in out.lower(), out
+
+
+def test_desktop_app_shortcut_missing_binary_is_honest(monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    for phrase in ("open calculator", "open settings"):
+        m = LA.match(phrase)
+        assert m is not None and m.name == "open_app", phrase
+        out = LA.execute(m)
+        assert "isn't installed" in out.lower(), (phrase, out)
+
+
+def test_desktop_shortcuts_do_not_shadow():
+    assert LA.match("open discord").name == "open_app"
+    assert LA.match("open chromium").name == "open_app"
+    assert LA.match("what time is it").name == "time_date"
+    # "start a timer" is the pinned timer form ("set a timer" alone matches
+    # nothing on pristine HEAD either — verified via stash, out of scope).
+    assert LA.match("start a timer").name == "timer"
+    assert LA.match("open file").name == "open_app"
+    assert LA.match("open downloads").name == "open_folder"

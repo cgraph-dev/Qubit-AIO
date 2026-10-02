@@ -1631,6 +1631,54 @@ class VoiceEditService:
                 "request_id": req.request_id,
                 "detail": "confirm to run this task"}
 
+    def _map_settled_confirmation(self, settled: Any, *, kind: str,
+                                        session_id: str, task_text: str,
+                                        request_id: str) -> Dict[str, Any]:
+        """Map a CT settle outcome onto the task_result shape.
+
+        ``settled`` is the verbatim dict from ``_settle_affirmed`` (registry)
+        or ``_settle_task_affirmed`` (task): success carries
+        ``{ok, text/reply, session_id, route, ...}``; failure carries
+        ``{ok False, code, detail, session_id, route}``. Neither carries
+        ``tool_used`` — the voice turn executed through the full agent turn,
+        so ``tool_used`` is ``"full-turn"``. Audits
+        ``voice_edit.task.settled`` with the confirmation kind. Never raises:
+        a malformed settle dict maps to a typed failure, never a phantom ok.
+        """
+        try:
+            settled = dict(settled or {})
+        except Exception:
+            settled = {}
+        route = str(settled.get("route") or kind or "")
+        self._audit("voice_edit.task.settled", {
+            "request_id": request_id, "kind": kind, "route": route,
+            "code": str(settled.get("code") or ""),
+            "confirmation_id": str(settled.get("confirmation_id") or ""),
+            "entry": str(settled.get("entry") or settled.get("task") or "")})
+        sid = str(settled.get("session_id") or settled.get("session")
+                  or session_id or "")
+        if settled.get("ok"):
+            reply = str(settled.get("reply") or settled.get("text")
+                        or settled.get("report") or "").strip()
+            if not reply:
+                return {"ok": False, "mode": "task_result",
+                        "code": "VOICE_EDIT_TASK_EMPTY",
+                        "detail": "settled confirmation returned no reply",
+                        "reply": "", "tool_used": "full-turn",
+                        "task_text": task_text, "request_id": request_id,
+                        "session_id": sid, "route": route}
+            return {"ok": True, "mode": "task_result", "reply": reply,
+                    "tool_used": "full-turn", "task_text": task_text,
+                    "request_id": request_id, "session_id": sid,
+                    "route": route}
+        code = str(settled.get("code") or "VOICE_EDIT_TASK_EMPTY")
+        detail = str(settled.get("detail") or "")[:200]
+        reply = str(settled.get("reply") or settled.get("text") or "")
+        return {"ok": False, "mode": "task_result", "code": code,
+                "detail": detail, "reply": reply, "tool_used": "full-turn",
+                "task_text": task_text, "request_id": request_id,
+                "session_id": sid, "route": route}
+
     def task(self, text: str, *, confirm: bool = False,
              request_id: str = "") -> Dict[str, Any]:
         """Run an actionable request through the one agent turn path.
@@ -1653,6 +1701,42 @@ class VoiceEditService:
                 "VOICE_EDIT_CONFIRM_REQUIRED",
                 "the task needs explicit confirmation before it runs",
                 status=409)
+        # Slice-1b: a voice "yes" settles a CT-staged confirmation first.
+        # ask()'s _full_turn_answer leaves CONFIRM_REQUIRED unstaged-spoken
+        # so voice never promises an unsettleable "say yes"; the helper
+        # speaks staged confirmations for service.task mode and the user
+        # answers "yes" -> task(confirm=True) lands here. run_tool_task
+        # knows nothing of the CT-staged id, so check the voice session
+        # for pending CT work (registry first, then task — mirror turn()'s
+        # T4/T5 order) and settle exactly once through the shared
+        # settle-once journal path (ids come from the pending record only,
+        # never invented). Nothing pending -> fall through byte-identical.
+        try:
+            from .. import chat_transport as _CT
+            _sid = self._voice_session()
+            _st = self._canonical_store()
+            if _st is not None:
+                try:
+                    _pending_reg = _CT._pending_registry(self.cfg, _sid)
+                except Exception:
+                    _pending_reg = []
+                if _pending_reg:
+                    _settled = _CT._settle_affirmed(self.cfg, _st, _sid)
+                    return self._map_settled_confirmation(
+                        _settled, kind="registry", session_id=_sid,
+                        task_text=clean, request_id=request_id)
+                try:
+                    _pending_t = _CT._pending_task(self.cfg, _sid)
+                except Exception:
+                    _pending_t = []
+                if _pending_t:
+                    _settled = _CT._settle_task_affirmed(
+                        self.cfg, _st, _sid)
+                    return self._map_settled_confirmation(
+                        _settled, kind="task", session_id=_sid,
+                        task_text=clean, request_id=request_id)
+        except Exception:
+            pass
         escalate, why = self._escalate_for("task")
         self._audit("voice_edit.task.run", {
             "request_id": request_id, "chars": len(clean),

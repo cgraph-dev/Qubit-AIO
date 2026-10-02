@@ -15,6 +15,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import voicebridge.chat_transport as CT  # noqa: E402
@@ -167,3 +169,77 @@ def test_full_turn_error_keeps_brain_outcome(monkeypatch):
     out = svc.ask("do the thing", request_id="r-5")
     assert out["ok"] is False
     assert any(op == "voice_edit.full_turn_error" for op, _ in audits)
+
+
+# --- Slice-1b: voice "yes" settles CT-staged confirmations via task() ---
+
+
+def test_slice1b_pending_registry_settles_on_yes(monkeypatch):
+    """Pending CT registry confirmation + task(confirm=True) settles it.
+
+    run_tool_task must never run (it knows nothing of the CT-staged id).
+    """
+    svc, audits, store = _service(
+        monkeypatch, brain={"ok": True, "text": "Brain fallback answer."})
+    monkeypatch.setattr(CT, "_pending_registry",
+                        lambda cfg, sid: [{"id": "c-1"}])
+    monkeypatch.setattr(CT, "_pending_task", lambda cfg, sid: [])
+
+    def fake_settle(cfg, st, sid):
+        assert sid == svc._voice_session()
+        return {"ok": True, "text": "Opened youtube", "reply": "Opened youtube",
+                "session_id": sid, "route": "registry", "entry": "open_website"}
+
+    monkeypatch.setattr(CT, "_settle_affirmed", fake_settle)
+
+    import voicebridge.voice_edit.tool_task as TT
+
+    def _boom(*a, **k):
+        raise AssertionError("run_tool_task must not run when CT settles")
+
+    monkeypatch.setattr(TT, "run_tool_task", _boom)
+    out = svc.task("yes", confirm=True, request_id="r-s1b1")
+    assert out["ok"] is True
+    assert out["mode"] == "task_result"
+    assert "Opened youtube" in out["reply"]
+    assert out["tool_used"] == "full-turn"
+    assert any(op == "voice_edit.task.settled" for op, _ in audits)
+
+
+def test_slice1b_no_pending_keeps_tool_task_path(monkeypatch):
+    """No CT pending -> today's run_tool_task behavior, byte-identical shape."""
+    svc, audits, store = _service(
+        monkeypatch, brain={"ok": True, "text": "Brain fallback answer."})
+    monkeypatch.setattr(CT, "_pending_registry", lambda cfg, sid: [])
+    monkeypatch.setattr(CT, "_pending_task", lambda cfg, sid: [])
+
+    import voicebridge.voice_edit.tool_task as TT
+
+    def fake_tool(cfg, clean, **kw):
+        return {"state": "OK", "reply": "did the thing",
+                "tool_used": "local.open_website", "session_id": "voice-chat"}
+
+    monkeypatch.setattr(TT, "run_tool_task", fake_tool)
+    out = svc.task("do the thing", confirm=True, request_id="r-s1b2")
+    assert out["ok"] is True
+    assert out["mode"] == "task_result"
+    assert out["reply"] == "did the thing"
+    assert out["tool_used"] == "local.open_website"
+    assert not any(op == "voice_edit.task.settled" for op, _ in audits)
+
+
+def test_slice1b_pending_with_confirm_false_still_refuses(monkeypatch):
+    """Pending CT confirmation + confirm=False refuses, settles nothing."""
+    svc, audits, store = _service(
+        monkeypatch, brain={"ok": True, "text": "Brain fallback answer."})
+    monkeypatch.setattr(CT, "_pending_registry",
+                        lambda cfg, sid: [{"id": "c-1"}])
+
+    def _boom(cfg, st, sid):
+        raise AssertionError("settle must not run without confirm=True")
+
+    monkeypatch.setattr(CT, "_settle_affirmed", _boom)
+    monkeypatch.setattr(CT, "_settle_task_affirmed", _boom)
+    with pytest.raises(Exception) as e:
+        svc.task("yes", confirm=False, request_id="r-s1b3")
+    assert e.value.code == "VOICE_EDIT_CONFIRM_REQUIRED"

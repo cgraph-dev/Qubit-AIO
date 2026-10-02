@@ -3022,3 +3022,32 @@ send/stop, queue strip with hold/resume, retry) in the Qubit theme —
 screenshots verified, no gate codes in UI.
 Evidence: 41 passed bridge tests; tsc clean; Bot 11/11; Taskflows +
 Checkpoints + Devices suites 28/28 with the Bot page.
+
+## 73. Slice-1b, batch-2 commands, STT verdict, bundle rebuilt — 2026-10-02
+
+**No milestone claimed. Not committed.** Four parallel lanes.
+
+- **Slice-1b (voice-"yes" settles CT-staged confirmations) — DONE.**
+  `service.task(confirm=True)` now checks the voice session's pending
+  CT-staged confirmations first (registry then task, mirroring
+  `turn()` T4/T5; settle-once via the journal, voice-session-scoped,
+  nothing invented) and maps the outcome onto `task_result`; nothing
+  pending falls through to `run_tool_task` byte-identical.
+  `confirm=False` still refuses first. 40 tests green.
+- **Commands batch 2 — DONE (74/74 in the actions suite):** bare
+  "open file" → Files; new `open_folder` (downloads/documents);
+  compound "A and B" (two-phase validate, grant-gated halves return
+  None → agent confirm path, no partial execution); 4 desktop
+  shortcuts (calculator/settings/monitor/clocks, PATH-verified).
+  Live: "Open calculator." → opened; docs still local-editor.
+- **STT headroom study — verdict: stay on small.** Measured on this
+  host (8 GB VRAM, ~2.8 GB free): medium fits (+641 MiB net) but buys
+  **zero WER** (0.029 both, the single diff is a `twelve→12`
+  normalization artifact) at +60% latency; prompt fixes the only real
+  error class (Cupid→Qubit); VAD stays. No code change.
+- **Bundle rebuilt** with the catalog UI + vad/max-s/verbatim/testid
+  strings verified in the fresh chunk; page 200. Full vitest
+  668/672 — 4 failures proven other lanes' (Channels×2, Harness,
+  MemoryBackends; no shared imports with this work).
+- **Evidence:** 166 focused + 74 actions green; service restarted
+  clean; calculator + doc open proven live through it.
