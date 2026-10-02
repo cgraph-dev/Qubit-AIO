@@ -445,3 +445,98 @@ def test_flows_programs_read_live(tmp_path, monkeypatch):
 
 
 # (flows/cancel gate covered by test_flows_hook_rows_live_except_cancel_gate)
+
+
+# -- lane J1 (local Viking context engine) -----------------------------------
+# The 9 viking rows are live on the local context engine
+# (voicebridge/context_store.py — state-home context/, no external server).
+# Reads execute; the two POST rows stage 409 then execute exactly once.
+
+
+def test_viking_status_is_local(tmp_path, monkeypatch):
+    """GET /api/qubit/viking/status reports the local engine (no server)."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/viking/status", {}, {})
+    assert code == 200, out
+    inner = out.get("result", out)
+    assert inner.get("connection") == "local", out
+    assert inner.get("engine") == "qubit-local-context", out
+
+
+def test_viking_tree_lists_four_groups(tmp_path, monkeypatch):
+    """GET viking/context-tree serves the four context groups."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET",
+                            "/api/qubit/viking/context-tree", {}, {})
+    assert code == 200, out
+    inner = out.get("result", out)
+    assert [g["key"] for g in inner["groups"]] == [
+        "user", "agent", "resources", "skills"], out
+
+
+def test_viking_file_search_related_roundtrip(tmp_path, monkeypatch):
+    """memory-add stages+executes; retrieval-search + file + related read it."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    body = {"text": "lane-j1-bridge-probe remembers the lighthouse"}
+    code, staged = HC.dispatch(cfg, "POST", "/api/qubit/viking/memory-add",
+                               {}, dict(body))
+    assert code == 409, staged
+    assert staged.get("confirmation_id"), staged
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/viking/memory-add",
+                            {}, {**body, "confirm": True})
+    assert code == 200, out
+    code, out = HC.dispatch(cfg, "GET",
+                            "/api/qubit/viking/retrieval-search",
+                            {"q": "lane-j1-bridge-probe"}, {})
+    assert code == 200, out
+    inner = out.get("result", out)
+    assert inner.get("count", 0) >= 1, out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/viking/file",
+                            {"path": "user/memories.md"}, {})
+    assert code == 200, out
+    inner = out.get("result", out)
+    assert "lane-j1-bridge-probe" in inner.get("content", ""), out
+    assert inner.get("viking_uri") == "viking://user/memories.md", out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/viking/related-find",
+                            {"path": "user/memories.md"}, {})
+    assert code == 200, out
+    assert "items" in out.get("result", out), out
+
+
+def test_viking_resource_add_staged_then_executes(tmp_path, monkeypatch):
+    """POST viking/resource-add stages 409, then writes under resources/."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    body = {"uri": "viking://lane-j1-doc", "title": "Lane J1 Doc"}
+    code, staged = HC.dispatch(cfg, "POST",
+                               "/api/qubit/viking/resource-add", {},
+                               dict(body))
+    assert code == 409, staged
+    assert staged.get("code") == "CONFIRM_REQUIRED", staged
+    assert staged.get("confirmation_id"), staged
+    code, out = HC.dispatch(cfg, "POST", "/api/qubit/viking/resource-add",
+                            {}, {**body, "confirm": True})
+    assert code == 200, out
+    inner = out.get("result", out)
+    assert inner.get("path") == "resources/Lane-J1-Doc.md", out
+
+
+def test_viking_bot_sessions_and_skills_read(tmp_path, monkeypatch):
+    """GET viking/bot-sessions + viking/skills are live reads (no gates)."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/viking/bot-sessions",
+                            {}, {})
+    assert code == 200, out
+    assert "sessions" in out.get("result", out), out
+    code, out = HC.dispatch(cfg, "GET", "/api/qubit/viking/skills", {}, {})
+    assert code == 200, out
+    assert "skills" in out.get("result", out), out

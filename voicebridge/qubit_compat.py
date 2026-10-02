@@ -4194,8 +4194,9 @@ def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
     }
     if pid == "whatsapp":
         saved_allowed = _saved_whatsapp_allowed_users()
+        saved_mode = _saved_whatsapp_env_value("WHATSAPP_MODE")
         payload["whatsapp_setup"] = {
-            "mode": "",
+            "mode": saved_mode if saved_mode in ("bot", "self-chat") else "",
             "allowed_users_set": bool(refs.get("WHATSAPP_ALLOWED_USERS") or saved_allowed),
             "allowed_users": saved_allowed,
             "home_channel_set": False,
@@ -4203,13 +4204,11 @@ def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
     return payload
 
 
-def _saved_whatsapp_allowed_users() -> str:
-    """Saved WhatsApp allowlist from the runtime ``.env`` (read-only).
+def _saved_whatsapp_env_value(key: str) -> str:
+    """A single ``KEY=value`` read from the runtime ``.env`` (read-only).
 
-    The allowlist is dial-plan config, not a credential — the Channels panel
-    already renders it in a plaintext input — so returning it lets the panel
-    prefill instead of always rendering empty after refresh. Fail-closed to
-    ``""``; secret values are never read here.
+    Shared by the Channels panel prefill readers. Fail-closed to ``""``;
+    secret values are never read here.
     """
     try:
         from .gateway_supervisor import _daemon_home
@@ -4221,10 +4220,21 @@ def _saved_whatsapp_allowed_users() -> str:
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or "=" not in stripped:
             continue
-        key, _, value = stripped.partition("=")
-        if key.strip() == "WHATSAPP_ALLOWED_USERS":
+        found, _, value = stripped.partition("=")
+        if found.strip() == key:
             return value.strip().strip("\"'").strip()
     return ""
+
+
+def _saved_whatsapp_allowed_users() -> str:
+    """Saved WhatsApp allowlist from the runtime ``.env`` (read-only).
+
+    The allowlist is dial-plan config, not a credential — the Channels panel
+    already renders it in a plaintext input — so returning it lets the panel
+    prefill instead of always rendering empty after refresh. Fail-closed to
+    ``""``; secret values are never read here.
+    """
+    return _saved_whatsapp_env_value("WHATSAPP_ALLOWED_USERS")
 
 
 def _account_platform_payload(cfg: Any, account: Dict[str, Any],
@@ -17016,6 +17026,33 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
               "detail": "the /api/qubit/memory/* namespace has no backend; "
                         "the live probe is served at the canonical path",
               "counterpart": "GET /api/memory/providers/qubit-local"}},
+    # -- viking (ocFamilyVikingApi; 9 rows with paths verbatim) --
+    # Served by the LOCAL context engine (``voicebridge/context_store.py`` —
+    # Qubit-owned state-home ``context/`` root: user/agent/resources/skills
+    # groups with L0/L1 tier files; no external server, no network, no new
+    # DBs — flat files plus read-only queries against the existing runtime
+    # state.db). Reads execute immediately; the two POST rows are
+    # confirm-gated mutations through the shared journal (409 before any
+    # confirm is staged, exactly-once execute after). ``viking://`` URIs are
+    # local scheme identifiers (user-facing only, never leave this host).
+    {"family": "viking", "action": "status", "methods": ["GET"],
+     "gateway": "viking.status", "kind": "read"},
+    {"family": "viking", "action": "context-tree", "methods": ["GET"],
+     "gateway": "viking.tree", "kind": "read"},
+    {"family": "viking", "action": "file", "methods": ["GET"],
+     "gateway": "viking.file", "kind": "read"},
+    {"family": "viking", "action": "retrieval-search", "methods": ["GET"],
+     "gateway": "viking.search", "kind": "read"},
+    {"family": "viking", "action": "resource-add", "methods": ["POST"],
+     "gateway": "viking.resource_add", "kind": "mutation"},
+    {"family": "viking", "action": "memory-add", "methods": ["POST"],
+     "gateway": "viking.memory_add", "kind": "mutation"},
+    {"family": "viking", "action": "related-find", "methods": ["GET"],
+     "gateway": "viking.related", "kind": "read"},
+    {"family": "viking", "action": "bot-sessions", "methods": ["GET"],
+     "gateway": "viking.bot_sessions", "kind": "read"},
+    {"family": "viking", "action": "skills", "methods": ["GET"],
+     "gateway": "viking.skills", "kind": "read"},
     # -- webchat (ocFamilyWebchatApi; reuse-only — no bridge rows) --
     # Every webchat capability reuses an existing chat endpoint (sessions
     # list/create/history, POST /api/qubit/chat + /stream); NEEDS_BRIDGE is
@@ -17172,6 +17209,11 @@ def _ensure_family_backends(registry: Any) -> None:
     for _name, _fn in dict(getattr(canvas, "GATEWAY_METHODS", {})).items():
         registry.register(_name, _fn)
     for _name, _fn in dict(getattr(_SCH, "FLOWS_GATEWAY_METHODS", {})).items():
+        registry.register(_name, _fn)
+    from . import context_store as _CTX
+
+    for _name, _fn in dict(
+            getattr(_CTX, "VIKING_GATEWAY_METHODS", {})).items():
         registry.register(_name, _fn)
 
 
