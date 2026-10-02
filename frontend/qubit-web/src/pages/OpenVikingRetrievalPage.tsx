@@ -1,16 +1,16 @@
 /**
  * Open Viking retrieval (`/open-viking/retrieval`).
  *
- * Qubit-owned find/search UI over the external console server's
+ * Qubit-owned find/search UI over the local context engine's
  * retrieval API via `@/lib/ocFamilyVikingApi` (`retrieval_search`).
- * Unconfigured servers render the typed SERVER_UNCONFIGURED state.
+ * A missing bridge row renders honestly disabled with reason.
  */
 
 import { useCallback, useState } from "react";
 import { Link } from "react-router";
 import { ArrowLeft, Search } from "lucide-react";
 import {
-  isServerUnconfiguredPayload,
+  isBridgeRowMissing,
   normalizeSearchHits,
   searchVikingRetrieval,
   type VikingSearchHit,
@@ -19,7 +19,7 @@ import {
 export default function OpenVikingRetrievalPage() {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<VikingSearchHit[]>([]);
-  const [state, setState] = useState<"idle" | "loading" | "done" | "unconfigured" | "error">("idle");
+  const [state, setState] = useState<"idle" | "loading" | "done" | "unavailable" | "error">("idle");
   const [error, setError] = useState("");
 
   const onSearch = useCallback(async () => {
@@ -29,16 +29,16 @@ export default function OpenVikingRetrievalPage() {
     setError("");
     try {
       const payload = await searchVikingRetrieval(q, 25);
-      if (isServerUnconfiguredPayload(payload)) {
-        setState("unconfigured");
-        setHits([]);
-        return;
-      }
       setHits(normalizeSearchHits(payload));
       setState("done");
     } catch (e) {
-      setState("error");
-      setError(e instanceof Error ? e.message : "search failed");
+      if (isBridgeRowMissing(e)) {
+        setHits([]);
+        setState("unavailable");
+      } else {
+        setState("error");
+        setError(e instanceof Error ? e.message : "search failed");
+      }
     }
   }, [query]);
 
@@ -77,9 +77,13 @@ export default function OpenVikingRetrievalPage() {
       </form>
 
       {state === "loading" && <p className="text-sm text-muted-foreground">Searching…</p>}
-      {state === "unconfigured" && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm" role="note">
-          <strong>SERVER_UNCONFIGURED</strong> — no Open Viking server is configured.
+      {state === "unavailable" && (
+        <div
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
+          role="note"
+          data-testid="viking-retrieval-unavailable"
+        >
+          Retrieval-search bridge row missing — the J1 lane has not landed it yet.
         </div>
       )}
       {state === "error" && <p className="text-sm text-destructive">{error}</p>}

@@ -1,17 +1,17 @@
 /**
  * Open Viking Agent Hub (`/open-viking/agent-hub`).
  *
- * Qubit-owned view over the external console server's bot sessions
+ * Qubit-owned view over the local context engine's bot sessions
  * and skills catalog via `@/lib/ocFamilyVikingApi` (`bot_sessions`,
- * `skills_list`). Read-only; unconfigured servers render the typed
- * SERVER_UNCONFIGURED state.
+ * `skills_list`). Read-only; each panel degrades independently — a
+ * bridge row that still 404s renders honestly disabled with reason.
  */
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ArrowLeft, Bot, Wrench } from "lucide-react";
 import {
-  isServerUnconfiguredPayload,
+  isBridgeRowMissing,
   listVikingBotSessions,
   listVikingSkills,
   normalizeBotSessions,
@@ -23,7 +23,9 @@ import {
 export default function OpenVikingAgentHubPage() {
   const [sessions, setSessions] = useState<VikingBotSession[]>([]);
   const [skills, setSkills] = useState<VikingSkillRow[]>([]);
-  const [state, setState] = useState<"loading" | "done" | "unconfigured" | "error">("loading");
+  const [sessionsMissing, setSessionsMissing] = useState(false);
+  const [skillsMissing, setSkillsMissing] = useState(false);
+  const [state, setState] = useState<"loading" | "done" | "error">("loading");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -31,16 +33,34 @@ export default function OpenVikingAgentHubPage() {
     (async () => {
       try {
         const [sessionsPayload, skillsPayload] = await Promise.all([
-          listVikingBotSessions(),
-          listVikingSkills(),
+          listVikingBotSessions().catch((e: unknown) => {
+            if (isBridgeRowMissing(e)) return { __missing: "bot_sessions" };
+            throw e;
+          }),
+          listVikingSkills().catch((e: unknown) => {
+            if (isBridgeRowMissing(e)) return { __missing: "skills" };
+            throw e;
+          }),
         ]);
         if (cancelled) return;
-        if (isServerUnconfiguredPayload(sessionsPayload) || isServerUnconfiguredPayload(skillsPayload)) {
-          setState("unconfigured");
-          return;
+        if (
+          typeof sessionsPayload === "object" &&
+          sessionsPayload !== null &&
+          "__missing" in (sessionsPayload as Record<string, unknown>)
+        ) {
+          setSessionsMissing(true);
+        } else {
+          setSessions(normalizeBotSessions(sessionsPayload));
         }
-        setSessions(normalizeBotSessions(sessionsPayload));
-        setSkills(normalizeVikingSkills(skillsPayload));
+        if (
+          typeof skillsPayload === "object" &&
+          skillsPayload !== null &&
+          "__missing" in (skillsPayload as Record<string, unknown>)
+        ) {
+          setSkillsMissing(true);
+        } else {
+          setSkills(normalizeVikingSkills(skillsPayload));
+        }
         setState("done");
       } catch (e) {
         if (!cancelled) {
@@ -64,11 +84,6 @@ export default function OpenVikingAgentHubPage() {
       </header>
 
       {state === "loading" && <p className="text-sm text-muted-foreground">Loading…</p>}
-      {state === "unconfigured" && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm" role="note">
-          <strong>SERVER_UNCONFIGURED</strong> — no Open Viking server is configured.
-        </div>
-      )}
       {state === "error" && <p className="text-sm text-destructive">{error}</p>}
 
       {state === "done" && (
@@ -77,7 +92,11 @@ export default function OpenVikingAgentHubPage() {
             <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
               <Bot className="h-4 w-4" aria-hidden /> VikingBot sessions ({sessions.length})
             </h2>
-            {sessions.length === 0 ? (
+            {sessionsMissing ? (
+              <p className="text-sm text-muted-foreground" data-testid="viking-sessions-unavailable">
+                Bot-sessions bridge row missing — the J1 lane has not landed it yet.
+              </p>
+            ) : sessions.length === 0 ? (
               <p className="text-sm text-muted-foreground">No bot sessions.</p>
             ) : (
               <ul className="flex flex-col gap-2" data-testid="viking-bot-sessions">
@@ -96,7 +115,11 @@ export default function OpenVikingAgentHubPage() {
             <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
               <Wrench className="h-4 w-4" aria-hidden /> Skills ({skills.length})
             </h2>
-            {skills.length === 0 ? (
+            {skillsMissing ? (
+              <p className="text-sm text-muted-foreground" data-testid="viking-skills-unavailable">
+                Skills bridge row missing — the J1 lane has not landed it yet.
+              </p>
+            ) : skills.length === 0 ? (
               <p className="text-sm text-muted-foreground">No skills.</p>
             ) : (
               <ul className="flex flex-col gap-2" data-testid="viking-skills">

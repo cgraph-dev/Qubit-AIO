@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
- * Open Viking Agent Hub page: mocked bot sessions + skills render, and
- * the typed SERVER_UNCONFIGURED state renders when the bridge reports
- * no configured server.
+ * Open Viking Agent Hub page: mocked-live bot sessions + skills render,
+ * and a 404ing bridge row renders its panel honestly disabled with
+ * reason (no unconfigured state — the local engine is always present).
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -17,8 +17,8 @@ const vikingMocks = vi.hoisted(() => ({
 vi.mock("@/lib/ocFamilyVikingApi", () => ({
   listVikingBotSessions: vikingMocks.listVikingBotSessions,
   listVikingSkills: vikingMocks.listVikingSkills,
-  isServerUnconfiguredPayload: (p: unknown) =>
-    !!p && typeof p === "object" && (p as Record<string, unknown>).code === "SERVER_UNCONFIGURED",
+  isBridgeRowMissing: (e: unknown) =>
+    e instanceof Error && (e.message.includes("404") || e.message.toLowerCase().includes("not found")),
   normalizeBotSessions: (p: unknown) => (p as { sessions: unknown[] }).sessions ?? [],
   normalizeVikingSkills: (p: unknown) => (p as { skills: unknown[] }).skills ?? [],
 }));
@@ -54,7 +54,7 @@ afterEach(async () => {
 });
 
 describe("OpenVikingAgentHubPage", () => {
-  it("renders mocked bot sessions and skills", async () => {
+  it("renders mocked-live bot sessions and skills", async () => {
     vikingMocks.listVikingBotSessions.mockResolvedValue({
       sessions: [{ id: "s1", title: "evening chat", state: "open" }],
     });
@@ -74,9 +74,9 @@ describe("OpenVikingAgentHubPage", () => {
     expect(container.querySelector('[data-testid="viking-skills"]')).not.toBeNull();
   });
 
-  it("shows SERVER_UNCONFIGURED when the bridge reports no server", async () => {
-    vikingMocks.listVikingBotSessions.mockResolvedValue({ code: "SERVER_UNCONFIGURED" });
-    vikingMocks.listVikingSkills.mockResolvedValue({ code: "SERVER_UNCONFIGURED" });
+  it("renders honestly disabled panels when bridge rows 404", async () => {
+    vikingMocks.listVikingBotSessions.mockRejectedValue(new Error("HTTP 404 not found"));
+    vikingMocks.listVikingSkills.mockRejectedValue(new Error("HTTP 404 not found"));
     await act(async () => {
       root.render(
         <MemoryRouter>
@@ -84,6 +84,8 @@ describe("OpenVikingAgentHubPage", () => {
         </MemoryRouter>,
       );
     });
-    await waitFor(() => container.textContent?.includes("SERVER_UNCONFIGURED") ?? false);
+    await waitFor(() => container.querySelector('[data-testid="viking-sessions-unavailable"]') !== null);
+    expect(container.querySelector('[data-testid="viking-skills-unavailable"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("SERVER_UNCONFIGURED");
   });
 });

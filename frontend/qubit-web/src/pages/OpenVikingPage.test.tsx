@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * Open Viking console page: three-pane layout renders from mocked bridge
- * payloads (nav groups, context tree, Preview/Source toggle, Quick start,
- * terminal stub) and the typed SERVER_UNCONFIGURED state when the bridge
- * reports no configured server.
+ * Open Viking console page: three-pane layout renders from mocked-live
+ * bridge payloads (nav groups, context tree, Preview/Source toggle,
+ * Quick start, terminal stub); a 404ing bridge row renders its control
+ * honestly disabled with reason instead of faked content.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -27,8 +27,8 @@ vi.mock("@/lib/ocFamilyVikingApi", () => ({
   getVikingContextTree: vikingMocks.getVikingContextTree,
   getVikingFile: vikingMocks.getVikingFile,
   findVikingRelated: vikingMocks.findVikingRelated,
-  isServerUnconfiguredPayload: (p: unknown) =>
-    !!p && typeof p === "object" && (p as Record<string, unknown>).code === "SERVER_UNCONFIGURED",
+  isBridgeRowMissing: (e: unknown) =>
+    e instanceof Error && (e.message.includes("404") || e.message.toLowerCase().includes("not found")),
   normalizeVikingStatus: () => ({ connection: "connected" }),
   normalizeContextTree: (p: unknown) => (p as Record<string, unknown>).tree ?? {},
   normalizeVikingFile: (p: unknown) => (p as { file: unknown }).file ?? null,
@@ -101,7 +101,9 @@ describe("OpenVikingPage", () => {
     expect(container.textContent).toContain("Add memory");
     expect(container.textContent).toContain("Find related context");
     expect(container.querySelector('[data-testid="viking-terminal"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="viking-connection"]')?.textContent).toBe("Connected");
+    expect(container.querySelector('[data-testid="viking-connection"]')?.textContent).toBe(
+      "Connected (local engine)",
+    );
   });
 
   it("opens a tree node into the viewer with Preview/Source toggle and viking:// uri", async () => {
@@ -129,11 +131,12 @@ describe("OpenVikingPage", () => {
     );
   });
 
-  it("shows the typed SERVER_UNCONFIGURED state when the bridge reports no server", async () => {
-    vikingMocks.getVikingStatus.mockResolvedValue({ code: "SERVER_UNCONFIGURED" });
-    vikingMocks.getVikingContextTree.mockResolvedValue({ code: "SERVER_UNCONFIGURED" });
+  it("renders the missing-row notice when a bridge row 404s instead of faked content", async () => {
+    vikingMocks.getVikingStatus.mockRejectedValue(new Error("GET /api/qubit/viking/status: HTTP 404"));
+    vikingMocks.getVikingContextTree.mockRejectedValue(new Error("HTTP 404 not found"));
     await renderPage();
-    await waitFor(() => container.textContent?.includes("SERVER_UNCONFIGURED") ?? false);
-    expect(container.querySelector('[data-testid="viking-unconfigured"]')).not.toBeNull();
+    await waitFor(() => container.querySelector('[data-testid="viking-missing-rows"]') !== null);
+    expect(container.querySelector('[data-testid="viking-tree-unavailable"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("SERVER_UNCONFIGURED");
   });
 });

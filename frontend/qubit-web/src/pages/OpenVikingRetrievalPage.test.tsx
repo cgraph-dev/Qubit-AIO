@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
- * Open Viking retrieval page: search form renders, mocked hits render,
- * and the typed SERVER_UNCONFIGURED state renders when the bridge
- * reports no configured server.
+ * Open Viking retrieval page: search form renders, mocked-live hits
+ * render, and a 404ing bridge row renders honestly disabled with
+ * reason (no unconfigured state — the local engine is always present).
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -15,8 +15,8 @@ const vikingMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/ocFamilyVikingApi", () => ({
   searchVikingRetrieval: vikingMocks.searchVikingRetrieval,
-  isServerUnconfiguredPayload: (p: unknown) =>
-    !!p && typeof p === "object" && (p as Record<string, unknown>).code === "SERVER_UNCONFIGURED",
+  isBridgeRowMissing: (e: unknown) =>
+    e instanceof Error && (e.message.includes("404") || e.message.toLowerCase().includes("not found")),
   normalizeSearchHits: (p: unknown) => (p as { hits: unknown[] }).hits ?? [],
 }));
 
@@ -57,7 +57,7 @@ afterEach(async () => {
 });
 
 describe("OpenVikingRetrievalPage", () => {
-  it("renders mocked hits after search", async () => {
+  it("renders mocked-live hits after search", async () => {
     vikingMocks.searchVikingRetrieval.mockResolvedValue({
       hits: [{ id: "h1", title: "memory note", snippet: "likes dark mode", path: "memories/m1.md" }],
     });
@@ -81,8 +81,8 @@ describe("OpenVikingRetrievalPage", () => {
     expect(container.querySelector('[data-testid="viking-retrieval-hits"]')).not.toBeNull();
   });
 
-  it("shows SERVER_UNCONFIGURED when the bridge reports no server", async () => {
-    vikingMocks.searchVikingRetrieval.mockResolvedValue({ code: "SERVER_UNCONFIGURED" });
+  it("renders honestly disabled state when the bridge row 404s", async () => {
+    vikingMocks.searchVikingRetrieval.mockRejectedValue(new Error("HTTP 404 not found"));
     await act(async () => {
       root.render(
         <MemoryRouter>
@@ -97,6 +97,6 @@ describe("OpenVikingRetrievalPage", () => {
     await act(async () => {
       container.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
-    await waitFor(() => container.textContent?.includes("SERVER_UNCONFIGURED") ?? false);
+    await waitFor(() => container.querySelector('[data-testid="viking-retrieval-unavailable"]') !== null);
   });
 });

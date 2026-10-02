@@ -1,14 +1,14 @@
 /**
  * Viking family API: ROUTES manifest stays under /api/qubit/viking/* as
- * NEEDS-BRIDGE, the SERVER_UNCONFIGURED gate is typed, and normalizers
- * handle both envelope shapes without inventing data.
+ * LOCAL (local engine, always present), the missing-row helper detects
+ * not-yet-landed J1 rows, and normalizers handle both envelope shapes
+ * without inventing data.
  */
 import { describe, expect, it } from "vitest";
 import {
   ROUTES,
   VIKING_CONTEXT_GROUPS,
-  VikingServerUnconfiguredError,
-  isServerUnconfiguredPayload,
+  isBridgeRowMissing,
   normalizeBotSessions,
   normalizeContextTree,
   normalizeSearchHits,
@@ -16,16 +16,15 @@ import {
   normalizeVikingSkills,
   normalizeVikingStatus,
   routePath,
-  throwIfServerUnconfigured,
   toVikingUri,
 } from "@/lib/ocFamilyVikingApi";
 
 describe("ocFamilyVikingApi", () => {
-  it("keeps every route under /api/qubit/viking/ as NEEDS-BRIDGE", () => {
+  it("keeps every route under /api/qubit/viking/ as LOCAL", () => {
     expect(ROUTES.length).toBeGreaterThan(0);
     for (const route of ROUTES) {
       expect(route.path.startsWith("/api/qubit/viking/")).toBe(true);
-      expect(route.status).toBe("NEEDS-BRIDGE");
+      expect(route.status).toBe("LOCAL");
     }
     expect(routePath("status")?.path).toBe("/api/qubit/viking/status");
     expect(routePath("resource_add")?.method).toBe("POST");
@@ -45,18 +44,18 @@ describe("ocFamilyVikingApi", () => {
     ]);
   });
 
-  it("types the SERVER_UNCONFIGURED gate", () => {
-    expect(isServerUnconfiguredPayload({ code: "SERVER_UNCONFIGURED" })).toBe(true);
-    expect(isServerUnconfiguredPayload({ result: { code: "SERVER_UNCONFIGURED" } })).toBe(true);
-    expect(isServerUnconfiguredPayload({ connection: "connected" })).toBe(false);
-    expect(() => throwIfServerUnconfigured({ code: "SERVER_UNCONFIGURED" })).toThrow(
-      VikingServerUnconfiguredError,
-    );
-    expect(() => throwIfServerUnconfigured({ connection: "connected" })).not.toThrow();
+  it("detects missing bridge rows without an unconfigured state", () => {
+    expect(isBridgeRowMissing(new Error("GET /api/qubit/viking/status: HTTP 404"))).toBe(true);
+    expect(isBridgeRowMissing(new Error("not found"))).toBe(true);
+    expect(isBridgeRowMissing({ code: "NOT_FOUND" })).toBe(true);
+    expect(isBridgeRowMissing(new Error("boom"))).toBe(false);
+    expect(isBridgeRowMissing({ connection: "connected" })).toBe(false);
   });
 
   it("normalizes status, tree, file, hits, sessions, and skills", () => {
     expect(normalizeVikingStatus({ result: { connection: "connected" } }).connection).toBe("connected");
+    expect(normalizeVikingStatus({ result: { connection: "local" } }).connection).toBe("connected");
+    expect(normalizeVikingStatus({ nope: 1 }).connection).toBe("unknown");
     const tree = normalizeContextTree({
       tree: { user_memories: [{ id: "m1", label: "note", path: "memories/m1.md" }] },
     });

@@ -2,12 +2,14 @@
  * Open Viking console family API.
  *
  * Qubit-owned client for the Open Viking console pages (`/open-viking` and
- * its children). The console server is treated as EXTERNAL infrastructure:
- * nothing is bundled or vendored here. Every path below lives under
- * `/api/qubit/viking/<action>` (see {@link ROUTES}); each row is
- * NEEDS-BRIDGE until the backend bridge route exists. When no console
- * server is configured the bridge answers the typed `SERVER_UNCONFIGURED`
- * gate (never a faked payload) — see {@link VikingServerUnconfiguredError}.
+ * its children). Every path below lives under `/api/qubit/viking/<action>`
+ * (see {@link ROUTES}); each row is `LOCAL` — the bridge wires it onto our
+ * own local context engine (sessions, skills, memory, resources), which is
+ * always present. There is no server concept and no unconfigured state.
+ *
+ * A control whose bridge row answers 404 is rendered honestly disabled
+ * with the missing-row reason (see {@link isBridgeRowMissing}) — never a
+ * faked payload.
  *
  * Reads go through `fetchJSON`; mutations go through the shared
  * staged-confirmation round-trip (`runMutationWithConfirm`).
@@ -34,7 +36,7 @@ export type VikingFamilyAction =
   | "skills_list";
 
 export type VikingRouteMethod = "GET" | "POST";
-export type VikingRouteStatus = "NEEDS-BRIDGE";
+export type VikingRouteStatus = "LOCAL";
 
 export interface VikingFamilyRoute {
   family: "viking";
@@ -42,14 +44,13 @@ export interface VikingFamilyRoute {
   method: VikingRouteMethod;
   path: string;
   status: VikingRouteStatus;
-  /** External console-server capability the bridge wires this to. */
+  /** Local Qubit backend the bridge wires this to. */
   counterpart: string;
 }
 
 /**
- * Every path this family client addresses. All rows are new
- * `/api/qubit/viking/<action>` paths; the bridge ports each onto the
- * external console server's HTTP API when one is configured.
+ * Every path this family client addresses. All rows are
+ * `/api/qubit/viking/<action>` paths wired onto the local context engine.
  */
 export const ROUTES: ReadonlyArray<VikingFamilyRoute> = [
   {
@@ -57,72 +58,72 @@ export const ROUTES: ReadonlyArray<VikingFamilyRoute> = [
     action: "status",
     method: "GET",
     path: "/api/qubit/viking/status",
-    status: "NEEDS-BRIDGE",
-    counterpart: "console server health/status over its HTTP API",
+    status: "LOCAL",
+    counterpart: "local context engine status (always present)",
   },
   {
     family: "viking",
     action: "context_tree",
     method: "GET",
     path: "/api/qubit/viking/context-tree",
-    status: "NEEDS-BRIDGE",
-    counterpart: "console server context tree (memories, bot, peers, entities, preferences, profiles, sessions, skills, resources)",
+    status: "LOCAL",
+    counterpart: "local context tree (memories, bot, peers, entities, preferences, profiles, sessions, skills, resources)",
   },
   {
     family: "viking",
     action: "file_get",
     method: "GET",
     path: "/api/qubit/viking/file",
-    status: "NEEDS-BRIDGE",
-    counterpart: "console server file fetch for the Preview/Source viewer",
+    status: "LOCAL",
+    counterpart: "local context file fetch for the Preview/Source viewer",
   },
   {
     family: "viking",
     action: "retrieval_search",
     method: "GET",
     path: "/api/qubit/viking/retrieval-search",
-    status: "NEEDS-BRIDGE",
-    counterpart: "console server retrieval find/search over its HTTP API",
+    status: "LOCAL",
+    counterpart: "local retrieval find/search over the context engine",
   },
   {
     family: "viking",
     action: "resource_add",
     method: "POST",
     path: "/api/qubit/viking/resource-add",
-    status: "NEEDS-BRIDGE",
-    counterpart: "console server resource ingest (confirm-gated)",
+    status: "LOCAL",
+    counterpart: "local resource ingest (confirm-gated)",
   },
   {
     family: "viking",
     action: "memory_add",
     method: "POST",
     path: "/api/qubit/viking/memory-add",
-    status: "NEEDS-BRIDGE",
-    counterpart: "console server memory write (confirm-gated)",
+    status: "LOCAL",
+    counterpart: "local memory write (confirm-gated)",
   },
   {
     family: "viking",
     action: "related_find",
     method: "GET",
     path: "/api/qubit/viking/related-find",
-    status: "NEEDS-BRIDGE",
-    counterpart: "console server related-context lookup over its HTTP API",
+    status: "LOCAL",
+    counterpart: "local related-context lookup over the context engine",
   },
   {
     family: "viking",
     action: "bot_sessions",
     method: "GET",
     path: "/api/qubit/viking/bot-sessions",
-    status: "NEEDS-BRIDGE",
-    counterpart: "console server bot sessions over its HTTP API",
+    status: "LOCAL",
+    counterpart: "canonical session store (QubitSessionStore.list)",
   },
   {
     family: "viking",
     action: "skills_list",
     method: "GET",
     path: "/api/qubit/viking/skills",
-    status: "NEEDS-BRIDGE",
-    counterpart: "console server skills catalog over its HTTP API",
+    status: "LOCAL",
+    counterpart: "local skill catalog",
   },
 ];
 
@@ -130,43 +131,35 @@ export function routePath(action: VikingFamilyAction): VikingFamilyRoute | undef
   return ROUTES.find((r) => r.action === action);
 }
 
-// ── typed SERVER_UNCONFIGURED gate ────────────────────────────────────────
-
-export const VIKING_SERVER_UNCONFIGURED_CODE = "SERVER_UNCONFIGURED";
-
-/** Typed gate raised when no console server is configured (never a fake payload). */
-export class VikingServerUnconfiguredError extends Error {
-  readonly code = VIKING_SERVER_UNCONFIGURED_CODE;
-  readonly detail: string;
-  constructor(detail = "no Open Viking server is configured") {
-    super(`SERVER_UNCONFIGURED: ${detail}`);
-    this.name = "VikingServerUnconfiguredError";
-    this.detail = detail;
-  }
-}
+// ── missing-row honesty ──────────────────────────────────────────────────
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-/** True when a bridge payload is the typed unconfigured gate. */
-export function isServerUnconfiguredPayload(payload: unknown): boolean {
-  if (!isRecord(payload)) return false;
-  const inner = isRecord(payload.result) ? payload.result : payload;
-  return inner.code === VIKING_SERVER_UNCONFIGURED_CODE || payload.code === VIKING_SERVER_UNCONFIGURED_CODE;
-}
-
-/** Throw the typed gate when the bridge reports no configured server. */
-export function throwIfServerUnconfigured(payload: unknown): void {
-  if (isServerUnconfiguredPayload(payload)) {
-    const inner = isRecord(payload) && isRecord(payload.result)
-      ? (payload.result as Record<string, unknown>)
-      : (payload as Record<string, unknown>);
-    const detail = typeof inner.detail === "string" && inner.detail
-      ? inner.detail
-      : "no Open Viking server is configured";
-    throw new VikingServerUnconfiguredError(detail);
+/**
+ * True when a fetch failure (or payload) means the bridge row itself is
+ * missing — typically an HTTP 404 from a not-yet-landed J1 row. Pages use
+ * this to render the control honestly disabled with reason instead of a
+ * generic error or invented data.
+ */
+export function isBridgeRowMissing(errorOrPayload: unknown): boolean {
+  if (errorOrPayload instanceof Error) {
+    const msg = errorOrPayload.message.toLowerCase();
+    return (
+      msg.includes("404") ||
+      msg.includes("not found") ||
+      msg.includes("no_route") ||
+      msg.includes("no route") ||
+      msg.includes("unknown path")
+    );
   }
+  if (!isRecord(errorOrPayload)) return false;
+  const inner = isRecord(errorOrPayload.result)
+    ? (errorOrPayload.result as Record<string, unknown>)
+    : (errorOrPayload as Record<string, unknown>);
+  const code = typeof inner.code === "string" ? inner.code.toUpperCase() : "";
+  return code === "NOT_FOUND" || code === "NO_ROUTE" || code === "ROUTE_NOT_FOUND";
 }
 
 // ── shapes (defensive: pages normalize both envelope shapes) ─────────────
@@ -179,11 +172,10 @@ function str(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-export type VikingConnectionState = "connected" | "unconfigured" | "unknown";
+export type VikingConnectionState = "connected" | "unknown";
 
 export interface VikingStatus {
   connection: VikingConnectionState;
-  serverBaseUrl?: string;
   detail?: string;
 }
 
@@ -192,10 +184,11 @@ export function normalizeVikingStatus(payload: unknown): VikingStatus {
   const inner = (isRecord(payload.result) ? payload.result : payload) as Record<string, unknown>;
   const raw = str(inner.connection || inner.state || inner.status).toLowerCase();
   const connection: VikingConnectionState =
-    raw === "connected" ? "connected" : raw === "unconfigured" ? "unconfigured" : "unknown";
+    raw === "connected" || raw === "local" || raw === "ok" || raw === "ready" || raw === "available"
+      ? "connected"
+      : "unknown";
   return {
     connection,
-    serverBaseUrl: str(inner.server_base_url || inner.serverBaseUrl) || undefined,
     detail: str(inner.detail) || undefined,
   };
 }
@@ -351,7 +344,7 @@ function get(action: Extract<VikingFamilyAction, "status" | "context_tree" | "fi
   return fetchJSON<unknown>(qs ? `${route.path}?${qs}` : route.path);
 }
 
-/** Bridge status: connection state plus the configured server, if any. */
+/** Local engine status: always present once the bridge row lands. */
 export async function getVikingStatus(): Promise<unknown> {
   return get("status");
 }

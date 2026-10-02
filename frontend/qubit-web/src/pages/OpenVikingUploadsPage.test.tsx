@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * Open Viking uploads page: resource + memory tabs render, confirmed
- * writes call the mocked confirm-gated bridge, and the typed
- * SERVER_UNCONFIGURED failure renders honestly.
+ * writes call the mocked-live confirm-gated bridge, and a 404ing
+ * bridge row fails honestly with reason (no unconfigured state).
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -17,8 +17,8 @@ const vikingMocks = vi.hoisted(() => ({
 vi.mock("@/lib/ocFamilyVikingApi", () => ({
   addVikingResource: vikingMocks.addVikingResource,
   addVikingMemory: vikingMocks.addVikingMemory,
-  isServerUnconfiguredPayload: () => false,
-  VikingServerUnconfiguredError: class VikingServerUnconfiguredError extends Error {},
+  isBridgeRowMissing: (e: unknown) =>
+    e instanceof Error && (e.message.includes("404") || e.message.toLowerCase().includes("not found")),
 }));
 
 import OpenVikingUploadsPage from "@/pages/OpenVikingUploadsPage";
@@ -99,5 +99,27 @@ describe("OpenVikingUploadsPage", () => {
       container.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
     expect(vikingMocks.addVikingMemory).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails honestly when the bridge row 404s", async () => {
+    vikingMocks.addVikingResource.mockRejectedValue(new Error("HTTP 404 not found"));
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <OpenVikingUploadsPage />
+        </MemoryRouter>,
+      );
+    });
+    const uri = container.querySelector("#viking-upload-uri") as HTMLInputElement;
+    await act(async () => {
+      setInputValue(uri, "viking://resources/guide.md");
+    });
+    await act(async () => {
+      container.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/Bridge row missing/);
   });
 });

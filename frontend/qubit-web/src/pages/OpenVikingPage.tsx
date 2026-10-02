@@ -1,12 +1,13 @@
 /**
  * Open Viking console (`/open-viking`).
  *
- * Qubit-owned three-pane console for an external Open Viking server:
+ * Qubit-owned three-pane console over our LOCAL context engine:
  * left workspace/resources nav + context tree, center file
  * Preview/Source viewer, right Quick start panel + terminal stub.
  * All data comes from `@/lib/ocFamilyVikingApi` (bridge paths under
- * `/api/qubit/viking/<action>`); with no server configured the page
- * shows the typed SERVER_UNCONFIGURED state instead of faked content.
+ * `/api/qubit/viking/<action>`); the local engine is always present, so
+ * there is no unconfigured state. A bridge row that still 404s renders
+ * its control honestly disabled with reason — never faked content.
  * Sub-pages (wired by the integrator): `/open-viking/retrieval`,
  * `/open-viking/uploads`, `/open-viking/agent-hub`, `/open-viking/resources`.
  */
@@ -36,7 +37,7 @@ import {
   getVikingContextTree,
   getVikingFile,
   getVikingStatus,
-  isServerUnconfiguredPayload,
+  isBridgeRowMissing,
   normalizeContextTree,
   normalizeSearchHits,
   normalizeVikingFile,
@@ -72,10 +73,11 @@ function firstPath(node: VikingContextNode): string | undefined {
 }
 
 export default function OpenVikingPage() {
-  const [connection, setConnection] = useState<"connected" | "unconfigured" | "unknown" | "loading">("loading");
-  const [unconfiguredDetail, setUnconfiguredDetail] = useState("");
+  const [connection, setConnection] = useState<"connected" | "unavailable" | "unknown" | "loading">("loading");
+  const [missingRows, setMissingRows] = useState<string[]>([]);
   const [tree, setTree] = useState<Partial<Record<VikingContextGroup, VikingContextNode[]>>>({});
   const [treeError, setTreeError] = useState("");
+  const [treeMissing, setTreeMissing] = useState(false);
   const [selectedPath, setSelectedPath] = useState("");
   const [viewerMode, setViewerMode] = useState<ViewerMode>("preview");
   const [fileContent, setFileContent] = useState("");
@@ -83,7 +85,12 @@ export default function OpenVikingPage() {
   const [fileError, setFileError] = useState("");
   const [fileLoading, setFileLoading] = useState(false);
   const [related, setRelated] = useState<{ title: string; path?: string }[]>([]);
-  const [relatedState, setRelatedState] = useState<"idle" | "loading" | "error">("idle");
+  const [relatedState, setRelatedState] = useState<"idle" | "loading" | "error" | "unavailable">("idle");
+  const [relatedError, setRelatedError] = useState("");
+
+  function markMissing(row: string) {
+    setMissingRows((prev) => (prev.includes(row) ? prev : [...prev, row]));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -91,27 +98,31 @@ export default function OpenVikingPage() {
       try {
         const payload = await getVikingStatus();
         if (cancelled) return;
-        if (isServerUnconfiguredPayload(payload)) {
-          setConnection("unconfigured");
-          setUnconfiguredDetail("Configure an Open Viking server to light up this console.");
-          return;
+        const status = normalizeVikingStatus(payload);
+        setConnection(status.connection === "connected" ? "connected" : "unknown");
+      } catch (e) {
+        if (cancelled) return;
+        if (isBridgeRowMissing(e)) {
+          markMissing("status");
+          setConnection("unavailable");
+        } else {
+          setConnection("unknown");
         }
-        setConnection(normalizeVikingStatus(payload).connection);
-      } catch {
-        if (!cancelled) setConnection("unknown");
       }
     })();
     (async () => {
       try {
         const payload = await getVikingContextTree();
         if (cancelled) return;
-        if (isServerUnconfiguredPayload(payload)) {
-          setConnection("unconfigured");
-          return;
-        }
         setTree(normalizeContextTree(payload));
       } catch (e) {
-        if (!cancelled) setTreeError(e instanceof Error ? e.message : "context tree unavailable");
+        if (cancelled) return;
+        if (isBridgeRowMissing(e)) {
+          setTreeMissing(true);
+          markMissing("context-tree");
+        } else {
+          setTreeError(e instanceof Error ? e.message : "context tree unavailable");
+        }
       }
     })();
     return () => {
@@ -125,12 +136,6 @@ export default function OpenVikingPage() {
     setFileLoading(true);
     try {
       const payload = await getVikingFile(path);
-      if (isServerUnconfiguredPayload(payload)) {
-        setConnection("unconfigured");
-        setFileContent("");
-        setFileUri(toVikingUri(path));
-        return;
-      }
       const file = normalizeVikingFile(payload);
       setFileContent(file?.content ?? "");
       setFileUri(file?.vikingUri ?? toVikingUri(path));
@@ -138,7 +143,12 @@ export default function OpenVikingPage() {
     } catch (e) {
       setFileContent("");
       setFileUri(toVikingUri(path));
-      setFileError(e instanceof Error ? e.message : "file load failed");
+      if (isBridgeRowMissing(e)) {
+        markMissing("file");
+        setFileError("file bridge row missing — the J1 lane has not landed it yet.");
+      } else {
+        setFileError(e instanceof Error ? e.message : "file load failed");
+      }
     } finally {
       setFileLoading(false);
     }
@@ -147,30 +157,37 @@ export default function OpenVikingPage() {
   const onFindRelated = useCallback(async () => {
     if (!selectedPath) return;
     setRelatedState("loading");
+    setRelatedError("");
     try {
       const payload = await findVikingRelated(selectedPath);
-      if (isServerUnconfiguredPayload(payload)) {
-        setConnection("unconfigured");
-        setRelatedState("error");
-        return;
-      }
       setRelated(
         normalizeSearchHits(payload).map((h) => ({ title: h.title || h.id, path: h.path })),
       );
       setRelatedState("idle");
-    } catch {
-      setRelatedState("error");
+    } catch (e) {
+      if (isBridgeRowMissing(e)) {
+        markMissing("related-find");
+        setRelatedState("unavailable");
+      } else {
+        setRelatedError(e instanceof Error ? e.message : "related lookup failed");
+        setRelatedState("error");
+      }
     }
   }, [selectedPath]);
 
   const connectionLabel =
     connection === "connected"
-      ? "Connected"
-      : connection === "unconfigured"
-        ? "Server unconfigured"
+      ? "Connected (local engine)"
+      : connection === "unavailable"
+        ? "Bridge row missing"
         : connection === "loading"
           ? "Checking…"
           : "Unknown";
+
+  const treeGroupCount = VIKING_CONTEXT_GROUPS.reduce(
+    (n, { key }) => n + (tree[key]?.length ?? 0),
+    0,
+  );
 
   return (
     <div className="flex flex-col gap-4 p-4" data-testid="open-viking-page">
@@ -178,19 +195,20 @@ export default function OpenVikingPage() {
         <div>
           <h1 className="text-xl font-semibold">Open Viking</h1>
           <p className="text-sm text-muted-foreground">
-            Console for the external VikingBot server ·{" "}
+            Console over the local context engine ·{" "}
             <span data-testid="viking-connection">{connectionLabel}</span>
           </p>
         </div>
       </header>
 
-      {connection === "unconfigured" && (
+      {missingRows.length > 0 && (
         <div
           className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
           role="note"
-          data-testid="viking-unconfigured"
+          data-testid="viking-missing-rows"
         >
-          <strong>SERVER_UNCONFIGURED</strong> — {unconfiguredDetail || "no Open Viking server is configured."}
+          Bridge row{missingRows.length === 1 ? "" : "s"} not yet served:{" "}
+          {missingRows.join(", ")} — those controls stay disabled until the row lands.
         </div>
       )}
 
@@ -237,6 +255,16 @@ export default function OpenVikingPage() {
               Context tree
             </h2>
             {treeError && <p className="text-sm text-destructive">{treeError}</p>}
+            {treeMissing && (
+              <p className="text-sm text-muted-foreground" data-testid="viking-tree-unavailable">
+                Context tree bridge row missing — the J1 lane has not landed it yet.
+              </p>
+            )}
+            {!treeMissing && !treeError && treeGroupCount === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No context entries yet — add a resource or a memory to light up this tree.
+              </p>
+            )}
             {VIKING_CONTEXT_GROUPS.map(({ key, label }) => {
               const nodes = tree[key] ?? [];
               if (nodes.length === 0) return null;
@@ -339,7 +367,7 @@ export default function OpenVikingPage() {
               </Link>
               <button
                 type="button"
-                disabled={!selectedPath}
+                disabled={!selectedPath || relatedState === "unavailable"}
                 onClick={() => void onFindRelated()}
                 className="flex items-center gap-2 rounded border px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
               >
@@ -350,7 +378,12 @@ export default function OpenVikingPage() {
               <p className="mt-2 text-sm text-muted-foreground">Finding related context…</p>
             )}
             {relatedState === "error" && (
-              <p className="mt-2 text-sm text-destructive">Related lookup failed.</p>
+              <p className="mt-2 text-sm text-destructive">{relatedError || "Related lookup failed."}</p>
+            )}
+            {relatedState === "unavailable" && (
+              <p className="mt-2 text-sm text-muted-foreground" data-testid="viking-related-unavailable">
+                Related-find bridge row missing — the J1 lane has not landed it yet.
+              </p>
             )}
             {related.length > 0 && (
               <ul className="mt-2 flex flex-col gap-1" data-testid="viking-related">
@@ -383,11 +416,13 @@ export default function OpenVikingPage() {
                 state: {connectionLabel}
               </p>
               <p className="mt-1 text-green-300/70">
-                Stub — shows connection state only; no live shell is attached here.
+                No live shell is attached here — this panel needs a shell bridge
+                row (for example a confirm-gated run against the local engine)
+                before it can execute anything.
               </p>
             </div>
             <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-              <Plug className="h-3 w-3" aria-hidden /> External server only; nothing runs in this panel.
+              <Plug className="h-3 w-3" aria-hidden /> Local engine only; nothing runs in this panel.
             </p>
           </section>
         </aside>

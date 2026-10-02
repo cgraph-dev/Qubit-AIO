@@ -1,9 +1,11 @@
 /**
  * Open Viking uploads (`/open-viking/uploads`).
  *
- * Qubit-owned add-resource surface: resource ingest and memory writes
- * are staged and confirm-gated through `@/lib/ocFamilyVikingApi`
- * (`resource_add`, `memory_add`). Nothing is sent without confirmation.
+ * Qubit-owned add-resource surface over the local context engine:
+ * resource ingest and memory writes are staged and confirm-gated
+ * through `@/lib/ocFamilyVikingApi` (`resource_add`, `memory_add`).
+ * Nothing is sent without confirmation. A missing bridge row fails
+ * honestly with reason — never invented success.
  */
 
 import { useState } from "react";
@@ -12,8 +14,7 @@ import { ArrowLeft, Database, FolderUp } from "lucide-react";
 import {
   addVikingMemory,
   addVikingResource,
-  isServerUnconfiguredPayload,
-  VikingServerUnconfiguredError,
+  isBridgeRowMissing,
 } from "@/lib/ocFamilyVikingApi";
 
 type Tab = "resource" | "memory";
@@ -42,8 +43,8 @@ export default function OpenVikingUploadsPage() {
       setUri("");
       setTitle("");
     } catch (e) {
-      if (e instanceof VikingServerUnconfiguredError || isServerUnconfiguredPayload(e)) {
-        setFailed("SERVER_UNCONFIGURED — no Open Viking server is configured.");
+      if (isBridgeRowMissing(e)) {
+        setFailed("Bridge row missing — the J1 lane has not landed resource-add yet.");
       } else {
         setFailed(e instanceof Error ? e.message : "resource add failed");
       }
@@ -65,8 +66,8 @@ export default function OpenVikingUploadsPage() {
       setNotice("Memory staged and confirmed.");
       setText("");
     } catch (e) {
-      if (e instanceof VikingServerUnconfiguredError || isServerUnconfiguredPayload(e)) {
-        setFailed("SERVER_UNCONFIGURED — no Open Viking server is configured.");
+      if (isBridgeRowMissing(e)) {
+        setFailed("Bridge row missing — the J1 lane has not landed memory-add yet.");
       } else {
         setFailed(e instanceof Error ? e.message : "memory add failed");
       }

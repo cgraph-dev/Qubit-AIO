@@ -1,10 +1,11 @@
 /**
  * Open Viking resources (`/open-viking/resources`).
  *
- * Qubit-owned resource index for the external console: documentation,
- * about, SDK & API, and agent integrations. Static orientation content
- * written for this console (no upstream text is reproduced here);
- * live entries arrive through the bridge once a server is configured.
+ * Qubit-owned resource index for the local context engine:
+ * documentation, about, SDK & API, and agent integrations. Static
+ * orientation content written for this console (no upstream text is
+ * reproduced here); live entries arrive through the local bridge rows
+ * under `/api/qubit/viking/<action>`.
  */
 
 import { Link } from "react-router";
@@ -21,13 +22,13 @@ const SECTIONS = [
     key: "about",
     label: "About",
     icon: Info,
-    body: "Open Viking is an external console server. Qubit talks to it over its HTTP API only; nothing is bundled into this dashboard.",
+    body: "Open Viking runs on Qubit's local context engine — sessions, skills, memory, and resources served by this dashboard's own bridge. No external server is involved.",
   },
   {
     key: "sdk-api",
     label: "SDK & API",
     icon: Code,
-    body: "This dashboard addresses /api/qubit/viking/<action> bridge paths. Each action is NEEDS-BRIDGE until wired, and answers SERVER_UNCONFIGURED when no server is set.",
+    body: "This dashboard addresses /api/qubit/viking/<action> bridge paths. Every row is LOCAL to the context engine; a row that still 404s renders its control disabled with reason until it lands.",
   },
   {
     key: "agent-integrations",
