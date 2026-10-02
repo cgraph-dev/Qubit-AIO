@@ -171,6 +171,84 @@ def backfill_profile_context(profile: ModelProfile) -> bool:
     return True
 
 
+def _current_slot_summary(cfg: Any) -> str:
+    """Human-readable current main-slot selection (never raises, never secrets).
+
+    Used to name the still-working slot in a ``MODEL_UNAVAILABLE`` refusal so
+    the operator knows what is still serving default turns.
+    """
+    try:
+        active = R.get_active_profile(cfg)
+        pid = str(active.get("active") or "")
+        if pid:
+            prof = R.get_profile(cfg, pid)
+            if prof is not None:
+                return f"{prof.provider}/{prof.model} (profile {pid!r})"
+            return f"profile {pid!r}"
+    except Exception:  # noqa: BLE001 - summary is best-effort
+        pass
+    try:
+        configured = R.configured_default_model(cfg)
+        if configured:
+            return str(configured)
+    except Exception:  # noqa: BLE001 - summary is best-effort
+        pass
+    return "the shipped local default"
+
+
+def _refuse_unavailable(cfg: Any, provider: str, model: str,
+                        reason: str) -> Dict[str, Any]:
+    """Typed fail-closed refusal for a dead/unreachable remote model."""
+    slot = _current_slot_summary(cfg)
+    return {
+        "ok": False, "code": "MODEL_UNAVAILABLE",
+        "detail": (
+            f"model {provider!r}/{model!r} looks unavailable "
+            f"(context probe: {reason}); the pick is refused so the main "
+            f"slot stays on {slot}. Retry the pick when the model is "
+            f"reachable again, or pick a working model."),
+        "provider": provider, "model": model,
+    }
+
+
+def _gate_remote_liveness(*, cfg: Any, provider: str, model: str,
+                          base_url: str) -> Optional[Dict[str, Any]]:
+    """Fail-closed liveness gate for REMOTE model activation.
+
+    Runs the existing bounded context probe
+    (:func:`resolver._probe_real_context_window` — daemon thread, hard
+    timeout; reused, never reimplemented). Explicit negative evidence fails
+    closed with ``MODEL_UNAVAILABLE`` *before anything is persisted* (the
+    caller returns the refusal as-is, so no profile is registered, the
+    active pointer never moves, and the runtime ``config.yaml`` slot is
+    byte-unchanged):
+
+    * ``probe-timeout`` — the endpoint black-holed the probe;
+    * ``probe-failed:*`` — the vendored layer raised during resolution
+      (``ModelProtocolUnsupported`` / unavailable / transport errors surface
+      here);
+    * the probe itself raising (same fail-closed treatment).
+
+    Anything else is NOT negative evidence and proceeds as before: a
+    resolved window, or an inconclusive result (``resolver-unavailable`` /
+    ``unresolved`` / ``fallback`` — hermetic/offline/unknown) keeps today's
+    accept behavior. Local-tier picks never reach this gate (the caller
+    only gates non-``LOCAL`` profiles, which need no credentials to probe).
+    """
+    try:
+        value, source = R._probe_real_context_window(
+            str(model or ""), str(base_url or ""), str(provider or ""))
+    except Exception as exc:  # noqa: BLE001 - probe error fails closed
+        return _refuse_unavailable(
+            cfg, provider, model, f"probe-error:{type(exc).__name__}")
+    if isinstance(value, int) and value > 0:
+        return None
+    reason = str(source or "")
+    if reason == "probe-timeout" or reason.startswith("probe-failed:"):
+        return _refuse_unavailable(cfg, provider, model, reason)
+    return None
+
+
 def _voice_config_path(cfg: Any) -> Path:
     from .. import config as C
 
@@ -302,6 +380,16 @@ def activate_endpoint(cfg: Any, ident: str, record: Dict[str, Any], *,
     if gate.get("state") != "OK":
         return {"ok": False, "code": gate.get("code", "PROFILE_INVALID"),
                 "detail": gate.get("detail", "endpoint is incomplete")}
+    if profile.kind != R.LOCAL:
+        # Fail closed on dead upstream models BEFORE anything is persisted:
+        # a drifted main slot breaks every default turn until hand-repaired,
+        # so negative probe evidence refuses the pick with the slot unchanged.
+        # Local-tier picks skip the probe (no endpoint/credential involved).
+        live = _gate_remote_liveness(
+            cfg=cfg, provider=profile.provider, model=profile.model,
+            base_url=profile.base_url)
+        if live is not None:
+            return live
     if not confirm:
         return {"ok": True, "dry_run": True, "profile_id": ident,
                 "provider": profile.provider, "model": profile.model}
@@ -420,7 +508,9 @@ def select_model(cfg: Any, provider: str, model: str, *,
     write. An already-registered profile with the same provider+model is
     reused (its endpoint/credential are preserved); otherwise one is created.
     A remote provider with no endpoint/credential is an honest typed refusal,
-    never a fabricated success.
+    never a fabricated success. A remote pick whose bounded liveness probe
+    reports the model unavailable (``MODEL_UNAVAILABLE``) is likewise refused
+    with the slot unchanged; local-tier picks skip the probe.
     """
     provider = str(provider or "").strip()
     model = str(model or "").strip()
