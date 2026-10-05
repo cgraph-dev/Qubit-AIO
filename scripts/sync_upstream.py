@@ -109,12 +109,55 @@ def route(path: str) -> str:
     return path
 
 
+# Matches things that must NEVER be rewritten, even though they contain
+# identifier-looking substrings. Applied as a mask BEFORE IDENT_RULES run.
+#
+# Why: the identifier rules are context-free string substitutions and they run
+# over ALL text, including prose and URLs. Verified breakage before this guard:
+#   github.com/plastic-labs/honcho/.../hermes-plugin-honcho/cli.py
+#     -> .../qubit-plugin-honcho/cli.py   (that directory is in SOMEONE ELSE'S
+#                                          repo; the link 404s and we cannot fix it)
+#   nousresearch.github.io/hermes-agent
+#     -> nousresearch.github.io/qubit     (dead host, and "-agent" was dropped)
+# 144 such URLs existed across just the 150 changed markdown files.
+#
+# Order matters: scheme URLs first, then bare dotted hosts, then repo paths.
+PROTECT_RULES: list[re.Pattern[str]] = [
+    re.compile(r"https?://[^\s`\"')\]>]+"),                       # full URLs
+    re.compile(r"\b(?:[\w-]+\.)+(?:com|io|org|net|dev|ai|sh)(?:/[\w./%~+-]*)?"),  # bare hosts
+    re.compile(r"\b(?:github|gitlab|bitbucket)\.com/[\w./%~+-]+"),  # repo paths
+    re.compile(r"\b(?:[\w.-]+/){2,}[\w.-]+\.(?:py|sh|rs|ts|tsx|js|md|ya?ml|json)\b"),  # repo-relative paths
+]
+
+
 def translate(text: str) -> tuple[str, int]:
+    """Rewrite upstream identifiers to Qubit identifiers, preserving URLs/paths.
+
+    Returns (translated_text, substitution_count).
+    """
+    # Mask protected spans, remembering them by index, so IDENT_RULES never see
+    # (and therefore never corrupt) a URL, hostname or repo path.
+    stash: list[str] = []
+
+    def _stash(m: re.Match[str]) -> str:
+        stash.append(m.group(0))
+        # A NUL-delimited sentinel cannot occur in source text and survives the
+        # lexer-neutral substitutions below untouched.
+        return f"\x00{len(stash) - 1}\x00"
+
+    masked = text
+    for rx in PROTECT_RULES:
+        masked = rx.sub(_stash, masked)
+
     n = 0
     for rx, repl in IDENT_RULES:
-        text, k = rx.subn(repl, text)
+        masked, k = rx.subn(repl, masked)
         n += k
-    return text, n
+
+    def _unstash(m: re.Match[str]) -> str:
+        return stash[int(m.group(1))]
+
+    return re.sub(r"\x00(\d+)\x00", _unstash, masked), n
 
 
 def skip(path: str) -> bool:
