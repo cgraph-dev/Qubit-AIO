@@ -46,9 +46,9 @@ _STATIC_PROVIDER_ENV_BLOCKLIST = frozenset({
     "NOUS_API_KEY", "QWEN_API_KEY",
     # Hermes' own secrets read in code: the anonymous-inference secret, dashboard auth
     # (basic, OIDC, drain) and the Google Meet realtime key.
-    "QUBIT_ANON_API_SECRET", "QUBIT_DASHBOARD_BASIC_AUTH_PASSWORD",
-    "QUBIT_DASHBOARD_BASIC_AUTH_SECRET", "QUBIT_DASHBOARD_DRAIN_SECRET",
-    "QUBIT_DASHBOARD_OIDC_CLIENT_SECRET", "QUBIT_MEET_REALTIME_KEY",
+    "HERMES_ANON_API_SECRET", "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
+    "HERMES_DASHBOARD_BASIC_AUTH_SECRET", "HERMES_DASHBOARD_DRAIN_SECRET",
+    "HERMES_DASHBOARD_OIDC_CLIENT_SECRET", "HERMES_MEET_REALTIME_KEY",
 })
 
 
@@ -375,12 +375,11 @@ _ALWAYS_STRIP_KEYS: frozenset[str] = frozenset({
     # enumerated here to stay stripped on the inherit_credentials=True path.
     "GATEWAY_RELAY_ID", "GATEWAY_RELAY_SECRET", "GATEWAY_RELAY_DELIVERY_KEY",
     "HASS_TOKEN", "EMAIL_PASSWORD", "HERMES_DASHBOARD_SESSION_TOKEN",
-    "QUBIT_DASHBOARD_SESSION_TOKEN",
     # Dashboard auth: the basic-auth password and session-signing secret, the OIDC client
     # secret and the drain bearer. They let a holder mint or forge dashboard sessions, and no
     # child (credentialed CLIs included) consumes them.
-    "QUBIT_DASHBOARD_BASIC_AUTH_PASSWORD", "QUBIT_DASHBOARD_BASIC_AUTH_SECRET",
-    "QUBIT_DASHBOARD_OIDC_CLIENT_SECRET", "QUBIT_DASHBOARD_DRAIN_SECRET",
+    "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD", "HERMES_DASHBOARD_BASIC_AUTH_SECRET",
+    "HERMES_DASHBOARD_OIDC_CLIENT_SECRET", "HERMES_DASHBOARD_DRAIN_SECRET",
     # Remote-compute / infrastructure secrets
     "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "DAYTONA_API_KEY",
 }) | _ADAPTER_SECRET_ENV  # every declared adapter secret is Tier 1, like the bot tokens above

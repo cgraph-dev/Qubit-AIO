@@ -75,12 +75,12 @@ def is_dispatcher_owned_worker_context() -> bool:
 
 def explicit_board_intent_is_pinned() -> bool:
     """Whether an explicit kanban ``board=`` argument must still resolve through
-    the dispatcher-injected env pins (``QUBIT_KANBAN_DB`` & friends) rather than
+    the dispatcher-injected env pins (``HERMES_KANBAN_DB`` & friends) rather than
     its own board directory.
 
     True for in-process delegate children, descendants carrying
     :data:`DELEGATED_CHILD_ENV_MARKER`, and dispatched workers
-    (``QUBIT_KANBAN_TASK`` set). The pins are the "workers physically cannot
+    (``HERMES_KANBAN_TASK`` set). The pins are the "workers physically cannot
     see other boards" isolation, and :func:`kanban_path_is_fenced` checks the
     pinned path / fenced root — an explicit board that resolved elsewhere would
     also escape that fence. Outside these fences an explicit board is the
@@ -90,7 +90,7 @@ def explicit_board_intent_is_pinned() -> bool:
         return True
     if os.environ.get(DELEGATED_CHILD_ENV_MARKER):
         return True
-    return bool((os.environ.get("QUBIT_KANBAN_TASK") or "").strip())
+    return bool((os.environ.get("HERMES_KANBAN_TASK") or "").strip())
 
 
 def owned_kanban_task() -> str:

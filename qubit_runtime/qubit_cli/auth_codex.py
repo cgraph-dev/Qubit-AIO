@@ -74,7 +74,7 @@ def _codex_base_url() -> str:
 
 def _codex_pool_route_base_url(entry_base_url: Optional[str] = "") -> str:
     """Base URL the chat route sends a pooled Codex credential to — the same rule
-    ``runtime_provider._pool_entry_mode_and_url`` applies (``QUBIT_CODEX_BASE_URL`` > ``model.base_url``
+    ``runtime_provider._pool_entry_mode_and_url`` applies (``HERMES_CODEX_BASE_URL`` > ``model.base_url``
     while the row still carries the canonical URL > the row's own URL). A pooled gateway key belongs to
     that host only; composing it with the ambient default sends it to chatgpt.com (#121486)."""
     base = _stripped(entry_base_url).rstrip("/")
@@ -89,7 +89,7 @@ def _codex_pool_route_base_url(entry_base_url: Optional[str] = "") -> str:
         # Profile-scoped override only (never the raw process env: a multiplexed sibling's gateway).
         with suppress(Exception):
             from agent.secret_scope import get_secret_str
-            base = _stripped(get_secret_str("QUBIT_CODEX_BASE_URL", "")).rstrip("/") or base
+            base = _stripped(get_secret_str("HERMES_CODEX_BASE_URL", "")).rstrip("/") or base
         return base or DEFAULT_CODEX_BASE_URL
 
 

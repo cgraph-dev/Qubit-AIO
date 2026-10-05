@@ -173,7 +173,7 @@ def _secure_cache_dir(new_subpath: str, old_name: str) -> Path:
     scan. Created with a bare ``mkdir(parents=True, exist_ok=True)`` these
     inherited the umask and landed 0755, readable by every other local
     account. ``QUBIT_HOME`` is 0700 by default so default-config exposure is
-    narrow; the concrete scenario is the documented ``QUBIT_HOME_MODE=0701``
+    narrow; the concrete scenario is the documented ``HERMES_HOME_MODE=0701``
     hatch (letting nginx/caddy traverse to a served subdirectory), where a
     0755 child really is world-readable.
 
@@ -182,7 +182,7 @@ def _secure_cache_dir(new_subpath: str, old_name: str) -> Path:
     Policy is then reconciled through ``qubit_cli.config._secure_dir`` — the
     house helper — rather than a hand-rolled chmod, which is what keeps this
     correct off a single-user desktop: managed/NixOS installs are skipped,
-    ``QUBIT_HOME_MODE`` stays honoured, and ``QUBIT_UID``/``QUBIT_GID``
+    ``HERMES_HOME_MODE`` stays honoured, and ``HERMES_UID``/``HERMES_GID``
     ownership is applied so a root-created dir does not lock out uid-mapped
     Docker workers (#34107).
 
@@ -229,7 +229,7 @@ def _write_private_bytes(path: Path, data: bytes) -> None:
     """Write ``data`` to ``path`` with owner-only (0600) permissions.
 
     ``Path.write_bytes`` lands 0644 under a default umask. The enclosing cache
-    dir is 0700, so this matters only under ``QUBIT_HOME_MODE=0701`` — but
+    dir is 0700, so this matters only under ``HERMES_HOME_MODE=0701`` — but
     ``tools.computer_use.tool`` already writes private captures into this
     very directory, and one directory with two file-mode conventions is the
     kind of inconsistency that rots. POSIX mode bits are advisory on Windows

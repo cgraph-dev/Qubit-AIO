@@ -86,7 +86,7 @@ def provider_names() -> frozenset[str]:
     import providers
     from qubit_cli.auth import _PROVIDER_ALIASES, BUILTIN_PROVIDER_IDS
     from qubit_cli.models_catalog_static import _PROVIDER_ALIASES as _CATALOG_ALIASES
-    from qubit_cli.providers import ALIASES, QUBIT_OVERLAYS
+    from qubit_cli.providers import ALIASES, HERMES_OVERLAYS
 
     providers.list_providers()  # runs discovery; bundled profiles land in the process-wide layer
     bundled = {
@@ -94,7 +94,7 @@ def provider_names() -> frozenset[str]:
         for alias in (name, *profile.aliases)
     }
     return BUILTIN_PROVIDER_IDS.union(
-        QUBIT_OVERLAYS, ALIASES, _PROVIDER_ALIASES, _CATALOG_ALIASES, bundled, ("openrouter", CUSTOM)
+        HERMES_OVERLAYS, ALIASES, _PROVIDER_ALIASES, _CATALOG_ALIASES, bundled, ("openrouter", CUSTOM)
     )
 
 

@@ -95,7 +95,7 @@ def _(rid, params: dict) -> dict:
 def _(rid, params: dict) -> dict:
     """The Ink TUI (gateway ready) and Desktop (backend attached) each report their own launch ->
     ready time once per launch; ``launch_id`` latches it here too, so a reconnect to this backend
-    never re-counts. A Desktop on a URL/cloud backend has no ``QUBIT_DESKTOP`` here, so the
+    never re-counts. A Desktop on a URL/cloud backend has no ``HERMES_DESKTOP`` here, so the
     client's declared surface wins over env detection. Always ``{ok: true}``."""
     from qubit_cli.observability.shared_metrics_startup import record_rpc_startup_latency
 

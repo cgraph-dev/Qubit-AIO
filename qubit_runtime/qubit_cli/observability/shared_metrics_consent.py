@@ -139,7 +139,7 @@ def offer_consent_before_chat(args: Any) -> None:
         return
     if getattr(args, "safe_mode", False) or getattr(args, "ignore_user_config", False):
         return
-    if os.environ.get("QUBIT_DESKTOP") or is_noninteractive():
+    if os.environ.get("HERMES_DESKTOP") or is_noninteractive():
         return
     if not (sys.stdin.isatty() and sys.stdout.isatty()) or is_managed():
         return

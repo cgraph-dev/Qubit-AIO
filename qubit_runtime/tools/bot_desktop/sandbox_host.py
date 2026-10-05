@@ -241,13 +241,13 @@ def start(env: Any, profile: str, *, geometry: str, wait_seconds: float = 20.0,
         raise RuntimeError(f"could not seed the sandbox desktop dir: {proc.stderr.decode('utf-8', 'replace')[-500:]}")
     num = 20  # one profile per sandbox; the launcher's stale-lock logic handles a leftover :20
     child_env = {
-        "QUBIT_BD_PROFILE": profile, "QUBIT_BD_DISPLAY_NUM": str(num), "QUBIT_BD_SOCKET": f"{rdir}/rfb.sock",
-        "QUBIT_BD_XAUTH": f"{rdir}/Xauthority", "QUBIT_BD_ENV_FILE": f"{rdir}/env",
-        "QUBIT_BD_CONFIG_HOME": f"{rdir}/xdg", "QUBIT_BD_GEOMETRY": geometry, "QUBIT_BD_WALLPAPER": f"{rdir}/wallpaper.png",
+        "HERMES_BD_PROFILE": profile, "HERMES_BD_DISPLAY_NUM": str(num), "HERMES_BD_SOCKET": f"{rdir}/rfb.sock",
+        "HERMES_BD_XAUTH": f"{rdir}/Xauthority", "HERMES_BD_ENV_FILE": f"{rdir}/env",
+        "HERMES_BD_CONFIG_HOME": f"{rdir}/xdg", "HERMES_BD_GEOMETRY": geometry, "HERMES_BD_WALLPAPER": f"{rdir}/wallpaper.png",
     }
     if browser_exec and browser_exec_line:
-        child_env["QUBIT_BD_BROWSER_EXEC"] = browser_exec
-        child_env["QUBIT_BD_BROWSER_EXEC_LINE"] = browser_exec_line
+        child_env["HERMES_BD_BROWSER_EXEC"] = browser_exec
+        child_env["HERMES_BD_BROWSER_EXEC_LINE"] = browser_exec_line
     # The launcher must outlive this exec (docker exec / ssh) and be its own session so stop() can take the
     # whole group (Xvnc, dbus, Xfce) with one kill. `setsid -f` forks, so `$!` would be the wrong pid: the
     # launcher records ITS OWN pid (= its session id) before doing anything else.

@@ -625,7 +625,7 @@ def _secure_media_cache_dir(cache_dir: Path) -> None:
     messaging platform) is user content, not regenerable cache: the
     umask-derived 0755 these dirs inherited made them readable by every other
     local account whenever ``QUBIT_HOME`` is traversable — the documented
-    ``QUBIT_HOME_MODE=0701`` web-server hatch. The mode is passed to ``mkdir``
+    ``HERMES_HOME_MODE=0701`` web-server hatch. The mode is passed to ``mkdir``
     so it is set at creation, then reconciled by the house policy helper
     ``qubit_cli.config._secure_dir`` (managed/NixOS installs keep their
     group-share design: these lazily-created dirs are not covered by the

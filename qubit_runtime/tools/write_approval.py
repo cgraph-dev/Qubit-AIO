@@ -166,7 +166,7 @@ class GateDecision:
 def _slash_review_surface() -> bool:
     """Whether the ACTIVE turn has a human who can type ``/<subsystem> pending``: the interactive
     CLI, TUI/desktop (exec route), and chat-gateway sessions all answer it now. Headless worker
-    contexts — cron (``QUBIT_CRON_SESSION``), kanban (``QUBIT_KANBAN_TASK``) and the unattended
+    contexts — cron (``HERMES_CRON_SESSION``), kanban (``HERMES_KANBAN_TASK``) and the unattended
     programmatic platforms (api_server, webhook delivery) — have nobody at a prompt, so the staged
     hint must not name a command nobody can deliver (#98330); it names the pending dir instead."""
     def _env(name: str) -> str:
@@ -175,15 +175,15 @@ def _slash_review_surface() -> bool:
             return get_session_env(name, "") or ""
         except Exception:  # standalone/tests: process env is the fallback
             return os.environ.get(name, "") or ""
-    if _env("QUBIT_KANBAN_TASK").strip():
+    if _env("HERMES_KANBAN_TASK").strip():
         return False
     try:
         from utils import is_truthy_value
-        if is_truthy_value(_env("QUBIT_CRON_SESSION")):
+        if is_truthy_value(_env("HERMES_CRON_SESSION")):
             return False
     except Exception:
         pass
-    platform = (_env("QUBIT_SESSION_PLATFORM") or os.environ.get("QUBIT_PLATFORM", "")).strip().lower()
+    platform = (_env("HERMES_SESSION_PLATFORM") or os.environ.get("HERMES_PLATFORM", "")).strip().lower()
     return platform not in {"webhook", "msgraph_webhook", "api_server"}
 
 

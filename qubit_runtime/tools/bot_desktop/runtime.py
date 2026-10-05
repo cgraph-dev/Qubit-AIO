@@ -724,7 +724,7 @@ def _spawn_and_wait(sd: Path, wait_seconds: float) -> DesktopStatus:
         # scrubbed child env like any other agent child, keeping the user's HOME.
         from tools.environments.local import served_profile_child_env
         child_env = served_profile_child_env(inherit_credentials=False)
-        child_env["HOME"] = child_env["QUBIT_REAL_HOME"]
+        child_env["HOME"] = child_env["HERMES_REAL_HOME"]
         for key in ("DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "SESSION_MANAGER"):
             child_env.pop(key, None)
         child_env.update({

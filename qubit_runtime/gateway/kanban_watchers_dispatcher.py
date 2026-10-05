@@ -188,7 +188,7 @@ class _KanbanDispatcher:
             # No explicit init_db(): connect() runs the migration once per
             # process (see the matching note in the notifier collector).
             # Pin-first: the tick is machine flow — on a box whose env pins
-            # QUBIT_KANBAN_DB every enumerated slug must resolve to the pinned
+            # HERMES_KANBAN_DB every enumerated slug must resolve to the pinned
             # file, or the dispatcher reads per-slug DBs nobody writes.
             from qubit_cli import kanban_db as _kb
             with _kb.pin_first_board_resolution():

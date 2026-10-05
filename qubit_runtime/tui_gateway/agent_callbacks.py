@@ -229,7 +229,7 @@ def _wire_callbacks(sid: str):
         # record whose profile scope the value is saved into. No bound owner: skip.
         from gateway.session_context import get_session_env
 
-        owner_sid = get_session_env("QUBIT_UI_SESSION_ID")
+        owner_sid = get_session_env("HERMES_UI_SESSION_ID")
         # Credential admission is fenced to a live runtime. owner_sid is a ContextVar copied onto
         # the worker's thread at spawn: a background/btw/preview worker outlives its session, and
         # the close path's `_clear_pending` cancels only requests ALREADY open — it cannot fence

@@ -160,7 +160,7 @@ def _posix_cron_script_argv(script: Path) -> tuple[list[str], dict[str, str]]:
         # The caller's interpreter is the bare store Python here — the #123044 failure mode.
         raise RuntimeError(f"dependency environment interpreter is missing: {python}")
     return ([str(python), "-c", _POSIX_SCRIPT_BOOTSTRAP, str(repo), str(script)],
-            {"QUBIT_DISABLE_LAZY_INSTALLS": "1"})
+            {"HERMES_DISABLE_LAZY_INSTALLS": "1"})
 
 
 def _windows_cron_python_invocation(python_exe: str) -> tuple[str, dict[str, str]]:

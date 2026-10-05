@@ -101,7 +101,7 @@ def test_current_custom_endpoint_passthrough_marks_current_row(monkeypatch):
     """Interactive picker should preserve current custom endpoint semantics."""
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     monkeypatch.setattr("agent.models_dev.PROVIDER_TO_MODELS_DEV", {})
-    monkeypatch.setattr("qubit_cli.providers.QUBIT_OVERLAYS", {})
+    monkeypatch.setattr("qubit_cli.providers.HERMES_OVERLAYS", {})
     monkeypatch.setattr("qubit_cli.models.fetch_openrouter_models",
                         lambda *a, **kw: [])
 
@@ -183,7 +183,7 @@ def _stub_kimi_discovery(monkeypatch, *, canonical):
         name = "Kimi For Coding"
 
     monkeypatch.setattr(md, "get_provider_info", lambda _pid: _PInfo())
-    monkeypatch.setattr("qubit_cli.providers.QUBIT_OVERLAYS", {})
+    monkeypatch.setattr("qubit_cli.providers.HERMES_OVERLAYS", {})
     monkeypatch.setattr(hm, "CANONICAL_PROVIDERS", canonical)
     monkeypatch.setattr(qubit_cli_models_catalog_static, "CANONICAL_PROVIDERS", canonical)
     monkeypatch.setattr(hm, "cached_provider_model_ids",

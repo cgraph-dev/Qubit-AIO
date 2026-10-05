@@ -223,7 +223,7 @@ def _switch_away_provider(agent, explicit_provider: str, current_provider: str) 
     ``custom``."""
     if agent or not explicit_provider:
         return current_provider
-    if env_provider := os.environ.get("QUBIT_TUI_PROVIDER", "").strip():
+    if env_provider := os.environ.get("HERMES_TUI_PROVIDER", "").strip():
         return env_provider
     if _env_model_seed():
         return None

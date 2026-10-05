@@ -1330,7 +1330,7 @@ def _configured_plugin_inputs() -> Path | None:
 
 
 def _explicit_plugins_toml() -> Path | None:
-    """Return the file selected by ``QUBIT_NEMO_RELAY_PLUGINS_TOML`` after checking that it parses."""
+    """Return the file selected by ``HERMES_NEMO_RELAY_PLUGINS_TOML`` after checking that it parses."""
     configured = os.environ.get(RELAY_PLUGINS_CONFIG_ENV, "").strip()
     if not configured:
         return None

@@ -35,7 +35,7 @@ def _pin_first():
     """Machine-flow board resolution: env pins outrank the enumerated slug.
 
     The slug here came from ``list_boards()``, not from a user — on a box whose
-    env pins ``QUBIT_KANBAN_DB`` every board must resolve to the pinned file
+    env pins ``HERMES_KANBAN_DB`` every board must resolve to the pinned file
     or the notifier reads per-slug DBs nobody writes (see
     ``kanban_db.pin_first_board_resolution``)."""
     from qubit_cli import kanban_db
@@ -254,7 +254,7 @@ class _Collector:
             logger.debug("kanban notifier: no connected adapters; skipping tick")
             return self.deliveries
         # Poll each resolved DB path once: several slugs can map to one DB when
-        # QUBIT_KANBAN_DB pins the board path. The whole tick resolves pin-first:
+        # HERMES_KANBAN_DB pins the board path. The whole tick resolves pin-first:
         # on a dispatcher-pinned box each enumerated slug must map to the pinned
         # DB, never to that slug's own (empty) physical file.
         kb = self.kb

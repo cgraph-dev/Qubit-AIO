@@ -748,7 +748,7 @@ def _secure_dir_policy(cache_dir) -> None:
     manager, a private chat, a bank tab. The umask-derived 0755 these dirs
     used to get made every local account able to list (and read) those
     frames whenever ``QUBIT_HOME`` itself is traversable, which is exactly
-    what the documented ``QUBIT_HOME_MODE=0701`` web-server escape hatch
+    what the documented ``HERMES_HOME_MODE=0701`` web-server escape hatch
     arranges. Delegates to the same house policy as every Hermes secret dir —
     ``qubit_cli.config._secure_dir`` — with the mode passed to ``mkdir`` so
     there is no window between mkdir and chmod; managed/NixOS installs keep

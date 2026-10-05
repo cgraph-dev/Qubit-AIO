@@ -305,7 +305,7 @@ def _supervised_child() -> bool:
     """
     return any(
         os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
-        for name in ("QUBIT_SUPERVISED_CHILD", "QUBIT_S6_SUPERVISED_CHILD")
+        for name in ("HERMES_SUPERVISED_CHILD", "HERMES_S6_SUPERVISED_CHILD")
     )
 
 
