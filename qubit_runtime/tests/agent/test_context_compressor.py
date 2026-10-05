@@ -19,7 +19,10 @@ from agent.context_compressor import (
     _sum_clarify,
     _is_summary_access_or_quota_error,
 )
-from agent.compression_marker import _COMPRESSION_MARKER_PREFIX
+from agent.compression_marker import (
+    _COMPRESSION_MARKER_PREFIX,
+    _COMPRESSION_MARKER_TEMPLATE,
+)
 from qubit_state import SessionDB
 from agent.auxiliary_client import CODEX_STREAM_STALL_MARKER
 
