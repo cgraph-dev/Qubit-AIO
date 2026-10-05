@@ -2,8 +2,9 @@
 
 A ``default`` package (see ``Package.default``) joins the installers' PM stage,
 a bare ``qubit pm install`` and ``qubit update`` on every target it builds
-for. The user can decline one (``install.sh --skip-browser``,
-``install.ps1 -SkipBrowser``, ``qubit pm install --without NAME``). The choice
+for. The user can decline one (``install.sh --skip-browser`` /
+``--skip-computer-use``, ``install.ps1 -SkipBrowser`` / ``-SkipComputerUse``,
+``qubit pm install --without NAME``). The choice
 is recorded per installation beside PM's other install state, so a later
 update or bare install never re-adds it. An explicit
 ``qubit pm install NAME`` clears it.
