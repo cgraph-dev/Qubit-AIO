@@ -72,7 +72,7 @@ def _emit_every_model_metric(provider, model) -> dict:
 
 _MODEL_METRICS = {
     "qubit.model_route.count", "qubit.model_tokens.sum", "qubit.context_peak.count",
-    "qubit.fallback.count", "qubit.model_switch.count", "qubit.setup.completed",
+    "qubit.fallback.count", "qubit.model_switch.count", "hermes.setup.completed",
     "qubit.model_friction.count", "qubit.model_tool_quality.count",
 }
 

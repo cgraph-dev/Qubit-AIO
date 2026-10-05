@@ -40,7 +40,7 @@ def catalog_dir(tmp_path, monkeypatch):
     """Provide an isolated optional-mcps/ directory."""
     cat = tmp_path / "optional-mcps"
     cat.mkdir()
-    monkeypatch.setenv("QUBIT_OPTIONAL_MCPS", str(cat))
+    monkeypatch.setenv("HERMES_OPTIONAL_MCPS", str(cat))
     return cat
 
 
@@ -949,9 +949,9 @@ class TestShippedCatalog:
         manifest. Intentionally NOT a snapshot of catalog names (those are
         expected to change as PRs land).
         """
-        # Use the actual repo's optional-mcps directory (no QUBIT_OPTIONAL_MCPS
+        # Use the actual repo's optional-mcps directory (no HERMES_OPTIONAL_MCPS
         # override) so this test catches real manifests.
-        monkeypatch.delenv("QUBIT_OPTIONAL_MCPS", raising=False)
+        monkeypatch.delenv("HERMES_OPTIONAL_MCPS", raising=False)
         from qubit_cli.mcp_catalog import _catalog_root, _parse_manifest
 
         root = _catalog_root()
@@ -982,7 +982,7 @@ class TestShippedCatalog:
         pin at the transport layer (the server runs elsewhere / comes from the
         SHA-pinned clone), so they're exempt.
         """
-        monkeypatch.delenv("QUBIT_OPTIONAL_MCPS", raising=False)
+        monkeypatch.delenv("HERMES_OPTIONAL_MCPS", raising=False)
         from qubit_cli.mcp_catalog import _catalog_root, _parse_manifest
 
         root = _catalog_root()

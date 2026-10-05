@@ -74,7 +74,7 @@ def test_profile_liveness_is_the_shared_ladder(tmp_path, monkeypatch):
 DECOY = "tool --name qubit server 30"
 BACKENDS = [
     "/opt/qubit/venv/bin/python -m qubit_cli.main serve --port 0",
-    "/usr/bin/python3 /opt/qubit/qubit_cli/main.py dashboard --no-open",
+    "/usr/bin/python3 /opt/hermes/hermes_cli/main.py dashboard --no-open",
 ]
 
 

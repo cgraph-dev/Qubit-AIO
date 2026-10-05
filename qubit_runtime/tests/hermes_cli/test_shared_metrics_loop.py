@@ -242,7 +242,7 @@ def test_every_shipped_terminal_backend_has_its_own_bucket():
     from tools.terminal_tool_config import _BUILTIN_BACKENDS
 
     schema = json.loads(
-        (Path(contract.__file__).parent / "schemas" / "qubit.shared_metrics.v3.schema.json").read_text()
+        (Path(contract.__file__).parent / "schemas" / "hermes.shared_metrics.v3.schema.json").read_text()
     )
     execution = schema["$defs"]["execution_backend_counter"]["properties"]["dimensions"]
     for backend in _BUILTIN_BACKENDS:

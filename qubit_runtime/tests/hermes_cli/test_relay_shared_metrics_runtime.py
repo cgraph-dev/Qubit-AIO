@@ -785,7 +785,7 @@ def test_real_binding_drives_lifecycle_aggregation_export_and_snapshot(
         json.loads(package.read_text(encoding="utf-8")) for package in packages
     ]
     for package in package_payloads:
-        assert package["schema_version"] == "qubit.shared_metrics.v3"
+        assert package["schema_version"] == "hermes.shared_metrics.v3"
         for metric in package["metrics"]:
             key = (metric["name"], tuple(sorted(metric["dimensions"].items())))
             package_values[key] = package_values.get(key, 0) + metric["value"]
@@ -1244,7 +1244,7 @@ def test_managed_config_cannot_override_shared_metrics_consent(
         f"    enabled: {str(managed_enabled).lower()}\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("QUBIT_MANAGED_DIR", str(managed))
+    monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
     config._LOAD_CONFIG_CACHE.clear()
     config._RAW_CONFIG_CACHE.clear()
     managed_scope.invalidate_managed_cache()
@@ -2947,7 +2947,7 @@ def test_milestone_install_age_is_the_subscriber_profile_not_the_relay_thread(tm
         subscriber = SharedMetricsSubscriber(SharedMetricsStore(), "1.0")
     finally:
         reset_qubit_home_override(token)
-    subscriber._record_milestones("qubit.setup.completed", {"provider": "nous", "surface": "cli"})
+    subscriber._record_milestones("hermes.setup.completed", {"provider": "nous", "surface": "cli"})
     ages = [c["dimensions"]["install_age_bucket"] for c in subscriber.store.counter_snapshot()
             if c["metric_name"] == "qubit.install.milestone"]
     assert ages == ["gte_90d"]
