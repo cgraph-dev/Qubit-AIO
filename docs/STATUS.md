@@ -4702,3 +4702,45 @@ MainPID `209179` on 8890, serving the SPA (`HTTP 302`), API auth-guarded
   (`tui_gateway.server` reassigns `sys.stdout` at import, so probe output can
   land on stderr). Worktrees have no `.venv` (untracked) — use
   `scripts/sync_setup_worktree.sh`.
+
+### Sync defect log — 2026-10-05 (merge tooling bugs, all found by measuring)
+
+Each of these silently produced plausible-but-wrong output. Recorded because
+the pattern — my tooling being less reliable than the reasoning around it —
+drove the verification discipline (every agent must prove no-regression).
+
+1. **Compound-identifier miss.** `\bhermes_` fails inside `get_hermes_home`
+   (99 sites), so consumers imported names that no longer existed. Fixed by
+   dropping the word boundary before `hermes_`.
+2. **Dependency ordering.** Root-level modules must land FIRST — consumers
+   import symbols upstream ADDED there (`mkstemp_beside`,
+   `is_nvidia_n1x_pci_id`, `install_state_permission_message`). 16 import
+   failures cleared after reordering.
+3. **URL/prose corruption.** IDENT_RULES ran over all text, rewriting URLs:
+   `github.com/plastic-labs/honcho/.../hermes-plugin-honcho` →
+   `.../qubit-plugin-honcho` (a directory in someone else's repo), and
+   `nousresearch.github.io/hermes-agent` → a dead host. **144 corrupted URLs**
+   across the 150 changed markdown files, plus **172** in plugin-catalog.
+   Fixed with a PROTECT_RULES mask; verified 144→0 and 172→0.
+4. **False rename.** `HERMES_AGENT_HELP_GUIDANCE` → `QUBIT_AGENT_HELP_GUIDANCE`
+   in `agent/system_prompt.py`, but Qubit never renamed that symbol →
+   ImportError, 6 test modules uncollectable. Rule: accept a translation only
+   when Qubit's own tree independently uses the new name.
+5. **Stale test imports not propagated.** Upstream DELETED
+   `_truncate_tool_call_args_json` (and its two test classes); the merge kept
+   the old import. Separately, upstream moved `_COMPRESSION_MARKER_PREFIX` /
+   `_COMPRESSION_MARKER_TEMPLATE` to `agent/compression_marker.py`, but the
+   merge appended them to the ADJACENT `from agent.context_compressor import`
+   block. `test_context_compressor.py`: 17 collection errors → 0, and
+   **276 passed** after the conflicting class hunk was resolved to the side
+   upstream actually has.
+6. **Gate defects** (all four made the gate report wrong numbers):
+   count-only comparison missed a swapped failure; system-python probing gave
+   ~23 bogus `ruamel` failures (worktrees have no untracked `.venv`);
+   results land on stderr (`tui_gateway.server` reassigns `sys.stdout`); the
+   module list contained 2 phantom entries (`agent.turn_naming`,
+   `gateway.platforms.telegram`) that exist in neither tree.
+
+**Verified check going forward:** no `QUBIT_*` name is imported anywhere in
+`qubit_runtime/` without a definition (scripted scan: 0). Snapshot:
+129+73+64+76+31+29+248 files merged across 16 subsystems; gate 29 OK / 0 FAIL.
