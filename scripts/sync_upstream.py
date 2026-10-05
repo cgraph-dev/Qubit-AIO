@@ -124,6 +124,13 @@ def git_show(sha: str, path: str) -> str | None:
     return r.stdout if r.returncode == 0 else None
 
 
+def git_show_bytes(sha: str, path: str) -> bytes | None:
+    """Raw blob bytes; avoids UnicodeDecodeError on binary assets (favicon.ico)."""
+    r = subprocess.run(["git", "-C", str(PIN), "show", f"{sha}:{path}"],
+                       capture_output=True, check=False)
+    return r.stdout if r.returncode == 0 else None
+
+
 @dataclass
 class Plan:
     modified: list[str] = field(default_factory=list)
@@ -162,11 +169,22 @@ def merge_one(up_path: str) -> tuple[str, str, int]:
     """Return (status, detail, translated_count)."""
     qpath = route(up_path)
     target = QR / qpath
-    base = git_show(PIN_SHA, up_path)
-    new = git_show(BASE_SHA, up_path)
-    if new is None:
+    raw_base = git_show_bytes(PIN_SHA, up_path)
+    raw_new = git_show_bytes(BASE_SHA, up_path)
+    if raw_new is None:
         return "SKIP", "upstream blob unreadable", 0
 
+    # Binary assets (favicon.ico etc.) cannot go through a text merge: decoding
+    # raises UnicodeDecodeError and substring identifier rules are meaningless.
+    # Copy upstream's bytes verbatim; translation does not apply.
+    if b"\x00" in raw_new or b"\x00" in (raw_base or b""):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        existed = target.exists()
+        target.write_bytes(raw_new)
+        return ("MERGED" if existed else "ADDED"), f"{qpath} (binary, copied)", 0
+
+    base = raw_base.decode("utf-8") if raw_base is not None else None
+    new = raw_new.decode("utf-8")
     t_base, n1 = translate(base if base is not None else "")
     t_new, n2 = translate(new)
     translated = n1 + n2

@@ -69,24 +69,8 @@ def _pick_interpreter(repo: Path) -> str:
     (ModuleNotFoundError: ruamel) that had nothing to do with the sync --
     the harness was measuring its own missing dependencies. The venv is the
     environment the app actually runs in, so that is what the gate must probe.
-
-    A `git worktree` checkout has NO .venv (it is untracked), so also look at
-    the main worktree's venv via `git rev-parse --git-common-dir`. Without this
-    fallback every worktree agent measured system python and reported a bogus
-    8 OK / 23 FAIL baseline instead of the real 18 OK / 13 FAIL.
     """
-    cands = [repo / ".venv/bin/python", repo / ".venv/bin/python3"]
-    try:
-        common = subprocess.run(
-            ["git", "-C", str(repo), "rev-parse", "--path-format=absolute", "--git-common-dir"],
-            capture_output=True, text=True, check=False,
-        ).stdout.strip()
-        if common:
-            main = Path(common).parent
-            cands += [main / ".venv/bin/python", main / ".venv/bin/python3"]
-    except Exception:
-        pass
-    for cand in cands:
+    for cand in (repo / ".venv/bin/python", repo / ".venv/bin/python3"):
         if cand.exists():
             return str(cand)
     return sys.executable
@@ -98,7 +82,14 @@ def probe(modules: list[str], repo: Path, home: str) -> dict[str, str]:
     env["PYTHONPATH"] = f"{repo / 'qubit_runtime'}:{repo}"
     env["QUBIT_HOME"] = home
 
-    program = "import importlib, json, sys\nresults = {}\n"
+    # A probed module may reassign ``sys.stdout`` at IMPORT time (tui_gateway.server
+    # reserves real stdout for its JSON-RPC pipe and points sys.stdout at stderr). A
+    # bare ``print`` would then land on stderr and the harness would see an empty
+    # stdout, reporting bogus "gate-crashed" for every module. Snapshot the real
+    # stream before the loop and write the payload to it explicitly.
+    program = "import importlib, json, sys\n"
+    program += "_out = sys.stdout\n"
+    program += "results = {}\n"
     program += "mods = json.loads(sys.argv[1])\n"
     program += (
         "for m in mods:\n"
@@ -107,7 +98,8 @@ def probe(modules: list[str], repo: Path, home: str) -> dict[str, str]:
         "        results[m] = 'OK'\n"
         "    except Exception as e:\n"
         "        results[m] = 'FAIL ' + type(e).__name__ + ': ' + str(e)[:120]\n"
-        "print(json.dumps(results))\n"
+        "_out.write(json.dumps(results) + '\\n')\n"
+        "_out.flush()\n"
     )
     proc = subprocess.run(
         [_pick_interpreter(repo), "-c", program, json.dumps(modules)],
@@ -116,23 +108,17 @@ def probe(modules: list[str], repo: Path, home: str) -> dict[str, str]:
         env=env,
         cwd=str(repo),
     )
-    stdout = (proc.stdout or "") + "\n" + (proc.stderr or "")
-    # The JSON line can land on EITHER stream: some imported module writes to
-    # stderr and the interpreter's buffering can put our final print there too
-    # (observed in a worktree run: RC=0, stdout empty, JSON on stderr). Parse the
-    # FIRST complete dict that contains one of our module names; do not trust a
-    # bare startswith("{") because import banners can also start with a brace.
-    for line in stdout.splitlines():
-        line = line.strip()
-        if not line.startswith("{"):
-            continue
-        try:
-            parsed = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict) and any(m in parsed for m in modules):
-            return parsed
-    return {m: f"FAIL gate-crashed: {(proc.stderr or proc.stdout or '')[-200:]}" for m in modules}
+    # Prefer the dedicated stdout payload; fall back to stderr in case a module
+    # closed or replaced the stream we captured.
+    for stream in (proc.stdout, proc.stderr):
+        for line in reversed((stream or "").splitlines()):
+            line = line.strip()
+            if line.startswith("{"):
+                try:
+                    return json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+    return {m: f"FAIL gate-crashed: {(proc.stderr or '')[-160:]}" for m in modules}
 
 
 def main() -> int:
