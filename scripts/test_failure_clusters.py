@@ -61,20 +61,51 @@ _ERR = re.compile(r"^E\s+(.*)$")
 def clusters_from(stdout: str) -> tuple[dict[str, list[str]], Counter]:
     """Group failing tests by normalized error signature.
 
-    Heuristic: within each '____ test ____' section, take the LAST E-line --
-    that is the assertion/exception that actually failed, not a context line.
+    Two pytest output shapes must both be handled:
+
+    1. FAILED tests render as a body under a '____ test_name ____' rule, with
+       the exception on an 'E   ' line. Take the LAST E-line (the actual
+       failure, not a context line).
+    2. COLLECTION/setup ERRORS render as 'ERROR at setup of <test>' lines in
+       the summary block, and often carry no 'E ' line at all in --tb=line.
+       The previous version only handled shape 1, so 662 setup errors all
+       collapsed into one useless 'NO ERROR LINE CAPTURED' bucket -- a parser
+       bug that looked like a finding.
+
+    For shape 2 we key off the error TYPE extracted from the short summary
+    line, falling back to the fixture/module named in the line.
     """
-    sections = re.split(r"_{5,}\s+(.+?)\s+_{5,}", stdout)
     by_sig: dict[str, list[str]] = defaultdict(list)
     counter: Counter = Counter()
 
-    # sections[0] is preamble; then alternating (title, body)
+    # --- shape 1: failed-test bodies with E-lines ---
+    sections = re.split(r"_{5,}\s+(.+?)\s+_{5,}", stdout)
     for i in range(1, len(sections) - 1, 2):
         title, body = sections[i], sections[i + 1]
         errs = [normalize(m.group(1)) for m in _ERR.finditer(body)]
-        sig = errs[-1] if errs else "NO ERROR LINE CAPTURED"
-        by_sig[sig].append(title.strip())
-        counter[sig] += 1
+        if not errs:
+            continue
+        by_sig[errs[-1]].append(title.strip())
+        counter[errs[-1]] += 1
+
+    # --- shape 2: summary lines: FAILED / ERROR [at setup of] path::test - msg ---
+    for line in stdout.splitlines():
+        m = re.match(r"^(FAILED|ERROR)\s+(?:at \w+ of\s+)?(\S+)(?:\s+-\s+(.*))?$", line.strip())
+        if not m:
+            continue
+        kind, nodeid, msg = m.group(1), m.group(2), (m.group(3) or "").strip()
+        if kind == "FAILED" and msg:
+            sig = normalize(msg)
+            by_sig[sig].append(nodeid)
+            counter[sig] += 1
+        elif kind == "ERROR":
+            # 'ERROR at setup of x' with no message: bucket by the module, and
+            # mark it distinctly so it is not confused with an assertion failure.
+            mod = nodeid.split("::")[0]
+            sig = normalize(f"ERROR(setup) [{msg}] {Path(mod).name}") if msg else f"ERROR(setup) {Path(mod).name}"
+            by_sig[sig].append(nodeid)
+            counter[sig] += 1
+
     return by_sig, counter
 
 
