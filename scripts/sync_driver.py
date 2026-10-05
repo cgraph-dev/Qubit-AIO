@@ -27,18 +27,22 @@ PIN = Path("/home/trick/.cache/qubit-pins/hermes-agent")
 PIN_SHA = "69948c0057"
 BASE_SHA = "bd0affe5"
 
-# Dependency-ordered, NOT smallest-first: qubit_cli/ (and other consumers) import
-# symbols DEFINED in the lower-level trees, so those must land first or the
-# consumer merge produces imports of symbols that do not exist yet
-# (verified failure: qubit_cli referred to is_nvidia_n1x_pci_id from
-# qubit_platform.host.products, which only existed after that subsystem synced).
+# Dependency-ordered, NOT smallest-first: consumers import symbols DEFINED in
+# more primitive modules, so those must land first or the consumer merge
+# produces imports of symbols that do not exist yet.
 #
-# Tier 0 = leaf/platform modules everything imports from.
-# Tier 1 = core agent + tools + gateway.
-# Tier 2 = surfaces that import tier 0/1.
-# Tier 3 = bulk build output, safe last.
+# VERIFIED failures this ordering fixes:
+#   - qubit_cli imported is_nvidia_n1x_pci_id from qubit_platform.host.products
+#   - qubit_cli imported mkstemp_beside from utils.py
+#   - qubit_cli imported SessionActiveWriteGuardError from qubit_state_errors
+#     (all three are NEW upstream symbols added in the 4,128 commits, defined in
+#      modules OUTSIDE the consuming subsystem)
+#
+# tier -1 = ROOT-LEVEL modules (utils.py, hermes_state_errors.py, ...) — the
+#           most primitive layer; scheduled FIRST, not last.
 SUBSYSTEMS = [
-    "locales", "nix", "docker",          # 0: inert
+    "__root__",                           # -1: root-level .py modules (44 files)
+    "locales", "nix", "docker",           # 0: inert
     "plugins", "optional-skills",         # 1: leaf capability
     "agent", "tools", "gateway",          # 2: core
     "tui_gateway", "web", "cron", "acp_adapter", "evals", "pm", "scripts",

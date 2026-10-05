@@ -3,10 +3,50 @@
 from __future__ import annotations
 
 import shlex
+from pathlib import Path
 from typing import Any
+
+from utils import is_truthy_value
 
 _LIST_WORDS = {"list", "ls", "browse"}
 _SEARCH_WORDS = {"search", "find"}
+SUBAGENT_SOURCE = "subagent"
+
+
+def show_subagent_sessions(qubit_home: str | Path) -> bool:
+    """``sessions.show_subagents`` from *qubit_home*'s own config.yaml. One ``serve`` lists many
+    profiles' stores, so the store's home decides, never the process ``QUBIT_HOME``. False when
+    the config cannot be read (the listing keeps its default shape)."""
+    from qubit_cli.config import load_config_readonly
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+
+    token = set_qubit_home_override(str(qubit_home))
+    try:
+        sessions_cfg = load_config_readonly().get("sessions") or {}
+    except Exception:
+        return False
+    finally:
+        reset_qubit_home_override(token)
+    return isinstance(sessions_cfg, dict) and is_truthy_value(sessions_cfg.get("show_subagents"))
+
+
+def subagent_listing_scope(
+    qubit_home: str | Path, *, source: str | None = None, sources: list[str] | None = None,
+    exclude_sources: list[str] | None = None,
+) -> tuple[bool, list[str] | None]:
+    """``(include_subagents, exclude_sources)`` for one human-facing session list (#97202).
+
+    With ``sessions.show_subagents`` on, delegate runs join a list that is not scoped to named
+    sources and either has no exclusions or excludes the ``subagent`` source itself (the desktop
+    recents shape); that exclusion is dropped so the runs actually land. A slice that excludes
+    other sources without ``subagent`` (the per-platform messaging lists) keeps its shape.
+    """
+    excluded = list(exclude_sources or [])
+    if source or sources or (excluded and SUBAGENT_SOURCE not in excluded):
+        return False, exclude_sources
+    if not show_subagent_sessions(qubit_home):
+        return False, exclude_sources
+    return True, [s for s in excluded if s != SUBAGENT_SOURCE] or None
 
 
 def parse_session_listing_args(raw_args: str) -> tuple[bool, bool, str, str | None]:

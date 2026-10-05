@@ -415,6 +415,11 @@ def _apply_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace
                 print_success(f"Pre-migration backup: {backup_archive} "
                               f"({_format_size(backup_archive.stat().st_size)})")
                 print_info(f"Restore with: qubit import {backup_archive.name}")
+            else:
+                print()
+                print_warning("Pre-migration backup was not created (nothing to back up, the write "
+                              "failed, or it was incomplete); if incomplete, a partial "
+                              "pre-migration-*.incomplete.zip may exist in the backups dir.")
         except Exception as e:
             return _error_block(
                 f"Could not create pre-migration backup: {e}",
