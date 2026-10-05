@@ -593,9 +593,7 @@ def normalize_skill_lookup_name(identifier: str) -> str:
         return raw_identifier
     identifier_path = Path(raw_identifier).expanduser()
     if not identifier_path.is_absolute():
-        # Read-old: a legacy skill name (e.g. `hermes-agent`) resolves to its
-        # Qubit name after the W-BRAND rename migration.
-        return resolve_legacy_skill_name(raw_identifier.lstrip("/"))
+        return raw_identifier.lstrip("/")
     # Resolve the primary root via tools.skills_tool at CALL time: tests patch
     # ``tools.skills_tool.SKILLS_DIR`` and skill_view() enforces ``_skills_dir()``
     # (which follows the live profile-scoped QUBIT_HOME), so normalization
