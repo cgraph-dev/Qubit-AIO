@@ -5843,6 +5843,22 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
         else:
             os.environ["TERMINAL_CWD"] = resolved_cwd
 
+    # Messaging-only defaults belong to startup, not incidental imports by the TUI.
+    configured_cwd = os.environ.get("TERMINAL_CWD", "")
+    if not configured_cwd or configured_cwd in CWD_PLACEHOLDERS:
+        resolved_cwd = resolve_placeholder_terminal_cwd(
+            configured_cwd=configured_cwd,
+            terminal_backend=os.environ.get("TERMINAL_ENV", ""),
+            messaging_cwd=os.getenv("MESSAGING_CWD"),
+            docker_mount_cwd_to_workspace=os.getenv(
+                "TERMINAL_DOCKER_MOUNT_CWD_TO_WORKSPACE", "false").lower()
+            in {"true", "1", "yes"},
+            home_fallback=str(Path.home()))
+        if resolved_cwd is None:
+            os.environ.pop("TERMINAL_CWD", None)
+        else:
+            os.environ["TERMINAL_CWD"] = resolved_cwd
+
     from qubit_cli.resource_limits import apply_nofile_soft_limit
     apply_nofile_soft_limit()
 
