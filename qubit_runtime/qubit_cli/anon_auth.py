@@ -201,6 +201,21 @@ def guest_carries_inference() -> bool:
     return guest_enabled() and has_guest()
 
 
+def has_free_tier_account() -> bool:
+    """True when the profile's Nous identity is the free tier and the free tier is on.
+
+    Profile-level: use for status, picker and notice surfaces. Routing decisions (which model a
+    request may carry) must use :func:`route_is_welcome_host` on the SELECTED runtime instead: a
+    credential-pool entry can pick a paid Nous key while the profile singleton is still a guest.
+    """
+    return guest_enabled() and has_guest()
+
+
+def free_tier_route() -> bool:
+    from qubit_cli.auth import resolve_provider
+    return has_free_tier_account() and resolve_provider("auto") == "nous"
+
+
 WELCOME_HOSTS = frozenset({"welcome-api.nousresearch.com"})
 # Dev-only: extra hostnames that count as the welcome host, comma-separated (for example
 # ``127.0.0.1`` while ``NOUS_INFERENCE_BASE_URL`` points at a local stand-in). Read from the
