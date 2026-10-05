@@ -109,10 +109,9 @@ def catalog_cap(finding: Finding) -> Optional[str]:
 
 
 # A README "Uninstall" section removing the plugin's OWN install directory
-# (``rm -rf "$HOME/.qubit/plugins/<name>"``, ``~/.qubit/plugins/<name>`` before a reinstall
+# (``rm -rf "$HOME/.hermes/plugins/<name>"``, ``rm -rf ~/.hermes/plugins/<name>`` before a reinstall
 # ``cp``) is the one destructive shape that is harmless by construction: one ``rm``, one argument
-# rooted at ``$HOME``/``${HOME}``/``~`` + ``/.qubit/plugins/`` or ``skills/`` (the legacy
-# ``~/.hermes/plugins/`` home is recognized too).
+# rooted at ``$HOME``/``${HOME}``/``~`` + ``/.hermes/plugins/`` or ``skills/``
 # with a plain leaf — no glob, no ``..``, nothing chained. It lands at medium (a note). Any
 # wider target (``$HOME``, ``$HOME/.hermes``, ``$HOME/.hermes/plugins/*``) only gets the
 # generic prose step (high, caution) and the same line in a ``.sh`` stays critical (#115353).

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from qubit_constants import get_qubit_home
-from tools.tool_backend_helpers import managed_nous_tools_enabled
+from tools.tool_backend_helpers import fast_search_entitled, managed_nous_tools_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def auth_json_path():
 
 def _read_nous_provider_state() -> Optional[dict]:
     """The profile's Qubit state, or None. A free-tier identity counts only while the free tier is on:
-    with ``nous.guest: false`` it is invisible here, so no cached or refreshed token of it is ever
+    with ``qubit.guest: false`` it is invisible here, so no cached or refreshed token of it is ever
     attached to a request.
 
     Resolves through the same profile-then-global-root fallback every other credential reader
@@ -49,7 +49,7 @@ def _read_nous_provider_state() -> Optional[dict]:
     try:
         from qubit_cli.auth import get_provider_auth_state
 
-        nous_provider = get_provider_auth_state("nous")
+        nous_provider = get_provider_auth_state("qubit")
         if not isinstance(nous_provider, dict):
             return None
         from qubit_cli.anon_auth import guest_enabled, is_guest_state
@@ -162,17 +162,32 @@ def build_vendor_gateway_url(vendor: str) -> str:
     return f"{get_tool_gateway_scheme()}://{vendor}-gateway.{shared_domain}"
 
 
-def resolve_managed_tool_gateway(
-    vendor: str, gateway_builder: Optional[Callable[[str], str]] = None,
-    token_reader: Optional[Callable[[], Optional[str]]] = None) -> Optional[ManagedToolGatewayConfig]:
-    """Resolve shared managed-tool gateway config for a vendor."""
-    if not managed_nous_tools_enabled():
-        return None
+def _vendor_gateway(vendor: str, gateway_builder, token_reader) -> Optional[ManagedToolGatewayConfig]:
     gateway_origin = (gateway_builder or build_vendor_gateway_url)(vendor)
     nous_user_token = (token_reader or read_nous_access_token)()
     if not gateway_origin or not nous_user_token:
         return None
     return ManagedToolGatewayConfig(vendor=vendor, gateway_origin=gateway_origin, nous_user_token=nous_user_token, managed_mode=True)
+
+
+def resolve_managed_tool_gateway(
+    vendor: str, gateway_builder: Optional[Callable[[str], str]] = None,
+    token_reader: Optional[Callable[[], Optional[str]]] = None) -> Optional[ManagedToolGatewayConfig]:
+    """Resolve shared managed-tool gateway config for a vendor (entitled accounts only)."""
+    if not managed_nous_tools_enabled():
+        return None
+    return _vendor_gateway(vendor, gateway_builder, token_reader)
+
+
+def resolve_free_search_gateway(token_reader: Optional[Callable[[], Optional[str]]] = None) -> Optional[ManagedToolGatewayConfig]:
+    """Perplexity ``search_type: "fast"`` is served without funding checks, so it needs a registered
+    Qubit identity this profile may use (guest-disabled and refresh rules live in the reader) rather
+    than paid entitlement. The anonymous guest tier is excluded — it has no Portal account, so it
+    keeps the keyless ring. Search only: every other vendor route goes through
+    :func:`resolve_managed_tool_gateway`."""
+    if not fast_search_entitled():
+        return None
+    return _vendor_gateway("perplexity", None, token_reader)
 
 
 def is_managed_tool_gateway_ready(
@@ -283,7 +298,7 @@ def build_managed_media_uploader(
        expiry; type and length are signed into it) and an upload token.
     2. PUT the bytes to that URL. This goes directly to storage — never
        through the gateway — which is what removes the request-size ceiling.
-    3. Return ``nous-upload:<token>`` for the tool argument. The token is
+    3. Return ``qubit-upload:<token>`` for the tool argument. The token is
        bound to this Qubit principal and is redeemable only through the
        gateway, so it is inert anywhere else it might end up.
     """
@@ -346,7 +361,7 @@ def build_managed_media_uploader(
         if put.status_code != 200:
             raise RuntimeError(f"storage refused the upload (HTTP {put.status_code})")
 
-        return f"nous-upload:{token}"
+        return f"qubit-upload:{token}"
 
     return upload
 
