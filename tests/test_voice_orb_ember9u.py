@@ -142,20 +142,20 @@ def test_render_frame_stats_per_state():
         assert stats["points"] > 100, st
         assert stats["ovals"] >= 1 + 3, st  # core + min rings
         assert stats["min_y"] >= 0.0 and stats["max_y"] <= 96.0, st
-        # Per-state family (owner contract 2026-10-04: ORANGE idle,
-        # YELLOWGREEN listening (me talking), YELLOW thinking, GREEN
-        # speaking, RED error) — each mixed toward near-black.
+        # Per-state family (owner contract 2026-10-05: ORANGE idle,
+        # GREEN voice (listening + speaking share one green family),
+        # YELLOW thinking, RED error) — each mixed toward near-black.
+        # Green mixes keep green dominant but blue can exceed red
+        # (family core is (60,220,120)), so voice states assert g-max.
         for fill in stats["fills"]:
             assert fill.startswith("#") and len(fill) == 7, fill
             r, g, b = (int(fill[i:i + 2], 16) for i in (1, 3, 5))
             if st == "idle":
                 assert r >= g >= b, (st, fill)
-            elif st == "listening":
-                assert g >= r > b, (st, fill)
+            elif st in ("listening", "speaking"):
+                assert g >= r and g >= b, (st, fill)
             elif st == "thinking":
                 assert r >= g > b, (st, fill)
-            elif st == "speaking":
-                assert g > r and g >= b, (st, fill)
             elif st == "error":
                 assert r > g and r > b, (st, fill)
 

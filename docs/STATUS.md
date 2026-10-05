@@ -4594,3 +4594,29 @@ when speaking — no listening, no thinking.
   (orange). Tests reconciled: 126 passed (orb + wake suites).
 - **Evidence:** listening set verified; helper + orb restarted; `git diff
   --check` clean.
+
+## 94. /qubit-chat capability questions reach the tool agent (2026-10-05)
+
+**No milestone claimed.** Owner: "can you use all skills and mcps and plugins
+and slash commands?" answered `state UNKNOWN_CAPABILITY` / a bare-model refusal.
+
+- **Cause A — an over-broad registry alias.** The voice registry's `capability`
+  verb had the alias **`"can you"`**, so EVERY conversational "can you …?"
+  question matched it and ran the capability catalog, which then failed
+  `UNKNOWN_CAPABILITY` (live: `_decide_branch(...)` -> `registry:capability`).
+  Removed that alias; capability checks now require the explicit shape
+  ("check capability", "is X available"). `voice_commands.resolve` verified:
+  the question now resolves `unknown` and explicit checks still match.
+- **Cause B — the agent wiring missed `clarify`.** The §93 follow-up routed
+  `answer_local` turns through the tool-capable agent; the classifier marks a
+  plain question `clarify`, which bypassed it and hit the bare model. Extended
+  the seam to `("answer_local", "clarify")` in both `turn()` and
+  `stream_turn()`.
+- **Live proof:** the owner's exact prompt now returns
+  `runtime: qubit-vendored-agent` with **5 tools called** (`skill_view`,
+  `terminal`, `skills_list`, `execute_code`, `tool_search`) and a
+  tool-verified answer ("198 installed … skills yes, plugins partially, MCP
+  no, slash commands no — but I can do the tool-equivalents").
+- **Evidence:** 39 passed across the qubitchat tool-turn, agent-worker,
+  voice-commands, and branches suites; service restarted; `git diff --check`
+  clean on touched files.

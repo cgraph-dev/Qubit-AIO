@@ -3475,8 +3475,8 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
     # registry/web/build task) already returned above and never reach here.
     # An explicit per-call model is honored; a huge turn keeps its explicit
     # escalation model instead.
-    if decided.get("action") == "answer_local" and not escalated_away \
-            and not model:
+    if decided.get("action") in ("answer_local", "clarify") \
+            and not escalated_away and not model:
         agent_out = _agent_chat(cfg, st, sid, clean, timeout_s=timeout_s,
                                 cancel=cancel, reasoning=reasoning_level)
         if agent_out is not None:
@@ -4195,7 +4195,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     # caller asked for a specific model, not the /chat config model); when no
     # tool-capable vendored runtime is available this falls through to the
     # legacy remote/local stream byte-identically.
-    if decided.get("action") == "answer_local" and not model:
+    if decided.get("action") in ("answer_local", "clarify") and not model:
         agent_out = _agent_chat(cfg, st, sid, clean, timeout_s=timeout_s,
                                 cancel=cancel, reasoning=reasoning_level)
         if agent_out is not None:

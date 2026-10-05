@@ -6226,7 +6226,12 @@ _E("chat_session_search", "Search chat sessions",
    examples=("qubit, search my chats invoice",),
    help="Search canonical chat sessions by title/preview.")
 _E("capability", "Capability check",
-   ("check capability", "rx:is (.+) available", "can you"),
+   # NOTE: the bare "can you" alias was removed — it is far too broad and
+   # captured EVERY conversational question ("can you use all skills…?"),
+   # routing it to this verb, which then failed UNKNOWN_CAPABILITY instead of
+   # reaching the tool-capable agent (live 2026-10-05). Capability checks now
+   # require the explicit shape ("check capability", "is X available").
+   ("check capability", "rx:is (.+) available"),
    "capability", ("tools",), args=(_R("name"),),
    examples=("qubit, is whatsapp available",),
    help="Typed state for any capability.")
