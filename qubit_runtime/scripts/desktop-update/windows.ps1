@@ -2,8 +2,8 @@
 #
 # WHY THIS EXISTS (the frozen-binary problem): the Desktop's Update button
 # used to hand off exclusively to the staged Tauri binary
-# (%HERMES_HOME%\hermes-setup.exe). That binary has no self-update path --
-# copy_self_to_hermes_home deliberately no-ops during --update -- so every
+# (%QUBIT_HOME%\hermes-setup.exe). That binary has no self-update path --
+# copy_self_to_qubit_home deliberately no-ops during --update -- so every
 # updater-side fix (cache refresh #67369, marker self-adopt #74782, straggler
 # handling) only reaches users when a new installer is built, signed, and
 # published. In practice binaries go months stale and users hit long-fixed
@@ -19,10 +19,10 @@
 # CONTRACT (keep in sync with apps/desktop/electron/main.ts):
 #   cmd /d /s /c start "" /b powershell -NoProfile -ExecutionPolicy Bypass
 #     -File scripts\desktop-update\windows.ps1
-#     -InstallRoot <path>   repo checkout (HERMES_HOME\hermes-agent)
+#     -InstallRoot <path>   repo checkout (QUBIT_HOME\qubit)
 #     [-Branch <ref> | -Channel stable|canary|main]  default: branch main
 #     -DesktopPid <pid>     the Electron main process to wait out
-#     [-RelaunchExe <path>] Hermes.exe to start when done (omit = no relaunch)
+#     [-RelaunchExe <path>] Qubit.exe to start when done (omit = no relaunch)
 #     [-NoUi]               headless (tests); default shows a progress window
 #     [-NoMarkerCleanup]    leave .hermes-update-in-progress in place (tests)
 #
@@ -33,10 +33,10 @@
 # .hermes-update-result.json for the relaunched Desktop to surface, and
 # relaunches the Desktop so the user is never left stranded.
 #
-# Marker: we claim HERMES_HOME\.hermes-update-in-progress with OUR pid as
+# Marker: we claim QUBIT_HOME\.hermes-update-in-progress with OUR pid as
 # step 0 (the wrapper cmd.exe pid the Desktop saw is useless -- it exits
 # immediately), retaining HERMES_UPDATE_STARTED_AT from the Desktop hand-off.
-# hermes_cli/update_lock.py's ancestry rule lets our
+# qubit_cli/update_lock.py's ancestry rule lets our
 # `qubit update` child adopt the claim; electron/update-marker.ts parks a
 # relaunched Desktop on it. Cleanup only removes the marker while WE still
 # own it (a handoff partner that rewrote it keeps its claim).
@@ -74,15 +74,53 @@ $ErrorActionPreference = "Continue"
 # unless we explicitly claim focus --
 # and after the update we must hand focus TO the relaunched Desktop (a
 # WMI-spawned process starts unfocused). AllowSetForegroundWindow lets us
-# pass our foreground right on to the new Hermes.exe pid.
+# pass our foreground right on to the new Qubit.exe pid.
 try {
-    Add-Type -Namespace HermesHandoff -Name Win32 -MemberDefinition @'
+    Add-Type -Namespace QubitHandoff -Name Win32 -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr hWnd);
 [DllImport("user32.dll")] public static extern bool AllowSetForegroundWindow(int dwProcessId);
 [DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr hWnd, int nCmdShow);
 '@ -ErrorAction Stop
     $script:Win32 = $true
 } catch { $script:Win32 = $false }
+# Console selection must never hold the hand-off (#103222). The console is
+# hidden by design (wrapHandoffForDetachedConsole), but an older Desktop or a
+# manual run can leave it visible, and conhost blocks every write to it while a
+# selection is active: the child output replayed after `qubit update` exited
+# stalled on Write-Host until the user pressed Esc, and the result, marker
+# cleanup and relaunch waited behind it. QuickEdit goes off for the run (so a
+# stray click cannot start a selection) and the console echo is skipped while
+# one is active; the log file keeps every line either way.
+try {
+    Add-Type -Namespace QubitHandoff -Name ConsoleInput -MemberDefinition @'
+[StructLayout(LayoutKind.Sequential)] public struct SelectionInfo { public uint Flags; public uint Anchor; public ulong Window; }
+[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+static extern IntPtr CreateFile(string name, uint access, uint share, IntPtr attributes, uint disposition, uint flags, IntPtr template);
+[DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+[DllImport("kernel32.dll")] static extern bool GetConsoleMode(IntPtr handle, out uint mode);
+[DllImport("kernel32.dll")] static extern bool SetConsoleMode(IntPtr handle, uint mode);
+[DllImport("kernel32.dll")] static extern bool GetConsoleSelectionInfo(out SelectionInfo info);
+
+// stdin is NUL under the Desktop spawn, so open the console input buffer itself.
+static uint? Swap(Func<uint, uint> change) {
+    IntPtr input = CreateFile("CONIN$", 0xC0000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
+    if (input == new IntPtr(-1)) return null;
+    try {
+        uint mode;
+        if (!GetConsoleMode(input, out mode) || !SetConsoleMode(input, change(mode))) return null;
+        return mode;
+    } finally { CloseHandle(input); }
+}
+// ENABLE_EXTENDED_FLAGS (0x80) makes conhost honour the cleared ENABLE_QUICK_EDIT_MODE (0x40).
+public static uint? DisableQuickEdit() { return Swap(mode => (mode & ~0x40u) | 0x80u); }
+public static void Restore(uint mode) { Swap(_ => mode); }
+public static bool Selecting() {
+    SelectionInfo info;
+    return GetConsoleSelectionInfo(out info) && (info.Flags & 1u) != 0; // CONSOLE_SELECTION_IN_PROGRESS
+}
+'@ -ErrorAction Stop
+    $script:ConsoleInput = $true
+} catch { $script:ConsoleInput = $false }
 # Render UTF-8 glyphs (checkmarks, arrows) correctly in our own console echo
 # too; the legacy conhost default OEM codepage shows them as mojibake.
 try {
@@ -90,12 +128,12 @@ try {
     $OutputEncoding = [System.Text.Encoding]::UTF8
 } catch {}
 $TempDir = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
-$HermesHome = if ($env:HERMES_HOME) { $env:HERMES_HOME } elseif ($InstallRoot) { Split-Path -Parent $InstallRoot } else { $TempDir }
-$env:HERMES_HOME = $HermesHome
-$MarkerPath = Join-Path $HermesHome ".hermes-update-in-progress"
-$LogDir = Join-Path $HermesHome "logs"
+$QubitHome = if ($env:QUBIT_HOME) { $env:QUBIT_HOME } elseif ($InstallRoot) { Split-Path -Parent $InstallRoot } else { $TempDir }
+$env:QUBIT_HOME = $QubitHome
+$MarkerPath = Join-Path $QubitHome ".hermes-update-in-progress"
+$LogDir = Join-Path $QubitHome "logs"
 $LogPath = Join-Path $LogDir "desktop-update-handoff.log"
-$ResultPath = Join-Path $HermesHome ".hermes-update-result.json"
+$ResultPath = Join-Path $QubitHome ".hermes-update-result.json"
 $script:Ui = $null
 $script:UiStage = "Qubit will open once done."   # until the first gate; matches ui.html
 $script:UiStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
@@ -103,6 +141,7 @@ $script:UiStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 function Write-HandoffLog([string]$Message) {
     $line = "{0:yyyy-MM-ddTHH:mm:ssK} {1}" -f (Get-Date), $Message
     try { Add-Content -LiteralPath $LogPath -Value $line -Encoding UTF8 } catch {}
+    if ($script:ConsoleInput -and [QubitHandoff.ConsoleInput]::Selecting()) { return }
     Write-Host $line
 }
 
@@ -342,7 +381,7 @@ function Get-UiProgressLine {
 
 function Publish-UiProgress([string]$Message) {
     # Stages come from the orchestrator's own control flow. Child stdout and
-    # stderr remain asynchronously drained in Invoke-HermesStep and are never
+    # stderr remain asynchronously drained in Invoke-QubitStep and are never
     # read or parsed for UI updates.
     $script:UiStage = $Message
     $script:UiState.message = $Message
@@ -454,7 +493,7 @@ function Show-ProgressWindow {
         # window is decoration and competes with nothing (no TopMost).
         try {
             $form.Activate()
-            if ($script:Win32) { [HermesHandoff.Win32]::SetForegroundWindow($form.Handle) | Out-Null }
+            if ($script:Win32) { [QubitHandoff.Win32]::SetForegroundWindow($form.Handle) | Out-Null }
         } catch {}
         [System.Windows.Forms.Application]::DoEvents()
         $script:Ui = [pscustomobject]@{ Form = $form; Bar = $bar; Title = $title; Sub = $sub; Timer = $null }
@@ -503,7 +542,7 @@ function Show-ErrorFinale([string]$Message) {
         $ui.Form.AcceptButton = $close
         try {
             $ui.Form.Activate()
-            if ($script:Win32) { [HermesHandoff.Win32]::SetForegroundWindow($ui.Form.Handle) | Out-Null }
+            if ($script:Win32) { [QubitHandoff.Win32]::SetForegroundWindow($ui.Form.Handle) | Out-Null }
         } catch {}
         # Hold for dismissal so the failure is actually seen, but never park
         # forever -- the marker is already cleaned up and the relaunched
@@ -545,7 +584,7 @@ function Show-ManualFinale([string]$Message) {
         $ui.Form.AcceptButton = $close
         try {
             $ui.Form.Activate()
-            if ($script:Win32) { [HermesHandoff.Win32]::SetForegroundWindow($ui.Form.Handle) | Out-Null }
+            if ($script:Win32) { [QubitHandoff.Win32]::SetForegroundWindow($ui.Form.Handle) | Out-Null }
         } catch {}
         $deadline = (Get-Date).AddMinutes(5)
         while (-not $script:ErrorDismissed -and (Get-Date) -lt $deadline -and $ui.Form.Visible) {
@@ -615,7 +654,7 @@ function Start-DesktopRelaunch {
     # — the sibling truth contract to posix.sh's launch acceptance.
     if (-not $RelaunchExe) { return $false }
     # electron-builder replaces win-unpacked in place. After a successful
-    # update it can remove the old Hermes.exe before writing the replacement,
+    # update it can remove the old Qubit.exe before writing the replacement,
     # so a one-shot existence check races the rebuild and strands the user.
     $relaunchDeadline = (Get-Date).AddSeconds(120)
     while (-not (Test-Path -LiteralPath $RelaunchExe)) {
@@ -627,7 +666,7 @@ function Start-DesktopRelaunch {
         if ($script:Ui) { [System.Windows.Forms.Application]::DoEvents() }
     }
     Write-HandoffLog "relaunching desktop: $RelaunchExe"
-    # DO NOT spawn Hermes.exe as our child: Electron/Chromium calls
+    # DO NOT spawn Qubit.exe as our child: Electron/Chromium calls
     # AttachConsole(ATTACH_PARENT_PROCESS) at boot, so a Desktop launched
     # directly from this console PowerShell latches onto OUR console --
     # the console window then outlives the script (it can't close while
@@ -653,7 +692,7 @@ function Start-DesktopRelaunch {
             # takes a couple seconds to create it.
             try {
                 if ($script:Win32) {
-                    [HermesHandoff.Win32]::AllowSetForegroundWindow([int]$r.ProcessId) | Out-Null
+                    [QubitHandoff.Win32]::AllowSetForegroundWindow([int]$r.ProcessId) | Out-Null
                     $deadline = (Get-Date).AddSeconds(20)
                     while ((Get-Date) -lt $deadline) {
                         $hwnd = [System.IntPtr]::Zero
@@ -668,8 +707,8 @@ function Start-DesktopRelaunch {
                             break
                         }
                         if ($hwnd -ne [System.IntPtr]::Zero) {
-                            [HermesHandoff.Win32]::ShowWindow($hwnd, 9) | Out-Null  # SW_RESTORE
-                            [HermesHandoff.Win32]::SetForegroundWindow($hwnd) | Out-Null
+                            [QubitHandoff.Win32]::ShowWindow($hwnd, 9) | Out-Null  # SW_RESTORE
+                            [QubitHandoff.Win32]::SetForegroundWindow($hwnd) | Out-Null
                             Write-HandoffLog "focused relaunched desktop window"
                             break
                         }
@@ -709,14 +748,14 @@ function Start-DesktopRelaunch {
                     # (us) can delegate that right.
                     try {
                         if ($script:Win32) {
-                            [HermesHandoff.Win32]::AllowSetForegroundWindow([int]$fresh[0].Id) | Out-Null
+                            [QubitHandoff.Win32]::AllowSetForegroundWindow([int]$fresh[0].Id) | Out-Null
                             $focusDeadline = (Get-Date).AddSeconds(20)
                             while ((Get-Date) -lt $focusDeadline) {
                                 $hwnd = [System.IntPtr]::Zero
                                 try { $hwnd = (Get-Process -Id $fresh[0].Id -ErrorAction Stop).MainWindowHandle } catch { break }
                                 if ($hwnd -ne [System.IntPtr]::Zero) {
-                                    [HermesHandoff.Win32]::ShowWindow($hwnd, 9) | Out-Null  # SW_RESTORE
-                                    [HermesHandoff.Win32]::SetForegroundWindow($hwnd) | Out-Null
+                                    [QubitHandoff.Win32]::ShowWindow($hwnd, 9) | Out-Null  # SW_RESTORE
+                                    [QubitHandoff.Win32]::SetForegroundWindow($hwnd) | Out-Null
                                     Write-HandoffLog "focused relaunched desktop window"
                                     break
                                 }
@@ -763,7 +802,7 @@ function Start-DesktopRelaunch {
 # every descendant that is spawned without its own redirection gets a
 # duplicate -- and the read side does not see EOF until the last of them
 # closes it. `qubit update` deliberately runs its build steps with stdout
-# inherited (hermes_cli/main.py, the tee-stderr runner), so the tree under a
+# inherited (qubit_cli/main.py, the tee-stderr runner), so the tree under a
 # step is arbitrarily deep and not something this script can enumerate. When
 # one of those descendants is a resident gateway, the pipe stays open for the
 # life of the gateway, i.e. forever.
@@ -794,7 +833,7 @@ if ($env:HERMES_UPDATE_STEP_IDLE_SECONDS) {
 
 # Silence on the pipes is NOT silence in the update. `qubit update` captures
 # the (very loud) Electron/vite build into logs/update.log instead of its own
-# stdout (hermes_cli/update_cmd.py, the update-log tee), so a real update is
+# stdout (qubit_cli/update_cmd.py, the update-log tee), so a real update is
 # routinely stdout-silent for 40+ minutes while demonstrably progressing. An
 # idle ceiling that watched only stdout/stderr would cancel every healthy
 # large update at StepIdleTimeoutSeconds. The drain therefore also counts
@@ -819,7 +858,7 @@ function Get-StepProgressLogStamp {
     }
 }
 
-if (-not ("HermesUpdateJob" -as [type])) {
+if (-not ("QubitUpdateJob" -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Diagnostics;
@@ -829,7 +868,7 @@ using System.Text;
 using System.Threading;
 using Microsoft.Win32.SafeHandles;
 
-public static class HermesUpdateJob {
+public static class QubitUpdateJob {
     public sealed class StartedProcess {
         public Process Process;
         public StreamReader StandardOutput;
@@ -1053,7 +1092,7 @@ function Step-PipeDrain($Reader, [ref]$Task, $Buffer, $Sink, [ref]$Moved) {
     return $false
 }
 
-function Invoke-HermesStep([string]$Exe, [string[]]$HermesArgs, [string]$Tag) {
+function Invoke-QubitStep([string]$Exe, [string[]]$QubitArgs, [string]$Tag) {
     # The window does not stream child output, so no line-pump: both pipes
     # drain asynchronously (no deadlock however chatty the child) while a small
     # DoEvents loop keeps the marquee animating through long silent
@@ -1073,13 +1112,13 @@ function Invoke-HermesStep([string]$Exe, [string[]]$HermesArgs, [string]$Tag) {
     # unreliably $null under PS 5.1 even with the Handle-touch workaround.
     # CREATE_SUSPENDED closes the startup race: no updater instruction can run
     # before the process is assigned to its private job and resumed.
-    $arguments = ($HermesArgs | ForEach-Object { '"{0}"' -f ($_ -replace '"', '\"') }) -join ' '
+    $arguments = ($QubitArgs | ForEach-Object { '"{0}"' -f ($_ -replace '"', '\"') }) -join ' '
     # CreateProcess inherits this process's environment. Set Python's encoding
     # and buffering only for the atomic launch, then restore the hand-off host.
     # Historical user-bin publication could be a command file rather than a
     # native launcher. Keep the wrapper inside the same supervised job.
     if ([IO.Path]::GetExtension($Exe) -eq '.cmd') {
-        if ($Exe -match '[%!"\x0D\x0A]' -or @($HermesArgs | Where-Object { $_ -match '[%!"\x0D\x0A]' }).Count) {
+        if ($Exe -match '[%!"\x0D\x0A]' -or @($QubitArgs | Where-Object { $_ -match '[%!"\x0D\x0A]' }).Count) {
             throw 'The legacy command launcher cannot safely quote this update target; refresh the installation launcher first.'
         }
         $arguments = '/d /s /c ""' + $Exe + '" ' + $arguments + '"'
@@ -1092,7 +1131,7 @@ function Invoke-HermesStep([string]$Exe, [string[]]$HermesArgs, [string]$Tag) {
         $env:PYTHONIOENCODING = "utf-8"
         $env:PYTHONUTF8 = "1"
         $env:PYTHONUNBUFFERED = "1"
-        $started = [HermesUpdateJob]::StartAssigned($Exe, $arguments)
+        $started = [QubitUpdateJob]::StartAssigned($Exe, $arguments)
     } finally {
         if ($null -eq $savedPythonIoEncoding) { Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue } else { $env:PYTHONIOENCODING = $savedPythonIoEncoding }
         if ($null -eq $savedPythonUtf8) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue } else { $env:PYTHONUTF8 = $savedPythonUtf8 }
@@ -1153,11 +1192,11 @@ function Invoke-HermesStep([string]$Exe, [string[]]$HermesArgs, [string]$Tag) {
                 # venv, or release tree can overlap two installers and
                 # corrupt the install.
                 Write-HandoffLog ("{0}!| step stalled: no stdout/stderr for {1}s and no update.log growth while pid {2} remained alive; cancelling its process tree." -f $Tag, $script:StepIdleTimeoutSeconds, $proc.Id)
-                $stalled = [HermesUpdateJob]::TerminateAndWait($job, 124, 10000)
+                $stalled = [QubitUpdateJob]::TerminateAndWait($job, 124, 10000)
                 if (-not $stalled) {
                     Write-HandoffLog ("{0}!| process-tree cancellation could not prove quiescence; refusing the timeout retry." -f $Tag)
                     $script:TreeSafeToFinalize = $false
-                    [HermesUpdateJob]::Close($job)
+                    [QubitUpdateJob]::Close($job)
                     throw "Unable to quiesce stalled update process tree"
                 }
             }
@@ -1206,8 +1245,28 @@ function Invoke-HermesStep([string]$Exe, [string[]]$HermesArgs, [string]$Tag) {
     $all = $outText
     if ($errText) { $all += "`n" + $errText }
     $code = if ($stalled) { 124 } else { $proc.ExitCode }
-    [HermesUpdateJob]::Close($job)
+    [QubitUpdateJob]::Close($job)
     return @{ Code = $code; Output = $all; TreeQuiesced = (-not $stalled -or $proc.HasExited); StartedAfterJobAssignment = $true }
+}
+
+# `qubit update` can COMPLETE (its output carries "✓ Update complete!") and
+# still be killed with the idle-watchdog sentinel 124: the post-update phase
+# (gateway restart hand-off) stayed alive and silent past the ceiling, so
+# Invoke-QubitStep terminated the tree (#96205). The install is done; failing
+# would keep the old Desktop and a legacy install would re-run the whole update.
+# Surface success so the hand-off verifies, restores the gateways and relaunches.
+# Only 124 is remapped, and never when anything after the banner reports a
+# failure: the restart/verify phase prints "✗ Update not complete", "Update
+# incomplete — …", "✗ <unit> failed to come back after restart" or
+# "verification incomplete" there. \u2717 (✗) stays an escape: Windows
+# PowerShell reads this BOM-less script as ANSI, never as UTF-8.
+function Resolve-QubitUpdateOutcome($StepResult) {
+    $banner = if ($StepResult.Output) { $StepResult.Output.LastIndexOf('Update complete!') } else { -1 }
+    if ($StepResult.Code -eq 124 -and $banner -ge 0 -and $StepResult.Output.Substring($banner) -notmatch 'incomplete|not complete|\u2717') {
+        Write-HandoffLog "update completed before the idle watchdog killed its finalizing step (exit 124); treating it as success, not retrying (#96205)"
+        $StepResult.Code = 0
+    }
+    return $StepResult
 }
 
 function Set-InstallRootCurrentDirectory([string]$Root) {
@@ -1253,7 +1312,7 @@ if ($SelfTestUi) {
     exit 0
 }
 
-# -SelfTestPipeDrain: prove Invoke-HermesStep survives a leaked pipe ------
+# -SelfTestPipeDrain: prove Invoke-QubitStep survives a leaked pipe ------
 # The #90455 deadlock needs no update, no checkout and no Qubit install to
 # reproduce -- only a step whose grandchild outlives it holding the inherited
 # write end of the redirected pipe. That is exactly what this builds, so the
@@ -1357,7 +1416,7 @@ exit 3
     $savedIdle = $script:StepIdleTimeoutSeconds
     try {
         $script:StepIdleTimeoutSeconds = 120
-        $res = Invoke-HermesStep $powershell @(
+        $res = Invoke-QubitStep $powershell @(
             "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $childPs1,
             "-Hold", [string]$hold, "-PidFile", $pidFile
         ) "pipedrain"
@@ -1381,7 +1440,7 @@ exit 3
     }
 
     $floodSw = [System.Diagnostics.Stopwatch]::StartNew()
-    $flood = Invoke-HermesStep $powershell @(
+    $flood = Invoke-QubitStep $powershell @(
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $floodPs1,
         "-Kb", [string]$floodKb
     ) "pipeflood"
@@ -1390,7 +1449,7 @@ exit 3
     $floodBytes = $flood.Output.Length
 
     $stallSw = [System.Diagnostics.Stopwatch]::StartNew()
-    $stall = Invoke-HermesStep $powershell @(
+    $stall = Invoke-QubitStep $powershell @(
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $stallPs1,
         "-Hold", [string]$hold, "-PidFile", $stallPidFile,
         "-GrandchildPidFile", $stallGrandchildPidFile
@@ -1417,7 +1476,7 @@ exit 3
     $script:StepProgressLogPath = $logStallProgress
     $logStallSw = [System.Diagnostics.Stopwatch]::StartNew()
     try {
-        $logstall = Invoke-HermesStep $powershell @(
+        $logstall = Invoke-QubitStep $powershell @(
             "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $logStallPs1,
             "-Hold", [string]$hold, "-ProgressLog", $logStallProgress
         ) "logstall"
@@ -1447,8 +1506,8 @@ exit 3
     if ($stallElapsed -ge $stallBudget) { $problems += "stall arm returned in ${stallElapsed}s, over the ${stallBudget}s budget" }
     if ($stall.Code -ne 124) { $problems += "stall arm exit code $($stall.Code), expected 124" }
     if ($stall.Output -notmatch "step entered silent finalization") { $problems += "stall arm step output was lost" }
-    if ($stallAlive) { $problems += "stalled child pid $stallPid remained alive after Invoke-HermesStep returned" }
-    if ($stallGrandchildAlive) { $problems += "stalled descendant pid $stallGrandchildPid remained alive after Invoke-HermesStep returned" }
+    if ($stallAlive) { $problems += "stalled child pid $stallPid remained alive after Invoke-QubitStep returned" }
+    if ($stallGrandchildAlive) { $problems += "stalled descendant pid $stallGrandchildPid remained alive after Invoke-QubitStep returned" }
     if (-not $stall.TreeQuiesced) { $problems += "stall arm returned without proving its process tree quiescent" }
     if (-not $stall.StartedAfterJobAssignment) { $problems += "stall arm started before cancellation-job assignment" }
     $logStallBudget = $hold + 60
@@ -1465,6 +1524,7 @@ exit 3
     exit 0
 }
 
+$savedConsoleInputMode = if ($script:ConsoleInput) { [QubitHandoff.ConsoleInput]::DisableQuickEdit() } else { $null }
 try {
     New-Item -ItemType Directory -Path $LogDir -Force -ErrorAction SilentlyContinue | Out-Null
     Remove-Item -LiteralPath $ResultPath -Force -ErrorAction SilentlyContinue
@@ -1495,7 +1555,7 @@ try {
 
     # StartAssigned passes a null CreateProcess currentDirectory, so children
     # inherit the hand-off process directory rather than PowerShell's $PWD.
-    # Desktop launches us from HERMES_HOME; pin the process directory to the
+    # Desktop launches us from QUBIT_HOME; pin the process directory to the
     # checkout before any update child can resolve files against the wrong tree.
     try {
         $resolvedInstallRoot = Set-InstallRootCurrentDirectory $InstallRoot
@@ -1511,7 +1571,7 @@ try {
     if ($SelfTestWorkingDirectory) {
         $expectedRoot = [System.IO.Path]::GetFullPath($InstallRoot)
         $probeExe = Join-Path $PSHOME "powershell.exe"
-        $probe = Invoke-HermesStep $probeExe @("-NoProfile", "-Command", "[Environment]::CurrentDirectory; [Console]::IsInputRedirected") "cwd"
+        $probe = Invoke-QubitStep $probeExe @("-NoProfile", "-Command", "[Environment]::CurrentDirectory; [Console]::IsInputRedirected") "cwd"
         $observed, $stdinRedirected = @($probe.Output.Trim() -split "`r?`n" | ForEach-Object { $_.Trim() })
         if ($probe.Code -ne 0 -or -not [string]::Equals($observed, $expectedRoot, [StringComparison]::OrdinalIgnoreCase)) {
             $finalMsg = "WORKING-DIRECTORY SELF-TEST: FAIL expected=$expectedRoot observed=$observed code=$($probe.Code)"
@@ -1533,7 +1593,7 @@ try {
     . (Join-Path $PSScriptRoot 'runtime.ps1')
     $legacyInstall = -not (Test-Path -LiteralPath (Join-Path $InstallRoot 'pm') -PathType Container)
     try {
-        $runtimeCommand = @(Get-HermesRuntimeCommand -InstallRoot $InstallRoot)
+        $runtimeCommand = @(Get-QubitRuntimeCommand -InstallRoot $InstallRoot)
     } catch {
         $finalCode = 3
         $finalMsg = $_.Exception.Message
@@ -1596,21 +1656,23 @@ try {
     }
     Write-HandoffLog ("running: python " + ($updateArgs -join " "))
     Publish-UiProgress "Updating code and dependencies"
-    $res = Invoke-HermesStep $pythonExe $updateArgs "update"
+    $res = Invoke-QubitStep $pythonExe $updateArgs "update"
     Write-HandoffLog "qubit update exit code: $($res.Code)"
+    $res = Resolve-QubitUpdateOutcome $res
 
     # Retry only the identified pre-PM update-boundary transition. Current
     # update/build failures propagate and must not trigger another owner.
     if ($legacyInstall -and $res.Code -ne 0 -and $res.Code -ne 2) {
         Write-HandoffLog "legacy update failed; retrying once from the updated installation"
         Publish-UiProgress "Retrying update"
-        $runtimeCommand = @(Get-HermesRuntimeCommand -InstallRoot $InstallRoot)
+        $runtimeCommand = @(Get-QubitRuntimeCommand -InstallRoot $InstallRoot)
         $pythonExe = $runtimeCommand[0]
         $runtimeArgs = @($runtimeCommand | Select-Object -Skip 1)
         # Same request as the first attempt (--force included): the installation is still the
         # legacy one being converted until this run succeeds.
         $updateArgs = $runtimeArgs + @('update', '--yes') + $gatewayArg + $forceArg + $targetArgs
-        $res = Invoke-HermesStep $pythonExe $updateArgs 'update'
+        $res = Invoke-QubitStep $pythonExe $updateArgs 'update'
+        $res = Resolve-QubitUpdateOutcome $res
     }
 
     # Pre-PM updates reported a successful exit with a failed build warning.
@@ -1619,21 +1681,21 @@ try {
     if ($legacyInstall -and $res.Code -eq 0 -and $res.Output -match "Desktop build failed") {
         Write-HandoffLog "qubit update reported a desktop build failure (non-fatal there, fatal here); retrying build"
         Publish-UiProgress "Rebuilding Desktop"
-        $runtimeCommand = @(Get-HermesRuntimeCommand -InstallRoot $InstallRoot)
+        $runtimeCommand = @(Get-QubitRuntimeCommand -InstallRoot $InstallRoot)
         $rebuildArgs = @($runtimeCommand | Select-Object -Skip 1) + @('desktop', '--force-build', '--build-only')
-        $rebuild = Invoke-HermesStep $runtimeCommand[0] $rebuildArgs 'rebuild'
+        $rebuild = Invoke-QubitStep $runtimeCommand[0] $rebuildArgs 'rebuild'
         Write-HandoffLog "desktop rebuild exit code: $($rebuild.Code)"
         if ($rebuild.Code -ne 0) { $desktopBuildFailed = $true }
     }
 
     # A zero-exit update is not proof that the runtime survived the update.
     if ($res.Code -eq 0 -and -not $desktopBuildFailed) {
-        $verifyCommand = @(Get-HermesRuntimeCommand -InstallRoot $InstallRoot -Module 'hermes_cli.desktop_update_verify')
+        $verifyCommand = @(Get-QubitRuntimeCommand -InstallRoot $InstallRoot -Module 'qubit_cli.desktop_update_verify')
         $verifyArgs = @($verifyCommand | Select-Object -Skip 1)
-        $verify = Invoke-HermesStep $verifyCommand[0] $verifyArgs 'verify'
+        $verify = Invoke-QubitStep $verifyCommand[0] $verifyArgs 'verify'
         if ($verify.Code -ne 0) {
             $finalCode = 8
-            $finalMsg = "The updated Qubit runtime or Desktop build failed verification. Repair the installation and review antivirus quarantine before retrying."
+            $finalMsg = "Qubit was updated, but the new Desktop build could not be verified. Nothing was removed. If Qubit does not start normally, run 'qubit desktop --force-build' in a terminal to rebuild it."
             Write-HandoffLog $finalMsg
             exit $finalCode
         }
@@ -1650,9 +1712,9 @@ try {
         try {
             # Resolve again after update: PM may have published a new generation,
             # and its command can include an isolation/bootstrap prefix.
-            $gatewayCommand = @(Get-HermesRuntimeCommand -InstallRoot $InstallRoot)
+            $gatewayCommand = @(Get-QubitRuntimeCommand -InstallRoot $InstallRoot)
             $gatewayArgs = @($gatewayCommand | Select-Object -Skip 1) + @("gateway", "start", "--all")
-            $gatewayRestart = Invoke-HermesStep $gatewayCommand[0] $gatewayArgs "gateway restart"
+            $gatewayRestart = Invoke-QubitStep $gatewayCommand[0] $gatewayArgs "gateway restart"
             $gatewayRestartFailed = $gatewayRestart.Code -ne 0
         } catch {
             $gatewayRestartFailed = $true
@@ -1720,4 +1782,5 @@ try {
             Close-ProgressWindow
         }
     }
+    if ($null -ne $savedConsoleInputMode) { [QubitHandoff.ConsoleInput]::Restore($savedConsoleInputMode) }
 }

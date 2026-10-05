@@ -4,30 +4,38 @@
 #   -Manifest             print the stage list as JSON
 #   -Stage NAME [-Json]   run one stage
 #   -NonInteractive       skip stages that need input
+#   -SkipSetup            deprecated alias for -NonInteractive
 #   -IncludeDesktop       add the desktop build stage
 #   -ProtocolVersion      print the stage protocol version
 #   -SkipBrowser          do not install the browser tools (agent-browser +
-#                         Chromium); remembered by later installs and
-#                         `qubit update`, undone by
+#                         Chromium); remembered by later
+#                         installs and `qubit update`, undone by
 #                         `qubit pm install agent-browser`
+#   -SkipComputerUse      do not install the computer-use driver (cua-driver);
+#                         remembered the same way, undone by
+#                         `qubit pm install cua-driver`
 #   -Verbose              stream every child command's output (the default
 #                         with redirected output and in CI)
 [CmdletBinding(PositionalBinding=$false)]
 param(
     [string]$Branch = "main",
     [string]$Commit = "",
-    [string]$HermesHome = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\qubit" }),
-    [string]$InstallDir = $(if ($env:HERMES_HOME) { "$env:HERMES_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\qubit\hermes-agent" }),
+    [string]$QubitHome = $(if ($env:QUBIT_HOME) { $env:QUBIT_HOME } else { "$env:LOCALAPPDATA\qubit" }),
+    [string]$InstallDir = $(if ($env:QUBIT_HOME) { "$env:QUBIT_HOME\qubit" } else { "$env:LOCALAPPDATA\qubit\qubit" }),
     [switch]$Manifest,
     [string]$Stage,
     [switch]$ProtocolVersion,
     [switch]$NonInteractive,
+    # Pre-rework spelling of -NonInteractive, still accepted so install
+    # wrappers written against the old switch keep binding (#125350).
+    [switch]$SkipSetup,
     [switch]$Json,
     [switch]$IncludeDesktop,
     # Same opt-out as install.sh --skip-browser: PM records it, so later
     # installs and `qubit update` keep the browser tools off until
     # `qubit pm install agent-browser` opts back in.
     [switch]$SkipBrowser,
+    [switch]$SkipComputerUse,
     # Print the paths this install would use, as JSON on stdout, and exit
     # without touching anything. The first question on any "installer says a
     # path doesn't exist" report is which paths it actually resolved --
@@ -37,6 +45,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# -SkipSetup is the pre-rework spelling of -NonInteractive.
+if ($SkipSetup) { $NonInteractive = $true }
 
 # --- Dot-source guard (part 1: detect) ---------------------------------------
 # Tests (and any embedding host) dot-source this file (`. install.ps1`) to get
@@ -60,7 +71,7 @@ $script:BoundParams = $PSBoundParameters
 # Under iex, script scope is the caller's session and outlives a run; start
 # each run without the previous run's answer (see Set-LauncherUserPath).
 $script:BinDirOnCallerPath = $null
-$RepoUrl = if ($env:HERMES_REPO_URL) { $env:HERMES_REPO_URL } else { "https://github.com/cgraph-dev/Qubit-AIO.git" }
+$RepoUrl = if ($env:HERMES_REPO_URL) { $env:HERMES_REPO_URL } else { "https://github.com/NousResearch/hermes-agent.git" }
 
 # --- BEGIN GENERATED: bootstrap pins (scripts/gen-bootstrap-pins.py) ---
 # Derived from pm/lock.json. DO NOT EDIT BY HAND:
@@ -82,14 +93,14 @@ $script:UvPinFiles = @{
 $script:GitPinVersion = "2.53.0+3"
 $script:GitPinFiles = @{
     "win32-x64" = @{
-        Url    = "https://github.com/git-for-windows/git/releases/download/v2.53.0.windows.3/Git-2.53.0.3-64-bit.tar.bz2"
-        MirrorUrl = "https://hermes-assets.nousresearch.com/upstream/sha256/1661f02e85a7901ad7920e2a358ee3772ed9066b00d8590bf2d9046ef10aa8b2"
-        Sha256 = "1661f02e85a7901ad7920e2a358ee3772ed9066b00d8590bf2d9046ef10aa8b2"
+        Url    = "https://github.com/git-for-windows/git/releases/download/v2.53.0.windows.3/PortableGit-2.53.0.3-64-bit.7z.exe"
+        MirrorUrl = "https://hermes-assets.nousresearch.com/upstream/sha256/b365da794b1d2225eb24d5f5e09ef7792cfd5fa26c3a3586210280c80dff3a2a"
+        Sha256 = "b365da794b1d2225eb24d5f5e09ef7792cfd5fa26c3a3586210280c80dff3a2a"
     }
     "win32-arm64" = @{
-        Url    = "https://github.com/git-for-windows/git/releases/download/v2.53.0.windows.3/Git-2.53.0.3-arm64.tar.bz2"
-        MirrorUrl = "https://hermes-assets.nousresearch.com/upstream/sha256/4015f05a68bd2bcf3cc6c426e8d44b65d670fbb879225bb7b7c347cfc3a2758a"
-        Sha256 = "4015f05a68bd2bcf3cc6c426e8d44b65d670fbb879225bb7b7c347cfc3a2758a"
+        Url    = "https://github.com/git-for-windows/git/releases/download/v2.53.0.windows.3/PortableGit-2.53.0.3-arm64.7z.exe"
+        MirrorUrl = "https://hermes-assets.nousresearch.com/upstream/sha256/0db54010054c01f35501cf69e1e32d3710138ecb934d188bd77093afed24300e"
+        Sha256 = "0db54010054c01f35501cf69e1e32d3710138ecb934d188bd77093afed24300e"
     }
 }
 # --- END GENERATED: bootstrap pins ---
@@ -101,7 +112,7 @@ $script:GitPinFiles = @{
 # contains a space ("First Last" -> FIRST~1.LAS), a dot, or an accented
 # character. It can then expose %TEMP%, %TMP%, %LOCALAPPDATA%, %APPDATA% and
 # %USERPROFILE% -- plus everything derived from them, including the default
-# HERMES_HOME and InstallDir -- in that short form:
+# QUBIT_HOME and InstallDir -- in that short form:
 #   C:\Users\FIRST~1.LAS\AppData\Local\Temp
 # PowerShell's FileSystem provider mishandles the aliased component once it
 # reaches a provider cmdlet (Tee-Object -FilePath, Out-File, New-Item,
@@ -221,17 +232,17 @@ function ConvertTo-LongPath {
     # 1. kernel32. Compiled on first use only, so a normal profile never pays
     #    the Add-Type cost (this file is re-entered once per install stage).
     try {
-        if (-not ([System.Management.Automation.PSTypeName]'HermesInstall.LongPath').Type) {
-            Add-Type -Namespace 'HermesInstall' -Name 'LongPath' -MemberDefinition @'
+        if (-not ([System.Management.Automation.PSTypeName]'QubitInstall.LongPath').Type) {
+            Add-Type -Namespace 'QubitInstall' -Name 'LongPath' -MemberDefinition @'
 [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
 public static extern int GetLongPathNameW(string lpszShortPath, System.Text.StringBuilder lpszLongPath, int cchBuffer);
 '@
         }
         $buffer = New-Object System.Text.StringBuilder 4096
-        $length = [HermesInstall.LongPath]::GetLongPathNameW($Path, $buffer, $buffer.Capacity)
+        $length = [QubitInstall.LongPath]::GetLongPathNameW($Path, $buffer, $buffer.Capacity)
         if ($length -gt $buffer.Capacity) {
             $buffer = New-Object System.Text.StringBuilder $length
-            $length = [HermesInstall.LongPath]::GetLongPathNameW($Path, $buffer, $buffer.Capacity)
+            $length = [QubitInstall.LongPath]::GetLongPathNameW($Path, $buffer, $buffer.Capacity)
         }
         if ($length -gt 0) {
             $expanded = $buffer.ToString()
@@ -302,33 +313,33 @@ function Initialize-ResolvedPaths {
     $script:NormalizedProfilePaths = Set-LongProfileEnvVars
 
     # Re-derive the install paths now that the env vars behind their defaults
-    # are long. An explicitly passed -HermesHome / -InstallDir is normalized
+    # are long. An explicitly passed -QubitHome / -InstallDir is normalized
     # in place rather than replaced, so a caller's choice is never
     # overwritten by a default. The script's own $PSBoundParameters was
     # captured at script scope ($script:BoundParams) because a function body
     # sees its own binding, not the script's.
-    $resolvedHome = if ($script:BoundParams.ContainsKey('HermesHome')) {
-        ConvertTo-LongPath $HermesHome
+    $resolvedHome = if ($script:BoundParams.ContainsKey('QubitHome')) {
+        ConvertTo-LongPath $QubitHome
     } else {
         ConvertTo-LongPath $(
-            if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\qubit" }
+            if ($env:QUBIT_HOME) { $env:QUBIT_HOME } else { "$env:LOCALAPPDATA\qubit" }
         )
     }
     $resolvedDir = if ($script:BoundParams.ContainsKey('InstallDir')) {
         ConvertTo-LongPath $InstallDir
     } else {
-        Join-Path $resolvedHome 'hermes-agent'
+        Join-Path $resolvedHome 'qubit'
     }
     # The param() variables live in the CALLER's scope, which is the script
     # scope only under -File. Under the documented
     # `& ([scriptblock]::Create((irm ...)))` install they live in the
     # scriptblock's scope and `$script:` names the caller's session instead,
-    # so `$script:HermesHome` read '' and every stage's bare $HermesHome kept
+    # so `$script:QubitHome` read '' and every stage's bare $QubitHome kept
     # the un-normalized value. Scope 1 is where param() bound in every mode
     # (-File, scriptblock, dot-source).
-    Set-Variable -Scope 1 -Name HermesHome -Value $resolvedHome
+    Set-Variable -Scope 1 -Name QubitHome -Value $resolvedHome
     Set-Variable -Scope 1 -Name InstallDir -Value $resolvedDir
-    $env:HERMES_HOME = $resolvedHome
+    $env:QUBIT_HOME = $resolvedHome
 
     # Captured here, where the values are final. The report goes to STDOUT as
     # JSON under -ShowResolvedPaths: on Windows a child's stderr does not
@@ -340,16 +351,16 @@ function Initialize-ResolvedPaths {
         normalized        = $script:NormalizedPathRewrites
         resolver          = $script:LastResolver
         temp              = $env:TEMP
-        hermes_home       = $resolvedHome
+        qubit_home       = $resolvedHome
         install_dir       = $resolvedDir
     }
 }
 
 # Resolve the pm store root (same resolution as pm's store_root()):
-# $env:HERMES_RUNTIME_DIR wins, else <HermesHome>\tools.
+# $env:HERMES_RUNTIME_DIR wins, else <QubitHome>\tools.
 function Get-PmStoreRoot {
     if ($env:HERMES_RUNTIME_DIR) { return $env:HERMES_RUNTIME_DIR }
-    return (Join-Path $HermesHome "tools")
+    return (Join-Path $QubitHome "tools")
 }
 
 # The MACHINE's architecture (registry PROCESSOR_ARCHITECTURE), not the
@@ -485,16 +496,12 @@ function Invoke-DownloadWithProgress {
 # (<store>\uv-<version>-<target>\), sha256-verified, so pm adopts the same
 # bytes — no astral-latest, no irm|iex. Returns the uv.exe path.
 function Get-Uv {
-    $existing = Get-Command uv -ErrorAction SilentlyContinue
-    if ($existing) {
-        # Developer shortcut: fetches nothing, but only for a new-enough uv.
-        if (Test-UvAtLeastPin $existing.Source) { return $existing.Source }
-        Log "uv on PATH ($($existing.Source)) is older than the pinned $($script:UvPinVersion) or does not run; downloading our own copy"
-    }
+    # Always the pinned artifact, never a uv already on PATH: Qubit runs only
+    # its own packaged toolchain.
     $target = "win32-$(Get-WindowsArch)"
     $pin = $script:UvPinFiles[$target]
     if (-not $pin) {
-        Fail "no pinned uv artifact for $target; install uv manually: https://docs.astral.sh/uv/"
+        Fail "no pinned uv artifact for $target; Qubit does not support this host"
     }
     $entry = Join-Path (Get-PmStoreRoot) "uv-$($script:UvPinVersion)-$target"
     $uvExe = Join-Path $entry "uv.exe"
@@ -540,34 +547,32 @@ function Get-PinnedGit {
     $tmpDir = Join-Path ([IO.Path]::GetTempPath()) "hermes-git-bootstrap-$PID"
     try {
         New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
-        $tarPath = Join-Path $tmpDir "git.tar.bz2"
-        Invoke-VerifiedDownload -Url $pin.Url -MirrorUrl $pin.MirrorUrl -Sha256 $pin.Sha256 -OutFile $tarPath
+        $sfxPath = Join-Path $tmpDir "portable-git.7z.exe"
+        Invoke-VerifiedDownload -Url $pin.Url -MirrorUrl $pin.MirrorUrl -Sha256 $pin.Sha256 -OutFile $sfxPath
         $extractDir = Join-Path $tmpDir "unpacked"
         New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
-        # The pinned artifact is a git-for-windows tar.bz2 (the same one pm
-        # itself extracts). Windows 10+ ships bsdtar with bzip2 support in
-        # System32; a GNU tar earlier on PATH (Cygwin/MSYS) reads C:\ as a
-        # remote host, so never resolve it from PATH.
-        $inboxTar = Join-Path $env:SystemRoot 'System32\tar.exe'
-        # MSYS ships these as symlinks into /proc. Without symlink rights (not
-        # elevated, no Developer Mode) tar cannot create them and fails the
-        # whole extract. Skip exactly the links pm's own extractor skips
-        # (pm/store.py extract_tar git_msys) so any other failure still fails.
-        # '^' anchors bsdtar's otherwise any-path-component match.
-        $msysProcLinks = @('dev/fd', 'dev/stdin', 'dev/stdout', 'dev/stderr', 'etc/mtab')
-        $excludes = foreach ($link in $msysProcLinks) { '--exclude'; "^$link" }
-        Invoke-Native { & $inboxTar @excludes -xf $tarPath -C $extractDir }
-        if ($LASTEXITCODE) { Fail "failed to extract pinned git archive" }
-        # Layout: Git-<ver>/cmd\git.exe — flatten the single wrapper dir.
-        $inner = @(Get-ChildItem $extractDir)
-        $src = $extractDir
-        if ($inner.Count -eq 1 -and $inner[0].PSIsContainer) { $src = $inner[0].FullName }
-        if (-not (Test-Path (Join-Path $src "cmd\git.exe"))) { Fail "git.exe not found in the downloaded archive" }
+        # PortableGit's self-extracting 7z carries its own extractor: stock
+        # Windows 10 tar.exe has no bzip2 ("unable to run program bzip2 -d").
+        Unblock-File -Path $sfxPath -ErrorAction SilentlyContinue
+        # A GUI-subsystem exe: `&` would not wait for it. Under -y it reports
+        # nothing, so the exit code is all there is. Bound the wait like pm's
+        # timeout; kill the whole tree, since the stub's post-install children
+        # would otherwise keep $tmpDir held past the cleanup below.
+        $sfx = [System.Diagnostics.Process]::Start($sfxPath, "-o`"$extractDir`" -y")
+        if (-not $sfx.WaitForExit(600000)) {
+            Invoke-Native { taskkill.exe /T /F /PID $sfx.Id 2>&1 | Out-Null }
+            $sfx.WaitForExit()
+            Fail "pinned git self-extractor timed out after 600s"
+        }
+        if ($sfx.ExitCode) {
+            Fail "pinned git self-extractor exited $($sfx.ExitCode) (it reports nothing under -y; usual causes: disk full, path-length limit, antivirus lock)"
+        }
+        if (-not (Test-Path (Join-Path $extractDir "cmd\git.exe"))) { Fail "git.exe not found in the downloaded archive" }
         if (Test-Path $entry) { Remove-Item -Recurse -Force $entry }
         # Prerequisites run first, so on a fresh host the store root does not
         # exist yet; Move-Item never creates the destination's parent.
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $entry) | Out-Null
-        Move-Item $src $entry
+        Move-Item $extractDir $entry
     } finally {
         Remove-Item -Path $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -597,7 +602,7 @@ function Write-Banner {
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
     Write-Host "|             * Qubit Agent Installer                    |" -ForegroundColor Magenta
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
-    Write-Host "|  An open source AI agent by Qubit Labs.              |" -ForegroundColor Magenta
+    Write-Host "|  An open source AI agent by Nous Research.              |" -ForegroundColor Magenta
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
     Write-Host ""
 }
@@ -642,7 +647,7 @@ function Invoke-Logged {
     param([string]$StatusLabel, [scriptblock]$NativeBlock, [switch]$MayFail)
     $logWriter = $null
     if (Test-QuietOutput) {
-        $logPath = Join-Path (Join-Path $HermesHome 'logs') 'install.log'
+        $logPath = Join-Path (Join-Path $QubitHome 'logs') 'install.log'
         try {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $logPath) | Out-Null
             $logWriter = New-Object System.IO.StreamWriter($logPath, $true, (New-Object System.Text.UTF8Encoding($false)))
@@ -728,6 +733,16 @@ function Stage-Prerequisites {
     Write-Ok "prerequisites ok (git)"
 }
 
+# A treeless checkout must never write a commit-graph: over a graph with changed-path
+# data that lazy-fetches the trees of every unseen commit, in a loop (#127711).
+# gc.auto stays on: `qubit update` folds lazy-fetch packs with `gc --auto`.
+function Disable-TreelessGraphWrites([string]$Dir) {
+    foreach ($key in 'maintenance.commit-graph.enabled', 'gc.writeCommitGraph', 'fetch.writeCommitGraph') {
+        Invoke-Native { git -C $Dir config $key false } | Out-Null
+        if ($LASTEXITCODE) { Write-Warn "could not set $key in $Dir" }
+    }
+}
+
 function Stage-Repository {
     # Refuse an occupied non-checkout before provisioning Git. This check
     # needs no tool download and must not overwrite a user's existing files.
@@ -759,7 +774,24 @@ function Stage-Repository {
             Invoke-Native { git -C $InstallDir remote set-url origin $RepoUrl }
             if ($LASTEXITCODE) { Fail "cannot point origin at $RepoUrl" }
         }
-        Invoke-Logged "Fetching origin/$Branch" { git -C $InstallDir fetch origin $Branch }
+        # Explicit refspec: a tag-pinned --single-branch checkout from an older installer maps only
+        # the tag, so a by-name fetch never writes the origin/$Branch used below (#125112).
+        # git 2.53+ aborts fetches into a partial clone whose packs lack a .promisor marker
+        # (#124272), and an install stuck there never fetches the updater that heals it.
+        # Marking is idempotent and never rewrites objects.
+        $promisor = Invoke-Native { git -C $InstallDir config --bool --get remote.origin.promisor }
+        $packDir = Join-Path $InstallDir '.git\objects\pack'
+        if ("$promisor".Trim() -eq 'true' -and (Test-Path -LiteralPath $packDir)) {
+            Get-ChildItem -LiteralPath $packDir -Filter 'pack-*.pack' | ForEach-Object {
+                $marker = [IO.Path]::ChangeExtension($_.FullName, '.promisor')
+                if (-not (Test-Path -LiteralPath $marker)) {
+                    try { New-Item -ItemType File -Path $marker | Out-Null }
+                    catch { Write-Warn "could not mark $marker as a partial-clone pack" }
+                }
+            }
+            Disable-TreelessGraphWrites $InstallDir
+        }
+        Invoke-Logged "Fetching origin/$Branch" { git -C $InstallDir fetch origin "+refs/heads/${Branch}:refs/remotes/origin/${Branch}" }
         if ($LASTEXITCODE) { Fail "git fetch failed" }
         $stamp = (Get-Date -Format 'yyyyMMdd-HHmmss')
         # Park local work BEFORE switching branches: checkout refuses a dirty
@@ -779,7 +811,14 @@ function Stage-Repository {
             if ($LASTEXITCODE) { Fail "could not stash local changes in $InstallDir; commit or move them aside, then rerun" }
             Write-Warn "local changes stashed as hermes-install-autostash-$stamp"
         }
-        Invoke-Logged "Checking out $Branch" { git -C $InstallDir checkout $Branch }
+        # checkout's branch guess only sees remote refs the refspec maps, so a narrow checkout
+        # (detached at its tag, no local branch) gets the branch created at the fetched tip.
+        Invoke-Native { git -C $InstallDir show-ref --verify --quiet "refs/heads/$Branch" }
+        if ($LASTEXITCODE) {
+            Invoke-Logged "Checking out $Branch" { git -C $InstallDir checkout -b $Branch "origin/$Branch" }
+        } else {
+            Invoke-Logged "Checking out $Branch" { git -C $InstallDir checkout $Branch }
+        }
         if ($LASTEXITCODE) { Fail "git checkout failed" }
         # --no-stat: across a large gap (v2026.7.1 -> today is ~27k lines) the
         # diffstat arrives as one burst. Qubit-Setup.exe forwards every line
@@ -860,6 +899,7 @@ function Stage-Repository {
             }
             if (-not $cloned) { Fail "git clone failed; no checkout published" }
             Move-Item -LiteralPath $tree -Destination $InstallDir
+            Disable-TreelessGraphWrites $InstallDir
             Write-Ok "Qubit Agent cloned"
         } finally {
             Remove-Item -LiteralPath $staged -Recurse -Force -ErrorAction SilentlyContinue
@@ -921,6 +961,7 @@ function Invoke-BootstrapPm {
         # param() binding is not in $script: scope (see Initialize-ResolvedPaths).
         $pmArgs = @('install')
         if ($SkipBrowser) { $pmArgs += @('--without', 'agent-browser') }
+        if ($SkipComputerUse) { $pmArgs += @('--without', 'cua-driver') }
         Invoke-Logged "Installing dependencies (hash-verified via uv.lock)" { & $bootPy -m pm.cli @pmArgs }
         if ($LASTEXITCODE) { Fail "dependency install failed" }
     } finally {
@@ -941,7 +982,7 @@ function Invoke-SourceCompletion([bool]$Desktop) {
     # arrive through pm as the build asks for them; the bootstrap interpreter
     # itself only re-enters the tree on PM's selected Python.
     $bootPy = Get-BootstrapPython
-    $completionArgs = @('-I', '-B', '-X', 'utf8', 'hermes_cli/source_completion.py', '--source', $InstallDir)
+    $completionArgs = @('-I', '-B', '-X', 'utf8', 'qubit_cli/source_completion.py', '--source', $InstallDir)
     if ($Desktop) { $completionArgs += '--desktop' }
     Push-Location $InstallDir
     try {
@@ -959,11 +1000,11 @@ function Publish-UserCommand {
     # "windows-installer-owned" rather than creating the user-facing command,
     # so the install-scoped launchers the completion publishes are not the ones
     # the user's PATH points at.
-    $binDir = Join-Path $HermesHome "bin"
+    $binDir = Join-Path $QubitHome "bin"
     $bootPy = Get-BootstrapPython
     Push-Location $InstallDir
     try {
-        Invoke-Logged "Publishing the qubit command" { & $bootPy -I -X utf8 hermes_cli/_launchers.py $binDir }
+        Invoke-Logged "Publishing the qubit command" { & $bootPy -I -X utf8 qubit_cli/_launchers.py $binDir }
         $code = $LASTEXITCODE
     } finally {
         Pop-Location
@@ -978,8 +1019,12 @@ function Test-DesktopProductPresent {
     # upgrade rerun on a desktop install must REBUILD it rather than leave a
     # bundle built by the previous code: the app is part of that install and its
     # artifacts live inside the tree, so an update makes them stale, not gone.
+    # electron-builder suffixes the output dir with the arch on every non-x64
+    # target (win-arm64-unpacked, linux-arm64-unpacked, mac-arm64), so the x64
+    # names alone miss a desktop build on ARM64 (#94703).
     $release = Join-Path $InstallDir "apps/desktop/release"
-    foreach ($candidate in @("win-unpacked", "linux-unpacked", "mac", "mac-arm64")) {
+    foreach ($candidate in @("win-unpacked", "win-ia32-unpacked", "win-arm64-unpacked",
+                             "linux-unpacked", "linux-arm64-unpacked", "mac", "mac-arm64")) {
         if (Test-Path (Join-Path $release $candidate)) { return $true }
     }
     return $false
@@ -1021,20 +1066,20 @@ function Write-PathReloadHint {
 
 function Stage-Config {
     foreach ($d in @("cron","sessions","logs","pairing","hooks","image_cache","audio_cache","memories","skills")) {
-        New-Item -ItemType Directory -Force -Path (Join-Path $HermesHome $d) | Out-Null
+        New-Item -ItemType Directory -Force -Path (Join-Path $QubitHome $d) | Out-Null
     }
-    $envFile = Join-Path $HermesHome ".env"
+    $envFile = Join-Path $QubitHome ".env"
     if (-not (Test-Path $envFile)) {
         $example = Join-Path $InstallDir ".env.example"
         if (Test-Path $example) { Copy-Item $example $envFile } else { New-Item -ItemType File -Path $envFile | Out-Null }
     }
-    $cfg = Join-Path $HermesHome "config.yaml"
+    $cfg = Join-Path $QubitHome "config.yaml"
     $cfgExample = Join-Path $InstallDir "cli-config.yaml.example"
     if (-not (Test-Path $cfg) -and (Test-Path $cfgExample)) { Copy-Item $cfgExample $cfg }
-    Write-Ok "config prepared in $HermesHome"
+    Write-Ok "config prepared in $QubitHome"
 }
 
-function Invoke-InstalledHermes([string[]]$CommandArgs) {
+function Invoke-InstalledQubit([string[]]$CommandArgs) {
     # Load the helper from its text, not its path. Under `irm | iex` this
     # installer runs as a string that execution policy never checks, but
     # dot-sourcing a .ps1 from disk is a file load. The default Restricted
@@ -1043,7 +1088,7 @@ function Invoke-InstalledHermes([string[]]$CommandArgs) {
     . ([ScriptBlock]::Create([IO.File]::ReadAllText($runtimeHelper)))
     # Not `$command`: Invoke-Native's `$Command` parameter shadows it
     # (names are case-insensitive) and the block would invoke itself.
-    $runtimeCommand = @(Get-HermesRuntimeCommand -InstallRoot $InstallDir)
+    $runtimeCommand = @(Get-QubitRuntimeCommand -InstallRoot $InstallDir)
     $runtimeArgs = @($runtimeCommand | Select-Object -Skip 1) + $CommandArgs
     Invoke-Native { & $runtimeCommand[0] @runtimeArgs }
     if ($LASTEXITCODE) { Fail "qubit $($CommandArgs -join ' ') failed (exit $LASTEXITCODE)" }
@@ -1051,13 +1096,13 @@ function Invoke-InstalledHermes([string[]]$CommandArgs) {
 
 function Stage-Setup {
     if ($NonInteractive) { return }
-    Invoke-InstalledHermes @('setup')
+    Invoke-InstalledQubit @('setup')
 }
 
 function Stage-Gateway {
     if ($NonInteractive) { return }
     # Setup installs the service when it handles the gateway; ask only if it did not.
-    Invoke-InstalledHermes @('gateway', 'install', '--if-missing')
+    Invoke-InstalledQubit @('gateway', 'install', '--if-missing')
 }
 
 function Stage-Desktop {
@@ -1072,28 +1117,28 @@ function Stage-Desktop {
 
 function Confirm-DesktopArtifact {
     # Probe the packaged artifact the completion just built -- the same
-    # candidates hermes_cli/main_desktop._desktop_packaged_executable resolves.
+    # candidates qubit_cli/main_desktop._desktop_packaged_executable resolves.
     Push-Location $InstallDir
     try {
         $desktopDir = Join-Path $InstallDir "apps\desktop"
         $candidates = @(
-            (Join-Path $desktopDir "release\win-unpacked\Hermes.exe"),
-            (Join-Path $desktopDir "release\win-ia32-unpacked\Hermes.exe"),
-            (Join-Path $desktopDir "release\win-arm64-unpacked\Hermes.exe")
+            (Join-Path $desktopDir "release\win-unpacked\Qubit.exe"),
+            (Join-Path $desktopDir "release\win-ia32-unpacked\Qubit.exe"),
+            (Join-Path $desktopDir "release\win-arm64-unpacked\Qubit.exe")
         )
         $desktopExe = $null
         foreach ($cand in $candidates) {
             if (Test-Path $cand) { $desktopExe = $cand; break }
         }
         if (-not $desktopExe) {
-            Fail "desktop build produced no Hermes.exe under $desktopDir\release\*-unpacked"
+            Fail "desktop build produced no Qubit.exe under $desktopDir\release\*-unpacked"
         }
         Write-Ok "Desktop ready: $desktopExe"
 
         # Grant ALL APPLICATION PACKAGES (S-1-15-2-2) RX on the unpacked
         # app directory: Chromium's GPU/renderer sandboxes CHECK-fail with
         # 0x80000003 without this ACE beside orphan AppContainer SIDs under
-        # %LOCALAPPDATA% (electron/electron#51761, hermes-agent#38216).
+        # %LOCALAPPDATA% (electron/electron#51761, qubit#38216).
         # Best-effort -- never fail an otherwise-good install over ACL.
         try {
             $appDir = Split-Path -Parent $desktopExe
@@ -1153,8 +1198,8 @@ function New-DesktopShortcuts {
         }
 
         $targets = @(
-            (Join-Path ([Environment]::GetFolderPath('Programs')) 'Hermes.lnk'),
-            (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Hermes.lnk')
+            (Join-Path ([Environment]::GetFolderPath('Programs')) 'Qubit.lnk'),
+            (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Qubit.lnk')
         )
 
         foreach ($lnkPath in $targets) {

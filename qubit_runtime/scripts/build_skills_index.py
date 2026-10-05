@@ -1,4 +1,4 @@
-#!/usr/bin/env -S bash -c 'exec "$BASH" "$(dirname "$0")/_hermes-python" "$0" "$@"'
+#!/usr/bin/env -S bash -c 'exec "$BASH" "$(dirname "$0")/run-in-hermes-env" python3 "$0" "$@"'
 """Build the Qubit Skills Index — a centralized JSON catalog of all skills.
 
 This script crawls every skill source (skills.sh, GitHub taps, official,
@@ -29,7 +29,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
 # Ensure QUBIT_HOME is set (needed by tools/skills_hub*.py imports)
-os.environ.setdefault("QUBIT_HOME", os.path.join(os.path.expanduser("~"), ".hermes"))
+os.environ.setdefault("QUBIT_HOME", os.path.join(os.path.expanduser("~"), ".qubit"))
 
 from tools.skills_hub_clawhub import ClawHubSource
 from tools.skills_hub_github import GitHubAuth, GitHubSource

@@ -27,15 +27,15 @@ SKILL_CANARY = "relay-smoke-private-agent-skill"
 INSTALLED_SKILL_CANARY = "relay-smoke-private-installed-skill"
 
 
-def _resolve_qubit_executable(hermes_repo: Path) -> Path:
+def _resolve_qubit_executable(qubit_repo: Path) -> Path:
     for relative_path in (
-        Path(".venv") / "bin" / "hermes",
-        Path(".venv") / "Scripts" / "hermes.exe",
+        Path(".venv") / "bin" / "qubit",
+        Path(".venv") / "Scripts" / "qubit.exe",
     ):
-        candidate = hermes_repo / relative_path
+        candidate = qubit_repo / relative_path
         if candidate.is_file():
             return candidate
-    discovered = shutil.which("hermes")
+    discovered = shutil.which("qubit")
     if discovered:
         return Path(discovered)
     raise SystemExit(
@@ -266,12 +266,42 @@ def _write_config(home: Path, port: int) -> None:
   api_key: no-key-required
 security:
   tirith_enabled: false
+auxiliary:
+  title_generation:
+    enabled: false
 telemetry:
   shared_metrics:
     enabled: true
 """,
         encoding="utf-8",
     )
+
+
+# One interactive turn (2 model calls, 1 read_file) on the canary custom model: the v5 per-turn,
+# per-conversation rows it must produce, identical in SQLite and in the export. The agent-created
+# skill is Qubit' own work, so it records no feature_adoption row (the exact name sets assert that).
+V5_EXPECTED_DIMENSIONS = {
+    "qubit.task_cost.count": {
+        "api_calls_bucket": "2", "model": "custom", "outcome": "completed", "provider": "custom",
+        "tokens_bucket": "lt_2k", "tool_calls_bucket": "1",
+    },
+    "qubit.tool_output_truncation.count": {"original_size_bucket": "lt_1k", "tool": "read_file", "truncated": "no"},
+    "qubit.tool_enabled_unused.count": {"toolset": "file", "used": "yes"},
+}
+
+
+def _validate_v5_rows(rows: dict[str, list[dict[str, Any]]]) -> None:
+    for name, dimensions in V5_EXPECTED_DIMENSIONS.items():
+        if [row["dimensions"] for row in rows[name]] != [dimensions] or rows[name][0]["value"] != 1:
+            raise AssertionError(f"Unexpected {name}: {rows[name]}")
+    [overhead] = rows["qubit.tool_overhead.count"]  # the file toolset's 4 tools, schema tokens estimated
+    if (
+        overhead["value"] != 1
+        or overhead["dimensions"]["execution_surface"] != "cli"
+        or overhead["dimensions"]["enabled_tool_count_bucket"] != "3_to_5"
+        or overhead["dimensions"]["tool_schema_tokens_bucket"] in {"0", "unknown"}
+    ):
+        raise AssertionError(f"Unexpected tool overhead: {overhead}")
 
 
 def _validate_store(database_path: Path) -> list[dict[str, Any]]:
@@ -298,66 +328,80 @@ def _validate_store(database_path: Path) -> list[dict[str, Any]]:
     for counter in counters:
         by_name.setdefault(counter["name"], []).append(counter)
     if set(by_name) != {
-        "hermes.client.active",
-        "hermes.model_route.count",
-        "hermes.skill.lifecycle.count",
-        "hermes.skill.load.count",
-        "hermes.task_run.finished",
-        "hermes.task_run.started",
-        "hermes.tool_call.count",
+        "qubit.client.active",
+        "qubit.context_peak.count",
+        "qubit.install.milestone",
+        "qubit.install.snapshot",
+        "qubit.model_reply_issue.count",
+        "qubit.model_route.count",
+        "qubit.model_tokens.sum",
+        "qubit.model_tool_quality.count",
+        "qubit.session.count",
+        "qubit.skill.lifecycle.count",
+        "qubit.skill.load.count",
+        "qubit.startup.latency",
+        "qubit.task_cost.count",
+        "qubit.task_run.duration",
+        "qubit.task_run.finished",
+        "qubit.task_run.started",
+        "qubit.tool.usage.count",
+        "qubit.tool_call.count",
+        "qubit.tool_call.latency",
+        "qubit.tool_enabled_unused.count",
+        "qubit.tool_output_truncation.count",
+        "qubit.tool_overhead.count",
     }:
         raise AssertionError(
             f"Unexpected SQLite counters:\n{json.dumps(counters, indent=2)}"
         )
-    if by_name["hermes.client.active"] != [
+    if by_name["qubit.client.active"] != [
         {
-            "name": "hermes.client.active",
+            "name": "qubit.client.active",
             "dimensions": {},
             "value": 1,
             "packaged_value": 1,
         }
     ]:
         raise AssertionError(
-            f"Unexpected client-active counter: {by_name['hermes.client.active']}"
+            f"Unexpected client-active counter: {by_name['qubit.client.active']}"
         )
-    [model] = by_name["hermes.model_route.count"]
+    # Two primary calls; each lands in whatever TTFT bucket the host's load put it in.
+    models = by_name["qubit.model_route.count"]
     expected_model = {
-        "name": "hermes.model_route.count",
-        "dimensions": {
-            "model": MODEL_CANARY,
-            "provider": "custom",
-        },
-        "value": 2,
-        "packaged_value": 2,
+        "call_role": "primary", "error_class": "none", "model": "custom", "outcome": "success",
+        "provider": "custom",
     }
-    if model != expected_model:
+    if (
+        any({k: v for k, v in m["dimensions"].items() if k != "ttft_bucket"} != expected_model for m in models)
+        or sum(m["value"] for m in models) != 2
+        or sum(m["packaged_value"] for m in models) != 2
+    ):
         raise AssertionError(
-            f"Unexpected model counter: {by_name['hermes.model_route.count']}"
+            f"Unexpected model counter: {by_name['qubit.model_route.count']}"
         )
     expected_start = {
-        "name": "hermes.task_run.started",
+        "name": "qubit.task_run.started",
         "dimensions": {
             "entrypoint": "interactive",
             "execution_surface": "cli",
+            "platform": "none",
         },
         "value": 1,
         "packaged_value": 1,
     }
-    if by_name["hermes.task_run.started"] != [expected_start]:
+    if by_name["qubit.task_run.started"] != [expected_start]:
         raise AssertionError(
-            f"Unexpected task start: {by_name['hermes.task_run.started']}"
+            f"Unexpected task start: {by_name['qubit.task_run.started']}"
         )
-    [terminal] = by_name["hermes.task_run.finished"]
+    [terminal] = by_name["qubit.task_run.finished"]
     expected_terminal_dimensions = {
-        "duration_bucket": terminal["dimensions"].get("duration_bucket"),
         "end_reason": "completed",
         "entrypoint": "interactive",
         "execution_surface": "cli",
-        "model_call_count_bucket": "2",
+        "failure_class": "none",
         "outcome": "success",
-        "retry_count_bucket": "0",
+        "platform": "none",
         "termination": "none",
-        "tool_call_count_bucket": "1",
     }
     if (
         terminal["dimensions"] != expected_terminal_dimensions
@@ -365,22 +409,61 @@ def _validate_store(database_path: Path) -> list[dict[str, Any]]:
         or terminal["packaged_value"] != 1
     ):
         raise AssertionError(f"Unexpected task terminal counter: {terminal}")
-    [tool] = by_name["hermes.tool_call.count"]
+    [duration] = by_name["qubit.task_run.duration"]
+    if duration["dimensions"] != {
+        "duration_bucket": duration["dimensions"].get("duration_bucket"),
+        "execution_surface": "cli", "outcome": "success", "retry_count_bucket": "0",
+    } or duration["value"] != 1:
+        raise AssertionError(f"Unexpected task duration counter: {duration}")
+    [cost] = by_name["qubit.task_cost.count"]
+    if (cost["dimensions"]["api_calls_bucket"], cost["dimensions"]["tool_calls_bucket"]) != ("2", "1"):
+        raise AssertionError(f"Unexpected task cost counter: {cost}")
+    if [c["dimensions"] for c in by_name["qubit.tool.usage.count"]] != [
+        {"error_class": "none", "outcome": "success", "tool_name": "read_file"}
+    ]:
+        raise AssertionError(f"Unexpected tool usage: {by_name['qubit.tool.usage.count']}")
+    [snapshot] = by_name["qubit.install.snapshot"]
+    if snapshot["value"] != 1 or snapshot["dimensions"]["memory_provider"] != "builtin":
+        raise AssertionError(f"Unexpected install snapshot: {snapshot}")
+    [session] = by_name["qubit.session.count"]
+    if (session["dimensions"]["turn_count_bucket"], session["dimensions"]["last_outcome"]) != (
+        "1", "success",
+    ):
+        raise AssertionError(f"Unexpected session summary: {session}")
+    tokens = {c["dimensions"]["token_type"]: c["value"] for c in by_name["qubit.model_tokens.sum"]}
+    if tokens != {"input": 20, "output": 2}:
+        raise AssertionError(f"Unexpected token sums: {by_name['qubit.model_tokens.sum']}")
+    [quality] = by_name["qubit.model_tool_quality.count"]
+    if quality["dimensions"] != {"call_role": "primary", "issue": "none", "model": "custom", "provider": "custom"}:
+        raise AssertionError(f"Unexpected tool-call quality: {quality}")
+    [reply] = by_name["qubit.model_reply_issue.count"]  # both scripted replies are usable
+    if (reply["dimensions"], reply["value"]) != ({"issue": "none", "model": "custom", "provider": "custom"}, 2):
+        raise AssertionError(f"Unexpected model reply issues: {reply}")
+    [peak] = by_name["qubit.context_peak.count"]
+    if (peak["dimensions"]["provider"], peak["dimensions"]["model"], peak["dimensions"]["limit_hit"]) != (
+        "custom", "custom", "no",
+    ):
+        raise AssertionError(f"Unexpected context peak: {peak}")
+    [startup] = by_name["qubit.startup.latency"]
+    if startup["dimensions"]["surface"] != "cli":
+        raise AssertionError(f"Unexpected startup latency: {startup}")
+    milestones = {c["dimensions"]["milestone"] for c in by_name["qubit.install.milestone"]}
+    if not {"first_task_started", "first_task_success", "first_tool_success"} <= milestones:
+        raise AssertionError(f"Missing install milestones: {sorted(milestones)}")
+    [tool] = by_name["qubit.tool_call.count"]
     expected_tool_dimensions = {
-        "approval_outcome": "not_required",
-        "latency_bucket": tool["dimensions"].get("latency_bucket"),
-        "outcome": "success",
-        "retry_count_bucket": "unknown",
-        "tool_category": "file",
+        "approval_outcome": "not_required", "outcome": "success", "tool_category": "file",
     }
+    [latency] = by_name["qubit.tool_call.latency"]
     if (
         tool["dimensions"] != expected_tool_dimensions
-        or tool["dimensions"]["latency_bucket"] == "unknown"
+        or latency["dimensions"]["latency_bucket"] == "unknown"
+        or (latency["dimensions"]["retry_count_bucket"], latency["dimensions"]["tool_category"]) != ("unknown", "file")
         or tool["value"] != 1
         or tool["packaged_value"] != 1
     ):
         raise AssertionError(f"Unexpected tool counter: {tool}")
-    lifecycle = by_name["hermes.skill.lifecycle.count"]
+    lifecycle = by_name["qubit.skill.lifecycle.count"]
     expected_actions = {
         "archived",
         "created",
@@ -396,7 +479,7 @@ def _validate_store(database_path: Path) -> list[dict[str, Any]]:
         or any(counter["packaged_value"] != 1 for counter in lifecycle)
     ):
         raise AssertionError(f"Unexpected skill lifecycle counters: {lifecycle}")
-    loads = by_name["hermes.skill.load.count"]
+    loads = by_name["qubit.skill.load.count"]
     expected_load_states = {
         ("first_use", "not_applicable", "1"),
         ("reused", "no_new_patch", "2"),
@@ -416,6 +499,7 @@ def _validate_store(database_path: Path) -> list[dict[str, Any]]:
         or any(counter["packaged_value"] != 1 for counter in loads)
     ):
         raise AssertionError(f"Unexpected skill load counters: {loads}")
+    _validate_v5_rows(by_name)
     return counters
 
 
@@ -443,7 +527,7 @@ def _validate_packages(
         jsonschema.validate(package, schema)
         if set(package["resource"]) != {
             "architecture",
-            "hermes_version",
+            "qubit_version",
             "install_method",
             "os_family",
         }:
@@ -451,6 +535,7 @@ def _validate_packages(
 
     serialized = json.dumps(packages)
     for prohibited in (
+        MODEL_CANARY,
         PROMPT_CANARY,
         RESPONSE_CANARY,
         TOOL_CALL_CANARY,
@@ -467,63 +552,73 @@ def _validate_packages(
         for metric in package.get("metrics", []):
             metrics.setdefault(metric["name"], []).append(metric)
     if set(metrics) != {
-        "hermes.client.active",
-        "hermes.model_route.count",
-        "hermes.skill.lifecycle.count",
-        "hermes.skill.load.count",
-        "hermes.task_run.finished",
-        "hermes.task_run.started",
-        "hermes.tool_call.count",
+        "qubit.client.active",
+        "qubit.context_peak.count",
+        "qubit.install.milestone",
+        "qubit.install.snapshot",
+        "qubit.model_reply_issue.count",
+        "qubit.model_route.count",
+        "qubit.model_tokens.sum",
+        "qubit.model_tool_quality.count",
+        "qubit.session.count",
+        "qubit.skill.lifecycle.count",
+        "qubit.skill.load.count",
+        "qubit.startup.latency",
+        "qubit.task_cost.count",
+        "qubit.task_run.duration",
+        "qubit.task_run.finished",
+        "qubit.task_run.started",
+        "qubit.tool.usage.count",
+        "qubit.tool_call.count",
+        "qubit.tool_call.latency",
+        "qubit.tool_enabled_unused.count",
+        "qubit.tool_output_truncation.count",
+        "qubit.tool_overhead.count",
     }:
         raise AssertionError(
             f"Unexpected package metrics:\n{json.dumps(metrics, indent=2)}"
         )
-    if metrics["hermes.client.active"] != [
+    if metrics["qubit.client.active"] != [
         {
-            "name": "hermes.client.active",
+            "name": "qubit.client.active",
             "type": "counter",
             "dimensions": {},
             "value": 1,
         }
     ]:
         raise AssertionError(
-            f"Unexpected client-active metric: {metrics['hermes.client.active']}"
+            f"Unexpected client-active metric: {metrics['qubit.client.active']}"
         )
-    [model] = metrics["hermes.model_route.count"]
-    if model["dimensions"] != {
-        "model": MODEL_CANARY,
-        "provider": "custom",
-    } or model["value"] != 2:
+    models = metrics["qubit.model_route.count"]
+    if any(
+        {k: v for k, v in m["dimensions"].items() if k != "ttft_bucket"} != {
+            "call_role": "primary", "error_class": "none", "model": "custom", "outcome": "success",
+            "provider": "custom",
+        }
+        for m in models
+    ) or sum(m["value"] for m in models) != 2:
         raise AssertionError(
-            f"Unexpected model metric: {metrics['hermes.model_route.count']}"
+            f"Unexpected model metric: {metrics['qubit.model_route.count']}"
         )
-    [terminal] = metrics["hermes.task_run.finished"]
+    [terminal] = metrics["qubit.task_run.finished"]
     if terminal["dimensions"] != {
-        "duration_bucket": terminal["dimensions"].get("duration_bucket"),
         "end_reason": "completed",
         "entrypoint": "interactive",
         "execution_surface": "cli",
-        "model_call_count_bucket": "2",
+        "failure_class": "none",
         "outcome": "success",
-        "retry_count_bucket": "0",
+        "platform": "none",
         "termination": "none",
-        "tool_call_count_bucket": "1",
     }:
         raise AssertionError(f"Unexpected task terminal metric: {terminal}")
-    [tool] = metrics["hermes.tool_call.count"]
+    [tool] = metrics["qubit.tool_call.count"]
     if (
         tool["dimensions"]
-        != {
-            "approval_outcome": "not_required",
-            "latency_bucket": tool["dimensions"].get("latency_bucket"),
-            "outcome": "success",
-            "retry_count_bucket": "unknown",
-            "tool_category": "file",
-        }
-        or tool["dimensions"]["latency_bucket"] == "unknown"
+        != {"approval_outcome": "not_required", "outcome": "success", "tool_category": "file"}
+        or metrics["qubit.tool_call.latency"][0]["dimensions"]["latency_bucket"] == "unknown"
     ):
         raise AssertionError(f"Unexpected tool metric: {tool}")
-    lifecycle = metrics["hermes.skill.lifecycle.count"]
+    lifecycle = metrics["qubit.skill.lifecycle.count"]
     if {metric["dimensions"]["action"] for metric in lifecycle} != {
         "archived",
         "created",
@@ -534,7 +629,7 @@ def _validate_packages(
         "stale",
     }:
         raise AssertionError(f"Unexpected skill lifecycle metrics: {lifecycle}")
-    loads = metrics["hermes.skill.load.count"]
+    loads = metrics["qubit.skill.load.count"]
     if {
         (
             metric["dimensions"]["reuse_state"],
@@ -548,14 +643,15 @@ def _validate_packages(
         ("reused", "reused_after_patch", "3_to_5"),
     }:
         raise AssertionError(f"Unexpected skill load metrics: {loads}")
+    _validate_v5_rows(metrics)
     return package_paths, packages
 
 
 def main() -> int:
     args = _arguments()
-    hermes_repo = args.hermes_repo.resolve()
+    qubit_repo = args.qubit_repo.resolve()
     relay_python = args.relay_python.resolve() if args.relay_python else None
-    qubit = _resolve_qubit_executable(hermes_repo)
+    qubit = _resolve_qubit_executable(qubit_repo)
     if relay_python is not None and not any(
         (relay_python / "nemo_relay").glob("_native.*")
     ):
@@ -609,7 +705,7 @@ def main() -> int:
         _write_config(home, server.server_port)
         env = os.environ.copy()
         env["QUBIT_HOME"] = str(home)
-        python_paths = [str(hermes_repo)]
+        python_paths = [str(qubit_repo)]
         if relay_python is not None:
             python_paths.append(str(relay_python))
         python_paths.append(env.get("PYTHONPATH", ""))
@@ -642,8 +738,8 @@ def main() -> int:
         server.server_close()
         thread.join(timeout=5)
 
-    (root / "hermes.stdout.txt").write_text(result.stdout, encoding="utf-8")
-    (root / "hermes.stderr.txt").write_text(result.stderr, encoding="utf-8")
+    (root / "qubit.stdout.txt").write_text(result.stdout, encoding="utf-8")
+    (root / "qubit.stderr.txt").write_text(result.stderr, encoding="utf-8")
     if result.returncode != 0:
         raise AssertionError(
             f"Qubit exited with {result.returncode}\n"
@@ -719,11 +815,11 @@ def main() -> int:
     counters = _validate_store(telemetry / "metrics.sqlite3")
     package_paths, packages = _validate_packages(
         telemetry / "outbox",
-        hermes_repo
+        qubit_repo
         / "qubit_cli"
         / "observability"
         / "schemas"
-        / "hermes.shared_metrics.v2.schema.json",
+        / "qubit.shared_metrics.v3.schema.json",
     )
 
     print("Qubit -> NeMo Relay shared-metrics smoke test passed")

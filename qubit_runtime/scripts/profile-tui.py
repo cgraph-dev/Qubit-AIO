@@ -1,4 +1,4 @@
-#!/usr/bin/env -S bash -c 'exec "$BASH" "$(dirname "$0")/_hermes-python" "$0" "$@"'
+#!/usr/bin/env -S bash -c 'exec "$BASH" "$(dirname "$0")/run-in-hermes-env" python3 "$0" "$@"'
 """Drive the Qubit TUI under HERMES_DEV_PERF and summarize the pipeline.
 
 Usage:
@@ -43,7 +43,7 @@ try:
 except ImportError:
     def get_qubit_home() -> Path:  # type: ignore[misc]
         val = (os.environ.get("QUBIT_HOME") or "").strip()
-        return Path(val) if val else Path.home() / ".hermes"
+        return Path(val) if val else Path.home() / ".qubit"
 
 DEFAULT_TUI_DIR = Path(
     os.environ.get("HERMES_TUI_DIR")
@@ -537,7 +537,7 @@ def loop_mode(args: argparse.Namespace) -> int:
 
     tui_dir = Path(args.tui_dir).resolve()
     src_root = tui_dir / "src"
-    pkg_root = tui_dir / "packages" / "qubit-ink" / "src"
+    pkg_root = tui_dir / "packages" / "hermes-ink" / "src"
 
     def collect_mtimes() -> dict[str, float]:
         mtimes: dict[str, float] = {}

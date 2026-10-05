@@ -1,4 +1,4 @@
-#!/usr/bin/env -S bash -c 'exec "$BASH" "$(dirname "$0")/_hermes-python" "$0" "$@"'
+#!/usr/bin/env -S bash -c 'exec "$BASH" "$(dirname "$0")/run-in-hermes-env" python3 "$0" "$@"'
 """Build the Qubit Model Catalog — a centralized JSON manifest of curated models.
 
 This script reads the in-repo hardcoded curated lists (``OPENROUTER_MODELS``,
@@ -17,7 +17,7 @@ Usage::
 Output: ``website/static/api/model-catalog.json``
 
 Live URL (after ``deploy-site.yml`` runs on merge to main):
-``https://raw.githubusercontent.com/cgraph-dev/Qubit-AIO/main/website/static/api/model-catalog.json``
+``https://qubit.nousresearch.com/docs/api/model-catalog.json``
 """
 
 from __future__ import annotations
@@ -31,9 +31,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
 # Ensure QUBIT_HOME is set for imports that touch it at module level.
-os.environ.setdefault("QUBIT_HOME", os.path.join(os.path.expanduser("~"), ".hermes"))
+os.environ.setdefault("QUBIT_HOME", os.path.join(os.path.expanduser("~"), ".qubit"))
 
-from qubit_cli import install_source  # noqa: E402
 from qubit_cli.models import (  # noqa: E402
     OPENROUTER_MODELS,
     PREFERRED_SILENT_DEFAULT_MODEL,
@@ -64,8 +63,8 @@ def build_catalog() -> dict:
         "version": CATALOG_VERSION,
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "metadata": {
-            "source": "hermes-agent repo",
-            "docs": install_source.docs_url("reference/model-catalog"),
+            "source": "qubit repo",
+            "docs": "https://qubit.nousresearch.com/docs/reference/model-catalog",
         },
         "providers": {
             "openrouter": {
@@ -85,7 +84,7 @@ def build_catalog() -> dict:
             },
             "nous": {
                 "metadata": {
-                    "display_name": "Qubit Labs",
+                    "display_name": "Nous Portal",
                     "note": (
                         'The entry labeled "default": true is the model Qubit '
                         "silently lands on when the user never picked one."
