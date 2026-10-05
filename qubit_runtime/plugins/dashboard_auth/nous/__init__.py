@@ -1,4 +1,4 @@
-"""NousDashboardAuthProvider — Qubit Labs OAuth (authorization-code + PKCE).
+"""NousDashboardAuthProvider — Nous Portal OAuth (authorization-code + PKCE).
 
 Implements ``nous-account-service/docs/agent-dashboard-oauth-contract.md``; registers only
 when a client_id (``dashboard.oauth.client_id`` / ``HERMES_DASHBOARD_OAUTH_CLIENT_ID``, shape
@@ -28,7 +28,7 @@ from plugins.dashboard_auth._shared import (
     verify_jwt)
 
 logger = logging.getLogger(__name__)
-_TAG = "dashboard-auth-qubit"
+_TAG = "dashboard-auth-nous"
 
 _DEFAULT_PORTAL_URL = "https://portal.nousresearch.com"
 _SCOPE = "agent_dashboard:access"  # contract C3
@@ -38,10 +38,10 @@ LAST_SKIP_REASON: str = ""  # cleared on every register() so restarts don't leak
 
 
 class NousDashboardAuthProvider(JwtOAuthProvider):
-    """Qubit Labs OAuth via authorization-code + PKCE (S256)."""
+    """Nous Portal OAuth via authorization-code + PKCE (S256)."""
 
     name = "nous"
-    display_name = "Qubit Labs"
+    display_name = "Nous Research"
 
     def __init__(self, *, client_id: str, portal_url: str) -> None:
         # Defense-in-depth: register() filters too, but a malformed id must never construct a provider.
@@ -103,7 +103,7 @@ class NousDashboardAuthProvider(JwtOAuthProvider):
         contract_version = claims.get("oauth_contract_version")
         if contract_version is None:
             logger.warning(
-                "Qubit Labs token missing oauth_contract_version claim (contract says it should be %d); proceeding anyway.",
+                "Nous Portal token missing oauth_contract_version claim (contract says it should be %d); proceeding anyway.",
                 _EXPECTED_CONTRACT_VERSION)
         elif contract_version != _EXPECTED_CONTRACT_VERSION:
             raise ProviderError(
@@ -131,7 +131,7 @@ def _settings() -> dict:
     if not client_id:
         raise SkipRegistration(
             "HERMES_DASHBOARD_OAUTH_CLIENT_ID is not set (and dashboard.oauth.client_id "
-            "in config.yaml is empty). The Qubit Labs provisions this env var (shape "
+            "in config.yaml is empty). The Nous Portal provisions this env var (shape "
             "'agent:{instance_id}') when it deploys a Qubit Agent instance — set it to "
             "your provisioned client id (either as an env var or under "
             "dashboard.oauth.client_id in config.yaml), or pass --insecure to skip the "
@@ -139,7 +139,7 @@ def _settings() -> dict:
     if not client_id.startswith("agent:"):
         raise SkipRegistration(
             f"HERMES_DASHBOARD_OAUTH_CLIENT_ID={client_id!r} doesn't match the contract "
-            f"shape 'agent:{{instance_id}}'. The Qubit Labs provisions this value at deploy "
+            f"shape 'agent:{{instance_id}}'. The Nous Portal provisions this value at deploy "
             f"time; check your Fly app's secrets or override with the value from the Portal admin UI.",
             level="warning")
     return {"client_id": client_id, "portal_url": portal_url}
@@ -152,35 +152,4 @@ def register(ctx) -> None:
     kwargs, LAST_SKIP_REASON = register_provider(ctx, logger, _TAG, NousDashboardAuthProvider, _settings)
     if kwargs is not None:
         logger.info(
-            "dashboard-auth-qubit: registered provider (client_id=%s, portal=%s)", kwargs["client_id"], kwargs["portal_url"])
-
-
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import base64  # noqa: F401,E402
-import hashlib  # noqa: F401,E402
-import httpx  # noqa: F401,E402
-import os  # noqa: F401,E402
-import secrets  # noqa: F401,E402
-import urllib.parse  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'DashboardAuthProvider': ('qubit_cli.dashboard_auth', 'DashboardAuthProvider'),
-    'InvalidCodeError': ('qubit_cli.dashboard_auth', 'InvalidCodeError'),
-    'RefreshExpiredError': ('qubit_cli.dashboard_auth', 'RefreshExpiredError'),
-    'classify_jwks_lookup_error': ('qubit_cli.dashboard_auth', 'classify_jwks_lookup_error'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from qubit_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----
+            "dashboard-auth-nous: registered provider (client_id=%s, portal=%s)", kwargs["client_id"], kwargs["portal_url"])
