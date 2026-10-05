@@ -1,3 +1,5 @@
+> **Session 2026-10-05 — voice sweep + waveform P0 + Perplexity verdict (3 lanes, live).** (1) Voice commands/routes sweep drove every route through the real function: 5 wrong-backend/dead-end fixes — settings-questions no longer flip the widget (`waveform_command` None on `\bsettings?\b`), `be brief` no longer briefs, topical "new on X" no longer fires the away-digest, bare `close it/stop it` no longer closes YouTube tabs, and `say that again` now re-speaks the last answer deterministically (0.14ms, no model). New `test_voice_sweep_fixes9u` 15/15; sweep 864 passed (1 pre-existing perplexity-receipt fail + 2 pre-existing collection errors, both stash-proven). (2) Waveform P0s: dashboard widget now paints the owner palette (was one accent for all 4 states), Qt view mirrors the Tk talk meter (was full-blast in silence), click/session timeouts 10s→2s, in-flight thinking capped at 12s past last transcript (was unbounded), xprop probe 3s→0.5s. New `test_p0_waveform_orb9u` 8/8; joint suites 114 green; `frontend/qubit-dist` rebuilt with the widget palette live. (3) Perplexity: audited 10 call sites; key handling strong, degrade direction right, agent tool already on cheap Search API. Headline scare REFUTED live — Sonar retirement (docs said 2026-09-27) is not enforced: `sonar-pro` and `sonar` both answer HTTP 200 (`PPLX_OK`, ~$0.01). Real issues kept as ranked list: voice path never tries free-first (chat does), no `search_context_size:low` on chat-completions (~40% fee overpay), retry fires on auth/400s, no budget guard, 10-min narrow cache missing on voice path. Waveform flags live at False/False. Uncommitted (plus snapshot `dd11e445` swept the tree mid-flight — nothing lost). No suite or release verdict run.
+
 > **Session 2026-10-05 — voice orb color/animation repair (3 lanes, live).** Owner: orb stays green/yellow-green many seconds after a turn, no recording-like animation while talking. Root causes measured in `events.jsonl`: fixed recency windows (LISTEN 6s/SPEAK 8s/THINK 12s + 2s poll + 1s dwell — a ~10s turn spanned ~34s of color, thinking→idle a full 12s after `stt.final`); own-TTS echo re-arming `wake.capturing` every 2s past the fixed 5s echo tail; waveform pure `sin(t)` loops with zero amplitude input (orb never opens mic by design); 2–3 blocking 10s-timeout HTTP calls on the Tk mainloop freezing frames mid-turn. Fixes, all TDD red→green, uncommitted: (1) `orb/state.py` — LISTEN 3s, SPEAK 4s, THINK 4s when `active_requests==0` (12s only while a turn is in flight), capturing ignored while speak recency is newer (echo guard); (2) `orb/app.py`+`client.py`+`qt_app.py` — HTTP moved to a daemon worker thread + queue (widgets mainloop-only, scan-pinned), POLL 2s→1s, timeouts 10s→2s, `orb.` added to logview prefixes; (3) real talk meter — helper publishes per-frame mic peak into heartbeat extras (`mic_level`/`mic_level_ts`), orb modulates listening `band_gain`/brightness with fast-attack/slow-release smoothing (loud == today's loop byte-identical, silence calms to near-idle amplitude, color untouched). Evidence: 201 passed across orb/wake/helper suites; orb + helper restarted live (`--once` idle, window mapped 68x68+1219+874); journal shows the owner's live dictate turns succeeding. Pending: `qubit-voicebridge` service restart (logview prefix + any service-side reads; restart drops live PTYs — left for owner) and owner's eyes-on proof (talk → pumping green; done → orange within ~4s). `voicebridge/orb/` remains an untracked concurrent-lane tree. No suite or release verdict run.
 
 > **Session 2026-10-05 — orb color contract simplified (owner: green = voice, yellow = thinking).** `ember.STATE_COLORS`: listening + speaking share ONE green family (agent hearing you and agent talking read as the same voice-active state), thinking alone is yellow, idle orange / error red unchanged; motion params untouched. `test_voice_orb_colors_fluid9u` re-pinned, 76 passed across colors/level/orb suites, live orb restarted (`--once` idle, window mapped). Uncommitted. No suite or release verdict run.
@@ -4620,3 +4622,83 @@ and slash commands?" answered `state UNKNOWN_CAPABILITY` / a bare-model refusal.
 - **Evidence:** 39 passed across the qubitchat tool-turn, agent-worker,
   voice-commands, and branches suites; service restarted; `git diff --check`
   clean on touched files.
+
+---
+
+## Vendor sync applied — 2026-10-05 (pin 69948c0057 → bd0affe5)
+
+**Status: PARTIAL — in progress. Not COMPLETE, not VERIFIED.**
+
+Upstream's 4,128 commits (4,438 touched files) are being applied to
+`qubit_runtime/` as a **file-level overlay** (`qubit_runtime/` has no `.git`),
+per file: translate identifiers through the derived rename map, then a 3-way
+`git merge-file` against the translated upstream base. Conflicts are LEFT
+UNTOUCHED for review, never auto-resolved.
+
+### Applied and committed (dependency order)
+
+| Subsystem | Tally | Commit |
+|---|---|---|
+| Root-level modules | 29 M / 1 A / 4 C | `65eeb897` |
+| `qubit_cli` (incl. config_defaults/auth/plugins_cmd conflicts) | 248 M / 37 A / 74 C → resolved | `65eeb897`, `6e6fddae` |
+| `locales` | 18 A / 17 C | `249c6e24` |
+| `nix`, `docker` | 2 M / 3 A / 3 C | `793e1863`, `f3fc4ecc` |
+| `agent` | 138 M / 8 A / 17 C | `1128474e` |
+| `tui_gateway` | 64 M / 3 A | `72e075b1` |
+| `cron` | 16 M / 2 A | `b4f34f54` |
+| `qubit_platform` | 2 M | `8b84ae11` |
+| `pm` | 16 M / 2 C | `a5ba6ea2` |
+| `tools` | 126 M / 6 A / 32 C | `55cb2e6f` |
+| `gateway` | 76 M / 2 A / 14 C | `25232ac9` |
+| `web` | 31 M / 4 A | `01eedd54` |
+| `ui-tui` | 73 M / 42 A / 19 C | `13e18934` |
+
+**938 files changed, +74,570 / −12,745** since `dd11e445`.
+
+### Gate state — MEASURED
+
+`scripts/sync_import_gate.py`: **29 OK / 0 FAIL** (was 18 OK / 13 FAIL before
+this wave). Every module in the list was verified to exist in the upstream
+tree; phantom entries were removed rather than left permanently red.
+
+Real entry points import clean: `qubit_cli`, `qubit_cli.main`,
+`qubit_cli.web_server`, `qubit_cli.sessions_cmd`, `gateway.run`,
+`tui_gateway.server`, `agent.conversation_loop`, `agent.turn_facade`,
+`tools.registry`. Fork-side tests: **17 passed**
+(`test_pty_lease_shim.py`, `test_status_storage_root.py`).
+
+Live service verified after the sync: `qubit-voicebridge.service` active,
+MainPID `209179` on 8890, serving the SPA (`HTTP 302`), API auth-guarded
+(`HTTP 401` without token).
+
+### Still pending (not synced)
+
+`apps` (1,514), `tests` (1,094), `plugin-catalog` (170), `contributors` (146),
+`website` (129), `plugins` (118), `.github` (56), `scripts` (52),
+`tests-js` (14).
+
+### Unresolved conflicts (by design, need review)
+
+`qubit_cli` 74 (partially resolved), `tools` 32, `ui-tui` 19, `agent` 17,
+`locales` 17, `gateway` 14, `nix` 3, `pm` 2. See `docs/SYNC_CONFLICT_PLAN.md`.
+
+### Method notes (pitfalls that cost real time)
+
+- **Translation trap:** never use `\b` before `hermes_` — it fails inside
+  compound identifiers (`get_hermes_home`, `SessionActiveWriteGuardError`),
+  which then survive untranslated at ~99 sites.
+- **Ordering:** ROOT-LEVEL modules (`utils.py`, `qubit_state_errors.py`) and
+  primitive trees must land FIRST. Consumers import symbols upstream ADDED
+  there (`mkstemp_beside`, `is_nvidia_n1x_pci_id`,
+  `install_state_permission_message`). Wrong order produces ImportErrors that
+  look like merge bugs.
+- **Never translate a fork sentinel.** `__HERMES_ACTIVATED` is read by
+  `activate`, `_activation.sh`, `_activation.py` and tests; blindly rewriting
+  `HERMES_`→`QUBIT_` creates a FALSE conflict. Accept a translation only when
+  Qubit's own tree independently uses the new name.
+- **Parallel agents need isolated `git worktree`s.** Two agents on one index
+  produced a contaminated commit (recovered by `git reset --soft`).
+- **The gate must use the project venv** and read BOTH stdout and stderr
+  (`tui_gateway.server` reassigns `sys.stdout` at import, so probe output can
+  land on stderr). Worktrees have no `.venv` (untracked) — use
+  `scripts/sync_setup_worktree.sh`.
