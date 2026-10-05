@@ -4766,3 +4766,31 @@ properly -- are upstream's ADDED symbols present in the local file? -- showed
 The merge tool reported MERGED and wrote nothing, correctly: already up to date.
 Lesson: coverage must be measured by CONTENT (are upstream's added symbols
 present?), never by file existence.
+
+### Capability audit + two silent-failure fixes — 2026-10-05
+
+**The delta is a capability audit.** Diffing 69948c0057..bd0affe5 against Qubit
+enumerates what upstream ADDED and Qubit lacks: **346 missing symbols / 92 files**
+from 5,572 checked. New tool `scripts/audit_capability_gaps.py`, report in
+`docs/SYNC_CAPABILITY_GAPS.md`. Content-based by design (an existence-based check
+falsely reported 20 unsynced modules earlier).
+
+**Two defects that were failing SILENTLY, both behind bare `except` clauses:**
+
+1. `agent/skill_utils.py:598` called `resolve_legacy_skill_name`, defined in
+   NEITHER tree (upstream line 594 is just `return raw_identifier.lstrip("/")`).
+   The bare `except Exception: return None` in `_load_skill_payload` swallowed the
+   NameError, so EVERY non-absolute skill lookup returned None -- skill bundles,
+   `/skill` invocation and skill_view-by-name were all dead. One line -> 7 passed.
+
+2. `qubit_cli/plugins_manifest.py` defined `parse_provides_locales` (my port) but
+   `parse_manifest_file` never CALLED it, so `provides_locales`/`locale_metadata`
+   defaulted empty for every plugin and manifest-only language packs fell through.
+   Upstream calls it at :542. -> test_i18n_layers.py 5 failed/4 passed -> 9 passed.
+
+**Measured now:** the four files that mass-failed this morning run together at
+**310 passed / 0 failed** in one process (was FAILED/ERROR across the suite);
+gate 29 OK / 0 FAIL.
+
+Method note: both were found by forcing a swallowed exception to surface rather
+than reading the except-clause's fallback value as a real answer.
