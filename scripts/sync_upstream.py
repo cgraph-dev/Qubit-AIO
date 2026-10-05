@@ -56,9 +56,14 @@ for _flat in ("state.py", "constants.py", "logging.py", "bootstrap.py", "time.py
     PREFIX_RULES[f"hermes_{_flat}"] = f"qubit_{_flat}"
 
 IDENT_RULES: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"\bHERMES_"), "QUBIT_"),
-    (re.compile(r"\bhermes_"), "qubit_"),
-    (re.compile(r"\bHermes(?=[A-Z_])"), "Qubit"),
+    # Order matters: most specific first. NOTE the identifier rules must NOT use
+    # \b before `hermes_`: it appears as a SUBSTRING inside compound names
+    # (get_hermes_home, is_hermes_config, _hermes_home_key), where \b after the
+    # preceding word char does not fire and the name silently survives the
+    # translation. Match the literal token anywhere, then guard the tail.
+    (re.compile(r"HERMES_"), "QUBIT_"),
+    (re.compile(r"hermes_"), "qubit_"),
+    (re.compile(r"Hermes(?=[A-Z_])"), "Qubit"),
     (re.compile(r"\bhermes-agent\b"), "qubit"),
     (re.compile(r"\.hermes\b"), ".qubit"),
     (re.compile(r"\bhermes\b"), "qubit"),
