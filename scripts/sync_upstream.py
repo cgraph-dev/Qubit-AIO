@@ -74,8 +74,16 @@ IDENT_RULES: list[tuple[re.Pattern[str], str]] = [
 ]
 
 # Paths deliberately NOT synced (Qubit-owned or upstream-only scaffolding).
+# Trees deliberately NOT synced from upstream.
+#   contributors/  -- 1,705 third-party email addresses; not Qubit's to carry
+#   .github/       -- CI config for the upstream repo's own workflows
+#   node_modules/, .git/ -- build/VCS internals
+# website/ and plugin-catalog/ were REMOVED from this list: skipping website/
+# let Qubit's developer-guide docs silently drift from the code the sync just
+# brought in (129 changed upstream files, e.g. context-compression-and-caching,
+# cron-internals, desktop-plugin-sdk). Docs must track their code.
 SKIP_PREFIXES = (
-    ".github/", "contributors/", "website/", "plugin-catalog/",
+    ".github/", "contributors/",
     "node_modules/", ".git/",
 )
 
