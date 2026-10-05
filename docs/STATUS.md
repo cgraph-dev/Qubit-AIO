@@ -1,3 +1,5 @@
+> **Session 2026-10-05 — voice double-trigger + /chat outage (infra).** Owner: "voice trigger twice when I'm speaking". Root cause MEASURED: **two `voicebridge.desktop_helper` processes** alive (an orphan from a pre-restart run + the systemd one), each with its own mic + wake loop, so every wake event journaled **exactly twice** (`wake.capturing`/`transcript`/`wake.command`/`helper.wake.command` all ×2, identical ts). No singleton guard existed and SIGTERM had no handler (`shutdown()` never ran → the orphan's `parec` outlived it holding the mic). Fix (TDD, 13 new tests in `test_voice_edit_heartbeat9u.py`, 51 across helper+heartbeat green): `heartbeat.other_live_pid()` (fresh + running + cmdline-validated pid, never signals a recycled pid); `desktop_helper.take_over_previous_helper()` (SIGTERM + bounded 3s wait, injected seams); `_install_term_handler()` (SIGTERM → `shutdown()` so the capture child is never orphaned); wired into `main()` before `helper.start()`. Live: exactly one helper + one parec, zero duplicated events. **Also fixed the /chat outage:** the vendored-tree sync changed ui-tui sources so `_tui_need_rebuild` was always true → every PTY spawn ran `npm ci`, and concurrent spawns (each /chat retry) trampled one `node_modules` (`ENOTEMPTY`), so the terminal never opened. Fix: stopped the service to end the spawn loop, wiped `node_modules`, ran one clean `node-deps` (`--reuse`, wrote `node_modules/.hermes-node-deps`) + `scripts/build/tui.mjs` (wrote `ui-tui/dist/hermes-build.json`), so `freshness.mjs` now returns `true` and the launcher runs the prebuilt bundle directly. Proven: `_tui_need_rebuild → False`, real WS `/agent/api/pty` connect streamed TUI banner bytes, session `20261005_031340_03b8ab` resume ticket mints with `opencode-go/deepseek-v4.1-flash`. Uncommitted. No suite or release verdict run.
+
 > **Session 2026-10-05 — voice sweep + waveform P0 + Perplexity verdict (3 lanes, live).** (1) Voice commands/routes sweep drove every route through the real function: 5 wrong-backend/dead-end fixes — settings-questions no longer flip the widget (`waveform_command` None on `\bsettings?\b`), `be brief` no longer briefs, topical "new on X" no longer fires the away-digest, bare `close it/stop it` no longer closes YouTube tabs, and `say that again` now re-speaks the last answer deterministically (0.14ms, no model). New `test_voice_sweep_fixes9u` 15/15; sweep 864 passed (1 pre-existing perplexity-receipt fail + 2 pre-existing collection errors, both stash-proven). (2) Waveform P0s: dashboard widget now paints the owner palette (was one accent for all 4 states), Qt view mirrors the Tk talk meter (was full-blast in silence), click/session timeouts 10s→2s, in-flight thinking capped at 12s past last transcript (was unbounded), xprop probe 3s→0.5s. New `test_p0_waveform_orb9u` 8/8; joint suites 114 green; `frontend/qubit-dist` rebuilt with the widget palette live. (3) Perplexity: audited 10 call sites; key handling strong, degrade direction right, agent tool already on cheap Search API. Headline scare REFUTED live — Sonar retirement (docs said 2026-09-27) is not enforced: `sonar-pro` and `sonar` both answer HTTP 200 (`PPLX_OK`, ~$0.01). Real issues kept as ranked list: voice path never tries free-first (chat does), no `search_context_size:low` on chat-completions (~40% fee overpay), retry fires on auth/400s, no budget guard, 10-min narrow cache missing on voice path. Waveform flags live at False/False. Uncommitted (plus snapshot `dd11e445` swept the tree mid-flight — nothing lost). No suite or release verdict run.
 
 > **Session 2026-10-05 — voice orb color/animation repair (3 lanes, live).** Owner: orb stays green/yellow-green many seconds after a turn, no recording-like animation while talking. Root causes measured in `events.jsonl`: fixed recency windows (LISTEN 6s/SPEAK 8s/THINK 12s + 2s poll + 1s dwell — a ~10s turn spanned ~34s of color, thinking→idle a full 12s after `stt.final`); own-TTS echo re-arming `wake.capturing` every 2s past the fixed 5s echo tail; waveform pure `sin(t)` loops with zero amplitude input (orb never opens mic by design); 2–3 blocking 10s-timeout HTTP calls on the Tk mainloop freezing frames mid-turn. Fixes, all TDD red→green, uncommitted: (1) `orb/state.py` — LISTEN 3s, SPEAK 4s, THINK 4s when `active_requests==0` (12s only while a turn is in flight), capturing ignored while speak recency is newer (echo guard); (2) `orb/app.py`+`client.py`+`qt_app.py` — HTTP moved to a daemon worker thread + queue (widgets mainloop-only, scan-pinned), POLL 2s→1s, timeouts 10s→2s, `orb.` added to logview prefixes; (3) real talk meter — helper publishes per-frame mic peak into heartbeat extras (`mic_level`/`mic_level_ts`), orb modulates listening `band_gain`/brightness with fast-attack/slow-release smoothing (loud == today's loop byte-identical, silence calms to near-idle amplitude, color untouched). Evidence: 201 passed across orb/wake/helper suites; orb + helper restarted live (`--once` idle, window mapped 68x68+1219+874); journal shows the owner's live dictate turns succeeding. Pending: `qubit-voicebridge` service restart (logview prefix + any service-side reads; restart drops live PTYs — left for owner) and owner's eyes-on proof (talk → pumping green; done → orange within ~4s). `voicebridge/orb/` remains an untracked concurrent-lane tree. No suite or release verdict run.
@@ -4794,3 +4796,50 @@ gate 29 OK / 0 FAIL.
 
 Method note: both were found by forcing a swallowed exception to surface rather
 than reading the except-clause's fallback value as a real answer.
+
+## 95. /qubit-chat: vague analysis no longer misrouted to the build worker (2026-10-05)
+
+**No milestone claimed.** Owner: an investigation request ("check why
+/qubit-chat, harnessrouter and Open Viking is not working 1:1, what are we
+missing to integrate them") got the nonsense reply "Dashboard ready at
+http://0.0.0.0:8898/".
+
+- **Cause:** the intent classifier labelled it `coding` from a WEAK
+  "partial task hints (0.5)" match, and `_decide_branch` sent every
+  `coding`/`agent` kind to the headless BUILD worker (`agent_task`) — which
+  tried to build something unrelated. Analysis is not a build order.
+- **Fix (`chat_transport.py::_decide_branch`):** a partial/weak hint match now
+  routes to `answer_local` -> the §93/§94 tool-capable agent (which can
+  investigate with real tools AND build when the request truly is a build).
+  Only a strong hint still delegates to the build worker. Verified:
+  `check why … is not working 1:1` -> `answer_local`; `create a flask app …`
+  -> `agent_task` (strong, 1.0).
+- **Note:** a companion phrasing ("what tools do you have to investigate …")
+  matched the voice registry (`runtime: qubit-chat-branch`, "Done.") — the
+  registry aliases still over-match some conversational shapes; the explicit
+  "can you" alias was removed in §94, the remaining fuzzy matches need a
+  dedicated pass.
+
+### CORRECTION — the mass-failure cause was NOT only the conftest — 2026-10-05
+
+I previously attributed the whole mass-failure to order pollution via tests/conftest.py.
+That was INCOMPLETE. Measured now:
+
+  qubit_runtime/tests/qubit_cli/   1338 test files   (the real Qubit tree)
+  qubit_runtime/tests/hermes_cli/   303 test files   (MIS-ROUTED DUPLICATE)
+  present in BOTH:                  205
+  of those, content differs:        204   (stale second copies)
+
+The rename map's `hermes_cli -> qubit_cli` prefix rule was never applied to the TESTS
+subtree, so upstream's tests/hermes_cli/ landed as a second copy beside Qubit's
+tests/qubit_cli/. pytest collects both as distinct modules; the stale copies carry
+fabricated names (e.g. tests/hermes_cli/test_real_home_tripwire.py references the
+invented conftest._REAL_QUBIT_ROOT_CANDIDATES -> 25 errors) and run the same assertions
+twice against divergent expectations. That -- not only conftest -- is what produced the
+"1,236 failed" full-suite reading.
+
+Tests/qubit_state/ + tests/hermes_state/ are the same defect (21 files).
+
+Resolving conftest.py was still correct and necessary, but on its own it silenced a
+symptom, not the cause. Fix = route the tests subtree through the rename map (or delete
+the stale duplicates after verifying nothing is unique to them).
