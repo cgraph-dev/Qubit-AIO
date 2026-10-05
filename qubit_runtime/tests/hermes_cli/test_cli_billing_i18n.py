@@ -33,14 +33,14 @@ def overlay_locales(tmp_path, monkeypatch):
         "cli:\n  billing:\n    choice_add_funds: 充值\n    charge_failed_card_declined: 卡被拒绝\n",
         encoding="utf-8")
     monkeypatch.setattr(i18n, "_locales_dir", lambda: fake)
-    monkeypatch.delenv("QUBIT_LANGUAGE", raising=False)
+    monkeypatch.delenv("HERMES_LANGUAGE", raising=False)
     i18n.reset_language_cache()
     yield fake
     i18n.reset_language_cache()
 
 
 def _use(monkeypatch, lang: str) -> None:
-    monkeypatch.setenv("QUBIT_LANGUAGE", lang)
+    monkeypatch.setenv("HERMES_LANGUAGE", lang)
     i18n.reset_language_cache()
 
 

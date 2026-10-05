@@ -31,7 +31,7 @@ def home(tmp_path, monkeypatch):
     (home / "locales").mkdir(parents=True)
     monkeypatch.setenv("HOME", str(tmp_path / "os-home"))
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.delenv("QUBIT_LANGUAGE", raising=False)
+    monkeypatch.delenv("HERMES_LANGUAGE", raising=False)
     i18n.reset_language_cache()
     yield home
     i18n_layers._reset_registry_for_tests()

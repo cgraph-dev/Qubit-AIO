@@ -64,11 +64,11 @@ def fake_locale(tmp_path, monkeypatch):
     i18n.reset_language_cache()
 
     def activate(lang: str = "xx"):
-        monkeypatch.setenv("QUBIT_LANGUAGE", lang)
+        monkeypatch.setenv("HERMES_LANGUAGE", lang)
         i18n.reset_language_cache()
 
     yield activate
-    monkeypatch.delenv("QUBIT_LANGUAGE", raising=False)
+    monkeypatch.delenv("HERMES_LANGUAGE", raising=False)
     i18n.reset_language_cache()
 
 
