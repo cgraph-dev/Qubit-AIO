@@ -85,7 +85,7 @@ export const slashCmdSessionEn = {
       lowBalanceFallback: 'under $5',
       lowNote: (left: string) => `! Low balance · ${left} left. Run /topup or /subscription.`,
       noCalls: 'no API calls yet',
-      nousBalanceTitle: 'Nous balance',
+      nousBalanceTitle: 'Qubit balance',
       plan: (plan: string) => `Plan: ${plan}`,
       // {0}=plan name, {1}=renewal date display
       planRenews: (plan: string, renews: string) => `Plan: ${plan} · renews ${renews}`,
@@ -124,7 +124,7 @@ export const slashCmdSessionEn = {
   subscription: {
     billingUnreachable: 'Could not reach the billing service — check your connection, then retry.',
     manageUrlFailed: 'Could not build manage URL — is your portal configured?',
-    notLoggedIn: 'Not logged into Nous Portal — run /portal to log in, then /subscription.',
+    notLoggedIn: 'Not logged into Qubit Labs — run /portal to log in, then /subscription.',
     openBrowserFailedManage: (url: string) =>
       `Could not open browser — visit your subscription page manually at ${url}`,
     openBrowserFailedPortal: (url: string) => `Could not open browser — visit ${url} to finish.`,
@@ -169,7 +169,7 @@ export const slashCmdSessionEn = {
       rateLimited: (retrySuffix: string) =>
         `🟡 Too many charges right now${retrySuffix}. This isn't a payment failure.`,
       remoteSpendingDisabled:
-        "Remote spending is off for this account — a billing admin can turn it on from the portal's Hermes Agent page.",
+        "Remote spending is off for this account — a billing admin can turn it on from the portal's Qubit Agent page.",
       retryIn: (minutes: string) => ` (try again in ~${minutes} min)`,
       revokedByAdmin: 'An admin stopped remote spending for this terminal.',
       revokedByYou: 'You stopped remote spending for this terminal.',
@@ -184,7 +184,7 @@ export const slashCmdSessionEn = {
       upgradeCapExceeded:
         '🔴 Daily plan-change limit reached (5 per org) — try again tomorrow, or manage this on the portal.'
     },
-    notLoggedIn: '💳 Not logged into Nous Portal — run /portal to log in, then /topup.',
+    notLoggedIn: '💳 Not logged into Qubit Labs — run /portal to log in, then /topup.',
     openingPortal: (url: string) => `Opening portal: ${url}`,
     validate: {
       invalid: 'Enter a dollar amount, e.g. 100 (max 2 decimal places).',

@@ -64,7 +64,7 @@ export const subscriptionEn = {
       freeNudge: 'Paid models need a subscription. Start one to reach them.',
       lowNudge: (amount: string) => `Low balance · ${amount} left. Top up or upgrade before a mid-run cutoff.`,
       lowNudgeAmountFallback: 'under $5',
-      noPortalUrl: '🔴 No portal URL available — manage your subscription on the Nous portal.',
+      noPortalUrl: '🔴 No portal URL available — manage your subscription on the Qubit portal.',
       keepPlanUndo: (plan: string) => `Keep ${plan} (undo this change)`,
       changePlan: 'Change plan',
       cancelSubscription: 'Cancel subscription',

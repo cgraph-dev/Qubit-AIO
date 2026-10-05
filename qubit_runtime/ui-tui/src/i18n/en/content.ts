@@ -65,7 +65,7 @@ export const contentEn = {
     },
     setup: {
       title: 'Setup Required',
-      intro: 'Hermes needs a model provider before the TUI can start a session.',
+      intro: 'Qubit needs a model provider before the TUI can start a session.',
       actions: 'Actions',
       setupRow: 'run the first-time setup wizard in-place (adds a provider)',
       modelRow: 'pick a model (needs a session — add a provider first)',

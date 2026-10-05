@@ -25,7 +25,7 @@ export const billingEn = {
       needsBillingPermissions:
         'Billing actions need someone with billing permissions (owner, admin, or finance admin).',
       remoteSpendingOff:
-        "Remote spending is off for this org — a billing admin can turn it on from the portal's Hermes Agent page.",
+        "Remote spending is off for this org — a billing admin can turn it on from the portal's Qubit Agent page.",
       addFunds: 'Add funds',
       autoReload: 'Auto-reload',
       monthlyLimit: 'Monthly limit',
@@ -56,7 +56,7 @@ export const billingEn = {
       title: 'Confirm purchase',
       total: (amount: string) => `Total: ${amount}`,
       portalCardCharged: 'Your card saved on the portal will be charged.',
-      authorization: 'By confirming, you allow Nous Research to charge your card.',
+      authorization: 'By confirming, you allow Qubit Labs to charge your card.',
       payNow: (amount: string) => `Pay ${amount} now`,
       hint: '↑/↓ select · Enter confirm · Y/N quick · Esc back'
     },
@@ -107,7 +107,7 @@ export const billingEn = {
       thresholdLabel: 'When balance falls below:',
       reloadToLabel: 'Reload balance to:',
       authorization: (card: string) =>
-        `By confirming, you authorize Nous Research to charge ${card} whenever your balance falls below the threshold. Turn off any time here or on the portal.`,
+        `By confirming, you authorize Qubit Labs to charge ${card} whenever your balance falls below the threshold. Turn off any time here or on the portal.`,
       hint: '↑/↓ move · Tab switch field · Enter next/confirm · Esc back'
     },
     limit: {
