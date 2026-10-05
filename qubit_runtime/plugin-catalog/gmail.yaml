@@ -1,5 +1,5 @@
 name: gmail
-repo: https://github.com/guberm/qubit-gmail-desktop-plugin
+repo: https://github.com/guberm/hermes-gmail-desktop-plugin
 sha: cc8d4a2c9112976099d85ea5bc6ca501bde17079
 subdir: plugins/gmail
 title: Gmail
@@ -7,7 +7,7 @@ description: "Hermes Desktop Gmail mailbox UI for search, reading, and thread in
 maintainer: guberm
 tier: community
 category: desktop
-docs_url: https://github.com/guberm/qubit-gmail-desktop-plugin#readme
+docs_url: https://github.com/guberm/hermes-gmail-desktop-plugin#readme
 version: "1.0.11"
 readme: false
 platforms: []

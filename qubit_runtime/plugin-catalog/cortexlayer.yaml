@@ -1,5 +1,5 @@
 name: cortexlayer
-repo: https://github.com/Cortex-Layer/cortexlayer-qubit-plugin
+repo: https://github.com/Cortex-Layer/cortexlayer-hermes-plugin
 sha: 099e4b3e77f73086bbf94fb32e052c864295e2ee
 subdir: plugins/memory/cortexlayer
 description: >
@@ -12,7 +12,7 @@ description: >
 maintainer: Cortex-Layer
 tier: community
 category: memory
-docs_url: https://docs.cortexlayer.net/docs/agents/qubit
+docs_url: https://docs.cortexlayer.net/docs/agents/hermes
 version: "0.1.1"
 capabilities:
   provides_tools: []

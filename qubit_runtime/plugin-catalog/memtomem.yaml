@@ -16,7 +16,7 @@ maintainer: memtomem
 tier: community
 category: memory
 requires_hermes: ">=0.21.5"
-docs_url: https://github.com/memtomem/memtomem/tree/8fc62753ef95f14848d61cd502e1bef09bfd2757/packages/memtomem-qubit-plugin
+docs_url: https://github.com/memtomem/memtomem/tree/8fc62753ef95f14848d61cd502e1bef09bfd2757/packages/memtomem-hermes-plugin
 capabilities:
   provides_tools: []
   provides_hooks: []

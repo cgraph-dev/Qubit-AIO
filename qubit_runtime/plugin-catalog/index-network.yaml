@@ -1,6 +1,6 @@
 name: index-network
 title: Index Network
-repo: https://github.com/indexnetwork/qubit-plugin
+repo: https://github.com/indexnetwork/hermes-plugin
 sha: 97ce52266792a5171004cabbc7f9ab42ed8a9677
 description: >-
   Index tools for intents, networks, and opportunities. Disclosure — registers
@@ -13,7 +13,7 @@ description: >-
 maintainer: indexnetwork
 tier: community
 category: tools
-docs_url: https://github.com/indexnetwork/qubit-plugin#readme
+docs_url: https://github.com/indexnetwork/hermes-plugin#readme
 version: "0.47.4"
 capabilities:
   provides_tools:

@@ -21,8 +21,8 @@ maintainer: LetsFG
 tier: community
 category: tools
 version: "1.0.0"
-docs_url: https://github.com/LetsFG/LetsFG/tree/main/integrations/qubit
-image: https://raw.githubusercontent.com/LetsFG/LetsFG/3a309f60e2e0a52082728a277f319148fa60bff1/integrations/qubit/assets/banner.png
+docs_url: https://github.com/LetsFG/LetsFG/tree/main/integrations/hermes
+image: https://raw.githubusercontent.com/LetsFG/LetsFG/3a309f60e2e0a52082728a277f319148fa60bff1/integrations/hermes/assets/banner.png
 platforms: []
 capabilities:
   provides_tools: []

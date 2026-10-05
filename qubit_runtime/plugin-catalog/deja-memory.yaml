@@ -8,7 +8,7 @@ maintainer: vshulcz
 tier: community
 category: memory
 platforms: [linux, macos, windows]
-docs_url: https://vshulcz.github.io/deja-vu/guide/memory-for-qubit.html
+docs_url: https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html
 readme: true
 capabilities:
   provides_tools: []

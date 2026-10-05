@@ -11,7 +11,7 @@ description: >-
 maintainer: ashmoonori-afk
 tier: community
 category: memory
-docs_url: https://github.com/ashmoonori-afk/birkin-mnemosyne/tree/4244768c9afcc14001a59af6e39151e96a43bc2a/integrations/qubit
+docs_url: https://github.com/ashmoonori-afk/birkin-mnemosyne/tree/4244768c9afcc14001a59af6e39151e96a43bc2a/integrations/hermes
 capabilities:
   provides_tools: []
   provides_hooks: []

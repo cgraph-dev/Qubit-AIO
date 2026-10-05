@@ -13,7 +13,7 @@ maintainer: cirwel
 tier: community
 category: automation
 requires_hermes: ">=0.21.0"
-docs_url: https://github.com/cirwel/unitares-host-adapter#qubit
+docs_url: https://github.com/cirwel/unitares-host-adapter#hermes-agent
 version: "0.3.1"
 readme: true
 platforms: []

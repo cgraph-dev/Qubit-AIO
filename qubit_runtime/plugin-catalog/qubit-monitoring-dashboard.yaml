@@ -1,6 +1,6 @@
 name: qubit-monitoring-dashboard
 title: Monitoring Dashboard
-repo: https://github.com/austinpickett/qubit-monitoring-dashboard
+repo: https://github.com/austinpickett/hermes-monitoring-dashboard
 subdir: plugin
 sha: ec61fbd5fa75f40463839e2049e25d1645338b28
 version: "1.0.1"
@@ -8,8 +8,8 @@ description: "Prompt-customizable desktop dashboard with live host metrics, sess
 maintainer: austinpickett
 tier: community
 category: desktop
-docs_url: https://github.com/austinpickett/qubit-monitoring-dashboard/blob/ec61fbd5fa75f40463839e2049e25d1645338b28/plugin/README.md
-image: https://raw.githubusercontent.com/austinpickett/qubit-monitoring-dashboard/ec61fbd5fa75f40463839e2049e25d1645338b28/assets/qubit-cyanotype.jpg
+docs_url: https://github.com/austinpickett/hermes-monitoring-dashboard/blob/ec61fbd5fa75f40463839e2049e25d1645338b28/plugin/README.md
+image: https://raw.githubusercontent.com/austinpickett/hermes-monitoring-dashboard/ec61fbd5fa75f40463839e2049e25d1645338b28/assets/hermes-cyanotype.jpg
 readme: true
 platforms: []
 capabilities:

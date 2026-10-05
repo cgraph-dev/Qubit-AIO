@@ -18,9 +18,9 @@ description: >-
 maintainer: RohiRIK
 tier: community
 category: memory
-docs_url: https://github.com/RohiRIK/OpenLtm/blob/main/docs/10-qubit-plugin.md
+docs_url: https://github.com/RohiRIK/OpenLtm/blob/main/docs/10-hermes-plugin.md
 version: "2.15.1"
-image: https://raw.githubusercontent.com/RohiRIK/OpenLtm/6105051fd2d8b70fee5027fd66230f830fe31563/qubit/plugin-catalog/banner.png
+image: https://raw.githubusercontent.com/RohiRIK/OpenLtm/6105051fd2d8b70fee5027fd66230f830fe31563/hermes/plugin-catalog/banner.png
 readme: true
 platforms: []
 capabilities:

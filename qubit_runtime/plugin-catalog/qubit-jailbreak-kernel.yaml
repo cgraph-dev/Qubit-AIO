@@ -1,5 +1,5 @@
 name: qubit-jailbreak-kernel
-repo: https://github.com/Enchanted0911/qubit-jailbreak-kernel
+repo: https://github.com/Enchanted0911/hermes-jailbreak-kernel
 sha: 476233ffb0a17c2da75b4b05a8bbcd51031323f4
 description: >-
   Jailbreak-kernel plugin for Hermes Agent (ported from dsh-infinite-gen-4): dual-layer
@@ -13,7 +13,7 @@ maintainer: Enchanted0911
 tier: community
 category: general
 requires_hermes: ">=0.19"
-docs_url: https://github.com/Enchanted0911/qubit-jailbreak-kernel#readme
+docs_url: https://github.com/Enchanted0911/hermes-jailbreak-kernel#readme
 capabilities:
   provides_tools: []
   provides_hooks: []

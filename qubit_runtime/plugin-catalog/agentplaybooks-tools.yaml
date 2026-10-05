@@ -16,8 +16,8 @@ tier: community
 category: tools
 requires_hermes: ">=0.21.4"
 version: "0.1.0"
-docs_url: https://github.com/matebenyovszky/agentplaybooks/tree/819c3491d83c0371b678e2ccd7e95679b8a7d288/packages/qubit-portable/agentplaybooks-tools
-image: https://raw.githubusercontent.com/matebenyovszky/agentplaybooks/819c3491d83c0371b678e2ccd7e95679b8a7d288/public/plugin-catalog/qubit-tools.png
+docs_url: https://github.com/matebenyovszky/agentplaybooks/tree/819c3491d83c0371b678e2ccd7e95679b8a7d288/packages/hermes-portable/agentplaybooks-tools
+image: https://raw.githubusercontent.com/matebenyovszky/agentplaybooks/819c3491d83c0371b678e2ccd7e95679b8a7d288/public/plugin-catalog/hermes-tools.png
 readme: true
 platforms: [linux, macos, windows]
 capabilities:
