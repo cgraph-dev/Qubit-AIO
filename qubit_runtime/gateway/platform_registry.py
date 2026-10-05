@@ -331,6 +331,14 @@ class PlatformRegistry:
             entries, _deferred = self._scope_maps(scope)
             return entries.get(name) or self._entries.get(name)
 
+    def required_env_names(self) -> set[str]:
+        """``required_env`` of every loaded entry (current profile scope AND process-global) without
+        loading deferred adapters; the child-env scrub reads this on every spawn."""
+        with self._lock:
+            entries, _deferred = self._scope_maps(self.current_scope_key())
+            return {n for e in (*self._entries.values(), *entries.values())
+                    for n in e.required_env if isinstance(n, str)}
+
     def all_entries(self) -> list[PlatformEntry]:
         """Return all registered platform entries."""
         self._resolve_all()

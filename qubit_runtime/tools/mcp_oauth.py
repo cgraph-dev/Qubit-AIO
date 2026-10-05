@@ -1251,21 +1251,3 @@ def build_oauth_auth(server_name: str, server_url: str, oauth_config: dict | Non
             "__doc__": "SDK provider plus Qubit' token-endpoint fixes (see ``QubitProviderMixin``).",
             "__module__": __name__, "_qubit_logger": logger})
     return QubitOAuthClientProvider(server_url=server_url, **kwargs)
-
-
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from contextlib import contextmanager  # noqa: F401,E402
-
-OAuthClientInformationFull: Any = None
-
-OAuthClientMetadata: Any = None
-
-OAuthClientProvider: Any = None
-
-OAuthMetadata: Any = None
-
-OAuthToken: Any = None
-# ---- END PLUGIN-COMPAT ----
