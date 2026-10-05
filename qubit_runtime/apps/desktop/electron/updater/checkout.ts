@@ -83,6 +83,22 @@ export function readStampedCommit(root: string): string | null {
 }
 
 /**
+ * The commit this checkout was installed at, from the install stamp the
+ * updater already trusts (written by the CLI's completion tail next to the
+ * checkout it attests). Read-only display data for `currentSha`; never a
+ * git spawn and never an update input. Null when absent or malformed.
+ */
+export function readStampedCommit(root: string): string | null {
+  try {
+    const stamp = JSON.parse(readFileSync(path.join(root, 'install-stamp.json'), 'utf8')) as { commit?: unknown }
+
+    return typeof stamp.commit === 'string' && stamp.commit ? stamp.commit : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * The checkout strategy: windows-handoff on win32, posix-handoff elsewhere.
  * The bodies are the production update flow; the mechanism stamp rides on
  * every result the way the wire contract expects.

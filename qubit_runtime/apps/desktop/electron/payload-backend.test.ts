@@ -87,3 +87,10 @@ test('bundled core code precedes the dependencies, as the bin launchers order th
     ['payload/qubit', 'payload/venv/site-packages'].join(path.delimiter)
   )
 })
+
+test('bundled core code precedes the dependencies, as the bin launchers order them', () => {
+  assert.equal(
+    payloadPythonPath({ repoDir: 'payload/qubit', sitePackages: 'payload/venv/site-packages' }),
+    ['payload/qubit', 'payload/venv/site-packages'].join(path.delimiter)
+  )
+})

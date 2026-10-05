@@ -593,6 +593,34 @@ describe('requestActiveUpdate', () => {
 
     expect($backendUpdateApply.get().command).toBe('qubit update')
   })
+
+  it('shows the refusal message, not a fake command, when the backend has no command to run', async () => {
+    setRemote(true)
+    updateQubitSpy.mockResolvedValue({
+      ok: false,
+      name: 'qubit-update',
+      error: 'dashboard_update_managed_externally',
+      message: 'Hermes updates are managed outside this dashboard in containerized environments.',
+      update_command: ''
+    })
+
+    const result = await applyBackendUpdate()
+
+    expect(result.manual).toBe(true)
+    expect(result.command).toBeUndefined()
+    expect($backendUpdateApply.get().stage).toBe('manual')
+    expect($backendUpdateApply.get().command).toBeNull()
+    expect($backendUpdateApply.get().message).toContain('managed outside this dashboard')
+  })
+
+  it('falls back to `qubit update` only when an older backend omits update_command', async () => {
+    setRemote(true)
+    updateQubitSpy.mockResolvedValue({ ok: false, name: 'qubit-update', message: 'Run it yourself.' })
+
+    await applyBackendUpdate()
+
+    expect($backendUpdateApply.get().command).toBe('qubit update')
+  })
 })
 
 // Surface-bound update entry points. A surface that displays ONE target's
