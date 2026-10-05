@@ -43,11 +43,15 @@ DEFAULT_MODULES = [
     "agent.display",
     "agent.provider_media",
     "agent.runtime_self_protection",
-    "agent.turn_naming",
     "gateway.run",
     "gateway.status",
     "gateway.memory_status",
-    "gateway.platforms.telegram",
+    # NOTE: `agent.turn_naming` and `gateway.platforms.telegram` were removed
+    # from this list. Neither module exists upstream at bd0affe5 OR locally --
+    # they were phantom entries that made the gate report 2 permanent failures
+    # no sync could ever fix. A gate that always shows red trains people to
+    # ignore it. Verify a module exists before listing it here:
+    #   git -C ~/.cache/qubit-pins/hermes-agent cat-file -e bd0affe5:<path>
     "tools.registry",
     "tools.terminal_tool",
     "tools.file_tools",
