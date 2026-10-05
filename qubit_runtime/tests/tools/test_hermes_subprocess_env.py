@@ -123,6 +123,11 @@ class TestTierInvariants:
     def test_tier1_covers_infra_secrets(self):
         assert {"MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "DAYTONA_API_KEY"} <= _ALWAYS_STRIP_KEYS
 
+    def test_tier1_covers_dashboard_auth(self):
+        # Credentialed CLIs (claude/codex) must not be able to mint dashboard sessions.
+        assert {"QUBIT_DASHBOARD_BASIC_AUTH_PASSWORD", "QUBIT_DASHBOARD_BASIC_AUTH_SECRET",
+                "QUBIT_DASHBOARD_OIDC_CLIENT_SECRET", "QUBIT_DASHBOARD_DRAIN_SECRET"} <= _ALWAYS_STRIP_KEYS
+
 
 class TestBrowserPassthroughPattern:
     def test_browser_keys_recoverable_after_strip(self):

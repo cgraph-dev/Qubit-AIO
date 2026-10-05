@@ -56,7 +56,7 @@ def qubit_home(monkeypatch):
     monkeypatch.setattr(_st, "QUBIT_HOME", home, raising=False)
     monkeypatch.setattr(_st, "SKILLS_DIR", home / "skills", raising=False)
     # Reset the in-process slash-command cache so each test starts from zero.
-    monkeypatch.setattr(_sc, "_skill_commands", {}, raising=False)
+    monkeypatch.setattr(_sc, "_skill_commands_by_key", {}, raising=False)
 
     yield home
 

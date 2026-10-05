@@ -273,6 +273,26 @@ def test_only_swallowed_matching_load_failures_are_guarded(audit):
     assert {("qubit_constants", s) for s in ("wrong_exception", "name_not_module", "reraised")} <= surface.required.keys()
 
 
+def test_suppress_context_guards_like_a_swallowing_except(audit):
+    root = audit.REPO_ROOT
+    put(root, "qubit_cli/update_cmd.py", """import contextlib
+from contextlib import suppress
+
+
+def cmd_update():
+    with suppress(Exception):
+        from qubit_constants import via_suppress
+    with contextlib.suppress(ImportError):
+        from qubit_constants import via_qualified_suppress
+    with suppress(AttributeError):
+        from qubit_constants import wrong_suppress
+""")
+    commit(root, "suppress boundaries")
+    surface = audit.audit_history()
+    assert {("qubit_constants", "via_suppress"), ("qubit_constants", "via_qualified_suppress")} <= surface.guarded_only
+    assert ("qubit_constants", "wrong_suppress") in surface.required.keys()
+
+
 def test_lazy_module_facade_follows_called_helper_not_unrelated_commands(audit):
     root = audit.REPO_ROOT
     put(root, "qubit_cli/entry.py", """def _m():
