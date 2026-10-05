@@ -4744,3 +4744,25 @@ drove the verification discipline (every agent must prove no-regression).
 **Verified check going forward:** no `QUBIT_*` name is imported anywhere in
 `qubit_runtime/` without a definition (scripted scan: 0). Snapshot:
 129+73+64+76+31+29+248 files merged across 16 subsystems; gate 29 OK / 0 FAIL.
+
+### Measurement correction + pollution resolved — 2026-10-05
+
+**Order pollution is FIXED.** Resolving the deferred `tests/conftest.py` conflict
+(commit 38f3d43d) removed the environment bleed that collapsed the whole suite:
+
+    7 test files, ONE process, before: mass FAILED/ERROR
+    7 test files, ONE process, after : 409 passed / 6 failed  (116s)
+
+The 6 survivors are diagnosed defects (3 i18n pack-precedence, 1 bundle-typed-keys,
+2 others) -- not pollution. This supersedes the earlier "1,236 failed" reading,
+which was an artifact of running the full suite against a broken conftest.
+
+**FALSE ALARM, recorded so it is not repeated:** I measured "20 unsynced
+qubit_state_* modules (~1200 upstream lines)" and it was WRONG. The check treated
+"counterpart file exists" as "file is stale" without comparing content. Verifying
+properly -- are upstream's ADDED symbols present in the local file? -- showed
+**20/20 already synced** (the root-level-modules commit 65eeb897 carried them;
+`hermes_state_*.py` are root-level files, not a subtree driver ever ran).
+The merge tool reported MERGED and wrote nothing, correctly: already up to date.
+Lesson: coverage must be measured by CONTENT (are upstream's added symbols
+present?), never by file existence.
