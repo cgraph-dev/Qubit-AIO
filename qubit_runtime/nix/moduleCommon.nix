@@ -474,10 +474,10 @@ let
           dependencies — no PYTHONPATH patching or collision risk.
 
           Use this for optional extras already declared in hermes-agent's
-          pyproject.toml (e.g. "honcho", "voice").
+          pyproject.toml (e.g. "exa", "voice").
           Use extraPythonPackages for external packages not in pyproject.toml.
         '';
-        example = [ "honcho" ];
+        example = [ "voice" ];
       };
 
       # ── Service behaviour ──────────────────────────────────────────────
@@ -695,9 +695,22 @@ let
       workingDirectory,
     }:
     let
-      generated = pkgs.writeText "hermes-config.yaml" (
-        builtins.toJSON (lib.recursiveUpdate { terminal.cwd = workingDirectory; } cfg.settings)
-      );
+      generated =
+        pkgs.runCommand "hermes-config.yaml"
+          {
+            settings = builtins.toJSON (lib.recursiveUpdate { terminal.cwd = workingDirectory; } cfg.settings);
+            passAsFile = [ "settings" ];
+          }
+          ''
+            HOME=$TMPDIR ${(effectivePackage cfg).hermesVenv}/bin/python3 - "$settingsPath" > $out <<'PY'
+            import json, sys
+            from hermes_cli.config_defaults import DEFAULT_CONFIG
+            with open(sys.argv[1]) as f:
+                settings = json.load(f)
+            settings.setdefault("_config_version", DEFAULT_CONFIG["_config_version"])
+            json.dump(settings, sys.stdout)
+            PY
+          '';
     in
     {
       inherit generated;
