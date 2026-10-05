@@ -1,4 +1,4 @@
-#!/usr/bin/env -S bash -c 'exec "$BASH" "$(dirname "$0")/_hermes-python" "$0" "$@"'
+#!/usr/bin/env -S bash -c 'exec "$BASH" "$(dirname "$0")/run-in-qubit-env" python3 "$0" "$@"'
 """Regenerate apps/desktop/src/lib/desktop-slash-registry.json from COMMAND_REGISTRY.
 
 Run after changing any ``desktop=`` value or alias in ``qubit_cli/commands.py``;
