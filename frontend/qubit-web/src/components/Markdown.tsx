@@ -60,6 +60,40 @@ type BlockNode =
 /*  Block parser                                                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Pretty-print a whole-line JSON payload, or return null if the text is not
+ * actually JSON.
+ *
+ * Tool results arrive as a single-line JSON string with escaped newlines
+ * (`{"output": "a\nb"}`). Rendered as prose that becomes an unreadable wall, so
+ * a line that parses cleanly as an object or array is lifted into a code block.
+ * The `JSON.parse` round-trip is the guard: prose that merely contains braces
+ * fails to parse and is left alone.
+ */
+function asJsonBlock(raw: string): string | null {
+  const text = raw.trim();
+  if (!text || (text[0] !== "{" && text[0] !== "[")) return null;
+  if (text[text.length - 1] !== "}" && text[text.length - 1] !== "]") return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed === null || typeof parsed !== "object") return null;
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Normalise ```` ```json ```` fenced payloads: a fenced body that is really one
+ * escaped-JSON line should be pretty-printed too, so the reader sees a tree
+ * rather than a single escaped wall.
+ */
+function liftJsonFences(lang: string, body: string): string {
+  if (lang && lang.toLowerCase() !== "json") return body;
+  const lifted = asJsonBlock(body);
+  return lifted ?? body;
+}
+
 function parseBlocks(text: string): BlockNode[] {
   const lines = text.split("\n");
   const blocks: BlockNode[] = [];
@@ -79,8 +113,26 @@ function parseBlocks(text: string): BlockNode[] {
         i++;
       }
       i++; // skip closing ```
-      blocks.push({ type: "code", lang, content: codeLines.join("\n") });
+      blocks.push({ type: "code", lang, content: liftJsonFences(lang, codeLines.join("\n")) });
       continue;
+    }
+
+    // Whole-line JSON payload (escaped newlines and all) -> pretty code block,
+    // rather than a prose wall. Must run before the paragraph fallback.
+    if (/^\s*[{[]/.test(line)) {
+      // Gather the contiguous run so a wrapped/indented payload still parses.
+      const candidate: string[] = [line];
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() !== "") {
+        candidate.push(lines[j]);
+        j++;
+      }
+      const lifted = asJsonBlock(candidate.join("\n"));
+      if (lifted) {
+        blocks.push({ type: "code", lang: "json", content: lifted });
+        i = j;
+        continue;
+      }
     }
 
     // Heading

@@ -32,7 +32,13 @@ clean-room oracle for behavior.
 `browser_cdp`. Still to prove: the `/chat` terminal TUI, `/qubit-chat` voice
 turn, session persistence, gateway status/start/restart, and core dashboard
 controls against the real backend. The voicebridge `qubit task` segfault
-(`sherpa_onnx`/`sounddevice`) is the first blocker.
+(`sherpa_onnx`/`sounddevice`) is the first blocker. **Open blocker (2026-10-04):**
+the `/chat` PTY does not auto-continue a turn interrupted by a service restart —
+the TUI reconnect takes the gate-less live-reuse return at `methods_session.py:937`
+(`_resume_reuse_live_locked` `:752-766`; gate present only on `_resume_cold` `:853`
+and `_resume_eager` `:914`), so `_maybe_schedule_auto_continue` is never entered
+on the PTY boot path ([STATUS.md](STATUS.md) §86, [SESSION_SURVIVAL.md](SESSION_SURVIVAL.md),
+[RPC_BOOT_PATH_TRACE.md](RPC_BOOT_PATH_TRACE.md)).
 
 ### M2 — `CORE_PARITY_PASSED` (Phase 1)
 `/chat` and `/qubit-chat` behave on the **one** Qubit backend (real provider,

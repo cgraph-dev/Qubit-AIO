@@ -1,0 +1,818 @@
+/**
+ * Qubit bot-chat stylesheet — chat UX adapted from the external upstream
+ * project CopilotKit/openmuse (https://github.com/CopilotKit/openmuse),
+ * commit `9ec439f`, MIT license.
+ *
+ * Upstream sources (structure / states / flows only — code below is ours):
+ *   apps/mobile/src/chat.tsx               hero, bubbles, typing indicator,
+ *                                          pill composer + send/stop,
+ *                                          follow-up queue hold/resume,
+ *                                          jump-to-latest, retry
+ *   apps/mobile/src/threads.tsx            thread switching, visited threads
+ *                                          stay mounted, new-thread start
+ *   apps/mobile/src/conversation-queue.ts  one turn at a time, failure pauses
+ *                                          the queue, never resend implicitly
+ *   apps/mobile/src/conversation-run.ts    run-failure surfaces via onError
+ *   apps/mobile/src/assistant-response.tsx assistant markdown, safe http(s)
+ *                                          links only
+ *   apps/mobile/src/agent-ui.tsx           task / artifact thread cards
+ *   apps/mobile/src/screens.tsx            recent-results affordance
+ *   apps/mobile/src/ui.tsx                 palette + radii the values below
+ *                                          were adapted from
+ *
+ * Selector contract: JSX in `src/pages/QubitBotPage.tsx` and
+ * `src/pages/WebChatPage.tsx` carries these `qb-*` classes 1:1. The
+ * class-parity suite (`src/pages/BotChatParity.test.tsx`) asserts every
+ * class listed there renders on both pages.
+ *
+ * Theming: every color/radius/font routes through Qubit theme tokens
+ * (`--midground`, `--background-base`, `--theme-font-*`, `--theme-radius`,
+ * shadcn-compat `--color-*` in `src/index.css`). Zero legacy brand values.
+ *
+ * Transport note: this file is presentation only. Turns stream over the
+ * existing Qubit chat/SSE modules; no sockets are opened here.
+ */
+
+/* Layout root: column flex, full height (upstream ChatScreen root View). */
+/* Chat shell.
+ *
+ * `height: 100%` is NOT sufficient: a percentage height only resolves against a
+ * parent with a definite height, and inside the app's `flex-1 min-h-0` page slot
+ * that parent is auto-height — so the column grew to its content (a 100k-px
+ * transcript) and pushed the composer below the fold. As a flex participant the
+ * column is bounded by the slot and the transcript becomes the only scroller.
+ */
+.qb-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  flex: 1 1 auto;
+}
+
+/* Scroll transcript (upstream ScrollView: gap 13, top/bottom padding). */
+.qb-chat-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding-top: 15px;
+  padding-bottom: 20px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* Empty-thread hero (upstream centered hero + starter prompts). */
+.qb-hero {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 34px 12px;
+  gap: 15px;
+}
+.qb-hero-title {
+  font-size: 28px;
+  letter-spacing: -1px;
+  line-height: 1.25;
+  color: var(--color-foreground);
+  max-width: 350px;
+  font-weight: 600;
+}
+.qb-hero-sub {
+  color: var(--color-muted-foreground);
+  font-size: 14px;
+  line-height: 23px;
+  max-width: 320px;
+}
+.qb-starters {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 360px;
+  margin-top: 14px;
+  gap: 8px;
+}
+
+/* Bubbles (upstream: user right/blue maxW 85%, assistant left/grey 95%,
+   radius 22 with the sender-side corner pulled to 7). */
+.qb-bubble-row-user {
+  display: flex;
+  justify-content: flex-end;
+}
+.qb-bubble-row-assistant {
+  display: flex;
+  justify-content: flex-start;
+}
+.qb-bubble-user {
+  max-width: 85%;
+  padding: 13px 16px;
+  border-radius: 22px;
+  border-bottom-right-radius: 7px;
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  font-size: 16px;
+  line-height: 24px;
+}
+.qb-bubble-assistant {
+  max-width: 95%;
+  padding: 13px 16px;
+  border-radius: 22px;
+  border-bottom-left-radius: 7px;
+  background: var(--color-muted);
+  color: var(--color-foreground);
+  font-size: 15px;
+  line-height: 23px;
+}
+.qb-bubble-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+}
+.qb-bubble-sources {
+  margin-top: 4px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qb-bubble-sources a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Tool / progress cards under a turn (upstream ServerToolCard /
+   BrowserToolCard / recent-results affordance). */
+.qb-tool-card {
+  margin-right: auto;
+  max-width: 85%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--theme-radius);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--color-card);
+  color: var(--color-card-foreground);
+}
+.qb-progress {
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+}
+
+/* Typing indicator (upstream three dots, radius 28 pill). */
+.qb-typing {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  padding: 18px 19px;
+  border-radius: 28px;
+  background: var(--color-muted);
+}
+.qb-typing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--color-muted-foreground);
+  animation: qb-typing-bounce 1.2s ease-in-out infinite;
+}
+.qb-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.qb-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes qb-typing-bounce {
+  0%, 60%, 100% { opacity: 0.4; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* Pill composer with circular send/stop (upstream radius 32 bar, 44px
+   round button, focus border tint). */
+.qb-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  border-radius: 32px;
+  border: 1px solid var(--color-input);
+  background: var(--color-card);
+  padding: 8px;
+}
+.qb-composer:focus-within {
+  border-color: var(--color-ring);
+}
+.qb-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 15px;
+  line-height: 24px;
+  padding: 10px 2px;
+  color: var(--color-foreground);
+}
+.qb-composer-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+.qb-send-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+.qb-send-btn:disabled {
+  opacity: 0.5;
+}
+.qb-send-btn:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+/* Follow-up queue hold/resume (upstream "Messages on hold / Up next"). */
+.qb-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+.qb-queue-label {
+  font-size: 11px;
+  line-height: 17px;
+  color: var(--color-muted-foreground);
+}
+.qb-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.qb-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9999px;
+  background: var(--color-muted);
+  padding: 4px 12px;
+  font-size: 14px;
+}
+.qb-queue-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-muted-foreground);
+}
+.qb-queue-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  color: var(--color-muted-foreground);
+}
+.qb-queue-remove:hover {
+  color: var(--color-foreground);
+}
+
+/* Jump-to-latest (upstream "Latest messages" pill over the scroll end). */
+.qb-jump-latest {
+  position: sticky;
+  bottom: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Error + retry (upstream ErrorNotice + "Retry response" on SAME id). */
+.qb-error {
+  border: 1px solid var(--color-destructive);
+  border-radius: var(--theme-radius);
+  padding: 8px 12px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Thread switching (upstream ThreadsSheet list; visited chats stay
+   mounted, drafts + queues keyed per thread). */
+.qb-thread-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.qb-thread-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  border-radius: 9999px;
+  padding: 8px 12px;
+}
+.qb-thread-item-active {
+  background: var(--color-muted);
+  font-weight: 500;
+}
+
+/* ── Port additions: 1:1 chat surface (openmuse `chat.tsx` port) ──────── */
+
+/* Full-height page shell: the chat fills the route slot; the reserved
+   workspace panels scroll below it inside `qb-below`. */
+.qb-chat-page {
+  overflow: hidden;
+}
+.qb-below {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--color-border);
+  padding: 10px 16px 16px;
+  min-height: 0;
+  flex: 0 0 auto;
+  max-height: 42vh;
+}
+.qb-below-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  min-height: 38px;
+  padding: 7px 13px;
+  border-radius: 24px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font-size: 14px;
+  font-weight: 600;
+}
+.qb-below-toggle:hover {
+  background: var(--color-muted);
+}
+.qb-below-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.qb-thread-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.qb-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* The DS `Button outlined` renders `bg-transparent` at rest with no border
+   (only a 1px `shadow-midground` inset accent), so these buttons read as dead
+   text — measured `background: rgba(0,0,0,0)` and `border-width: 0` both at
+   rest AND on hover. Give them the same resting surface + hover state as every
+   other control family on this page (.qb-below-toggle, .qb-starter-btn), using
+   only the hoisted `--color-*` tokens. Document scope, not a descendant scope:
+   `.qb-actions-row` sits under `.qb-chat-scroll`, `.qb-below-body` and
+   `.qb-picker`, so an ancestor-scoped rule would miss most call sites. */
+.qb-actions-row button {
+  border: 1px solid var(--color-border, color-mix(in srgb, var(--midground-base, #ffe6cb) 15%, transparent));
+  background: var(--color-card, color-mix(in srgb, var(--midground-base, #ffe6cb) 4%, var(--background-base, #041c1c)));
+}
+.qb-actions-row button:hover {
+  background: var(--color-muted, color-mix(in srgb, var(--midground-base, #ffe6cb) 8%, var(--background-base, #041c1c)));
+}
+
+/* Starter prompt buttons (upstream hero Buttons). */
+.qb-starter-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 17px;
+  border-radius: 24px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qb-starter-btn:hover {
+  background: var(--color-muted);
+}
+
+/* Composer expands 44px -> 140px (upstream multiline TextInput +
+   `onContentSizeChange`; the page sets the measured height inline). */
+.qb-composer-input {
+  resize: none;
+  overflow-y: auto;
+  display: block;
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  max-height: 140px;
+}
+.qb-composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+}
+.qb-composer-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+.qb-composer-focused {
+  border-color: var(--color-ring);
+}
+.qb-plus-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: var(--color-foreground);
+}
+.qb-plus-btn-active,
+.qb-plus-btn:hover {
+  background: var(--color-muted);
+}
+
+/* Attachment chips (upstream removable document chips). */
+.qb-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 9px;
+}
+.qb-attach-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  border-radius: 16px;
+  padding: 8px 11px;
+  background: var(--color-secondary);
+  color: var(--color-foreground);
+  font-size: 12px;
+}
+.qb-attach-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Document picker (upstream "+" opens Add-a-document Card). */
+.qb-picker {
+  margin-bottom: 12px;
+  padding: 15px;
+  border-radius: 23px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.qb-picker-heading {
+  font-size: 16px;
+  font-weight: 600;
+}
+.qb-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 230px;
+  overflow-y: auto;
+}
+.qb-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  padding: 6px 4px;
+  cursor: pointer;
+}
+
+/* Tool row wrapper inside the transcript. */
+.qb-tool-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 95%;
+}
+.qb-tool-card-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  padding: 12px;
+}
+.qb-tool-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.qb-tool-head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+}
+.qb-tool-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: var(--color-secondary);
+  color: var(--color-accent-foreground, var(--color-foreground));
+  flex-shrink: 0;
+}
+.qb-tool-icon-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.qb-tool-text {
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+.qb-tool-text-muted,
+.qb-tool-sub {
+  font-size: 11px;
+  line-height: 17px;
+  color: var(--color-muted-foreground);
+}
+.qb-tool-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+.qb-tool-heading {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.25px;
+  color: var(--color-foreground);
+}
+.qb-tool-body {
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--color-muted-foreground);
+}
+.qb-tool-check {
+  color: var(--color-muted-foreground);
+}
+.qb-tool-error {
+  font-size: 14px;
+  color: var(--color-destructive);
+}
+.qb-tool-button {
+  align-self: flex-start;
+  min-height: 38px;
+  padding: 7px 13px;
+  border-radius: 24px;
+  background: var(--color-secondary);
+  color: var(--color-foreground);
+  font-size: 14px;
+  font-weight: 600;
+}
+.qb-tool-preview {
+  background: var(--color-muted);
+  border-radius: 12px;
+  padding: 21px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qb-tool-preview-title {
+  font-size: 14px;
+  color: var(--color-foreground);
+}
+.qb-tool-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qb-tool-skeleton span {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--color-border);
+}
+
+/* Generic tool-call card badges (upstream `useRenderToolCall` fallback). */
+.qb-call-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--color-muted);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+  text-transform: lowercase;
+}
+.qb-call-badge-state {
+  background: var(--color-secondary);
+}
+
+/* Inline tool spinner (three dots, staggered). */
+.qb-tool-spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.qb-tool-spinner-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--color-muted-foreground);
+  animation: qb-typing-bounce 1.2s ease-in-out infinite;
+}
+.qb-tool-spinner-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.qb-tool-spinner-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* Typing indicator wrapper (align the pill to the transcript start). */
+.qb-typing-wrap {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* Task / file thread cards (upstream thread-artifacts.tsx). */
+.qb-thread-card {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 15px;
+  border-radius: 22px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  max-width: 440px;
+}
+.qb-thread-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.qb-thread-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.qb-thread-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 13px;
+  background: var(--color-secondary);
+}
+.qb-progress-track {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+.qb-progress-fill {
+  display: block;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--color-primary);
+}
+.qb-thread-waiting {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+.qb-file-card {
+  gap: 18px;
+  background: var(--color-muted);
+}
+.qb-file-inner {
+  border-radius: 12px;
+  padding: 22px;
+  background: var(--color-card);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.qb-file-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+.qb-file-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 9px;
+}
+.qb-file-label {
+  font-size: 9px;
+  color: var(--color-muted-foreground);
+  letter-spacing: 0.06em;
+}
+.qb-file-value {
+  font-size: 12px;
+}
+.qb-file-foot {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.qb-file-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px;
+  border-radius: 9px;
+  background: var(--color-destructive);
+  color: var(--color-destructive-foreground, #fff);
+}
+.qb-file-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+/* Artifact card (upstream agent-ui.tsx ArtifactCard). */
+.qb-artifact-card {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 20px;
+  border-radius: 23px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  max-width: 440px;
+}
+.qb-artifact-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.qb-artifact-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.qb-artifact-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 8px 0;
+}
+.qb-artifact-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+.qb-artifact-value {
+  font-size: 14px;
+  text-align: right;
+}
+.qb-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--color-muted);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+}
+
+/* Recent-results affordance + save-error dock. */
+.qb-recent-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qb-save-error {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}

@@ -177,8 +177,8 @@ export default function SkillsPage() {
     ])
       .then(([s, tsets]) => {
         if (cancelled) return;
-        setSkills(s);
-        setToolsets(tsets);
+        setSkills(s ?? []);
+        setToolsets(tsets ?? []);
       })
       .catch(() => !cancelled && showToast(t.common.loading, "error"))
       .finally(() => !cancelled && setLoading(false));
@@ -278,7 +278,7 @@ export default function SkillsPage() {
       // shows up immediately.
       api
         .getSkills(selectedProfile || undefined)
-        .then(setSkills)
+        .then((next) => setSkills(next ?? []))
         .catch(() => {});
     },
     [selectedProfile, showToast],

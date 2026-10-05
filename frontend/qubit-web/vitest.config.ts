@@ -1,3 +1,14 @@
+// Qubit harness: React's production bundle strips `act` entirely
+// (`exports.act` only exists in react.development.js; react/index.js picks
+// the bundle by `process.env.NODE_ENV`). Vitest defaults an *unset*
+// NODE_ENV to "test", but an ambient `NODE_ENV=production` leaks through
+// and every `import { act } from "react"` resolves to `undefined`
+// ("act is not a function"). Force the test default back: the config loads
+// before workers fork, so they inherit the fixed value before React loads.
+if (process.env.NODE_ENV === "production") {
+  process.env.NODE_ENV = "test";
+}
+
 import { defineConfig } from "vitest/config";
 import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";

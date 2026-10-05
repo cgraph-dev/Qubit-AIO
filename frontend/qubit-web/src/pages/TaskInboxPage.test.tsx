@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * /qubit-task-inbox — ledger + read-only suggestions render, cancel/retry run
- * via receipt/session with confirmation, and dismiss/mentions/suggestion-write
- * verbs render disabled-with-reason (code + verbatim detail + counterpart
- * links) and never fire.
+ * /qubit-task-inbox — ledger + derived ideas render, ideas accept/dismiss run
+ * over the real bot/ideas-* actions with confirmation, cancel/retry run via
+ * receipt/session, and dismiss/mentions verbs render disabled-with-reason
+ * (code + verbatim detail + counterpart links) and never fire.
  */
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -15,6 +15,8 @@ const taskMocks = vi.hoisted(() => ({
   getTaskSuggestions: vi.fn(),
   cancelTask: vi.fn(),
   retryTask: vi.fn(),
+  acceptIdea: vi.fn(),
+  dismissIdea: vi.fn(),
 }));
 
 vi.mock("@/lib/ocFamilyBoardApi", () => ({
@@ -31,13 +33,6 @@ vi.mock("@/lib/ocFamilyBoardApi", () => ({
     detail: "Qubit runs no human-mention inbox service; no mention is listed or dismissed",
     prerequisite: "a human-mention inbox service backed by configured message channels",
     counterpart: "voicebridge.automation outbox/orders (`qubit channels`)",
-  },
-  TASK_SUGGESTIONS_REFUSAL: {
-    method: "taskSuggestions.create / taskSuggestions.accept / taskSuggestions.dismiss",
-    code: "TASK_SUGGESTIONS_OPERATOR_REQUIRED",
-    detail: "Qubit keeps no ephemeral model-proposed task-suggestion registry; no suggestion is created, accepted, or dismissed",
-    prerequisite: "an upstream model-proposed task-suggestion registry + run-control runtime; Qubit runs none",
-    counterpart: "durable scheduled work via voicebridge.schedules.create_job (`qubit cron add`) + the canonical chat session",
   },
   normalizeTasks: (v: unknown) => v,
   normalizeSuggestions: (v: unknown) => v,
@@ -114,10 +109,12 @@ beforeEach(() => {
     { id: "t-1", title: "Summarize inbox", state: "done", session: "chat-1", updated_at: "" },
   ]);
   taskMocks.getTaskSuggestions.mockResolvedValue([
-    { id: "s-1", prompt: "File the weekly report", title: "", session: "" },
+    { id: "s-1", prompt: "File the weekly report", title: "Re-run Weekly review", session: "", reason: "failed run", kind: "agent" },
   ]);
   taskMocks.cancelTask.mockResolvedValue({ ok: true });
   taskMocks.retryTask.mockResolvedValue({ ok: true });
+  taskMocks.acceptIdea.mockResolvedValue({ state: "OK", taskId: "chat-9" });
+  taskMocks.dismissIdea.mockResolvedValue({ state: "OK", dismissed: true });
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -220,7 +217,7 @@ describe("TaskInboxPage", () => {
     );
     await waitFor(() => {
       const titles = columnTitles();
-      return titles.includes("Suggestions (read-only)") && !titles.includes("Task ledger");
+      return titles.includes("Ideas") && !titles.includes("Task ledger");
     });
     // Controls + gated columns stay reachable in every preset.
     expect(columnTitles()).toContain("Cancel / retry via receipt or session");
@@ -230,7 +227,7 @@ describe("TaskInboxPage", () => {
     await act(async () => tasksPill.click());
     await waitFor(() => {
       const titles = columnTitles();
-      return titles.includes("Task ledger") && !titles.includes("Suggestions (read-only)");
+      return titles.includes("Task ledger") && !titles.includes("Ideas");
     });
   });
 
@@ -246,14 +243,13 @@ describe("TaskInboxPage", () => {
     await act(async () => (container.querySelector("#task-inbox-hide-empty") as HTMLInputElement).click());
     await waitFor(() => {
       const titles = columnTitles();
-      return titles.includes("Suggestions (read-only)") && !titles.includes("Task ledger");
+      return titles.includes("Ideas") && !titles.includes("Task ledger");
     });
   });
 
   it.each([
     ["TASKS_DISMISS_OPERATOR_REQUIRED", "Qubit keeps no detached-task completion-delivery registry; nothing is dismissed", null],
     ["MENTIONS_INBOX_OPERATOR_REQUIRED", "Qubit runs no human-mention inbox service; no mention is listed or dismissed", "/channels"],
-    ["TASK_SUGGESTIONS_OPERATOR_REQUIRED", "Qubit keeps no ephemeral model-proposed task-suggestion registry; no suggestion is created, accepted, or dismissed", "/cron"],
   ])(
     "renders %s disabled with its verbatim reason and never fires",
     async (code, detail, counterpartTo) => {

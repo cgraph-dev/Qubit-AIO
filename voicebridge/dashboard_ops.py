@@ -1035,6 +1035,44 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             return HC.h_plugin_kanban_tasks_patch(
                 cfg, {}, {**staged, "confirm": True}, {"task_id": tid})
         return _run
+    if action.startswith("family."):
+        # Every ``qubit.family.<fam>.<act>`` capability stages through
+        # ``_compat_confirm`` when the caller omits ``confirm``. Before this
+        # runner existed, the id-only Confirm in the pending-approvals banner
+        # answered ``CONFIRM_UNSUPPORTED`` for all 62 family capabilities
+        # ("No executable Qubit backend for 'family.bot.ideas-accept'"), so a
+        # banner of 82 pending items could never be cleared.
+        #
+        # The family mutation itself IS executable: the compat route answers
+        # normally when the request carries ``confirm: true`` (proven live for
+        # ``bot.ideas-accept`` and ``harness.task_submit``). So re-issue the
+        # SAME family action with the staged payload plus ``confirm``.
+        #
+        # ``action`` is ``family.<fam>.<act>``; re-split on the LAST dot so a
+        # dotted action name (none today, but the family table uses them for
+        # gateway method ids) cannot mis-slice the name.
+        parts = action.split(".")
+        if len(parts) < 3:
+            return None
+        fam, act = parts[1], ".".join(parts[2:])
+        if not fam or not act:
+            return None
+
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            staged = dict(payload or {})
+            body = {**{k: v for k, v in staged.items()
+                       if k not in ("confirm", "confirmation_id")},
+                    "confirm": True}
+            handler = getattr(HC, "_family_mutation", None)
+            if handler is None:  # pragma: no cover - wiring guard
+                return 400, {
+                    "ok": False, "code": "CONFIRM_UNSUPPORTED",
+                    "detail": "the family dispatcher is not wired; "
+                              "cancel and retry."}
+            return handler(cfg, fam, act, body)
+        return _run
     return None
 
 
@@ -1083,7 +1121,14 @@ def _confirm_compat_one(cfg: Any, item: Any, *, actor: str, session: str,
         return {"state": "failed", "code": str(code)[:60],
                 "detail": _redact(str(exc))[:300]}
     http, body = outcome if isinstance(outcome, tuple) else (200, outcome)
-    ok = bool(isinstance(body, dict) and body.get("ok"))
+    # Family routes answer with ``state`` ("OK"/"NO_MODEL"/...) and no ``ok``
+    # key, while the cron/mcp/skills runners answer with ``ok``. Accept both:
+    # a successful family settle was previously reported as ``BACKEND_REFUSED``
+    # with an empty detail *after* the mutation had already applied, so the
+    # banner said failed while the change was live.
+    _b = body if isinstance(body, dict) else {}
+    ok = bool(_b.get("ok")) if "ok" in _b else \
+        str(_b.get("state", "")).upper() in ("OK", "EXECUTED", "DONE")
     if not ok:
         code = str((body or {}).get("code") or "BACKEND_REFUSED")[:60]
         _audit("confirmed_failed", actor,

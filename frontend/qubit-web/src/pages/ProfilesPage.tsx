@@ -396,7 +396,7 @@ export default function ProfilesPage() {
   const load = useCallback(() => {
     Promise.all([api.getProfiles(), api.getActiveProfile().catch(() => null)])
       .then(([res, active]) => {
-        setProfiles(res.profiles);
+        setProfiles(res?.profiles ?? []);
         setActiveInfo(active);
       })
       .catch((e) => showToast(`${t.status.error}: ${e}`, "error"))

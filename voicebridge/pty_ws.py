@@ -55,7 +55,12 @@ class TerminalContextError(Exception):
         self.detail = str(guard.get("detail") or "")
 
 TICKET_TTL_S = 30.0
-MAX_SESSIONS = 4
+#: Concurrent PTY terminals. Was 4 — far too low for normal use (one /chat tab
+#: per open session plus detached terminals kept alive across reloads), so a
+#: handful of session opens exhausted it and every later /chat (including a
+#: brand-new one) was refused — the owner's "black screen even for new chat"
+#: (2026-10-05). Each TUI is ~250 MB; 12 is a safe ceiling on this host.
+MAX_SESSIONS = 12
 IDLE_TIMEOUT_S = 30 * 60.0
 MAX_FRAME_BYTES = 1 << 20          # 1 MiB inbound frame cap
 PTY_READ_TIMEOUT = 0.2
@@ -134,6 +139,83 @@ class TicketStore:
 # ---------------------------------------------------------------------------
 class WsProtocolError(Exception):
     pass
+
+
+def _infer_provider_for_model(model: str, cfg: Any = None) -> str:
+    """Best-effort provider for a bare model name from the profile registry.
+
+    Local models have no billing row, so ``session_model_usage`` cannot name
+    their provider; the registry can. Never raises; ``""`` when unknown.
+    """
+    name = str(model or "").strip()
+    if not name:
+        return ""
+    try:
+        from .providers import resolver as _R
+        profiles: list = []
+        try:
+            profiles.extend(_R.default_profiles())
+        except Exception:
+            pass
+        try:
+            profiles.extend(_R.load_profiles(cfg))
+        except Exception:
+            pass
+        for p in profiles:
+            if str(getattr(p, "model", "") or "") == name:
+                prov = str(getattr(p, "provider", "") or "")
+                if prov:
+                    return prov
+    except Exception:
+        pass
+    return ""
+
+
+def _session_stored_model(session_id: str, cfg: Any = None
+                        ) -> Tuple[str, str]:
+    """Stored (provider, model) for a resumed vendored session, best-effort.
+
+    A resumed TUI reopens the session's transcript with the model recorded in
+    the canonical ``sessions`` row — NOT the current config default. The MODEL
+    card must report what the terminal actually runs, so the ws-ticket grant
+    overlays this on resume. Returns ``("", "")`` when unknown; never raises.
+    """
+    sid = str(session_id or "").strip()
+    if not sid:
+        return "", ""
+    try:
+        from . import qubit_runtime as _QR
+        home = _QR.use_qubit_home(cfg)
+        import sqlite3 as _sql
+        db = str(Path(home) / "state.db")
+        con = _sql.connect(f"file:{db}?mode=ro", uri=True, timeout=2.0)
+        try:
+            row = con.execute(
+                "SELECT model FROM sessions WHERE id = ?", (sid,)).fetchone()
+            model = str((row or ("",))[0] or "").strip()
+            provider = ""
+            if model:
+                prow = con.execute(
+                    "SELECT billing_provider FROM session_model_usage "
+                    "WHERE session_id = ? AND model = ? "
+                    "ORDER BY last_seen DESC LIMIT 1",
+                    (sid, model)).fetchone()
+                provider = str(((prow or ("",))[0]) or "").strip()
+            if model and not provider:
+                # No usage row (local models never bill): infer the provider
+                # from the profile registry so a local session reports the
+                # LOCAL provider, not the API default. Without this the grant
+                # said `opencode-go / qubit-brain4` — a mismatched pair that
+                # made the picker mark the wrong provider (2026-10-05).
+                provider = _infer_provider_for_model(model, cfg)
+            return provider, model
+        finally:
+            try:
+                con.close()
+            except Exception:
+                pass
+    except Exception:
+        return "", ""
 
 
 def _accept_key(sec_key: str) -> str:
@@ -485,6 +567,11 @@ class _Session:
     last_activity: float = field(default_factory=time.monotonic)
     cancelled: bool = False
     loop: Any = None  # dedicated asyncio loop for the vendored async writes
+    # True when the terminal genuinely finished (process exit, idle timeout,
+    # estop, cancel). False means the CLIENT went away (refresh/close) and the
+    # PTY should be kept alive for a re-attach.
+    ended: bool = False
+    key: str = ""  # stable conversation key used for detach/re-attach
 
 
 class PtyWsServer:
@@ -512,8 +599,14 @@ class PtyWsServer:
         self._idle = float(idle_timeout_s)
         self._lock = threading.Lock()
         self._active: Dict[int, _Session] = {}
+        # Detached PTYs: a browser refresh closes the websocket, but the
+        # terminal must keep running so an in-flight turn is not killed. We
+        # keep the bridge alive under its conversation key and re-attach on the
+        # next connect with the same key instead of tearing it down.
+        self._detached: Dict[str, _Session] = {}
 
-    def _resolve_guard(self, profile_id: str = "") -> Optional[Dict[str, Any]]:
+    def _resolve_guard(self, profile_id: str = "",
+                       session_id: str = "") -> Optional[Dict[str, Any]]:
         """Resolve the ``/chat`` context guard for the real vendored spawn.
 
         Returns the guard dict (pass *or* typed failure) or ``None`` when no
@@ -521,21 +614,40 @@ class PtyWsServer:
         double, or no guard configured. ``profile_id`` is the client's requested
         Qubit model profile id; it is threaded through so the guard selects that
         exact profile (an unknown id is a typed refusal) rather than silently
-        resolving a different one.
+        resolving a different one. ``session_id`` is the ``?resume=`` target:
+        a resumed TUI keeps its stored session model, so the grant overlays it
+        (with ``session_pinned`` + the fresh default kept as ``default_*``)
+        instead of reporting a default the terminal does not run.
         """
         if self._context_guard is None or getattr(
                 self._spawn, "__func__", None) is not PtyWsServer._production_spawn:
             return None
         requested = str(profile_id or "").strip() or None
         try:
-            return self._context_guard(self.cfg, profile_id=requested)
+            guard = self._context_guard(self.cfg, profile_id=requested)
         except TypeError:
             # A guard injected without the profile keyword still resolves its
             # own default; the client profile is never silently substituted.
-            return self._context_guard(self.cfg)
+            guard = self._context_guard(self.cfg)
         except Exception as exc:  # noqa: BLE001 - fail closed, redacted
             return {"ok": False, "code": "TERMINAL_CONTEXT_UNVERIFIED",
                     "detail": _redact(str(exc))}
+        if not isinstance(guard, dict):
+            return guard
+        resume = str(session_id or "").strip()
+        if resume and guard.get("ok") is not False:
+            stored_provider, stored_model = _session_stored_model(
+                resume, self.cfg)
+            if stored_model and stored_model != str(guard.get("model") or ""):
+                guard = dict(guard)
+                guard["default_provider"] = str(guard.get("provider") or "")
+                guard["default_model"] = str(guard.get("model") or "")
+                guard["provider"] = stored_provider or str(
+                    guard.get("provider") or "")
+                guard["model"] = stored_model
+                guard["session_pinned"] = True
+                guard["resumed_session"] = resume
+        return guard
 
     def journal_context_refusal(self, guard: Dict[str, Any], *,
                                 requested_profile: str = "",
@@ -574,12 +686,20 @@ class PtyWsServer:
         resolves the Qubit-seeded model/provider from the child env +
         ``QUBIT_HOME`` config instead.
         """
-        guard = self._resolve_guard(profile)
+        guard = self._resolve_guard(profile, session_id=resume)
         if isinstance(guard, dict) and guard.get("ok") is False:
             raise TerminalContextError(guard)
         overrides = terminal_profile_env(self.cfg, guard) if guard else None
+        # The QUBIT_HOME config write must track the CURRENT default, never a
+        # resumed session's pinned model: a resume must not flip the global
+        # default backwards (the TUI reopens the stored session model anyway).
+        home_guard = guard
+        if isinstance(guard, dict) and guard.get("session_pinned"):
+            fresh = self._resolve_guard(profile)
+            if isinstance(fresh, dict) and fresh.get("ok") is not False:
+                home_guard = fresh
         return _default_spawn(cols, rows, resume, "",
-                              env_overrides=overrides, home_config=guard,
+                              env_overrides=overrides, home_config=home_guard,
                               cfg=self.cfg, workspace_cwd=workspace_cwd)
 
     def _request_spawn(self, cols: int, rows: int, resume: str, profile: str,
@@ -613,7 +733,8 @@ class PtyWsServer:
         with self._lock:
             return len(self._active)
 
-    def context_preflight(self, profile_id: str = "") -> Optional[Dict[str, Any]]:
+    def context_preflight(self, profile_id: str = "",
+                            session_id: str = "") -> Optional[Dict[str, Any]]:
         """Typed ``/chat`` context-floor failure, or ``None`` when it passes.
 
         The floor only guards the REAL vendored spawn; a server constructed
@@ -622,13 +743,32 @@ class PtyWsServer:
         ``profile_id`` is the client's requested Qubit model profile id, when
         one was supplied.
         """
-        guard = self._resolve_guard(profile_id)
+        guard = self._resolve_guard(profile_id, session_id=session_id)
         if isinstance(guard, dict) and guard.get("ok") is False:
             return guard
         return None
 
+    def detach_all(self) -> None:
+        """Move every LIVE session to the detached set without killing it.
+
+        Used at shutdown: the browser may be gone (refresh) or about to be
+        (page reload). The terminal must survive so an in-flight turn is not
+        destroyed by a service restart.
+        """
+        with self._lock:
+            sessions = list(self._active.values())
+        for s in sessions:
+            self._detach(s)
+
     def cancel_all(self) -> None:
-        """Kill every live PTY child (listener shutdown / e-stop)."""
+        """Kill every live PTY child (listener shutdown / e-stop).
+
+        Detached sessions are deliberately NOT killed. A detached PTY is one
+        whose browser went away (refresh) yet whose terminal must keep running;
+        killing it here would also kill an in-flight turn on every bridge
+        restart. Its own idle timeout still retires it, and a fresh connect
+        re-attaches or spawns cleanly.
+        """
         with self._lock:
             sessions = list(self._active.values())
         for s in sessions:
@@ -642,7 +782,8 @@ class PtyWsServer:
 
     def serve(self, handler: Any, *, ticket_value: str, cols: int, rows: int,
               resume: str, profile: str, origin_ok: bool,
-              peer_ok: bool, workspace_cwd: str = "") -> None:
+              peer_ok: bool, workspace_cwd: str = "",
+              attach: str = "") -> None:
         """Run one WS-PTY session to completion (called from the handler thread)."""
         # 1) Auth + boundary checks BEFORE the handshake so a rejection is an
         #    HTTP status, never an accepted socket.
@@ -670,7 +811,7 @@ class PtyWsServer:
         # ``_spawn`` with a double and must not require a 64k+ provider. The
         # client's Qubit model profile (``?profile=``) is threaded through so an
         # unknown id is a typed refusal, never a silent substitution.
-        guard = self._resolve_guard(profile)
+        guard = self._resolve_guard(profile, session_id=resume)
         if isinstance(guard, dict) and guard.get("ok") is False:
             status = (503 if guard.get("code") == "TERMINAL_CONTEXT_UNVERIFIED"
                       else 409)
@@ -687,6 +828,40 @@ class PtyWsServer:
             if len(self._active) >= self._max:
                 _reject(handler, 429, "PTY_LIMIT",
                         "Too many concurrent terminal sessions.")
+                return
+
+        # 1b) Re-attach to a terminal this conversation already owns. A browser
+        #     refresh drops the socket but must NOT kill an in-flight turn, so a
+        #     previously detached session for the same ticket session resumes
+        #     here instead of spawning a second terminal. An explicit
+        #     ``resume`` request, or a session whose terminal has exited, falls
+        #     through to a fresh spawn below.
+        key = str(attach or ticket.session or "")
+        if key and not resume:
+            prior = self._reattach(key)
+            if prior is not None:
+                session = prior
+                with self._lock:
+                    self._active[id(session)] = session
+                try:
+                    handshake(handler)
+                except WsProtocolError as exc:
+                    self._teardown(session)
+                    _reject(handler, 400, "WS_HANDSHAKE", str(exc))
+                    return
+                log_event("webui.pty.session_reattach", session=ticket.session,
+                          pid=_safe_pid(session.bridge),
+                          conversation_id=key)
+                try:
+                    self._pump(handler, session)
+                finally:
+                    if session.ended:
+                        self._teardown(session)
+                        log_event("webui.pty.session_close",
+                                  session=ticket.session,
+                                  pid=_safe_pid(session.bridge))
+                    else:
+                        self._detach(session)
                 return
 
         # 2) Spawn the real terminal behind the vendored PTY bridge.
@@ -706,7 +881,7 @@ class PtyWsServer:
                     _redact(str(detail))[:200])
             return
 
-        session = _Session(bridge=bridge, ticket=ticket)
+        session = _Session(bridge=bridge, ticket=ticket, key=key)
         with self._lock:
             self._active[id(session)] = session
         try:
@@ -736,9 +911,16 @@ class PtyWsServer:
         try:
             self._pump(handler, session)
         finally:
-            self._teardown(session)
-            log_event("webui.pty.session_close", session=ticket.session,
-                      pid=_safe_pid(bridge))
+            # The browser closes the websocket on refresh/close. That is a
+            # DETACH, not an end: the terminal must keep running so an
+            # in-flight turn survives the reload. Only a genuine end (process
+            # exited, idle timeout, estop, cancel) tears the PTY down.
+            if session.ended:
+                self._teardown(session)
+                log_event("webui.pty.session_close", session=ticket.session,
+                          pid=_safe_pid(bridge))
+            else:
+                self._detach(session)
 
     def _pump(self, handler: Any, session: _Session) -> None:
         sock = handler.connection
@@ -746,13 +928,16 @@ class PtyWsServer:
         bridge = session.bridge
         while True:
             if session.cancelled:
+                session.ended = True
                 close_frame(sock, 1001, "cancelled")
                 return
             if self._estop_engaged():
                 session.cancelled = True
+                session.ended = True
                 close_frame(sock, 1011, "emergency stop")
                 return
             if time.monotonic() - session.last_activity > self._idle:
+                session.ended = True
                 close_frame(sock, 1000, "idle timeout")
                 return
             # PTY -> WS
@@ -761,6 +946,7 @@ class PtyWsServer:
             except Exception:
                 chunk = None
             if chunk is None:
+                session.ended = True
                 close_frame(sock, 1000, "session ended")
                 return
             if chunk:
@@ -823,6 +1009,8 @@ class PtyWsServer:
     def _teardown(self, session: _Session) -> None:
         with self._lock:
             self._active.pop(id(session), None)
+            if session.key:
+                self._detached.pop(session.key, None)
         try:
             session.bridge.close()
         except Exception:
@@ -833,6 +1021,63 @@ class PtyWsServer:
             except Exception:
                 pass
             session.loop = None
+
+    def _detach(self, session: _Session) -> None:
+        """Keep the PTY alive after its client went away (refresh/close).
+
+        The bridge keeps running with an unread output buffer; the next connect
+        with the same conversation key re-attaches and resumes streaming. The
+        terminal thread keeps the dedicated loop so buffered async writes still
+        land while detached.
+        """
+        with self._lock:
+            self._active.pop(id(session), None)
+            if session.key:
+                self._detached[session.key] = session
+                # Bound the detached set the same way ``_active`` is bounded.
+                while len(self._detached) > self._max:
+                    old_key = next(iter(self._detached))
+                    if old_key == session.key:
+                        break
+                    old = self._detached.pop(old_key, None)
+                    if old is not None:
+                        self._teardown(old)
+        log_event("webui.pty.session_detach", session=session.ticket.session,
+                  pid=_safe_pid(session.bridge))
+
+    def _reattach(self, key: str) -> Optional[_Session]:
+        """Return a still-live detached session for ``key``, if any.
+
+        A detached session whose terminal has since exited is retired here (its
+        ``bridge.read`` would return EOF anyway), so a stale entry never
+        resurrects a dead terminal.
+        """
+        with self._lock:
+            session = self._detached.pop(key, None)
+        if session is None:
+            return None
+        if getattr(session.bridge, "isalive", None) is not None:
+            try:
+                if not session.bridge.isalive():
+                    with self._lock:
+                        self._active.pop(id(session), None)
+                    try:
+                        session.bridge.close()
+                    except Exception:
+                        pass
+                    if session.loop is not None:
+                        try:
+                            session.loop.close()
+                        except Exception:
+                            pass
+                        session.loop = None
+                    return None
+            except Exception:
+                pass
+        session.last_activity = time.monotonic()
+        session.cancelled = False
+        session.ended = False
+        return session
 
 
 def _safe_pid(bridge: Any) -> int:

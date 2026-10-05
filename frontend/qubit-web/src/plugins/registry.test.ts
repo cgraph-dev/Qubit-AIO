@@ -2,8 +2,9 @@
  * Smoke test for the plugin SDK surface additions.
  *
  * Verifies that `exposePluginSDK()` writes the new dialog/toast primitives to
- * `window.__QUBIT_PLUGIN_SDK__` (with the legacy `window.__HERMES_PLUGIN_SDK__`
- * alias assigned the same object for third-party plugins). Each new key is
+ * `window.__QUBIT_PLUGIN_SDK__` (with the legacy
+ * `window.__QUBIT_PLUGIN_SDK_LEGACY__` alias assigned the same object for
+ * plugins built against the old globals). Each new key is
  * checked individually so a regression in one helper doesn't mask the others.
  *
  * Companion to the additive PR "feat(plugins): expose Dialog/ConfirmDialog/
@@ -18,8 +19,8 @@ type SdkWindow = {
     components: Record<string, unknown>;
     hooks: Record<string, unknown>;
   };
-  __HERMES_PLUGINS__?: unknown;
-  __HERMES_PLUGIN_SDK__?: {
+  __QUBIT_PLUGINS_LEGACY__?: unknown;
+  __QUBIT_PLUGIN_SDK_LEGACY__?: {
     components: Record<string, unknown>;
     hooks: Record<string, unknown>;
   };
@@ -31,8 +32,8 @@ describe("plugin SDK dialog/toast surface", () => {
     (globalThis as unknown as { window: SdkWindow }).window = {
       __QUBIT_PLUGINS__: undefined,
       __QUBIT_PLUGIN_SDK__: undefined,
-      __HERMES_PLUGINS__: undefined,
-      __HERMES_PLUGIN_SDK__: undefined,
+      __QUBIT_PLUGINS_LEGACY__: undefined,
+      __QUBIT_PLUGIN_SDK_LEGACY__: undefined,
     };
   });
 
@@ -62,10 +63,10 @@ describe("plugin SDK dialog/toast surface", () => {
     expect(typeof sdk.hooks.useCallback).toBe("function");
   });
 
-  it("keeps the legacy __HERMES_* aliases assigned to the same objects", () => {
+  it("keeps the legacy pre-rebrand aliases assigned to the same objects", () => {
     exposePluginSDK();
     const w = (globalThis as unknown as { window: SdkWindow }).window;
-    expect(w.__HERMES_PLUGIN_SDK__).toBe(w.__QUBIT_PLUGIN_SDK__);
-    expect(w.__HERMES_PLUGINS__).toBe(w.__QUBIT_PLUGINS__);
+    expect(w.__QUBIT_PLUGIN_SDK_LEGACY__).toBe(w.__QUBIT_PLUGIN_SDK__);
+    expect(w.__QUBIT_PLUGINS_LEGACY__).toBe(w.__QUBIT_PLUGINS__);
   });
 });

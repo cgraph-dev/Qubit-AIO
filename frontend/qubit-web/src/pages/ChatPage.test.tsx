@@ -74,6 +74,10 @@ vi.mock("@/lib/api", () => ({
     getChatSession: apiMocks.getChatSession,
     patchChatSession: apiMocks.patchChatSession,
   },
+  // Transcript reads go through the backoff wrapper; mocked transports
+  // never transiently fail, so a first-attempt passthrough matches the
+  // real behavior on a healthy backend.
+  withBackoff: (fn: () => Promise<unknown>) => fn(),
   authedFetch: vi.fn(),
   streamChatTurn,
   CHAT_REASONING_LEVELS: [
@@ -250,7 +254,7 @@ describe("Qubit ChatPage", () => {
   it("renders the empty state and the model line", async () => {
     await renderChat();
     await vi.waitFor(() =>
-      expect(container.textContent).toContain("No messages yet"),
+      expect(container.textContent).toContain("Start a new run."),
     );
     await vi.waitFor(() =>
       expect(container.textContent).toContain("qubit-brain4"),
@@ -316,7 +320,7 @@ describe("Qubit ChatPage", () => {
     });
     await renderChat();
     await vi.waitFor(() =>
-      expect(container.textContent).toContain("No messages yet"),
+      expect(container.textContent).toContain("Start a new run."),
     );
     expect(apiMocks.getChatSessionMessages).not.toHaveBeenCalled();
   });
@@ -420,6 +424,40 @@ describe("Qubit ChatPage", () => {
       expect(container.textContent).toContain("recovered"),
     );
     expect(streamChatTurn).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces a mid-stream typed error and offers Retry (no crash)", async () => {
+    // Deltas arrive, then a typed error before `done`. The page drops the
+    // provisional streaming text (it was never a committed turn), surfaces the
+    // error honestly, and offers Retry — never blanks the transcript or throws
+    // on the truncated frame.
+    streamChatTurn.mockImplementationOnce(
+      async (
+        _body: unknown,
+        handlers: {
+          onStart?: (e: unknown) => void;
+          onDelta?: (t: string, e: unknown) => void;
+          onError?: (e: unknown) => void;
+        },
+      ) => {
+        handlers.onStart?.({ event: "start", session: "dashboard-chat" });
+        handlers.onDelta?.("half ", { event: "delta" });
+        handlers.onDelta?.("written", { event: "delta" });
+        handlers.onError?.({ event: "error", code: "STREAM_BROKEN", detail: "socket closed" });
+      },
+    );
+    await renderChat();
+    await typeAndSend("stream please");
+
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("STREAM_BROKEN"),
+    );
+    expect(container.textContent).toContain("socket closed");
+    // The truncated provisional text must not linger as a committed reply.
+    expect(container.textContent).not.toContain("half written");
+    expect(
+      container.querySelector('button[aria-label="Retry the last message"]'),
+    ).not.toBeNull();
   });
 
   it("reports a typed unsupported state when the browser has no speech API", async () => {

@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run",
+    "test:shared": "vitest run --config vitest.shared.config.ts",
     "check": "npm run typecheck && npm run test && npm run lint"
   },
   "dependencies": {

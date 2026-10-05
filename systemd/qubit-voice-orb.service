@@ -1,0 +1,32 @@
+[Unit]
+Description=Qubit floating voice orb (X11 Tk overlay)
+Documentation=https://github.com/cgraph-dev/qubit-voicebridge
+# OWNER OPT-IN 2026-10-04: enabled + started ("make it launch when qubit
+# is active ... so always"). PartOf (not Requires/BindsTo) the dashboard
+# unit: stopping/restarting the dashboard stops/restarts the orb, but the
+# orb never restarts anything itself. After voice-typing is ordering-only
+# (the orb signals the helper when live, falls back to stage-only begin
+# when it is not); an absent typing unit does not block the orb.
+PartOf=qubit-voicebridge.service
+After=qubit-voicebridge.service qubit-voice-typing.service graphical-session.target network.target
+# Bounded restart storm guard (matches the sibling units).
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# X11 overlay: needs the owner's graphical session. DISPLAY/XAUTHORITY are
+# deliberately NOT hardcoded here — the unit inherits the user manager's
+# session environment (import once after login if needed:
+#   systemctl --user import-environment DISPLAY XAUTHORITY
+#   systemctl --user daemon-reload
+# With no DISPLAY the process exits 0 by itself (ORB_NO_DISPLAY), so the
+# unit fails gracefully on a headless host instead of restart-storming.
+ExecStart=%h/Projects/Repos/qubit-voicebridge/.venv/bin/python -m voicebridge.orb
+WorkingDirectory=%h/Projects/Repos/qubit-voicebridge
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

@@ -17,6 +17,16 @@ VOICE_PREFIXES = (
     "voice_edit.",
     "qubit_compat.voice_edit.",
     "stt.",
+    # 2026-10-04: the orb's speaking set names tts.speak/tts.synthesize,
+    # but this filter dropped every tts.* row — dashboard-rendered speech
+    # (speak buttons, talk page) never lit the orb. Slimmed rows carry no
+    # text (SHOWN_FIELDS has no path/text for tts rows).
+    "tts.",
+    # 2026-10-05: the orb's transition rows (log_event("orb.state") in
+    # the poll tick) were invisible through GET /api/voice-edit/log, so
+    # stuck-state reports were undecidable. Read-only visibility: the
+    # slimmed rows carry frm/to only (SHOWN_FIELDS has no text for them).
+    "orb.",
 )
 
 # Fields worth showing; never include selected/transcribed text.

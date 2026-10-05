@@ -85,7 +85,10 @@ def _wind_dir16(degrees: float) -> str:
         return ""
 
 
-def _get_json(url: str, timeout: float = 8.0) -> dict:
+def _get_json(url: str, timeout: float = 5.0) -> dict:
+    # Lane 4 budget: two sequential fetches (geocode + forecast) must stay
+    # under the caller's 12 s subprocess cap (scripts/web_search.py), so each
+    # fetch gets 5 s and the miss degrades loudly via the caller's stderr.
     req = urllib.request.Request(url, headers={"User-Agent": "qubit-voicebridge/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read())

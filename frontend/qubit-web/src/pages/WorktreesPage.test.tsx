@@ -56,7 +56,18 @@ beforeEach(() => {
     if (url === "/api/git/worktrees") {
       return { worktrees: [{ path: "/repo/wt1", branch: "b1" }] };
     }
-    if (url === "/api/git/branches") return { branches: ["main", "b1"] };
+    // Branches come back as OBJECTS from /api/git/branches (verified live:
+    // `{name, checkedOut, isDefault, isRemote, worktreePath}`), not bare
+    // strings — the old `["main","b1"]` mock encoded the very mismatch that
+    // made the page render an object as a React child (React #31).
+    if (url === "/api/git/branches") {
+      return {
+        branches: [
+          { name: "main", isDefault: true },
+          { name: "b1", checkedOut: true, worktreePath: "/repo/wt1" },
+        ],
+      };
+    }
     throw new Error(`unexpected GET: ${url}`);
   });
 });

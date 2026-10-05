@@ -52,13 +52,173 @@ def _looks_like_brain_refusal(text: str) -> bool:
         return False
     return any(rx.search(t) for rx in _BRAIN_REFUSAL_RES)
 
+
+#: Worker narration shapes (Lane 2, 2026-10-03, journal test-4 09:54:53):
+#: the headless worker ran an irrelevant tool (``local.open_app`` for a
+#: create-file task) and summarized with assistant chatter
+#: ("Qubit is available to assist with tasks. Let me know how I can
+#: help.") — the T5-forbidden shape: narration instead of an honest
+#: failure. A reply matching one of these with no action evidence behind
+#: it is a typed ``VOICE_EDIT_WORKER_NARRATION`` failure, never a spoken
+#: ok answer. Kept literal and narrow so a genuine report that happens to
+#: thank ("Created X — let me know if you need more!") still passes (it
+#: carries action evidence; see :func:`_full_turn_narration_only`).
+_WORKER_NARRATION_RES = (
+    _re_module.compile(r"\bavailable to assist\b", _re_module.IGNORECASE),
+    _re_module.compile(r"\blet me know how i can help\b",
+                       _re_module.IGNORECASE),
+    _re_module.compile(r"\bhow can i (help|assist)( you)?\b",
+                       _re_module.IGNORECASE),
+    _re_module.compile(r"\bi'?m here to help\b", _re_module.IGNORECASE),
+    _re_module.compile(r"\bwhat can i (do|help).{0,40}for you\b",
+                       _re_module.IGNORECASE),
+)
+
+#: Action evidence that redeems a polite reply: past-tense acted verbs,
+#: concrete file identities, or completed-work nouns. Mirrors the
+#: ``chat_transport._ACTION_RE`` completion half (kept local so the voice
+#: lane never imports the chat branch internals).
+_WORKER_ACTION_RE = _re_module.compile(
+    r"\b(built|created|wrote|written|saved|added|finished|completed|"
+    r"updated|generated|delivered|attached|done|opened|sent|set|found|"
+    r"playing|paused|resumed|stopped|closed)\b"
+    r"|[A-Za-z0-9_][A-Za-z0-9_.\-]*\.(html?|js|jsx|ts|tsx|css|json|md|"
+    r"txt|py|png|jpe?g|pdf)\b"
+    r"|/(?:[\w.\-]+/)+[\w.\-]+",
+    _re_module.IGNORECASE)
+
+
+def _full_turn_narration_only(text: str) -> bool:
+    """True when a worker reply is narration with no action evidence."""
+    t = str(text or "").strip()
+    if not t:
+        return False
+    if not any(rx.search(t) for rx in _WORKER_NARRATION_RES):
+        return False
+    return not bool(_WORKER_ACTION_RE.search(t))
+
 REQUEST_TTL_S = 300.0
+
+
+def _counts_turn(fn):
+    """Count a turn as in-flight for exactly its duration (never raises).
+
+    ``status()["active_requests"]`` used to report begun-but-expired
+    sessions (9 stale with nothing running, live 2026-10-04) — the orb
+    read permanent "thinking". It now reports real in-flight turns only;
+    nested calls (route() -> transform()) balance out. The stale-session
+    prune in ``status()`` stays as hygiene.
+    """
+    import functools as _ft
+
+    @_ft.wraps(fn)
+    def _w(self, *a, **k):
+        try:
+            with self._lock:
+                self._inflight += 1
+        except Exception:
+            pass
+        try:
+            return fn(self, *a, **k)
+        finally:
+            try:
+                with self._lock:
+                    self._inflight = max(0, self._inflight - 1)
+            except Exception:
+                pass
+
+    return _w
 
 _QUESTION_STARTERS = (
     "what", "who", "when", "where", "why", "how", "which", "whose",
     "is ", "are ", "do ", "does ", "did ", "can ", "could ", "would ",
     "should ", "will ", "tell me", "show me", "what's", "whats",
 )
+
+#: Manual sleep-mode trigger (owner decision 2026-10-03 §5 #1): "going to
+#: sleep" / "I'm going to sleep" silences UNPROMPTED speech (completions,
+#: briefings/proactive) until the next directed "hey qubit". Substring-based
+#: and punctuation-tolerant; the sleep turn itself is on-request and always
+#: answered.
+_SLEEP_COMMAND_RE = _re_module.compile(
+    r"\bgoing\s+to\s+sleep\b", _re_module.IGNORECASE)
+
+#: Dashboard waveform visibility (voice-final lane): "show waveform" /
+#: "hide waveform" flips ``voice_edit.waveform_visible`` through the SAME
+#: ask-stage mechanism as sleep mode (deterministic, audited, remembered —
+#: no parallel dispatcher). Owner-natural shapes (2026-10-04, journal:
+#: "Waveform on." reached the helper with no flip): noun-first
+#: "waveform on/off" (END-ANCHORED, punctuation-tolerant — so "waveform on
+#: the screen" never fires), "turn on/off (the) waveform" and
+#: "enable/disable (the) waveform" (verb adjacent to "waveform", optional
+#: "the" between — so "show me the waveform settings" still never fires).
+#: The in-game override regexes below accept the SAME owner-natural shapes
+#: (show/hide, turn on/off, enable/disable, noun-first on/off — each with the
+#: spaced "wave form" variant) but require the end-anchored ingame qualifier.
+#: STT emits the spaced two-word "wave form" (journal 2026-10-04 10:17:47
+#: owner-verbatim "Show Wave Form."): every ``waveform`` atom below also
+#: accepts ``wave <space> form`` with the same adjacency guards.
+#: ``_INGAME_QUAL`` is the shared qualifier tail (ingame / in-game / in game,
+#: utterance-final with optional trailing punctuation — so "show waveform in
+#: game settings" never fires the override).
+_INGAME_QUAL = r"(ingame|in-game|in\s+game)\s*[.?!]*\s*$"
+_WAVEFORM_SHOW_RE = _re_module.compile(
+    r"\bshow\s+(the\s+)?wave(?:form|\s+form)\b"
+    r"|\bturn\s+on\s+(the\s+)?wave(?:form|\s+form)\b"
+    r"|\benable\s+(the\s+)?wave(?:form|\s+form)\b"
+    r"|\bwave(?:form|\s+form)\s+on\s*[.?!]*\s*$", _re_module.IGNORECASE)
+_WAVEFORM_HIDE_RE = _re_module.compile(
+    r"\bhide\s+(the\s+)?wave(?:form|\s+form)\b"
+    r"|\bturn\s+off\s+(the\s+)?wave(?:form|\s+form)\b"
+    r"|\bdisable\s+(the\s+)?wave(?:form|\s+form)\b"
+    r"|\bwave(?:form|\s+form)\s+off\s*[.?!]*\s*$", _re_module.IGNORECASE)
+
+#: In-game orb override (owner 2026-10-04): "show waveform ingame" /
+#: "hide waveform ingame" flips ``voice_edit.waveform_ingame`` ONLY (the
+#: orb's fullscreen rule — never the dashboard ``waveform_visible`` widget).
+#: Accepts the same owner-natural shapes as the widget pair (show/hide,
+#: turn on/off, enable/disable, noun-first on/off, spaced "wave form"),
+#: each requiring the end-anchored qualifier (optional trailing
+#: punctuation), so "show waveform in game settings" never fires the
+#: override. Checked BEFORE the bare widget regexes (which substring-match
+#: the verb-first qualified phrases); the hey-prefix is handled upstream
+#: (strip_wake) and inline (substring search), as proven for the bare pair.
+_WAVEFORM_INGAME_SHOW_RE = _re_module.compile(
+    r"\bshow\s+(the\s+)?wave(?:form|\s+form)\s+" + _INGAME_QUAL
+    + r"|\bturn\s+on\s+(the\s+)?wave(?:form|\s+form)\s+" + _INGAME_QUAL
+    + r"|\benable\s+(the\s+)?wave(?:form|\s+form)\s+" + _INGAME_QUAL
+    + r"|\bwave(?:form|\s+form)\s+on\s+" + _INGAME_QUAL,
+    _re_module.IGNORECASE)
+_WAVEFORM_INGAME_HIDE_RE = _re_module.compile(
+    r"\bhide\s+(the\s+)?wave(?:form|\s+form)\s+" + _INGAME_QUAL
+    + r"|\bturn\s+off\s+(the\s+)?wave(?:form|\s+form)\s+" + _INGAME_QUAL
+    + r"|\bdisable\s+(the\s+)?wave(?:form|\s+form)\s+" + _INGAME_QUAL
+    + r"|\bwave(?:form|\s+form)\s+off\s+" + _INGAME_QUAL,
+    _re_module.IGNORECASE)
+
+#: On-request briefing trigger (Slice 4b, owner decision 2026-10-03 §5 #2a):
+#: "brief me" / "morning briefing". Substring-based like the sleep trigger;
+#: deliberately narrow (no bare "briefing" — "a briefing document" is not a
+#: request for speech). The turn itself is on-request and never sleep-gated.
+#: Lane 3 (2026-10-03): owner's ASR hears "brief me" as "breathe"/"breathe me"/
+#: "brave me" — those misheard shapes are accepted end-anchored (case/punct
+#: tolerant), so "breathe deeply" and "be brave" still do NOT match.
+_BRIEF_ME_RE = _re_module.compile(
+    r"\bbrief\s+me\b|\bmorning\s+briefing\b"
+    r"|\b(?:breathe(?:\s+me)?|brave\s+me|brief)\s*[.?!]*\s*$",
+    _re_module.IGNORECASE)
+
+#: On-request away-digest trigger (Lane 3, 2026-10-03): "what did I miss" /
+#: "while I was away" / "catch me up". Substring-based like the briefing
+#: trigger; deliberately narrow — "I miss my old phone" is not a digest
+#: request (the verb needs the what/away/catch frame). The turn itself is
+#: on-request and never sleep-gated, mirroring brief_me(); only UNPROMPTED
+#: digest delivery consults sleep mode (and currently has no callers — the
+#: gate is in place for when a caller arrives).
+_DIGEST_REQUEST_RE = _re_module.compile(
+    r"\bwhat\s+did\s+i\s+miss\b|\bwhile\s+i\s+was\s+away\b"
+    r"|\bcatch\s+me\s+up\b|\banything\s+new\b|\bwhat'?s\s+new\b",
+    _re_module.IGNORECASE)
 
 
 def _looks_like_question(text: str) -> bool:
@@ -118,6 +278,9 @@ class VoiceEditService:
         self._session_store = session_store
         self._lock = threading.Lock()
         self._reqs: Dict[str, _Request] = {}
+        #: Real in-flight turns (see _counts_turn). Seeds 0; sessions that
+        #: merely began (orb click staging, helper begins) are not turns.
+        self._inflight = 0
 
     # -- authority helpers ----------------------------------------------
     def _estop(self) -> bool:
@@ -144,6 +307,35 @@ class VoiceEditService:
             audit_event(op, "voice-edit", detail)
         except Exception:
             pass
+
+    def _copy_transform_to_clipboard(self, text: str, *,
+                                           request_id: str = "",
+                                           audit_op: str = "") -> Dict[str, Any]:
+        """Copy one successful transform output to the system clipboard.
+
+        Owner ask (2026-10-04 voice-final lane): every redo/rewrite result
+        lands in the clipboard so it can be pasted. Write-only clipboard
+        use (no capture, no keys) — safe on the selection-less wake path
+        AND the PTT path. A missing clipboard is audited LOUD (typed code,
+        ``ok: False``) and returned to the caller — never silently skipped.
+        Only char counts / backend names reach the audit, never text.
+        """
+        try:
+            from .clipboard import copy_text as _copy_text
+            res = _copy_text(text, desktop=self.desktop)
+        except Exception:
+            res = {"ok": False, "backend": "none",
+                   "code": "VOICE_EDIT_CLIPBOARD_UNAVAILABLE"}
+        try:
+            self._audit(audit_op or "voice_edit.transform.clipboard", {
+                "request_id": request_id or "",
+                "ok": bool(res.get("ok")),
+                "backend": str(res.get("backend", "") or ""),
+                "code": str(res.get("code", "") or ""),
+                "chars": len(text or "")})
+        except Exception:
+            pass
+        return res
 
     def _canonical_store(self) -> Any:
         """The ONE canonical chat store the voice/PTT path already writes.
@@ -221,6 +413,15 @@ class VoiceEditService:
 
     # -- lifecycle -------------------------------------------------------
     def status(self) -> Dict[str, Any]:
+        # Prune before counting: begun sessions die by TTL, and every wake
+        # turn / helper begin / orb click begins one. Without this the
+        # count only grew and the orb read permanent "thinking" (live
+        # 2026-10-04: active_requests 9 with nothing in flight — the
+        # yellow-green the owner reads as stuck).
+        try:
+            self._prune()
+        except Exception:
+            pass
         caps = self.desktop.session()
         try:
             from . import heartbeat as _hb
@@ -262,7 +463,7 @@ class VoiceEditService:
             "auto_send": bool(_read_cfg(self.cfg, "voice_edit", "auto_send",
                                         default=False)),
             "request_ttl_s": self.ttl(),
-            "active_requests": len(self._reqs),
+            "active_requests": int(getattr(self, "_inflight", 0) or 0),
             "privacy": (
                 "debug logging is ON: spoken transcript and dictated text "
                 "are recorded locally"
@@ -328,6 +529,7 @@ class VoiceEditService:
     def focused_app(snap: SelectionSnapshot) -> str:
         return snap.app_class or snap.app_name or ""
 
+    @_counts_turn
     def transform(self, request_id: str, transcript: str, *,
                   privacy_override: str = "",
                   action_override: str = "",
@@ -501,6 +703,13 @@ class VoiceEditService:
                     "detail": result.detail, "request_id": req.request_id}
         req.proposed = result.text
         req.result = result
+        # Owner ask (2026-10-04): the successful output is copied to the
+        # system clipboard at preview time (write-only; the selection itself
+        # is untouched — replacement still needs the confirm-gated apply
+        # through the safe paste primitive). Loud on failure, never silent.
+        _clip = self._copy_transform_to_clipboard(
+            result.text, request_id=req.request_id,
+            audit_op="voice_edit.transform.clipboard")
         return {
             "ok": True, "mode": "preview", "request_id": req.request_id,
             "original": req.original, "proposed": result.text,
@@ -516,8 +725,12 @@ class VoiceEditService:
             "prompt_version": result.prompt_version,
             "selection_digest": req.selection.digest,
             "target_app": req.target_app,
+            "clipboard_ok": bool(_clip.get("ok")),
+            "clipboard_backend": str(_clip.get("backend", "") or ""),
+            "clipboard_code": str(_clip.get("code", "") or ""),
         }
 
+    @_counts_turn
     def route(self, request_id: str, transcript: str) -> Dict[str, Any]:
         """Classify one utterance with the ONE router and dispatch it.
 
@@ -530,9 +743,94 @@ class VoiceEditService:
         """
         req = self._get(request_id)
         self._require_estop_clear()
+        # Voice-final repair lane (2026-10-04): waveform commands ("show /
+        # hide waveform" + owner shapes "waveform on/off", "turn on/off",
+        # "enable/disable" — see _WAVEFORM_SHOW_RE) must reach ask() (which flips the setting deterministically)
+        # instead of the intent classifier — the classifier sends "show
+        # waveform" to task/coding (confirm-gated proposal, never flips).
+        # Parsed before the route words below; ask() owns the flip + speak.
+        # In-game override (owner 2026-10-04) first: "show waveform ingame"
+        # also substring-matches the bare widget regex, so the qualified
+        # command must win here (ask() applies the same order).
+        if self.waveform_ingame_command(transcript) is not None:
+            self._audit("voice_edit.router.waveform_override", {
+                "request_id": req.request_id, "mode": "answer",
+                "reason": "waveform-ingame",
+                "intent": "waveform-ingame", "escalate": False,
+                "has_selection": False})
+            return {"ok": True, "mode": "answer",
+                    "question": (transcript or "").strip(),
+                    "escalate": False,
+                    "decision": {"mode": "answer",
+                                 "reason": "waveform-ingame",
+                                 "intent": "waveform-ingame",
+                                 "escalate": False},
+                    "request_id": req.request_id}
+        if self.waveform_command(transcript) is not None:
+            self._audit("voice_edit.router.waveform_override", {
+                "request_id": req.request_id, "mode": "answer",
+                "reason": "waveform-visible",
+                "intent": "waveform-visible", "escalate": False,
+                "has_selection": False})
+            return {"ok": True, "mode": "answer",
+                    "question": (transcript or "").strip(),
+                    "escalate": False,
+                    "decision": {"mode": "answer",
+                                 "reason": "waveform-visible",
+                                 "intent": "waveform-visible",
+                                 "escalate": False},
+                    "request_id": req.request_id}
+        # Slice 1 route words: "in chat:" must reach ask() (which dispatches
+        # the headless /chat worker directly) instead of the voice-level
+        # task-confirm staging, and "quick:" must reach ask() for a direct
+        # brain-only answer. Both map to answer mode with the original text;
+        # ask() strips the prefix. Unprefixed text keeps the router path.
+        try:
+            from ..chat_transport import parse_route_word as _parse_rw
+            _rw = _parse_rw(transcript)
+        except Exception:
+            _rw = None
+        if _rw is not None:
+            self._audit("voice_edit.router", {
+                "request_id": req.request_id, "mode": "answer",
+                "reason": f"route-word:{_rw['route']}",
+                "intent": "route-word", "escalate": False,
+                "has_selection": False})
+            return {"ok": True, "mode": "answer",
+                    "question": (transcript or "").strip(),
+                    "escalate": False,
+                    "decision": {"mode": "answer",
+                                 "reason": f"route-word:{_rw['route']}",
+                                 "intent": "route-word", "escalate": False},
+                    "request_id": req.request_id}
         has_selection = bool(
             req.selection is not None and req.selection.available
             and (req.original or "").strip())
+        # Lane 2 (2026-10-03): transform-shaped speech with no selection
+        # ("Redo this text for me, ..." carries its own trailing text) must
+        # not reach the intent classifier — it called the journal sentence
+        # ``coding`` and staged a nonsense web.search. Steer it to the
+        # answer path so the helper asks (which transforms directly); the
+        # router still decides everything else first.
+        if not has_selection:
+            try:
+                _pre = self._transform_pre_route(transcript)
+            except Exception:
+                _pre = None
+            if _pre is not None:
+                self._audit("voice_edit.router.transform_override", {
+                    "request_id": req.request_id, "mode": "answer",
+                    "reason": "transform-pre-route",
+                    "intent": "transform-pre-route", "escalate": False,
+                    "has_selection": False})
+                decision_wire = {
+                    "mode": "answer", "reason": "transform-pre-route",
+                    "intent": "transform-pre-route", "escalate": False}
+                return {"ok": True, "mode": "answer",
+                        "question": (transcript or "").strip(),
+                        "escalate": False,
+                        "decision": decision_wire,
+                        "request_id": req.request_id}
         from .router import VoiceRouter
         router = self.router or VoiceRouter(self.cfg)
         decision = router.decide(
@@ -547,10 +845,43 @@ class VoiceEditService:
             "has_selection": has_selection,
             **(_dbg.text_fields(self.cfg, transcript=transcript))})
         if decision.mode in ("dictate", "transform"):
+            if req.selection is None:
+                # The wake path never captures by design (service-side
+                # Ctrl+C into the focused window is SIGINT in a terminal),
+                # but transform() gates on a capture. Seed the same
+                # explicit unavailable snapshot the helper builds locally
+                # so dictate — which carries its own payload and never
+                # needs a selection — executes, while selection transforms
+                # degrade to clarify instead of raising NO_CAPTURE.
+                # Right-Ctrl always arrives with a capture; untouched.
+                from .schema import SelectionSnapshot
+                req.selection = SelectionSnapshot(
+                    available=False, captured_via="wake_no_capture",
+                    reason=("wake path never captures "
+                            "(no Ctrl+C into focused window)"))
             out = self.transform(request_id, transcript)
             out["decision"] = decision_wire
             return out
         if decision.mode in ("answer", "chat"):
+            # Lane-3 net (2026-10-03): the intent classifier misses
+            # tool-shaped utterances ("Set THE timer for one minute." reached
+            # ask() as conversation and the brain narrated an unsettleable
+            # "Confirm?" — journal 04:53 UTC). A deterministic local-tool hit
+            # stages through propose_task instead, so the helper speaks the
+            # staged confirmation and re-arms for voice "yes". The router
+            # still decides first; this only repairs its misses, and reply
+            # drafts / briefings / direct facts keep their own paths (the
+            # guard inside _tool_shaped_proposal + ask() ordering).
+            if self._tool_shaped_proposal(transcript) is not None:
+                self._audit("voice_edit.router.tool_override", {
+                    "request_id": req.request_id,
+                    "from_mode": decision.mode,
+                    "reason": decision.reason,
+                    "chars": len((transcript or "").strip()),
+                    **(_dbg.text_fields(self.cfg, transcript=transcript))})
+                task = self.propose_task(request_id, transcript)
+                task["decision"] = decision_wire
+                return task
             # The helper answers both through :meth:`ask` (spoken, never typed);
             # this branch only carries the classification back.
             return {"ok": True, "mode": decision.mode,
@@ -644,8 +975,18 @@ class VoiceEditService:
             return {"ok": False, "mode": "error", "code": ins.code,
                     "detail": ins.detail, "reason": ins.reason,
                     "request_id": req.request_id, "insertion": ins.public()}
+        # Owner ask (2026-10-04): the applied redo result stays in the system
+        # clipboard (``insert_text`` restores the user's original clipboard,
+        # so re-copy the final text here — write-only, selection already
+        # replaced through the safe paste primitive). Loud on failure.
+        _applied_clip = self._copy_transform_to_clipboard(
+            req.proposed, request_id=req.request_id,
+            audit_op="voice_edit.apply.clipboard")
         return {"ok": True, "mode": "applied", "request_id": req.request_id,
-                "insertion": ins.public(), "applied": req.proposed}
+                "insertion": ins.public(), "applied": req.proposed,
+                "clipboard_ok": bool(_applied_clip.get("ok")),
+                "clipboard_backend": str(_applied_clip.get("backend", "") or ""),
+                "clipboard_code": str(_applied_clip.get("code", "") or "")}
 
     def revert(self, request_id: str) -> Dict[str, Any]:
         req = self._get(request_id)
@@ -872,6 +1213,523 @@ class VoiceEditService:
         """Configured local model profile for non-escalated turns."""
         return str(_read_cfg(self.cfg, "voice_edit", "local_profile",
                              default="qubit-brain4") or "qubit-brain4")
+
+    # -- sleep mode (Slice 4a) -------------------------------------------
+    def sleeping(self) -> bool:
+        """True while manual sleep mode is on (unprompted speech gated)."""
+        return bool(_read_cfg(self.cfg, "voice_edit", "sleep_mode",
+                              default=False))
+
+    def set_sleep_mode(self, on: bool) -> bool:
+        """Persist sleep mode through the canonical settings writer.
+
+        Uses ``settings.update_voice_edit`` (atomic write + live-cfg sync);
+        on any persist fault the live data is mutated directly so the gate
+        still holds for this process, and the fault is audited.
+        """
+        on = bool(on)
+        try:
+            from .settings import update_voice_edit
+            update_voice_edit(self.cfg, {"sleep_mode": on})
+        except Exception as exc:  # noqa: BLE001 - gate must hold anyway
+            try:
+                data = getattr(self.cfg, "data", None)
+                if isinstance(data, dict):
+                    ve = data.setdefault("voice_edit", {})
+                    if isinstance(ve, dict):
+                        ve["sleep_mode"] = on
+                    else:
+                        data["voice_edit"] = {"sleep_mode": on}
+            except Exception:
+                pass
+            self._audit("voice_edit.sleep.persist_fallback",
+                        {"sleep_mode": on, "error": str(exc)[:160]})
+        return on
+
+    def should_suppress_unprompted(self) -> bool:
+        """True when completions/briefings/proactive turns must stay silent.
+
+        Slice-4a contract for future briefing/completion code: sleep mode
+        gates (b) unprompted speech, never (a) on-request answers (owner
+        decision §5 #2). Direct ``ask()``/``task()`` turns never consult
+        this — they always run.
+        """
+        return self.sleeping()
+
+    def may_speak_unprompted(self) -> bool:
+        """Inverse of :meth:`should_suppress_unprompted` (readability)."""
+        return not self.sleeping()
+
+    @staticmethod
+    def is_sleep_command(text: str) -> bool:
+        """True when the utterance asks for sleep mode."""
+        return bool(_SLEEP_COMMAND_RE.search(text or ""))
+
+    # -- dashboard waveform visibility --------------------------------------
+    def waveform_visible(self) -> bool:
+        """True while the dashboard waveform widget is visible."""
+        # Default False (owner 2026-10-04): absent key means HIDDEN.
+        return bool(_read_cfg(self.cfg, "voice_edit", "waveform_visible",
+                              default=False))
+
+    def set_waveform_visible(self, on: bool) -> bool:
+        """Persist waveform visibility through the canonical settings writer.
+
+        Uses ``settings.update_voice_edit`` (atomic write + live-cfg sync);
+        on any persist fault the live data is mutated directly so the gate
+        still holds for this process, and the fault is audited.
+        """
+        on = bool(on)
+        try:
+            from .settings import update_voice_edit
+            update_voice_edit(self.cfg, {"waveform_visible": on})
+        except Exception as exc:  # noqa: BLE001 - gate must hold anyway
+            try:
+                data = getattr(self.cfg, "data", None)
+                if isinstance(data, dict):
+                    ve = data.setdefault("voice_edit", {})
+                    if isinstance(ve, dict):
+                        ve["waveform_visible"] = on
+                    else:
+                        data["voice_edit"] = {"waveform_visible": on}
+            except Exception:
+                pass
+            self._audit("voice_edit.waveform.persist_fallback",
+                        {"waveform_visible": on, "error": str(exc)[:160]})
+        return on
+
+    @staticmethod
+    def waveform_command(text: str) -> Optional[str]:
+        """"show" / "hide" when the utterance flips waveform visibility.
+
+        Accepts verb-first "show/hide (the) waveform", "turn on/off (the)
+        waveform", "enable/disable (the) waveform", and end-anchored
+        noun-first "waveform on/off" (owner 2026-10-04) — each with the
+        spaced two-word "wave form" shape STT emits (journal 2026-10-04
+        "Show Wave Form."). None otherwise —
+        in particular "show me the waveform settings" (verb not adjacent
+        to "waveform") and "waveform on the screen" (noun-first shape not
+        utterance-final) never match.
+        """
+        t = text or ""
+        if _WAVEFORM_SHOW_RE.search(t):
+            return "show"
+        if _WAVEFORM_HIDE_RE.search(t):
+            return "hide"
+        return None
+
+    # -- in-game orb override -------------------------------------------------
+    def waveform_ingame(self) -> bool:
+        """True while the orb stays mapped over fullscreen games."""
+        # Default False (owner 2026-10-04): absent key means auto-hide.
+        return bool(_read_cfg(self.cfg, "voice_edit", "waveform_ingame",
+                              default=False))
+
+    def set_waveform_ingame(self, on: bool) -> bool:
+        """Persist the in-game override through the canonical settings writer.
+
+        Same shape as :meth:`set_waveform_visible` (atomic write + live-cfg
+        sync; persist-fault fallback mutates live data so the gate still
+        holds for this process, and the fault is audited distinctly).
+        """
+        on = bool(on)
+        try:
+            from .settings import update_voice_edit
+            update_voice_edit(self.cfg, {"waveform_ingame": on})
+        except Exception as exc:  # noqa: BLE001 - gate must hold anyway
+            try:
+                data = getattr(self.cfg, "data", None)
+                if isinstance(data, dict):
+                    ve = data.setdefault("voice_edit", {})
+                    if isinstance(ve, dict):
+                        ve["waveform_ingame"] = on
+                    else:
+                        data["voice_edit"] = {"waveform_ingame": on}
+            except Exception:
+                pass
+            self._audit("voice_edit.waveform_ingame.persist_fallback",
+                        {"waveform_ingame": on, "error": str(exc)[:160]})
+        return on
+
+    @staticmethod
+    def waveform_ingame_command(text: str) -> Optional[str]:
+        """"show" / "hide" when the utterance flips the in-game override.
+
+        Accepts the same owner-natural shapes as :meth:`waveform_command`
+        (show/hide, turn on/off, enable/disable, noun-first on/off — each
+        with the spaced "wave form" variant), each requiring the
+        end-anchored ingame qualifier ("ingame" / "in-game" / "in game",
+        optional trailing punctuation).
+
+        None otherwise — in particular bare "show/hide waveform" (no ingame
+        qualifier: the dashboard widget's command) and "show waveform in
+        game settings" (qualifier not utterance-final: a settings question,
+        not a command) never match.
+        """
+        t = text or ""
+        if _WAVEFORM_INGAME_SHOW_RE.search(t):
+            return "show"
+        if _WAVEFORM_INGAME_HIDE_RE.search(t):
+            return "hide"
+        return None
+
+    def _is_directed_wake(self, text: str) -> bool:
+        """True when the utterance starts with a wake phrase ("hey qubit")."""
+        try:
+            from .wake import strip_wake
+            return strip_wake(text or "") is not None
+        except Exception:
+            return "hey qubit" in (text or "").lower()
+
+    # -- briefings (Slice 4b) ------------------------------------------------
+    # Owner decisions 2026-10-03 §5 #2: briefings are BOTH (a) on-request
+    # ("brief me") AND (b) unprompted spoken completions ("report's ready").
+    # Sleep mode gates (b), never (a): brief_me() never consults sleep;
+    # speak_completion() consults may_speak_unprompted() and stays silent
+    # in sleep. Neither path uses a model (deterministic, local-first).
+    @staticmethod
+    def is_briefing_request(text: str) -> bool:
+        """True when the utterance asks for a spoken briefing."""
+        return bool(_BRIEF_ME_RE.search(text or ""))
+
+    @staticmethod
+    def is_digest_request(text: str) -> bool:
+        """True when the utterance asks for the "while away" digest."""
+        return bool(_DIGEST_REQUEST_RE.search(text or ""))
+
+    def _tool_shaped_proposal(self, text: str) -> Optional[Dict[str, Any]]:
+        """Deterministic local tool for ``text``, or None (Lane-3 net).
+
+        Coordinates via ``tool_task.propose_tool`` (the SAME resolver the
+        confirmed task path executes) — never a second classifier, never the
+        model. Only ``local.*`` tools stage here: ``web.*`` intents stay on
+        the answer path (direct facts / skills / full turn own them), and
+        reply-shaped text is excluded (``parse_reply`` is pure parsing, no
+        I/O) so drafts keep their skill-social staging. Pure + bounded:
+        regex matching over config only, no subprocess, no network.
+        """
+        clean = (text or "").strip()
+        if not clean:
+            return None
+        try:
+            from . import send as _S
+            if _S.parse_reply(clean) is not None:
+                return None
+        except Exception:
+            pass
+        try:
+            from .tool_task import propose_tool as _propose
+            proposal = _propose(self.cfg, clean)
+        except Exception:
+            return None
+        if not proposal:
+            return None
+        if not str(proposal.get("tool") or "").startswith("local."):
+            return None
+        # Deterministic instant answers win over staging: a clock question
+        # ("what time is it" also resolves to local.time_date) must answer
+        # immediately, never ask "say yes to hear the time". Weather-shaped
+        # text never reaches here with a local hit (propose_tool yields no
+        # local tool for it), so this guard costs at most a strftime.
+        try:
+            if self._direct_fact_answer(clean):
+                return None
+        except Exception:
+            pass
+        return proposal
+
+    def _transform_pre_route(self, text: str) -> Any:
+        """Deterministic transform claim on one utterance, or None.
+
+        Lane 2 (2026-10-03, journal test-2 09:52:38): "Redo this text for
+        me, ..." classified as ``intent:coding`` and ran ``web.search`` on
+        the whole sentence. The deterministic edit parser already knows
+        every transform trigger (exact rewrite phrases plus the loose
+        ``redo <anything> for me`` fallback) — reuse it here (read-only;
+        the parser module itself is untouched) so transform-shaped speech
+        reaches TRANSFORM with selection-or-trailing-text, never a worker.
+        A trailing payload after the trigger (the redo suffix) becomes the
+        transform input; dictation wins elsewhere and is excluded here.
+        Pure: no model, no I/O, never raises.
+        """
+        clean = (text or "").strip()
+        if not clean:
+            return None
+        try:
+            from .parser import parse
+            cmd = parse(clean, selected_text="")
+        except Exception:
+            return None
+        if getattr(cmd, "needs_clarification", True):
+            return None
+        action = str(getattr(cmd, "action", "") or "")
+        if not action or action == "dictate_text":
+            return None
+        try:
+            from .schema import ACTIONS
+            if action not in ACTIONS:
+                return None
+        except Exception:
+            return None
+        return cmd
+
+    def _ask_transform_answer(self, cmd: Any, question: str, *,
+                               request_id: str = "",
+                               mode: str = "answer") -> Optional[Dict[str, Any]]:
+        """Run a pre-routed transform command as a spoken answer.
+
+        No worker, no confirm theater: the transform engine (detail tier)
+        rewrites the selection-or-trailing-text and the rewrite is spoken
+        + remembered like any direct answer. An engine FAULT still falls
+        through (None) so the caller keeps today's path — and so does a
+        non-ok engine RESULT: the pre-router claims bare triggers too
+        ("summarize this for me" parses as summarize with no input), and
+        with nothing to transform the engine fails while the brain, the
+        escalation target, or a skill (YouTube) could still answer. The
+        failure is audited (voice_edit.ask.transform_failed) but never
+        terminal. Never raises.
+        """
+        try:
+            selected = str(getattr(cmd, "selected_text", "") or "")
+            res = self.engine.transform(
+                self.cfg, cmd, selected_text=selected)
+        except Exception:
+            return None
+        if not getattr(res, "ok", False):
+            code = str(getattr(res, "code", "") or "VOICE_EDIT_TRANSFORM_FAILED")
+            self._audit("voice_edit.ask.transform_failed", {
+                "request_id": request_id, "mode": mode,
+                "action": str(getattr(cmd, "action", "") or ""),
+                "code": code,
+                "chars": len(question)})
+            # Fall through to the normal ask pipeline (direct facts, skills,
+            # brain) — a transform with no input is not an answer, and the
+            # failure detail is audit-only, never spoken.
+            return None
+        answer = str(getattr(res, "text", "") or "").strip()
+        if not answer:
+            self._audit("voice_edit.ask.transform_failed", {
+                "request_id": request_id, "mode": mode,
+                "action": str(getattr(cmd, "action", "") or ""),
+                "code": "VOICE_EDIT_TRANSFORM_EMPTY",
+                "chars": len(question)})
+            return {"ok": False, "code": "VOICE_EDIT_TRANSFORM_EMPTY",
+                    "detail": "the rewrite came back empty; nothing was done",
+                    "mode": mode, "request_id": request_id}
+        self._audit("voice_edit.ask", {
+            "request_id": request_id, "mode": mode,
+            "chars": len(question), "ok": True,
+            "answer_chars": len(answer), "provider": "local",
+            "model": "transform"})
+        self._remember_ask_exchange(question, answer, model="transform")
+        # Owner ask (2026-10-04): the redo result lands in the system
+        # clipboard (write-only — safe on the selection-less wake path; no
+        # capture, no keys, no replacement-in-place). The answer itself is
+        # returned unchanged; the helper speaks the short "copied" receipt.
+        clip = self._copy_transform_to_clipboard(
+            answer, request_id=request_id,
+            audit_op="voice_edit.ask.transform_clipboard")
+        return {"ok": True, "answer": answer, "mode": mode,
+                "provider": "local", "model": "transform",
+                "spoken": False,
+                "clipboard_ok": bool(clip.get("ok")),
+                "clipboard_backend": str(clip.get("backend", "") or ""),
+                "clipboard_code": str(clip.get("code", "") or "")}
+
+    def _briefing_weather(self) -> str:
+        """Live weather line via the existing no-key script path (or "")."""
+        try:
+            line = self._live_weather("weather")
+            return str(line or "").strip()
+        except Exception:
+            return ""
+
+    def _briefing_clock(self) -> str:
+        """One-line machine-clock readout (no egress, never raises)."""
+        try:
+            import time as _time
+            return f"It is {_time.strftime('%A %H:%M')}."
+        except Exception:
+            return ""
+
+    def _briefing_cron(self) -> str:
+        """Today's schedule count from the canonical store (or "")."""
+        try:
+            from .. import schedules as _S
+            jobs = _S.list_jobs(self.cfg)
+            items = jobs if isinstance(jobs, list) else (
+                jobs.get("jobs") if isinstance(jobs, dict) else [])
+            n = len(items or [])
+            if n <= 0:
+                return ""
+            return (f"{n} scheduled job{'s' if n != 1 else ''} on the list "
+                    f"today.")
+        except Exception:
+            return ""
+
+    def _briefing_unread(self) -> str:
+        """Unread-mail count via the skill reader (or "" when unreachable)."""
+        try:
+            rows = self._read_gmail_rows()
+            if not rows:
+                return ""
+            n = len(rows)
+            return (f"{n} unread email{'s' if n != 1 else ''} in the inbox.")
+        except Exception:
+            return ""
+
+    def brief_me(self, *, request_id: str = "") -> Dict[str, Any]:
+        """On-request briefing: need-to-know first, max 3 short items.
+
+        Order is unread → cron → weather → clock (capped at 3); empty
+        seams are skipped, never spoken as "unknown". Sleep NEVER gates
+        this path (owner decision §5 #2) — the turn is answered and
+        remembered like any direct answer. Never raises: total failure
+        yields an honest empty-house answer.
+        """
+        self._require_estop_clear()
+        items = [line for line in (
+            self._briefing_unread(), self._briefing_cron(),
+            self._briefing_weather(), self._briefing_clock())
+            if str(line or "").strip()][:3]
+        if items:
+            answer = " ".join(items)
+        else:
+            answer = ("Nothing needs your attention right now — no unread "
+                      "mail, no schedules, and the weather service is "
+                      "unreachable.")
+        self._audit("voice_edit.briefing", {
+            "request_id": request_id, "items": len(items),
+            "answer_chars": len(answer)})
+        self._remember_ask_exchange("brief me", answer, model="briefing")
+        return {"ok": True, "answer": answer, "mode": "briefing",
+                "provider": "local", "model": "briefing",
+                "spoken": False, "items": items}
+
+    def speak_completion(self, summary: str, *,
+                         request_id: str = "") -> Dict[str, Any]:
+        """Unprompted completion speech hook ("report's ready").
+
+        Consults :meth:`may_speak_unprompted`: silent (typed
+        ``suppressed``) in sleep mode, spoken otherwise. The service
+        owns the gate and the History row; the caller owns the TTS.
+        Never prints secrets: the audit carries chars only, never text.
+        """
+        text = str(summary or "").strip()
+        if not text:
+            return {"ok": False, "code": "VOICE_EDIT_EMPTY_COMPLETION",
+                    "detail": "no completion text to speak"}
+        if not self.may_speak_unprompted():
+            self._audit("voice_edit.completion.suppressed", {
+                "request_id": request_id, "chars": len(text)})
+            return {"ok": True, "spoken": False, "suppressed": True,
+                    "answer": "", "mode": "completion",
+                    "provider": "local", "model": "completion"}
+        self._audit("voice_edit.completion.spoken", {
+            "request_id": request_id, "chars": len(text)})
+        self._remember_ask_exchange("task completed", text,
+                                    model="completion")
+        return {"ok": True, "spoken": True, "suppressed": False,
+                "answer": text, "mode": "completion",
+                "provider": "local", "model": "completion"}
+
+    def _recent_completions(self, *, limit: int = 2) -> list:
+        """Latest spoken completion texts from the voice-session History.
+
+        Reads the ONE canonical store (the same rows
+        :meth:`speak_completion` writes with question ``"task completed"``)
+        via the existing ``store.messages`` seam — no new data source, no
+        model. Latest first-window, chronological, capped at ``limit``.
+        Fail-closed: an unreadable store yields ``[]``, never raises.
+        """
+        try:
+            store = self._canonical_store()
+            if store is None:
+                return []
+            msgs = store.messages(
+                self._voice_session(), limit=200).get("messages", [])
+            if not isinstance(msgs, list):
+                return []
+            found: list = []
+            for i, m in enumerate(msgs):
+                if not isinstance(m, dict):
+                    continue
+                if (str(m.get("role") or "") == "user"
+                        and str(m.get("content") or "").strip().lower()
+                        == "task completed"):
+                    nxt = msgs[i + 1] if i + 1 < len(msgs) else None
+                    if (isinstance(nxt, dict)
+                            and str(nxt.get("role") or "") == "assistant"):
+                        txt = " ".join(
+                            str(nxt.get("content") or "").split())
+                        if txt:
+                            found.append(txt)
+            n = max(1, int(limit or 1))
+            return found[-n:]
+        except Exception:  # noqa: BLE001 - digest seam is additive
+            return []
+
+    def away_digest(self, *, unprompted: bool = False,
+                    request_id: str = "") -> Dict[str, Any]:
+        """Batched "while you were away" digest (Slice 4 composer).
+
+        Combines recent spoken completions (History) + the unread/cron
+        seams, need-to-know first (unread → completions → cron), max 3
+        items. Deterministic, local-first, no model. Sleep gates
+        UNPROMPTED delivery only (``unprompted=True`` stays silent while
+        sleeping, mirroring :meth:`speak_completion`); on-request answers
+        sleeping or not (mirroring :meth:`brief_me`). An unprompted digest
+        with nothing to report stays silent rather than narrating emptiness.
+        Never raises: total failure yields the honest empty-house answer.
+        """
+        self._require_estop_clear()
+        if unprompted and not self.may_speak_unprompted():
+            self._audit("voice_edit.away_digest.suppressed", {
+                "request_id": request_id})
+            return {"ok": True, "spoken": False, "suppressed": True,
+                    "answer": "", "mode": "away-digest",
+                    "provider": "local", "model": "away-digest", "items": []}
+        items = []
+        try:
+            unread = self._briefing_unread()
+            if str(unread or "").strip():
+                items.append(str(unread).strip())
+            for done in self._recent_completions(limit=2):
+                items.append(f"Completed: {done}")
+            cron = self._briefing_cron()
+            if str(cron or "").strip():
+                items.append(str(cron).strip())
+        except Exception:  # noqa: BLE001 - seams are fail-closed already
+            pass
+        items = [i for i in items if str(i or "").strip()][:3]
+        if not items:
+            if unprompted:
+                self._audit("voice_edit.away_digest.empty", {
+                    "request_id": request_id})
+                return {"ok": True, "spoken": False, "suppressed": False,
+                        "empty": True, "answer": "", "mode": "away-digest",
+                        "provider": "local", "model": "away-digest",
+                        "items": []}
+            answer = ("Nothing new while you were away — no completions, "
+                      "no unread mail, and nothing on the schedule.")
+            self._audit("voice_edit.away_digest", {
+                "request_id": request_id, "items": 0,
+                "answer_chars": len(answer)})
+            self._remember_ask_exchange("while you were away", answer,
+                                        model="away-digest")
+            return {"ok": True, "answer": answer, "mode": "away-digest",
+                    "provider": "local", "model": "away-digest",
+                    "spoken": False, "suppressed": False, "items": []}
+        answer = " ".join(items)
+        self._audit("voice_edit.away_digest", {
+            "request_id": request_id, "items": len(items),
+            "answer_chars": len(answer)})
+        self._remember_ask_exchange("while you were away", answer,
+                                    model="away-digest")
+        return {"ok": True, "answer": answer, "mode": "away-digest",
+                "provider": "local", "model": "away-digest",
+                "spoken": bool(unprompted), "suppressed": False,
+                "items": items}
 
     def _default_action_fallback(self, transcript: str) -> str:
         """Configured default action when the router yields no action.
@@ -1349,16 +2207,34 @@ class VoiceEditService:
             return ""
         if _re.search(r"\bweather\b|\bforecast\b|\btemperature\b|\btemp\b", q, _re.IGNORECASE):
             return self._live_weather(q)
+        # Lane 3 (2026-10-03): STT emits contractions ("What's the time in
+        # Bucharest right now?", "What's the date now in Romania?") which
+        # missed the contiguous "what time"/"what date" patterns and fell to
+        # the brain — which then spoke wrong facts ("Bucharest: 12:34 PM",
+        # "Today is April 3, 2025"; journal 03:31 + 04:31 UTC). Match the
+        # contraction shapes explicitly. Date questions get the calendar
+        # date (a clock time does not answer "what date"); time questions
+        # keep the existing "It is %A %H:%M." shape.
         if _re.search(r"\bwhat time\b|\bcurrent time\b|\btime is it\b"
-                      r"|\bwhat day is it\b|\bwhat date\b"
-                      r"|\bwhat's today\b|\bwhat is today\b",
-                      q, _re.IGNORECASE):
+                       r"|\bwhat'?s the time\b|\btell me the time\b",
+                       q, _re.IGNORECASE):
             try:
                 return f"It is {_time.strftime('%A %H:%M')}."
             except Exception:
                 return ""
+        if _re.search(r"\bwhat day is it\b|\bwhat date\b"
+                       r"|\bwhat'?s (the |today'?s )?(date|day|today)\b"
+                       r"|\bwhat is today\b|\bwhat'?s today\b",
+                       q, _re.IGNORECASE):
+            try:
+                return (f"It is {_time.strftime('%A, %B')} "
+                        f"{int(_time.strftime('%d'))}, "
+                        f"{_time.strftime('%Y')}.")
+            except Exception:
+                return ""
         return ""
 
+    @_counts_turn
     def ask(self, text: str, *, request_id: str = "",
             mode: str = "answer") -> Dict[str, Any]:
         """Answer a spoken question/chat turn through the one Qubit brain.
@@ -1380,6 +2256,114 @@ class VoiceEditService:
             raise VoiceEditError("VOICE_EDIT_EMPTY_QUESTION",
                                  "no question to answer")
         self._require_estop_clear()
+        # Slice 4a — manual sleep mode (owner decision 2026-10-03 §5 #1/#2).
+        # "going to sleep" sets the mode (this turn is on-request: answered,
+        # remembered, spoken like any direct answer). A directed "hey qubit"
+        # clears it and is answered normally. Anything else — sleeping or
+        # not — falls through: sleep NEVER gates on-request answers, only
+        # unprompted speech via should_suppress_unprompted().
+        if self.is_sleep_command(question):
+            self.set_sleep_mode(True)
+            answer = ("Sleep mode on — I'll stay quiet until you say hey "
+                      "qubit.")
+            self._audit("voice_edit.sleep.set", {
+                "request_id": request_id, "mode": mode,
+                "chars": len(question)})
+            self._remember_ask_exchange(question, answer, model="sleep-mode")
+            return {"ok": True, "answer": answer, "mode": "sleep",
+                    "provider": "local", "model": "sleep-mode",
+                    "spoken": False}
+        if self.sleeping() and self._is_directed_wake(question):
+            self.set_sleep_mode(False)
+            self._audit("voice_edit.sleep.cleared", {
+                "request_id": request_id, "mode": mode,
+                "chars": len(question)})
+        # Dashboard waveform visibility (voice-final lane): waveform commands
+        # flip the setting through the canonical writer.
+        # This turn is on-request: answered, remembered, spoken like any
+        # direct answer. Parsed with the sleep block (which always wins) and
+        # before the route words (a deterministic settings flip beats dispatch).
+        # In-game override (owner 2026-10-04) first: the qualified phrases
+        # also match the bare widget regex, so they must win here — they flip
+        # ONLY voice_edit.waveform_ingame (the orb's fullscreen rule) with
+        # the unambiguous confirms "Game overlay on/off." (never "Waveform").
+        _ingame = self.waveform_ingame_command(question)
+        if _ingame is not None:
+            on = _ingame == "show"
+            self.set_waveform_ingame(on)
+            answer = ("Game overlay on." if on else "Game overlay off.")
+            self._audit("voice_edit.waveform_ingame.set", {
+                "request_id": request_id, "mode": mode,
+                "ingame": on, "chars": len(question)})
+            self._remember_ask_exchange(question, answer,
+                                        model="waveform-ingame")
+            return {"ok": True, "answer": answer, "mode": "waveform-ingame",
+                    "provider": "local", "model": "waveform-ingame",
+                    "spoken": False}
+        _waveform = self.waveform_command(question)
+        if _waveform is not None:
+            visible = _waveform == "show"
+            self.set_waveform_visible(visible)
+            answer = ("Waveform on." if visible else "Waveform off.")
+            self._audit("voice_edit.waveform.set", {
+                "request_id": request_id, "mode": mode,
+                "visible": visible, "chars": len(question)})
+            self._remember_ask_exchange(question, answer,
+                                        model="waveform-visible")
+            return {"ok": True, "answer": answer, "mode": "waveform",
+                    "provider": "local", "model": "waveform-visible",
+                    "spoken": False}
+        # Slice 1 route words, parsed BEFORE the deterministic stages.
+        # "in chat:" skips reply drafts, live facts, and skills entirely and
+        # dispatches straight to the full agent turn (headless /chat worker).
+        # When the worker cannot answer, fall through to the direct path on
+        # the stripped text (a CT-staged confirmation settles via voice-"yes";
+        # never an unsettleable promise, never double-executed — the
+        # settle-once journal owns it). "quick:" keeps today's direct
+        # behavior with the worker fallback disabled (brain-only).
+        try:
+            from ..chat_transport import parse_route_word as _parse_ask_rw
+            _ask_rw = _parse_ask_rw(question)
+        except Exception:
+            _ask_rw = None
+        _quick_only = False
+        if _ask_rw is not None and _ask_rw["route"] == "in-chat":
+            question = _ask_rw["task_text"]
+            _full_first = self._full_turn_answer(
+                question, request_id=request_id, mode=mode)
+            if _full_first is not None:
+                return _full_first
+        elif _ask_rw is not None and _ask_rw["route"] == "quick":
+            question = _ask_rw["task_text"]
+            _quick_only = True
+        # Lane 2 (2026-10-03): transform-shaped speech reaches TRANSFORM
+        # here, never a worker. Runs on the stripped question (after the
+        # route words above) and before the deterministic answer stages, so
+        # a rewrite can never become a task.run/web.search again. Coding
+        # tasks are unaffected (the parser leaves them unclaimed).
+        try:
+            _tcmd = self._transform_pre_route(question)
+        except Exception:
+            _tcmd = None
+        if _tcmd is not None:
+            _tout = self._ask_transform_answer(
+                _tcmd, question, request_id=request_id, mode=mode)
+            if _tout is not None:
+                return _tout
+        # Slice 4b — on-request briefing (owner decision 2026-10-03 §5 #2a).
+        # Parsed AFTER the sleep command (which always wins) and the route
+        # words (a "quick:" prefix is honored; an "in chat:" prefix already
+        # dispatched above). Sleep NEVER gates this: brief_me() answers
+        # sleeping or not; only unprompted speech consults sleep mode.
+        if self.is_briefing_request(question):
+            return self.brief_me(request_id=request_id)
+        # Lane 3 — on-request away digest ("what did I miss", 2026-10-03).
+        # Parsed with the briefing block: on-request, so sleep NEVER gates
+        # it (away_digest answers sleeping or not; only unprompted delivery
+        # consults sleep, and that path currently has no callers). Before
+        # reply drafts: a digest question is never a reply draft.
+        if self.is_digest_request(question):
+            return self.away_digest(request_id=request_id)
         staged = self._reply_draft(question)
         if staged is not None:
             kind, payload = staged
@@ -1439,6 +2423,31 @@ class VoiceEditService:
             return {"ok": True, "answer": skill_answer, "mode": mode,
                     "provider": "local", "model": skill_model,
                     "spoken": False}
+        # Lane-3 net (2026-10-03): tool-shaped misses that reach ask() as
+        # conversation must STAGE, never let the brain narrate a
+        # confirmation with no backing task (the 04:53 UTC "Set THE timer"
+        # case: brain "Confirm?" spoken, then "Yes." discarded unarmed).
+        # Runs AFTER reply drafts, direct facts, and skills (those deterministic
+        # answers keep priority) and only for local.* tools — the brain never
+        # sees tool-shaped text. The returned shape is the same staged-task
+        # shape propose_task emits, so the helper speaks the confirmation and
+        # re-arms for voice "yes" (see _answer_question). Staging is pure
+        # dict-building over the live request id when one exists; a direct
+        # /ask call without begin() still stages (nothing executes).
+        proposal = self._tool_shaped_proposal(question)
+        if proposal is not None:
+            tool = str(proposal.get("tool") or "")
+            self._audit("voice_edit.task.proposed", {
+                "request_id": request_id, "chars": len(question),
+                "tool": tool, "via": "ask-net",
+                **(_dbg.text_fields(self.cfg, task=question))})
+            summary = (f"{question} (runs {tool} after yes)"
+                       if tool else question)
+            return {"ok": True, "mode": "task",
+                    "requires_confirmation": True,
+                    "task_text": question, "summary": summary,
+                    "request_id": request_id,
+                    "detail": "confirm to run this task"}
         escalate, why = self._escalate_for(mode)
         profile = ""
         if escalate:
@@ -1523,8 +2532,10 @@ class VoiceEditService:
         # fails, stays silent, or answers with a polite refusal, the question
         # gets a second chance through the same persisted agent turn
         # /qubit-chat uses (branches + worker + voice-local model). A working
-        # brain answer returns exactly as before.
-        if not ok or not answer or _looks_like_brain_refusal(answer):
+        # brain answer returns exactly as before. "quick:" route words are
+        # brain-only by contract: no worker dispatch, failure stays typed.
+        if not _quick_only and (
+                not ok or not answer or _looks_like_brain_refusal(answer)):
             full = self._full_turn_answer(question, request_id=request_id,
                                           mode=mode)
             if full is not None:
@@ -1556,10 +2567,10 @@ class VoiceEditService:
         when the full turn cannot answer (caller keeps the brain outcome).
 
         Staged confirmations (``CONFIRM_REQUIRED`` + ``confirmation_id``)
-        deliberately fall through to None: voice "yes" settles through the
-        service task path, which cannot settle a chat-transport-staged
-        confirmation yet (Slice-1b) — speaking an unsettleable "say yes"
-        would be a lie, so the brain answer stands instead.
+        deliberately fall through to None: the helper speaks staged
+        confirmations for service.task mode, where voice "yes" settles the
+        CT-staged record (Slice-1b) — speaking "say yes" here would
+        double-promise the settle, so the brain answer stands instead.
         """
         try:
             from .. import chat_transport as CT
@@ -1585,6 +2596,35 @@ class VoiceEditService:
         if res.get("ok"):
             text = str(res.get("reply") or res.get("text") or "").strip()
             if text:
+                # Lane 2 (2026-10-03, journal test-4 09:54:53): the worker
+                # ran an irrelevant tool (local.open_app for a create-file
+                # task) and summarized with assistant chatter ("Qubit is
+                # available to assist ...") — the T5-forbidden shape. A
+                # narration-shaped reply with no action evidence is a TYPED
+                # failure (what failed + what was tried), never a spoken ok.
+                if _full_turn_narration_only(text):
+                    tool_used = str(res.get("tool_used")
+                                    or res.get("route") or "worker")
+                    self._audit("voice_edit.full_turn_narration", {
+                        "request_id": request_id,
+                        "tool_used": tool_used,
+                        "steps": res.get("steps", ""),
+                        "reply_chars": len(text)})
+                    return {
+                        "ok": False, "mode": mode,
+                        "code": "VOICE_EDIT_WORKER_NARRATION",
+                        "detail": (
+                            f"the {tool_used} task finished without doing "
+                            f"anything — no file was created, opened, or "
+                            f"acted on"),
+                        "answer": (
+                            f"The {tool_used} task finished without doing "
+                            f"anything — no file was created and nothing "
+                            f"was opened. Please try again, for example "
+                            f"'create VoiceTest dot txt in documents'."),
+                        "tool_used": tool_used,
+                        "task_text": question,
+                        "request_id": request_id}
                 self._audit("voice_edit.ask", {
                     "request_id": request_id, "mode": mode,
                     "chars": len(question), "ok": True,
@@ -1679,6 +2719,7 @@ class VoiceEditService:
                 "task_text": task_text, "request_id": request_id,
                 "session_id": sid, "route": route}
 
+    @_counts_turn
     def task(self, text: str, *, confirm: bool = False,
              request_id: str = "") -> Dict[str, Any]:
         """Run an actionable request through the one agent turn path.
@@ -1702,11 +2743,11 @@ class VoiceEditService:
                 "the task needs explicit confirmation before it runs",
                 status=409)
         # Slice-1b: a voice "yes" settles a CT-staged confirmation first.
-        # ask()'s _full_turn_answer leaves CONFIRM_REQUIRED unstaged-spoken
-        # so voice never promises an unsettleable "say yes"; the helper
-        # speaks staged confirmations for service.task mode and the user
-        # answers "yes" -> task(confirm=True) lands here. run_tool_task
-        # knows nothing of the CT-staged id, so check the voice session
+        # ask()'s _full_turn_answer leaves CONFIRM_REQUIRED unspoken (it
+        # returns None so the brain answer stands) so voice never promises an
+        # unsettleable "say yes"; the helper speaks staged confirmations for
+        # service.task mode and the user answers "yes" -> task(confirm=True)
+        # lands here. run_tool_task knows nothing of the CT-staged id, so check the voice session
         # for pending CT work (registry first, then task — mirror turn()'s
         # T4/T5 order) and settle exactly once through the shared
         # settle-once journal path (ids come from the pending record only,

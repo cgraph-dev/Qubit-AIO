@@ -203,6 +203,8 @@ _BG_PROVIDER_KWARGS = {
 _WORKTREE_SUBCOMMANDS = {
     **dict.fromkeys(("prune", "gc", "clean"), "_worktree_prune"),
     **dict.fromkeys(("list", "ls"), "_worktree_list"),
+    **dict.fromkeys(("remove", "rm", "delete"), "_worktree_remove"),
+    **dict.fromkeys(("restore", "readd"), "_worktree_restore"),
     **dict.fromkeys(("new", "add", "create"), "_worktree_new")}
 
 # Message fields copied verbatim onto a /branch row (plus role / tool_name / api_content).
@@ -1461,6 +1463,7 @@ class CLICommandsMixin:
                 print("  No active worktree for this session.")
             if repo_root:
                 _pr("  /worktree new [name] — create one and move this session into it",
+                    "  /worktree remove <name> [--force] — remove ONE worktree (refuses if it carries work)",
                     "  /worktree prune      — reclaim stale trees and merged branches")
             else:
                 print("  (not inside a git repository)")
@@ -1474,6 +1477,112 @@ class CLICommandsMixin:
                   if handler == "_worktree_new" else "  Not inside a git repository.")
             return
         getattr(self, handler)(repo_root, rest)
+
+    def _worktree_remove(self, repo_root: str, rest: str) -> None:
+        """Remove ONE managed worktree, through the CANONICAL confined path.
+
+        The lifecycle verb already exists as `qubit worktree remove <name>
+        --confirm` (`voicebridge/cli.py::_cmd_worktree`), which runs the
+        scoped `git_scope` runner and refuses an unregistered root / escaping
+        target / unconfirmed operation with a typed code. This slash command
+        is only a thin front door for it — it must NOT grow a second,
+        unconfined `git worktree remove` of its own.
+        """
+        import cli as _cli
+        from qubit_cli import worktree_gc
+        tokens = [t for t in rest.split() if t]
+        force = "--force" in tokens or "-f" in tokens
+        names = [t for t in tokens if not t.startswith("-")]
+        if not names:
+            return _pr("  Usage: /worktree remove <name> [--force]",
+                       "  Removes ONE worktree. Use /worktree prune for bulk reclaim.")
+        target = names[0]
+        active = _cli._active_worktree
+        records = worktree_gc.audit_worktrees(repo_root, with_sizes=False)
+        match = None
+        for record in records:
+            if target in (record.name, record.path) or str(record.path).endswith("/" + target):
+                match = record
+                break
+        if match is None:
+            names_available = ", ".join(sorted(r.name for r in records)) or "(none)"
+            return _pr(f"  No managed worktree matching {target!r}.",
+                       f"  Known: {names_available}")
+        if active and str(match.path) == str(active.get("path") or ""):
+            return _pr("  Refused — that is the worktree this session is running in.",
+                       "  Move out of it first (or use /worktree list to pick another).")
+        if match.verdict != "reclaim" and not force:
+            return _pr(f"  Refused — {match.name} carries work: {match.reason}",
+                       "  Re-run with --force to remove anyway.")
+        # Delegate to the canonical confined lifecycle (typed refusals included).
+        self._worktree_lifecycle(repo_root, "remove", match.name, force=force)
+
+    def _worktree_lifecycle(self, repo_root: str, verb: str, name: str,
+                            force: bool = False) -> None:
+        """Run one lifecycle verb through the canonical `qubit worktree` code.
+
+        Reuses `voicebridge.cli._cmd_worktree` (`add`/`remove`/`switch`) so the
+        slash command inherits the same project-root confinement, name contract
+        and typed refusal codes as the CLI — one implementation, not two.
+        """
+        try:
+            from voicebridge import cli as _vcli
+            from voicebridge import git_scope as GI
+        except Exception as exc:  # pragma: no cover - import guard
+            return _pr(f"  Worktree lifecycle unavailable: {exc}")
+        cfg = getattr(self, "config", None) or getattr(self, "cfg", None)
+
+        class _Args:
+            pass
+
+        args = _Args()
+        args.worktree_command = verb
+        args.root = repo_root
+        args.name = name
+        args.branch = ""
+        args.base = ""
+        args.confirm = True
+        args.force = force
+        try:
+            code = _vcli._cmd_worktree(cfg, args)
+        except GI.GitError as exc:
+            return _pr(f"  Refused — {exc.code}: {exc.detail}")
+        except Exception as exc:
+            return _pr(f"  Failed — {str(exc)[:200]}")
+        if code != 0:
+            _pr(f"  Worktree {verb} did not complete (exit {code}).")
+
+    def _worktree_restore(self, repo_root: str, rest: str) -> None:
+        """Re-materialize a managed worktree via the registered gateway handler.
+
+        `voicebridge.cli._cmd_worktree` has no `restore` verb (only add/remove/
+        switch), so this routes to the REAL registered `worktrees.restore`
+        handler (`voicebridge/gateway/qubit_handlers/worktrees.py::_wt_restore`)
+        — a confined `git worktree add` re-materialization that emits its own
+        `WORKTREES_RESTORE_LOCAL_READD` code. Qubit keeps no managed snapshot
+        store, so this is the honest local counterpart, not a fake replay.
+        """
+        tokens = [t for t in rest.split() if t]
+        names = [t for t in tokens if not t.startswith("-")]
+        if not names:
+            return _pr("  Usage: /worktree restore <name>",
+                       "  Re-creates <root>/.worktrees/<name> (confined git worktree add).")
+        name = names[0]
+        try:
+            from voicebridge.gateway.qubit_handlers import worktrees as _wt
+        except Exception as exc:  # pragma: no cover - import guard
+            return _pr(f"  Worktree restore unavailable: {exc}")
+        cfg = getattr(self, "config", None) or getattr(self, "cfg", None)
+        params = {"repoRoot": repo_root, "name": name, "confirm": True}
+        try:
+            result = _wt._wt_restore(cfg, params)
+        except Exception as exc:
+            return _pr(f"  Refused — {str(exc)[:200]}")
+        if isinstance(result, dict) and result.get("state") == "OK":
+            return _pr(f"  Restored {name} -> {result.get('path')}",
+                       f"    branch {result.get('branch')} ({result.get('code')})")
+        detail = (result or {}).get("detail") if isinstance(result, dict) else result
+        _pr(f"  Worktree restore did not complete: {str(detail)[:200]}")
 
     def _worktree_prune(self, repo_root: str, rest: str) -> None:
         import cli as _cli
@@ -1907,6 +2016,552 @@ class CLICommandsMixin:
     def _save_write_approval(self, subsystem: str, enabled: bool):
         """Persist <subsystem>.write_approval to config (for /memory|/skills approval)."""
         _save(f"{subsystem}.write_approval", bool(enabled))
+
+    # ---- ported overlay surfaces: /board, /harness, /viking, /bot, /webchat, ----
+    # ---- /memory-backend, /canvas, /taskflow (all via qubit_cli.overlay) --------
+    def _overlay_call(self, label: str, fn, *args, **kwargs):
+        """Call a ``qubit_cli.overlay`` backend; print + return None on failure."""
+        from qubit_cli.overlay import OverlayUnavailable
+        try:
+            return fn(*args, **kwargs)
+        except OverlayUnavailable as exc:
+            _pr(f"(._.) {label} backend unavailable: {exc}")
+        except Exception as exc:
+            code = getattr(exc, "code", None) or type(exc).__name__
+            _pr(f"(x_x) {label} failed [{code}]: {exc}")
+        return None
+
+    @staticmethod
+    def _overlay_flag(tokens: list, *flags: str) -> tuple[list, bool]:
+        """Split ``--confirm``/``--yes`` out of shlex tokens: (rest, confirmed)."""
+        rest = [t for t in tokens if t not in flags]
+        return rest, len(rest) != len(tokens)
+
+    @staticmethod
+    def _overlay_opt(tokens: list, flag: str, default: str = "") -> tuple[list, str]:
+        """Pop ``flag VALUE`` out of shlex tokens: (rest, value)."""
+        rest, value, _ok = _take_flag(list(tokens), flag)
+        return rest, (value if value is not None else default)
+
+    def _handle_board_command(self, cmd: str):
+        """Handle /board — read-first view over the ported board surface."""
+        tokens = _shlex_args(cmd)
+        rest, board = self._overlay_opt(tokens, "--board", "main")
+        sub = (rest[0].lower() if rest else "open")
+        if sub == "open":
+            from qubit_cli.overlay import board_snapshot
+            out = self._overlay_call("board", board_snapshot, board)
+            if out is None:
+                return
+            _pr(f"Board: {out.get('board', board)}",
+                f"  Columns: {', '.join(out.get('columns', []))}")
+            for name, rows in (out.get("by_column") or {}).items():
+                _pr(f"  {name} ({len(rows)}):")
+                for task in rows[:10]:
+                    _pr(f"    #{task.get('id')} {task.get('title', '')[:70]}")
+            widgets = out.get("widgets", [])
+            _pr(f"  Widgets ({len(widgets)}):")
+            for widget in widgets[:10]:
+                _pr(f"    #{widget.get('id')} [{widget.get('kind')}] "
+                    f"{widget.get('title', '')[:60]}")
+            roles = out.get("roles", [])
+            _pr(f"  Roles ({len(roles)}), tabs ({len(out.get('tabs', []))})")
+        elif sub == "tabs":
+            from qubit_cli.overlay import board_tabs
+            out = self._overlay_call("board tabs", board_tabs, board)
+            if out is None:
+                return
+            tabs = out.get("tabs", [])
+            if not tabs:
+                return _pr("(._.) No tabs on board '{0}'.".format(board))
+            _pr(f"Tabs on {board}:")
+            for tab in tabs:
+                _pr(f"  {tab.get('slug')} — {tab.get('name', '')} "
+                    f"({tab.get('widget_count', '?')} widgets)")
+        elif sub == "widgets":
+            from qubit_cli.overlay import board_widgets
+            out = self._overlay_call("board widgets", board_widgets, board)
+            if out is None:
+                return
+            widgets = out.get("widgets", [])
+            if not widgets:
+                return _pr("(._.) No widgets on board '{0}'.".format(board))
+            _pr(f"Widgets on {board}:")
+            for widget in widgets:
+                _pr(f"  #{widget.get('id')} [{widget.get('kind')}] "
+                    f"{widget.get('title', '')[:70]}")
+        elif sub == "roles":
+            from qubit_cli.overlay import board_roles
+            out = self._overlay_call("board roles", board_roles, board)
+            if out is None:
+                return
+            roles = out.get("roles", [])
+            if not roles:
+                return _pr(f"(._.) No roles on board '{board}' (unrestricted).")
+            _pr(f"Roles on {board}:")
+            for role in roles:
+                _pr(f"  {role.get('principal')} — {role.get('role')}")
+        elif sub == "log":
+            rest2, limit_raw = self._overlay_opt(rest[1:], "--limit", "50")
+            del rest2
+            try:
+                limit = max(1, int(limit_raw))
+            except ValueError:
+                return _pr("(._.) --limit must be an integer")
+            from qubit_cli.overlay import board_log
+            out = self._overlay_call("board log", board_log, board, limit)
+            if out is None:
+                return
+            events = out.get("events", [])
+            if not events:
+                return _pr("(._.) No board events.")
+            _pr(f"Board events (last {len(events)}):")
+            for event in events:
+                _pr(f"  {event.get('at', '?')} {event.get('kind', '')} "
+                    f"{str(event.get('detail', ''))[:100]}")
+        else:
+            _pr(f"(._.) Unknown board command: {sub}",
+                "  Available: open, tabs, widgets, roles, log [--board <name>]")
+
+    def _handle_harness_command(self, cmd: str):
+        """Handle /harness — starter kits, task submit, sessions, files."""
+        tokens = _shlex_args(cmd)
+        sub = (tokens[0].lower() if tokens else "list")
+        args = tokens[1:]
+        if sub == "list":
+            from qubit_cli.overlay import harness_kits
+            out = self._overlay_call("harness list", harness_kits)
+            if out is None:
+                return
+            kits = out.get("kits", [])
+            if not kits:
+                return _pr("(._.) No starter kits.")
+            _pr(f"Starter kits ({len(kits)}):")
+            for kit in kits:
+                _pr(f"  {kit.get('id')} — {kit.get('title', '')}",
+                    f"    {kit.get('description', '')[:100]}")
+        elif sub == "submit":
+            if len(args) < 2:
+                return _pr("(._.) Usage: /harness submit <harness> <prompt>")
+            from qubit_cli.overlay import harness_submit
+            out = self._overlay_call("harness submit", harness_submit,
+                                     args[0], " ".join(args[1:]))
+            if out is None:
+                return
+            _pr(f"(^_^)b Submitted to session: {out.get('session')}",
+                f"  Harness: {out.get('harness', args[0])}")
+        elif sub == "sessions":
+            try:
+                limit = max(1, int(args[0])) if args else 50
+            except ValueError:
+                return _pr("(._.) Usage: /harness sessions [limit]")
+            from qubit_cli.overlay import harness_sessions
+            out = self._overlay_call("harness sessions", harness_sessions, limit)
+            if out is None:
+                return
+            rows = out.get("sessions", [])
+            if not rows:
+                return _pr("(._.) No bot sessions.")
+            _pr(f"Bot sessions ({len(rows)}):")
+            for row in rows:
+                _pr(f"  {row.get('session_id', row.get('id', '?'))} — "
+                    f"{str(row.get('title', row.get('last_text', '')))[:80]}")
+        elif sub == "files":
+            from qubit_cli.overlay import harness_files
+            out = self._overlay_call("harness files", harness_files,
+                                     args[0] if args else "")
+            if out is None:
+                return
+            if "files" in out:
+                files = out["files"] or {}
+                _pr(f"Harness files in '{out.get('group')}' ({len(files)}):")
+                for name in sorted(files)[:30]:
+                    _pr(f"  {name}")
+            else:
+                for grp in out.get("groups", []):
+                    files = grp.get("files") or {}
+                    _pr(f"  [{grp.get('key')}] ({len(files)} files)")
+        else:
+            _pr(f"(._.) Unknown harness command: {sub}",
+                "  Available: list, submit <harness> <prompt>, sessions [limit], files [group]")
+
+    def _handle_viking_command(self, cmd: str):
+        """Handle /viking — local context engine status/tree/search/add."""
+        tokens = _shlex_args(cmd)
+        sub = (tokens[0].lower() if tokens else "status")
+        args = tokens[1:]
+        if sub == "status":
+            from qubit_cli.overlay import viking_status
+            out = self._overlay_call("viking status", viking_status)
+            if out is None:
+                return
+            counts = out.get("counts", {})
+            _pr(f"Viking: {out.get('engine', 'qubit-local-context')} "
+                f"({out.get('connection', 'local')})",
+                f"  Seeded: {out.get('seeded')}")
+            for group, count in counts.items():
+                _pr(f"  {group}: {count}")
+        elif sub == "tree":
+            from qubit_cli.overlay import viking_tree
+            out = self._overlay_call("viking tree", viking_tree)
+            if out is None:
+                return
+            _pr(f"Context tree ({out.get('root', '')}):")
+            for grp in out.get("groups", []):
+                nodes = grp.get("nodes", [])
+                _pr(f"  [{grp.get('key')}] ({len(nodes)}):")
+                for node in nodes[:15]:
+                    _pr(f"    {node.get('label')} ({node.get('size', 0)}b)")
+        elif sub == "search":
+            if not args:
+                return _pr("(._.) Usage: /viking search <query> [limit]")
+            try:
+                limit = int(args[-1]) if len(args) > 1 and args[-1].isdigit() else 20
+            except ValueError:
+                limit = 20
+            query = " ".join(args[:-1] if len(args) > 1 and args[-1].isdigit() else args)
+            from qubit_cli.overlay import viking_search
+            out = self._overlay_call("viking search", viking_search, query, limit)
+            if out is None:
+                return
+            hits = out.get("hits", out.get("results", []))
+            if not hits:
+                return _pr(f"(._.) No hits for {query!r}.")
+            _pr(f"Viking hits for {query!r} ({len(hits)}):")
+            for hit in hits:
+                _pr(f"  {hit.get('path', hit.get('id', '?'))} — "
+                    f"{str(hit.get('snippet', ''))[:100]}")
+        elif sub == "add":
+            if not args:
+                return _pr("(._.) Usage: /viking add <text> [--scope user|session]")
+            rest, scope = self._overlay_opt(args, "--scope", "user")
+            if not rest:
+                return _pr("(._.) Usage: /viking add <text> [--scope user|session]")
+            from qubit_cli.overlay import viking_add
+            out = self._overlay_call("viking add", viking_add, " ".join(rest), scope)
+            if out is None:
+                return
+            _pr(f"(^_^)b Saved to {scope} memory: {str(out.get('id', ''))}")
+        elif sub == "resource":
+            if not args:
+                return _pr("(._.) Usage: /viking resource <uri> [--title T] [--notes N]")
+            rest, title = self._overlay_opt(args, "--title", "")
+            rest, notes = self._overlay_opt(rest, "--notes", "")
+            if not rest:
+                return _pr("(._.) Usage: /viking resource <uri> [--title T] [--notes N]")
+            from qubit_cli.overlay import viking_add_resource
+            out = self._overlay_call("viking resource", viking_add_resource,
+                                     rest[0], title, notes)
+            if out is None:
+                return
+            _pr(f"(^_^)b Resource added: {rest[0]}")
+        else:
+            _pr(f"(._.) Unknown viking command: {sub}",
+                "  Available: status, tree, search <query>, add <text>, resource <uri>")
+
+    def _handle_bot_command(self, cmd: str):
+        """Handle /bot — delegated tasks via the bot/harness backend."""
+        tokens = _shlex_args(cmd)
+        sub = (tokens[0].lower() if tokens else "ideas")
+        args = tokens[1:]
+        if sub == "ideas":
+            from qubit_cli.overlay import bot_ideas
+            out = self._overlay_call("bot ideas", bot_ideas)
+            if out is None:
+                return
+            rows = out.get("suggestions", [])
+            if not rows:
+                return _pr("(._.) No open bot ideas.")
+            _pr(f"Bot ideas ({out.get('considered', len(rows))}):")
+            for row in rows[:20]:
+                _pr(f"  {row.get('id', row.get('task_id', '?'))} — "
+                    f"{str(row.get('title', row.get('prompt', '')))[:90]}")
+        elif sub == "goals":
+            from qubit_cli.overlay import bot_goals
+            out = self._overlay_call("bot goals", bot_goals)
+            if out is None:
+                return
+            goals = out.get("goals", [])
+            jobs = out.get("jobs", [])
+            _pr(f"Bot goals ({len(goals)}) + schedules ({len(jobs)}):")
+            for goal in goals[:20]:
+                _pr(f"  {goal.get('id')} — {goal.get('title', '')[:90]}")
+        elif sub == "launch":
+            if not args:
+                return _pr("(._.) Usage: /bot launch <prompt> [--title T]")
+            rest, title = self._overlay_opt(args, "--title", "")
+            if not rest:
+                return _pr("(._.) Usage: /bot launch <prompt> [--title T]")
+            from qubit_cli.overlay import bot_launch
+            out = self._overlay_call("bot launch", bot_launch, " ".join(rest), title)
+            if out is None:
+                return
+            _pr(f"(^_^)b Launched worker session: {out.get('session')}")
+        elif sub in ("pause", "resume"):
+            if not args:
+                return _pr(f"(._.) Usage: /bot {sub} <session>")
+            from qubit_cli.overlay import bot_pause, bot_resume
+            fn = bot_pause if sub == "pause" else bot_resume
+            out = self._overlay_call(f"bot {sub}", fn, args[0])
+            if out is None:
+                return
+            _pr(f"(^_^)b Worker {args[0]} {sub}d.")
+        elif sub == "card":
+            if not args:
+                return _pr("(._.) Usage: /bot card <name>|<session>/<name>")
+            from qubit_cli.overlay import bot_card
+            out = self._overlay_call("bot card", bot_card, args[0])
+            if out is None:
+                return
+            _pr(f"Card: {out.get('card', args[0])} (session {out.get('session', '?')})")
+            artifact = out.get("artifact")
+            if artifact is not None:
+                _pr(f"  {str(artifact)[:500]}")
+        else:
+            _pr(f"(._.) Unknown bot command: {sub}",
+                "  Available: ideas, goals, launch <prompt>, pause <session>, "
+                "resume <session>, card <name>")
+
+    def _handle_webchat_command(self, cmd: str):
+        """Handle /webchat — webchat sessions (list/show/messages/delete)."""
+        tokens = _shlex_args(cmd)
+        sub = (tokens[0].lower() if tokens else "list")
+        args = tokens[1:]
+        if sub == "list":
+            try:
+                limit = max(1, int(args[0])) if args else 50
+            except ValueError:
+                return _pr("(._.) Usage: /webchat list [limit]")
+            from qubit_cli.overlay import webchat_list
+            out = self._overlay_call("webchat list", webchat_list, limit)
+            if out is None:
+                return
+            rows = out.get("sessions", [])
+            if not rows:
+                return _pr("(._.) No webchat sessions.")
+            _pr(f"Webchat sessions ({len(rows)}):")
+            for row in rows:
+                sid = row.get("session_id", row.get("id", "?"))
+                _pr(f"  {sid} — {str(row.get('name', row.get('title', '')))[:80]}")
+        elif sub == "show":
+            if not args:
+                return _pr("(._.) Usage: /webchat show <id>")
+            from qubit_cli.overlay import webchat_show
+            out = self._overlay_call("webchat show", webchat_show, args[0])
+            if out is None:
+                return
+            _pr(f"Session: {out.get('session_id', args[0])}",
+                f"  Name: {out.get('name', '')}",
+                f"  Messages: {out.get('message_count', '?')}")
+        elif sub == "messages":
+            if not args:
+                return _pr("(._.) Usage: /webchat messages <id> [limit]")
+            try:
+                limit = int(args[1]) if len(args) > 1 else 50
+            except ValueError:
+                return _pr("(._.) Usage: /webchat messages <id> [limit]")
+            from qubit_cli.overlay import webchat_messages
+            out = self._overlay_call("webchat messages", webchat_messages,
+                                     args[0], limit)
+            if out is None:
+                return
+            for msg in out.get("messages", []):
+                _pr(f"[{msg.get('role', '?')}] "
+                    f"{str(msg.get('content', ''))[:200]}")
+        elif sub == "delete":
+            rest, confirmed = self._overlay_flag(args, "--confirm", "--yes")
+            if not rest:
+                return _pr("(._.) Usage: /webchat delete <id> --confirm")
+            if not confirmed:
+                return _pr(f"(._.) Dry run: would delete webchat session {rest[0]}.",
+                            "  Re-run with --confirm to delete it.")
+            from qubit_cli.overlay import webchat_delete
+            out = self._overlay_call("webchat delete", webchat_delete,
+                                     rest[0], True)
+            if out is None:
+                return
+            _pr(f"(^_^)b Deleted webchat session: {rest[0]}")
+        else:
+            _pr(f"(._.) Unknown webchat command: {sub}",
+                "  Available: list [limit], show <id>, messages <id> [limit], "
+                "delete <id> --confirm")
+
+    def _handle_memory_backend_command(self, cmd: str):
+        """Handle /memory-backend — status/provider/probe of the memory backend."""
+        tokens = _shlex_args(cmd)
+        sub = (tokens[0].lower() if tokens else "status")
+        if sub == "status":
+            from qubit_cli.overlay import memory_status
+            out = self._overlay_call("memory status", memory_status)
+            if out is None:
+                return
+            _pr("Memory backend status:",
+                f"  {out.get('state', out.get('status', '?'))}")
+            for key in ("provider", "active", "store", "counts"):
+                if out.get(key) is not None:
+                    _pr(f"  {key}: {out[key]}")
+        elif sub == "provider":
+            from qubit_cli.overlay import memory_provider
+            out = self._overlay_call("memory provider", memory_provider)
+            if out is None:
+                return
+            _pr(f"Memory provider: {out.get('provider', out.get('active', '?'))}")
+            for key, value in out.items():
+                if key not in ("state", "provider", "active"):
+                    _pr(f"  {key}: {value}")
+        elif sub == "probe":
+            from qubit_cli.overlay import memory_probe
+            out = self._overlay_call("memory probe", memory_probe)
+            if out is None:
+                return
+            _pr(f"Memory probe: {out.get('state', out.get('ok', '?'))}")
+            for key, value in out.items():
+                if key not in ("state", "ok"):
+                    _pr(f"  {key}: {value}")
+        else:
+            _pr(f"(._.) Unknown memory-backend command: {sub}",
+                "  Available: status, provider, probe")
+
+    def _handle_canvas_command(self, cmd: str):
+        """Handle /canvas — canvas files (list/get/add/remove)."""
+        tokens = _shlex_args(cmd)
+        sub = (tokens[0].lower() if tokens else "list")
+        args = tokens[1:]
+        if sub == "list":
+            from qubit_cli.overlay import canvas_list
+            out = self._overlay_call("canvas list", canvas_list)
+            if out is None:
+                return
+            files = out.get("files", [])
+            if not files:
+                return _pr("(._.) No canvas files.")
+            _pr(f"Canvas files ({len(files)}):")
+            for entry in files[:40]:
+                _pr(f"  {entry.get('path', entry.get('name', '?'))} "
+                    f"({entry.get('size', '?')}b)")
+            if out.get("truncated"):
+                _pr("  ... (truncated)")
+        elif sub == "get":
+            if not args:
+                return _pr("(._.) Usage: /canvas get <path>")
+            from qubit_cli.overlay import canvas_get
+            out = self._overlay_call("canvas get", canvas_get, args[0])
+            if out is None:
+                return
+            text = out.get("text", out.get("content", ""))
+            _pr(f"Canvas file: {out.get('path', args[0])} ({out.get('size', '?')}b)")
+            if text:
+                _pr(str(text)[:2000])
+        elif sub == "add":
+            rest, confirmed = self._overlay_flag(args, "--confirm", "--yes")
+            if len(rest) < 2:
+                return _pr("(._.) Usage: /canvas add <path> <text> --confirm")
+            if not confirmed:
+                return _pr(f"(._.) Dry run: would write {len(rest[1])} chars to "
+                            f"canvas file {rest[0]}.",
+                            "  Re-run with --confirm to write it.")
+            from qubit_cli.overlay import canvas_add
+            out = self._overlay_call("canvas add", canvas_add,
+                                     rest[0], " ".join(rest[1:]), True)
+            if out is None:
+                return
+            _pr(f"(^_^)b Canvas file written: {out.get('path', rest[0])}")
+        elif sub == "remove":
+            rest, confirmed = self._overlay_flag(args, "--confirm", "--yes")
+            if not rest:
+                return _pr("(._.) Usage: /canvas remove <path> --confirm")
+            if not confirmed:
+                return _pr(f"(._.) Dry run: would remove canvas file {rest[0]}.",
+                            "  Re-run with --confirm to remove it.")
+            from qubit_cli.overlay import canvas_remove
+            out = self._overlay_call("canvas remove", canvas_remove, rest[0], True)
+            if out is None:
+                return
+            _pr(f"(^_^)b Canvas file removed: {out.get('removed', rest[0])}")
+        else:
+            _pr(f"(._.) Unknown canvas command: {sub}",
+                "  Available: list, get <path>, add <path> <text> --confirm, "
+                "remove <path> --confirm")
+
+    def _handle_taskflow_command(self, cmd: str):
+        """Handle /taskflow — durable flows + hooks (read-first)."""
+        tokens = _shlex_args(cmd)
+        sub = (tokens[0].lower() if tokens else "flows")
+        args = tokens[1:]
+        if sub in ("flows", "list"):
+            from qubit_cli.overlay import taskflow_flows
+            out = self._overlay_call("taskflow flows", taskflow_flows)
+            if out is None:
+                return
+            jobs = out.get("jobs", [])
+            if not jobs:
+                return _pr("(._.) No taskflow flows.")
+            _pr(f"Taskflow flows ({len(jobs)}):")
+            for job in jobs:
+                _pr(f"  #{job.get('id', job.get('job_id', '?'))} "
+                    f"[{'on' if job.get('enabled', True) else 'off'}] "
+                    f"{str(job.get('name', job.get('task_text', '')))[:80]}")
+        elif sub == "show":
+            if not args:
+                return _pr("(._.) Usage: /taskflow show <id>")
+            try:
+                job_id = int(args[0])
+            except ValueError:
+                return _pr("(._.) Usage: /taskflow show <id>")
+            from qubit_cli.overlay import taskflow_flow
+            out = self._overlay_call("taskflow show", taskflow_flow, job_id)
+            if out is None:
+                return
+            job = out.get("job", out)
+            _pr(f"Flow #{job.get('id', job_id)}: {job.get('name', '')}",
+                f"  Schedule: {job.get('schedule', job.get('when', '?'))}",
+                f"  Enabled: {job.get('enabled', '?')}")
+        elif sub in ("pause", "resume", "trigger"):
+            if not args:
+                return _pr(f"(._.) Usage: /taskflow {sub} <id>")
+            try:
+                job_id = int(args[0])
+            except ValueError:
+                return _pr(f"(._.) Usage: /taskflow {sub} <id>")
+            from qubit_cli import overlay as _ov
+            fn = {"pause": _ov.taskflow_pause, "resume": _ov.taskflow_resume,
+                  "trigger": _ov.taskflow_trigger}[sub]
+            out = self._overlay_call(f"taskflow {sub}", fn, job_id)
+            if out is None:
+                return
+            _pr(f"(^_^)b Flow #{job_id} {sub}d.")
+        elif sub == "delete":
+            rest, confirmed = self._overlay_flag(args, "--confirm", "--yes")
+            if not rest:
+                return _pr("(._.) Usage: /taskflow delete <id> --confirm")
+            if not confirmed:
+                return _pr(f"(._.) Dry run: would delete flow #{rest[0]}.",
+                            "  Re-run with --confirm to delete it.")
+            try:
+                job_id = int(rest[0])
+            except ValueError:
+                return _pr("(._.) Usage: /taskflow delete <id> --confirm")
+            from qubit_cli.overlay import taskflow_delete
+            out = self._overlay_call("taskflow delete", taskflow_delete, job_id)
+            if out is None:
+                return
+            _pr(f"(^_^)b Deleted flow #{job_id}.")
+        elif sub == "hooks":
+            from qubit_cli.overlay import taskflow_hooks
+            out = self._overlay_call("taskflow hooks", taskflow_hooks)
+            if out is None:
+                return
+            hooks = out.get("hooks", [])
+            if not hooks:
+                return _pr("(._.) No hooks declared.")
+            _pr(f"Taskflow hooks ({len(hooks)}):")
+            for hook in hooks:
+                _pr(f"  {hook.get('name')} [{hook.get('event', '?')}] "
+                    f"{'enabled' if hook.get('enabled') else 'disabled'}")
+        else:
+            _pr(f"(._.) Unknown taskflow command: {sub}",
+                "  Available: flows, show <id>, pause <id>, resume <id>, "
+                "trigger <id>, delete <id> --confirm, hooks")
 
     # ---- prompt-queueing handlers: /learn, /plan, /init -----------------------------------
     def _queue_prompt_turn(self, msg: str, command: str) -> None:

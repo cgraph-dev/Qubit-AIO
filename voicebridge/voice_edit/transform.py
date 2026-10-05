@@ -76,6 +76,24 @@ _ASKING_RE = re.compile(
     r"\b(could you|can you|would you|i need (?:a bit )?more|please provide|"
     r"please share|provide more|more detail|what (?:is|are) the)\b",
     re.IGNORECASE)
+
+# Trailing conversational offer-tails the small local model appends to
+# shorten/funny outputs ("Let me know if you need further details.",
+# "Is there anything else I can assist with?"). Mirrors _PREAMBLE_RE
+# (leading-only precedent): an allowlist of EXACT tail shapes, anchored at
+# the end, stripped only when real content precedes the tail. Never fuzzy —
+# a genuine closing ("Call me Ishmael.", "Yours truly, Qubit.", "Let me
+# know, Ishmael.") never matches a shape, and a tail with nothing before
+# it is kept verbatim (never strip to empty).
+_TAIL_RE = re.compile(
+    r"\s*(?:let me know if you need (?:anything else|anything|"
+    r"further details|any further assistance|more help|any help)"
+    r"|is there anything else i can (?:help with|assist with|"
+    r"assist you with|do for you)"
+    r"|how can i (?:assist|help) you(?: further)?)"
+    r"\s*[.!?]?\s*$",
+    re.IGNORECASE)
+
 _LABEL_PREFIX_RE = re.compile(
     r"^\s*(?:\*\*)?(corrected sentence|corrected text|corrected version|"
     r"rewritten text|rewritten version|improved (?:text|prompt|version)|"
@@ -125,6 +143,14 @@ def _strip_model_wrapper(text: str) -> str:
     m = _PREAMBLE_RE.match(t)
     if m and (t[m.end():].strip()):
         t = t[m.end():].lstrip("\n").strip()
+    # Drop a trailing conversational offer-tail ("... Let me know if you
+    # need further details.") when real content precedes it. The policy
+    # asks models not to append offers; this enforces it without eating
+    # genuine closings (exact allowlist shapes only, and never when
+    # nothing precedes the tail).
+    m = _TAIL_RE.search(t)
+    if m and (t[:m.start()].strip()):
+        t = t[:m.start()].rstrip()
     return t
 
 
@@ -143,6 +169,14 @@ _NARRATION_MARKERS = (
     "let me ",
     "one moment", "just a moment", "give me a moment",
     "here is", "here's", "sure,",
+    # Instruction-echo class (small local models narrating the system
+    # instruction instead of rewriting): "We are asked to reply with
+    # exactly: ...". Kept reply/response-scoped so genuine content that
+    # happens to start similarly is never stripped.
+    "we are asked to reply", "we're asked to reply",
+    "we are asked to respond", "we're asked to respond",
+    "rewrote your text", "rewrote your request",
+    "reply with exactly",
 )
 
 
@@ -170,11 +204,77 @@ _NARRATION_WHOLE_RE = re.compile(
     r"concise|clearer|better|updat\w*|summar\w*|translat\w*|result|"
     r"version|email|draft|bullet)\b"
     r"|here\s+(?:you go|it is|we go|you are)\b"
-    r"|sure,?\s+(?:i can help|here(?:'s| is| are)|i(?:'ll| will)|let me|"
-    r"(?:just\s+)?(?:one|a)\s+moment|give me a (?:moment|second)|"
-    r"absolutely|of course|no problem|happy to help)\b"
-    r")[^.!?\n]{0,160}[.!?]?\s*$",
+     r"|sure,?\s+(?:i can help|here(?:'s| is| are)|i(?:'ll| will)|let me|"
+     r"(?:just\s+)?(?:one|a)\s+moment|give me a (?:moment|second)|"
+     r"absolutely|of course|no problem|happy to help)\b"
+     r"|i\s+(?:just\s+)?rewrote\s+(?:your|the)\s+(?:text|selection|"
+     r"passage|message|request)\b"
+     r")[^.!?\n]{0,160}[.!?]?\s*$",
     re.IGNORECASE)
+
+
+# First-person future promise paired with a confirm/request clause or a
+# question (2026-10-04 owner turn: "I will handle the task immediately.
+# Please confirm the details to proceed with the app update." shipped as an
+# ok:true rewrite). The promise alone is genuine content ("I will move the
+# meeting to Thursday." must pass); the confirm/request clause or question
+# is what marks it as the model stalling for instructions instead of
+# rewriting. Scans the whole output (not single-sentence anchored) because
+# the shape is promise-sentence + confirm-sentence.
+_PROMISE_RE = re.compile(r"\bi(?:'ll|\s+will)\s+[a-z]+", re.IGNORECASE)
+_CONFIRM_REQUEST_RE = re.compile(
+    r"please confirm|do you want me to|shall\s+i\b|let me know\s+to proceed",
+    re.IGNORECASE)
+
+
+def _is_future_promise_request(text: str) -> bool:
+    t = text or ""
+    if not _PROMISE_RE.search(t):
+        return False
+    if "?" in t:
+        return True
+    return bool(_CONFIRM_REQUEST_RE.search(t))
+
+
+# Instruction echo: the model repeats the system instruction ("reply with
+# exactly") instead of producing the rewrite. Anchored at the start (after
+# the wrapper strip) so genuine content that merely contains the phrase
+# mid-sentence ("Please reply with exactly the amount due.") never matches;
+# the pipeline strips a recoverable rewrite first and only fails on the
+# remainder.
+_INSTRUCTION_ECHO_RE = re.compile(
+    r"^\s*we(?:'re| are)\s+asked\s+to\s+(?:reply|respond|output|return|"
+    r"repeat|produce|write|say)\b"
+    r"|^\s*(?:reply|respond|output|return|repeat|echo)\s+with\s+exactly\b",
+    re.IGNORECASE)
+
+
+# Verbatim echo: the model returns the input unchanged (modulo case,
+# punctuation, or whitespace) instead of rewriting it. Small local models do
+# this on short/fragment inputs that look "already fine" ("the quick brown
+# fox." -> "the quick brown fox"). Returning it as ok:true lets the owner
+# hear their own words back as the result, so an echo is never a rewrite:
+# the engine retries once with an explicit reword instruction, then fails
+# honestly (VOICE_EDIT_NO_CHANGE) instead of returning input-as-output.
+_ECHO_RETRY_INSTRUCTION = (
+    "The previous output was identical to the input. Reword it now using "
+    "different words with the same meaning; never return the input "
+    "unchanged.")
+
+
+def _normalize_for_echo(text: str) -> str:
+    low = (text or "").lower()
+    collapsed = re.sub(r"[^\w]+", " ", low, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", collapsed).strip()
+
+
+def is_echo_output(source: str, target: str) -> bool:
+    """True when the rewrite is the input back verbatim (case/punct/
+    whitespace-insensitive). Empty normalizations never count as echo."""
+    norm_src = _normalize_for_echo(source)
+    if not norm_src:
+        return False
+    return norm_src == _normalize_for_echo(target)
 
 
 def strip_narration_preamble(text: str) -> str:
@@ -208,8 +308,12 @@ def is_narration_only(text: str) -> bool:
     t = (text or "").strip()
     if not t:
         return False
+    if _INSTRUCTION_ECHO_RE.search(t):
+        return True
     rest = strip_narration_preamble(t).strip()
     if not rest:
+        return True
+    if _is_future_promise_request(rest):
         return True
     return bool(_NARRATION_WHOLE_RE.match(rest))
 
@@ -377,6 +481,21 @@ class TransformEngine:
                 prompt_version=rendered["prompt_version"],
                 injection_suspected=injection)
 
+        # A narration preamble with the rewrite after it: keep the rewrite
+        # BEFORE the narration-only verdict, so "echo: REAL" recovers the
+        # rewrite and only a pure echo fails below.
+        out = strip_narration_preamble(out)
+        if not out.strip():
+            return TransformResult(
+                ok=False, code="VOICE_EDIT_EMPTY_RESULT",
+                detail="model returned no text; nothing was fabricated",
+                action=getattr(cmd, "action", ""), model=str(
+                    getattr(res, "model", "") or ""),
+                provider=str(getattr(res, "provider", "") or ""),
+                elapsed_ms=elapsed_ms, privacy_mode=mode,
+                prompt_version=rendered["prompt_version"],
+                injection_suspected=injection)
+
         # Narration-only output: the model talked about rewriting instead of
         # rewriting. In auto mode retry once on the configured API (recorded,
         # never silent); otherwise fail loudly so narration is never
@@ -410,6 +529,7 @@ class TransformEngine:
                         injection_suspected=injection)
                 out = _strip_model_wrapper(
                     str(getattr(res, "text", "") or ""))
+                out = strip_narration_preamble(out)
                 if not out.strip() or is_narration_only(out):
                     return TransformResult(
                         ok=False, code="VOICE_EDIT_NARRATION_ONLY",
@@ -435,20 +555,62 @@ class TransformEngine:
                     prompt_version=rendered["prompt_version"],
                     injection_suspected=injection)
 
-        # A narration preamble with the rewrite after it: keep the rewrite.
-        out = strip_narration_preamble(out)
-        if not out.strip():
-            return TransformResult(
-                ok=False, code="VOICE_EDIT_EMPTY_RESULT",
-                detail="model returned no text; nothing was fabricated",
-                action=getattr(cmd, "action", ""), model=str(
-                    getattr(res, "model", "") or ""),
-                provider=str(getattr(res, "provider", "") or ""),
-                elapsed_ms=elapsed_ms, privacy_mode=mode,
-                prompt_version=rendered["prompt_version"],
-                injection_suspected=injection)
-
         dropped: List[str] = []
+        # Verbatim echo: the model returned the input unchanged. Retry ONCE
+        # on the same backend with an explicit reword instruction (bounded:
+        # no loops, no API escalation); a second echo is an honest
+        # no-change result, never input-as-output.
+        if is_echo_output(text, out):
+            res = self._invoke(cfg, system=rendered["system"] + "\n\n"
+                               + _ECHO_RETRY_INSTRUCTION,
+                               user=rendered["user"],
+                               profile_id=profile_id,
+                               timeout_s=settings["timeout_s"],
+                               cancel=cancel)
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            details = getattr(res, "details", None) or {}
+            if isinstance(details, dict):
+                locality = str(details.get("locality", "") or "")
+            if not getattr(res, "ok", False):
+                return TransformResult(
+                    ok=False, code=str(getattr(res, "code", "MODEL_ERROR")
+                                       or "MODEL_ERROR"),
+                    detail=str(getattr(res, "message", "")
+                               or "model refused")[:200],
+                    action=getattr(cmd, "action", ""),
+                    style=getattr(cmd, "style", ""),
+                    provider=str(getattr(res, "provider", "") or ""),
+                    model=str(getattr(res, "model", "") or ""),
+                    elapsed_ms=elapsed_ms, privacy_mode=mode,
+                    prompt_version=rendered["prompt_version"],
+                    injection_suspected=injection)
+            out = _strip_model_wrapper(
+                str(getattr(res, "text", "") or ""))
+            out = strip_narration_preamble(out)
+            if not out.strip() or is_narration_only(out):
+                return TransformResult(
+                    ok=False, code="VOICE_EDIT_NARRATION_ONLY",
+                    detail="model returned narration instead of a "
+                           "rewrite, including on the echo retry",
+                    action=getattr(cmd, "action", ""),
+                    style=getattr(cmd, "style", ""),
+                    provider=str(getattr(res, "provider", "") or ""),
+                    model=str(getattr(res, "model", "") or ""),
+                    elapsed_ms=elapsed_ms, privacy_mode=mode,
+                    prompt_version=rendered["prompt_version"],
+                    injection_suspected=injection)
+            if is_echo_output(text, out):
+                return TransformResult(
+                    ok=False, code="VOICE_EDIT_NO_CHANGE",
+                    detail="the text is already clear as-is; the model "
+                           "returned it unchanged, so nothing was replaced",
+                    action=getattr(cmd, "action", ""),
+                    style=getattr(cmd, "style", ""),
+                    provider=str(getattr(res, "provider", "") or ""),
+                    model=str(getattr(res, "model", "") or ""),
+                    elapsed_ms=elapsed_ms, privacy_mode=mode,
+                    prompt_version=rendered["prompt_version"],
+                    injection_suspected=injection)
         if getattr(cmd, "preserve_facts", True) and \
                 getattr(cmd, "action", "") != "translate":
             dropped = _dropped_tokens(text, out)
@@ -468,4 +630,5 @@ class TransformEngine:
 
 
 __all__ = ["TransformEngine", "digest_text", "MAX_INPUT_CHARS",
-           "strip_narration_preamble", "is_narration_only"]
+           "strip_narration_preamble", "is_narration_only",
+           "is_echo_output"]

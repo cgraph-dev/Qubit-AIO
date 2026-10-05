@@ -381,13 +381,13 @@ def _task_suggestions_dismiss(cfg: Any, params: Dict[str, Any]
 def _tasks_cancel(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
     from ... import chat_transport as CT
     from ... import task_ledger as TL
-    from ...actions import actions_store
+    from ...actions import action_runner
 
     receipt_id = _sm_str(params, "receiptId", "receipt_id", "runId", "run_id")
     session = _sm_str(params, "session", "sessionKey", "session_key")
     task_id = _sm_str(params, "taskId", "task_id", "id")
     if receipt_id:
-        out = actions_store(cfg).cancel(receipt_id)
+        out = action_runner(cfg).cancel(receipt_id)
         return {"state": str(out.get("state", "OK")),
                 "code": TASKS_CANCEL_LOCAL_RECEIPT, "cancelled": True,
                 "receipt_id": receipt_id, "result": out,
@@ -416,13 +416,13 @@ def _tasks_cancel(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
 def _tasks_retry(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
     from ... import chat_transport as CT
     from ... import task_ledger as TL
-    from ...actions import actions_store
+    from ...actions import action_runner
 
     receipt_id = _sm_str(params, "receiptId", "receipt_id", "runId", "run_id")
     session = _sm_str(params, "session", "sessionKey", "session_key")
     if receipt_id:
         args = params.get("args") if isinstance(params.get("args"), dict) else {}
-        out = actions_store(cfg).retry(
+        out = action_runner(cfg).retry(
             receipt_id, args=args, target=_sm_str(params, "target"),
             scope=_sm_str(params, "scope"), source="gateway",
             confirmed=_sm_bool(params, "confirm", "confirmed"))

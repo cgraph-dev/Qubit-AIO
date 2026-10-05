@@ -18,6 +18,14 @@ browser_auto_state
 # Playwright MCP probe output (transient page snapshots/console logs — never shipped)
 .playwright-mcp/
 
+# Playwright CLI session state (transient; regenerated per run).
+.playwright-cli/
+
+# Local screenshot/capture output for parity review (regenerable by re-running
+# the capturing script; adds MBs of PNGs and must never bloat the vendored tree
+# the upstream sync rebases over).
+/output/
+
 # opencode tooling: cache/deps are local, never committed (config/skills/commands are)
 .opencode/node_modules/
 opencode.json.backup

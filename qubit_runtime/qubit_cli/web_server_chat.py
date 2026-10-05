@@ -48,6 +48,20 @@ _PTY_IDLE_BACKOFF = 0.05
 PTY_REGISTRY = PtySessionRegistry(
     ttl=30 * 60, max_sessions=16, buffer_cap=1 * 1024 * 1024, read_timeout=_PTY_READ_CHUNK_TIMEOUT)
 
+# A PTY child is a real `qubit --tui` writer and holds an active-session lease
+# once it runs a turn, but a browser refresh only DETACHES it (see the /api/pty
+# finally block) — so it keeps fencing its session id while the refreshed tab's
+# sidecar claims a new one and is refused SESSION_NOT_OWNED. Nothing in the
+# same-process takeover path can see a lease held by this OTHER process
+# (session_lifecycle.py::_detached_lease_holder scans only its own _sessions),
+# so the claim is released here instead. Fork-local: see voicebridge/pty_lease_shim.py.
+try:
+    from voicebridge.pty_lease_shim import wrap_registry as _wrap_pty_registry
+
+    PTY_REGISTRY = _wrap_pty_registry(PTY_REGISTRY)
+except Exception:  # noqa: BLE001 - never block the dashboard on an optional shim
+    _log.debug("pty lease shim unavailable; PTY leases release on the normal paths", exc_info=True)
+
 
 async def _close_stalled_pty_input(ws: "WebSocket", *, path: str) -> None:
     """Close only the terminal socket when its child stops accepting input."""
@@ -367,12 +381,13 @@ def _resolve_chat_argv(
     env["HERMES_TUI_DASHBOARD"] = "1"
 
     def _mirror_tui(name: str) -> None:
-        """Publish the QUBIT_TUI_* name the rebranded TUI reads.
+        """Publish the QUBIT_TUI_* twin of a HERMES_TUI_* var (forward-compat).
 
-        The vendored launch path sets the HERMES_TUI_* names; the deep-rebranded
-        ui-tui reads QUBIT_TUI_*. Without the mirror, dashboard mode, inline
-        mode, mouse suppression, resume, and sidecar/gateway attach are silently
-        off in the Qubit terminal.
+        The ui-tui reads the HERMES_TUI_* names (see ui-tui/src/config/env.ts);
+        the QUBIT_TUI_* copies are inert today and exist only so a future
+        reader can move over without a flag day. Never drop the HERMES_*
+        names: resume, gateway attach, dashboard/inline mode, and mouse
+        suppression all key off them.
         """
         qubit_name = "QUBIT_TUI_" + name[len("HERMES_TUI_"):]
         if name in env:
@@ -480,13 +495,35 @@ async def _resolve_chat_argv_async(
 
 
 def _active_session_file_for_channel(app: "FastAPI", channel: str) -> Path:
-    """Return the per-channel file where a dashboard TUI writes its active sid."""
+    """Return the per-channel file where a dashboard TUI writes its active sid.
+
+    The path is DETERMINISTIC per channel, not a fresh ``mkstemp`` per process.
+    The dashboard's own mapping lives in ``app.state`` and dies with the
+    process, so a random temp path made every reconnect after a restart read an
+    empty file, find no resume id, and spawn a brand-new session — the point at
+    which an interrupted turn could no longer be recovered. A stable path lets
+    the id written before the restart be read after it.
+    """
     from qubit_cli.web_server import _get_pty_active_session_files
+    import hashlib
     files = _get_pty_active_session_files(app)
     if files.get(channel) is None:
-        fd, raw_path = tempfile.mkstemp(prefix="hermes-pty-active-", suffix=".json")
-        os.close(fd)
-        files[channel] = Path(raw_path)
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", channel or "default")[:64]
+        digest = hashlib.sha256((channel or "default").encode("utf-8")).hexdigest()[:12]
+        root = Path(tempfile.gettempdir()) / "hermes-pty-active"
+        try:
+            root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        except OSError:
+            root = Path(tempfile.gettempdir())
+        path = root / f"{safe}-{digest}.json"
+        try:
+            # Create once, private; never truncate an existing file — it may
+            # hold the pre-restart session id we are trying to recover.
+            path.touch(mode=0o600, exist_ok=True)
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+        files[channel] = path
     return files[channel]
 
 

@@ -42,30 +42,46 @@ _ACTION_RULES = [
                     "make this funny", "funnier", "funny", "humorous",
                     "add humor", "add humour")),
     ("shorten", ("without changing the requirements", "remove unnecessary words",
-                 "remove unnecessary", "cut the fluff", "make this shorter",
-                 "make it shorter", "shorten", "shorter", "be brief",
-                 "be concise", "concise", "trim this", "less wordy")),
+                   "remove unnecessary", "cut the fluff", "make this shorter",
+                   "make it shorter", "shorten", "shorter", "be brief",
+                   "make it brief", "make this brief",
+                   "be concise", "concise", "trim this", "less wordy",
+                   "reduce this text", "reduce the text", "reduce this",
+                   "reduce it")),
     ("expand", ("expand this", "expand it", "expand with", "add more detail",
-                "more detail", "elaborate", "expand", "longer version")),
-    ("summarize", ("summarize", "summarise", "sum up", "summary",
-                   "tl;dr", "tldr")),
+                 "more detail", "elaborate", "expand", "longer version",
+                 "make it longer", "make this longer", "lengthen")),
+    ("summarize", ("summarize", "summarise", "sum up", "sum this up",
+                    "sum it up", "summary",
+                    "tl;dr", "tldr")),
     ("correct_grammar", ("fix the grammar", "fix grammar", "correct grammar",
                          "grammar", "fix the spelling", "spelling",
                          "proofread", "fix typos", "typos", "punctuation")),
     ("bullet_points", ("bullet points", "bulleted list", "as bullets",
-                       "into bullets", "make a list")),
+                        "into bullets", "make a list", "bullet this",
+                        "bullets")),
     ("email", ("suitable for an email", "as an email", "into an email",
-               "write an email", "make it an email", "email-ready",
-               "for an email")),
+                "write an email", "make it an email", "make this an email",
+                "email-ready", "for an email")),
     ("technical", ("for a technical audience", "technical audience",
                    "technical reader", "for engineers", "technical",
                    "technically accurate")),
     ("casual", ("sound casual", "more casual", "casual", "relaxed",
                 "informal", "chill")),
-    ("translate", ("translate", "translation")),
-    ("rewrite", ("rewrite this", "rewrite it", "rewrite", "reword",
+    ("translate", ("translate", "translation", "convert this",
+                    "convert it", "convert to")),
+    ("rewrite", ("redo this text for me", "redo this text", "redo this",
+                 "redo it", "rewrite this", "rewrite it", "rewrite", "reword",
                  "rephrase", "paraphrase")),
 ]
+
+# Loose redo trigger (Lane 3, 2026-10-03): ASR mishears the middle noun
+# ("redo THESE PACKS for me" for "redo THIS TEXT for me"), so any
+# "redo <anything> for me" routes to rewrite. The "for me" anchor is
+# required — bare "redo the thing" must not steal unrelated turns.
+_REDO_FOR_ME_RE = re.compile(
+    r"\bredo\b.+?\bfor\s+me\b\s*[,:\-–—]*\s*(.*)$",
+    re.IGNORECASE | re.DOTALL)
 
 # Style words that can appear without an explicit action ("make it persuasive").
 _STYLE_RULES = [
@@ -238,6 +254,20 @@ def parse(transcript: str, *, selected_text: str = "",
             action_hit = action
             break
 
+    # Loose redo fallback: "redo <anything> for me" (any middle, including
+    # ASR-misheard nouns). Content after "for me" becomes the selection when
+    # no selection is present; a present selection always wins.
+    _redo_suffix = ""
+    try:
+        _redo_m = _REDO_FOR_ME_RE.search(_clean(raw))
+        if _redo_m is not None:
+            if action_hit is None:
+                action_hit = "rewrite"
+            _redo_suffix = (_redo_m.group(1) or "").strip().lstrip(
+                " \t,.:;!?-\u2013\u2014").strip()
+    except Exception:
+        _redo_suffix = ""
+
     style_hit = ""
     for style, phrases in _STYLE_RULES:
         if _contains_any(low, phrases):
@@ -261,12 +291,14 @@ def parse(transcript: str, *, selected_text: str = "",
         cmd.clarification = (
             "I heard an editing request but could not tell which change you "
             "want. Try 'make it shorter', 'fix the grammar', 'summarize', "
-            "'translate to English', or 'rewrite this professionally'.")
+             "'translate to English', or 'redo this text for me professionally'.")
         return cmd
 
     cmd.action = action_hit
     cmd.style = style_hit
     cmd.custom_instruction = custom
+    if action_hit == "rewrite" and _redo_suffix and not (selected_text or "").strip():
+        cmd.selected_text = _redo_suffix
 
     # Explicit style words refine a coarse action when unambiguous.
     if action_hit == "rewrite" and not style_hit:

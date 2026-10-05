@@ -3,8 +3,8 @@
  "decision": "owner architecture decision 2026-09-17",
  "matrix": "docs/generated/QUBIT_ROUTE_OWNERSHIP.json",
  "counts": {
-  "production_referenced": 39,
-  "route_test_reachable": 33,
+  "production_referenced": 42,
+  "route_test_reachable": 32,
   "registration_only": 5,
   "test_referenced": 2
  },
@@ -16,7 +16,9 @@
   "h_wa_ob_status"
  ],
  "delete_candidates": [],
- "dead_module_functions": [],
+ "dead_module_functions": [
+  "set_oauth_public_base"
+ ],
  "rows": [
   {
    "handler": "ckpt",
@@ -321,7 +323,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "1861: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
+     "1871: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
     ]
    },
    "script_references": {},
@@ -736,9 +738,13 @@
     "GET /api/memory",
     "GET /api/memory/provider"
    ],
-   "classification": "route_test_reachable",
+   "classification": "production_referenced",
    "route_test_reachable": true,
-   "production_references": {},
+   "production_references": {
+    "voicebridge/family_memory.py": [
+     "42: return _call(QC.h_memory, cfg, params, {})"
+    ]
+   },
    "script_references": {},
    "test_references": {}
   },
@@ -928,7 +934,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "2919: code, out = _HC.h_power(self.app.orch.cfg,"
+     "2922: code, out = _HC.h_power(self.app.orch.cfg,"
     ]
    },
    "script_references": {},
@@ -1104,6 +1110,38 @@
    }
   },
   {
+   "handler": "mem_config",
+   "defined": true,
+   "routes": [
+    "GET /api/memory/providers/(?P<id>[^/]+)/config"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/family_memory.py": [
+     "56: return _call(QC.mem_config, cfg, params, {\"id\": name})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "mem_provider_set",
+   "defined": true,
+   "routes": [
+    "PUT /api/memory/provider"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/family_memory.py": [
+     "69: return _call(QC.mem_provider_set, cfg, params, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
    "handler": "msg_update",
    "defined": true,
    "routes": [
@@ -1139,7 +1177,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "3543: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
+     "3546: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
     ]
    },
    "script_references": {},

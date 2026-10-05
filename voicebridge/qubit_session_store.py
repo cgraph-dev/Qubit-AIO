@@ -83,6 +83,16 @@ class SessionDbWriteAuthorityError(RuntimeError):
         return {"state": "REFUSED", "code": self.code, "detail": self.detail,
                 "path": self.path, "owner": self.owner}
 
+# Liveness contract for session reads. Mirrors the reference dashboard
+# (`hermes_cli/web_routers/sessions.py`): `_ACTIVE_WINDOW_S = 300` and
+# `_AUTOMATIC_SESSION_END_REASONS`. Kept here rather than imported so the store
+# owns its own read shape; the values are asserted equal to the TUI gateway's
+# frozenset by a test, so the two definitions cannot drift.
+ACTIVE_SESSION_WINDOW_S = 300.0
+AUTOMATIC_SESSION_END_REASONS = frozenset({
+    "ws_orphan_reap", "ws_disconnect", "idle_timeout", "lru_evict", "tui_shutdown",
+})
+
 # B-04M fidelity: the vendored ``sessions`` columns a migration must restore.
 _SESSION_COLUMNS = (
     "source", "user_id", "session_key", "chat_id", "chat_type", "thread_id",
@@ -180,7 +190,7 @@ def qubit_state_db_path(cfg: Any = None) -> Path:
     return Path(home) / STATE_DB_FILENAME
 
 
-def _external_hermes_state_db() -> Path:
+def _external_legacy_state_db() -> Path:
     """The operator's external fork store (``~/.hermes/state.db``).
 
     Computed from ``Path.home()`` at call time (never a constant) so a test
@@ -201,7 +211,7 @@ def refuse_external_state_db(path: Any) -> Path:
     candidate = Path(path)
     try:
         same = candidate.expanduser().resolve(strict=False) == \
-            _external_hermes_state_db().resolve(strict=False)
+            _external_legacy_state_db().resolve(strict=False)
     except OSError:
         same = False
     if same:
@@ -507,6 +517,33 @@ class QubitSessionStore:
                     content_hits[sid] = {"snippet": hit.get("snippet"),
                                          "role": hit.get("role")}
 
+        # Liveness, matching the reference dashboard
+        # (`hermes_cli/web_routers/sessions.py::_is_active` + `_ACTIVE_WINDOW_S`):
+        # a row is live when it has no terminal end stamp AND its last activity is
+        # inside a 5-minute window. This field used to be a hardcoded ``False``,
+        # which made the Sessions page and Chat picker permanently show every
+        # session as closed — the "Live" badge could never appear, so a session
+        # the user was actively talking to looked dead. It is computed, never
+        # synthesized: both inputs come straight from the row.
+        now = time.time()
+
+        def _is_active(s: Dict[str, Any]) -> bool:
+            ended = s.get("ended_at")
+            if ended:
+                # An end stamp normally means finished. The exception is the
+                # AUTOMATIC end reasons an orphan-reaper/TUI-exit writes
+                # (`tui_gateway/session_lifecycle.py::_AUTOMATIC_SESSION_END_REASONS`):
+                # those mark "the surface went away", not "the conversation
+                # ended", and a the same session continuing to receive activity
+                # afterwards is provably live. A deliberate end (`compression`,
+                # `new_session`, `cli_close`, `agent_close`, user delete) stays
+                # terminal no matter how recently the row was touched.
+                reason = str(s.get("end_reason") or "")
+                if reason not in AUTOMATIC_SESSION_END_REASONS:
+                    return False
+            last = float(s.get("last_active") or s.get("started_at") or 0)
+            return (now - last) < ACTIVE_SESSION_WINDOW_S
+
         def _entry(s: Dict[str, Any]) -> Dict[str, Any]:
             title = s.get("title") or s.get("display_name")
             return {
@@ -518,7 +555,7 @@ class QubitSessionStore:
                 "started_at": float(s.get("started_at") or 0),
                 "ended_at": s.get("ended_at"),
                 "last_active": float(s.get("last_active") or s.get("started_at") or 0),
-                "is_active": False,
+                "is_active": _is_active(s),
                 "message_count": int(s.get("message_count") or 0),
                 "tool_call_count": int(s.get("tool_call_count") or 0),
                 "input_tokens": int(s.get("input_tokens") or 0),

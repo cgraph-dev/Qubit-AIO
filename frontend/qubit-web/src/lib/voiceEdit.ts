@@ -158,6 +158,12 @@ export interface VoiceEditSettings {
   tts_kokoro_voice_sid?: number;
   /** Show the on-screen voice history panel. */
   history_panel?: boolean;
+  /** Show the floating dashboard waveform widget (backend default false —
+   *  hidden unless explicitly enabled; the OS orb is the always-on waveform). */
+  waveform_visible?: boolean;
+  /** Keep the OS orb mapped over fullscreen games (backend default false =
+   *  today's auto-hide: withdraw on fullscreen focus, return on alt-tab). */
+  waveform_ingame?: boolean;
   wake?: {
     enabled: boolean;
     phrase: string;

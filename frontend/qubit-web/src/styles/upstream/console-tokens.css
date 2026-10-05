@@ -1,0 +1,122 @@
+/* ------------------------------------------------------------------
+ * Console token bridge — hoists the ported upstream token set to `:root`.
+ *
+ * WHY THIS FILE EXISTS
+ * `upstream-compat.css` defines the shared token set (--text, --muted,
+ * --border, --space-2, --bg-hover, --accent, --radius-md, --control-ui-*,
+ * --v2-*, --duration-*, --danger, --font-*, …) but SCOPED to `.qb-upstream`.
+ * A page only receives those tokens if it opts in by putting `.qb-upstream`
+ * on its root element.
+ *
+ * Measured on the live console: only /open-viking carries the class. Every
+ * other ported page — /worktrees, /checkpoints, /qubit-taskflows,
+ * /qubit-memory, /canvas, /nodes, /session-ops, /workboard — reported
+ * `document.querySelectorAll('.qb-upstream').length === 0`, so ALL of those
+ * tokens were `(UNSET)` at runtime. A custom property that is not defined
+ * makes the whole declaration invalid-at-computed-value time, so every rule
+ * reading them dropped: no padding (--space-*), no border (--border), no
+ * hover surface (--bg-hover), no text colour (--text/--muted). That is the
+ * single root cause of the "unstyled text dump" pages.
+ *
+ * HOW THIS FIXES IT WITHOUT BREAKING THE SCOPING INTENT
+ * The tokens are re-declared on `:root` with IDENTICAL values, so a page
+ * that has opted in still resolves them from `.qb-upstream` (same
+ * specificity outcome, same values) and a page that has not opted in now
+ * inherits them from the root. Nothing is removed from the scoped block, so
+ * the deliberate accessible `--muted`-as-text choice documented there is
+ * preserved verbatim.
+ *
+ * Loaded AFTER upstream-compat.css so `:root` and `.qb-upstream` agree.
+ *
+ * Keep this in sync with `upstream-compat.css`: if a token is added there,
+ * add it here too, or the pages that never opt in will silently lose it.
+ * `src/styles/theme-tokens.test.ts` guards the contract.
+ * ------------------------------------------------------------------ */
+
+:root {
+  /* --- surfaces ---------------------------------------------------- */
+  --accent: var(--midground);
+  --accent-2: #ffbd38;
+  --accent-2-subtle: color-mix(in srgb, #ffbd38 12%, transparent);
+  --accent-glow: rgba(255, 92, 92, 0.2);
+  --accent-subtle: color-mix(in srgb, var(--midground-base) 12%, transparent);
+  --bg: var(--background-base);
+  --bg-accent: color-mix(in srgb, var(--midground-base) 6%, var(--background-base));
+  --bg-elevated: color-mix(in srgb, var(--midground-base) 5%, var(--background-base));
+  --bg-hover: color-mix(in srgb, var(--midground-base) 9%, var(--background-base));
+  --card: color-mix(in srgb, var(--midground-base) 4%, var(--background-base));
+  --secondary: color-mix(in srgb, var(--midground-base) 8%, var(--background-base));
+
+  /* --- lines ------------------------------------------------------- */
+  --border: color-mix(in srgb, var(--midground-base) 15%, transparent);
+  --border-strong: color-mix(in srgb, var(--midground-base) 28%, transparent);
+  --input: color-mix(in srgb, var(--midground-base) 15%, transparent);
+  --overlay-border: color-mix(in srgb, var(--border-strong) 64%, transparent);
+  --overlay-shadow: 0 1px 2px rgb(0 0 0 / 0.18), 0 8px 24px rgb(0 0 0 / 0.24);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+
+  /* --- text -------------------------------------------------------- */
+  --text: var(--midground);
+  --text-strong: #ffffff;
+  /* ``--muted`` is used as a TEXT colour in the large majority of ported
+     rules. It is kept readable-as-text here for the same reason the scoped
+     block does so; ``--muted-surface`` exists for the few surface call
+     sites. See the note in upstream-compat.css. */
+  --muted: color-mix(in srgb, var(--midground-base) 82%, var(--background-base));
+  --muted-surface: color-mix(in srgb, var(--midground-base) 65%, var(--background-base));
+  --muted-strong: color-mix(in srgb, var(--midground-base) 90%, var(--background-base));
+
+  /* --- semantic tones ---------------------------------------------- */
+  --primary: var(--midground);
+  --primary-foreground: var(--background-base);
+  --primary-hover: #ffffff;
+  --danger: #fb2c36;
+  --danger-subtle: color-mix(in srgb, #fb2c36 12%, transparent);
+  --ok: #4ade80;
+  --ok-subtle: color-mix(in srgb, #4ade80 12%, transparent);
+  --warn: #ffbd38;
+  --warn-subtle: color-mix(in srgb, #ffbd38 12%, transparent);
+  --info: #93c5fd;
+  --info-subtle: color-mix(in srgb, #93c5fd 12%, transparent);
+  --ring: var(--midground);
+
+  /* --- radii ------------------------------------------------------- */
+  --radius: var(--theme-radius);
+  --radius-full: 9999px;
+  --radius-lg: var(--theme-radius);
+  --radius-md: calc(var(--theme-radius) - 2px);
+  --radius-sm: calc(var(--theme-radius) - 4px);
+
+  /* --- space ------------------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+
+  /* --- type -------------------------------------------------------- */
+  --chat-text-size: 0.875rem;
+  --control-ui-text-lg: 1rem;
+  --control-ui-text-md: 0.875rem;
+  --control-ui-text-sm: 0.8125rem;
+  --control-ui-text-xs: 0.75rem;
+  --control-ui-touch-input-size: 44px;
+  --font-body: var(--theme-font-sans);
+  --font-chat: var(--theme-font-sans);
+  --mono: var(--theme-font-mono);
+
+  /* --- motion / misc ----------------------------------------------- */
+  --cursor-action: default;
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --focus-ring: 0 0 0 2px var(--background-base), 0 0 0 3px color-mix(in srgb, var(--midground-base) 80%, transparent);
+  --menu-item-height: 28px;
+  --menu-item-radius: var(--radius-sm);
+  --menu-padding: 4px;
+  --menu-radius: var(--radius-md);
+  --settings-control-height: 32px;
+}

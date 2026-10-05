@@ -1,0 +1,126 @@
+/* ------------------------------------------------------------------
+ * Open Viking console shell — `.viking-*` primitives.
+ *
+ * WHY THIS FILE EXISTS
+ * The five Open Viking routes (/open-viking + retrieval/uploads/
+ * agent-hub/resources) compose the shared settings contract from
+ * `viking-settings.tsx`. That contract is styled by upstream-sessions.css
+ * and console-primitives.css; this sheet adds only the few shell elements
+ * that the settings vocabulary has no class for — a consistent page
+ * breadcrumb and the wide-page sub-nav — plus the vertical-text guard for
+ * the viking nav rows.
+ *
+ * All colours resolve through the Qubit theme tokens so the sheet follows
+ * the active theme; nothing here hard-codes a palette. No upstream brand
+ * appears in this file: it is Qubit-original console chrome.
+ * ------------------------------------------------------------------ */
+
+/* Uniform page opening (SettingsPageIntro): intro line + breadcrumb +
+   sub-nav stack with one rhythm across the five routes. */
+.viking-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+}
+
+/* Parent breadcrumb above a sub-page intro. Renders as a quiet link so the
+   five pages share the same "where am I" line instead of each hand-rolling
+   its own back button. */
+.viking-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  margin: 0;
+  font-size: var(--control-ui-text-sm, 13px);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.viking-breadcrumb__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 6px;
+  margin: -2px 0;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-md, 0.5rem);
+  /* A link must read as a control, not as loose text: give it a faint
+     resting surface that resolves on hover. */
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 5%, transparent);
+}
+
+.viking-breadcrumb__link:hover {
+  color: var(--color-foreground, currentColor);
+  background: var(--color-muted, rgba(232, 240, 228, 0.12));
+}
+
+.viking-breadcrumb__sep {
+  color: color-mix(in srgb, currentColor 55%, transparent);
+}
+
+/* A nav row is a button that must read as a row, not as loose text.
+   `.settings-row--nav` (console-primitives.css) carries a hover surface but
+   no resting surface, so a column of nav rows reads as plain text. Give the
+   viking nav rows a faint resting surface that resolves on hover; scoped to
+   `.viking-settings` so no other page's rows are affected. */
+.viking-settings .settings-row--nav {
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 4%, transparent);
+}
+
+.viking-settings .settings-row--nav:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  background: var(--color-muted, rgba(232, 240, 228, 0.12));
+  border-color: var(--color-border, rgba(232, 240, 228, 0.14));
+}
+
+/* Vertical-text guard (belt-and-braces with console-primitives.css).
+   A nav row is a flex button whose text column can collapse to width 0
+   when an icon + chevron claim the row; the label then wraps one character
+   per line. The title/desc columns may never be squeezed below a legible
+   width and must wrap on word boundaries. */
+.viking-settings .settings-row__title,
+.viking-settings .settings-row__desc {
+  min-width: 10rem;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.viking-settings .settings-row--nav .settings-row__text {
+  min-width: 0;
+}
+
+/* The sub-nav strip on the wide sub-pages (retrieval/uploads/agent-hub/
+   resources). Gives the shared "sibling views" switcher one rhythm. */
+.viking-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+}
+
+.viking-subnav__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 0.5rem);
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 5%, transparent);
+  color: inherit;
+  font-size: var(--control-ui-text-sm, 12px);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.viking-subnav__item:hover {
+  background: var(--color-muted, rgba(232, 240, 228, 0.12));
+  border-color: var(--color-border, rgba(232, 240, 228, 0.14));
+}
+
+.viking-subnav__item[aria-current="page"] {
+  border-color: var(--color-border, currentColor);
+  background: var(--color-muted, rgba(232, 240, 228, 0.1));
+}

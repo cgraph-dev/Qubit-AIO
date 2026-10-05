@@ -2107,6 +2107,89 @@ def _gw_programs(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
     return list_programs(cfg)
 
 
+def _gw_flows_list(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    """``flows.list`` -> the durable-flow rows (the cron job store).
+
+    Mirrors the cron ``GET /api/cron/jobs`` read (``voicebridge.schedules
+    .list_jobs``) exactly: every stored schedule as a flow row with its
+    schedule parts, enabled state, last state and timestamps. Recurring jobs
+    render as standing orders, ``run_at`` jobs as one-shots — the same
+    semantics ``ocFamilyFlowsApi.normalizeFlowRow`` applies. The envelope also
+    carries the bare ``jobs`` key so both the flow client and the cron client
+    read the identical rows from one source, never a second store.
+    """
+    listing = list_jobs(cfg, limit=LIST_MAX)
+    rows = [dict(j) for j in listing.get("jobs", [])]
+    return {"state": "OK", "flows": rows, "jobs": rows, "count": len(rows),
+            "limit": listing.get("limit"),
+            "timezone": listing.get("timezone"),
+            "authority": "voicebridge.schedules (cron job store)"}
+
+
+def _gw_flows_runs(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    """``flows.runs`` -> the retained run log for one durable flow.
+
+    Delegates to ``voicebridge.schedules.history`` — the same SQLite run log
+    ``qubit schedules history`` and the cron ``.../runs`` route read. A
+    non-numeric job id honestly reports no runs (never a fabricated or
+    error row). ``limit`` is bounded by the store, as every other read is.
+    """
+    raw = str(params.get("id", params.get("job_id", "")) or "").strip()
+    try:
+        limit = max(1, min(int(params.get("limit", 20) or 20), LIST_MAX))
+    except (TypeError, ValueError):
+        limit = 20
+    try:
+        job_id = int(raw)
+    except (TypeError, ValueError):
+        job_id = 0
+    if not job_id:
+        return {"state": "OK", "runs": [], "count": 0, "limit": limit,
+                "detail": f"flow {raw!r} has no numeric id; no runs",
+                "authority": "voicebridge.schedules (run history)"}
+    res = history(cfg, job_id, limit)
+    runs = res.get("runs", []) if isinstance(res, dict) else []
+    return {"state": "OK", "runs": runs, "count": len(runs), "limit": limit,
+            "job_id": job_id,
+            "authority": "voicebridge.schedules (run history)"}
+
+
+def _gw_flows_blueprints(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    """``flows.blueprints`` -> the REAL vendored blueprint catalog.
+
+    Sourced from ``cron.blueprint_catalog`` (the same catalog the cron
+    ``GET /api/cron/blueprints`` route reads), with the same ``deliver``
+    option rewrite. A pure read: instantiating a blueprint stays the
+    confirm-gated cron ``/api/cron/blueprints/instantiate`` operation.
+    """
+    from . import qubit_runtime
+    qubit_runtime.ensure_path()
+    try:
+        qubit_runtime.use_qubit_home(cfg)
+    except Exception:  # noqa: BLE001 - a resolution miss must not fail the read
+        pass
+    from cron.blueprint_catalog import (  # type: ignore
+        CATALOG, blueprint_catalog_entry,
+    )
+    deliver_options = None
+    try:
+        from cron.scheduler_delivery import cron_delivery_targets  # type: ignore
+        platforms = [t["id"] for t in cron_delivery_targets() if t.get("id")]
+        deliver_options = ["origin", "local", *platforms]
+    except Exception:  # noqa: BLE001 - keep the static options, like upstream
+        deliver_options = None
+    entries = []
+    for r in CATALOG:
+        entry = blueprint_catalog_entry(r)
+        if deliver_options:
+            for f in entry.get("fields", []):
+                if f.get("name") == "deliver":
+                    f["options"] = deliver_options
+        entries.append(entry)
+    return {"state": "OK", "blueprints": entries, "count": len(entries),
+            "authority": "cron.blueprint_catalog (vendored blueprint catalog)"}
+
+
 #: Gateway method name -> handler (registered onto each bridge registry by the
 #: family bridge in ``voicebridge/qubit_compat.py`` — the one wiring
 #: owner).
@@ -2127,6 +2210,9 @@ def _gw_flow_cancel(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
 
 FLOWS_GATEWAY_METHODS = {
     "flows.hooks": _gw_hooks,
+    "flows.list": _gw_flows_list,
+    "flows.runs": _gw_flows_runs,
+    "flows.blueprints": _gw_flows_blueprints,
     "hooks.enable": _gw_hook_enable,
     "hooks.disable": _gw_hook_disable,
     "flows.programs": _gw_programs,

@@ -91,6 +91,11 @@ dependencies = [
 hotkey = ["pynput>=1.7"]
 edge = ["edge-tts>=6"]
 kokoro = []                   # Kokoro TTS ships inside sherpa-onnx; model download only
+# Qt orb renderer (voicebridge/orb/qt_app.py): per-pixel alpha + QPainter
+# radial gradients on X11. Optional: the Tk view (stdlib) stays the
+# fallback when Qt is absent. Note Qt 6.5+ on X11 also needs the system
+# lib libxcb-cursor0 (no sudo here; qt_compat preloads runtime copies).
+orb-qt = ["PySide6-Essentials>=6.5"]
 # The v0.21.5 vendored runtime eagerly constructs a native Anthropic client in
 # `agent.agent_init._init_anthropic_client`, and the vendored test suite asserts
 # on real SDK client shape. The SDK is an optional *runtime* extra upstream

@@ -301,14 +301,38 @@ class OnlineStreamingSession(StreamingSession):
         self._lock = lock or threading.Lock()
         self._padding = np.zeros(int(padding_s * sample_rate), dtype=np.float32)
         self._finished = False
+        # Onset priming (2026-10-04): the transducer encoder starts cold, so
+        # a first chunk that IS speech decodes with no left context — measured
+        # live (nemotron-560ms, full-audio cold start): "Hello" -> "Low" with
+        # zero truncation. Feeding the trailing-silence pad up front warms
+        # the convolutional subsampling caches, and the first real chunk then
+        # decodes with context (measured: verbatim). Silence carries no words,
+        # so partials are unaffected (empty hypotheses are dropped by
+        # _partial). The window session needs nothing: it buffers the whole
+        # utterance and its silence gate skips this prefix entirely.
+        self._stream.accept_waveform(sample_rate=sample_rate,
+                                     waveform=self._padding)
 
     def _drain(self) -> str:
         # The recognizer may be shared across sessions (warm cache), so decode
-        # is serialised per engine.
-        with self._lock:
-            while self._rec.is_ready(self._stream):
-                self._rec.decode_stream(self._stream)
-            return str(self._rec.get_result(self._stream) or "")
+        # is serialised per engine. A decode failure (GPU OOM under memory
+        # pressure is the observed one) must degrade to an empty hypothesis,
+        # never propagate: the caller is the STT socket pump, which only
+        # catches SttWsError, so a raw RuntimeError kills the whole request
+        # with a socketserver traceback (2026-10-01/02 storm: ~2090 dead
+        # requests). The accurate rescore on stop still gets its chance.
+        # Mirrors WindowStreamingSession's partial_error/final_error degrade.
+        try:
+            with self._lock:
+                while self._rec.is_ready(self._stream):
+                    self._rec.decode_stream(self._stream)
+                return str(self._rec.get_result(self._stream) or "")
+        except ASRUnavailable:
+            raise
+        except Exception as exc:  # noqa: BLE001 - decode must not kill the socket
+            log_event("asr.stream.decode_error", engine=self.engine,
+                      error=type(exc).__name__)
+            return ""
 
     def accept(self, pcm: np.ndarray, *,
                end_of_speech: bool = False) -> Optional[PartialResult]:

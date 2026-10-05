@@ -78,6 +78,17 @@ setupGracefulExit({
     // a zombie: Ink's render loop throws once a second, each throw lands back
     // in this handler, and the crash log fills with `write EIO` forever while
     // the gateway child keeps running. Bail out for real after a few in a row.
+    //
+    // Do NOT suppress this under the dashboard. A backend restart destroys the
+    // PTY permanently — the old `voicebridge run` is gone and nothing can
+    // reattach this process to a new browser connection — so surviving the EIO
+    // burst does not save the turn; it produces an orphaned process that writes
+    // EIO into a void forever (~14 lines/sec, observed) and never reconnects,
+    // because GatewayClient's recovery only heals the GATEWAY child, not the
+    // PTY. Measured 2026-10-04: suppressing this left 7 TUI trees alive, ~4
+    // orphaned under systemd, spinning into a 21 MB crash log. Exiting is the
+    // correct cleanup; the session survives through the interrupted-turn
+    // marker + resume path, not through process survival.
     const code = (err as NodeJS.ErrnoException)?.code
 
     if (code === 'EIO' || code === 'EPIPE') {

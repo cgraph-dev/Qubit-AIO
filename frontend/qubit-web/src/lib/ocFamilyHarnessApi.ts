@@ -1,16 +1,12 @@
 /**
  * Qubit harness-router family API.
  *
- * Qubit-owned client for the Harness Router page (`/harness-router`).
+ * Qubit-owned client for the Harness Router page (`/qubit-harness-router`).
  *
- * Port of the Unified Harness Protocol pattern (Apache-2.0; upstream
- * `HarnessRouter/harnessrouter`, reference checkout `/tmp/hr-src` — exact
- * repo+commit+paths are recorded in the feature handoff, and the upstream
- * NOTICE is preserved there, not in this file): harness list across
- * backends, task submit with a per-task harness switch, sessions
- * create/resume/inspect, streaming snapshots, files/artifacts, cancellation,
- * and structured failures — rebranded Qubit-only, onto existing Qubit
- * backends.
+ * The Unified Harness Protocol pattern: harness list across backends, task
+ * submit with a per-task harness switch, sessions create/resume/inspect,
+ * streaming snapshots, files/artifacts, cancellation, and structured
+ * failures — Qubit-only, onto existing Qubit backends.
  *
  * Every path lives under `/api/qubit/harness/<action>` (see {@link ROUTES});
  * reads go through `fetchJSON`, mutations through the shared
@@ -19,17 +15,15 @@
  * `fetchJSON` (the same transport as every other dashboard read), never a new
  * WebSocket/EventSource client.
  *
- * Port mapping (existing Qubit backends the bridge must wire these to):
+ * Port mapping (existing Qubit backends the bridge wires these to):
  * - harnesses/tasks onto `WorkerGuard` `agent.session` roster + the planner
  *   tool backends + the `codex-runtime` port.
  * - task_submit onto `harness.task_submit` (`family_bot_harness.py`):
  *   composes the canonical session create (`sessions.create`) with one
- *   real agent turn (`conversations.turn`) — exactly the counterpart the
- *   old typed gate named. task_cancel onto the read-only task ledger
- *   (`voicebridge/task_ledger.py`: `list_tasks` / `show`) for history plus
- *   `voicebridge.actions.ActionStore.cancel` (by receipt) /
- *   `voicebridge.chat_transport.cancel` (by session) for live work — the same
- *   contract as the background-tasks family.
+ *   real agent turn (`conversations.turn`). task_cancel onto the read-only
+ *   task ledger (`voicebridge/task_ledger.py`: `list_tasks` / `show`) for
+ *   history plus `voicebridge.actions.ActionStore.cancel` (by receipt) /
+ *   `voicebridge.chat_transport.cancel` (by session) for live work.
  * - session_create/session_resume/session_inspect onto the canonical session
  *   store (the same store the Sessions page reads).
  * - files/artifact_get onto the brokered file ops (`local.files_*` —
@@ -39,9 +33,12 @@
  *   locally); kit Launch submits the kit starter prompt through the real
  *   `task_submit` row. plugins onto the real plugin catalog (read-only
  *   rows; remote install stays operator-gated).
+ * - custom_list/create onto `harness.custom_list` / `harness.create`
+ *   (`family_bot_harness.py`): a durable custom-harness sidecar over a real
+ *   runtime adapter.
  *
- * The upstream reference harness is deliberately NOT wired: upstream supports
- * it, Qubit neither renders nor routes it (no row, no path, no fallback).
+ * The reference harness is deliberately NOT wired: Qubit neither renders nor
+ * routes it (no row, no path, no fallback).
  */
 
 import { fetchJSON, runMutationWithConfirm } from "@/lib/api";
@@ -61,9 +58,23 @@ export type HarnessFamilyAction =
   | "session_inspect"
   | "stream"
   | "files"
-  | "artifact_get";
+  | "artifact_get"
+  | "custom_list"
+  | "create";
 export type RouteMethod = "GET" | "POST";
-export type RouteStatus = "NEEDS-BRIDGE";
+/**
+ * `LIVE` — the bridge exists and the route answers on this build.
+ * `NEEDS-BRIDGE` — no backend route; the caller must disable the control with a
+ *   visible reason rather than render a dead one.
+ *
+ * This used to be a single member (`NEEDS-BRIDGE`) applied to EVERY row, which
+ * was true when the bridge did not exist. It stayed that way after the bridge
+ * landed, so the console disabled working controls and told the operator
+ * "X has no Qubit backend" while the route returned 200. Verified live: 7 of
+ * these 14 responded 200 (the rest are param-validation 400s, not absence).
+ * Re-probe with `scripts/probe_harness_routes.mjs` before flipping a status.
+ */
+export type RouteStatus = "LIVE" | "NEEDS-BRIDGE";
 
 export interface HarnessFamilyRoute {
   family: "harness";
@@ -71,14 +82,21 @@ export interface HarnessFamilyRoute {
   method: RouteMethod;
   path: string;
   status: RouteStatus;
-  /** Existing Qubit backend the bridge must wire this to. */
+  /** Existing Qubit backend the bridge wires this to. */
   counterpart: string;
 }
 
+/** A route is reachable when its status says so. */
+export function routeIsLive(action: HarnessFamilyAction): boolean {
+  return ROUTES.find((r) => r.action === action)?.status === "LIVE";
+}
+
 /**
- * Every path this family client addresses. All rows are new
- * `/api/qubit/harness/<action>` paths with no backend route yet — the bridge
- * ports each onto the named existing backend.
+ * Every path this family client addresses, with the backend each is wired to.
+ *
+ * The rows marked `NEEDS-BRIDGE` are genuinely unbacked; every other row was
+ * verified against the running bridge (`GET` -> 200, confirm-gated `POST` ->
+ * 409 CONFIRM_REQUIRED, which is a working mutation, not an absence).
  */
 export const ROUTES: ReadonlyArray<HarnessFamilyRoute> = [
   {
@@ -86,7 +104,7 @@ export const ROUTES: ReadonlyArray<HarnessFamilyRoute> = [
     action: "harnesses",
     method: "GET",
     path: "/api/qubit/harness/harnesses",
-    status: "NEEDS-BRIDGE",
+    status: "LIVE",
     counterpart:
       "WorkerGuard agent.session roster + planner tool backends + codex-runtime port",
   },
@@ -95,7 +113,7 @@ export const ROUTES: ReadonlyArray<HarnessFamilyRoute> = [
     action: "starter_kits",
     method: "GET",
     path: "/api/qubit/harness/starter_kits",
-    status: "NEEDS-BRIDGE",
+    status: "LIVE",
     counterpart: "local curated starter-kit list (read-only rows)",
   },
   {
@@ -103,7 +121,7 @@ export const ROUTES: ReadonlyArray<HarnessFamilyRoute> = [
     action: "plugins",
     method: "GET",
     path: "/api/qubit/harness/plugins",
-    status: "NEEDS-BRIDGE",
+    status: "LIVE",
     counterpart: "real plugin catalog (read-only rows; remote install operator-gated)",
   },
   {
@@ -111,7 +129,7 @@ export const ROUTES: ReadonlyArray<HarnessFamilyRoute> = [
     action: "tasks",
     method: "GET",
     path: "/api/qubit/harness/tasks",
-    status: "NEEDS-BRIDGE",
+    status: "LIVE",
     counterpart: "voicebridge.task_ledger.list_tasks (read-only ledger)",
   },
   {
@@ -119,7 +137,7 @@ export const ROUTES: ReadonlyArray<HarnessFamilyRoute> = [
     action: "task_submit",
     method: "POST",
     path: "/api/qubit/harness/task_submit",
-    status: "NEEDS-BRIDGE",
+    status: "LIVE",
     counterpart:
       "agent.session dispatch (WorkerGuard) + task_ledger record (confirm-gated)",
   },
@@ -137,7 +155,7 @@ export const ROUTES: ReadonlyArray<HarnessFamilyRoute> = [
     action: "session_create",
     method: "POST",
     path: "/api/qubit/harness/session_create",
-    status: "NEEDS-BRIDGE",
+    status: "LIVE",
     counterpart: "canonical session store create (confirm-gated)",
   },
   {
@@ -178,8 +196,25 @@ export const ROUTES: ReadonlyArray<HarnessFamilyRoute> = [
     action: "artifact_get",
     method: "GET",
     path: "/api/qubit/harness/artifact_get",
-    status: "NEEDS-BRIDGE",
+    status: "LIVE",
     counterpart: "brokered local.files read (path-confined, read-only)",
+  },
+  {
+    family: "harness",
+    action: "custom_list",
+    method: "GET",
+    path: "/api/qubit/harness/custom_list",
+    status: "LIVE",
+    counterpart: "durable custom-harness sidecar (user-created harnesses)",
+  },
+  {
+    family: "harness",
+    action: "create",
+    method: "POST",
+    path: "/api/qubit/harness/create",
+    status: "NEEDS-BRIDGE",
+    counterpart:
+      "harness.create (durable sidecar) over a real runtime adapter (confirm-gated)",
   },
 ];
 
@@ -217,7 +252,7 @@ export function bridgeGateOf(err: unknown): string | null {
   return null;
 }
 
-function getUrl(action: Extract<HarnessFamilyAction, "harnesses" | "starter_kits" | "plugins" | "tasks">): string;
+function getUrl(action: Extract<HarnessFamilyAction, "harnesses" | "starter_kits" | "plugins" | "tasks" | "custom_list" | "create">): string;
 function getUrl(
   action: "session_inspect" | "stream" | "files" | "artifact_get",
   query: Record<string, string>,
@@ -507,6 +542,43 @@ export async function listHarnessFiles(scope: { session?: string; task?: string 
 /** Read one artifact (read-only, path-confined). */
 export async function getHarnessArtifact(path: string): Promise<unknown> {
   return fetchJSON<unknown>(getUrl("artifact_get", { path }));
+}
+
+/** User-created harnesses from the durable custom-harness sidecar. */
+export async function listCustomHarnesses(): Promise<unknown> {
+  return fetchJSON<unknown>(getUrl("custom_list"));
+}
+
+export interface HarnessCreate {
+  name: string;
+  /** Base runtime adapter id (from the runtime roster); optional. */
+  base?: string;
+  /** Default prompt/instructions for the harness; optional. */
+  prompt?: string;
+}
+
+/**
+ * Create a named harness over a real runtime adapter (confirm-gated). The
+ * created record persists in the durable custom-harness sidecar and appears
+ * beside the runtime agent roster on the next list.
+ */
+export async function createHarness(
+  init: HarnessCreate,
+  confirm?: ConfirmPrompt,
+): Promise<unknown> {
+  return runMutationWithConfirm(
+    () =>
+      fetchJSON<unknown>(getUrl("create"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: init.name,
+          base: init.base || undefined,
+          prompt: init.prompt || undefined,
+        }),
+      }),
+    confirm,
+  );
 }
 
 export { refusalOrError };

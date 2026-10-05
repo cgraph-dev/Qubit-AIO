@@ -116,8 +116,18 @@ export interface WorktreeListResponse {
   worktrees: WorktreeRow[];
 }
 
+/** A branch as the backend reports it — an object, not a bare name. */
+export interface BranchEntry {
+  name: string;
+  checkedOut?: boolean;
+  isDefault?: boolean;
+  isRemote?: boolean;
+  /** Set when the branch is checked out in a worktree. */
+  worktreePath?: string;
+}
+
 export interface BranchListResponse {
-  branches: string[];
+  branches: BranchEntry[];
 }
 
 export interface CheckpointSessionRow {

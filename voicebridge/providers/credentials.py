@@ -135,9 +135,12 @@ def resolve_key(provider: str, ref: str) -> tuple[str, str]:
     """Resolve a credential reference.
 
     ``ref`` forms:
-      - "env:NAME" -> ``os.environ["NAME"]``, else ``NAME`` from the canonical
-        runtime ``.env`` (``<state_dir>/runtime/.env``); the process
-        environment always wins
+      - "env:NAME" -> ``NAME`` from the canonical runtime ``.env``
+        (``<state_dir>/runtime/.env``), else ``os.environ["NAME"]``. The
+        canonical .env is the operator's authoritative credential store and
+        is read fresh on every call, so a deliberate edit/rotation wins over
+        a stale value inherited from the parent shell — exact parity with the
+        reference (`hermes_cli.config.get_env_value_prefer_dotenv`).
       - "file:/path" -> first line of file (path must exist, never logged)
       - "" -> missing
     Returns (key, code) where code is "" on success else "AUTH_MISSING".
@@ -151,9 +154,14 @@ def resolve_key(provider: str, ref: str) -> tuple[str, str]:
         name = ref[len("env:"):].strip()
         if not name:
             return "", "AUTH_MISSING"
-        val = os.environ.get(name, "")
-        if not val:
-            val = _env_file_value(name)
+        # File first, environment second (Hermes parity). Reversing this was
+        # the rebrand divergence that broke key rotation: the vendored runtime
+        # dotenv-loads .env into os.environ at import, so preferring os.environ
+        # shadowed every rotated key until a full service restart (live
+        # 2026-10-05: the owner replaced a rate-limited OpenCode Go key and
+        # every provider call kept 402ing). _env_file_value re-reads the file
+        # each call, so a direct .env edit takes effect immediately.
+        val = _env_file_value(name) or os.environ.get(name, "")
         return (val, "") if val else ("", "AUTH_MISSING")
     if ref.startswith("file:"):
         p = Path(ref[len("file:"):].strip()).expanduser()

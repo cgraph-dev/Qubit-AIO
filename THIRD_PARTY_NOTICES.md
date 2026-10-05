@@ -118,6 +118,124 @@ distributions (full text at https://www.apache.org/licenses/LICENSE-2.0):
 > CONDITIONS OF ANY KIND, either express or implied. See the License for the
 > specific language governing permissions and limitations under the License.
 
+## HarnessRouter — harness console styles and structure
+
+The `/harness-router` console (`frontend/qubit-web/src/styles/upstream/harness.css`
+plus the matching JSX structure in `frontend/qubit-web/src/pages/HarnessRouterPage.tsx`)
+ports selectors verbatim from HarnessRouter/harnessrouter (Apache-2.0),
+reviewed at pinned commit `f3192445c82da533fe83b125917efb8c3947aef0` (2026-10-02):
+the Agent harnesses console in `ui/src/app/v2.css` (`hx-*` panel/header/index-table
+rules, `ak-*` sheet/dialog rules) and the skeleton shimmer in `ui/src/app/revamp.css`
+(`.sk`). Color/font tokens are remapped to the Qubit theme and upstream product
+marks are not carried over. No upstream backend code is used — all data flows
+over the existing Qubit family bridge.
+
+Apache License 2.0 requirement: include the license text and copyright notice in
+distributions (full text at https://www.apache.org/licenses/LICENSE-2.0):
+
+> Copyright (c) 2026 HarnessRouter
+>
+> Licensed under the Apache License, Version 2.0 (the "License"); you may not
+> use this file except in compliance with the License. You may obtain a copy of
+> the License at http://www.apache.org/licenses/LICENSE-2.0
+>
+> Unless required by applicable law or agreed to in writing, software distributed
+> under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+> CONDITIONS OF ANY KIND, either express or implied. See the License for the
+> specific language governing permissions and limitations under the License.
+
+## OpenClaw — console styles and structure (workboard, sessions, cron, devices, debug, skills)
+
+The non-Hermes overlay pages (`frontend/qubit-web/src/styles/upstream/workboard.css`,
+`upstream-sessions.css`, `upstream-cron.css`, `upstream-devices.css`, `upstream-chrome.css`,
+`upstream-compat.css`, plus matching JSX structure in the Task Inbox, Board Admin,
+Session Ops, Nodes, Devices, Scheduler, Taskflows, Worktrees, Checkpoints, Memory
+Backends, Canvas, MCP Calls, and Skills Review pages) port selectors from
+openclaw/openclaw (MIT), reviewed at pinned commit
+`7ff3b3be3713751de356800167d67ce752ad0d04` (2026-10-02):
+`extensions/workboard/browser/{pages/workboard,widgets,styles}`,
+`ui/src/pages/{sessions,devices,cron,worktrees,config,debug,skill-workshop,skills}`,
+`ui/src/styles`, `extensions/{memory-lancedb,memory-wiki,active-memory,canvas}`,
+`docs/automation`. Color/font tokens are remapped to the Qubit theme and upstream
+product marks are not carried over. No upstream backend code is used — all data flows
+over the existing Qubit bridges.
+
+MIT License text requirement (copyright notice retained):
+
+> Copyright (c) 2026 OpenClaw Foundation
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+
+## OpenMuse — mobile-chat UX patterns (bot + webchat)
+
+The `/qubit-bot` and `/webchat` pages (`frontend/qubit-web/src/styles/upstream/botchat.css`
+plus matching JSX structure) adapt chat UX patterns from CopilotKit/openmuse (MIT),
+reviewed at pinned commit `9ec439fbaa878197d9d44c2aa982cca55676dd68` (2026-10-02):
+`apps/mobile/src/{chat,threads,agent-ui,assistant-response,conversation-queue,conversation-run,screens,ui}`.
+No verbatim upstream code is shipped (reimplemented for web in the Qubit theme);
+all turns run over the existing Qubit chat/SSE transport.
+
+MIT License text requirement (copyright notice retained):
+
+> Copyright (c) 2026 OpenMuse contributors
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+
+## OpenMuse — Goals, Monitors and Ideas domain (agent surfaces)
+
+The Qubit agent surfaces `Goals`, `Monitors` (page watches) and `Ideas` port the
+domain model and service behaviour of CopilotKit/openmuse (MIT) at pinned commit
+`b06caad7005ac5b6d2b451752a3794a6ae1759c1` (2026-10-04):
+
+- `packages/domain/src/agent.ts` — the `Goal` (line 57), `Monitor` (line 66) and
+  `Idea` (line 82) interfaces, their zod input schemas (`monitorInputSchema`,
+  `goalInputSchema`), and the `AgentTask["kind"]` enum that includes `monitor`
+  and `finance`.
+- `apps/server/src/engine/routes.ts` — the `POST /goals`, `POST /goals/:id`,
+  `POST /monitors`, `POST /monitors/:id/control`, `POST /ideas/refresh` and
+  `POST /ideas/:id` route shapes.
+- `apps/server/src/engine/service.ts` — the observable behaviour of
+  `createGoal`/`updateGoal` (incl. pause-cascades-to-linked-tasks),
+  `createMonitor`/`controlMonitor` (incl. URL safety rejection and the stopped
+  monitor restart rule), and `refreshIdeas`/`decideIdea` (idempotent derivation,
+  stable-hash ids, retire-obsolete, compare-and-swap on status).
+
+No verbatim upstream code is shipped. Field names, defaults, validation bounds,
+state transitions and error semantics are reproduced so the surfaces behave 1:1;
+the storage is Qubit's own (existing stores, no new daemons). Where upstream
+derives ideas from a mail store Qubit does not have, the derivation reads Qubit's
+real stores instead — same rules and evidence shape, no fabricated rows.
+
+MIT License text requirement (copyright notice retained):
+
+> Copyright (c) 2026 OpenMuse contributors
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+
 ## Optional local skill snapshots
 
 The repository-local `skills/` folder contains third-party instruction and

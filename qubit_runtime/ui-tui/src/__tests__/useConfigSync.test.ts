@@ -11,6 +11,7 @@ import {
   normalizeStatusBar,
   syncMcpReload
 } from '../app/useConfigSync.js'
+import { MOUSE_TRACKING } from '../config/env.js'
 
 describe('applyDisplay', () => {
   beforeEach(() => {
@@ -185,15 +186,30 @@ describe('normalizeStatusBar', () => {
 })
 
 describe('normalizeMouseTracking', () => {
-  it('defaults to all and prefers canonical mouse_tracking over legacy tui_mouse', () => {
-    expect(normalizeMouseTracking({})).toBe('all')
+  it('preserves the resolved boot policy when unset, and prefers canonical mouse_tracking over legacy tui_mouse', () => {
+    // Unset (and the legacy-only shape) returns the resolved boot policy
+    // rather than forcing 'all' — under the dashboard that policy is 'off',
+    // so a config sync can no longer re-arm the mouse and leak ESC[M bytes
+    // into the composer.
+    expect(normalizeMouseTracking({})).toBe(MOUSE_TRACKING)
     expect(normalizeMouseTracking({ mouse_tracking: false })).toBe('off')
     expect(normalizeMouseTracking({ mouse_tracking: 0 })).toBe('off')
     expect(normalizeMouseTracking({ mouse_tracking: 'off' })).toBe('off')
     expect(normalizeMouseTracking({ mouse_tracking: 'false' })).toBe('off')
-    expect(normalizeMouseTracking({ mouse_tracking: null, tui_mouse: false })).toBe('all')
+    expect(normalizeMouseTracking({ mouse_tracking: undefined })).toBe(MOUSE_TRACKING)
+    expect(normalizeMouseTracking({ mouse_tracking: null, tui_mouse: false })).toBe(MOUSE_TRACKING)
     expect(normalizeMouseTracking({ mouse_tracking: true, tui_mouse: false })).toBe('all')
     expect(normalizeMouseTracking({ tui_mouse: false })).toBe('off')
+  })
+
+  it('honours a dashboard mouse-off boot policy when the key is unset', () => {
+    // The dashboard PTY sets HERMES_TUI_DISABLE_MOUSE=1 before the child boots;
+    // an unset display.mouse_tracking must not override that back to 'all'.
+    expect(normalizeMouseTracking({}, 'off')).toBe('off')
+    expect(normalizeMouseTracking({ mouse_tracking: undefined }, 'off')).toBe('off')
+    // An explicit config value still wins over the boot policy.
+    expect(normalizeMouseTracking({ mouse_tracking: 'all' }, 'off')).toBe('all')
+    expect(normalizeMouseTracking({}, 'all')).toBe('all')
   })
 
   it('accepts preset strings (wheel/buttons/all) and their aliases', () => {

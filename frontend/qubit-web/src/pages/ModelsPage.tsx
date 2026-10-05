@@ -710,8 +710,8 @@ function ModelSettingsPanel({
   );
   const [mainNotice, setMainNotice] = useState<string | null>(null);
 
-  const mainProv = activeProfile?.provider ?? aux?.main.provider ?? "";
-  const mainModel = activeProfile?.model ?? aux?.main.model ?? "";
+  const mainProv = activeProfile?.provider ?? aux?.main?.provider ?? "";
+  const mainModel = activeProfile?.model ?? aux?.main?.model ?? "";
 
   const applyAssignment = async ({
     scope,
@@ -1035,6 +1035,19 @@ function ProfileUseAsPanel({ onAssigned }: { onAssigned(): void }) {
 /*  Page                                                                */
 /* ──────────────────────────────────────────────────────────────────── */
 
+/** Zeroed totals used when a backend response omits the `totals` block. */
+const EMPTY_MODEL_TOTALS: ModelsAnalyticsResponse["totals"] = {
+  distinct_models: 0,
+  total_input: 0,
+  total_output: 0,
+  total_cache_read: 0,
+  total_reasoning: 0,
+  total_estimated_cost: 0,
+  total_actual_cost: 0,
+  total_sessions: 0,
+  total_api_calls: 0,
+};
+
 export default function ModelsPage() {
   const [days, setDays] = useState(30);
   const [data, setData] = useState<ModelsAnalyticsResponse | null>(null);
@@ -1076,7 +1089,14 @@ export default function ModelsPage() {
       api.getActiveTerminalProfile().catch(() => null),
     ])
       .then(([models, auxData, active]) => {
-        setData(models);
+        // A backend response missing `totals`/`models` must not blank the
+        // stats row (React read `undefined.distinct_models`); fold in the
+        // empty shape so the page renders zeros instead of crashing.
+        setData(
+          models
+            ? { ...models, models: models.models ?? [], totals: models.totals ?? EMPTY_MODEL_TOTALS }
+            : models,
+        );
         setAux(auxData);
         setActiveProfile(active);
       })

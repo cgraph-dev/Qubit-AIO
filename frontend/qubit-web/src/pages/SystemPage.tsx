@@ -300,7 +300,7 @@ export default function SystemPage() {
         if (st.status === "fulfilled") setStats(st.value);
         if (m.status === "fulfilled") setMemory(m.value);
         if (p.status === "fulfilled") {
-          setPool(p.value.providers);
+          setPool(p.value?.providers ?? []);
           setPoolRefusal(null);
         } else {
           // A gated read must not silently render as an empty pool.
@@ -1423,8 +1423,8 @@ export default function SystemPage() {
             <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
               <span className="text-xs text-muted-foreground">
                 Built-in files — MEMORY.md:{" "}
-                {formatBytes(memory?.builtin_files.memory ?? 0)} · USER.md:{" "}
-                {formatBytes(memory?.builtin_files.user ?? 0)}
+                {formatBytes(memory?.builtin_files?.memory ?? 0)} · USER.md:{" "}
+                {formatBytes(memory?.builtin_files?.user ?? 0)}
               </span>
               <div className="flex items-center gap-2 ml-auto">
                 <Button size="sm" ghost className="text-destructive" onClick={() => memoryReset.requestDelete("memory")}>
@@ -1790,10 +1790,10 @@ export default function SystemPage() {
         <Card>
           <CardContent className="flex items-center justify-between py-4">
             <span className="text-sm text-muted-foreground">
-              {checkpoints?.sessions.length ?? 0} session(s) ·{" "}
+              {checkpoints?.sessions?.length ?? 0} session(s) ·{" "}
               {formatBytes(checkpoints?.total_bytes ?? 0)}
             </span>
-            <Button size="sm" ghost className="text-destructive" disabled={!checkpoints?.sessions.length} prefix={<Trash2 className="h-3.5 w-3.5" />} onClick={() => checkpointsPrune.requestDelete("all")}>
+            <Button size="sm" ghost className="text-destructive" disabled={!checkpoints?.sessions?.length} prefix={<Trash2 className="h-3.5 w-3.5" />} onClick={() => checkpointsPrune.requestDelete("all")}>
               Prune
             </Button>
           </CardContent>
@@ -1810,14 +1810,14 @@ export default function SystemPage() {
             New hook
           </Button>
         </div>
-        {(!hooks || hooks.hooks.length === 0) && (
+        {(!hooks?.hooks || hooks.hooks.length === 0) && (
           <Card>
             <CardContent className="py-6 text-center text-sm text-muted-foreground">
               No shell hooks configured.
             </CardContent>
           </Card>
         )}
-        {hooks?.hooks.map((h: HookEntry, i) => (
+        {hooks?.hooks?.map((h: HookEntry, i) => (
           <Card key={`${h.event}-${i}`}>
             <CardContent className="flex items-center gap-3 py-3">
               <Badge tone="outline">{h.event}</Badge>

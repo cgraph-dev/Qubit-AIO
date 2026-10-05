@@ -8,6 +8,44 @@
 @import '@nous-research/ui/styles/fonts.css';
 @import '@nous-research/ui/styles/globals.css';
 
+/* ------------------------------------------------------------------ */
+/* Ported upstream console stylesheets.                                */
+/*                                                                     */
+/* Each file is a 1:1 port of its upstream console's stylesheet, with  */
+/* a provenance header naming the repo, commit and licence. They are   */
+/* imported HERE (after the DS, before Tailwind utilities) because the */
+/* ported pages carry the upstream class vocabulary and resolve to     */
+/* nothing without them — the sheets being present but unimported is   */
+/* exactly how the ported layout went missing in the served build.     */
+/*                                                                     */
+/* Order matters: `upstream-compat.css` carries the theme-token        */
+/* remap that the family sheets read, so it must load FIRST; the       */
+/* remaining sheets are independent of each other.                     */
+/* ------------------------------------------------------------------ */
+@import './styles/upstream/upstream-compat.css';
+@import './styles/upstream/upstream-chrome.css';
+@import './styles/upstream/harness.css';
+@import './styles/upstream/workboard.css';
+@import './styles/upstream/botchat.css';
+@import './styles/upstream/upstream-sessions.css';
+@import './styles/upstream/upstream-cron.css';
+@import './styles/upstream/upstream-devices.css';
+@import './styles/upstream/upstream-qubit-additions.css';
+/* Must come AFTER workboard.css: it re-states `.btn`/`.settings-input`/
+   `.callout` at document scope for the pages that use them outside a
+   `.workboard` ancestor (16 pages would otherwise render those controls
+   with no background, border or colour at all). */
+@import './styles/upstream/console-primitives.css';
+/* Hoists the ported upstream token set to :root. upstream-compat.css scopes
+   it to `.qb-upstream`, which only /open-viking carries — every other page
+   therefore had --text/--muted/--border/--space-* UNSET, so the rules using
+   them dropped. This makes the tokens globally available with identical
+   values; the scoped block is unchanged. */
+@import './styles/upstream/console-tokens.css';
+/* Open Viking console shell primitives (breadcrumb, sub-nav, and the
+   vertical-text guard for the viking nav rows). Qubit-original chrome. */
+@import './styles/upstream/viking-settings.css';
+
 /* Scan the published design-system bundle so its utility classes survive
    Tailwind's JIT purge. */
 @source '../node_modules/@nous-research/ui/dist';
@@ -201,6 +239,15 @@ code { font-size: 0.875rem; }
 @keyframes toast-out {
   from { opacity: 1; transform: translateX(0); }
   to   { opacity: 0; transform: translateX(16px); }
+}
+
+/* Shared surface layer (`@qubit/shared/muse`) — spinner + sheet entrance. */
+@keyframes qubit-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes slide-up {
+  from { transform: translateY(24px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
 }
 
 /* Generic fade + dialog entrance used by popovers and confirm dialogs. */

@@ -1474,6 +1474,24 @@ export default function VoiceEditPage() {
             <label className="mt-2 flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
+                data-testid="voice-edit-waveform-visible"
+                checked={settings.waveform_visible === true}
+                onChange={(e) => void update({ waveform_visible: e.target.checked })}
+              />
+              Show the floating voice waveform widget
+            </label>
+            <label className="mt-2 flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                data-testid="voice-edit-waveform-ingame"
+                checked={settings.waveform_ingame === true}
+                onChange={(e) => void update({ waveform_ingame: e.target.checked })}
+              />
+              Show orb over fullscreen games
+            </label>
+            <label className="mt-2 flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
                 data-testid="voice-edit-debug-log"
                 checked={Boolean(settings.debug_log)}
                 onChange={(e) => void update({ debug_log: e.target.checked })}

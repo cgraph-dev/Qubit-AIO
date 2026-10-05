@@ -16,10 +16,12 @@ import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import {
+  ArrowUpRight,
   Bug,
   Code,
   Copy,
   FileText,
+  GitBranch,
   Globe,
   ImagePlus,
   Mic,
@@ -48,6 +50,7 @@ import { useSearchParams } from "react-router";
 
 import { ChatSessionList } from "@/components/ChatSessionList";
 import { ChatSessionArtifacts } from "@/components/ChatSessionArtifacts";
+import { ChatToolsSummary } from "@/components/ChatToolsSummary";
 import { Markdown } from "@/components/Markdown";
 import { firstImageFromClipboard } from "@/lib/chatImagePaste";
 
@@ -63,6 +66,7 @@ import {
   api,
   CHAT_REASONING_LEVELS,
   streamChatTurn,
+  withBackoff,
   type ChatStoreMessage,
   type ChatStreamEvent,
 } from "@/lib/api";
@@ -77,7 +81,14 @@ import {
 import { useTranscriptionController } from "@/hooks/useTranscriptionController";
 import { useDesktopVoiceHelper } from "@/hooks/useDesktopVoiceHelper";
 import { cn } from "@/lib/utils";
+import {
+  filterSlashCommands,
+  slashCompletionText,
+  type SlashCommandItem,
+} from "@/lib/slashCommands";
 import { PluginSlot } from "@/plugins";
+import "./ChatPage.css";
+import "./ChatPage.studio.css";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -178,6 +189,7 @@ function normalizeReasoning(value: unknown): string | null {
 }
 
 const STORAGE_PREFIX = "qubit.chat.transcript.";
+const SESSION_PROGRESS_PREFIX = "qubit.chat.progress.";
 const SESSION_KEY = "qubit.chat.session";
 const DEFAULT_SESSION = "dashboard-chat";
 
@@ -239,6 +251,31 @@ function loadTranscript(session: string): ChatMessage[] {
 
 function saveTranscript(session: string, messages: ChatMessage[]): void {
   storageSet(STORAGE_PREFIX + session, JSON.stringify(messages.slice(-200)));
+}
+
+interface SessionProgress {
+  userTurns: number;
+  toolRuns: number;
+}
+
+function loadSessionProgress(session: string): SessionProgress {
+  try {
+    const parsed: unknown = JSON.parse(
+      storageGet(SESSION_PROGRESS_PREFIX + session) ?? "null",
+    );
+    if (!parsed || typeof parsed !== "object") return { userTurns: 0, toolRuns: 0 };
+    const progress = parsed as Partial<SessionProgress>;
+    return {
+      userTurns: Number.isFinite(progress.userTurns) ? Math.max(0, Number(progress.userTurns)) : 0,
+      toolRuns: Number.isFinite(progress.toolRuns) ? Math.max(0, Number(progress.toolRuns)) : 0,
+    };
+  } catch {
+    return { userTurns: 0, toolRuns: 0 };
+  }
+}
+
+function saveSessionProgress(session: string, progress: SessionProgress): void {
+  storageSet(SESSION_PROGRESS_PREFIX + session, JSON.stringify(progress));
 }
 
 /** Extract a typed code/detail from a fetch Error("<status>: <body>"). */
@@ -334,12 +371,19 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const [messages, setMessages] = useState<ChatMessage[]>(() =>
     loadTranscript(session),
   );
+  const [transcriptSession, setTranscriptSession] = useState(session);
   const [transcriptState, setTranscriptState] = useState<
     "loading" | "ready" | "error"
   >("loading");
   const [streamingText, setStreamingText] = useState("");
   const [input, setInput] = useState("");
+  // Slash autocomplete selection + Esc-dismissal (single-token "/" prefix only;
+  // see `slashVisible` below). The composer owns no gateway socket, so the
+  // popup filters the static registry catalog, not `complete.slash`.
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [slashDismissedFor, setSlashDismissedFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [assistantActivity, setAssistantActivity] = useState<"thinking" | "summarizing">("thinking");
   // D1 Task 5: the live /chat-worker build card. Set from `progress` frames,
   // marked done from the task `done` receipt; cleared on the next send.
   const [taskProgress, setTaskProgress] = useState<TaskProgress | null>(null);
@@ -417,9 +461,16 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const lastCommittedRef = useRef("");
   const browserSentRef = useRef("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const loadReqRef = useRef(0);
+  // Sessions already auto-resumed in this page load, so a surviving crash marker
+  // can re-issue a turn exactly once (a crash loop must not spin here).
+  const resumedRef = useRef<Set<string>>(new Set());
+  // Late-bound sender: the load effect that detects an interrupted turn runs
+  // before `send` is defined, so it reaches it through this ref.
+  const sendRef = useRef<((raw: string, activity?: "thinking" | "summarizing") => void) | null>(null);
 
   // Keep the session pointer stable in storage so a reload lands back on the
   // same conversation even without a ?resume= param.
@@ -437,6 +488,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     const myReq = ++loadReqRef.current;
     // Instant paint from the cache; the server load below replaces it.
     setMessages(loadTranscript(session));
+    setTranscriptSession(session);
     setStreamingText("");
     setError(null);
     setRetryText(null);
@@ -453,19 +505,34 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           setTranscriptState("ready");
           return null;
         }
-        return api.getChatSessionMessages(session).then((res) => {
+        // Retry the transcript read through a backend bounce (`voicebridge run`
+        // restarting) instead of freezing on one failed fetch: the page should
+        // recover on its own when the service comes back.
+        return withBackoff(() => api.getChatSessionMessages(session), {
+          shouldStop: () => loadReqRef.current !== myReq,
+        }).then((res) => {
           if (loadReqRef.current !== myReq) return;
           const loaded = (res.messages ?? []).map(toChatMessage);
           setMessages(loaded);
+          setTranscriptSession(session);
           saveTranscript(session, loaded);
           setTranscriptState("ready");
           // Session-persisted reasoning preference (server is authoritative;
           // a session without one keeps the model default).
-          api
-            .getChatSession(session)
+          withBackoff(() => api.getChatSession(session), {
+            shouldStop: () => loadReqRef.current !== myReq,
+          })
             .then((info) => {
               if (loadReqRef.current !== myReq) return;
               setReasoning(normalizeReasoning(info.meta?.reasoning));
+              // A turn cut short by a backend restart: re-issue it so the
+              // operator does not have to retype `continue`. Guarded to once per
+              // session per page load, so a crash loop cannot spin here.
+              const interrupted = info.interrupted_turn;
+              if (interrupted?.prompt && !resumedRef.current.has(session)) {
+                resumedRef.current.add(session);
+                sendRef.current?.(interrupted.prompt, "thinking");
+              }
             })
             .catch(() => {
               /* keep the default; the turn path still validates */
@@ -481,6 +548,21 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
 
   // Keep the read-through cache in step with the rendered transcript.
   useEffect(() => saveTranscript(session, messages), [session, messages]);
+
+  // Progress is stored by canonical session id, independently of the visible
+  // transcript window, so returning to this session restores its highest run.
+  useEffect(() => {
+    if (transcriptSession !== session) return;
+    const saved = loadSessionProgress(session);
+    const userTurns = messages.filter(
+      (message) => message.role === "user" && message.kind !== "tool",
+    ).length;
+    const toolRuns = messages.filter((message) => message.kind === "tool").length;
+    saveSessionProgress(session, {
+      userTurns: Math.max(saved.userTurns, userTurns),
+      toolRuns: Math.max(saved.toolRuns, toolRuns),
+    });
+  }, [messages, session, transcriptSession]);
 
   useEffect(() => {
     setTitle(isActive ? t.app.nav.chat : null);
@@ -539,7 +621,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   }, []);
 
   const send = useCallback(
-    (raw: string) => {
+    (raw: string, activity: "thinking" | "summarizing" = "thinking") => {
       const text = (raw || "").trim();
       if (!text || busy) return;
       setInput("");
@@ -547,6 +629,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       setRetryText(null);
       setVoiceNotice(null);
       setBusy(true);
+      setAssistantActivity(activity);
       setStreamingText("");
       setTaskProgress(null);
       setMessages((prev) => prev.concat([{ role: "user", text }]));
@@ -653,6 +736,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     [busy, session, reasoning],
   );
 
+  // Publish the sender for the load effect (which runs before `send` exists) so
+  // an interrupted turn detected on load can be re-issued automatically.
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
+
   // Persist the selector per session on the canonical store (validated
   // server-side; a not-yet-created session 404s harmlessly — the next turn
   // creates it and the following change persists).
@@ -696,6 +785,54 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     `local — ${LOCAL_PRIVACY_NOTICE}. ` +
     "terminal — uses the local desktop audio path through the same local STT backend.";
 
+  // Panel → composer affordance: clicking a skill name in the side panel's
+  // registry summary inserts `@name` as plain composer text (exactly as if
+  // typed). The turn/send path is untouched — the backend sees ordinary text.
+  const insertToolMention = useCallback((name: string) => {
+    const mention = `@${name} `;
+    setInput((prev) =>
+      prev
+        ? /[\s\n]$/.test(prev)
+          ? `${prev}${mention}`
+          : `${prev} ${mention}`
+        : mention,
+    );
+    requestAnimationFrame(() => composerRef.current?.focus());
+  }, []);
+
+  // Slash autocomplete (/chat parity): the popup shows while the whole
+  // composer is one "/" token (`/`, `/mod`). Once the user types a space
+  // (command args) or a newline, it hides and Enter sends again. Esc hides it
+  // until the token changes. No gateway socket is opened for this; the static
+  // `SLASH_COMMANDS` catalog (same registry the TUI completer reads) is
+  // filtered client-side.
+  const slashToken = /^\/[A-Za-z0-9_-]*$/.test(input) ? input : null;
+  const slashMatches = useMemo(
+    () => (slashToken === null ? [] : filterSlashCommands(slashToken)),
+    [slashToken],
+  );
+  const slashVisible =
+    slashToken !== null &&
+    slashToken !== slashDismissedFor &&
+    slashMatches.length > 0;
+  const slashActive = slashMatches.length > 0 ? slashIndex % slashMatches.length : 0;
+  // "@" mentions get a static hint row only (no filtering): skill/MCP names
+  // resolve through the agent turn, so there is nothing to complete against.
+  const atHint =
+    !slashVisible && /^@[A-Za-z0-9_-]*$/.test(input) ? input : null;
+
+  // Reset the highlight whenever the token changes (new filter = new list).
+  useEffect(() => {
+    setSlashIndex(0);
+  }, [slashToken]);
+
+  const applySlash = useCallback((item: SlashCommandItem) => {
+    setInput(slashCompletionText(item));
+    setSlashIndex(0);
+    setSlashDismissedFor(null);
+    requestAnimationFrame(() => composerRef.current?.focus());
+  }, []);
+
   const onSubmit = useCallback(
     (event: FormEvent) => {
       event.preventDefault();
@@ -706,12 +843,47 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+      if (slashVisible) {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          setSlashIndex((i) => (i + 1) % slashMatches.length);
+          return;
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          setSlashIndex(
+            (i) => (i - 1 + slashMatches.length) % slashMatches.length,
+          );
+          return;
+        }
+        if (event.key === "Tab") {
+          event.preventDefault();
+          const match = slashMatches[slashActive];
+          if (match) applySlash(match);
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setSlashDismissedFor(slashToken);
+          return;
+        }
+        if (event.key === "Enter" && !event.shiftKey) {
+          const match = slashMatches[slashActive];
+          // A fully-typed token falls through and sends; a partial token is
+          // completed first and a second Enter sends it.
+          if (match && match.name.toLowerCase() !== input.toLowerCase()) {
+            event.preventDefault();
+            applySlash(match);
+            return;
+          }
+        }
+      }
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         send(input);
       }
     },
-    [input, send],
+    [input, send, slashVisible, slashMatches, slashActive, slashToken, applySlash],
   );
 
   // "New chat" mints a genuinely NEW session on the canonical store (the same
@@ -792,6 +964,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         }
         send(
           `Report on this chat session (${session}): read the transcript below and summarize what happened, what was decided, and what is still open. Transcript:\n${lines.join("\n")}`,
+          "summarizing",
         );
       })
       .catch((err: unknown) => {
@@ -1063,25 +1236,38 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       : null;
 
   const hasMessages = messages.length > 0 || streamingText.length > 0;
+  const activeTranscript = transcriptSession === session ? messages : [];
+  const transcriptUserTurns = activeTranscript.filter(
+    (message) => message.role === "user" && message.kind !== "tool",
+  ).length;
+  const transcriptToolRuns = activeTranscript.filter((message) => message.kind === "tool").length;
+  const savedSessionProgress = loadSessionProgress(session);
+  const sessionUserTurns = Math.max(savedSessionProgress.userTurns, transcriptUserTurns);
+  const sessionToolRuns = Math.max(savedSessionProgress.toolRuns, transcriptToolRuns);
+  const sessionLevel = Math.floor(sessionUserTurns / 5) + 1;
+  const levelProgress = sessionUserTurns % 5;
+  const loadMission = useCallback((prompt: string) => {
+    setInput((current) => current.trim() ? `${current}\n\n${prompt}` : prompt);
+  }, []);
   const modelToolsLabel = `${t.app.modelToolsSheetTitle} ${t.app.modelToolsSheetSubtitle}`;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="qchat flex min-h-0 flex-1 flex-col gap-2">
       <PluginSlot name="chat:top" />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row lg:gap-3">
+      <div className="qchat__workspace flex min-h-0 flex-1 flex-col">
         <section
           aria-label="Qubit Chat transcript"
           className={cn(
-            "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg",
+            "qchat__conversation relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg",
             "border border-current/15 bg-background-base/60 p-2 sm:p-3",
           )}
         >
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-current/10 pb-2">
+          <div className="qchat__header flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-current/10 pb-2">
             <div className="flex min-w-0 items-center gap-2">
               <Typography
                 mondwest
-                className="text-sm tracking-[0.08em] text-text-secondary"
+                className="qchat__title text-sm tracking-[0.08em] text-text-secondary"
               >
                 Qubit Chat
               </Typography>
@@ -1141,10 +1327,49 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           </div>
 
           <div
+            className="qchat__run-hud"
+            role="group"
+            aria-label={`Current session level ${sessionLevel}; ${sessionUserTurns} user turns; ${sessionToolRuns} tool runs`}
+            title="Local session rank: every five user turns advances one level."
+          >
+            <div className="qchat__rank-mark" data-level={sessionLevel} key={sessionLevel} aria-hidden="true">
+              <span>LVL</span>
+              <strong>{String(sessionLevel).padStart(2, "0")}</strong>
+            </div>
+            <div className="qchat__rank-track">
+              <div className="qchat__rank-copy">
+                <span>SESSION RUN</span>
+                <strong><span className="qchat__rank-charge">{levelProgress}/5</span> {5 - levelProgress} turns to next level</strong>
+              </div>
+              <div
+                className="qchat__rank-meter"
+                role="progressbar"
+                aria-label="Progress to next local session level"
+                aria-valuemin={0}
+                aria-valuemax={5}
+                aria-valuenow={levelProgress}
+                aria-valuetext={`${levelProgress} of 5 user turns`}
+              >
+                <span style={{ transform: `scaleX(${levelProgress / 5})` }} />
+              </div>
+            </div>
+            <div className="qchat__run-stat">
+              <span>TOOL RUNS</span>
+              <strong>{String(sessionToolRuns).padStart(2, "0")}</strong>
+            </div>
+            <div className="qchat__run-stat qchat__run-stat--voice">
+              <span>VOICE LINK</span>
+              <strong data-state={voice.connected ? "online" : "offline"}>
+                {voice.connected ? "ONLINE" : "IDLE"}
+              </strong>
+            </div>
+          </div>
+
+          <div
             role="status"
             data-testid="voice-status"
             data-state={voiceState}
-            className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border border-current/10 px-2 py-1 text-xs text-text-tertiary"
+            className="qchat__voice-status mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border border-current/10 px-2 py-1 text-xs text-text-tertiary"
           >
             <span>
               engine: <span className="font-mono">{inputEngine}</span>
@@ -1317,26 +1542,83 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             aria-live="polite"
             aria-relevant="additions text"
             aria-busy={busy}
-            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3"
+            className="qchat__transcript min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3"
           >
             {transcriptState === "loading" && !hasMessages ? (
               <div
                 data-state="loading"
-                className="flex h-full min-h-[8rem] items-center justify-center gap-2 text-sm text-text-tertiary"
+                className="qchat__transcript-loading"
+                role="status"
+                aria-label="Loading transcript"
               >
-                <Spinner className="shrink-0" />
-                <span>Loading transcript…</span>
+                <div className="qchat__transcript-skeleton" aria-hidden="true">
+                  <div className="qchat__skeleton-message qchat__skeleton-message--assistant">
+                    <span /><span /><span />
+                  </div>
+                  <div className="qchat__skeleton-message qchat__skeleton-message--user">
+                    <span /><span />
+                  </div>
+                  <div className="qchat__skeleton-message qchat__skeleton-message--assistant">
+                    <span /><span />
+                  </div>
+                </div>
+                <span className="sr-only">Loading transcript…</span>
               </div>
             ) : !hasMessages && !busy ? (
               <div
                 data-state="empty"
-                className="flex h-full min-h-[8rem] flex-col items-center justify-center gap-2 text-center text-sm text-text-tertiary"
+                className="qchat__empty flex h-full min-h-[8rem] flex-col items-center justify-center gap-2 text-center text-sm text-text-tertiary"
               >
-                <p>No messages yet — ask something.</p>
-                <p className="text-xs">
-                  Native agent turns on the shared Qubit backend (same module as
-                  CLI and voice).
+                <p>Start a new run.</p>
+                <p>
+                  Choose a mission to prepare a prompt, or write your own below.
                 </p>
+                <div className="qchat__qubit-probe" aria-hidden="true">
+                  <span className="qchat__qubit-ket">|0⟩</span>
+                  <span className="qchat__qubit-wire"><i /></span>
+                  <span className="qchat__qubit-symbol">ψ</span>
+                  <span className="qchat__qubit-wire"><i /></span>
+                  <span className="qchat__qubit-ket">|1⟩</span>
+                  <span className="qchat__qubit-equation">α|0⟩ + β|1⟩</span>
+                </div>
+                <div className="qchat__mission-picker" aria-label="Mission presets">
+                  <h2 className="qchat__mission-caption">Choose a mission</h2>
+                  <div className="qchat__mission-list">
+                    <button
+                      type="button"
+                      className="qchat__mission-card qchat__mission-card--violet"
+                      onClick={() => loadMission("Help me trace a bug. Inspect the available context, list three plausible causes, then suggest the safest next check before changing anything.")}
+                      aria-label="Load the Trace a bug mission into the composer"
+                    >
+                      <Bug className="qchat__mission-icon" aria-hidden="true" />
+                      <span>TRACE A BUG</span>
+                      <span className="qchat__mission-detail">Find the cause and safest next check</span>
+                      <ArrowUpRight className="qchat__mission-arrow" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="qchat__mission-card qchat__mission-card--cyan"
+                      onClick={() => loadMission("Map this system for me. Explain its key components, how data moves between them, and where a new feature should be added.")}
+                      aria-label="Load the Map this system mission into the composer"
+                    >
+                      <GitBranch className="qchat__mission-icon" aria-hidden="true" />
+                      <span>MAP THE SYSTEM</span>
+                      <span className="qchat__mission-detail">See the components and data flow</span>
+                      <ArrowUpRight className="qchat__mission-arrow" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="qchat__mission-card qchat__mission-card--amber"
+                      onClick={() => loadMission("Pressure-test this plan. Find hidden assumptions, failure modes, and the smallest experiment that would prove or disprove it.")}
+                      aria-label="Load the Pressure-test a plan mission into the composer"
+                    >
+                      <Code className="qchat__mission-icon" aria-hidden="true" />
+                      <span>PRESSURE-TEST A PLAN</span>
+                      <span className="qchat__mission-detail">Expose assumptions and smallest test</span>
+                      <ArrowUpRight className="qchat__mission-arrow" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <>
@@ -1367,12 +1649,17 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                     </Button>
                   </div>
                 )}
-                <ul className="flex list-none flex-col gap-3">
+                <ul className="qchat__messages flex list-none flex-col gap-3">
                 {messages.map((message, index) => (
                   <li
                     key={`${message.role}-${index}`}
                     className={cn(
-                      "rounded-lg border px-3 py-2 text-sm",
+                      "qchat__message rounded-lg border px-3 py-2 text-sm",
+                      message.kind === "tool"
+                        ? "qchat__message--tool"
+                        : message.role === "user"
+                          ? "qchat__message--user"
+                          : "qchat__message--assistant",
                       message.kind === "tool"
                         ? "mr-6 border-dashed border-current/15 bg-background-base/40"
                         : message.role === "user"
@@ -1460,7 +1747,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   <li
                     data-testid="task-progress"
                     data-status={taskProgress.status}
-                    className="mr-6 rounded-lg border border-accent/40 bg-accent/5 px-3 py-2 text-sm"
+                    className="qchat__message qchat__message--progress mr-6 rounded-lg border border-accent/40 bg-accent/5 px-3 py-2 text-sm"
                     aria-live="polite"
                   >
                     <div className="mb-1 flex items-center gap-2 text-xs font-semibold tracking-wide text-text-secondary">
@@ -1490,7 +1777,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 {busy && streamingText ? (
                   <li
                     data-state="streaming"
-                    className="mr-6 rounded-lg border border-current/15 bg-background-base/70 px-3 py-2 text-sm"
+                    className="qchat__message qchat__message--assistant qchat__message--streaming mr-6 rounded-lg border border-current/15 bg-background-base/70 px-3 py-2 text-sm"
                     aria-live="polite"
                   >
                     <div className="mb-1 text-xs font-semibold tracking-wide text-text-secondary">
@@ -1503,10 +1790,20 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 ) : busy ? (
                   <li
                     data-state="loading"
-                    className="mr-6 flex items-center gap-2 text-sm text-text-tertiary"
+                    data-activity={assistantActivity}
+                    className="qchat__activity"
+                    aria-live="polite"
                   >
-                    <Spinner className="shrink-0" />
-                    <span>Qubit is thinking…</span>
+                    <span className="qchat__activity-mark" aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                    <span>
+                      {assistantActivity === "summarizing"
+                        ? "Summarizing this session…"
+                        : "Qubit is thinking…"}
+                    </span>
                   </li>
                 ) : null}
                 </ul>
@@ -1557,7 +1854,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
 
           <form
             onSubmit={onSubmit}
-            className="mt-2 flex shrink-0 flex-wrap items-end gap-2 border-t border-current/10 pt-2"
+            className="qchat__composer mt-2 flex shrink-0 flex-wrap items-end gap-2 border-t border-current/10 pt-2"
           >
             <label className="sr-only" htmlFor="qubit-chat-input">
               Message Qubit
@@ -1610,22 +1907,65 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 {voice.interimText}
               </div>
             ) : null}
-            <textarea
-              id="qubit-chat-input"
-              value={input}
-              disabled={busy}
-              rows={2}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={handleKeyDown}
-              onPaste={onPasteImage}
-              placeholder="Message Qubit… (Enter to send, Shift+Enter for newline)"
-              aria-label="Message Qubit"
-              className={cn(
-                "min-h-[2.5rem] min-w-full flex-1 resize-none rounded-md border border-current/20 sm:min-w-0",
-                "bg-background-base/70 px-3 py-2 text-sm text-foreground",
-                "focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60",
-              )}
-            />
+            <div className="relative min-w-full flex-1 sm:min-w-0">
+              {slashVisible ? (
+                <div
+                  role="listbox"
+                  aria-label="Slash commands"
+                  className="absolute bottom-full left-0 right-0 z-10 mb-2 max-h-64 overflow-y-auto rounded-md border border-border bg-popover text-sm shadow-xl"
+                >
+                  {slashMatches.map((match, i) => (
+                    <button
+                      key={match.name}
+                      type="button"
+                      role="option"
+                      aria-selected={i === slashActive}
+                      onMouseEnter={() => setSlashIndex(i)}
+                      onMouseDown={(e) => {
+                        // Apply before the textarea loses focus (click would
+                        // blur first); the composer is refocused in applySlash.
+                        e.preventDefault();
+                        applySlash(match);
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-2 px-3 py-1.5 text-left",
+                        i === slashActive && "bg-accent/10",
+                      )}
+                    >
+                      <span className="shrink-0 truncate font-mono text-xs">
+                        {match.name}
+                      </span>
+                      <span className="ml-auto truncate text-xs text-text-tertiary">
+                        {match.description}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {!slashVisible && atHint ? (
+                <div className="absolute bottom-full left-0 right-0 z-10 mb-2 rounded-md border border-border bg-popover px-3 py-1.5 text-xs text-text-tertiary shadow-xl">
+                  Mention a skill or MCP server by name — @skills and @mcp
+                  resolve through the agent turn.
+                </div>
+              ) : null}
+              <textarea
+                id="qubit-chat-input"
+                ref={composerRef}
+                value={input}
+                disabled={busy}
+                rows={2}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={handleKeyDown}
+                onPaste={onPasteImage}
+                placeholder="Message Qubit… (Enter to send, Shift+Enter for newline)"
+                aria-label="Message Qubit"
+                className={cn(
+                  "min-h-[2.5rem] w-full resize-none rounded-md border border-current/20",
+                  "bg-background-base/70 px-3 py-2 text-sm text-foreground",
+                  "focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60",
+                )}
+              />
+            </div>
             <input
               ref={attachInputRef}
               type="file"
@@ -1678,7 +2018,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             </Button>
           </form>
 
-          <div className="mt-2 flex items-center justify-between gap-2">
+          <div className="qchat__session-actions mt-2 flex items-center justify-between gap-2">
             <Button
               ghost
               size="sm"
@@ -1724,10 +2064,14 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             id="chat-side-panel"
             role="complementary"
             aria-label={modelToolsLabel}
-            className="flex min-h-0 shrink-0 flex-col gap-3 overflow-hidden lg:h-full lg:w-60"
+            className="qchat__side flex min-h-0 shrink-0 flex-col gap-3 overflow-hidden lg:h-full lg:w-60"
           >
-            <div className="shrink-0">
-              <Suspense fallback={<div aria-hidden="true" className="h-24" />}>
+            <div className="qchat__model-panel shrink-0">
+              <Suspense fallback={
+                <div className="qchat__model-skeleton" role="status" aria-label="Loading model controls">
+                  <span /><span /><span className="qchat__skeleton-control" />
+                </div>
+              }>
                 <ChatSidebar
                   channel={channel}
                   profile={scopedProfile}
@@ -1735,8 +2079,16 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 />
               </Suspense>
             </div>
-            <ChatSessionArtifacts key={session} sessionId={session} />
-            <div className="min-h-0 flex-1 overflow-hidden">
+            <div className="qchat__tools shrink-0">
+              <ChatToolsSummary
+                profile={scopedProfile}
+                onMention={insertToolMention}
+              />
+            </div>
+            <div className="qchat__artifacts shrink-0">
+              <ChatSessionArtifacts key={session} sessionId={session} />
+            </div>
+            <div className="qchat__sessions min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
                 activeSessionId={resumeParam}

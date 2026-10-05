@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 from .logging_setup import log_event
+from .chat_transport import parse_route_word
 from .voice_edit import debug as _dbg
 from .voice_edit.sound import beep
 from .voice_edit.desktop import DesktopAdapter
@@ -55,6 +56,17 @@ def _trace(stage: str, **fields: Any) -> None:
 #: bind intent to recency: the arm window gates the reply to seconds, and this
 #: TTL is the backstop for re-woken or hotkey confirmations.
 _PENDING_TASK_TTL_S = 120.0
+
+#: Backstop for one wake turn (journal 2026-10-04 10:17-10:18: turns that
+#: reach ``helper.wake.listening`` and never answer feel dead). The worker
+#: blocks in HTTP (route 120 s / task 180 s / ask 90 s / speak 60 s) with
+#: state PROCESSING, and every following turn refuses via ``_open_request``
+#: with only a trace. Past this bound the watchdog degrades LOUDLY (typed
+#: ``wake.turn_timeout`` + error status) and frees the loop to IDLE so the
+#: next turn processes; a late-stale worker landing afterwards is harmless
+#: (same as a slow turn today). Generous over the slowest legit path
+#: (180 s task + ~155 s speak ≈ 335 s). ``<= 0`` disables the watchdog.
+_WAKE_TURN_TIMEOUT_S = 360.0
 
 
 class HelperError(Exception):
@@ -102,6 +114,42 @@ def verbatim_transcript(text: Any, cfg_or_enabled: Any = False) -> str:
         return t
     except Exception:
         return raw
+
+
+#: Speak-time legacy-brand substitution (lane 4, 2026-10-03): the brain
+#: stitches legacy self-reference tokens from memory context / skill prose
+#: (e.g. today's journal: helper.answer spoke "I'll use Hermes agent
+#: instead of OpenClaw."). Spoken voice IS a product surface (DECISIONS #7),
+#: so the OUTGOING spoken excerpt is substituted inside _speak() only.
+#: Panel preview / History rows keep the VERBATIM brain text for audit
+#: honesty — never route them through this. Small explicit map,
+#: case-insensitive, longest-first; no fuzzy matching. Tradeoff (stated):
+#: code/URLs naming those strings are also substituted in the ephemeral
+#: speech; the verbatim stays in History/panel for copy, so no data is lost.
+_SPEAK_BRAND_MAP = (
+    ("Hermes agent", "Qubit"),
+    ("Nous Research", "Qubit"),
+    ("NousResearch", "Qubit"),
+    ("OpenClaw", "Qubit"),
+    ("Hermes", "Qubit"),
+)
+
+
+def speak_brand_text(text: Any) -> str:
+    """Substitute legacy self-reference tokens in OUTGOING speech (pure).
+
+    Never raises; non-string/empty input returns "" (falsy, like before).
+    Sentences without legacy tokens are returned byte-identical.
+    """
+    raw = str(text or "")
+    if not raw:
+        return ""
+    try:
+        for src, dst in _SPEAK_BRAND_MAP:
+            raw = re.sub(re.escape(src), dst, raw, flags=re.IGNORECASE)
+        return raw
+    except Exception:
+        return str(text or "")
 
 
 def _mic_target_peak(cfg: Any, default: float = 0.5) -> float:
@@ -275,6 +323,237 @@ def resolve_token(cfg: Any) -> str:
     return ""
 
 
+#: Journal events proving the room audio is our own reply: service TTS
+#: (orchestrator) or the helper's own speak trace. Hearing one recently
+#: means a wake segment is echo, not direction (false-fire fix 2026-10-02:
+#: the journal showed our own "say yes to run it ..." prompt transcribed
+#: back and executed as a command).
+_TTS_ECHO_EVENTS = frozenset(
+    {"tts.speak", "tts.synthesize", "voice_edit.helper.speak"})
+
+
+def recent_tts_speak(events_path, window_s=5.0) -> bool:
+    """True when a TTS speak event landed in the journal within ``window_s``.
+
+    Read-only tail scan (last 64 KiB, event-name prefilter); a missing or
+    unreadable journal returns False (fail open: never wedge wake on a
+    logging problem). Event ``ts`` is epoch seconds, same clock as
+    :func:`time.time`.
+    """
+    try:
+        window_s = float(window_s)
+    except Exception:
+        window_s = 5.0
+    try:
+        with open(str(events_path), "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            size = fh.tell()
+            fh.seek(max(0, size - 65536))
+            tail = fh.read().decode("utf-8", "replace")
+    except OSError:
+        return False
+    now = time.time()
+    for line in tail.splitlines():
+        line = line.strip()
+        if not line or ("tts" not in line and "helper.speak" not in line):
+            continue
+        try:
+            event = json.loads(line)
+        except Exception:
+            continue
+        if not isinstance(event, dict) \
+                or event.get("event") not in _TTS_ECHO_EVENTS:
+            continue
+        try:
+            spoken_at = float(event.get("ts", 0) or 0)
+        except Exception:
+            continue
+        if spoken_at and now - spoken_at < window_s:
+            return True
+    return False
+
+
+def frame_rms(frame: Any) -> float:
+    """RMS level of one mono-s16 mic frame as 0.0..1.0 (never raises).
+
+    Pure-per-sample math (no ``audioop`` — deprecated and an error under
+    the repo's ``filterwarnings = error``).
+    """
+    try:
+        import array
+        import math
+        import sys
+        data = bytes(frame)
+        if len(data) < 2:
+            return 0.0
+        samples = array.array("h", data[:len(data) // 2 * 2])
+        if not samples:
+            return 0.0
+        if sys.byteorder != "little":
+            samples.byteswap()
+        mean_sq = math.fsum(float(s) * float(s) for s in samples) / len(samples)
+        return max(0.0, min(1.0, math.sqrt(mean_sq) / 32768.0))
+    except Exception:
+        return 0.0
+
+
+#: Live mic-level talk meter (2026-10-05): the helper — the single mic
+#: owner — publishes a cheap per-frame peak (0.0..1.0 + monotonic ts) that
+#: the voice orb renders as a recording-like talk meter. Transport is the
+#: existing heartbeat file extras (``mic_level``/``mic_level_ts``); never
+#: audio bytes, never text. The orb NEVER opens the mic; it only reads
+#: these two numbers.
+_MIC_LEVEL_LOCK = threading.Lock()
+_MIC_LEVEL = {"level": 0.0, "ts": 0.0}
+
+#: Minimum seconds between heartbeat-file refreshes while capturing (the
+#: per-frame in-memory publish is free; the file rewrite is throttled so a
+#: 300 ms frame cadence does not churn the state dir).
+_MIC_LEVEL_HB_MIN_S = 0.5
+
+
+def _mic_peak(frame: Any) -> float:
+    """Peak abs level of one mono-s16 mic frame as 0.0..1.0 (never raises).
+
+    Same sample reading as :func:`frame_rms` (plain ``array``, no
+    ``audioop``); peak (not RMS) so conversational speech visibly pumps
+    the meter instead of hovering near the noise floor.
+    """
+    try:
+        import array
+        import sys
+        data = bytes(frame)
+        if len(data) < 2:
+            return 0.0
+        samples = array.array("h", data[:len(data) // 2 * 2])
+        if not samples:
+            return 0.0
+        if sys.byteorder != "little":
+            samples.byteswap()
+        peak = 0
+        for sample in samples:
+            mag = abs(int(sample))
+            if mag > peak:
+                peak = mag
+        return max(0.0, min(1.0, peak / 32768.0))
+    except Exception:
+        return 0.0
+
+
+def publish_mic_level(frame: Any) -> float:
+    """Record one captured frame's peak; return the clamped level.
+
+    Called on the helper-owned capture path only (PTT mic via
+    :class:`LevelTapMic`). Never raises; garbage input publishes 0.0.
+    """
+    level = _mic_peak(frame)
+    try:
+        with _MIC_LEVEL_LOCK:
+            _MIC_LEVEL["level"] = level
+            _MIC_LEVEL["ts"] = time.monotonic()
+    except Exception:
+        pass
+    return level
+
+
+def read_mic_level() -> "tuple[float, float]":
+    """Freshest published ``(level, monotonic_ts)``. Never raises."""
+    try:
+        with _MIC_LEVEL_LOCK:
+            return (float(_MIC_LEVEL.get("level", 0.0) or 0.0),
+                    float(_MIC_LEVEL.get("ts", 0.0) or 0.0))
+    except Exception:
+        return (0.0, 0.0)
+
+
+def mic_level_for_heartbeat() -> Dict[str, float]:
+    """Additive heartbeat extras carrying the talk meter. Never raises.
+
+    Keys: ``mic_level`` (0.0..1.0 peak float) + ``mic_level_ts``
+    (``time.monotonic`` seconds of the frame). The consumer treats a
+    value older than ~1 s as 0.0 (silence).
+    """
+    try:
+        level, ts = read_mic_level()
+        return {"mic_level": max(0.0, min(1.0, float(level))),
+                "mic_level_ts": float(ts)}
+    except Exception:
+        return {"mic_level": 0.0, "mic_level_ts": 0.0}
+
+
+class LevelTapMic:
+    """Wrap a helper-owned mic; publish per-frame peak, pass audio through.
+
+    Every frame read through here keeps its exact bytes (the STT path is
+    untouched) while :func:`publish_mic_level` records the peak. Installed
+    on the helper's PTT capture mics only — the orb never constructs one
+    (it never opens the mic). Optional ``on_frame(level)`` callback lets
+    the helper refresh the heartbeat file throttled; faults in the
+    callback never break the read. Everything except ``read_frame``
+    delegates to the wrapped mic.
+    """
+
+    def __init__(self, mic: Any,
+                 on_frame: Optional[Callable[[float], None]] = None) -> None:
+        self._mic = mic
+        self._on_frame = on_frame
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.__dict__["_mic"], name)
+
+    def read_frame(self, timeout: float = 0.5) -> Optional[bytes]:
+        frame = self._mic.read_frame(timeout)
+        if frame:
+            try:
+                level = publish_mic_level(frame)
+            except Exception:
+                level = 0.0
+            cb = self.__dict__.get("_on_frame")
+            if cb is not None:
+                try:
+                    cb(level)
+                except Exception:
+                    pass
+        return frame
+
+
+class BargeInWatcher:
+    """Time-based confident-speech trigger for TTS barge-in (pure logic).
+
+    Feed one RMS level per mic frame; returns True the moment confident
+    speech (``rms >= threshold``) has been continuous for ``min_ms``.
+    Any below-threshold frame resets the run, so echo-level audio and
+    short transients never fire. ``min_ms`` is clamped to the
+    research-backed 150-300 ms band.
+    """
+
+    def __init__(self, *, threshold: float = 0.10, min_ms: int = 200,
+                 frame_ms: int = 300) -> None:
+        self.threshold = float(threshold)
+        self.min_ms = max(150, min(300, int(min_ms)))
+        self.frame_ms = int(frame_ms)
+        self._hot_ms = 0.0
+
+    def feed(self, rms: float, dt_ms: Any = None) -> bool:
+        """One mic frame's RMS level. ``dt_ms`` defaults to the mic's nominal
+        frame duration (frames arrive at mic cadence, so frame count maps to
+        real time); an explicit value overrides for tests/callers with a
+        known different cadence."""
+        try:
+            dt = float(dt_ms) if dt_ms is not None else float(self.frame_ms)
+        except Exception:
+            dt = float(self.frame_ms)
+        try:
+            level = float(rms)
+        except Exception:
+            level = 0.0
+        if level >= self.threshold:
+            self._hot_ms += max(0.0, dt)
+            return self._hot_ms >= self.min_ms
+        self._hot_ms = 0.0
+        return False
+
+
 class DesktopHelper:
     """Hotkey -> STT -> transform/dictate -> preview -> apply state machine."""
 
@@ -322,6 +601,12 @@ class DesktopHelper:
         self._gen = 0
         self._repeat_restore: list = []
         self._listen_started_at = 0.0
+        # Key-DOWN pre-roll handoff (2026-10-04 onset fix): the pump mic +
+        # ring owned by _open_request until _transcribe claims them.
+        self._pre_mic = None
+        self._pre_roll: list = []
+        self._pre_pump = None
+        self._pre_pump_stop = None
         # Accurate-vs-streaming provenance (surfaced, never silent).
         self._stt_fallback_reason = ""
         self._final_engine = ""
@@ -329,12 +614,19 @@ class DesktopHelper:
         self._pending_task: Dict[str, Any] = {}
         # True while Qubit is speaking its reply (voice conversation).
         self._speaking = False
+        # True when the last _speak() was stopped by barge-in (reset each
+        # speak; read by callers/tests, never a second audio authority).
+        self._barge_interrupted = False
         # Accurate-model prewarm readiness (explicit, not blind): the background
         # prewarm sets the event/state, and the first activation waits for it
         # with a bounded timeout so the user is never left waiting blind.
         # Tests may set these directly (no real model required).
         self._warm_event = threading.Event()
         self._warm_state = "skipped"
+        # Talk-meter heartbeat-file refresh throttle (monotonic seconds;
+        # see _note_capture_frame). The per-frame in-memory publish is
+        # free; the file rewrite is throttled.
+        self._level_hb_at = 0.0
 
     def _tame_key_repeat(self) -> None:
         """Disable X auto-repeat for Right-Ctrl (and Left-Ctrl).
@@ -384,6 +676,29 @@ class DesktopHelper:
             self._fs_active = False
         return self._fs_active
 
+    def _tts_echo_busy(self, window_s: float = 5.0) -> bool:
+        """True while our own reply is still in the room (echo guard).
+
+        Service TTS (orchestrator) plays through the room speakers, which
+        the AT2020 hears; without this the wake loop transcribes our own
+        answers back into commands (observed live 2026-10-02). Cached 1s —
+        this runs on the wake loop's hot path. Fail open (False) when the
+        journal is unreadable, so wake never wedges on a logging problem.
+        """
+        now = time.monotonic()
+        if now - getattr(self, "_tts_echo_checked", 0.0) < 1.0:
+            return bool(getattr(self, "_tts_echo_cached", False))
+        busy = False
+        try:
+            from .config import canonical_state_dir
+            busy = recent_tts_speak(canonical_state_dir() / "events.jsonl",
+                                    window_s=window_s)
+        except Exception:
+            busy = False
+        self._tts_echo_checked = now
+        self._tts_echo_cached = busy
+        return busy
+
     def _default_mic_factory(self) -> Any:
         # ``voice_edit.asr_device`` names a PulseAudio/PipeWire source; empty
         # means the system default source (the user's microphone).
@@ -428,7 +743,8 @@ class DesktopHelper:
         # command path; it pauses whenever a Right-Ctrl session is active.
         try:
             from .voice_edit.wake import WakeMonitor
-            # Busy = a session is actively capturing/processing, or a
+            # Busy = a session is actively capturing/processing, our own
+            # reply is still playing through the room (echo guard), or a
             # full-screen app is focused. A PREVIEW left open must NOT block
             # wake forever: a new wake simply supersedes it.
             self._wake = WakeMonitor(
@@ -436,7 +752,17 @@ class DesktopHelper:
                 is_busy=lambda: (self.state in (self.LISTENING,
                                                 self.PROCESSING)
                                  or getattr(self, "_speaking", False)
-                                 or self._fullscreen_active()))
+                                 or self._tts_echo_busy()
+                                 or self._fullscreen_active()),
+                # Lane 1 (2026-10-03): let the wake loop's bare-confirm
+                # precheck see this helper's staged confirmation (e.g. the
+                # timer). Read-only TTL mirror — never stages, settles, or
+                # clears; a broken read degrades to no-pending (False).
+                pending_probe=self._wake_has_live_pending,
+                # 2026-10-03 (silent-discard fix): route command-shaped
+                # unarmed discards to the heard-preview status line.
+                # Status line only — the hook never beeps/speaks/emits.
+                on_hint=self._on_wake_hint)
             if self._wake.enabled():
                 self._wake.start()
         except Exception:
@@ -477,34 +803,101 @@ class DesktopHelper:
         from .voice_edit import heartbeat as _hb
         self._hb = _hb
         _hb.write(session=str(self.desktop.session().get("session_type", "x11")),
-                  extra={"hotkey_mode": "toggle" if self.toggle else "hold",
-                         "wake": bool(self._wake is not None
-                                      and self._wake.enabled()),
-                         "wake_engine": getattr(self._wake, "engine", ""),
-                         "stt_warm": self._warm_state,
-                         "state": self.state})
+                  extra=self._heartbeat_extra())
         self._hb_stop = threading.Event()
         self._hb_thread = threading.Thread(target=self._heartbeat_loop, daemon=True,
                                            name="voice-edit-heartbeat")
         self._hb_thread.start()
+        # Orb click-to-talk trigger (owner opt-in 2026-10-04): SIGUSR1 from
+        # the voice orb toggles capture via on_orb_toggle. The handler only
+        # enqueues (signal-safe); the hotkey worker does the real work on
+        # the existing PTT path. Installed best-effort (main thread only);
+        # never raises out of start().
+        self._orb_prev_sigusr1: Any = None
+        try:
+            import signal as _sig
+            self._orb_prev_sigusr1 = _sig.getsignal(_sig.SIGUSR1)
+            _sig.signal(_sig.SIGUSR1, lambda _s, _f: self.on_orb_toggle())
+        except Exception:
+            pass
         self._ui_status("idle", "hold Right-Ctrl to speak")
         return True
+
+    def _heartbeat_extra(self) -> Dict[str, Any]:
+        """Heartbeat extras: liveness keys + the talk-meter level (additive).
+
+        The ``mic_level``/``mic_level_ts`` keys are the orb's recording-like
+        meter (0.0..1.0 peak + monotonic ts; consumer reads >1 s old as
+        silence). Never raises; a broken read degrades to level 0.0.
+        """
+        try:
+            wake_on = bool(self._wake is not None
+                           and self._wake.enabled())
+        except Exception:
+            wake_on = False
+        try:
+            wake_engine = str(getattr(self._wake, "engine", "") or "")
+        except Exception:
+            wake_engine = ""
+        extra: Dict[str, Any] = {
+            "hotkey_mode": "toggle" if self.toggle else "hold",
+            "wake": wake_on,
+            "wake_engine": wake_engine,
+            "stt_warm": self._warm_state,
+            "state": self.state,
+        }
+        try:
+            extra.update(mic_level_for_heartbeat())
+        except Exception:
+            pass
+        return extra
+
+    def _note_capture_frame(self, level: float) -> None:
+        """Throttled heartbeat-file refresh carrying the live talk meter.
+
+        Called per captured frame (via :class:`LevelTapMic`) on the
+        helper-owned PTT path only. The in-memory level is already fresh;
+        this rewrites the heartbeat file at most every
+        ``_MIC_LEVEL_HB_MIN_S`` so the orb's 2 s poll sees a live value
+        instead of an 8 s-loop-stale one. Never raises; never runs when
+        the helper has no heartbeat writer (tests/embedded use).
+        """
+        try:
+            now = time.monotonic()
+            if now - float(getattr(self, "_level_hb_at", 0.0) or 0.0) \
+                    < _MIC_LEVEL_HB_MIN_S:
+                return
+            self._level_hb_at = now
+            hb = getattr(self, "_hb", None)
+            if hb is None:
+                return
+            hb.write(
+                session=str(self.desktop.session().get("session_type",
+                                                        "x11")),
+                extra=self._heartbeat_extra())
+        except Exception:
+            pass
 
     def _heartbeat_loop(self) -> None:
         while not self._hb_stop.wait(8.0):
             try:
                 self._hb.write(
                     session=str(self.desktop.session().get("session_type", "x11")),
-                    extra={"hotkey_mode": "toggle" if self.toggle else "hold",
-                           "wake": bool(self._wake is not None
-                                        and self._wake.enabled()),
-                           "wake_engine": getattr(self._wake, "engine", ""),
-                           "stt_warm": self._warm_state,
-                           "state": self.state})
+                    extra=self._heartbeat_extra())
             except Exception:
                 pass
 
     def shutdown(self) -> None:
+        try:
+            import signal as _sig
+            prev = getattr(self, "_orb_prev_sigusr1", None)
+            if prev is not None:
+                try:
+                    _sig.signal(_sig.SIGUSR1, prev)
+                except Exception:
+                    pass
+        except Exception:
+            pass
         try:
             if self._wake is not None:
                 self._wake.stop()
@@ -546,6 +939,25 @@ class DesktopHelper:
             return
         self._handle_hotkey(event, key)
 
+    def on_orb_toggle(self) -> None:
+        """Orb click-to-talk trigger (SIGUSR1 from the voice orb).
+
+        The orb never opens the mic itself (single mic owner stays this
+        helper, no contention): this only enqueues the same toggle the
+        click would mean on a key — start capture when idle, finish
+        (stop -> transcribe -> turn) while capturing. Queues to the
+        hotkey worker when running; direct synchronous handle otherwise
+        (unit tests / embedded use). Never raises.
+        """
+        try:
+            worker = getattr(self, "_hk_worker", None)
+            if worker is not None and worker.is_alive():
+                self._hk_q.put(("orb_toggle", "orb"))
+                return
+            self._handle_hotkey("orb_toggle", "orb")
+        except Exception:
+            pass
+
     def _hotkey_loop(self) -> None:
         while not self._hk_stop.is_set():
             try:
@@ -558,6 +970,11 @@ class DesktopHelper:
         try:
             if event == "cancel":
                 self.cancel()
+                return
+            if event == "orb_toggle":
+                # Orb click-to-talk: always toggle semantics (the orb has no
+                # key-up edge, independent of voice_edit.hotkey_mode).
+                self._handle_orb_toggle()
                 return
             if event == "ptt_start":
                 if self.toggle:
@@ -576,6 +993,26 @@ class DesktopHelper:
                     _trace("hotkey.ghost_release")
                     return
                 self._stop_listening()
+        except Exception as exc:  # never kill the hotkey worker
+            self._ui_error("VOICE_EDIT_HELPER_ERROR", str(exc)[:160])
+
+    def _handle_orb_toggle(self) -> None:
+        """One orb click: start capture / finish capture / cancel preview.
+
+        Toggle semantics always (no key-up exists on the orb path):
+        PREVIEW -> cancel; LISTENING/PROCESSING -> finish via the normal
+        release tail (transcribe -> turn); IDLE -> the existing
+        ``_start_listening`` (begin + mic + STT, the Right-Ctrl path).
+        A second click can never overlap a first: ``_open_request``
+        refuses while LISTENING/PROCESSING. Never raises.
+        """
+        try:
+            if self.state == self.PREVIEW:
+                self.cancel()
+            elif self.state in (self.LISTENING, self.PROCESSING):
+                self._stop_listening()
+            else:
+                self._start_listening()
         except Exception as exc:  # never kill the hotkey worker
             self._ui_error("VOICE_EDIT_HELPER_ERROR", str(exc)[:160])
 
@@ -662,6 +1099,87 @@ class DesktopHelper:
                 self._ui(self.overlay.show)
         except Exception:
             pass
+
+    #: Max fired-timer reminders announced on one voice turn (Lane 2,
+    #: 2026-10-03): the timer ledger is never pruned, so a long downtime
+    #: could leave dozens of `fired` rows — announce at most this many per
+    #: turn (oldest first) and drain the rest on following turns instead
+    #: of one unbounded speech.
+    _TIMER_DELIVERY_PER_TURN = 3
+
+    @staticmethod
+    def _timer_reminder_text(mins: int) -> str:
+        """Spoken reminder for a fired timer (deterministic, no secrets)."""
+        try:
+            mins = int(mins)
+        except (TypeError, ValueError):
+            mins = 0
+        if mins <= 0:
+            return "Your timer is up."
+        plural = "" if mins == 1 else "s"
+        return f"Your {mins}-minute timer is up."
+
+    def _deliver_fired_timers(self) -> list:
+        """Announce ledger-fired timers on the voice-turn cadence (no push).
+
+        Lane 2 (2026-10-03): the timer firer writes only the ledger (never
+        chat/session state), so a fired timer reaches the user here — the
+        helper answer path, where unprompted delivery actually speaks.
+        Pulls ``poll_fired_timers()`` (reused as-is), skips ids already
+        announced this lifetime, honors sleep (panel/History only, never
+        speech — the same contract as completions), audits each delivery.
+        Never raises and never disturbs the current turn.
+        """
+        try:
+            from .local.actions import poll_fired_timers as _poll
+            fired = _poll() or []
+        except Exception:
+            return []
+        announced = getattr(self, "_timers_announced", None)
+        if not isinstance(announced, set):
+            announced = self._timers_announced = set()
+        try:
+            sleeping = bool(_read_cfg(self.cfg, "voice_edit", "sleep_mode",
+                                      default=False))
+        except Exception:
+            sleeping = False
+        try:
+            ordered = sorted(
+                [r for r in fired if isinstance(r, dict)],
+                key=lambda r: float(r.get("fired_at") or 0.0))
+        except Exception:
+            ordered = []
+        fresh = []
+        for rec in ordered:
+            try:
+                tid = str(rec.get("id") or "")
+            except Exception:
+                continue
+            if not tid or tid in announced:
+                continue
+            fresh.append(rec)
+            if len(fresh) >= self._TIMER_DELIVERY_PER_TURN:
+                break
+        delivered = []
+        for rec in fresh:
+            try:
+                tid = str(rec.get("id") or "")
+                mins = int(rec.get("mins") or 0)
+            except (TypeError, ValueError, AttributeError):
+                continue
+            if not tid:
+                continue
+            text = self._timer_reminder_text(mins)
+            announced.add(tid)
+            _trace("timer.reminded", timer_id=tid[:16], mins=mins,
+                   slept=sleeping)
+            self._history("timer", f"{mins}-minute timer elapsed", text)
+            self._notify_status("Qubit", text)
+            if not sleeping:
+                self._speak(text)
+            delivered.append({"id": tid, "mins": mins, "text": text,
+                              "slept": sleeping})
+        return delivered
 
     # -- capture / listening --------------------------------------------
     def _warm_timeout_s(self) -> float:
@@ -750,9 +1268,121 @@ class DesktopHelper:
                 self._ui_status("error", f"{exc.code}: {exc.detail}")
                 self._active = False
                 return False
+            # Key-DOWN edge (2026-10-04 onset fix): open the mic NOW, before
+            # the ticket/WS round-trips in _transcribe, and pump onset frames
+            # into a bounded pre-roll the transcribe path prepends. Without
+            # this, everything spoken during begin + ticket + mic-spawn +
+            # WS-connect (~0.3 s warm, far more on a cold accurate load) was
+            # never recorded — measured live as "Hello" lost unrecoverably.
+            # A mic that will not open here degrades to today's behavior
+            # (transcribe-time start); buffered audio is dropped unsent on
+            # any failure below, never retained.
+            self._pre_mic = None
+            self._pre_roll = []
+            self._pre_pump = None
+            self._pre_pump_stop = None
+            try:
+                base = self._mic_factory()
+                try:
+                    from .voice_edit.noise import enabled as _ns_on
+                    if _ns_on(self.cfg):
+                        base = _NsFilterMic(base)
+                except Exception:
+                    pass
+                # Talk meter: tap the helper-owned mic so every captured
+                # frame publishes its peak (audio bytes pass through
+                # unchanged; the orb only ever reads the two numbers).
+                try:
+                    base = LevelTapMic(base,
+                                       on_frame=self._note_capture_frame)
+                except Exception:
+                    pass
+                base.start()
+            except Exception:
+                base = None
+            if base is not None:
+                self._pre_mic = base
+                self._pre_pump_stop = threading.Event()
+                pump = threading.Thread(target=self._pump_pre_roll,
+                                        daemon=True, name="voice-edit-preroll")
+                self._pre_pump = pump
+                pump.start()
             self.state = self.LISTENING
             self._listen_started_at = time.monotonic()
             return True
+
+    def _pump_pre_roll(self) -> None:
+        """Fill the onset ring while ticket/WS proceed (key-DOWN pump).
+
+        Reads up to 4 frames (~1.2 s at 300 ms) from the already-started mic
+        the request opened; the transcribe path prepends them, so speech at
+        the key edge survives setup. Exits on stop/pump-stop/generation turn/
+        full ring. Never raises; frames already pass the NS/AGC stage, so a
+        quiet onset also meets settled gain (the transient measured
+        identical either way needs no separate fix).
+        """
+        try:
+            mic = self._pre_mic
+            gen = self._gen
+            stop = self._pre_pump_stop
+            while (len(self._pre_roll) < 4 and not self._stop.is_set()
+                    and (stop is None or not stop.is_set())
+                    and self._gen == gen and mic is not None):
+                try:
+                    frame = mic.read_frame(timeout=0.2)
+                except Exception:
+                    break
+                if frame:
+                    self._pre_roll.append(frame)
+                    if len(self._pre_roll) > 4:
+                        del self._pre_roll[:len(self._pre_roll) - 4]
+                else:
+                    # Idle mic (or a test double answering None instantly):
+                    # never tight-spin; the ring simply stays short.
+                    time.sleep(0.05)
+        except Exception:
+            pass
+
+    def _claim_pre_roll(self) -> "tuple[Any, list]":
+        """Take the key-DOWN mic + buffered onset for the transcribe path.
+
+        Stops the pump (bounded join), drains the ring, and transfers mic
+        ownership: the caller must NOT start it again and must stop it on
+        failure. Returns ``(mic_or_None, frames)``; a missing mic degrades
+        to the transcribe-time start. Never raises.
+        """
+        mic = getattr(self, "_pre_mic", None)
+        self._pre_mic = None
+        stop = getattr(self, "_pre_pump_stop", None)
+        try:
+            if stop is not None:
+                stop.set()
+        except Exception:
+            pass
+        try:
+            pump = getattr(self, "_pre_pump", None)
+            if pump is not None:
+                pump.join(timeout=0.5)
+        except Exception:
+            pass
+        self._pre_pump = None
+        self._pre_pump_stop = None
+        try:
+            frames = [bytes(f) for f in (getattr(self, "_pre_roll", None)
+                                         or []) if f]
+        except Exception:
+            frames = []
+        self._pre_roll = []
+        return mic, frames
+
+    def _drop_pre_roll(self) -> None:
+        """Stop a key-DOWN pump mic whose turn never started (never sent)."""
+        mic, _frames = self._claim_pre_roll()
+        if mic is not None:
+            try:
+                mic.stop()
+            except Exception:
+                pass
 
     def _capture_selection(self) -> bool:
         """Capture the focused window's selection (one service round-trip)."""
@@ -785,16 +1415,33 @@ class DesktopHelper:
         # Start the microphone + STT FIRST (browser-like: audio flows the
         # moment you press), then capture the selection concurrently.
         self._worker = threading.Thread(target=self._transcribe, daemon=True,
-                                        name="voice-edit-stt")
+                                         name="voice-edit-stt")
         self._worker.start()
         if not self._capture_selection():
+            self._drop_pre_roll()
             self._stop.set()
+
+    def _on_wake_hint(self, detail: str) -> None:
+        """Visible hint for an unarmed command-shaped discard (2026-10-03).
+
+        Same status-line surface the §67 heard-preview uses (``_safe_show``
+        + ``_ui_status("heard", …)``) — status line only: never beeps,
+        never speaks, never emits a command. Never raises.
+        """
+        try:
+            self._safe_show()
+            self._ui_status("heard", str(detail or "")[-160:])
+        except Exception:
+            pass
 
     def on_wake_command(self, command: str) -> None:
         """A hands-free wake utterance arrived (already transcribed).
 
-        Runs the SAME begin/capture/transform path as Right-Ctrl; only the
-        audio source differs (the wake monitor, not the hold-to-talk mic).
+        Runs the begin/transform path with a key-synthesis-free local focus
+        snapshot (never the service selection capture: that emits Ctrl+C
+        into the focused window, which is SIGINT in a terminal); only the
+        audio source differs from Right-Ctrl (the wake monitor, not the
+        hold-to-talk mic).
         The turn itself runs on a worker thread: the whole wake turn (HTTP
         + model + blocking TTS + agent) used to park inside the monitor
         loop's thread, blinding the detector for the entire turn — exactly
@@ -806,6 +1453,10 @@ class DesktopHelper:
         if not self._open_request():
             _trace("wake.turn_refused", state=self.state)
             return
+        # The wake utterance is already transcribed by the monitor — the
+        # key-DOWN pump mic has no consumer on this path. Drop it (unsent)
+        # rather than leaking an open capture.
+        self._drop_pre_roll()
         # Claim the turn so a second wake command refuses (via
         # _open_request) instead of overlapping agent turns and TTS.
         self.state = self.PROCESSING
@@ -822,17 +1473,111 @@ class DesktopHelper:
                                   daemon=True, name="voice-wake-turn")
         self._wake_thread = worker
         worker.start()
+        self._arm_wake_turn_watchdog(worker)
+
+    def _wake_turn_timeout_s(self) -> float:
+        """Bound for one wake turn (0/disabled → no watchdog). Never raises."""
+        try:
+            val = float(_read_cfg(self.cfg, "voice_edit", "wake_turn_timeout_s",
+                                  default=_WAKE_TURN_TIMEOUT_S)
+                        or _WAKE_TURN_TIMEOUT_S)
+        except Exception:
+            return _WAKE_TURN_TIMEOUT_S
+        return val
+
+    def _arm_wake_turn_watchdog(self, worker: Any) -> None:
+        """Arm the stuck-turn watchdog for this generation (never raises).
+
+        Fires only while THIS turn still owns the loop (generation match)
+        with the worker alive in PROCESSING — a newer turn re-arms its own
+        timer and the stale one no-ops on the generation check.
+        """
+        try:
+            timeout = self._wake_turn_timeout_s()
+            if timeout <= 0:
+                return
+            gen = self._gen
+            timer = threading.Timer(timeout, self._wake_turn_watchdog,
+                                    args=(gen, worker))
+            timer.daemon = True
+            try:
+                worker._watchdog = timer  # owned by this turn only
+            except Exception:
+                pass
+            timer.start()
+        except Exception:
+            pass
+
+    def _wake_turn_watchdog(self, gen: Any, worker: Any) -> None:
+        """Free a wedged wake turn loudly (never raises; generation-guarded).
+
+        A hung HTTP dependency (route/task/ask/speak) parks the worker with
+        state PROCESSING and every following turn refuses silently. Past the
+        bound this degrades to a typed error + IDLE instead — mirroring the
+        P0 ``_finish_error``-on-every-path guards. The stale worker landing
+        late afterwards is harmless (same as a slow turn today).
+        """
+        try:
+            alive = bool(getattr(worker, "is_alive", lambda: False)())
+        except Exception:
+            alive = False
+        try:
+            if not alive or self._gen != gen or self.state != self.PROCESSING:
+                return
+            _trace("wake.turn_timeout", state=self.state,
+                   request_id=self.request_id)
+            self._ui_error("VOICE_EDIT_TURN_TIMEOUT",
+                           "voice turn timed out — say it again")
+            self._finish_error()
+        except Exception:
+            pass
+
+    def _capture_selection_local(self) -> bool:
+        """Snapshot focus identity WITHOUT touching selection/clipboard/keys.
+
+        Hands-free (wake) path only. The service capture synthesizes Ctrl+C
+        into the focused window to read the selection; in any terminal whose
+        WM_CLASS is not on the adapter's allowlist (VS Code's integrated
+        terminal, gnome-console, JetBrains, ..., or an empty class when
+        detection fails) that bare Ctrl+C is SIGINT and kills the foreground
+        process (P0 2026-10-03: "hey qubit" killed `sleep` in the owner's
+        terminal). A wake turn must therefore NEVER invoke the service
+        capture: this builds an explicitly selection-less snapshot from a
+        single read-only ``focused_window()`` query — no HTTP, no clipboard
+        save/clear/restore, no key synthesis. Push-to-talk keeps the real
+        ``_capture_selection`` (explicit key-hold over a selection).
+        """
+        try:
+            live = self.desktop.focused_window()
+        except Exception:
+            live = {}
+        try:
+            self.snapshot = SelectionSnapshot(
+                available=False,
+                captured_via="wake_no_capture",
+                app_class=str(live.get("app_class", "") or ""),
+                window_id=str(live.get("window_id", "") or ""))
+        except Exception:
+            self.snapshot = SelectionSnapshot(window_id="")
+        _trace("wake.listening", selected=False,
+               request_id=self.request_id,
+               window_id=self.snapshot.window_id or "")
+        return True
 
     def _wake_turn(self, cmd: str) -> None:
-        """Body of one wake turn (worker thread, never the monitor loop)."""
+        """Body of one wake turn (worker thread, never the monitor loop).
+
+        Uses the key-synthesis-free local snapshot (see
+        ``_capture_selection_local``): the service capture would emit Ctrl+C
+        into the focused window. Selection-edit via wake degrades to the
+        clarify path; dictate/answer/task/chat (which need no selection)
+        are unaffected.
+        """
         try:
-            if not self._capture_selection():
-                self._ui_status("idle", "capture failed")
-                self._finish_error()
-                return
+            self._capture_selection_local()
             _trace("wake.command", chars=len(cmd),
-                   request_id=self.request_id,
-                   **(_dbg.text_fields(self.cfg, command=cmd)))
+                    request_id=self.request_id,
+                    **(_dbg.text_fields(self.cfg, command=cmd)))
             self._transcript = cmd
             self._process_transcript(cmd)
         except Exception as exc:
@@ -841,47 +1586,81 @@ class DesktopHelper:
                 self._finish_error()
             except Exception:
                 pass
+        finally:
+            try:
+                timer = getattr(threading.current_thread(), "_watchdog", None)
+                if timer is not None:
+                    timer.cancel()
+            except Exception:
+                pass
 
     def _transcribe(self) -> None:
         _trace("transcribe.start", request_id=self.request_id)
         mode = str(_read_cfg(self.cfg, "voice_edit", "stt_mode",
                              default="accurate") or "accurate").lower()
         accurate = mode == "accurate"
+        # Onset handoff (2026-10-04): the key-DOWN pump mic is already
+        # running with onset frames buffered; otherwise open the mic here —
+        # in both cases BEFORE the ticket mint, so the onset is recorded
+        # while the ticket/WS round-trips proceed (measured: ticket-first
+        # order lost "Hello" unrecoverably).
+        claimed, pre_roll = self._claim_pre_roll()
+        if claimed is not None:
+            base_mic = claimed  # already NS-wrapped + started; never restart
+        else:
+            base_mic = self._mic_factory()
+            # Honest consumer of ``voice_edit.noise_suppression`` on the
+            # Right-Ctrl path: when ON, every captured frame runs through the
+            # software NS/AGC stage before either STT consumer (the streaming
+            # socket reads filtered frames live; the accurate pass decodes the
+            # filtered buffer). OFF → mic untouched. Mirrors the wake path
+            # (``voice_edit.wake._maybe_ns_filter``) at frame granularity.
+            try:
+                from .voice_edit.noise import enabled as _ns_on
+                if _ns_on(self.cfg):
+                    base_mic = _NsFilterMic(base_mic)
+            except Exception:
+                pass
+            # Talk meter (same tap as the key-DOWN path above): the fallback
+            # mic opened here is helper-owned too.
+            try:
+                base_mic = LevelTapMic(base_mic,
+                                       on_frame=self._note_capture_frame)
+            except Exception:
+                pass
+        # In accurate mode the streaming socket still drives live interim
+        # partials; the wrapper records every frame so the same audio can be
+        # decoded once by faster-whisper after release. PreRoll sits inside
+        # Buffering so the accurate rescore also gets the onset.
+        from .voice_edit.stt_client import BufferingMic, PreRollMic
+        inner = PreRollMic(base_mic, pre_roll=pre_roll) if pre_roll \
+            else base_mic
+        mic = BufferingMic(inner) if accurate else inner
+        if claimed is None:
+            # One start, via chain delegation — and BEFORE the ticket mint,
+            # so the onset is recorded while the ticket/WS round-trips run.
+            try:
+                mic.start()
+            except SttError as exc:
+                _trace("transcribe.mic_failed", code=exc.code)
+                self._on_stt_error(exc.code, exc.detail)
+                return
+            except Exception as exc:  # any capture-tool failure is a mic fault
+                _trace("transcribe.mic_failed", code="STT_MIC_UNAVAILABLE")
+                self._on_stt_error("STT_MIC_UNAVAILABLE", str(exc)[:160])
+                return
         try:
             ticket = self.client.mint_stt_ticket()
         except HelperError as exc:
+            if claimed is not None:
+                try:
+                    base_mic.stop()  # claimed ownership: never leak parec
+                except Exception:
+                    pass
             _trace("transcribe.ticket_failed", code=exc.code)
             self._on_stt_error(exc.code, exc.detail)
             return
         _trace("transcribe.ticket_ok", ticket_len=len(ticket))
-        base_mic = self._mic_factory()
-        # Honest consumer of ``voice_edit.noise_suppression`` on the
-        # Right-Ctrl path: when ON, every captured frame runs through the
-        # software NS/AGC stage before either STT consumer (the streaming
-        # socket reads filtered frames live; the accurate pass decodes the
-        # filtered buffer). OFF → mic untouched. Mirrors the wake path
-        # (``voice_edit.wake._maybe_ns_filter``) at frame granularity.
-        try:
-            from .voice_edit.noise import enabled as _ns_on
-            if _ns_on(self.cfg):
-                base_mic = _NsFilterMic(base_mic)
-        except Exception:
-            pass
-        # In accurate mode the streaming socket still drives live interim
-        # partials; the wrapper records every frame so the same audio can be
-        # decoded once by faster-whisper after release.
-        from .voice_edit.stt_client import BufferingMic
-        mic = BufferingMic(base_mic) if accurate else base_mic
-        try:
-            mic.start()
-        except SttError as exc:
-            _trace("transcribe.mic_failed", code=exc.code)
-            self._on_stt_error(exc.code, exc.detail)
-            return
-        except Exception as exc:  # any capture-tool failure is a mic fault
-            _trace("transcribe.mic_failed", code="STT_MIC_UNAVAILABLE")
-            self._on_stt_error("STT_MIC_UNAVAILABLE", str(exc)[:160])
-            return
         _trace("transcribe.mic_started", stop_set=self._stop.is_set(),
                stt_mode="accurate" if accurate else "streaming")
         client = self._stt_factory(ticket)
@@ -963,11 +1742,35 @@ class DesktopHelper:
         self._active = False
         self.state = self.IDLE
 
+    def _wake_has_live_pending(self) -> bool:
+        """Read-only liveness of the staged confirm-gated task (Lane 1).
+
+        Mirrors the TTL gate in ``_process_transcript`` without consuming
+        anything: True only while ``_pending_task`` is staged and unexpired
+        (``_PENDING_TASK_TTL_S`` on the same ``time.monotonic`` clock).
+        Never raises — an unreadable state degrades to False (no settle).
+        """
+        try:
+            pending = getattr(self, "_pending_task", None)
+            if not pending:
+                return False
+            try:
+                staged_at = float(pending.get("staged_at", 0.0))
+            except (TypeError, ValueError, AttributeError):
+                return False
+            return (time.monotonic() - staged_at) <= _PENDING_TASK_TTL_S
+        except Exception:
+            return False
+
     def _process_transcript(self, transcript: str = "") -> None:
         if self.snapshot is None and self.request_id:
             # Ensure the selection snapshot exists even if capture lagged.
             self._capture_selection()
         text = (transcript or self._transcript or "").strip()
+        # Fired-timer pull (Lane 2, 2026-10-03): the ledger firer never
+        # touches chat/session state, so timers surface here — every voice
+        # turn announces what fired while away (sleep: panel/History only).
+        self._deliver_fired_timers()
         # A staged task (mode "task") is confirm-gated: the next utterance is
         # only honored if it is an affirmative/negative confirmation.
         if self._pending_task:
@@ -1153,14 +1956,45 @@ class DesktopHelper:
 
     def _answer_question(self, question: str, *, mode: str = "answer") -> None:
         """Ask the Qubit brain, display the answer, and speak it aloud."""
+        # Slice 1 talk-back: an "in chat:" turn runs the headless worker and
+        # can take many seconds, so acknowledge immediately (status + voice)
+        # instead of silent waiting. The full reply is spoken at the end
+        # (gist) with the complete text in History.
+        try:
+            _rw = parse_route_word(question)
+        except Exception:
+            _rw = None
+        if _rw is not None and _rw["route"] == "in-chat":
+            self._ui_status("working", "working in /chat…")
+            self._speak("On it — working on that in chat.")
         self._ui_status("processing", "answering…")
         spoken = False
+        # Owner ask (2026-10-04 voice-final lane): a redo/rewrite answer
+        # carries clipboard fields (service copied the output write-only —
+        # safe on the selection-less wake path, no capture/keys/replace).
+        # The short receipt is spoken AFTER the reply so a long rewrite
+        # never swallows it in the 2-sentence excerpt. Absent fields (every
+        # non-transform answer) mean silence — no behavior change there.
+        clip_ok: Optional[bool] = None
         try:
             if hasattr(self.client, "ask_result"):
                 out = self.client.ask_result(question, self.request_id)
                 reply = str(out.get("answer", "") or "")
+                # Lane 3 (2026-10-03): the service stages tool-shaped misses
+                # that reached ask() as conversation (timer-class) instead of
+                # letting the brain narrate an unsettleable "Confirm?". A
+                # task-shaped ask result stages through the existing confirm
+                # path — spoken prompt + wake re-arm — so voice "yes" settles
+                # it like any routed task.
+                if (not reply and out.get("mode") == "task"
+                        and out.get("requires_confirmation")
+                        and str(out.get("task_text") or "").strip()):
+                    self._propose_task(out)
+                    return
                 # The service streams the speech itself; don't double-play.
                 spoken = bool(out.get("spoken"))
+                if "clipboard_ok" in out:
+                    clip_ok = bool(out.get("clipboard_ok"))
             else:  # compatibility seam (older/fake clients)
                 reply = self.client.ask(question, self.request_id)
         except HelperError as exc:
@@ -1187,6 +2021,10 @@ class DesktopHelper:
         self._history(mode, question, reply)
         if not spoken:
             self._speak(reply)
+        if clip_ok is True:
+            self._speak("Copied to clipboard.")
+        elif clip_ok is False:
+            self._speak("Clipboard copy failed.")
 
     @staticmethod
     def _spoken_excerpt(text: str, sentences: int = 2) -> str:
@@ -1199,11 +2037,130 @@ class DesktopHelper:
         parts = re.split(r"(?<=[.!?])\s+", t)
         return " ".join(parts[:max(1, sentences)]).strip()
 
+    def _barge_in_settings(self) -> "tuple[bool, float, int]":
+        """Barge-in tuning from config (never raises; echo-safe defaults).
+
+        ``voice_edit.barge_in`` (default True) enables stopping TTS on
+        confident room speech; ``barge_in_threshold`` is the RMS gate
+        (default 0.10 — calibrated 2026-10-03: 60 s drone baseline max
+        0.073, speaker echo max 0.097, owner speech peaks 0.5 max-abs
+        i.e. ~0.13+ RMS even straddled across 300 ms frames; the old
+        0.20 sat above every owner word at seating distance so the
+        first "stop" died silently); ``barge_in_ms`` is the sustain
+        window, clamped to 150-300 ms. Direct YAML keys only (no
+        settings-view change — the other lane owns that surface).
+        """
+        try:
+            enabled = _read_cfg(self.cfg, "voice_edit", "barge_in",
+                                default=True)
+            enabled = True if enabled is None else bool(enabled)
+        except Exception:
+            enabled = True
+        try:
+            threshold = float(_read_cfg(self.cfg, "voice_edit",
+                                        "barge_in_threshold",
+                                        default=0.10) or 0.10)
+        except Exception:
+            threshold = 0.10
+        try:
+            min_ms = int(_read_cfg(self.cfg, "voice_edit", "barge_in_ms",
+                                   default=200) or 200)
+        except Exception:
+            min_ms = 200
+        return enabled, threshold, max(150, min(300, min_ms))
+
+    def _play_with_barge_in(self, proc: Any) -> bool:
+        """Block until ``proc`` ends; stop it on confident speech. Pure flow.
+
+        Returns True when barge-in stopped playback. Disabled (or an
+        unopenable mic) degrades to a plain blocking wait — speech never
+        breaks because detection cannot run. The mic stream is short-lived
+        (this playback only) and never touches the wake monitor's mic.
+        """
+        enabled, threshold, min_ms = self._barge_in_settings()
+        if not enabled or not threshold > 0:
+            try:
+                proc.wait(timeout=90)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+            return False
+        try:
+            mic = self._mic_factory()
+        except Exception:
+            mic = None
+        if mic is None:
+            try:
+                proc.wait(timeout=90)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+            return False
+        watcher = BargeInWatcher(threshold=threshold, min_ms=min_ms)
+        try:
+            mic.start()
+        except Exception:
+            try:
+                proc.wait(timeout=90)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+            return False
+        interrupted = False
+        try:
+            frame_ms = int(getattr(mic, "frame_ms", 300) or 300)
+        except Exception:
+            frame_ms = 300
+        try:
+            while proc.poll() is None:
+                try:
+                    frame = mic.read_frame(timeout=0.5)
+                except Exception:
+                    frame = None
+                if not frame:
+                    continue
+                # One real frame = one nominal frame duration of audio: the
+                # mic delivers at its own cadence, so counting frames maps to
+                # real confident-speech time without wall-clock flakiness.
+                if watcher.feed(frame_rms(frame), frame_ms):
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                    interrupted = True
+                    _trace("speak.barge_in", threshold=threshold,
+                           min_ms=min_ms)
+                    break
+        finally:
+            try:
+                mic.stop()
+            except Exception:
+                pass
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        return interrupted
+
     def _speak(self, text: str) -> None:
         """Speak the gist of ``text`` through the service's TTS, locally.
 
         Best-effort and non-fatal: a TTS/playback failure never changes the
         answer that was already shown. Disable with ``voice_edit.speak_answers``.
+        Confident room speech stops playback mid-reply (barge-in); silence
+        and echo-level audio play through. Yields to idle speech afterwards.
+        The spoken excerpt runs through ``speak_brand_text`` (legacy
+        self-reference tokens -> Qubit-neutral wording); preview/History
+        keep the verbatim text for audit honesty.
         """
         if not text or not bool(_read_cfg(self.cfg, "voice_edit",
                                           "speak_answers", default=True)):
@@ -1213,6 +2170,9 @@ class DesktopHelper:
         import subprocess
         import tempfile
         spoken = self._spoken_excerpt(text)
+        if not spoken:
+            return
+        spoken = speak_brand_text(spoken)
         if not spoken:
             return
         try:
@@ -1228,27 +2188,47 @@ class DesktopHelper:
             return
         path = ""
         self._speaking = True
+        self._barge_interrupted = False
         try:
             fd, path = tempfile.mkstemp(suffix=".wav", prefix="qubit-answer-")
             with os.fdopen(fd, "wb") as fh:
                 fh.write(wav)
             _trace("speak", chars=len(text))
-            subprocess.run([player, path], timeout=90, check=False,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            proc = subprocess.Popen(
+                [player, path], stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL)
+            if self._play_with_barge_in(proc):
+                self._barge_interrupted = True
+                self._ui_status("interrupted", "stopped — speak again")
         except Exception as exc:  # never fatal
             _trace("speak_failed", detail=str(exc)[:120])
         finally:
             self._speaking = False
+            # Playback finished: a done marker so the orb's green ends the
+            # moment Qubit stops talking instead of lingering for the whole
+            # recency window (live 2026-10-05).
+            _trace("speak_done", chars=len(text))
             if path:
                 try:
                     os.unlink(path)
                 except OSError:
                     pass
 
+    #: Leading cue separators stripped at the insert boundary (journal
+    #: 2026-10-04: "Type this for me. 1 plus 1 equals 99." arrived as
+    #: ". 1 plus 1 equals 99." — the exact-cue strip in the parser leaves the
+    #: sentence period, the loose-cue strip removes it; the boundary strips
+    #: it either way so both PTT and wake dictate type clean text). The set
+    #: mirrors the loose-cue lstrip (whitespace + sentence punctuation
+    #: only): parens/quotes/letters/digits are never touched.
+    _DICTATE_LEAD_STRIP = " \t,.:;!?-\u2013\u2014"
+
     def _insert_dictation(self, text: str) -> None:
-        if not text:
+        cleaned = str(text or "").lstrip(self._DICTATE_LEAD_STRIP)
+        if not cleaned.strip():
             self._finish_error()
             return
+        text = cleaned
         snap = self.snapshot or SelectionSnapshot(window_id="")
         # Refuse to inject into a fullscreen app (a game/video): text there is
         # almost always unintended. Offer the clipboard instead.
@@ -1264,6 +2244,13 @@ class DesktopHelper:
             self._finish_error()
             return
         if self.snapshot is not None and self.snapshot.window_id:
+            # The overlay may hold focus (it shows status cues); hide it and
+            # refocus the target first (parity with the apply path), so the
+            # focus gate below sees the real app and not our own window.
+            try:
+                self.overlay.hide()
+            except Exception:
+                pass
             self.desktop.activate_window(self.snapshot.window_id)
         res = self.desktop.insert_text(text, snap, self.cfg)
         _trace("insert", ok=res.ok, method=res.method,
@@ -1388,6 +2375,7 @@ class DesktopHelper:
 
     def cancel(self) -> None:
         self._stop.set()
+        self._drop_pre_roll()
         if self._worker is not None and self._worker.is_alive():
             self._worker.join(timeout=3.0)
         if self.request_id:

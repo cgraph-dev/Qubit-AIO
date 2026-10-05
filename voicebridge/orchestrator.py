@@ -426,9 +426,17 @@ def answer_web_query(cfg: Any, text: str,
                        "~/.config/qubit-voicebridge/.env")
         return {"ok": False, "answer": "", "sources": [],
                 "code": "WEB_UNAVAILABLE"}
-    url = str(_cfg_get(cfg, "intent", "perplexity_url",
-                       default="https://api.perplexity.ai/chat/completions")
-              or "https://api.perplexity.ai/chat/completions")
+    raw_url = str(_cfg_get(cfg, "intent", "perplexity_url",
+                           default="https://api.perplexity.ai/chat/completions")
+                or "https://api.perplexity.ai/chat/completions")
+    # Frontier appends "/chat/completions" itself (frontier.py contract), so
+    # pass the bare host here; strip the path when the operator configured
+    # the full completions URL (read-old full URL, write-new bare host).
+    base_url = raw_url.strip().rstrip("/")
+    _suffix = "/chat/completions"
+    if base_url.endswith(_suffix):
+        base_url = base_url[:-len(_suffix)].rstrip("/") or \
+            "https://api.perplexity.ai"
     system = ("You are a concise voice assistant answering from current web "
               "search. Give a short, accurate, up-to-date answer in 1-4 "
               "sentences. Prefer facts over hedging. Be direct: no emojis, "
@@ -441,7 +449,7 @@ def answer_web_query(cfg: Any, text: str,
         ProviderRequest(prompt=prompt, max_tokens=256, timeout_s=45.0,
                         route="frontier", provider="perplexity",
                         model=model),
-        cfg, base_url=str(url or ""), api_key=key)
+        cfg, base_url=str(base_url or ""), api_key=key)
     if not res.ok:
         log_event("conversation.perplexity.failed", code=res.code,
                   error=str(res.message)[:160])
@@ -1566,6 +1574,10 @@ class VoiceOrchestrator:
                     host=wu_cfg.get("host", "0.0.0.0"),
                     port=int(wu_cfg.get("port", 8890)),
                     state_dir=self.cfg.state_dir())
+                # Publish the live listener so the SIGTERM handler can detach
+                # its PTYs before shutdown kills an in-flight turn.
+                from . import webui as _webui_mod
+                _webui_mod.CURRENT_SERVER = self._webui
                 self._webui.start()
         except Exception as exc:
             self._webui = None

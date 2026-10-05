@@ -3,7 +3,7 @@
  *
  * Qubit-owned three-pane console over our LOCAL context engine:
  * left workspace/resources nav + context tree, center file
- * Preview/Source viewer, right Quick start panel + terminal stub.
+ * Preview/Source viewer, right Quick start panel + status strip.
  * All data comes from `@/lib/ocFamilyVikingApi` (bridge paths under
  * `/api/qubit/viking/<action>`); the local engine is always present, so
  * there is no unconfigured state. A bridge row that still 404s renders
@@ -11,13 +11,14 @@
  * Sub-pages (wired by the integrator): `/open-viking/retrieval`,
  * `/open-viking/uploads`, `/open-viking/agent-hub`, `/open-viking/resources`.
  *
- * Visual language matches SessionsPage/ChannelsPage: the layout owns the
- * page title (see ROUTE_TITLES), so this page renders no `h1`; sections
- * are `Card`s, actions are `Button`s, loading is a centered `Spinner`.
+ * Panels use the shared settings contract
+ * (`.settings-section` > `.settings-group` > `.settings-row`) so this page
+ * matches the ported console hierarchy; the layout owns the page title
+ * (see ROUTE_TITLES), so this page renders no `h1`.
  */
 
 import { useCallback, useContext, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import {
   AlertTriangle,
   Blocks,
@@ -34,18 +35,18 @@ import {
   Plug,
   Plus,
   Search,
-  TerminalSquare,
 } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Button } from "@nous-research/ui/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@nous-research/ui/ui/components/card";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { PageHeaderContext } from "@/contexts/page-header-context";
+import {
+  SettingsEmpty,
+  SettingsPageIntro,
+  SettingsRow,
+  SettingsSection,
+  SettingsStatus,
+} from "@/components/viking-settings";
 import {
   VIKING_CONTEXT_GROUPS,
   findVikingRelated,
@@ -158,7 +159,7 @@ export default function OpenVikingPage() {
     };
   }, []);
 
-  // Sessions-style connection badge next to the layout title.
+  // Console-style connection badge next to the layout title.
   useEffect(() => {
     if (!pageHeader || connection === "loading") return;
     pageHeader.setAfterTitle(
@@ -235,308 +236,295 @@ export default function OpenVikingPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6" data-testid="open-viking-page">
-      <p className="text-xs text-muted-foreground">
+    <div
+      className="qb-upstream viking-settings settings-page settings-page--wide"
+      data-testid="open-viking-page"
+    >
+      <SettingsPageIntro currentPath="/open-viking" showSubnav>
         Console over the local context engine ·{" "}
         <span data-testid="viking-connection">{connectionLabel}</span>
-      </p>
+      </SettingsPageIntro>
 
       {missingRows.length > 0 && (
-        <Card className="border-warning/50">
-          <CardContent
-            className="flex items-center gap-2 p-4 text-sm"
-            role="note"
-            data-testid="viking-missing-rows"
-          >
-            <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
-            <span>
-              Bridge row{missingRows.length === 1 ? "" : "s"} not yet served:{" "}
-              {missingRows.join(", ")} — those controls stay disabled until the
-              row lands.
-            </span>
-          </CardContent>
-        </Card>
+        <div
+          className="callout danger flex items-center gap-2"
+          role="note"
+          data-testid="viking-missing-rows"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+          <span>
+            Bridge row{missingRows.length === 1 ? "" : "s"} not yet served:{" "}
+            {missingRows.join(", ")} — those controls stay disabled with the
+            reason until the row lands.
+          </span>
+        </div>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)_280px]">
         {/* Left: workspace/resources nav + context tree */}
         <aside className="flex flex-col gap-4" aria-label="Open Viking navigation">
-          <Card>
-            <CardContent className="flex flex-col gap-4 p-4">
-              <nav aria-label="Workspace">
-                <h2 className="mb-2 text-xs font-medium uppercase text-muted-foreground">
-                  Workspace
-                </h2>
-                <ul className="flex flex-col gap-1">
-                  {WORKSPACE_NAV.map((item) => (
-                    <li key={item.label}>
-                      <Link
-                        to={item.path}
-                        className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-midground/10"
-                      >
-                        <item.icon className="h-4 w-4" aria-hidden />
-                        {item.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-              <nav aria-label="Resources">
-                <h2 className="mb-2 text-xs font-medium uppercase text-muted-foreground">
-                  Resources
-                </h2>
-                <ul className="flex flex-col gap-1">
-                  {RESOURCES_NAV.map((item) => (
-                    <li key={item.label}>
-                      <Link
-                        to={item.path}
-                        className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-midground/10"
-                      >
-                        <item.icon className="h-4 w-4" aria-hidden />
-                        {item.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            </CardContent>
-          </Card>
+          <SettingsSection title="Workspace" ariaLabel="Workspace">
+            {WORKSPACE_NAV.map((item) => (
+              <SettingsRow
+                key={item.label}
+                as="button"
+                title={
+                  <span className="flex items-center gap-2">
+                    <item.icon className="h-4 w-4" aria-hidden /> {item.label}
+                  </span>
+                }
+                onClick={() => void navigate(item.path)}
+              />
+            ))}
+          </SettingsSection>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Context tree</CardTitle>
-            </CardHeader>
-            <CardContent
-              className="pt-0"
-              aria-label="Context tree"
-              data-testid="viking-context-tree"
-            >
-              {treeLoading && (
-                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                  <Spinner /> Loading context tree…
+          <SettingsSection title="Resources" ariaLabel="Resources">
+            {RESOURCES_NAV.map((item) => (
+              <SettingsRow
+                key={item.label}
+                as="button"
+                title={
+                  <span className="flex items-center gap-2">
+                    <item.icon className="h-4 w-4" aria-hidden /> {item.label}
+                  </span>
+                }
+                onClick={() => void navigate(item.path)}
+              />
+            ))}
+          </SettingsSection>
+
+          <SettingsSection title="Context tree" ariaLabel="Context tree">
+            <div data-testid="viking-context-tree">
+              {treeLoading && <SettingsEmpty>Loading context tree…</SettingsEmpty>}
+              {!treeLoading && treeError && (
+                <div className="callout danger" role="alert">
+                  {treeError}
                 </div>
               )}
-              {!treeLoading && treeError && (
-                <p className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {treeError}
-                </p>
-              )}
               {!treeLoading && treeMissing && (
-                <p
-                  className="text-sm text-muted-foreground"
-                  data-testid="viking-tree-unavailable"
-                >
-                  Context tree couldn't be loaded — try Refresh.
-                </p>
+                <SettingsEmpty testId="viking-tree-unavailable">
+                  Context tree couldn't be loaded — try again.
+                </SettingsEmpty>
               )}
               {!treeLoading && !treeMissing && !treeError && treeGroupCount === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No context entries yet — add a resource or a memory to light
-                  up this tree.
-                </p>
+                <SettingsEmpty>
+                  No context entries yet — add a resource or a memory to light up
+                  this tree.
+                </SettingsEmpty>
               )}
               {VIKING_CONTEXT_GROUPS.map(({ key, label }) => {
                 const nodes = tree[key] ?? [];
                 if (nodes.length === 0) return null;
                 return (
-                  <details key={key} className="mb-1" data-testid={`viking-group-${key}`}>
-                    <summary className="cursor-pointer px-1 py-1 text-sm font-medium hover:bg-midground/10">
+                  <details key={key} open data-testid={`viking-group-${key}`}>
+                    <summary className="settings-row__desc cursor-pointer px-3 py-2">
                       {label} ({nodes.length})
                     </summary>
-                    <ul className="ml-3 flex flex-col gap-0.5 border-l border-border pl-2">
+                    <div>
                       {nodes.map((node) => {
                         const path = firstPath(node);
-                        return (
-                          <li key={node.id || node.label}>
-                            {path ? (
-                              <button
-                                type="button"
-                                className="w-full truncate px-1 py-0.5 text-left text-sm hover:bg-midground/10"
-                                title={path}
-                                onClick={() => void openPath(path)}
-                              >
-                                {node.label}
-                              </button>
-                            ) : (
-                              <span className="px-1 py-0.5 text-sm">{node.label}</span>
-                            )}
-                          </li>
+                        return path ? (
+                          <SettingsRow
+                            key={node.id || node.label}
+                            as="button"
+                            title={node.label}
+                            onClick={() => void openPath(path)}
+                            ariaLabel={`Preview ${node.label}`}
+                          />
+                        ) : (
+                          <SettingsRow key={node.id || node.label} title={node.label} />
                         );
                       })}
-                    </ul>
+                    </div>
                   </details>
                 );
               })}
-            </CardContent>
-          </Card>
+            </div>
+          </SettingsSection>
         </aside>
 
         {/* Center: file Preview/Source viewer */}
-        <Card className="flex min-h-[24rem] flex-col" aria-label="File viewer">
-          <CardContent className="flex flex-wrap items-center gap-2 border-b border-border p-4">
-            <FileText className="h-4 w-4 shrink-0" aria-hidden />
-            <span
-              className="truncate font-courier text-sm"
-              data-testid="viking-selected-path"
-            >
-              {selectedPath || "No file selected"}
-            </span>
-            {selectedPath && (
-              <span
-                className="truncate font-courier text-xs text-muted-foreground"
-                data-testid="viking-uri"
-              >
-                {fileUri || toVikingUri(selectedPath)}
+        <SettingsSection title="File viewer" ariaLabel="File viewer">
+          <SettingsRow
+            title={
+              <span className="flex min-w-0 items-center gap-2">
+                <FileText className="h-4 w-4 shrink-0" aria-hidden />
+                <span className="truncate" data-testid="viking-selected-path">
+                  {selectedPath || "No file selected"}
+                </span>
               </span>
-            )}
-            <div className="ml-auto flex gap-1" role="tablist" aria-label="Viewer mode">
-              {(["preview", "source"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewerMode === mode}
-                  onClick={() => setViewerMode(mode)}
-                  className={`px-3 py-1 text-xs uppercase tracking-[0.12em] ${
-                    viewerMode === mode
-                      ? "bg-midground text-background"
-                      : "text-muted-foreground hover:bg-midground/10"
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-          </CardContent>
-          <div className="flex-1 overflow-auto p-4" data-testid="viking-viewer-body">
+            }
+            description={
+              selectedPath ? (
+                <span className="truncate" data-testid="viking-uri">
+                  {fileUri || toVikingUri(selectedPath)}
+                </span>
+              ) : (
+                "Pick a node in the context tree to preview it here."
+              )
+            }
+            control={
+              <span className="flex gap-1" role="tablist" aria-label="Viewer mode">
+                {(["preview", "source"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="tab"
+                    aria-selected={viewerMode === mode}
+                    onClick={() => setViewerMode(mode)}
+                    className={`btn btn--xs uppercase ${viewerMode === mode ? "active" : "btn--ghost"}`}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </span>
+            }
+          />
+          <div className="p-4" data-testid="viking-viewer-body">
             {fileLoading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Spinner /> Loading…
-              </div>
+              <p className="settings-row__desc flex items-center gap-2">
+                <Spinner className="shrink-0" /> Loading…
+              </p>
             )}
             {!fileLoading && fileError && (
-              <p className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <div className="callout danger" role="alert">
                 {fileError}
-              </p>
+              </div>
             )}
             {!fileLoading && !fileError && !selectedPath && (
-              <p className="text-sm text-muted-foreground">
+              <SettingsEmpty>
                 Pick a node in the context tree to preview it here.
-              </p>
+              </SettingsEmpty>
             )}
             {!fileLoading && !fileError && selectedPath && viewerMode === "source" && (
-              <pre className="whitespace-pre-wrap font-courier text-sm">
-                {fileContent}
-              </pre>
+              <pre className="whitespace-pre-wrap font-courier text-sm">{fileContent}</pre>
             )}
             {!fileLoading && !fileError && selectedPath && viewerMode === "preview" && (
               <article className="whitespace-pre-wrap text-sm">{fileContent}</article>
             )}
           </div>
-        </Card>
+        </SettingsSection>
 
-        {/* Right: quick start + terminal stub */}
+        {/* Right: quick start + status strip */}
         <aside className="flex flex-col gap-4" aria-label="Quick start">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick start</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 pt-0">
-              <Button
-                size="sm"
-                outlined
-                className="uppercase"
-                onClick={() => void navigate("/open-viking/uploads")}
-                prefix={<Plus className="h-4 w-4" />}
-              >
-                Add resource
-              </Button>
-              <Button
-                size="sm"
-                outlined
-                className="uppercase"
-                onClick={() => void navigate("/open-viking/uploads?tab=memory")}
-                prefix={<Database className="h-4 w-4" />}
-              >
-                Add memory
-              </Button>
-              <Button
-                size="sm"
-                outlined
-                className="uppercase"
-                disabled={!selectedPath || relatedState === "unavailable"}
-                onClick={() => void onFindRelated()}
-                prefix={
-                  relatedState === "loading" ? (
-                    <Spinner />
-                  ) : (
-                    <Link2 className="h-4 w-4" />
-                  )
-                }
-              >
-                {relatedState === "loading" ? "Finding…" : "Find related context"}
-              </Button>
-              {relatedState === "error" && (
-                <p className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {relatedError || "Related lookup failed."}
-                </p>
-              )}
-              {relatedState === "unavailable" && (
-                <p
-                  className="text-sm text-muted-foreground"
-                  data-testid="viking-related-unavailable"
+          <SettingsSection title="Quick start" ariaLabel="Quick start">
+            <SettingsRow
+              title="Add resource"
+              description="Ingest a document or URI into the context store."
+              control={
+                <Button
+                  size="sm"
+                  outlined
+                  className="uppercase"
+                  onClick={() => void navigate("/open-viking/uploads")}
+                  prefix={<Plus className="h-4 w-4" />}
                 >
-                  Related-find bridge row missing — the J1 lane has not landed
-                  it yet.
-                </p>
-              )}
-              {related.length > 0 && (
-                <ul className="mt-1 flex flex-col gap-1" data-testid="viking-related">
-                  {related.map((row) => (
-                    <li key={`${row.title}-${row.path ?? ""}`} className="text-sm">
-                      {row.path ? (
-                        <button
-                          type="button"
-                          className="text-left underline-offset-2 hover:underline"
-                          onClick={() => void openPath(row.path as string)}
-                        >
-                          {row.title}
-                        </button>
-                      ) : (
-                        row.title
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card aria-label="Terminal" data-testid="viking-terminal">
-            <CardHeader>
-              <CardTitle>
-                <span className="flex items-center gap-2">
-                  <TerminalSquare className="h-4 w-4" aria-hidden /> Terminal
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 pt-0">
-              <div className="bg-black/80 p-2 font-courier text-xs text-green-300">
-                <p>
-                  <Globe className="mr-1 inline h-3 w-3" aria-hidden />
-                  state: {connectionLabel}
-                </p>
-                <p className="mt-1 text-green-300/70">
-                  Read-only status view — run commands from the Terminal page
-                  or a harness task instead.
-                </p>
+                  Add
+                </Button>
+              }
+            />
+            <SettingsRow
+              title="Add memory"
+              description="Stage a note into user memory (confirm-gated)."
+              control={
+                <Button
+                  size="sm"
+                  outlined
+                  className="uppercase"
+                  onClick={() => void navigate("/open-viking/uploads?tab=memory")}
+                  prefix={<Database className="h-4 w-4" />}
+                >
+                  Add
+                </Button>
+              }
+            />
+            <SettingsRow
+              stacked
+              title="Find related context"
+              description={
+                relatedState === "unavailable"
+                  ? "Related-find bridge row missing — the local engine isn't serving this lookup yet."
+                  : !selectedPath
+                    ? "Select a file in the context tree first."
+                    : "Look up siblings and keyword kin for the selected file."
+              }
+              control={
+                <Button
+                  size="sm"
+                  outlined
+                  className="uppercase"
+                  disabled={!selectedPath || relatedState === "unavailable"}
+                  onClick={() => void onFindRelated()}
+                  prefix={
+                    relatedState === "loading" ? (
+                      <Spinner />
+                    ) : (
+                      <Link2 className="h-4 w-4" />
+                    )
+                  }
+                >
+                  {relatedState === "loading" ? "Finding…" : "Find related"}
+                </Button>
+              }
+              testId={relatedState === "unavailable" ? "viking-related-unavailable" : undefined}
+            />
+            {relatedState === "error" && (
+              <div className="callout danger" role="alert">
+                {relatedError || "Related lookup failed."}
               </div>
-              <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Plug className="h-3 w-3" aria-hidden /> Local engine only;
-                nothing runs in this panel.
-              </p>
-            </CardContent>
-          </Card>
+            )}
+            {related.length > 0 && (
+              <div data-testid="viking-related">
+                {related.map((row) => (
+                  <SettingsRow
+                    key={`${row.title}-${row.path ?? ""}`}
+                    as="button"
+                    title={row.title}
+                    description={row.path}
+                    onClick={row.path ? () => void openPath(row.path as string) : undefined}
+                    disabled={!row.path}
+                  />
+                ))}
+              </div>
+            )}
+          </SettingsSection>
+
+          <SettingsSection
+            title="Engine status"
+            ariaLabel="Engine status"
+          >
+            <div data-testid="viking-terminal">
+              <SettingsRow
+                title={
+                  <span className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" aria-hidden /> Local engine
+                  </span>
+                }
+                description="Read-only status view — run commands from the Terminal page or a harness task instead."
+                control={
+                  <SettingsStatus
+                    tone={
+                      connection === "connected"
+                        ? "ok"
+                        : connection === "unavailable"
+                          ? "danger"
+                          : "warn"
+                    }
+                  >
+                    {connectionLabel}
+                  </SettingsStatus>
+                }
+              />
+              <SettingsRow
+                title={
+                  <span className="flex items-center gap-1">
+                    <Plug className="h-3 w-3" aria-hidden /> Local only
+                  </span>
+                }
+                description="Nothing runs in this panel; the engine is on this host."
+              />
+            </div>
+          </SettingsSection>
         </aside>
       </div>
     </div>

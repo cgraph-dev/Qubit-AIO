@@ -230,6 +230,137 @@ describe("LocalStreamingSTTAdapter", () => {
     frame(new Int16Array(4800)); // all-zero PCM = silence
     expect(socket.sent.find((s) => s instanceof ArrayBuffer)).toBeUndefined();
   });
+
+  it("starts capture before the socket is ready (no onset gap)", async () => {
+    const socket = fakeSocket();
+    let captureCreated = false;
+    let readySeen = false;
+    const adapter = new LocalStreamingSTTAdapter({
+      getWsUrl: async () => "ws://127.0.0.1/agent/api/audio/stt/ws?ticket=t",
+      openSocket: () => socket,
+      getUserMedia: async () => ({}) as MediaStream,
+      createCapture: (_stream, onFrame): PcmCapture => {
+        captureCreated = true;
+        void onFrame;
+        return { start: () => undefined, stop: () => undefined };
+      },
+    });
+    const startP = adapter.start({
+      onPartial: () => undefined,
+      onFinal: () => undefined,
+      onError: () => undefined,
+    });
+    // Capture must open on the button-press edge — before the socket
+    // handshake completes — or speech in that gap is never recorded.
+    await vi.waitFor(() => expect(captureCreated).toBe(true));
+    expect(readySeen).toBe(false);
+    await vi.waitFor(() => expect(socket.onopen).not.toBeNull());
+    socket.onopen?.({});
+    await vi.waitFor(() => expect(socket.sent.length).toBeGreaterThan(0));
+    const requestId = (
+      JSON.parse(String(socket.sent[0])) as { request_id: string }
+    ).request_id;
+    socket.onmessage?.({
+      data: JSON.stringify({
+        type: "stt.started",
+        request_id: requestId,
+        engine: "local-window",
+      }),
+    });
+    await startP;
+    readySeen = true;
+    await adapter.stop();
+  });
+
+  it("transmits pre-ready speech first (burst-at-t0 onset preserved)", async () => {
+    const socket = fakeSocket();
+    const holder: { frameCb: ((pcm: Int16Array) => void) | null } = {
+      frameCb: null,
+    };
+    const adapter = new LocalStreamingSTTAdapter({
+      getWsUrl: async () => "ws://127.0.0.1/agent/api/audio/stt/ws?ticket=t",
+      openSocket: () => socket,
+      getUserMedia: async () => ({}) as MediaStream,
+      createCapture: (_stream, onFrame): PcmCapture => {
+        holder.frameCb = onFrame;
+        return { start: () => undefined, stop: () => undefined };
+      },
+    });
+    const startP = adapter.start({
+      onPartial: () => undefined,
+      onFinal: () => undefined,
+      onError: () => undefined,
+    });
+    // Burst at t=0: the user speaks the instant they press Voice, while the
+    // ticket/socket handshake is still in flight.
+    await vi.waitFor(() => expect(holder.frameCb).not.toBeNull());
+    holder.frameCb?.(new Int16Array(4800).fill(1200));
+    await vi.waitFor(() => expect(socket.onopen).not.toBeNull());
+    socket.onopen?.({});
+    await vi.waitFor(() => expect(socket.sent.length).toBeGreaterThan(0));
+    const requestId = (
+      JSON.parse(String(socket.sent[0])) as { request_id: string }
+    ).request_id;
+    socket.onmessage?.({
+      data: JSON.stringify({
+        type: "stt.started",
+        request_id: requestId,
+        engine: "local-window",
+      }),
+    });
+    await startP;
+    const binary = socket.sent.find((s) => s instanceof ArrayBuffer);
+    expect(binary).toBeInstanceOf(ArrayBuffer);
+    const decoded = decodeBinaryFrame(binary as ArrayBuffer);
+    expect(decoded.samples).toBeGreaterThanOrEqual(4800);
+    await adapter.stop();
+  });
+
+  it("bounds the pre-ready ring (~1 s; oldest room tone yields, never newest)", async () => {
+    const socket = fakeSocket();
+    const holder: { frameCb: ((pcm: Int16Array) => void) | null } = {
+      frameCb: null,
+    };
+    const adapter = new LocalStreamingSTTAdapter({
+      getWsUrl: async () => "ws://127.0.0.1/agent/api/audio/stt/ws?ticket=t",
+      openSocket: () => socket,
+      getUserMedia: async () => ({}) as MediaStream,
+      createCapture: (_stream, onFrame): PcmCapture => {
+        holder.frameCb = onFrame;
+        return { start: () => undefined, stop: () => undefined };
+      },
+    });
+    const startP = adapter.start({
+      onPartial: () => undefined,
+      onFinal: () => undefined,
+      onError: () => undefined,
+    });
+    await vi.waitFor(() => expect(holder.frameCb).not.toBeNull());
+    // ~3 s of speech while the handshake stalls: the ring keeps the newest.
+    for (let i = 0; i < 10; i++) holder.frameCb?.(new Int16Array(4800).fill(1200));
+    await vi.waitFor(() => expect(socket.onopen).not.toBeNull());
+    socket.onopen?.({});
+    await vi.waitFor(() => expect(socket.sent.length).toBeGreaterThan(0));
+    const requestId = (
+      JSON.parse(String(socket.sent[0])) as { request_id: string }
+    ).request_id;
+    socket.onmessage?.({
+      data: JSON.stringify({
+        type: "stt.started",
+        request_id: requestId,
+        engine: "local-window",
+      }),
+    });
+    await startP;
+    let total = 0;
+    for (const s of socket.sent) {
+      if (s instanceof ArrayBuffer) total += decodeBinaryFrame(s).samples;
+    }
+    // ~1 s ring (16000 samples) + the in-flight frame, never the full 3 s.
+    expect(total).toBeLessThanOrEqual(16000 + 4800);
+    expect(total).toBeGreaterThanOrEqual(16000 - 4800);
+    await adapter.stop();
+  });
 });
 
 describe("resampleLinear", () => {
@@ -237,5 +368,196 @@ describe("resampleLinear", () => {
     const input = new Float32Array(4800);
     expect(resampleLinear(input, 48000, 16000).length).toBe(1600);
     expect(resampleLinear(input, 16000, 16000)).toBe(input);
+  });
+});
+
+describe("LocalStreamingSTTAdapter teardown (stuck-listener fix lane)", () => {
+  function events() {
+    const partials: string[] = [];
+    const finals: string[] = [];
+    const errors: Array<[string, string]> = [];
+    const engines: string[] = [];
+    return {
+      partials,
+      finals,
+      errors,
+      engines,
+      sink: {
+        onPartial: (t: string) => partials.push(t),
+        onFinal: (t: string) => finals.push(t),
+        onError: (c: string, d: string) => errors.push([c, d]),
+        onEngine: (l: string) => engines.push(l),
+      },
+    };
+  }
+
+  it("releases capture when the ticket mint fails (no leaked capture)", async () => {
+    let stopped = false;
+    const socket = fakeSocket();
+    const adapter = new LocalStreamingSTTAdapter({
+      getWsUrl: async () => {
+        throw new Error("no ticket");
+      },
+      openSocket: () => socket,
+      getUserMedia: async () => ({}) as MediaStream,
+      createCapture: () => ({
+        start: () => undefined,
+        stop: () => {
+          stopped = true;
+        },
+      }),
+    });
+    const ev = events();
+    await expect(adapter.start(ev.sink)).rejects.toMatchObject({
+      code: "VOICE_STT_UNAVAILABLE",
+    });
+    // The onset capture was already opened on the button-press edge: a
+    // refused backend must stop it, not just the mic tracks.
+    expect(stopped).toBe(true);
+  });
+
+  it("releases capture when the socket drops mid-turn (no stuck mic)", async () => {
+    const socket = fakeSocket();
+    let stopped = false;
+    const holder: { frameCb: ((pcm: Int16Array) => void) | null } = {
+      frameCb: null,
+    };
+    const adapter = new LocalStreamingSTTAdapter({
+      getWsUrl: async () => "ws://127.0.0.1/agent/api/audio/stt/ws?ticket=t",
+      openSocket: () => socket,
+      getUserMedia: async () => ({}) as MediaStream,
+      createCapture: (_stream, onFrame): PcmCapture => {
+        holder.frameCb = onFrame;
+        return {
+          start: () => undefined,
+          stop: () => {
+            stopped = true;
+          },
+        };
+      },
+    });
+    const ev = events();
+    const startP = adapter.start(ev.sink);
+    await vi.waitFor(() => expect(socket.onopen).not.toBeNull());
+    socket.onopen?.({});
+    await vi.waitFor(() => expect(socket.sent.length).toBeGreaterThan(0));
+    const requestId = (
+      JSON.parse(String(socket.sent[0])) as { request_id: string }
+    ).request_id;
+    socket.onmessage?.({
+      data: JSON.stringify({
+        type: "stt.started",
+        request_id: requestId,
+        engine: "local-window",
+      }),
+    });
+    await startP;
+    expect(stopped).toBe(false);
+    socket.onclose?.({ code: 1006, reason: "abnormal" });
+    expect(
+      ev.errors.some(([c]) => c === "VOICE_STT_DISCONNECTED"),
+    ).toBe(true);
+    expect(stopped).toBe(true);
+    expect(socket.closed).toBe(true);
+  });
+
+  it("auto-releases a quiet backend after 60 s with no server events", async () => {
+    vi.useFakeTimers();
+    try {
+      const socket = fakeSocket();
+      let stopped = false;
+      const adapter = new LocalStreamingSTTAdapter({
+        getWsUrl: async () => "ws://127.0.0.1/agent/api/audio/stt/ws?ticket=t",
+        openSocket: () => socket,
+        getUserMedia: async () => ({}) as MediaStream,
+        createCapture: () => ({
+          start: () => undefined,
+          stop: () => {
+            stopped = true;
+          },
+        }),
+      });
+      const ev = events();
+      const startP = adapter.start(ev.sink);
+      // Let the button-press-edge capture + socket handshake run to the
+      // point where the open handler is assigned (fake timers: the 4 s
+      // handshake timeouts are pending but untouched by a 0 ms advance).
+      await vi.advanceTimersByTimeAsync(0);
+      socket.onopen?.({});
+      await vi.advanceTimersByTimeAsync(0);
+      const requestId = (
+        JSON.parse(String(socket.sent[0])) as { request_id: string }
+      ).request_id;
+      socket.onmessage?.({
+        data: JSON.stringify({
+          type: "stt.started",
+          request_id: requestId,
+          engine: "local-window",
+        }),
+      });
+      await startP;
+      expect(socket.closed).toBe(false);
+      expect(ev.errors).toEqual([]);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(
+        ev.errors.some(([c]) => c === "VOICE_STT_NO_PROGRESS"),
+      ).toBe(true);
+      expect(socket.closed).toBe(true);
+      expect(stopped).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("server partials reset the no-progress watchdog", async () => {
+    vi.useFakeTimers();
+    try {
+      const socket = fakeSocket();
+      const adapter = new LocalStreamingSTTAdapter({
+        getWsUrl: async () => "ws://127.0.0.1/agent/api/audio/stt/ws?ticket=t",
+        openSocket: () => socket,
+        getUserMedia: async () => ({}) as MediaStream,
+        createCapture: () => ({
+          start: () => undefined,
+          stop: () => undefined,
+        }),
+      });
+      const ev = events();
+      const startP = adapter.start(ev.sink);
+      await vi.advanceTimersByTimeAsync(0);
+      socket.onopen?.({});
+      await vi.advanceTimersByTimeAsync(0);
+      const requestId = (
+        JSON.parse(String(socket.sent[0])) as { request_id: string }
+      ).request_id;
+      const started = JSON.stringify({
+        type: "stt.started",
+        request_id: requestId,
+        engine: "local-window",
+      });
+      socket.onmessage?.({ data: started });
+      await startP;
+      const partial = (text: string) =>
+        socket.onmessage?.({
+          data: JSON.stringify({
+            type: "stt.partial",
+            request_id: requestId,
+            text,
+          }),
+        });
+      // 59 s quiet, one partial (progress), 59 s more quiet: still alive
+      // (118 s wall, 59 s since progress).
+      await vi.advanceTimersByTimeAsync(59_000);
+      partial("he");
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect(ev.errors).toEqual([]);
+      // 60 s since the last server event: auto-release fires.
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(
+        ev.errors.some(([c]) => c === "VOICE_STT_NO_PROGRESS"),
+      ).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

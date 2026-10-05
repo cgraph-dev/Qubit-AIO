@@ -1,7 +1,517 @@
-# Qubit STATUS — 2026-09-22
+> **Session 2026-10-05 — voice orb color/animation repair (3 lanes, live).** Owner: orb stays green/yellow-green many seconds after a turn, no recording-like animation while talking. Root causes measured in `events.jsonl`: fixed recency windows (LISTEN 6s/SPEAK 8s/THINK 12s + 2s poll + 1s dwell — a ~10s turn spanned ~34s of color, thinking→idle a full 12s after `stt.final`); own-TTS echo re-arming `wake.capturing` every 2s past the fixed 5s echo tail; waveform pure `sin(t)` loops with zero amplitude input (orb never opens mic by design); 2–3 blocking 10s-timeout HTTP calls on the Tk mainloop freezing frames mid-turn. Fixes, all TDD red→green, uncommitted: (1) `orb/state.py` — LISTEN 3s, SPEAK 4s, THINK 4s when `active_requests==0` (12s only while a turn is in flight), capturing ignored while speak recency is newer (echo guard); (2) `orb/app.py`+`client.py`+`qt_app.py` — HTTP moved to a daemon worker thread + queue (widgets mainloop-only, scan-pinned), POLL 2s→1s, timeouts 10s→2s, `orb.` added to logview prefixes; (3) real talk meter — helper publishes per-frame mic peak into heartbeat extras (`mic_level`/`mic_level_ts`), orb modulates listening `band_gain`/brightness with fast-attack/slow-release smoothing (loud == today's loop byte-identical, silence calms to near-idle amplitude, color untouched). Evidence: 201 passed across orb/wake/helper suites; orb + helper restarted live (`--once` idle, window mapped 68x68+1219+874); journal shows the owner's live dictate turns succeeding. Pending: `qubit-voicebridge` service restart (logview prefix + any service-side reads; restart drops live PTYs — left for owner) and owner's eyes-on proof (talk → pumping green; done → orange within ~4s). `voicebridge/orb/` remains an untracked concurrent-lane tree. No suite or release verdict run.
+
+> **Session 2026-10-05 — orb color contract simplified (owner: green = voice, yellow = thinking).** `ember.STATE_COLORS`: listening + speaking share ONE green family (agent hearing you and agent talking read as the same voice-active state), thinking alone is yellow, idle orange / error red unchanged; motion params untouched. `test_voice_orb_colors_fluid9u` re-pinned, 76 passed across colors/level/orb suites, live orb restarted (`--once` idle, window mapped). Uncommitted. No suite or release verdict run.
+
+> **Session 2026-10-05 — `/qubit-chat` color, motion, and performance pass.** Added theme-aware violet, cyan, and amber accents to the level HUD, quantum probe, mission presets, selected session, and send action; used a static low-cost color field behind the transcript instead of a looping background effect. Mission and session behavior remain on their existing handlers. Progress now animates with `transform`; transcript messages retain `content-visibility`; reduced-motion rules remain active. Fixed the narrow empty-state sizing and replaced the hidden Typography wrapper on the sidebar brand with a plain themed label. Production frontend build passes (`tsc -b` + Vite, 2,291 modules; 7.23s). Final desktop and narrow captures: `output/playwright/qubit-chat-retro-final-desktop.png` and `output/playwright/qubit-chat-retro-final-mobile.png`. No test suite, parity run, or release verdict was run.
+
+> **Session 2026-10-05 — `/chat` hardening live, brand scrub, chat tests green.** Two agents: (1) ported all five PTY robustness layers from the pristine reference into `TerminalChatPage.tsx` (508 → 1171 lines, lib modules untouched): resume sanitizer, reconnect ladder + loading overlay, mobile/IME/shortcut handling, focus/scroll/font-refit, WebGL with fallback. No Hermes strings in added copy; wire `HERMES_TUI_*` names kept. (2) Live verification, read-only: canonical list `GET /agent/api/sessions` 200 with known id `dashboard-a9efe2daa44a` returned; `_session_latest_descendant` correct for child/parent/bogus on ro copy; bogus resume passes through verbatim (TUI owns rejection) while `:id/latest-descendant` 404s; voice store list + messages 200, bogus 404 `SESSION_NOT_FOUND`. Follow-ups done here: Hermes sweep — migrations already in-tree, one stale doc-comment fixed, window aliases + manifest reject-guard + `HERMES_QWEN_` intentionally kept with evidence; `act is not a function` root-caused to ambient `NODE_ENV=production` (vitest only defaults when unset) — fixed in `vitest.config.ts`, 4 chat suites 38/38 green, pty lib 93/93, full suite 907 pass / 33 pre-existing fails in 8 unrelated files (baseline-verified). Rebuilt `frontend/qubit-dist` (02:46); fresh `TerminalChatPage` chunk serves the reconnect hardening. Follow-up: fixed RESIZE frames sent as literal text (`\\x1b` double-escaped → gibberish in TUI input); now a real ESC byte via `String.fromCharCode(27)`, matching the server `_RESIZE_RE`/upstream wire. Rebuilt again; new chunk live. No suite or release verdict run.
+
+> **Session 2026-10-05 — `/chat` vs fresh Hermes verified, session-split fixed, `/qubit-chat` untouched.** Fresh Hermes `/chat` (127.0.0.1:9119) embeds `hermes --tui` over `/api/pty` with `HERMES_TUI_RESUME` resolved against `state.db`; ours had split into `/chat` (PTY) + `/qubit-chat` (React SSE voice channel, separate `chat_sessions.json`, 26 sessions vs 396 canonical). Root cause, measured: `ChatSessionList` read only the chat store, so canonical old sessions never listed, and chat-store ids passed as PTY `?resume=` miss in `state.db` (5/5 sampled) → silent fresh terminal. Fix (2 agents): `ChatSessionList` gains `source="chat"|"canonical"` (default `chat`, exact current behavior for the voice channel); `TerminalChatPage` uses `canonical` + upstream New-chat semantics (clear resume, rotate attach, no chat-store mint); additive cross-links `/chat` ↔ `/qubit-chat` preserving `?resume=` (`ChatPage.tsx` already had the `/chat` link; voice/stream/transcript logic untouched, no `voicebridge/` changes). Audit fixes: removed shipped `ACPROBE2` debug probe (`tui_gateway/session_auto_continue.py`), corrected false `_mirror_tui` docstring (TUI reads `HERMES_TUI_*`; `QUBIT_*` mirror inert), fixed `modelPickerReasoning.test.ts` to expect the real `--provider nous` slug. Evidence: `tsc -b` clean; py_compile clean; ChatPage vitests fail pre-existing (`act is not a function`, confirmed via stash); ui-tui vitest not installed, C2 fix verified by source inspection of the pass-through. No suite or release verdict run.
+
+> **Session 2026-10-04 — coordinated `/qubit-chat` visual repair (implementation pass).** Owner selected the Midnight purple palette as the target; the redesign continues to resolve color through the dashboard theme tokens so other selected palettes/fonts remain usable. Reworked empty-state hierarchy and mission cards, corrected the collapsed quantum-register SVG positioning and kept its circuit gates in side gutters, strengthened session level/progress display, nav active states, right-rail cards and model-picker surfaces. Replaced the picker’s orbital illustration with a circuit diagram. Existing handlers/backend contracts and per-session progress storage were left intact. `npm run build` (tsc + Vite, 2,289 modules) passes; live `/qubit-chat` was captured at `output/playwright/qubit-chat-redesign-final.png` with the circuit layer positioned at 427.5 CSS px height. The model picker was opened and captured at `output/playwright/qubit-model-picker-final.png`. Visual inspection used the dashboard’s default lime theme in the isolated Playwright context; the owner’s Midnight screenshot palette is retained through the same live theme tokens. No suite or release verdict was run; visual review remains open.
+
+> **Session 2026-10-04 — session-survival recorded, honest PROVEN/UNPROVEN (see §86).**
+> The `/chat` PTY terminal still does **NOT** auto-re-issue a turn interrupted by
+> `systemctl --user restart qubit-voicebridge`; the operator must type `continue`.
+> MEASURED, not inferred: the gate `_maybe_schedule_auto_continue`
+> (`qubit_runtime/tui_gateway/session_auto_continue.py:57`) is **never entered** on
+> the dashboard PTY boot path (a probe at `:65`, `[ACPROBE] gate reached`, never
+> fired across a restart with a valid marker; probe removed, `git diff` clean).
+> Full record: `docs/SESSION_SURVIVAL.md`. **NOT SOLVED — no fix, no `VERIFIED`.**
+
+# Qubit STATUS — 2026-10-04
+> **Session 2026-10-04 — `/qubit-chat` UI repair, continuation.** Fixed the
+> narrow-layout collision in the empty session state: below 1280px, the intro,
+> helper copy, and mission choices now use a single column. Fixed the composer
+> to size its actual textarea wrapper, keeping the Image/Voice/Send controls
+> compact, and prevented session action labels from wrapping. At narrow widths,
+> the right rail now stacks below the conversation and the workspace scrolls
+> vertically. A sidebar skin rule had overridden the mobile drawer's fixed
+> positioning and reserved a 240px gutter; restoring fixed positioning removed
+> it. Production frontend build passes (`tsc -b` + Vite, 2,291 modules).
+> Chromium captures at 1200px and 800px used an existing session; the 800px
+> capture shows the level, composer, action row, and stacked model/tools panels
+> without horizontal clipping. No suite or parity/release verdict was run.
+
+> **Session 2026-10-04 — `/qubit-chat` UI repair (implementation in progress).**
+> The earlier CSS-only fix did not reach the running dashboard because `:8890`
+> serves `frontend/qubit-dist`; this was confirmed by capturing the live page.
+> Rebuilt that bundle after restoring the horizontal session-level HUD and
+> three-card mission layout, removing the conflicting Tailwind row/grid classes,
+> and moving the side rail below chat only at narrow widths. Status chips now
+> wrap/truncate instead of covering transcript space. Reintroduced stronger
+> theme-token accents in the level meter, mission cards, composer and subtle
+> particle field (no wave/radar background); chat message and control text use
+> the selected theme's mono stack while the dashboard's chosen body font remains
+> intact. Existing backend actions were not changed. `npm run build` (tsc + Vite)
+> passes. Focused Playwright captures at 2048, 1200 and 800 px show the HUD and
+> panels laid out without overlap; browser console reports 0 errors/warnings.
+> The persisted session still renders level 33 after reload. No test suite or
+> release verdict was run. Further owner visual review is welcome; this is not
+> a parity or completion claim.
+
+
 
 **Living document. Evidence-backed. Reviewed every session.** No claim below is
 `VERIFIED`, `M1`, `M2`, `CODE_READY`, or `COMPLETE` unless its evidence says so.
+
+> **Session 2026-10-03 — owner ruling #27 in force (docs/DECISIONS.md).**
+> Hermes→Qubit declared DONE/frozen (pin `69948c0057`); reference
+> `origin/main` is now `bd0affe5` — **4,128 commits ahead** of the pin.
+> Non-Hermes pages go 1:1 with their own upstreams, full Qubit rebrand, one
+> unified agent/tree. Pins: `docs/QUBIT_NONHERMES_UPSTREAM_PINS.md`
+> (OpenClaw `7ff3b3be` MIT, harnessrouter `f319244` Apache-2.0, openmuse
+> `9ec439f` MIT). Root cause of "slop" look: ported pages emit upstream
+> classes with **zero upstream CSS shipped** (workboard-* count 0 in our
+> CSS vs 4,822-line upstream workboard.css). Fix pattern locked:
+> port styles to `frontend/qubit-web/src/styles/upstream/*.css` + 1:1 DOM
+> on Qubit backend + class-parity vitests. 5 port workers dispatched
+> (deleg_fb6dc2e9: workboard / ops pages / harness / botchat / memory-
+> canvas-mcp-skills-viking); results pending. No VERIFIED claim.
+>
+> **Session 2026-10-03 (later) — port wave LANDED and verified.** All 5 workers
+> done; joint tree verified by hand: `npm run build` exit 0 with
+> `workboard-*`/`hx-*`/`qb-*` classes confirmed in shipped `qubit-dist` CSS;
+> **16 test files / 95 tests pass** (`NODE_ENV=test`; repo shell exports
+> `NODE_ENV=production`, a pre-existing quirk that breaks all component tests).
+> Fixed post-merge: stale `__actions`→upstream `__tools` asserts + collapsible
+> search handling + sandbox-column counts in TaskInbox/BoardAdmin behavior tests.
+> `.sk` repair verified verbatim vs harnessrouter `revamp.css`. Legal:
+> OpenClaw + OpenMuse MIT entries added to `THIRD_PARTY_NOTICES.md`
+> (HarnessRouter Apache-2.0 entry by worker). Viking declared Qubit-original
+> (no upstream exists). Pins doc updated with exact paths. Remaining: u8 CLI
+> parity + voice paths for the new surfaces (board handlers exist;
+> harness/viking/bot CLI coverage unaudited).
+>
+> **Session 2026-10-03 (u8 CLI) — 8 overlay slash commands landed + verified
+> 36/36** (`qubit_runtime/tests/qubit_cli/test_overlay_commands.py` via
+> `.venv`): `/board /harness /viking /bot /webchat /memory-backend /canvas
+> /taskflow` (new `qubit_cli/overlay.py` lazy adapters; destructive ops
+> `--confirm` dry-run gated). Voice intents: first attempt interrupted after
+> one viking patch; continuation worker dispatched (deleg_ede444e9).
+>
+> **Session 2026-10-03 (audit wave) — SECURITY REVERT.** The audit wave flipped
+> channel credential policy to Hermes raw-paste (ChannelsPage + messaging.py);
+> upstream DOES do that (hermes_cli/web_routers/messaging.py:779/910), but
+> Qubit's reference-only posture (CHANNEL_ENV_REFERENCE_ONLY) is intentional
+> hardening. REVERTED both files (kept the legit restart-confirm 409 fix);
+> raw-paste parity needs explicit OWNER sign-off, never a worker decision.
+> Public MCP OAuth callback (webui.py) KEPT: state validated with
+> secrets.compare_digest, 404/409 on misuse — correct pattern. All 4 audit +
+> voice workers were mass-interrupted 08:45 (one SIGKILL/OOM in voice tests);
+> 87 files changed, build green; completion workers re-dispatched to verify.
+>
+> **Session 2026-10-03 (worktrees E2E closure) — 21/21 routes OK live.** Full
+> headless sweep of every dashboard route against loopback `:8890`: all 21
+> mount (`children=1`), zero page errors, zero failed/HTTP-error requests. Two
+> defects found and fixed at the correct layer:
+> (1) *Bridge fallback class bug* — `voicebridge/webui.py` degraded a failed
+> read-proxy to the compat handler only on 404/405, so the fork's HTTP **422**
+> on `/api/git/worktrees` + `/api/git/branches` (route requires `path`, the
+> roster page calls with none) was never recovered. Read path now degrades on
+> any `code < 500` and the write path records success on `200 <= code < 400`
+> (mirrors `tests/test_proxy_fallback_audit9u.py`). The vendored
+> `qubit_cli/web_routers/git.py` is **untouched** (frozen pin) — a first
+> attempt to make `path` optional there was reverted (`active_project` needs
+> a config object, not the fork dict; that contract is pinned by
+> `test_active_project_requires_a_config_object_not_a_dict`).
+> (2) *Worktrees page connector bug* — branches were typed `string[]` and
+> rendered directly, so the real `{name,checkedOut,isDefault,isRemote}`
+> payload crashed the page with React error #31 (blank body). Types
+> corrected in `ocFamilySessionsApi.ts` (`BranchRow`, `WorktreeRow.isMain`,
+> no `commit`) and `WorktreesPage.tsx` re-renders branch names + badges.
+> Evidence: frontend 103 files / 692 tests green; `tsc --noEmit` clean;
+> `npm run build` clean; backend 40 passed on
+> `test_proxy_fallback_audit9u` + `test_qubit_readsurfaces8u` +
+> `test_qubit_routes_parity8u`. Live `/worktrees` now renders 11 real
+> worktrees (main-checkout Remove disabled + reason) and 61 branch chips with
+> `checked out`/`default` badges — no error banner, no `[object Object]`.
+> **Session 2026-10-03 (5-agent wave LANDED + `/worktrees` React #31 crash FIXED — pages 3-7).**
+> Five parallel agents applied the ported vocabularies; every claim below was
+> re-verified against the live app, `tsc`, and the built bundle.
+> - **workboard** (agents 1) — `TaskInboxPage` + `BoardAdminPage`: added
+>   `workboard-heading`/`__identity`, `workboard-page-title`,
+>   `workboard-board-viewport`. `workboard-class-parity.test.ts` now **4/4**
+>   (was 1 failing). No class tokens were invented.
+> - **sessions** (agent 2) — `SessionsPage`: `session-data-row` +
+>   `--expandable/--archived/--expanded/--menu-open`, `session-key-cell*`,
+>   `session-avatar--{cron,direct,group,global}` + `__status`, `session-actions`,
+>   `session-details-panel`, `sessions-toolbar`, `data-table-empty-state`,
+>   `settings-loading-skeleton`. `SessionOpsPage`: `settings-page/--wide`,
+>   `settings-section`, `settings-group`, `settings-row*`, `settings-input`.
+>   Deliberately did NOT apply `.sessions-table` (min-width 760px) to the
+>   card-style list — it would force horizontal overflow on mobile.
+> - **cron** (agent 3) — `CronPage`: `qb-upstream` scope + `cron-page`,
+>   `cron-toolbar*`, `cron-table*` grid (head/row/name/cell/state/actions),
+>   `cron-empty-state`, `cron-editor`/`cron-advanced`/`cron-help`,
+>   `cron-detail-*`. All badges folded into `cron-table__name-meta` — no data
+>   dropped, `cron-last-result` testid preserved. Upstream-only run-history
+>   structures NOT fabricated (no such fetch exists).
+> - **devices** (agent 4) — `DevicesPage` + `PairingPage`: `device-entry*`
+>   (tile/body/heading/status/facts/scopes), `device-capability*` incl.
+>   `--disabled`/`--scope`, `settings-row*`/`settings-table--stacked`,
+>   `btn`/`btn--sm|ghost|icon`, `callout`/`--dismissible`/`--action`, and the
+>   `qb-upstream` scope (which no page carried before, so the device/chrome
+>   sheets' vars were inert). Refused capabilities render
+>   `device-capability--disabled` with the backend's `manage_reason` as title.
+> - **checkpoints** (agent 5) — `CheckpointsPage`: all 7
+>   `session-checkpoint-*` classes + `session-details-empty`.
+> - **`/worktrees` React #31 CRASH FIXED — a real second bug, found not fixed by
+>   the agents.** `listBranches()` typed `branches: string[]` but the backend
+>   returns **objects** — verified live: 76 items of
+>   `{name, checkedOut, isDefault, isRemote, worktreePath}`. Rendering an object
+>   as a React child crashed the route to a blank screen. Fixed the type
+>   (`BranchEntry`) + the render (chips with checked-out/default/remote badges,
+>   `worktreePath` as title). Also fixed `WorktreesPage.test.tsx`, whose mock
+>   returned `["main","b1"]` — the mock had encoded the bug.
+> - Suite: **6 → 5 failures, 103 → 105 passing files.** All 5 remaining are
+>   pre-existing and in files untouched this wave (`MemoryBackendsPage`,
+>   `OpenVikingUploadsPage` x3, `api.test.ts`).
+> - tsc clean, build clean. Verified live: `page errors: none` on `/worktrees`,
+>   and the 5 audited routes.
+> - **Audit of the other 4 flagged routes** (agent 5, re-verified after the SDK
+>   fix): `/logs`, `/files`, `/analytics`, `/system` all render with **no page
+>   errors** now. Their residual thinness is backed by real config/backend gaps,
+>   not render bugs: `/analytics` is intentionally empty until
+>   `dashboard.show_token_analytics: true`; `/system` metrics need the psutil
+>   extra; `/files` rows show `-`/epoch because the listing endpoint omits
+>   size/mtime. These are honest disabled-with-reason states, NOT defects.
+> The error `Cannot destructure property 'React' of 'SDK' as it is undefined`
+> reproduced on EVERY route (verified on `/qubit-bot`, `/sessions`, `/cron`,
+> `/devices`). Traced with a Playwright page-error stack capture to a single
+> plugin bundle: **`~/.local/state/qubit-voicebridge/runtime/plugins/memory-wiki/dashboard/dist/index.js:4`**
+> read `window.__HERMES_PLUGIN_SDK__` — a global the rebrand renamed to
+> `__QUBIT_PLUGIN_SDK__` (see `frontend/qubit-web/src/plugins/registry.ts:195`).
+> Nothing exposes the old name, so `SDK` was `undefined` and the whole page
+> died. Fixed at the SOURCE (`dashboard/src/index.jsx`) and rebuilt with
+> esbuild; also updated `__HERMES_PLUGINS__` → `__QUBIT_PLUGINS__`.
+> - Two earlier hypotheses were wrong and are recorded so they aren't retried:
+>   (a) "load-order race" — the host does expose `React`; (b) the `kanban` /
+>   `qubit-achievements` bundles — their `__HERMES__` hits are comment prose
+>   only, and the host's `*_LEGACY__` aliases are unused by them.
+> - Verified: **`page errors: none`** on all four routes.
+> - Added `frontend/qubit-web/src/plugins/plugin-globals.test.ts` — scans every
+>   served plugin bundle, strips comments (so attribution prose naming the
+>   upstream project can't cause a false positive), and fails if any retired
+>   global appears in executable code. **Mutation-tested**: reintroducing the
+>   old global makes it fail and name the exact file; restored after.
+> - Note: `dashboard/dist/index.js` is a build artifact; rebuilding needs
+>   esbuild, which is not on PATH in that plugin dir — use
+>   `npx --yes esbuild <same flags>` (they are in the plugin's package.json
+>   `build` script). Both chat pages now carry
+> the upstream `qb-*` chat structure from `styles/upstream/botchat.css`:
+> - `QubitBotPage` (`/qubit-bot`): `qb-chat` shell, `qb-thread-list`/
+>   `qb-thread-item` sidebar (was a plain `<ul>`), `qb-hero`/`qb-hero-title`/
+>   `qb-hero-sub`/`qb-starters` empty state, `qb-bubble-row-{user,assistant}` +
+>   `qb-bubble-{user,assistant}` (replacing hardcoded `bg-sky-200 text-sky-950`
+>   bubbles), `qb-tool-card`, `qb-typing`/`qb-typing-dot`, `qb-jump-latest`,
+>   `qb-composer`/`qb-composer-input`/`qb-send-btn` (replacing the bespoke
+>   `rounded-[32px]` pill and hand-rolled 44px send button), `qb-error`.
+> - `WebChatPage` (`/webchat`): same `qb-chat`/`qb-chat-scroll`/`qb-hero`/
+>   `qb-starters`/`qb-bubble-*`/`qb-composer`/`qb-send-btn`/`qb-error`/
+>   `qb-progress` structure, plus starter-prompt chips.
+> - All classes verified present in the **shipped** `botchat.css` (38 defined);
+>   one wrong-class use (`qb-tasks-empty`, which lives in `harness.css`) fixed.
+> - `BotChatParity.test.tsx` **3/3 pass** (was 3 failing / untracked); combined
+>   chat suites **19/19**; tsc clean; build clean.
+> - Suite moved **9 → 6 failures** (all 6 pre-existing: workboard 1,
+>   MemoryBackends 1, `api.test.ts` 1, OpenVikingUploads 3).
+> - Provenance header already correctly names the upstream repo + MIT licence
+>   (attribution intact — untouched).
+> - Remaining pages (workboard, sessions, cron, devices) still pending.
+> Owner ruling: "full console layout including its own sidebar and same for all
+> pages." Done for `/qubit-harness-router`:
+> - **Wired the ported CSS into the build** (`index.css` `@import`s the upstream
+>   family sheets; compat first, since the family sheets read its token remap).
+>   Rebuilt CSS **121 KB / 0 ported classes → 321 KB with all namespaces** —
+>   before this, every ported rule was inert and any "verified" contrast claim on
+>   those sheets was measuring a file that never loaded.
+> - **Rebuilt the page to upstream's `hx-*` console shell**: `hx-root` (its own
+>   full-height console) + `hx-side` sidebar (search, fixed Dashboard row,
+>   `hx-group` harness rows, Starter Kits / Plugins groups) + `hx-main` panel
+>   (`hx-head`/`hx-crumb`/`hx-title`/`hx-pill`, `hx-index-wrap` index table,
+>   `hx-card` sections, task console). Every data call and `data-testid` kept.
+> - Used the **real upstream class vocabulary** (`hx-row-name`/`hx-row-id`/
+>   `hx-row-chev`, `hx-thead` + grid rows, `hx-search`/`hx-add-select`,
+>   `hx-tasks`/`hx-task-row`); 22 invented names replaced. Ported the one
+>   genuinely-missing rule (`hx-task-x`) from the pin, theme-remapped.
+> - **RESTORED the attribution an earlier agent had sanitized.** `harness.css`
+>   header said "external harness-console project" and the parity test asserted
+>   that string — the test had been edited to match, which is why the conflict
+>   looked unresolvable. Provenance now names the real upstream repo
+>   (Apache-2.0, `f3192445c82da53…`, `ui/src/app/v2.css`) and the test's
+>   brand-leak check now scopes to the rule BODY, so the one required legal
+>   exception (attribution) no longer collides with the zero-legacy-brand rule.
+> - Verified: `HarnessRouterPage` suites **7/7 pass**, tsc clean, build clean,
+>   live DOM screenshots confirm the console layout + own sidebar render.
+> - Suite moved **14 → 9 failures** (all 9 pre-existing untracked suites; no
+>   harness-router failures).
+> - **Pre-existing, NOT mine:** a shell-wide `Cannot destructure property
+>   'React' of 'SDK' as it is undefined` page error. Reproduces on `/sessions`
+>   (untouched) — two built plugin bundles (`kanban`, `qubit-achievements`) do
+>   `const { React } = SDK` before the host exposes it. Load-order race, separate
+>   defect.
+> - Remaining pages (botchat, workboard, sessions, cron, devices) still pending
+>   the same treatment. Owner asked for a page-by-page port with
+> before/after screenshots. Investigation produced a design answer, not a styling fix.
+> * **Two of my own probes were wrong first.** I probed `/harness-router`, which does
+>   not exist — the real route is **`/qubit-harness-router`** (`App.tsx:267`), and the
+>   invented path returned the default page ("Sessions", 748 chars). That is the
+>   invented-route trap again, walked into for the second time this session. The
+>   correct route yields "Harness Router", 15,752 chars.
+> * **The page is NOT unstyled slop.** Screenshot: sectioned panel/list structure
+>   (Agent harnesses → Submit task → Tasks → Sessions → Files and artifacts →
+>   Starter Kits → Plugins), working forms, a real empty state ("No files listed —
+>   inspect a session first"), ~20-30% dead space. It is a purpose-built console
+>   rendered with Tailwind + the Qubit DS. It has **0 `className` attributes at all**
+>   (`grep -c className` = 0) — it styles via utility classes elsewhere / the DS.
+> * **Why `harness.css` was deliberately left unapplied — and must stay that way
+>   as-is.** The sheet is upstream's ENTIRE console chrome, not a page fragment:
+>   `.hx-root { display: flex; height: 100vh; }` plus `.hx-side` (upstream's own
+>   sidebar), `.hx-main`, `.hx-head`, `.hx-card`. Upstream wraps the page in
+>   `<section className="hx-root">` inside `ui/src/app/(app)/layout.tsx`. Our app
+>   ALREADY provides chrome (sidebar + header + shell), so adopting `.hx-root`
+>   would nest a second full-viewport console inside the first. 176 rules in the
+>   sheet; applying them is a shell replacement, not a class addition.
+> * **What WAS a genuine defect and is FIXED:** the sheets were imported by nothing,
+>   so even the compatible parts never loaded (built CSS 121 KB / 0 ported classes
+>   → 321 KB with them after adding the imports to `index.css`). That part is correct
+>   to keep: the ported tokens/rules now ship, and the family sheets can be adopted
+>   incrementally.
+> * **Correct scope statement:** the remaining work is a per-page DECISION about
+>   which upstream rules are safe to adopt inside our existing shell (tokens, table/
+>   card/list treatments) versus which are shell-level and must be dropped. Applying
+>   all 364 classes would double the shell. Do not bulk-apply.
+>
+> **Session 2026-10-03 (ROOT CAUSE: the ported upstream CSS and its class
+> vocabulary are NOT WIRED IN — measured live).** This supersedes several earlier
+> "verified" claims in this file, including my own contrast fixes.
+> * **Finding.** All 9 sheets in `frontend/qubit-web/src/styles/upstream/` are
+>   imported by nothing — there is no `@import` of any of them in `index.css`
+>   (verified clean at HEAD, no diff), none inside each other, and the built JS
+>   references none. `git log -S 'styles/upstream' -- index.css` returns NOTHING
+>   for the whole history: no commit ever wired them in.
+> * **Live proof** (`/harness-router`, real browser, served stylesheet
+>   `index-D_RrFzuq.css`): `hx-root` / `hx-head` / `hx-card` / `hx-index-table`
+>   are absent from the CSS rules AND the page markup carries **zero** `hx-*`
+>   classes. Same for `qb-*` on the chat pages. The freshly rebuilt stylesheet is
+>   121 KB with 0 ported classes; a stale earlier bundle was 320 KB *with* them —
+>   so any measurement taken against the old bundle measured a build that no
+>   longer exists.
+> * **Consequence — retractions.** `harness.css` is inert, so the earlier
+>   "1.1:1 → 14.81:1 contrast fix" and "harness-router 7.48" readings measured a
+>   file that never loads; they proved nothing about the shipped page. The pages
+>   ship as Tailwind utilities only. The 38 `qb-*` rules in `botchat.css` and the
+>   `hx-*`/`ak-*` rules in `harness.css` are orphaned.
+> * **What is genuinely broken vs merely unwired:** the pages are not unstyled —
+>   they render via Tailwind + the Qubit DS. What is missing is the ported 1:1
+>   upstream layout, which is the whole point of the port requirement. `hx-empty-main`
+>   and `hx-index-note` exist in `HarnessRouterPage.tsx` as *literals in a
+>   stylesheet comment*, not as classes the page applies — so my earlier "the port
+>   is already faithful" conclusion was wrong for the same reason.
+> * **Fix direction (not yet applied):** add the upstream imports to `index.css`
+>   in the documented order, and give the ported pages the classes their sheets
+>   define. `HarnessRouterPage.classParity.test.ts:48` already asserts
+>   `index.css` must contain `./styles/upstream/harness.css` — the test is
+>   correct and was catching this exact gap.
+>
+> **Session 2026-10-03 (parallel-agent wave — results verified, two of my own edits recovered).**
+> Four agents dispatched: frontend brand-leak rename, page empty/error/loading
+> audit, Python identifier audit, provenance docs. Verified their reports rather
+> than accepting them; two claims were checked and CONFIRMED against the tree,
+> one dispatch was stopped for fabrication (see the entry above).
+> * **Page audit (verified good):** 16 real crashes fixed across 16 pages — all the
+>   same class: a loader doing `setState(res.field)` where the backend omitted the
+>   field, so the next `field.length`/`.map`/`[...field]` threw and blanked the
+>   route (PairingPage, ChannelsPage, CheckpointsPage, FilesPage, LogsPage, McpPage,
+>   ModelsPage, ProfilesPage, SessionsPage, SessionOpsPage, SkillsPage, SystemPage,
+>   WorktreesPage, ConfigPage, CronPage, UsersAdminPage). All fixed with `?? []`
+>   / `?.` defaults. New resilience suites: sweep 138/138, regressions 15/15.
+> * **CORRECTION to my own "91 pages":** the tree has **47** page components; 91
+>   counted `.test.tsx` files too. Agent 2 caught this.
+> * **Python audit (verified good):** 3 identifiers renamed in 2 files; the
+>   `cli_qubit_forward.py` rename was correctly REVERTED as a wire contract (the
+>   constant values are emitted in the CLI refusal JSON envelope and the
+>   OPERATOR_ONLY token is a vocabulary shared with `gateway/qubit_dispositions.py`).
+>   Its long contract list is the valuable output: `HERMES_HOME`/`~/.hermes`,
+>   legacy state-file names, `hermes_session_at` cookie, the `hermes` login
+>   detector, and the gateway method names all stay.
+> * **My own edits were clobbered by concurrent agents and RESTORED:**
+>   `lib/format.ts` lost `formatDurationCompact`/`formatDurationLong`, and
+>   `components/Markdown.tsx` lost the JSON-lift (`asJsonBlock`/`liftJsonFences`).
+>   Both were wiped by another worker's write. Re-applied by hand; the
+>   signature the tests wanted is `formatDurationLong(ms, locale, fallback)`.
+>   This is exactly the concurrency hazard the skill warns about.
+> * **Baseline measured honestly:** frontend **99 files pass / 8 fail (14 tests)**.
+>   All 14 are in 8 files that are UNTRACKED new tests (`??`) failing against the
+>   tree — proven pre-existing by `git stash` (still 10/10 failing with every
+>   session change stashed). Backend target suites 60 passed. No new failure is
+>   attributable to this wave.
+> * **Do NOT treat untracked test files as a green baseline:** several suites
+>   created this session have never passed, so quoting them as evidence of a
+>   regression (or of health) is unsound in both directions.
+>
+> **Session 2026-10-03 (worktree CLI surface — CORRECTION to the entry below).**
+> The `/worktree remove` added earlier this session was a DUPLICATE on a weaker
+> basis: `qubit worktree remove <name> --confirm` already existed
+> (`voicebridge/cli.py::_cmd_worktree`, confined via `git_scope`), and the
+> gateway already registers a full worktrees backend
+> (`voicebridge/gateway/qubit_handlers/worktrees.py`: list/branches/create/
+> remove/restore/gc, pinned in `gateway/qubit_dispositions.py`). My version ran
+> raw `git worktree remove` off `worktree_gc.audit_worktrees` — no project-root
+> confinement. Fixed: `remove` now DELEGATES to `_cmd_worktree` via
+> `_worktree_lifecycle`, and `restore` routes to the registered `_wt_restore`
+> handler (NOT `_cmd_worktree`, which has no `restore` verb and would silently
+> fall through to its `switch` branch). Registered `restore`/`readd` aliases
+> (13 subcommands total). New `tests/test_worktree_cli_surface19.py` (8 tests)
+> pins both rules so this cannot regress; 20 passed with the existing suites.
+> **Lesson:** before adding a lifecycle verb, grep
+> `voicebridge/cli.py::_cmd_worktree` AND `gateway/qubit_dispositions.py` — the
+> capability and its disposition record usually already exist, and a second
+> unconfined implementation is worse than the gap it fills.
+>
+> **Session 2026-10-03 (capability parity — owner-confirmed).** Went through each
+> ported upstream surface comparing what upstream can DO vs ours, then implemented
+> the gaps natively (behaviour adopted, zero upstream identifiers).
+> * **Found by comparing subcommand sets, not code:** upstream's worktrees CLI has
+>   7 subcommands (`list, create, remove, retire-snapshot, recover-removal, restore,
+>   gc`); ours had 3 (`new, list, prune`). **`remove` was the real gap** — `prune`
+>   is BULK reclaim of trees the audit judges clean+merged, so there was no way to
+>   remove ONE named worktree. Added `/worktree remove <name|path> [--force]`
+>   (+ `rm`/`delete` aliases) in `cli_commands_mixin.py`, wired into
+>   `_WORKTREE_SUBCOMMANDS`. It reuses the SAME `worktree_gc.audit_worktrees`
+>   classification `prune` relies on, so a tree carrying real work is refused with
+>   its reason unless `--force`; removing the tree the current session is running in
+>   is refused outright. Backend was already real (`web_git.worktree_remove` +
+>   route); only the CLI surface was missing. New
+>   `tests/test_worktree_remove_subcommand19.py` (9 tests: alias routing incl. the
+>   `prune` non-collision, both refusal guards, force reaching git).
+> * **Checked and deliberately NOT added:** `/devices`, `/pairing`, `/models`,
+>   `/hooks`, `/mcp` have no CLI subcommand group, but their backends are
+>   dashboard/gateway surfaces reached via `h_qubit_family_*`, not agent tools —
+>   and `qubit_runtime/tools/AGENTS.md` forbids adding core tools for this (settle
+>   the Footprint Ladder; a local-only capability belongs in a plugin). Adding a
+>   slash command that shells to an invented transport would violate the repo's own
+>   architecture rule, so those stay dashboard-only for now.
+> * Verified: dispatch resolves (`remove`/`rm` -> `_worktree_remove`, `prune` ->
+>   `_worktree_prune`, 11 total); 39 existing worktree tests still pass; target
+>   suites 42 passed.
+>
+> a safe or useful operation; triaged and did the one real gain).** Owner asked to
+> check every upstream commit against our source and add the merged ones. Fetched
+> each pinned upstream and counted what actually landed after our pin:
+> * **harnessrouter — 0 commits.** `origin/main` IS our pin
+>   (`f3192445c82da5…`); `git merge-base --is-ancestor` confirms it. Nothing to add.
+> * **openmuse — 2 commits.** We ported UX *patterns* from it, not files; the 2 are
+>   docs/link-level. Nothing to add.
+> * **openclaw — 50 commits** (and `origin/main` **force-updated**: upstream
+>   rewrites history, so the pin is a snapshot reference, not a tracking branch).
+>   Triage: 10 are channels/macOS/Bun/Telegram/WhatsApp/Docker (surfaces we never
+>   ported), 28 are release/test/gateway/DB/dependency churn, and the 3 UI-facing
+>   ones touch upstream's own `ui/src/pages/chat/**` and `ui/src/lib/format*.ts` —
+>   files that do not exist in our tree because we built Qubit's chat page rather
+>   than porting upstream's.
+> * **Why not cherry-pick them:** they carry upstream authorship and brand
+>   metadata verbatim (`Author: RoboClaw <services+roboclaw@openclaw.org>`,
+>   `Co-authored-by: steipete`, `OpenClaw-Publication: …`). Applying them is the
+>   direct route to the thing the owner forbade — upstream names in our source.
+>   There is also no shared git ancestry to merge against.
+> * **Done instead (the real, safe gain):** implemented upstream's
+>   readable-elapsed-time behaviour **natively** in `lib/format.ts` —
+>   `formatDurationCompact` ("1h 5m" for dense rows) and `formatDurationLong`
+>   ("1 hour, 5 minutes" via `Intl.NumberFormat` + `Intl.ListFormat`, so a
+>   non-English locale gets its own phrasing and separator). No upstream
+>   identifiers, no new dependency. `format.test.ts` added (13 tests, incl. the
+>   unknown-input fallback that stops "0s" being printed over missing data).
+> * **Honest gap:** the helpers currently have no call site — our pages surface
+>   only short per-call `elapsed_ms` and relative `timeAgo` timestamps, not a long
+>   completed-work duration. Left unwired rather than inventing UI to host them;
+>   they are ready for the first surface that needs one.
+> * Gates: `tsc` clean; frontend **105 files / 712 tests** pass.
+>
+> Follow-on to the two bugs above, at the owner's instruction to apply the same
+> treatment to every ported upstream. Read each upstream's actual chat/message
+> RENDERER, not just its layout, and diff it against ours:
+> * **OpenMuse (`qubit-bot`, `webchat`)** — `apps/mobile/src/assistant-response.tsx`
+>   renders assistant turns through a markdown renderer (code fences, headings,
+>   lists, safe-URL link guard). `QubitBotPage` rendered every one of the three
+>   message roles as bare `<p>{ev.text}</p>`, so tool results — a single-line JSON
+>   string with escaped newlines — dumped as an unreadable prose wall (the
+>   "Qubit Bot looks like shit" report). Fixed: all three roles now render via the
+>   repo's existing `components/Markdown.tsx`; `<pre><code>` blocks on the live
+>   page went **10 → 388**. `WebChatPage` was already correct (assistant →
+>   `Markdown` with streaming, user → plain span).
+> * **`Markdown.tsx`** — added whole-line JSON detection: a `{…}`/`[…]` object
+>   pretty-prints into a code block instead of an escaped-JSON wall, guarded by a
+>   real `JSON.parse` round-trip so prose with braces is untouched. Because all
+>   four chat surfaces share this component, the fix lands for `qubit-chat`,
+>   `sessions`, `webchat` and `qubit-bot` at once. New `Markdown.test.tsx`
+>   (7 tests) pins the contract incl. the false-positive guards.
+> * **HarnessRouter (`harness-router`)** — verified 1:1, NOT fixed: our column set
+>   (`Tasks`/`Success`/`P95`/`Cr per task`), `hx-empty-main` copy, `hx-index-note`,
+>   `Harness ID` column and per-node empty states all match
+>   `ui/src/app/(app)/harnesses/page.tsx` at the pin. The dash-only metric cells
+>   are upstream's own `{s.success != null ? … : '—'}` behaviour with no 7-day
+>   metrics in the backend — 1:1, not unfinished.
+> * **OpenClaw (10 pages)** and **Open Viking (5, Qubit-original)** — audited for
+>   content/console errors/`[object Object]`/raw fences/controls: no defects found.
+>   Every page carries real buttons and forms; no page is missing an empty state.
+> * **Audit method correction (important):** the sweep's `[object Object]` ×18/×14
+>   hits on `qubit-bot`/`webchat` were **my own session transcript being rendered
+>   on the page** — the literal string I kept writing while investigating. Third
+>   time in this session an audit of my own conversation produced a false finding;
+>   skill updated with the filter rule. Verified: every hit sat in a `<code>` whose
+>   parent bubble was one of my messages.
+> * Gates: `tsc` clean; frontend **104 files / 699 tests** pass; build clean
+>   (`index-BBHA_ZHW.js`); zero page errors on all audited routes.
+>
+> **Session 2026-10-03 (contrast + browser image paste) — two live-only bugs,
+> both invisible to the test suite.** Found by reading the user's actual
+> screenshots (the harness rendered WHITE panels with cream text):
+> (1) *Ported-stylesheet palette bug.* `styles/upstream/harness.css` was ported
+> with layout rules verbatim but its literal light palette (`background: #fff`,
+> `#f5f5f4`, `#e0dcd9`) left in place, while the compat block remapped the
+> *text* tokens to the dark theme — so text and background both resolved light:
+> contrast **1.1:1**, invisible. Remapped every surface/border literal to a
+> theme token (`--v2-card`/`--v2-line`/`--v2-row`/`--v2-div`, pill tints to
+> `--ok`/`--info`/`--danger`); `color:#fff` on accent buttons kept. harness-router
+> 1.94 → 7.48, main panels 1.1 → **14.81**. Same class in JSX:
+> `SkillsReviewPage` status chips paired the `Button` default `bg-midground`
+> with `text-muted-foreground` (midground-on-midground, 1.00 → **15.82**).
+> Lesson recorded in the `upstream-port` skill.
+> (2) *Browser clipboard image paste was dead by an invented gate.*
+> `POST /api/chat/image-upload` was gated `CHAT_IMAGE_OVERLAY` → typed 403 on
+> the compat surface, while the dashboard paste path (`ChatPage.tsx` →
+> `uploadChatImage`) posts straight to it and threw on the 403. **Hermes at pin
+> `69948c0057` serves this route as a real handler with no gate** — verified by
+> reading `~/.cache/qubit-pins/hermes-agent/hermes_cli/web_routers/files.py`,
+> whose `upload_chat_image` our fork already ports byte-for-byte. Fix: gate
+> retired; real compat handler `h_chat_image_upload` (+ `HANDLERS` registration
+> and route row) writes to `get_qubit_home()/images/` — the same dir the TUI's
+> own clipboard capture uses — with data-URL shape, image mime whitelist, 25 MB
+> cap and magic-byte sniff, matching Hermes. Verified through the real
+> dispatcher: valid PNG → 200 + file on disk; spoofed bytes → 400 BAD_IMAGE.
+> New `tests/test_chat_image_upload_wave19.py` (7 tests, drives `dispatch()` so
+> an unregistered handler name fails the test — the gap that let a route resolve
+> to `NO_HANDLER` while direct-call unit tests stayed green).
+>
+> **Session 2026-10-03 (close-out, by hand — workers kept getting killed).**
+> Voice lane VERIFIED: 40 new intents all on valid backends, resolve-smoked;
+> fixed alias collision (`list flows` → incumbent automation_flows, new entry
+> uses `show task flows`); tests green (coverage 7/7, 8tf 27/27);
+> voice_coverage.json regenerated via script (1389 rows, 0 dead backends;
+> 7 unresolved are frozen Hermes rows). Parity-lane 5 failures PROVEN
+> environmental (TMPDIR under `.local` trips the secret-dir gate) — all 23
+> pass with TMPDIR=/tmp/pytest-q. Pre-existing quirks to know: shell exports
+> NODE_ENV=production (breaks component tests; use NODE_ENV=test) and
+> TMPDIR under `.local` (breaks project-root tests; use /tmp/pytest-q).
+>
+> **Session 2026-10-03 (bot transcript bug, found via screenshot).** The bot
+> page landed on the latest thread id but never fetched its transcript (hero
+> on 396-message history; clicking it was a no-op by the active-thread
+> guard). Fixed in QubitBotPage loadAll (fetch-on-land when empty) +
+> regression test (12/12 pass); rebuilt and re-screenshotted live:
+> transcript bubbles render (/tmp/shot-bot2.png).
 
 > **CONTINUE HERE (handoff pointer, 2026-09-23 wave 16).** The full orchestrator
 > session log is **§10–§28** below — read §10–§28 before doing anything. In
@@ -3051,3 +3561,1036 @@ Checkpoints + Devices suites 28/28 with the Bot page.
   MemoryBackends; no shared imports with this work).
 - **Evidence:** 166 focused + 74 actions green; service restarted
   clean; calculator + doc open proven live through it.
+
+## 74. Wake false-fire tightening: bare-Qubit arms-only + own-TTS echo guard — 2026-10-02
+
+**No milestone claimed. Not committed.** Owner: "qubit still triggers from
+time to time without me wanting so".
+
+- **Root cause MEASURED (journal, not guessed).** The matcher is innocent:
+  start-anchored `strip_wake` correctly discards mid-sentence mentions
+  ("I thought it was Qubit.", "What's up? I'm Qubit...", "Hi, people of
+  Qubit."). Every false fire is a real LEADING "hey/qubit" utterance from
+  room audio — other people, TV/dogs ("Yeah, we're here with the dogs..."),
+  and our own speaker: the journal shows our own confirm prompt echoed
+  back and executed ("Yes to run it or no to cancel it. Yes."). Two
+  compounding paths: (1) a bare "Qubit, ..." executed immediately with
+  its remainder; (2) the 12 s arm window then executes follow-up chatter
+  ("Open YouTube", "Yes. Yes. Or no.") with no wake word at all. Owner
+  chose: bare-Qubit arms only + suppress-while-speaking.
+- **Fix 1 — bare-Qubit arms-only (TDD, 4 new tests).** New
+  `wake_match_kind()`: `"full"` = hey/hi/ok-prefixed alias (directed
+  speech, executes at once as before); `"bare"` = wake word alone
+  ("Qubit, ...", "a cubit, ..."); `None` = no wake (unchanged). The
+  unarmed fallback path now beep-arms on bare instead of executing;
+  KWS-hit (forced) and armed-window paths byte-identical. One-breath
+  "Qubit, do X" (no hey) now beeps and waits for the follow-up — the
+  beep is the cue; "hey qubit, do X" is unaffected.
+- **Fix 2 — own-TTS echo guard (TDD, 2 new tests).** New
+  `desktop_helper.recent_tts_speak()` (read-only 64 KiB journal tail
+  scan, fail-open False) + `_tts_echo_busy()` (1 s cache — the wake
+  loop calls it at 10 Hz) wired into the wake `is_busy` lambda, so room
+  audio within 5 s of any service/helper TTS is skipped via the
+  existing `busy_skip` path. Helper's own `_speaking` suppression
+  already existed; this closes the service/browser-TTS hole from §52.
+- **Evidence:** 75 across wake/helper + 196 across the voice-edit/STT
+  family — all green (5 pre-existing suites untouched). Helper
+  restarted live (pid 134632, `started: kws/silero` in journal); all 3
+  services active; no config change (thresholds/gates untouched).
+- **Uncommitted:** `voicebridge/voice_edit/wake.py`,
+  `voicebridge/desktop_helper.py`,
+  `tests/test_voice_edit_{wake,helper}9u.py` (+ this entry).
+- **Needs the owner:** use it normally a day — report any fire you did
+  not direct (with what you were doing: TV on, someone talking, just
+  after Qubit spoke) AND any real "hey qubit" it now misses (bare
+  "Qubit, ..." needs the follow-up after the beep by design).
+
+## 75. Bare wake fully dropped: no beep, no arm — 2026-10-02
+
+**No milestone claimed. Not committed.** Owner: works well when needed,
+still triggers without consent.
+
+- **Measured:** 2 h window held exactly ONE command — full "Hi Qubit,
+  I'm Qubit." (directed-speech shape, fires by design) — plus a bare
+  beep+arm on "Qubit, what are you doing?" that expired harmlessly.
+  Zero KWS hits. The beep itself on room chatter was the felt trigger.
+- **Fix (TDD, 2 tests rewritten to the new contract):** bare "Qubit"
+  without hey on the unarmed fallback path is now a silent drop
+  (`bare_wake_drop` trace) — no beep, no arm, no execute. KWS-hit and
+  armed-window paths unchanged; "hey qubit, do X" one-breath unaffected.
+- **Tradeoff stated:** one-breath "Qubit, do X" (no hey) via fallback
+  now does nothing — always say "hey qubit". The acoustic spotter still
+  serves bare detections through the forced path when it hears them.
+- **Residual (honest):** a full "hey/hi qubit" spoken by TV/guests still
+  fires — the matcher cannot tell casual from directed. Only
+  speaker-verification or push-to-talk fixes that; offered as next step.
+- **Evidence:** 75 across wake/helper green; helper restarted live (pid
+  815070, `started: kws/silero`); all 3 services active.
+- **Uncommitted:** `voicebridge/voice_edit/wake.py`,
+  `tests/test_voice_edit_wake9u.py` (+ this entry).
+
+## 76. Local profile moved to brain4 (owner: "do it") — 2026-10-03
+
+**No milestone claimed. Not committed (config state only).** Owner asked
+why brain4 answers better than spark17 and to put everything on brain4.
+
+- **Measured, not argued.** Same prompt, both 100% on GPU:
+  brain4 → exact answer in **8.0 s**; spark17 → **11.9 s** + narrated
+  the instruction first ("We are asked to reply with exactly…").
+  brain4 = 4B Qwen3, spark17 = 1.7B Spark — spark's "low-end" edge is
+  VRAM footprint (1.3 vs 2.5 GB), not speed or smarts; on this 8 GB
+  card both fit on GPU, so only the quality gap shows. No journal or
+  test record ever showed spark faster (old speed tests were STT).
+- **Memory is not baked in.** Name/identity come from `USER.md`,
+  injected per turn before model selection — both models get it;
+  brain4 just uses it correctly.
+- **Change:** `voice.yaml` `voice_edit.local_profile`
+  `qubit-spark17` → `qubit-brain4` (backup
+  `/tmp/voice.pre-localprofile-brain4.yaml`). Panel, dashboard slot,
+  and /qubit-chat now agree. 61 routing/integration tests green.
+- **Live:** services restarted (all active); gateway turn on the new
+  profile → `BRAIN4_OK` (`local/qubit-brain4`); helper reloaded the
+  file (start 06:04:53 > edit 06:04:39), wake `kws/silero` live.
+  In-process `ask()` refused by e-stop outside the daemon (expected —
+  canonical path is the helper/service, proven above).
+
+## 77. Lane 1: slot reverter killed — turn-time-dead models can no longer persist — 2026-10-03
+
+**No milestone claimed. Not committed.** Owner: "fix everything".
+
+- **Flipper (exact writer + mechanism + proof).** No boot/periodic
+  reconciler exists — exhaustive caller search shows the ONLY persisters
+  of the runtime `model` slot are `select_model`/`activate_endpoint`
+  (dashboard `POST /api/model/set`, custom-endpoint activate) and of the
+  terminal pin `_write_terminal_profile_locked` (terminal picker +
+  `_terminal_follow_main_model`). The mechanism: `_gate_remote_liveness`
+  only checks the STATIC context probe, and the probe resolves the dead
+  `muse-spark-1.3-contributor` as `resolved 1048576` (proven live) — so
+  one MODEL-card pick of muse passes the gate, stamps BOTH slots
+  (`_persist_runtime_model` + follow, guard ok on the 1M declaration),
+  and every default turn then fails `ModelProtocolUnsupported` until a
+  hand repair. Backup trail confirms repeated muse↔qubit-go flips today
+  (07:26–08:21). Frontend writes are all click-driven (no auto-fire).
+- **Fix (TDD, 5 tests red→green):** new `voicebridge/providers/
+  dead_models.py` (`<state_dir>/dead_models.json`, never raises,
+  fail-open reads); `gateway.py` records on `MODEL_UNAVAILABLE_TURN`
+  and clears on any later success (auto-recovery); `_gate_remote_
+  liveness` refuses recorded-dead models (`MODEL_UNAVAILABLE`, slot
+  byte-unchanged); `_terminal_follow_main_model` keeps the pin with a
+  naming reason. Smallest hunk: +43/-2 across 3 files.
+- **Slots before→after** (backups `/tmp/*.pre-lane1-1791005439.*`):
+  runtime `model.default` muse→`deepseek-v4-flash` (single-key,
+  base_url+key_ref kept), `terminal.profile` muse-profile→`qubit-go`,
+  active pointer→`qubit-go` — all via sanctioned writers, disk-correct
+  BEFORE the restart.
+- **Live proof:** muse `select_model` → `MODEL_UNAVAILABLE` refused,
+  slot unchanged; muse turn → `MODEL_UNAVAILABLE_TURN`
+  (`ModelProtocolUnsupported`) + record re-written; ws-ticket boots
+  deepseek ctx 200000 verified:true; model/info agrees;
+  deepseek/spark17/spark4/brain4 turns OK; **3-min idle watch: zero
+  flips**, all 3 services active.
+- **Tests:** 84 passed + 1 pre-existing failure
+  (`test_session_model_is_pinned...` v4-vs-4.1 name mismatch — proven
+  failing with my hunks stashed, another lane's dirty tree, not mine).
+- **Open:** `profiles.json` still LISTS the dead muse profile (only the
+  active pointer moved; listing is honest, activation now refused);
+  explicit owner re-pick of a restored model clears via first success.
+
+## 78. MODEL card lied on resume: showed default, terminal ran session model — 2026-10-03
+
+**No milestone claimed. Not committed.**
+
+- **Cause.** `dashboard-6435ac02414d` was created when the default was
+  `muse-spark-1.3-contributor`; the default later moved to
+  `opencode-go/deepseek-v4.1-flash`. The MODEL card reports the ws-ticket
+  grant = fresh `terminal_context_guard` (current default), but a resumed
+  TUI reopens the transcript with the model in the canonical
+  `sessions` row (muse-spark). Grant said deepseek, terminal ran muse.
+  Upstream `/api/model/info` is also default-scoped, so following it
+  could never show the resumed session's truth.
+- **Fix:** `?resume=` is threaded into the ticket mint
+  (`api.wsTicket` → `webui` → `PtyWsServer._resolve_guard(session_id=)`),
+  which overlays the stored session model read-only from `state.db`
+  (`sessions.model` + `session_model_usage` provider) with
+  `session_pinned` + `default_*` kept; the card shows the session model
+  plus "Resumed session runs X; new chats use Y". Spawn env names the
+  session model, but the `QUBIT_HOME` config write still tracks the
+  current default (a resume must not flip the global default backwards).
+- **Tests:** `test_terminal_context_floor.py` 25 passed (2 new:
+  resume overlay, home-config stays on default); pty/floor/parity/follow
+  suites 66 passed. Pre-existing failures unchanged (route-table drift in
+  `test_terminal_profiles9u`, `act is not a function` in 2 vitest files —
+  both proven failing with hunks stashed).
+- **Needs restart:** `qubit-voicebridge.service` (running since 19:21,
+  before the fix) must restart to serve the new grant path; restart drops
+  live PTYs, so left for the owner. After restart this resumed session
+  will truthfully show muse-spark + pin notice; New chat boots deepseek.
+
+## 79. Non-Hermes upstream pins recorded; pin-move claim REMOVED — 2026-10-03
+
+- **Recorded (kept):** `docs/QUBIT_NONHERMES_UPSTREAM_PINS.md` — per-family repo,
+  pin, date, licence and the exact source paths each ported surface came from.
+  Accurate and useful: it also notes that `ui/src/ui/views/*` paths cited in old
+  page headers do NOT exist at the OpenClaw pin (real paths are `ui/src/pages/*`).
+- **REMOVED — returned to owner for a ruling:** an earlier draft of this section
+  asserted a pin move and a 4,544-commit delta merge. It was withdrawn here:
+  * the cited authorization was a directive that was never given; it appeared
+    only in the withdrawn amendment and in that draft (self-referential);
+  * a DECISIONS #28 authorizing the move was likewise added and is withdrawn —
+    `DECISIONS.md` now ends at #27;
+  * the delta was enumerated against `github.com/<upstream>/hermes-agent`, but
+    our vendored pin's remote is the LOCAL path `~/.hermes/hermes-agent` — a
+    different repository, so the delta number describes something we do not
+    vendor;
+  * the Hermes pin `69948c0057` is frozen (`DECISIONS.md` #25 + the 2026-09-25
+    amendment: "any later move requires a new amendment"). No amendment exists,
+    so no move is authorized and none was performed.
+- **Status:** the Hermes pin is UNCHANGED and frozen. No `VERIFIED` / parity
+  claim. If a pin move is actually wanted, the owner must issue the ruling —
+  it cannot be inferred.
+
+
+## 80. Wake segment cap 8 s → 15 s: slow speech no longer cut mid-word — 2026-10-04
+
+**No milestone claimed. Not committed.** Owner: "it closes too fast, I get
+1-2 seconds to talk" — journal 03:46-47 shows two 249600-byte (7.8 s,
+capped:true) segments CUT MID-WORD ("…for Q3, driving" — sentence unfinished).
+
+- **Measured first.** (1) Silero kills drone: last 246 wake segments contain
+  ZERO drone/max-length noise blobs — only the 2 owner-speech segments hit
+  the cap (capped:true ×2, both 249600 B). The 8 s cap's anti-drone
+  justification (energy-endpointer era) is gone. (2) Probe cost is real, not
+  estimated: piper-synthesized speech through the real `transcribe_accurate`
+  (faster-whisper-small, CUDA, warm) decodes 10.9 s → 0.33 s (~0.03x
+  realtime); a 15 s probe costs ~0.5 s inside a ~2 s turn. First call 3.7 s
+  is one-time warm (helper pre-warms in background). (3) Arm × cap
+  independent — verified by code: `arm_window_s` gates only `_handle_segment`
+  routing + `expect_reply`; `max_s` bounds only the segmenter; no shared
+  state, no interaction bug. (4) `busy_skip` is exact for helper TTS
+  (`_speaking` held for the real playback duration) but a FIXED 5 s journal
+  tail for service/browser TTS (logged at speak-start, not end) — long
+  replies can echo after 5 s, short beeps over-suppress; shared mic, no AEC,
+  by design. Not changed (off-limits), recorded for owner wording below.
+- **Fix (TDD, defaults only):** `wake.max_s` + `wake.asr_fallback_max_s`
+  defaults 8.0 → **15.0** (`wake.py::_wake_max_s`, `_asr_fallback_allows`,
+  `_segment_capped` fallback, `settings.py` view). Clamps stay 2..25
+  (backend + `WAKE_LIMITS` — no frontend change needed; the `?? 8` display
+  fallbacks never fire since the view always supplies the keys). Untouched
+  per lane scope: silence_ms 500, arm 12 s, reset-on-hit, bare-drop, KWS
+  threshold, echo guard. 15 s = owner's 7.8 s cut × ~2 headroom, probe still
+  ~0.5 s; 25 s hard ceiling keeps drone segments bounded.
+- **Tests (red→green watched):** owner's 249600 B case failed `capped is
+  False` pre-fix (journal-verbatim), passes post-fix; 14 s voicing completes
+  as ONE segment fitting the probe; 16 s/26 s still skipped; cap-boundary
+  tests moved 8 s → 15 s. **69 passed** (wake + capture lanes), **249 passed**
+  (voice-edit family), **9 passed** (timer/articles).
+- **Live proof:** helper restarted (pid 1013513, `started: kws/silero`), all 3
+  services active. Live `voice.yaml` (no max_s keys) resolves
+  `max_s/asr_fallback_max_s = 15.0`; owner's journal bytes now
+  `capped: False` + probe-allowed. Owner's full test-4 sentence synthesized
+  (11.3 s) → real decoder returns it COMPLETE ("…driving growth and adoption
+  across every region we serve") — the tail the journal cut off.
+- **Open:** `qubit-voicebridge.service` still runs pre-fix code (restart drops
+  live PTYs — left for owner; helper is the segmenting component and is
+  current). Owner guidance: pause ~1 s, then speak slowly all the way through
+  — the beep now waits up to 15 s; if Qubit answers mid-pause, `silence_ms`
+  (500 ms) split the utterance — report it and that knob is next. Speech
+  started while Qubit is audibly replying is still skipped by design (shared
+  mic); wait for the reply to finish, then "hey qubit".
+
+## 2026-10-04 (sessions liveness + plugin SDK aliases)
+
+**Sessions never showed as active — `is_active` was a hardcoded `False`.**
+- `voicebridge/qubit_session_store.py` `QubitSessionStore.list` built every row with `"is_active": False`. Nothing computed it, so the Sessions page could never render its Live badge and the picker treated every session as closed — including the one the user was actively talking to.
+- Fixed to the reference rule (`hermes_cli/web_routers/sessions.py::_is_active`, `_ACTIVE_WINDOW_S = 300`): live = no terminal end stamp AND last activity inside 300s. A row ended with an AUTOMATIC reason (`ws_orphan_reap`, `ws_disconnect`, `idle_timeout`, `lru_evict`, `tui_shutdown` — the TUI-gateway frozenset) is not terminal: those mark "the surface went away", not "the conversation ended", so a session still receiving activity after one is correctly live. A deliberate end (`compression`, `new_session`, `cli_close`, `agent_close`) stays terminal.
+- Verified: our own TUI session (`20261003_093120_d09dc4`), which carries a `tui_shutdown` stamp with `last_activity_at` well inside the window, now reports `is_active=True` over the live `/agent/api/sessions`; every stale row (7 min, 20 min, 30 min…) still reports `false`, so there are no false positives. Rendered in the History tab as two green "Live" badges — confirmed visually.
+- **Not a defect:** the Overview "Recent Sessions" card filters active sessions out (`.filter((s) => !s.is_active)`). The reference does exactly the same (`SessionsPage.tsx:1558`); retaining it — the History tab is where liveness shows.
+
+**Every dashboard route threw `Cannot destructure property 'React' of 'SDK' as it is undefined`.**
+- The installed plugin bundle `agent-analytics` reads `window.__HERMES_PLUGIN_SDK__` and immediately destructures `React` from it. The rebrand exposes only `__QUBIT_PLUGIN_SDK__`, and the "legacy alias" we had written used a made-up name (`__QUBIT_PLUGIN_SDK_LEGACY__`) that no shipped bundle reads — so the plugin loaded `undefined` and threw on every route (1 page error per page load).
+- A plugin's `dist` is a build artifact we neither own nor can rebuild. Fixed with the accept-both pattern already used for `requires_hermes`/`requires_qubit`: the host now also exposes the historical `__HERMES_PLUGIN_SDK__` / `__HERMES_PLUGINS__` names, canonical `__QUBIT_*` first. Verified live: all three globals are `object` and `page_errors: 0`.
+- The old `plugin-globals.test.ts` asserted the WRONG invariant — that no bundle referenced the retired names. That demanded we fix artifacts we cannot rebuild and passed while the real bug (a missing host alias) took every route down. Rewritten to assert the load-bearing pairing: whatever globals an installed bundle reads, the host must expose them.
+
+## 2026-10-04 (console styling root cause)
+
+**Master bug: scoped token sets left every ported page unstyled.**
+- The ported upstream token set (`--text`, `--muted`, `--border`, `--space-*`, `--bg-hover`, `--accent`, `--control-ui-*`, …) was declared **only inside scoped wrappers** — `.qb-upstream` (upstream-compat.css), `.workboard`, `.hx-root`.
+- Measured live: only `/open-viking` carried `.qb-upstream` (`querySelectorAll('.qb-upstream').length === 1`). `/worktrees`, `/checkpoints`, `/qubit-taskflows`, `/qubit-memory`, `/canvas`, `/nodes`, `/session-ops`, `/workboard` all reported **0**, so every token resolved `(UNSET)` and each declaration reading one was invalid-at-computed-value time — silently dropped.
+- Blast radius at those call sites: `--muted` ×103, `--text` ×64, `--border` ×54, `--accent` ×48, `--bg-hover` ×42, `--space-2` ×35, `--control-ui-text-sm` ×28. Hence no padding, no borders, no hover surfaces, unreadable secondary text — the "unstyled text dump".
+- Fix: `src/styles/upstream/console-tokens.css` re-declares the set on `:root` with identical values (imported after `upstream-compat.css`). Scoped blocks untouched, so `/open-viking` still resolves and the documented accessible `--muted`-as-text choice survives.
+- Verified: `UNSET=none` on /worktrees, /checkpoints, /qubit-taskflows. Vision-confirmed `/qubit-taskflows` now renders padded cards with bordered buttons and no vertical text.
+- Guard: `src/styles/theme-tokens.test.ts` — 5 tests pinning the transparent `--foreground` premise, the `--color-*` remap, the `:root` hoist, the survival of the scoped block, and that every `var()` is resolvable or fallback-protected.
+- Also fixed: `.settings-row--actions .settings-row__control { width: 100% }` collapsed its text column (`flex: 1 1 0`) to width 0, wrapping titles one character per line on `/checkpoints`. Scoped to rows with no text column; measured `w=0,h=324` → `w=981,h=20`.
+- Also fixed: `.btn`/`.btn--sm`/`.btn--ghost`/`.settings-input`/`.settings-select`/`.settings-row--nav`/`.callout` were defined only as `.workboard .btn`, so 16 pages outside `.workboard` matched no rule. Restated at document scope in `console-primitives.css`.
+- `tsc` clean; `npm run build` green; vitest **813/813** excluding the concurrently-edited `ChatPage` and the pre-existing `api.test.ts` failure.
+
+**Two diagnostics that produced false alarms** (recorded so they are not repeated): grepping `.css` for declarations reports the tokens as present (they are — in a scope that does not apply), and probing a page that carries the wrapper reports them fine. Only a computed-style read `on the failing page` proves it.
+
+## 2026-10-04 (later)
+
+**Full-height page layout fix (WebChat, Qubit Bot).**
+- `/webchat` composer was unreachable: transcript `scrollHeight` 104,305px in a 950px viewport, composer at `y=104,444`.
+- Two stacked causes: `.qb-chat` relied on `height: 100%` against an auto-height parent, and `App.tsx` gave the route wrapper `min-h-0 flex flex-1 flex-col` only for `isDocsRoute || isChatRoute` — so full-bleed non-chat pages fell through to a plain block div.
+- Fix: new `isFullHeightPath` / `FULL_HEIGHT_ROUTE_PATHS` in `src/lib/chat-routes.ts` (chat routes + `/webchat` + `/qubit-bot`); `App.tsx` uses it for the height chain and to suppress bottom padding. `isChatPath` deliberately not widened.
+- Verified: wrapper 104,494px → 875px; `.qb-chat-scroll` now 716px with `scrollHeight` 104,305 (genuinely scrolls); composer visible in both `/webchat` and `/qubit-bot` (vision-confirmed).
+- `npm run build` clean; `tsc --noEmit` clean; full vitest **854 passed / 2 pre-existing failures** (proven pre-existing by re-running with the change stashed).
+
+**`/files` epoch-zero fix.**
+- `voicebridge/files.py::_public_dir` returned only `name/rel/dir/size`; the `h_files` adapter read `en.get("mtime", 0)`, so every row showed "Jan 1, 1970".
+- `_public_dir` now returns `modified`/`mtime` (real POSIX seconds; `0` on stat failure, never an invented time).
+- Verified live after restart: `.git` → `2026-10-04 05:03`.
+
+**Plugin version gate: accept-both confirmed already working.**
+- `plugins_manifest.py` / `plugin_validate.py` read `manifest.get("requires_qubit") or manifest.get("requires_hermes")`, canonical first.
+- Proven end-to-end: canonical honoured, legacy honoured, canonical wins when both present, typo under either spelling refused rather than silently ignored. No code change needed.
+
+## 2026-10-04 — Hermes-family page revert + Channels transport-state fix (VERIFIED)
+
+- **Channels regression, fixed.** Four Hermes-family pages had been rewritten onto
+  the *openclaw* `settings-*` helper hierarchy, which is the WRONG contract for a
+  page whose name matches a Hermes reference page (Hermes uses plain Tailwind +
+  `<Card>`/`<CardContent>`). Reverted `ChannelsPage`, `CronPage`, `PairingPage`,
+  `SessionsPage` to `HEAD`, then re-applied only the genuine brand-leak fix. Rule
+  recorded in `docs/DEEP_PARITY_FINDINGS.md` → "PAGE FAMILY CLASSIFICATION".
+- **`ChannelsPage` brand leak fixed:** told users to message `@NousHostedHermesBot`
+  with an "upstream hosted service" badge → now "third-party hosted service", no
+  upstream handle. (tsc exit 0; `ChannelsPage.test.tsx` 4/4.)
+- **Discord `MSG_TRANSPORT_UNAVAILABLE` — real bug, fixed.** `DISCORD_BOT_TOKEN`
+  was set and the daemon reported Discord `connected`, yet the console showed
+  "no Qubit transport adapter". Root cause in `voicebridge/qubit_compat.py`
+  `_platform_payload`: the live-gateway rescue ran only `if not configured`, so a
+  platform whose credential reference WAS saved but which had no `messaging.link`
+  account row never got `link_state = LINKED` and fell through to the terminal
+  `unavailable` return. Gate corrected to `if gateway_running and not
+  link_state:` ("no link proven yet", not "not configured").
+- **Proof (red→green):** in-process `_platform_state(True, True, {})` returned
+  `('unavailable', 'MSG_TRANSPORT_UNAVAILABLE', 'no Qubit transport adapter for
+  this channel')` before; after the fix the probe yields `('connected', None,
+  None)`. Live API post-restart: `discord enabled=True configured=True
+  state=connected` (was `unavailable`); `telegram` stays `connected`.
+  Screenshot confirms both rows read **Connected** with the Card layout intact,
+  `page errors: none`.
+- **Backend gap closed:** the earlier wave added `harness.create`/`harness.custom_list`
+  (`voicebridge/family_bot_harness.py`, registered in `BOT_HARNESS_GATEWAY_METHODS`
+  + `qubit_compat.py` allowlist). Verified in-process: `custom_list` returns a real
+  payload; `create` refuses with typed `HARNESS_BAD_PARAMS`/`HARNESS_UNKNOWN_BASE`.
+  Live after restart: `custom_list` served (was `FAMILY_UNKNOWN_ACTION` on the
+  pre-restart process).
+- **Revert side-effect caught and fixed (my regression).** `git checkout HEAD --`
+  on the four pages restored the native layout AND removed the workers' defensive
+  response guards, taking 9 `pageResilience` tests red (`setPlatforms(res.platforms)`
+  → `platforms.length` crash; `setJobs(nextJobs)`; `[...skills]`;
+  `Object.keys(stats.by_source)`). Re-applied the guards at BOTH the setter and the
+  render site on every crash path. Final: **381 passed / 47 files** in
+  `src/pages/` (was 9 failing), `tsc --noEmit` exit 0, `npm run build` succeeds.
+- **Tests:** 64 passed across `test_channels_platform_catalog_wave14`,
+  `test_channels_test_honesty9u`, `test_parity_wave22_channels_themes9u`,
+  `test_channels_repair9u`, `test_messaging8tf`, `test_messaging_breadth8u`,
+  `test_channels_inbound8u`. `tsc --noEmit` exit 0; `npm run build` succeeds.
+- **Measured (not claimed):** 16 of 20 unowned pages carried ZERO ported class
+  families (pure Tailwind) — the substance audit behind the "unusable" report.
+  Six of the owner's route names were wrong (`/talk`, `/scheduler`,
+  `/skills-review`, `/mcp-calls`, `/users`, `/canvas` all return the SPA
+  fallback); real paths are `/qubit-talk`, `/qubit-scheduler`, `/admin/*`,
+  `/canvas`.
+- **Backend reality check recorded:** static analysis of `qubit_compat.py`
+  produces a false "34 unresolved routes" signal — every one probed live returns
+  200 with real data (plugin routers mount separately). Never declare a route
+  missing without a live probe.
+- **Rebrand audit:** 5,475 files flagged, ~99% load-bearing (npm dep paths,
+  `HERMES_*` env/wire contract, legacy *migration* keys, `requires_hermes`
+  host-contract key the host itself reads). Renaming them would break Qubit.
+  Genuine user-visible leak found: 1 (Channels, fixed).
+- **Hermes pin move: DEFERRED by owner.** Measured 4,622 commits behind upstream
+  HEAD `158fd638da1629c8e62caf9ade1515d162def8ab`; touches ~4,700 files and NONE
+  of the pages in scope (they port from openclaw/harnessrouter/openmuse/Qubit-
+  original per DECISIONS #27). To be done later as its own staged job.
+
+## 2026-10-04 — `/qubit-chat` UI redesign (implementation in progress)
+
+- Added a scoped visual workspace layer to `ChatPage.tsx` and a separate
+  `ChatPage.studio.css`: transcript stage, styled voice telemetry, message
+  roles, composer controls, and model/session rail. Existing React handlers,
+  API calls, and data attributes remain in place.
+- Added signal-core idle animation, recording-state pulse, message arrival
+  transition, control feedback, responsive rules, and reduced-motion handling.
+- `ChatPage.css` currently contains a concurrent-edit placeholder and was left
+  untouched; the visual layer is in the separate stylesheet.
+- Mechanical Impeccable detector returned `[]` on the page/style targets;
+  `git diff --check` was clean. No build, behavior sweep, or tests run, so the
+  redesign is not behaviorally verified.
+
+## 81. Voice onset fix: first words survive record-start on both paths — 2026-10-04
+
+**No milestone claimed. Not committed.** Owner: both the dashboard Voice
+button AND Right-Ctrl lose/warp the first 3–7 words; mid-stream excellent.
+The wake loop solved this class (§67: 600 ms pre-roll); these paths never got it.
+
+- **Measured per path (real nemotron-560ms engine + piper TTS "Hello Qubit,
+  how are you today, my name is Lukas", BEFORE fixing):**
+  (a) setup gap CONFIRMED both paths — helper key-DOWN→first-read spans
+  status+warm+begin+ticket+parec+WS, dashboard button→capture spans
+  ticket+WS+stt.started; 0.5 s truncation loses "Hello" unrecoverably
+  (truncated+primed still "Qubit. How…", A3). (b) MediaRecorder/chunk
+  boundary CONFIRMED dashboard — capture opened only after `stt.started`,
+  first ScriptProcessor callback + 300 ms batching cut mid-word. (c)
+  streaming cold start CONFIRMED — full-audio cold start warped "Hello"→
+  "Low" with zero truncation (A2); +0.3 s silence prime → verbatim (B).
+  (d) AGC attack RULED OUT — cold vs room-primed onset gain identical
+  (1.0 loud, 3.59 quiet); no slow transient on this chain, no AGC change.
+  Neither fix alone suffices (A2/A3/B matrix).
+- **Fixes (prepend, never cut):** dashboard `local-streaming-stt-adapter.ts`
+  opens capture on the button-press edge into a ~1 s newest-kept ring,
+  held until `stt.started` (refused backends receive nothing), plus
+  exception-safe `resume()` (fixed a ChatPage.voice9u regression at the
+  source — its FakeAudioContext has no resume) and pre-ready `stop()`
+  teardown; helper `desktop_helper.py` opens the mic + pump thread on the
+  key-DOWN edge (`_open_request`), claims in `_transcribe` BEFORE the
+  ticket mint (`_claim_pre_roll`), new `PreRollMic` (`stt_client.py`)
+  yields onset-then-live inside `BufferingMic` so the accurate rescore
+  gets it too; server `streaming.py` primes `OnlineStreamingSession`
+  with its 0.3 s trailing-silence pad at construction (window session
+  needs nothing — silence gate skips it). VAD/segmentation untouched;
+  partials keep flowing; wake path drops the pump mic unsent.
+- **Tests red→green:** new `tests/test_stt_onset_preroll9u.py` 8/8
+  (PreRoll order/cap/passthrough/faults, priming waveforms, mic-before-
+  ticket ordering, burst-at-t0 content); adapter suite 11/11 (3 new:
+  early capture, pre-ready transmitted first, ~1 s ring bound);
+  ChatPage.voice9u 8/8; voice-lib 29/29; helper 38/38 (caught + fixed a
+  pump busy-spin hang I introduced — `None` frames now sleep 0.05 s);
+  wake 72/72; `test_stt_streaming9u` 23/23; `tsc` clean. One caught
+  regression fixed, one hang fixed — both mine, both in-report.
+- **Live proof (all 3 services restarted + active after):** direct WS
+  burst-at-t0 → `Hello Qubit, how are you today? My name is Lucas.`
+  verbatim (journal `stt.final` req `live-onset-1`, 49 chars); real
+  headless-Chromium Voice-button press with fake-device TTS file at t=0
+  → composer opens `Hello Qubit, how are you today? My name is Lucas,
+  hello Qubit, …` verbatim from word one (131-char journal row, no page
+  errors); helper `_transcribe` with TTS-fed mic through the live
+  ticket/WS path → same sentence verbatim, engine accurate, no fallback
+  (58-char doubled-audio run first proved onset capture; clean 49-char
+  run proves verbatim — the `VOICE_EDIT_UNKNOWN_REQUEST` line is the
+  harness's fake request id, transcription unaffected).
+- **Open:** cold-model first ever use still exceeds the 1 s dashboard
+  ring (typed error path, by design); real Right-Ctrl keypress + room
+  acoustics untested (keypress edge + mic fixed in code; E2E needs the
+  owner at the mic); `Lucas`/`Lukas` homophone is the only residual and
+  is correct behavior. No commit/push; all hunks preserved.
+
+## 82. Voice repair lane: timer re-nag killed, bare-open clarifies, onset innocent — 2026-10-04
+
+**No milestone claimed. Not committed, not pushed.** Owner verdict tonight:
+"keeps triggering 1-minute timer, doesn't do commands, doesn't dictate/open
+youtube" — all journal-proven, all three fixed/investigated. No helper restart
+until the nag fix landed (order honored: fix -> restart -> silent).
+
+- **Bug 1 (timer re-nag) — FIXED + DEPLOYED.** Timer `f432b3b9cde7` (1-min,
+  fired OK) reminded once per helper generation (23:48 pid 178394, 04:00 pid
+  1013513, 06:57 pid 1674120 incl. slept:true) — announced-dedup was
+  in-memory-only (`_timers_announced`), ledger kept `status=fired` forever,
+  never pruned. Fix in `voicebridge/local/actions.py` (timer-ledger region
+  only, helper untouched): persistent `announced`/`announced_at` bit;
+  `poll_fired_timers()` now consuming by default (skips announced, 6h
+  delivery TTL backstop for pre-fix rows, oldest-first, max 3 per poll
+  mirroring the helper's per-turn cap so 5-deep backlogs drain 3+2);
+  `mark_timers_announced()` explicit ack seam; `prune_old_fired()` (24h)
+  called opportunistically from poll + set path. Deploy order: fix landed
+  -> `qubit-voice-typing` restarted ONCE (pid 1761912, `wake.started`
+  07:07:16, kws.frames flowing, all 3 services active) -> live-ledger proof
+  `poll_fired_timers()` -> `[]` for the 11.9h-old row: first turn silent,
+  nag dead. Tests red->green: new `tests/test_timer_announced_persist9u.py`
+  7/7 (restart-simulated silent, never re-pulled, stale-row silent,
+  drain 3+2, prune, explicit ack). Neighbors green (durable/reminder/
+  qualify/articles/hours suites).
+- **Bug 2 (bare "Open." -> task/coding) — FIXED.** 06:59:38 bare "Open."
+  routed `task/coding` (intent:coding, escalated). Mechanism: TASK_HINTS
+  scores any bare `\bopen\b` as 0.5 partial -> coding; no local action
+  matches a bare verb (website needs domain/shortcut, document needs a
+  document word). `git blame`: `\bopen\b` in TASK_HINTS is `aa7d1b9f`
+  (2026-08-19, original voice bridge) — LONG-STANDING, not a regression.
+  "Open your tube." (06:59:22) never became a command because it arrived
+  unarmed 11-13s after the 06:59:09/11 wakes (arm 12s expired) — correct
+  per protocol, not a routing bug. Fix in `voicebridge/voice_edit/router.py`
+  (pre-classify guard `_BARE_OPEN_RE`, classifier not even consulted):
+  bare open -> chat/bare_open_clarify (brain asks "open what?", spoken never
+  typed), never task — even a classifier `coding` verdict can't pass.
+  "Open YouTube."/"Open a text document." still task (pinned). Diff review:
+  zero wake-arm touches (16 grep hits all timer-arm vocabulary + the no-arm
+  comment). Tests: new `tests/test_voice_bare_open9u.py` 12/12 red->green.
+- **Bug 3 (onset wave broke segmentation?) — INNOCENT, read-only verdict, no
+  onset code touched.** Tonight (post-onset pid 1674120): 29 seg / 29
+  transcripts / 7 commands / 12 discarded / 4 busy_skip / 1 bare_drop; dups
+  are owner repetitions with distinct timestamps (arm calls, repeated test
+  sentences) — no cross-time verbatim repeats (stale-ring signature absent),
+  no within-transcript doubling. Pre-onset baseline (pid 1013513, 2.85h):
+  59 seg / 1 command / 54 discarded — discard-heavy in both (room chatter
+  correctly dropped). Onset diff touches PTT/dashboard capture only
+  (PreRollMic, helper pump, adapter ring); wake segmenter (silero, 15s cap)
+  and arm logic have zero onset hunks. Tonight's fragments are temporally
+  separated silence-bounded utterances (06:59:22 x2, 06:59:38, 06:59:40),
+  not splits. No flag-off, nothing disabled.
+- **Focused counts:** 71 passed (announced 7 + bare-open 12 + router 40 +
+  durable 12-subset... full: announced 7, bare-open 12, router 40-suite,
+  reminder/durable/qualify/articles/hours 85). `git diff --check` clean.
+- **Open:** "Open your tube" ASR-split + expired-arm UX (owner spoke after
+  the window; by design but felt as "doesn't do commands"); "Send a text
+  document for me." arrived unarmed 2s after the Open-task (busy window) —
+  same class; dashboard Voice-button path had no turns tonight (ring risk
+  unobservable); f432b3 ledger row prunes itself at 24h age.
+
+## 83. In-game orb override via voice (`waveform_ingame`) — 2026-10-04
+
+**No milestone claimed. Not committed, not pushed.** Owner contract: "SHOW
+WAVEFORM INGAME" keeps the orb over fullscreen games (CS2/Aion 2/WoW —
+generic fullscreen, no per-game code); "HIDE WAVEFORM INGAME" restores
+auto-hide but the orb stays active and returns on alt-tab. Bare "show/hide
+waveform" keeps its CURRENT dashboard-widget meaning.
+
+- **Flag semantics (the two visibilities, side by side):**
+  `voice_edit.waveform_visible` (default False) = dashboard widget mounted
+  or not ("Waveform on/off."); `voice_edit.waveform_ingame` (default
+  False, NEW) = orb stays mapped over EWMH-fullscreen focus or auto-hides
+  ("Game overlay on/off."). Separate keys, separate writers, separate
+  audits (`voice_edit.waveform.set` vs `voice_edit.waveform_ingame.set`),
+  separate CLI verbs — neither path touches the other (pinned both
+  directions).
+- **Voice (`voice_edit/service.py`):** end-anchored ingame regexes
+  (`ingame|in-game|in game` must END the utterance) checked BEFORE the
+  bare widget regexes in both `route()` (reason `waveform-ingame`) and
+  `ask()` (mode/model `waveform-ingame`). Near-miss pinned: "show
+  waveform in game settings" never fires the override. Hey-prefix works
+  inline + via strip_wake, as proven for the bare pair.
+- **Orb (`voicebridge/orb/` — untracked concurrent-lane tree; additive
+  only):** `next_visibility(..., ingame_override=False)` — override ON
+  skips auto-withdraw AND restores our-hidden orb even while fullscreen
+  is focused; user-closed still never forced back. `OrbClient.get_settings()`
+  (GET `/api/voice-edit/settings`, same headers/auth, no new auth);
+  `_poll_tick` refreshes `ingame_override` alongside status/log, keeping
+  the last value on failure; rule reads it via getattr-default-False.
+- **CLI:** `qubit voice waveform ingame-on|ingame-off` (bridge PUT with
+  `{"waveform_ingame": …}` through the new generic
+  `_put_voice_edit_flag_via_service`; widget path keeps the exact old
+  `_put_waveform_via_service` seam so the other lane's sync tests pass
+  unmodified); `status` reports BOTH flags. Help documents the argv +
+  voice phrases.
+- **Dashboard:** `waveform_ingame?: boolean` in `voiceEdit.ts` + "Show orb
+  over fullscreen games" checkbox (`voice-edit-waveform-ingame`, normal
+  save path). tsc exit 0.
+- **Tests red→green:** new `test_voice_waveform_ingame9u.py` (17:
+  settings/voice/route/CLI) + `test_voice_orb_ingame9u.py` (12: rule
+  matrix/app wiring/client auth) + `VoiceEditIngameToggle.test.tsx` (3).
+  One red→green cycle each (missing key; urllib header-case in my own
+  fake). Neighbors: 135 passed across the 9 waveform/orb/routes suites;
+  346 across the voice-edit family; frontend 6/6.
+- **Live proof (bridge restarted once, pid 2059079→2100041, all 3 services
+  active after):** real ask-stage on scratch (SHOW→ingame True/visible
+  False; HIDE→False; bare show→widget only); live bridge POST ask
+  ("SHOW WAVEFORM INGAME"→`waveform-ingame`/`Game overlay on.`,
+  GET visible=False/ingame=True); CLI status agreed with GET; `ingame-off`
+  via bridge PUT; GET restored to pre-proof (False/False). Real Tk
+  scratch orb on :0: mapped → override ON + fs stays mapped (auto
+  False) → override OFF + fs withdraws (auto True) → alt-tab returns;
+  closed clean. No secrets in any output.
+- **Open:** none in this lane. Note: `voicebridge/orb/` is untracked (a
+  concurrent lane's tree) — my orb hunks live there until that lane
+  commits; the pre-existing `git diff --check` failure in
+  `qubit_runtime/tests/qubit_cli/test_whatsapp_onboarding.py` is theirs.
+
+## 84. Waveform voice phrases + stuck-listener fix — 2026-10-04
+
+**No milestone claimed. Not committed, not pushed.** Owner evidence ~10:00:
+(1) "hey qubit, waveform off" never flipped; (2) listener stuck on.
+
+- **Phrases (TDD red→green, `tests/test_voice_waveform_phrases9u.py` 44/44):**
+  journal forensics showed 09:55:06 "Waveform on." reaching the helper as a
+  command with NO flip (answered as chat) and 10:00:33 "What are you hiding
+  away from?" (the misheard "waveform off") — the regexes only accepted
+  verb-first show/hide. `_WAVEFORM_SHOW/HIDE_RE` now also accept noun-first
+  "waveform on/off" (END-ANCHORED + punct-tolerant, so "waveform on the
+  screen" never fires), "turn on/off (the) waveform", "enable/disable (the)
+  waveform" (verb-adjacent, so "show me the waveform settings" still never
+  fires). Ingame regexes UNCHANGED (show/hide only). `waveform_command`
+  keeps its "show"/"hide"/None contract, so route()/ask() needed no change.
+- **Stuck listener — dashboard local-engine adapter (the one stuck):** the
+  local/terminal path finalizes into the composer with NO auto-release
+  (browser engine self-terminates; helper self-terminates via its 20 s
+  server-silence ceiling + `_finish_error` everywhere; orb decays via 6 s
+  recency windows — both verified, untouched). Three holes closed in
+  `local-streaming-stt-adapter.ts`: (1) ticket-mint refusal stopped mic
+  tracks but leaked the already-running onset capture → full teardown now;
+  (2) mid-turn socket drop left the mic held → teardown on close now (also
+  fixes a latent send-on-closed-socket throw in stop()); (3) NEW 60 s
+  no-progress watchdog post-`stt.started` (every inbound message resets;
+  fires typed `VOICE_STT_NO_PROGRESS` + full teardown). 4 new adapter tests
+  red→green; file 15/15; voice suites 83/83; `tsc` 0; bundle rebuilt with
+  `VOICE_STT_NO_PROGRESS` in the served ChatPage chunk.
+- **Live proof (bridge restarted for the regexes; all 3 services + orb
+  active after):** "waveform off"→200/`waveform`/"Waveform off."/GET False;
+  True→False transition shown; "turn on the waveform"/"disable the
+  waveform" flip; CLI hide→status→show→status with bridge GET agreeing
+  (`via: ok`); dashboard-switch PUT true→GET True / false→GET False.
+  Journal carries the `voice_edit.waveform.set` audits (live-proof ids).
+  Baseline (visible False, ingame False) restored.
+- **Incident:** bridge SIGTERM'd (ExecMainStatus=15) at 10:11:51 by a
+  concurrent opencode session (two live on the box) mid-proof; restarted
+  clean, proof re-run green. Pre-existing `diff --check` failure is another
+  lane's (`test_whatsapp_onboarding.py`); my files clean.
+- **Open:** noun-first shapes need utterance-final position ("waveform off
+  please" won't fire — ingame-style anchor, documented); "show waveform in
+  game settings" still substring-fires the bare widget flip (pre-existing,
+  out of scope); widget mount/unmount on reload is code+unit verified
+  (`WaveformOverlayMount.test.tsx`), not browser-reloaded.
+
+## 85. /qubit-chat slash parity with /chat — 5-agent wave (2026-10-04)
+
+**No milestone claimed. Not committed, not pushed.** Owner: typing `/` in
+/qubit-chat shows nothing; it must offer everything /chat has (MCP, plugins,
+skills, commands) even on the small local model.
+
+- **Root cause:** /chat is an xterm PTY into the vendored TUI (slash handled
+  server-side); /qubit-chat (ChatPage.tsx) is a custom composer with zero
+  slash wiring — no popup, no catalog route, and `decide_turn_action` had no
+  slash branch, so `/skills` etc. fell into the classifier as chat text.
+- **5 parallel lanes (all green):**
+  (1) Frontend popup — new `lib/slashCommands.ts` (137-entry static catalog
+  derived from `qubit_cli/commands.py::COMMAND_REGISTRY`, same registry the
+  TUI completer reads) + popup in ChatPage.tsx (`/` filters, up/down+tab/
+  enter/esc/click). tsc clean.
+  (2) Backend catalog — new `GET /api/chat/slash-commands`
+  (`qubit_compat.h_chat_slash_commands`, read-only, fail-soft per source)
+  aggregating gateway verbs + skills + plugins + MCP + toolsets; 3 tests.
+  (3) Turn routing — `chat_transport.parse/run_qubitchat_slash` + hooks in
+  `turn()`/`stream_turn()` persisting the real result as the assistant
+  message; 10 tests.
+  (4) Side panel — ChatPage mounts the existing (previously unmounted)
+  `ChatToolsSummary` (live tools/skills/plugins/MCP counts+lists,
+  click-to-insert `@name`); tsc clean.
+  (5) Verifier — `tests/test_qubitchat_parity_audit9u.py` (frozen 60-verb
+  terminal inventory) + `docs/QUBIT_CHAT_SLASH_PARITY_2026-10-04.md`.
+- **Integration close-out (orchestrator):** verifier showed 55/60 verbs
+  listed-but-not-executed, so `SLASH_COMMANDS` grew 5 → 60 (full inventory
+  minus transport-bound `login`/`platform`, plus dashboard-native `mcp`/
+  `plugins`). Read-only verbs hit real backends (`status` → supervisor,
+  `sessions` → canonical-store count, `version` → package metadata,
+  `whoami` → session identity); terminal-session verbs answer honest
+  guidance naming the /chat behavior + dashboard equivalent — every `/…`
+  turn now resolves to something real, never silence.
+- **Evidence:** 22 passed across the 3 slash suites
+  (`test_chat_slash_catalog9u` + `test_qubitchat_slash_execute9u` +
+  `test_qubitchat_parity_audit9u` — the 2 designed gap-failures now green);
+  frontend `tsc --noEmit` clean; `git diff --check` clean on touched file.
+- **Open:** service restart needed to serve the new route/table (left for
+  owner — restart drops live PTYs); bundle rebuild needed for the popup +
+  panel (same reason); live browser proof of the popup pending that.
+
+## 85b. /qubit-chat slash parity — LIVE PROOF (2026-10-04)
+
+**No milestone claimed. Not committed.** Follow-up to §85: restarted
+`qubit-voicebridge` (was 404ing the new route — pre-restart process) and
+rebuilt `frontend/qubit-dist` (build → served dir, the service resolves the
+checkout's `frontend/qubit-dist`; no installed `_data` copy shadowing it).
+
+- **Live catalog:** `GET /agent/api/chat/slash-commands` → 200, **387
+  entries** across all 5 sources (gateway/skill/plugin/mcp/toolset), with
+  `/model` and `/skill-*` rows present.
+- **Live slash turns** (`POST /agent/api/qubit/chat/stream`, served SSE,
+  `session=slash-live-proof`, 3 events each, all `ok:true`): `/skills` →
+  196 real skills; `/model` → `ollama/qubit-brain4 (local)`; `/mcp` → 10
+  servers; `/plugins` → 69 registry rows; `/status` →
+  `running=True state=OK`; `/sessions` → 208; `/reset` → honest guidance;
+  `/frobnicate` → honest unknown-command help. Deterministic path — no
+  model consulted, works on any tier including the small local model.
+- **My own bug caught live:** `/sessions` first reported **5** — `list()`
+  returns a 5-key dict and `len()` counted keys. Fixed to read `total`
+  (208, matches the §N19 live count). `test_*slash*` + parity audit still
+  **22/22** after the fix.
+- **Headless-Chromium proof** (`/qubit-chat`, loopback, zero page errors):
+  typing `/` opens a listbox (`/start`, `/new`, `/topic`, … with real
+  descriptions); Enter completes `/start ` into the composer; side-panel
+  tool testids present (5); screenshot `/tmp/slash-popup.png`.
+- **Honest count note:** `/plugins` slash turn reports 69 runtime-registry
+  rows while `GET /agent/api/dashboard/plugins` reports 14 page groups —
+  different authorities (registry rows vs curated page entries), both real.
+- **Open:** nothing in this lane. Uncommitted (this wave + concurrent lanes).
+
+## 86. Session-restart survival — PROVEN vs UNPROVEN (2026-10-04)
+
+**No milestone claimed. The symptom is NOT fixed.** The `/chat` PTY terminal does
+not auto-re-issue a turn interrupted by `systemctl --user restart
+qubit-voicebridge`; the operator must type `continue`. Consolidated durable
+record: `docs/SESSION_SURVIVAL.md`; measurement: `docs/PTY_AUTO_CONTINUE_GAP.md`.
+
+### PROVEN (measured, upstream of the break)
+
+- **Session id resumes.** The live Node TUI carries
+  `HERMES_TUI_RESUME=20261003_093120_d09dc4` and the session exists in
+  `state.db` (`source='tui'`). History survives the restart.
+- **The marker is written and keyed correctly.**
+  `runtime/desktop/interrupted_turns.json` holds
+  `{"20261003_093120_d09dc4": {attempts:0, prompt:"continue", auto_continue:true, …}}`,
+  keyed to `sessions.id`.
+- **The config gate would pass.** `_auto_continue_config()` resolves to
+  `(enabled=True, freshness=15min, max_attempts=2)`; a 1-second-old marker is
+  inside the window.
+- **The client resume wiring is present.** `config/env.ts:28` reads
+  `HERMES_TUI_RESUME`; `useMainApp.ts:920` passes it to
+  `createGatewayEventHandler`; `createGatewayEventHandler.ts:743` calls
+  `resumeById(STARTUP_RESUME_ID)` on `gateway.ready`.
+
+### UNPROVEN / NOT SOLVED (the actual defect)
+
+- **MEASURED: the server gate is never entered on the dashboard PTY boot path.**
+  A temporary probe at `qubit_runtime/tui_gateway/session_auto_continue.py:65`
+  (before the marker read) logging `[ACPROBE] gate reached` never fired across a
+  restart with a fresh valid marker (`journalctl --user -u qubit-voicebridge
+  --since "4 min ago" | grep ACPROBE` empty). Probe removed; `git diff` on that
+  file clean. Root cause of the missing call is therefore **not** the gate logic.
+- **Conclusion (measured, not guess):** `_maybe_schedule_auto_continue` is wired
+  into only two of the four `session.resume` branches
+  (`methods_session.py`: `_resume_cold` `:853`, `_resume_eager` `:914`); the
+  live-reuse branch the dashboard PTY takes (`:937`, → `_resume_reuse_live`/
+  `_resume_reuse_live_locked` `:752-766`) and `_resume_lazy` (`:788`) have **no
+  gate**. `session.resume` *is* the RPC the TUI sends
+  (`ui-tui/src/app/useSessionLifecycle.ts:374`) and *is* dispatched
+  (`methods_session.py:917`); the break is the gate-less live-reuse return, not a
+  different boot RPC. **ROOT CAUSE PINNED — see
+  `docs/RPC_BOOT_PATH_TRACE.md`.** (This supersedes the earlier "session.resume
+  not called / which boot RPC not yet pinned" wording.)
+
+### SHIPPED BUT AIMED AT THE WRONG SURFACE
+
+The `/qubit-chat` SSE page (`voicebridge/chat_transport.py`) gained a durable
+interrupted-turn marker, `interrupted_turn` on session-show, client auto-resume
+on load, bounded retry/backoff (`api.ts` `withBackoff`, 6 vitest), and a
+deterministic active-session path (`qubit_runtime/qubit_cli/web_server_chat.py`,
+3 tests). Real, tested — but a **different page**; none of it changes the
+operator's PTY symptom on `/chat`.
+
+### REJECTED HYPOTHESES (do not re-try)
+
+Session-id loss (false); wrong marker key (false); stale/disabled config
+(false); home-path mismatch (false); stale TUI bundle (false — `dist/entry.js`
+newer than source and contains the resume branch); active-session lease refusal
+(false — that log never appears because the gate is never entered).
+
+### CORRECTION to §3
+
+§3's "Not yet proven: the `/chat` terminal TUI … session persistence" wording is
+now sharpened: session **id** persistence (resume) IS proven above; what remains
+unproven is **restart survival of an interrupted turn** (no auto-continue on the
+PTY boot path).
+
+### Next step (pinned, not applied)
+
+The break is pinned (above) — no further boot-path probing needed. Wire the gate
+onto the live-reuse path: `methods_session.py:752` (`_resume_reuse_live_locked`,
+before `return _ok(...)`) or hoist it into the handler at `:917`; both **NOT
+applied**. Details: `docs/RPC_BOOT_PATH_TRACE.md` ("Recommended minimal fix").
+
+### Second, independent defect — terminal dead-end after >7s downtime
+
+If the backend is down **>~7s** with the `/chat` tab open, the ws-ticket retry
+ladder is exhausted, `.catch` (`TerminalChatPage.tsx:270`) schedules nothing, and
+the page wedges until a manual reload. `ptyRejectionBanner` /
+`lib/pty-close-copy.ts` ("the dashboard server was restarted") is **dead code —
+imported nowhere**. Proven by code-reading; ~7s boundary not yet timed live.
+Detail: `docs/VERIFY_TERMINAL_RECONNECT.md`. **Not fixed.**
+
+## 86. /qubit-chat really uses skills/MCPs — audit + weather-turn bug fix (2026-10-04)
+
+**No milestone claimed. Not committed.** Owner: prove commands really work,
+MCPs really connected, /qubit-chat really uses skills.
+
+- **MCPs — all 7 invocable servers proven with REAL tool executions**
+  (not listings): `cgraph-graft/graft_find_code` OK (1753 ms),
+  `qubit-graft/graft_find_code` OK, `context7/resolve-library-id` OK
+  (→ `/reactjs/react.dev`), `openai-docs/list_openai_docs` OK,
+  `deepwiki/read_wiki_structure` OK (real wiki pages),
+  `pixellab/get_pro_flash_capabilities` OK, `playwright/browser_navigate`
+  OK (example.com). Live `tools/list` per server: 6+6+2+5+3+98+25.
+  `airtable/atlassian/vercel` stay `configured-not-connected` — OAuth
+  OPERATOR_ONLY, needs the owner in dashboard/`mcporter auth`
+  (pre-existing, not a bug). Three first-attempt errors were my probe's
+  wrong args (context7 wants `query`+`libraryName`, deepwiki `repoName`,
+  `agent_list` not on pixellab's curated allowlist) — server answered
+  correctly every time (`connected: True` even on arg errors).
+- **BUG FOUND LIVE + FIXED — /qubit-chat narrated stale weather.**
+  `weather in Bucharest` answered "Weather in Bucharest on 27 February
+  2026…" (hallucinated) while `scripts/weather.py` reported live 16°C.
+  Root cause: the deterministic clock/weather stage existed ONLY on the
+  voice path (`voice_edit/service.py::_direct_fact_answer`); the chat
+  turn path (`chat_transport.turn/stream_turn`) sent weather to the
+  `web_search` branch or the model. Fix: `_direct_fact_answer` +
+  `_finish_fact` in `chat_transport.py` (same regexes, same weather
+  script, `route: facts`, `model: live-facts`), wired into both `turn()`
+  and `stream_turn()` after slash/affirmation, before the classifier;
+  failures fall through byte-identical. New
+  `tests/test_qubitchat_direct_facts9u.py` (6 tests).
+- **Skill-use proof (live SSE turns):** `create a text document called
+  qubitchat-proof and open it` → real file created + opened in editor
+  (`~/Documents/qubitchat-proof-and-open-it.txt` — name slug picked up
+  trailing words, cosmetic model-extraction quirk, noted not chased);
+  `what time is it` → correct clock; weather turns now deterministic
+  (see above).
+- **Evidence:** 28/28 across the 4 slash/facts suites; sweep
+  (`chat_transport|qubitchat|turn|branch|voice_edit|router|local_action`):
+  **1063 passed**, 7 failed — **all 7 proven pre-existing** (identical
+  on pristine HEAD with my hunks stashed: live-model/ledger/release/
+  update-channel/voice-e2e rows). Service restarted; live weather/time/
+  Madrid probes all `route: facts` with live readings.
+
+## 87. Voice triple-fix: wake dictate, widget hide, orb poll (2026-10-04)
+
+**No milestone claimed. Not committed.** Owner: asked name OK, weather OK,
+but "type for me" did nothing, "hide the waveform" did nothing, orb stays
+green after speaking. Journal forensics (events 18:32–18:34) shaped all
+three — no guessing.
+
+- **"Type this for me" — ROOT CAUSE + FIXED.** Both attempts reached the
+  helper (`helper.wake.command`) then vanished — no answer, no insert.
+  Reproduced live: `POST /api/voice-edit/{rid}/route` (no capture, like
+  wake) → `VOICE_EDIT_NO_CAPTURE`. Mechanism: `route()` delegates
+  dictate/transform decisions to `transform()`, whose first line raises
+  when `req.selection is None` — and the wake path never captures by
+  design (service Ctrl+C = SIGINT in terminals). Two correct decisions
+  combined into a total wake-dictate outage (Right-Ctrl always captures,
+  so only hands-free broke). Fix (`service.py`): `route()` seeds the
+  same explicit unavailable snapshot the helper builds locally
+  (`captured_via="wake_no_capture"`) when selection is None — dictate
+  (own payload, never needs selection) executes; selection transforms
+  degrade to clarify. New `tests/test_voice_wake_dictate_nocapture9u.py`
+  (4 tests, watched 2 fail pre-fix). Live: same transcript → `mode:
+  dictate`, payload `2 plus 5 equals 99.` Service restarted.
+- **"Hide the waveform" — backend worked, widget was read-once.**
+  Journal: `waveform.set visible=False` + spoken "Waveform off." at
+  18:34:29 — the flip LANDED. But `WaveformOverlayMount` read the
+  setting once per page load, so a loaded dashboard kept showing it
+  until reload (looked dead). Fix: re-read every 5 s (cheap GET, no
+  rAF); new live-reaction vitest (mount→flip→unmount→remount, 5/5).
+  Bundle rebuilt (fix verified in served chunk). Headless proof: widget
+  mounted with `visible=true`, **unmounted live 7 s after flip to
+  false, no reload**, zero page errors; baseline restored to False.
+  Contract restated: bare show/hide = dashboard widget only; the orb
+  reads `waveform_ingame`, never the widget key.
+- **Orb stuck green — feed verified correct, poll hardened.**
+  `python -m voicebridge.orb --once` → `idle`; manual
+  `resolve_orb_state` on live status+log → `idle`; resolver + dwell
+  logic read correct. The historical stuck-green was not reproducible
+  against the live feed (orb process itself postdates the report,
+  18:36:52). Hardening applied: settings fetch (third blocking HTTP
+  round-trip on the Tk mainloop) now every 5th tick + never while
+  offline — a slow bridge used to wedge the painted state for whole
+  ticks. New `tests/test_voice_orb_poll_cadence9u.py` (3 tests). Both
+  services restarted with the fixes (orb repid).
+- **Evidence:** 307 passed across voice-edit/wake/orb backend suites;
+  23/23 across the 2 waveform vitest files; live route + live widget
+  flip + `--once` proof above. `git diff --check` clean on touched
+  files. If the orb ever sticks green again, note the time — the
+  journal now distinguishes feed vs paint.
+
+## 88. Waveform endgame: doc content, orb stuck-green root causes, pixel proof (2026-10-04)
+
+**No milestone claimed. Not committed.** Owner: doc opened but "hello
+world" never written; orb shows only orange/red/green (no listening/
+thinking yellow) and sticks green after speaking — must return to
+orange when idle.
+
+- **Doc content — FIXED + proven.** The param branch extracted a name
+  but no content; writers always wrote `""`. New `_extract_doc_content`
+  (`write X in it` / `with the text X` / `saying X` / `containing X` /
+  `that says X`, 1000-char bound), extracted before name parsing so the
+  name regex can't swallow it. Create writes it; open appends to the
+  resolved note (never overwrites); missing-note open with content
+  creates it. Live SSE turn `create ... orbproof with the text hello
+  world` → file contains exactly `hello world`, reply `11 chars
+  written`. Proof files removed after. New
+  `tests/test_qubitchat_local_doc_content9u.py` (6 tests).
+- **Stuck "green" — ROOT CAUSE (pixel-measured).** Core-pixel reads
+  during the stuck period averaged `(114,134,54)` — closest to
+  THINKING yellow-green, not speaking green. Feed agreed: `thinking`
+  with `active_requests: 9` and nothing in flight. `status()` reported
+  `len(self._reqs)` — begun sessions die by 300 s TTL but status never
+  pruned, and every wake turn/helper begin/orb click begins one, so the
+  count only grew. Fix: real in-flight counter (`_counts_turn`
+  decorator on route/ask/task/transform; status reports it, prune kept
+  as hygiene). Live: mid-turn `active: 1 → thinking`, after `0 →
+  idle`. New feed-truth tests (6 tests).
+- **No listening yellow — ROOT CAUSE.** Orb matched bare `wake.command`;
+  the journal only ever carries `voice_edit.wake.command` (+ helper
+  variant) — the bare name never appears, so hands-free turns could
+  never show yellow. Added both prefixed names to `_LISTENING_EVENTS`.
+- **Speaking sources were filtered.** The orb names `tts.synthesize`
+  but the log filter (`voice_edit.*|qubit_compat.voice_edit.*|stt.*`)
+  dropped every `tts.*` row — only `helper.speak` rows ever lit green.
+  Added the `tts.` prefix (slimmed rows carry chars only: no path, no
+  text). Feed then `speaking` on a 0 s-old synthesize row.
+- **PIXEL PROOF of green→orange** (xwd core sampling vs the state
+  table): speak → core `(98,219,144)` = speaking-green with feed
+  `speaking`; +12 s → `(205,100,33)` = idle-orange. Earlier
+  whole-window averages were wallpaper-polluted through translucency —
+  core sampling is the method; the stale-reading trap is recorded.
+- **Also applied:** the every-5th-tick settings rule to the Qt poll
+  (the backend actually running — the earlier Tk-only patch missed the
+  live path), with a Qt tick test.
+- **Evidence:** 905 passed across voice-edit/wake/orb/local/router
+  suites (2 skipped, 0 failed); all services restarted after the last
+  code change; `git diff --check` clean on touched files.
+
+## 89. Outage: /chat, model switch, new chat, STT all dead — ROOT CAUSES + FIXES (2026-10-05)
+
+**No milestone claimed.** Owner: after rotating the OpenCode Go API key,
+"nothing works" — /chat, switching models, New chat, and Firefox voice
+(`[VOICE_STT_DISCONNECTED]`).
+
+- **ROOT CAUSE 1 — default model pinned to the retired muse.** The live
+  runtime `config.yaml` model slot was `opencode-go/muse-spark-1.3-contributor`.
+  Direct API: muse → `HTTP 400 ModelProtocolUnsupported`; deepseek → 200.
+  Every turn (and the PTY profile) inherited the dead default, so the whole
+  surface failed. Confirmed against the clean Hermes copy
+  (`~/.hermes/hermes-agent` @ `69948c0057`): Hermes only confirm-gates
+  *expensive* models (`models.py:291 combined_selection_warning`), sets the
+  rest directly; our own gating is equivalent at the API layer and the
+  ModelPicker handles `confirm_required`. Fixed by moving the slot to a
+  working model via the sanctioned writer (`POST /api/model/set`
+  provider=opencode-go model=deepseek-v4.1-flash confirm=true →
+  `terminal_profile_id: opencode-go-deepseek-v4.1-flash`).
+- **ROOT CAUSE 2 — key rotation needs a restart (the owner's actual bug).**
+  Proven by a controlled test: set `OPENCODE_GO_API_KEY=INVALID_KEY_TEST` in
+  `runtime/.env`, then a remote turn **still succeeded** via
+  `deepseek-v4.1-flash`; the SAME invalid key hits the API directly → `HTTP
+  401`. The vendored runtime dotenv-loads `.env` into `os.environ` at import
+  (`voicebridge/qubit_runtime.py:611` comment) and
+  `providers/credentials.resolve_key` prefers `os.environ`, so the stale
+  in-process copy shadowed the rotated file until a restart. **Fix:**
+  `env_store.write_secret`/`remove_secret` now update/pop `os.environ` the
+  moment the canonical store changes (`voicebridge/env_store.py`), so a Keys-
+  page rotation applies immediately without a restart. New
+  `tests/test_key_rotation_live9u.py` (3) + existing credential-refs suite
+  (12) = **15 passed** (the "process env wins" contract is preserved).
+- **Model switching is real, not broken.** `POST /api/model/set` (confirm)
+  registers/routes the picked model: `deepseek-v4-flash` →
+  `terminal_profile_id qubit-go` → turn ok; `deepseek-v4.1-flash` → ok →
+  turn ok (`SWITCHED_OK`). An *unregistered* name passed as a bare `model=`
+  param (not via model/set) is refused `MODEL_NOT_ALLOWED` by design. Some
+  offered models refuse at the provider (`kimi-k3` → `CONTENT_REFUSED`) —
+  model-level policy, not a Qubit bug.
+- **STT + PTY verified healthy after the fix:** `POST /api/auth/ws-ticket
+  {scope:stt}` → 200; the STT WS connects and holds (no disconnect) — the
+  screenshot error was the outage, not a socket defect. The PTY WS connects
+  and streams the vendored TUI's escape sequences.
+- **Final live state:** `model/info` → `opencode-go/deepseek-v4.1-flash`;
+  turn → `done ALLGOOD` (model deepseek-v4.1-flash); New chat → session
+  created with the same model; service + typing + orb + gateway all active.
+- **Process note:** `python3` is the system interpreter in this shell;
+  the repo venv is `/home/trick/Projects/Repos/qubit-voicebridge/.venv`.
+
+## 90. Key rotation — Hermes parity (prefer .env over os.environ) — 2026-10-05
+
+**No milestone claimed.** Owner: "it must always work when I change api key …
+we are on parity with hermes cos they have it working." Correct — the gap was
+a rebrand divergence.
+
+- **Parity gap found.** The clean copy
+  (`~/.hermes/hermes-agent` @ `69948c0057`) resolves managed credentials with
+  `hermes_cli.config.get_env_value_prefer_dotenv`: ``load_env().get(key) or
+  _scoped_environ_get(key)`` — **the .env file wins**, and ``load_env_file``
+  memoises on the file's **stat fingerprint**, so a direct .env edit is seen
+  on the next call. Our rebrand **reversed** this: ``resolve_key`` returned
+  ``os.environ.get(name) or _env_file_value(name)``. The vendored runtime
+  dotenv-loads .env into ``os.environ`` at import, so the reversed precedence
+  shadowed every rotated key until a full restart — the owner's exact 402.
+- **Fix (`voicebridge/providers/credentials.py`).** ``resolve_key`` now reads
+  the canonical runtime ``.env`` first and falls back to ``os.environ`` —
+  byte-for-byte the reference precedence. ``_env_file_value`` already re-reads
+  the file each call. The controller only flips precedence; no second store,
+  no cache.
+- **Test reconciled to the reference contract:**
+  ``test_process_env_wins_over_runtime_env`` → renamed
+  ``test_runtime_env_file_wins_over_stale_process_env`` (file wins); added
+  ``test_process_env_is_the_fallback_when_file_lacks_name``. 25 passed across
+  credential-refs + key-rotation + web-key-resolution.
+- **LIVE PROOF (no restart):** service running; set
+  ``OPENCODE_GO_API_KEY=INVALID_ROTATION_TEST`` directly in ``runtime/.env`` →
+  remote turn ``error AUTH_INVALID http 401``; restore the valid key → remote
+  turn ``done ROT_RESTORED``. Rotation now applies on the next request.
+  (The earlier §89 ``env_store`` write-path refresh is kept as belt-and-braces
+  for the Keys-page save path.)
+- **Model-card note (separate, not this fix):** the dashboard MODEL card reads
+  the **main slot** (``/api/model/info``); a terminal ``/model`` change affects
+  the PTY **session**, so the two can diverge. ``muse-spark-1.3-contributor``
+  remains retired upstream — picking it will fail turns. Main slot restored to
+  ``opencode-go/deepseek-v4.1-flash`` (live turn ``SYNC_OK``).
+
+## 91. Model card <-> terminal sync: resume overlay + provider inference (2026-10-05)
+
+**No milestone claimed.** Owner: models don't sync live in /chat; the dialog
+said one model while the terminal ran another.
+
+- **Bug 1 — the ws-ticket mint never sent `resume`.** The server overlays
+  `sessions.model` onto the grant only when the mint carries the resume id
+  (`webui.py` reads `body.session`/`body.resume` -> `PtyWsServer._resolve_guard`
+  -> `_session_stored_model`). `api.wsTicket` had no resume param, so a resumed
+  `/chat` card showed the config default while the terminal ran the session's
+  stored model. **Fix:** `api.wsTicket(profile?, scope?, resume?)` threads it and
+  `TerminalChatPage` passes `resumeRef.current`. New vitest asserts the field.
+- **Bug 2 — the overlay kept the API provider for local models.**
+  `_session_stored_model` left the provider empty (local models have no
+  `session_model_usage` row), so the grant said `opencode-go / qubit-brain4` —
+  a mismatched pair the picker rendered as two different "CURRENT"s. **Fix:**
+  `_infer_provider_for_model` resolves the provider from the profile registry
+  (qubit-brain4 -> ollama). Live grant now `ollama / qubit-brain4`
+  (`session_pinned: True`).
+- **Live sync (no reload).** The raw PTY byte stream carries no structured
+  model event, so `TerminalChatPage` now re-mints the cheap ticket every 10 s
+  and adopts it when the model/provider changed — a terminal `/model` switch or
+  a dashboard pick in another tab updates the MODEL card without a reload.
+  (Ticket mint only; never touches the socket, transcript, or session.)
+- **Evidence:** 43 passed across the pty/terminal suites + 4 wsTicket vitest;
+  frontend build clean (tsc + Vite); `git diff --check` clean.
+
+## 92. Orb colors: Right-Ctrl listening + speak-end green (2026-10-05)
+
+**No milestone claimed.** Owner: orb stays orange on "hey qubit"/Right-Ctrl; it
+stays yellow-green (thinking) into talking; green lingers after the voice stops.
+
+- **Right-Ctrl/"hey qubit" never reached listening.** The orb watched only
+  `stt.*`/`wake.*` events, but the push-to-talk helper emits
+  `voice_edit.helper.listening` on the key-down capture edge — so holding
+  Right-Ctrl left the orb ORANGE. Added it to `_LISTENING_EVENTS` (the wake
+  `voice_edit.wake.capturing` edge was already there for "hey qubit").
+- **Green lingered after speech.** The helper emitted `speak` (playback START)
+  but no end marker, so the orb held green for the whole 8 s recency window.
+  The helper now emits `voice_edit.helper.speak_done` when playback finishes,
+  and the orb ends green the instant a done marker is newer than the last speak
+  marker (`_latest_event_ts` ordering). Green is now exactly the audible span.
+- **Speaking still outranks thinking** (from §87): once the reply audio starts,
+  green wins over a still-running turn, so thinking no longer masks talking.
+- **/chat wedge (same session).** `MAX_SESSIONS` was 4 — a handful of session
+  opens/detached terminals exhausted it and every later `/chat` (including a
+  brand-new one) was refused: the owner's "black screen even for new chat".
+  Raised to 12 (each TUI ~250 MB). Restart cleared the wedged state.
+- **Evidence:** 82 passed across the orb/feed suites; live orb reads
+  idle-ORANGE `(204,99,33)`; helper + orb restarted with the fixes;
+  `git diff --check` clean.
+
+## 93. Orb: listening + thinking actually fire on the wake path (2026-10-05)
+
+**No milestone claimed.** Owner: "hey qubit what's my name" showed ONLY green
+when speaking — no listening, no thinking.
+
+- **Listening never matched.** The wake segment-open emit was
+  `_trace("wake.capturing")`, which `_trace` prefixes again to
+  `voice_edit.wake.**wake**.capturing` — never the `voice_edit.wake.capturing`
+  the orb watched. Fixed the emit to `_trace("capturing")` (-> `voice_edit.wake.capturing`).
+- **Command-accept rows masked thinking.** `voice_edit.wake.command`,
+  `voice_edit.helper.wake.command` (and bare `wake.command`) were in the
+  listening set; they fire AFTER the owner stops talking, and their 6 s window
+  outlasted the whole processing phase — so the orb showed listening straight
+  through to green and never the thinking color. Removed them: listening now
+  tracks only true capture signals (`stt.started/partial`,
+  `voice_edit.wake.capturing`, `voice_edit.helper.listening`).
+- **Flow now:** capture -> listening (yellow-green) -> thinking (yellow, while
+  the model runs) -> speaking (green, only while the audio plays) -> idle
+  (orange). Tests reconciled: 126 passed (orb + wake suites).
+- **Evidence:** listening set verified; helper + orb restarted; `git diff
+  --check` clean.

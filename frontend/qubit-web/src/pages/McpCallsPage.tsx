@@ -340,6 +340,7 @@ export default function McpCallsPage() {
                   disabled
                   title={d.reason}
                   aria-disabled="true"
+                  aria-label={`${d.action} unavailable: ${d.reason}`}
                   className="cursor-not-allowed border border-border px-2 py-1 text-xs"
                 >
                   Disabled

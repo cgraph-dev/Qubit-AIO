@@ -2,17 +2,22 @@
  * Qubit memory backends (`/qubit-memory`) — SEPARATE page, not part of
  * `/plugins` (owner separation rule).
  *
- * Ports the upstream memory extensions (memory-lancedb, memory-wiki,
- * active-memory — read-only source) as local-only store wiring behind the
- * existing memory-provider typed gate. The gate persists `qubit-local` only
- * (`MEMORY_LOCAL_ONLY` for anything else), so this page is status plus
- * disabled rows: the local backend gets a live status/read probe and a
- * confirm-gated re-affirm select; everything needing hosted infra or secrets
- * renders disabled-with-reason, never a fake connect button.
+ * Local-only store wiring behind the existing memory-provider typed gate. The
+ * gate persists `qubit-local` only (`MEMORY_LOCAL_ONLY` for anything else), so
+ * this page is status plus disabled rows: the local backend gets a live
+ * status/read probe and a confirm-gated re-affirm select; everything needing
+ * hosted infra or secrets renders disabled-with-reason, never a fake connect
+ * button.
  *
- * NOTE: the `/qubit-memory` route registration lives in the app shell, which
- * is out of scope for this change (new files only) — this module exports the
- * page; shell wiring is a bridge item.
+ * Backend handlers (registered in `voicebridge/family_memory.py`, verified
+ * live): GET /api/memory (status), GET /api/memory/providers/qubit-local
+ * (read probe), PUT /api/memory/provider (confirm-gated select, local-only).
+ *
+ * Built on the shipped openclaw render-helper contract
+ * (`@/components/openclaw-ui`): a `SettingsPage` root holding a
+ * `SettingsPageHeader`, a summary tile strip, and `SettingsSection` groups.
+ * `.settings-row__control` is emitted by the helper ONLY when a control is
+ * passed — a control-free row never renders an empty wrapper.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -28,6 +33,17 @@ import {
   type MemoryStatusPayload,
   type ProviderStatusPayload,
 } from "@/lib/ocFamilyMemoryApi";
+import {
+  SettingsEmpty,
+  SettingsLoadingSkeleton,
+  SettingsPage,
+  SettingsPageHeader,
+  SettingsRow,
+  SettingsSection,
+  SettingsStatus,
+  SettingsSummary,
+  SettingsValue,
+} from "@/components/openclaw-ui";
 
 type LoadState = "loading" | "ready" | "failed";
 
@@ -82,104 +98,270 @@ export default function MemoryBackendsPage() {
     }
   }, [refresh]);
 
+  // Source of truth for the live store: the provider-DETAIL read
+  // (`GET /api/memory/providers/qubit-local`) carries `active`, `store_state`,
+  // `enabled`, and `tiers`. The LIST read (`GET /api/memory`) returns
+  // `active: ""` and none of those fields, so every one of these values is
+  // taken from the detail read first and only falls back to the list.
+  //
+  // `activeProvider` must NEVER fall back to `providers[0].name`: the list's
+  // first row is an unrelated hosted backend (e.g. "byterover"), which would
+  // render a provider the gate is not actually serving.
+  const activeProvider = probe?.active || probe?.provider || status?.active || "";
+  const activeProviderLabel = activeProvider || "not reported by this endpoint";
+
+  // `probe` is authoritative; `status` only fills in when the probe failed.
+  // Absent everywhere = "not reported", spelled out with a reason rather than
+  // a bare placeholder.
+  const storeState = probe?.storeState || probe?.state || status?.storeState || status?.state || "";
+  const storeEnabled = probe ? probe.enabled : status?.enabled;
+  const storeEnabledLabel =
+    storeEnabled === undefined
+      ? "not reported by this backend"
+      : storeEnabled
+        ? "yes"
+        : "no";
+
+  const summaryItems = status
+    ? [
+        { label: "Active provider", value: activeProviderLabel },
+        {
+          label: "Store state",
+          value: storeState || "not reported by this backend",
+        },
+        { label: "Enabled", value: storeEnabledLabel },
+        { label: "Memory records", value: status.builtinFiles.memory },
+        { label: "User records", value: status.builtinFiles.user },
+      ]
+    : [];
+
   return (
-    <main data-testid="memory-backends-page" aria-label="Qubit memory backends">
-      <h1 data-testid="memory-backends-title">Qubit memory backends</h1>
-      <p data-testid="memory-backends-intro">
-        Local-only memory stores behind the memory-provider gate. The gate
-        persists <code>qubit-local</code> only ({MEMORY_LOCAL_ONLY_REFUSAL.code}
-        ); every other backend below is status-only and disabled with its
-        reason.
-      </p>
-
-      <section data-testid="memory-status-card" aria-label="Current provider">
-        <h2>Current provider</h2>
-        {loadState === "loading" && <p data-testid="memory-status-loading">Loading memory status…</p>}
-        {loadState === "failed" && (
-          <p data-testid="memory-status-error" role="alert">
-            Memory status unavailable: {loadError}{" "}
-            <button type="button" data-testid="memory-status-retry" onClick={() => void refresh()}>
-              Retry
+    <SettingsPage wide>
+      <div data-testid="memory-backends-page" aria-label="Qubit memory backends" className="contents">
+        <SettingsPageHeader
+          title={<span data-testid="memory-backends-title">Qubit memory backends</span>}
+          description={
+            <span data-testid="memory-backends-intro">
+              Local-only memory stores behind the memory-provider gate. The gate persists{" "}
+              <code>qubit-local</code> only ({MEMORY_LOCAL_ONLY_REFUSAL.code}); every other
+              backend below is status-only and disabled with its reason.
+            </span>
+          }
+          actions={
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => void refresh()}
+              disabled={loadState === "loading"}
+              aria-label="Refresh memory status"
+            >
+              Refresh
             </button>
+          }
+        />
+
+        {status ? <SettingsSummary items={summaryItems} /> : null}
+
+        <SettingsSection
+          title="Current provider"
+          description="Local store status read live from GET /api/memory."
+        >
+          {loadState === "loading" ? (
+            <SettingsLoadingSkeleton rows={3} />
+          ) : loadState === "failed" ? (
+            <SettingsRow
+              role="alert"
+              title="Memory status unavailable"
+              description={<span data-testid="memory-status-error">{loadError}</span>}
+              control={
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  data-testid="memory-status-retry"
+                  onClick={() => void refresh()}
+                >
+                  Retry
+                </button>
+              }
+            />
+          ) : status ? (
+            <>
+              <SettingsRow
+                title="Active provider"
+                description="The store the gate currently serves (from the provider-detail read)."
+                control={
+                  <SettingsValue mono>
+                    <span data-testid="memory-active-provider">{activeProviderLabel}</span>
+                  </SettingsValue>
+                }
+              />
+              <SettingsRow
+                title="Store state"
+                description="Backing store health."
+                control={
+                  <SettingsValue>
+                    <span data-testid="memory-store-state">
+                      {storeState || "not reported by this backend"}
+                    </span>
+                  </SettingsValue>
+                }
+              />
+              <SettingsRow
+                title="Enabled"
+                description="Auto-injection into prompt context (provider-detail read)."
+                control={
+                  <SettingsValue>
+                    <span data-testid="memory-enabled">{storeEnabledLabel}</span>
+                  </SettingsValue>
+                }
+              />
+              <SettingsRow
+                title="Records"
+                description="Built-in local store counts."
+                control={
+                  <SettingsValue>
+                    <span data-testid="memory-builtin-counts">
+                      {status.builtinFiles.memory} memory / {status.builtinFiles.user} user records
+                    </span>
+                  </SettingsValue>
+                }
+              />
+              {status.storePath ? (
+                <SettingsRow
+                  title="Store path"
+                  control={
+                    <SettingsValue mono>
+                      <span>{status.storePath}</span>
+                    </SettingsValue>
+                  }
+                />
+              ) : null}
+              <SettingsRow
+                title="Read probe"
+                description="Live status read via GET /api/memory/providers/qubit-local."
+                control={
+                  probe ? (
+                    <SettingsValue>
+                      <span data-testid="memory-read-probe">
+                        {probe.provider} · {probe.state || probe.storeState || "state not reported"} · tiers{" "}
+                        {probe.tiers.join(", ") || "—"}
+                      </span>
+                    </SettingsValue>
+                  ) : (
+                    <SettingsValue>probe unavailable (best-effort read)</SettingsValue>
+                  )
+                }
+              />
+            </>
+          ) : null}
+        </SettingsSection>
+
+        <SettingsSection
+          title="Backends"
+          count={MEMORY_BACKENDS.length}
+          description="Only the local store is selectable; hosted backends are disabled with their reason."
+        >
+          <div className="settings-subrows" role="group">
+            {MEMORY_BACKENDS.map((backend) => (
+              <SettingsRow
+                key={backend.id}
+                testId={`memory-backend-${backend.id}`}
+                title={
+                  <span data-testid={`memory-backend-${backend.id}-title`}>
+                    {backend.title}
+                  </span>
+                }
+                description={
+                  <>
+                    <span
+                      className="settings-row__desc"
+                      data-testid={`memory-backend-${backend.id}-blurb`}
+                    >
+                      {backend.blurb}
+                    </span>
+                    <span
+                      className="settings-row__desc"
+                      data-testid={`memory-backend-${backend.id}-probe`}
+                    >
+                      {backend.probeKind === "live"
+                        ? backend.probeDetail
+                        : `Probe unavailable — ${backend.probeDetail}`}
+                    </span>
+                    {!backend.selectable ? (
+                      <span
+                        className="settings-row__desc"
+                        role="note"
+                        data-testid={`memory-backend-${backend.id}-reason`}
+                      >
+                        {backend.disabledReason}
+                      </span>
+                    ) : null}
+                  </>
+                }
+                control={
+                  backend.selectable ? (
+                    <button
+                      type="button"
+                      className={`btn btn--ghost btn--sm${selecting ? " active" : ""}`}
+                      data-testid={`memory-backend-${backend.id}-select`}
+                      disabled={selecting || loadState !== "ready"}
+                      onClick={() => void onSelectLocal()}
+                    >
+                      {selecting ? "Confirming…" : "Use Qubit local memory"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      data-testid={`memory-backend-${backend.id}-select`}
+                      disabled
+                      title={backend.disabledReason}
+                      aria-disabled="true"
+                    >
+                      Unavailable — disabled with reason
+                    </button>
+                  )
+                }
+              />
+            ))}
+          </div>
+          {MEMORY_BACKENDS.filter((b) => !b.selectable).length === 0 ? (
+            <SettingsEmpty title="No hosted backends configured">
+              Every backend is selectable.
+            </SettingsEmpty>
+          ) : null}
+        </SettingsSection>
+
+        {actionMessage ? (
+          <p
+            role="status"
+            className="settings-status settings-status--accent"
+            data-testid="memory-action-message"
+          >
+            {actionMessage}
           </p>
-        )}
-        {loadState === "ready" && status && (
-          <dl>
-            <div>
-              <dt>Active</dt>
-              <dd data-testid="memory-active-provider">{status.active}</dd>
-            </div>
-            <div>
-              <dt>State</dt>
-              <dd data-testid="memory-store-state">{status.state || status.storeState || "unknown"}</dd>
-            </div>
-            <div>
-              <dt>Enabled</dt>
-              <dd data-testid="memory-enabled">{status.enabled ? "yes" : "no"}</dd>
-            </div>
-            <div>
-              <dt>Notes</dt>
-              <dd data-testid="memory-builtin-counts">
-                {status.builtinFiles.memory} memory / {status.builtinFiles.user} user records
-              </dd>
-            </div>
-            {probe && (
-              <div>
-                <dt>Read probe</dt>
-                <dd data-testid="memory-read-probe">
-                  {probe.provider} · {probe.state || "ok"} · tiers {probe.tiers.join(", ") || "—"}
-                </dd>
-              </div>
-            )}
-          </dl>
-        )}
-      </section>
+        ) : null}
 
-      <section data-testid="memory-backend-list" aria-label="Backends">
-        <h2>Backends</h2>
-        <ul>
-          {MEMORY_BACKENDS.map((backend) => (
-            <li key={backend.id} data-testid={`memory-backend-${backend.id}`}>
-              <h3 data-testid={`memory-backend-${backend.id}-title`}>{backend.title}</h3>
-              <p data-testid={`memory-backend-${backend.id}-blurb`}>{backend.blurb}</p>
-              <p data-testid={`memory-backend-${backend.id}-probe`}>
-                {backend.probeKind === "live" ? backend.probeDetail : `Probe unavailable — ${backend.probeDetail}`}
-              </p>
-              {backend.selectable ? (
-                <button
-                  type="button"
-                  data-testid={`memory-backend-${backend.id}-select`}
-                  disabled={selecting || loadState !== "ready"}
-                  onClick={() => void onSelectLocal()}
-                >
-                  {selecting ? "Confirming…" : "Use Qubit local memory"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  data-testid={`memory-backend-${backend.id}-select`}
-                  disabled
-                  title={backend.disabledReason}
-                  aria-disabled="true"
-                >
-                  Unavailable — disabled with reason
-                </button>
-              )}
-              {!backend.selectable && (
-                <p data-testid={`memory-backend-${backend.id}-reason`} role="note">
-                  {backend.disabledReason}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {actionMessage && (
-        <p data-testid="memory-action-message" role="status">
-          {actionMessage}
-        </p>
-      )}
-    </main>
+        <SettingsSection
+          title="Gate policy"
+          description="The memory-provider gate is local-only by policy; these rows quote the exact refusal."
+        >
+          <SettingsRow
+            title={<span className="settings-row__value settings-row__value--mono">{MEMORY_LOCAL_ONLY_REFUSAL.method}</span>}
+            description={MEMORY_LOCAL_ONLY_REFUSAL.detail}
+            control={
+              <SettingsStatus tone="warn" title={MEMORY_LOCAL_ONLY_REFUSAL.detail}>
+                {MEMORY_LOCAL_ONLY_REFUSAL.code}
+              </SettingsStatus>
+            }
+          />
+          <SettingsRow
+            title="Counterpart"
+            description="Where the capability actually lives on Qubit."
+            control={<SettingsValue>{MEMORY_LOCAL_ONLY_REFUSAL.counterpart}</SettingsValue>}
+          />
+        </SettingsSection>
+      </div>
+    </SettingsPage>
   );
 }

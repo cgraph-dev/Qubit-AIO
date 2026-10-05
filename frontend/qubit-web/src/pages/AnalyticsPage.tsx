@@ -19,11 +19,20 @@ import type {
 import { timeAgo } from "@/lib/utils";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Stats } from "@nous-research/ui/ui/components/stats";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
+import {
+  SettingsEmpty,
+  SettingsLoadingSkeleton,
+  SettingsPage,
+  SettingsRow,
+  SettingsSection,
+  SettingsStatus,
+  SettingsSummary,
+} from "@/components/openclaw-ui";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";
+import { Link } from "react-router";
 
 const PERIODS = [
   { label: "7d", days: 7 },
@@ -125,7 +134,13 @@ function SortHeader({
   );
 }
 
-
+// ---------------------------------------------------------------------------
+// Charts and tables
+//
+// These are dense data surfaces; they keep their semantic table markup and
+// sit inside a `.settings-group` so the page still reads as one settings
+// surface. The chart card is a single group surface — no nested card chrome.
+// ---------------------------------------------------------------------------
 
 function TokenBarChart({ daily }: { daily: AnalyticsDailyEntry[] }) {
   const { t } = useI18n();
@@ -403,15 +418,80 @@ function SkillTable({ skills }: { skills: AnalyticsSkillEntry[] }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Hidden state
+//
+// `dashboard.show_token_analytics` gates the whole page. The gate is not a
+// bare wall of prose: it is one settings section whose notice (`SettingsEmpty`)
+// carries the honest reason and whose row carries the action — a link to the
+// Config page where the flag can be flipped. No numbers are fabricated.
+// ---------------------------------------------------------------------------
+
+function HiddenState() {
+  return (
+    <SettingsSection
+      title="Token analytics"
+      description="Local token, session, and per-day figures for this profile. Local cost fields are never populated."
+      notice={
+        <SettingsEmpty title="Token analytics are hidden">
+          The numbers on this page are a local debug estimate, not provider
+          billing, so they are hidden rather than shown as if authoritative.
+        </SettingsEmpty>
+      }
+    >
+      <SettingsRow
+        title="What it counts"
+        description="Successful main-agent responses that carry a usable usage block. Nothing else."
+        control={<SettingsStatus tone="idle">Partial</SettingsStatus>}
+      />
+      <SettingsRow
+        title="What it excludes"
+        description="Auxiliary calls (compression, titles, vision, session search, web extract, approvals, MCP routing, plugin LLM), provider retries, and cache writes."
+        control={<SettingsStatus tone="warn">Incomplete</SettingsStatus>}
+      />
+      <SettingsRow
+        title="Why it is hidden"
+        description="On models with heavy auxiliary traffic (Kimi K2.6, MiniMax M2.7) the local total can read 10x–100x below your provider bill."
+        control={<SettingsStatus tone="error">Misleading</SettingsStatus>}
+      />
+      <SettingsRow
+        title="For actual usage"
+        description="Check your provider dashboard (OpenRouter, Anthropic, …) for real usage and billing."
+      />
+      <SettingsRow
+        title="Show local debug estimate"
+        description={
+          <>
+            Set <code className="font-mono">dashboard.show_token_analytics</code>{" "}
+            to <code className="font-mono">true</code> in Config to render the
+            local estimate anyway. In Config, search for{" "}
+            <code className="font-mono">show_token_analytics</code> or open the{" "}
+            <strong>Display</strong> category.
+          </>
+        }
+        control={
+          <Link
+            to="/config"
+            className="btn"
+            aria-label="Open Config to enable token analytics"
+          >
+            Open Config
+          </Link>
+        }
+      />
+    </SettingsSection>
+  );
+}
+
 export default function AnalyticsPage() {
   const [days, setDays] = useState(30);
   const [data, setData] = useState<AnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Gated on `dashboard.show_token_analytics` (default off).  When off the
-  // page renders an explanation card instead of fetching analytics — the
-  // local token counts exclude auxiliary calls and provider retries, so
-  // they diverge from provider billing in ways that mislead users.
+  // page renders a settings section explaining the gate instead of fetching
+  // analytics — the local token counts exclude auxiliary calls and provider
+  // retries, so they diverge from provider billing in ways that mislead users.
   const [showTokens, setShowTokens] = useState<boolean | null>(null);
   const { t } = useI18n();
   const { setAfterTitle, setEnd } = usePageHeader();
@@ -481,124 +561,98 @@ export default function AnalyticsPage() {
     load();
   }, [load]);
 
+  const isEmpty =
+    !!data &&
+    data.daily.length === 0 &&
+    data.by_model.length === 0 &&
+    data.skills.top_skills.length === 0;
+
+  // The full-page gate owns its own `.settings-page` wrapper.
+  if (showTokens === false) {
+    return (
+      <div className="settings-page settings-page--wide" data-testid="analytics-page">
+        <PluginSlot name="analytics:top" />
+        <HiddenState />
+        <PluginSlot name="analytics:bottom" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-6">
-      <PluginSlot name="analytics:top" />
+    <SettingsPage wide>
+      <div data-testid="analytics-page" className="contents">
+        <PluginSlot name="analytics:top" />
 
-      {showTokens === false && (
-        <Card>
-          <CardContent className="py-12">
-            <div className="mx-auto flex max-w-2xl flex-col gap-3 text-sm text-muted-foreground">
-              <h2 className="font-mondwest text-display text-base tracking-wider text-foreground">
-                Token analytics hidden
-              </h2>
-              <p>
-                The token, cost, and per-day analytics on this page are a
-                local debug estimate. They only count successful main-agent
-                responses with a usable <span className="font-mono">usage</span>{" "}
-                block, and silently exclude auxiliary calls (context
-                compression, title generation, vision, session search, web
-                extract, smart approvals, MCP routing, plugin LLM access)
-                plus provider-side retries and fallback attempts. Cache
-                writes are missing entirely.
-              </p>
-              <p>
-                On models with heavy auxiliary traffic (Kimi K2.6, MiniMax
-                M2.7) the local total can be 10x–100x lower than what your
-                provider bills. Hiding these numbers is safer than letting
-                them look authoritative.
-              </p>
-              <p>
-                Check your provider dashboard (OpenRouter, Anthropic, etc.)
-                for actual usage and billing. To re-enable the local debug
-                estimate anyway, set{" "}
-                <span className="font-mono">
-                  dashboard.show_token_analytics: true
-                </span>{" "}
-                in <a href="/config" className="underline">Config</a>.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        {showTokens && loading && !data && (
+          <SettingsSection title={t.analytics.period}>
+            <SettingsLoadingSkeleton rows={4} />
+          </SettingsSection>
+        )}
 
-      {showTokens && loading && !data && (
-        <div className="flex items-center justify-center py-24">
-          <Spinner className="text-2xl text-primary" />
-        </div>
-      )}
+        {showTokens && error && (
+          <SettingsSection title="Token analytics">
+            <SettingsRow
+              title="Analytics failed to load"
+              description={error}
+              control={
+                <SettingsStatus tone="error" title={error}>
+                  Error
+                </SettingsStatus>
+              }
+            />
+          </SettingsSection>
+        )}
 
-      {showTokens && error && (
-        <Card>
-          <CardContent className="py-6">
-            <p className="text-sm text-destructive text-center">{error}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {showTokens && data && (
-        <>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardContent className="py-6">
-                <Stats
-                  items={[
-                    {
-                      label: t.analytics.totalTokens,
-                      value: formatTokens(
-                        data.totals.total_input + data.totals.total_output,
-                      ),
-                    },
-                    {
-                      label: t.analytics.input,
-                      value: formatTokens(data.totals.total_input),
-                    },
-                    {
-                      label: t.analytics.output,
-                      value: formatTokens(data.totals.total_output),
-                    },
-                    {
-                      label: t.analytics.totalSessions,
-                      value: `${data.totals.total_sessions} (~${(data.totals.total_sessions / days).toFixed(1)}${t.analytics.perDayAvg})`,
-                    },
-                    {
-                      label: t.analytics.apiCalls,
-                      value: String(
-                        data.totals.total_api_calls ??
-                          data.daily.reduce((sum, d) => sum + d.sessions, 0),
-                      ),
-                    },
-                  ]}
-                />
-              </CardContent>
-            </Card>
+        {showTokens && data && (
+          <>
+            <SettingsSection
+              title={t.analytics.period}
+              description={`Aggregate local estimate over the last ${days} days. Excludes auxiliary calls and retries — not provider billing.`}
+            >
+              <SettingsSummary
+                items={[
+                  {
+                    label: t.analytics.totalTokens,
+                    value: formatTokens(
+                      data.totals.total_input + data.totals.total_output,
+                    ),
+                  },
+                  {
+                    label: t.analytics.input,
+                    value: formatTokens(data.totals.total_input),
+                  },
+                  {
+                    label: t.analytics.output,
+                    value: formatTokens(data.totals.total_output),
+                  },
+                  {
+                    label: t.analytics.totalSessions,
+                    value: data.totals.total_sessions,
+                  },
+                  {
+                    label: t.analytics.apiCalls,
+                    value:
+                      data.totals.total_api_calls ??
+                      data.daily.reduce((sum, d) => sum + d.sessions, 0),
+                  },
+                ]}
+              />
+              {isEmpty ? (
+                <SettingsEmpty title={t.analytics.noUsageData}>
+                  {t.analytics.startSession}
+                </SettingsEmpty>
+              ) : null}
+            </SettingsSection>
 
             <TokenBarChart daily={data.daily} />
-          </div>
-
-          <DailyTable daily={data.daily} />
-          <ModelTable models={data.by_model} />
-          <SkillTable skills={data.skills.top_skills} />
-        </>
-      )}
-
-      {data &&
-        data.daily.length === 0 &&
-        data.by_model.length === 0 &&
-        data.skills.top_skills.length === 0 && (
-          <Card>
-            <CardContent className="py-12">
-              <div className="flex flex-col items-center text-muted-foreground">
-                <BarChart3 className="h-8 w-8 mb-3 opacity-40" />
-                <p className="text-sm font-medium">{t.analytics.noUsageData}</p>
-                <p className="text-xs mt-1 text-text-tertiary">
-                  {t.analytics.startSession}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+            <DailyTable daily={data.daily} />
+            <ModelTable models={data.by_model} />
+            <SkillTable skills={data.skills.top_skills} />
+          </>
         )}
-      <PluginSlot name="analytics:bottom" />
-    </div>
+
+        <PluginSlot name="analytics:bottom" />
+      </div>
+    </SettingsPage>
   );
 }

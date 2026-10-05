@@ -1,0 +1,225 @@
+/* ------------------------------------------------------------------
+ * Qubit upstream port — shared controls (.btn/.callout from components.css).
+ * Source: external upstream (MIT, (c) 2026 OpenClaw Foundation) — see THIRD_PARTY_NOTICES.md
+ * Pinned commit: 7ff3b3be3713751de356800167d67ce752ad0d04
+ * Upstream path(s): ui/src/styles/components.css (.btn/.callout families only)
+ * Local path  : frontend/qubit-web/src/styles/upstream/upstream-chrome.css
+ *
+ * Selectors are 1:1 with upstream at the pinned commit. Theme/color vars
+ * are remapped to the Qubit theme (see the :root compat block below, which
+ * references only Qubit theme vars from src/index.css); layout constants
+ * are copied verbatim from upstream ui/src/styles/base.css :root.
+ * Brand strings (qubit-* custom-element selectors) are renamed qubit-*.
+ * Zero legacy brand remains in product surfaces.
+ * ------------------------------------------------------------------ */
+
+/* Theme vars: see upstream-compat.css (.qb-upstream scope). */
+
+.btn {
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  /* Labels never break mid-text; tight clusters wrap whole buttons instead
+     (see .settings-row--actions). */
+  white-space: nowrap;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+.btn:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+.btn:active:where(:not(:disabled, [aria-disabled="true"])) {
+  background: var(--secondary);
+}
+.btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+.btn.primary {
+  border-color: transparent;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 1px 3px var(--accent-subtle);
+}
+.btn.primary:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  background: var(--primary-hover);
+  box-shadow: 0 2px 12px var(--accent-glow);
+}
+.btn.active {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--text);
+}
+.btn.danger {
+  border-color: transparent;
+  background: var(--danger-subtle);
+  color: var(--danger);
+}
+.btn.danger:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+}
+.btn--sm {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.btn--xs {
+  padding: 4px 6px;
+  font-size: 12px;
+  line-height: 1;
+}
+.btn--icon {
+  padding: 8px;
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.btn--icon:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+.btn--icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.btn--ghost:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: transparent;
+}
+.btn:is(:disabled, [aria-disabled="true"]) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+:root[data-theme-mode="light"] .btn:where(:not(.primary, .danger)) {
+  background: var(--bg);
+  border-color: var(--input);
+}
+:root[data-theme-mode="light"]
+  .btn:hover:where(:not(.primary, .danger, :disabled, [aria-disabled="true"])) {
+  background: var(--bg-hover);
+}
+:root[data-theme-mode="light"] .btn.active {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--text);
+}
+:root[data-theme-mode="light"] .btn--icon {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+  color: var(--muted);
+}
+:root[data-theme-mode="light"] .btn--icon:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+:root[data-theme-mode="light"] .btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+:root[data-theme-mode="light"] .btn--ghost:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  background: var(--bg-hover);
+  border-color: transparent;
+}
+.callout {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.5;
+  position: relative;
+  user-select: text;
+}
+.callout--dismissible,
+.callout--action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.callout.danger {
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--danger) 14%, var(--bg-elevated)) 0%,
+    color-mix(in srgb, var(--danger) 8%, var(--bg-elevated)) 100%
+  );
+  color: color-mix(in srgb, var(--danger) 82%, var(--text-strong));
+}
+.callout.warn {
+  border-color: color-mix(in srgb, var(--warn) 34%, var(--border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--warn) 14%, var(--bg-elevated)) 0%,
+    color-mix(in srgb, var(--warn) 8%, var(--bg-elevated)) 100%
+  );
+  color: color-mix(in srgb, var(--warn) 82%, var(--text-strong));
+}
+.callout.info {
+  border-color: color-mix(in srgb, var(--info) 25%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--info) 8%, transparent) 0%,
+    color-mix(in srgb, var(--info) 4%, transparent) 100%
+  );
+  color: var(--info);
+}
+.callout.success {
+  border-color: color-mix(in srgb, var(--ok) 25%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ok) 8%, transparent) 0%,
+    color-mix(in srgb, var(--ok) 4%, transparent) 100%
+  );
+  color: var(--ok);
+}
+.data-table-bulk-bar .btn svg {
+  width: 14px;
+  height: 14px;
+}
+.exec-approval-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.skill-reader-dialog .exec-approval-header > .btn--icon {
+  min-width: var(--space-7);
+  height: var(--space-7);
+  padding: 0;
+}
+.skill-reader-dialog .btn--icon,
+.skill-reader-dialog .statusDot {
+  flex-shrink: 0;
+}

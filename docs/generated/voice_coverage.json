@@ -5,10 +5,10 @@
     "unresolved": "no unique entry, or an entry with a dead backend"
   },
   "registry": {
-    "bound_backends": 1152,
+    "bound_backends": 1193,
     "dead_backend_ids": [],
     "dead_backends": 0,
-    "total_entries": 1152
+    "total_entries": 1193
   },
   "rows": [
     {

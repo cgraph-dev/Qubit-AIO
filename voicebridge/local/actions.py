@@ -514,6 +514,34 @@ def _documents_dir() -> Path:
     return d
 
 
+def _newest_note() -> Optional[Path]:
+    """Most recently modified ``*.txt`` under ``~/Documents``, else None.
+
+    No-name open resumes this (fix lane 2026-10-04); an empty/unreadable
+    directory yields None so the caller falls back to a blank page. Read
+    order only — never creates, never writes. Never raises.
+    """
+    try:
+        docs = _documents_dir()
+    except Exception:
+        return None
+    try:
+        cands = [p for p in docs.glob("*.txt") if p.is_file()]
+    except OSError:
+        return None
+    best: Optional[Path] = None
+    best_mtime = -1.0
+    for p in cands:
+        try:
+            mt = p.stat().st_mtime
+        except OSError:
+            continue
+        if mt > best_mtime:
+            best_mtime = mt
+            best = p
+    return best
+
+
 def _open_in_editor(path: Optional[Path] = None,
                     editor: str = "") -> str:
     """Open a document (or a blank page) in the LOCAL text editor.
@@ -576,19 +604,26 @@ def _a_create_document(params: Dict[str, Any]) -> str:
     slug = _re.sub(r"[^a-z0-9]+", "-", raw.lower()).strip("-")[:40]
     if not slug:
         slug = "note-" + _dt.datetime.now().strftime("%Y%m%d-%H%M")
+    content = str(params.get("content") or params.get("text") or "")
     target = _documents_dir() / f"{slug}.txt"
     try:
         if not target.exists():
-            target.write_text("", encoding="utf-8")
+            target.write_text(content, encoding="utf-8")
+        elif content:
+            # Named an existing note with dictated content: append, never
+            # overwrite — the spoken words land in the file either way.
+            with target.open("a", encoding="utf-8") as fh:
+                fh.write(("\n" if target.stat().st_size else "") + content)
     except Exception as exc:
         return f"Could not create {target.name}: {exc}."
     editor = str(params.get("editor") or "")
     opened = _open_in_editor(target, editor)
+    wrote = f" with {len(content)} chars written" if content else " (empty)"
     if opened.startswith("could not open"):
-        return f"Created {target.name} in Documents, but {opened}"
+        return f"Created {target.name} in Documents{wrote}, but {opened}"
     if "isn't installed" in opened:
-        return f"Created {target.name}. {opened}"
-    return f"Created {target.name} and opened it in the editor."
+        return f"Created {target.name}{wrote}. {opened}"
+    return f"Created {target.name}{wrote} and opened it in the editor."
 
 
 #: Spoken site names -> canonical URLs (generic, operator-neutral).
@@ -662,10 +697,13 @@ def _a_open_document(params: Dict[str, Any]) -> str:
 
     A named document is searched under ``~/Documents`` (exact then
     containing match, ``.txt`` assumed); a missing name is answered
-    honestly, never guessed. No name opens a blank editor.
+    honestly, never guessed. No name resumes the most recently modified
+    note (a bare "open a text file" is a resume-to-write intent), or a
+    blank editor when no notes exist.
     """
     name = str(params.get("name") or "").strip().lower()
     editor = str(params.get("editor") or "")
+    content = str(params.get("content") or params.get("text") or "")
     if name:
         docs = _documents_dir()
         cands = sorted(docs.glob("*.txt"))
@@ -673,15 +711,54 @@ def _a_open_document(params: Dict[str, Any]) -> str:
         if hit is None:
             hit = next((p for p in cands if name in p.stem.lower()), None)
         if hit is None:
+            if content:
+                # "open <name> and write <content>" for a missing note:
+                # create it with the content rather than failing.
+                return _a_create_document(
+                    {"name": name, "content": content, "editor": editor})
             known = ", ".join(p.name for p in cands[:10]) or "no saved notes"
             return (f"I couldn't find {name!r} in Documents "
                     f"({known}). Say 'create a text document' to make one.")
+        if content:
+            # Dictated content for an existing note appends (never
+            # overwrites) so "write X in it" lands in the file.
+            try:
+                with hit.open("a", encoding="utf-8") as fh:
+                    fh.write(("\n" if hit.stat().st_size else "") + content)
+            except Exception as exc:
+                return f"Found {hit.name}, but could not write: {exc}."
+            opened = _open_in_editor(hit, editor)
+            if opened.startswith("could not open"):
+                return (f"Added {len(content)} chars to {hit.name}, "
+                        f"but {opened}")
+            return (f"Added {len(content)} chars to {hit.name} "
+                    f"and opened it in the editor.")
         opened = _open_in_editor(hit, editor)
+    newest = _newest_note()
+    if newest is not None:
+        if content:
+            try:
+                with newest.open("a", encoding="utf-8") as fh:
+                    fh.write(("\n" if newest.stat().st_size else "")
+                             + content)
+            except Exception as exc:
+                return f"Found {newest.name}, but could not write: {exc}."
+            opened = _open_in_editor(newest, editor)
+            if opened.startswith("could not open"):
+                return (f"Added {len(content)} chars to {newest.name}, "
+                        f"but {opened}")
+            return (f"Added {len(content)} chars to {newest.name} "
+                    f"and opened it in the editor.")
+        opened = _open_in_editor(newest, editor)
         if opened.startswith("could not open"):
-            return f"Found {hit.name}, but {opened}"
+            return f"Found {newest.name}, but {opened}"
         if "isn't installed" in opened:
-            return f"Found {hit.name}. {opened}"
-        return f"Opened {hit.name} in the editor."
+            return f"Found {newest.name}. {opened}"
+        return f"Opened {newest.name} in the editor (your most recent note)."
+    if content:
+        # No notes yet and dictated content: make the note with it.
+        return _a_create_document(
+            {"name": "", "content": content, "editor": editor})
     opened = _open_in_editor(None, editor)
     if opened.startswith("could not open"):
         return f"{opened.capitalize()}"
@@ -694,6 +771,62 @@ def _a_open_document(params: Dict[str, Any]) -> str:
 #: "downloads" alone implies the folder; "documents" needs an explicit
 #: folder/directory word (a bare "open documents" stays an editor intent).
 _FOLDERS = {"downloads": "Downloads", "documents": "Documents"}
+
+
+def _strip_beneficiary_tail(name: str) -> str:
+    """Remove a spoken beneficiary tail ("for me/for you/for us/please/now").
+
+    Journal 2026-10-04: "Open a text file for me." extracted ``name="me"``
+    (the ``for`` name-introducer matched the beneficiary) and the turn
+    failed with "couldn't find 'me' in Documents". The beneficiary is never
+    a filename: a trailing tail is dropped, and a bare beneficiary alone
+    ("me", "for me", "me please") collapses to "" (no-name open resumes the
+    newest note, else a blank page), never a Documents lookup. Never raises.
+    """
+    import re as _re
+    t = (name or "").strip(" \"'.)").strip()
+    if not t:
+        return ""
+    # Drop repeated trailing beneficiary phrases ("shopping list for me
+    # please" -> "shopping list"; "me please" -> "me" -> "" below).
+    prev = None
+    while prev != t:
+        prev = t
+        t = _re.sub(
+            r"\s+(?:for\s+(?:me|you|us)|please|now)\s*[.!?]*$", "", t,
+            flags=_re.I).strip(" \"'.)").strip()
+    # A bare beneficiary/pronoun alone is never a document name.
+    if _re.fullmatch(
+            r"(?:me|you|us|it|them|please|now|for\s+(?:me|you|us))", t,
+            flags=_re.I):
+        return ""
+    return t
+
+
+def _extract_doc_content(low: str) -> str:
+    """Spoken document content ("write X in it", "with the text X", ...).
+
+    Returns the dictated body or "" when the utterance carries none.
+    Bounded (1000 chars): spoken content is short, and an unbounded grab
+    would swallow trailing command words. Never raises.
+    """
+    import re as _re
+    t = str(low or "")
+    patterns = (
+        r"\bwrite\s+(.+?)\s+in\s+it\b",
+        r"\bwith\s+(?:the\s+)?(?:text|content)\s+(.+?)(?:\s+in\s+it)?\s*$",
+        r"\bsaying\s+(.+?)(?:\s+in\s+it)?\s*$",
+        r"\bcontaining\s+(.+?)(?:\s+in\s+it)?\s*$",
+        r"\bthat\s+says\s+(.+?)(?:\s+in\s+it)?\s*$",
+    )
+    for pat in patterns:
+        m = _re.search(pat, t)
+        if not m:
+            continue
+        body = (m.group(1) or "").strip(" \"'.,!?").strip()
+        if body and body.lower() not in ("it", "that", "this"):
+            return body[:1000]
+    return ""
 
 
 def _a_open_folder(params: Dict[str, Any]) -> str:
@@ -723,6 +856,294 @@ def _a_open_folder(params: Dict[str, Any]) -> str:
     return f"Opened {label}."
 
 
+# --- Slice 3 — VS Code edits by voice (default shape) -------------------------
+# "in chat: in repo X, change ..." enters through Agent 1's route-word
+# bypass (``chat_transport.parse_route_word``); the stripped task text lands
+# here. The headless /chat worker applies free-form changes; these local
+# actions cover the bounded slice: stage-or-apply a structured change
+# (``repo_edit``, confirm-gated, no free writes), open VS Code on the file
+# (``vscode_open``), and probe the official VS Code native MCP integration
+# (``code_mcp_probe``, read-only — never installs, never invents a server).
+# Dictated line-by-line edits are OUT (owner decision): they are refused
+# with a describe-the-change pointer, never applied.
+
+#: Phrases that mean "dictate code at me" (error-prone, OUT per Slice 3).
+#: A bare "change the greeting" is a description (kept); two or more
+#: "line N" claims, "type exactly", or "line by line" is dictation.
+_DICTATION_LINE_RE = r"\bline\s+\d+\b"
+_DICTATION_MARKERS = (
+    "type exactly",
+    "line by line",
+    "line-by-line",
+)
+
+
+def _looks_like_dictation(instruction: str) -> bool:
+    import re as _re
+    low = (instruction or "").lower()
+    if any(m in low for m in _DICTATION_MARKERS):
+        return True
+    return len(_re.findall(_DICTATION_LINE_RE, low)) >= 2
+
+
+#: Repos an explicit absolute path may resolve under when no operator
+#: project root matches: the operator's own tree and the scratch area.
+#: Anything else is refused (never a drive-by absolute path by voice).
+_SCRATCH_PREFIXES = ("/tmp",)
+
+
+def _scratch_allowed(p: Path) -> bool:
+    try:
+        home = Path.home()
+    except Exception:
+        home = None
+    for prefix in _SCRATCH_PREFIXES:
+        try:
+            if p.is_relative_to(prefix):
+                return True
+        except Exception:
+            pass
+    if home is not None:
+        try:
+            if p.is_relative_to(home):
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def _resolve_repo_dir(repo: str, path_hint: str = "") -> tuple:
+    """Resolve a repo name/hint to a real directory, or (None, reply).
+
+    Order: an explicit existing path (confined to the operator tree or
+    scratch), then the operator-configured ``project_roots`` name/fuzzy
+    match (same rule as ``_a_open_project``). Never raises; failures are
+    honest strings and write nothing.
+    """
+    hint = (path_hint or "").strip()
+    if hint:
+        try:
+            p = Path(os.path.expanduser(hint)).resolve()
+        except Exception:
+            return None, "I couldn't resolve that repo path."
+        if not p.is_dir():
+            return None, "That repo path isn't a directory I can open."
+        if not _scratch_allowed(p):
+            return None, (f"Refused: {p} is outside your projects and "
+                           "scratch areas.")
+        return p, ""
+    name = (repo or "").strip().lower()
+    roots = _project_roots()
+    root = roots.get(name)
+    if not root:
+        for key, path in roots.items():
+            if key in name and len(key) > 2:
+                root = path
+                break
+    if not root:
+        known = ", ".join(sorted(set(roots))) or "none configured"
+        return None, (f"I don't know a repo called '{repo or 'that'}' "
+                      f"({known}). Which repo should I use?")
+    try:
+        p = Path(os.path.expanduser(str(root))).resolve()
+    except Exception:
+        return None, "I couldn't resolve that repo path."
+    if not p.is_dir():
+        return None, "That repo path isn't a directory I can open."
+    return p, ""
+
+
+def _extract_repo_instruction(text: str, repo: str) -> str:
+    """The change description with the "in repo X" span removed."""
+    import re as _re
+    instr = _re.sub(r"\bin\s+repo\s+[\w.-]+\s*,?", "", text,
+                    count=1, flags=_re.I).strip(" ,.")
+    return instr or text.strip()
+
+
+def _extract_replace_parts(instruction: str) -> tuple:
+    """Structured "replace A with B in F" -> (old, new, file), else Nones.
+
+    Only this narrow, reviewable shape auto-applies on settle; free-form
+    prose stages to the headless /chat worker instead.
+    """
+    import re as _re
+    m = _re.search(r"\breplace\s+(.+?)\s+with\s+(.+?)"
+                   r"(?:\s+in\s+(\S+))?\s*$", instruction, flags=_re.I)
+    if not m:
+        return None, None, None
+    old, new = m.group(1).strip(" \"'."), m.group(2).strip(" \"'.")
+    fil = (m.group(3) or "").strip(" \"'.,)")
+    if not old or not new:
+        return None, None, None
+    return old, new, fil or ""
+
+
+def _extract_path_token(text: str) -> str:
+    """First path-like token (dotted filename or /path), else ""."""
+    import re as _re
+    m = _re.search(r"(/[\w.~/-]*[\w.-]+\.\w[\w.]*)", text)
+    if m:
+        return m.group(1)
+    m = _re.search(r"\b([\w.-]+\.\w[\w.]*)\b", text)
+    return m.group(1) if m else ""
+
+
+def format_edit_report(stat: Dict[str, Any]) -> str:
+    """Spoken diff summary: file + lines changed, never file content.
+
+    ``stat`` carries counts only (``file``/``added``/``removed``/
+    ``start_line``/``end_line``); any content-shaped key (``preview``,
+    ``old``, ``new``) is ignored by construction so payload text can never
+    reach the spoken path.
+    """
+    name = str((stat or {}).get("file") or "the file")
+    try:
+        added = int((stat or {}).get("added", 0))
+    except Exception:
+        added = 0
+    try:
+        removed = int((stat or {}).get("removed", 0))
+    except Exception:
+        removed = 0
+    start = str((stat or {}).get("start_line") or "")
+    end = str((stat or {}).get("end_line") or "")
+    span = f" (lines {start}–{end})" if start and end else (
+        f" (line {start})" if start else "")
+    return (f"Changed {name}: {added} added, {removed} removed"
+            f"{span}.")
+
+
+def _a_repo_edit(params: Dict[str, Any]) -> str:
+    """'in repo X, change ...' -> stage confirm-gated, apply on settle.
+
+    Staging writes nothing (the reply names the voice-"yes" settle word).
+    The settled apply handles only the structured "replace A with B in F"
+    shape: single file, confined to the repo, exact-once match (fail
+    closed), bounded sizes. Free-form prose stages to the headless /chat
+    worker instead of being guessed at; dictation is refused outright.
+    """
+    repo = str((params or {}).get("repo") or "")
+    instruction = str((params or {}).get("instruction") or "")
+    confirmed = str((params or {}).get("confirmed") or "").strip().lower()
+    root, reply = _resolve_repo_dir(repo, str((params or {}).get("path") or ""))
+    if root is None:
+        return reply
+    if _looks_like_dictation(instruction):
+        return ("I don't take dictated line-by-line edits — describe the "
+                f"change ('change the greeting in {repo or 'the repo'}') "
+                "and I'll run it in chat.")
+    target_desc = str((params or {}).get("file") or "") or "the code"
+    if confirmed != "yes":
+        short = instruction[:160] or "that change"
+        return (f"Ready to change {target_desc} in {repo or root.name} "
+                f"({short}). Say yes to apply it.")
+    old = str((params or {}).get("old") or "")
+    new = str((params or {}).get("new") or "")
+    fil = str((params or {}).get("file") or "")
+    if not old or not new or not fil:
+        return (f"I'll run that in chat against {repo or root.name}: "
+                f"'{instruction[:160]}'. Say yes to launch the worker.")
+    if len(new) > 10 * 1024:
+        return "That replacement is too large to apply by voice."
+    target = (root / fil).resolve()
+    try:
+        inside = target.is_relative_to(root)
+    except Exception:
+        inside = False
+    if not inside:
+        return f"Refused: {fil} is outside the {repo or root.name} repo."
+    if not target.is_file():
+        return f"I couldn't find {fil} in {repo or root.name}."
+    try:
+        if target.stat().st_size > 1024 * 1024:
+            return f"{fil} is too large to patch by voice."
+        body = target.read_text(encoding="utf-8")
+    except Exception as exc:
+        return f"Could not read {fil}: {exc}."
+    count = body.count(old)
+    if count == 0:
+        return f"I couldn't find that text in {fil} — nothing changed."
+    if count > 1:
+        return (f"'{old[:60]}' appears more than once in {fil} — "
+                "say which line to change.")
+    lineno = body[:body.index(old)].count("\n") + 1
+    try:
+        target.write_text(body.replace(old, new, 1), encoding="utf-8")
+    except Exception as exc:
+        return f"Could not write {fil}: {exc}."
+    log_event("local.repo_edit", repo=repo[:80], file=fil[:120],
+              line=lineno)
+    return format_edit_report({"file": fil, "added": 1, "removed": 1,
+                               "start_line": lineno, "end_line": lineno})
+
+
+def _a_vscode_open(params: Dict[str, Any]) -> str:
+    """Open a file (or repo) in VS Code at an optional line.
+
+    ``code -g path[:line]`` — navigation only, never a write. Honest when
+    ``code`` is absent; never raises.
+    """
+    line = str((params or {}).get("line") or "").strip()
+    if line and not line.isdigit():
+        line = ""
+    target_hint = str((params or {}).get("path") or "").strip()
+    if not target_hint and (params or {}).get("repo"):
+        root, reply = _resolve_repo_dir(str((params or {}).get("repo") or ""))
+        if root is None:
+            return reply
+        target = root
+    elif target_hint:
+        try:
+            target = Path(os.path.expanduser(target_hint)).resolve()
+        except Exception:
+            return "I couldn't resolve that path."
+        if not target.exists():
+            return "I couldn't find that file to open."
+        if not _scratch_allowed(target):
+            return (f"Refused: {target} is outside your projects and "
+                    "scratch areas.")
+    else:
+        return "Which file should I open in VS Code?"
+    if not shutil.which("code"):
+        return ("VS Code isn't installed (no `code` on PATH), so I can't "
+                "open it — the file is untouched.")
+    goto = f"{target}:{line}" if line and target.is_file() else str(target)
+    try:
+        subprocess.Popen(["code", "-g", goto],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
+    except Exception as exc:
+        return f"Could not open VS Code: {exc}."
+    name = target.name or str(target)
+    at = f" at line {line}" if line and target.is_file() else ""
+    return f"Opened {name}{at} in VS Code."
+
+
+def _a_code_mcp_probe(_: Dict[str, Any]) -> str:
+    """Read-only probe of the official VS Code native MCP integration.
+
+    Checks ``code --add-mcp`` presence via the CLI help text. Reports the
+    upgrade path honestly (present -> live editor state usable; absent ->
+    CLI-open + worker-edit fallback). Never launches, installs, or
+    configures anything, and never invents an MCP server.
+    """
+    if not shutil.which("code"):
+        return ("VS Code isn't installed here — falling back to CLI-open "
+                "+ worker-edit.")
+    try:
+        help_text = _run(["code", "--help"], timeout=10.0)
+    except Exception:
+        return ("I couldn't probe the VS Code CLI — falling back to "
+                "CLI-open + worker-edit.")
+    if "--add-mcp" in (help_text or ""):
+        return ("The VS Code native MCP integration is available "
+                "(code --add-mcp present) — the worker can use live "
+                "editor state.")
+    return ("No native MCP flag on this VS Code CLI — falling back to "
+            "CLI-open + worker-edit.")
+
+
 def _a_quick_note(params: Dict[str, Any]) -> str:
     text = params.get("note", "").strip()
     if not text:
@@ -736,24 +1157,530 @@ def _a_quick_note(params: Dict[str, Any]) -> str:
     return f"Noted: {text[:80]}"
 
 
+# --- Durable one-shot timers ---------------------------------------------
+# Journal-proof defect (2026-10-03, lane 1): a 1-minute voice timer spoke
+# "I'll notify you" and never fired. The old `_a_timer` armed only an
+# in-process `threading.Timer` (daemon-inheriting: it dies with the worker
+# thread/helper process that set it), wrote ZERO audit events, and ignored
+# notify-send/paplay failures silently — so a miss was invisible.
+#
+# New contract: setting a timer persists a ledger record synchronously
+# (`local_timers.json` next to the schedules store, atomic replace, fcntl
+# claim so exactly one firer wins), then arms a DETACHED survivor
+# (systemd-run transient `--on-active`, else a reparented sleeper) that
+# re-enters this module (`--fire-timer <id>`) from a fresh process. The
+# in-process thread is kept as a best-effort second layer. Every hop is
+# audited (`local.timer.scheduled/armed/fired/notify_failed/arm_failed`);
+# notify/sound failures are recorded LOUD on the record, never swallowed.
+#
+# Deliberately NOT used: `schedules.create_job(once in N minutes)` — the
+# only autonomous ticker is the hourly communications-monitor `autofire`
+# pass, so a schedule-backed 1-minute timer would fire up to ~60 min late.
+# The ledger survives reboots honestly (a `scheduled` record past its
+# fire_at with no `fired` receipt means "never fired" — askable via
+# `timer_status`/`poll_fired_timers`, the pull seam for the voice lane).
+_TIMER_LEDGER_NAME = "local_timers.json"
+_TIMER_MIN, _TIMER_MAX = 1, 180
+# Bug-1 lane (2026-10-04): the voice reminder dedup lived only in the
+# helper's in-memory `_timers_announced` set while the ledger keeps
+# `status=fired` forever — so every helper restart re-nagged (journal:
+# f432b3b9cde7 reminded once per helper generation). The ledger now
+# carries a persistent `announced` bit, and `poll_fired_timers` consumes
+# what it returns (atomic under the ledger lock). `_TIMER_DELIVERY_TTL_S`
+# is the backstop for pre-fix rows that were announced in-memory but never
+# marked (fired long ago -> never re-pulled, so the deploy restart itself
+# stays silent). `_TIMER_DELIVERY_PER_POLL` mirrors
+# `DesktopHelper._TIMER_DELIVERY_PER_TURN` exactly: the helper drains at
+# most that many per turn, so the poller marks at most that many per call
+# and a 5-deep backlog drains 3 + 2 instead of losing rows. Keep the two
+# constants in lock-step; the coupling is pinned by
+# `tests/test_timer_announced_persist9u.py::test_drain_contract_preserved`
+# and `tests/test_timer_reminder9u.py::test_delivery_capped_per_turn`.
+_TIMER_DELIVERY_TTL_S = 6 * 3600.0
+_TIMER_FIRED_PRUNE_S = 24 * 3600.0
+_TIMER_DELIVERY_PER_POLL = 3
+
+
+def _timer_state_dir() -> Path:
+    """Durable dir for the timer ledger (hermetic seam: env override)."""
+    over = os.environ.get("QUBIT_TIMER_STATE_DIR")
+    if over:
+        p = Path(over)
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    try:
+        from ..config import Config
+        sd = Path(Config.load().state_dir())
+        sd.mkdir(parents=True, exist_ok=True)
+        return sd
+    except Exception:
+        from ..config import canonical_state_dir
+        sd = Path(canonical_state_dir())
+        sd.mkdir(parents=True, exist_ok=True)
+        return sd
+
+
+def _timer_ledger_path() -> Path:
+    return _timer_state_dir() / _TIMER_LEDGER_NAME
+
+
+def _timer_lock(path: Path):
+    """Best-effort exclusive file lock (POSIX; no-op where unavailable)."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def _locked():
+        try:
+            import fcntl
+            fh = open(str(path) + ".lock", "w")
+            try:
+                fcntl.flock(fh, fcntl.LOCK_EX)
+                yield
+            finally:
+                try:
+                    fcntl.flock(fh, fcntl.LOCK_UN)
+                except Exception:
+                    pass
+                fh.close()
+        except Exception:
+            yield
+    return _locked()
+
+
+def _timer_read_all() -> Dict[str, Any]:
+    import json as _j
+    p = _timer_ledger_path()
+    try:
+        data = _j.loads(p.read_text())
+        if isinstance(data, dict) and isinstance(data.get("timers"), list):
+            return data
+    except Exception:
+        pass
+    return {"timers": []}
+
+
+def _timer_write_all(data: Dict[str, Any]) -> None:
+    import json as _j
+    p = _timer_ledger_path()
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(_j.dumps(data, indent=2, sort_keys=True))
+    os.replace(str(tmp), str(p))
+
+
+def schedule_timer(mins: int) -> Dict[str, Any]:
+    """Persist a `scheduled` timer record; returns the record (sync)."""
+    import time as _t
+    import uuid as _u
+    mins = max(_TIMER_MIN, min(int(mins), _TIMER_MAX))
+    now = _t.time()
+    rec = {"id": _u.uuid4().hex[:12], "mins": mins,
+           "created_at": now, "fire_at": now + mins * 60.0,
+           "status": "scheduled", "fired_at": 0.0,
+           "mechanism": "", "notify": {}, "sound": {}}
+    with _timer_lock(_timer_ledger_path()):
+        data = _timer_read_all()
+        data["timers"].append(rec)
+        _timer_write_all(data)
+    return dict(rec)
+
+
+def timer_status(timer_id: str) -> Optional[Dict[str, Any]]:
+    """Read one timer record (None when unknown). Never raises."""
+    try:
+        for rec in _timer_read_all().get("timers", []):
+            if str(rec.get("id")) == str(timer_id):
+                return dict(rec)
+    except Exception:
+        pass
+    return None
+
+
+def poll_fired_timers(since: float = 0.0, *, limit: int = _TIMER_DELIVERY_PER_POLL,
+                      consume: bool = True) -> List[Dict[str, Any]]:
+    """Oldest-first `fired` records with fired_at > since (voice pull seam).
+
+    A future service/helper turn can announce these ("your timer went off
+    while you were away") without any push channel into those processes.
+
+    Bug-1 lane (2026-10-04): this is now CONSUMING by default. Rows already
+    marked `announced` are skipped, rows older than `_TIMER_DELIVERY_TTL_S`
+    are never returned (stale pre-fix rows must not re-nag after a
+    restart), at most `limit` rows are returned oldest-first, and returned
+    rows are atomically marked `announced` under the ledger lock — so no
+    restart/reboot ever re-nags, while a backlog still drains across turns
+    (3 + 2, mirroring the helper's per-turn cap) instead of being lost.
+    Pass `consume=False` for a pure read (nothing is marked). `since`,
+    `limit`, and `consume` are keyword-compatible with the old
+    positional-`since` call shape. Never raises.
+    """
+    import time as _t
+    now = _t.time()
+    try:
+        lim = max(1, int(limit))
+    except Exception:
+        lim = _TIMER_DELIVERY_PER_POLL
+    out: List[Dict[str, Any]] = []
+    try:
+        with _timer_lock(_timer_ledger_path()):
+            data = _timer_read_all()
+            cand = []
+            for rec in data.get("timers", []):
+                if not isinstance(rec, dict):
+                    continue
+                if rec.get("status") != "fired":
+                    continue
+                if rec.get("announced") is True:
+                    continue
+                try:
+                    fired_at = float(rec.get("fired_at") or 0.0)
+                except Exception:
+                    continue
+                if fired_at <= float(since):
+                    continue
+                if fired_at <= 0.0 or (now - fired_at) > _TIMER_DELIVERY_TTL_S:
+                    continue
+                cand.append(rec)
+            cand.sort(key=lambda r: float(r.get("fired_at") or 0.0))
+            picked = cand[:lim]
+            if consume and picked:
+                for rec in picked:
+                    rec["announced"] = True
+                    rec["announced_at"] = now
+                _timer_write_all(data)
+                for rec in picked:
+                    log_event("local.timer.announced",
+                              timer_id=str(rec.get("id"))[:16])
+            out = [dict(rec) for rec in picked]
+    except Exception:
+        pass
+    try:
+        prune_old_fired()
+    except Exception:
+        pass
+    return out
+
+
+def mark_timers_announced(timer_ids) -> int:
+    """Persistently mark fired rows announced (explicit ack seam).
+
+    `poll_fired_timers` already consumes what it returns; this is the
+    explicit form (tests, future callers). Returns the count marked.
+    Never raises.
+    """
+    import time as _t
+    try:
+        want = {str(t) for t in (timer_ids or [])}
+    except Exception:
+        return 0
+    if not want:
+        return 0
+    marked = 0
+    try:
+        with _timer_lock(_timer_ledger_path()):
+            data = _timer_read_all()
+            for rec in data.get("timers", []):
+                if (isinstance(rec, dict)
+                        and str(rec.get("id")) in want
+                        and rec.get("status") == "fired"
+                        and rec.get("announced") is not True):
+                    rec["announced"] = True
+                    rec["announced_at"] = _t.time()
+                    marked += 1
+            if marked:
+                _timer_write_all(data)
+    except Exception:
+        return 0
+    return marked
+
+
+def prune_old_fired(max_age_s: float = _TIMER_FIRED_PRUNE_S) -> int:
+    """Delete `fired` rows older than `max_age_s` (ledger hygiene).
+
+    The delivery TTL suppresses stale re-nags; this reaps the rows so the
+    ledger does not grow forever (Lane 2's flagged open issue #1).
+    `scheduled`/`firing` rows are never touched. Returns the count
+    pruned. Never raises.
+    """
+    import time as _t
+    try:
+        max_age = float(max_age_s)
+    except Exception:
+        return 0
+    now = _t.time()
+    pruned = 0
+    try:
+        with _timer_lock(_timer_ledger_path()):
+            data = _timer_read_all()
+            rows = data.get("timers", [])
+            keep = []
+            for rec in rows:
+                if (isinstance(rec, dict) and rec.get("status") == "fired"):
+                    try:
+                        age = now - float(rec.get("fired_at") or 0.0)
+                    except Exception:
+                        age = max_age + 1.0
+                    if age > max_age:
+                        pruned += 1
+                        log_event("local.timer.pruned",
+                                  timer_id=str(rec.get("id"))[:16],
+                                  age_h=round(age / 3600.0, 1))
+                        continue
+                keep.append(rec)
+            if pruned:
+                data["timers"] = keep
+                _timer_write_all(data)
+    except Exception:
+        return 0
+    return pruned
+
+
+def claim_timer(timer_id: str) -> Optional[Dict[str, Any]]:
+    """Atomically claim a `scheduled` timer (scheduled->firing).
+
+    Exactly one caller wins; every later claim returns None. Never raises.
+    """
+    import time as _t
+    try:
+        with _timer_lock(_timer_ledger_path()):
+            data = _timer_read_all()
+            for rec in data.get("timers", []):
+                if (str(rec.get("id")) == str(timer_id)
+                        and rec.get("status") == "scheduled"):
+                    rec["status"] = "firing"
+                    rec["claimed_at"] = _t.time()
+                    _timer_write_all(data)
+                    return dict(rec)
+    except Exception as exc:
+        log_event("local.timer.claim_failed", timer_id=str(timer_id)[:16],
+                  error=str(exc)[:160])
+    return None
+
+
+def reap_stale_firing(max_age_s: float = 300.0) -> int:
+    """Return crashed `firing` claims to `scheduled` (audited, bounded).
+
+    A firer killed between claim and finalize (SIGKILL, power loss) would
+    otherwise leave the timer silent forever. Firing takes milliseconds
+    (notify-send + paplay + one ledger write), so a claim older than
+    `max_age_s` is a crashed firer, not a slow one. Never raises.
+    """
+    import time as _t
+    now = _t.time()
+    reaped = 0
+    try:
+        with _timer_lock(_timer_ledger_path()):
+            data = _timer_read_all()
+            for rec in data.get("timers", []):
+                if rec.get("status") != "firing":
+                    continue
+                try:
+                    age = now - float(rec.get("claimed_at") or 0.0)
+                except Exception:
+                    age = max_age_s + 1.0
+                if age >= max_age_s:
+                    rec["status"] = "scheduled"
+                    rec["reaped"] = int(rec.get("reaped") or 0) + 1
+                    reaped += 1
+                    log_event("local.timer.reaped",
+                              timer_id=str(rec.get("id"))[:16],
+                              age_s=round(age, 1))
+            if reaped:
+                _timer_write_all(data)
+    except Exception as exc:
+        log_event("local.timer.reap_failed", error=str(exc)[:160])
+    return reaped
+
+
+def _timer_notify(title: str, body: str) -> Dict[str, Any]:
+    """Desktop notification with a typed receipt (never silent)."""
+    if not shutil.which("notify-send"):
+        return {"ok": False, "detail": "notify-send is not installed"}
+    try:
+        proc = subprocess.run(["notify-send", "-a", "Qubit", title, body],
+                              capture_output=True, text=True, timeout=10)
+    except Exception as exc:
+        return {"ok": False, "detail": f"notify-send failed: {exc}"[:200]}
+    if proc.returncode != 0:
+        err = (proc.stderr or "").strip()[:160]
+        return {"ok": False,
+                "detail": f"notify-send exited {proc.returncode}: {err}"}
+    return {"ok": True, "code": 0}
+
+
+def _timer_sound() -> Dict[str, Any]:
+    """Alarm sound with a typed receipt (never silent)."""
+    cand = Path("/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga")
+    if not shutil.which("paplay"):
+        return {"ok": False, "detail": "paplay is not installed"}
+    if not cand.is_file():
+        return {"ok": False, "detail": f"alarm file missing: {cand}"}
+    try:
+        proc = subprocess.run(["paplay", str(cand)], capture_output=True,
+                              text=True, timeout=10)
+    except Exception as exc:
+        return {"ok": False, "detail": f"paplay failed: {exc}"[:200]}
+    if proc.returncode != 0:
+        return {"ok": False,
+                "detail": f"paplay exited {proc.returncode}"}
+    return {"ok": True, "detail": "alarm played"}
+
+
+def fire_timer(timer_id: str, notify_fn: Optional[Callable] = None,
+               sound_fn: Optional[Callable] = None) -> Dict[str, Any]:
+    """Fire one timer exactly once: claim, notify+sound LOUD, finalize.
+
+    Writes only the timer ledger (never chat/session state). Returns
+    `{"fired": bool, ...}`; `fired=False` means another layer already won
+    the claim (not an error). Idempotent and safe to call from any layer.
+    """
+    import time as _t
+    rec = claim_timer(timer_id)
+    if rec is None:
+        return {"fired": False, "detail": "already claimed/fired/unknown"}
+    mins = int(rec.get("mins") or 0)
+    plural = "s" if mins != 1 else ""
+    title = f"Timer: {mins} minute{plural} up."
+    notify = (notify_fn or _timer_notify)(title, "Time's up.")
+    try:
+        sound = (sound_fn or _timer_sound)()
+    except Exception as exc:
+        sound = {"ok": False, "detail": f"sound failed: {exc}"[:200]}
+    if not isinstance(sound, dict):
+        sound = {"ok": False, "detail": f"sound returned {sound!r}"[:160]}
+    if not isinstance(notify, dict):
+        notify = {"ok": False, "detail": f"notify returned {notify!r}"[:160]}
+    log_event("local.timer.fired", timer_id=str(timer_id)[:16], mins=mins,
+              notify_ok=bool(notify.get("ok")),
+              notify_detail=str(notify.get("detail") or "")[:160],
+              sound_ok=bool(sound.get("ok")))
+    if not notify.get("ok"):
+        log_event("local.timer.notify_failed", timer_id=str(timer_id)[:16],
+                  detail=str(notify.get("detail") or "")[:200])
+    try:
+        with _timer_lock(_timer_ledger_path()):
+            data = _timer_read_all()
+            for row in data.get("timers", []):
+                if str(row.get("id")) == str(timer_id):
+                    row["status"] = "fired"
+                    row["fired_at"] = _t.time()
+                    row["notify"] = notify
+                    row["sound"] = sound
+                    break
+            _timer_write_all(data)
+    except Exception as exc:
+        log_event("local.timer.finalize_failed",
+                  timer_id=str(timer_id)[:16], error=str(exc)[:160])
+        return {"fired": True, "detail": "fired but receipt write failed",
+                "notify": notify, "sound": sound}
+    return {"fired": True, "notify": notify, "sound": sound}
+
+
+def _arm_timer_survivor(rec: Dict[str, Any]) -> tuple:
+    """Spawn a detached process that fires the timer on time.
+
+    Preferred: `systemd-run --user --on-active=<s>s` transient timer (owned
+    by the user manager, survives the setting process AND its children).
+    Fallback: a reparented `python -m voicebridge.local.actions
+    --fire-timer-in <s> <id>` sleeper (double-forked via start_new_session,
+    stdio to DEVNULL). Raises when neither can be armed — the caller must
+    degrade LOUD, never promise a notification it cannot deliver.
+    """
+    import time as _t
+    delay = max(1, int(round(float(rec["fire_at"]) - _t.time())))
+    py = sys.executable or "python3"
+    argv = [py, "-m", "voicebridge.local.actions",
+            "--fire-timer", str(rec["id"])]
+    if shutil.which("systemd-run"):
+        cmd = (["systemd-run", "--user", f"--on-active={delay}",
+                f"--unit=qubit-timer-{rec['id']}",
+                "--timer-property=AccuracySec=1s",
+                "--description=Qubit voice timer"])
+        # Hermetic seam: a scratch ledger dir must reach the survivor.
+        if os.environ.get("QUBIT_TIMER_STATE_DIR"):
+            cmd.append("--setenv=QUBIT_TIMER_STATE_DIR="
+                       + os.environ["QUBIT_TIMER_STATE_DIR"])
+        cmd += argv
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True,
+                                  timeout=15)
+        except Exception as exc:
+            raise RuntimeError(f"systemd-run failed: {exc}"[:200])
+        if proc.returncode != 0:
+            err = ((proc.stderr or "") + (proc.stdout or "")) \
+                .strip()[:200]
+            raise RuntimeError(f"systemd-run exited {proc.returncode}: "
+                               f"{err}")
+        return ("systemd-run", f"on-active={delay}s")
+    sleeper = [py, "-m", "voicebridge.local.actions",
+               "--fire-timer-in", str(delay), str(rec["id"])]
+    try:
+        subprocess.Popen(
+            sleeper, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True, close_fds=True)
+    except Exception as exc:
+        raise RuntimeError(f"detached sleeper failed: {exc}"[:200])
+    return ("detached-sleep", f"in={delay}s")
+
+
+def _timer_clock(fire_at: float) -> str:
+    try:
+        import datetime as _dt
+        return _dt.datetime.fromtimestamp(float(fire_at)).strftime("%H:%M")
+    except Exception:
+        return "on time"
+
+
 def _a_timer(params: Dict[str, Any]) -> str:
     mins = params.get("minutes", 5)
-    try: mins = int(mins)
-    except: mins = 5
-    mins = max(1, min(mins, 180))
-    import threading
-    def _fire():
-        # desktop notification + spoken reminder
-        if shutil.which("notify-send"):
-            _run(["notify-send", f"Timer: {mins} minute{'s' if mins!=1 else ''} up.", "Time's up."])
-        # try to speak via piper if available (fire-and-forget)
-        try:
-            import subprocess as sp
-            sp.Popen(["paplay", "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"],
-                     stdout=sp.DEVNULL, stderr=sp.DEVNULL)
-        except: pass
-    threading.Timer(mins*60, _fire).start()
-    return f"Timer set for {mins} minute{'s' if mins!=1 else ''}. I'll notify you."
+    try:
+        mins = int(mins)
+    except Exception:
+        mins = 5
+    mins = max(_TIMER_MIN, min(mins, _TIMER_MAX))
+    try:
+        reaped = reap_stale_firing()
+        if reaped:
+            log_event("local.timer.reaped_at_set", count=reaped)
+        pruned = prune_old_fired()
+        if pruned:
+            log_event("local.timer.pruned_at_set", count=pruned)
+    except Exception:
+        pass
+    try:
+        rec = schedule_timer(mins)
+    except Exception as exc:
+        log_event("local.timer.persist_failed", error=str(exc)[:160])
+        return (f"I couldn't save the timer — it isn't set ({exc}). "
+                f"Nothing will notify you.")
+    log_event("local.timer.scheduled", timer_id=rec["id"], mins=mins,
+              fire_at=rec["fire_at"])
+    # Layer 1 (timely, survives this thread/process): detached survivor.
+    # Layer 2 (best-effort, this process only): in-process fallback.
+    # Both converge on claim_timer(); exactly one of them fires.
+    try:
+        mechanism, _detail = _arm_timer_survivor(rec)
+        log_event("local.timer.armed", timer_id=rec["id"],
+                  mechanism=mechanism)
+        durable = True
+    except Exception as exc:
+        log_event("local.timer.arm_failed", timer_id=rec["id"],
+                  error=str(exc)[:200])
+        durable = False
+    try:
+        import threading as _th
+        _th.Timer(mins * 60, fire_timer, args=(rec["id"],)).start()
+    except Exception as exc:
+        log_event("local.timer.thread_failed", timer_id=rec["id"],
+                  error=str(exc)[:160])
+    when = _timer_clock(rec["fire_at"])
+    plural = "s" if mins != 1 else ""
+    if durable:
+        return (f"Timer set for {mins} minute{plural}. "
+                f"I'll notify you even if I restart (fires ~{when}).")
+    return (f"Timer set for {mins} minute{plural} — warning: I could only "
+            f"arm it in this process, so a restart would lose it "
+            f"(fires ~{when}).")
 
 
 def _a_window_close(_: Dict[str, Any]) -> str:
@@ -1049,6 +1976,59 @@ def _a_compound(params: Dict[str, Any]) -> str:
     return " ".join(o for o in outs if o)
 
 
+# --- Timer number-words (voice: "one minute" .. "thirty minutes") -----------
+# Spoken durations arrive as words ("one", "two", ...) not digits. Map covers
+# one..sixty (tens + twenty/forty/fifty/sixty compounds) plus the indefinite
+# article ("a"/"an" minute == 1). Compounds ("twenty one" / "forty-two") are
+# handled in _timer_minutes_from_word.
+_TIMER_NUMBER_WORDS: Dict[str, int] = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+    "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+    "nineteen": 19, "twenty": 20, "thirty": 30,
+    "forty": 40, "fifty": 50, "sixty": 60,
+    "a": 1, "an": 1,
+}
+
+#: Tens that take a ones compound ("twenty one" .. "sixty nine").
+_TIMER_TENS: Dict[str, int] = {
+    "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60,
+}
+
+# Longest-first alternation so "twenty" doesn't shadow longer names; the
+# tens-X compounds are matched by the duration regex in _match_single.
+_TIMER_ONES_ALT = (r"one|two|three|four|five|six|seven|eight|nine")
+_TIMER_WORD_ALT = (
+    r"twenty[ -]?(?:one|two|three|four|five|six|seven|eight|nine)"
+    r"|forty[ -]?(?:one|two|three|four|five|six|seven|eight|nine)"
+    r"|fifty[ -]?(?:one|two|three|four|five|six|seven|eight|nine)"
+    r"|sixty[ -]?(?:one|two|three|four|five|six|seven|eight|nine)"
+    r"|nineteen|eighteen|seventeen|sixteen|fifteen|fourteen|thirteen|twelve"
+    r"|eleven|sixty|fifty|forty|thirty|twenty|seven|three|eight|five|nine|four|one|two|six|ten"
+    r"|a|an"
+)
+
+#: Hour units ("for 2 hours" -> 120 minutes, clamped by _a_timer as usual).
+_TIMER_HOUR_ALT = r"hours?|hrs?"
+
+
+def _timer_minutes_from_word(word: str) -> Optional[int]:
+    """Convert a spoken number-word (or digit string) to minutes count."""
+    w = (word or "").strip().lower().replace("-", " ")
+    w = " ".join(w.split())
+    if w.isdigit():
+        return int(w)
+    if w in _TIMER_NUMBER_WORDS:
+        return _TIMER_NUMBER_WORDS[w]
+    # tens-X compound ("twenty one" / "forty-two" with extra space)
+    parts = w.split()
+    if len(parts) == 2 and parts[0] in _TIMER_TENS \
+            and parts[1] in _TIMER_NUMBER_WORDS:
+        return _TIMER_TENS[parts[0]] + _TIMER_NUMBER_WORDS[parts[1]]
+    return None
+
+
 # ---------------------------------------------------------------------------
 ACTIONS: Dict[str, LocalAction] = {
     "volume_up": LocalAction("volume_up", "raise speaker volume", _a_volume_up,
@@ -1108,6 +2088,25 @@ ACTIONS: Dict[str, LocalAction] = {
     "open_folder": LocalAction("open_folder", "open Downloads/Documents in Files", _a_open_folder,
                              patterns=[r"\b(open|launch|show|go to)\b.{0,30}?\bdownloads?\b",
                                        r"\b(open|launch|show|go to)\b.{0,30}?\bdocuments?\s+(folder|directory|dir)\b"]),
+    # Slice 3 — VS Code edits by voice. Placed before open_document/
+    # open_website so an explicit "in vscode / in code" file request wins
+    # over the generic document/URL matchers; the patterns require a
+    # path-like token or repo-name form, so document/app phrases keep
+    # their existing owners (pinned by tests).
+    "repo_edit": LocalAction("repo_edit", "stage/apply a voice change in a repo (confirm-gated)", _a_repo_edit,
+                             patterns=[r"\bin\s+repo\s+([\w.-]+)\s*,?\s*change\b",
+                                       r"\bchange\b.{0,80}?\bin\s+repo\s+([\w.-]+)",
+                                       r"\bin\s+repo\s+([\w.-]+)\b"],
+                             confirm=True),
+    "vscode_open": LocalAction("vscode_open", "open a file in VS Code", _a_vscode_open,
+                               patterns=[r"\bopen\s+\S*(?:[\w-]+\.\w[\w.]*|/[\w.~/-]*)\S*\s+in\s+(?:vs\s*code|code)\b",
+                                         r"\bshow\s+\S+\s+in\s+(?:vs\s*code|code)\b",
+                                         r"\bopen\s+(?:the\s+)?([\w.-]+)\s+in\s+(?:vs\s*code|code)\b"]),
+    "code_mcp_probe": LocalAction("code_mcp_probe", "probe the VS Code native MCP integration (read-only)", _a_code_mcp_probe,
+                                  patterns=[r"\bcode\s+--add-mcp\b",
+                                            r"\bvs\s*code\s+mcp\b.{0,24}?\b(available|present|support|integration|installed)\b",
+                                            r"\bmcp\b.{0,24}?\b(available|present)\b.{0,24}?\b(vs\s*code|code)\b",
+                                            r"\bcheck\s+code\s+mcp\b"]),
     "open_document": LocalAction("open_document", "open a text document for writing", _a_open_document,
                                  patterns=[r"\bopen (a |the |this |that |my |new )+(text |txt )?(document|file|note)\b(?![\w-])",
                                            r"\bopen (text |txt )(document|note)\b(?![\w-])",
@@ -1162,8 +2161,12 @@ ACTIONS: Dict[str, LocalAction] = {
                                   r"\b(how much (ram|memory|cpu|disk))\b",
                                   r"\b(battery (level|status|percent))\b"]),
     "timer": LocalAction("timer", "set a timer", _a_timer,
-                        patterns=[r"\b(set (a )?timer (for )?|start (a )?timer)\b",
-                                  r"\b(timer for |remind me in )\s*\d+\s*(minute|minutes|min|mins|second|seconds)\b"]),
+                        # The set-branch keeps the duration space inside the
+                        # optional group: a bare "set a timer" (end of string)
+                        # must match, not just "set a timer for ...".
+                        patterns=[r"\b(set (a |an |the |my )?timer( for)?|start (a |an |the |my )?timer)\b",
+                                  r"\b(timer for |remind me in |in )\s*(\d+|" + _TIMER_WORD_ALT + r")\s*(minute|minutes|min|mins|second|seconds|" + _TIMER_HOUR_ALT + r")\b",
+                                  r"\bhalf an? hour\b"]),
     "quick_note": LocalAction("quick_note", "save a quick note", _a_quick_note,
                         patterns=[r"\b(note (that|this)|remember (that|this)|write down|jot down|save (a )?note)\b",
                                   r"\b(take a note|make a note)\b",
@@ -1223,11 +2226,19 @@ _COMPOUND_STEPS_SEP = "\n"
 #: Fallback when the broker tier table cannot be imported (same-process
 #: import failure): mirrors broker._ACTION_TIERS' non-reversible names.
 _NON_COMPOUNDABLE_FALLBACK = frozenset(
-    {"send_message", "empty_trash", "window_close"})
+    {"send_message", "empty_trash", "window_close", "repo_edit"})
+
+#: Slice 3: a voice repo edit is a write and must never fold into a "both
+#: at once" compound run — even where the broker tier table is reachable
+#: (a new action defaults to REVERSIBLE there). The whole utterance falls
+#: through to the agent path, which confirm-gates it. No partial execution.
+_NEVER_COMPOUND = frozenset({"repo_edit"})
 
 
 def _compoundable(names) -> bool:
     """True only when every named action runs without a broker grant."""
+    if any(n in _NEVER_COMPOUND for n in names):
+        return False
     try:
         from ..broker import _ACTION_TIERS
         from ..capabilities import Tier
@@ -1343,14 +2354,25 @@ def _match_single(text: str) -> Optional[ActionMatch]:
                         params["note"] = text
                 elif name == "timer":
                     import re as _re
-                    m2 = _re.search(r"(\d+)\s*(minute|minutes|min|mins|second|seconds)", low)
-                    if m2:
-                        n = int(m2.group(1))
-                        if "second" in m2.group(2):
-                            n = max(1, (n + 59)//60)
-                        params["minutes"] = n
+                    # Half-hour idiom carries no number word.
+                    if _re.search(r"\bhalf an? hour\b", low):
+                        params["minutes"] = 30
                     else:
-                        params["minutes"] = 5
+                        m2 = _re.search(r"(\d+|" + _TIMER_WORD_ALT + r")\s*(minute|minutes|min|mins|second|seconds|" + _TIMER_HOUR_ALT + r")\b", low)
+                        if m2:
+                            n = _timer_minutes_from_word(m2.group(1))
+                            if n is None:
+                                n = 5
+                            unit = m2.group(2)
+                            if _re.fullmatch(_TIMER_HOUR_ALT, unit):
+                                n = n * 60
+                            elif "second" in unit:
+                                n = max(1, (n + 59)//60)
+                            params["minutes"] = n
+                        elif _re.search(r"\ban? hour\b", low):
+                            params["minutes"] = 60
+                        else:
+                            params["minutes"] = 5
                 elif name == "find_file":
                     import re as _re
                     m2 = _re.search(r"(?:find|locate|search for|where is) (?:a |the )?file\s*(?:named |called )?(.+)", low)
@@ -1364,10 +2386,27 @@ def _match_single(text: str) -> Optional[ActionMatch]:
                             params["query"] = ""
                 elif name in ("create_document", "open_document"):
                     import re as _re
+                    # Spoken content ("write hello world in it", "with the
+                    # text ...", "saying ...", "containing ...") is extracted
+                    # FIRST and blanked out, so the name regex below cannot
+                    # swallow it (2026-10-04: "open a txt document and write
+                    # hello world in it" opened an empty doc — the content
+                    # was parsed nowhere and silently dropped).
+                    params["content"] = _extract_doc_content(low)
+                    if params["content"]:
+                        # Greedy to end of string (mirrors the extraction
+                        # patterns, which are all terminal clauses).
+                        low = _re.sub(
+                            r"\b(?:and\s+)?write\s+.+\s+in\s+it\b"
+                            r"|\bwith\s+(?:the\s+)?(?:text|content)\s+.+"
+                            r"|\bsaying\s+.+|\bcontaining\s+.+"
+                            r"|\bthat\s+says\s+.+",
+                            " ", low)
                     m2 = _re.search(
                         r"(?:called|named|titled|for)\s+(.+?)\s*$", low)
                     if m2:
-                        params["name"] = m2.group(1).strip(" \"'.)")
+                        params["name"] = _strip_beneficiary_tail(
+                            m2.group(1))
                     else:
                         params["name"] = ""
                     if not params["name"] and name == "open_document":
@@ -1381,7 +2420,7 @@ def _match_single(text: str) -> Optional[ActionMatch]:
                         cand = _re.sub(
                             r"\b(a|the|this|that|my|new|text|txt|in|vs|code)\b",
                             "", cand).strip(" ,.-")
-                        params["name"] = cand
+                        params["name"] = _strip_beneficiary_tail(cand)
                     # VS Code opens only when explicitly named; otherwise the
                     # operating system's own .txt editor handles the file.
                     if _re.search(r"\bvs\s*code\b|\bin\s+code\b|\bwith\s+code\b",
@@ -1406,6 +2445,30 @@ def _match_single(text: str) -> Optional[ActionMatch]:
                 elif name == "open_folder":
                     params["folder"] = ("downloads" if "download" in low
                                         else "documents")
+                elif name == "repo_edit":
+                    m2 = _re.search(r"\bin\s+repo\s+([\w.-]+)\b", low)
+                    params["repo"] = (m2.group(1) if m2 else "")
+                    params["instruction"] = _extract_repo_instruction(
+                        text, params["repo"])
+                    old, new, fil = _extract_replace_parts(
+                        params["instruction"])
+                    params["old"] = old or ""
+                    params["new"] = new or ""
+                    params["file"] = fil or _extract_path_token(text)
+                    params["confirmed"] = ""
+                    params["path"] = ""
+                elif name == "vscode_open":
+                    m2 = _re.search(r"\bin\s+(?:vs\s*code|code)\b", low)
+                    params["path"] = _extract_path_token(text)
+                    params["repo"] = ""
+                    if not params["path"]:
+                        m3 = _re.search(
+                            r"\bopen\s+(?:the\s+)?([\w.-]+)\s+in\s+"
+                            r"(?:vs\s*code|code)\b", low)
+                        if m3:
+                            params["repo"] = m3.group(1)
+                    m4 = _re.search(r"\bline\s+(\d+)\b", low)
+                    params["line"] = m4.group(1) if m4 else ""
                 elif name == "open_website":
                     params["url"] = _normalize_website_url(low)
                 elif name == "play_youtube":
@@ -1446,3 +2509,34 @@ def execute(m: ActionMatch) -> str:
     except Exception as exc:
         log_event("local.action.error", action=m.name, error=str(exc)[:160])
         return f"Action failed: {exc}"
+
+
+# Detached-survivor entry: `python -m voicebridge.local.actions
+# --fire-timer <id>` (systemd-run path) or `--fire-timer-in <s> <id>`
+# (reparented-sleeper path). Writes only the timer ledger. Exit 0 whenever
+# the record is known (an already-claimed race is an idempotent no-op);
+# exit 2 only for an unknown id, 3 for bad usage.
+if __name__ == "__main__":
+    import time as _t
+
+    _argv = sys.argv[1:]
+    if _argv[:1] == ["--fire-timer-in"] and len(_argv) == 3:
+        try:
+            _t.sleep(max(0, int(_argv[1])))
+        except Exception:
+            pass
+        _argv = ["--fire-timer", _argv[2]]
+    if _argv[:1] == ["--fire-timer"] and len(_argv) == 2:
+        _known = timer_status(_argv[1])
+        if _known is None:
+            print(f"unknown timer {_argv[1]}", file=sys.stderr)
+            raise SystemExit(2)
+        _res = fire_timer(_argv[1])
+        # Exit 0 whenever the record is known: a lost claim race means the
+        # other layer already fired (idempotent no-op, not a unit failure).
+        if not _res.get("fired"):
+            print("timer already claimed/fired", file=sys.stderr)
+        raise SystemExit(0)
+    print("usage: actions --fire-timer <id> | --fire-timer-in <s> <id>",
+          file=sys.stderr)
+    raise SystemExit(3)

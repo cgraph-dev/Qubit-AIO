@@ -208,7 +208,10 @@ def test_wake_command_runs_the_same_session_and_transform(monkeypatch):
     h.on_wake_command("type this for me: hello world")
     _join_wake_turn(h)
     assert ("begin",) in client.calls
-    assert ("capture", "req-1") in client.calls
+    # P0 2026-10-03: the wake turn must NEVER hit the service capture
+    # (it synthesizes Ctrl+C into the focused window = SIGINT in a
+    # terminal). Local focus snapshot only; the turn still routes.
+    assert ("capture", "req-1") not in client.calls
     assert ("transform", "req-1", "type this for me: hello world") in client.calls
     # Wake dictation flows through the same path: the service returns dictate.
     h2, overlay2, client2, desktop2 = _helper(monkeypatch, available=False,
@@ -591,3 +594,104 @@ def test_yes_with_comma_confirms():
     assert _dh.DesktopHelper._affirmative("Yes, please.")
     assert _dh.DesktopHelper._affirmative("No, thanks.") is False
     assert _dh.DesktopHelper._negative("No, thanks.")
+
+
+def test_recent_tts_speak_detects_service_tts(tmp_path):
+    # Own-TTS echo guard: a recent service/helper speak event means the
+    # room audio is our own reply, not a directed command.
+    import json as _json
+    import time as _t
+
+    import voicebridge.desktop_helper as _dh
+    p = tmp_path / "events.jsonl"
+    now = _t.time()
+    p.write_text(_json.dumps({"event": "tts.speak", "ts": now - 1.0}) + "\n")
+    assert _dh.recent_tts_speak(p, window_s=5.0) is True
+    p.write_text(_json.dumps({"event": "tts.speak", "ts": now - 60.0}) + "\n")
+    assert _dh.recent_tts_speak(p, window_s=5.0) is False
+    assert _dh.recent_tts_speak(tmp_path / "missing.jsonl",
+                                window_s=5.0) is False
+
+
+def test_recent_tts_speak_ignores_wake_commands(tmp_path):
+    import json as _json
+    import time as _t
+
+    import voicebridge.desktop_helper as _dh
+    p = tmp_path / "events.jsonl"
+    p.write_text(_json.dumps(
+        {"event": "voice_edit.wake.command", "ts": _t.time() - 1.0,
+         "command": "open youtube"}) + "\n")
+    assert _dh.recent_tts_speak(p, window_s=5.0) is False
+
+
+def test_wake_pending_probe_sees_fresh_stage(monkeypatch):
+    # Lane 1 (2026-10-03): the wake loop's bare-confirm precheck reads the
+    # helper's staged confirmation through this probe (e.g. the timer).
+    import time as _t
+    h, overlay, client, desktop = _helper(monkeypatch)
+    assert h._wake_has_live_pending() is False
+    h._pending_task = {"text": "set a timer", "request_id": "r1",
+                       "staged_at": _t.monotonic()}
+    assert h._wake_has_live_pending() is True
+
+
+def test_wake_pending_probe_expired_and_malformed(monkeypatch):
+    # Expired or malformed stages read as no-pending (never a settle);
+    # the probe never raises and never consumes the stage.
+    import time as _t
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h._pending_task = {"text": "delete everything", "request_id": "old",
+                       "staged_at": _t.monotonic() - 9999.0}
+    assert h._wake_has_live_pending() is False
+    assert h._pending_task != {}, "the probe must not consume the stage"
+    h._pending_task = {"text": "x"}  # no staged_at
+    assert h._wake_has_live_pending() is False
+    h._pending_task = {}
+    assert h._wake_has_live_pending() is False
+
+
+def test_wake_hint_wired_to_heard_status_path(monkeypatch):
+    # 2026-10-03 (silent-discard fix): start() must wire the wake
+    # monitor's on_hint hook to the heard-preview status line, and the
+    # hook must be status-line-only (no beep/speak/emit). A monitor
+    # built without the hook stays journal-only and never raises.
+    import voicebridge.voice_edit.wake as wake_mod
+    captured = {}
+    real = wake_mod.WakeMonitor
+
+    class _Cap(real):
+        def __init__(self, *a, **kw):
+            captured.update(kw)
+            super().__init__(*a, **kw)
+
+        def start(self):
+            return True  # no live mic thread in tests
+
+    monkeypatch.setattr(wake_mod, "WakeMonitor", _Cap)
+    import voicebridge.voice_edit.heartbeat as hb
+    monkeypatch.setattr(hb, "write", lambda **kw: None)
+    monkeypatch.setattr(dh.DesktopHelper, "_tame_key_repeat",
+                        lambda self: None)
+    h, overlay, client, desktop = _helper(monkeypatch)
+    try:
+        assert h.start() is True
+        hint = captured.get("on_hint")
+        assert callable(hint), captured.keys()
+        hint("heard: Redo this text for me — say hey qubit first")
+        assert ("heard",
+                "heard: Redo this text for me — say hey qubit first") \
+            in overlay.statuses
+        # Status line only: nothing spoken, no turn staged, no state move.
+        assert client.calls == []
+        assert h.state == h.IDLE
+    finally:
+        h.shutdown()
+    # None-hook still safe: a command-shaped discard with no hook wired
+    # emits nothing, posts nothing, and never raises.
+    commands = []
+    m = real(FakeCfg(), on_command=commands.append,
+             is_busy=lambda: False,
+             transcribe=lambda pcm: "Redo this text for me.")
+    m._handle_segment(b"\x00" * 9600)
+    assert commands == []

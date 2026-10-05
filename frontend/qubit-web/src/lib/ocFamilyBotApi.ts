@@ -4,7 +4,8 @@
  * Qubit-owned client for the Qubit Bot page (`/qubit-bot`).
  *
  * Port attribution (MIT, license notice preserved): behavior ported from
- * `CopilotKit/openmuse` (https://github.com/CopilotKit/openmuse)
+ * the external upstream project `CopilotKit/openmuse`
+ * (https://github.com/CopilotKit/openmuse, MIT)
  * commit `9ec439fbaa878197d9d44c2aa982cca55676dd68`, architecture +
  * interaction design (`docs/EXPERIENCE.md`, `docs/RICH-THREADS.md`,
  * `docs/FEATURES.md`), domain shapes (`packages/domain/src/agent.ts`),
@@ -81,6 +82,7 @@ export type BotFamilyAction =
   | "ideas-dismiss"
   | "goals-list"
   | "goals-set"
+  | "goals-update"
   | "watches-set"
   | "alerts-list"
   | "computer-status"
@@ -267,6 +269,14 @@ export const ROUTES: ReadonlyArray<BotFamilyRoute> = [
     path: "/api/qubit/bot/goals-set",
     status: "LIVE",
     counterpart: "durable goal sidecar record (confirm-gated)",
+  },
+  {
+    family: "bot",
+    action: "goals-update",
+    method: "POST",
+    path: "/api/qubit/bot/goals-update",
+    status: "LIVE",
+    counterpart: "durable goal sidecar patch: status/milestones merge, pause cascades to the goal's tasks (confirm-gated)",
   },
   {
     family: "bot",
@@ -881,12 +891,47 @@ export async function listBotGoals(): Promise<unknown> {
 
 /** Record a goal with milestones (confirm-gated). */
 export async function setBotGoal(
-  input: { title: string; description?: string; milestones?: string[] },
+  input: {
+    title: string;
+    description?: string;
+    category?: string;
+    milestones?: string[];
+  },
   confirm?: ConfirmPrompt,
 ): Promise<unknown> {
   return mutate(
     "goals-set",
-    { title: input.title, description: input.description ?? undefined, milestones: input.milestones ?? undefined },
+    {
+      title: input.title,
+      description: input.description ?? undefined,
+      category: input.category ?? undefined,
+      milestones: input.milestones ?? undefined,
+    },
+    confirm,
+  );
+}
+
+/**
+ * Patch a goal's status and/or milestones (confirm-gated).
+ *
+ * Mirrors upstream `service.updateGoal`: a merge patch, and pausing the goal
+ * also pauses every non-terminal task whose `goalId` is this goal.
+ */
+export async function updateBotGoal(
+  input: {
+    id: string;
+    status?: string;
+    milestones?: { id: string; title: string; done: boolean }[];
+  },
+  confirm?: ConfirmPrompt,
+): Promise<unknown> {
+  return mutate(
+    "goals-update",
+    {
+      id: input.id,
+      status: input.status ?? undefined,
+      milestones: input.milestones ?? undefined,
+    },
     confirm,
   );
 }

@@ -369,6 +369,16 @@ def write_secret(cfg: Any, name: str, value: str) -> Dict[str, Any]:
     tmp.write_text("\n".join(out) + "\n")
     os.chmod(tmp, 0o600)
     os.replace(tmp, path)
+    # The vendored runtime dotenv-loads the canonical .env into os.environ at
+    # import, so a key rotated here was shadowed by the stale in-process copy
+    # until a full restart (live 2026-10-05: the owner replaced a rate-limited
+    # OpenCode Go key and every provider call kept failing until the service
+    # restarted). Keep the process env in step with the canonical store the
+    # moment it changes — never logged, never echoed.
+    try:
+        os.environ[clean] = secret
+    except Exception:
+        pass
     return {"name": clean, "stored": "env", "replaced": replaced}
 
 
@@ -399,4 +409,11 @@ def remove_secret(cfg: Any, name: str) -> Dict[str, Any]:
         tmp.write_text("\n".join(out) + ("\n" if out else ""))
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
+        # Keep the in-process env in step with the canonical store (same
+        # reason as write_secret): a removed key must stop resolving without
+        # a service restart.
+        try:
+            os.environ.pop(clean, None)
+        except Exception:
+            pass
     return {"name": clean, "removed": removed}

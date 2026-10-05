@@ -326,8 +326,24 @@ def test_patched_model_set_applies_catalog_pick(patched_qc, tmp_path):
     assert code == 200 and out["ok"] is True, (code, out)
     eff = R.resolve_model(cfg)
     assert eff["ok"] is True and eff["model"] == "anthropic/claude-sonnet-4"
-    # Auxiliary pins stay a typed refusal.
-    code, _ = patched_qc.h_model_set(
-        cfg, {}, {"scope": "auxiliary", "model": "x"}, {})
-    assert code == 400
+    # Auxiliary pins write the runtime config's auxiliary section (reference
+    # parity): pin one slot, read it back through the real reader, and check
+    # validation still rejects junk.
+    code, out = patched_qc.h_model_set(
+        cfg, {}, {"scope": "auxiliary", "task": "vision",
+                  "provider": "opencode-go", "model": "deepseek-v4-flash",
+                  "confirm_expensive_model": True}, {})
+    assert code == 200 and out.get("ok") is True, (code, out)
+    assert out.get("tasks") == ["vision"], out
+    _, aux = patched_qc.h_model_auxiliary(cfg, {}, {}, {})
+    slots = {t["task"]: t for t in aux["tasks"]}
+    assert slots["vision"]["provider"] == "opencode-go", slots["vision"]
+    assert slots["vision"]["model"] == "deepseek-v4-flash", slots["vision"]
+    code, out = patched_qc.h_model_set(
+        cfg, {}, {"scope": "auxiliary", "task": "nope",
+                  "provider": "opencode-go", "model": "x"}, {})
+    assert code == 400, (code, out)
+    code, out = patched_qc.h_model_set(
+        cfg, {}, {"scope": "bogus", "model": "x"}, {})
+    assert code == 400 and out["code"] == "MALFORMED", (code, out)
 

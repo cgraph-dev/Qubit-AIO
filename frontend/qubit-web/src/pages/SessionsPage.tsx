@@ -1155,7 +1155,7 @@ export default function SessionsPage() {
   const refreshEmptyCount = useCallback(() => {
     api
       .getEmptySessionsCount()
-      .then((r) => setEmptyCount(r.count))
+      .then((r) => setEmptyCount(r?.count ?? 0))
       .catch(() => {});
   }, []);
 
@@ -1235,8 +1235,8 @@ export default function SessionsPage() {
       .getSessions(PAGE_SIZE, p * PAGE_SIZE, sessionQueryOptions)
       .then((resp) => {
         if (requestId !== sessionsRequestRef.current) return;
-        setSessions(resp.sessions);
-        setTotal(resp.total);
+        setSessions(resp?.sessions ?? []);
+        setTotal(resp?.total ?? 0);
       })
       .catch(() => {})
       .finally(() => {
@@ -1329,7 +1329,7 @@ export default function SessionsPage() {
         .getSessions(50, 0, sessionQueryOptions)
         .then((r) => {
           if (cancelled) return;
-          setOverviewSessions(r.sessions);
+          setOverviewSessions(r?.sessions ?? []);
           // The dashboard server and a terminal CLI are separate
           // processes sharing one session DB — there is no push channel,
           // so we detect sessions created in another process here. The
@@ -1956,10 +1956,10 @@ export default function SessionsPage() {
             </span>
             <span className="text-xs text-muted-foreground">Messages</span>
           </div>
-          {Object.keys(stats.by_source).length > 0 && (
+          {Object.keys(stats.by_source ?? {}).length > 0 && (
             <div className="flex flex-col">
               <span className="text-lg font-semibold tabular-nums leading-none">
-                {Object.keys(stats.by_source).length}
+                {Object.keys(stats.by_source ?? {}).length}
               </span>
               <span className="text-xs text-muted-foreground">Sources</span>
             </div>

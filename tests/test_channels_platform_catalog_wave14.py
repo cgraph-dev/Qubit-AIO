@@ -11,8 +11,9 @@ ported contract:
 2. per-platform state is honest and never a fabricated "connected";
 3. Enable/Disable persists through the confirm path and is read back from the
    SAME store the GET serves;
-4. credentials stay reference-only: a raw secret is a typed
-   ``CHANNEL_ENV_REFERENCE_ONLY`` refusal, ``env:``/``vault:``/``file:``
+4. Hermes parity: a pasted raw secret is accepted (written straight to the
+   gateway ``.env``; the dashboard store keeps only the ``env:KEY`` marker
+   and the raw value never lands on disk there), ``env:``/``vault:``/``file:``
    references are accepted;
 5. an unknown id stays a typed ``MSG_NOT_FOUND``.
 
@@ -138,19 +139,54 @@ def test_enable_disable_round_trip_through_confirm_store(tmp_path, monkeypatch):
     assert "telegram" in json.loads(store.read_text())["platforms"]
 
 
-def test_raw_secret_is_refused_and_reference_is_accepted(tmp_path, monkeypatch):
-    cfg = _cfg(tmp_path, monkeypatch)
-    code, refused = _put(
-        cfg, "telegram",
-        {"env": {"TELEGRAM_BOT_TOKEN": "123456:AAFfake-secret"},
-         "confirm": True})
-    assert code == 403, refused
-    assert refused.get("code") == "CHANNEL_ENV_REFERENCE_ONLY", refused
+def test_raw_secret_is_saved_to_gateway_env_and_marked_in_store(
+        tmp_path, monkeypatch):
+    import os
 
+    cfg = _cfg(tmp_path, monkeypatch)
+    raw = "123456:AAFfake-secret-paste"
+    try:
+        code, ok = _put(
+            cfg, "telegram",
+            {"env": {"TELEGRAM_BOT_TOKEN": raw}, "confirm": True})
+        assert code == 200 and ok.get("ok") is True, ok
+
+        # The dashboard store keeps only the marker — the raw value is never
+        # persisted there.
+        store = (Path(cfg.state_dir()) / "msg-platforms.json")
+        blob = store.read_text()
+        assert raw not in blob, blob[:200]
+        refs = json.loads(blob)["platforms"]["telegram"]["refs"]
+        assert refs.get("TELEGRAM_BOT_TOKEN") == "env:TELEGRAM_BOT_TOKEN", refs
+
+        # The gateway `.env` the daemon reads got the real value.
+        env_text = (Path(os.environ["QUBIT_HOME"]) / ".env").read_text()
+        assert "TELEGRAM_BOT_TOKEN=" in env_text
+
+        # The GET round-trips the channel as configured without echoing the
+        # value.
+        _code, body = _get(cfg)
+        field = next(v for v in _platform(body, "telegram")["env_vars"]
+                     if v["key"] == "TELEGRAM_BOT_TOKEN")
+        assert field["is_set"] is True
+        assert raw not in json.dumps(body)
+    finally:
+        os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+
+
+def test_reference_is_accepted(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
     code, ok = _put(
         cfg, "telegram",
-        {"env": {"TELEGRAM_BOT_TOKEN": "env:TELEGRAM_BOT_TOKEN"},
-         "confirm": True})
+        {"env": {"TELEGRAM_BOT_TOKEN": "env:TELEGRAM_BOT_TOKEN"}},
+        )
+    # Without confirm this stages; with confirm it applies.
+    assert code in (200, 409), ok
+    if code == 409:
+        code, ok = _put(
+            cfg, "telegram",
+            {"env": {"TELEGRAM_BOT_TOKEN": "env:TELEGRAM_BOT_TOKEN"},
+             "confirm": True})
     assert code == 200 and ok.get("ok") is True, ok
 
     _code, body = _get(cfg)

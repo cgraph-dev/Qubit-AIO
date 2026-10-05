@@ -113,7 +113,8 @@ DEFAULT_PROMPTS: Dict[str, PromptSpec] = {
             "requirement, constraint, and requested action.\n\n"
             "Remove repetition, filler, and unnecessary wording. Do not remove "
             "technical details that affect execution.\n\n"
-            "Return only the concise version."),
+            "Return only the concise version: no status updates, no narration, "
+            "no commentary."),
     ),
     "correct_grammar": PromptSpec(
         action="correct_grammar", title="Grammar", version=PROMPT_VERSION,
@@ -123,7 +124,8 @@ DEFAULT_PROMPTS: Dict[str, PromptSpec] = {
             "Preserve the original meaning, tone, formatting, technical "
             "identifiers, URLs, code, and numbers. Do not rewrite more than "
             "necessary.\n\n"
-            "Return only the corrected text."),
+            "Return only the corrected text: no status updates, no narration, "
+            "no commentary."),
     ),
     "bullet_points": PromptSpec(
         action="bullet_points", title="Bullet points", version=PROMPT_VERSION,
@@ -177,8 +179,10 @@ DEFAULT_PROMPTS: Dict[str, PromptSpec] = {
             "preserving its meaning, facts, requirements, and intent.\n\n"
             "Improve wording, structure, and readability. Do not add new "
             "requirements, remove important details, or change the "
-            "meaning.\n\n"
-            "Return only the rewritten text."),
+            "meaning. Never return the input unchanged: always reword "
+            "with different words, even for short inputs.\n\n"
+            "Return only the rewritten text: no status updates, no narration, "
+            "no commentary."),
     ),
     "expand": PromptSpec(
         action="expand", title="Expand", version=PROMPT_VERSION,

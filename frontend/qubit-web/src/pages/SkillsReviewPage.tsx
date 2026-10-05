@@ -1,10 +1,10 @@
 /**
  * Skills review queue (`/admin/skills-review`).
  *
- * Mirrors the upstream skill workshop board (lifecycle tabs + proposal queue
- * + inspect detail + revision dialog) and the upstream skills card (header
- * with refresh, filter row with a shown-count, grouped rows with status
- * chips, detail with overview tabs), rebranded to Qubit voice.
+ * Structure mirrors the ported settings surfaces in this app
+ * (`.settings-page` > `.settings-section` > `.settings-group` > `.settings-row`),
+ * following the lifecycle tabs + proposal queue + inspect detail + revision
+ * dialog of the skill workshop board, rebranded to Qubit voice.
  *
  * The verified-skill proposals surface the main Skills page intentionally
  * does not cover: the pending queue (list/inspect rows), the owner-gated
@@ -40,7 +40,7 @@ import { refusalOrError } from "@/lib/policy-refusal";
 const CONFIRM_YES = () => true;
 
 /**
- * Lifecycle tabs mirror the upstream workshop board tabs. "all" maps to the
+ * Lifecycle tabs mirror the workshop board tabs. "all" maps to the
  * empty filter (unfiltered queue).
  */
 const STATUS_TABS = [
@@ -64,6 +64,10 @@ function statusChipClass(status: unknown): string {
 function errText(e: unknown, fallback: string): string {
   return refusalOrError(e, `${fallback}: ${e instanceof Error ? e.message : String(e)}`);
 }
+
+const BTN_CLASS = "btn btn--sm";
+const BTN_GHOST_CLASS = "btn btn--sm btn--ghost";
+const INPUT_CLASS = "settings-input border border-border bg-background-base px-2 py-1 text-xs";
 
 export default function SkillsReviewPage() {
   const [statusFilter, setStatusFilter] = useState("");
@@ -182,27 +186,12 @@ export default function SkillsReviewPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4" data-testid="skills-review-page">
-      {/* ── Card header: title + sub + refresh (upstream skills card) ── */}
-      <header className="flex flex-wrap items-start justify-between gap-2 rounded-none border border-border p-4">
-        <div>
-          <h1 className="text-base font-semibold">Skills review queue</h1>
-          <p className="text-xs text-muted-foreground">
-            Pending verified-skill proposals: inspect, then Apply / Reject /
-            Quarantine. Reads via the content half; verdicts via the
-            mutations half (owner-gated, button press confirms).
-          </p>
-        </div>
-        <button
-          type="button"
-          data-testid="sr-refresh"
-          className="h-8 border border-border px-3 text-xs uppercase"
-          disabled={loading}
-          onClick={() => void refresh(statusFilter.trim())}
-        >
-          {loading ? "Loading…" : "Refresh"}
-        </button>
-      </header>
+    <div className="settings-page settings-page--wide" data-testid="skills-review-page">
+      <p className="settings-page__intro">
+        Pending verified-skill proposals: inspect, then Apply / Reject / Quarantine.
+        Reads via the content half; verdicts via the mutations half (owner-gated,
+        button press confirms).
+      </p>
 
       {error && (
         <p role="alert" className="text-xs text-destructive">
@@ -211,183 +200,212 @@ export default function SkillsReviewPage() {
       )}
       {notice && <p className="text-xs text-success">{notice}</p>}
 
-      {/* ── Queue card: lifecycle tabs + filter row + rows ── */}
-      <section className="flex flex-col gap-3 rounded-none border border-border p-4">
-        {/* Lifecycle tabs (upstream workshop board) */}
-        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Proposal status">
-          {STATUS_TABS.map((tab) => (
+      {/* ── Queue: lifecycle tabs + filter row + rows ── */}
+      <section className="settings-section">
+        <div className="settings-section__header">
+          <div className="settings-section__copy">
+            <h2 className="settings-section__heading">
+              Proposals <span className="settings-count">{loading ? "…" : count}</span>
+            </h2>
+            <p className="settings-section__desc">
+              Filter the queue by lifecycle status. Inspect a row to act on it.
+            </p>
+          </div>
+          <div className="settings-section__actions">
             <button
-              key={tab.id}
               type="button"
-              role="tab"
-              aria-selected={activeTab(tab.status)}
-              data-testid={`sr-tab-${tab.id}`}
-              className={`border px-2 py-1 text-xs uppercase ${
-                activeTab(tab.status)
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border text-muted-foreground"
-              }`}
-              onClick={() => void handleTab(tab.status)}
+              data-testid="sr-refresh"
+              className={BTN_CLASS}
+              disabled={loading}
+              onClick={() => void refresh(statusFilter.trim())}
             >
-              {tab.label}
+              {loading ? "Loading…" : "Refresh"}
             </button>
-          ))}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="sr-status" className="text-xs text-muted-foreground">
-            Status filter
-          </label>
-          <input
-            id="sr-status"
-            data-testid="sr-status-filter"
-            className="h-8 border border-border bg-background px-2 text-xs"
-            placeholder="e.g. pending (empty = all)"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          />
-          <button
-            type="button"
-            data-testid="sr-filter-apply"
-            className="h-8 border border-border px-3 text-xs uppercase"
-            onClick={handleFilter}
-          >
-            Filter
-          </button>
-          <span className="text-xs text-muted-foreground" data-testid="sr-count">
-            {loading ? "Loading…" : `${count} shown`}
-          </span>
-          {journal && (
-            <span className="text-xs text-muted-foreground" title={journal}>
-              journal verified
-            </span>
-          )}
-        </div>
-
-        {loading ? (
-          <p className="text-xs text-muted-foreground">Loading proposals…</p>
-        ) : proposals.length === 0 ? (
-          <p className="text-xs text-muted-foreground" data-testid="sr-empty">
-            No proposals in the queue.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-1" data-testid="sr-list">
-            {proposals.map((p) => {
-              const id = proposalIdOf(p);
-              return (
-                <li
-                  key={id || JSON.stringify(p).slice(0, 32)}
-                  data-testid={`sr-row-${id}`}
-                  className="flex flex-wrap items-center gap-2 border border-border px-2 py-1.5"
+        <div className="settings-group">
+          {/* Lifecycle tabs */}
+          <div className="settings-row settings-row--stacked" role="tablist" aria-label="Proposal status">
+            <div className="settings-row__text">
+              <div className="settings-row__title">Status</div>
+            </div>
+            <div className="settings-row__control">
+              {STATUS_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab(tab.status)}
+                  data-testid={`sr-tab-${tab.id}`}
+                  className={`${
+                    activeTab(tab.status) ? BTN_CLASS : BTN_GHOST_CLASS
+                  } text-xs uppercase`}
+                  onClick={() => void handleTab(tab.status)}
                 >
-                  <code className="font-mono text-xs">{id || "(unidentified)"}</code>
-                  {typeof p.status === "string" && (
-                    <span className={`text-xs ${statusChipClass(p.status)}`}>
-                      {p.status}
-                    </span>
-                  )}
-                  <span className="ml-auto flex flex-wrap gap-1">
-                    <button
-                      type="button"
-                      data-testid={`sr-inspect-${id}`}
-                      className="border border-border px-2 py-1 text-xs"
-                      disabled={inspecting || !id}
-                      onClick={() => void handleInspect(id)}
-                    >
-                      Inspect
-                    </button>
-                    <button
-                      type="button"
-                      data-testid={`sr-apply-${id}`}
-                      className="border border-border px-2 py-1 text-xs"
-                      disabled={busy !== null || !id}
-                      onClick={() =>
-                        void runVerdict(`apply ${id}`, () =>
-                          applyProposal(id, reason.trim() || undefined, CONFIRM_YES),
-                        )
-                      }
-                    >
-                      Apply
-                    </button>
-                    <button
-                      type="button"
-                      data-testid={`sr-reject-${id}`}
-                      className="border border-border px-2 py-1 text-xs"
-                      disabled={busy !== null || !id}
-                      onClick={() =>
-                        void runVerdict(`reject ${id}`, () =>
-                          rejectProposal(id, reason.trim() || undefined, CONFIRM_YES),
-                        )
-                      }
-                    >
-                      Reject
-                    </button>
-                    <button
-                      type="button"
-                      data-testid={`sr-quarantine-${id}`}
-                      className="border border-border px-2 py-1 text-xs"
-                      disabled={busy !== null || !id}
-                      onClick={() =>
-                        void runVerdict(`quarantine ${id}`, () =>
-                          quarantineProposal(id, CONFIRM_YES),
-                        )
-                      }
-                    >
-                      Quarantine
-                    </button>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="sr-reason" className="text-xs text-muted-foreground">
-            Verdict reason (optional)
-          </label>
-          <input
-            id="sr-reason"
-            data-testid="sr-reason"
-            className="h-8 flex-1 border border-border bg-background px-2 text-xs"
-            placeholder="recorded on the verdict"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          />
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label htmlFor="sr-status" className="settings-row__title">
+                Status filter
+              </label>
+              <p className="settings-row__desc">e.g. pending (empty = all)</p>
+            </div>
+            <div className="settings-row__control">
+              <input
+                id="sr-status"
+                data-testid="sr-status-filter"
+                className={INPUT_CLASS}
+                placeholder="e.g. pending (empty = all)"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              />
+              <button
+                type="button"
+                data-testid="sr-filter-apply"
+                className={BTN_CLASS}
+                onClick={handleFilter}
+              >
+                Filter
+              </button>
+              <span className="text-xs text-muted-foreground" data-testid="sr-count">
+                {loading ? "Loading…" : `${count} shown`}
+              </span>
+              {journal && (
+                <span className="text-xs text-muted-foreground" title={journal}>
+                  journal verified
+                </span>
+              )}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="settings-empty">Loading proposals…</div>
+          ) : proposals.length === 0 ? (
+            <div className="settings-empty" data-testid="sr-empty">
+              No proposals in the queue.
+            </div>
+          ) : (
+            <ul className="flex flex-col" data-testid="sr-list">
+              {proposals.map((p) => {
+                const id = proposalIdOf(p);
+                return (
+                  <li
+                    key={id || JSON.stringify(p).slice(0, 32)}
+                    data-testid={`sr-row-${id}`}
+                    className="settings-row"
+                  >
+                    <div className="settings-row__text">
+                      <div className="settings-row__title font-mono">
+                        {id || "(unidentified)"}
+                      </div>
+                      {typeof p.status === "string" && (
+                        <p className={`settings-row__desc ${statusChipClass(p.status)}`}>
+                          {p.status}
+                        </p>
+                      )}
+                    </div>
+                    <div className="settings-row__control">
+                      <button
+                        type="button"
+                        data-testid={`sr-inspect-${id}`}
+                        className={BTN_GHOST_CLASS}
+                        disabled={inspecting || !id}
+                        onClick={() => void handleInspect(id)}
+                      >
+                        Inspect
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`sr-apply-${id}`}
+                        className={BTN_CLASS}
+                        disabled={busy !== null || !id}
+                        onClick={() =>
+                          void runVerdict(`apply ${id}`, () =>
+                            applyProposal(id, reason.trim() || undefined, CONFIRM_YES),
+                          )
+                        }
+                      >
+                        Apply
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`sr-reject-${id}`}
+                        className={BTN_GHOST_CLASS}
+                        disabled={busy !== null || !id}
+                        onClick={() =>
+                          void runVerdict(`reject ${id}`, () =>
+                            rejectProposal(id, reason.trim() || undefined, CONFIRM_YES),
+                          )
+                        }
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`sr-quarantine-${id}`}
+                        className={BTN_GHOST_CLASS}
+                        disabled={busy !== null || !id}
+                        onClick={() =>
+                          void runVerdict(`quarantine ${id}`, () =>
+                            quarantineProposal(id, CONFIRM_YES),
+                          )
+                        }
+                      >
+                        Quarantine
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label htmlFor="sr-reason" className="settings-row__title">
+                Verdict reason
+              </label>
+              <p className="settings-row__desc">Optional; recorded on the verdict.</p>
+            </div>
+            <div className="settings-row__control">
+              <input
+                id="sr-reason"
+                data-testid="sr-reason"
+                className={INPUT_CLASS}
+                placeholder="recorded on the verdict"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ── Inspect detail (upstream skills detail: header + overview) ── */}
+      {/* ── Inspect detail ── */}
       {selected && selectedId && (
-        <section
-          className="flex flex-col gap-2 rounded-none border border-border p-4"
-          data-testid="sr-detail"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-medium">
-              <span
-                aria-hidden="true"
-                className={`inline-block h-2 w-2 rounded-full ${
-                  typeof selected.status === "string" &&
-                  (selected.status === "applied"
-                    ? "bg-success"
-                    : selected.status === "pending"
-                      ? "bg-warning"
-                      : "bg-destructive")
-                }`}
-              />
-              Inspect: <code className="font-mono">{selectedId}</code>
-              {typeof selected.status === "string" && (
-                <span className={`text-xs ${statusChipClass(selected.status)}`}>
-                  {selected.status}
-                </span>
-              )}
-            </h2>
-            <div className="flex flex-wrap gap-1">
+        <section className="settings-section" data-testid="sr-detail">
+          <div className="settings-section__header">
+            <div className="settings-section__copy">
+              <h2 className="settings-section__heading flex items-center gap-2">
+                Inspect: <code className="font-mono">{selectedId}</code>
+                {typeof selected.status === "string" && (
+                  <span className={`text-xs ${statusChipClass(selected.status)}`}>
+                    {selected.status}
+                  </span>
+                )}
+              </h2>
+            </div>
+            <div className="settings-section__actions">
               <button
                 type="button"
                 data-testid="sr-events-open"
-                className="border border-border px-2 py-1 text-xs"
+                className={BTN_GHOST_CLASS}
                 onClick={() => void openEvents(selectedId)}
               >
                 Events
@@ -395,7 +413,7 @@ export default function SkillsReviewPage() {
               <button
                 type="button"
                 data-testid="sr-detail-close"
-                className="border border-border px-2 py-1 text-xs"
+                className={BTN_GHOST_CLASS}
                 onClick={() => {
                   setSelected(null);
                   setSelectedId(null);
@@ -405,96 +423,126 @@ export default function SkillsReviewPage() {
               </button>
             </div>
           </div>
-          <pre className="max-h-64 overflow-auto border border-border bg-background/40 p-2 font-mono text-xs">
-            {JSON.stringify(selected, null, 2)}
-          </pre>
 
-          <label htmlFor="sr-payload" className="text-xs text-muted-foreground">
-            Revision payload (JSON object — used by Revise and Update-staged)
-          </label>
-          <textarea
-            id="sr-payload"
-            data-testid="sr-payload"
-            className="min-h-[80px] border border-border bg-background px-2 py-1 font-mono text-xs"
-            value={revisePayload}
-            onChange={(e) => setRevisePayload(e.target.value)}
-          />
-          <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              data-testid="sr-revise"
-              className="border border-border px-2 py-1 text-xs"
-              disabled={busy !== null}
-              onClick={() => {
-                const payload = parsePayload(revisePayload);
-                if (!payload) {
-                  setError("Revise needs a JSON object payload");
-                  return;
-                }
-                void runVerdict(`revise ${selectedId}`, () =>
-                  reviseProposal(selectedId, payload, CONFIRM_YES),
-                );
-              }}
-            >
-              Revise
-            </button>
-            <button
-              type="button"
-              data-testid="sr-update-staged"
-              className="border border-border px-2 py-1 text-xs"
-              disabled={busy !== null}
-              onClick={() => {
-                const payload = parsePayload(revisePayload);
-                if (!payload) {
-                  setError("Update-staged needs a JSON object payload");
-                  return;
-                }
-                void runVerdict(`update-staged ${selectedId}`, () =>
-                  updateStagedProposal(selectedId, payload, CONFIRM_YES),
-                );
-              }}
-            >
-              Update-staged
-            </button>
-          </div>
+          <div className="settings-group">
+            <div className="settings-row settings-row--stacked">
+              <div className="settings-row__text">
+                <div className="settings-row__title">Proposal</div>
+              </div>
+              <div className="settings-row__control">
+                <pre className="max-h-64 w-full overflow-auto border border-border bg-background/40 p-2 text-left font-mono text-xs">
+                  {JSON.stringify(selected, null, 2)}
+                </pre>
+              </div>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="sr-rev-session" className="text-xs text-muted-foreground">
-              Session
-            </label>
-            <input
-              id="sr-rev-session"
-              data-testid="sr-revision-session"
-              className="h-8 border border-border bg-background px-2 text-xs"
-              value={revisionSession}
-              onChange={(e) => setRevisionSession(e.target.value)}
-            />
-            <input
-              id="sr-rev-text"
-              data-testid="sr-revision-text"
-              className="h-8 flex-1 border border-border bg-background px-2 text-xs"
-              placeholder="revision instructions (required)"
-              value={revisionText}
-              onChange={(e) => setRevisionText(e.target.value)}
-            />
-            <button
-              type="button"
-              data-testid="sr-request-revision"
-              className="border border-border px-2 py-1 text-xs"
-              disabled={busy !== null || !revisionText.trim()}
-              onClick={() =>
-                void runVerdict(`request-revision ${selectedId}`, () =>
-                  requestProposalRevision(
-                    selectedId,
-                    revisionSession.trim() || "qubit",
-                    revisionText.trim(),
-                    CONFIRM_YES,
-                  ),
-                )
-              }
-            >
-              Request-revision
-            </button>
+            <div className="settings-row settings-row--stacked">
+              <div className="settings-row__text">
+                <label htmlFor="sr-payload" className="settings-row__title">
+                  Revision payload
+                </label>
+                <p className="settings-row__desc">
+                  JSON object — used by Revise and Update-staged.
+                </p>
+              </div>
+              <div className="settings-row__control">
+                <textarea
+                  id="sr-payload"
+                  data-testid="sr-payload"
+                  className="min-h-[80px] w-full border border-border bg-background px-2 py-1 font-mono text-xs"
+                  value={revisePayload}
+                  onChange={(e) => setRevisePayload(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="settings-row settings-row--actions">
+              <div className="settings-row__text">
+                <div className="settings-row__title">Revision writes</div>
+              </div>
+              <div className="settings-row__control">
+                <button
+                  type="button"
+                  data-testid="sr-revise"
+                  className={BTN_CLASS}
+                  disabled={busy !== null}
+                  onClick={() => {
+                    const payload = parsePayload(revisePayload);
+                    if (!payload) {
+                      setError("Revise needs a JSON object payload");
+                      return;
+                    }
+                    void runVerdict(`revise ${selectedId}`, () =>
+                      reviseProposal(selectedId, payload, CONFIRM_YES),
+                    );
+                  }}
+                >
+                  Revise
+                </button>
+                <button
+                  type="button"
+                  data-testid="sr-update-staged"
+                  className={BTN_GHOST_CLASS}
+                  disabled={busy !== null}
+                  onClick={() => {
+                    const payload = parsePayload(revisePayload);
+                    if (!payload) {
+                      setError("Update-staged needs a JSON object payload");
+                      return;
+                    }
+                    void runVerdict(`update-staged ${selectedId}`, () =>
+                      updateStagedProposal(selectedId, payload, CONFIRM_YES),
+                    );
+                  }}
+                >
+                  Update-staged
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-row">
+              <div className="settings-row__text">
+                <label htmlFor="sr-rev-session" className="settings-row__title">
+                  Request revision
+                </label>
+                <p className="settings-row__desc">Instructions are required.</p>
+              </div>
+              <div className="settings-row__control">
+                <input
+                  id="sr-rev-session"
+                  data-testid="sr-revision-session"
+                  className={`${INPUT_CLASS} w-24 font-mono`}
+                  value={revisionSession}
+                  onChange={(e) => setRevisionSession(e.target.value)}
+                />
+                <input
+                  id="sr-rev-text"
+                  data-testid="sr-revision-text"
+                  className={INPUT_CLASS}
+                  placeholder="revision instructions (required)"
+                  value={revisionText}
+                  onChange={(e) => setRevisionText(e.target.value)}
+                />
+                <button
+                  type="button"
+                  data-testid="sr-request-revision"
+                  className={BTN_GHOST_CLASS}
+                  disabled={busy !== null || !revisionText.trim()}
+                  onClick={() =>
+                    void runVerdict(`request-revision ${selectedId}`, () =>
+                      requestProposalRevision(
+                        selectedId,
+                        revisionSession.trim() || "qubit",
+                        revisionText.trim(),
+                        CONFIRM_YES,
+                      ),
+                    )
+                  }
+                >
+                  Request-revision
+                </button>
+              </div>
+            </div>
           </div>
         </section>
       )}
@@ -502,134 +550,160 @@ export default function SkillsReviewPage() {
       {/* ── Events drawer ── */}
       {eventsOpen && (
         <section
-          className="flex flex-col gap-2 rounded-none border border-border p-4"
+          className="settings-section"
           data-testid="sr-events-drawer"
           role="complementary"
           aria-label="Proposal events"
         >
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium">Events journal</h2>
-            <button
-              type="button"
-              data-testid="sr-events-close"
-              className="border border-border px-2 py-1 text-xs"
-              onClick={() => setEventsOpen(false)}
-            >
-              Close
-            </button>
+          <div className="settings-section__header">
+            <div className="settings-section__copy">
+              <h2 className="settings-section__heading">Events journal</h2>
+            </div>
+            <div className="settings-section__actions">
+              <button
+                type="button"
+                data-testid="sr-events-close"
+                className={BTN_GHOST_CLASS}
+                onClick={() => setEventsOpen(false)}
+              >
+                Close
+              </button>
+            </div>
           </div>
-          {eventsLoading ? (
-            <p className="text-xs text-muted-foreground">Loading events…</p>
-          ) : events.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No events recorded.</p>
-          ) : (
-            <ul className="flex max-h-64 flex-col gap-1 overflow-auto">
-              {events.map((ev, i) => (
-                <li
-                  key={`${ev.sequence}-${i}`}
-                  className="border border-border px-2 py-1 font-mono text-xs"
-                >
-                  #{ev.sequence} {ev.action} — {JSON.stringify(ev.payload)}
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="settings-group">
+            {eventsLoading ? (
+              <div className="settings-empty">Loading events…</div>
+            ) : events.length === 0 ? (
+              <div className="settings-empty">No events recorded.</div>
+            ) : (
+              <ul className="flex max-h-64 flex-col overflow-auto">
+                {events.map((ev, i) => (
+                  <li
+                    key={`${ev.sequence}-${i}`}
+                    className="border-b border-border px-2 py-1 font-mono text-xs"
+                  >
+                    #{ev.sequence} {ev.action} — {JSON.stringify(ev.payload)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </section>
       )}
 
       {/* ── Curator pin / unpin / restore (confirm) ── */}
-      <section className="flex flex-col gap-2 rounded-none border border-border p-4">
-        <h2 className="text-sm font-medium">Curator</h2>
-        <p className="text-xs text-muted-foreground">
-          Owner-gated pin primitives for the verified-skill collection. Button
-          press confirms.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="sr-curator-skill" className="text-xs text-muted-foreground">
-            Skill id
-          </label>
-          <input
-            id="sr-curator-skill"
-            data-testid="sr-curator-skill"
-            className="h-8 border border-border bg-background px-2 font-mono text-xs"
-            value={curatorSkill}
-            onChange={(e) => setCuratorSkill(e.target.value)}
-          />
-          <button
-            type="button"
-            data-testid="sr-curator-pin"
-            className="border border-border px-2 py-1 text-xs"
-            disabled={busy !== null || !curatorSkill.trim()}
-            onClick={() =>
-              void runVerdict(`curator pin ${curatorSkill.trim()}`, () =>
-                curatorPin(curatorSkill.trim(), CONFIRM_YES),
-              )
-            }
-          >
-            Pin
-          </button>
-          <button
-            type="button"
-            data-testid="sr-curator-unpin"
-            className="border border-border px-2 py-1 text-xs"
-            disabled={busy !== null || !curatorSkill.trim()}
-            onClick={() =>
-              void runVerdict(`curator unpin ${curatorSkill.trim()}`, () =>
-                curatorUnpin(curatorSkill.trim(), CONFIRM_YES),
-              )
-            }
-          >
-            Unpin
-          </button>
-          <button
-            type="button"
-            data-testid="sr-curator-restore"
-            className="border border-border px-2 py-1 text-xs"
-            disabled={busy !== null || !curatorSkill.trim()}
-            onClick={() =>
-              void runVerdict(`curator restore ${curatorSkill.trim()}`, () =>
-                curatorRestore(curatorSkill.trim(), CONFIRM_YES),
-              )
-            }
-          >
-            Restore
-          </button>
+      <section className="settings-section">
+        <div className="settings-section__copy">
+          <h2 className="settings-section__heading">Curator</h2>
+          <p className="settings-section__desc">
+            Owner-gated pin primitives for the verified-skill collection. Button press
+            confirms.
+          </p>
+        </div>
+        <div className="settings-group">
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label htmlFor="sr-curator-skill" className="settings-row__title">
+                Skill id
+              </label>
+            </div>
+            <div className="settings-row__control">
+              <input
+                id="sr-curator-skill"
+                data-testid="sr-curator-skill"
+                className={`${INPUT_CLASS} font-mono`}
+                value={curatorSkill}
+                onChange={(e) => setCuratorSkill(e.target.value)}
+              />
+              <button
+                type="button"
+                data-testid="sr-curator-pin"
+                className={BTN_CLASS}
+                disabled={busy !== null || !curatorSkill.trim()}
+                onClick={() =>
+                  void runVerdict(`curator pin ${curatorSkill.trim()}`, () =>
+                    curatorPin(curatorSkill.trim(), CONFIRM_YES),
+                  )
+                }
+              >
+                Pin
+              </button>
+              <button
+                type="button"
+                data-testid="sr-curator-unpin"
+                className={BTN_GHOST_CLASS}
+                disabled={busy !== null || !curatorSkill.trim()}
+                onClick={() =>
+                  void runVerdict(`curator unpin ${curatorSkill.trim()}`, () =>
+                    curatorUnpin(curatorSkill.trim(), CONFIRM_YES),
+                  )
+                }
+              >
+                Unpin
+              </button>
+              <button
+                type="button"
+                data-testid="sr-curator-restore"
+                className={BTN_GHOST_CLASS}
+                disabled={busy !== null || !curatorSkill.trim()}
+                onClick={() =>
+                  void runVerdict(`curator restore ${curatorSkill.trim()}`, () =>
+                    curatorRestore(curatorSkill.trim(), CONFIRM_YES),
+                  )
+                }
+              >
+                Restore
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* ── Policy-refused operations: disabled with the exact prerequisite ── */}
-      <section className="flex flex-col gap-2 rounded-none border border-border p-4">
-        <h2 className="text-sm font-medium">Unavailable by policy</h2>
-        <p className="text-xs text-muted-foreground">
-          Qubit runs no upload store, no automated evaluator, no
-          history scanner, and no remote verdict registry. These stay
-          disabled; the reason names the exact prerequisite.
-        </p>
-        <ul className="flex flex-col gap-2">
+      <section className="settings-section">
+        <div className="settings-section__copy">
+          <h2 className="settings-section__heading">
+            Unavailable by policy{" "}
+            <span className="settings-count">{DISABLED_SKILLS_ACTIONS.length}</span>
+          </h2>
+          <p className="settings-section__desc">
+            Qubit runs no upload store, no automated evaluator, no history scanner, and
+            no remote verdict registry. These stay disabled; the reason names the exact
+            prerequisite.
+          </p>
+        </div>
+        <div className="settings-group">
           {DISABLED_SKILLS_ACTIONS.map((d) => (
-            <li
+            <div
               key={d.action}
               data-testid={`sr-disabled-${d.action}`}
-              className="flex flex-col gap-1 border border-border px-2 py-1.5 opacity-70"
+              className="settings-row settings-row--stacked"
+              data-state="refused"
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <code className="font-mono text-xs">{d.action}</code>
+              <div className="settings-row__text">
+                <div className="settings-row__title font-mono">{d.action}</div>
+                <p
+                  className="settings-row__desc"
+                  data-testid={`sr-disabled-reason-${d.action}`}
+                >
+                  Prerequisite: {d.reason}. Counterpart: {d.counterpart}.
+                </p>
+              </div>
+              <div className="settings-row__control">
                 <button
                   type="button"
                   disabled
                   title={d.reason}
                   aria-disabled="true"
-                  className="cursor-not-allowed border border-border px-2 py-1 text-xs"
+                  aria-label={`${d.action} unavailable: ${d.reason}`}
+                  className="btn btn--sm cursor-not-allowed"
                 >
                   Disabled
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground" data-testid={`sr-disabled-reason-${d.action}`}>
-                Prerequisite: {d.reason}. Counterpart: {d.counterpart}.
-              </p>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
     </div>
   );

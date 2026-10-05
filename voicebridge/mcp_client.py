@@ -229,12 +229,17 @@ def is_invocable(record: Dict[str, Any]) -> bool:
 # Reference resolution (values never leave this process)
 # ---------------------------------------------------------------------------
 def _resolve_ref(ref: str) -> Optional[str]:
-    """Resolve one ``env:``/``file:``/``vault:`` reference (``None`` = unknown).
+    """Resolve one ``env:``/``file:``/``vault:``/``oauth:`` reference.
 
     ``vault:`` has no Qubit-side resolver, so it fails closed rather than
-    spawning a server without its credential.
+    spawning a server without its credential. ``oauth:<server>`` reads the
+    dashboard-obtained access token from the vendored per-home
+    ``mcp-tokens/`` store (read-only, unexpired only — refresh happens on
+    the next dashboard probe/login, never here).
     """
     ref = str(ref or "").strip()
+    if ref.startswith("oauth:"):
+        return _resolve_oauth_token(ref[len("oauth:"):].strip())
     if ref.startswith("env:"):
         return os.environ.get(ref[len("env:"):], "")
     if ref.startswith("file:"):
@@ -244,6 +249,45 @@ def _resolve_ref(ref: str) -> Optional[str]:
         except OSError:
             return ""
     return None
+
+
+def _resolve_oauth_token(server_name: str) -> Optional[str]:
+    """Read a dashboard-OAuth access token for *server_name* (``None`` = none).
+
+    Reads the vendored ``QUBIT_HOME/mcp-tokens/<server>.json`` file written by
+    the dashboard OAuth login — the same store the vendored probe reads.
+    Returns the token only when present and unexpired (30 s leeway); expired
+    or absent fails closed so the caller reports an honest auth error instead
+    of connecting with a dead bearer token. No refresh is attempted here:
+    refresh happens on the next dashboard probe/login.
+    """
+    import json as _json
+    import time as _time
+    name = str(server_name or "").strip()
+    if not name:
+        return None
+    try:
+        from .qubit_runtime import default_home, ensure_path
+        ensure_path()
+        token_dir = Path(str(default_home())) / "mcp-tokens"
+        safe = "".join(c if (c.isalnum() or c in "-_.") else "_"
+                       for c in name)[:64]
+        data = _json.loads((token_dir / f"{safe}.json").read_text(
+            encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    token = str(data.get("access_token") or "")
+    if not token:
+        return None
+    try:
+        expires_at = float(data.get("expires_at") or 0)
+    except (TypeError, ValueError):
+        expires_at = 0.0
+    if expires_at and expires_at <= _time.time() + 30:
+        return None
+    return token
 
 
 def resolve_env(env_refs: Any) -> Tuple[Dict[str, str], List[str]]:
@@ -267,8 +311,8 @@ def resolve_env(env_refs: Any) -> Tuple[Dict[str, str], List[str]]:
         if value is None:
             raise McpClientError(
                 SECRET_CODE,
-                f"env {name!r} cannot be resolved (only env:/file: references "
-                "have a resolver); refusing to start the server")
+                f"env {name!r} cannot be resolved (only env:/file:/oauth: "
+                "references have a resolver); refusing to start the server")
         overrides[name] = value
         if value:
             secrets.append(value)

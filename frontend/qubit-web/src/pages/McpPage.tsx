@@ -308,7 +308,7 @@ export default function McpPage() {
   const loadServers = useCallback(() => {
     return api
       .getMcpServers()
-      .then((res) => setServers(res.servers))
+      .then((res) => setServers(res?.servers ?? []))
       .catch((e) => showToast(`Error: ${e}`, "error"));
   }, [showToast]);
 
@@ -316,8 +316,8 @@ export default function McpPage() {
     return api
       .getMcpCatalog()
       .then((res) => {
-        setCatalog(res.entries);
-        setDiagnostics(res.diagnostics);
+        setCatalog(res?.entries ?? []);
+        setDiagnostics(res?.diagnostics ?? []);
       })
       .catch((e) => showToast(`Error: ${e}`, "error"));
   }, [showToast]);

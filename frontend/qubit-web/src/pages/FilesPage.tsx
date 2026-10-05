@@ -478,7 +478,7 @@ export default function FilesPage() {
               <Spinner />
               Loading files...
             </div>
-          ) : listing && listing.entries.length === 0 ? (
+          ) : listing && (listing.entries ?? []).length === 0 ? (
             <div className="flex flex-col items-center gap-1 py-12 text-center text-sm text-muted-foreground">
               <span>No files</span>
               {emptyReason && emptyReason !== "No files" && (

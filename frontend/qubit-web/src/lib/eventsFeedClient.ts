@@ -11,7 +11,7 @@
  *
  * Ported from the pinned upstream `web/src/lib/eventsFeedClient.ts`
  * (`d337b736aa1e8ebecfab043842d13e4a2d2f48a3`) with the rename map
- * (`@hermes/shared` → `@qubit/shared`). Qubit's shared client does not expose
+ * (`@nous/shared` → `@qubit/shared`). Qubit's shared client does not expose
  * an upstream `replay` option, so that constructor field is omitted; the
  * Qubit overlay drives replay internally.
  */

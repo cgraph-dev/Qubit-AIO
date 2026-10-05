@@ -173,6 +173,8 @@ class _FakeChatStore:
 
 
 def test_turn_web_ddg_ok_wins_without_paid_call(monkeypatch):
+    from voicebridge import chat_transport as _CT_slice2
+    _CT_slice2._web_cache_clear()  # Slice 2 cache is process-wide
     """Free-first (default): DDG-ok answers directly; Perplexity never runs.
 
     Reconciliation 2026-10-02 (free-first lane): this replaces the old
@@ -206,6 +208,8 @@ def test_turn_web_ddg_ok_wins_without_paid_call(monkeypatch):
 
 
 def test_turn_web_paid_first_flag_restores_paid_order(monkeypatch):
+    from voicebridge import chat_transport as _CT_slice2
+    _CT_slice2._web_cache_clear()  # Slice 2 cache is process-wide
     """Opt-out: ``intent.web_paid_first: true`` tries paid first again.
 
     New contract 2026-10-02 (free-first lane): the owner can flip the
@@ -239,6 +243,8 @@ def test_turn_web_paid_first_flag_restores_paid_order(monkeypatch):
 
 
 def test_turn_web_perplexity_down_ddg_ok_answers_with_sources(monkeypatch):
+    from voicebridge import chat_transport as _CT_slice2
+    _CT_slice2._web_cache_clear()  # Slice 2 cache is process-wide
     """DDG-miss order note: free-first tries DDG first, so DDG-ok wins here
     without the paid layer; the paid-down mock stands in for the fallback
     attempt when DDG misses (pinned by the next test's flag case)."""
@@ -273,6 +279,8 @@ def test_turn_web_perplexity_down_ddg_ok_answers_with_sources(monkeypatch):
 
 
 def test_turn_web_ddg_miss_falls_back_to_paid(monkeypatch):
+    from voicebridge import chat_transport as _CT_slice2
+    _CT_slice2._web_cache_clear()  # Slice 2 cache is process-wide
     """DDG-miss → paid layer attempted (paid wins when DDG has nothing).
 
     New contract 2026-10-02 (free-first lane): the paid fallback still
@@ -301,6 +309,8 @@ def test_turn_web_ddg_miss_falls_back_to_paid(monkeypatch):
 
 
 def test_turn_web_both_down_stays_web_unavailable(monkeypatch):
+    from voicebridge import chat_transport as _CT_slice2
+    _CT_slice2._web_cache_clear()  # Slice 2 cache is process-wide
     """Both layers down → typed WEB_UNAVAILABLE, nothing fabricated."""
     from voicebridge import chat_transport as CT
     from voicebridge import orchestrator as ORC
@@ -320,6 +330,8 @@ def test_turn_web_both_down_stays_web_unavailable(monkeypatch):
 
 
 def test_stream_web_fallback_mirrors_single_delta(monkeypatch):
+    from voicebridge import chat_transport as _CT_slice2
+    _CT_slice2._web_cache_clear()  # Slice 2 cache is process-wide
     """Stream variant mirrors: single truthful delta + sources, no narrative."""
     from voicebridge import chat_transport as CT
     from voicebridge import orchestrator as ORC

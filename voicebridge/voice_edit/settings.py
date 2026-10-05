@@ -27,9 +27,11 @@ SETTINGS_KEYS = ("routing", "local_profile", "api_profile", "allow_api",
                  "beep", "debug_log", "mic_gain", "mic_target_peak",
                  "release_tail_ms", "noise_suppression", "disable_key_repeat",
                  "text_commands", "capture_source", "agc",
-                  "speak_answers", "history_panel", "chat_model",
-                  "detail_model", "detail_cues", "voice_recent_turns",
-                  "verbatim_transcript", "custom_commands")
+                   "speak_answers", "history_panel", "chat_model",
+                   "detail_model", "detail_cues", "voice_recent_turns",
+                    "verbatim_transcript", "custom_commands",
+                    "sleep_mode", "waveform_visible", "waveform_ingame",
+                    "web_paid_first", "ollama_model", "runner_alias")
 # NOTE: "answer_questions" was removed from persistence+view (2026-09-30): it
 # persisted with zero readers repo-wide, and wiring a service consumer would
 # contradict the honest-UI invariant (no control may act without a rendered
@@ -258,7 +260,32 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
                                         default=True)),
         "verbatim_transcript": bool(_read_cfg(cfg, "voice_edit",
                                               "verbatim_transcript",
-                                              default=False)),        "history_panel": bool(_read_cfg(cfg, "voice_edit", "history_panel",
+                                              default=False)),
+        # Manual sleep mode (owner decision 2026-10-03 §5 #1): set by saying
+        # "going to sleep" / "I'm going to sleep"; gates UNPROMPTED speech
+        # only (completions/briefings), never on-request answers. Cleared by
+        # the next directed "hey qubit".
+        "sleep_mode": bool(_read_cfg(cfg, "voice_edit", "sleep_mode",
+                                     default=False)),
+        # Dashboard waveform widget (voice-final lane): set by saying
+        # "show waveform" / "hide waveform" or the Voice settings switch.
+        # Default False (owner 2026-10-04): the OS orb is the only
+        # always-on waveform; False unmounts the widget entirely
+        # (no polling/rAF while hidden). "show waveform" re-mounts.
+        "waveform_visible": bool(_read_cfg(cfg, "voice_edit",
+                                           "waveform_visible",
+                                           default=False)),
+        # In-game orb override (owner 2026-10-04): set by saying
+        # "show waveform ingame" / "hide waveform ingame" or the Voice
+        # settings switch. Default False = today's auto-hide (the orb
+        # withdraws while a fullscreen game is focused and returns on
+        # alt-tab). True keeps the orb mapped over fullscreen too. This is
+        # a SEPARATE flag from waveform_visible (dashboard widget) — bare
+        # "show/hide waveform" never touches it.
+        "waveform_ingame": bool(_read_cfg(cfg, "voice_edit",
+                                          "waveform_ingame",
+                                          default=False)),
+        "history_panel": bool(_read_cfg(cfg, "voice_edit", "history_panel",
                                         default=True)),
         "chat_model": str(_read_cfg(cfg, "voice_edit", "chat_model",
                                     default="") or ""),
@@ -283,6 +310,25 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
             cfg, "intent", "local_llm", "temperature", default=0.7) or 0.7),
         "local_think": bool(_read_cfg(cfg, "intent", "local_llm", "think",
                                       default=False)),
+        # Slice-2 web/model knobs (authority: intent.*; voice_edit.* kept as
+        # a UI round-trip mirror). Readers: chat_transport._web_paid_first
+        # (intent.web_paid_first), runner_contract (intent.runner.alias /
+        # intent.ollama_model).
+        "web_paid_first": bool(_read_cfg(cfg, "intent", "web_paid_first",
+                                         default=None)
+                               if _read_cfg(cfg, "intent", "web_paid_first",
+                                            default=None) is not None
+                               else _read_cfg(cfg, "voice_edit",
+                                              "web_paid_first",
+                                              default=False)),
+        "ollama_model": str(_read_cfg(cfg, "intent", "ollama_model",
+                                      default=None)
+                            or _read_cfg(cfg, "voice_edit", "ollama_model",
+                                         default="") or ""),
+        "runner_alias": str(_read_cfg(cfg, "intent", "runner", "alias",
+                                      default=None)
+                            or _read_cfg(cfg, "voice_edit", "runner_alias",
+                                         default="") or ""),
         "wake": {
             "enabled": bool(_read_cfg(cfg, "voice_edit", "wake", "enabled",
                                       default=False)),
@@ -303,10 +349,10 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
                                         "asr_fallback", default=True) is not False,
             "asr_fallback_max_s": float(_read_cfg(
                 cfg, "voice_edit", "wake", "asr_fallback_max_s",
-                default=8.0) or 8.0),
+                default=15.0) or 15.0),
             "max_s": float(_read_cfg(
                 cfg, "voice_edit", "wake", "max_s",
-                default=8.0) or 8.0),
+                default=15.0) or 15.0),
             "arm_window_s": float(_read_cfg(
                 cfg, "voice_edit", "wake", "arm_window_s",
                 default=6.0) or 6.0),
@@ -431,6 +477,12 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                 max(300.0, min(clean_wake["silence_ms"], 5000.0)))
         if "rms_gate" in clean_wake:
             clean_wake["rms_gate"] = max(0.0005, min(clean_wake["rms_gate"], 0.2))
+        if "arm_window_s" in clean_wake:
+            # The conversational-confirm window: below ~2 s a spoken "yes"
+            # can never land in time; above 60 s a stale "yes" executes a
+            # long-gone proposal (the pending-task TTL is 120 s).
+            clean_wake["arm_window_s"] = max(
+                2.0, min(clean_wake["arm_window_s"], 60.0))
         clean["wake"] = clean_wake
     if "per_app" in update:
         per_app = update["per_app"]
@@ -481,9 +533,21 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
     for key in ("beep", "debug_log", "block_fullscreen", "noise_suppression",
                 "disable_key_repeat", "text_commands",
                 "speak_answers", "history_panel", "agc",
-                "verbatim_transcript"):
+                 "verbatim_transcript", "sleep_mode", "waveform_visible",
+                 "waveform_ingame",
+                "enabled", "allow_api", "confirm_before_replace",
+                "auto_send", "brain_router"):
         if key in clean:
             clean[key] = bool(clean[key])
+    # Helper-connection endpoints + device/engine overrides: strip whitespace
+    # (a trailing space in a URL breaks the helper connection) and cap length
+    # like the model-name siblings (unbounded strings can never resolve).
+    for key in ("service_url", "stt_ws_url"):
+        if key in clean:
+            clean[key] = str(clean[key] or "").strip()[:512]
+    for key in ("asr_device", "stt_engine"):
+        if key in clean:
+            clean[key] = str(clean[key] or "").strip()[:120]
     for key in ("mic_gain", "mic_target_peak"):
         if key in clean:
             try:
@@ -539,6 +603,15 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
         from .schema import VoiceEditError
         raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                              "router must be deterministic|brain")
+    # Slice-5 AEC consumer switch: auto|raw keep the raw mic, aec selects the
+    # echo-cancelled source (default auto = raw until the owner-eared test).
+    if "capture_source" in clean and str(clean["capture_source"]).lower() not in (
+            "auto", "raw", "aec"):
+        from .schema import VoiceEditError
+        raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                             "capture_source must be auto|raw|aec")
+    if "capture_source" in clean:
+        clean["capture_source"] = str(clean["capture_source"]).lower()
     if "request_ttl_s" in clean:
         try:
             clean["request_ttl_s"] = max(30.0, min(float(clean["request_ttl_s"]),
@@ -547,7 +620,22 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
             from .schema import VoiceEditError
             raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                                  "request_ttl_s must be a number")
+    if "brain_timeout_s" in clean:
+        # Brain-router classify wait: negative breaks the wait, absurd
+        # values wedge the turn past the request TTL.
+        try:
+            clean["brain_timeout_s"] = max(
+                0.5, min(float(clean["brain_timeout_s"]), 30.0))
+        except (TypeError, ValueError):
+            from .schema import VoiceEditError
+            raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                 "brain_timeout_s must be a number")
     for key in ("chat_model", "detail_model"):
+        if key in clean:
+            clean[key] = str(clean[key] or "").strip()[:120]
+    for key in ("local_profile", "api_profile"):
+        # Profile selectors: bound the persisted string like the other
+        # model-name knobs (an unbounded name can never resolve).
         if key in clean:
             clean[key] = str(clean[key] or "").strip()[:120]
     if "detail_cues" in clean:
@@ -566,6 +654,23 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
             from .schema import VoiceEditError
             raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                                  "voice_recent_turns must be a number")
+    # Slice-2 web/model knobs: validate/coerce here, persist under voice_edit
+    # (via clean) AND mirror to the intent.* authority the readers use.
+    intent_patch: Dict[str, Any] = {}
+    if "web_paid_first" in clean:
+        clean["web_paid_first"] = bool(clean["web_paid_first"])
+        intent_patch["web_paid_first"] = clean["web_paid_first"]
+    for _mkey in ("ollama_model", "runner_alias"):
+        if _mkey in clean:
+            _mname = str(clean[_mkey] or "").strip()[:120]
+            if not _mname:
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     f"{_mkey} must be a non-empty model name")
+            clean[_mkey] = _mname
+    if "ollama_model" in clean:
+        intent_patch["ollama_model"] = clean["ollama_model"]
+    if "runner_alias" in clean:
+        intent_patch.setdefault("runner", {})["alias"] = clean["runner_alias"]
     path = _config_path(cfg)
     data = _load_yaml(path)
     patch: Dict[str, Any] = {}
@@ -573,8 +678,10 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
         patch["voice_edit"] = clean
     if tts_patch:
         patch["tts"] = tts_patch
-    if llm_patch:
-        patch["intent"] = {"local_llm": llm_patch}
+    if llm_patch or intent_patch:
+        patch["intent"] = dict(intent_patch)
+        if llm_patch:
+            patch["intent"]["local_llm"] = llm_patch
     merged = _deep_merge(data, patch)
     if "per_app" in clean and clean["per_app"] == {}:
         # PUT per_app:{} clears stored per-app mappings (a deep merge would

@@ -18,20 +18,28 @@ import time
 from pathlib import Path
 
 DDG_MIN_RESULTS = 2   # fewer than this -> fall back to Perplexity
-# Portable resolution: the bridge venv python runs this script, so the current
-# interpreter is the launcher; the Perplexity skill path below is a
-# legacy-operator fallback (migration compat, documented), never a
-# machine-specific absolute path. Qubit-native research runs DDG here and
-# the supervised browser lane in the product.
+#: DDG layer bound (Lane 4): the browser layer is 25 s-bounded, so the fast
+#: layer gets 10 s — a stalled DDG must fall through loudly, never hold a
+#: voice turn hostage.
+DDG_TIMEOUT_S = 10
+#: Browser-Pro layer bound (Slice 2): the CDP-driven Perplexity session must
+#: never hold a voice turn hostage — 25 s, then a loud degrade. The old
+#: 120 s timeout is unusable for live voice rhythm (CDP DOWN stalls it).
+BROWSER_PRO_TIMEOUT_S = 25
+# Portable resolution: bridge-local script first, then the Hermes skill copy
+# (migration compat). Never a bare system python: the bridge venv python runs
+# this script, so the current interpreter is the launcher.
 BRIDGE_PYTHON = sys.executable
-PERPLEXITY_SCRIPT = (Path.home() / ".hermes/skills/research/perplexity-web-search"
-                     / "scripts" / "perplexity_search.py")
+_LOCAL = Path(__file__).resolve().parent / "perplexity_search.py"
+_HERMES = (Path.home() / ".hermes/skills/research/perplexity-web-search"
+           / "scripts" / "perplexity_search.py")
+PERPLEXITY_SCRIPT = str(_LOCAL if _LOCAL.is_file() else _HERMES)
 
 
 def ddg_search(query: str, max_results: int = 5) -> list:
     """DuckDuckGo text search via the ddgs library (bridge venv)."""
     from ddgs import DDGS
-    with DDGS() as d:
+    with DDGS(timeout=DDG_TIMEOUT_S) as d:
         return list(d.text(query, max_results=max_results))
 
 
@@ -59,14 +67,43 @@ def ddg_answer(query: str) -> str:
 
 
 def perplexity_answer(query: str, max_chars: int) -> str:
-    """Deep fallback via the logged-in Perplexity Pro browser session."""
+    """Deep fallback via the logged-in Perplexity Pro browser session.
+
+    Bounded to ``BROWSER_PRO_TIMEOUT_S`` (Slice 2) and loud on every
+    degrade path: CDP down (exit 2 from the probe script), timeout, or
+    empty — each prints its reason to stderr so a skipped layer is never
+    a silent empty. Returns "" on any miss (caller falls through).
+    """
     cmd = [BRIDGE_PYTHON, PERPLEXITY_SCRIPT, query, str(max_chars)]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        return (proc.stdout or "").strip()
-    except Exception as exc:
-        print(f"perplexity error: {exc}", file=sys.stderr)
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=BROWSER_PRO_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        print(f"perplexity browser probe timed out after "
+              f"{BROWSER_PRO_TIMEOUT_S}s (CDP path degraded) — "
+              f"falling through", file=sys.stderr)
         return ""
+    except Exception as exc:
+        print(f"perplexity error: {exc} — falling through",
+              file=sys.stderr)
+        return ""
+    if proc.returncode == 2:
+        print("perplexity browser probe: CDP not reachable on "
+              "127.0.0.1:9222 (browser search unavailable, using API) — "
+              "falling through", file=sys.stderr)
+        return ""
+    if proc.returncode != 0:
+        tail = (proc.stderr or "").strip().splitlines()
+        reason = tail[-1][:160] if tail else f"exit {proc.returncode}"
+        print(f"perplexity browser probe missed ({reason}) — "
+              f"falling through", file=sys.stderr)
+        return ""
+    answer = (proc.stdout or "").strip()
+    if not answer:
+        print("perplexity browser probe returned empty — falling through",
+              file=sys.stderr)
+        return ""
+    return answer
 
 
 def main() -> int:

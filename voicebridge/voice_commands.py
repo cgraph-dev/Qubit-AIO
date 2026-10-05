@@ -884,6 +884,15 @@ def _b_chat_sessions(ctx, args):
     if action == "search":
         return {"sessions": store.list(limit=20,
                                        query=str(args.get("query", "") or ""))}
+    if action == "resume":
+        # Webchat resume: the canonical store has no re-activate verb —
+        # delete is a tombstone and archive is a flag — so resume clears
+        # the archived flag (and reports the tombstone honestly when the
+        # record is gone). Confirm-gated by the voice journal.
+        if not sid:
+            raise ValueError("which chat session? say the session id")
+        store.archive(sid, False)
+        return {"session": store.show(sid), "resumed": True}
     try:
         limit = int(args.get("limit", 20) or 20)
     except (TypeError, ValueError):
@@ -1113,6 +1122,48 @@ def _b_memory(ctx, args):
         if action == "forget":
             sm.forget(int(args.get("memory_id", 0)), requested_by="user")
             return {"forgotten": True, "semantic": gate}
+        # Viking overlay page reads the LOCAL context engine
+        # (voicebridge/context_store.py — state-home ``context/`` root), not
+        # the semantic store above. These branches answer from that same
+        # engine, so voice reports exactly what the page renders. Writes are
+        # confirm-gated by the shared voice journal before this body runs.
+        if action in ("viking_status", "viking_tree", "viking_file",
+                      "viking_search", "viking_resource_add",
+                      "viking_memory_add", "viking_related",
+                      "viking_bot_sessions", "viking_skills"):
+            from . import context_store as _CTX
+
+            if action == "viking_status":
+                return {"viking": _CTX.status(ctx.cfg), "semantic": gate}
+            if action == "viking_tree":
+                return {"viking": _CTX.tree(ctx.cfg)}
+            if action == "viking_file":
+                return {"viking": _CTX.read_file(
+                    ctx.cfg, str(args.get("path", "") or ""))}
+            if action == "viking_search":
+                return {"viking": _CTX.search(
+                    ctx.cfg, str(args.get("query", "") or ""))}
+            if action == "viking_memory_add":
+                return {"viking": _CTX.add_memory(
+                    ctx.cfg, str(args.get("text", "") or ""),
+                    scope=str(args.get("scope", "") or "user"),
+                    requested_by="voice:user", confirmed=True)}
+            if action == "viking_related":
+                return {"viking": _CTX.related(
+                    ctx.cfg, str(args.get("path", "") or ""))}
+            if action == "viking_bot_sessions":
+                try:
+                    limit = int(args.get("limit", 50) or 50)
+                except (TypeError, ValueError):
+                    limit = 50
+                return {"viking": _CTX.bot_sessions(ctx.cfg, limit=limit)}
+            if action == "viking_skills":
+                return {"viking": _CTX.skills_list(ctx.cfg)}
+            return {"viking": _CTX.add_resource(
+                ctx.cfg, str(args.get("resource", "") or ""),
+                title=str(args.get("title", "") or ""),
+                notes=str(args.get("notes", "") or ""),
+                requested_by="voice:user", confirmed=True)}
         raise ValueError(f"unknown memory action {action!r}")
     finally:
         try:
@@ -2252,6 +2303,16 @@ def _b_schedules(ctx, args):
     if action == "delete":
         return {"schedule": SC.delete(
             ctx.cfg, job_id, requested_by="voice:user", confirmed=True)}
+    if action == "trigger":
+        # Taskflow trigger: force one run now regardless of schedule state
+        # (typed NOT_FOUND when the job id is unknown; run-due receipt
+        # otherwise). Confirm-gated like run_due.
+        return {"scheduled_run": SC.trigger(
+            ctx.cfg, job_id, requested_by="voice:user")}
+    if action == "hooks":
+        # Taskflow hook guards: the bundled flow-hook list from the same
+        # schedules store the flows bridge (flows.hooks) serves.
+        return {"flow_hooks": SC.list_flow_hooks(ctx.cfg)}
     raise ValueError(f"unknown schedules action {action!r}")
 
 
@@ -4270,6 +4331,193 @@ def _b_task_ledger(ctx, args):
         "rollback": "read-only; nothing to roll back"}}
 
 
+def _b_harness(ctx, args):
+    """Harness router surface (same gateway methods the dashboard calls).
+
+    Reads delegate to the canonical pinned registry methods (agents.list,
+    harness.starter_kits, tasks.list, sessions.get, sessions.files.list,
+    artifacts.get); task_submit composes the real session_create + turn
+    from ``family_bot_harness``. Submit is confirm-tier (the voice journal
+    already authorized it, so requested_by/confirmed flow through).
+    """
+    from .gateway.rpc import default_registry
+    from . import family_bot_harness as _FBH
+
+    action = str(args.get("action", "list") or "list")
+    registry = default_registry()
+    if action == "list":
+        return {"harness": registry.handle(ctx.cfg, "agents.list", {})}
+    if action == "kits":
+        return {"harness": _FBH._gw_harness_starter_kits(ctx.cfg, {})}
+    if action == "tasks":
+        try:
+            limit = int(args.get("limit", 50) or 50)
+        except (TypeError, ValueError):
+            limit = 50
+        return {"harness": registry.handle(
+            ctx.cfg, "tasks.list", {"limit": limit})}
+    if action == "submit":
+        prompt = str(args.get("prompt", "") or "").strip()
+        if not prompt:
+            raise ValueError("what should the harness run? say the task")
+        return {"harness": _FBH._gw_harness_task_submit(
+            ctx.cfg, {"prompt": prompt,
+                      "harness": str(args.get("harness", "") or ""),
+                      "requested_by": "voice:user"})}
+    if action == "session_show":
+        sid = str(args.get("session_id", "") or "").strip()
+        if not sid:
+            raise ValueError("which harness session? say the session id")
+        return {"harness": registry.handle(
+            ctx.cfg, "sessions.get", {"session_id": sid})}
+    if action == "files":
+        sid = str(args.get("session_id", "") or "").strip()
+        if not sid:
+            raise ValueError("which harness session? say the session id")
+        return {"harness": registry.handle(
+            ctx.cfg, "sessions.files.list",
+            {"session_id": sid,
+             "limit": int(args.get("limit", 50) or 50)})}
+    if action == "artifact":
+        sid = str(args.get("session_id", "") or "").strip()
+        path = str(args.get("path", "") or "").strip()
+        if not sid or not path:
+            raise ValueError("say the harness session and the artifact name")
+        return {"harness": registry.handle(
+            ctx.cfg, "artifacts.get",
+            {"session_id": sid, "path": path})}
+    raise ValueError(f"unknown harness action {action!r}")
+
+
+def _b_bot(ctx, args):
+    """Delegated-worker bot console (same modules the dashboard calls).
+
+    Task list/status read the shared ledger (tasks.list/tasks.get — the
+    rows tasks-list/tasks-get serve); launch/pause/resume run the durable
+    worker path in ``family_bot_harness``; cancel runs the real
+    tasks.cancel (receipt/session cancel, typed UNAVAILABLE for plain
+    ledger ids); ideas read the ledger-derived suggestion inbox with the
+    durable overlay; goals read/set the durable goal sidecar. Mutations
+    are confirm-tier (the voice journal already authorized them).
+    """
+    from .gateway.rpc import default_registry
+    from . import family_bot_harness as _FBH
+
+    action = str(args.get("action", "tasks_list") or "tasks_list")
+    registry = default_registry()
+    if action == "tasks_list":
+        try:
+            limit = int(args.get("limit", 50) or 50)
+        except (TypeError, ValueError):
+            limit = 50
+        return {"bot": registry.handle(
+            ctx.cfg, "tasks.list", {"limit": limit})}
+    if action == "tasks_get":
+        task_id = str(args.get("task_id", "") or "").strip()
+        if not task_id:
+            raise ValueError("which delegated task? say the task id")
+        return {"bot": registry.handle(
+            ctx.cfg, "tasks.get", {"taskId": task_id})}
+    if action == "tasks_launch":
+        prompt = str(args.get("prompt", "") or "").strip()
+        if not prompt:
+            raise ValueError("what should the worker run? say the task")
+        return {"bot": _FBH._gw_bot_tasks_launch(
+            ctx.cfg, {"title": str(args.get("title", "") or ""),
+                      "prompt": prompt,
+                      "requested_by": "voice:user"})}
+    if action == "tasks_pause":
+        sid = str(args.get("session", "") or "").strip()
+        if not sid:
+            raise ValueError("which worker? say the session key "
+                             "the launch reported")
+        return {"bot": _FBH._gw_bot_tasks_pause(
+            ctx.cfg, {"session": sid, "requested_by": "voice:user"})}
+    if action == "tasks_resume":
+        sid = str(args.get("session", "") or "").strip()
+        if not sid:
+            raise ValueError("which paused worker? say the session key")
+        return {"bot": _FBH._gw_bot_tasks_resume(
+            ctx.cfg, {"session": sid, "requested_by": "voice:user"})}
+    if action == "tasks_cancel":
+        target = str(args.get("session", "") or
+                     args.get("task_id", "") or
+                     args.get("target", "") or "").strip()
+        if not target:
+            raise ValueError("which worker? say the session key or task id")
+        params: Dict[str, Any] = {"session": target,
+                                  "taskId": target,
+                                  "requested_by": "voice:user"}
+        return {"bot": registry.handle(ctx.cfg, "tasks.cancel", params)}
+    if action == "ideas_list":
+        return {"bot": _FBH._gw_bot_ideas_list(ctx.cfg, {})}
+    if action == "ideas_accept":
+        idea = str(args.get("idea", "") or "").strip()
+        if not idea:
+            raise ValueError("which idea? say the idea id from the list")
+        return {"bot": _FBH._gw_bot_ideas_accept(
+            ctx.cfg, {"idea": idea, "requested_by": "voice:user"})}
+    if action == "goals_list":
+        return {"bot": _FBH._gw_bot_goals_list(ctx.cfg, {})}
+    if action == "goals_set":
+        title = str(args.get("title", "") or "").strip()
+        if not title:
+            raise ValueError("what goal? say the goal title")
+        return {"bot": _FBH._gw_bot_goals_set(
+            ctx.cfg, {"title": title,
+                      "description": str(args.get("description", "") or ""),
+                      "requested_by": "voice:user"})}
+    raise ValueError(f"unknown bot action {action!r}")
+
+
+def _b_canvas(ctx, args):
+    """Canvas file host (same confined host the dashboard bridge calls).
+
+    Reads (list/get/live) execute directly; add/remove run only after the
+    voice pipeline's confirmation and pass confirmed=True with the
+    canonical human principal.
+    """
+    from pathlib import Path as _Path
+    import importlib.util as _ilu
+
+    # ``voicebridge/files.py`` (project-folder host) shadows the
+    # ``voicebridge/files/`` package dir on a normal import, so load the
+    # confined canvas host by path — the same module the family bridge
+    # registers (``qubit_compat._canvas_host_module``).
+    _path = _Path(__file__).resolve().parent / "files" / "canvas_host.py"
+    _spec = _ilu.spec_from_file_location("voicebridge.canvas_host", str(_path))
+    if _spec is None or _spec.loader is None:
+        raise ValueError("canvas host unavailable: module not found")
+    _CH = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_CH)
+
+    action = str(args.get("action", "list") or "list")
+    if action == "list":
+        return {"canvas": _CH.list_files(ctx.cfg)}
+    if action == "live":
+        return {"canvas": _CH.live_state(ctx.cfg)}
+    if action == "get":
+        path = str(args.get("path", "") or "").strip()
+        if not path:
+            raise ValueError("which canvas file? say the file name")
+        return {"canvas": _CH.get_file(ctx.cfg, path)}
+    if action == "add":
+        path = str(args.get("path", "") or "").strip()
+        content = str(args.get("content", "") or "")
+        if not path:
+            raise ValueError("which canvas file? say the file name")
+        return {"canvas": _CH.add_file(
+            ctx.cfg, path, content,
+            confirmed=True, requested_by="voice:user")}
+    if action == "remove":
+        path = str(args.get("path", "") or "").strip()
+        if not path:
+            raise ValueError("which canvas file? say the file name")
+        return {"canvas": _CH.remove_file(
+            ctx.cfg, path, confirmed=True, requested_by="voice:user")}
+    raise ValueError(f"unknown canvas action {action!r}")
+
+
 def _b_media_gen(ctx, args):
     """Media generation registry/gate (same module the CLI/dashboard use).
 
@@ -5243,6 +5491,9 @@ _BACKENDS: Dict[str, Callable] = {
     "branding": _b_branding,
     "node_host": _b_node_host,
     "task_ledger": _b_task_ledger,
+    "harness": _b_harness,
+    "bot": _b_bot,
+    "canvas": _b_canvas,
     "media_gen": _b_media_gen,
     "local_models": _b_local_models,
     "plugin_runtime": _b_plugin_runtime,
@@ -6053,6 +6304,66 @@ _E("memory_forget", "Forget memory",
    fixed=(("action", "forget"),), confirm=True,
    examples=("qubit, forget memory 12",),
    help="Delete a memory (confirmed).")
+# ------------------------------------------------------------- viking reads
+# The Viking overlay page reads the LOCAL context engine
+# (voicebridge/context_store.py); these entries answer from that same
+# engine, so voice reports exactly what the page renders. Writes are
+# confirm-gated by the shared voice journal before the body runs.
+_E("viking_status", "Viking context status",
+   ("viking status", "context status", "viking engine status"),
+   "memory", ("memory",),
+   fixed=(("action", "viking_status"),),
+   examples=("qubit, viking status",),
+   help="Local context-engine groups and counts (read-only).")
+_E("viking_tree", "Viking context tree",
+   ("viking tree", "context tree", "show context tree"),
+   "memory", ("memory",),
+   fixed=(("action", "viking_tree"),),
+   examples=("qubit, viking tree",),
+   help="Local context-engine file tree (read-only).")
+_E("viking_file", "Read a Viking context file",
+   ("viking file", "read context file", "show context file"),
+   "memory", ("memory",), args=(_S("path"),),
+   fixed=(("action", "viking_file"),),
+   examples=("qubit, viking file user/memories.md",),
+   help="One local context file, previewed (read-only).")
+_E("viking_search", "Search Viking context",
+   ("viking search", "search context files", "search viking"),
+   "memory", ("memory",), args=(_R("query"),),
+   fixed=(("action", "viking_search"),),
+   examples=("qubit, viking search invoices",),
+   help="Full-text search over local context files (read-only).")
+_E("viking_resource_add", "Add a Viking resource",
+   ("viking add resource", "add context resource", "save viking resource"),
+   "memory", ("memory",),
+   args=(_R("resource"), _S("title"), _S("notes")),
+   fixed=(("action", "viking_resource_add"),), confirm=True,
+   examples=("qubit, viking add resource https://example.com report",),
+   help="Record a resource under resources/ (confirmed).")
+_E("viking_memory_add", "Add a Viking memory note",
+   ("viking remember", "viking add memory", "save viking memory"),
+   "memory", ("memory",), args=(_R("text"), _S("scope")),
+   fixed=(("action", "viking_memory_add"),), confirm=True,
+   examples=("qubit, viking remember the gate code",),
+   help="Append a note to user/memories.md (confirmed).")
+_E("viking_related", "Related Viking context",
+   ("viking related", "related context", "what relates to this file"),
+   "memory", ("memory",), args=(_S("path"),),
+   fixed=(("action", "viking_related"),),
+   examples=("qubit, viking related user/memories.md",),
+   help="Same-folder siblings plus keyword kin (read-only).")
+_E("viking_sessions", "Viking bot sessions",
+   ("viking sessions", "viking bot sessions", "list viking sessions"),
+   "memory", ("memory",),
+   fixed=(("action", "viking_bot_sessions"),),
+   examples=("qubit, viking sessions",),
+   help="Bot sessions from the runtime session store (read-only).")
+_E("viking_skills", "Viking skills catalog",
+   ("viking skills", "list viking skills", "context skills"),
+   "memory", ("memory",),
+   fixed=(("action", "viking_skills"),),
+   examples=("qubit, viking skills",),
+   help="Skills catalog rows the context engine cites (read-only).")
 _E("skills_list", "List skills",
    ("list skills", "show skills", "what skills"),
    "skills", ("skills/bundles", "plugins/plugins-list"),
@@ -8338,6 +8649,223 @@ _E("task_ledger_timeline", "Task timeline",
    fixed=(("action", "timeline"),),
    examples=("qubit, task timeline kanban:1",),
    help="Ordered real events correlated to one task (never fabricated).")
+# ------------------------------------------- harness router (voice parity)
+# The HarnessRouter page drives the ocFamilyHarnessApi gateway rows; these
+# entries speak the same methods (agents.list, harness.starter_kits,
+# tasks.list, harness.task_submit, sessions.get/files, artifacts.get).
+# Reads execute immediately; submit is confirm-gated.
+_E("harness_list", "Harness router status",
+   ("harness router status", "show harness router", "router status"),
+   "harness", (),
+   fixed=(("action", "list"),),
+   examples=("qubit, harness router status",),
+   help="Worker roster behind the harness router (read-only).")
+_E("harness_kits", "Harness starter kits",
+   ("list starter kits", "harness starter kits", "show starter kits"),
+   "harness", (),
+   fixed=(("action", "kits"),),
+   examples=("qubit, list starter kits",),
+   help="Curated starter-kit list (read-only).")
+_E("harness_tasks", "Harness tasks",
+   ("list harness tasks", "harness tasks", "show harness tasks"),
+   "harness", (),
+   fixed=(("action", "tasks"),),
+   examples=("qubit, list harness tasks",),
+   help="Tasks visible to the harness router (read-only).")
+_E("harness_submit", "Submit a harness task",
+   ("submit harness task", "run harness task", "harness submit"),
+   "harness", (),
+   args=(_R("prompt",
+            clarifier="What should the harness run?"),
+         _S("harness")),
+   fixed=(("action", "submit"),), confirm=True,
+   examples=("qubit, submit harness task check inbox",),
+   help="Open a session and run one turn in it (confirmed).")
+_E("harness_session_show", "Show a harness session",
+   ("show harness session", "harness session"),
+   "harness", (), args=(_S("session_id", True),),
+   fixed=(("action", "session_show"),),
+   examples=("qubit, show harness session abc123",),
+   help="One harness session snapshot (read-only).")
+_E("harness_files", "Harness session files",
+   ("list harness files", "harness session files"),
+   "harness", (), args=(_S("session_id", True),),
+   fixed=(("action", "files"),),
+   examples=("qubit, list harness files abc123",),
+   help="Per-session draft files (read-only).")
+_E("harness_artifact", "Read a harness artifact",
+   ("read harness artifact", "harness artifact", "show harness artifact"),
+   "harness", (), args=(_S("session_id", True), _S("path", True)),
+   fixed=(("action", "artifact"),),
+   examples=("qubit, read harness artifact abc123 notes",),
+   help="One session artifact (read-only).")
+# ----------------------------------------------- bot console (voice parity)
+# The QubitBot page drives the ocFamilyBotApi gateway rows; these entries
+# speak the same methods (tasks.list/get, bot.tasks_launch/pause/resume,
+# tasks.cancel, bot.ideas_list/accept, bot.goals_list/set). Reads execute
+# immediately; launches, pauses, cancels, accepts, and goal sets are
+# confirm-gated.
+_E("bot_tasks_list", "Delegated worker tasks",
+   ("list delegated tasks", "bot tasks", "list bot tasks"),
+   "bot", (),
+   fixed=(("action", "tasks_list"),),
+   examples=("qubit, list delegated tasks",),
+   help="Delegated tasks from the shared ledger (read-only).")
+_E("bot_task_show", "Delegated task status",
+   ("show delegated task", "bot task status"),
+   "bot", (), args=(_R("task_id"),),
+   fixed=(("action", "tasks_get"),),
+   examples=("qubit, show delegated task kanban:1",),
+   help="One delegated task record (read-only).")
+_E("bot_task_launch", "Launch a delegated task",
+   ("launch delegated task", "delegate a task", "bot launch task"),
+   "bot", (),
+   args=(_R("prompt",
+            clarifier="What should the worker run?"),
+         _S("title")),
+   fixed=(("action", "tasks_launch"),), confirm=True,
+   examples=("qubit, delegate a task summarize my notes",),
+   help="Launch a durable headless worker (confirmed).")
+_E("bot_task_pause", "Pause a delegated worker",
+   ("pause delegated task", "pause bot task"),
+   "bot", (), args=(_S("session", True),),
+   fixed=(("action", "tasks_pause"),), confirm=True,
+   examples=("qubit, pause bot task sess_abc",),
+   help="Flag a running worker to stop, keeping its prompt (confirmed).")
+_E("bot_task_resume", "Resume a delegated worker",
+   ("resume delegated task", "resume bot task"),
+   "bot", (), args=(_S("session", True),),
+   fixed=(("action", "tasks_resume"),), confirm=True,
+   examples=("qubit, resume bot task sess_abc",),
+   help="Relaunch a paused worker's kept prompt (confirmed).")
+_E("bot_task_cancel", "Cancel a delegated worker",
+   ("cancel delegated task", "cancel bot task"),
+   "bot", (), args=(_R("target"),),
+   fixed=(("action", "tasks_cancel"),), confirm=True,
+   examples=("qubit, cancel bot task sess_abc",),
+   help="Cancel a receipt or in-flight session (confirmed; plain ledger "
+        "ids report typed UNAVAILABLE).")
+_E("bot_ideas_list", "Bot suggestion inbox",
+   ("list bot ideas", "bot ideas", "bot suggestions"),
+   "bot", (),
+   fixed=(("action", "ideas_list"),),
+   examples=("qubit, list bot ideas",),
+   help="Ledger suggestions minus dismissed, plus edits (read-only).")
+_E("bot_idea_accept", "Accept a bot suggestion",
+   ("accept bot idea", "approve bot idea"),
+   "bot", (), args=(_S("idea", True),),
+   fixed=(("action", "ideas_accept"),), confirm=True,
+   examples=("qubit, accept bot idea kanban:1",),
+   help="Launch a suggestion as a durable worker (confirmed).")
+_E("bot_goals_list", "Bot goals",
+   ("list bot goals", "bot goals", "show bot goals"),
+   "bot", (),
+   fixed=(("action", "goals_list"),),
+   examples=("qubit, list bot goals",),
+   help="Durable goals plus cron schedules (read-only).")
+_E("bot_goal_set", "Set a bot goal",
+   ("set bot goal", "add bot goal"),
+   "bot", (), args=(_R("title"),),
+   fixed=(("action", "goals_set"),), confirm=True,
+   examples=("qubit, set bot goal inbox zero",),
+   help="Store a goal record (confirmed).")
+# ------------------------------------------------ webchat (voice parity)
+# WebChat has no bridge rows by design (reuse-only over the chat
+# endpoints); voice reuses the same canonical chat-session store the
+# chat_sessions entries drive. List/show read immediately; resume is
+# confirm-gated.
+_E("webchat_list", "Webchat sessions",
+   ("list web chats", "webchat sessions", "show web chats"),
+   "chat_sessions", ("sessions",),
+   fixed=(("action", "list"),), summary="sessions",
+   examples=("qubit, list web chats",),
+   help="Canonical chat sessions behind WebChat (read-only).")
+_E("webchat_show", "Show a webchat session",
+   ("show web chat", "open web chat"),
+   "chat_sessions", ("sessions",), args=(_S("session_id", True),),
+   fixed=(("action", "show"),), summary="sessions",
+   examples=("qubit, show web chat abc123",),
+   help="One WebChat session with its transcript (read-only).")
+_E("webchat_resume", "Resume a webchat session",
+   ("resume web chat", "reopen web chat"),
+   "chat_sessions", ("sessions",), args=(_S("session_id", True),),
+   fixed=(("action", "resume"),), confirm=True, summary="sessions",
+   examples=("qubit, resume web chat abc123",),
+   help="Clear the archived flag so WebChat reopens it (confirmed).")
+# ------------------------------------------------- canvas (voice parity)
+# The Canvas page drives the ocFamilyCanvasApi bridge rows on the
+# confined canvas file host; these entries speak the same host.
+# Reads execute immediately; add/remove are confirm-gated.
+_E("canvas_list", "Canvas files",
+   ("list canvas files", "canvas files", "show canvas"),
+   "canvas", (),
+   fixed=(("action", "list"),),
+   examples=("qubit, list canvas files",),
+   help="Confined canvas-root files (read-only).")
+_E("canvas_get", "Read a canvas file",
+   ("read canvas file", "show canvas file"),
+   "canvas", (), args=(_S("path", True),),
+   fixed=(("action", "get"),),
+   examples=("qubit, read canvas file notes.md",),
+   help="One canvas file (read-only).")
+_E("canvas_add", "Add a canvas file",
+   ("add canvas file", "save canvas file"),
+   "canvas", (), args=(_S("path", True), _R("content")),
+   fixed=(("action", "add"),), confirm=True, split="first-rest",
+   examples=("qubit, add canvas file notes.md hello",),
+   help="Add or replace one canvas file (confirmed).")
+_E("canvas_remove", "Remove a canvas file",
+   ("remove canvas file", "delete canvas file"),
+   "canvas", (), args=(_S("path", True),),
+   fixed=(("action", "remove"),), confirm=True,
+   examples=("qubit, remove canvas file notes.md",),
+   help="Remove one canvas file (confirmed).")
+# ----------------------------------------------- taskflows (voice parity)
+# Taskflows render the same schedules store the CLI cron family drives
+# (recurring jobs render as standing orders; flows.cancel disables the
+# hook). Spoken with flow wording; mutations are confirm-gated.
+_E("taskflow_list", "Task flows",
+   ("list task flows", "task flows", "show task flows"),
+   "schedules", ("cron",),
+   fixed=(("action", "list"),), summary="schedules",
+   examples=("qubit, list task flows",),
+   help="Recurring jobs rendered as standing orders (read-only).")
+_E("taskflow_show", "Show a task flow",
+   ("show task flow", "describe task flow"),
+   "schedules", ("cron",), args=(_I("job_id"),),
+   fixed=(("action", "show"),), summary="schedules",
+   examples=("qubit, show task flow 2",),
+   help="One flow with recent runs (read-only).")
+_E("taskflow_pause", "Pause a task flow",
+   ("pause task flow", "pause flow"),
+   "schedules", ("cron",), args=(_I("job_id"),),
+   fixed=(("action", "pause"),), confirm=True, summary="schedules",
+   examples=("qubit, pause task flow 2",),
+   help="Pause a flow (confirmed).")
+_E("taskflow_resume", "Resume a task flow",
+   ("resume task flow", "resume flow"),
+   "schedules", ("cron",), args=(_I("job_id"),),
+   fixed=(("action", "resume"),), confirm=True, summary="schedules",
+   examples=("qubit, resume task flow 2",),
+   help="Resume a flow (confirmed).")
+_E("taskflow_trigger", "Trigger a task flow",
+   ("trigger task flow", "run task flow now"),
+   "schedules", ("cron",), args=(_I("job_id"),),
+   fixed=(("action", "trigger"),), confirm=True, summary="schedules",
+   examples=("qubit, trigger task flow 2",),
+   help="Force one run now regardless of schedule (confirmed).")
+_E("taskflow_delete", "Delete a task flow",
+   ("delete task flow", "remove task flow"),
+   "schedules", ("cron",), args=(_I("job_id"),),
+   fixed=(("action", "delete"),), confirm=True, summary="schedules",
+   examples=("qubit, delete task flow 2",),
+   help="Delete a flow, history retained (confirmed).")
+_E("taskflow_hooks", "Task flow hooks",
+   ("list flow hooks", "task flow hooks", "show flow hooks"),
+   "schedules", ("cron",),
+   fixed=(("action", "hooks"),), summary="schedules",
+   examples=("qubit, list flow hooks",),
+   help="Bundled flow-hook guards (read-only).")
 # -------------------------------------------------------------- media gen
 _E("media_gen_status", "Media generation status",
    ("media status", "media generation status", "image generation status"),

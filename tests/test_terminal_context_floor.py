@@ -194,6 +194,62 @@ def test_high_context_but_not_executable_is_typed(tmp_path, monkeypatch):
     assert out["code"] == "TERMINAL_PROFILE_NOT_EXECUTABLE"
 
 
+def test_resume_overlays_stored_session_model(tmp_path, monkeypatch):
+    """A resumed TUI keeps its stored session model: the grant reports it.
+
+    Regression for the MODEL card showing the current default (deepseek)
+    while the resumed terminal ran its stored session model (muse-spark).
+    """
+    from voicebridge import pty_ws
+    from voicebridge.providers import resolver as R
+
+    cfg = _cfg(tmp_path, monkeypatch, _FRONTIER)
+    R.upsert_model_profile(cfg, _api_profile(), confirm=True)
+    R.set_active_profile(cfg, "big-api", confirm=True)
+    monkeypatch.setattr(pty_ws, "_session_stored_model",
+                        lambda sid, c=None: ("opencode", "old-model"))
+    srv = pty_ws.PtyWsServer(cfg=cfg)
+    fresh = srv._resolve_guard("")
+    assert isinstance(fresh, dict)
+    assert fresh["ok"] is True and fresh["model"] == "big-model", fresh
+    resumed = srv._resolve_guard("", session_id="dashboard-abc123")
+    assert isinstance(resumed, dict)
+    assert resumed["model"] == "old-model", resumed
+    assert resumed["provider"] == "opencode", resumed
+    assert resumed.get("session_pinned") is True, resumed
+    assert resumed.get("default_model") == "big-model", resumed
+    assert resumed.get("resumed_session") == "dashboard-abc123", resumed
+
+
+def test_resume_spawn_keeps_home_config_on_default(tmp_path, monkeypatch):
+    """Resuming an old session must not flip the global default backwards.
+
+    The child env names the session's pinned model, but the QUBIT_HOME
+    config write tracks the current default fresh chats boot from.
+    """
+    from voicebridge import pty_ws
+    from voicebridge.providers import resolver as R
+
+    cfg = _cfg(tmp_path, monkeypatch, _FRONTIER)
+    R.upsert_model_profile(cfg, _api_profile(), confirm=True)
+    R.set_active_profile(cfg, "big-api", confirm=True)
+    monkeypatch.setattr(pty_ws, "_session_stored_model",
+                        lambda sid, c=None: ("opencode", "old-model"))
+    captured: dict = {}
+
+    def fake(cols, rows, resume, profile, *, env_overrides=None,
+             home_config=None, cfg=None, workspace_cwd=""):
+        captured["env"] = env_overrides
+        captured["home_config"] = home_config
+        return object(), {}
+
+    monkeypatch.setattr(pty_ws, "_default_spawn", fake)
+    srv = pty_ws.PtyWsServer(cfg=cfg)
+    srv._production_spawn(80, 24, "dashboard-abc123", "")
+    assert captured["env"]["HERMES_MODEL"] == "old-model"
+    assert captured["home_config"]["model"] == "big-model"
+
+
 def test_resolve_model_exposes_context_tokens(tmp_path, monkeypatch):
     from voicebridge.providers import resolver as R
 

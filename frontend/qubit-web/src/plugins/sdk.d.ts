@@ -5,13 +5,15 @@
  * This is the public type surface for ``window.__QUBIT_PLUGIN_SDK__`` and
  * ``window.__QUBIT_PLUGINS__``, the globals the dashboard host exposes to
  * plugin bundles (see ``web/src/plugins/registry.ts::exposePluginSDK``).
- * The legacy ``__HERMES_*`` aliases expose the same objects.
+ * The legacy ``__QUBIT_PLUGIN_SDK_LEGACY__`` / ``__QUBIT_PLUGINS_LEGACY__``
+ * aliases expose the same objects (kept for plugins built against the
+ * pre-rebrand globals).
  *
  * STATUS: spike. This file documents the contract and gives plugin authors
  * (in-repo IIFEs and external bundles alike) editor types without bundling
  * their own copies of React / the API client. It is intentionally a
  * hand-authored ambient declaration rather than ``typeof
- * window.__HERMES_PLUGIN_SDK__`` because:
+ * window.__QUBIT_PLUGIN_SDK__`` because:
  *   1. The runtime object is assembled from many internal modules
  *      (``@/lib/api``, ``@nous-research/ui``, …). Deriving the type would
  *      leak those internal import paths into the public contract and couple
@@ -179,9 +181,20 @@ declare global {
   interface Window {
     __QUBIT_PLUGIN_SDK__?: QubitPluginSDK;
     __QUBIT_PLUGINS__?: PluginRegistry;
-    /** Legacy aliases (same objects) for third-party plugins. */
+    /**
+     * Historical global names, exposed so plugin bundles built BEFORE the
+     * rebrand still load. A plugin's shipped `dist` is an artifact we neither
+     * own nor can rebuild; one in the tree (`agent-analytics`) reads
+     * `window.__HERMES_PLUGIN_SDK__` and immediately destructures `React` from
+     * it, so when these are absent the plugin fails at load with
+     * "Cannot destructure property 'React' of 'SDK' as it is undefined".
+     * First-party code must keep using the `__QUBIT_*` names above.
+     */
     __HERMES_PLUGIN_SDK__?: QubitPluginSDK;
     __HERMES_PLUGINS__?: PluginRegistry;
+    /** Earlier spelling of the alias (same objects). */
+    __QUBIT_PLUGIN_SDK_LEGACY__?: QubitPluginSDK;
+    __QUBIT_PLUGINS_LEGACY__?: PluginRegistry;
   }
 }
 

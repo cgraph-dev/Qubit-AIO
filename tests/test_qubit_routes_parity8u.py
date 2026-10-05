@@ -93,6 +93,10 @@ NEW_READS = [
     ("GET", "/api/ask/pending", "h_ask_pending"),
     ("GET", "/api/shares/status", "h_session_share_status"),
     ("GET", "/api/sessions/shares", "h_session_shares_list"),
+    # Qubit MCP OAuth family (dashboard login parity): the flows list and an
+    # unknown-flow cancel are always-200 implemented reads.
+    ("GET", "/api/mcp/oauth/flows", "mcp_oauth_flows_list"),
+    ("DELETE", "/api/mcp/oauth/flows/f1", "mcp_oauth_flow_cancel"),
 ]
 
 # (method, path, query, body, code, http) -- implemented handlers that return a
@@ -156,8 +160,9 @@ NEW_GATES = [
      "OAUTH_MANUAL_HANDOFF", 403),
     ("GET", "/api/memory/providers/aa/oauth/status",
      "OAUTH_MANUAL_HANDOFF", 403),
-    ("DELETE", "/api/mcp/oauth/flows/f1", "OAUTH_MANUAL_HANDOFF", 403),
-    ("GET", "/api/mcp/oauth/callback/aa/bb", "OAUTH_MANUAL_HANDOFF", 403),
+    # NOTE: the MCP OAuth family (GET flows, GET/DELETE flows/{id}, GET
+    # callback/*) is implemented, not gated — covered in NEW_READS above and
+    # test_mcp_oauth_callback_dispatch below.
     # Credentialed/desktop/WS surfaces that stay gated even after the
     # git-review + audio HTTP reads become real.
     ("GET", "/api/git/gh-auth", "GH_AUTH_OPERATOR", 403),
@@ -244,6 +249,26 @@ def test_new_gates_dispatch_exact_typed_code(tmp_path, monkeypatch):
         assert out.get("qubit_counterpart"), (method, path, out)
         assert out.get("owner"), (method, path, out)
         assert out.get("rollback"), (method, path, out)
+
+
+def test_mcp_oauth_callback_dispatch(tmp_path, monkeypatch):
+    """The OAuth callback resolves as implemented on dispatch (JSON view).
+
+    With no live flow the landing is an honest expired 404 — never a gate,
+    never a proxy. The HTML landing for real browsers is served by webui's
+    public branch and shares the same deliver function.
+    """
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    route, params = HC.match("GET", "/api/mcp/oauth/callback/aa")
+    assert route is not None and route["disposition"] == "implemented"
+    assert route["handler"] == "mcp_oauth_callback", route
+    code, out = HC.dispatch(cfg, "GET", "/api/mcp/oauth/callback/aa",
+                            {"code": "x", "state": "y"}, {})
+    assert code == 404, (code, out)
+    assert out.get("ok") is False and out.get("state") == "expired", out
+    assert out.get("server") == "aa" and out.get("detail"), out
 
 
 def _gate_sample(pattern: str) -> str:
@@ -771,10 +796,11 @@ REMAINING_TYPED = [
     ("POST", "/api/providers/custom-endpoints/validate",
      "NETWORK_PROBE_BLOCKED", 403),
     ("GET", "/api/media", "MEDIA_NOT_SERVED", 403),
-    ("POST", "/api/chat/image-upload", "CHAT_IMAGE_OVERLAY", 403),
-    # D5: the file download/stream routes are now real brokered binary reads
-    # (voicebridge.qubit_compat.h_files_download); covered by
-    # tests/test_audit_remaining_repair9u.py, not this typed-refusal table.
+    # POST /api/chat/image-upload was converted to the REAL ported handler
+    # (reference qubit_cli/web_routers/files.py upload_chat_image: validates
+    # MIME, caps size, sniffs magic bytes, writes QUBIT_HOME/images/) because
+    # the dashboard's browser clipboard paste path calls it directly. Covered
+    # by tests/test_chat_image_upload_wave19.py, not this typed-refusal table.
     ("GET", "/api/git/gh-auth", "GH_AUTH_OPERATOR", 403),
     ("GET", "/api/git/review/ship-info", "GIT_SHIP_GH_EXTERNAL", 403),
     ("POST", "/api/git/review/pr-list", "GIT_WRITE_BROKERED", 403),

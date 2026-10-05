@@ -349,6 +349,10 @@ class _WhatsAppOnboardingSession:
     account_name: str | None = None
     account_phone: str | None = None
     error: str | None = None
+    # Isolated pairing dir (``session.pairing-*`` next to the live session).
+    # The pairing bridge writes here so it can never fight the gateway bridge
+    # over the live session files; apply() promotes it on success.
+    pairing_session_path: str | None = None
 
 
 _whatsapp_onboarding_sessions: dict[str, _WhatsAppOnboardingSession] = {}

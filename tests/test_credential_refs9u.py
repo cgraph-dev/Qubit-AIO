@@ -6,8 +6,10 @@ runtime ``.env`` (``<state_dir>/runtime/.env``). These tests prove, hermetically
 and with an isolated ``XDG_STATE_HOME`` (never the operator's real
 ``~/.hermes``):
 
-* an ``env:`` reference resolves from the canonical runtime ``.env`` while the
-  process environment still wins when it carries the variable;
+* an ``env:`` reference resolves from the canonical runtime ``.env``, which
+  wins over a stale process-environment value (Hermes parity:
+  ``get_env_value_prefer_dotenv``), while ``os.environ`` remains the fallback
+  when the file does not define the name;
 * a missing variable is a typed ``AUTH_MISSING`` (never a raw key or a raise);
 * the value never leaks through a redaction, a typed result, or a log line;
 * a config-declared profile ``policy``/``allowlist`` override flips
@@ -94,15 +96,30 @@ def test_env_file_supports_export_and_quotes(tmp_path, monkeypatch):
     assert (key, code) == (SECRET, "")
 
 
-def test_process_env_wins_over_runtime_env(tmp_path, monkeypatch):
+def test_runtime_env_file_wins_over_stale_process_env(tmp_path, monkeypatch):
+    # Hermes parity (`hermes_cli.config.get_env_value_prefer_dotenv`): a
+    # deliberate .env edit/rotation beats a stale value inherited from the
+    # parent shell (or dotenv-loaded at import), so a key change takes effect
+    # without a restart.
     from voicebridge.providers.credentials import resolve_key
 
     _cfg(tmp_path, monkeypatch)
     _write_runtime_env(f"OPENCODE_GO_API_KEY={SECRET}\n")
-    monkeypatch.setenv("OPENCODE_GO_API_KEY", "sk-process-wins")
+    monkeypatch.setenv("OPENCODE_GO_API_KEY", "sk-stale-process-copy")
 
     key, code = resolve_key("opencode-go", "env:OPENCODE_GO_API_KEY")
-    assert (key, code) == ("sk-process-wins", "")
+    assert (key, code) == (SECRET, "")
+
+
+def test_process_env_is_the_fallback_when_file_lacks_name(tmp_path, monkeypatch):
+    from voicebridge.providers.credentials import resolve_key
+
+    _cfg(tmp_path, monkeypatch)
+    _write_runtime_env("SOME_OTHER_KEY=whatever\n")
+    monkeypatch.setenv("OPENCODE_GO_API_KEY", "sk-env-fallback")
+
+    key, code = resolve_key("opencode-go", "env:OPENCODE_GO_API_KEY")
+    assert (key, code) == ("sk-env-fallback", "")
 
 
 def test_missing_env_ref_is_typed_auth_missing(tmp_path, monkeypatch):

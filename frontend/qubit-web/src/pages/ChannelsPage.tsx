@@ -173,9 +173,9 @@ export default function ChannelsPage() {
     return api
       .getMessagingPlatforms()
       .then((res) => {
-        setPlatforms(res.platforms);
-        setEnvPath(res.env_path || "~/.qubit/.env");
-        setGatewayStartCommand(res.gateway_start_command || "qubit gateway start");
+        setPlatforms(res?.platforms ?? []);
+        setEnvPath(res?.env_path || "~/.qubit/.env");
+        setGatewayStartCommand(res?.gateway_start_command || "qubit gateway start");
       })
       .catch((e) => showToast(`Error: ${e}`, "error"));
   }, [showToast]);
@@ -1377,13 +1377,13 @@ function TelegramOnboardingPanel({
             <span className="text-xs font-medium uppercase text-foreground">
               Automatic QR setup
             </span>
-            <Badge tone="warning">upstream hosted service</Badge>
+            <Badge tone="warning">third-party hosted service</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            QR setup creates the bot through the upstream hosted pairing
-            service (bot: @NousHostedHermesBot) until the Qubit pairing
-            service exists — the created bot is yours, but the creation step
-            runs on third-party infrastructure. Prefer{" "}
+            QR setup creates the bot through a third-party hosted pairing
+            service until the Qubit pairing service exists — the created bot is
+            yours, but the creation step runs on infrastructure Qubit does not
+            operate. Prefer{" "}
             <span className="font-medium text-foreground">Manual setup</span>{" "}
             with a <code className="font-courier">@BotFather</code> token
             reference to connect without any third party.

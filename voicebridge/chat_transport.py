@@ -34,7 +34,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional
 
 SCHEMA = "qubit-chat/1"
 SESSION_SCHEMA = "qubit-chat-session/1"
@@ -493,6 +493,72 @@ def build_projection(cfg: Any, session_id: str, **kwargs: Any) -> Dict[str, Any]
     return SA.build_projection(cfg, session_id, **kwargs)
 
 
+def _chat_turn_marker_module() -> Any:
+    """The shared interrupted-turn marker store (tui_gateway.turn_marker).
+
+    One implementation for both chat surfaces: the embedded TUI already writes
+    and reads these markers, so `/chat` reuses the same file rather than
+    inventing a second, divergent recovery path. Returns None when the module
+    cannot be imported, which degrades to "no marker" (never a broken turn).
+    """
+    try:
+        from tui_gateway import turn_marker  # type: ignore[import-not-found]
+
+        return turn_marker
+    except Exception:  # noqa: BLE001 - marker bookkeeping must never break a turn
+        return None
+
+
+def _chat_home(cfg: Any) -> Optional[Any]:
+    """The QUBIT_HOME the marker store lives under, or None when unresolvable.
+
+    Prefers an explicit config value, then the active profile home, then the
+    process default — matching how the TUI path resolves
+    ``session["profile_home"] or _qubit_home``.
+    """
+    for key in ("qubit_home", "home"):
+        try:
+            value = cfg.get("paths", key) if hasattr(cfg, "get") else None
+        except Exception:  # noqa: BLE001
+            value = None
+        if value:
+            return value
+    try:
+        from qubit_constants import get_qubit_home
+
+        return get_qubit_home()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _write_turn_marker(cfg: Any, session_id: str, prompt: str) -> None:
+    """Record that a turn is about to run for ``session_id`` (best-effort)."""
+    module = _chat_turn_marker_module()
+    home = _chat_home(cfg)
+    if module is None or home is None or not session_id or not str(prompt or "").strip():
+        return
+    try:
+        module.record_turn_start(home, session_id, prompt)
+    except Exception:  # noqa: BLE001 - never break a turn over bookkeeping
+        return
+
+
+def _clear_turn_marker(cfg: Any, session_id: str) -> None:
+    """Drop the marker once a turn concluded (answered, cancelled, or errored).
+
+    A marker surviving a process death is the signal auto-continue acts on, so
+    every other conclusion must clear it here.
+    """
+    module = _chat_turn_marker_module()
+    home = _chat_home(cfg)
+    if module is None or home is None or not session_id:
+        return
+    try:
+        module.clear_turn_marker(home, session_id)
+    except Exception:  # noqa: BLE001
+        return
+
+
 def record_activity(cfg: Any, session_id: str, assistant_text: str, *,
                     actor: str = "dashboard:user") -> Dict[str, Any]:
     """Append a ``summary`` activity event after a successful turn.
@@ -668,9 +734,74 @@ def _audit(op: str, **fields: Any) -> None:
 
 
 def _resolve_session(st: ChatSessionStore, session: Optional[str], *,
-                     model: Optional[str]) -> Dict[str, Any]:
+                     model: Optional[str], cfg: Any = None) -> Dict[str, Any]:
     sid = str(session or DEFAULT_SESSION).strip()[:80] or DEFAULT_SESSION
-    return st.ensure(sid, model=model)
+    result = st.ensure(sid, model=model)
+    # Surface a turn that a process death cut short, so the client can offer to
+    # resume it instead of the operator retyping `continue` by hand. The marker
+    # is cleared by whichever side acts on it (or by the turn concluding).
+    result["interrupted_turn"] = _pending_interrupted_turn(cfg, sid)
+    return result
+
+
+def _pending_interrupted_turn(cfg: Any, session_id: str) -> Optional[Dict[str, Any]]:
+    """The interrupted prompt for ``session_id`` if a crash left one behind.
+
+    Read-only: the client decides whether to re-issue it, so a stale marker can
+    never silently re-run work while the operator is not looking.
+
+    Applies the same freshness/attempt gate the TUI's auto-continue uses
+    (``session_auto_continue._auto_continue_config``): ``read_turn_marker``
+    itself is age-blind, so without this a marker from days ago would still
+    fire a resume. A marker past the window is cleared, not returned.
+    """
+    module = _chat_turn_marker_module()
+    home = _chat_home(cfg)
+    if module is None or home is None or not session_id:
+        return None
+    try:
+        marker = module.read_turn_marker(home, session_id)
+    except Exception:  # noqa: BLE001
+        return None
+    if marker is None:
+        return None
+    if not _auto_continue_allowed(cfg, marker):
+        try:
+            module.clear_turn_marker(home, session_id)
+        except Exception:  # noqa: BLE001
+            pass
+        return None
+    return marker
+
+
+def _auto_continue_allowed(cfg: Any, marker: Dict[str, Any]) -> bool:
+    """Whether an interrupted turn is still worth resuming.
+
+    Mirrors ``desktop.auto_continue`` (enabled / freshness_minutes /
+    max_attempts) so `/chat` and the TUI agree on what counts as recoverable.
+    Defaults match the TUI (enabled, 15 minutes, 2 attempts).
+    """
+    if not marker.get("auto_continue", True):
+        return False
+    try:
+        desktop = cfg.get("desktop") if hasattr(cfg, "get") else None
+        section = desktop.get("auto_continue") if isinstance(desktop, dict) else None
+        section = section if isinstance(section, dict) else {}
+        enabled_raw = section.get("enabled", True)
+        enabled = not (
+            enabled_raw is False
+            or str(enabled_raw).strip().lower() in ("0", "false", "no", "off")
+        )
+        minutes = float(section.get("freshness_minutes", 15))
+        max_attempts = int(section.get("max_attempts", 2))
+    except Exception:  # noqa: BLE001 - malformed config falls back to defaults
+        enabled, minutes, max_attempts = True, 15.0, 2
+    if not enabled:
+        return False
+    started = float(marker.get("started_at") or 0)
+    if started and (time.time() - started) > max(0.0, minutes) * 60.0:
+        return False
+    return int(marker.get("attempts") or 0) < max(0, max_attempts)
 
 
 #: How many transcript rows are read to build/compact context. Larger than the
@@ -790,6 +921,48 @@ def _intent_cfg(cfg: Any) -> Dict[str, Any]:
     return {}
 
 
+# ---------------------------------------------------------------------------
+# Slice 1 — explicit route words (bypass the classifier, never through it)
+# ---------------------------------------------------------------------------
+#: Explicit routing prefixes. "in chat: ..." forces the headless /chat worker
+#: (``agent_task`` branch); "quick: ..." forces the direct answer
+#: (``answer_local`` — today's brain/facts/skills behavior, no worker).
+#: Matched case-insensitively on the leading prefix only; an empty remainder
+#: falls through to the normal classifier path. Unprefixed turns never match.
+#: The separator after the prefix may be a colon, a comma, or whitespace
+#: (task prose "in chat, ..." arrives comma-separated from speech).
+_ROUTE_WORDS = (
+    ("in chat", "in-chat", "agent_task"),
+    ("in-chat", "in-chat", "agent_task"),
+    ("quick", "quick", "answer_local"),
+)
+_ROUTE_WORD_SEPS = (":", ",", " ", "\t")
+
+
+def parse_route_word(text: Any) -> Optional[Dict[str, Any]]:
+    """Parse an explicit Slice-1 route-word prefix, or None. Pure.
+
+    Returns ``{"route", "action", "task_text"}`` with the prefix stripped,
+    or None when the text carries no route word (classifier path unchanged)
+    or nothing follows the prefix (fall through, never an empty dispatch).
+    """
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+    low = raw.lower()
+    for prefix, route, action in _ROUTE_WORDS:
+        if not low.startswith(prefix):
+            continue
+        rest = raw[len(prefix):]
+        if not rest or rest[0] not in _ROUTE_WORD_SEPS:
+            continue
+        task = rest[1:].strip()
+        if not task:
+            return None
+        return {"route": route, "action": action, "task_text": task}
+    return None
+
+
 def decide_turn_action(text: Any, *, cfg: Any = None,
                        intent: Any = None) -> Dict[str, Any]:
     """Pure classification: map text -> one action dict. No side effects.
@@ -813,6 +986,13 @@ def decide_turn_action(text: Any, *, cfg: Any = None,
     if not raw.strip():
         return {"action": "clarify", "kind": "clarify", "task_text": raw,
                 "params": {}, "reason": "empty turn"}
+    # Slice 1 route words bypass the classifier entirely: no Classifier
+    # construction, no local-LLM round-trip — the prefix IS the decision.
+    rw = parse_route_word(raw)
+    if rw is not None:
+        return {"action": rw["action"], "kind": "route-word",
+                "task_text": rw["task_text"], "params": {},
+                "reason": f"route-word:{rw['route']}"}
     if intent is None:
         clf = Classifier(_intent_cfg(cfg), ConfirmationState(),
                          ConversationState())
@@ -1431,25 +1611,300 @@ def _web_paid_first(cfg: Any) -> bool:
         return False
 
 
-def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
-    """Wave C Task 2: execute a web answer, never chatter about searching.
+# ---------------------------------------------------------------------------
+# Slice 2 — web order + hardening (paid API -> browser-Pro -> DDG)
+# ---------------------------------------------------------------------------
+#: Identical-query cache TTL: kills the rapid-follow-up problem (a repeated
+#: question within 10 minutes reuses the proven answer, no new API/DDG hit).
+_WEB_CACHE_TTL_S = 600.0
+_WEB_CACHE_MAX = 128
+_web_cache: Dict[str, Any] = {}
+_web_cache_lock = threading.Lock()
 
-    Free-first order (default; see :func:`_web_paid_first`): the no-key
-    DDG fallback runs first and wins without any paid call; the paid
-    Perplexity path (``orchestrator.answer_web_query``) runs only when
-    DDG misses. With ``intent.web_paid_first: true`` the order flips back
-    (paid first, DDG as fallback). Both layers down stays a typed
-    ``WEB_UNAVAILABLE`` — nothing is fabricated, and no key is ever logged
-    (audits carry session/code/counts only). Both orders return the same
-    receipt shape ``{route: web, sources, model}``.
+#: Browser-Pro layer bound (Slice 2 accept: 25 s, "still reading…" talk-back
+#: hook while it runs). CDP_DOWN makes this path unusable for live voice
+#: rhythm, so the pre-flight skips it loudly instead of failing mid-turn.
+_BROWSER_PRO_TIMEOUT_S = 25.0
+_CDP_PROBE_TIMEOUT_S = 2.0
+_CDP_JSON_URL = "http://127.0.0.1:9222/json"
+
+#: Paid API hardening: bounded retry-with-backoff plus a model degrade
+#: (``sonar-pro`` -> ``sonar``). The shared ``answer_web_query`` collapses
+#: every gateway failure to ``WEB_UNAVAILABLE`` (no 429 granularity survives),
+#: so ANY paid failure retries once after a backoff — the live 429 that
+#: motivated this slice degrades exactly this way.
+_PAID_API_MAX_ATTEMPTS = 2
+_PAID_API_BACKOFF_S = (0.5, 2.0)
+_PAID_FALLBACK_MODEL = "sonar"
+
+
+def _web_cache_key(query: Any) -> str:
+    return re.sub(r"\s+", " ", str(query or "").strip().lower())
+
+
+def _web_cache_get(query: Any) -> Optional[Dict[str, Any]]:
+    """Return the cached success for an identical query, else None."""
+    key = _web_cache_key(query)
+    if not key:
+        return None
+    now = time.monotonic()
+    with _web_cache_lock:
+        row = _web_cache.get(key)
+        if not isinstance(row, dict):
+            return None
+        if float(row.get("expires", 0) or 0) <= now:
+            _web_cache.pop(key, None)
+            return None
+        hit = dict(row.get("result") or {})
+    return hit or None
+
+
+def _web_cache_put(query: Any, result: Dict[str, Any]) -> None:
+    """Cache one successful web answer for 10 minutes (successes only)."""
+    if not isinstance(result, dict) or not result.get("ok"):
+        return
+    key = _web_cache_key(query)
+    if not key:
+        return
+    with _web_cache_lock:
+        _web_cache[key] = {"expires": time.monotonic() + _WEB_CACHE_TTL_S,
+                           "result": dict(result)}
+        while len(_web_cache) > _WEB_CACHE_MAX:
+            _web_cache.pop(next(iter(_web_cache)), None)
+
+
+def _web_cache_clear() -> None:
+    """Drop the web cache (tests / operator; never on the hot path)."""
+    with _web_cache_lock:
+        _web_cache.clear()
+
+
+def _paid_model_name(cfg: Any) -> str:
+    """Configured Perplexity model (default ``sonar-pro``; read-only)."""
+    try:
+        return str(_cfg_flag(cfg, "intent", "perplexity_model",
+                             default="sonar-pro") or "sonar-pro")
+    except Exception:  # noqa: BLE001 - degraded to the default, never fatal
+        return "sonar-pro"
+
+
+class _CfgModelOverride:
+    """Narrow cfg shim forcing one Perplexity model (Slice 2 degrade).
+
+    Delegates everything to the wrapped config except
+    ``get("intent", "perplexity_model")``. Lets the retry attempt the
+    cheaper ``sonar`` model through the SAME shared ``answer_web_query``
+    (same gate, same key seam, same redaction) without mutating live config.
+    """
+
+    def __init__(self, inner: Any, model: str) -> None:
+        self._inner = inner
+        self._model = model
+
+    def get(self, *path: str, default: Any = None) -> Any:
+        if tuple(path) == ("intent", "perplexity_model"):
+            return self._model
+        try:
+            return self._inner.get(*path, default=default)
+        except TypeError:
+            node: Any = self._inner
+            for key in path:
+                node = node.get(key) if isinstance(node, dict) else None
+            return default if node is None else node
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
+def _paid_api_with_retry(cfg: Any, query: str) -> Dict[str, Any]:
+    """Paid API layer with backoff + ``sonar-pro`` -> ``sonar`` degrade.
+
+    Attempt 1 uses the configured model; on ANY failure it sleeps the
+    backoff and retries once on the fallback model (a no-op shim when the
+    configured model already is the fallback). Returns the last typed
+    result — never fabricated. Audits carry attempt/model/code only.
     """
     from . import orchestrator as ORC
 
+    first_model = _paid_model_name(cfg)
+    try:
+        res = ORC.answer_web_query(cfg, query)
+    except Exception as exc:  # noqa: BLE001 - typed, never fabricated
+        _audit("turn_web_paid_error", attempt=1, model=first_model,
+               error=str(exc))
+        res = {"ok": False, "code": "WEB_UNAVAILABLE",
+               "answer": str(exc)[:200], "sources": []}
+    if isinstance(res, dict) and res.get("ok"):
+        res["model"] = first_model
+        return res
+    code = str((res or {}).get("code") or "WEB_UNAVAILABLE") \
+        if isinstance(res, dict) else "WEB_UNAVAILABLE"
+    _audit("turn_web_paid_miss", attempt=1, model=first_model, code=code)
+    if _PAID_API_MAX_ATTEMPTS < 2:
+        return res if isinstance(res, dict) else {
+            "ok": False, "code": code, "answer": "", "sources": []}
+    try:
+        time.sleep(_PAID_API_BACKOFF_S[0])
+    except Exception:  # noqa: BLE001 - a broken clock never blocks voice
+        pass
+    retry_cfg: Any = cfg if first_model == _PAID_FALLBACK_MODEL \
+        else _CfgModelOverride(cfg, _PAID_FALLBACK_MODEL)
+    try:
+        res2 = ORC.answer_web_query(retry_cfg, query)
+    except Exception as exc:  # noqa: BLE001 - typed, never fabricated
+        _audit("turn_web_paid_error", attempt=2,
+               model=_PAID_FALLBACK_MODEL, error=str(exc))
+        res2 = {"ok": False, "code": "WEB_UNAVAILABLE",
+                "answer": str(exc)[:200], "sources": []}
+    if isinstance(res2, dict) and res2.get("ok"):
+        _audit("turn_web_paid_degraded", model=_PAID_FALLBACK_MODEL)
+        res2["model"] = _PAID_FALLBACK_MODEL
+        return res2
+    code2 = str((res2 or {}).get("code") or code) \
+        if isinstance(res2, dict) else code
+    _audit("turn_web_paid_miss", attempt=2, model=_PAID_FALLBACK_MODEL,
+           code=code2)
+    return res2 if isinstance(res2, dict) else {
+        "ok": False, "code": code2, "answer": "", "sources": []}
+
+
+def _cdp_healthy(timeout_s: float = _CDP_PROBE_TIMEOUT_S) -> bool:
+    """Loopback-CDP pre-flight: True when a debugger endpoint answers.
+
+    The Slice-6 supervisor verdict wins when fresh (``cdp_supervisor.
+    read_health`` — absent/stale degrades to the direct probe below).
+    Otherwise a read-only ``GET /json`` with a short bound; ANY failure
+    (refused, timeout, malformed) is False — the browser-Pro layer is
+    skipped loudly instead of failing mid-turn. Never launches or
+    touches a browser.
+    """
+    try:
+        from . import cdp_supervisor as _CDPS
+
+        _sup = _CDPS.read_health()
+        if _sup is not None:
+            return bool(_sup.get("cdp_up"))
+    except Exception:  # noqa: BLE001 - degraded to the direct probe
+        pass
+    try:
+        import urllib.request
+
+        with urllib.request.urlopen(_CDP_JSON_URL,
+                                    timeout=float(timeout_s)) as resp:
+            resp.read(64)
+        return True
+    except Exception as exc:  # noqa: BLE001 - degraded to unhealthy
+        _audit("turn_web_cdp_down", error=str(exc)[:120])
+        return False
+
+
+def _browser_pro_web_search(query: str,
+                            timeout_s: float = _BROWSER_PRO_TIMEOUT_S
+                            ) -> Optional[Dict[str, Any]]:
+    """Browser-Pro layer: logged-in Perplexity session over loopback CDP.
+
+    CDP-healthy only (pre-flight first — one honest skip instead of a
+    mid-turn failure), bounded to 25 s, loud on every degrade path (audit +
+    stderr; never a silent None). Returns ``{"answer", "sources"}`` (sources
+    may be empty — the browser path renders prose, not links) or None.
+    """
+    import subprocess
+    import sys as _sys
+
+    if not _cdp_healthy():
+        _audit("turn_web_browser_skipped", reason="cdp_unavailable")
+        print("web search: browser-Pro unavailable (CDP :9222 refused) — "
+              "using API/DDG layers", file=_sys.stderr)
+        return None
+    try:
+        from pathlib import Path as _Path
+
+        script = str(_Path(__file__).resolve().parents[1] / "scripts"
+                     / "perplexity_search.py")
+    except Exception:  # noqa: BLE001 - typed degrade, never fatal
+        _audit("turn_web_browser_error", error="script path unresolvable")
+        return None
+    try:
+        proc = subprocess.run([_sys.executable, script, str(query), "4000"],
+                              capture_output=True, text=True,
+                              timeout=float(timeout_s))
+    except subprocess.TimeoutExpired:
+        _audit("turn_web_browser_timeout", timeout_s=float(timeout_s))
+        print(f"web search: browser-Pro timed out after "
+              f"{float(timeout_s):.0f}s — falling through",
+              file=_sys.stderr)
+        return None
+    except Exception as exc:  # noqa: BLE001 - typed degrade, never fatal
+        _audit("turn_web_browser_error", error=str(exc)[:120])
+        print(f"web search: browser-Pro error ({str(exc)[:120]}) — "
+              f"falling through", file=_sys.stderr)
+        return None
+    if proc.returncode != 0:
+        tail = (proc.stderr or "").strip().splitlines()
+        reason = tail[-1][:160] if tail else f"exit {proc.returncode}"
+        _audit("turn_web_browser_miss", reason=reason[:120])
+        print(f"web search: browser-Pro missed ({reason}) — "
+              f"falling through", file=_sys.stderr)
+        return None
+    answer = (proc.stdout or "").strip()
+    if not answer:
+        _audit("turn_web_browser_miss", reason="empty answer")
+        print("web search: browser-Pro returned empty — falling through",
+              file=_sys.stderr)
+        return None
+    return {"answer": _redact(answer)[:2000], "sources": []}
+
+
+def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
+    """Wave C Task 2 + Slice 2: execute a web answer, never chatter.
+
+    Two orders selected by ``intent.web_paid_first`` (see
+    :func:`_web_paid_first`):
+
+    * paid-first (``true`` — the Slice 2 voice order): hardened paid API
+      (retry + ``sonar-pro`` -> ``sonar`` degrade) -> browser-Pro
+      (CDP-healthy only, 25 s bound, ``turn_web_browser_progress`` audit is
+      the "still reading…" talk-back hook) -> DDG last resort.
+    * free-first (default, legacy byte-identical): no-key DDG first, paid
+      API only on a DDG miss; the browser layer does not run here so the
+      legacy contract is untouched.
+
+    An identical query within 10 minutes reuses the cached success without
+    touching any layer. Every layer down stays a typed ``WEB_UNAVAILABLE``
+    — nothing is fabricated, and no key is ever logged (audits carry
+    session/code/counts only).     All orders return the same receipt shape
+    ``{route: web, sources, model}`` plus a ``layers`` trace.
+    """
     paid_first = _web_paid_first(cfg)
+    layers: list = []
+
+    def _with_layers(res: Dict[str, Any]) -> Dict[str, Any]:
+        receipt = res.get("receipt")
+        if isinstance(receipt, dict):
+            receipt["layers"] = list(layers)
+        return res
+
+    cached = _web_cache_get(task_text)
+    if isinstance(cached, dict) and str(cached.get("answer") or "").strip():
+        answer = str(cached.get("answer"))
+        sources = [str(s) for s in (cached.get("sources") or [])
+                   if str(s).strip()]
+        body = answer + ("\n\nSources:\n" + "\n".join(sources)
+                         if sources else "")
+        st.append(sid, "assistant", body,
+                  meta={"route": "web", "sources": sources or None,
+                        "fallback": "cache"})
+        _audit("turn_web_cache", session=sid, sources=len(sources))
+        return _with_layers(
+            {"ok": True, "text": answer, "reply": answer,
+             "sources": sources, "session_id": sid, "session": sid,
+             "route": "web",
+             "receipt": _branch_receipt("web", task=task_text,
+                                        sources=sources, cfg=cfg)})
 
     def _paid_attempt() -> Dict[str, Any]:
         try:
-            web = ORC.answer_web_query(cfg, task_text)
+            web = _paid_api_with_retry(cfg, task_text)
         except Exception as exc:  # noqa: BLE001 - typed, never fabricated
             _audit("turn_web_error", session=sid, error=str(exc))
             web = {"ok": False, "code": "WEB_UNAVAILABLE",
@@ -1470,6 +1925,35 @@ def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
         st.append(sid, "assistant", body,
                   meta={"route": "web", "sources": sources or None})
         _audit("turn_web", session=sid, sources=len(sources))
+        _web_cache_put(task_text, {"ok": True, "answer": answer,
+                                   "sources": sources})
+        # The receipt names the layer that actually answered (the paid
+        # model), never the surface chat-model default.
+        paid_model = str(web.get("model") or "") \
+            or _paid_model_name(cfg)
+        return {"ok": True, "text": answer, "reply": answer,
+                "sources": sources, "session_id": sid, "session": sid,
+                "route": "web",
+                "receipt": _branch_receipt("web", task=task_text,
+                                           sources=sources,
+                                           model=paid_model, cfg=cfg)}
+
+    def _browser_ok(fb: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(fb, dict):
+            return None
+        answer = str(fb.get("answer") or "")
+        sources = [str(s) for s in (fb.get("sources") or [])
+                   if str(s).strip()]
+        if not answer.strip():
+            return None
+        body = answer + ("\n\nSources:\n" + "\n".join(sources)
+                         if sources else "")
+        st.append(sid, "assistant", body,
+                  meta={"route": "web", "sources": sources or None,
+                        "fallback": "browser-pro"})
+        _audit("turn_web_browser", session=sid, sources=len(sources))
+        _web_cache_put(task_text, {"ok": True, "answer": answer,
+                                   "sources": sources})
         return {"ok": True, "text": answer, "reply": answer,
                 "sources": sources, "session_id": sid, "session": sid,
                 "route": "web",
@@ -1489,27 +1973,48 @@ def _turn_web(cfg: Any, st: Any, sid: str, task_text: str) -> Dict[str, Any]:
                   meta={"route": "web", "sources": sources or None,
                         "fallback": "ddg"})
         _audit("turn_web_ddg", session=sid, sources=len(sources))
+        _web_cache_put(task_text, {"ok": True, "answer": answer,
+                                   "sources": sources})
         return {"ok": True, "text": answer, "reply": answer,
                 "sources": sources, "session_id": sid, "session": sid,
                 "route": "web",
                 "receipt": _branch_receipt("web", task=task_text,
                                            sources=sources, cfg=cfg)}
 
-    layers = ("paid", "free") if paid_first else ("free", "paid")
+    def _run_browser() -> Optional[Dict[str, Any]]:
+        layers.append("browser")
+        # Talk-back hook: the voice layer speaks progress off this audit
+        # while the 25 s browser probe runs (never silent waiting).
+        _audit("turn_web_browser_progress", session=sid,
+               detail="still reading…")
+        return _browser_ok(_browser_pro_web_search(task_text))
+
+    def _run_free() -> Optional[Dict[str, Any]]:
+        layers.append("free")
+        return _free_ok(_ddg_web_fallback(task_text))
+
+    if paid_first:
+        steps = ("paid", "browser", "free")
+    else:
+        steps = ("free", "paid")
     paid_detail = ""
     paid_code = "WEB_UNAVAILABLE"
-    for layer in layers:
-        if layer == "free":
-            hit = _free_ok(_ddg_web_fallback(task_text))
-            if hit is not None:
-                return hit
-        else:
+    for step in steps:
+        if step == "paid":
+            layers.append("paid")
             web = _paid_attempt()
             hit = _paid_ok(web)
             if hit is not None:
-                return hit
+                return _with_layers(hit)
             paid_code = str(web.get("code") or "WEB_UNAVAILABLE")
             paid_detail = str(web.get("answer") or "")[:200]
+            continue
+        if step == "browser":
+            hit = _run_browser()
+        else:
+            hit = _run_free()
+        if hit is not None:
+            return _with_layers(hit)
     detail = paid_detail or "web search unavailable; nothing was fabricated"
     _audit("turn_web_unavailable", session=sid, code=paid_code)
     return {"ok": False, "state": "FAILED", "code": paid_code,
@@ -1849,6 +2354,398 @@ def _finish_task(cfg: Any, st: Any, sid: str, key: str,
             "receipt": _branch_receipt("task", task=key, cfg=cfg)}
 
 
+# ---------------------------------------------------------------------------
+# Lane 2 — dead-main fallback for headless voice turns (2026-10-03)
+# ---------------------------------------------------------------------------
+#: THIS-turn-only fallback when the resolved main model is recorded-dead.
+#: The owner keeps muse as main for interactive /chat (works there via
+#: streaming); voice headless turns use the gateway non-streaming shape
+#: that muse rejects (``MODEL_UNAVAILABLE_TURN`` /
+#: ``ModelProtocolUnsupported``). Voice must not inherit a dead main, and
+#: the fallback must never become a slot write: no ``select_model`` /
+#: ``activate_endpoint`` / ``set_active_profile`` / runtime ``config.yaml``
+#: write happens here — an in-memory shim steers THIS worker thread only,
+#: explicit user model choices elsewhere are untouched, and the shim is
+#: removed in a ``finally`` so a crash can never leak it.
+#: Micro-lane 2026-10-03: the fallback is resolved DYNAMICALLY (first
+#: healthy API chat profile, preferring the dead main's provider family);
+#: the ``qubit-go``/deepseek literal below is the last resort only.
+_FALLBACK_PROFILE_ID = "qubit-go"
+_FALLBACK_PROVIDER = "opencode-go"
+_FALLBACK_MODEL = "deepseek-v4-flash"
+
+#: Wait outcomes that smell like a dead remote model (the worker's gateway
+#: turn failed at use time while the static probe still resolved). A retry
+#: is only attempted when the dead record then exists (the gateway records
+#: ``MODEL_UNAVAILABLE_TURN`` on the failed turn), so non-model worker
+#: errors (tool blocks, safety, crashes) never retry.
+_DEAD_TURN_CODES = frozenset({
+    "MODEL_ERROR", "MODEL_UNAVAILABLE", "MODEL_UNAVAILABLE_TURN",
+    "PROVIDER_OUTAGE",
+})
+_DEAD_TURN_MARKERS = (
+    "MODEL_UNAVAILABLE_TURN",
+    "ModelProtocolUnsupported",
+    "unavailable at turn time",
+)
+
+
+def _worker_effective(cfg: Any) -> Optional[Dict[str, Any]]:
+    """The effective headless-worker profile (role chat default), or None.
+
+    Read-only resolver read; fail-open None on any error so a broken or
+    hermetic resolver keeps today's behavior (no fallback, never fatal).
+    """
+    try:
+        from .providers import resolver as _R
+
+        eff = _R.resolve(cfg, role="chat")
+    except Exception:  # noqa: BLE001 - degraded to no-fallback, never fatal
+        return None
+    try:
+        return {"provider": str(getattr(eff, "provider", "") or ""),
+                "model": str(getattr(eff, "model", "") or ""),
+                "profile_id": str(getattr(eff, "profile_id", "") or ""),
+                "executable": bool(getattr(eff, "executable", True)),
+                "eff": eff}
+    except Exception:  # noqa: BLE001 - degraded to no-fallback, never fatal
+        return None
+
+
+def _literal_fallback_effective(cfg: Any) -> Optional[Dict[str, Any]]:
+    """The last-resort literal fallback profile (``qubit-go``), or None.
+
+    None when unresolvable, inexecutable, or itself recorded-dead
+    (both-dead degrades LOUD instead of burning a turn on a dead model).
+    Read-only; never raises, never writes a slot. This is the LAST resort
+    only — :func:`_fallback_effective` prefers a dynamically resolved
+    healthy API profile first, so the fallback works for any API model.
+    """
+    try:
+        from .providers import resolver as _R
+
+        eff = _R.resolve(cfg, role="chat",
+                         profile_id=_FALLBACK_PROFILE_ID)
+    except Exception:  # noqa: BLE001 - degraded to no-fallback, never fatal
+        return None
+    try:
+        if not bool(getattr(eff, "executable", True)):
+            return None
+        provider = str(getattr(eff, "provider", "") or "")
+        model = str(getattr(eff, "model", "") or "")
+    except Exception:  # noqa: BLE001 - degraded to no-fallback, never fatal
+        return None
+    try:
+        from .providers import dead_models as _DM
+
+        if _DM.is_dead(cfg, provider, model) is not None:
+            return None
+    except Exception:  # noqa: BLE001 - a broken record fails OPEN here;
+        # the turn itself stays truthful (a dead fallback still fails
+        # typed below instead of masquerading as action).
+        pass
+    return {"provider": provider, "model": model,
+            "profile_id": str(getattr(eff, "profile_id", "") or ""),
+            "eff": eff}
+
+
+def _dynamic_fallback_effective(cfg: Any, *, prefer_provider: str = "",
+                                exclude_provider: str = "",
+                                exclude_model: str = ""
+                                ) -> Optional[Dict[str, Any]]:
+    """First healthy API chat profile, preferring the dead main's family.
+
+    A candidate qualifies only when it is an enabled ``api``-kind profile
+    with the ``chat`` role, is NOT the dead main itself, is NOT
+    recorded-dead, declares at least the ``/chat`` context floor, and
+    resolves executable through the canonical resolver. Ordering: same
+    provider as the dead main first (the current default family), then
+    larger declared windows, then profile id (deterministic). The dead
+    literal (``qubit-go``/deepseek) is NOT prioritized here — it stays the
+    last resort in :func:`_fallback_effective`. Read-only; never raises,
+    never writes a slot; ``None`` when nothing qualifies (or the registry
+    itself is unreadable, so the literal path still gets its chance).
+    """
+    try:
+        from .providers import resolver as _R
+
+        profiles = _R.load_profiles(cfg)
+    except Exception:  # noqa: BLE001 - registry unreadable: literal fallback
+        return None
+    try:
+        floor = int(_R.terminal_min_context_tokens(cfg))
+    except Exception:  # noqa: BLE001 - floor read never blocks a fallback
+        floor = 65536
+    prefer = str(prefer_provider or "").strip().lower()
+    excl_p = str(exclude_provider or "").strip().lower()
+    excl_m = str(exclude_model or "").strip().lower()
+    found: List[Dict[str, Any]] = []
+    for cand in profiles or []:
+        try:
+            if str(getattr(cand, "kind", "") or "") != "api":
+                continue
+            if not bool(getattr(cand, "enabled", False)):
+                continue
+            roles = getattr(cand, "roles", None) or ["chat"]
+            if "chat" not in list(roles):
+                continue
+            provider = str(getattr(cand, "provider", "") or "")
+            model = str(getattr(cand, "model", "") or "")
+            pid = str(getattr(cand, "id", "") or "")
+            if not provider or not model or not pid:
+                continue
+            if provider.strip().lower() == excl_p \
+                    and model.strip().lower() == excl_m:
+                continue
+            try:
+                ctx = int(getattr(cand, "context_tokens", 0) or 0)
+            except (TypeError, ValueError):
+                ctx = 0
+            if ctx < floor:
+                continue
+        except Exception:  # noqa: BLE001 - one bad row hides no other
+            continue
+        try:
+            from .providers import dead_models as _DM
+
+            rec = _DM.is_dead(cfg, provider, model)
+        except Exception:  # noqa: BLE001 - fail OPEN like is_dead itself
+            rec = None
+        if rec is not None:
+            continue
+        try:
+            from .providers import resolver as _R2
+
+            eff = _R2.resolve(cfg, role="chat", profile_id=pid)
+        except Exception:  # noqa: BLE001 - unresolvable: not a fallback
+            continue
+        try:
+            if not bool(getattr(eff, "executable", True)):
+                continue
+        except Exception:  # noqa: BLE001 - unreadable: not a fallback
+            continue
+        found.append({"provider": provider, "model": model,
+                      "profile_id": pid, "eff": eff, "ctx": ctx})
+    if not found:
+        return None
+
+    def _rank(item: Dict[str, Any]) -> Any:
+        fam = 0 if prefer and str(item["provider"] or "").strip().lower() \
+            == prefer else 1
+        return (fam, -int(item.get("ctx") or 0),
+                str(item.get("profile_id") or ""))
+
+    found.sort(key=_rank)
+    best = found[0]
+    return {"provider": str(best["provider"]), "model": str(best["model"]),
+            "profile_id": str(best["profile_id"]), "eff": best["eff"]}
+
+
+def _fallback_effective(cfg: Any, *, prefer_provider: str = "",
+                        exclude_provider: str = "",
+                        exclude_model: str = "") -> Optional[Dict[str, Any]]:
+    """The THIS-turn fallback profile: dynamic first, literal last resort.
+
+    Any healthy API chat profile (preferring the dead main's provider
+    family) serves; only when the dynamic search finds nothing does the
+    ``qubit-go``/deepseek literal get its chance. ``None`` when neither
+    qualifies. Read-only; never raises, never writes a slot.
+    """
+    dyn = _dynamic_fallback_effective(
+        cfg, prefer_provider=prefer_provider,
+        exclude_provider=exclude_provider, exclude_model=exclude_model)
+    if dyn is not None:
+        return dyn
+    return _literal_fallback_effective(cfg)
+
+
+def _dead_main_pair(cfg: Any) -> Optional[Dict[str, Any]]:
+    """Dead-main + healthy-fallback pair, or None (no fallback indicated).
+
+    Mirrors the ``_gate_remote_liveness`` silent-path semantics
+    (``explicit=False``): a recorded-dead main refuses the silent headless
+    dispatch. The explicit picker path is untouched (that gate lives in
+    ``providers/endpoints.py``, not here). Never raises, never writes.
+    """
+    worker = _worker_effective(cfg)
+    if not worker or not worker.get("model"):
+        return None
+    try:
+        from .providers import dead_models as _DM
+
+        rec = _DM.is_dead(cfg, worker["provider"], worker["model"])
+    except Exception:  # noqa: BLE001 - degraded to no-fallback, never fatal
+        return None
+    if rec is None:
+        return None
+    fallback = _fallback_effective(
+        cfg, prefer_provider=str(worker.get("provider") or ""),
+        exclude_provider=str(worker.get("provider") or ""),
+        exclude_model=str(worker.get("model") or ""))
+    if fallback is None:
+        return None
+    if (str(fallback.get("provider") or "").lower()
+            == str(worker.get("provider") or "").lower()
+            and str(fallback.get("model") or "").lower()
+            == str(worker.get("model") or "").lower()):
+        return None
+    return {"dead": worker, "record": dict(rec),
+            "fallback": fallback}
+
+
+def _is_dead_turn_error(res: Any) -> bool:
+    """True when a wait outcome looks like a dead-model turn failure."""
+    if not isinstance(res, dict):
+        return False
+    if str(res.get("status") or "") != "error":
+        return False
+    code = str(res.get("code") or "")
+    if code in _DEAD_TURN_CODES:
+        blob = f"{res.get('detail') or ''} {res.get('reply') or ''}"
+        if code == "MODEL_ERROR" and not any(
+                m in blob for m in _DEAD_TURN_MARKERS):
+            return False
+        return True
+    blob = f"{code} {res.get('detail') or ''} {res.get('reply') or ''}"
+    return any(m in blob for m in _DEAD_TURN_MARKERS)
+
+
+def _apply_fallback_shim(cfg: Any, fallback: Dict[str, Any]) -> Callable:
+    """Steer THIS turn's worker onto the fallback profile (in-memory).
+
+    Patches ``agent._model`` (the worker's model string) and the
+    default-role ``resolver.resolve`` (the worker's profile choice) so the
+    headless ``run_session`` gateway turn executes as the fallback.
+    Explicit ``profile_id`` resolutions pass through untouched. Returns a
+    zero-arg restore callable; the caller MUST run it in a ``finally``.
+    No slot, file, or registry is written.
+    """
+    from . import agent as _AG
+    from .providers import resolver as _R
+
+    fb_model = str(fallback.get("model") or _FALLBACK_MODEL)
+    fb_eff = fallback.get("eff")
+    orig_model = _AG._model
+    orig_resolve = _R.resolve
+
+    def _shimmed_model(_cfg: Any = None) -> str:
+        return fb_model
+
+    def _shimmed_resolve(_cfg2: Any = None, *args: Any,
+                         **kwargs: Any) -> Any:
+        if not args and kwargs.get("profile_id", None) in (None, "") \
+                and str(kwargs.get("role", "chat") or "chat") == "chat":
+            return fb_eff
+        return orig_resolve(_cfg2, *args, **kwargs)
+
+    _AG._model = _shimmed_model  # type: ignore[method-assign]
+    _R.resolve = _shimmed_resolve  # type: ignore[method-assign]
+
+    def _restore() -> None:
+        try:
+            _AG._model = orig_model  # type: ignore[method-assign]
+        except Exception:  # noqa: BLE001 - restore is best-effort, audited
+            pass
+        try:
+            _R.resolve = orig_resolve  # type: ignore[method-assign]
+        except Exception:  # noqa: BLE001 - restore is best-effort, audited
+            pass
+
+    return _restore
+
+
+def _loud_both_dead(cfg: Any, sid: str, worker: Optional[Dict[str, Any]],
+                    reason: str = "") -> Dict[str, Any]:
+    """LOUD typed failure: dead main and no healthy fallback (zero launches).
+
+    Never ok:true, never a narrated action — the service layer must hear a
+    typed code, not words it could speak as a done deed.
+    """
+    dead_name = "unknown"
+    if isinstance(worker, dict) and worker.get("model"):
+        dead_name = (f"{worker.get('provider') or '?'}"
+                     f"/{worker.get('model')}")
+    detail = (f"headless voice turn needs a working model: main {dead_name} "
+              f"is recorded unavailable"
+              f"{f' ({reason})' if reason else ''} and no healthy API "
+              f"fallback was found (dynamic search over the API chat "
+              f"profiles; last-resort "
+              f"{_FALLBACK_PROVIDER}/{_FALLBACK_MODEL} "
+              f"(profile {_FALLBACK_PROFILE_ID!r}) is also unavailable); "
+              f"nothing was executed — pick a working model")
+    _audit("turn_task_both_dead", session=sid, dead=dead_name)
+    return {"ok": False, "state": "FAILED",
+            "code": "TASK_MODEL_UNAVAILABLE",
+            "detail": detail[:300], "session_id": sid, "session": sid,
+            "route": "task"}
+
+
+def _finish_with_fallback_mark(out: Dict[str, Any],
+                               pair: Dict[str, Any]) -> Dict[str, Any]:
+    """Stamp a fallback-turn outcome with the audited both-models receipt."""
+    if not isinstance(out, dict):
+        return out
+    dead = pair.get("dead") or {}
+    fallback = pair.get("fallback") or {}
+    mark = {"from_provider": str(dead.get("provider") or ""),
+            "from_model": str(dead.get("model") or ""),
+            "from_profile": str(dead.get("profile_id") or ""),
+            "to_provider": str(fallback.get("provider") or ""),
+            "to_model": str(fallback.get("model") or _FALLBACK_MODEL),
+            "to_profile": str(fallback.get("profile_id") or
+                              _FALLBACK_PROFILE_ID),
+            "slot_mutated": False}
+    receipt = out.get("receipt")
+    if isinstance(receipt, dict):
+        receipt = dict(receipt)
+        receipt["model"] = mark["to_model"]
+        receipt["model_fallback"] = mark
+        out["receipt"] = receipt
+    else:
+        out["fallback"] = mark
+    return out
+
+
+def _dead_worker(cfg: Any) -> Optional[Dict[str, Any]]:
+    """Recorded-dead headless-worker profile, or None.
+
+    The ``_gate_remote_liveness`` silent-path read (``explicit=False``):
+    a previous turn failed at use time while the static probe still
+    resolved. Never raises, never writes.
+    """
+    worker = _worker_effective(cfg)
+    if not worker or not worker.get("model"):
+        return None
+    try:
+        from .providers import dead_models as _DM
+
+        rec = _DM.is_dead(cfg, worker["provider"], worker["model"])
+    except Exception:  # noqa: BLE001 - degraded to no-fallback, never fatal
+        return None
+    if rec is None:
+        return None
+    return {"worker": worker, "record": dict(rec)}
+
+
+def _fallback_failed_mark(out: Dict[str, Any], pair: Dict[str, Any],
+                          sid: str) -> Dict[str, Any]:
+    """LOUD wrapper for a failed fallback attempt (typed, no narration).
+
+    The outcome stays a typed failure naming BOTH models — never ok:true,
+    never words the service layer could speak as a done deed.
+    """
+    out = _finish_with_fallback_mark(out, pair)
+    if isinstance(out, dict) and not out.get("ok"):
+        _audit("turn_task_fallback_failed", session=sid,
+               code=str(out.get("code") or ""))
+        detail = str(out.get("detail") or "")
+        fb_model = str((pair.get("fallback") or {}).get("model")
+                       or _FALLBACK_MODEL)
+        out["detail"] = (f"fallback {fb_model} also failed "
+                         f"({out.get('code')}): {detail}")[:300]
+    return out
+
+
 def _turn_task(cfg: Any, st: Any, sid: str, task_text: str, *,
                timeout_s: Optional[float] = None,
                cancel: Optional[Callable[[], bool]] = None) -> Dict[str, Any]:
@@ -1858,36 +2755,125 @@ def _turn_task(cfg: Any, st: Any, sid: str, task_text: str, *,
     blocks with cancel checks, then the Spark summary (never a phantom)
     lands in this transcript. E-stop latched refuses before launch with
     zero worker invocations.
+
+    Lane 2: a recorded-dead main model never dispatches the doomed headless
+    turn. Pre-dispatch, a dead main + healthy fallback runs THIS turn on
+    the fallback profile only (in-memory shim, audited, receipt naming both
+    models, zero slot writes); a dead main with no healthy fallback fails
+    LOUD with zero launches. Post-turn, a turn-time dead-model error (the
+    gateway records it on the failed turn) retries exactly once via the
+    fallback; a failed fallback degrades LOUD (typed, never narrated).
     """
     from . import orchestrator as ORC
 
-    try:
-        key = ORC.launch_task(task_text, session=sid, cfg=cfg)
-    except ORC.TaskLaunchDenied as exc:
-        state = "UNAVAILABLE" if exc.code in (
-            "EMERGENCY_STOP", "BLOCKED", "SAFETY_CONFIRM_REQUIRED",
-            "DRY_RUN", "TASK_INFLIGHT") else "FAILED"
-        _audit("turn_task_refused", session=sid, code=exc.code)
-        return {"ok": False, "state": state, "code": exc.code,
-                "detail": str(exc.detail)[:200], "session_id": sid,
-                "session": sid, "route": "task"}
-    except Exception as exc:  # noqa: BLE001 - typed, redacted
-        _audit("turn_task_launch_error", session=sid, error=str(exc))
-        return {"ok": False, "state": "FAILED",
-                "code": "TASK_LAUNCH_FAILED",
-                "detail": _redact(str(exc))[:200], "session_id": sid,
-                "session": sid, "route": "task"}
-    st.append(sid, "assistant",
-              f"Working on it in /chat (task {key}). I'll report back here.",
-              meta={"route": "task", "task": key, "phase": "started"})
-    res = ORC.wait_task(key, timeout_s=float(timeout_s or 300.0),
-                        cancel=cancel)
-    # T5: the worker proposed a confirmation-gated file write — stage it as
-    # a user confirmation (CONFIRM_REQUIRED + confirmation_id, same pattern
-    # as _turn_registry) instead of ending typed need-confirmation forever.
+    def _run_once() -> Dict[str, Any]:
+        """One launch -> starter row -> wait.
+
+        Typed launch denials carry ``launch_denied`` so the caller returns
+        them directly (safety denials never fall back, never retry).
+        """
+        try:
+            key = ORC.launch_task(task_text, session=sid, cfg=cfg)
+        except ORC.TaskLaunchDenied as exc:
+            state = "UNAVAILABLE" if exc.code in (
+                "EMERGENCY_STOP", "BLOCKED", "SAFETY_CONFIRM_REQUIRED",
+                "DRY_RUN", "TASK_INFLIGHT") else "FAILED"
+            _audit("turn_task_refused", session=sid, code=exc.code)
+            return {"ok": False, "state": state, "code": exc.code,
+                    "detail": str(exc.detail)[:200], "session_id": sid,
+                    "session": sid, "route": "task", "launch_denied": True}
+        except Exception as exc:  # noqa: BLE001 - typed, redacted
+            _audit("turn_task_launch_error", session=sid, error=str(exc))
+            return {"ok": False, "state": "FAILED",
+                    "code": "TASK_LAUNCH_FAILED",
+                    "detail": _redact(str(exc))[:200], "session_id": sid,
+                    "session": sid, "route": "task", "launch_denied": True}
+        st.append(sid, "assistant",
+                  f"Working on it in /chat (task {key}). I'll report back here.",
+                  meta={"route": "task", "task": key, "phase": "started"})
+        res = ORC.wait_task(key, timeout_s=float(timeout_s or 300.0),
+                            cancel=cancel)
+        return {"key": key, "res": res}
+
+    def _run_fallback_once(pair: Dict[str, Any]) -> Dict[str, Any]:
+        """One launch -> wait under the THIS-turn-only fallback shim."""
+        restore = _apply_fallback_shim(cfg, pair["fallback"])
+        try:
+            return _run_once()
+        finally:
+            restore()
+
+    def _settle_wait(key: str, res: Dict[str, Any],
+                     pair: Optional[Dict[str, Any]] = None
+                     ) -> Dict[str, Any]:
+        """Stage needs-confirm; finish the task; stamp fallback wins."""
+        # T5: the worker proposed a confirmation-gated file write — stage it
+        # as a user confirmation (CONFIRM_REQUIRED + confirmation_id, same
+        # pattern as _turn_registry) instead of ending typed need-confirmation
+        # forever.
+        if str((res or {}).get("status") or "") == "needs-confirm":
+            return _stage_task_proposal(cfg, sid, key, res)
+        out = _finish_task(cfg, st, sid, key, res)
+        if pair is not None and out.get("ok"):
+            dead = pair.get("dead") or {}
+            fallback = pair.get("fallback") or {}
+            _audit("turn_task_model_fallback", session=sid,
+                   dead=f"{dead.get('provider')}/{dead.get('model')}",
+                   fallback=f"{fallback.get('provider')}"
+                            f"/{fallback.get('model')}")
+            return _finish_with_fallback_mark(out, pair)
+        return out
+
+    # Pre-dispatch: a recorded-dead main never runs the doomed turn.
+    pair = _dead_main_pair(cfg)
+    if pair is not None:
+        first = _run_fallback_once(pair)
+        if first.get("launch_denied"):
+            first.pop("launch_denied", None)
+            return first
+        res = first["res"]
+        key = first["key"]
+        out = _settle_wait(key, res, pair)
+        if out.get("ok") or str(out.get("code") or "") == "CONFIRM_REQUIRED":
+            return out
+        return _fallback_failed_mark(out, pair, sid)
+    # Dead main with no healthy fallback: LOUD, zero launches. A healthy
+    # (or unresolvable) main keeps today's single attempt below.
+    dw = _dead_worker(cfg)
+    if dw is not None:
+        _dw_worker = dw.get("worker") or {}
+        _no_fb = _fallback_effective(
+            cfg, prefer_provider=str(_dw_worker.get("provider") or ""),
+            exclude_provider=str(_dw_worker.get("provider") or ""),
+            exclude_model=str(_dw_worker.get("model") or "")) is None
+        if _no_fb:
+            reason = str((dw.get("record") or {}).get("reason") or "")
+            return _loud_both_dead(cfg, sid, dw.get("worker"), reason)
+    first = _run_once()
+    if first.get("launch_denied"):
+        first.pop("launch_denied", None)
+        return first
+    res = first["res"]
+    key = first["key"]
     if str((res or {}).get("status") or "") == "needs-confirm":
         return _stage_task_proposal(cfg, sid, key, res)
-    return _finish_task(cfg, st, sid, key, res)
+    if not _is_dead_turn_error(res):
+        return _finish_task(cfg, st, sid, key, res)
+    # Turn-time dead: the gateway recorded the model on this failed turn —
+    # exactly one retry via the fallback, then LOUD on any further failure.
+    pair = _dead_main_pair(cfg)
+    if pair is None:
+        return _finish_task(cfg, st, sid, key, res)
+    second = _run_fallback_once(pair)
+    if second.get("launch_denied"):
+        second.pop("launch_denied", None)
+        return second
+    res2 = second["res"]
+    key2 = second["key"]
+    out = _settle_wait(key2, res2, pair)
+    if out.get("ok") or str(out.get("code") or "") == "CONFIRM_REQUIRED":
+        return out
+    return _fallback_failed_mark(out, pair, sid)
 
 
 def _branch_dispatch(cfg: Any, st: Any, sid: str, decided: Dict[str, Any],
@@ -1909,6 +2895,398 @@ def _branch_dispatch(cfg: Any, st: Any, sid: str, decided: Dict[str, Any],
     return {"ok": False, "state": "FAILED", "code": "BRANCH_UNKNOWN",
             "detail": f"no branch for action {action!r}",
             "session_id": sid}
+
+
+# ---------------------------------------------------------------------------
+# Qubit-chat slash commands — leading-slash turns execute, never chatter
+# ---------------------------------------------------------------------------
+#: Slash verbs the ``/qubit-chat`` turn path executes against the SAME
+#: backends the dashboard/CLI/voice surfaces read (DECISIONS #26: voice /
+#: qubit-chat does everything /chat does). ``/chat`` (the PTY/TUI surface)
+#: handles its own richer slash set in-process
+#: (``voicebridge/terminal.py::handle_slash`` + the vendored TUI); this table
+#: is the feasible subset on the shared turn path — every entry resolves to a
+#: real backend result persisted as the assistant message, never a typed
+#: refusal and never model narration. Anything starting with ``/`` that is
+#: not listed answers honest help (unknown command named + valid verbs),
+#: never phantom success.
+#: Full gateway slash inventory (frozen in
+#: tests/test_qubitchat_parity_audit9u.py::TERMINAL_SLASH_INVENTORY, 60 names)
+#: minus the two transport-bound verbs (``login``, ``platform`` — see that
+#: test's OUT_OF_SCOPE), plus the two dashboard-native extras (``mcp``,
+#: ``plugins``) with no terminal counterpart. Every entry parses AND executes:
+#: read-only verbs hit the real backend; terminal-session verbs answer honest
+#: guidance naming the /chat behavior + the dashboard equivalent (never a
+#: typed refusal, never phantom success, never model narration).
+SLASH_COMMANDS = (
+    "agents", "approve", "approvals", "bg", "blueprint", "branch", "btw",
+    "bundles", "busy", "codex-runtime", "commands", "compress", "context",
+    "debug", "deny", "diff", "fast", "footer", "goal", "heartbeat", "help",
+    "insights", "kanban", "loop", "mcp", "memory", "model", "pause",
+    "personality", "plugins", "profile", "reasoning", "refine",
+    "reload-mcp", "reload-skills", "reset", "restart", "resume", "retry",
+    "review", "rollback", "save", "sessions", "sethome", "skills",
+    "status", "stop", "subgoal", "suggestions", "title", "topic", "topup",
+    "undo", "update", "usage", "verbose", "version", "voice", "whoami",
+    "yolo",
+)
+
+_SLASH_HELP_LINES = (
+    "Available slash commands:",
+    "/skills — list installed skills (real catalog)",
+    "/model — show the effective chat model/profile",
+    "/mcp — list configured MCP servers",
+    "/plugins — list registered plugins",
+    "/status — gateway + service state (real supervisor read)",
+    "/sessions — session count on the canonical store + Sessions page",
+    "/version — product version",
+    "/whoami — this dashboard session identity",
+    "/reasoning — MODEL card reasoning selector (this page's side panel)",
+    "/memory — Memory page (/qubit-memory)",
+    "/kanban — board pages (/qubit-taskflows, Task Inbox)",
+    "/help — show this list",
+    "Terminal-session verbs (reset, undo, compress, …) run in /chat;",
+    "type one here for where to run it.",
+)
+
+
+def parse_qubitchat_slash(text: Any) -> Optional[Dict[str, Any]]:
+    """Parse a leading-slash turn, or None when the text is not slash-shaped.
+
+    Pure: no store, broker, or model touch. Any text whose first non-space
+    character is ``/`` parses — known verbs carry ``command`` + ``args``,
+    anything else carries ``command: "unknown"`` so the caller answers
+    honest help instead of letting the classifier chatter about it.
+    """
+    raw = str(text or "").strip()
+    if not raw.startswith("/"):
+        return None
+    body = raw[1:].strip()
+    if not body:
+        return {"command": "unknown", "name": "", "args": ""}
+    parts = body.split(None, 1)
+    name = parts[0].lower()
+    args = parts[1].strip() if len(parts) > 1 else ""
+    if name in SLASH_COMMANDS:
+        return {"command": name, "name": name, "args": args}
+    return {"command": "unknown", "name": name, "args": args}
+
+
+def _slash_help_reply(unknown: str = "") -> str:
+    head = (f"Unknown slash command '/{unknown}'. "
+            if unknown else "Slash commands. ")
+    return head + "\n".join(_SLASH_HELP_LINES)
+
+
+def _slash_skills(cfg: Any, args: str) -> str:
+    from .skill_catalog import catalog_entries
+
+    rows = catalog_entries(cfg) or []
+    needle = args.strip().lower()
+    if needle:
+        rows = [r for r in rows
+                if needle in str(r.get("name", "")).lower()
+                or needle in str(r.get("description", "")).lower()]
+    if not rows:
+        return ("No skills installed"
+                + (f" matching {args.strip()!r}" if args.strip() else "")
+                + ".")
+    lines = [f"Skills ({len(rows)}):"]
+    for r in rows[:50]:
+        name = str(r.get("name", ""))
+        desc = str(r.get("description", "")).strip()
+        lines.append(f"- {name}" + (f" — {desc[:120]}" if desc else ""))
+    if len(rows) > 50:
+        lines.append(f"… and {len(rows) - 50} more")
+    return "\n".join(lines)
+
+
+def _slash_model(cfg: Any) -> str:
+    routed = resolve_route(cfg, None, session=None, role="chat")
+    if not routed.get("ok"):
+        return (f"Model route unavailable: "
+                f"{routed.get('code') or 'MODEL_NOT_ALLOWED'} — "
+                f"{routed.get('detail') or 'no executable profile'}")
+    provider = str(routed.get("provider") or "local")
+    model = str(routed.get("model") or configured_model(cfg))
+    kind = str(routed.get("kind") or "")
+    profile = str(routed.get("profile_id") or "")
+    bits = f"{provider}/{model}"
+    if kind:
+        bits += f" ({kind})"
+    if profile and profile != model:
+        bits += f" [profile {profile}]"
+    return f"Effective chat model: {bits}"
+
+
+def _slash_mcp(cfg: Any) -> str:
+    from .mcp_servers import list_servers
+
+    res = list_servers(cfg) or {}
+    rows = res.get("servers") or []
+    if not rows:
+        return "No MCP servers configured."
+    lines = [f"MCP servers ({len(rows)}):"]
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        name = str(r.get("name", ""))
+        transport = str(r.get("transport", ""))
+        state = ("invocable" if r.get("invocable")
+                 else str(r.get("status") or "configured"))
+        lines.append(f"- {name} [{transport}] — {state}")
+    return "\n".join(lines)
+
+
+def _slash_plugins(cfg: Any) -> str:
+    from .plugin_runtime import list_plugins
+
+    res = list_plugins(cfg) or {}
+    rows = res.get("plugins") or []
+    if not rows:
+        return "No plugins registered."
+    names = sorted({str(r.get("id", "")) for r in rows
+                    if isinstance(r, dict) and r.get("id")})
+    if not names:
+        return "No plugins registered."
+    lines = [f"Plugins ({len(names)}):"]
+    lines.extend(f"- {n}" for n in names[:80])
+    if len(names) > 80:
+        lines.append(f"… and {len(names) - 80} more")
+    return "\n".join(lines)
+
+
+#: Terminal-session verbs: what each does in /chat + the dashboard
+#: equivalent. Replies built from this map never claim execution — they name
+#: the verb, its /chat behavior, and where to run it. (Read-only verbs with
+#: real backends live in the dedicated _slash_* handlers above, not here.)
+_SLASH_TERMINAL_GUIDANCE = {
+    "agents": "lists the terminal agent roster — run it in /chat; this page's side panel shows sessions instead.",
+    "approve": "approves a pending terminal action — approve dashboard mutations in their own confirm dialog; terminal approvals run in /chat.",
+    "approvals": "lists pending terminal approvals — run it in /chat; dashboard confirmations appear inline where they stage.",
+    "bg": "backgrounds the running terminal turn — /chat only; this page streams in place.",
+    "blueprint": "terminal blueprint/scaffold flow — run it in /chat.",
+    "branch": "branches the terminal session — run it in /chat; past sessions live on the Sessions page.",
+    "btw": "terminal aside-to-agent — run it in /chat; here just send the message normally.",
+    "bundles": "terminal bundle listing — run it in /chat.",
+    "busy": "shows terminal busy state — run it in /chat; this page shows its own streaming state.",
+    "codex-runtime": "manages the codex runtime — run it in /chat or the qubit CLI.",
+    "compress": "compacts the terminal transcript — run it in /chat; to start fresh here use New chat.",
+    "context": "shows terminal context usage — run it in /chat; this page's MODEL card shows the active model.",
+    "debug": "toggles terminal debug output — run it in /chat.",
+    "deny": "denies a pending terminal action — deny dashboard mutations in their own confirm dialog; terminal denials run in /chat.",
+    "diff": "shows the terminal working-tree diff — run it in /chat.",
+    "fast": "toggles terminal fast mode — run it in /chat.",
+    "footer": "terminal footer control — run it in /chat.",
+    "goal": "terminal goal tracking — run it in /chat; task boards live on the Taskflows pages.",
+    "heartbeat": "terminal heartbeat control — run it in /chat.",
+    "insights": "terminal usage insights — run it in /chat; token analytics live on the Analytics page.",
+    "kanban": "terminal kanban view — open the Taskflows / board pages on this dashboard instead.",
+    "loop": "terminal loop control — run it in /chat.",
+    "memory": "terminal memory view — open the Memory page (/qubit-memory) on this dashboard instead.",
+    "pause": "pauses the terminal turn — run it in /chat; stop this page's stream with the stop button.",
+    "personality": "terminal persona control — run it in /chat; assistant identity lives in Profiles.",
+    "profile": "terminal profile switch — run it in /chat; the MODEL card on this page switches this surface.",
+    "refine": "terminal refine flow — run it in /chat.",
+    "reload-mcp": "reloads MCP servers — open the MCP page on this dashboard instead (test + reload controls there).",
+    "reload-skills": "reloads the skill catalog — open the Skills page on this dashboard instead.",
+    "reset": "resets the terminal session — run it in /chat; to start fresh here use New chat.",
+    "restart": "restarts the terminal/gateway — gateway restart lives on the System page (confirm-gated).",
+    "resume": "resumes a terminal session — run it in /chat; past sessions live on the Sessions page.",
+    "retry": "retries the terminal turn — run it in /chat; here resend the message.",
+    "review": "terminal review flow — run it in /chat.",
+    "rollback": "rolls back the terminal session — run it in /chat.",
+    "save": "exports the terminal transcript — run it in /chat; this transcript persists on the canonical store.",
+    "sethome": "sets the terminal home directory — run it in /chat or the qubit CLI.",
+    "stop": "stops the terminal turn — run it in /chat; stop this page's stream with the stop button.",
+    "subgoal": "terminal subgoal tracking — run it in /chat; task boards live on the Taskflows pages.",
+    "suggestions": "terminal task suggestions — run it in /chat.",
+    "title": "sets the terminal session title — run it in /chat.",
+    "topic": "terminal topic sessions — run it in /chat.",
+    "topup": "terminal top-up/billing — see the System page on this dashboard.",
+    "undo": "backs up terminal turns — run it in /chat.",
+    "update": "product update — see the System page (update check/apply/rollback, confirm-gated).",
+    "usage": "terminal usage readout — run it in /chat; token analytics live on the Analytics page.",
+    "verbose": "toggles terminal verbose output — run it in /chat.",
+    "voice": "voice controls — open the Voice page (/voice-edit) on this dashboard instead.",
+    "yolo": "terminal privileged mode — run it in /chat; destructive dashboard actions confirm where they stage.",
+}
+
+
+def _slash_status(cfg: Any) -> str:
+    """Real supervisor read; honest degradation when unreachable."""
+    try:
+        from .gateway_supervisor import status as _gw_status
+
+        st = _gw_status(cfg) or {}
+        if isinstance(st, dict):
+            running = st.get("running", st.get("daemon_live", "?"))
+            return f"Gateway supervisor: running={running} state={st.get('state') or st.get('daemon_state') or 'n/a'}"
+        return f"Gateway supervisor: {st}"
+    except Exception as exc:  # noqa: BLE001 - guidance, never a refusal
+        return (f"Gateway status unreadable from this surface "
+                f"({str(exc)[:120]}); live state is on the System page.")
+
+
+def _slash_sessions(cfg: Any) -> str:
+    """Real canonical-store count; honest degradation when unreadable."""
+    try:
+        res = store(cfg).list() or {}
+        # list() returns {"sessions": [...], "total": N, ...} — total is the
+        # canonical count (same filters as the rows); len(res) would count
+        # the dict keys, never the sessions.
+        total = res.get("total")
+        if total is None:
+            total = len(res.get("sessions") or [])
+        return (f"Sessions on the canonical store: {total}. "
+                f"Browse + resume them on the Sessions page.")
+    except Exception as exc:  # noqa: BLE001 - guidance, never a refusal
+        return (f"Session count unreadable from this surface "
+                f"({str(exc)[:120]}); browse them on the Sessions page.")
+
+
+def _slash_version() -> str:
+    try:
+        from importlib.metadata import version as _pkg_version
+
+        for dist in ("qubit-agent", "qubit-voicebridge", "voicebridge"):
+            try:
+                return f"Product version: {_pkg_version(dist)} ({dist})"
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return "Product version: unknown (package metadata unreadable)"
+
+
+def _slash_whoami(session_id: str) -> str:
+    sid = (session_id or "").strip() or "dashboard-chat"
+    return (f"This dashboard chat session: {sid} "
+            f"(identity dashboard:user on the canonical store).")
+
+
+def run_qubitchat_slash(cfg: Any, text: str,
+                         *, session_id: str = "") -> Dict[str, Any]:
+    """Execute one leading-slash turn against a real backend.
+
+    Read-only verbs hit the real registries; terminal-session verbs answer
+    honest guidance (what the verb does in /chat + the dashboard equivalent —
+    never a typed refusal, never phantom success); unknown verbs answer
+    honest help naming the miss and the valid set. ``ok False`` only when a
+    real backend raised.
+    """
+    parsed = parse_qubitchat_slash(text)
+    if parsed is None:
+        return {"ok": False, "state": "FAILED", "code": "NOT_SLASH",
+                "detail": "not a slash command"}
+    command = str(parsed.get("command") or "unknown")
+    try:
+        if command in ("help", "commands"):
+            reply = "\n".join(_SLASH_HELP_LINES)
+        elif command == "skills":
+            reply = _slash_skills(cfg, str(parsed.get("args") or ""))
+        elif command == "model":
+            reply = _slash_model(cfg)
+        elif command == "mcp":
+            reply = _slash_mcp(cfg)
+        elif command == "plugins":
+            reply = _slash_plugins(cfg)
+        elif command == "status":
+            reply = _slash_status(cfg)
+        elif command == "sessions":
+            reply = _slash_sessions(cfg)
+        elif command == "version":
+            reply = _slash_version()
+        elif command == "whoami":
+            reply = _slash_whoami(session_id)
+        elif command in _SLASH_TERMINAL_GUIDANCE:
+            reply = (f"/{command} {_SLASH_TERMINAL_GUIDANCE[command]}")
+        else:
+            reply = _slash_help_reply(str(parsed.get("name") or ""))
+    except Exception as exc:  # noqa: BLE001 - typed, redacted, never narrated
+        _audit("turn_slash_error", command=command, error=str(exc))
+        return {"ok": False, "state": "FAILED",
+                "code": "SLASH_BACKEND_ERROR",
+                "detail": _redact(str(exc))[:200],
+                "route": "slash", "entry": command}
+    return {"ok": True, "text": reply, "reply": reply,
+            "route": "slash", "entry": command,
+            "receipt": _branch_receipt("slash", task=text, cfg=cfg)}
+
+
+def _direct_fact_answer(text: Any) -> str:
+    """Deterministic clock/weather answers for the chat turn path (no model).
+
+    Mirrors ``voice_edit/service.py::_direct_fact_answer`` (same regexes, same
+    ``scripts/weather.py`` backend) so ``/qubit-chat`` answers facts exactly
+    like voice does. Before this stage a weather question fell into the
+    ``web_search`` branch or the model and could narrate stale data (live
+    2026-10-04: "Weather in Bucharest on 27 February 2026" while the script
+    reported live 16°C). Anything else (or a failed weather read) returns ""
+    and the turn continues to the classifier byte-identical. Never raises.
+    """
+    import re as _re
+    import time as _time
+    q = str(text or "").strip()
+    if not q:
+        return ""
+    if _re.search(r"\bweather\b|\bforecast\b|\btemperature\b|\btemp\b",
+                   q, _re.IGNORECASE):
+        try:
+            import subprocess as _sp
+            import sys as _sys
+            from pathlib import Path as _Path
+            script = (_Path(__file__).resolve().parents[1]
+                      / "scripts" / "weather.py")
+            if not script.is_file():
+                return ""
+            proc = _sp.run([_sys.executable, str(script), q],
+                           capture_output=True, text=True, timeout=15)
+            if proc.returncode != 0:
+                return ""
+            return str(proc.stdout or "").strip()
+        except Exception:
+            return ""
+    if _re.search(r"\bwhat time\b|\bcurrent time\b|\btime is it\b"
+                   r"|\bwhat'?s the time\b|\btell me the time\b",
+                   q, _re.IGNORECASE):
+        try:
+            return f"It is {_time.strftime('%A %H:%M')}."
+        except Exception:
+            return ""
+    if _re.search(r"\bwhat day is it\b|\bwhat date\b"
+                   r"|\bwhat'?s (the |today'?s )?(date|day|today)\b"
+                   r"|\bwhat is today\b|\bwhat'?s today\b",
+                   q, _re.IGNORECASE):
+        try:
+            return (f"It is {_time.strftime('%A, %B')} "
+                    f"{int(_time.strftime('%d'))}, "
+                    f"{_time.strftime('%Y')}.")
+        except Exception:
+            return ""
+    return ""
+
+
+def _finish_fact(cfg: Any, st: Any, sid: str, reply: str) -> Dict[str, Any]:
+    """Persist a direct-fact outcome as the turn's assistant message."""
+    st.append(sid, "assistant", reply,
+              meta={"route": "facts", "model": "live-facts"})
+    _audit("turn_fact", session=sid)
+    return {"ok": True, "text": reply, "reply": reply, "route": "facts",
+            "model": "live-facts", "session_id": sid, "session": sid,
+            "receipt": _branch_receipt("facts", task=reply, cfg=cfg)}
+
+
+def _finish_slash(cfg: Any, st: Any, sid: str, clean: str) -> Dict[str, Any]:
+    """Persist a slash outcome as the turn's assistant message (turn shape)."""
+    res = run_qubitchat_slash(cfg, clean, session_id=sid)
+    if not res.get("ok"):
+        return dict(res, session_id=sid, session=sid)
+    st.append(sid, "assistant", str(res.get("reply") or ""),
+              meta={"route": "slash",
+                    "entry": str(res.get("entry") or "")})
+    _audit("turn_slash", session=sid, entry=str(res.get("entry") or ""))
+    return dict(res, session_id=sid, session=sid)
 
 
 def _decide_branch(text: str, cfg: Any) -> Dict[str, Any]:
@@ -1960,6 +3338,26 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
                 "detail": str(exc)[:200]}
     clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
     st = store(cfg)
+    # Qubit-chat slash turns (DECISIONS #26): a leading "/" executes against
+    # the real backend registries instead of entering the classifier/model
+    # path (which would chatter about or narrate the slash text). Non-slash
+    # turns continue below byte-identical.
+    if clean.startswith("/"):
+        created = _resolve_session(st, session, model=None, cfg=cfg)
+        if created.get("state") != "OK":
+            return {"ok": False, "state": "FAILED",
+                    "code": created.get("code"),
+                    "detail": created.get("detail", "")}
+        sid = created["session"]["id"]
+        if not clean:
+            return {"ok": False, "state": "FAILED", "code": "MALFORMED",
+                    "detail": "turn needs non-empty text", "session_id": sid}
+        appended = st.append(sid, "user", clean)
+        if appended.get("state") != "OK":
+            return {"ok": False, "state": "FAILED",
+                    "code": appended.get("code"),
+                    "detail": appended.get("detail", "")}
+        return _finish_slash(cfg, st, sid, clean)
     # T4: an affirmative follow-up ("yes"/"confirm"/"do it") on a session
     # with a pending staged registry confirmation settles THAT record
     # through the same shared journal path — never a fresh classify (which
@@ -1970,7 +3368,7 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
         _probe = str(session or DEFAULT_SESSION).strip()[:80] \
             or DEFAULT_SESSION
         if _pending_registry(cfg, _probe):
-            created = _resolve_session(st, session, model=None)
+            created = _resolve_session(st, session, model=None, cfg=cfg)
             if created.get("state") != "OK":
                 return {"ok": False, "state": "FAILED",
                         "code": created.get("code"),
@@ -1987,7 +3385,7 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
         # path), never a fresh classify. Non-affirmative text keeps the
         # legacy path byte-for-byte (no auto-execution without affirmation).
         if _pending_task(cfg, _probe):
-            created = _resolve_session(st, session, model=None)
+            created = _resolve_session(st, session, model=None, cfg=cfg)
             if created.get("state") != "OK":
                 return {"ok": False, "state": "FAILED",
                         "code": created.get("code"),
@@ -1999,9 +3397,27 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
                         "code": appended.get("code"),
                         "detail": appended.get("detail", "")}
             return _settle_task_affirmed(cfg, st, sid)
+    # Direct facts (DECISIONS #26 — same facts voice answers): clock/weather
+    # never consult the model. Runs after slash + affirmation settles (those
+    # own their shapes) and before the classifier, so "weather in X" cannot
+    # narrate stale data. Empty answer falls through byte-identical.
+    _fact = _direct_fact_answer(clean)
+    if _fact:
+        created = _resolve_session(st, session, model=None, cfg=cfg)
+        if created.get("state") != "OK":
+            return {"ok": False, "state": "FAILED",
+                    "code": created.get("code"),
+                    "detail": created.get("detail", "")}
+        sid = created["session"]["id"]
+        appended = st.append(sid, "user", clean)
+        if appended.get("state") != "OK":
+            return {"ok": False, "state": "FAILED",
+                    "code": appended.get("code"),
+                    "detail": appended.get("detail", "")}
+        return _finish_fact(cfg, st, sid, _fact)
     decided = _decide_branch(clean, cfg)
     if decided.get("action") in BRANCH_ACTIONS:
-        created = _resolve_session(st, session, model=None)
+        created = _resolve_session(st, session, model=None, cfg=cfg)
         if created.get("state") != "OK":
             return {"ok": False, "state": "FAILED",
                     "code": created.get("code"),
@@ -2022,7 +3438,7 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
         return routed
     resolved_model = routed["model"]
 
-    created = _resolve_session(st, session, model=resolved_model)
+    created = _resolve_session(st, session, model=resolved_model, cfg=cfg)
     if created.get("state") != "OK":
         return {"ok": False, "state": "FAILED", "code": created.get("code"),
                 "detail": created.get("detail", "")}
@@ -2039,6 +3455,7 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
     # transcript. A post-append failure is retryable by design (retry_last
     # re-runs the stored user message), but a turn refused before it ever ran
     # has nothing to retry and must not be recorded as one.
+    escalated_away = False
     if decision.requires_escalation:
         escalated = _escalation_route(cfg, decision, routed)
         if not escalated.get("ok"):
@@ -2051,6 +3468,19 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
         _audit("context_escalated", session=sid,
                reason=",".join(decision.reasons),
                model=resolved_model, tier=decision.tier)
+        escalated_away = True
+    # DECISIONS #26: a general conversation turn runs the SAME tool-capable
+    # agent the /chat terminal drives, so the model knows and can call its
+    # tools (skills/plugins/MCP). Fast paths (slash/facts/affirmatives/local/
+    # registry/web/build task) already returned above and never reach here.
+    # An explicit per-call model is honored; a huge turn keeps its explicit
+    # escalation model instead.
+    if decided.get("action") == "answer_local" and not escalated_away \
+            and not model:
+        agent_out = _agent_chat(cfg, st, sid, clean, timeout_s=timeout_s,
+                                cancel=cancel, reasoning=reasoning_level)
+        if agent_out is not None:
+            return agent_out
     appended = st.append(sid, "user", clean)
     if appended.get("state") != "OK":
         return {"ok": False, "state": "FAILED", "code": appended.get("code"),
@@ -2164,6 +3594,70 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
     return {"ok": True, "reply": safe, "session": sid, "session_id": sid,
             "elapsed_ms": elapsed_ms, "message": saved.get("message"),
             "message_count": saved.get("message_count"), "receipt": receipt}
+
+
+def _agent_chat(cfg: Any, st: Any, sid: str, clean: str, *,
+                timeout_s: Optional[float] = None,
+                cancel: Optional[Callable[[], bool]] = None,
+                reasoning: Optional[str] = None
+                ) -> "Optional[Dict[str, Any]]":
+    """Run a general turn through the tool-capable agent, else None.
+
+    DECISIONS #26: a ``/qubit-chat`` turn that falls through to the model must
+    run the SAME ``run_agent.AIAgent`` the ``/chat`` terminal drives (full tool
+    schema, real tool calls), never a bare ``providers.gateway`` text call.
+    Returns the shaped turn outcome on success, a typed failure when the agent
+    refused/errored, or ``None`` exactly when no tool-capable vendored runtime
+    is available — the caller then keeps the legacy model path byte-identical.
+
+    The user row and assistant reply are persisted by the vendored agent
+    (``persist_user``); this helper adds the activity projection and the turn
+    receipt. It never fabricates text and never invents a parallel grant.
+    """
+    from . import agent as AG
+
+    if not str(sid or "").strip() or not str(clean or "").strip():
+        return None
+    try:
+        out = AG.run_agent_turn(
+            cfg, clean, session=sid, reasoning=reasoning,
+            estop_engaged=lambda: _estop(cfg)
+            or (cancel is not None and bool(cancel())))
+    except AG.AgentDenied as exc:
+        _audit("turn_agent_denied", session=sid, code=exc.code)
+        code = "EMERGENCY_STOP" if exc.code == "EMERGENCY_STOP" \
+            else "AGENT_DISABLED"
+        return {"ok": False, "state": "UNAVAILABLE", "code": code,
+                "detail": _redact(exc.detail)[:300], "session_id": sid}
+    except Exception as exc:  # noqa: BLE001 - not an agent run: legacy fallback
+        _audit("turn_agent_error", session=sid, error=str(exc)[:160])
+        return None
+    if out is None:
+        return None
+    if str(out.get("state") or "") != "OK":
+        code = str(out.get("code") or "MODEL_ERROR")
+        detail = _redact(str(out.get("detail") or ""))[:300]
+        _audit("turn_agent_failed", session=sid, code=code)
+        return {"ok": False, "state": "FAILED", "code": code,
+                "detail": detail, "session_id": sid,
+                "elapsed_ms": out.get("elapsed_ms")}
+    reply = str(out.get("reply") or "")
+    if not reply.strip():
+        _audit("turn_agent_empty", session=sid)
+        return {"ok": False, "state": "FAILED", "code": "MODEL_UNAVAILABLE",
+                "detail": "agent returned no text; nothing was fabricated",
+                "session_id": sid}
+    receipt = dict(out.get("receipt") or {})
+    receipt.setdefault("transport", "voicebridge.chat_transport.agent")
+    try:
+        record_activity(cfg, sid, reply)
+    except Exception:  # noqa: BLE001 - projection glue, never fatal
+        pass
+    _audit("turn_agent", session=sid,
+           tools=len(receipt.get("tools") or []))
+    return {"ok": True, "reply": reply, "text": reply, "session": sid,
+            "session_id": sid, "route": "agent",
+            "elapsed_ms": out.get("elapsed_ms"), "receipt": receipt}
 
 
 def _generate(cfg: Any, sid: str, clean: str, resolved_model: str,
@@ -2362,7 +3856,7 @@ def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
     """
     clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
     st = store(cfg)
-    created = _resolve_session(st, session, model=routed.get("model"))
+    created = _resolve_session(st, session, model=routed.get("model"), cfg=cfg)
     if created.get("state") != "OK":
         yield {"event": "error", "code": created.get("code"),
                "detail": created.get("detail", "")}
@@ -2590,7 +4084,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     # must still execute/confirm/delegate instead of chattering.
     clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
     st = store(cfg)
-    created = _resolve_session(st, session, model=resolved_model)
+    created = _resolve_session(st, session, model=resolved_model, cfg=cfg)
     if created.get("state") != "OK":
         yield {"event": "error", "code": created.get("code"),
                "detail": created.get("detail", "")}
@@ -2643,11 +4137,83 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
                "receipt": res.get("receipt")}
         return
+    # Qubit-chat slash turns (DECISIONS #26): same real-backend execution
+    # as turn(), streamed as a single truthful delta. Non-slash turns
+    # continue below byte-identical.
+    if clean.startswith("/"):
+        started = time.monotonic()
+        yield {"event": "start", "session_id": sid, "session": sid,
+               "route": "slash"}
+        appended = st.append(sid, "user", clean)
+        if appended.get("state") != "OK":
+            yield {"event": "error", "code": appended.get("code"),
+                   "detail": appended.get("detail", ""), "session_id": sid}
+            return
+        res = _finish_slash(cfg, st, sid, clean)
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        if not res.get("ok"):
+            yield {"event": "error", "code": res.get("code", "SLASH_FAILED"),
+                   "detail": res.get("detail", ""), "session_id": sid,
+                   "route": "slash", "elapsed_ms": elapsed_ms}
+            return
+        text_out = str(res.get("text") or res.get("reply") or "")
+        yield {"event": "delta", "text": text_out, "session_id": sid}
+        yield {"event": "done", "ok": True, "reply": text_out,
+               "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
+               "receipt": res.get("receipt")}
+        return
+    # Direct facts on the stream path (same contract as turn() above):
+    # single truthful delta, route "facts", no model consulted.
+    _fact = _direct_fact_answer(clean)
+    if _fact:
+        started = time.monotonic()
+        yield {"event": "start", "session_id": sid, "session": sid,
+               "route": "facts"}
+        appended = st.append(sid, "user", clean)
+        if appended.get("state") != "OK":
+            yield {"event": "error", "code": appended.get("code"),
+                   "detail": appended.get("detail", ""), "session_id": sid}
+            return
+        res = _finish_fact(cfg, st, sid, _fact)
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        yield {"event": "delta", "text": _fact, "session_id": sid}
+        yield {"event": "done", "ok": True, "reply": _fact,
+               "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
+               "route": "facts", "model": "live-facts",
+               "receipt": res.get("receipt")}
+        return
     decided = _decide_branch(clean, cfg)
     if decided.get("action") in BRANCH_ACTIONS:
         yield from _stream_branch(cfg, st, sid, clean, decided,
                                   timeout_s=timeout_s, cancel=cancel)
         return
+    # DECISIONS #26: a general conversation turn runs the SAME tool-capable
+    # agent the /chat terminal drives (full tool schema + real tool calls), on
+    # both local and API-resolved sessions — /chat parity. The deterministic
+    # fast paths above never reach here. The agent is non-streaming, so its
+    # reply is one truthful delta. An explicit per-call model is honored (the
+    # caller asked for a specific model, not the /chat config model); when no
+    # tool-capable vendored runtime is available this falls through to the
+    # legacy remote/local stream byte-identically.
+    if decided.get("action") == "answer_local" and not model:
+        agent_out = _agent_chat(cfg, st, sid, clean, timeout_s=timeout_s,
+                                cancel=cancel, reasoning=reasoning_level)
+        if agent_out is not None:
+            yield {"event": "start", "session_id": sid, "session": sid,
+                   "route": "agent"}
+            if not agent_out.get("ok"):
+                yield {"event": "error",
+                       "code": agent_out.get("code", "MODEL_ERROR"),
+                       "detail": agent_out.get("detail", ""),
+                       "session_id": sid, "route": "agent"}
+                return
+            text_out = str(agent_out.get("reply") or "")
+            yield {"event": "delta", "text": text_out, "session_id": sid}
+            yield {"event": "done", "ok": True, "reply": text_out,
+                   "session_id": sid, "session": sid,
+                   "elapsed_ms": agent_out.get("elapsed_ms"),
+                   "receipt": agent_out.get("receipt")}
+            return
     routed_probe = resolve_route(cfg, model, session=session, role=role)
     if routed_probe.get("kind") in ("api", "realtime", "plugin"):
         yield from _stream_remote(cfg, text, session=session,
@@ -2657,7 +4223,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
 
     clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
     st = store(cfg)
-    created = _resolve_session(st, session, model=resolved_model)
+    created = _resolve_session(st, session, model=resolved_model, cfg=cfg)
     if created.get("state") != "OK":
         yield {"event": "error", "code": created.get("code"),
                "detail": created.get("detail", "")}
@@ -2720,7 +4286,49 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         if suffix:
             out.put(("delta", suffix))
 
+    saved_box: Dict[str, Any] = {"id": None}
+
+    def _stopped() -> bool:
+        return bool(ev.is_set() or (cancel is not None and bool(cancel())))
+
+    def _persist_reply(reply: str, elapsed_ms: int) -> Optional[str]:
+        """Persist the assistant reply as soon as it exists.
+
+        Runs in the worker thread, NOT the SSE drain loop: when the browser
+        refreshes, the response generator is closed and everything after the
+        drain (including the save) would be skipped, losing the turn's answer
+        and forcing the operator to retype. Writing here means the reply is
+        durable even though the client that asked for it went away.
+
+        A STOPPED turn (cancel / e-stop) is deliberately NOT persisted: the
+        model returns its own partial as ``ok`` text, and saving it would file
+        a truncated answer in the transcript as if it were complete.
+        """
+        if _stopped():
+            return None
+        safe_reply = _redact(_sanitize(str(reply or "").strip()))
+        if not safe_reply or saved_box["id"] is not None:
+            return None
+        try:
+            rec = st.append(sid, "assistant", safe_reply,
+                            meta={"model": resolved_model,
+                                  "elapsed_ms": elapsed_ms, "streamed": True})
+            saved_box["id"] = (rec or {}).get("id") or "saved"
+            try:
+                record_activity(cfg, sid, safe_reply)
+            except Exception:
+                pass
+            return safe_reply
+        except Exception:
+            return None
+
     def _worker() -> None:
+        # Durable crash marker for THIS turn, written where the turn actually
+        # runs. `voicebridge run` can be killed mid-turn (operator restart); on
+        # the next `/chat` connect the marker lets the session re-issue the
+        # request instead of stranding it behind a manual `continue`. This is the
+        # same mechanism the embedded TUI already uses (tui_gateway.turn_marker).
+        _write_turn_marker(cfg, sid, clean)
         try:
             from .providers import gateway as _gateway
             res = _gateway.run_role(
@@ -2735,6 +4343,10 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                 or (cancel is not None and bool(cancel())),
                 reasoning=reasoning_level)
             if res.ok:
+                # Durable BEFORE the client hears about it: a refresh mid-turn
+                # must not lose a reply the model already produced.
+                _persist_reply(acc["text"] or res.text,
+                               int((time.monotonic() - started) * 1000))
                 out.put(("reply", res.text))
                 out.put(("identity", res))
             else:
@@ -2742,6 +4354,10 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         except Exception as exc:  # noqa: BLE001 - surfaced as a typed event
             out.put(("error", exc))
         finally:
+            # The turn concluded in this process (answered, refused, or stopped),
+            # so the crash marker must not survive: only a process death should
+            # leave one behind for auto-continue to act on.
+            _clear_turn_marker(cfg, sid)
             out.put(done)
 
     thread = threading.Thread(target=_worker, name=f"qubit-chat-stream-{sid}",
@@ -2781,7 +4397,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     finally:
         _release_cancel(sid, ev)
     elapsed_ms = int((time.monotonic() - started) * 1000)
-    if ev.is_set() or (cancel is not None and cancel()):
+    if _stopped():
         _audit("stream_cancelled", session=sid, elapsed_ms=elapsed_ms)
         yield {"event": "cancelled", "session_id": sid, "elapsed_ms": elapsed_ms}
         return
@@ -2796,10 +4412,16 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                "session_id": sid, "elapsed_ms": elapsed_ms}
         return
     safe = _redact(_sanitize(full.strip()))
-    saved = st.append(sid, "assistant", safe,
-                      meta={"model": resolved_model,
-                            "elapsed_ms": elapsed_ms, "streamed": True})
-    record_activity(cfg, sid, safe)
+    # The worker already persisted this reply (it may have raced a client
+    # refresh). Only write here if that did not happen, so a turn is saved
+    # exactly once.
+    if saved_box["id"] is None:
+        saved = st.append(sid, "assistant", safe,
+                          meta={"model": resolved_model,
+                                "elapsed_ms": elapsed_ms, "streamed": True})
+        record_activity(cfg, sid, safe)
+    else:
+        saved = {"id": saved_box["id"]}
     _audit("stream_done", session=sid, elapsed_ms=elapsed_ms,
            context_tier=decision.tier, context_window=decision.window_tokens)
     receipt = {"runtime": "qubit-native", "model": resolved_model,

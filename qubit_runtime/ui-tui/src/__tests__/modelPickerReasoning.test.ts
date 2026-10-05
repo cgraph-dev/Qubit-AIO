@@ -13,13 +13,13 @@ const provider = (capabilities?: ModelOptionProvider['capabilities']): ModelOpti
 describe('ModelPicker reasoning step', () => {
   it('emits one /model request carrying provider, effort and scope', () => {
     expect(modelPickerCommand('gpt-5.6', 'nous', false, 'high')).toBe(
-      'gpt-5.6 --provider qubit --reasoning high --tui-session'
+      'gpt-5.6 --provider nous --reasoning high --tui-session'
     )
     expect(modelPickerCommand('gpt-5.6', 'nous', true, 'none')).toBe(
-      'gpt-5.6 --provider qubit --reasoning none --global'
+      'gpt-5.6 --provider nous --reasoning none --global'
     )
     // "Keep current effort" (empty value) adds no flag at all.
-    expect(modelPickerCommand('gpt-5.6', 'nous', false, '')).toBe('gpt-5.6 --provider qubit --tui-session')
+    expect(modelPickerCommand('gpt-5.6', 'nous', false, '')).toBe('gpt-5.6 --provider nous --tui-session')
     expect(REASONING_PICKER_ROWS.at(-1)?.value).toBe('')
     // The new-session draft label strips the effort flag like it strips --provider.
     expect(draftModelNameFromArg(modelPickerCommand('gpt-5.6', 'nous', false, 'low'))).toBe('gpt-5.6')

@@ -1048,6 +1048,11 @@ QUBIT_READ_AUTHORITY: tuple = (
     # reports ``repos=[]`` / ``scan_enabled=false`` because Qubit runs no
     # git-root scanner.
     "/api/chat/workspaces",
+    # Unified slash catalog for /qubit-chat (parity with the /chat terminal
+    # palette). Qubit-owned read over the canonical slash registry plus the
+    # skills/plugins/mcp/toolset list authorities — never fork-proxied, so a
+    # fork route of the same name cannot shadow the Qubit aggregation.
+    "/api/chat/slash-commands",
     # Curator pause/run read/write split-brain (UI audit 2026-09-29): PUT
     # /api/curator/paused writes ``curator_control.json`` (the compat store),
     # but GET was fork-proxied and always reported paused:false, so the badge
@@ -1758,9 +1763,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # The client's requested Qubit model profile is threaded through so
             # an unknown id is a typed refusal, never a silent substitution.
             requested_profile = str(body.get("profile", "") or "")
+            resume_session = str(
+                body.get("session", "") or body.get("resume", "") or "")
             guard: Optional[Dict[str, Any]] = None
             if scope == SCOPE_PTY:
-                guard = self.app.pty_ws._resolve_guard(requested_profile)
+                guard = self.app.pty_ws._resolve_guard(
+                    requested_profile, session_id=resume_session)
                 if isinstance(guard, dict) and guard.get("ok") is False:
                     self.app.pty_ws.journal_context_refusal(
                         guard, requested_profile=requested_profile,
@@ -1816,6 +1824,13 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 # never key_ref or base_url.
                 for _k in ("context_verification", "context_window_source",
                            "context_verified", "real_context_tokens"):
+                    if guard.get(_k) is not None:
+                        payload[_k] = guard[_k]
+                # A resumed session keeps its stored model, not the current
+                # default: surface the pin so the MODEL card can explain why
+                # it differs from a fresh chat (never key_ref or base_url).
+                for _k in ("session_pinned", "resumed_session",
+                           "default_provider", "default_model"):
                     if guard.get(_k) is not None:
                         payload[_k] = guard[_k]
             self._json(payload)
@@ -1884,7 +1899,16 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     code, hdrs, rbody = HA.call(
                         method, api_path, query=query,
                         headers={"accept": "application/json"})
-                    if code < 500 and code not in (404, 405):
+                    # A 422 is the fork refusing to serve the read because the
+                    # request shape does not match its own route contract (e.g.
+                    # `/api/git/worktrees`, whose vendored route requires a
+                    # `path` query the dashboard roster page does not send).
+                    # That is a "not served" answer exactly like 404/405, so it
+                    # degrades to the Qubit compat handler; serving the raw 422
+                    # leaked the fork's validation error onto the page
+                    # (docs/generated QUBIT_OPEN_CLOSURE records the same
+                    # probe). Only a served response (2xx/3xx) is used.
+                    if 200 <= code < 400:
                         ctype = hdrs.get("content-type", "application/json")
                         if "json" in ctype:
                             try:
@@ -1926,7 +1950,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
                               path=api_path[:120], status=code)
             except Exception as exc:
                 log_event("webui.qubit_backend.fallback",
-                          error=str(exc)[:160])
+                          path=api_path[:120], error=str(exc)[:160])
         # Cutover stage 3 (docs/archive/2026-09-21/QUBIT_HERMES_CUTOVER_MIGRATION.md): when
         # `webui.hermes_writes` is on, a mutating request that the operator has
         # explicitly allowlisted runs the Qubit policy middleware first (e-stop
@@ -1949,7 +1973,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         headers={"accept": "application/json",
                                  "content-type": "application/json"},
                         body=payload)
-                    if code < 500 and code not in (404, 405):
+                    if 200 <= code < 400:
                         log_event("webui.hermes_writes.proxied",
                                   path=api_path[:120], status=code)
                         ctype = hdrs.get("content-type", "application/json")
@@ -2190,7 +2214,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
             resume=q.get("resume", ""), profile=q.get("profile", ""),
             origin_ok=P.origin_allowed(self, self.app.allowed_origins),
             peer_ok=P.peer_allowed(self),
-            workspace_cwd=_workspace_cwd(q.get("cwd", "")))
+            workspace_cwd=_workspace_cwd(q.get("cwd", "")),
+            attach=q.get("attach", ""))
         return True
 
     def _maybe_stt_upgrade(self) -> bool:
@@ -4039,6 +4064,11 @@ def cors_headers_for(allowed_origins, request_origin: str) -> list:
     return []
 
 
+#: The live listener, published so the SIGTERM handler can reach it and
+#: detach in-flight PTYs before shutdown destroys a running turn.
+CURRENT_SERVER: Optional["WebUI"] = None
+
+
 class WebUI:
     """Thin HTTP layer around the orchestrator's processing pipeline."""
 
@@ -4293,9 +4323,13 @@ class WebUI:
         pty = getattr(self, "_pty_ws", None)
         if pty is not None:
             try:
-                pty.cancel_all()
+                # Detach, do not cancel: a terminal whose turn is still running
+                # (unattended work) must outlive this listener so the operator
+                # finds it continued instead of having to retype `continue`.
+                # The idle-TTL reaper still retires it.
+                pty.detach_all()
             except Exception:
-                log.exception("webui.stop: pty cancel_all failed")
+                log.exception("webui.stop: pty detach_all failed")
         hub = getattr(self, "_events_hub", None)
         if hub is not None:
             try:

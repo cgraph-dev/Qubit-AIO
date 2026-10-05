@@ -2,6 +2,7 @@ import type { MouseTrackingMode } from '@qubit/ink'
 import { useEffect, useRef } from 'react'
 
 import { resolveDetailsMode, resolveSections } from '../domain/details.js'
+import { MOUSE_TRACKING } from '../config/env.js'
 import type { GatewayClient } from '../gatewayClient.js'
 import type { ConfigFullResponse, ConfigMtimeResponse, ReloadMcpResponse } from '../gatewayTypes.js'
 import { DEFAULT_VOICE_RECORD_KEY, type ParsedVoiceRecordKey, parseVoiceRecordKey } from '../lib/platform.js'
@@ -82,21 +83,39 @@ const hasOwn = (obj: object, key: PropertyKey) => Object.prototype.hasOwnPropert
 // `display.mouse_tracking` accepts boolean (`true` ⇒ all modes, `false` ⇒ off)
 // for back-compat, plus the string presets `off|wheel|buttons|all` (aliases:
 // `on`/`full`/`any`/`1`/`true`/... → `all`; `0`/`false`/`no`/`off` → `off`).
-// `wheel` enables 1000+1006 — scroll wheel + click only, no drag or hover,
+// ``wheel`` enables 1000+1006 — scroll wheel + click only, no drag or hover,
 // which silences tmux's "No image in clipboard" spam over the prompt row.
 // `buttons` adds 1002 so terminal-side text selection drags still register.
 // Legacy `tui_mouse` is honored only if `mouse_tracking` is absent.
-export const normalizeMouseTracking = (display: {
-  mouse_tracking?: unknown
-  tui_mouse?: unknown
-}): MouseTrackingMode => {
+//
+// An UNSET key must NOT mean "on". The dashboard launcher forces mouse off for
+// its PTY (``HERMES_TUI_DISABLE_MOUSE=1``, see web_server_chat.py) so the
+// browser keeps wheel events for transcript scrolling; the boot default in
+// config/env.ts already honours that. Returning 'all' here made every config
+// sync clobber that default and re-arm mouse tracking, so clicks and moves
+// arrived as raw ``ESC[M`` mouse bytes typed straight into the composer — the
+// pre-filled gibberish users saw on the dashboard. Unset (or the legacy
+// ``tui_mouse`` key too) now preserves the resolved boot policy instead of
+// overriding it. ``bootPolicy`` defaults to the module's resolved
+// ``MOUSE_TRACKING`` and is injectable for tests.
+export const normalizeMouseTracking = (
+  display: {
+    mouse_tracking?: unknown
+    tui_mouse?: unknown
+  },
+  bootPolicy: MouseTrackingMode = MOUSE_TRACKING
+): MouseTrackingMode => {
   const raw = hasOwn(display, 'mouse_tracking') ? display.mouse_tracking : display.tui_mouse
 
   if (raw === false || raw === 0) {
     return 'off'
   }
 
-  if (raw === true || raw === undefined || raw === null) {
+  if (raw === undefined || raw === null) {
+    return bootPolicy
+  }
+
+  if (raw === true) {
     return 'all'
   }
 

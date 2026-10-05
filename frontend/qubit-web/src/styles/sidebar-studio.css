@@ -1,0 +1,118 @@
+/* Shared app navigation uses the same live theme surface as /qubit-chat. */
+.qagent-sidebar {
+  --qsidebar-accent: var(--color-primary, var(--midground-base));
+  --qsidebar-active: color-mix(in srgb, #b89aff 78%, var(--qsidebar-accent));
+  --qsidebar-surface: var(--color-card, color-mix(in srgb, var(--midground-base) 4%, var(--background-base)));
+  --qsidebar-wash: color-mix(in srgb, var(--qsidebar-accent) 9%, transparent);
+  --qsidebar-muted: color-mix(in srgb, var(--midground-base) 66%, var(--background-base));
+  --qsidebar-line: var(--color-border, color-mix(in srgb, var(--qsidebar-accent) 17%, transparent));
+  background: var(--background-base) !important;
+  border-color: var(--qsidebar-line) !important;
+  color: var(--midground-base);
+  font-family: var(--theme-font-sans, sans-serif);
+}
+.qagent-sidebar .qagent-sidebar__brand-row {
+  border-bottom-color: var(--qsidebar-line);
+  background: var(--qsidebar-surface);
+}
+.qagent-sidebar .qagent-sidebar__brand-row > div:first-child { min-width: 0; }
+.qagent-sidebar .qagent-sidebar__brand-row svg { color: var(--qsidebar-accent); }
+.qagent-sidebar .qagent-sidebar__brand-name { font-family: var(--theme-font-display, var(--theme-font-sans)); }
+.qagent-sidebar .qagent-sidebar__brand-name { display: inline-flex !important; }
+.qagent-sidebar .qagent-sidebar__nav {
+  border-top-color: var(--qsidebar-line);
+  scrollbar-color: var(--qsidebar-line) transparent;
+  scrollbar-width: thin;
+}
+.qagent-sidebar .qagent-sidebar__nav > ul { gap: .1rem; padding: .2rem .25rem; }
+.qagent-sidebar .qagent-sidebar__nav [role="group"] { border-top-color: var(--qsidebar-line); }
+.qagent-sidebar .qagent-sidebar__link {
+  position: relative;
+  min-height: 2.55rem;
+  margin: .1rem .2rem;
+  padding: .58rem .72rem;
+  gap: .72rem;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--theme-radius, .55rem);
+  color: var(--qsidebar-muted);
+  font-family: var(--theme-font-sans, sans-serif);
+  font-size: .84rem;
+  font-weight: 550;
+  letter-spacing: var(--theme-letter-spacing, 0);
+  text-transform: none;
+  text-decoration: none;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease,
+    box-shadow 150ms ease, transform 150ms ease;
+}
+.qagent-sidebar .qagent-sidebar__link:hover:not([aria-current="page"]) {
+  border-color: var(--qsidebar-line);
+  background: var(--qsidebar-surface);
+  color: var(--midground-base);
+}
+.qagent-sidebar .qagent-sidebar__link[aria-current="page"] {
+  border-color: color-mix(in srgb, var(--qsidebar-accent) 29%, transparent);
+  background: var(--qsidebar-wash);
+  color: var(--midground-base);
+  box-shadow: inset 2px 0 var(--qsidebar-accent);
+}
+.qagent-sidebar .qagent-sidebar__link:focus-visible {
+  z-index: 2;
+  outline: 2px solid var(--qsidebar-accent);
+  outline-offset: 1px;
+}
+.qagent-sidebar .qagent-sidebar__link > svg,
+.qagent-sidebar .qagent-sidebar__link-label { position: relative; z-index: 1; }
+.qagent-sidebar .qagent-sidebar__link > svg { width: 1rem; height: 1rem; color: inherit; opacity: .78; }
+.qagent-sidebar .qagent-sidebar__link[aria-current="page"] > svg { color: var(--qsidebar-accent); opacity: 1; }
+.qagent-sidebar .qagent-sidebar__link-label { min-width: 0; font: inherit; }
+.qagent-sidebar .qagent-sidebar__hover-wash { display: none; }
+.qagent-sidebar .qagent-sidebar__active-rail { display: none; }
+.qagent-sidebar .qagent-sidebar__link--nested { margin-left: .55rem; padding-left: 1.8rem; font-size: .79rem; }
+.qagent-sidebar .qagent-sidebar__nav [id="qubit-sidebar-plugin-nav-heading"] {
+  padding: .85rem .8rem .35rem;
+  color: var(--qsidebar-muted);
+  font-family: var(--theme-font-display, var(--theme-font-sans));
+  font-size: .68rem;
+  font-weight: 650;
+  letter-spacing: .025em;
+}
+@media (min-width: 1024px) {
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__link {
+    width: calc(100% - .3rem);
+    justify-content: center;
+    margin-inline: .15rem;
+    padding-inline: .2rem;
+    gap: 0;
+  }
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__link--nested { margin-left: .15rem; }
+}
+@media (max-width: 1023px) {
+  .qagent-sidebar .qagent-sidebar__link { min-height: 2.8rem; margin-inline: .4rem; padding-inline: .8rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qagent-sidebar .qagent-sidebar__link { transition-duration: .01ms !important; }
+}
+
+/* Qubit navigation: compact control-room rail, still driven by the active theme. */
+.qagent-sidebar { position: relative; isolation: isolate; background: color-mix(in srgb, var(--background-base) 94%, var(--qsidebar-accent)) !important; }
+.qagent-sidebar::before { position: absolute; z-index: -1; inset: 3.5rem 0 0; content: ""; background: radial-gradient(ellipse at 0 8%, color-mix(in srgb, var(--qsidebar-accent) 9%, transparent), transparent 46%), radial-gradient(circle, color-mix(in srgb, var(--qsidebar-accent) 26%, transparent) 0 1px, transparent 1.4px); background-size: auto, 29px 29px; mask-image: linear-gradient(180deg, #000, transparent 75%); pointer-events: none; opacity: .42; }
+.qagent-sidebar .qagent-sidebar__brand-row { min-height: 3.65rem; padding-inline: .85rem; background: color-mix(in srgb, var(--qsidebar-surface) 92%, transparent); }
+.qagent-sidebar .qagent-sidebar__brand-name { font-size: .88rem; font-weight: 750; letter-spacing: .015em; }
+.qagent-sidebar .qagent-sidebar__nav { padding-block: .55rem; }
+.qagent-sidebar .qagent-sidebar__nav > ul { gap: .2rem; padding-inline: .45rem; }
+.qagent-sidebar .qagent-sidebar__link { min-height: 2.45rem; margin: .06rem .15rem; padding: .5rem .62rem; gap: .62rem; border-radius: calc(var(--theme-radius, .55rem) + .1rem); font-family: var(--theme-font-mono, ui-monospace, monospace); font-size: .69rem; font-weight: 620; letter-spacing: .045em; }
+.qagent-sidebar .qagent-sidebar__link:hover:not([aria-current="page"]) { transform: translateX(2px); }
+.qagent-sidebar .qagent-sidebar__link[aria-current="page"] { border-color: color-mix(in srgb, var(--qsidebar-active) 36%, transparent); background: linear-gradient(100deg, color-mix(in srgb, var(--qsidebar-active) 13%, transparent), color-mix(in srgb, var(--qsidebar-active) 5%, transparent)); box-shadow: inset 2px 0 var(--qsidebar-active), 0 5px 18px color-mix(in srgb, var(--qsidebar-active) 7%, transparent); }
+.qagent-sidebar .qagent-sidebar__link[aria-current="page"]::after { position: absolute; right: .58rem; width: .34rem; height: .34rem; border-radius: 50%; background: var(--qsidebar-accent); box-shadow: 0 0 12px color-mix(in srgb, var(--qsidebar-accent) 48%, transparent); content: ""; }
+.qagent-sidebar .qagent-sidebar__link > svg { width: .95rem; height: .95rem; }
+.qagent-sidebar .qagent-sidebar__link--nested { font-size: .66rem; }
+.qagent-sidebar .qagent-sidebar__nav [id="qubit-sidebar-plugin-nav-heading"] { margin: .35rem .35rem .2rem; padding: .6rem .5rem .38rem; border-top: 1px solid var(--qsidebar-line); font-family: var(--theme-font-mono, ui-monospace, monospace); font-size: .57rem; letter-spacing: .12em; text-transform: uppercase; }
+@media (prefers-reduced-motion: reduce) { .qagent-sidebar::before { display: none; } }
+
+/* Remove the legacy slot wordmark beside the canonical Qubit brand. */
+.qagent-sidebar .qagent-sidebar__brand-row .qubit-brandmark { display: none !important; }
+.qagent-sidebar { background: var(--background-base) !important; }
+.qagent-sidebar::before { display: none; }
+.qagent-sidebar .qagent-sidebar__link[aria-current="page"]::after { display: none; }
+@media (max-width: 1023px) { .qagent-sidebar { position: fixed !important; } }

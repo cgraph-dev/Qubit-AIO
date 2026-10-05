@@ -440,6 +440,73 @@ def test_transform_strips_conversational_preamble():
     assert only.text.startswith("Sure.")
 
 
+def test_transform_strips_trailing_conversational_tail():
+    """Lane 3 (2026-10-03): brain4 appends offer-tails to shorten/funny
+    outputs ("Let me know if you need further details."). A trailing tail
+    is stripped when real content precedes it; the rewrite is kept."""
+    cfg = enabled_cfg()
+    cmd = parser.parse("shorten", selected_text="do the thing")
+    raw = "Do the thing now. Let me know if you need further details."
+    res = TransformEngine(runner=lambda *a, **k: FakeResult(text=raw)).transform(
+        cfg, cmd)
+    assert res.ok
+    assert res.text == "Do the thing now."
+    assert "further details" not in res.text
+    # NOTE (echo lane 2026-10-03): the stripped core must differ from the
+    # input -- a verbatim echo now retries once, then fails honestly as
+    # VOICE_EDIT_NO_CHANGE instead of returning input-as-output.
+
+
+def test_transform_strips_trailing_assist_tail():
+    cfg = enabled_cfg()
+    cmd = parser.parse("shorten", selected_text="do the thing")
+    raw = ("Short version here.\n"
+           "Is there anything else I can assist with?")
+    res = TransformEngine(runner=lambda *a, **k: FakeResult(text=raw)).transform(
+        cfg, cmd)
+    assert res.ok
+    assert res.text == "Short version here."
+    assert "assist with" not in res.text
+
+
+def test_transform_tail_only_output_survives():
+    """A tail with no rewrite before it is kept verbatim — stripping must
+    never produce an empty result from a non-empty model output."""
+    cfg = enabled_cfg()
+    cmd = parser.parse("shorten", selected_text="do the thing")
+    raw = "Let me know if you need further details."
+    res = TransformEngine(runner=lambda *a, **k: FakeResult(text=raw)).transform(
+        cfg, cmd)
+    assert res.ok
+    assert res.text == raw
+
+
+def test_transform_keeps_genuine_closings():
+    """Genuine closings are not conversational tails and must pass through
+    byte-identical (the allowlist is exact-shape, never fuzzy)."""
+    cfg = enabled_cfg()
+    cmd = parser.parse("shorten", selected_text="do the thing")
+    for genuine in ("Call me Ishmael.",
+                    "The report is done.\n\nYours truly, Qubit."):
+        res = TransformEngine(runner=lambda *a, **k: FakeResult(
+            text=genuine)).transform(cfg, cmd)
+        assert res.ok
+        assert res.text == genuine, genuine
+
+
+def test_transform_tail_requires_exact_shape():
+    """Near-misses carry real content and must survive: only the exact
+    allowlisted tail shapes strip, nothing resembling them."""
+    cfg = enabled_cfg()
+    cmd = parser.parse("shorten", selected_text="do the thing")
+    for raw in ("Do the thing. Let me know, Ishmael.",
+                "Do the thing. Let me know if the details change."):
+        res = TransformEngine(runner=lambda *a, **k: FakeResult(
+            text=raw)).transform(cfg, cmd)
+        assert res.ok
+        assert res.text == raw, raw
+
+
 def test_transform_flags_clarifying_question_output():
     cfg = enabled_cfg()
     cmd = parser.parse("clarify", selected_text="do the thing")

@@ -5,14 +5,14 @@
  * ~/.hermes/kanban.db. Calls the plugin's backend at /api/plugins/kanban/
  * and tails task_events over a WebSocket for live updates.
  *
- * Plain IIFE, no build step. Uses window.__HERMES_PLUGIN_SDK__ for React +
+ * Plain IIFE, no build step. Uses window.__QUBIT_PLUGIN_SDK__ for React +
  * shadcn primitives; HTML5 drag-and-drop for card movement on desktop and
  * a pointer-based fallback for touch.
  */
 (function () {
   "use strict";
 
-  const SDK = window.__HERMES_PLUGIN_SDK__;
+  const SDK = window.__QUBIT_PLUGIN_SDK__;
   if (!SDK) return;
 
   const { React } = SDK;
@@ -752,7 +752,7 @@
         if (wsClosedRef.current) return;
         // Build the WS URL via the host SDK so the correct auth param is used
         // in BOTH modes: single-use ?ticket= in gated OAuth mode, ?token= in
-        // loopback. Reading window.__HERMES_SESSION_TOKEN__ directly (the old
+        // loopback. Reading window.__QUBIT_SESSION_TOKEN__ directly (the old
         // path) sends an empty token and is rejected in gated mode. buildWsUrl
         // also applies the dashboard base-path prefix for reverse-proxied
         // deployments, which the old inline URL did not. It's async (gated
@@ -4907,7 +4907,7 @@
   // Register
   // -------------------------------------------------------------------------
 
-  if (window.__HERMES_PLUGINS__ && typeof window.__HERMES_PLUGINS__.register === "function") {
-    window.__HERMES_PLUGINS__.register("kanban", KanbanPage);
+  if (window.__QUBIT_PLUGINS__ && typeof window.__QUBIT_PLUGINS__.register === "function") {
+    window.__QUBIT_PLUGINS__.register("kanban", KanbanPage);
   }
 })();

@@ -1,14 +1,14 @@
 /**
- * Background tasks — the upstream background-tasks depth as its own page.
- *
- * Qubit-owned page (route `/qubit-tasks`; route registration in `App.tsx` is
- * a NEEDS-BRIDGE item — this file only exports the component).
+ * Background tasks — the background-tasks depth as its own page (route
+ * `/qubit-tasks`).
  *
  * Separate from `/qubit-task-inbox` (which this page never extends): the
  * inbox covers ledger history + suggestions + mentions, while this page
- * mirrors the upstream tasks surface (`docs/automation/tasks.md`: list with a
- * state filter, inspect by receipt/session id, cancel + retry, progress where
- * the backend reports it).
+ * mirrors the background-tasks surface (list with a state filter, inspect by
+ * receipt/session id, cancel + retry, progress where the backend reports it).
+ *
+ * Structure mirrors the ported settings surfaces in this app
+ * (`.settings-page` > `.settings-section` > `.settings-group` > `.settings-row`).
  *
  * Port mapping: list/get onto the read-only task ledger
  * (`voicebridge/task_ledger.py`: `list_tasks` / `show`); cancel/retry onto a
@@ -18,13 +18,9 @@
  * is disabled-with-reason and never wired.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Info } from "lucide-react";
 import { Link } from "react-router";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Button } from "@nous-research/ui/ui/components/button";
-import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Input } from "@nous-research/ui/ui/components/input";
-import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
@@ -43,32 +39,38 @@ import {
 } from "@/lib/ocFamilyTasksApi";
 import { refusalOrError } from "@/lib/policy-refusal";
 
+const INPUT_CLASS =
+  "settings-input border border-border bg-background-base px-2 py-1 text-sm";
+
 function DismissRefusalRow({ refusal }: { refusal: GatewayRefusal }) {
   return (
     <div
-      className="rounded-md border border-dashed p-3 space-y-1"
+      className="settings-row settings-row--stacked"
+      data-state="refused"
       data-testid={`refusal-${refusal.code}`}
     >
-      <div className="flex items-center gap-2 flex-wrap">
-        <code className="text-xs font-mono">{refusal.method}</code>
-        <Badge tone="secondary">{refusal.code}</Badge>
+      <div className="settings-row__text">
+        <div className="settings-row__title font-mono">{refusal.method}</div>
+        <p className="settings-row__desc">{refusal.detail}</p>
+        <p className="settings-row__desc">
+          <span className="font-medium">Needs: </span>
+          {refusal.prerequisite}
+        </p>
+        <p className="settings-row__desc">
+          <span className="font-medium">Use instead: </span>
+          <code className="font-mono text-xs">{refusal.counterpart}</code>
+          {" — "}
+          <Link className="underline" to="/qubit-task-inbox">
+            Open the task inbox
+          </Link>
+        </p>
       </div>
-      <p className="text-sm text-muted-foreground">{refusal.detail}</p>
-      <p className="text-sm">
-        <span className="font-medium">Needs: </span>
-        {refusal.prerequisite}
-      </p>
-      <p className="text-sm">
-        <span className="font-medium">Use instead: </span>
-        <code className="text-xs font-mono">{refusal.counterpart}</code>
-        {" — "}
-        <Link className="underline" to="/qubit-task-inbox">
-          Open the task inbox
-        </Link>
-      </p>
-      <Button disabled title={refusal.detail}>
-        Run {refusal.method}
-      </Button>
+      <div className="settings-row__control">
+        <Badge tone="secondary">{refusal.code}</Badge>
+        <Button disabled title={refusal.detail}>
+          Run {refusal.method}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -200,32 +202,47 @@ export default function TasksPage() {
   );
 
   return (
-    <div className="space-y-6 p-4">
-      <div>
-        <h1 className="text-xl font-semibold">Background tasks</h1>
-        <p className="text-sm text-muted-foreground">
-          Detached runs (agent, subagent, cron, CLI) as a live list: filter by
-          state, inspect by receipt/session id, cancel or retry against a real
-          receipt or session. Dismiss stays disabled with its reason.
-        </p>
-      </div>
+    <div className="settings-page settings-page--wide">
+      <p className="settings-page__intro">
+        Detached runs (agent, subagent, cron, CLI) as a live list: filter by state,
+        inspect by receipt/session id, cancel or retry against a real receipt or
+        session. Dismiss stays disabled with its reason.
+      </p>
 
       {loading ? (
-        <div className="flex items-center gap-2">
-          <Spinner /> <span className="text-sm">Loading background tasks…</span>
-        </div>
+        <p className="flex items-center gap-2 text-sm text-text-tertiary">
+          <Spinner /> Loading background tasks…
+        </p>
       ) : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <Card>
-        <CardContent className="pt-4 space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="font-medium">Task list</h2>
-            <div className="space-y-1">
-              <Label htmlFor="background-tasks-state">State filter</Label>
+      <section className="settings-section">
+        <div className="settings-section__header">
+          <div className="settings-section__copy">
+            <h2 className="settings-section__heading">
+              Task list <span className="settings-count">{tasks.length}</span>
+            </h2>
+            <p className="settings-section__desc">
+              Detached runs reported by the read-only task ledger.
+            </p>
+          </div>
+          <div className="settings-section__actions">
+            <Button outlined size="sm" onClick={() => load()} disabled={loading}>
+              Reload
+            </Button>
+          </div>
+        </div>
+        <div className="settings-group">
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label htmlFor="background-tasks-state" className="settings-row__title">
+                State filter
+              </label>
+            </div>
+            <div className="settings-row__control">
               <select
                 id="background-tasks-state"
-                className="rounded-md border bg-background px-2 py-1 text-sm"
+                className="settings-select border border-border bg-background-base px-2 py-1 text-sm"
                 value={stateFilter}
                 onChange={(e) => setStateFilter(e.target.value)}
               >
@@ -237,188 +254,256 @@ export default function TasksPage() {
                 ))}
               </select>
             </div>
-            <Button outlined size="sm" onClick={() => load()} disabled={loading}>
-              Reload
-            </Button>
           </div>
           {tasks.length === 0 && !loading ? (
-            <p className="text-sm text-muted-foreground">No background tasks yet.</p>
+            <div className="settings-empty">No background tasks yet.</div>
           ) : (
-            <ul className="space-y-1">
-              {tasks.map((t) => (
-                <li key={t.id} className="flex items-center gap-2 text-sm flex-wrap">
-                  <code className="text-xs font-mono">{t.id}</code>
+            tasks.map((t) => (
+              <div key={t.id} className="settings-row">
+                <div className="settings-row__text">
+                  <div className="settings-row__title">{t.title}</div>
+                  <p className="settings-row__desc font-mono text-xs">{t.id}</p>
+                  {t.sessionKey ? (
+                    <p className="settings-row__desc">session {t.sessionKey}</p>
+                  ) : null}
+                </div>
+                <div className="settings-row__control">
                   {t.state ? <Badge tone="outline">{t.state}</Badge> : null}
                   {t.kind || t.runtime ? (
                     <Badge tone="secondary">{t.kind ?? t.runtime}</Badge>
                   ) : null}
-                  <span>{t.title}</span>
                   {t.progressPercent !== undefined ? (
-                    <span className="text-muted-foreground">
-                      · {t.progressPercent}%{t.progress ? ` — ${t.progress}` : ""}
+                    <span className="settings-row__value">
+                      {t.progressPercent}%{t.progress ? ` — ${t.progress}` : ""}
                     </span>
                   ) : t.progress ? (
-                    <span className="text-muted-foreground">· {t.progress}</span>
+                    <span className="settings-row__value">{t.progress}</span>
                   ) : null}
-                  {t.sessionKey ? (
-                    <span className="text-muted-foreground">· {t.sessionKey}</span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+                </div>
+              </div>
+            ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Card>
-        <CardContent className="pt-4 space-y-3">
-          <h2 className="font-medium">Task detail</h2>
-          <p className="text-sm text-muted-foreground">
+      <section className="settings-section">
+        <div className="settings-section__copy">
+          <h2 className="settings-section__heading">Task detail</h2>
+          <p className="settings-section__desc">
             Look up one task by task id, run/receipt id, or session key.
           </p>
-          <div className="flex items-end gap-2 flex-wrap">
-            <div className="space-y-1">
-              <Label htmlFor="background-tasks-lookup">Receipt / session id</Label>
-              <Input
+        </div>
+        <div className="settings-group">
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label htmlFor="background-tasks-lookup" className="settings-row__title">
+                Receipt / session id
+              </label>
+            </div>
+            <div className="settings-row__control">
+              <input
                 id="background-tasks-lookup"
+                className={INPUT_CLASS}
                 value={lookup}
                 onChange={(e) => setLookup(e.target.value)}
                 placeholder="task, run, or session id"
               />
+              <Button disabled={busy || !lookup.trim()} onClick={() => lookUp()}>
+                Look up
+              </Button>
             </div>
-            <Button disabled={busy || !lookup.trim()} onClick={() => lookUp()}>
-              Look up
-            </Button>
           </div>
           {detailMissing ? (
-            <p className="text-sm text-muted-foreground">No task matches that lookup.</p>
+            <div className="settings-empty">No task matches that lookup.</div>
           ) : null}
           {detail ? (
-            <dl className="text-sm space-y-1" data-testid="background-task-detail">
-              <div className="flex gap-2 flex-wrap">
-                <dt className="font-medium">Id:</dt>
-                <dd>
-                  <code className="text-xs font-mono">{detail.id}</code>
-                </dd>
+            <dl className="settings-group" data-testid="background-task-detail">
+              <div className="settings-row">
+                <div className="settings-row__text">
+                  <dt className="settings-row__title">Id</dt>
+                </div>
+                <div className="settings-row__control">
+                  <dd className="settings-row__value settings-row__value--mono">{detail.id}</dd>
+                </div>
               </div>
               {detail.state ? (
-                <div className="flex gap-2 flex-wrap">
-                  <dt className="font-medium">State:</dt>
-                  <dd>
-                    <Badge tone="outline">{detail.state}</Badge>
-                  </dd>
+                <div className="settings-row">
+                  <div className="settings-row__text">
+                    <dt className="settings-row__title">State</dt>
+                  </div>
+                  <div className="settings-row__control">
+                    <dd>
+                      <Badge tone="outline">{detail.state}</Badge>
+                    </dd>
+                  </div>
                 </div>
               ) : null}
               {detail.title ? (
-                <div className="flex gap-2 flex-wrap">
-                  <dt className="font-medium">Title:</dt>
-                  <dd>{detail.title}</dd>
+                <div className="settings-row">
+                  <div className="settings-row__text">
+                    <dt className="settings-row__title">Title</dt>
+                  </div>
+                  <div className="settings-row__control">
+                    <dd className="settings-row__value">{detail.title}</dd>
+                  </div>
                 </div>
               ) : null}
               {detail.progressPercent !== undefined || detail.progress ? (
-                <div className="flex gap-2 flex-wrap">
-                  <dt className="font-medium">Progress:</dt>
-                  <dd>
-                    {detail.progressPercent !== undefined
-                      ? `${detail.progressPercent}%${detail.progress ? ` — ${detail.progress}` : ""}`
-                      : (detail.progress ?? "")}
-                  </dd>
+                <div className="settings-row">
+                  <div className="settings-row__text">
+                    <dt className="settings-row__title">Progress</dt>
+                  </div>
+                  <div className="settings-row__control">
+                    <dd className="settings-row__value">
+                      {detail.progressPercent !== undefined
+                        ? `${detail.progressPercent}%${detail.progress ? ` — ${detail.progress}` : ""}`
+                        : (detail.progress ?? "")}
+                    </dd>
+                  </div>
                 </div>
               ) : null}
               {detail.sessionKey ? (
-                <div className="flex gap-2 flex-wrap">
-                  <dt className="font-medium">Session:</dt>
-                  <dd>
-                    <code className="text-xs font-mono">{detail.sessionKey}</code>
-                  </dd>
+                <div className="settings-row">
+                  <div className="settings-row__text">
+                    <dt className="settings-row__title">Session</dt>
+                  </div>
+                  <div className="settings-row__control">
+                    <dd className="settings-row__value settings-row__value--mono">
+                      {detail.sessionKey}
+                    </dd>
+                  </div>
                 </div>
               ) : null}
               {detail.runId ? (
-                <div className="flex gap-2 flex-wrap">
-                  <dt className="font-medium">Run:</dt>
-                  <dd>
-                    <code className="text-xs font-mono">{detail.runId}</code>
-                  </dd>
+                <div className="settings-row">
+                  <div className="settings-row__text">
+                    <dt className="settings-row__title">Run</dt>
+                  </div>
+                  <div className="settings-row__control">
+                    <dd className="settings-row__value settings-row__value--mono">
+                      {detail.runId}
+                    </dd>
+                  </div>
                 </div>
               ) : null}
               {detail.error ? (
-                <div className="flex gap-2 flex-wrap">
-                  <dt className="font-medium">Error:</dt>
-                  <dd className="text-muted-foreground">{detail.error}</dd>
+                <div className="settings-row">
+                  <div className="settings-row__text">
+                    <dt className="settings-row__title">Error</dt>
+                  </div>
+                  <div className="settings-row__control">
+                    <dd className="settings-row__value text-destructive">{detail.error}</dd>
+                  </div>
                 </div>
               ) : null}
               {fmtStamp(detail.updatedAt) ? (
-                <div className="flex gap-2 flex-wrap">
-                  <dt className="font-medium">Updated:</dt>
-                  <dd>{fmtStamp(detail.updatedAt)}</dd>
+                <div className="settings-row">
+                  <div className="settings-row__text">
+                    <dt className="settings-row__title">Updated</dt>
+                  </div>
+                  <div className="settings-row__control">
+                    <dd className="settings-row__value">{fmtStamp(detail.updatedAt)}</dd>
+                  </div>
                 </div>
               ) : null}
             </dl>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Card>
-        <CardContent className="pt-4 space-y-3">
-          <h2 className="font-medium">Cancel / retry via receipt or session</h2>
-          <p className="text-sm text-muted-foreground">
-            A bare ledger id maps to no live run — cancel and retry need a real
-            action receipt or an in-flight chat session.
+      <section className="settings-section">
+        <div className="settings-section__copy">
+          <h2 className="settings-section__heading">Cancel / retry</h2>
+          <p className="settings-section__desc">
+            A bare ledger id maps to no live run — cancel and retry need a real action
+            receipt or an in-flight chat session.
           </p>
-          <div className="flex items-end gap-2 flex-wrap">
-            <div className="space-y-1">
-              <Label htmlFor="background-tasks-receipt">Receipt id</Label>
-              <Input
+        </div>
+        <div className="settings-group">
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label htmlFor="background-tasks-receipt" className="settings-row__title">
+                Receipt id
+              </label>
+            </div>
+            <div className="settings-row__control">
+              <input
                 id="background-tasks-receipt"
+                className={INPUT_CLASS}
                 value={receiptId}
                 onChange={(e) => setReceiptId(e.target.value)}
                 placeholder="action receipt"
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="background-tasks-session">Session</Label>
-              <Input
+          </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label htmlFor="background-tasks-session" className="settings-row__title">
+                Session
+              </label>
+            </div>
+            <div className="settings-row__control">
+              <input
                 id="background-tasks-session"
+                className={INPUT_CLASS}
                 value={session}
                 onChange={(e) => setSession(e.target.value)}
                 placeholder="chat session"
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="background-tasks-task">Ledger id (read-only)</Label>
-              <Input
+          </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label htmlFor="background-tasks-task" className="settings-row__title">
+                Ledger id
+              </label>
+              <p className="settings-row__desc">Read-only target.</p>
+            </div>
+            <div className="settings-row__control">
+              <input
                 id="background-tasks-task"
+                className={INPUT_CLASS}
                 value={taskId}
                 onChange={(e) => setTaskId(e.target.value)}
                 placeholder="task id"
               />
             </div>
-            <Button disabled={busy || !hasTarget} onClick={() => runControl("cancel")}>
-              Cancel
-            </Button>
-            <Button outlined disabled={busy || !hasTarget} onClick={() => runControl("retry")}>
-              Retry
-            </Button>
+          </div>
+          <div className="settings-row settings-row--actions">
+            <div className="settings-row__text">
+              <div className="settings-row__title">Control</div>
+              {!hasTarget ? (
+                <p className="settings-row__desc" data-testid="task-control-hint">
+                  Enter a receipt id, session, or ledger id to enable Cancel / Retry.
+                </p>
+              ) : null}
+            </div>
+            <div className="settings-row__control">
+              <Button disabled={busy || !hasTarget} onClick={() => runControl("cancel")}>
+                Cancel
+              </Button>
+              <Button outlined disabled={busy || !hasTarget} onClick={() => runControl("retry")}>
+                Retry
+              </Button>
+            </div>
           </div>
           <DismissRefusalRow refusal={TASKS_DISMISS_REFUSAL} />
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Card>
-        <CardContent className="pt-4 space-y-3">
-          <h2 className="font-medium flex items-center gap-2">
-            <Info size={16} /> About dismiss
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Dismiss is refused by policy (no detached-task delivery registry).
-            The ledger history view lives on the task inbox:{" "}
+      <section className="settings-section">
+        <div className="settings-section__copy">
+          <h2 className="settings-section__heading">About dismiss</h2>
+          <p className="settings-section__desc">
+            Dismiss is refused by policy (no detached-task delivery registry). The
+            ledger history view lives on the task inbox:{" "}
             <Link className="underline" to="/qubit-task-inbox">
               Open the task inbox
             </Link>
             .
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <ConfirmDialog
         open={brokerConfirm !== null}

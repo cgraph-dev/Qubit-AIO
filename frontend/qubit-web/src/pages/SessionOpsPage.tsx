@@ -89,7 +89,7 @@ export default function SessionOpsPage() {
   const refreshGroups = useCallback(async () => {
     try {
       const res = await listSessionGroups();
-      setGroups(res.groups);
+      setGroups(res?.groups ?? []);
     } catch {
       setGroups([]);
     }
@@ -143,94 +143,132 @@ export default function SessionOpsPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6 p-6" data-testid="session-ops-page">
-      <header>
-        <h1 className="text-xl font-semibold">Session operations</h1>
-        <p className="text-sm text-muted-foreground">
-          Lineage, compaction, goals, suggestions, groups, and companion for
-          one selected session. Every destructive press asks first.
-        </p>
-      </header>
-
-      <section aria-label="fork-versus-branch-guidance" className="rounded border p-4">
-        <h2 className="text-sm font-semibold">Fork vs branch-switch vs checkpoints</h2>
-        <ul className="list-disc pl-5 text-sm">
-          <li>
-            <strong>Fork</strong> copies the session into a NEW session — the
-            source session is untouched.
-          </li>
-          <li>
-            <strong>Branch-switch</strong> restores in place — it rewrites the
-            current session transcript.
-          </li>
-          <li>
-            <strong>Journal checkpoints are verify-only.</strong> Compaction
-            restore below names its checkpoint id explicitly; the Checkpoints
-            page offers verify, never a blind journal restore.
-          </li>
-        </ul>
+    <div className="settings-page settings-page--wide" data-testid="session-ops-page">
+      <section className="settings-section">
+        <div className="settings-section__header">
+          <div className="settings-section__copy">
+            <h1 className="settings-section__heading">Session operations</h1>
+            <p className="settings-section__desc">
+              Lineage, compaction, goals, suggestions, groups, and companion for
+              one selected session. Every destructive press asks first.
+            </p>
+          </div>
+        </div>
       </section>
 
-      <section aria-label="session-picker" className="rounded border p-4">
-        <h2 className="text-sm font-semibold">Session picker</h2>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            aria-label="session-picker-input"
-            className="rounded border px-2 py-1 text-sm"
-            placeholder="session id"
-            value={pickerInput}
-            onChange={(e) => setPickerInput(e.target.value)}
-          />
-          <button
-            type="button"
-            aria-label="session-picker-use"
-            className="rounded border px-3 py-1 text-sm"
-            onClick={() => setSessionId(pickerInput.trim())}
-          >
-            Use session
-          </button>
-          <button
-            type="button"
-            aria-label="session-picker-refresh"
-            className="rounded border px-3 py-1 text-sm"
-            onClick={() => void refreshPicker()}
-          >
-            Refresh list
-          </button>
+      <section aria-label="fork-versus-branch-guidance" className="settings-section">
+        <h2 className="settings-section__heading">Fork vs branch-switch vs checkpoints</h2>
+        <div className="settings-group">
+          <div className="settings-row settings-row--stacked">
+            <div className="settings-row__text">
+              <ul className="list-disc pl-5 text-sm">
+                <li>
+                  <strong>Fork</strong> copies the session into a NEW session — the
+                  source session is untouched.
+                </li>
+                <li>
+                  <strong>Branch-switch</strong> restores in place — it rewrites the
+                  current session transcript.
+                </li>
+                <li>
+                  <strong>Journal checkpoints are verify-only.</strong> Compaction
+                  restore below names its checkpoint id explicitly; the Checkpoints
+                  page offers verify, never a blind journal restore.
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
-        <p className="mt-2 text-sm">
-          Selected: <code aria-label="session-picker-selected">{sessionId || "(none)"}</code>
-        </p>
-        <ul className="mt-2 flex max-h-40 flex-col gap-1 overflow-auto">
-          {sessions.map((s) => (
-            <li key={s.id}>
+      </section>
+
+      <section aria-label="session-picker" className="settings-section">
+        <h2 className="settings-section__heading">Session picker</h2>
+        <div className="settings-group">
+          <div className="settings-row">
+            <label className="settings-row__text" htmlFor="session-picker-input">
+              <span className="settings-row__title">Session id</span>
+            </label>
+            <div className="settings-row__control">
+              <input
+                id="session-picker-input"
+                aria-label="session-picker-input"
+                className="settings-input"
+                placeholder="session id"
+                value={pickerInput}
+                onChange={(e) => setPickerInput(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <span className="settings-row__title">Selected</span>
+            </div>
+            <div className="settings-row__control">
+              <code aria-label="session-picker-selected" className="settings-row__value">
+                {sessionId || "(none)"}
+              </code>
+            </div>
+          </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <span className="settings-row__title">Picker actions</span>
+            </div>
+            <div className="settings-row__control">
               <button
                 type="button"
-                aria-label={`pick-session-${s.id}`}
-                className="rounded border px-2 py-1 text-left text-sm"
-                onClick={() => {
-                  setSessionId(s.id);
-                  setPickerInput(s.id);
-                }}
+                aria-label="session-picker-use"
+                className="btn btn--sm"
+                onClick={() => setSessionId(pickerInput.trim())}
               >
-                {s.id}
-                {s.title ? ` — ${s.title}` : ""}
+                Use session
               </button>
-            </li>
-          ))}
-        </ul>
+              <button
+                type="button"
+                aria-label="session-picker-refresh"
+                className="btn btn--sm"
+                onClick={() => void refreshPicker()}
+              >
+                Refresh list
+              </button>
+            </div>
+          </div>
+          <div className="settings-row settings-row--stacked">
+            <div className="settings-row__text">
+              <span className="settings-row__title">Recent sessions</span>
+              <ul className="mt-1 flex max-h-40 flex-col gap-1 overflow-auto">
+                {sessions.map((s) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      aria-label={`pick-session-${s.id}`}
+                      className="btn btn--sm"
+                      onClick={() => {
+                        setSessionId(s.id);
+                        setPickerInput(s.id);
+                      }}
+                    >
+                      {s.id}
+                      {s.title ? ` — ${s.title}` : ""}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section aria-label="ops-panel" className="rounded border p-4">
-        <h2 className="text-sm font-semibold">Ops panel</h2>
+      <section aria-label="ops-panel" className="settings-section">
+        <h2 className="settings-section__heading">Ops panel</h2>
 
-        <h3 className="mt-3 text-sm font-semibold">Transcript</h3>
+        <h3 className="settings-section__heading">Transcript</h3>
+        <div className="settings-group">
         <div className="mt-1 flex flex-wrap gap-2">
           <button
             type="button"
             aria-label="session-op-reset"
             disabled={needSession || busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Reset session",
@@ -245,7 +283,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-compact"
             disabled={needSession || busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Compact session",
@@ -260,7 +298,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-cleanup-empty"
             disabled={busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Cleanup empty sessions",
@@ -275,7 +313,7 @@ export default function SessionOpsPage() {
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input
             aria-label="rewind-message-id"
-            className="rounded border px-2 py-1 text-sm"
+            className="settings-input"
             placeholder="message id"
             value={messageId}
             onChange={(e) => setMessageId(e.target.value)}
@@ -284,7 +322,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-rewind"
             disabled={needSession || busy || !messageId.trim()}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Rewind to message",
@@ -296,14 +334,16 @@ export default function SessionOpsPage() {
             Rewind-to-message
           </button>
         </div>
+        </div>
 
-        <h3 className="mt-4 text-sm font-semibold">Lineage</h3>
+        <div className="settings-group">
+        <h3 className="settings-section__heading">Lineage</h3>
         <div className="mt-1 flex flex-wrap gap-2">
           <button
             type="button"
             aria-label="session-op-fork"
             disabled={needSession || busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Fork session",
@@ -316,7 +356,7 @@ export default function SessionOpsPage() {
           </button>
           <input
             aria-label="branch-switch-target"
-            className="rounded border px-2 py-1 text-sm"
+            className="settings-input"
             placeholder="branch target"
             value={branchTarget}
             onChange={(e) => setBranchTarget(e.target.value)}
@@ -325,7 +365,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-branch-switch"
             disabled={needSession || busy || !branchTarget.trim()}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Branch-switch",
@@ -338,13 +378,15 @@ export default function SessionOpsPage() {
           </button>
         </div>
 
-        <h3 className="mt-4 text-sm font-semibold">Compaction branch / restore</h3>
+        </div>
+        <div className="settings-group">
+        <h3 className="settings-section__heading">Compaction branch / restore</h3>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <button
             type="button"
             aria-label="session-op-compaction-branch"
             disabled={needSession || busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Compaction branch",
@@ -357,7 +399,7 @@ export default function SessionOpsPage() {
           </button>
           <input
             aria-label="compaction-restore-checkpoint"
-            className="rounded border px-2 py-1 text-sm"
+            className="settings-input"
             placeholder="checkpoint id"
             value={checkpointId}
             onChange={(e) => setCheckpointId(e.target.value)}
@@ -366,7 +408,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-compaction-restore"
             disabled={needSession || busy || !checkpointId.trim()}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Compaction restore",
@@ -377,16 +419,18 @@ export default function SessionOpsPage() {
           >
             Compaction restore
           </button>
-          <a className="text-sm underline" href="/checkpoints">
+          <a className="settings-row__value" href="/checkpoints">
             Verify checkpoints
           </a>
         </div>
 
-        <h3 className="mt-4 text-sm font-semibold">Goals</h3>
+        </div>
+        <div className="settings-group">
+        <h3 className="settings-section__heading">Goals</h3>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <input
             aria-label="session-goals-input"
-            className="rounded border px-2 py-1 text-sm"
+            className="settings-input"
             placeholder="goal text"
             value={goals}
             onChange={(e) => setGoals(e.target.value)}
@@ -395,7 +439,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-goals-set"
             disabled={needSession || busy || !goals.trim()}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Set goals",
@@ -410,7 +454,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-goals-clear"
             disabled={needSession || busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Clear goals",
@@ -423,13 +467,15 @@ export default function SessionOpsPage() {
           </button>
         </div>
 
-        <h3 className="mt-4 text-sm font-semibold">Suggestions</h3>
+        </div>
+        <div className="settings-group">
+        <h3 className="settings-section__heading">Suggestions</h3>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <button
             type="button"
             aria-label="session-op-suggestions-list"
             disabled={needSession || busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               runDirect(async () => {
                 const res = await listSuggestions(sessionId);
@@ -442,7 +488,7 @@ export default function SessionOpsPage() {
           </button>
           <input
             aria-label="suggestion-text-input"
-            className="rounded border px-2 py-1 text-sm"
+            className="settings-input"
             placeholder="suggestion text"
             value={suggestionText}
             onChange={(e) => setSuggestionText(e.target.value)}
@@ -451,7 +497,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-suggestions-add"
             disabled={needSession || busy || !suggestionText.trim()}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Add suggestion",
@@ -474,7 +520,7 @@ export default function SessionOpsPage() {
                   type="button"
                   aria-label={`suggestion-resolve-${s.id}`}
                   disabled={needSession || busy}
-                  className="rounded border px-2 py-0.5 text-xs disabled:opacity-50"
+                  className="btn btn--xs"
                   onClick={() =>
                     stage(
                       "Resolve suggestion",
@@ -490,11 +536,13 @@ export default function SessionOpsPage() {
           ))}
         </ul>
 
-        <h3 className="mt-4 text-sm font-semibold">Groups</h3>
+        </div>
+        <div className="settings-group">
+        <h3 className="settings-section__heading">Groups</h3>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <input
             aria-label="group-name-input"
-            className="rounded border px-2 py-1 text-sm"
+            className="settings-input"
             placeholder="group name"
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
@@ -503,7 +551,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-groups-create"
             disabled={busy || !groupName.trim()}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage("Create group", `Create group ${groupName.trim()}?`, () =>
                 createSessionGroup(groupName.trim(), () => true),
@@ -516,7 +564,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-groups-refresh"
             disabled={busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() => void refreshGroups()}
           >
             Refresh groups
@@ -530,7 +578,7 @@ export default function SessionOpsPage() {
                 type="button"
                 aria-label={`group-rename-${g.id}`}
                 disabled={busy || !groupName.trim()}
-                className="rounded border px-2 py-0.5 text-xs disabled:opacity-50"
+                className="btn btn--xs"
                 onClick={() =>
                   stage("Rename group", `Rename group ${g.name}?`, () =>
                     renameSessionGroup(g.id, groupName.trim(), () => true),
@@ -543,7 +591,7 @@ export default function SessionOpsPage() {
                 type="button"
                 aria-label={`group-delete-${g.id}`}
                 disabled={busy}
-                className="rounded border px-2 py-0.5 text-xs disabled:opacity-50"
+                className="btn btn--xs"
                 onClick={() =>
                   stage("Delete group", `Delete group ${g.name}?`, () =>
                     deleteSessionGroup(g.id, () => true),
@@ -556,11 +604,13 @@ export default function SessionOpsPage() {
           ))}
         </ul>
 
-        <h3 className="mt-4 text-sm font-semibold">Companion</h3>
+        </div>
+        <div className="settings-group">
+        <h3 className="settings-section__heading">Companion</h3>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <input
             aria-label="companion-question-input"
-            className="rounded border px-2 py-1 text-sm"
+            className="settings-input"
             placeholder="side question"
             value={companionQuestion}
             onChange={(e) => setCompanionQuestion(e.target.value)}
@@ -569,7 +619,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-companion-ask"
             disabled={needSession || busy || !companionQuestion.trim()}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() => void runDirect(() => companionAsk(sessionId, companionQuestion.trim()))}
           >
             Companion ask
@@ -578,7 +628,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-companion-state"
             disabled={needSession || busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               runDirect(async () => {
                 const st = await companionState(sessionId);
@@ -593,7 +643,7 @@ export default function SessionOpsPage() {
             type="button"
             aria-label="session-op-companion-reset"
             disabled={needSession || busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+            className="btn btn--sm"
             onClick={() =>
               stage(
                 "Companion reset",
@@ -613,15 +663,16 @@ export default function SessionOpsPage() {
               : ""}
           </p>
         )}
+        </div>
       </section>
 
       {resultText && (
-        <pre aria-label="op-result" className="overflow-auto rounded border p-3 text-xs">
+        <pre aria-label="op-result" className="settings-group overflow-auto p-3 text-xs">
           {resultText}
         </pre>
       )}
       {errorText && (
-        <p role="alert" aria-label="op-error" className="rounded border p-3 text-sm">
+        <p role="alert" aria-label="op-error" className="sessions-error settings-group p-3 text-sm">
           {errorText}
         </p>
       )}
@@ -631,17 +682,17 @@ export default function SessionOpsPage() {
           role="dialog"
           aria-modal="true"
           aria-label="staged-op-confirm"
-          className="fixed inset-0 flex items-center justify-center bg-black/40"
+          className="fixed inset-0 z-30 flex items-center justify-center bg-black/40"
         >
-          <div className="rounded border bg-white p-4">
-            <h2 className="text-sm font-semibold">{pending.title}</h2>
+          <div className="settings-group bg-white p-4" role="document">
+            <h2 className="settings-section__heading">{pending.title}</h2>
             <p className="mt-1 text-sm">{pending.detail}</p>
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
                 aria-label="confirm-staged-op"
                 disabled={busy}
-                className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+                className="btn btn--sm"
                 onClick={() => void settle(pending)}
               >
                 Confirm
@@ -649,7 +700,7 @@ export default function SessionOpsPage() {
               <button
                 type="button"
                 aria-label="cancel-staged-op"
-                className="rounded border px-3 py-1 text-sm"
+                className="btn btn--sm"
                 onClick={() => setPending(null)}
               >
                 Cancel

@@ -76,6 +76,53 @@ _GREETING_RE = re.compile(
 
 _WORD_RE = re.compile(r"[A-Za-z0-9']+")
 
+# Bug-2 lane (2026-10-04): a bare single-verb "open" (no object) must
+# clarify, never task. Journal 06:59:38: bare "Open." routed task/coding
+# because TASK_HINTS scores any bare ``\bopen\b`` as partial task hints
+# (0.5 -> coding) and no local action matches a bare verb (open_website
+# needs a domain/shortcut, open_document needs a document word) — a
+# long-standing shape since the original voice bridge (aa7d1b9f), not an
+# onset regression. The chat mode lets the brain ask "open what?" (spoken,
+# never typed); task would stage a nonsense coding confirm. Checked before
+# the question rule and before classification, so even a classifier
+# `coding` verdict for a bare open can never become a voice task. An
+# object ("Open YouTube.", "Open a text document.") never matches and
+# keeps its existing owner. No arm/wake state is touched here (armless
+# pure decision function; arm-preserving repeat behavior unchanged).
+_BARE_OPEN_RE = re.compile(
+    r"^(?:(?:hey|ok|okay)\s+)?(?:qubit[,.]?\s+)?open[\s.!?]*$",
+    re.IGNORECASE)
+
+# Fix lane 2026-10-04 (bug 3): the guard above covers exactly "open", but
+# journal 2026-10-04 shows "Open it, hey Qubit, open it." routing
+# task/coding — open + a bare pronoun/no-object is the same no-object
+# shape (no local action matches it: open_website needs a domain/shortcut,
+# open_document needs a document word) and must clarify, never task.
+# Token-vocabulary check (punctuation/wake-insensitive): every word must be
+# opener, pronoun, politeness, or wake address — any real object
+# ("youtube", "document", "file", "tab", ...) falls through untouched.
+_BARE_OPEN_WORDS = frozenset({
+    "open", "it", "that", "this", "them", "these", "those",
+    "please", "for", "me", "you", "us", "now",
+    "hey", "ok", "okay", "qubit",
+})
+
+
+def _is_bare_open(text: str) -> bool:
+    """True for open with no object (bare verb, pronoun, or politeness).
+
+    "open", "open it", "open it please", "open that for me", and the
+    journal shape "Open it, hey Qubit, open it." are all bare. "open
+    youtube", "open this document", "open it in a tab" carry a real object
+    and return False. Pure and never raises.
+    """
+    try:
+        toks = re.sub(r"[^a-z0-9 ]", " ", (text or "").lower()).split()
+        return (bool(toks) and "open" in toks
+                and all(t in _BARE_OPEN_WORDS for t in toks))
+    except Exception:
+        return False
+
 
 def _system_is_actionable(text: str) -> bool:
     """True only for a short, anchored system command -- never a greeting.
@@ -222,6 +269,14 @@ class VoiceRouter:
         # (including clarification); never fall through to task/chat.
         if has_selection:
             return self._decide_selection(text)
+
+        # Rule 3b -- bare "open" (verb alone, or verb + pronoun /
+        # politeness with no object) clarifies, never tasks (bug-2 lane
+        # 2026-10-04, extended fix lane 2026-10-04 for open + bare
+        # pronoun; see _BARE_OPEN_RE / _is_bare_open).
+        if _BARE_OPEN_RE.match(text) or _is_bare_open(text):
+            return RouteDecision("chat", reason="bare_open_clarify",
+                                 task_text=text, intent="clarify")
 
         # Rule 4 -- no selection, a question is answered, never typed. An
         # anchored system ask ("what can you do", "how do i use you") is a

@@ -686,7 +686,7 @@ export default function CronPage() {
         if (
           jobsRequestGenerationRef.current === generation &&
           selectedProfileRef.current === profile
-        ) setJobs(nextJobs);
+        ) setJobs(Array.isArray(nextJobs) ? nextJobs : []);
       })
       .catch(() => {
         if (
@@ -707,7 +707,7 @@ export default function CronPage() {
   useEffect(() => {
     api
       .getProfiles()
-      .then((res) => setProfiles(res.profiles))
+      .then((res) => setProfiles(res?.profiles ?? []))
       .catch(() => setProfiles([]));
   }, []);
 
@@ -743,8 +743,10 @@ export default function CronPage() {
       api.getModelOptions(resourceProfile).catch(() => null),
     ]).then(([skills, toolsets, options]) => {
       if (cancelled) return;
-      setAvailableSkills([...skills].sort((a, b) => a.name.localeCompare(b.name)));
-      setAvailableToolsets([...toolsets].sort((a, b) => a.name.localeCompare(b.name)));
+      const skillList = Array.isArray(skills) ? skills : [];
+      const toolsetList = Array.isArray(toolsets) ? toolsets : [];
+      setAvailableSkills([...skillList].sort((a, b) => a.name.localeCompare(b.name)));
+      setAvailableToolsets([...toolsetList].sort((a, b) => a.name.localeCompare(b.name)));
       setModelOptions(options);
     });
     return () => {

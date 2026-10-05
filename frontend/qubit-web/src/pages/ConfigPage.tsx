@@ -218,7 +218,7 @@ export default function ConfigPage() {
     // so the header path comes from status, not /api/config/raw.
     api
       .getStatus()
-      .then((resp) => setConfigPath((prev) => prev ?? resp.config_path))
+      .then((resp) => setConfigPath((prev) => prev ?? resp?.config_path ?? null))
       .catch(() => {});
   }, []);
 

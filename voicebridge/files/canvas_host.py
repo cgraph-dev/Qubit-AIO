@@ -507,6 +507,97 @@ def snapshot(cfg: Any, node_id: str, *, confirmed: bool = False,
             "authority": "voicebridge canvas host (state-home canvas/)"}
 
 
+def write_text(cfg: Any, path: str, text: Any, *, confirmed: bool = False,
+               requested_by: str = "dashboard:user") -> Dict[str, Any]:
+    """Save (create or replace) one canvas-root file (confirm-gated, audited).
+
+    The computer/workspace save surface. Delegates to :func:`add_file` — the
+    one confined writer — so the MAX_CONTENT_BYTES limit, ``.tmp`` atomic
+    replace, special-file refusal and traversal confinement are never
+    duplicated. ``text`` must be str (the upstream ``write`` schema is text).
+    """
+    if not isinstance(text, str):
+        raise CanvasError(BAD_PATH_CODE, "text must be a string")
+    return add_file(cfg, path, text, confirmed=confirmed,
+                    requested_by=requested_by)
+
+
+def make_dir(cfg: Any, path: str, *, confirmed: bool = False,
+             requested_by: str = "dashboard:user") -> Dict[str, Any]:
+    """Create one canvas-root folder (confirm-gated, confined, audited)."""
+    _require_confirmed(confirmed, "mkdir")
+    if _estop_engaged(cfg):
+        _refuse_estop("mkdir")
+    target = _resolve(cfg, path)
+    if target.exists():
+        if target.is_dir():
+            return {"state": "OK", "path": str(
+                target.relative_to(root(cfg).resolve()))[:300],
+                "created": False, "existed": True,
+                "authority": "voicebridge canvas host (state-home canvas/)"}
+        raise CanvasError(BAD_PATH_CODE, f"{path!r} exists and is not a folder")
+    try:
+        target.mkdir(parents=False, exist_ok=False)
+    except OSError as exc:
+        raise CanvasError(IO_CODE, f"cannot create folder ({exc})")
+    _audit("mkdir", requested_by, {})
+    rel = str(target.relative_to(root(cfg).resolve()))
+    return {"state": "OK", "path": rel[:300], "created": True,
+            "existed": False,
+            "authority": "voicebridge canvas host (state-home canvas/)"}
+
+
+def list_dir(cfg: Any, path: str = "") -> Dict[str, Any]:
+    """List one canvas-root folder (read-only, confined, bounded).
+
+    Empty ``path`` lists the root. Entries are direct children only, so the
+    shape matches the upstream ``ComputerDirectory`` (folders + files).
+    """
+    base = root(cfg).resolve()
+    if str(path or "").strip() in ("", "/", "."):
+        target = base
+        rel = ""
+    else:
+        target = _resolve(cfg, path)
+        rel = str(target.relative_to(base))
+    if not target.exists():
+        raise CanvasError(NOT_FOUND_CODE, f"no canvas folder {path!r}")
+    if not target.is_dir():
+        raise CanvasError(BAD_PATH_CODE, f"{path!r} is not a folder")
+    entries: List[Dict[str, Any]] = []
+    truncated = False
+    try:
+        children = sorted(target.iterdir(), key=lambda p: p.name)
+    except OSError as exc:
+        raise CanvasError(IO_CODE, f"cannot list folder ({exc})")
+    for child in children:
+        try:
+            child.relative_to(base)
+            _refuse_special(child, dir_ok=True)
+        except CanvasError:
+            continue
+        try:
+            is_dir = child.is_dir()
+        except OSError:
+            continue
+        row: Dict[str, Any] = {"name": child.name[:120],
+                               "path": str(child.relative_to(base))[:300],
+                               "kind": "directory" if is_dir else "file"}
+        if not is_dir:
+            try:
+                row["size"] = int(child.stat().st_size)
+            except OSError:
+                row["size"] = 0
+        entries.append(row)
+        if len(entries) >= MAX_LIST_ENTRIES:
+            truncated = True
+            break
+    _audit("list_dir", "qubit", {"count": str(len(entries))})
+    return {"state": "OK", "path": rel[:300] or "/", "entries": entries,
+            "truncated": truncated, "root": CANVAS_ROOT_LABEL,
+            "authority": "voicebridge canvas host (state-home canvas/)"}
+
+
 # ------------------------------------------------------- gateway entry points
 def _gw_list(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
     return list_files(cfg)
@@ -566,6 +657,37 @@ def _gw_snapshot(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
                     confirmed=_confirmed(params), requested_by=_by(params))
 
 
+# ---------------------------------------------- computer/ workspace gateway
+# The computer-file-mutations surface (upstream `/api/computer/files/*`:
+# list / read / write / mkdir). Every op reuses the ONE confined canvas host
+# root above — no parallel filesystem store, no path outside the root.
+def _gw_computer_files_list(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    return list_dir(cfg, str(params.get("path", "") or ""))
+
+
+def _gw_computer_files_read(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    path = str(params.get("path", "") or "")
+    if not path.strip():
+        raise CanvasError(BAD_PATH_CODE, "path is required")
+    return get_file(cfg, path)
+
+
+def _gw_computer_files_write(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    path = str(params.get("path", "") or "")
+    if not path.strip():
+        raise CanvasError(BAD_PATH_CODE, "path is required")
+    return write_text(cfg, path, params.get("text", ""),
+                      confirmed=_confirmed(params), requested_by=_by(params))
+
+
+def _gw_computer_files_mkdir(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    path = str(params.get("path", "") or "")
+    if not path.strip():
+        raise CanvasError(BAD_PATH_CODE, "path is required")
+    return make_dir(cfg, path, confirmed=_confirmed(params),
+                    requested_by=_by(params))
+
+
 #: Gateway method name -> handler (registered onto each bridge registry by the
 #: family bridge in ``voicebridge/qubit_compat.py`` — the one wiring owner).
 GATEWAY_METHODS = {
@@ -578,4 +700,9 @@ GATEWAY_METHODS = {
     "canvas.hide": _gw_hide,
     "canvas.navigate": _gw_navigate,
     "canvas.snapshot": _gw_snapshot,
+    # computer/ workspace file mutations (same confined canvas root).
+    "computer.files.list": _gw_computer_files_list,
+    "computer.files.read": _gw_computer_files_read,
+    "computer.files.write": _gw_computer_files_write,
+    "computer.files.mkdir": _gw_computer_files_mkdir,
 }

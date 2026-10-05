@@ -230,10 +230,21 @@ class PtySessionRegistry:
         self._sessions.pop(oldest.key, None)
         asyncio.create_task(oldest.close())
 
-    async def close_all(self) -> None:
+    async def close_all(self, *, keep_detached: bool = False) -> None:
+        """Close every registry session.
+
+        ``keep_detached=True`` spares sessions whose viewer already went away
+        (a browser reload). Those hold a still-running agent turn: killing them
+        here would destroy work the operator is mid-way through every time the
+        backend restarts (the "I had to type continue again" symptom). They
+        stay under the idle-TTL reaper and a reconnect re-attaches to them.
+        """
         for key in list(self._sessions):
             # Same overlap window as reap_idle: an in-flight reap may have popped
             # a snapshot key while we awaited an earlier close().
             session = self._sessions.pop(key, None)
-            if session is not None:
-                await session.close()
+            if session is None:
+                continue
+            if keep_detached and not session.attached:
+                continue
+            await session.close()

@@ -77760,6 +77760,7 @@ var init_useConfigSync = __esm({
     "use strict";
     import_react57 = __toESM(require_react(), 1);
     init_details();
+    init_env();
     init_platform();
     init_rpc();
     init_createGatewayEventHandler();
@@ -77800,12 +77801,15 @@ var init_useConfigSync = __esm({
     FALSEY_MOUSE = /* @__PURE__ */ new Set(["0", "false", "no", "off"]);
     TRUTHY_MOUSE_ALL = /* @__PURE__ */ new Set(["1", "true", "yes", "on", "all", "full", "any"]);
     hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
-    normalizeMouseTracking = (display) => {
+    normalizeMouseTracking = (display, bootPolicy = MOUSE_TRACKING) => {
       const raw = hasOwn(display, "mouse_tracking") ? display.mouse_tracking : display.tui_mouse;
       if (raw === false || raw === 0) {
         return "off";
       }
-      if (raw === true || raw === void 0 || raw === null) {
+      if (raw === void 0 || raw === null) {
+        return bootPolicy;
+      }
+      if (raw === true) {
         return "all";
       }
       if (typeof raw === "number") {

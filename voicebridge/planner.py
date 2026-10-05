@@ -240,6 +240,27 @@ def _validate(tool: Any, args: Any, confidence: Any,
             log.info("planner.no_decision reason=missing_required "
                      "tool=%s arg=%s", tool, k)
             return None
+    if tool == "local.open_app":
+        # Lane 2 (2026-10-03, journal test-4 09:54:51): the headless worker
+        # picked ``local.open_app {app: notepad.exe}`` for a CREATE-FILE task
+        # — a Windows binary on a Linux box, ending in narration instead of
+        # a file. Two narrow gates (validate-only; the prompt is untouched):
+        # (1) no ``.exe`` target off Windows — per-OS gating, never offered;
+        # (2) open_app launches, never creates — a create-file-shaped request
+        # must fail closed here (the deterministic create_document action or
+        # a file tool owns it), never resolve to a launcher.
+        app = str((args.get("app") or ""))
+        if app.lower().endswith(".exe"):
+            import sys as _sys
+            if _sys.platform != "win32":
+                log.info("planner.no_decision reason=windows_binary "
+                         "tool=%s app=%s", tool, app)
+                return None
+        if re.search(r"\bcreat(?:e|es|ing|ion|ions)?\b",
+                     str(text or ""), re.IGNORECASE):
+            log.info("planner.no_decision reason=open_app_for_create_file "
+                     "tool=%s", tool)
+            return None
     try:
         conf = float(confidence)
     except (TypeError, ValueError):

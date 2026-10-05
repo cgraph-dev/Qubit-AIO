@@ -222,6 +222,30 @@ describe("WebChatPage (SSE transport)", () => {
       container.querySelector('[data-testid="webchat-session"]')?.textContent,
     ).toContain("webchat-new");
   });
+
+  it("keeps the partial reply when the stream breaks mid-flight (no crash)", async () => {
+    // The stream sends deltas, then errors before `done`. The page must keep
+    // the partial assistant text, surface the typed error, and stay mounted —
+    // never blank the transcript or throw on the truncated frame.
+    streamChatTurn.mockImplementationOnce(
+      async (_body: unknown, handlers: StreamHandlers) => {
+        handlers.onStart?.({ event: "start", session_id: "webchat-1" });
+        handlers.onDelta?.("partial answ", { event: "delta" });
+        handlers.onDelta?.("er so far", { event: "delta" });
+        handlers.onError?.({ event: "error", code: "STREAM_BROKEN", detail: "socket closed" });
+      },
+    );
+    await renderWebchat();
+    await typeAndSend("stream please");
+
+    expect(container.textContent).toContain("partial answer so far");
+    expect(
+      container.querySelector('[data-testid="webchat-error"]')?.textContent,
+    ).toContain("socket closed");
+    expect(
+      container.querySelector('[data-testid="webchat-retry"]'),
+    ).not.toBeNull();
+  });
 });
 
 describe("ocFamilyWebchatApi ROUTES manifest (reuse-only)", () => {

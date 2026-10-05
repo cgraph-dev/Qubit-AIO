@@ -141,14 +141,25 @@ def _is_binary(sample: bytes) -> bool:
 
 # -------------------------------------------------------------------- ops
 def _public_dir(entry: Path, root: Path) -> Dict[str, Any]:
+    """One directory row.
+
+    ``modified``/``mtime`` carry the real POSIX mtime (seconds). The console
+    renders it directly, so returning the field is what keeps the Files table
+    from falling back to an epoch-zero "Jan 1, 1970" cell; a stat failure
+    reports ``0`` rather than inventing a time.
+    """
+    modified = 0
     try:
         is_dir = entry.is_dir()
-        size = 0 if is_dir else entry.stat().st_size
+        st = entry.stat()
+        size = 0 if is_dir else st.st_size
+        modified = int(st.st_mtime)
     except OSError:
         is_dir, size = False, 0
     return {"name": entry.name[:120],
             "rel": redact_spec(str(entry.relative_to(root)))[:300],
-            "dir": bool(is_dir), "size": int(size)}
+            "dir": bool(is_dir), "size": int(size),
+            "modified": modified, "mtime": modified}
 
 
 def list_dir(cfg: Any, path: str, *, depth: int = 1) -> Dict[str, Any]:

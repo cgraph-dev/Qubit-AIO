@@ -582,10 +582,15 @@ function pluginPath(name: string): string {
  * Tickets are single-use and TTL=30s — every WS connect attempt must
  * fetch a fresh ticket.
  */
-export async function getWsTicket(): Promise<{ ticket: string; ttl_seconds: number }> {
+export async function getWsTicket(
+  scope = "pty",
+  session = "",
+): Promise<{ ticket: string; ttl_seconds: number }> {
   const res = await fetch(`${BASE}${withApiPrefix("/api/auth/ws-ticket")}`, {
     method: "POST",
     credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(session ? { scope, session } : { scope }),
   });
   if (!res.ok) {
     throw new Error(`/api/auth/ws-ticket: HTTP ${res.status}`);
@@ -598,9 +603,11 @@ export async function getWsTicket(): Promise<{ ticket: string; ttl_seconds: numb
  * connect. In gated mode mints a fresh single-use ticket; in loopback
  * mode returns the injected session token.
  */
-export async function buildWsAuthParam(): Promise<[string, string]> {
+export async function buildWsAuthParam(
+  session = "",
+): Promise<[string, string]> {
   if (window.__QUBIT_AUTH_REQUIRED__) {
-    const { ticket } = await getWsTicket();
+    const { ticket } = await getWsTicket("pty", session);
     return ["ticket", ticket];
   }
   const token = window.__QUBIT_SESSION_TOKEN__ ?? "";
@@ -616,7 +623,7 @@ export async function buildWsAuthParam(): Promise<[string, string]> {
  * Auth, in both modes, exactly as ``fetchJSON`` does it:
  *  - loopback / ``--insecure``: attach the ``X-Qubit-Session-Token`` header.
  *  - gated OAuth: no token header (it's absent by design); the
- *    ``hermes_session_at`` cookie rides along via ``credentials: 'include'``.
+ *    the session cookie rides along via ``credentials: 'include'``.
  *
  * Unlike ``fetchJSON`` this does NOT parse the body, does NOT throw on
  * non-2xx (the caller decides — a 404 on a download is meaningful), and
@@ -761,6 +768,49 @@ export class WsTicketError extends Error {
   }
 }
 
+/** True for a failure that means "the backend is unreachable", not "the request
+ *  was refused". A restart (`voicebridge run` bouncing) surfaces here as a
+ *  `TypeError: Failed to fetch` / NetworkError, and those are the only errors
+ *  worth retrying — a typed refusal would fail identically on every attempt. */
+export function isTransientNetworkError(err: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  const name = err instanceof Error ? err.name : "";
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  if (name === "AbortError") return false;
+  return (
+    name === "TypeError" ||
+    /networkerror|failed to fetch|load failed|network request failed|connection (refused|reset)|econnrefused|socket hang up/i.test(
+      message,
+    )
+  );
+}
+
+/** Bounded exponential backoff for the "backend is restarting" window.
+ *  Attempts ~5 times over ~7s total, so a normal service bounce is ridden out
+ *  without the user refreshing, while a backend that is genuinely down stops
+ *  being hammered. `shouldStop` lets a component cancel a cycle on unmount. */
+export async function withBackoff<T>(
+  fn: () => Promise<T>,
+  opts: { attempts?: number; baseMs?: number; maxMs?: number; shouldStop?: () => boolean } = {},
+): Promise<T> {
+  const attempts = Math.max(1, opts.attempts ?? 5);
+  const baseMs = Math.max(1, opts.baseMs ?? 400);
+  const maxMs = Math.max(baseMs, opts.maxMs ?? 4000);
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i += 1) {
+    if (opts.shouldStop?.()) throw lastErr ?? new Error("aborted");
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientNetworkError(err) || i === attempts - 1) throw err;
+      const delay = Math.min(maxMs, baseMs * 2 ** i);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw lastErr ?? new Error("withBackoff failed");
+}
+
 /** Typed model-assignment failure. Qubit routes the "main model" through the
  *  real model-profile registry (`GET /api/terminal/profiles` +
  *  `PUT /api/terminal/profile`); a provider/model pair with no registered
@@ -808,6 +858,7 @@ export const api = {
   wsTicket: async (
     profileId?: string,
     scope?: "pty" | "rpc" | "stt",
+    resume?: string,
   ): Promise<WsTicketGrant> => {
     const res = await authedFetch("/api/auth/ws-ticket", {
       method: "POST",
@@ -815,6 +866,12 @@ export const api = {
       body: JSON.stringify({
         ...(profileId ? { profile: profileId } : {}),
         ...(scope ? { scope } : {}),
+        // A resumed /chat must report the STORED session model in its grant
+        // (the server overlays `sessions.model`), not the config default —
+        // otherwise the MODEL card / picker show one model while the terminal
+        // runs another (live 2026-10-05: card said deepseek, session ran
+        // qubit-brain4).
+        ...(resume ? { resume } : {}),
       }),
     });
     let body: Record<string, unknown> = {};
@@ -2112,7 +2169,7 @@ export const api = {
     fetchJSON<{ ok: boolean; theme: string }>("/api/dashboard/theme", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ theme: name }),
     }),
   getFontPref: () =>
     fetchJSON<DashboardFontResponse>("/api/dashboard/font"),
@@ -3578,6 +3635,13 @@ export interface ChatStoreMessagesResponse {
   total: number;
 }
 
+export interface InterruptedTurn {
+  prompt: string;
+  attempts: number;
+  started_at: number;
+  auto_continue?: boolean;
+}
+
 export interface ChatStoreSessionResponse {
   session: ChatStoreSession;
   messages: ChatStoreMessage[];
@@ -3585,6 +3649,9 @@ export interface ChatStoreSessionResponse {
   /** Per-session preferences from the session `model_config` metadata
    * (e.g. `reasoning`). */
   meta?: Record<string, unknown>;
+  /** A turn cut short by a process death (backend restart). Present only while
+   * the marker survives, so the client can offer to resume it. */
+  interrupted_turn?: InterruptedTurn | null;
 }
 
 export interface ChatStoreCreateResponse {

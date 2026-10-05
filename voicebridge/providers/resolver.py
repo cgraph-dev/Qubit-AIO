@@ -150,6 +150,16 @@ class ModelProfile:
     rollback_to: str = ""
     provenance: str = ""
     license: str = ""
+    # Stale-window correction audit (9U, 2026-10-03): a declared
+    # ``context_tokens`` corrected upward to a freshly probed window stamps
+    # WHEN (unix time), WHAT the probe said, and WHERE it came from. An
+    # explicitly user-set window (staged at activation, ``explicit:<actor>``)
+    # or a window changed after the probe stamp always wins over a later
+    # auto-correction — the stamp is what lets the repair tell "stale" from
+    # "deliberate". Legacy records simply carry the zero defaults.
+    context_probed_at: float = 0.0
+    context_probed_value: int = 0
+    context_probe_source: str = ""
 
     def validate(self, cfg: Any = None) -> Dict[str, str]:
         if not self.id:
@@ -1166,10 +1176,12 @@ def terminal_context_guard(cfg: Any, *, profile_id: Optional[str] = None,
             # context — the exact value ``/agent/api/model/info`` reports. The
             # resolved real window is an advertised ceiling used for the floor
             # check only; a static registry that advertises more than the
-            # configured profile (deepseek-v4-flash: advertised 1M vs configured
-            # 200k) must not override the effective/config value, or the two
-            # dashboard authorities disagree. The advertised value stays for
-            # audit.
+            # configured profile must not override the effective/config value,
+            # or the two dashboard authorities disagree. The advertised value
+            # stays for audit. (The 2026-10-03 stale-window repair corrected
+            # the known instance of this disagreement — deepseek-v4-flash
+            # declared 200k vs probed 1M — at the profile, so configured and
+            # advertised now agree instead of papering over the drift here.)
             base["real_context_tokens"] = real
             base["context_verified"] = True
             base["declared_context_tokens"] = context

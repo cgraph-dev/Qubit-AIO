@@ -15,7 +15,7 @@
  * de-branded to the Qubit namespace (`qubit.pty.*`).
  */
 
-const PTY_ATTACH_TOKEN_KEY = "qubit.pty.token.chat";
+export const PTY_ATTACH_TOKEN_KEY = "qubit.pty.token.chat";
 
 /** The token this document claimed — a reconnect must not re-request the lock
  *  (Web Locks are not reentrant, so asking twice in one document deadlocks). */

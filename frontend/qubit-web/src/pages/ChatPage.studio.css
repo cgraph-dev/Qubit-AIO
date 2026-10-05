@@ -1,0 +1,365 @@
+/* Qubit Chat console: theme-led surfaces, quiet depth, compact controls. */
+.qchat {
+  --qchat-accent: var(--color-primary, var(--midground-base));
+  --qchat-violet: color-mix(in srgb, #b89aff 82%, var(--qchat-accent));
+  --qchat-cyan: color-mix(in srgb, #54dcf1 86%, var(--qchat-accent));
+  --qchat-amber: color-mix(in srgb, #ffb85e 90%, var(--qchat-accent));
+  --qchat-ink: var(--color-primary-foreground, var(--background-base));
+  --qchat-surface: var(--color-card, color-mix(in srgb, var(--midground-base) 4%, var(--background-base)));
+  --qchat-raised: color-mix(in srgb, var(--midground-base) 6%, var(--background-base));
+  --qchat-line: var(--color-border, color-mix(in srgb, var(--midground-base) 15%, transparent));
+  --qchat-muted: color-mix(in srgb, var(--midground-base) 62%, var(--background-base));
+  --qchat-wash: color-mix(in srgb, var(--qchat-accent) 9%, transparent);
+  --qchat-radius: var(--theme-radius, .7rem);
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: .55rem;
+  color: var(--midground-base);
+  font-family: var(--theme-font-sans, system-ui, sans-serif);
+  font-size: var(--theme-base-size, 15px);
+  line-height: var(--theme-line-height, 1.45);
+  letter-spacing: var(--theme-letter-spacing, 0);
+}
+.qchat__workspace { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; gap: .7rem; }
+.qchat__conversation {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(.7rem, 1vw, 1rem);
+  border: 1px solid var(--qchat-line);
+  border-radius: var(--qchat-radius);
+  background: var(--background-base);
+  box-shadow: 0 16px 44px rgb(0 0 0 / .14), inset 0 1px rgb(255 255 255 / .025);
+}
+.qchat__conversation::before { position: absolute; z-index: 0; inset: 0; content: ""; background: radial-gradient(ellipse at 7% 11%, color-mix(in srgb, var(--qchat-violet) 13%, transparent), transparent 39%), radial-gradient(ellipse at 94% 84%, color-mix(in srgb, var(--qchat-cyan) 10%, transparent), transparent 37%), linear-gradient(132deg, color-mix(in srgb, var(--qchat-violet) 3%, transparent), transparent 42%, color-mix(in srgb, var(--qchat-amber) 3%, transparent)); pointer-events: none; }
+.qchat__conversation > * { position: relative; z-index: 1; }
+.qchat__header {
+  display: flex;
+  min-height: 3rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: .7rem;
+  padding: 0 0 .65rem;
+  border-bottom: 1px solid var(--qchat-line);
+}
+.qchat__header > div:first-child { min-width: 0; }
+.qchat__title {
+  color: var(--midground-base);
+  font-family: var(--theme-font-display, var(--theme-font-sans, sans-serif));
+  font-size: .96rem;
+  font-weight: 650;
+  letter-spacing: -.015em;
+}
+.qchat [data-testid="chat-model"] {
+  display: inline-flex;
+  max-width: min(54vw, 32rem);
+  overflow: hidden;
+  padding: .27rem .55rem;
+  border: 1px solid var(--qchat-line);
+  border-radius: 999px;
+  background: var(--qchat-surface);
+  color: var(--qchat-muted);
+  font: 500 .65rem/1.2 var(--theme-font-mono, ui-monospace, monospace);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qchat__header > div:last-child { display: flex; gap: .25rem; padding: .13rem; border: 1px solid var(--qchat-line); border-radius: .55rem; background: var(--qchat-surface); }
+.qchat button, .qchat a { transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease, transform 140ms cubic-bezier(.2,.8,.2,1); }
+.qchat button:focus-visible, .qchat a:focus-visible, .qchat select:focus-visible, .qchat textarea:focus-visible { outline: 2px solid var(--qchat-accent); outline-offset: 2px; }
+
+/* Per-session progression remains visible without arcade-style tilt or glow. */
+.qchat__run-hud {
+  display: grid;
+  min-height: 3.15rem;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: .68rem;
+  margin-top: .45rem;
+  padding: .38rem .55rem;
+  border: 1px solid var(--qchat-line);
+  border-radius: .65rem;
+  background: var(--qchat-surface);
+  font-family: var(--theme-font-mono, ui-monospace, monospace);
+}
+.qchat__rank-mark {
+  display: grid;
+  width: 3.25rem;
+  height: 2.3rem;
+  align-content: center;
+  justify-items: center;
+  gap: .12rem;
+  border: 1px solid color-mix(in srgb, var(--qchat-accent) 35%, var(--qchat-line));
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--qchat-violet) 12%, var(--qchat-surface));
+  line-height: 1;
+  transform: none;
+  box-shadow: inset 2px 0 var(--qchat-violet), inset -2px 0 color-mix(in srgb, var(--qchat-violet) 48%, transparent);
+  animation: qchat-level-pop 360ms steps(3, end) both;
+}
+.qchat__rank-mark:hover { transform: none; box-shadow: none; }
+.qchat__rank-mark span, .qchat__run-stat span { color: var(--qchat-muted); font-size: .5rem; font-weight: 650; letter-spacing: .1em; line-height: 1.2; }
+.qchat__rank-mark strong { color: var(--qchat-violet); font-size: .9rem; font-variant-numeric: tabular-nums; line-height: 1; text-shadow: none; transform: none; }
+@keyframes qchat-level-pop { 0% { transform: translateY(3px); opacity: .5; } 65% { transform: translateY(-1px); opacity: 1; } 100% { transform: none; } }
+.qchat__rank-track { display: grid; min-width: 0; gap: .32rem; }
+.qchat__rank-copy { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: .6rem; }
+.qchat__rank-copy > span { color: var(--qchat-muted); font-size: .53rem; font-weight: 650; letter-spacing: .1em; }
+.qchat__rank-copy strong { overflow: hidden; color: var(--midground-base); font-size: .59rem; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.qchat__rank-charge { color: var(--qchat-cyan); font-variant-numeric: tabular-nums; }
+.qchat__rank-meter { display: block; height: .4rem; overflow: hidden; border: 1px solid var(--qchat-line); border-radius: 2px; background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--qchat-violet) 12%, var(--background-base)) 0 8px, var(--background-base) 8px 11px); }
+.qchat__rank-meter > span { display: block; width: 100%; height: 100%; transform: scaleX(0); transform-origin: left center; border-radius: 1px; background: repeating-linear-gradient(90deg, var(--qchat-violet) 0 8px, color-mix(in srgb, var(--qchat-cyan) 72%, var(--qchat-violet)) 8px 10px, transparent 10px 11px); transition: transform 240ms cubic-bezier(.2,.8,.2,1); }
+.qchat__run-stat { display: grid; min-width: 3.1rem; gap: .15rem; padding-left: .65rem; border-left: 1px solid var(--qchat-line); }
+.qchat__run-stat strong { color: var(--midground-base); font-size: .65rem; font-weight: 600; line-height: 1.15; }
+.qchat__run-stat--voice strong[data-state="online"] { color: var(--qchat-accent); }
+
+.qchat__voice-status {
+  display: flex;
+  max-height: 4.3rem;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: .3rem;
+  overflow: auto;
+  margin-top: .38rem;
+  padding: .25rem .35rem;
+  border: 1px solid var(--qchat-line);
+  border-radius: .55rem;
+  background: var(--qchat-surface);
+  color: var(--qchat-muted);
+  font: 500 .61rem/1.35 var(--theme-font-mono, ui-monospace, monospace);
+}
+.qchat__voice-status > span { display: inline-flex; min-height: 1.45rem; align-items: center; gap: .2rem; padding: .16rem .4rem; border: 1px solid var(--qchat-line); border-radius: 2px; background: var(--background-base); }
+.qchat__voice-status > span:nth-child(3n + 1) { border-color: color-mix(in srgb, var(--qchat-cyan) 24%, var(--qchat-line)); }
+.qchat__voice-status > span:nth-child(3n + 2) { border-color: color-mix(in srgb, var(--qchat-violet) 24%, var(--qchat-line)); }
+.qchat__voice-status > span:nth-child(3n) { border-color: color-mix(in srgb, var(--qchat-amber) 20%, var(--qchat-line)); }
+.qchat__voice-status[data-state="listening"] > span[data-testid="listener-state"] { border-color: color-mix(in srgb, var(--qchat-accent) 42%, var(--qchat-line)); background: var(--qchat-wash); color: var(--midground-base); }
+.qchat__voice-status [data-testid="voice-fallback"] { color: var(--color-warning, var(--midground-base)); }
+
+.qchat__transcript { position: relative; display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow-x: hidden; overflow-y: auto; padding: clamp(.8rem, 2vh, 1.5rem) clamp(.2rem, 2vw, 1.5rem); scrollbar-color: var(--qchat-line) transparent; scrollbar-width: thin; }
+.qchat__transcript [data-state="empty"] {
+  display: grid !important;
+  width: min(100%, 74rem);
+  min-height: 100%;
+  grid-template-columns: minmax(18rem, .9fr) minmax(28rem, 1.1fr);
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  align-items: center;
+  column-gap: clamp(3.5rem, 7vw, 8rem);
+  row-gap: 1rem;
+  margin: auto;
+  padding: clamp(1rem, 4vh, 2.8rem) clamp(.3rem, 2vw, 1rem);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+.qchat__transcript [data-state="empty"] > * { animation: qchat-stage-in 380ms cubic-bezier(.16,1,.3,1) both; }
+.qchat__transcript [data-state="empty"] > :nth-child(2) { animation-delay: 45ms; }
+.qchat__transcript [data-state="empty"] > :nth-child(3) { animation-delay: 90ms; }
+.qchat__transcript [data-state="empty"] > :nth-child(4) { animation-delay: 135ms; }
+@keyframes qchat-stage-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+.qchat__transcript [data-state="empty"] p:first-child {
+  grid-column: 1;
+  grid-row: 1;
+  max-width: 11ch;
+  margin: 0;
+  color: var(--midground-base);
+  font-family: var(--theme-font-mono, ui-monospace, monospace);
+  font-size: clamp(2.25rem, 3.35vw, 3.4rem);
+  font-weight: 750;
+  letter-spacing: -.055em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+.qchat__transcript [data-state="empty"] p:last-child { grid-column: 1; grid-row: 2; max-width: 38ch; margin: 0; color: var(--qchat-muted); font-size: .9rem; line-height: 1.6; }
+.qchat__qubit-probe { display: grid; width: min(100%, 27rem); grid-column: 1; grid-row: 3; grid-template-columns: auto minmax(2rem,1fr) auto minmax(2rem,1fr) auto; align-items: center; gap: .55rem; color: var(--qchat-muted); font: 600 .75rem/1 var(--theme-font-mono, ui-monospace, monospace); }
+.qchat__qubit-ket { color: var(--qchat-cyan); font-size: .8rem; }
+.qchat__qubit-symbol { display: grid; width: 2rem; height: 2rem; place-items: center; border: 1px solid color-mix(in srgb, var(--qchat-violet) 55%, var(--qchat-line)); border-radius: 2px; background: color-mix(in srgb, var(--qchat-violet) 11%, var(--qchat-surface)); color: var(--qchat-violet); font-size: 1.15rem; box-shadow: inset 0 -2px color-mix(in srgb, var(--qchat-violet) 45%, transparent); }
+.qchat__qubit-wire { position: relative; height: 2px; background: linear-gradient(90deg, var(--qchat-cyan), var(--qchat-violet), var(--qchat-amber)); }
+.qchat__qubit-wire i { position: absolute; top: -2px; left: 0; width: 6px; height: 6px; background: var(--qchat-cyan); box-shadow: 0 0 8px color-mix(in srgb, var(--qchat-cyan) 52%, transparent); animation: qchat-state-step 1.8s steps(5, end) infinite alternate; }
+.qchat__qubit-wire:nth-of-type(4) i { animation-delay: -900ms; background: var(--qchat-amber); }
+.qchat__qubit-equation { grid-column: 1 / -1; color: var(--qchat-muted); font-size: .63rem; letter-spacing: .08em; }
+@keyframes qchat-state-step { to { transform: translateX(calc(100% - 6px)); } }
+.qchat__mission-picker { grid-column: 2; grid-row: 1 / span 3; width: 100%; margin: 0; }
+.qchat__mission-caption { display: block; margin: 0 0 .7rem; color: var(--midground-base); font: 700 .9rem/1.3 var(--theme-font-mono, ui-monospace, monospace); letter-spacing: .01em; }
+.qchat__mission-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: .48rem; }
+.qchat__mission-list button, .qchat__mission-list button:nth-child(2), .qchat__mission-list button:nth-child(3) {
+  display: grid;
+  min-width: 0;
+  min-height: 4.4rem;
+  grid-template-columns: 1.8rem minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: .72rem;
+  row-gap: .15rem;
+  padding: .58rem .75rem;
+  border: 1px solid var(--qchat-line);
+  border-radius: 2px;
+  background: var(--qchat-surface);
+  color: var(--midground-base);
+  text-align: left;
+  box-shadow: none;
+}
+.qchat__mission-list button:hover { transform: translateY(-2px); border-color: var(--qchat-tone); background: color-mix(in srgb, var(--qchat-tone) 8%, var(--qchat-surface)); }
+.qchat__mission-card--violet { --qchat-tone: var(--qchat-violet); }
+.qchat__mission-card--cyan { --qchat-tone: var(--qchat-cyan); }
+.qchat__mission-card--amber { --qchat-tone: var(--qchat-amber); }
+.qchat__mission-icon { display: grid; width: 1.7rem; height: 1.7rem; grid-column: 1; grid-row: 1 / span 2; padding: .32rem; border: 1px solid color-mix(in srgb, var(--qchat-tone) 52%, var(--qchat-line)); border-radius: 2px; background: color-mix(in srgb, var(--qchat-tone) 11%, var(--qchat-surface)); color: var(--qchat-tone); stroke-width: 1.8; }
+.qchat__mission-list button > span:nth-child(2) { grid-column: 2; grid-row: 1; overflow: hidden; color: var(--midground-base); font: 650 .69rem/1.2 var(--theme-font-mono, ui-monospace, monospace); letter-spacing: .035em; text-overflow: ellipsis; white-space: nowrap; }
+.qchat__mission-detail { grid-column: 2; grid-row: 2; overflow: hidden; color: var(--qchat-muted); font: 450 .68rem/1.25 var(--theme-font-sans, sans-serif); text-overflow: ellipsis; white-space: nowrap; }
+.qchat__mission-arrow { width: .95rem; height: .95rem; grid-column: 3; grid-row: 1 / span 2; color: var(--qchat-tone); transition: transform 140ms cubic-bezier(.2,.8,.2,1); }
+.qchat__mission-list button:hover .qchat__mission-arrow { transform: translate(2px, -2px); }
+
+.qchat__messages { display: flex; width: min(100%, 54rem); flex-direction: column; gap: .9rem; margin-inline: auto; }
+.qchat__message { width: fit-content; max-width: min(88%, 48rem); padding: .8rem .95rem; border: 1px solid var(--qchat-line); border-radius: .8rem; color: var(--midground-base); font: 450 .84rem/1.62 var(--theme-font-mono, ui-monospace, monospace); overflow-wrap: anywhere; contain: layout paint; content-visibility: auto; contain-intrinsic-size: auto 5rem; animation: qchat-message-in 180ms ease-out both; }
+.qchat__message--assistant { margin-right: auto; border-top-left-radius: .25rem; background: var(--qchat-surface); }
+.qchat__message--user { margin-left: auto; border-color: color-mix(in srgb, var(--qchat-violet) 40%, var(--qchat-line)); border-top-right-radius: .25rem; background: color-mix(in srgb, var(--qchat-violet) 9%, var(--qchat-surface)); }
+.qchat__message--tool { width: calc(100% - 2rem); max-width: 46rem; margin-inline: auto; border-style: dashed; color: var(--qchat-muted); font-size: .76rem; }
+.qchat__message a { color: var(--qchat-accent); }
+@keyframes qchat-message-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+.qchat__composer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: .48rem;
+  margin-top: .45rem;
+  padding: .65rem;
+  border: 1px solid var(--qchat-line);
+  border-radius: .7rem;
+  background: var(--qchat-surface);
+  box-shadow: 0 10px 28px rgb(0 0 0 / .13);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.qchat__composer:focus-within { border-color: color-mix(in srgb, var(--qchat-accent) 42%, var(--qchat-line)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--qchat-accent) 8%, transparent), 0 12px 30px rgb(0 0 0 / .16); }
+.qchat__composer > label:has(select[aria-label="Voice engine"]) { order: 0; }
+.qchat__composer > label:has(select[aria-label="Reasoning effort"]) { order: 1; }
+.qchat__composer [data-testid="voice-interim"] { order: 2; }
+.qchat__composer > .relative { order: 3; flex: 1 0 100%; min-width: 0; }
+.qchat__composer textarea { display: block; width: 100%; min-height: 3.35rem; padding: .7rem .8rem; border: 1px solid var(--qchat-line); border-radius: .5rem; background: var(--background-base); color: var(--midground-base); font: 450 .82rem/1.5 var(--theme-font-sans, sans-serif); transition: border-color 150ms ease, box-shadow 150ms ease; }
+.qchat__composer textarea::placeholder { color: var(--qchat-muted); }
+.qchat__composer textarea:focus { border-color: color-mix(in srgb, var(--qchat-accent) 46%, var(--qchat-line)); box-shadow: 0 0 0 2px var(--qchat-wash); }
+.qchat__composer > input[type="file"] { display: none; }
+.qchat__composer select { min-height: 2.15rem; max-width: 14rem; padding: .35rem .6rem; border: 1px solid var(--qchat-line); border-radius: .45rem; background: var(--background-base); color: var(--midground-base); font: 500 .71rem/1.2 var(--theme-font-sans, sans-serif); }
+.qchat__composer > button { order: 4; width: max-content !important; min-height: 2.2rem; flex: 0 0 auto !important; align-self: flex-start; padding: .42rem .72rem; border: 1px solid var(--qchat-line); border-radius: .48rem; background: var(--qchat-raised); color: var(--midground-base); font: 600 .7rem/1.1 var(--theme-font-mono, ui-monospace, monospace); letter-spacing: .025em; }
+.qchat__composer > button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--qchat-accent) 48%, var(--qchat-line)); background: var(--qchat-wash); }
+.qchat__composer > button[type="submit"] { order: 5; min-width: 5.7rem; border-color: color-mix(in srgb, var(--qchat-violet) 58%, var(--qchat-line)); background: color-mix(in srgb, var(--qchat-violet) 23%, var(--qchat-surface)); color: var(--qchat-violet); font-weight: 700; }
+.qchat__composer > button[type="submit"]:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--qchat-violet); background: color-mix(in srgb, var(--qchat-violet) 34%, var(--qchat-surface)); box-shadow: 0 3px 14px color-mix(in srgb, var(--qchat-violet) 16%, transparent); }
+.qchat__composer > button[type="submit"]:disabled { border-color: var(--qchat-line); background: var(--qchat-raised); color: var(--qchat-muted); opacity: .8; }
+.qchat__composer button[aria-label="Stop voice input"] { border-color: var(--qchat-accent); background: var(--qchat-wash); color: var(--qchat-accent); }
+.qchat__composer button:disabled { cursor: not-allowed; }
+
+.qchat__session-actions { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: .4rem; margin-top: .45rem; padding: .28rem; border: 1px solid var(--qchat-line); border-radius: .58rem; background: var(--qchat-surface); }
+.qchat__session-actions > button, .qchat__session-actions > a { display: inline-flex; min-height: 2rem; flex: 0 0 auto; align-items: center; gap: .4rem; padding: .38rem .58rem; border: 1px solid transparent; border-radius: .42rem; color: var(--qchat-muted); font: 550 .65rem/1.2 var(--theme-font-mono, ui-monospace, monospace); text-decoration: none; white-space: nowrap; }
+.qchat__session-actions > button:hover:not(:disabled), .qchat__session-actions > a:hover { border-color: var(--qchat-line); background: var(--qchat-raised); color: var(--midground-base); }
+.qchat__session-actions > button:disabled { opacity: .5; }
+.qchat__activity { display: inline-flex; min-height: 2.3rem; align-items: center; gap: .55rem; padding: .42rem .68rem; border: 1px solid var(--qchat-line); border-radius: .56rem; background: var(--qchat-surface); color: var(--qchat-muted); font-size: .74rem; }
+.qchat__activity-mark { display: inline-flex; gap: .2rem; }
+.qchat__activity-mark i { width: .3rem; height: .3rem; border-radius: 50%; background: var(--qchat-accent); animation: qchat-pulse .85s ease-in-out infinite alternate; }
+.qchat__activity-mark i:nth-child(2) { animation-delay: .15s; opacity: .7; }
+.qchat__activity-mark i:nth-child(3) { animation-delay: .3s; opacity: .45; }
+@keyframes qchat-pulse { to { transform: translateY(-2px); opacity: 1; } }
+
+.qchat__side { display: flex; width: 18rem; min-width: 0; min-height: 0; flex: 0 0 auto; flex-direction: column; gap: .6rem; overflow: hidden; padding: .1rem; }
+.qchat__model-panel > div { height: auto; gap: .55rem; overflow: visible; border: 0; background: transparent; box-shadow: none; }
+.qchat__model-panel > div > *, .qchat__side details, .qchat__sessions, .qchat__artifacts > * { border-color: var(--qchat-line); border-radius: .62rem; background: var(--qchat-surface); box-shadow: none; }
+.qchat__tools-card { gap: .42rem !important; padding: .62rem .68rem !important; }
+.qchat__tools-row { gap: .16rem !important; }
+.qchat__tools-row > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qchat__tools-row > div { min-height: 1rem; }
+.qchat__side details { padding: .58rem .68rem; }
+.qchat__side details > summary { display: flex; min-height: 1.7rem; align-items: center; }
+.qchat__sessions { min-height: 0; overflow: hidden; padding: .38rem; }
+.qchat__sessions > div { padding-inline: .2rem; }
+.qchat__sessions button { min-height: 2.35rem; }
+.qchat__sessions [aria-current="true"] { border: 1px solid color-mix(in srgb, var(--qchat-accent) 36%, var(--qchat-line)); border-radius: .42rem; background: var(--qchat-wash); box-shadow: inset 0 1px color-mix(in srgb, var(--qchat-violet) 32%, transparent); }
+
+.qchat__transcript-loading { display: flex; min-height: 100%; align-items: center; justify-content: center; padding: 1rem; }
+.qchat__transcript-skeleton { display: grid; width: min(100%, 42rem); gap: .72rem; }
+.qchat__skeleton-message { display: grid; width: min(86%, 31rem); gap: .52rem; padding: .85rem .95rem; border: 1px solid var(--qchat-line); border-radius: .65rem; background: var(--qchat-surface); }
+.qchat__skeleton-message--user { justify-self: end; width: min(68%, 24rem); }
+.qchat__skeleton-message > span, .qchat__session-skeleton-row > span, .qchat__model-skeleton > span { display: block; height: .48rem; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--qchat-accent) 3%, var(--background-base)), color-mix(in srgb, var(--qchat-accent) 8%, var(--background-base)) 48%, color-mix(in srgb, var(--qchat-accent) 3%, var(--background-base))); background-size: 200% 100%; animation: qchat-skeleton 1.5s ease-in-out infinite; }
+.qchat__skeleton-message > span:first-child { width: 80%; }
+.qchat__skeleton-message > span:nth-child(2) { width: 96%; }
+.qchat__skeleton-message > span:last-child { width: 55%; }
+.qchat__sessions-skeleton { display: grid; gap: .5rem; padding: .3rem .2rem; }
+.qchat__session-skeleton-row { display: grid; gap: .42rem; padding: .55rem; border: 1px solid var(--qchat-line); border-radius: .48rem; background: var(--qchat-surface); }
+.qchat__session-skeleton-row > span:first-child { width: 72%; }
+.qchat__session-skeleton-row > span:last-child { width: 42%; height: .33rem; }
+.qchat__model-skeleton { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .45rem; min-height: 3.2rem; padding: .65rem; border: 1px solid var(--qchat-line); border-radius: .58rem; background: var(--qchat-surface); }
+.qchat__model-skeleton > span:first-child { width: 40%; grid-column: 1 / -1; height: .33rem; }
+.qchat__model-skeleton > span:nth-child(2) { width: 62%; }
+.qchat__model-skeleton > .qchat__skeleton-control { width: 3.4rem; height: 1.2rem; }
+@keyframes qchat-skeleton { to { background-position: -200% 0; } }
+
+@media (min-width: 1024px) {
+  .qchat__workspace { display: grid; grid-template-columns: minmax(0, 1fr) 22rem; }
+  .qchat__workspace:not(:has(> .qchat__side)) { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1023px) {
+  .qchat__workspace { flex-direction: column; overflow-y: auto; }
+  .qchat__conversation { height: min(88dvh, 54rem); min-height: min(88dvh, 54rem); flex: 0 0 auto; }
+  .qchat__side { display: grid; width: 100%; max-height: none; grid-template-columns: minmax(0, 1fr); overflow: visible; }
+  .qchat__model-panel, .qchat__artifacts, .qchat__sessions { min-width: 0; flex: initial; }
+  .qchat__session-actions { gap: .12rem; }
+  .qchat__session-actions > button, .qchat__session-actions > a { padding-inline: .35rem; font-size: .58rem; }
+}
+@media (max-width: 1279px) {
+  .qchat__transcript [data-state="empty"] {
+    width: min(100%, 42rem);
+    height: max-content !important;
+    min-height: 0 !important;
+    flex: 0 0 auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto;
+    align-content: start !important;
+    gap: .8rem;
+    margin: 0 auto;
+    padding: 1rem .3rem;
+  }
+  .qchat__transcript [data-state="empty"] p:first-child,
+  .qchat__transcript [data-state="empty"] p:last-child,
+  .qchat__mission-picker { grid-column: 1; }
+  .qchat__transcript [data-state="empty"] p:first-child { grid-row: 1; max-width: 18ch; font-size: clamp(1.8rem, 5vw, 2.6rem); }
+  .qchat__transcript [data-state="empty"] p:last-child { grid-row: 2; max-width: 52ch; }
+  .qchat__qubit-probe { grid-column: 1; grid-row: 3; }
+  .qchat__mission-picker { grid-column: 1; grid-row: 4; }
+}
+@media (max-width: 640px) {
+  .qchat__conversation { padding: .58rem; }
+  .qchat__header { min-height: 2.65rem; align-items: flex-start; }
+  .qchat__header > div:first-child { flex-wrap: wrap; }
+  .qchat [data-testid="chat-model"] { max-width: 67vw; }
+  .qchat__header > div:last-child { margin-left: auto; }
+  .qchat__run-hud { grid-template-columns: auto minmax(0,1fr) auto; gap: .4rem; }
+  .qchat__run-stat--voice { display: none; }
+  .qchat__rank-copy { align-items: flex-start; flex-direction: column; gap: .15rem; }
+  .qchat__voice-status { max-height: 4rem; }
+  .qchat__transcript { padding: .65rem .1rem; }
+  .qchat__transcript [data-state="empty"] { grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto auto auto; gap: .65rem; padding: 1rem .3rem; }
+  .qchat__transcript [data-state="empty"] p:first-child, .qchat__transcript [data-state="empty"] p:last-child, .qchat__mission-picker { grid-column: 1; }
+  .qchat__transcript [data-state="empty"] p:first-child { grid-row: 1; font-size: clamp(1.8rem, 9vw, 2.5rem); }
+  .qchat__transcript [data-state="empty"] p:last-child { grid-row: 2; }
+  .qchat__qubit-probe { grid-column: 1; grid-row: 3; }
+  .qchat__mission-picker { grid-column: 1; grid-row: 4; }
+  .qchat__mission-list button, .qchat__mission-list button:nth-child(2), .qchat__mission-list button:nth-child(3) { min-height: 3.4rem; }
+  .qchat__composer { gap: .35rem; padding: .5rem; }
+  .qchat__composer > label { flex: 1 1 auto; min-width: 0; }
+  .qchat__composer select { width: 100%; max-width: none; }
+  .qchat__composer textarea { min-height: 3.15rem; }
+  .qchat__composer > button { flex: 0 0 auto; }
+  .qchat__session-actions { flex-wrap: wrap; justify-content: flex-start; overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qchat *, .qchat *::before, .qchat *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}

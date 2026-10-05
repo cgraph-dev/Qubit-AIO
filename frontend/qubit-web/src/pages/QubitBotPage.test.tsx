@@ -189,9 +189,19 @@ function clickButton(label: string) {
 }
 
 function setInputById(id: string, value: string) {
-  const el = container!.querySelector(`#${id}`) as HTMLInputElement | null;
+  const el = container!.querySelector(`#${id}`) as
+    | HTMLInputElement
+    | HTMLTextAreaElement
+    | null;
   expect(el, `input ${id}`).not.toBeNull();
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+  // The composer is a multi-line <textarea> (upstream multiline TextInput);
+  // the remaining controls are single-line <input>s. Pick the prototype that
+  // matches the element so React's value tracker sees the change.
+  const proto =
+    el instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
   act(() => {
     setter!.call(el, value);
     el!.dispatchEvent(new Event("input", { bubbles: true }));

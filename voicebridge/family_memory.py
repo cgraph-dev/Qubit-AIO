@@ -7,10 +7,9 @@ cloud sync is refused by policy, so these methods delegate to the same
 ``active_memory`` store and the same persisted provider store — no second
 source of truth.
 
-Lineage note: the dashboard memory pages were ported from the upstream
-Hermes console (hermes-agent lineage); the provider model here is
-reimplemented Qubit-native (single local SQLite/FTS5 store) rather than the
-upstream multi-provider catalog.
+Lineage note: the dashboard memory pages were built for the console; the
+provider model here is Qubit-native (single local SQLite/FTS5 store) rather
+than a multi-provider catalog.
 """
 
 from __future__ import annotations

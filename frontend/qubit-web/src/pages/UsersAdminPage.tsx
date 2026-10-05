@@ -81,20 +81,20 @@ export default function UsersAdminPage() {
       authConnectCatalog(),
     ]);
     const [s, l, m, p, a, ma, c] = rows;
-    if (s.status === "fulfilled") setSelf(s.value.profile);
-    if (l.status === "fulfilled") setRoster(l.value.profiles ?? []);
-    if (m.status === "fulfilled") setMentionable(m.value.mentionable ?? []);
+    if (s.status === "fulfilled") setSelf(s.value?.profile ?? null);
+    if (l.status === "fulfilled") setRoster(l.value?.profiles ?? []);
+    if (m.status === "fulfilled") setMentionable(m.value?.mentionable ?? []);
     if (p.status === "fulfilled") {
-      setPrefs(p.value.entries ?? {});
-      setFont(String(p.value.entries?.font ?? ""));
-      setTheme(String(p.value.entries?.theme ?? ""));
+      setPrefs(p.value?.entries ?? {});
+      setFont(String(p.value?.entries?.font ?? ""));
+      setTheme(String(p.value?.entries?.theme ?? ""));
     }
-    if (a.status === "fulfilled") setLinks(a.value.links ?? []);
+    if (a.status === "fulfilled") setLinks(a.value?.links ?? []);
     if (ma.status === "fulfilled") {
-      setAccounts(ma.value.accounts ?? []);
-      setActiveAccount(String(ma.value.active ?? ""));
+      setAccounts(ma.value?.accounts ?? []);
+      setActiveAccount(String(ma.value?.active ?? ""));
     }
-    if (c.status === "fulfilled") setCatalog(c.value.providers ?? []);
+    if (c.status === "fulfilled") setCatalog(c.value?.providers ?? []);
     const failed = rows.find((r) => r.status === "rejected");
     if (failed && failed.status === "rejected") {
       setError(errText(failed.reason, "Operator admin failed to load"));
@@ -501,6 +501,7 @@ export default function UsersAdminPage() {
                   disabled
                   title={d.reason}
                   aria-disabled="true"
+                  aria-label={`${d.action} unavailable: ${d.reason}`}
                   className="cursor-not-allowed border border-border px-2 py-1 text-xs"
                 >
                   Disabled

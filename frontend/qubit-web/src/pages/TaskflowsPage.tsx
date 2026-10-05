@@ -2,24 +2,22 @@
  * TaskflowsPage — route `/qubit-taskflows`.
  *
  * SEPARATE Qubit-branded page for taskflow/standing-orders/hooks
- * semantics (upstream `docs/automation/{taskflow,standing-orders,hooks}.md`),
- * ported onto the existing `schedules.*` backend. This page does NOT extend
- * `/qubit-scheduler` (owner's separation rule): the scheduler stays the
- * media/cron surface; this page is the durable-flows surface.
+ * semantics, ported onto the existing `schedules.*` backend. This page does
+ * NOT extend `/qubit-scheduler` (owner's separation rule): the scheduler stays
+ * the media/cron surface; this page is the durable-flows surface.
+ *
+ * Structure mirrors the ported settings surfaces in this app
+ * (`.settings-page` > `.settings-section` > `.settings-group` > `.settings-row`).
  *
  * - Flows list: standing orders (recurring schedules) + one-shots (`run_at`),
  *   read from the real cron backend. Create flow (schedule expression +
  *   action + confirm), enable/disable toggle (honest: the backend's
  *   `cron_update` takes the full mutation, so the row's fields ride along
  *   unchanged with only `enabled` flipped), trigger-now, delete (confirm).
- * - Hooks: the 5 upstream bundled hooks with live guard states and
+ * - Hooks: the bundled hooks with live guard states and
  *   enable/disable/cancel on the family bridge (staged-confirm).
  * - Honest scope: durable flows only. No ephemeral-suggestion registry —
  *   that refusal lives on `/qubit-task-inbox`.
- *
- * NOTE: router wiring (App.tsx) is intentionally NOT in this file — this
- * change adds new files only. Wire `/qubit-taskflows` to this component
- * separately.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -52,6 +50,99 @@ function formatResult(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+const INPUT_CLASS =
+  "settings-input min-w-0 border border-border bg-background-base px-2 py-1 text-sm";
+
+function FlowActions({
+  flow,
+  busy,
+  onStage,
+}: {
+  flow: FlowRow;
+  busy: boolean;
+  onStage: (op: StagedOp) => void;
+}) {
+  return (
+    <div className="settings-row__control">
+      <button
+        type="button"
+        aria-label={`flow-toggle-${flow.id}`}
+        disabled={busy}
+        className="btn btn--sm disabled:opacity-50"
+        onClick={() =>
+          onStage({
+            title: flow.enabled ? "Disable flow" : "Enable flow",
+            detail: `${flow.enabled ? "Disable" : "Enable"} flow ${flow.name}?`,
+            run: () => setFlowEnabled(flow, !flow.enabled, () => true),
+          })
+        }
+      >
+        {flow.enabled ? "Disable" : "Enable"}
+      </button>
+      <button
+        type="button"
+        aria-label={`flow-trigger-${flow.id}`}
+        disabled={busy}
+        className="btn btn--sm btn--ghost disabled:opacity-50"
+        onClick={() =>
+          onStage({
+            title: "Trigger flow now",
+            detail: `Run flow ${flow.name} now?`,
+            run: () => triggerFlowNow(flow.id, () => true),
+          })
+        }
+      >
+        Trigger now
+      </button>
+      <button
+        type="button"
+        aria-label={`flow-delete-${flow.id}`}
+        disabled={busy}
+        className="btn btn--sm btn--ghost disabled:opacity-50"
+        onClick={() =>
+          onStage({
+            title: "Delete flow",
+            detail: `Delete flow ${flow.name}? This cannot be undone.`,
+            run: () => deleteFlow(flow.id, () => true),
+          })
+        }
+      >
+        Delete
+      </button>
+    </div>
+  );
+}
+
+function FlowRowView({
+  flow,
+  busy,
+  onStage,
+}: {
+  flow: FlowRow;
+  busy: boolean;
+  onStage: (op: StagedOp) => void;
+}) {
+  return (
+    <div className="settings-row" aria-label={`flow-row-${flow.id}`}>
+      <div className="settings-row__text">
+        <div className="settings-row__title">
+          {flow.name}
+          <span className="settings-status settings-status--ok ml-2" role="note">
+            <span className="settings-status__dot" aria-hidden="true" />
+            {flow.enabled ? "enabled" : "disabled"}
+          </span>
+        </div>
+        <p className="settings-row__desc">
+          {flow.schedule || "no schedule"}
+          {flow.lastStatus ? ` · last: ${flow.lastStatus}` : ""}
+        </p>
+        {flow.prompt ? <p className="settings-row__desc">{flow.prompt}</p> : null}
+      </div>
+      <FlowActions flow={flow} busy={busy} onStage={onStage} />
+    </div>
+  );
 }
 
 export default function TaskflowsPage() {
@@ -106,312 +197,290 @@ export default function TaskflowsPage() {
   const canCreate = newName.trim() && newSchedule.trim() && newPrompt.trim();
 
   return (
-    <div className="flex flex-col gap-6 p-6" data-testid="taskflows-page">
-      <header>
-        <h1 className="text-xl font-semibold">Taskflows</h1>
-        <p className="text-sm text-muted-foreground">
-          Durable flows (standing orders + one-shots + hooks) on the Qubit schedules backend.
-        </p>
-      </header>
+    <div className="settings-page settings-page--wide" data-testid="taskflows-page">
+      <p className="settings-page__intro">
+        Durable flows (standing orders + one-shots + hooks) on the Qubit schedules
+        backend. Every control here has a live route behind it.
+      </p>
 
-      <section aria-label="taskflows-scope-notice" className="rounded border p-4">
-        <h2 className="text-sm font-semibold">Durable flows only</h2>
-        <p className="mt-1 text-sm">
-          This page lists cron-backed durable flows. There is no ephemeral-suggestion
-          registry here — suggestions live on the{" "}
-          <a className="underline" href="/qubit-task-inbox">
-            task-inbox page
-          </a>
-          . Scheduling media stays on the{" "}
-          <a className="underline" href="/qubit-scheduler">
-            scheduler page
-          </a>
-          .
-        </p>
-      </section>
-
-      <section aria-label="standing-orders" className="rounded border p-4">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold">Standing orders ({standingOrders.length})</h2>
-          <button
-            type="button"
-            aria-label="taskflows-refresh"
-            disabled={busy}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
-            onClick={() => void refresh()}
-          >
-            Refresh
-          </button>
-        </div>
-        {standingOrders.length === 0 ? (
-          <p className="mt-2 text-sm">No standing orders. Create one below.</p>
-        ) : (
-          <ul className="mt-2 flex flex-col gap-2">
-            {standingOrders.map((flow) => (
-              <li key={flow.id} aria-label={`flow-row-${flow.id}`} className="rounded border p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold">{flow.name}</span>
-                  <span className="text-xs">{flow.schedule || "no schedule"}</span>
-                  <span className="text-xs">{flow.enabled ? "enabled" : "disabled"}</span>
-                  {flow.lastStatus && <span className="text-xs">last: {flow.lastStatus}</span>}
-                </div>
-                {flow.prompt && <p className="mt-1 text-xs">{flow.prompt}</p>}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    aria-label={`flow-toggle-${flow.id}`}
-                    disabled={busy}
-                    className="rounded border px-2 py-1 text-xs disabled:opacity-50"
-                    onClick={() =>
-                      setPending({
-                        title: flow.enabled ? "Disable flow" : "Enable flow",
-                        detail: `${flow.enabled ? "Disable" : "Enable"} flow ${flow.name}?`,
-                        run: () => setFlowEnabled(flow, !flow.enabled, () => true),
-                      })
-                    }
-                  >
-                    {flow.enabled ? "Disable" : "Enable"}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`flow-trigger-${flow.id}`}
-                    disabled={busy}
-                    className="rounded border px-2 py-1 text-xs disabled:opacity-50"
-                    onClick={() =>
-                      setPending({
-                        title: "Trigger flow now",
-                        detail: `Run flow ${flow.name} now?`,
-                        run: () => triggerFlowNow(flow.id, () => true),
-                      })
-                    }
-                  >
-                    Trigger now
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`flow-delete-${flow.id}`}
-                    disabled={busy}
-                    className="rounded border px-2 py-1 text-xs disabled:opacity-50"
-                    onClick={() =>
-                      setPending({
-                        title: "Delete flow",
-                        detail: `Delete flow ${flow.name}? This cannot be undone.`,
-                        run: () => deleteFlow(flow.id, () => true),
-                      })
-                    }
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section aria-label="one-shots" className="rounded border p-4">
-        <h2 className="text-sm font-semibold">One-shots ({oneShots.length})</h2>
-        {oneShots.length === 0 ? (
-          <p className="mt-2 text-sm">No one-shot flows.</p>
-        ) : (
-          <ul className="mt-2 flex flex-col gap-2">
-            {oneShots.map((flow) => (
-              <li key={flow.id} aria-label={`flow-row-${flow.id}`} className="rounded border p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold">{flow.name}</span>
-                  <span className="text-xs">{flow.schedule || "no schedule"}</span>
-                  <span className="text-xs">{flow.enabled ? "enabled" : "disabled"}</span>
-                </div>
-                {flow.prompt && <p className="mt-1 text-xs">{flow.prompt}</p>}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    aria-label={`flow-toggle-${flow.id}`}
-                    disabled={busy}
-                    className="rounded border px-2 py-1 text-xs disabled:opacity-50"
-                    onClick={() =>
-                      setPending({
-                        title: flow.enabled ? "Disable flow" : "Enable flow",
-                        detail: `${flow.enabled ? "Disable" : "Enable"} flow ${flow.name}?`,
-                        run: () => setFlowEnabled(flow, !flow.enabled, () => true),
-                      })
-                    }
-                  >
-                    {flow.enabled ? "Disable" : "Enable"}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`flow-trigger-${flow.id}`}
-                    disabled={busy}
-                    className="rounded border px-2 py-1 text-xs disabled:opacity-50"
-                    onClick={() =>
-                      setPending({
-                        title: "Trigger flow now",
-                        detail: `Run flow ${flow.name} now?`,
-                        run: () => triggerFlowNow(flow.id, () => true),
-                      })
-                    }
-                  >
-                    Trigger now
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`flow-delete-${flow.id}`}
-                    disabled={busy}
-                    className="rounded border px-2 py-1 text-xs disabled:opacity-50"
-                    onClick={() =>
-                      setPending({
-                        title: "Delete flow",
-                        detail: `Delete flow ${flow.name}? This cannot be undone.`,
-                        run: () => deleteFlow(flow.id, () => true),
-                      })
-                    }
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section aria-label="flow-create" className="rounded border p-4">
-        <h2 className="text-sm font-semibold">Create flow</h2>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            aria-label="flow-create-name"
-            className="rounded border px-2 py-1 text-sm"
-            placeholder="flow name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-          />
-          <input
-            aria-label="flow-create-schedule"
-            className="rounded border px-2 py-1 text-sm"
-            placeholder="schedule (0 8 * * 1-5)"
-            value={newSchedule}
-            onChange={(e) => setNewSchedule(e.target.value)}
-          />
-          <input
-            aria-label="flow-create-prompt"
-            className="rounded border px-2 py-1 text-sm"
-            placeholder="action to run"
-            value={newPrompt}
-            onChange={(e) => setNewPrompt(e.target.value)}
-          />
-          <button
-            type="button"
-            aria-label="flow-create-submit"
-            disabled={busy || !canCreate}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
-            onClick={() =>
-              setPending({
-                title: "Create flow",
-                detail: `Create flow ${newName.trim()} on schedule ${newSchedule.trim()}?`,
-                run: () =>
-                  createFlow(
-                    { name: newName.trim(), schedule: newSchedule.trim(), prompt: newPrompt.trim() },
-                    () => true,
-                  ),
-              })
-            }
-          >
-            Create
-          </button>
+      <section aria-label="taskflows-scope-notice" className="settings-section">
+        <div className="settings-section__copy">
+          <h2 className="settings-section__heading">Durable flows only</h2>
+          <p className="settings-section__desc">
+            This page lists cron-backed durable flows. There is no ephemeral-suggestion
+            registry here — suggestions live on the{" "}
+            <a className="underline" href="/qubit-task-inbox">
+              task-inbox page
+            </a>
+            . Scheduling media stays on the{" "}
+            <a className="underline" href="/qubit-scheduler">
+              scheduler page
+            </a>
+            .
+          </p>
         </div>
       </section>
 
-      <section aria-label="hooks" className="rounded border p-4">
-        <h2 className="text-sm font-semibold">Hooks ({HOOK_CATALOG.length})</h2>
-        <p className="mt-1 text-sm">
-          Event-driven hooks on the live bridge — enable/disable flips the
-          guard immediately (staged-confirm).
-        </p>
-        <ul className="mt-2 flex flex-col gap-2">
+      <section aria-label="standing-orders" className="settings-section">
+        <div className="settings-section__header">
+          <div className="settings-section__copy">
+            <h2 className="settings-section__heading">
+              Standing orders <span className="settings-count">{standingOrders.length}</span>
+            </h2>
+            <p className="settings-section__desc">Recurring schedules that keep running.</p>
+          </div>
+          <div className="settings-section__actions">
+            <button
+              type="button"
+              aria-label="taskflows-refresh"
+              disabled={busy}
+              className="btn btn--sm disabled:opacity-50"
+              onClick={() => void refresh()}
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+        <div className="settings-group">
+          {standingOrders.length === 0 ? (
+            <div className="settings-empty">No standing orders. Create one below.</div>
+          ) : (
+            standingOrders.map((flow) => (
+              <FlowRowView key={flow.id} flow={flow} busy={busy} onStage={setPending} />
+            ))
+          )}
+        </div>
+      </section>
+
+      <section aria-label="one-shots" className="settings-section">
+        <div className="settings-section__copy">
+          <h2 className="settings-section__heading">
+            One-shots <span className="settings-count">{oneShots.length}</span>
+          </h2>
+          <p className="settings-section__desc">One-time schedules keyed on a run time.</p>
+        </div>
+        <div className="settings-group">
+          {oneShots.length === 0 ? (
+            <div className="settings-empty">No one-shot flows.</div>
+          ) : (
+            oneShots.map((flow) => (
+              <FlowRowView key={flow.id} flow={flow} busy={busy} onStage={setPending} />
+            ))
+          )}
+        </div>
+      </section>
+
+      <section aria-label="flow-create" className="settings-section">
+        <div className="settings-section__copy">
+          <h2 className="settings-section__heading">Create flow</h2>
+          <p className="settings-section__desc">
+            Name, schedule expression, and the action to run. Confirms before writing.
+          </p>
+        </div>
+        <div className="settings-group">
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <div className="settings-row__title">Name</div>
+            </div>
+            <div className="settings-row__control">
+              <input
+                aria-label="flow-create-name"
+                className={INPUT_CLASS}
+                placeholder="flow name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <div className="settings-row__title">Schedule</div>
+              <p className="settings-row__desc">Cron expression, e.g. 0 8 * * 1-5.</p>
+            </div>
+            <div className="settings-row__control">
+              <input
+                aria-label="flow-create-schedule"
+                className={INPUT_CLASS}
+                placeholder="schedule (0 8 * * 1-5)"
+                value={newSchedule}
+                onChange={(e) => setNewSchedule(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <div className="settings-row__title">Action</div>
+              <p className="settings-row__desc">The prompt/action the flow runs.</p>
+            </div>
+            <div className="settings-row__control">
+              <input
+                aria-label="flow-create-prompt"
+                className={INPUT_CLASS}
+                placeholder="action to run"
+                value={newPrompt}
+                onChange={(e) => setNewPrompt(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="settings-row settings-row--actions">
+            <div className="settings-row__text">
+              <div className="settings-row__title">Create</div>
+              {!canCreate ? (
+                <p className="settings-row__desc" data-testid="flow-create-hint">
+                  Fill name, schedule, and action to enable Create.
+                </p>
+              ) : null}
+            </div>
+            <div className="settings-row__control">
+              <button
+                type="button"
+                aria-label="flow-create-submit"
+                disabled={busy || !canCreate}
+                title={canCreate ? "Create this flow" : "Name, schedule, and action are required"}
+                className="btn btn--sm disabled:opacity-50"
+                onClick={() =>
+                  setPending({
+                    title: "Create flow",
+                    detail: `Create flow ${newName.trim()} on schedule ${newSchedule.trim()}?`,
+                    run: () =>
+                      createFlow(
+                        {
+                          name: newName.trim(),
+                          schedule: newSchedule.trim(),
+                          prompt: newPrompt.trim(),
+                        },
+                        () => true,
+                      ),
+                  })
+                }
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="hooks" className="settings-section">
+        <div className="settings-section__copy">
+          <h2 className="settings-section__heading">
+            Hooks <span className="settings-count">{HOOK_CATALOG.length}</span>
+          </h2>
+          <p className="settings-section__desc">
+            Event-driven hooks on the live bridge — enable/disable flips the guard
+            immediately (staged-confirm).
+          </p>
+        </div>
+        <div className="settings-group">
           {HOOK_CATALOG.map((hook) => {
             const live = hookStates.find((s) => s.name === hook.name);
             const enabled = live?.enabled === true;
             return (
-            <li key={hook.name} aria-label={`hook-row-${hook.name}`} className="rounded border p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold">{hook.name}</span>
-                <span className="text-xs">{hook.events.join(", ")}</span>
-                <span className="text-xs" aria-label={`hook-state-${hook.name}`}>
-                  {live ? (enabled ? "enabled" : "disabled") : "state unknown"}
-                </span>
+              <div className="settings-row" key={hook.name} aria-label={`hook-row-${hook.name}`}>
+                <div className="settings-row__text">
+                  <div className="settings-row__title">
+                    {hook.name}
+                    <span
+                      className="settings-status settings-status--ok ml-2"
+                      role="note"
+                      aria-label={`hook-state-${hook.name}`}
+                    >
+                      <span className="settings-status__dot" aria-hidden="true" />
+                      {live ? (enabled ? "enabled" : "disabled") : "state unknown"}
+                    </span>
+                  </div>
+                  <p className="settings-row__desc">{hook.events.join(", ")}</p>
+                  <p className="settings-row__desc">{hook.description}</p>
+                </div>
+                <div className="settings-row__control">
+                  <button
+                    type="button"
+                    aria-label={`hook-enable-${hook.name}`}
+                    disabled={busy || enabled}
+                    title={enabled ? "Hook is already enabled" : "Enable this hook"}
+                    className="btn btn--sm disabled:opacity-50"
+                    onClick={() =>
+                      setPending({
+                        title: "Enable hook",
+                        detail: `Enable hook ${hook.name}?`,
+                        run: () => enableHook(hook.name, () => true),
+                      })
+                    }
+                  >
+                    Enable
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`hook-disable-${hook.name}`}
+                    disabled={busy || !enabled}
+                    title={!enabled ? "Hook is already disabled" : "Disable this hook"}
+                    className="btn btn--sm btn--ghost disabled:opacity-50"
+                    onClick={() =>
+                      setPending({
+                        title: "Disable hook",
+                        detail: `Disable hook ${hook.name}?`,
+                        run: () => disableHook(hook.name, () => true),
+                      })
+                    }
+                  >
+                    Disable
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`hook-cancel-${hook.name}`}
+                    disabled={busy || !enabled}
+                    title="Cancel this flow (disables the hook)"
+                    className="btn btn--sm btn--ghost disabled:opacity-50"
+                    onClick={() =>
+                      setPending({
+                        title: "Cancel flow",
+                        detail: `Cancel flow for hook ${hook.name}? This disables the hook.`,
+                        run: () => cancelFlowHook(hook.name, () => true),
+                      })
+                    }
+                  >
+                    Cancel flow
+                  </button>
+                </div>
               </div>
-              <p className="mt-1 text-xs">{hook.description}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  aria-label={`hook-enable-${hook.name}`}
-                  disabled={busy || enabled}
-                  title={enabled ? "Hook is already enabled" : "Enable this hook"}
-                  className="rounded border px-2 py-1 text-xs disabled:opacity-50"
-                  onClick={() =>
-                    setPending({
-                      title: "Enable hook",
-                      detail: `Enable hook ${hook.name}?`,
-                      run: () => enableHook(hook.name, () => true),
-                    })
-                  }
-                >
-                  Enable
-                </button>
-                <button
-                  type="button"
-                  aria-label={`hook-disable-${hook.name}`}
-                  disabled={busy || !enabled}
-                  title={!enabled ? "Hook is already disabled" : "Disable this hook"}
-                  className="rounded border px-2 py-1 text-xs disabled:opacity-50"
-                  onClick={() =>
-                    setPending({
-                      title: "Disable hook",
-                      detail: `Disable hook ${hook.name}?`,
-                      run: () => disableHook(hook.name, () => true),
-                    })
-                  }
-                >
-                  Disable
-                </button>
-                <button
-                  type="button"
-                  aria-label={`hook-cancel-${hook.name}`}
-                  disabled={busy || !enabled}
-                  title="Cancel this flow (disables the hook)"
-                  className="rounded border px-2 py-1 text-xs disabled:opacity-50"
-                  onClick={() =>
-                    setPending({
-                      title: "Cancel flow",
-                      detail: `Cancel flow for hook ${hook.name}? This disables the hook.`,
-                      run: () => cancelFlowHook(hook.name, () => true),
-                    })
-                  }
-                >
-                  Cancel flow
-                </button>
-              </div>
-            </li>
             );
           })}
-        </ul>
-        <ul className="mt-2 flex flex-col gap-1">
+        </div>
+      </section>
+
+      <section aria-label="flow-scope-notes" className="settings-section">
+        <div className="settings-section__copy">
+          <h2 className="settings-section__heading">Out of scope on this page</h2>
+        </div>
+        <div className="settings-group">
           {DISABLED_FLOW_ACTIONS.map((row) => (
-            <li key={row.action} aria-label={`disabled-flow-${row.action}`} className="text-xs">
-              {row.action}: {row.code} — {row.reason} Counterpart: {row.counterpart}
-            </li>
+            <div
+              className="settings-row settings-row--stacked"
+              key={row.action}
+              aria-label={`disabled-flow-${row.action}`}
+              data-state="refused"
+            >
+              <div className="settings-row__text">
+                <div className="settings-row__title font-mono">{row.action}</div>
+                <p className="settings-row__desc">
+                  {row.code} — {row.reason} Counterpart: {row.counterpart}
+                </p>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
 
       {resultText && (
-        <pre aria-label="op-result" className="overflow-auto rounded border p-3 text-xs">
+        <pre
+          aria-label="op-result"
+          className="max-h-64 overflow-auto border border-border bg-background/40 p-3 text-xs"
+        >
           {resultText}
         </pre>
       )}
       {errorText && (
-        <p role="alert" aria-label="op-error" className="rounded border p-3 text-sm">
+        <p role="alert" aria-label="op-error" className="border border-border p-3 text-sm text-destructive">
           {errorText}
         </p>
       )}
@@ -421,9 +490,9 @@ export default function TaskflowsPage() {
           role="dialog"
           aria-modal="true"
           aria-label="staged-op-confirm"
-          className="fixed inset-0 flex items-center justify-center bg-black/40"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 p-4"
         >
-          <div className="rounded border bg-white p-4">
+          <div className="border border-border bg-card p-4 shadow-2xl">
             <h2 className="text-sm font-semibold">{pending.title}</h2>
             <p className="mt-1 text-sm">{pending.detail}</p>
             <div className="mt-3 flex gap-2">
@@ -431,7 +500,7 @@ export default function TaskflowsPage() {
                 type="button"
                 aria-label="confirm-staged-op"
                 disabled={busy}
-                className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+                className="btn btn--sm disabled:opacity-50"
                 onClick={() => void settle(pending)}
               >
                 Confirm
@@ -440,7 +509,7 @@ export default function TaskflowsPage() {
                 type="button"
                 aria-label="cancel-staged-op"
                 disabled={busy}
-                className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+                className="btn btn--sm btn--ghost disabled:opacity-50"
                 onClick={() => setPending(null)}
               >
                 Cancel

@@ -90,7 +90,7 @@ describe("resolvePageTitle", () => {
     // Integrator lane 3: page-documented paths, titles match each page's
     // own heading (the Viking children use their short h1s).
     expect(resolvePageTitle("/qubit-bot", t, [])).toBe("Qubit Bot");
-    expect(resolvePageTitle("/harness-router", t, [])).toBe("Harness Router");
+    expect(resolvePageTitle("/qubit-harness-router", t, [])).toBe("Harness Router");
     expect(resolvePageTitle("/open-viking", t, [])).toBe("Open Viking");
     expect(resolvePageTitle("/open-viking/retrieval", t, [])).toBe("Retrieval");
     expect(resolvePageTitle("/open-viking/uploads", t, [])).toBe("Uploads");

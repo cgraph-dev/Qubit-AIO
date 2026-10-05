@@ -20,7 +20,6 @@
 
 import { Button } from "@nous-research/ui/ui/components/button";
 import { ListItem } from "@nous-research/ui/ui/components/list-item";
-import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { AlertCircle, MessageSquarePlus, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
@@ -31,6 +30,11 @@ import { api, type ChatStoreSession } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 
 const SESSION_LIMIT = 30;
+/** Which session store this list reads. `chat` keeps the Qubit-native
+ * chat-session store (`GET /api/qubit/chat/sessions`, voice channel);
+ * `canonical` reads the canonical receipts store (`GET /api/sessions`,
+ * profile-scoped, the store the `/chat` PTY resumes). */
+export type ChatSessionListSource = "chat" | "canonical";
 interface ChatSessionListProps {
   /** Active resume target (the session currently shown in the transcript). */
   activeSessionId: string | null;
@@ -49,6 +53,12 @@ interface ChatSessionListProps {
   workspaceCwd?: string;
   /** Owned by the host so the picker applies on the next New chat. */
   onWorkspaceChange?: (cwd: string) => void;
+  /**
+   * Which session store to list. Defaults to `chat` (exact current
+   * behavior); `/chat` hosts pass `canonical` so rows match the store the
+   * PTY resumes.
+   */
+  source?: ChatSessionListSource;
 }
 
 function rowLabel(session: ChatStoreSession, untitled: string): string {
@@ -67,6 +77,7 @@ export function ChatSessionList({
   profile,
   workspaceCwd,
   onWorkspaceChange,
+  source = "chat",
 }: ChatSessionListProps) {
   const { t } = useI18n();
   const [, setSearchParams] = useSearchParams();
@@ -81,12 +92,24 @@ export function ChatSessionList({
   // list out of order.
   const reqRef = useRef(0);
 
+  // `profile` scopes the canonical listing; the empty-string fallback keeps
+  // the dep stable when no profile is selected (default profile). The chat
+  // store is single-principal and ignores it.
+  const scopeKey = profile ?? "";
+
   const load = useCallback(() => {
     const myReq = ++reqRef.current;
     setLoading(true);
     setError(null);
-    api
-      .listChatSessions(SESSION_LIMIT, 0)
+    // Canonical rows carry the same render fields (id/title/preview/source/
+    // last_active/message_count), so they flow through the shared row render.
+    const request =
+      source === "canonical"
+        ? api
+            .getSessions(SESSION_LIMIT, 0, scopeKey, "recent")
+            .then((res) => ({ sessions: res.sessions }))
+        : api.listChatSessions(SESSION_LIMIT, 0);
+    request
       .then((res) => {
         if (reqRef.current !== myReq) return;
         setSessions(res.sessions);
@@ -98,7 +121,7 @@ export function ChatSessionList({
       .finally(() => {
         if (reqRef.current === myReq) setLoading(false);
       });
-  }, []);
+  }, [scopeKey, source]);
 
   useEffect(() => {
     // Dashboard data surfaces fetch from an effect on mount + scope change;
@@ -153,8 +176,13 @@ export function ChatSessionList({
   const content = useMemo(() => {
     if (loading && sessions === null) {
       return (
-        <div className="flex items-center justify-center gap-2 px-2 py-6 text-xs text-text-secondary">
-          <Spinner /> {t.common.loading}
+        <div className="qchat__sessions-skeleton" role="status" aria-label={t.common.loading}>
+          {[0, 1, 2, 3].map((row) => (
+            <div className="qchat__session-skeleton-row" key={row} aria-hidden="true">
+              <span />
+              <span />
+            </div>
+          ))}
         </div>
       );
     }

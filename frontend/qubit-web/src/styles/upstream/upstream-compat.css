@@ -1,0 +1,86 @@
+/* ------------------------------------------------------------------
+ * Qubit upstream compat — shared var remap for the 1:1 upstream ports.
+ *
+ * Upstream theme/color vars are remapped onto live Qubit theme vars from
+ * src/index.css (so theme switching follows); layout/type/spacing
+ * constants are copied verbatim from upstream ui/src/styles/base.css :root
+ * at the pinned commit. Scoped to `.qb-upstream` (added to the root
+ * element of each ported page) so sibling lanes are untouched.
+ * Source: external upstream (MIT) — see THIRD_PARTY_NOTICES.md,
+ * commit 7ff3b3be3713751de356800167d67ce752ad0d04, ui/src/styles/base.css.
+ * ------------------------------------------------------------------ */
+.qb-upstream {
+  --accent: var(--midground);
+  --accent-2: #ffbd38;
+  --accent-2-subtle: color-mix(in srgb, #ffbd38 12%, transparent);
+  --accent-glow: rgba(255, 92, 92, 0.2);
+  --accent-subtle: color-mix(in srgb, var(--midground-base) 12%, transparent);
+  --bg: var(--background-base);
+  --bg-accent: color-mix(in srgb, var(--midground-base) 6%, var(--background-base));
+  --bg-elevated: color-mix(in srgb, var(--midground-base) 5%, var(--background-base));
+  --bg-hover: color-mix(in srgb, var(--midground-base) 9%, var(--background-base));
+  --border: color-mix(in srgb, var(--midground-base) 15%, transparent);
+  --border-strong: color-mix(in srgb, var(--midground-base) 28%, transparent);
+  --card: color-mix(in srgb, var(--midground-base) 4%, var(--background-base));
+  --chat-text-size: 0.875rem;
+  --control-ui-text-lg: 1rem;
+  --control-ui-text-md: 0.875rem;
+  --control-ui-text-sm: 0.8125rem;
+  --control-ui-text-xs: 0.75rem;
+  --control-ui-touch-input-size: 44px;
+  --cursor-action: default;
+  --danger: #fb2c36;
+  --danger-subtle: color-mix(in srgb, #fb2c36 12%, transparent);
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --focus-ring: 0 0 0 2px var(--background-base), 0 0 0 3px color-mix(in srgb, var(--midground-base) 80%, transparent);
+  --font-body: var(--theme-font-sans);
+  --font-chat: var(--theme-font-sans);
+  --info: #93c5fd;
+  --info-subtle: color-mix(in srgb, #93c5fd 12%, transparent);
+  --input: color-mix(in srgb, var(--midground-base) 15%, transparent);
+  --menu-item-height: 28px;
+  --menu-item-radius: var(--radius-sm);
+  --menu-padding: 4px;
+  --menu-radius: var(--radius-md);
+  --mono: var(--theme-font-mono);
+  /* ``--muted`` is used as a TEXT color in ~157 ported rules but as a surface
+     in only 3. Upstream defined it in a LIGHT theme where a mid-gray read
+     fine as text; under the dark remap a 65%-toward-background mix renders
+     near-invisible on that same dark background (measured 1.66:1 on
+     `.workboard-column__count`, 1.00:1 where the mix hit the bg exactly).
+     So: keep ``--muted`` readable-as-text (the dominant use), and give the
+     few surface call sites an explicit ``--muted-surface``. */
+  --muted: color-mix(in srgb, var(--midground-base) 82%, var(--background-base));
+  --muted-surface: color-mix(in srgb, var(--midground-base) 65%, var(--background-base));
+  --muted-strong: color-mix(in srgb, var(--midground-base) 90%, var(--background-base));
+  --ok: #4ade80;
+  --ok-subtle: color-mix(in srgb, #4ade80 12%, transparent);
+  --overlay-border: color-mix(in srgb, var(--border-strong) 64%, transparent);
+  --overlay-shadow: 0 1px 2px rgb(0 0 0 / 0.18), 0 8px 24px rgb(0 0 0 / 0.24);
+  --primary: var(--midground);
+  --primary-foreground: var(--background-base);
+  --primary-hover: #ffffff;
+  --radius: var(--theme-radius);
+  --radius-full: 9999px;
+  --radius-lg: var(--theme-radius);
+  --radius-md: calc(var(--theme-radius) - 2px);
+  --radius-sm: calc(var(--theme-radius) - 4px);
+  --ring: var(--midground);
+  --secondary: color-mix(in srgb, var(--midground-base) 8%, var(--background-base));
+  --settings-control-height: 32px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --text: var(--midground);
+  --text-strong: #ffffff;
+  --warn: #ffbd38;
+  --warn-subtle: color-mix(in srgb, #ffbd38 12%, transparent);
+}

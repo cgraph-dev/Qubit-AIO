@@ -47,6 +47,14 @@ export const ROUTES: ReadonlyArray<FamilyRoute> = [
   { family: "board", action: "log", method: "GET", path: "/api/qubit/board/log" },
   { family: "task", action: "ledger", method: "GET", path: "/api/qubit/task/ledger" },
   { family: "task", action: "suggestions", method: "GET", path: "/api/qubit/task/suggestions" },
+  // The live, derived ideas inbox. `/api/qubit/task/suggestions` (rpc
+  // `_task_suggestions`) is keyed by a durable sha-hash registry whose
+  // pre-existing accept/dismiss decisions shadow every re-derivation, so it
+  // returns an empty list — it is never the row source here. The working
+  // store is `/api/qubit/bot/ideas-list` (`family_bot_harness._gw_bot_ideas_list`),
+  // which derives from the live stores and applies the durable dismiss/accept
+  // overlay; accept/dismiss below target the same overlay.
+  { family: "task", action: "ideas", method: "GET", path: "/api/qubit/bot/ideas-list" },
   { family: "task", action: "cancel", method: "POST", path: "/api/qubit/task/cancel" },
   { family: "task", action: "retry", method: "POST", path: "/api/qubit/task/retry" },
 ];
@@ -108,11 +116,22 @@ export interface TaskRow {
   updated_at?: string;
 }
 
+export interface SuggestionEvidence {
+  id?: string;
+  kind?: string;
+  title?: string;
+  excerpt?: string;
+}
+
 export interface SuggestionRow {
   id: string;
   prompt?: string;
   title?: string;
   session?: string;
+  reason?: string;
+  kind?: string;
+  status?: string;
+  evidence?: SuggestionEvidence[];
 }
 
 export interface MentionRow {
@@ -199,6 +218,15 @@ export function normalizeTasks(payload: unknown): TaskRow[] {
   }));
 }
 
+function normalizeEvidence(row: Record<string, unknown>): SuggestionEvidence {
+  return {
+    id: str(row.id) || undefined,
+    kind: str(row.kind) || undefined,
+    title: str(row.title ?? row.name ?? row.subject) || undefined,
+    excerpt: str(row.excerpt ?? row.snippet ?? row.text ?? row.body) || undefined,
+  };
+}
+
 export function normalizeSuggestions(payload: unknown): SuggestionRow[] {
   if (!payload || typeof payload !== "object") return [];
   const env = payload as Record<string, unknown>;
@@ -208,6 +236,10 @@ export function normalizeSuggestions(payload: unknown): SuggestionRow[] {
     prompt: str(s.prompt ?? s.title ?? s.text ?? ""),
     title: str(s.title ?? s.prompt ?? ""),
     session: str(s.session ?? s.session_key ?? ""),
+    reason: str(s.reason ?? ""),
+    kind: str(s.kind ?? ""),
+    status: str(s.status ?? "new"),
+    evidence: asArray(s.evidence ?? s.sources).map(normalizeEvidence),
   }));
 }
 
@@ -320,6 +352,21 @@ export async function getTaskSuggestions(): Promise<unknown> {
   return fetchJSON<unknown>(url("task", "suggestions"));
 }
 
+/**
+ * Read the live derived ideas inbox (`/api/qubit/bot/ideas-list`).
+ *
+ * This is the working row source: `family_bot_harness._gw_bot_ideas_list`
+ * derives rows from the live stores (schedules / hooks / goals / ledger) and
+ * applies the durable dismiss/accept overlay that `acceptIdea`/`dismissIdea`
+ * write. `/api/qubit/task/suggestions` is NOT used here because its sha-hash
+ * registry shadows every re-derivation once a decision is recorded, leaving
+ * the list empty. Nothing is fabricated: each row carries its source record as
+ * `evidence`.
+ */
+export async function getTaskIdeas(): Promise<unknown> {
+  return fetchJSON<unknown>(url("task", "ideas"));
+}
+
 export interface TaskTarget {
   receiptId?: string;
   session?: string;
@@ -404,9 +451,33 @@ export const MENTIONS_REFUSAL: GatewayRefusal = {
 export const TASK_SUGGESTIONS_REFUSAL: GatewayRefusal = {
   method: "taskSuggestions.create / taskSuggestions.accept / taskSuggestions.dismiss",
   code: "TASK_SUGGESTIONS_OPERATOR_REQUIRED",
-  detail: "Qubit keeps no ephemeral model-proposed task-suggestion registry; no suggestion is created, accepted, or dismissed",
-  prerequisite: "an upstream model-proposed task-suggestion registry + run-control runtime; Qubit runs none",
-  counterpart: "durable scheduled work via voicebridge.schedules.create_job (`qubit cron add`) + the canonical chat session",
+  detail:
+    "Qubit keeps no ephemeral model-proposed task-suggestion registry; no suggestion is created, accepted, or dismissed",
+  prerequisite:
+    "an upstream model-proposed task-suggestion registry + run-control runtime; Qubit runs none",
+  counterpart:
+    "durable scheduled work via voicebridge.schedules.create_job (`qubit cron add`) + the canonical chat session",
 };
+
+// ── idea inbox actions (REAL) ────────────────────────────────────────────
+// The `/api/qubit/bot/ideas-*` rows derive the inbox from Qubit's own stores
+// (task ledger / cron schedules / flows hooks / goal sidecar) and are served
+// by `voicebridge/family_bot_harness.py`. Accept launches a real delegated
+// worker; dismiss records the decision. This is the working replacement for
+// the old TASK_SUGGESTIONS_OPERATOR_REQUIRED dead end.
+
+export async function acceptIdea(
+  ideaId: string,
+  confirm?: ConfirmPrompt,
+): Promise<unknown> {
+  return mutate("/api/qubit/bot/ideas-accept", { idea: ideaId }, confirm);
+}
+
+export async function dismissIdea(
+  ideaId: string,
+  confirm?: ConfirmPrompt,
+): Promise<unknown> {
+  return mutate("/api/qubit/bot/ideas-dismiss", { idea: ideaId }, confirm);
+}
 
 export { refusalOrError };

@@ -158,8 +158,12 @@ def backfill_profile_context(profile: ModelProfile) -> bool:
     """Fill a defaulted ``context_tokens`` from the real window; ``True`` if set.
 
     Only fires when the profile still carries the ``4096`` creation default —
-    an explicitly recorded window (larger OR smaller) is never overwritten.
-    A failed/unknown probe keeps the default (today's behavior).
+    an explicitly recorded window (larger OR smaller) is never overwritten
+    here (stale explicit windows are corrected by
+    :func:`correct_stale_profile_context`, never silently). A failed/unknown
+    probe keeps the default (today's behavior). A successful fill stamps the
+    probe (time/value/source) so a later repair can tell "stale" from
+    "deliberate".
     """
     if int(getattr(profile, "context_tokens", 0) or 0) != 4096:
         return False
@@ -168,7 +172,197 @@ def backfill_profile_context(profile: ModelProfile) -> bool:
     if real is None:
         return False
     profile.context_tokens = real
+    try:
+        profile.context_probed_at = time.time()
+    except Exception:  # noqa: BLE001 - stamp is audit-only, never fatal
+        pass
+    try:
+        profile.context_probed_value = int(real)
+    except Exception:  # noqa: BLE001 - stamp is audit-only, never fatal
+        pass
+    try:
+        profile.context_probe_source = "probe:vendored-resolver"
+    except Exception:  # noqa: BLE001 - stamp is audit-only, never fatal
+        pass
     return True
+
+
+def mark_profile_context_explicit(profile: ModelProfile, *,
+                                  actor: str = "operator") -> bool:
+    """Stamp the profile's window as an explicit user-set value.
+
+    Called when a window is staged deliberately at activation (a
+    user-typed ``context_length`` on a custom endpoint): a later
+    :func:`correct_stale_profile_context` refuses to auto-move it (the
+    explicit choice wins) unless forced. Never probes, never changes the
+    window itself. ``True`` when stamped.
+    """
+    try:
+        current = int(getattr(profile, "context_tokens", 0) or 0)
+    except (TypeError, ValueError):
+        return False
+    if current <= 0:
+        return False
+    try:
+        profile.context_probed_at = time.time()
+        profile.context_probed_value = current
+        profile.context_probe_source = (
+            f"explicit:{str(actor or 'operator')[:64]}")
+    except Exception:  # noqa: BLE001 - stamp is audit-only, never fatal
+        return False
+    return True
+
+
+def correct_stale_profile_context(profile: ModelProfile, *,
+                                  probed: Optional[int] = None,
+                                  force: bool = False) -> bool:
+    """Correct a stale declared window upward to a fresh probe; in-memory only.
+
+    Bounded repair for the 2026-10-03 stale-window defect (declared 200k vs
+    probed 1M on ``deepseek-v4-flash``): when a fresh genuine probe resolves
+    ABOVE the declared window, the declaration moves up to the probed value
+    and the probe is stamped (time/value/source). Otherwise untouched:
+
+    * probe unknown/``None`` -> ``False`` (fail-open, today's behavior);
+    * declared >= probe -> ``False`` (NEVER a downgrade; equal is fresh);
+    * an explicit user-set window (``explicit:`` stamp, or the window changed
+      since the probe stamp) wins -> ``False``, unless ``force=True``.
+
+    Never persists (the caller owns the sanctioned writer) and never raises
+    on a malformed profile (``False``). ``probed`` injects the fresh value
+    for hermetic callers; ``None`` runs the live bounded probe.
+    """
+    try:
+        declared = int(getattr(profile, "context_tokens", 0) or 0)
+    except (TypeError, ValueError):
+        return False
+    fresh = probed
+    if fresh is None:
+        try:
+            fresh = resolve_real_context_tokens(
+                str(getattr(profile, "model", "") or ""),
+                str(getattr(profile, "base_url", "") or ""),
+                str(getattr(profile, "provider", "") or ""))
+        except Exception:  # noqa: BLE001 - probe failure is a no-op
+            return False
+    if not isinstance(fresh, int) or fresh <= 0:
+        return False
+    if declared >= fresh:
+        return False
+    if not force:
+        src = str(getattr(profile, "context_probe_source", "") or "")
+        if src.startswith("explicit:"):
+            return False
+        try:
+            stamped_at = float(
+                getattr(profile, "context_probed_at", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            stamped_at = 0.0
+        if stamped_at > 0:
+            try:
+                stamped_val = int(
+                    getattr(profile, "context_probed_value", 0) or 0)
+            except (TypeError, ValueError):
+                stamped_val = 0
+            if declared != stamped_val:
+                # The window moved after the probe stamp: an operator
+                # narrowed/widened it deliberately after seeing a probe.
+                return False
+    try:
+        profile.context_tokens = int(fresh)
+        profile.context_probed_at = time.time()
+        profile.context_probed_value = int(fresh)
+        profile.context_probe_source = "probe:vendored-resolver"
+    except Exception:  # noqa: BLE001 - a half-written stamp is not a repair
+        return False
+    return True
+
+
+def repair_stale_profile_context(cfg: Any, profile_id: str, *,
+                                 actor: str = "dashboard:user",
+                                 force: bool = False,
+                                 probed: Optional[int] = None
+                                 ) -> Dict[str, Any]:
+    """Sanctioned one-time correction of a stale declared window.
+
+    Loads ``profile_id`` from the canonical registry, runs
+    :func:`correct_stale_profile_context` (upward-only, explicit-wins), and
+    persists through ``upsert_model_profile(confirm=True)`` — never a raw
+    registry edit — with a journal audit naming who/when/before/after/source.
+    A no-change outcome is ``ok:True, repaired:False`` with an honest
+    ``reason`` (``fresh`` | ``explicit-wins`` | ``probe-unresolved``), never
+    a failure. Unknown profiles are a typed refusal.
+    """
+    pid = str(profile_id or "").strip()
+    if not pid:
+        return {"ok": False, "code": "MALFORMED",
+                "detail": "profile id required"}
+    profile = R.get_profile(cfg, pid)
+    if profile is None:
+        return {"ok": False, "code": "UNKNOWN_PROFILE",
+                "detail": f"no model profile {pid!r}"}
+    try:
+        before = int(getattr(profile, "context_tokens", 0) or 0)
+    except (TypeError, ValueError):
+        before = 0
+    fresh = probed
+    if fresh is None:
+        try:
+            fresh = resolve_real_context_tokens(
+                str(getattr(profile, "model", "") or ""),
+                str(getattr(profile, "base_url", "") or ""),
+                str(getattr(profile, "provider", "") or ""))
+        except Exception:  # noqa: BLE001 - probe failure degrades to no-op
+            fresh = None
+    try:
+        changed = correct_stale_profile_context(
+            profile, probed=fresh, force=force)
+    except Exception as exc:  # noqa: BLE001 - typed, never raised
+        return {"ok": False, "code": "CORRECT_FAILED",
+                "detail": f"stale-window correction failed: "
+                          f"{type(exc).__name__}",
+                "profile_id": pid, "before": before}
+    if not changed:
+        if not isinstance(fresh, int) or fresh <= 0:
+            reason = "probe-unresolved"
+        elif before >= fresh:
+            reason = "fresh"
+        else:
+            reason = "explicit-wins"
+        out: Dict[str, Any] = {
+            "ok": True, "repaired": False, "reason": reason,
+            "profile_id": pid, "before": before,
+            "probe": fresh if isinstance(fresh, int) else None}
+        if reason == "explicit-wins" and not force:
+            out["detail"] = (
+                f"profile {pid!r} declares {before} but the window was "
+                f"explicitly set after the last probe; re-run with "
+                f"force=True to override it")
+        return out
+    saved = R.upsert_model_profile(cfg, profile, confirm=True)
+    if saved.get("state") != "OK":
+        return {"ok": False, "code": saved.get("code", "PROFILE_WRITE_FAILED"),
+                "detail": saved.get("detail", "could not persist correction"),
+                "profile_id": pid, "before": before}
+    after = int(getattr(profile, "context_tokens", 0) or before)
+    try:
+        from ..logging_setup import log_event as _log
+
+        _log("model.context_repaired", actor=str(actor or ""),
+             profile_id=pid,
+             provider=str(getattr(profile, "provider", "") or ""),
+             model=str(getattr(profile, "model", "") or ""),
+             before=before, after=after,
+             source=str(getattr(profile, "context_probe_source", "") or ""),
+             forced=bool(force))
+    except Exception:  # noqa: BLE001 - audit never fails a persisted repair
+        pass
+    return {"ok": True, "repaired": True, "profile_id": pid,
+            "provider": str(getattr(profile, "provider", "") or ""),
+            "model": str(getattr(profile, "model", "") or ""),
+            "before": before, "after": after, "forced": bool(force),
+            "probe_source": str(
+                getattr(profile, "context_probe_source", "") or "")}
 
 
 def _current_slot_summary(cfg: Any) -> str:
@@ -203,16 +397,34 @@ def _refuse_unavailable(cfg: Any, provider: str, model: str,
     return {
         "ok": False, "code": "MODEL_UNAVAILABLE",
         "detail": (
-            f"model {provider!r}/{model!r} looks unavailable "
-            f"(context probe: {reason}); the pick is refused so the main "
+            f"model {provider!r}/{model!r} was recently reported "
+            f"unavailable ({reason}); the pick is refused so the main "
             f"slot stays on {slot}. Retry the pick when the model is "
             f"reachable again, or pick a working model."),
         "provider": provider, "model": model,
     }
 
 
+def _warn_over_dead_record(provider: str, model: str,
+                            reason: str) -> Dict[str, Any]:
+    """Proceed-warning for an EXPLICIT pick of a recorded-unavailable model.
+
+    Plain language only: this text can reach the picker/confirm surfaces,
+    so it never carries internal record names.
+    """
+    return {
+        "ok": True, "proceed_over_dead_record": True,
+        "warning": (
+            f"model {provider!r}/{model!r} was recently reported "
+            f"unavailable ({reason}); proceeding on your explicit pick — "
+            f"if turns fail, pick a working model."),
+        "provider": provider, "model": model,
+    }
+
+
 def _gate_remote_liveness(*, cfg: Any, provider: str, model: str,
-                          base_url: str) -> Optional[Dict[str, Any]]:
+                           base_url: str,
+                           explicit: bool = False) -> Optional[Dict[str, Any]]:
     """Fail-closed liveness gate for REMOTE model activation.
 
     Runs the existing bounded context probe
@@ -229,12 +441,39 @@ def _gate_remote_liveness(*, cfg: Any, provider: str, model: str,
       here);
     * the probe itself raising (same fail-closed treatment).
 
+    Recorded-unavailable models (a previous turn failed at use time while
+    the static probe still resolved) split by caller intent: an EXPLICIT
+    user pick (``select_model``/``activate_endpoint`` from the picker,
+    CLI, or voice confirm) PROCEEDS with a plain-language warning audit
+    (one path's turn failure is not model death while the owner watches
+    it stream elsewhere); every SILENT path (``explicit=False``: defaults,
+    follow-model, voice escalation auto-picks) keeps the
+    ``MODEL_UNAVAILABLE`` refusal with the slot unchanged.
+
     Anything else is NOT negative evidence and proceeds as before: a
     resolved window, or an inconclusive result (``resolver-unavailable`` /
     ``unresolved`` / ``fallback`` — hermetic/offline/unknown) keeps today's
     accept behavior. Local-tier picks never reach this gate (the caller
     only gates non-``LOCAL`` profiles, which need no credentials to probe).
     """
+    try:
+        from . import dead_models as _DM
+
+        rec = _DM.is_dead(cfg, provider, model)
+    except Exception:
+        rec = None
+    if rec is not None:
+        reason = str(rec.get("reason", "unavailable") or "unavailable")[:200]
+        if explicit:
+            try:
+                from ..logging_setup import log_event as _log
+
+                _log("model.dead_record_warning", provider=provider,
+                     model=model, reason=reason)
+            except Exception:  # noqa: BLE001 - warning audit never blocks
+                pass
+            return _warn_over_dead_record(provider, model, reason)
+        return _refuse_unavailable(cfg, provider, model, reason)
     try:
         value, source = R._probe_real_context_window(
             str(model or ""), str(base_url or ""), str(provider or ""))
@@ -361,11 +600,16 @@ def _persist_runtime_model(cfg: Any, *, provider: str, model: str,
 
 
 def activate_endpoint(cfg: Any, ident: str, record: Dict[str, Any], *,
-                      confirm: bool = True) -> Dict[str, Any]:
+                      confirm: bool = True,
+                      explicit_window: bool = False) -> Dict[str, Any]:
     """Apply a staged custom endpoint as the effective runtime model.
 
     Returns a typed dict. ``confirm`` mirrors the caller's confirm gate so an
-    unconfirmed call is a dry run (never a silent apply).
+    unconfirmed call is a dry run (never a silent apply). ``explicit_window``
+    marks a caller-staged window as a deliberate user choice (stamped
+    ``explicit:`` so a later stale-window repair never silently moves it);
+    a carried preservation window (``select_model`` reuse) leaves it
+    ``False`` so drift stays repairable.
     """
     ident = slug_endpoint_id(ident or _text(record, "id", "name"))
     if not ident:
@@ -375,24 +619,43 @@ def activate_endpoint(cfg: Any, ident: str, record: Dict[str, Any], *,
     # A record without an explicit window gets the 4096 creation default;
     # replace it with the real window when the vendored metadata resolves one
     # (otherwise /chat's context floor refuses a capable model on stale data).
-    backfill_profile_context(profile)
+    if explicit_window and int(getattr(profile, "context_tokens", 0)
+                               or 0) != 4096:
+        try:
+            mark_profile_context_explicit(profile, actor="activate-endpoint")
+        except Exception:  # noqa: BLE001 - stamp never blocks activation
+            pass
+    else:
+        backfill_profile_context(profile)
     gate = profile.validate(cfg)
     if gate.get("state") != "OK":
         return {"ok": False, "code": gate.get("code", "PROFILE_INVALID"),
                 "detail": gate.get("detail", "endpoint is incomplete")}
     if profile.kind != R.LOCAL:
-        # Fail closed on dead upstream models BEFORE anything is persisted:
-        # a drifted main slot breaks every default turn until hand-repaired,
-        # so negative probe evidence refuses the pick with the slot unchanged.
-        # Local-tier picks skip the probe (no endpoint/credential involved).
+        # An explicit user pick proceeds over a recorded-unavailable model
+        # with a warning (one path's turn failure is not model death);
+        # silent paths never reach this explicit surface — they keep the
+        # refusal via the gate's explicit=False default. Local-tier picks
+        # skip the probe (no endpoint/credential involved).
         live = _gate_remote_liveness(
             cfg=cfg, provider=profile.provider, model=profile.model,
-            base_url=profile.base_url)
+            base_url=profile.base_url, explicit=True)
+        if live is not None and live.get("proceed_over_dead_record"):
+            dead_warning = str(live.get("warning") or "")
+            live = None
+        else:
+            dead_warning = ""
         if live is not None:
             return live
+    else:
+        dead_warning = ""
     if not confirm:
-        return {"ok": True, "dry_run": True, "profile_id": ident,
-                "provider": profile.provider, "model": profile.model}
+        out_dry: Dict[str, Any] = {
+            "ok": True, "dry_run": True, "profile_id": ident,
+            "provider": profile.provider, "model": profile.model}
+        if dead_warning:
+            out_dry["warning"] = dead_warning
+        return out_dry
     out = R.upsert_model_profile(cfg, profile, confirm=True)
     if out.get("state") != "OK":
         return {"ok": False, "code": out.get("code", "PROFILE_WRITE_FAILED"),
@@ -405,12 +668,16 @@ def activate_endpoint(cfg: Any, ident: str, record: Dict[str, Any], *,
     home_applied = _persist_runtime_model(
         cfg, provider=profile.provider, model=profile.model,
         base_url=profile.base_url, key_ref=profile.key_ref)
-    return {"ok": True, "active": ident, "profile_id": ident,
-            "provider": profile.provider, "model": profile.model,
-            "kind": profile.kind, "allow_persisted": persisted,
-            "home_applied": home_applied,
-            "rollback": "select another profile or remove "
-                        f"{ident!r} from the model-profile registry"}
+    applied: Dict[str, Any] = {
+        "ok": True, "active": ident, "profile_id": ident,
+        "provider": profile.provider, "model": profile.model,
+        "kind": profile.kind, "allow_persisted": persisted,
+        "home_applied": home_applied,
+        "rollback": "select another profile or remove "
+                    f"{ident!r} from the model-profile registry"}
+    if dead_warning:
+        applied["warning"] = dead_warning
+    return applied
 
 
 def _slug_model_id(provider: str, model: str) -> str:
@@ -510,7 +777,10 @@ def select_model(cfg: Any, provider: str, model: str, *,
     A remote provider with no endpoint/credential is an honest typed refusal,
     never a fabricated success. A remote pick whose bounded liveness probe
     reports the model unavailable (``MODEL_UNAVAILABLE``) is likewise refused
-    with the slot unchanged; local-tier picks skip the probe.
+    with the slot unchanged; local-tier picks skip the probe. An explicit
+    pick of a model with a recorded turn-time failure proceeds with a
+    plain-language ``warning`` (one path's failure is not model death);
+    silent paths keep the refusal via the gate default.
     """
     provider = str(provider or "").strip()
     model = str(model or "").strip()

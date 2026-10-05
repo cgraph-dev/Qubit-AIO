@@ -52,6 +52,28 @@ describe("api.wsTicket", () => {
     expect(grant.context_window_source).toBe("not-cached");
   });
 
+  it("threads the resume target so the grant reflects the session model", async () => {
+    // A resumed /chat must report the STORED session model, not the config
+    // default (2026-10-05: the MODEL card said deepseek while the terminal
+    // ran qubit-brain4). The server overlays `sessions.model` only when the
+    // mint carries the resume id.
+    let sent: Record<string, unknown> = {};
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      sent = JSON.parse(String(init?.body ?? "{}"));
+      return jsonResponse({
+        ok: true,
+        ticket: "t-2",
+        profile_id: "opencode-go-deepseek-v4.1-flash",
+        provider: "ollama",
+        model: "qubit-brain4",
+        session_pinned: true,
+      });
+    }));
+    const grant = await api.wsTicket(undefined, "pty", "dashboard-abc123");
+    expect(sent.resume).toBe("dashboard-abc123");
+    expect(grant.model).toBe("qubit-brain4");
+  });
+
   it("throws a typed WsTicketError on a 409 context refusal", async () => {
     vi.stubGlobal("fetch", vi.fn(async () =>
       jsonResponse(

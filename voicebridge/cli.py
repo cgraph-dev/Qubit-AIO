@@ -1781,6 +1781,32 @@ def build_parser() -> argparse.ArgumentParser:
     vo_cancel.add_argument("--session", default="cli")
     vo_sub.add_parser("commands", parents=[common],
                       help="list every voice command with aliases and help")
+    vo_wave = vo_sub.add_parser(
+        "waveform", parents=[common],
+        help=("show/hide the dashboard waveform widget and the in-game "
+              "orb overlay "
+              "(voice_edit.waveform_visible / voice_edit.waveform_ingame; "
+              "same as saying "
+              "'show waveform' / 'hide waveform' / 'show waveform ingame' / "
+              "'hide waveform ingame' or flipping the "
+              "Voice settings dashboard switches)"))
+    wave_sub = vo_wave.add_subparsers(dest="waveform_action")
+    wave_sub.add_parser("show", parents=[common],
+                        help=("show the waveform widget "
+                              "(same as saying 'show waveform')"))
+    wave_sub.add_parser("hide", parents=[common],
+                        help=("hide the waveform widget "
+                              "(same as saying 'hide waveform')"))
+    wave_sub.add_parser("ingame-on", parents=[common],
+                        help=("keep the orb visible over fullscreen games "
+                              "(same as saying 'show waveform ingame')"))
+    wave_sub.add_parser("ingame-off", parents=[common],
+                        help=("auto-hide the orb on fullscreen again "
+                              "(same as saying 'hide waveform ingame')"))
+    wave_sub.add_parser("status", parents=[common],
+                        help=("report waveform visibility + game overlay "
+                              "(same switches as "
+                              "the Voice settings dashboard page)"))
     bn = add("brain", help="Multi-principal profiles, accounts, vault refs, onboarding")
     bn_sub = bn.add_subparsers(dest="brain_command")
     bn_padd = bn_sub.add_parser("principal-add", parents=[common],
@@ -3875,6 +3901,47 @@ def _chat_noninteractive_gate(tail: list):
     }
 
 
+def _install_pty_detach_on_term() -> None:
+    """Detach live dashboard PTYs when this process is asked to stop.
+
+    ``systemctl stop/restart qubit-voicebridge`` SIGTERMs the whole cgroup, so
+    the dashboard-hosted terminal (and the agent turn running inside it) dies
+    mid-work — the operator then has to retype `continue`. Detaching first
+    leaves the terminal process running and the next page load re-attaches to
+    the same conversation via the pty_ws detach/reattach registry.
+
+    Idempotent and best-effort: a failure here must never block shutdown.
+    """
+    import signal as _signal
+
+    if getattr(_install_pty_detach_on_term, "_done", False):
+        return
+    _install_pty_detach_on_term._done = True  # type: ignore[attr-defined]
+
+    def _on_term(signum, _frame):
+        try:
+            from . import webui as _webui
+            server = getattr(_webui, "CURRENT_SERVER", None)
+            pty = getattr(server, "_pty_ws", None) if server is not None else None
+            if pty is not None:
+                pty.detach_all()
+        except Exception:
+            pass
+        # Restore the default disposition and re-raise so systemd still sees a
+        # clean stop (we do not swallow the signal).
+        try:
+            _signal.signal(signum, _signal.SIG_DFL)
+            import os as _os
+            _os.kill(_os.getpid(), signum)
+        except Exception:
+            pass
+
+    try:
+        _signal.signal(_signal.SIGTERM, _on_term)
+    except Exception:
+        pass
+
+
 def main(argv=None) -> int:
     raw = list(sys.argv[1:] if argv is None else argv)
     # Narrow legacy migration: adopt pre-rebrand env names for this process
@@ -4139,6 +4206,12 @@ def main(argv=None) -> int:
     from .orchestrator import VoiceOrchestrator
     orch = VoiceOrchestrator(cfg, no_hotkey=args.no_hotkey, dry_run=args.dry_run)
     orch.muted = args.mute
+
+    # A systemd stop/restart sends SIGTERM to the whole cgroup, which kills the
+    # in-flight agent turn mid-work and costs the operator a manual `continue`.
+    # Detach live dashboard PTYs first: the terminal keeps running and the next
+    # page load re-attaches to the same conversation instead of losing it.
+    _install_pty_detach_on_term()
 
     try:
         if command == "run":
@@ -7815,6 +7888,156 @@ def _cmd_brain(cfg, args) -> int:
         return rc
 
 
+def _put_voice_edit_flag_via_service(cfg, key, visible,
+                                       opener=None) -> str:
+    """PUT one voice-edit flag through the RUNNING bridge (dashboard path).
+
+    ``key`` is ``"waveform_visible"`` (dashboard widget) or
+    ``"waveform_ingame"`` (in-game orb override) — both ride the SAME
+    ``PUT /api/voice-edit/settings`` the dashboard switch uses, so file,
+    bridge memory, and GET agree after any writer.
+
+    Returns ``"ok"`` (bridge synced file + its live memory) or
+    ``"unreachable"`` (nothing listening —
+    the caller falls back to the direct file write, which the bridge reads
+    on its next boot). Raises :class:`_WaveformServiceRefused` when the
+    bridge ANSWERED non-2xx: the caller must NOT file-write then, or file
+    would desync from bridge memory. Reuses the local-client convention
+    (``desktop_helper.resolve_service_base`` / ``resolve_token``, ``/agent``
+    prefix, both session headers) — no new auth invented. Never logs the
+    token. Never raises on connection failure (returns ``"unreachable"``).
+    """
+    from .desktop_helper import resolve_service_base, resolve_token
+
+    import urllib.error
+    import urllib.request
+
+    base = str(resolve_service_base(cfg) or "").rstrip("/")
+    token = str(resolve_token(cfg) or "")
+    payload = json.dumps({str(key or "waveform_visible"): bool(visible)}).encode()
+    url = f"{base}/agent/api/voice-edit/settings"
+    req = urllib.request.Request(url, data=payload, method="PUT")
+    req.add_header("Content-Type", "application/json")
+    if token:
+        req.add_header("X-Api-Token", token)
+        req.add_header("X-Qubit-Session-Token", token)
+    open_fn = opener or urllib.request.urlopen
+    try:
+        with open_fn(req, timeout=5.0) as resp:
+            try:
+                code = int(getattr(resp, "status", 200) or 200)
+            except (TypeError, ValueError):
+                code = 200
+            if 200 <= code < 300:
+                return "ok"
+            raise _WaveformServiceRefused(code, "")
+    except _WaveformServiceRefused:
+        raise
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            raw = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
+            parsed = json.loads(raw) if raw.strip() else {}
+            detail = str(parsed.get("detail") or parsed.get("code") or "")[:160]
+        except Exception:
+            detail = ""
+        raise _WaveformServiceRefused(int(getattr(exc, "code", 0) or 0), detail)
+    except Exception:
+        return "unreachable"
+
+
+def _put_waveform_via_service(cfg, visible, opener=None) -> str:
+    """PUT waveform_visible through the RUNNING bridge (dashboard path).
+
+    Thin wrapper over :func:`_put_voice_edit_flag_via_service` (same
+    contract: ``"ok"`` / ``"unreachable"`` / raises
+    :class:`_WaveformServiceRefused`). Kept as the stable entry point the
+    widget path — and its tests — call.
+    """
+    return _put_voice_edit_flag_via_service(cfg, "waveform_visible",
+                                            visible, opener=opener)
+
+
+class _WaveformServiceRefused(Exception):
+    """The running bridge refused the waveform PUT (code, detail)."""
+
+    def __init__(self, code=0, detail=""):
+        super().__init__(f"HTTP_{code}")
+        self.code = code
+        self.detail = detail
+
+
+def _cmd_voice_waveform(cfg, args) -> int:
+    """voicebridge voice waveform show|hide|status|ingame-on|ingame-off.
+
+    Terminal mirror of the "show waveform" / "hide waveform" voice intents
+    and the Voice settings dashboard switch, plus the in-game orb override
+    ("show waveform ingame" / "hide waveform ingame", ``ingame-on`` /
+    ``ingame-off``). ``show``/``hide``/``ingame-on``/``ingame-off`` first try the
+    running bridge's authed localhost PUT (the SAME path the dashboard
+    switch uses, so file, bridge memory, and GET agree after any writer);
+    when no bridge is listening it falls back to the canonical file writer
+    (``VoiceEditService.set_waveform_visible`` /
+    ``set_waveform_ingame`` -> ``update_voice_edit``:
+    atomic write + live-cfg sync) and audits like the voice path
+    (``voice_edit.waveform.set`` / ``voice_edit.waveform_ingame.set``).
+    When the bridge ANSWERS non-2xx the flip is
+    refused loudly (no file write — that would desync file vs bridge
+    memory). ``status`` (or no action) is read-only and reports BOTH flags
+    (widget + game overlay). Never prints secrets
+    (one word + on/off only).
+    """
+    from .voice_edit.service import VoiceEditService
+
+    action = (getattr(args, "waveform_action", None) or "status")
+    action = str(action).strip().lower()
+    if action in ("show", "hide", "ingame-on", "ingame-off"):
+        svc = VoiceEditService(cfg)
+        ingame = action.startswith("ingame-")
+        on = action in ("show", "ingame-on")
+        key = "waveform_ingame" if ingame else "waveform_visible"
+        try:
+            if ingame:
+                via = _put_voice_edit_flag_via_service(cfg, key, on)
+            else:
+                via = _put_waveform_via_service(cfg, on)
+        except _WaveformServiceRefused as exc:
+            code = f"HTTP_{exc.code}" if exc.code else "SERVICE_REFUSED"
+            tail = f" {exc.detail}" if exc.detail else ""
+            print(f"ERROR: voice waveform {action} refused by the running "
+                  f"bridge ({code}{tail}); file left unchanged "
+                  f"(fix dashboard auth and retry)")
+            return 1
+        if via != "ok":
+            if ingame:
+                svc.set_waveform_ingame(on)
+            else:
+                svc.set_waveform_visible(on)
+        if ingame:
+            svc._audit("voice_edit.waveform_ingame.set",
+                       {"source": "cli", "ingame": on,
+                        "via": via})
+            print(f"Game overlay {'on' if on else 'off'}.")
+        else:
+            svc._audit("voice_edit.waveform.set",
+                       {"source": "cli", "visible": on,
+                        "via": via})
+            print(f"Waveform {'on' if on else 'off'}.")
+        return 0
+    if action == "status":
+        from .voice_edit import settings as _vesettings
+
+        view = _vesettings.settings_view(cfg)
+        visible = bool(view.get("waveform_visible", False))
+        ingame = bool(view.get("waveform_ingame", False))
+        print(f"Waveform {'on' if visible else 'off'}.")
+        print(f"Game overlay {'on' if ingame else 'off'}.")
+        return 0
+    print(f"ERROR: unknown voice waveform action {action!r} "
+          f"(expected show|hide|ingame-on|ingame-off|status)")
+    return 2
+
+
 def _cmd_voice(cfg, args) -> int:
     """voicebridge voice say|confirm|cancel|commands.
 
@@ -7825,6 +8048,8 @@ def _cmd_voice(cfg, args) -> int:
     import json as _json
     from . import voice_commands as VC
     cmd = getattr(args, "voice_command", None) or "commands"
+    if cmd == "waveform":
+        return _cmd_voice_waveform(cfg, args)
     session = getattr(args, "session", "") or "cli"
     ctx = VC.make_ctx(cfg, actor="cli:user", session=session, source="cli")
     as_json = bool(getattr(args, "json", False))

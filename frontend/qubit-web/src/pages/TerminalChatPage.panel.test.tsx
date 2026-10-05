@@ -79,6 +79,21 @@ const apiMocks = vi.hoisted(() => ({
     limit: 30,
     offset: 0,
   })),
+  // Canonical panel list (`source="canonical"` in TerminalChatPage) reads the
+  // receipts store; rows carry the same render fields (id/title/...).
+  getSessions: vi.fn(async () => ({
+    sessions: [
+      {
+        id: "session-1",
+        title: "Panel session",
+        last_active: Date.now() / 1000,
+        message_count: 2,
+      },
+    ],
+    total: 1,
+    limit: 30,
+    offset: 0,
+  })),
   // Read-only registries rendered by ChatToolsSummary in the panel.
   getToolsets: vi.fn(async () => []),
   getSkills: vi.fn(async () => []),
@@ -101,12 +116,16 @@ vi.mock("@/lib/api", () => ({
     createChatSession: apiMocks.createChatSession,
     setTerminalProfile: apiMocks.setTerminalProfile,
     listChatSessions: apiMocks.listChatSessions,
+    getSessions: apiMocks.getSessions,
     getToolsets: apiMocks.getToolsets,
     getSkills: apiMocks.getSkills,
     getPlugins: apiMocks.getPlugins,
     getMcpServers: apiMocks.getMcpServers,
     getChatWorkspaces: apiMocks.getChatWorkspaces,
   },
+  // PTY resume/session reads go through the backoff wrapper (same rationale
+  // as the ChatPage mock); passthrough matches a healthy backend.
+  withBackoff: (fn: () => Promise<unknown>) => fn(),
   WsTicketError: class WsTicketError extends Error {
     code = "";
     detail = "";
@@ -128,6 +147,16 @@ vi.mock("@xterm/xterm", () => ({
     onResize() {
       return { dispose() {} };
     }
+    onScroll() {
+      return { dispose() {} };
+    }
+    attachCustomKeyEventHandler() {}
+    getSelection() {
+      return "";
+    }
+    clearSelection() {}
+    focus() {}
+    buffer = { active: { viewportY: 0, baseY: 0 } };
   },
 }));
 vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { fit() {} } }));
@@ -218,6 +247,7 @@ beforeEach(() => {
     session: { id: "dashboard-abc123def456" },
   });
   apiMocks.listChatSessions.mockClear();
+  apiMocks.getSessions.mockClear();
   sidebarMount.mockClear();
   FakeWebSocket.instances = [];
   vi.stubGlobal("WebSocket", FakeWebSocket);
@@ -270,7 +300,8 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     await vi.waitFor(() =>
       expect(container.textContent).toContain("Panel session"),
     );
-    expect(apiMocks.listChatSessions).toHaveBeenCalled();
+    // The panel list uses source="canonical", so it reads the receipts store.
+    expect(apiMocks.getSessions).toHaveBeenCalled();
   });
 
   it("collapses and re-expands the panel with the a11y toggle", async () => {
@@ -408,11 +439,16 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(closeSpy).toHaveBeenCalled();
   });
 
-  it("mints a NEW canonical session id on New chat and resumes it", async () => {
-    // Regression (SESS-01/D1): New chat used to clear `?resume` and reconnect,
-    // which the server mapped to the fixed default `dashboard-chat`, so the
-    // SAME transcript reopened. It must mint a new id via the canonical store
-    // and resume that id into the PTY WebSocket.
+  it("starts a fresh server-minted session on New chat (no client resume)", async () => {
+    // Regression (SESS-01/D1), new contract: New chat used to clear `?resume`
+    // and reconnect, which the server mapped to the fixed default
+    // `dashboard-chat`, so the SAME transcript reopened. Client-side minting
+    // (createChatSession + resume=<newId>) was superseded: with no `?resume=`
+    // the server emits no resume env and the vendored TUI forges a brand-new
+    // session, while the rotated attach token keeps the new PTY from
+    // inheriting the previous terminal. Pin the observable half: New chat
+    // reconnects exactly once with a FRESH socket carrying no resume target
+    // (and mints nothing up front).
     apiMocks.wsTicket.mockImplementation(async () => ({
       ticket: "tkt",
       expires_in: 60,
@@ -438,12 +474,10 @@ describe("Qubit TerminalChatPage right-side panel", () => {
       newChat!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    await vi.waitFor(() =>
-      expect(apiMocks.createChatSession).toHaveBeenCalled(),
-    );
     await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(2));
-    expect(FakeWebSocket.instances[1].url).toContain(
-      "resume=dashboard-abc123def456",
-    );
+    // Fresh PTY: no resume target, so the server forges a new session instead
+    // of reopening the old transcript. Nothing is minted client-side.
+    expect(FakeWebSocket.instances[1].url).not.toContain("resume=");
+    expect(apiMocks.createChatSession).not.toHaveBeenCalled();
   });
 });

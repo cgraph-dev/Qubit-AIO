@@ -1,0 +1,243 @@
+/* ------------------------------------------------------------------
+ * Unscoped console primitives — `.btn`, `.settings-input`, `.callout`.
+ *
+ * WHY THIS FILE EXISTS
+ * `workboard.css` defines these bases only under a `.workboard` ancestor
+ * (`.workboard .btn { … }`). Sixteen console pages — /worktrees,
+ * /checkpoints, /qubit-taskflows, /canvas, /nodes, /session-ops,
+ * /qubit-memory, /analytics, and others — use `btn` / `btn--sm` /
+ * `btn--ghost` WITHOUT being inside `.workboard`. They therefore matched
+ * no rule at all: every button rendered with no background, no border and
+ * no colour, i.e. invisible text. Inputs were the same.
+ *
+ * This file re-states the same geometry at document scope so those pages
+ * style correctly. Colours resolve through the Qubit theme tokens, so it
+ * follows the active theme instead of hard-coding a palette.
+ *
+ * Geometry is intentionally identical to the `.workboard .btn` block in
+ * `workboard.css` (border 1px, padding 8px 14px, radius var(--radius-md),
+ * font-size 13px, weight 500) so a control reads the same inside and
+ * outside the workboard.
+ *
+ * NOT a replacement for the workboard rules — those stay as they are, and
+ * their higher specificity keeps winning inside `.workboard`.
+ * ------------------------------------------------------------------ */
+
+/* ----------------------------------------------------------------- button */
+
+.btn {
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--color-border, var(--border, rgba(232, 240, 228, 0.14)));
+  background: var(--color-card, #161b24);
+  padding: 8px 14px;
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 140ms cubic-bezier(0.4, 0, 0.2, 1),
+    background 140ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 140ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  border-color: var(--color-foreground, currentColor);
+}
+
+.btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+}
+
+/* Disabled state must stay visibly disabled, not disappear. */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* A disabled GHOST button has neither border nor background, so `opacity`
+ * alone is the only signal that it cannot be pressed — and against the dark
+ * canvas it reads as ordinary muted text. Give it a dashed outline so
+ * "disabled with a reason" is visually distinct from a live control. This is
+ * what the pages show for policy-gated actions ("Unavailable — <reason>"). */
+.btn--ghost:disabled,
+.btn--ghost[aria-disabled="true"] {
+  opacity: 0.6;
+  border-style: dashed;
+  border-color: var(--color-border, rgba(232, 240, 228, 0.22));
+  background: transparent;
+}
+
+/* ------------------------------------------------------------- modifiers */
+
+.btn--sm {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.btn--icon {
+  padding: 8px;
+  min-width: 36px;
+  height: 36px;
+}
+
+.btn--icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-foreground, inherit);
+}
+
+/* A ghost button carries no surface at rest, so a toolbar of them reads as
+ * loose text — the "text dump" look. Give it a faint resting surface that
+ * resolves on hover; the control stays visually quiet but is legibly a
+ * control. */
+.btn--ghost {
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 5%, transparent);
+}
+
+.btn--ghost:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  background: var(--color-muted, rgba(232, 240, 228, 0.12));
+}
+
+.btn--xs {
+  padding: 3px 8px;
+  font-size: 11px;
+  min-height: 24px;
+  border-radius: 8px;
+}
+
+.btn.primary,
+.btn--primary {
+  border-color: transparent;
+  background: var(--color-foreground, currentColor);
+  color: var(--color-background, #10141c);
+}
+
+.btn.danger,
+.btn--danger {
+  border-color: transparent;
+  background: color-mix(in srgb, #aa4a45 18%, transparent);
+  color: #f0b8b4;
+}
+
+.btn.active {
+  border-color: var(--color-border, currentColor);
+  background: var(--color-muted, rgba(232, 240, 228, 0.1));
+}
+
+/* ------------------------------------------------------------------ input */
+
+/* Pages use bare `.settings-input`; give it a real field surface so an
+ * input is distinguishable from body text. */
+.settings-input {
+  color: inherit;
+  width: 100%;
+  border: 1px solid var(--color-border, rgba(232, 240, 228, 0.14));
+  background: var(--color-card, #161b24);
+  padding: 7px 10px;
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 13px;
+  min-height: 31px;
+}
+
+.settings-input::placeholder {
+  color: color-mix(in srgb, currentColor 55%, transparent);
+}
+
+.settings-input:focus-visible {
+  outline: 2px solid var(--color-foreground, currentColor);
+  outline-offset: 1px;
+}
+
+/* ---------------------------------------------------------------- select */
+
+/* Pages emit `settings-select` for dropdowns, but no sheet defined it, so the
+ * control rendered with the browser default chrome against the dark canvas.
+ * `settings-controls.css` upstream has no such class; this is the Qubit
+ * equivalent built from the same field tokens as `.settings-input`. */
+.settings-select {
+  color: inherit;
+  border: 1px solid var(--color-border, rgba(232, 240, 228, 0.14));
+  background: var(--color-card, #161b24);
+  padding: 7px 10px;
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 13px;
+  min-height: 31px;
+}
+
+.settings-select:focus-visible {
+  outline: 2px solid var(--color-foreground, currentColor);
+  outline-offset: 1px;
+}
+
+/* A navigation row is a button that must read as a row, not as body text.
+ * `settings-row--nav` is emitted by the rows-as-links surfaces; give it a
+ * hover surface and a pressed state so it is recognisably interactive. */
+.settings-row--nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 0.5rem);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-row--nav:hover {
+  background: var(--color-muted, rgba(232, 240, 228, 0.1));
+  border-color: var(--color-border, rgba(232, 240, 228, 0.14));
+}
+
+/* ---------------------------------------------------------------- callout */
+
+/* Vertical-text guard.
+ *
+ * A flex text column whose basis is 0 collapses to zero width when a sibling
+ * claims the full row, and the title then wraps one character per line
+ * ("P r u n e   c h e c k p o i n t s"). That failure is invisible to tests
+ * and screenshots taken without the offending content, so the guard is global:
+ * a settings title may never be squeezed below a legible width, and it wraps
+ * on word boundaries rather than mid-word.
+ */
+.settings-row__text {
+  min-width: 0;
+}
+
+.settings-row__title,
+.settings-row__desc {
+  overflow-wrap: break-word;
+  word-break: normal;
+  min-width: 10rem;
+}
+
+.callout {
+  border: 1px solid var(--color-border, rgba(232, 240, 228, 0.14));
+  background: var(--color-card, #161b24);
+  border-radius: var(--radius-md, 0.5rem);
+  padding: 12px 14px;
+}
+
+.callout--muted {
+  background: transparent;
+  color: color-mix(in srgb, currentColor 78%, transparent);
+}

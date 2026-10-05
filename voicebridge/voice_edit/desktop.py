@@ -61,6 +61,35 @@ def _looks_like_text(text: str) -> bool:
     return (printable / max(1, len(sample))) >= 0.85
 
 
+def _app_class_same(old: str, new: str) -> bool:
+    """True when two WM_CLASS readings name the same application.
+
+    Journal 2026-10-04: a Firefox dictate failed the focus gate with
+    ``snapshot=firefox_firefox`` vs ``now=firefox`` — the same window id,
+    two spellings of one class (instance_class doubling, depending on
+    whether ``getwindowclassname`` or the ``xprop`` fallback answered).
+    The window id stays the hard focus proof; the class string is only a
+    sanity check against id reuse, so spelling variants of one class must
+    match: equal, substring, or shared token (split on non-alphanumerics).
+    ``code`` vs ``vscode`` matches (one app, two reporters); ``code`` vs
+    ``firefox`` does not. Never raises.
+    """
+    try:
+        o = (old or "").lower()
+        n = (new or "").lower()
+        if o == n:
+            return True
+        if not o or not n:
+            return True
+        if o in n or n in o:
+            return True
+        ot = set(re.split(r"[^a-z0-9]+", o)) - {""}
+        nt = set(re.split(r"[^a-z0-9]+", n)) - {""}
+        return bool(ot & nt)
+    except Exception:
+        return False
+
+
 @dataclass
 class ClipboardBackup:
     targets: List[str] = field(default_factory=list)
@@ -507,7 +536,7 @@ class DesktopAdapter:
         if not now["window_id"] or now["window_id"] != snapshot.window_id:
             return False
         if snapshot.app_class and now["app_class"] and \
-                now["app_class"] != snapshot.app_class:
+                not _app_class_same(snapshot.app_class, now["app_class"]):
             return False
         return True
 

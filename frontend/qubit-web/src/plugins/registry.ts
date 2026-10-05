@@ -5,9 +5,10 @@
  * that plugin bundles can use them without bundling their own copies.
  *
  * Plugins call window.__QUBIT_PLUGINS__.register(name, Component)
- * to register their tab component. The legacy ``__HERMES_PLUGINS__`` alias
- * is assigned the same object so third-party plugins built against it keep
- * working; new plugins must use the Qubit name.
+ * to register their tab component. The legacy ``__QUBIT_PLUGINS_LEGACY__``
+ * alias (kept for plugins built against the pre-rebrand global) is assigned
+ * the same object so such plugins keep working; new plugins must use the
+ * Qubit name.
  */
 
 import React, {
@@ -192,8 +193,21 @@ export function exposePluginSDK() {
   };
   window.__QUBIT_PLUGINS__ = registry;
   window.__QUBIT_PLUGIN_SDK__ = sdk;
-  // Legacy aliases for third-party plugins built against the old names.
-  // Assigned, never read by first-party code.
-  window.__HERMES_PLUGINS__ = registry;
+  // Legacy aliases for plugin bundles built before the rebrand renamed the
+  // host globals. These MUST carry the historical names the bundles actually
+  // read — a plugin's dist is a build artifact we do not control and cannot
+  // rebuild, and a shipped one (`agent-analytics`) does
+  // `const SDK = window.__HERMES_PLUGIN_SDK__` then destructures `React` off it,
+  // so when the alias is missing the plugin throws
+  // "Cannot destructure property 'React' of 'SDK' as it is undefined" on every
+  // route. Accept-both, canonical first: first-party code always uses the
+  // QUBIT names above; these exist only so an old bundle keeps loading.
+  //
+  // ``window.__HERMES_PLUGINS__`` is the registry handle too: the same bundle
+  // calls ``window.__HERMES_PLUGINS__.register(...)``.
   window.__HERMES_PLUGIN_SDK__ = sdk;
+  window.__HERMES_PLUGINS__ = registry;
+  // Earlier spelling of the alias (kept: something may already reference it).
+  window.__QUBIT_PLUGINS_LEGACY__ = registry;
+  window.__QUBIT_PLUGIN_SDK_LEGACY__ = sdk;
 }

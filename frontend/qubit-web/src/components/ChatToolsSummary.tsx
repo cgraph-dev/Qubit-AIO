@@ -1,9 +1,10 @@
 /**
  * ChatToolsSummary — compact, READ-ONLY summary of the agent's real tool,
- * skill, plugin, and MCP registries, shown inside the `/chat` side panel.
+ * skill, plugin, and MCP registries, shown inside the chat side panels
+ * (`/qubit-chat` today; the same card is intended for `/chat`).
  *
  * Closes M1 boot item 5: those registries were reachable only via the left-nav
- * pages, never surfaced next to the embedded TUI. This card reads the SAME
+ * pages, never surfaced next to the chat surface. This card reads the SAME
  * authenticated endpoints the dedicated pages already call:
  *
  *   - tools   → `GET /api/tools/toolsets` (each toolset carries its `tools[]`)
@@ -14,7 +15,13 @@
  * No mutation, no new backend route, no fabricated data: an endpoint that
  * fails (or an empty registry) renders a short honest note and nothing else.
  * Every fetch is independent and best-effort, so a failure here can never
- * disturb the PTY terminal or the rest of the panel.
+ * disturb the chat surface or the rest of the panel.
+ *
+ * Optional `onMention`: when the host page provides it (a composer that can
+ * accept text), listed names render as buttons that hand the name back —
+ * the host inserts plain `@name` text, exactly as if typed. No send-path,
+ * protocol, or routing change: the turn backend sees ordinary composer text.
+ *
  *
  * MCP rows are inventory, not a live-connection count: a server is
  * `configured` (registered) and, independently, `connected`. The embedded TUI
@@ -79,15 +86,41 @@ function CountBadge({ children }: { children: ReactNode }) {
   );
 }
 
-function ShortList({ items }: { items: string[] }) {
+function ShortList({
+  items,
+  onMention,
+}: {
+  items: string[];
+  onMention?: (name: string) => void;
+}) {
   if (items.length === 0) {
     return <span className="text-[0.6875rem] text-text-tertiary">none</span>;
   }
   const shown = items.slice(0, SHORT_LIST);
   const rest = items.length - shown.length;
+  if (!onMention) {
+    return (
+      <span className="min-w-0 wrap-break-word text-[0.6875rem] leading-snug text-text-tertiary">
+        {shown.join(", ")}
+        {rest > 0 ? ` +${rest} more` : ""}
+      </span>
+    );
+  }
   return (
     <span className="min-w-0 wrap-break-word text-[0.6875rem] leading-snug text-text-tertiary">
-      {shown.join(", ")}
+      {shown.map((name, i) => (
+        <span key={name}>
+          {i > 0 ? ", " : ""}
+          <button
+            type="button"
+            onClick={() => onMention(name)}
+            title={`Insert @${name} into the composer`}
+            className="hover:underline"
+          >
+            {name}
+          </button>
+        </span>
+      ))}
       {rest > 0 ? ` +${rest} more` : ""}
     </span>
   );
@@ -101,6 +134,7 @@ function Row({
   detail,
   items,
   failed,
+  onMention,
 }: {
   label: string;
   href: string;
@@ -109,9 +143,10 @@ function Row({
   detail?: string;
   items: string[];
   failed: boolean;
+  onMention?: (name: string) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
+    <div className="qchat__tools-row flex min-w-0 flex-col gap-0.5">
       <div className="flex min-w-0 items-center justify-between gap-2">
         <Link
           to={href}
@@ -137,12 +172,20 @@ function Row({
           </CountBadge>
         )}
       </div>
-      {!failed && count !== null ? <ShortList items={items} /> : null}
+      {!failed && count !== null ? (
+        <ShortList items={items} onMention={onMention} />
+      ) : null}
     </div>
   );
 }
 
-export function ChatToolsSummary({ profile }: { profile?: string }) {
+export function ChatToolsSummary({
+  profile,
+  onMention,
+}: {
+  profile?: string;
+  onMention?: (name: string) => void;
+}) {
   // Each loader is a stable identity for its profile so `useRegistry` fires
   // exactly once per mount / profile switch.
   const toolsets = useRegistry<ToolsetInfo[]>(
@@ -179,7 +222,7 @@ export function ChatToolsSummary({ profile }: { profile?: string }) {
   return (
     <Card
       data-testid="chat-tools-summary"
-      className="flex shrink-0 flex-col gap-2 px-3 py-2"
+      className="qchat__tools-card flex shrink-0 flex-col gap-2 px-3 py-2"
     >
       <span className="text-display text-xs tracking-wider text-text-tertiary">
         Agent tools
@@ -200,6 +243,10 @@ export function ChatToolsSummary({ profile }: { profile?: string }) {
         count={skillRows.length}
         items={skillRows.map((s) => s.name)}
         failed={skills.failed}
+        // Skill names are the composer affordance: the host inserts `@name`
+        // as plain text. Tool rows list toolset (not tool) names and plugin /
+        // MCP rows list inventory identities, so they stay plain text.
+        onMention={onMention}
       />
       <Row
         label="Plugins"

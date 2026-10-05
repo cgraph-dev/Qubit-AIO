@@ -13,6 +13,7 @@ import { cn, themedBody } from "@/lib/utils";
 import { fuzzyRank } from "@/lib/fuzzy";
 import { queryMatchesProviderOnly } from "@/lib/model-picker-filter";
 import { modelSearchText } from "@/lib/model-search-text";
+import "./ModelPickerDialog.css";
 
 /**
  * Two-stage model picker modal.
@@ -375,50 +376,54 @@ export function ModelPickerDialog(props: Props) {
   // Toast.tsx for the same pattern.
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 p-4"
+      className="qmodel-picker__backdrop fixed inset-0 z-[100] flex items-center justify-center p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
       role="dialog"
       aria-modal="true"
       aria-labelledby="model-picker-title"
     >
-      <div className={cn(themedBody, "relative w-full max-w-3xl max-h-[80vh] border border-border bg-card shadow-2xl flex flex-col")}>
+      <div className={cn(themedBody, "qmodel-picker relative flex max-h-[84vh] w-full max-w-4xl flex-col overflow-hidden")}>
         <Button
           ghost
           size="icon"
           onClick={onClose}
-          className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+          className="qmodel-picker__close absolute right-3 top-3 text-muted-foreground hover:text-foreground"
           aria-label="Close"
         >
           <X />
         </Button>
 
-        <header className="p-5 pb-3 border-b border-border">
-          <h2
-            id="model-picker-title"
-            className="font-mondwest text-display text-base tracking-wider"
-          >
-            {title}
-          </h2>
-          <p className="text-xs text-muted-foreground mt-1 font-mono">
-            {currentOverride ? "this chat" : "current"}: {currentModel || "(unknown)"}
-            {currentProviderSlug && ` · ${currentProviderSlug}`}
+        <header className="qmodel-picker__header">
+          <div className="qmodel-picker__identity">
+            <span className="qmodel-picker__mark" aria-hidden="true">
+              <span>Q</span><i />
+            </span>
+            <div className="min-w-0">
+              <h2 id="model-picker-title" className="qmodel-picker__title">{title}</h2>
+              <p className="qmodel-picker__eyebrow">MODEL CONTROL <span>·</span> PROVIDER MATRIX</p>
+            </div>
+          </div>
+          <p className="qmodel-picker__current">
+            <span className="qmodel-picker__current-label">{currentOverride ? "THIS CHAT" : "CURRENT MODEL"}</span>
+            <span className="qmodel-picker__current-name">{currentModel || "(unknown)"}</span>
+            {currentProviderSlug && <span className="qmodel-picker__provider-slug">{currentProviderSlug}</span>}
           </p>
         </header>
 
-        <div className="px-5 pt-3 pb-2 border-b border-border">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <div className="qmodel-picker__search-row">
+          <div className="qmodel-picker__search">
+            <Search className="qmodel-picker__search-icon" aria-hidden="true" />
             <Input
               autoFocus
               placeholder="Filter providers and models…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="pl-7 h-8 text-sm"
+              className="qmodel-picker__input"
             />
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 grid grid-cols-[200px_1fr] overflow-hidden">
+        <div className="qmodel-picker__body">
           <ProviderColumn
             loading={loading}
             error={error}
@@ -452,13 +457,13 @@ export function ModelPickerDialog(props: Props) {
           />
         </div>
 
-        <footer className="border-t border-border p-3 flex items-center justify-between gap-3 flex-wrap">
+        <footer className="qmodel-picker__footer">
           {alwaysGlobal ? (
-            <span className="text-xs text-muted-foreground">
+            <span className="qmodel-picker__save-note">
               Saves to config.yaml — applies to new sessions.
             </span>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="qmodel-picker__persist">
               <Checkbox
                 checked={persistGlobal}
                 id="model-picker-persist-global"
@@ -468,7 +473,7 @@ export function ModelPickerDialog(props: Props) {
               />
 
               <Label
-                className="font-mondwest normal-case tracking-normal text-xs text-muted-foreground cursor-pointer"
+                className="qmodel-picker__persist-label"
                 htmlFor="model-picker-persist-global"
               >
                 Persist globally (otherwise this session only)
@@ -476,19 +481,20 @@ export function ModelPickerDialog(props: Props) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="qmodel-picker__actions">
             <Button
               outlined
+              className="qmodel-picker__action qmodel-picker__action--refresh"
               onClick={refreshOptions}
               disabled={applying || loading || refreshing}
             >
               {refreshing ? <Spinner /> : <RefreshCw className="h-3.5 w-3.5" />}
               Refresh Models
             </Button>
-            <Button outlined onClick={onClose} disabled={applying}>
+            <Button outlined className="qmodel-picker__action" onClick={onClose} disabled={applying}>
               Cancel
             </Button>
-            <Button onClick={confirm} disabled={!canConfirm}>
+            <Button className="qmodel-picker__action qmodel-picker__action--confirm" onClick={confirm} disabled={!canConfirm}>
               {applying ? <Spinner /> : "Switch"}
             </Button>
           </div>
@@ -537,17 +543,21 @@ function ProviderColumn({
   onSelect(slug: string): void;
 }) {
   return (
-    <div className="border-r border-border overflow-y-auto">
+    <div className="qmodel-picker__provider-column">
+      <div className="qmodel-picker__column-heading">
+        <span>PROVIDERS</span>
+        <span>{providers.length}<i>/</i>{total}</span>
+      </div>
       {loading && (
-        <div className="flex items-center gap-2 p-4 text-xs text-muted-foreground">
+        <div className="qmodel-picker__loading">
           <Spinner className="text-xs" /> loading…
         </div>
       )}
 
-      {error && <div className="p-4 text-xs text-destructive">{error}</div>}
+      {error && <div className="qmodel-picker__error">{error}</div>}
 
       {!loading && !error && providers.length === 0 && (
-        <div className="p-4 text-xs text-muted-foreground italic">
+        <div className="qmodel-picker__empty">
           {query
             ? "no matches"
             : total === 0
@@ -563,7 +573,7 @@ function ProviderColumn({
             key={p.slug}
             active={active}
             onClick={() => onSelect(p.slug)}
-            className={`items-start text-xs border-l-2 ${
+            className={`qmodel-picker__provider-item items-start text-xs border-l-2 ${
               active ? "border-l-primary" : "border-l-transparent"
             }`}
           >
@@ -608,8 +618,8 @@ function ModelColumn({
 }) {
   if (!provider) {
     return (
-      <div className="overflow-y-auto">
-        <div className="p-4 text-xs text-muted-foreground italic">
+      <div className="qmodel-picker__model-column">
+        <div className="qmodel-picker__empty qmodel-picker__choose-provider">
           pick a provider →
         </div>
       </div>
@@ -617,15 +627,19 @@ function ModelColumn({
   }
 
   return (
-    <div className="overflow-y-auto">
+    <div className="qmodel-picker__model-column">
+      <div className="qmodel-picker__column-heading qmodel-picker__models-heading">
+        <span>{provider.name}</span>
+        <span>{allModels.length} MODELS</span>
+      </div>
       {provider.warning && (
-        <div className="p-3 text-xs text-destructive border-b border-border">
+        <div className="qmodel-picker__error qmodel-picker__warning">
           {provider.warning}
         </div>
       )}
 
       {models.length === 0 ? (
-        <div className="p-4 text-xs text-muted-foreground italic">
+        <div className="qmodel-picker__empty">
           {allModels.length
             ? "no models match your filter"
             : "no models listed for this provider"}
@@ -642,7 +656,7 @@ function ModelColumn({
               active={active}
               onClick={() => onSelect(m)}
               onDoubleClick={() => onConfirm(m)}
-              className="px-3 py-1.5 text-xs font-mono"
+              className={`qmodel-picker__model-item px-3 py-1.5 text-xs font-mono ${active ? "qmodel-picker__model-item--selected" : ""}`}
             >
               <Check
                 className={`h-3 w-3 shrink-0 ${active ? "text-primary" : "text-transparent"}`}
@@ -655,15 +669,38 @@ function ModelColumn({
           );
         })
       )}
+      {allModels.length > 0 && allModels.length <= 4 && !selectedModel && (
+        <QuantumStateGraphic />
+      )}
     </div>
   );
 }
 
 function CurrentTag() {
   return (
-    <span className="text-display text-xs tracking-wider text-primary shrink-0">
+    <span className="qmodel-picker__current-tag text-display text-xs tracking-wider shrink-0">
       current
     </span>
+  );
+}
+
+function QuantumStateGraphic() {
+  return (
+    <div className="qmodel-picker__state-graphic" aria-hidden="true">
+      <svg viewBox="0 0 180 150" fill="none">
+        <path className="qmodel-picker__circuit-wire" d="M8 35h158M8 75h158M8 115h158M38 35v40m42 0v40m42-80v80" />
+        <rect className="qmodel-picker__circuit-gate" x="27" y="24" width="22" height="22" rx="4" />
+        <rect className="qmodel-picker__circuit-gate" x="69" y="64" width="22" height="22" rx="4" />
+        <rect className="qmodel-picker__circuit-gate" x="111" y="24" width="22" height="22" rx="4" />
+        <path className="qmodel-picker__circuit-node" d="M34 35h8m-4-4v8M76 75h8m-4-4v8M118 35h8m-4-4v8" />
+        <circle cx="122" cy="75" r="3.5" fill="var(--qmp-accent)" />
+        <circle cx="122" cy="115" r="3.5" fill="var(--qmp-secondary)" />
+        <path d="M122 78.5v33" stroke="var(--qmp-secondary)" strokeDasharray="2 3" />
+        <text x="8" y="18">Q0</text><text x="8" y="58">Q1</text><text x="8" y="98">Q2</text>
+        <text x="142" y="30">H</text><text x="142" y="70">RZ</text><text x="142" y="110">MEASURE</text>
+      </svg>
+      <span>Provider link ready · select an active model state</span>
+    </div>
   );
 }
 

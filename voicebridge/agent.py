@@ -46,6 +46,21 @@ def _agent_enabled(cfg: Any) -> bool:
         return True
 
 
+def _explicit_model(cfg: Any) -> str:
+    """The operator's explicit ``agent.model`` override, or ``""``.
+
+    Distinct from :func:`_model`, which falls back to the voicebridge resolver
+    default (a local model). The vendored tool-capable worker must only adopt
+    an override the operator actually set; otherwise the vendored config's own
+    tool-capable ``model`` slot decides (matching /chat).
+    """
+    try:
+        return str(cfg.get("agent", "model", default="") or "").strip() \
+            if cfg is not None else ""
+    except Exception:
+        return ""
+
+
 def _model(cfg: Any) -> str:
     """Legacy ``agent.model`` override, else the canonical resolver default.
 
@@ -311,6 +326,217 @@ def turn(cfg: Any, text: str, *, session: str = "qubit",
                 path="voicebridge.agent.turn")}
 
 
+def _vendor_tool_names(result: Any) -> "list[str]":
+    """Tool names the vendored agent actually invoked, from its message log.
+
+    Reads assistant ``tool_calls`` and ``role == "tool"`` rows so the turn
+    receipt reports the real tools that ran (the same evidence
+    ``chat_transport._worker_acted`` needs to accept a build). Order-stable,
+    de-duplicated.
+    """
+    names: "list[str]" = []
+    for msg in (result or {}).get("messages") or []:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("role") == "tool" and msg.get("name"):
+            names.append(str(msg["name"]))
+        for call in msg.get("tool_calls") or []:
+            try:
+                fn = (call.get("function") or {}).get("name") or call.get("name")
+            except AttributeError:
+                fn = None
+            if fn:
+                names.append(str(fn))
+    seen: "set[str]" = set()
+    out: "list[str]" = []
+    for n in names:
+        if n not in seen:
+            seen.add(n)
+            out.append(n)
+    return out
+
+
+def _run_vendored_session(cfg: Any, text: str, sid: str, *,
+                          check: Callable[[], bool], store: Any,
+                          reasoning: Optional[str],
+                          persist_user: bool = False
+                          ) -> "Optional[Dict[str, Any]]":
+    """Run one tool-capable agent turn through the vendored ``AIAgent``.
+
+    This is the terminal /chat agent (``run_agent.AIAgent``): it resolves the
+    same tool set (skills, plugins, MCP), sends the tool schema to the model,
+    and executes tool calls. Owner directive docs/DECISIONS.md #26 requires the
+    /qubit-chat worker to be this agent, never a tool-less shim.
+
+    Returns the ``run_session``-shaped outcome on a real run, or ``None`` when
+    the vendored runtime is not importable (hermetic tests, an install that
+    never vendored the fork). ``None`` lets the caller fall back to the planner
+    path, so this is purely additive.
+
+    The agent's own broker/policy/confirmation/e-stop chain governs each tool
+    (the terminal path's authority), so this never invents a parallel grant:
+    sensitive tools stay confirm-gated exactly as they are in /chat.
+    """
+    try:
+        from . import qubit_runtime as _qr  # type: ignore
+
+        _qr.use_qubit_home(cfg)
+        _qr.ensure_path()
+        from run_agent import AIAgent  # type: ignore
+        from qubit_cli.config import load_config  # type: ignore
+        from qubit_cli.oneshot import (  # type: ignore
+            _resolve_model_and_provider)
+        from qubit_cli.runtime_provider import (  # type: ignore
+            resolve_runtime_with_fallback)
+        from qubit_cli.tools_config import _get_platform_tools  # type: ignore
+    except Exception as exc:  # noqa: BLE001 - no vendored runtime: use planner
+        _audit("session_vendored_unavailable", session=sid,
+               error=str(exc)[:160])
+        return None
+    if check():
+        raise AgentDenied("EMERGENCY_STOP",
+                          "emergency stop latched before the agent turn")
+    vcfg = load_config()
+    # Model selection follows the vendored config's ``model`` slot (the /chat
+    # authority), resolved through the same helper the CLI one-shot uses. The
+    # voicebridge ``agent.model`` override wins only when explicitly set —
+    # never the local voice default, which is not a tool-capable remote model.
+    try:
+        choice = _resolve_model_and_provider(
+            vcfg, _explicit_model(cfg) or None, None)
+    except Exception as exc:  # noqa: BLE001 - fail closed to the planner path
+        _audit("session_vendored_runtime_error", session=sid,
+               error=str(exc)[:160])
+        return None
+    model = str(getattr(choice, "model", "") or "")
+    # Fast bail when the vendored config resolves no model at all (an
+    # unconfigured/home-less runtime): there is no tool-capable agent to run,
+    # so return None for the caller's legacy fallback instead of paying the
+    # provider-resolution failure. A configured runtime always names a model.
+    if not str(getattr(choice, "provider", "") or "").strip() \
+            and not model.strip():
+        _audit("session_vendored_unconfigured", session=sid)
+        return None
+    try:
+        runtime, _fallback = resolve_runtime_with_fallback(
+            vcfg, requested=str(getattr(choice, "provider", "") or ""),
+            target_model=model or None)
+    except Exception as exc:  # noqa: BLE001 - fail closed to the planner path
+        _audit("session_vendored_runtime_error", session=sid,
+               error=str(exc)[:160])
+        return None
+    try:
+        toolsets = sorted(_get_platform_tools(vcfg, "cli"))
+    except Exception:  # noqa: BLE001 - config toolsets are best-effort
+        toolsets = None
+    # The vendored runtime is resolvable, so the turn will really run: persist
+    # the user row now (the caller that asked for ``persist_user`` owns neither
+    # side). This keeps the transcript ordered user-then-assistant and leaves a
+    # retryable user row even when the agent later fails.
+    if persist_user:
+        _persist_session_turn(store, sid, "user", text,
+                              model=model or None)
+    started = time.monotonic()
+    agent = None
+    try:
+        agent = AIAgent(
+            api_key=runtime.get("api_key"),
+            base_url=runtime.get("base_url"),
+            provider=runtime.get("provider"),
+            requested_provider=runtime.get("requested_provider"),
+            api_mode=runtime.get("api_mode"),
+            model=model or runtime.get("model"),
+            enabled_toolsets=toolsets,
+            quiet_mode=True,
+            verbose_logging=False,
+            platform="cli",
+            session_id=sid,
+            credential_pool=runtime.get("credential_pool"),
+            reasoning_config=_vendor_reasoning_config(reasoning),
+            clarify_callback=_vendor_clarify_callback,
+        )
+        result = agent.run_conversation(text) or {}
+    except AgentDenied:
+        raise
+    except Exception as exc:  # noqa: BLE001 - typed, redacted, no fabrication
+        _audit("session_vendored_error", session=sid, error=str(exc)[:160])
+        return {"state": "FAILED", "code": "MODEL_ERROR",
+                "detail": _redact(str(exc))[:300], "session": sid,
+                "session_id": sid}
+    finally:
+        if agent is not None:
+            try:
+                agent.close()
+            except Exception:  # noqa: BLE001 - teardown is best-effort
+                pass
+    if check():
+        raise AgentDenied("EMERGENCY_STOP",
+                          "emergency stop latched mid-session")
+    reply = str(result.get("final_response") or "").strip()
+    tool_names = _vendor_tool_names(result)
+    model_used = str(result.get("model") or model or "")
+    provider_used = str(result.get("provider") or runtime.get("provider") or "")
+    if not reply:
+        return {"state": "FAILED", "code": "MODEL_UNAVAILABLE",
+                "detail": "agent returned no text; nothing was fabricated",
+                "session": sid, "session_id": sid,
+                "steps": len(tool_names),
+                "tool_used": tool_names[0] if tool_names else "",
+                "elapsed_ms": int((time.monotonic() - started) * 1000)}
+    from .textutil import sanitize
+
+    reply_out = _redact(sanitize(reply))
+    _persist_session_turn(store, sid, "assistant", reply_out,
+                          model=model_used or None)
+    _audit("session_vendored", session=sid, tools=len(tool_names),
+           elapsed_ms=int((time.monotonic() - started) * 1000))
+    receipt = {
+        "runtime": "qubit-vendored-agent",
+        "path": "voicebridge.agent.run_session",
+        "provider": provider_used, "model": model_used,
+        "tools": tool_names, "session_id": sid,
+    }
+    return {"state": "OK", "reply": reply_out, "session": sid,
+            "session_id": sid, "steps": len(tool_names) or 1,
+            "tool_used": tool_names[0] if tool_names else "",
+            "elapsed_ms": int((time.monotonic() - started) * 1000),
+            "receipt": receipt}
+
+
+def _vendor_reasoning_config(reasoning: Optional[str]) -> Any:
+    """Map the /qubit-chat reasoning selector onto the vendored config.
+
+    ``None``/invalid degrades to the configured default (never raises), matching
+    the /chat path so a resumed-session preference cannot brick a worker turn.
+    """
+    try:
+        from qubit_constants import (parse_reasoning_effort,
+                                     resolve_reasoning_config)  # type: ignore
+
+        if reasoning is not None and str(reasoning).strip():
+            parsed = parse_reasoning_effort(str(reasoning))
+            if parsed is not None:
+                return parsed
+        return resolve_reasoning_config({}, "")
+    except Exception:  # noqa: BLE001 - preference is advisory
+        return None
+
+
+def _vendor_clarify_callback(question: str, choices=None,
+                             multi_select: bool = False) -> str:
+    """Headless clarify: no user at the console, so pick and continue.
+
+    Mirrors the vendored one-shot callback — a worker turn must never stall on
+    interactive input.
+    """
+    if choices:
+        what = "subset" if multi_select else "option"
+        return (f"[headless worker: no user available. Pick the best {what} "
+                f"from {choices} using your own judgment and continue.]")
+    return ("[headless worker: no user available. Make the most reasonable "
+            "assumption you can and continue.]")
+
+
 def run_session(cfg: Any, task_text: str, *, session: str,
                 execute_tool: Optional[Callable[[str, Dict[str, Any]],
                                                 Any]] = None,
@@ -320,13 +546,15 @@ def run_session(cfg: Any, task_text: str, *, session: str,
                 cancelled: Optional[Callable[[], bool]] = None) -> Dict[str, Any]:
     """Run a bounded multi-step worker session natively.
 
-    Plan once with the validated planner; when it yields a tool proposal
-    and an ``execute_tool`` backend is provided, run exactly that tool
-    through the caller's broker path and summarize the observation with
-    the model. Otherwise answer directly. Every step honors the
-    emergency stop and the caller's cancellation flag; sensitive tool
-    work stays behind the caller's own approval pipeline (this function
-    never confirms anything itself).
+    Prefers the vendored tool-capable ``AIAgent`` (the terminal /chat agent:
+    full tool schema — skills, plugins, MCP) so a /qubit-chat build turn runs
+    real tools, per docs/DECISIONS.md #26. When the vendored runtime is not
+    importable it falls back to the planner path: plan once, and when the
+    planner yields a tool proposal and an ``execute_tool`` backend is provided,
+    run exactly that tool through the caller's broker path and summarize the
+    observation with the model. Every step honors the emergency stop and the
+    caller's cancellation flag; sensitive tool work stays behind the caller's
+    own approval pipeline (this function never confirms anything itself).
 
     Session continuity: the session id is mapped through
     :func:`resolve_session_id` (an empty/voice-default alias converges on the
@@ -374,6 +602,16 @@ def run_session(cfg: Any, task_text: str, *, session: str,
     _persist_session_turn(store, sid, "user", clean,
                           model=_model(cfg) or None)
     started = time.monotonic()
+    # Owner directive docs/DECISIONS.md #26: a /qubit-chat agent_task turn must
+    # run the SAME tool-capable agent the terminal /chat path uses, not a
+    # planner shim. The vendored AIAgent sends the full tool schema (skills,
+    # plugins, MCP) and actually calls tools; the planner below is the
+    # fallback for environments without the vendored runtime.
+    vendored = _run_vendored_session(cfg, clean, sid, check=check,
+                                     store=store, reasoning=reasoning)
+    if vendored is not None:
+        vendored.setdefault("session_id", sid)
+        return vendored
     steps = 0
     tool_used = ""
     observation = ""
@@ -462,6 +700,54 @@ def run_session(cfg: Any, task_text: str, *, session: str,
             "tool_used": tool_used,
             "elapsed_ms": elapsed_ms,
             "receipt": receipt}
+
+
+def run_agent_turn(cfg: Any, text: str, *, session: str,
+                   reasoning: Optional[str] = None,
+                   estop_engaged: Optional[Callable[[], bool]] = None
+                   ) -> "Optional[Dict[str, Any]]":
+    """Run one general turn through the tool-capable vendored agent.
+
+    Owner directive docs/DECISIONS.md #26: a ``/qubit-chat`` turn that falls
+    through to the model must run the SAME ``run_agent.AIAgent`` the ``/chat``
+    terminal drives — the model receives the full tool schema (skills, plugins,
+    MCP) and can call tools — never a bare ``providers.gateway`` text call.
+    This is the seam :mod:`voicebridge.chat_transport` uses for general turns;
+    the deterministic fast paths (slash/facts/affirmatives/local/registry/web/
+    build task) keep their own branches and never reach here.
+
+    Returns the ``run_session``-shaped outcome (``state``/``reply``/``code``/
+    ``receipt``) on a real run, or ``None`` when no tool-capable vendored
+    runtime/model is available (no vendored import, no configured model) so the
+    caller can fall back to the legacy model path verbatim. The user row and
+    the assistant reply are persisted here via the vendored ``persist_user``
+    hook; the caller owns neither when this returns a dict.
+
+    The agent's own broker/policy/confirmation/e-stop chain governs each tool
+    (the terminal path's authority), so sensitive tools stay confirm-gated
+    exactly as in /chat; ``estop_engaged`` is honored before and after the run.
+    """
+    check = estop_engaged or (lambda: False)
+    if check():
+        raise AgentDenied("EMERGENCY_STOP",
+                          "emergency stop latched; agent turn refused")
+    if not _agent_enabled(cfg):
+        raise AgentDenied("AGENT_DISABLED",
+                          "agent turns are off (agent.enabled=false)")
+    clean = (text or "").strip()[:MAX_TEXT_CHARS]
+    if not clean:
+        return None
+    sid = resolve_session_id(cfg, session)
+    if reasoning is None:
+        try:
+            from .chat_transport import session_reasoning
+
+            reasoning = session_reasoning(cfg, sid)
+        except Exception:  # noqa: BLE001 - preference is advisory
+            reasoning = None
+    store = _canonical_session_store(cfg)
+    return _run_vendored_session(cfg, clean, sid, check=check, store=store,
+                                 reasoning=reasoning, persist_user=True)
 
 
 def refuse_estop() -> Dict[str, Any]:

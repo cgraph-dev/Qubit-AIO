@@ -45,6 +45,28 @@ const FRAME_SAMPLES = Math.round(TARGET_SR * 0.3);
 /** Client-side gate: don't stream pure leading silence. */
 const SILENCE_RMS = 0.004;
 const STOP_TIMEOUT_MS = 4000;
+/**
+ * Onset ring: ~1 s of mono 16 kHz PCM buffered while the ticket/socket
+ * handshake runs (2026-10-04 onset fix). The user speaks the instant they
+ * press Voice, but capture used to open only after `stt.started` — every
+ * frame in that gap was never recorded (measured live: "Hello" lost
+ * unrecoverably while mid-stream audio decoded fine). Kept newest-first:
+ * beyond the cap the oldest room tone yields, never the newest onset.
+ */
+const PREROLL_CAP_SAMPLES = TARGET_SR * 1;
+
+/**
+ * No-progress watchdog: once the backend has acknowledged (`stt.started`),
+ * any 60 s window with zero inbound server events auto-releases the turn
+ * (2026-10-04 stuck-listener fix). Every inbound message — partial, final,
+ * completed, error — resets the window, so live dictation never trips it;
+ * only a dead/silent backend with a held-open mic does. The release is
+ * loud: a typed `VOICE_STT_NO_PROGRESS` error (the controller surfaces it
+ * in the voice status) plus full teardown (capture + tracks + socket).
+ * Pre-ready silence keeps its existing 4 s `STOP_TIMEOUT_MS` handshake
+ * timeouts; this watchdog covers the post-ready half only.
+ */
+export const NO_PROGRESS_TIMEOUT_MS = 60_000;
 
 export const LOCAL_PRIVACY_NOTICE =
   "local STT keeps audio on the configured local machine";
@@ -119,8 +141,15 @@ function defaultCreateCapture(
   return {
     start() {
       // A context created under a user gesture usually runs, but resume() is
-      // required when the browser autoplayed it in "suspended" state.
-      void ctx.resume().catch(() => undefined);
+      // required when the browser autoplayed it in "suspended" state. The
+      // call itself is exception-safe: a context without resume (or a
+      // throwing one) must never kill the turn — the capture was already
+      // opened on the button-press edge and frames flow whenever it runs.
+      try {
+        void ctx.resume()?.catch(() => undefined);
+      } catch {
+        /* proceed without the resume cue */
+      }
     },
     stop() {
       try {
@@ -157,9 +186,11 @@ export class LocalStreamingSTTAdapter implements TranscriptionAdapter {
   #speechSeen = false;
   #stopped = false;
   #closed = false;
+  #ready = false;
   #endResolve: (() => void) | null = null;
   #readyResolve: (() => void) | null = null;
   #readyReject: ((code: string, detail: string) => void) | null = null;
+  #progressTimer: ReturnType<typeof setTimeout> | null = null;
   #finalText = "";
   #engineLabel: string;
   #deps: LocalAdapterDeps;
@@ -198,6 +229,7 @@ export class LocalStreamingSTTAdapter implements TranscriptionAdapter {
     this.#stopped = false;
     this.#closed = false;
     this.#speechSeen = false;
+    this.#ready = false;
     this.#pending = [];
     this.#pendingSamples = 0;
     this.#sequence = 0;
@@ -233,11 +265,24 @@ export class LocalStreamingSTTAdapter implements TranscriptionAdapter {
     }
     this.#stream = stream;
 
+    // Onset fix: open capture on the button-press edge, BEFORE the ticket /
+    // socket handshake. Frames arriving during setup accumulate in #pending
+    // (#flush no-ops without a socket) and are transmitted first once the
+    // server acknowledges — prepend, never cut. Buffered audio never leaves
+    // the browser unless `stt.started` arrives: a refused backend tears down
+    // with #pending still local. VAD/segmentation still live server-side.
+    const capture = createCapture(stream, (pcm) => this.#onFrame(pcm));
+    this.#capture = capture;
+    capture.start();
+
     let url: string;
     try {
       url = await getUrl();
     } catch {
-      this.#teardownStream();
+      // The onset capture was already opened on the button-press edge: a
+      // refused ticket must stop it too, not just the mic tracks, or the
+      // AudioContext keeps running with no backend (stuck-listener fix).
+      this.#teardown();
       throw new LocalSttUnavailable(
         "VOICE_STT_UNAVAILABLE",
         "could not mint an STT socket ticket",
@@ -298,6 +343,10 @@ export class LocalStreamingSTTAdapter implements TranscriptionAdapter {
       this.#readyReject?.("VOICE_STT_DISCONNECTED",
         "the local STT socket closed before it started");
       this.#endResolve?.();
+      // A dropped socket must not leave the mic held open: release capture
+      // + tracks now (stuck-listener fix). Idempotent — a later stop() /
+      // teardown is a no-op over nulled handles.
+      this.#teardown();
     };
 
     try {
@@ -308,17 +357,20 @@ export class LocalStreamingSTTAdapter implements TranscriptionAdapter {
       throw err;
     }
 
-    const capture = createCapture(stream, (pcm) => this.#onFrame(pcm));
-    this.#capture = capture;
-    capture.start();
     events.onEngine?.(this.#engineLabel);
   }
 
   async stop(): Promise<void> {
-    if (this.#stopped || !this.#socket) return;
+    if (this.#stopped) return;
     this.#stopped = true;
     this.#capture?.stop();
     this.#capture = null;
+    if (!this.#socket) {
+      // Stopped before the socket opened (quick cancel): nothing was ever
+      // sent, so just release the mic — never leave capture running.
+      this.#teardown();
+      return;
+    }
     this.#flush(true);
     const done = new Promise<void>((resolve) => {
       this.#endResolve = resolve;
@@ -359,11 +411,25 @@ export class LocalStreamingSTTAdapter implements TranscriptionAdapter {
     }
     this.#pending.push(pcm);
     this.#pendingSamples += pcm.length;
+    // Rolling onset ring: while the handshake runs, speech accumulates here
+    // instead of being dropped. Beyond ~1 s the oldest room tone yields so
+    // a stalled backend cannot grow memory — the newest onset is never cut.
+    while (
+      this.#pendingSamples > PREROLL_CAP_SAMPLES &&
+      this.#pending.length > 1
+    ) {
+      const dropped = this.#pending.shift();
+      if (dropped) this.#pendingSamples -= dropped.length;
+      else break;
+    }
     if (this.#pendingSamples >= FRAME_SAMPLES) this.#flush(false);
   }
 
   #flush(force: boolean): void {
-    if (!this.#socket || this.#pending.length === 0) return;
+    // Hold pre-ready audio until the backend acknowledges (`stt.started`):
+    // a refused backend must never receive even the onset. The ring keeps it
+    // locally; a refusal tears down with #pending still unsent.
+    if (!this.#socket || !this.#ready || this.#pending.length === 0) return;
     if (!force && this.#pendingSamples < FRAME_SAMPLES) return;
     const total = this.#pendingSamples;
     const merged = new Int16Array(total);
@@ -400,14 +466,21 @@ export class LocalStreamingSTTAdapter implements TranscriptionAdapter {
       return;
     }
     const type = String(msg.type ?? "");
-    // Stale request events (from a superseded utterance) are ignored.
+    // Stale request events (from a superseded utterance) are ignored —
+    // and must not reset the watchdog either.
     if (String(msg.request_id ?? "") !== this.#requestId) return;
+    this.#noteProgress();
     switch (type) {
       case "stt.started":
         if (typeof msg.engine === "string" && msg.engine) {
           this.#engineLabel = msg.engine;
           this.#events?.onEngine?.(this.#engineLabel);
         }
+        // The backend acknowledged: release the onset ring (oldest first —
+        // the first binary frame carries the button-press instant).
+        this.#ready = true;
+        this.#noteProgress();
+        this.#flush(false);
         this.#readyResolve?.();
         break;
       case "stt.partial":
@@ -468,6 +541,7 @@ export class LocalStreamingSTTAdapter implements TranscriptionAdapter {
   }
 
   #teardown(): void {
+    this.#clearProgressWatchdog();
     this.#capture?.stop();
     this.#capture = null;
     this.#teardownStream();
@@ -480,5 +554,33 @@ export class LocalStreamingSTTAdapter implements TranscriptionAdapter {
     } catch {
       /* already closed */
     }
+  }
+
+  #noteProgress(): void {
+    // Post-ready server activity only: pre-ready silence is owned by the
+    // 4 s handshake timeouts, and a stopped/closed turn needs no watchdog.
+    if (!this.#ready || this.#stopped || this.#closed) return;
+    this.#clearProgressWatchdog();
+    this.#progressTimer = setTimeout(
+      () => this.#onNoProgress(),
+      NO_PROGRESS_TIMEOUT_MS,
+    );
+  }
+
+  #clearProgressWatchdog(): void {
+    if (this.#progressTimer !== null) {
+      clearTimeout(this.#progressTimer);
+      this.#progressTimer = null;
+    }
+  }
+
+  #onNoProgress(): void {
+    this.#progressTimer = null;
+    if (this.#closed || this.#stopped || !this.#ready) return;
+    this.#events?.onError("VOICE_STT_NO_PROGRESS",
+      "the local STT backend went quiet — the mic was released, " +
+      "press Voice to try again");
+    this.#endResolve?.();
+    this.#teardown();
   }
 }

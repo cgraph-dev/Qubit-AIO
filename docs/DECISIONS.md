@@ -197,3 +197,18 @@ archived contract is preserved, not edited.
     same broker / policy / audit / confirmation / e-stop authority path.
     Destructive tool calls stay confirm-gated per the existing policy unless
     the owner rules otherwise.
+
+## Owner decisions in force (2026-10-03)
+
+27. **Hermes→Qubit is DONE and frozen; all other ported surfaces go 1:1 with
+    THEIR upstreams.** Hermes pages stay 1:1 with the Hermes pin
+    (`69948c0057`) and are not to be reworked. Every non-Hermes ported page
+    and feature — Open Viking console + subpages, Harness Router, Qubit Bot,
+    Qubit WebChat, Qubit Memory Backends, Qubit Taskflows, Canvas, Memory
+    Wiki, MCP Calls, Skills Review, Scheduler, Task Inbox, and all
+    OpenClaw-ported pages — must look and behave 1:1 with its own upstream
+    console (layout, controls, flows), fully rebranded as Qubit (zero
+    legacy brand on product surfaces; legal attribution preserved), running
+    on the Qubit backend with CLI parity and a voice path. **One unified
+    agent, one source tree** — no second agent, no forked codebase. Pins and
+    provenance: `docs/QUBIT_NONHERMES_UPSTREAM_PINS.md`.

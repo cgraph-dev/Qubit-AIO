@@ -72,12 +72,17 @@ export const ROUTE_TITLES: Record<string, string> = {
   // Page-documented paths (the pages link to these); titles match each
   // page's own heading.
   "/qubit-bot": "Qubit Bot",
-  "/harness-router": "Harness Router",
+  "/qubit-harness-router": "Harness Router",
   "/open-viking": "Open Viking",
   "/open-viking/retrieval": "Retrieval",
   "/open-viking/uploads": "Uploads",
   "/open-viking/agent-hub": "Agent Hub",
   "/open-viking/resources": "Resources",
+  // Agent console surfaces (computer workspace + typed agent cards). Paths
+  // need explicit titles or the naive fallback mangles them
+  // ("/agent-cards" -> "Agent-cards").
+  "/computer": "Agent Computer",
+  "/agent-cards": "Agent Work & Artifacts",
 };
 
 export function resolvePageTitle(

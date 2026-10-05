@@ -38,6 +38,7 @@ import {
   KeyRound,
   Menu,
   MessageSquare,
+  Monitor,
   Network,
   Package,
   PanelLeftClose,
@@ -79,8 +80,27 @@ import { useProfileScope } from "@/contexts/useProfileScope";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { ProfileScopeBanner } from "@/components/ProfileScopeBanner";
 import { MemoryPressureBanner } from "@/components/MemoryPressureBanner";
+import { WaveformOverlayMount } from "@/components/WaveformOverlayMount";
 import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
+import "@/styles/sidebar-studio.css";
+
+function QubitMark({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      viewBox="0 0 40 40"
+    >
+      <rect x="3" y="3" width="34" height="34" rx="10" fill="var(--background-base)" stroke="currentColor" strokeOpacity=".72" />
+      <text x="19" y="27" fill="currentColor" fontFamily="var(--theme-font-display, var(--theme-font-sans))" fontSize="23" fontWeight="700" textAnchor="middle">Q</text>
+      <circle cx="29" cy="11" r="3.1" fill="currentColor" stroke="var(--background-base)" strokeWidth="1.6" />
+      <circle cx="29" cy="11" r="5.2" stroke="currentColor" strokeOpacity=".25" />
+    </svg>
+  );
+}
+
 // Route pages are lazy-loaded so the initial dashboard shell does not pay for
 // every admin surface (and heavy deps like xterm) up front.
 const ConfigPage = lazy(() => import("@/pages/ConfigPage"));
@@ -146,6 +166,12 @@ const OpenVikingAgentHubPage = lazy(
 const OpenVikingResourcesPage = lazy(
   () => import("@/pages/OpenVikingResourcesPage"),
 );
+// Agent console surfaces (integrator lane): ported computer workspace +
+// typed agent card/artifact renderers.
+const ComputerWorkspacePage = lazy(
+  () => import("@/pages/ComputerWorkspacePage"),
+);
+const AgentCardsPage = lazy(() => import("@/pages/AgentCardsPage"));
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useI18n } from "@/i18n";
@@ -155,7 +181,7 @@ import type { PluginManifest } from "@/plugins";
 import { useTheme } from "@/themes";
 import { isDashboardEmbeddedChatEnabled } from "@/lib/dashboard-flags";
 import { latchChatActivation } from "@/lib/chat-activation";
-import { isChatPath, isNativeChatPath } from "@/lib/chat-routes";
+import { isChatPath, isFullHeightPath, isNativeChatPath } from "@/lib/chat-routes";
 import { ROUTE_TITLES } from "@/lib/resolve-page-title";
 import {
   parsePolicyRefusal,
@@ -264,12 +290,16 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   // Integrator lane 3: page-documented paths (the pages link to these;
   // short aliases like /bot or /viking serve no in-page link and stay out).
   "/qubit-bot": QubitBotPage,
-  "/harness-router": HarnessRouterPage,
+  "/qubit-harness-router": HarnessRouterPage,
   "/open-viking": OpenVikingPage,
   "/open-viking/retrieval": OpenVikingRetrievalPage,
   "/open-viking/uploads": OpenVikingUploadsPage,
   "/open-viking/agent-hub": OpenVikingAgentHubPage,
   "/open-viking/resources": OpenVikingResourcesPage,
+  // Agent console surfaces (integrator lane): the ported computer workspace
+  // and the typed agent card/artifact renderers.
+  "/computer": ComputerWorkspacePage,
+  "/agent-cards": AgentCardsPage,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
@@ -321,6 +351,8 @@ const BUILTIN_NAV_REST: NavItem[] = [
   },
   { path: "/voice-edit", label: "Voice Editing", icon: Sparkles },
   { path: "/agent-workspace", label: "Agent Workspace", icon: Code },
+  { path: "/computer", label: "Computer", icon: Monitor },
+  { path: "/agent-cards", label: "Agent Cards", icon: Bot },
   { path: "/nodes", label: "Nodes", icon: Globe },
   { path: "/devices", label: "Devices", icon: Shield },
   { path: "/session-ops", label: "Session Ops", icon: Activity },
@@ -339,7 +371,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/qubit-memory", label: "Qubit Memory Backends", icon: Database },
   { path: "/webchat", label: "Qubit WebChat", icon: MessageSquare },
   { path: "/qubit-bot", label: "Qubit Bot", icon: Bot },
-  { path: "/harness-router", label: "Harness Router", icon: Workflow },
+  { path: "/qubit-harness-router", label: "Harness Router", icon: Workflow },
   // Open Viking submenu group (integrator lane 3): the parent console plus
   // its four sub-pages. Children render indented under the parent entry
   // (see SidebarNavGroup); the parent path stays exactly-highlighted so a
@@ -556,6 +588,10 @@ export default function App() {
   const isDocsRoute = pathname === "/docs" || pathname === "/docs/";
   // Both chat routes render the one persistent ChatPage host.
   const isChatRoute = isChatPath(pathname);
+  // Full-bleed console pages (WebChat, Qubit Bot) own the viewport and scroll
+  // internally; without this their `height: 100%` resolves against an
+  // auto-height block ancestor and the page grows to its content.
+  const isFullHeightRoute = isFullHeightPath(pathname);
   // The Qubit-native ChatPage is the persistent host for `/qubit-chat` only;
   // `/chat` is the real Qubit terminal (xterm) rendered as a normal route.
   const isNativeChatRoute = isNativeChatPath(pathname);
@@ -681,7 +717,8 @@ export default function App() {
           "bg-background-base",
         )}
         style={{
-          background: "var(--component-header-background)",
+          background:
+            "var(--component-header-background, var(--background-base))",
           borderImage: "var(--component-header-border-image)",
           clipPath: "var(--component-header-clip-path)",
         }}
@@ -698,7 +735,8 @@ export default function App() {
           <Menu />
         </Button>
 
-        <Typography className="font-bold text-[0.95rem] leading-[0.95] tracking-[0.05em] text-midground">
+        <QubitMark className="h-8 w-8 shrink-0 text-midground" />
+        <Typography className="font-bold text-[0.95rem] tracking-[0.04em] text-midground">
           {t.app.brand}
         </Typography>
       </header>
@@ -728,8 +766,10 @@ export default function App() {
         <div className="flex min-h-0 min-w-0 flex-1">
           <aside
             id="app-sidebar"
+            data-collapsed={isDesktopCollapsed}
             aria-label={t.app.navigation}
             className={cn(
+              "qagent-sidebar",
               "fixed top-0 left-0 z-50 flex h-dvh max-h-dvh w-64 min-h-0 flex-col font-sans",
               "border-r border-current/20",
               "bg-background-base",
@@ -740,13 +780,15 @@ export default function App() {
               collapsed && "lg:w-14",
             )}
             style={{
-              background: "var(--component-sidebar-background)",
+              background:
+                "var(--component-sidebar-background, var(--background-base))",
               clipPath: "var(--component-sidebar-clip-path)",
               borderImage: "var(--component-sidebar-border-image)",
             }}
           >
             <div
               className={cn(
+                "qagent-sidebar__brand-row",
                 "flex h-14 shrink-0 items-center gap-2",
                 "border-b border-current/20",
                 collapsed ? "lg:justify-center lg:px-0" : "px-4 justify-between",
@@ -754,17 +796,15 @@ export default function App() {
             >
               <div
                 className={cn(
-                  "flex items-center gap-2",
+                  "flex min-w-0 items-center gap-2.5",
                   collapsed && "lg:hidden",
                 )}
               >
                 <PluginSlot name="header-left" />
-
-                <Typography className="font-bold text-[1.125rem] leading-[0.95] tracking-[0.0525rem] text-midground uppercase">
-                  Qubit
-                  <br />
-                  Agent
-                </Typography>
+                <QubitMark className="h-8 w-8 shrink-0 text-midground" />
+                <span className="qagent-sidebar__brand-name font-bold text-[1rem] tracking-[0.02em] text-midground">
+                  {t.app.brand}
+                </span>
               </div>
 
               <Button
@@ -797,7 +837,7 @@ export default function App() {
             <ProfileSwitcher collapsed={isDesktopCollapsed} />
 
             <nav
-              className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden border-t border-current/10 py-2"
+              className="qagent-sidebar__nav min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden border-t border-current/10 py-2"
               aria-label={t.app.navigation}
             >
               <ul className="flex flex-col">
@@ -927,8 +967,9 @@ export default function App() {
                 className={cn(
                   "w-full min-w-0",
                   !isChatRoute &&
+                    !isFullHeightRoute &&
                     "pb-[calc(2rem+env(safe-area-inset-bottom,0px))] lg:pb-8",
-                  (isDocsRoute || isChatRoute) &&
+                  (isDocsRoute || isChatRoute || isFullHeightRoute) &&
                     "min-h-0 flex flex-1 flex-col",
                 )}
               >
@@ -983,6 +1024,7 @@ export default function App() {
         </div>
       </div>
 
+      <WaveformOverlayMount />
       <PluginSlot name="overlay" />
     </div>
     </ProfileProvider>
@@ -1037,16 +1079,19 @@ function SidebarNavLink({
         to={path}
         end={item.exactEnd ?? path === "/sessions"}
         onClick={closeMobile}
+        title={navLabel}
         aria-label={collapsed ? navLabel : undefined}
         onFocus={collapsed ? showTooltip : undefined}
         onBlur={collapsed ? hideTooltip : undefined}
         className={({ isActive }) =>
           cn(
+            "qagent-sidebar__link",
             "group/nav relative flex items-center gap-3",
             "px-5 py-2.5",
             // Submenu children sit one indent in (tailwind-merge keeps the
             // later pl over px-5's left padding).
             nested && "pl-10",
+            nested && "qagent-sidebar__link--nested",
             "font-sans text-display uppercase text-sm tracking-[0.12em]",
             "whitespace-nowrap transition-colors cursor-pointer",
             "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-midground",
@@ -1065,8 +1110,8 @@ function SidebarNavLink({
 
             <span
               className={cn(
-                "truncate transition-opacity duration-300",
-                collapsed ? "lg:opacity-0" : "lg:opacity-100",
+                "qagent-sidebar__link-label truncate transition-opacity duration-300",
+                collapsed ? "lg:hidden" : "lg:opacity-100",
               )}
             >
               {navLabel}
@@ -1074,13 +1119,13 @@ function SidebarNavLink({
 
             <span
               aria-hidden
-              className="absolute inset-y-0.5 left-1.5 right-1.5 bg-midground opacity-0 pointer-events-none transition-opacity duration-200 group-hover/nav:opacity-5"
+              className="qagent-sidebar__hover-wash absolute inset-y-0.5 left-1.5 right-1.5 bg-midground opacity-0 pointer-events-none transition-opacity duration-200 group-hover/nav:opacity-5"
             />
 
             {isActive && (
               <span
                 aria-hidden
-                className="absolute left-0 top-0 bottom-0 w-px bg-midground"
+                className="qagent-sidebar__active-rail absolute left-0 top-0 bottom-0 w-px bg-midground"
               />
             )}
           </>

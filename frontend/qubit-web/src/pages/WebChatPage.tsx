@@ -237,11 +237,11 @@ export function WebChatPage() {
   const streaming = status === "streaming";
 
   return (
-    <div className="flex h-full flex-col gap-3 p-4" data-testid="webchat-page">
+    <div className="qb-chat h-full p-4" data-testid="webchat-page">
       <header className="flex items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold">WebChat</h1>
-          <p className="text-xs text-muted-foreground" data-testid="webchat-session">
+          <p className="qb-bubble-meta" data-testid="webchat-session">
             {sessionId ? `Session ${sessionId}` : "Opening session…"}
           </p>
         </div>
@@ -257,26 +257,37 @@ export function WebChatPage() {
         </button>
       </header>
 
-      <div className="flex-1 space-y-3 overflow-y-auto" data-testid="webchat-transcript">
+      <div className="qb-chat-scroll" data-testid="webchat-transcript">
         {messages.length === 0 && status === "idle" && (
-          <p className="text-sm text-muted-foreground">
-            Start a new conversation below. History is stored on the server.
-          </p>
+          <div className="qb-hero">
+            <p className="qb-hero-title">WebChat</p>
+            <p className="qb-hero-sub">
+              Start a new conversation below. History is stored on the server.
+            </p>
+            <div className="qb-starters">
+              {["Summarize the latest session", "What changed today?", "Open a new task"].map(
+                (prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    className="rounded border px-3 py-2 text-sm text-left"
+                    onClick={() => setInput(prompt)}
+                  >
+                    {prompt}
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
         )}
         {messages.map((m, i) => (
           <div
             key={i}
             data-testid={`webchat-message-${i}`}
             data-role={m.role}
-            className={m.role === "user" ? "text-right" : "text-left"}
+            className={m.role === "user" ? "qb-bubble-row-user" : "qb-bubble-row-assistant"}
           >
-            <div
-              className={
-                m.role === "user"
-                  ? "inline-block rounded bg-primary/10 px-3 py-2 text-sm"
-                  : "rounded border px-3 py-2"
-              }
-            >
+            <div className={m.role === "user" ? "qb-bubble-user" : "qb-bubble-assistant"}>
               {m.role === "user" ? (
                 <span className="text-sm">{m.text}</span>
               ) : (
@@ -285,19 +296,12 @@ export function WebChatPage() {
                   streaming={streaming && i === messages.length - 1}
                 />
               )}
-              {m.meta && (
-                <div className="mt-1 text-xs text-muted-foreground">{m.meta}</div>
-              )}
+              {m.meta && <div className="qb-bubble-meta">{m.meta}</div>}
               {m.sources && m.sources.length > 0 && (
-                <ul className="mt-1 space-y-0.5 text-xs">
+                <ul className="qb-bubble-sources">
                   {m.sources.map((s, j) => (
                     <li key={j}>
-                      <a
-                        href={s}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline"
-                      >
+                      <a href={s} target="_blank" rel="noreferrer" className="underline">
                         {s}
                       </a>
                     </li>
@@ -308,10 +312,11 @@ export function WebChatPage() {
           </div>
         ))}
         {progress.length > 0 && (
-          <div data-testid="webchat-progress" className="text-xs text-muted-foreground">
+          <div data-testid="webchat-progress" className="qb-progress">
             {progress.map((p, i) => (
               <div key={i}>
-                {p.task ? `${p.task}: ` : ""}{p.status}
+                {p.task ? `${p.task}: ` : ""}
+                {p.status}
                 {p.detail ? ` — ${p.detail}` : ""}
               </div>
             ))}
@@ -320,11 +325,7 @@ export function WebChatPage() {
       </div>
 
       {status === "error" && error && (
-        <div
-          data-testid="webchat-error"
-          role="alert"
-          className="rounded border border-destructive/40 px-3 py-2 text-sm"
-        >
+        <div data-testid="webchat-error" role="alert" className="qb-error">
           <span>{error}</span>{" "}
           <button
             type="button"
@@ -343,29 +344,29 @@ export function WebChatPage() {
           e.preventDefault();
           handleSend();
         }}
-        className="flex gap-2"
+        className="qb-composer"
       >
         <textarea
           data-testid="webchat-input"
           aria-label="Message"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          rows={2}
+          rows={1}
           placeholder="Type a message…"
-          className="flex-1 rounded border px-3 py-2 text-sm"
+          className="qb-composer-input"
         />
         <button
           type="submit"
           aria-label="Send"
           data-testid="webchat-send"
           disabled={streaming || status === "loading" || !input.trim()}
-          className="rounded border px-4 py-2 text-sm"
+          className="qb-send-btn"
         >
           Send
         </button>
       </form>
 
-      <p data-testid="webchat-status" className="text-xs text-muted-foreground">
+      <p data-testid="webchat-status" className="qb-progress">
         {status === "loading" && "Opening session…"}
         {status === "idle" && "Ready"}
         {status === "streaming" && "Streaming…"}

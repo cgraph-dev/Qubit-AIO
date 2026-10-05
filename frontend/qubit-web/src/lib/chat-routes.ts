@@ -34,3 +34,30 @@ export function isTerminalChatPath(pathname: string): boolean {
 export function isNativeChatPath(pathname: string): boolean {
   return normalizeRoutePath(pathname) === NATIVE_CHAT_PATH;
 }
+
+/**
+ * Full-bleed console routes: pages that own the whole viewport and manage their
+ * own internal scrolling (a pinned composer, a fixed rail, a transcript that
+ * scrolls on its own).
+ *
+ * These are NOT chat routes — the two predicates answer different questions and
+ * must not be merged. This one only controls the layout chain in `App.tsx`.
+ *
+ * Why it exists: `App.tsx` wraps every route in a plain block `div`. A block
+ * grows to its content, so a page relying on `height: 100%` resolves against an
+ * auto-height ancestor and expands to the full content height instead of being
+ * bounded — pushing its composer/controls off-screen (measured: a 104,305px
+ * transcript in a 950px viewport). Any page with a fixed footer element needs
+ * this flag, or it will reproduce that bug.
+ */
+export const FULL_HEIGHT_ROUTE_PATHS = [
+  ...CHAT_ROUTE_PATHS,
+  "/webchat",
+  "/qubit-bot",
+] as const;
+
+export function isFullHeightPath(pathname: string): boolean {
+  return (FULL_HEIGHT_ROUTE_PATHS as readonly string[]).includes(
+    normalizeRoutePath(pathname),
+  );
+}

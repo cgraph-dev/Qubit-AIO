@@ -356,6 +356,52 @@ class BufferingMic:
             self._buf = bytearray()
 
 
+class PreRollMic:
+    """Rolling ~1 s ring buffer prepended at record start (wake §67 mirror).
+
+    The wake loop keeps a 600 ms pre-roll because its endpointer only
+    buffers frames after flipping to speech. The push-to-talk paths had no
+    equivalent: every frame between the key-DOWN edge and the first live
+    read (ticket mint + WS connect + mic spawn) was never recorded, so the
+    first words were unrecoverably lost while mid-stream audio decoded
+    fine. This wrapper yields caller-supplied onset frames first, then the
+    live mic — prepend, never cut. Bounded (``max_frames`` newest kept);
+    never raises out of ``read_frame``. Everything else delegates.
+    """
+
+    def __init__(self, mic: Any, *, pre_roll: Any = (),
+                 max_frames: int = 4) -> None:
+        self._mic = mic
+        try:
+            pre = [bytes(f) for f in (pre_roll or []) if f]
+        except Exception:
+            pre = []
+        try:
+            cap = max(0, int(max_frames))
+        except Exception:
+            cap = 4
+        if cap and len(pre) > cap:
+            del pre[:len(pre) - cap]
+        self._pre = pre
+
+    def start(self) -> None:
+        self._mic.start()
+
+    def stop(self) -> None:
+        self._mic.stop()
+
+    def read_frame(self, timeout: float = 0.5) -> Optional[bytes]:
+        if self._pre:
+            return self._pre.pop(0)
+        try:
+            return self._mic.read_frame(timeout)
+        except Exception:
+            return None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.__dict__["_mic"], name)
+
+
 class SttClient:
     """One streaming STT request against the existing STT WebSocket."""
 
@@ -544,5 +590,5 @@ def transcribe_accurate(cfg: Any, pcm: bytes, *,
 
 
 __all__ = ["SttClient", "SttError", "ParecMic", "BufferingMic",
-           "transcribe_once", "transcribe_accurate"]
+           "PreRollMic", "transcribe_once", "transcribe_accurate"]
 

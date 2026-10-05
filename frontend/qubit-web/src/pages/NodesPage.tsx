@@ -1,18 +1,29 @@
 /**
- * Nodes page (route /nodes). List/describe enrolled nodes, enroll + approve
- * with confirmation, revoke/remove with confirmation, per-node capability
- * refresh, dispatch with confirmation, and rename with confirmation plus a
- * re-enroll warning. Unmanageable rows render disabled with their reason and
+ * Nodes page (route /nodes). Enrolled-node console: list/describe, confirm-gated
+ * enroll / approve / revoke / remove / dispatch / rename, and per-node
+ * capability refresh. Unmanageable rows render disabled with their reason and
  * never fire. There are no message-gateway controls on this page.
  *
- * Layout mirrors the upstream nodes view hierarchy (toolbar + form card +
- * roster card with live-link rows + detail card), translated into Qubit voice.
- * Every backend call, confirm-gating, and disabled-with-reason row is wired
- * exactly as before.
+ * Backend handlers (already registered in `voicebridge/`, verified live):
+ *   GET  /api/qubit/nodes/list          (nodes.list)
+ *   GET  /api/qubit/nodes/describe      (nodes.describe, ?node_id=)
+ *   POST /api/qubit/nodes/enroll        (nodes.enroll, confirm-gated)
+ *   POST /api/qubit/nodes/approve       (nodes.approve, confirm-gated)
+ *   POST /api/qubit/nodes/revoke        (nodes.revoke, confirm-gated)
+ *   POST /api/qubit/nodes/remove        (nodes.remove, confirm-gated)
+ *   GET  /api/qubit/nodes/capabilities  (nodes.capabilities, ?node_id=)
+ *   POST /api/qubit/nodes/dispatch      (nodes.dispatch, confirm-gated)
+ *   POST /api/qubit/nodes/rename        (nodes.rename, confirm-gated)
+ *
+ * Built on the shipped openclaw render-helper contract
+ * (`@/components/openclaw-ui`): a `SettingsPage` root holding a
+ * `SettingsPageHeader`, a summary tile strip, and `SettingsSection` groups
+ * (enroll / roster / detail). `.settings-row__control` is emitted by the helper
+ * ONLY when a control is passed — a control-free row never renders an empty
+ * wrapper.
  */
 import { useCallback, useEffect, useState } from "react";
 
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 
 import {
@@ -30,7 +41,16 @@ import {
   type NodeRow,
 } from "@/lib/ocFamilyAgentsApi";
 import { refusalOrError } from "@/lib/policy-refusal";
-import { cn } from "@/lib/utils";
+import {
+  SettingsEmpty,
+  SettingsLoadingSkeleton,
+  SettingsPage,
+  SettingsPageHeader,
+  SettingsRow,
+  SettingsSection,
+  SettingsSummary,
+  SettingsValue,
+} from "@/components/openclaw-ui";
 
 interface PendingConfirm {
   detail: string;
@@ -131,320 +151,357 @@ export default function NodesPage() {
     [pendingConfirm],
   );
 
+  const manageReason = (n: NodeRow) =>
+    n.manage_reason ?? "This node cannot be managed from the dashboard.";
+
+  const manageableCount = nodes.filter((n) => n.manageable).length;
+
   return (
-    <div className={cn("flex min-h-0 w-full min-w-0 flex-1 flex-col gap-3 pt-1 sm:pt-2")}>
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-medium tracking-[0.08em]">Nodes</h2>
-          <p className="text-xs text-text-tertiary">
-            Enrolled nodes: describe, approve, dispatch, rename, revoke, remove.
-          </p>
-        </div>
-        <Button
-          ghost
-          size="sm"
-          onClick={load}
-          disabled={state === "loading"}
-          aria-label="Refresh nodes"
+    <SettingsPage wide>
+      <div className="contents" aria-label="Nodes">
+        <SettingsPageHeader
+          title="Nodes"
+          description="Enrolled nodes: describe, approve, dispatch, rename, revoke, remove."
+          actions={
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={load}
+              disabled={state === "loading"}
+              aria-label="Refresh nodes"
+            >
+              {state === "loading" ? <Spinner /> : "refresh"}
+            </button>
+          }
+        />
+
+        <SettingsSummary
+          items={[
+            { label: "Enrolled", value: state === "ready" ? nodes.length : "…" },
+            { label: "Manageable", value: state === "ready" ? manageableCount : "…" },
+            { label: "Authority", value: authority || "—" },
+          ]}
+        />
+
+        <SettingsSection
+          ariaLabel="Enroll node form"
+          title="Add a node"
+          description="Enroll a new node by id; enrollment is confirm-gated."
         >
-          {state === "loading" ? <Spinner /> : "refresh"}
-        </Button>
-      </div>
-
-      <section
-        aria-label="Enroll node form"
-        className="border border-border bg-background-base/60 px-3 py-2"
-      >
-        <h3 className="text-xs font-medium text-text-secondary">Enroll node</h3>
-        <p className="text-[0.6875rem] text-text-tertiary">
-          Add a node by id with an optional label.
-        </p>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            value={enrollId}
-            onChange={(e) => setEnrollId(e.target.value)}
-            placeholder="node id"
-            aria-label="Enroll node id"
-            className="min-w-0 flex-1 border border-border bg-background-base px-2 py-1 font-mono text-xs"
-          />
-          <input
-            type="text"
-            value={enrollLabel}
-            onChange={(e) => setEnrollLabel(e.target.value)}
-            placeholder="label (optional)"
-            aria-label="Enroll node label"
-            className="min-w-0 flex-1 border border-border bg-background-base px-2 py-1 text-xs"
-          />
-          <Button
-            ghost
-            size="sm"
-            onClick={() =>
-              mutate("Enroll", "enroll", (confirm) =>
-                enrollNode(
-                  { node_id: enrollId.trim(), label: enrollLabel.trim() || undefined },
-                  confirm,
-                ),
-              )
-            }
-            disabled={busy === "enroll" || !enrollId.trim()}
-            aria-label="Enroll node"
-          >
-            {busy === "enroll" ? <Spinner /> : "enroll"}
-          </Button>
-        </div>
-      </section>
-
-      <section
-        aria-label="Node roster card"
-        className="border border-border bg-background-base/60 px-3 py-2"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h3 className="text-xs font-medium text-text-secondary">Nodes</h3>
-            <p className="text-[0.6875rem] text-text-tertiary">
-              {authority || "Enrolled nodes and live links."}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-2">
-          {state === "loading" ? (
-            <p className="flex items-center gap-2 text-sm text-text-tertiary">
-              <Spinner className="shrink-0" /> Loading nodes…
-            </p>
-          ) : state === "error" ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          ) : nodes.length === 0 ? (
-            <p className="text-sm text-text-tertiary">No nodes found.</p>
-          ) : (
-            <ul className="flex flex-col gap-1" aria-label="Node roster">
-              {nodes.map((n) => (
-                <li
-                  key={n.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-border bg-background-base/60 px-3 py-2 text-xs"
+          <SettingsRow
+            stacked
+            title="Enroll node"
+            description="Add a node by id with an optional label."
+            control={
+              <>
+                <input
+                  type="text"
+                  value={enrollId}
+                  onChange={(e) => setEnrollId(e.target.value)}
+                  placeholder="node id"
+                  aria-label="Enroll node id"
+                  className="settings-input"
+                />
+                <input
+                  type="text"
+                  value={enrollLabel}
+                  onChange={(e) => setEnrollLabel(e.target.value)}
+                  placeholder="label (optional)"
+                  aria-label="Enroll node label"
+                  className="settings-input"
+                />
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() =>
+                    mutate("Enroll", "enroll", (confirm) =>
+                      enrollNode(
+                        { node_id: enrollId.trim(), label: enrollLabel.trim() || undefined },
+                        confirm,
+                      ),
+                    )
+                  }
+                  disabled={busy === "enroll" || !enrollId.trim()}
+                  aria-label="Enroll node"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="font-mono text-text-secondary">{n.id}</div>
-                    <div className="text-text-tertiary">
-                      {[n.name, n.state ? `state: ${n.state}` : ""]
-                        .filter((part): part is string => typeof part === "string" && part.length > 0)
-                        .join(" · ") || "—"}
-                    </div>
-                    {n.state ? (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        <span className="border border-border px-1.5 py-0.5 text-[0.6875rem] text-text-tertiary">
-                          {n.state}
-                        </span>
-                        <span
-                          className={cn(
-                            "border border-border px-1.5 py-0.5 text-[0.6875rem]",
-                            n.manageable ? "text-text-secondary" : "text-text-tertiary",
-                          )}
-                        >
-                          {n.manageable ? "manageable" : "not manageable"}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="ml-auto flex flex-wrap items-center gap-1">
-                    <Button
-                      ghost
-                      size="sm"
-                      onClick={() => describe(n.id)}
-                      aria-label={`Describe node ${n.id}`}
-                    >
-                      describe
-                    </Button>
-                    {n.manageable ? (
-                      <>
-                        <Button
-                          ghost
-                          size="sm"
-                          onClick={() =>
-                            mutate("Approve", `approve:${n.id}`, (confirm) =>
-                              approveNode(n.id, confirm),
-                            )
-                          }
-                          disabled={busy === `approve:${n.id}`}
-                          aria-label={`Approve node ${n.id}`}
-                        >
-                          {busy === `approve:${n.id}` ? <Spinner /> : "approve"}
-                        </Button>
-                        <Button
-                          ghost
-                          size="sm"
-                          onClick={() =>
-                            mutate("Revoke", `revoke:${n.id}`, (confirm) =>
-                              revokeNode(n.id, confirm),
-                            )
-                          }
-                          disabled={busy === `revoke:${n.id}`}
-                          aria-label={`Revoke node ${n.id}`}
-                        >
-                          {busy === `revoke:${n.id}` ? <Spinner /> : "revoke"}
-                        </Button>
-                        <Button
-                          ghost
-                          size="sm"
-                          onClick={() =>
-                            mutate("Remove", `remove:${n.id}`, (confirm) =>
-                              removeNode(n.id, confirm),
-                            )
-                          }
-                          disabled={busy === `remove:${n.id}`}
-                          aria-label={`Remove node ${n.id}`}
-                        >
-                          {busy === `remove:${n.id}` ? <Spinner /> : "remove"}
-                        </Button>
-                      </>
-                    ) : (
+                  {busy === "enroll" ? <Spinner /> : "enroll"}
+                </button>
+              </>
+            }
+          />
+        </SettingsSection>
+
+        <SettingsSection
+          ariaLabel="Node roster card"
+          title="Roster"
+          count={state === "ready" ? nodes.length : undefined}
+          description={authority || "Enrolled nodes and live links."}
+        >
+          {state === "loading" ? (
+            <SettingsLoadingSkeleton rows={3} />
+          ) : state === "error" ? (
+            <SettingsRow role="alert" title="Node list failed" description={error} />
+          ) : nodes.length === 0 ? (
+            <SettingsEmpty title="No nodes enrolled yet">
+              Use the enroll row above to add one.
+            </SettingsEmpty>
+          ) : (
+            <div className="settings-subrows" role="group" aria-label="Node roster">
+              {nodes.map((n) => (
+                <SettingsRow
+                  key={n.id}
+                  title={
+                    <>
+                      <SettingsValue mono>{n.id}</SettingsValue>
+                      {n.name ? ` · ${n.name}` : ""}
+                    </>
+                  }
+                  description={
+                    <>
+                      <span className="settings-row__desc">
+                        {n.state ? `state: ${n.state} · ` : ""}
+                        {n.manageable ? "manageable" : "not manageable"}
+                      </span>
+                      {n.manageable ? null : (
+                        <span className="settings-row__desc">{manageReason(n)}</span>
+                      )}
+                    </>
+                  }
+                  control={
+                    <>
                       <button
                         type="button"
-                        disabled
-                        data-state="refused"
-                        title={n.manage_reason ?? "This node cannot be managed from the dashboard."}
-                        aria-label={`Manage node ${n.id} unavailable`}
-                        aria-disabled="true"
-                        className="cursor-not-allowed border border-border px-2 py-1 text-xs text-text-tertiary opacity-60"
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => describe(n.id)}
+                        aria-label={`Describe node ${n.id}`}
                       >
-                        manage unavailable
+                        describe
                       </button>
-                    )}
-                  </div>
-                  {n.manageable ? null : (
-                    <span className="w-full text-text-tertiary">
-                      {n.manage_reason ?? "This node cannot be managed from the dashboard."}
-                    </span>
-                  )}
-                </li>
+                      {n.manageable ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() =>
+                              mutate("Approve", `approve:${n.id}`, (confirm) =>
+                                approveNode(n.id, confirm),
+                              )
+                            }
+                            disabled={busy === `approve:${n.id}`}
+                            aria-label={`Approve node ${n.id}`}
+                          >
+                            {busy === `approve:${n.id}` ? <Spinner /> : "approve"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() =>
+                              mutate("Revoke", `revoke:${n.id}`, (confirm) =>
+                                revokeNode(n.id, confirm),
+                              )
+                            }
+                            disabled={busy === `revoke:${n.id}`}
+                            aria-label={`Revoke node ${n.id}`}
+                          >
+                            {busy === `revoke:${n.id}` ? <Spinner /> : "revoke"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() =>
+                              mutate("Remove", `remove:${n.id}`, (confirm) =>
+                                removeNode(n.id, confirm),
+                              )
+                            }
+                            disabled={busy === `remove:${n.id}`}
+                            aria-label={`Remove node ${n.id}`}
+                          >
+                            {busy === `remove:${n.id}` ? <Spinner /> : "remove"}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          data-state="refused"
+                          title={manageReason(n)}
+                          aria-label={`Manage node ${n.id} unavailable`}
+                          aria-disabled="true"
+                          className="btn btn--ghost btn--sm"
+                        >
+                          manage unavailable
+                        </button>
+                      )}
+                    </>
+                  }
+                />
               ))}
-            </ul>
-          )}
-        </div>
-      </section>
-
-      {selectedId ? (
-        <section
-          aria-label="Node detail"
-          className="border border-border bg-background-base/60 px-3 py-2"
-        >
-          <h3 className="font-mono text-xs text-text-secondary">{selectedId}</h3>
-          <p className="text-[0.6875rem] text-text-tertiary">
-            Detail, capabilities, dispatch, and rename.
-          </p>
-          {detailError ? (
-            <p role="alert" className="mt-1 text-xs text-destructive">
-              {detailError}
-            </p>
-          ) : detail ? (
-            <div className="mt-1 text-xs text-text-tertiary">
-              {detail.name ? <p>name: {detail.name}</p> : null}
-              {detail.state ? <p>state: {detail.state}</p> : null}
-              {detail.last_seen ? <p>last seen: {detail.last_seen}</p> : null}
-              {detail.capabilities ? <p>capabilities: {detail.capabilities.join(", ")}</p> : null}
             </div>
-          ) : (
-            <p className="mt-1 flex items-center gap-2 text-xs text-text-tertiary">
-              <Spinner className="shrink-0" /> Describing…
-            </p>
           )}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button
-              ghost
-              size="sm"
-              onClick={() => refreshCapabilities(selectedId)}
-              disabled={busy === `caps:${selectedId}`}
-              aria-label={`Refresh capabilities for ${selectedId}`}
-            >
-              {busy === `caps:${selectedId}` ? <Spinner /> : "refresh capabilities"}
-            </Button>
-          </div>
-          {capabilities ? (
-            <p className="mt-1 text-xs text-text-tertiary">
-              capabilities: {capabilities.length > 0 ? capabilities.join(", ") : "none reported"}
-            </p>
-          ) : null}
+        </SettingsSection>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              value={dispatchTask}
-              onChange={(e) => setDispatchTask(e.target.value)}
-              placeholder="task to dispatch"
-              aria-label={`Dispatch task for ${selectedId}`}
-              className="min-w-0 flex-1 border border-border bg-background-base px-2 py-1 text-xs"
-            />
-            <Button
-              ghost
-              size="sm"
-              onClick={() =>
-                mutate("Dispatch", `dispatch:${selectedId}`, (confirm) =>
-                  dispatchNode({ node_id: selectedId, task: dispatchTask.trim() }, confirm),
+        {selectedId ? (
+          <SettingsSection
+            ariaLabel="Node detail"
+            title={`Node ${selectedId}`}
+            description="Detail, capabilities, dispatch, and rename."
+          >
+            <SettingsRow
+              title="Detail"
+              description={
+                detailError ? (
+                  <span role="alert">{detailError}</span>
+                ) : detail ? (
+                  <span className="settings-row__desc">
+                    {detail.name ? `name: ${detail.name} · ` : ""}
+                    {detail.state ? `state: ${detail.state} · ` : ""}
+                    {detail.last_seen ? `last seen: ${detail.last_seen} · ` : ""}
+                    capabilities:{" "}
+                    {detail.capabilities && detail.capabilities.length > 0
+                      ? detail.capabilities.join(", ")
+                      : "none reported"}
+                  </span>
+                ) : (
+                  <span className="settings-row__desc flex items-center gap-2">
+                    <Spinner className="shrink-0" /> Describing…
+                  </span>
                 )
               }
-              disabled={busy === `dispatch:${selectedId}` || !dispatchTask.trim()}
-              aria-label={`Dispatch to ${selectedId}`}
-            >
-              {busy === `dispatch:${selectedId}` ? <Spinner /> : "dispatch"}
-            </Button>
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              value={renameName}
-              onChange={(e) => setRenameName(e.target.value)}
-              placeholder="new node name"
-              aria-label={`Rename ${selectedId}`}
-              className="min-w-0 flex-1 border border-border bg-background-base px-2 py-1 text-xs"
-            />
-            <Button
-              ghost
-              size="sm"
-              onClick={() =>
-                mutate("Rename", `rename:${selectedId}`, (confirm) =>
-                  renameNode({ node_id: selectedId, name: renameName.trim() }, confirm),
-                )
+              control={
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => refreshCapabilities(selectedId)}
+                  disabled={busy === `caps:${selectedId}`}
+                  aria-label={`Refresh capabilities for ${selectedId}`}
+                >
+                  {busy === `caps:${selectedId}` ? <Spinner /> : "refresh capabilities"}
+                </button>
               }
-              disabled={busy === `rename:${selectedId}` || !renameName.trim()}
-              aria-label={`Rename ${selectedId}`}
-            >
-              {busy === `rename:${selectedId}` ? <Spinner /> : "rename"}
-            </Button>
-          </div>
-          <p className="mt-1 text-[0.6875rem] text-text-tertiary">
-            Renaming a node may require re-enrollment before it accepts new work.
+            />
+
+            {capabilities ? (
+              <SettingsRow
+                title="Capabilities"
+                description={
+                  capabilities.length > 0
+                    ? `capabilities: ${capabilities.join(", ")}`
+                    : "none reported"
+                }
+              />
+            ) : null}
+
+            <SettingsRow
+              stacked
+              title="Dispatch"
+              description="Send a task to this node (confirm-gated)."
+              control={
+                <>
+                  <input
+                    type="text"
+                    value={dispatchTask}
+                    onChange={(e) => setDispatchTask(e.target.value)}
+                    placeholder="task to dispatch"
+                    aria-label={`Dispatch task for ${selectedId}`}
+                    className="settings-input"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() =>
+                      mutate("Dispatch", `dispatch:${selectedId}`, (confirm) =>
+                        dispatchNode({ node_id: selectedId, task: dispatchTask.trim() }, confirm),
+                      )
+                    }
+                    disabled={busy === `dispatch:${selectedId}` || !dispatchTask.trim()}
+                    aria-label={`Dispatch to ${selectedId}`}
+                  >
+                    {busy === `dispatch:${selectedId}` ? <Spinner /> : "dispatch"}
+                  </button>
+                </>
+              }
+            />
+
+            <SettingsRow
+              stacked
+              title="Rename"
+              description="Renaming a node may require re-enrollment before it accepts new work."
+              control={
+                <>
+                  <input
+                    type="text"
+                    value={renameName}
+                    onChange={(e) => setRenameName(e.target.value)}
+                    placeholder="new node name"
+                    aria-label={`Rename ${selectedId}`}
+                    className="settings-input"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() =>
+                      mutate("Rename", `rename:${selectedId}`, (confirm) =>
+                        renameNode({ node_id: selectedId, name: renameName.trim() }, confirm),
+                      )
+                    }
+                    disabled={busy === `rename:${selectedId}` || !renameName.trim()}
+                    aria-label={`Rename node ${selectedId}`}
+                  >
+                    {busy === `rename:${selectedId}` ? <Spinner /> : "rename"}
+                  </button>
+                </>
+              }
+            />
+          </SettingsSection>
+        ) : (
+          <SettingsSection title="Node detail">
+            <SettingsEmpty title="No node selected">
+              Describe a node from the roster to inspect its capabilities, dispatch a task,
+              or rename it.
+            </SettingsEmpty>
+          </SettingsSection>
+        )}
+
+        {notice ? (
+          <p role="status" className="settings-status settings-status--accent">
+            {notice}
           </p>
-        </section>
-      ) : null}
+        ) : null}
 
-      {notice ? (
-        <p role="status" className="text-xs text-text-secondary">
-          {notice}
-        </p>
-      ) : null}
-
-      {pendingConfirm ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirm node action"
-          className="border border-border bg-background-base px-3 py-2 text-xs"
-        >
-          <p className="text-text-secondary">{pendingConfirm.detail}</p>
-          <div className="mt-2 flex gap-2">
-            <Button ghost size="sm" onClick={() => settleConfirm(true)} aria-label="Confirm">
-              Confirm
-            </Button>
-            <Button ghost size="sm" onClick={() => settleConfirm(false)} aria-label="Cancel">
-              Cancel
-            </Button>
+        {pendingConfirm ? (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm node action"
+            className="settings-group"
+          >
+            <SettingsRow
+              title="Confirm action"
+              description={pendingConfirm.detail}
+              control={
+                <>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => settleConfirm(true)}
+                    aria-label="Confirm"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => settleConfirm(false)}
+                    aria-label="Cancel"
+                  >
+                    Cancel
+                  </button>
+                </>
+              }
+            />
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </SettingsPage>
   );
 }

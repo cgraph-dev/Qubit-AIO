@@ -145,7 +145,12 @@ def _local_complete(prompt: str, cfg: Any, max_tokens: int, *,
                 num_ctx=num_ctx or rc.num_ctx, on_sentence=on_sentence,
                 should_stop=should_stop, reasoning=reasoning, **extra)
         else:
-            text = chat_local(prompt[:2000], conversation_prompt,
+            # Lane 2 (2026-10-03, journal test-2 09:52:38): the non-streaming
+            # local path silently truncated the prompt at 2000 chars while the
+            # streaming branch above passed it whole — a "2000 context" the
+            # owner could see as lost trailing text. The runner contract owns
+            # context limits (num_ctx); never truncate here.
+            text = chat_local(prompt, conversation_prompt,
                               model=alias, timeout_s=timeout,
                               max_tokens=max_tokens, context=context,
                               num_ctx=num_ctx or rc.num_ctx,
@@ -808,11 +813,17 @@ def run(req: ProviderRequest, cfg: Any,
     if res.ok and res.usage is not None:
         # Spend already recorded by gov.release above; attach disclosure.
         res.details["disclosure"] = disclosure_block(policy, provider, model,
-                                                    res.usage.cost_usd_est or est)
+                                                     res.usage.cost_usd_est or est)
         res.details["privacy_tier"] = policy.privacy_tier
         res.details["egress_warning"] = eg.warning
         log_event("frontier.used", provider=provider, model=model,
                   cost_usd=res.usage.cost_usd_est or est)
+        try:
+            from . import dead_models as _DM
+
+            _DM.clear_dead(cfg, provider, model)
+        except Exception:
+            pass
         return res
     if not res.ok:
         # Auto route falls back to local with truthful identity; explicit
@@ -820,7 +831,15 @@ def run(req: ProviderRequest, cfg: Any,
         if res.code == "MODEL_UNAVAILABLE_TURN" and requested != "auto":
             # Turn-time dead model: typed error only. Name the dead model
             # (already in res.message) plus the still-working slot, without
-            # moving the slot and without a silent fallback.
+            # moving the slot and without a silent fallback. Record it so
+            # the activation gate refuses to (re-)persist this model into
+            # the slots until a later successful turn clears the record.
+            try:
+                from . import dead_models as _DM
+
+                _DM.record_dead(cfg, provider, model, res.code or "unavailable")
+            except Exception:
+                pass
             res.message = (f"{res.message} — still serving default turns: "
                            f"{_working_slot_summary(cfg)}")
             return res

@@ -94,11 +94,25 @@ export default function LogsPage() {
   const [file, setFile] = useState<LogFile>(() =>
     isLogFile(requestedFile) ? requestedFile : "agent",
   );
+  // Default to ALL (Hermes parity: the reference LogsPage defaults to ALL).
+  // A narrower default silently drops a level class AND breaks paging — the
+  // backend over-reads only `offset+cap+1` raw lines before filtering, so an
+  // INFO default returned ~29 lines with `has_more=false` and "Load older"
+  // greyed out, i.e. the retained log was unreachable. ALL renders the full
+  // tail and pages correctly; a level is one click away. The old INFO default
+  // was justified by a DEBUG flood that the row rendering now absorbs the same
+  // way Hermes does.
   const [level, setLevel] = useState<(typeof LEVELS)[number]>("ALL");
   const [component, setComponent] =
     useState<(typeof COMPONENTS)[number]>("all");
   const [lineCount, setLineCount] = useState<(typeof LINE_COUNTS)[number]>(100);
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  // Live tail by default: a logs page that needs a manual refresh to show new
+  // lines is the wrong surface for an operator watching a running gateway.
+  // Owner directive (2026-10-04): "shouldn't logs show live and not need to
+  // refresh to see new logs?" — upstream Hermes ships this OFF, but the
+  // checkbox remains so the 5s poll can be stopped (e.g. while reading a
+  // specific line that keeps scrolling away).
+  const [autoRefresh, setAutoRefresh] = useState(true);
   // Free-text filter, server-side post-filtered by the vendored status router
   // (`?search=`). Debounced so typing does not spam the tail reader.
   const [searchInput, setSearchInput] = useState("");
@@ -140,25 +154,48 @@ export default function LogsPage() {
     if (offset > 0) qs.set("offset", String(offset));
     fetchJSON<LogsPageResponse>(`/api/logs?${qs.toString()}`)
       .then((resp) => {
-        setLines(resp.lines);
-        setHasMore(Boolean(resp.has_more));
+        setLines(resp?.lines ?? []);
+        setHasMore(Boolean(resp?.has_more));
         setNextOffset(
           typeof resp.next_offset === "number" ? resp.next_offset : null,
         );
-        setDetailIndex(null);
         // Only follow the tail on the newest page; an older page must not yank
-        // the viewport to the bottom.
+        // the viewport to the bottom. With auto-refresh ON this runs every 5s,
+        // so it must NOT fight the operator: we re-pin to the newest line only
+        // when they are already parked at the bottom. Scrolled up = reading,
+        // and the viewport is left exactly where it is.
         if (offset === 0) {
-          setTimeout(() => {
-            if (scrollRef.current) {
-              scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-            }
-          }, 50);
+          const el = scrollRef.current;
+          const atBottom = el
+            ? el.scrollHeight - el.scrollTop - el.clientHeight < 48
+            : true;
+          if (atBottom) {
+            setTimeout(() => {
+              if (scrollRef.current) {
+                scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+              }
+            }, 50);
+          }
         }
       })
       .catch((err) => setError(String(err)))
       .finally(() => setLoading(false));
   }, [file, lineCount, level, component, search, offset]);
+
+  // Live tail: while auto-refresh is on, re-fetch every 5s (same cadence as
+  // Hermes). Skipped while a line is expanded and while the tab is hidden, so
+  // an open detail view is never closed under the operator and a backgrounded
+  // tab is not polled.
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const tick = () => {
+      if (document.visibilityState === "hidden") return;
+      if (detailIndex !== null) return;
+      fetchLogs();
+    };
+    const interval = setInterval(tick, 5000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchLogs, detailIndex]);
 
   // Download the exact lines currently shown (the server tail + filters are the
   // source of truth; no second backend fetch is invented).
@@ -256,11 +293,9 @@ export default function LogsPage() {
     fetchLogs();
   }, [fetchLogs]);
 
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const interval = setInterval(fetchLogs, 5000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, fetchLogs]);
+  // NOTE: the live-tail interval lives with `fetchLogs` above (it skips while a
+  // row is expanded or the tab is hidden). Do not add a second one here — two
+  // 5s polls would double-fetch and race each other's state writes.
 
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-4">

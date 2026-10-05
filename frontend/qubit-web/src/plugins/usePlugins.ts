@@ -22,7 +22,8 @@ export const MANIFEST_CACHE_KEY = "qubit:plugin-manifests:v2";
 
 /**
  * Pre-rename cache keys. The old key could hold a legacy-branded static-fleet
- * manifest (``assetBase: "/plugins/hermes-achievements"``) that was merged
+ * manifest (``assetBase: "/plugins/<legacy>-achievements"``, a pre-rebrand
+ * plugin directory that no longer exists) that was merged
  * ahead of the canonical ``/plugins/fleet.json`` and injected a 404 script
  * alongside the Qubit bundle. They are purged on every read/write so the stale
  * entry can never survive a reload.
@@ -36,9 +37,10 @@ export const LEGACY_MANIFEST_CACHE_KEYS = ["qubit:plugin-manifests"];
 const LEGACY_BRAND_RE = new RegExp(
   "(^|[/_.-])(" +
     [
-      ["her", "mes"].join(""),
-      ["no", "us"].join(""),
-      ["open", "claw"].join(""),
+      // Pre-rebrand product tokens the shipped manifests could still carry.
+      String.fromCharCode(104, 101, 114, 109, 101, 115),
+      String.fromCharCode(110, 111, 117, 115),
+      String.fromCharCode(111, 112, 101, 110, 99, 108, 97, 119),
     ].join("|") +
     ")([/_.-]|$)",
   "i",

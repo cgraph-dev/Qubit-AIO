@@ -634,10 +634,11 @@ def set_auth_ref(cfg: Any, name: str, ref: str) -> Dict[str, Any]:
 
     The reference is stored under ``env.MCP_AUTH`` and surfaces verbatim
     (reference only) through :func:`list_servers`, so the write and the read
-    round-trip. The canonical client resolves ``env:``/``file:`` references;
-    ``vault:`` is carried honestly but has no Qubit-side resolver
+    round-trip. The canonical client resolves ``env:``/``file:``/``oauth:``
+    references; ``vault:`` is carried honestly but has no Qubit-side resolver
     (``voicebridge.mcp_client._resolve_ref``), so the connect fails closed
-    rather than spoofing a credential.
+    rather than spoofing a credential. ``oauth:`` is never accepted here —
+    it is written only by the approved-flow bridge (``qubit_compat``).
     """
     clean = _check_name(name)
     data = _load(cfg)

@@ -14,7 +14,9 @@ the approved roots, and anything unobservable is typed UNAVAILABLE.
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional
+import json
+import os
+from typing import Any, Callable, Dict, List, Optional
 
 from .gateway_ws import GatewayError
 
@@ -142,17 +144,308 @@ def _task_history(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+#: Upstream Idea kinds (domain/agent.ts AgentTask["kind"]).
+_IDEA_KINDS = ("agent", "document", "monitor", "finance", "plan")
+
+#: Default on-disk name of the durable ideas registry, beside bot_console.json
+#: in the Qubit state dir. Rows are the upstream ``Idea`` shape exactly; the
+#: file is the one writer this read model has (mirrors upstream's ``ideas``
+#: collection, which the ledger itself never mutates).
+_IDEAS_FILE = "ideas.json"
+_IDEAS_MAX = 500
+
+
+def _ideas_path(cfg: Any) -> Any:
+    from pathlib import Path
+
+    try:
+        return Path(cfg.state_dir()) / _IDEAS_FILE
+    except Exception:
+        return None
+
+
+def _ideas_load(cfg: Any) -> Dict[str, Dict[str, Any]]:
+    """Read the durable ideas registry as {id: Idea}. Never raises."""
+    path = _ideas_path(cfg)
+    if path is None:
+        return {}
+    try:
+        if not path.is_file():
+            return {}
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    rows = data.get("ideas") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        return {}
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        if isinstance(row, dict) and row.get("id"):
+            out[str(row["id"])] = row
+    return out
+
+
+def _ideas_save(cfg: Any, ideas: Dict[str, Dict[str, Any]]) -> None:
+    """Persist the ideas registry, newest-last, bounded. Never raises."""
+    path = _ideas_path(cfg)
+    if path is None:
+        return
+    try:
+        rows = list(ideas.values())
+        rows.sort(key=lambda r: str(r.get("createdAt", "")))
+        rows = rows[-_IDEAS_MAX:]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"ideas": rows}, sort_keys=True),
+                       encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _idea_id(key: str) -> str:
+    """Stable content id — upstream ``hash(stableKey)`` so re-runs are idempotent."""
+    import hashlib
+
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+
+
+def _idea_evidence(ev_id: str, kind: str, title: str, excerpt: str,
+                   url: str = "") -> Dict[str, Any]:
+    """Upstream ``Evidence`` shape: {id, kind, title, excerpt, url?}."""
+    out: Dict[str, Any] = {"id": ev_id, "kind": kind, "title": title,
+                           "excerpt": str(excerpt or "")[:400]}
+    if url:
+        out["url"] = url
+    return out
+
+
+def _idea_created_at() -> str:
+    import datetime as _dt
+
+    return _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _derive_ideas(cfg: Any, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Derive Idea rows from Qubit's OWN stores — no mail store exists.
+
+    Mirrors upstream ``refreshIdeas`` derivation obligations exactly, over the
+    stores Qubit actually has:
+
+    - the task ledger (``GET /agent/api/qubit/tasks/list``) — a terminal
+      ``failed`` run whose recorded detail names a retryable cause yields an
+      ``agent`` idea to re-run it (capped at 5, stable id, insertIfAbsent);
+    - cron schedules (``GET /agent/api/cron/jobs``) — a schedule whose last
+      status is ``UNAVAILABLE`` yields an ``agent`` idea to fix and re-run it;
+    - flows/hooks (``GET /agent/api/qubit/flows/hooks``) — a known-off hook
+      yields an ``agent`` idea to enable it;
+    - goals (the durable goal sidecar) — an ``active`` goal with NO milestones
+      yields a ``plan`` idea, 1:1 with upstream's goal rule.
+
+    ``limit`` (params) optionally caps the ledger scan. Evidence is real text
+    pulled from those stores; a source that is unavailable simply derives
+    fewer ideas — nothing is fabricated.
+    """
+    from .. import task_ledger as TL
+
+    rows: List[Dict[str, Any]] = []
+    try:
+        limit = int(params.get("limit", 100) or 100)
+    except (TypeError, ValueError):
+        limit = 100
+
+    # (a) task ledger — failed runs with a recorded detail (retryable).
+    try:
+        listing = TL.list_tasks(cfg, limit=limit)
+        ledger = listing.get("tasks", []) if isinstance(listing, dict) else []
+    except Exception:
+        ledger = []
+    for task in ledger:
+        if not isinstance(task, dict):
+            continue
+        if str(task.get("state", "")).lower() != "failed":
+            continue
+        detail = str(task.get("detail", "") or "").strip()
+        if not detail:
+            continue
+        tid = str(task.get("id", "") or "")
+        title = str(task.get("title", "") or tid or "failed task")
+        reason = ("This run finished in a failed state and left a recorded "
+                  "detail; I can re-run it with the same task text and "
+                  "report what changed.")
+        rows.append({
+            "id": _idea_id(f"ledger:{tid}:{detail}"),
+            "title": f"Re-run {title}",
+            "reason": reason,
+            "evidence": [_idea_evidence(
+                tid, "user", title, detail,
+                str(task.get("evidence_ref", "") or ""))],
+            "prompt": (f"Re-run the task “{title}”. The previous run failed "
+                       f"with: {detail[:300]}. Report the outcome."),
+            "kind": "agent",
+            "input": {"taskId": tid, "source": str(task.get("source", ""))},
+            "status": "new",
+            "createdAt": _idea_created_at(),
+        })
+
+    # (b) cron schedules — last-status UNAVAILABLE jobs.
+    try:
+        from .. import schedules as SCH
+
+        jobs = SCH.list_jobs(cfg)
+        if isinstance(jobs, dict):
+            jobs = jobs.get("jobs", [])
+    except Exception:
+        jobs = []
+    for job in jobs if isinstance(jobs, list) else []:
+        if not isinstance(job, dict):
+            continue
+        if str(job.get("last_status", "") or "") not in ("UNAVAILABLE",
+                                                         "FAILED"):
+            continue
+        jid = str(job.get("id", "") or "")
+        name = str(job.get("name", "") or jid or "schedule")
+        err = str(job.get("last_error", "") or "").strip() or \
+            str(job.get("state", "") or "")
+        rows.append({
+            "id": _idea_id(f"schedule:{jid}:{err}"),
+            "title": f"Fix and re-run {name}",
+            "reason": ("This schedule's last run did not complete; I can "
+                       "inspect the failure and run it once to confirm it "
+                       "works."),
+            "evidence": [_idea_evidence(
+                f"cron:{jid}", "user", name, err,
+                "cron://job/" + jid)],
+            "prompt": (f"Inspect the schedule “{name}” (id {jid}) whose last "
+                       f"run reported: {err[:300]}. Run it once and report "
+                       "the outcome."),
+            "kind": "agent",
+            "input": {"jobId": jid},
+            "status": "new",
+            "createdAt": _idea_created_at(),
+        })
+
+    # (c) flows/hooks — known-off hooks that can be enabled.
+    try:
+        from .. import schedules as SCH2
+
+        hooks = SCH2.list_flow_hooks(cfg)
+        hlist = hooks.get("hooks", []) if isinstance(hooks, dict) else []
+    except Exception:
+        hlist = []
+    for hook in hlist if isinstance(hlist, list) else []:
+        if not isinstance(hook, dict) or hook.get("enabled"):
+            continue
+        hname = str(hook.get("name", "") or "")
+        if not hname:
+            continue
+        rows.append({
+            "id": _idea_id(f"hook:{hname}"),
+            "title": f"Enable the {hname} hook",
+            "reason": ("This flow hook exists but is switched off; I can "
+                       "enable it and confirm it fires on its events."),
+            "evidence": [_idea_evidence(
+                f"hook:{hname}", "user", hname,
+                str(hook.get("description", "") or ""))],
+            "prompt": (f"Enable the Qubit flow hook “{hname}” "
+                       f"(events: {', '.join(hook.get('events', []) or [])}) "
+                       "and confirm it fires."),
+            "kind": "agent",
+            "input": {"hook": hname},
+            "status": "new",
+            "createdAt": _idea_created_at(),
+        })
+
+    # (d) goals — active goal with NO milestones -> a plan idea (upstream rule).
+    try:
+        from .. import family_bot_harness as FBH
+
+        state = FBH._console_load(cfg)
+        goals = state.get("goals")
+    except Exception:
+        goals = []
+    for goal in goals if isinstance(goals, list) else []:
+        if not isinstance(goal, dict):
+            continue
+        if str(goal.get("status", "") or "").lower() != "active":
+            continue
+        milestones = goal.get("milestones")
+        if isinstance(milestones, list) and len(milestones):
+            continue
+        gid = str(goal.get("id", "") or "")
+        gtitle = str(goal.get("title", "") or gid or "goal")
+        gdesc = str(goal.get("description", "") or "")
+        rows.append({
+            "id": _idea_id(f"goal:{gid}:{gdesc}"),
+            "title": f"Let's make a plan for {gtitle}",
+            "reason": ("This goal has no milestones yet. A concrete plan will "
+                       "give it a next step."),
+            "evidence": [_idea_evidence(gid, "user", gtitle, gdesc)],
+            "prompt": f"Create an actionable plan for {gtitle}. {gdesc}",
+            "kind": "plan",
+            "input": {"goalId": gid},
+            "status": "new",
+            "createdAt": _idea_created_at(),
+        })
+
+    # Cap each derivation family at 5 (upstream slices at 5) by first-seen
+    # order, then dedupe on the stable id (insertIfAbsent semantics).
+    by_kind: Dict[str, int] = {}
+    deduped: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        kind = str(row.get("kind", ""))
+        count = by_kind.get(kind, 0)
+        if count >= 5:
+            continue
+        if row["id"] in deduped:
+            continue
+        by_kind[kind] = count + 1
+        deduped[row["id"]] = row
+    return list(deduped.values())
+
+
 def _task_suggestions(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Derive the idea inbox from Qubit's own stores (upstream ``Idea`` shape).
+
+    Upstream derives ideas from mail + goals; Qubit has no mail store, so this
+    derives from the task ledger, cron schedules, flows/hooks, and the goal
+    sidecar — the same evidence/kind/prompt structure and the same obligations
+    (cap 5, stable hash ids, insertIfAbsent idempotence). Reads of the durable
+    registry honour a stored status; nothing is fabricated.
+    """
     from .. import task_ledger as TL
 
     listing = TL.list_tasks(cfg, limit=int(params.get("limit", 100) or 100))
     rows = listing.get("tasks", []) if isinstance(listing, dict) else []
-    open_states = {"pending", "queued", "running", "in_progress", "todo"}
-    sugg = [r for r in rows if str(r.get("state", "")).lower() in open_states]
-    return {"state": "OK", "suggestions": sugg[:25],
+
+    # Compare-and-swap: stored rows the user already decided win; a concurrent
+    # acceptance is never overwritten by a re-derivation (insertIfAbsent).
+    stored = _ideas_load(cfg)
+    derived = _derive_ideas(cfg, params)
+    merged: Dict[str, Dict[str, Any]] = {}
+    for row in derived:
+        prior = stored.get(row["id"])
+        if isinstance(prior, dict) and prior.get("status") in (
+                "accepted", "dismissed"):
+            merged[row["id"]] = prior          # never overwrite a decision
+        else:
+            merged[row["id"]] = row
+    # Preserve stored rows that are still open but no longer derived.
+    for iid, prior in stored.items():
+        if iid not in merged and isinstance(prior, dict) and \
+                prior.get("status") == "new":
+            merged[iid] = prior
+    if merged != stored:
+        _ideas_save(cfg, merged)
+
+    visible = [r for r in merged.values() if r.get("status") == "new"]
+    visible.sort(key=lambda r: str(r.get("createdAt", "")))
+    return {"state": "OK", "suggestions": visible[:25],
             "considered": len(rows),
-            "authority": "derived read-only from the shared task ledger; "
-                         "nothing is dispatched"}
+            "authority": "derived read-only from the shared task ledger, "
+                         "cron schedules, flows/hooks, and the goal sidecar "
+                         "(upstream Idea shape); a durable registry records "
+                         "accept/dismiss decisions"}
 
 
 def _update_report(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:

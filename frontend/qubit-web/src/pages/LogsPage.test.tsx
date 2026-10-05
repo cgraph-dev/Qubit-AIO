@@ -87,6 +87,11 @@ describe("LogsPage search", () => {
     expect(requestedUrls().some((u) => u.includes("file=agent&lines=100"))).toBe(
       true,
     );
+    // Hermes parity + capture: the default view must be UNFILTERED. A narrowed
+    // default level silently drops a severity class AND breaks paging (the
+    // backend over-reads only offset+cap+1 raw lines before filtering), so the
+    // default request must not send a `level` param at all.
+    expect(requestedUrls().every((u) => !u.includes("level="))).toBe(true);
 
     const input = container.querySelector<HTMLInputElement>(
       'input[aria-label="Search log lines"]',

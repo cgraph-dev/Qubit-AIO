@@ -3,9 +3,8 @@
  *
  * Separate Qubit-branded client for the memory-backends page
  * (`/qubit-memory`). This is intentionally NOT part of the plugins surface:
- * it ports the upstream memory extensions (`extensions/memory-lancedb`,
- * `extensions/memory-wiki`, `extensions/active-memory` — read-only source)
- * as local-only store wiring behind the existing memory-provider typed gate.
+ * it exposes the memory extensions as local-only store wiring behind the
+ * existing memory-provider typed gate.
  *
  * Gate truth (reused exactly, never reinvented — see `voicebridge/`):
  * - `GET /api/memory` answers the live local store status with
@@ -34,8 +33,11 @@ import { refusalOrError } from "@/lib/policy-refusal";
 // ── ROUTES manifest ──────────────────────────────────────────────────────
 // Qubit namespace, served by family_memory.py (aliases over the canonical
 // local surface). The client keeps calling the live canonical path in
-// `via` (same store, same data); `bridge: "LIVE"` records that every
-// `/api/qubit/memory/*` row is served too.
+// `via` (same store, same data). `bridge: "NEEDS-BRIDGE"` is the family-
+// manifest marker: the `/api/qubit/memory/*` rows are bridge aliases that the
+// Qubit namespace must resolve, matching the sibling `ocFamily*Api` manifests
+// (canvas, harness). This is an annotation only — the page never reads it and
+// always dials the working canonical `via` path.
 
 export type MemoryAction =
   | "status"
@@ -48,18 +50,19 @@ export interface MemoryRoute {
   action: MemoryAction;
   method: "GET" | "POST";
   path: string;
-  /** Live canonical path the client calls (same store the bridge serves). */
+  /** Live canonical path the client calls (same store the family serves). */
   via: string;
-  bridge: "LIVE";
+  /** Family bridge marker: the `/api/qubit/memory/*` row needs its namespace served. */
+  bridge: "NEEDS-BRIDGE";
 }
 
 /** Every path + method this family client wants, under `/api/qubit/memory/`. */
 export const ROUTES: ReadonlyArray<MemoryRoute> = [
-  { action: "status", method: "GET", path: "/api/qubit/memory/status", via: "GET /api/memory", bridge: "LIVE" },
-  { action: "provider", method: "GET", path: "/api/qubit/memory/provider", via: "GET /api/memory", bridge: "LIVE" },
-  { action: "provider_config", method: "GET", path: "/api/qubit/memory/provider-config", via: "GET /api/memory/providers/<id>/config", bridge: "LIVE" },
-  { action: "provider_set", method: "POST", path: "/api/qubit/memory/provider-set", via: "PUT /api/memory/provider", bridge: "LIVE" },
-  { action: "probe", method: "GET", path: "/api/qubit/memory/probe", via: "GET /api/memory/providers/qubit-local", bridge: "LIVE" },
+  { action: "status", method: "GET", path: "/api/qubit/memory/status", via: "GET /api/memory", bridge: "NEEDS-BRIDGE" },
+  { action: "provider", method: "GET", path: "/api/qubit/memory/provider", via: "GET /api/memory", bridge: "NEEDS-BRIDGE" },
+  { action: "provider_config", method: "GET", path: "/api/qubit/memory/provider-config", via: "GET /api/memory/providers/<id>/config", bridge: "NEEDS-BRIDGE" },
+  { action: "provider_set", method: "POST", path: "/api/qubit/memory/provider-set", via: "PUT /api/memory/provider", bridge: "NEEDS-BRIDGE" },
+  { action: "probe", method: "GET", path: "/api/qubit/memory/probe", via: "GET /api/memory/providers/qubit-local", bridge: "NEEDS-BRIDGE" },
 ];
 
 export function routePath(action: MemoryAction): MemoryRoute | undefined {
@@ -81,7 +84,8 @@ export interface MemoryStatusPayload {
   providers: QubitLocalProviderRow[];
   builtinFiles: { memory: number; user: number };
   state: string;
-  enabled: boolean;
+  /** `undefined` = the endpoint did not report enablement (never assume true). */
+  enabled: boolean | undefined;
   storeState: string;
   storePath: string;
 }
@@ -91,7 +95,7 @@ export interface ProviderStatusPayload {
   active: string;
   tiers: string[];
   state: string;
-  enabled: boolean;
+  enabled: boolean | undefined;
   storeState: string;
   detail: string;
 }
@@ -112,6 +116,11 @@ function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+/** Tri-state: `undefined` when the field is absent — never a fabricated default. */
+function boolOrUndefined(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
 function asArray(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
 }
@@ -122,7 +131,11 @@ export function normalizeMemoryStatus(payload: unknown): MemoryStatusPayload | n
   if (!inner.active && !inner.providers) return null;
   const builtin = asRecord(inner.builtin_files ?? inner.builtinFiles);
   return {
-    active: str(inner.active ?? "qubit-local"),
+    // NOTE: `GET /api/memory` answers `active: ""` when the gate holds no
+    // selected provider — keep it verbatim. The live active store is reported
+    // by the provider-detail read (`GET /api/memory/providers/<name>`); this
+    // function must never coerce an empty value into a fabricated name.
+    active: str(inner.active ?? ""),
     providers: asArray(inner.providers).map((p) => ({
       name: str(p.name ?? "qubit-local"),
       description: str(p.description ?? ""),
@@ -132,7 +145,10 @@ export function normalizeMemoryStatus(payload: unknown): MemoryStatusPayload | n
     })),
     builtinFiles: { memory: num(builtin.memory), user: num(builtin.user) },
     state: str(inner.state ?? inner.status ?? ""),
-    enabled: bool(inner.enabled, true),
+    // The list payload carries NO `enabled`; absence is "not reported", never
+    // a defaulted `true` (that made the page claim enablement the backend
+    // never asserted — the real value is `enabled: false` on the detail read).
+    enabled: boolOrUndefined(inner.enabled),
     storeState: str(inner.store_state ?? inner.storeState ?? ""),
     storePath: str(inner.store_path ?? inner.storePath ?? ""),
   };
@@ -144,11 +160,11 @@ export function normalizeProviderStatus(payload: unknown): ProviderStatusPayload
   if (!inner.provider && !inner.active) return null;
   const tiers = inner.tiers;
   return {
-    provider: str(inner.provider ?? inner.active ?? "qubit-local"),
-    active: str(inner.active ?? inner.provider ?? "qubit-local"),
+    provider: str(inner.provider ?? inner.active ?? ""),
+    active: str(inner.active ?? inner.provider ?? ""),
     tiers: Array.isArray(tiers) ? tiers.filter((t): t is string => typeof t === "string") : [],
     state: str(inner.state ?? ""),
-    enabled: bool(inner.enabled, true),
+    enabled: boolOrUndefined(inner.enabled),
     storeState: str(inner.store_state ?? inner.storeState ?? ""),
     detail: str(inner.detail ?? ""),
   };
@@ -226,7 +242,7 @@ export const MEMORY_BACKENDS: ReadonlyArray<MemoryBackendRow> = [
   {
     id: "lancedb",
     title: "LanceDB vector memory",
-    blurb: "Upstream vector long-term memory port (auto-recall, auto-capture, vector search).",
+    blurb: "Vector long-term memory store (auto-recall, auto-capture, vector search).",
     localOnly: false,
     selectable: false,
     disabledReason: "Needs hosted embedding infra and an API key (secret) plus native vector deps — refused by policy, no writer exists.",
@@ -236,7 +252,7 @@ export const MEMORY_BACKENDS: ReadonlyArray<MemoryBackendRow> = [
   {
     id: "wiki",
     title: "Memory wiki",
-    blurb: "Upstream persistent wiki-compiler port (knowledge vault).",
+    blurb: "Persistent wiki-compiler store (knowledge vault).",
     localOnly: true,
     selectable: false,
     disabledReason: "No memory-provider writer exists; reads live under the separate plugin namespace, out of scope for this page.",
@@ -246,7 +262,7 @@ export const MEMORY_BACKENDS: ReadonlyArray<MemoryBackendRow> = [
   {
     id: "active-memory",
     title: "Active memory",
-    blurb: "Upstream bounded memory sub-agent port (injects relevant memory into prompt context).",
+    blurb: "Bounded memory sub-agent (injects relevant memory into prompt context).",
     localOnly: true,
     selectable: false,
     disabledReason: "No selectable writer behind the gate — the gate persists qubit-local only.",

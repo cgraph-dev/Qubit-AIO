@@ -285,6 +285,47 @@ def test_run_tool_task_deterministic_local_action(monkeypatch):
     assert out["reply"] == "Volume up"
 
 
+def test_ask_transform_engine_failure_falls_through_to_brain(monkeypatch):
+    """A transform-shaped ask whose engine fails is NOT a typed failure.
+
+    Lane-2 pre-route claims bare triggers ("summarize this for me" parses
+    as summarize with no input), but with nothing to transform the engine
+    fails — the turn must fall through to the normal ask pipeline (brain /
+    escalation / skills) instead of returning VOICE_EDIT_NO_SELECTION.
+    Regression 2026-10-03: the typed failure starved the local, escalation,
+    and YouTube paths (3 certifier tests)."""
+    from voicebridge.voice_edit.schema import TransformResult
+    from voicebridge.voice_edit.transform import TransformEngine
+    svc, audits = _service()
+
+    class _FailEngine(TransformEngine):
+        def transform(self, cfg, cmd, selected_text="", **kw):
+            return TransformResult(
+                ok=False, code="VOICE_EDIT_NO_SELECTION",
+                detail="no selected text to transform",
+                action=getattr(cmd, "action", ""))
+
+    svc.engine = _FailEngine()
+    calls = {}
+
+    class FakeRes:
+        ok = True
+        text = "brain answer"
+        provider = "local"
+        model = "qubit-brain4"
+        code = ""
+        message = ""
+
+    import voicebridge.providers.gateway as GW
+    monkeypatch.setattr(
+        GW, "run_role",
+        lambda prompt, cfg, **kw: (calls.update(kw), FakeRes())[1])
+    out = svc.ask("summarize this for me", request_id="r-fallthrough",
+                  mode="answer")
+    assert out["ok"] is True and out["answer"] == "brain answer"
+    assert calls.get("profile_id") == "qubit-brain4"
+
+
 def test_ask_escalation_routes_to_a_known_api_profile(monkeypatch):
     svc, audits = _service(cfg=_cfg(routing="api", allow_api=True,
                                     api_profile="qubit-api"))

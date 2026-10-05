@@ -50,6 +50,7 @@ def _hermetic(monkeypatch, fake):
 def test_web_branch_executes_with_sources(monkeypatch):
     fake = _FakeStore()
     CT = _hermetic(monkeypatch, fake)
+    CT._web_cache_clear()  # Slice 2: identical-query cache is process-wide
     d = CT.decide_turn_action(
         "use perplexity api to search when Aion 2 will release", cfg={})
     assert d["action"] == "web_search", d
@@ -76,6 +77,7 @@ def test_web_branch_executes_with_sources(monkeypatch):
 def test_web_branch_failure_is_typed(monkeypatch):
     fake = _FakeStore()
     CT = _hermetic(monkeypatch, fake)
+    CT._web_cache_clear()  # Slice 2: the success test above caches this q
     monkeypatch.setattr(
         "voicebridge.orchestrator.answer_web_query",
         lambda cfg, text, **kw: {"ok": False, "answer": "",
@@ -138,20 +140,37 @@ def test_local_destructive_needs_confirmation(monkeypatch):
 
 
 def test_registry_branch_executes_browser(monkeypatch):
+    # Reconciled 2026-10-03: "open youtube in the browser" no longer reaches
+    # the registry browser_open entry. The §70 local open_website action owns
+    # spoken site shortcuts (youtube -> https://www.youtube.com, http(s)-only
+    # launch guard), so decide_turn_action deterministically yields a
+    # local_action and the turn executes through the broker — not a blind
+    # expectation edit: the params below are the real §70 shortcut mapping.
     fake = _FakeStore()
     CT = _hermetic(monkeypatch, fake)
     d = CT.decide_turn_action("open youtube in the browser", cfg={})
-    assert d["action"] == "registry", d
-    monkeypatch.setattr(
-        "voicebridge.voice_commands.voice_say",
-        lambda cfg, text, **kw: {"state": "ok",
-                                 "speech": "Opened YouTube in the browser.",
-                                 "route": "browser_open"})
+    assert d["action"] == "local_action", d
+    assert d["params"]["action"] == "open_website", d
+    assert d["params"]["action_params"]["url"] == "https://www.youtube.com", d
+
+    calls = []
+
+    class _FakeBroker:
+        def execute(self, capability, args, *, source, session,
+                    utterance=""):
+            calls.append({"capability": capability, "args": args,
+                          "source": source, "session": session})
+            return SimpleNamespace(ok=True, output="Opened https://www.youtube.com.",
+                                   error="", denied="")
+
+    monkeypatch.setattr("voicebridge.broker.build_host_broker",
+                        lambda cfg=None: _FakeBroker())
     out = CT.turn({}, "open youtube in the browser",
                   session="test-branch-reg-9u")
     assert out.get("ok") is True, out
-    assert out.get("route") == "registry", out
+    assert out.get("route") == "local", out
     assert "youtube" in (out.get("text") or "").lower(), out
+    assert calls and calls[0]["capability"] == "local.open_website", calls
 
 
 def test_registry_confirm_tier_is_typed(monkeypatch):

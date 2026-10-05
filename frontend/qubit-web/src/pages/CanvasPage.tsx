@@ -1,16 +1,26 @@
 /**
- * Canvas page (intended route /canvas — route registration is bridge work
- * outside this file). Separate Qubit-branded canvas surface ported from the
- * upstream canvas extension: canvas-root file list, open/preview through the
- * mirrored entry-URL shape, confirm-gated add/remove (brokered,
- * path-confined), node presentation over capability URLs, and a live-reload
- * indicator. Reads go through `fetchJSON`; every mutation settles through
- * the shared staged-confirmation round-trip (`runMutationWithConfirm`).
- * Traversal names are refused client-side before anything is sent.
+ * Canvas page (route /canvas). Qubit-branded canvas surface: canvas-root file
+ * list, open/preview through the mirrored entry-URL shape, confirm-gated
+ * add/remove (brokered, path-confined), node presentation over capability URLs,
+ * and a live-reload indicator. Reads go through `fetchJSON`; every mutation
+ * settles through the shared staged-confirmation round-trip
+ * (`runMutationWithConfirm`). Traversal names are refused client-side before
+ * anything is sent.
+ *
+ * Backend handlers (registered in `voicebridge/files/canvas_host.py`, verified
+ * live): GET /api/qubit/canvas/list · get · live, and the confirm-gated POSTs
+ * add · remove · present · hide · navigate · snapshot. `list` answers
+ * `{ files: [], root, live_reload, authority }`; a missing file is a typed
+ * `CANVAS_NOT_FOUND`, never a fake page.
+ *
+ * Built on the shipped openclaw render-helper contract
+ * (`@/components/openclaw-ui`): a `SettingsPage` root holding a
+ * `SettingsPageHeader`, a summary tile strip, and `SettingsSection` groups.
+ * `.settings-row__control` is emitted by the helper ONLY when a control is
+ * passed — a control-free row never renders an empty wrapper.
  */
 import { useCallback, useEffect, useState } from "react";
 
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 
 import {
@@ -34,15 +44,25 @@ import {
   type ConfirmPrompt,
 } from "@/lib/ocFamilyCanvasApi";
 import { listNodes, type NodeRow } from "@/lib/ocFamilyAgentsApi";
-import { cn } from "@/lib/utils";
+import {
+  SettingsEmpty,
+  SettingsLoadingSkeleton,
+  SettingsPage,
+  SettingsPageHeader,
+  SettingsRow,
+  SettingsSection,
+  SettingsStatus,
+  SettingsSummary,
+  SettingsValue,
+} from "@/components/openclaw-ui";
 
 interface PendingConfirm {
   detail: string;
   resolve: (value: boolean) => void;
 }
 
-const BRIDGE_PENDING =
-  "Canvas bridge pending: the backend serves no canvas route yet (every /api/qubit/canvas/* path is NEEDS-BRIDGE). Nothing was changed.";
+const CANVAS_READ_FALLBACK =
+  "Canvas list unavailable: the backend canvas route refused the read. Nothing was changed.";
 
 export default function CanvasPage() {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -90,7 +110,7 @@ export default function CanvasPage() {
       setAuthority(normalized.authority || "");
       setState("ready");
     } catch (e) {
-      setError(refusalOrError(e, BRIDGE_PENDING));
+      setError(refusalOrError(e, CANVAS_READ_FALLBACK));
       setState("error");
     }
   }, []);
@@ -125,7 +145,7 @@ export default function CanvasPage() {
       const content = typeof inner.content === "string" ? inner.content : "";
       setPreviewContent(content);
     } catch (e) {
-      setPreviewError(refusalOrError(e, BRIDGE_PENDING));
+      setPreviewError(refusalOrError(e, "Canvas open refused: this file is not served."));
     } finally {
       setBusy(null);
     }
@@ -147,7 +167,7 @@ export default function CanvasPage() {
       setAddContent("");
       await refresh();
     } catch (e) {
-      setFormError(refusalOrError(e, `Add failed (${BRIDGE_PENDING})`));
+      setFormError(refusalOrError(e, "Add failed."));
     } finally {
       setBusy(null);
     }
@@ -169,7 +189,7 @@ export default function CanvasPage() {
       }
       await refresh();
     } catch (e) {
-      setNotice(refusalOrError(e, `Remove failed (${BRIDGE_PENDING})`));
+      setNotice(refusalOrError(e, "Remove failed."));
     } finally {
       setBusy(null);
     }
@@ -197,7 +217,7 @@ export default function CanvasPage() {
       );
       setNotice("Present completed.");
     } catch (e) {
-      setNotice(refusalOrError(e, `Present failed (${BRIDGE_PENDING})`));
+      setNotice(refusalOrError(e, "Present failed."));
     } finally {
       setBusy(null);
     }
@@ -214,7 +234,7 @@ export default function CanvasPage() {
       await hideCanvas(nodeId, confirm);
       setNotice("Hide completed.");
     } catch (e) {
-      setNotice(refusalOrError(e, `Hide failed (${BRIDGE_PENDING})`));
+      setNotice(refusalOrError(e, "Hide failed."));
     } finally {
       setBusy(null);
     }
@@ -231,7 +251,7 @@ export default function CanvasPage() {
       await snapshotCanvas(nodeId, confirm);
       setNotice("Snapshot completed.");
     } catch (e) {
-      setNotice(refusalOrError(e, `Snapshot failed (${BRIDGE_PENDING})`));
+      setNotice(refusalOrError(e, "Snapshot failed."));
     } finally {
       setBusy(null);
     }
@@ -253,7 +273,7 @@ export default function CanvasPage() {
       await navigateCanvas(nodeId, safe, confirm);
       setNotice("Navigate completed.");
     } catch (e) {
-      setNotice(refusalOrError(e, `Navigate failed (${BRIDGE_PENDING})`));
+      setNotice(refusalOrError(e, "Navigate failed."));
     } finally {
       setBusy(null);
     }
@@ -264,248 +284,339 @@ export default function CanvasPage() {
     : undefined;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold">Canvas</h1>
-        <span
-          aria-label="Live reload state"
-          title={liveReload === null ? "live-reload unknown (bridge pending)" : `live reload ${liveReload ? "on" : "off"} (server-reported)`}
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
-            liveReload ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600",
-          )}
-        >
-          <span
-            aria-hidden="true"
-            className={cn("h-2 w-2 rounded-full", liveReload ? "bg-green-500" : "bg-gray-400")}
-          />
-          {liveReload === null ? "live reload unknown" : liveReload ? "live reload on" : "live reload off"}
-        </span>
-        <Button outlined size="sm" onClick={() => void refresh()} aria-label="Refresh canvas files">
-          Refresh
-        </Button>
-      </div>
+    <SettingsPage wide>
+      <div className="contents" aria-label="Canvas">
+        <SettingsPageHeader
+          title="Canvas"
+          description={
+            <>
+              Root: {root} Every write is confirm-gated and path-confined.
+              {authority ? ` Authority: ${authority}` : ""}
+            </>
+          }
+          actions={
+            <>
+              <span
+                aria-label="Live reload state"
+                title={
+                  liveReload === null
+                    ? "live-reload unknown (not reported by the host)"
+                    : `live reload ${liveReload ? "on" : "off"} (server-reported)`
+                }
+                className={`settings-status ${
+                  liveReload ? "settings-status--ok" : "settings-status--warn"
+                }`}
+              >
+                <span aria-hidden="true" className="settings-status__dot" />
+                {liveReload === null
+                  ? "live reload unknown"
+                  : liveReload
+                    ? "live reload on"
+                    : "live reload off"}
+              </span>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => void refresh()}
+                aria-label="Refresh canvas files"
+              >
+                Refresh
+              </button>
+            </>
+          }
+        />
 
-      <p className="text-sm text-gray-500">
-        Root: {root} Every write is confirm-gated and path-confined. {authority ? `Authority: ${authority}` : null}
-      </p>
+        <SettingsSummary
+          items={[
+            { label: "Files", value: state === "ready" ? files.length : "…" },
+            { label: "Root", value: root },
+            { label: "Live reload", value: liveReload === null ? "unknown" : liveReload ? "on" : "off" },
+            { label: "Nodes", value: nodes.length },
+          ]}
+        />
 
-      {state === "loading" ? (
-        <p className="flex items-center gap-2 text-sm text-gray-500">
-          <Spinner /> Loading canvas files…
-        </p>
-      ) : null}
-
-      {state === "error" ? (
-        <p role="alert" className="text-sm text-amber-700">
-          {error}
-        </p>
-      ) : null}
-
-      {state === "ready" ? (
-        <section aria-label="Canvas file roster card">
-          <h2 className="mb-2 text-sm font-medium">Files</h2>
-          {files.length === 0 ? (
-            <p className="text-sm text-gray-500">No canvas files yet — add one below.</p>
+        <SettingsSection title="Files" count={state === "ready" ? files.length : undefined}>
+          {state === "loading" ? (
+            <SettingsLoadingSkeleton rows={2} />
+          ) : state === "error" ? (
+            <SettingsRow role="alert" title="Canvas list unavailable" description={error} />
+          ) : files.length === 0 ? (
+            <SettingsEmpty title="No canvas files yet" >
+              Add one in the form below — files are served from the canvas root.
+            </SettingsEmpty>
           ) : (
-            <ul aria-label="Canvas file roster" className="divide-y rounded border">
+            <div className="settings-subrows" role="group" aria-label="Canvas file roster">
               {files.map((f) => (
-                <li key={f.path || f.name} className="flex items-center gap-2 px-3 py-2">
-                  <span className="min-w-0 flex-1 truncate font-mono text-sm">{f.name || f.path}</span>
-                  {typeof f.size_bytes === "number" ? (
-                    <span className="text-xs text-gray-500">{f.size_bytes} B</span>
-                  ) : null}
-                  <Button
-                    outlined
-                    size="sm"
-                    aria-label={`Open canvas file ${f.name || f.path}`}
-                    disabled={busy === `open:${f.path}`}
-                    onClick={() => void openPreview(f.path || f.name)}
-                  >
-                    {busy === `open:${f.path}` ? <Spinner /> : "Open"}
-                  </Button>
-                  <Button
-                    outlined
-                    size="sm"
-                    aria-label={`Remove canvas file ${f.name || f.path}`}
-                    disabled={busy === `remove:${f.path}`}
-                    onClick={() => void handleRemove(f.path || f.name)}
-                  >
-                    {busy === `remove:${f.path}` ? <Spinner /> : "Remove"}
-                  </Button>
-                </li>
+                <SettingsRow
+                  key={f.path || f.name}
+                  title={
+                    <SettingsValue mono>{f.name || f.path}</SettingsValue>
+                  }
+                  description={
+                    typeof f.size_bytes === "number" ? `${f.size_bytes} B` : undefined
+                  }
+                  control={
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        aria-label={`Open canvas file ${f.name || f.path}`}
+                        disabled={busy === `open:${f.path}`}
+                        onClick={() => void openPreview(f.path || f.name)}
+                      >
+                        {busy === `open:${f.path}` ? <Spinner /> : "Open"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        aria-label={`Remove canvas file ${f.name || f.path}`}
+                        disabled={busy === `remove:${f.path}`}
+                        onClick={() => void handleRemove(f.path || f.name)}
+                      >
+                        {busy === `remove:${f.path}` ? <Spinner /> : "Remove"}
+                      </button>
+                    </>
+                  }
+                />
               ))}
-            </ul>
+            </div>
           )}
-        </section>
-      ) : null}
+        </SettingsSection>
 
-      <section aria-label="Add canvas file form" className="space-y-2 rounded border p-3">
-        <h2 className="text-sm font-medium">Add file</h2>
-        <label className="block text-sm">
-          Name (canvas-root relative, no traversal)
-          <input
-            aria-label="New canvas file name"
-            className="mt-1 block w-full rounded border px-2 py-1 font-mono text-sm"
-            value={addName}
-            placeholder="index.html"
-            onChange={(e) => setAddName(e.target.value)}
+        <SettingsSection
+          title="Add file"
+          description="Canvas-root-relative name (no traversal) and content."
+        >
+          <SettingsRow
+            stacked
+            title="Name"
+            description="Canvas-root relative, no traversal."
+            control={
+              <input
+                aria-label="New canvas file name"
+                className="settings-input"
+                value={addName}
+                placeholder="index.html"
+                onChange={(e) => setAddName(e.target.value)}
+              />
+            }
           />
-        </label>
-        <label className="block text-sm">
-          Content
-          <textarea
-            aria-label="New canvas file content"
-            className="mt-1 block w-full rounded border px-2 py-1 font-mono text-sm"
-            rows={4}
-            value={addContent}
-            placeholder="<!doctype html>…"
-            onChange={(e) => setAddContent(e.target.value)}
+          <SettingsRow
+            stacked
+            title="Content"
+            description="The file body to write."
+            control={
+              <textarea
+                aria-label="New canvas file content"
+                className="settings-input"
+                rows={4}
+                value={addContent}
+                placeholder="<!doctype html>…"
+                onChange={(e) => setAddContent(e.target.value)}
+              />
+            }
           />
-        </label>
-        {formError ? (
-          <p role="alert" className="text-sm text-red-700">
-            {formError}
+          {formError ? (
+            <SettingsRow role="alert" title="Write refused" description={formError} />
+          ) : null}
+          <SettingsRow
+            title="Write file"
+            description="The write is confirm-gated."
+            control={
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                aria-label="Add canvas file"
+                disabled={busy === "add"}
+                onClick={() => void handleAdd()}
+              >
+                {busy === "add" ? <Spinner /> : "Add (confirm)"}
+              </button>
+            }
+          />
+        </SettingsSection>
+
+        {selectedPath ? (
+          <SettingsSection
+            title="Preview"
+            description={<SettingsValue mono>{selectedPath}</SettingsValue>}
+          >
+            <SettingsRow
+              stacked
+              title="Entry"
+              description={
+                previewError ? (
+                  <span role="alert">{previewError}</span>
+                ) : (
+                  "Served through the mirrored canvas host path."
+                )
+              }
+              control={
+                <>
+                  {previewSrc ? (
+                    <iframe
+                      aria-label="Canvas preview"
+                      title={`Canvas preview of ${selectedPath}`}
+                      src={previewSrc}
+                      sandbox="allow-scripts"
+                      className="w-full"
+                    />
+                  ) : null}
+                  {previewContent !== null ? (
+                    <details className="settings-row__desc">
+                      <summary>Stored content</summary>
+                      <pre className="settings-kv w-full whitespace-pre-wrap">{previewContent}</pre>
+                    </details>
+                  ) : null}
+                </>
+              }
+            />
+          </SettingsSection>
+        ) : null}
+
+        <SettingsSection
+          title="Show on node"
+          description="Present, hide, snapshot, or navigate the node canvas (each confirm-gated)."
+        >
+          <SettingsRow
+            stacked
+            title="Target node"
+            description="Node identity comes from the existing node roster."
+            control={
+              <>
+                <select
+                  aria-label="Presentation node"
+                  className="settings-select"
+                  value={nodeId}
+                  onChange={(e) => setNodeId(e.target.value)}
+                >
+                  <option value="">— pick a node —</option>
+                  {nodes.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.name ? `${n.name} (${n.id})` : n.id}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  aria-label="Scoped base URL"
+                  className="settings-input"
+                  value={scopedBase}
+                  placeholder="scoped base URL (optional)"
+                  onChange={(e) => setScopedBase(e.target.value)}
+                />
+              </>
+            }
+          />
+          <SettingsRow
+            title="Canvas actions"
+            description={
+              selectedPath
+                ? `Open file: ${selectedPath}`
+                : "Open a file to enable present/navigate."
+            }
+            control={
+              <>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  aria-label="Present on node"
+                  disabled={busy === "present"}
+                  onClick={() => void handlePresent()}
+                >
+                  {busy === "present" ? <Spinner /> : "Present (confirm)"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  aria-label="Hide node canvas"
+                  disabled={busy === "hide"}
+                  onClick={() => void handleHide()}
+                >
+                  {busy === "hide" ? <Spinner /> : "Hide (confirm)"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  aria-label="Snapshot node canvas"
+                  disabled={busy === "snapshot"}
+                  onClick={() => void handleSnapshot()}
+                >
+                  {busy === "snapshot" ? <Spinner /> : "Snapshot (confirm)"}
+                </button>
+                {selectedPath ? (
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    aria-label="Navigate node canvas to open file"
+                    disabled={busy === "navigate"}
+                    onClick={() => void handleNavigate(canvasEntryPath(selectedPath))}
+                  >
+                    {busy === "navigate" ? <Spinner /> : "Navigate to open file (confirm)"}
+                  </button>
+                ) : null}
+              </>
+            }
+          />
+        </SettingsSection>
+
+        {notice ? (
+          <p role="status" className="settings-status settings-status--accent">
+            {notice}
           </p>
         ) : null}
-        <Button
-          size="sm"
-          aria-label="Add canvas file"
-          disabled={busy === "add"}
-          onClick={() => void handleAdd()}
-        >
-          {busy === "add" ? <Spinner /> : "Add (confirm)"}
-        </Button>
-      </section>
 
-      {selectedPath ? (
-        <section aria-label="Canvas preview card" className="space-y-2 rounded border p-3">
-          <h2 className="text-sm font-medium">Preview: {selectedPath}</h2>
-          {previewError ? (
-            <p role="alert" className="text-sm text-amber-700">
-              {previewError}
-            </p>
-          ) : null}
-          {previewSrc ? (
-            <iframe
-              aria-label="Canvas preview"
-              title={`Canvas preview of ${selectedPath}`}
-              src={previewSrc}
-              sandbox="allow-scripts"
-              className="h-64 w-full rounded border bg-white"
-            />
-          ) : null}
-          {previewContent !== null ? (
-            <details className="text-sm">
-              <summary>Stored content</summary>
-              <pre className="mt-1 max-h-40 overflow-auto rounded bg-gray-50 p-2 font-mono text-xs">
-                {previewContent}
-              </pre>
-            </details>
-          ) : null}
-        </section>
-      ) : null}
-
-      <section aria-label="Node presentation form" className="space-y-2 rounded border p-3">
-        <h2 className="text-sm font-medium">Show on node</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-sm">
-            Node{" "}
-            <select
-              aria-label="Presentation node"
-              className="rounded border px-2 py-1 text-sm"
-              value={nodeId}
-              onChange={(e) => setNodeId(e.target.value)}
-            >
-              <option value="">— pick a node —</option>
-              {nodes.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.name ? `${n.name} (${n.id})` : n.id}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            Scoped base URL (optional, bridge-supplied){" "}
-            <input
-              aria-label="Scoped base URL"
-              className="rounded border px-2 py-1 font-mono text-sm"
-              value={scopedBase}
-              placeholder="https://…"
-              onChange={(e) => setScopedBase(e.target.value)}
-            />
-          </label>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" aria-label="Present on node" disabled={busy === "present"} onClick={() => void handlePresent()}>
-            {busy === "present" ? <Spinner /> : "Present (confirm)"}
-          </Button>
-          <Button size="sm" outlined aria-label="Hide node canvas" disabled={busy === "hide"} onClick={() => void handleHide()}>
-            {busy === "hide" ? <Spinner /> : "Hide (confirm)"}
-          </Button>
-          <Button
-            size="sm"
-            outlined
-            aria-label="Snapshot node canvas"
-            disabled={busy === "snapshot"}
-            onClick={() => void handleSnapshot()}
+        {pendingConfirm ? (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm canvas action"
+            className="settings-group"
           >
-            {busy === "snapshot" ? <Spinner /> : "Snapshot (confirm)"}
-          </Button>
-          {selectedPath ? (
-            <Button
-              size="sm"
-              outlined
-              aria-label="Navigate node canvas to open file"
-              disabled={busy === "navigate"}
-              onClick={() => void handleNavigate(canvasEntryPath(selectedPath))}
-            >
-              {busy === "navigate" ? <Spinner /> : "Navigate to open file (confirm)"}
-            </Button>
-          ) : null}
-        </div>
-      </section>
-
-      {notice ? (
-        <p role="status" className="text-sm text-gray-700">
-          {notice}
-        </p>
-      ) : null}
-
-      {pendingConfirm ? (
-        <div role="dialog" aria-label="Confirm canvas action" className="rounded border bg-white p-3 shadow">
-          <p className="text-sm">{pendingConfirm.detail}</p>
-          <div className="mt-2 flex gap-2">
-            <Button
-              size="sm"
-              onClick={() => {
-                const p = pendingConfirm;
-                setPendingConfirm(null);
-                p.resolve(true);
-              }}
-            >
-              Confirm
-            </Button>
-            <Button
-              size="sm"
-              outlined
-              onClick={() => {
-                const p = pendingConfirm;
-                setPendingConfirm(null);
-                p.resolve(false);
-              }}
-            >
-              Cancel
-            </Button>
+            <SettingsRow
+              title="Confirm action"
+              description={pendingConfirm.detail}
+              control={
+                <>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => {
+                      const p = pendingConfirm;
+                      setPendingConfirm(null);
+                      p.resolve(true);
+                    }}
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => {
+                      const p = pendingConfirm;
+                      setPendingConfirm(null);
+                      p.resolve(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </>
+              }
+            />
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      <p className="text-xs text-gray-400">
-        Canvas files live under a server-owned state-home subdirectory (never outside approved roots).
-        Preview URLs mirror the served entry shape; node scoping applies a bridge-supplied capability
-        base when present.
-      </p>
-    </div>
+        <SettingsSection title="Host notes">
+          <SettingsRow
+            title="Canvas host"
+            description="Canvas files live under a server-owned state-home subdirectory (never outside approved roots). Preview URLs mirror the served entry shape; node scoping applies a bridge-supplied capability base when present."
+            control={
+              <SettingsStatus tone={liveReload ? "ok" : "warn"}>
+                {liveReload === null ? "live reload unknown" : liveReload ? "live" : "static"}
+              </SettingsStatus>
+            }
+          />
+        </SettingsSection>
+      </div>
+    </SettingsPage>
   );
 }

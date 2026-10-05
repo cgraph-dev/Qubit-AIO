@@ -539,6 +539,13 @@ async def pty_ws(ws: WebSocket) -> None:
         await _pty_fail(ws, exc)
         return
 
+    # A reattach inside the detached-lease grace window must cancel the pending
+    # release: this tab is that PTY's live viewer again, so its session lease has
+    # to stay with it. No-op for a plain PtySessionRegistry.
+    cancel_pending = getattr(PTY_REGISTRY, "attach_or_spawn_cancel_pending", None)
+    if callable(cancel_pending):
+        cancel_pending(attach_token)
+
     # A fresh xterm can't rebuild the TUI from an arbitrary tail of alternate-
     # screen differential output; reused PTYs emit a full frame after replay.
     if not await session.attach(ws, force_redraw=not _created):

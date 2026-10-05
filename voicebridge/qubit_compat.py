@@ -446,6 +446,28 @@ def _status_auth_gate(cfg: Any) -> Dict[str, Any]:
             "auth_flows": auth_flows}
 
 
+def _resolve_state_db_path(home: Optional[Path]) -> Optional[Path]:
+    """Locate the canonical ``state.db`` under a QUBIT_HOME root.
+
+    ``QUBIT_HOME`` is the profile root, but the runtime nests its state one
+    level down in ``runtime/`` (``<home>/runtime/state.db``). Probing only
+    ``<home>/state.db`` reported ``storage: degraded`` on a perfectly healthy
+    install, which rolled ``overall`` up to ``degraded`` permanently. Try the
+    nested path first, then the flat one for older layouts; return ``None``
+    only when neither exists.
+    """
+    if home is None:
+        return None
+    root = Path(home)
+    for candidate in (root / "runtime" / "state.db", root / "state.db"):
+        try:
+            if candidate.exists():
+                return candidate
+        except OSError:
+            continue
+    return None
+
+
 def _status_components(gw: Dict[str, Any], platforms: Dict[str, Any],
                        home: Optional[Path]) -> Dict[str, Any]:
     """Component health rollup (counts/enums only) matching the reference."""
@@ -460,7 +482,7 @@ def _status_components(gw: Dict[str, Any], platforms: Dict[str, Any],
     }
     storage_ok = False
     try:
-        storage_ok = home is not None and (Path(home) / "state.db").exists()
+        storage_ok = _resolve_state_db_path(home) is not None
     except Exception:  # noqa: BLE001
         storage_ok = False
     components["storage"] = {"status": "ok" if storage_ok else "degraded"}
@@ -1814,6 +1836,70 @@ def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                effective_context_length=effective, capabilities=caps)
 
 
+#: Internal record/error tokens that must never reach the model picker
+#: surface. A refusal ``detail`` may name them; the picker shows plain
+#: language instead (a row NOTE or dialog text — never a fake model row).
+_OPTIONS_JARGON_MAP = (
+    ("turn-time dead-model record", "recently reported unavailable"),
+    ("turn-time-dead", "reported unavailable"),
+    ("turn-time", "turn time"),
+    ("turn_time", "turn time"),
+    ("dead-model record", "unavailable report"),
+    ("dead_record", "unavailable report"),
+    ("dead_models.json", "unavailable-model report"),
+    ("MODEL_UNAVAILABLE_TURN", "recently unavailable"),
+    ("MODEL_UNAVAILABLE", "recently unavailable"),
+)
+
+
+def _plain_options_text(text: Any) -> str:
+    """Rewrite internal record/error tokens to plain picker-safe language."""
+    out = str(text or "")
+    for old, new in _OPTIONS_JARGON_MAP:
+        out = re.sub(re.escape(old), new, out, flags=re.IGNORECASE)
+    return out
+
+
+def sanitize_model_options_providers(rows: Any) -> List[Dict[str, Any]]:
+    """Keep only real provider rows; degrade failures to a row NOTE.
+
+    A refusal/error payload (``code``/``detail``, a plain string, a row
+    without ``slug``) is dropped — it must never render as a selectable
+    provider or model row. Entries inside a row's ``models`` list that are
+    not plain model ids (whitespace/``:``/parens = error text, never an id)
+    are removed and folded into that row's ``warning`` in plain language.
+    ``total_models`` is recomputed so counts never disagree with the list.
+    """
+    if not isinstance(rows, list):
+        return []
+    clean: List[Dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        slug = str(row.get("slug") or "").strip()
+        models = row.get("models")
+        if not slug or not isinstance(models, list):
+            continue
+        kept: List[str] = []
+        notes: List[str] = []
+        for m in models:
+            if isinstance(m, str) and m and not re.search(r"[\s:()]", m) \
+                    and len(m) <= 128:
+                kept.append(m)
+            elif isinstance(m, str) and m.strip():
+                notes.append(_plain_options_text(m.strip())[:200])
+        warning = _plain_options_text(row.get("warning") or "")
+        if notes:
+            folded = "; ".join(notes)
+            warning = f"{warning}; {folded}".strip("; ") if warning else folded
+        out = dict(row)
+        out["models"] = kept
+        out["total_models"] = len(kept)
+        out["warning"] = warning or None
+        clean.append(out)
+    return clean
+
+
 def _ollama_options_row(cfg: Any) -> Optional[Dict[str, Any]]:
     """Qubit-owned Ollama row for the model picker (``/api/model/options``).
 
@@ -1900,6 +1986,16 @@ def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 if ollama_row is not None:
                     payload["providers"] = [*rows, ollama_row]
     except Exception:  # noqa: BLE001 - additive row never breaks options
+        pass
+    # Picker-surface guard: a refusal/error payload must never render as a
+    # selectable provider or model row, and internal record names must never
+    # reach the screen — failures degrade to a row NOTE (warning) or are
+    # dropped, with counts recomputed to match.
+    try:
+        rows = payload.get("providers")
+        if isinstance(rows, list):
+            payload["providers"] = sanitize_model_options_providers(rows)
+    except Exception:  # noqa: BLE001 - guard never breaks options
         pass
     # Single CURRENT authority: the canonical active profile. The vendored
     # builder marks current from the config slot while the Ollama row marks
@@ -2140,6 +2236,7 @@ def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 200, {"ok": True, "scope": "main",
                      "provider": str(applied.get("provider", provider)),
                      "model": str(applied.get("model", model)),
+                     "warning": str(applied.get("warning") or ""),
                      "terminal_profile_id": follow["terminal_profile_id"],
                      "terminal_follows": follow["terminal_follows"],
                      "terminal_detail": follow["terminal_detail"]}
@@ -2606,6 +2703,24 @@ def _terminal_follow_main_model(cfg: Any, profile_id: str, *,
                     f"/chat keeps {current or 'its current model'}: "
                     f"{picked.model} is a local model for /qubit-chat and "
                     f"voice")}
+    if picked is not None:
+        # Never move /chat onto a turn-time-dead model: its static metadata
+        # resolves (so the floor check below would pass) but every real
+        # turn fails, and the pin would stick until a hand repair.
+        try:
+            from .providers import dead_models as _DM
+
+            _rec = _DM.is_dead(cfg, str(getattr(picked, "provider", "") or ""),
+                               str(getattr(picked, "model", "") or ""))
+        except Exception:  # noqa: BLE001 - record read never blocks a follow
+            _rec = None
+        if _rec is not None:
+            return {"terminal_follows": False, "terminal_profile_id": current,
+                    "terminal_detail": (
+                        f"/chat keeps {current or 'its current model'}: "
+                        f"{picked.provider}/{picked.model} was recently "
+                        f"reported unavailable "
+                        f"({str(_rec.get('reason', 'unavailable'))[:120]})")}
     try:
         verdict = R.terminal_context_guard(cfg, profile_id=pid)
     except Exception as exc:  # noqa: BLE001 - guard fault keeps the pin
@@ -4165,13 +4280,20 @@ def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
     ref_complete = (all(refs.get(k) for k in required) if required
                     else bool(refs))
     configured = bool(ref_complete or account_ok)
-    if not configured and gateway_running:
+    if gateway_running and not str(link.get("state", "") or ""):
         # Gateway-owned transports (WhatsApp QR bridge, bot platforms) prove
         # themselves in the daemon's own gateway_state.json. The overlay store
         # only knows credential *references* saved via CONFIGURE, so a channel
         # paired outside it (QR scan) would otherwise read "not configured"
         # while actually connected. The daemon's verdict is live first-party
         # evidence, never fabricated here.
+        #
+        # This must run whenever no account link is already proven, NOT only
+        # when `configured` is False: a platform whose credential reference IS
+        # saved but which has no `messaging.link` account row (Discord,
+        # Telegram) would otherwise be reported UNAVAILABLE with
+        # MSG_TRANSPORT_UNAVAILABLE even while the daemon serves it as
+        # `connected` — a typed refusal standing in for a working channel.
         if _live_gateway_platform_state(pid) == "connected":
             configured = True
             link = {"state": "LINKED", "platform": pid,
@@ -5462,6 +5584,9 @@ def h_chat_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(session=_rebrand_chat_record(res["session"]),
                messages=_rebrand_chat_messages(res.get("messages", [])),
                message_count=res.get("message_count", 0),
+               # A turn cut short by a process death: the client offers to resume
+               # it so the operator does not have to retype `continue`.
+               interrupted_turn=CT._pending_interrupted_turn(cfg, p.get("id", "")),
                meta=meta if isinstance(meta, dict) else {})
 
 
@@ -7293,7 +7418,10 @@ def h_custom_endpoints_activate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     from .providers import endpoints as EP
 
     try:
-        out = EP.activate_endpoint(cfg, ident, record, confirm=True)
+        _staged_window = bool(
+            record.get("context_length") or record.get("context_tokens"))
+        out = EP.activate_endpoint(cfg, ident, record, confirm=True,
+                                   explicit_window=_staged_window)
     except Exception as exc:
         return _fail(exc)
     if not out.get("ok"):
@@ -7465,6 +7593,173 @@ def h_chat_workspaces(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(projects=projects, repos=[], default_cwd=default_cwd,
                home=str(Path.home()), scan_enabled=False,
                qubit_counterpart="CLI `qubit project list` + dashboard Projects")
+
+
+def h_chat_slash_commands(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/chat/slash-commands -> unified slash catalog for ``/qubit-chat``.
+
+    Parity surface for the ``/chat`` terminal slash palette. The terminal
+    resolves through the canonical ``qubit_cli.commands.COMMAND_REGISTRY``
+    (the single source CLI help, gateway dispatch and autocomplete derive
+    from) plus the gateway ``GatewaySlashCommandsMixin`` family
+    (``qubit_runtime/gateway/slash_commands*.py``); the voicebridge chat path
+    (``/qubit-chat`` via ``chat_transport``) had no equivalent catalog
+    endpoint, so this serves one.
+
+    Mapping (documented contract):
+    * registry / gateway commands -> ``/<name>`` (``source: "gateway"``);
+      registry aliases are listed as their own ``/<alias>`` entries.
+    * skills -> ``/skill-<name>`` (``source: "skill"``); the ``/skills``
+      registry command itself manages the catalog.
+    * dashboard plugins -> ``/plugin-<name>`` (``source: "plugin"``); the
+      ``/plugins`` registry command lists them.
+    * MCP servers -> ``/mcp-<name>`` (``source: "mcp"``).
+    * toolsets -> ``/toolset-<name>`` (``source: "toolset"``); the
+      ``/toolsets`` registry command lists them.
+
+    Read-only: every source is a list/read call already used by the existing
+    ``GET /api/skills``, ``/api/dashboard/plugins``, ``/api/mcp/servers`` and
+    ``/api/tools/toolsets`` handlers — no broker, no confirmation, no estop,
+    no mutation. Each source is fail-soft (a source miss narrows the catalog;
+    the miss is recorded in ``sources``). Auth is the front-door dashboard
+    session-token gate every ``/agent/api/*`` compat route sits behind, not
+    this handler.
+    """
+    commands: List[Dict[str, Any]] = []
+    seen: set = set()
+    notes: Dict[str, str] = {}
+
+    def _add(name: str, description: str, source: str) -> None:
+        key = str(name or "").strip()
+        if not key or key in seen:
+            return
+        seen.add(key)
+        commands.append({"name": key, "description": str(description or ""),
+                         "source": str(source)})
+
+    # 1. Canonical slash registry (single source per qubit_cli/AGENTS.md).
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.commands import COMMAND_REGISTRY  # type: ignore
+        for cmd in COMMAND_REGISTRY or []:
+            _add("/" + str(cmd.name), str(cmd.description or ""), "gateway")
+            for alias in (cmd.aliases or ()):
+                _add("/" + str(alias),
+                     "Alias of /%s: %s" % (cmd.name, cmd.description or ""),
+                     "gateway")
+        notes["gateway"] = "registry"
+    except Exception as exc:  # noqa: BLE001 - fall back to the mixin scan
+        notes["gateway"] = "registry miss: %s" % type(exc).__name__
+    # 1b. Gateway mixin scan: any ``_handle_<name>_command`` the registry
+    # does not list is still a real terminal/gateway command.
+    try:
+        _vendored_runtime(cfg)
+        from gateway.slash_commands import (  # type: ignore
+            GatewaySlashCommandsMixin)
+        try:
+            from gateway.run_busy import (  # type: ignore
+                GatewayBusySessionMixin)
+            _extra_bases: tuple = (GatewayBusySessionMixin,)
+        except Exception:  # noqa: BLE001 - busy extras are optional
+            _extra_bases = ()
+        for cls in (GatewaySlashCommandsMixin,) + _extra_bases:
+            for attr in dir(cls):
+                m = re.fullmatch(r"_handle_(.+)_command", attr)
+                if not m:
+                    continue
+                name = "/" + str(m.group(1)).replace("_", "-")
+                if name not in seen:
+                    _add(name, "Gateway slash command", "gateway")
+        notes.setdefault("gateway", "mixins")
+    except Exception as exc:  # noqa: BLE001 - skills/plugins/mcp still serve
+        notes.setdefault("gateway", "miss: %s" % type(exc).__name__)
+
+    # 2. Skills (same authority as GET /api/skills).
+    try:
+        from . import skill_catalog
+        count = 0
+        for entry in skill_catalog.catalog_entries(cfg) or []:
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("name") or "").strip()
+            if not name:
+                continue
+            _add("/skill-" + name, str(entry.get("description") or ""),
+                 "skill")
+            count += 1
+        notes["skill"] = "catalog:%d" % count
+    except Exception as exc:  # noqa: BLE001 - fail soft, keep other sources
+        notes["skill"] = "miss: %s" % type(exc).__name__
+
+    # 3. Dashboard plugins (same authority as GET /api/dashboard/plugins).
+    try:
+        _code, rows = h_plugins(cfg, {}, {}, {})
+        count = 0
+        for man in rows or []:
+            if not isinstance(man, dict):
+                continue
+            name = str(man.get("name") or "").strip()
+            if not name:
+                continue
+            _add("/plugin-" + name, str(man.get("description") or ""),
+                 "plugin")
+            count += 1
+        notes["plugin"] = "catalog:%d" % count
+    except Exception as exc:  # noqa: BLE001 - fail soft, keep other sources
+        notes["plugin"] = "miss: %s" % type(exc).__name__
+
+    # 4. MCP servers (same authority as GET /api/mcp/servers, names only).
+    try:
+        from . import mcp_servers as MS
+        listing = MS.list_servers(cfg)
+        count = 0
+        for srv in (listing.get("servers", []) if isinstance(listing, dict)
+                    else []):
+            if not isinstance(srv, dict):
+                continue
+            name = str(srv.get("name") or "").strip()
+            if not name:
+                continue
+            _add("/mcp-" + name,
+                 "MCP server '%s' (%s)" % (name, srv.get("transport")
+                                          or "stdio"),
+                 "mcp")
+            count += 1
+        notes["mcp"] = "registry:%d" % count
+    except Exception as exc:  # noqa: BLE001 - fail soft, keep other sources
+        notes["mcp"] = "miss: %s" % type(exc).__name__
+
+    # 5. Toolsets (same authorities as GET /api/tools/toolsets).
+    try:
+        from . import toolsets as TS
+        meta: Dict[str, str] = {}
+        ordered: List[str] = []
+        try:
+            _vendored_runtime(cfg)
+            from qubit_cli.tools_config import (  # type: ignore
+                _get_effective_configurable_toolsets)
+            for tname, label, desc in _get_effective_configurable_toolsets():
+                key = str(tname)
+                if key not in ordered:
+                    ordered.append(key)
+                meta[key] = str(desc or label or "")
+        except Exception:  # noqa: BLE001 - dashboard store still lists
+            pass
+        try:
+            for tname in TS.toolset_states(cfg).keys():
+                if str(tname) not in ordered:
+                    ordered.append(str(tname))
+        except Exception:  # noqa: BLE001 - vendored list already gathered
+            pass
+        for tname in ordered:
+            _add("/toolset-" + tname,
+                 meta.get(tname, "Toolset '%s'" % tname), "toolset")
+        notes["toolset"] = "catalog:%d" % len(ordered)
+    except Exception as exc:  # noqa: BLE001 - fail soft, keep other sources
+        notes["toolset"] = "miss: %s" % type(exc).__name__
+
+    return _ok(commands=commands, total=len(commands), sources=notes)
 
 
 def h_profile_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -8849,6 +9144,11 @@ _r("GET", r"/api/profiles/projects/tree", "h_profiles_projects_tree")
 # project registry (the vendored router read per-profile projects.db; Qubit's
 # one registry is the same authority). Read-only, never a fabricated list.
 _r("GET", r"/api/chat/workspaces", "h_chat_workspaces")
+# Unified slash catalog for /qubit-chat (parity with the /chat terminal
+# palette): read-only aggregation over the canonical slash registry plus the
+# skills/plugins/mcp/toolset list authorities. Never fork-proxied (see
+# webui.QUBIT_READ_AUTHORITY).
+_r("GET", r"/api/chat/slash-commands", "h_chat_slash_commands")
 _r("POST", r"/api/profiles", "h_profile_create")
 _r("GET", r"/api/tools/terminal/backends", "h_terminal_backends")
 _r("GET", r"/api/tools/computer-use/status", "h_computer_use_status")
@@ -9007,6 +9307,10 @@ _r("POST", r"/api/fs/write-text", "h_fs_write_text")
 _r("POST", r"/api/files/upload", "h_files_upload")
 _r("POST", r"/api/files/upload-stream", "h_files_upload")
 _r("POST", r"/api/files/mkdir", "h_files_mkdir")
+# Browser clipboard image paste (dashboard -> embedded chat). Hermes serves
+# this as a real handler with no gate; the compat surface owns POSTs, so the
+# port lives here and writes to QUBIT_HOME/images/ for the TUI's /image.
+_r("POST", r"/api/chat/image-upload", "h_chat_image_upload")
 _r("POST", r"/api/git/review/stage", "h_git_stage")
 _r("POST", r"/api/git/review/unstage", "h_git_unstage")
 _r("POST", r"/api/git/review/revert", "h_git_revert")
@@ -9050,10 +9354,14 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/credentials/pool.*", _NO_SECRET),
     ("PUT", r"/api/credentials/pool.*", _NO_SECRET),
     ("DELETE", r"/api/credentials/pool.*", _NO_SECRET),
-    ("POST", r"/api/chat/image-upload", _g("CHAT_IMAGE_OVERLAY",
-                                           "Built-in xterm chat image paste is superseded by "
-                                           "Qubit Chat attachments (vision_describe backend).",
-                                            "overlay Qubit Chat tab + `qubit vision describe`")),
+    # ``POST /api/chat/image-upload`` is a REAL handler, not a typed gate. The
+    # vendored fork serves it (``qubit_cli/web_routers/files.py``
+    # ``upload_chat_image``): it validates the MIME, caps size, sniffs magic
+    # bytes and writes into ``QUBIT_HOME/images/`` so the embedded TUI can read
+    # the path. The dashboard's paste handler (``ChatPage`` -> ``uploadChatImage``)
+    # calls it directly, so a gate here only broke browser clipboard paste.
+    # Gate retired (owner call): browser-held image bytes are exactly the input
+    # the real handler exists to accept, and it opens no shell/secret surface.
     # Public Qubit update surface. The specific canonical routes
     # (``GET /api/qubit/update/check``, ``POST /api/qubit/update``,
     # ``POST /api/qubit/update/rollback``) are real handlers registered above;
@@ -15090,6 +15398,95 @@ def h_files_upload(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                qubit_counterpart=counterpart)
 
 
+def h_chat_image_upload(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/chat/image-upload -> persist a browser clipboard image.
+
+    Hermes parity: an unmodified Hermes serves this route as a real handler
+    (``hermes_cli/web_routers/files.py::upload_chat_image`` at pin
+    ``69948c0057``) with no gate, because the dashboard's paste path
+    (``frontend/qubit-web/src/pages/ChatPage.tsx`` -> ``uploadChatImage``)
+    posts browser-held bytes here and then drives the TUI's ``/image <path>``.
+    Browser clipboard bytes are invisible to the server-side clipboard, so this
+    route is the only way the embedded chat can receive a pasted screenshot.
+
+    Writes to ``get_qubit_home()/images/`` — the SAME directory the TUI's own
+    clipboard capture uses (``cli_terminal_mixin`` ``clip_*.png``), so the path
+    returned here is readable by ``/image``. Validation mirrors the fork's
+    helper exactly (data-URL shape, image mime whitelist, size cap, magic-byte
+    sniff) so a spoofed extension is rejected rather than trusted.
+
+    This is not a project-file write: it touches no project root, so the
+    brokered confined-write path does not apply and no confirmation_id is
+    required — matching Hermes, which writes it directly.
+    """
+    import base64 as _b64
+    import re as _re
+    from pathlib import Path as _Path
+
+    match = _CHAT_DATA_URL_RE.match(str(b.get("data_url", "") or ""))
+    if not match:
+        return 400, {"ok": False, "code": "BAD_IMAGE",
+                     "detail": "data_url must be a base64 png/jpeg/gif/webp/"
+                               "bmp data URL",
+                     "qubit_counterpart": "paste an image in Qubit Chat"}
+    mime, b64 = match.group(1), match.group(2)
+    try:
+        raw = _b64.b64decode(_re.sub(r"\s+", "", b64), validate=True)
+    except Exception:
+        return 400, {"ok": False, "code": "BAD_IMAGE",
+                     "detail": "image data URL is not valid base64",
+                     "qubit_counterpart": "paste an image in Qubit Chat"}
+    if not raw or len(raw) > _CHAT_IMAGE_MAX_BYTES:
+        return 400, {"ok": False, "code": "BAD_IMAGE",
+                     "detail": f"image must be 1..{_CHAT_IMAGE_MAX_BYTES} bytes",
+                     "qubit_counterpart": "paste a smaller image"}
+    # Magic-byte sniff: never trust the declared mime/extension alone.
+    head = raw[:16]
+    ext = None
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        ext = ".png"
+    elif head.startswith(b"\xff\xd8\xff"):
+        ext = ".jpg"
+    elif head.startswith((b"GIF87a", b"GIF89a")):
+        ext = ".gif"
+    elif head.startswith(b"BM"):
+        ext = ".bmp"
+    elif head.startswith(b"RIFF") and head[8:12] == b"WEBP":
+        ext = ".webp"
+    if ext is None:
+        return 400, {"ok": False, "code": "BAD_IMAGE",
+                     "detail": "unsupported image type (magic bytes did not "
+                               "match a known image format)",
+                     "qubit_counterpart": "paste a png/jpeg/gif/webp/bmp"}
+    if _CHAT_IMAGE_MIME_EXT.get(mime) != ext.lstrip("."):
+        # .jpeg/.jpg normalize to the same container; anything else is a spoof.
+        if not (mime == "image/jpeg" and ext == ".jpg"):
+            return 400, {"ok": False, "code": "BAD_IMAGE",
+                         "detail": "declared mime does not match the image bytes",
+                         "qubit_counterpart": "paste a png/jpeg/gif/webp/bmp"}
+
+    from qubit_constants import get_qubit_home
+    stem = _Path(str(b.get("filename", "") or "").strip()).name
+    stem = _re.sub(r"[\x00-\x1f]+", "_", stem).strip().strip(".") or "pasted-image"
+    stem = _Path(stem).stem or "pasted-image"
+    stem = _re.sub(r"[^A-Za-z0-9_.-]+", "_", stem).strip("._-") or "pasted-image"
+    import secrets as _secrets
+    from datetime import datetime as _dt
+    brand = str(b.get("brand", "") or "").strip().lower()
+    prefix = "dashboard" if not brand else _re.sub(r"[^a-z0-9]+", "_", brand).strip("_")
+    name = f"{prefix}_{_dt.now():%Y%m%d_%H%M%S}_{_secrets.token_hex(4)}_{stem}{ext}"
+    try:
+        img_dir = _Path(str(get_qubit_home())) / "images"
+        img_dir.mkdir(parents=True, exist_ok=True)
+        target = img_dir / name
+        target.write_bytes(raw)
+    except OSError as exc:
+        return _fail(exc)
+    return _ok(path=str(target), name=name, bytes=len(raw),
+               mime_type=mime, qubit_counterpart="`/image` in the Qubit chat")
+
+
 def h_files_mkdir(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/files/mkdir -> confined, brokered directory creation.
@@ -16255,6 +16652,7 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_profiles_sessions_sidebar": h_profiles_sessions_sidebar,
     "h_profiles_projects_tree": h_profiles_projects_tree,
     "h_chat_workspaces": h_chat_workspaces,
+    "h_chat_slash_commands": h_chat_slash_commands,
     "h_profile_create": h_profile_create,
     "h_terminal_backends": h_terminal_backends,
     "h_computer_use_status": h_computer_use_status,
@@ -16658,6 +17056,20 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
      "gateway": "agents.workspace.get", "kind": "read"},
     {"family": "agent-workspace", "action": "run-status", "methods": ["GET"],
      "gateway": "agent.wait", "kind": "read"},
+    # -- computer (upstream ComputerFiles /api/computer/files/*) --
+    # Backed by the ONE confined canvas host (voicebridge/files/canvas_host.py,
+    # state-home canvas/ root) — no parallel filesystem store. list/read are
+    # reads; write/mkdir are confirm-gated mutations (409 -> confirm:true) like
+    # every other mutation in this table. Traversal is refused by the host.
+    {"family": "computer", "action": "files/list", "methods": ["GET"],
+     "gateway": "computer.files.list", "kind": "read",
+     "aliases": {"path": "path"}},
+    {"family": "computer", "action": "files/read", "methods": ["POST"],
+     "gateway": "computer.files.read", "kind": "read"},
+    {"family": "computer", "action": "files/write", "methods": ["POST"],
+     "gateway": "computer.files.write", "kind": "mutation"},
+    {"family": "computer", "action": "files/mkdir", "methods": ["POST"],
+     "gateway": "computer.files.mkdir", "kind": "mutation"},
     # -- nodes (ocFamilyAgentsApi) --
     {"family": "nodes", "action": "list", "methods": ["GET"],
      "gateway": "node.list", "kind": "read"},
@@ -16975,6 +17387,12 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
     # (counterpart: DELETE /api/cron/jobs/{id} or pause).
     {"family": "flows", "action": "hooks", "methods": ["GET"],
      "gateway": "flows.hooks", "kind": "read"},
+    {"family": "flows", "action": "list", "methods": ["GET"],
+     "gateway": "flows.list", "kind": "read"},
+    {"family": "flows", "action": "runs/{id}", "methods": ["GET"],
+     "gateway": "flows.runs", "kind": "read"},
+    {"family": "flows", "action": "blueprints", "methods": ["GET"],
+     "gateway": "flows.blueprints", "kind": "read"},
     {"family": "flows", "action": "hook_enable", "methods": ["POST"],
      "gateway": "hooks.enable", "kind": "mutation"},
     {"family": "flows", "action": "hook_disable", "methods": ["POST"],
@@ -17086,6 +17504,8 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
      "gateway": "bot.goals_list", "kind": "read"},
     {"family": "bot", "action": "goals-set", "methods": ["POST"],
      "gateway": "bot.goals_set", "kind": "mutation"},
+    {"family": "bot", "action": "goals-update", "methods": ["POST"],
+     "gateway": "bot.goals_update", "kind": "mutation"},
     {"family": "bot", "action": "watches-set", "methods": ["POST"],
      "gateway": "bot.watches_set", "kind": "mutation"},
     {"family": "bot", "action": "alerts-list", "methods": ["GET"],
@@ -17134,6 +17554,14 @@ _QUBIT_FAMILY_BRIDGE: List[Dict[str, Any]] = [
      "gateway": "sessions.files.list", "kind": "read"},
     {"family": "harness", "action": "artifact_get", "methods": ["GET"],
      "gateway": "workspace.files", "kind": "read"},
+    # custom harnesses: a named harness over a real runtime adapter, persisted
+    # in the durable custom-harness sidecar (family_bot_harness). create is a
+    # confirm-gated mutation; custom_list reads the sidecar alongside the
+    # runtime agent roster.
+    {"family": "harness", "action": "custom_list", "methods": ["GET"],
+     "gateway": "harness.custom_list", "kind": "read"},
+    {"family": "harness", "action": "create", "methods": ["POST"],
+     "gateway": "harness.create", "kind": "mutation"},
     # -- webchat (ocFamilyWebchatApi; reuse-only — no bridge rows) --
     # Every webchat capability reuses an existing chat endpoint (sessions
     # list/create/history, POST /api/qubit/chat + /stream); NEEDS_BRIDGE is
@@ -17382,6 +17810,29 @@ def _qubit_family_dispatch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         if kind == "mutation":
             safe = {k: v for k, v in params.items()
                     if isinstance(v, (str, int, float, bool)) or v is None}
+            # An empty CALLER body cannot be replayed: `_confirm_compat_one`
+            # settles by re-issuing this action with the STAGED scalars, so
+            # staging with nothing creates a Confirm button guaranteed to fail
+            # ("GATEWAY_BAD_PARAMS: conversationRef or sourceSessionKey is
+            # required"). Refuse at STAGE time with the real reason rather than
+            # offering an unrunnable pending item.
+            #
+            # Test the CALLER's `b`, not the derived `safe`: `_qubit_family_params`
+            # injects defaults (requested_by, ops, name, ...) so `safe` is never
+            # empty even when the request body was `{}` — which is why an earlier
+            # version of this guard never fired.
+            caller_fields = {k for k in (b or {}) if k not in
+                             ("confirm", "confirmation_id")}
+            if b is not None and not caller_fields:
+                return 400, {
+                    "ok": False, "code": "FAMILY_MUTATION_NO_PARAMS",
+                    "detail": f"family {family}/{entry['action']} needs its "
+                              "parameters in the request body before it can be "
+                              "staged; an empty body would leave a confirmation "
+                              "that cannot be executed.",
+                    "gateway_method": str(entry.get("gateway") or ""),
+                    "qubit_counterpart": "re-POST with the action's required "
+                                         "fields plus {\"confirm\": true}"}
             guard = _compat_confirm(
                 cfg, f"family.{family}.{entry['action']}",
                 f"family {family}/{entry['action']} requires explicit "
@@ -17420,6 +17871,47 @@ HANDLERS["h_qubit_family_get"] = h_qubit_family_get
 HANDLERS["h_qubit_family_post"] = h_qubit_family_post
 HANDLERS["h_qubit_family_put"] = h_qubit_family_put
 
+
+def _family_mutation(cfg: Any, family: str, action: str,
+                     body: Optional[Dict[str, Any]] = None
+                     ) -> Tuple[int, Dict[str, Any]]:
+    """Execute one family mutation directly, as the pending-approvals Confirm.
+
+    The dashboard's id-only ``POST /api/ops/confirm`` settles a staged
+    ``qubit.family.<fam>.<act>`` journal entry through
+    ``dashboard_ops._compat_runner``. That runner used to return ``None`` for
+    every family capability, so Confirm answered ``CONFIRM_UNSUPPORTED`` and a
+    banner full of pending items could never be cleared — the family backend is
+    executable, it just had no caller from the settle path.
+
+    Re-enters the ordinary family dispatch with ``confirm`` set, so the request
+    passes the same gate a direct ``POST /api/qubit/<fam>/<act> {"confirm":true}``
+    would, and the real gateway backend still runs exactly once (the journal
+    entry is marked executed by ``_confirm_compat_one`` before this is called).
+    """
+    fam = str(family or "").strip()
+    rest = str(action or "").strip().lstrip("/")
+    if not fam or not rest:
+        return 400, {"ok": False, "code": "FAMILY_BAD_PARAMS",
+                     "detail": "family and action are required"}
+    entry, _pid = _qubit_family_match(fam, rest, "POST")
+    if entry is None:
+        # Fall back to GET for read-kind entries the settle path may reach.
+        entry, _pid = _qubit_family_match(fam, rest, "GET")
+    method = "POST"
+    if entry is not None and str(entry.get("kind", "read")) == "read":
+        method = "GET"
+    payload = dict(body or {})
+    payload["confirm"] = True
+    payload.pop("confirmation_id", None)
+    return _qubit_family_dispatch(
+        cfg, {}, payload, {"family": fam, "rest": rest}, method)
+
+
+# Defined below the HANDLERS literal (image-upload port lives next to the other
+# file handlers), so it is registered explicitly like the family handlers.
+HANDLERS["h_chat_image_upload"] = h_chat_image_upload
+
 for _qfb_family in sorted({e["family"] for e in _QUBIT_FAMILY_BRIDGE}):
     _qfb_methods = sorted({m for e in _QUBIT_FAMILY_BRIDGE
                            if e["family"] == _qfb_family for m in e["methods"]})
@@ -17428,3 +17920,70 @@ for _qfb_family in sorted({e["family"] for e in _QUBIT_FAMILY_BRIDGE}):
            r"/api/qubit/(?P<family>" + _qfb_family + r")/(?P<rest>.+)",
            "h_qubit_family_" + _qfb_method.lower())
 del _qfb_family, _qfb_methods, _qfb_method
+
+
+# -------------------------------------------------------------------------
+# Computer file surface (upstream shape): /api/computer/files/*
+# -------------------------------------------------------------------------
+# The upstream mobile ComputerFiles client reads `/api/computer/files*`
+# directly (computer-workspace.tsx). Qubit serves the SAME operations under the
+# SPA prefix `/agent/api/computer/files/*` backed by the ONE confined canvas
+# host (state-home canvas/ root) — no parallel filesystem store. list/read are
+# reads; write/mkdir are confirm-gated (409 -> {"confirm": true}) like every
+# other mutation. Traversal is refused by the host (_resolve/_check_name).
+def _computer_files_call(cfg: Any, method: str, gq: Dict[str, str],
+                         gb: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    entry = next((e for e in _QUBIT_FAMILY_BRIDGE
+                  if e["family"] == "computer" and e["action"] == gq.get("_action")),
+                 None)
+    if entry is None:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": "no computer file route"}
+    # Reuse the family dispatch core so the confirm gate + e-stop + audit are
+    # identical to every other mutation (one policy, never a second gate).
+    return _qubit_family_dispatch(cfg, gq, gb,
+                                  {"family": "computer",
+                                   "rest": str(gq.get("_action", ""))}, method)
+
+
+def h_computer_files_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/computer/files?path= -> confined canvas-host folder listing."""
+    q = dict(q or {})
+    q["_action"] = "files/list"
+    return _computer_files_call(cfg, "GET", q, b)
+
+
+def h_computer_files_read(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/computer/files/read {path} -> confined single-file read."""
+    q = dict(q or {})
+    q["_action"] = "files/read"
+    return _computer_files_call(cfg, "POST", q, b)
+
+
+def h_computer_files_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/computer/files/write {path,text} -> confirm-gated save."""
+    q = dict(q or {})
+    q["_action"] = "files/write"
+    return _computer_files_call(cfg, "POST", q, b)
+
+
+def h_computer_files_mkdir(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/computer/files/mkdir {path} -> confirm-gated folder create."""
+    q = dict(q or {})
+    q["_action"] = "files/mkdir"
+    return _computer_files_call(cfg, "POST", q, b)
+
+
+HANDLERS["h_computer_files_list"] = h_computer_files_list
+HANDLERS["h_computer_files_read"] = h_computer_files_read
+HANDLERS["h_computer_files_write"] = h_computer_files_write
+HANDLERS["h_computer_files_mkdir"] = h_computer_files_mkdir
+
+_r("GET", r"/api/computer/files", "h_computer_files_list")
+_r("POST", r"/api/computer/files/read", "h_computer_files_read")
+_r("POST", r"/api/computer/files/write", "h_computer_files_write")
+_r("POST", r"/api/computer/files/mkdir", "h_computer_files_mkdir")

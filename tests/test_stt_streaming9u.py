@@ -197,6 +197,51 @@ def test_online_session_drains_ready_stream():
     assert f is not None and f.is_final
 
 
+def test_online_session_decode_oom_degrades_without_killing_socket(monkeypatch):
+    """An OOM inside decode_stream must degrade, never kill the request thread.
+
+    Regression for the 2026-10-01/02 journal storm (~2090 socketserver
+    tracebacks: sherpa decode_stream RuntimeError OOM propagated out of
+    OnlineStreamingSession.accept through stt_ws._pump, which only catches
+    SttWsError -- every STT request died with a full traceback + stt.cancelled).
+    The window session already degrades this way (asr.stream.partial_error);
+    the online session must match: audit once, return no partial, keep the
+    socket alive for the accurate rescore on stop.
+    """
+    import voicebridge.asr.streaming as ST
+
+    audited = []
+    monkeypatch.setattr(ST, "log_event",
+                        lambda event, **kw: audited.append((event, kw)))
+
+    class _OomRec:
+        def is_ready(self, _s):
+            return True
+
+        def decode_stream(self, _s):
+            raise RuntimeError(
+                "Non-zero status code returned while running Concat node. "
+                "Failed to allocate memory for requested buffer of size 5120")
+
+        def get_result(self, _s):
+            return "must never surface"
+
+        def reset(self, _s):
+            return None
+
+    class _Stream:
+        def accept_waveform(self, *, sample_rate, waveform):
+            return None
+
+        def input_finished(self):
+            return None
+
+    s = OnlineStreamingSession(_OomRec(), _Stream(), engine="fake-oom")
+    assert s.accept(np.full(1600, 0.2, dtype=np.float32)) is None
+    assert s.finalize() is None
+    assert any(e == "asr.stream.decode_error" for e, _ in audited), audited
+
+
 def test_resample_and_pcm_helpers():
     x = np.sin(np.arange(8000, dtype=np.float32))
     assert _resample_mono(x, 8000, 16000).shape == (16000,)

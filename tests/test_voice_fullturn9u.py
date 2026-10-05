@@ -111,13 +111,16 @@ def test_brain_failure_gets_full_turn_second_chance(monkeypatch):
     def fake_turn(cfg, text, **kw):
         seen.update(kw)
         seen["text"] = text
-        return {"ok": True, "reply": "Created notes/todo.txt and opened it.",
+        return {"ok": True, "reply": "Did the thing via the full turn.",
                 "session_id": "voice-chat"}
 
     monkeypatch.setattr(CT, "turn", fake_turn)
-    out = svc.ask("create and open a txt document", request_id="r-2")
+    # NOTE (Lane 3, 2026-10-03): this used "create and open a txt document",
+    # which is now a deterministic local action (stages before the brain by
+    # design). The fallback contract needs free-form text no tool claims.
+    out = svc.ask("do the thing", request_id="r-2")
     assert out["ok"] is True
-    assert "todo.txt" in out["answer"]
+    assert "Did the thing" in out["answer"]
     assert seen.get("session") == "voice-chat"
     assert store.rows == []  # the turn persists itself; never double-write
 
@@ -134,10 +137,12 @@ def test_brain_cant_do_refusal_escalates_to_full_turn(monkeypatch):
         return {"ok": True, "reply": "Done via the full turn."}
 
     monkeypatch.setattr(CT, "turn", fake_turn)
-    out = svc.ask("create and open a txt document", request_id="r-3")
+    # NOTE (Lane 3, 2026-10-03): was "create and open a txt document" (now a
+    # deterministic local action); free-form text keeps the tested contract.
+    out = svc.ask("do the thing", request_id="r-3")
     assert out["ok"] is True
     assert out["answer"] == "Done via the full turn."
-    assert called == ["create and open a txt document"]
+    assert called == ["do the thing"]
 
 
 def test_staged_confirmation_falls_back_to_brain(monkeypatch):

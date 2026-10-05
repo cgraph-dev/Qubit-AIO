@@ -229,13 +229,15 @@ export default function BoardAdminPage() {
   return (
     <section className="workboard">
       <div className="workboard-main space-y-6 p-4">
-        <div>
-          <h1 className="text-xl font-semibold">Board administration</h1>
-          <p className="text-sm text-muted-foreground">
-            Tabs, widgets, roles, and the board log for one Qubit board. Sandbox-gated
-            widget verbs stay disabled with their reason.
-          </p>
-        </div>
+        <header className="workboard-heading">
+          <div className="workboard-heading__identity">
+            <h1 className="workboard-page-title text-xl font-semibold">Board administration</h1>
+            <p className="text-sm text-muted-foreground">
+              Tabs, widgets, roles, and the board log for one Qubit board. Sandbox-gated
+              widget verbs stay disabled with their reason.
+            </p>
+          </div>
+        </header>
 
         <div className="workboard-toolbar">
           <div className="workboard-toolbar__filters">
@@ -356,7 +358,8 @@ export default function BoardAdminPage() {
           </div>
         ) : null}
 
-        <div className={`workboard-board workboard-board--${layout}`}>
+        <div className="workboard-board-viewport">
+          <div className={`workboard-board workboard-board--${layout}`}>
           {showColumn("tabs") ? (
             <section className="workboard-column workboard-column--tabs">
               <div className="workboard-column__header">
@@ -672,6 +675,7 @@ export default function BoardAdminPage() {
               </div>
             </section>
           ) : null}
+        </div>
         </div>
 
         <Card>

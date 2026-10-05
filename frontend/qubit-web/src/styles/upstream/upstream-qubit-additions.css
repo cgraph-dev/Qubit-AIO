@@ -1,0 +1,62 @@
+/* ------------------------------------------------------------------
+ * Qubit additions — NOT upstream.
+ *
+ * These classes are emitted by the Qubit SessionOps / Worktrees /
+ * Checkpoints pages but have no upstream counterpart at the pinned
+ * commit (upstream renders compaction history inline in the sessions
+ * detail panel; there is no `session-checkpoint-card` in
+ * ui/src/styles/sessions.css). They are modeled on the upstream
+ * session-details tokens above so the Qubit card lists read as the
+ * same surface. Kept in this separate file so the 1:1 upstream ports
+ * stay clean.
+ * ------------------------------------------------------------------ */
+
+.session-checkpoint-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.session-checkpoint-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  padding: var(--space-3) var(--space-4);
+}
+
+.session-checkpoint-card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.session-checkpoint-card__summary {
+  color: var(--muted);
+  font-size: var(--control-ui-text-sm);
+  line-height: 1.5;
+}
+
+.session-checkpoint-card__delta {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--control-ui-text-xs);
+}
+
+.session-checkpoint-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.session-details-empty {
+  color: var(--muted);
+  font-size: var(--control-ui-text-sm);
+  padding: var(--space-3) 0;
+}

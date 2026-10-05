@@ -37,7 +37,7 @@ LEGACY_ENV_MAP = {
 #: The generic namespace prefixes the adapter mirrors. Only whole env names
 #: matching these (``QUBIT_<SUFFIX>`` / ``HERMES_<SUFFIX>``) are considered.
 _QUBIT_PREFIX = "QUBIT_"
-_HERMES_PREFIX = "HERMES_"
+_LEGACY_PREFIX = "HERMES_"
 _ENV_NAME = re.compile(r"^(QUBIT|HERMES)_[A-Z0-9_]+$")
 #: Names the adapter must never mirror (handled explicitly, or wire-preserved).
 _MIRROR_EXCLUDE = frozenset({"HERMES_HOME", "QUBIT_HOME"})
@@ -67,9 +67,9 @@ def _mirror(env: Dict[str, str], adopted: Dict[str, str]) -> None:
         if not value:
             continue
         if key.startswith(_QUBIT_PREFIX):
-            counterpart = _HERMES_PREFIX + key[len(_QUBIT_PREFIX):]
+            counterpart = _LEGACY_PREFIX + key[len(_QUBIT_PREFIX):]
         else:
-            counterpart = _QUBIT_PREFIX + key[len(_HERMES_PREFIX):]
+            counterpart = _QUBIT_PREFIX + key[len(_LEGACY_PREFIX):]
         if counterpart in env and (env.get(counterpart) or "").strip():
             continue
         # Never let the adapter surface the external upstream home under either

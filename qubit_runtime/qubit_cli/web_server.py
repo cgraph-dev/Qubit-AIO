@@ -282,7 +282,7 @@ async def _lifespan(app: "FastAPI"):
         pty_reaper_task.cancel()
         selftest_task.cancel()
         auto_archive_task.cancel()
-        await PTY_REGISTRY.close_all()
+        await PTY_REGISTRY.close_all(keep_detached=True)
         # Stop the managed llama-server with its parent (an orphan pins VRAM).
         try:
             from qubit_cli.local_runtime.bootstrap import shutdown_local_runtime

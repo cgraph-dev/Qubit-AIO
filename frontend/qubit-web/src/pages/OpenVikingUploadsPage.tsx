@@ -7,27 +7,28 @@
  * Nothing is sent without confirmation. A missing bridge row fails
  * honestly with reason — never invented success.
  *
- * Visual language matches SessionsPage/ChannelsPage: the layout owns the
- * page title (see ROUTE_TITLES), so this page renders no `h1`; fields
- * use `Label` + `Input`, submits use `Button`, confirmation goes through
- * the shared `ConfirmDialog` round-trip (same resolver pattern as
- * ChannelsPage's broker confirm), and feedback uses `Toast`.
+ * Structure follows the shared settings contract
+ * (`.settings-page` > `.settings-section` > `.settings-group` > `.settings-row`)
+ * composed with the uniform Open Viking shell (`SettingsPageIntro`) and the
+ * sibling-view switcher; the layout owns the page title (see ROUTE_TITLES),
+ * so this page renders no `h1`.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router";
 import { Database, FolderUp } from "lucide-react";
 import { Button } from "@nous-research/ui/ui/components/button";
-import {
-  Card,
-  CardContent,
-} from "@nous-research/ui/ui/components/card";
-import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { Input } from "@nous-research/ui/ui/components/input";
-import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import {
+  SettingsEmpty,
+  SettingsPageIntro,
+  SettingsRow,
+  SettingsSection,
+} from "@/components/viking-settings";
 import {
   addVikingMemory,
   addVikingResource,
@@ -41,6 +42,14 @@ const TABS = [
   { key: "memory", label: "Add memory", icon: Database },
 ] as const;
 
+/** A staged write kept in page memory after it settles. This is a real
+ *  record of what this session sent — never a fabricated history. */
+interface StagedWrite {
+  kind: Tab;
+  label: string;
+  at: string;
+}
+
 export default function OpenVikingUploadsPage() {
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>(
@@ -52,33 +61,23 @@ export default function OpenVikingUploadsPage() {
   const [notice, setNotice] = useState("");
   const [failed, setFailed] = useState("");
   const [busy, setBusy] = useState(false);
+  const [staged, setStaged] = useState<StagedWrite[]>([]);
   const { toast, showToast } = useToast();
 
-  // ConfirmDialog round-trip (ChannelsPage broker-confirm pattern):
-  // submit stages the payload, the dialog settles it, and only an
-  // explicit confirm issues the bridge write.
-  const [pending, setPending] = useState<{
-    kind: Tab;
-    title: string;
-    description: string;
-  } | null>(null);
-  const confirmResolverRef = useRef<((ok: boolean) => void) | null>(null);
-
-  const askConfirm = useCallback(
-    (kind: Tab, title: string, description: string) =>
-      new Promise<boolean>((resolve) => {
-        confirmResolverRef.current = resolve;
-        setPending({ kind, title, description });
-      }),
-    [],
-  );
-
-  const settleConfirm = useCallback((ok: boolean) => {
-    const resolve = confirmResolverRef.current;
-    confirmResolverRef.current = null;
-    setPending(null);
-    resolve?.(ok);
+  // Staged confirm gate: the write is refused unless the operator approves
+  // it explicitly. Uses the platform confirm primitive so the gate is a real
+  // round-trip in the browser and stubbable in tests — never a silent send.
+  const askConfirm = useCallback((description: string) => {
+    return Promise.resolve(
+      typeof window !== "undefined" && typeof window.confirm === "function"
+        ? window.confirm(description)
+        : false,
+    );
   }, []);
+
+  function recordStaged(kind: Tab, label: string) {
+    setStaged((prev) => [{ kind, label, at: new Date().toLocaleTimeString() }, ...prev].slice(0, 20));
+  }
 
   async function submitResource() {
     const value = uri.trim();
@@ -89,19 +88,18 @@ export default function OpenVikingUploadsPage() {
     try {
       const input = { uri: value, title: title.trim() || undefined };
       const ok = await askConfirm(
-        "resource",
-        "Add this resource?",
-        `Stage ${value} into the VikingBot context. Nothing is sent until you confirm here.`,
+        `Stage ${value} into the local context engine? Nothing is sent until you confirm.`,
       );
       if (!ok) return;
       await addVikingResource(input, () => true);
       setNotice("Resource staged and confirmed.");
       showToast("Resource staged and confirmed.", "success");
+      recordStaged("resource", title.trim() || value);
       setUri("");
       setTitle("");
     } catch (e) {
       const message = isBridgeRowMissing(e)
-        ? "Bridge row missing — the J1 lane has not landed resource-add yet."
+        ? "Bridge row missing — resource ingest isn't served by the local engine yet."
         : e instanceof Error
           ? e.message
           : "resource add failed";
@@ -120,18 +118,17 @@ export default function OpenVikingUploadsPage() {
     setFailed("");
     try {
       const ok = await askConfirm(
-        "memory",
-        "Add this memory?",
-        "Stage this note into the VikingBot context. Nothing is sent until you confirm here.",
+        "Stage this note into the local context engine? Nothing is sent until you confirm.",
       );
       if (!ok) return;
       await addVikingMemory({ text: value }, () => true);
       setNotice("Memory staged and confirmed.");
       showToast("Memory staged and confirmed.", "success");
+      recordStaged("memory", value.length > 60 ? `${value.slice(0, 57)}…` : value);
       setText("");
     } catch (e) {
       const message = isBridgeRowMissing(e)
-        ? "Bridge row missing — the J1 lane has not landed memory-add yet."
+        ? "Bridge row missing — memory writes aren't served by the local engine yet."
         : e instanceof Error
           ? e.message
           : "memory add failed";
@@ -143,133 +140,190 @@ export default function OpenVikingUploadsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6" data-testid="open-viking-uploads-page">
+    <div className="qb-upstream viking-settings settings-page settings-page--wide" data-testid="open-viking-uploads-page">
       <Toast toast={toast} />
-      <p className="text-xs text-muted-foreground">
+
+      <SettingsPageIntro currentPath="/open-viking/uploads" showSubnav>
         Stage a resource or a memory into the local context engine. Every write
         asks for confirmation first — nothing sends silently.
-      </p>
+      </SettingsPageIntro>
 
-      <div className="flex gap-1" role="tablist" aria-label="Upload type">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-[0.12em] ${
-              tab === t.key
-                ? "bg-midground text-background"
-                : "text-muted-foreground hover:bg-midground/10"
-            }`}
-          >
-            <t.icon className="h-4 w-4" aria-hidden /> {t.label}
-          </button>
-        ))}
-      </div>
+      <SettingsSection
+        title="Write mode"
+        description="Pick what this session is staging. Both writes are confirm-gated."
+        ariaLabel="Upload type"
+      >
+        <div className="viking-subnav" role="tablist">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.key}
+              onClick={() => setTab(t.key)}
+              className={cn("btn btn--sm", tab === t.key && "active")}
+            >
+              <t.icon className="h-4 w-4" aria-hidden /> {t.label}
+            </button>
+          ))}
+        </div>
+      </SettingsSection>
 
       {notice && (
-        <p
-          className="border border-success/30 bg-success/15 px-3 py-2 text-sm text-success"
-          role="status"
-        >
+        <p className="callout" role="status">
           {notice}
         </p>
       )}
       {failed && (
-        <p
-          className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
+        <p className="callout danger" role="alert">
           {failed}
         </p>
       )}
 
-      {tab === "resource" ? (
-        <Card className="max-w-xl">
-          <CardContent className="flex flex-col gap-3 p-4">
-            <form
-              className="flex flex-col gap-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void submitResource();
-              }}
-            >
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="viking-upload-uri">Resource URI</Label>
+      <SettingsSection
+        title={tab === "resource" ? "Add resource" : "Add memory"}
+        description={
+          tab === "resource"
+            ? "Ingest a document or URI into the context store. Confirm-gated; nothing is written until you approve."
+            : "Append a note to the user memory. Confirm-gated; nothing is written until you approve."
+        }
+        ariaLabel={tab === "resource" ? "Add resource" : "Add memory"}
+      >
+        {tab === "resource" ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submitResource();
+            }}
+          >
+            <SettingsRow
+              stacked
+              title="Resource URI"
+              description="A viking:// path or an https:// link to ingest."
+              control={
                 <Input
                   id="viking-upload-uri"
                   className="font-courier"
                   placeholder="viking://… or https://…"
                   value={uri}
                   onChange={(e) => setUri(e.target.value)}
+                  aria-label="Resource URI"
                 />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="viking-upload-title">Title (optional)</Label>
+              }
+            />
+            <SettingsRow
+              stacked
+              title="Title"
+              description="Optional label shown in the context tree."
+              control={
                 <Input
                   id="viking-upload-title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  aria-label="Resource title"
                 />
-              </div>
-              <Button
-                type="submit"
-                size="sm"
-                className="w-fit uppercase"
-                disabled={busy}
-                prefix={busy ? <Spinner /> : <FolderUp className="h-4 w-4" />}
-              >
-                {busy ? "Staging…" : "Add resource"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="max-w-xl">
-          <CardContent className="flex flex-col gap-3 p-4">
-            <form
-              className="flex flex-col gap-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void submitMemory();
-              }}
-            >
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="viking-memory-text">Memory text</Label>
+              }
+            />
+            <SettingsRow
+              className="settings-row--actions"
+              control={
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="uppercase"
+                  disabled={busy}
+                  prefix={busy ? <Spinner /> : <FolderUp className="h-4 w-4" />}
+                >
+                  {busy ? "Staging…" : "Add resource"}
+                </Button>
+              }
+            />
+          </form>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submitMemory();
+            }}
+          >
+            <SettingsRow
+              stacked
+              title="Memory text"
+              description="A single fact or preference worth remembering."
+              control={
                 <textarea
                   id="viking-memory-text"
                   className="min-h-28 w-full border border-midground/15 bg-background/40 px-3 py-2 font-courier text-sm transition-colors placeholder:text-midground/50 focus-visible:border-midground/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-midground/30 disabled:cursor-not-allowed disabled:opacity-50"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
+                  aria-label="Memory text"
                 />
-              </div>
-              <Button
-                type="submit"
-                size="sm"
-                className="w-fit uppercase"
-                disabled={busy}
-                prefix={busy ? <Spinner /> : <Database className="h-4 w-4" />}
-              >
-                {busy ? "Staging…" : "Add memory"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+              }
+            />
+            <SettingsRow
+              className="settings-row--actions"
+              control={
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="uppercase"
+                  disabled={busy}
+                  prefix={busy ? <Spinner /> : <Database className="h-4 w-4" />}
+                >
+                  {busy ? "Staging…" : "Add memory"}
+                </Button>
+              }
+            />
+          </form>
+        )}
+      </SettingsSection>
 
-      <ConfirmDialog
-        open={pending !== null}
-        onCancel={() => settleConfirm(false)}
-        onConfirm={() => settleConfirm(true)}
-        title={pending?.title ?? "Confirm write"}
-        description={
-          pending?.description ??
-          "This write requires explicit confirmation."
-        }
-        confirmLabel="Confirm"
-      />
+      <SettingsSection
+        title="Staged this session"
+        description="Writes this page confirmed into the local engine, newest first. Cleared on reload."
+        count={staged.length}
+        ariaLabel="Staged this session"
+      >
+        {staged.length === 0 ? (
+          <SettingsEmpty>
+            Nothing staged yet — a failed write or a declined confirm never
+            appears here.
+          </SettingsEmpty>
+        ) : (
+          <div data-testid="viking-staged">
+            {staged.map((row, i) => (
+              <SettingsRow
+                key={`${row.kind}-${row.at}-${i}`}
+                title={row.label}
+                description={
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span>{row.kind === "resource" ? "resource" : "memory"}</span>
+                    <span className="settings-row__value settings-row__value--mono">{row.at}</span>
+                  </span>
+                }
+              />
+            ))}
+          </div>
+        )}
+      </SettingsSection>
+
+      <SettingsSection
+        title="Write flow"
+        description="How a staged write reaches the local engine."
+      >
+        <SettingsRow
+          title="1 · Stage"
+          description="Enter the URI or note; the form holds your input locally."
+        />
+        <SettingsRow
+          title="2 · Confirm"
+          description="A prompt asks for explicit approval before anything is sent."
+        />
+        <SettingsRow
+          title="3 · Write"
+          description="On confirm, the bridge row runs the write against the state-home context store."
+        />
+      </SettingsSection>
     </div>
   );
 }

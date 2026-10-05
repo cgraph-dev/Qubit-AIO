@@ -40,8 +40,8 @@ export default function PairingPage() {
     api
       .getPairing()
       .then((res: PairingResponse) => {
-        setPending(res.pending);
-        setApproved(res.approved);
+        setPending(res?.pending ?? []);
+        setApproved(res?.approved ?? []);
       })
       .catch(() => showToast("Failed to load pairing requests", "error"))
       .finally(() => setLoading(false));
