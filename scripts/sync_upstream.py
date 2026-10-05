@@ -32,7 +32,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 PIN = Path("/home/trick/.cache/qubit-pins/hermes-agent")
-REPO = Path("/home/trick/Projects/Repos/qubit-voicebridge")
+# Derive the repo root from this script's location so the tool works correctly
+# inside a `git worktree` checkout. A hardcoded absolute path made every
+# worktree agent write into the MAIN tree, destroying the isolation that
+# worktrees exist to provide.
+REPO = Path(__file__).resolve().parent.parent
 QR = REPO / "qubit_runtime"
 PIN_SHA = "69948c0057"
 BASE_SHA = "bd0affe5"
