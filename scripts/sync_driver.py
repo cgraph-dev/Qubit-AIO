@@ -46,12 +46,14 @@ BASE_SHA = "a036b13793"
 # tier -1 = ROOT-LEVEL modules (utils.py, hermes_state_errors.py, ...) — the
 #           most primitive layer; scheduled FIRST, not last.
 SUBSYSTEMS = [
-    "__root__",                           # -1: root-level .py modules (44 files)
+    "__root__",                           # -1: root-level .py modules (49 files)
     "locales", "nix", "docker",           # 0: inert
     "plugins", "optional-skills",         # 1: leaf capability
-    "agent", "tools", "gateway",          # 2: core
+    "agent", "tools", "gateway",          # 2: core   (applied 2026-10-06)
     "tui_gateway", "web", "cron", "acp_adapter", "evals", "pm", "scripts",
-    "ui-tui", "apps",                     # 3: surfaces + bulk
+    "tests", "tests-js",                  # 3: upstream test suite + JS tests
+    "ui-tui", "apps",                     # 4: surfaces + bulk
+    "plugin-catalog", "contributors", "website", "skills", "providers", "assets",
 ]
 
 
