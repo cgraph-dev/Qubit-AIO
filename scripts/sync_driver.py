@@ -26,7 +26,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO = Path("/home/trick/Projects/Repos/qubit-voicebridge")
+REPO = Path(__file__).resolve().parent.parent
 STATE = REPO / "docs" / "generated" / "sync_driver_state.json"
 PIN = Path("/home/trick/.hermes/hermes-agent")
 PIN_SHA = "69948c0057"

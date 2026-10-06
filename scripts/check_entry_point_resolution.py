@@ -111,6 +111,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import subprocess
 import sys
 import time
 from collections import defaultdict
@@ -723,6 +724,18 @@ def main() -> int:
 
     elapsed = time.time() - t0
 
+    # Provenance: a bare number caused real confusion. Five agents were told the
+    # baseline was prod_hard=0; the COMMITTED tree measured 19 at the same commit,
+    # and 0 was only true of a checkout carrying ~79 uncommitted files. Print what
+    # was actually measured so the number can never be read out of context.
+    try:
+        dirty = subprocess.run(["git", "-C", str(repo), "status", "--porcelain"],
+                               capture_output=True, text=True, timeout=20).stdout.count("\n")
+        head = subprocess.run(["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
+                              capture_output=True, text=True, timeout=20).stdout.strip()
+    except Exception:
+        dirty, head = -1, "?"
+
     prod_hard = [f for f in prod if f.hard]
     prod_soft = [f for f in prod if not f.hard]
     prod_unverified = [f for f in prod_soft if "unverified" in f.flags]
@@ -731,6 +744,9 @@ def main() -> int:
 
     print("# Entry-point resolution sweep")
     print(f"# roots: {', '.join(ROOTS)}")
+    print(f"# measured tree: HEAD {head}  uncommitted files: {dirty}"
+          + ("   <-- RESULTS REFLECT UNCOMMITTED WORK, NOT A COMMITTED BASELINE"
+             if dirty > 0 else "   (clean: results are reproducible from this commit)"))
     print(f"# modules scanned: {len(targets)}  time: {elapsed:.1f}s")
     print(f"# HARD (production): {len(prod_hard)}")
     print(f"# OPTIONAL/TYPECHECKING (production): {len(prod_optional)}")
