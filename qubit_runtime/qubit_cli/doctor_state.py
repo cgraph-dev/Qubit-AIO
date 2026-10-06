@@ -579,6 +579,31 @@ def _check_skills_hub(should_fix: bool, f: Finding) -> None:
                    ("No GITHUB_TOKEN", f"(60 req/hr rate limit — set in {_DHH}/.env for better rates)"))
 
 
+def _memory_provider_honcho(issues: list) -> None:
+    from plugins.memory import import_provider_module
+    client = import_provider_module("honcho", "client")
+    hcfg = client.HonchoClientConfig.from_global_config()
+    cfg_path = client.resolve_config_path()
+    if not cfg_path.exists():
+        # Config file missing — env-var fallback may still have resolved it.
+        check_bool(hcfg.api_key or hcfg.base_url,
+                   ("Honcho configured via environment variables", f"config file {cfg_path} not found, using HONCHO_API_KEY env var"),
+                   ("Honcho config not found", "run: qubit memory setup"))
+    elif not hcfg.enabled:
+        check_info(f"Honcho disabled (set enabled: true in {cfg_path} to activate)")
+    elif not (hcfg.api_key or hcfg.base_url):
+        _fail_and_issue("Honcho API key or base URL not set", "run: qubit memory setup",
+                        "No Honcho API key — run 'qubit memory setup'", issues)
+    else:
+        client.reset_honcho_client()
+        try:
+            client.get_honcho_client(hcfg)
+            check_ok("Honcho connected", f"workspace={hcfg.workspace_id} mode={hcfg.recall_mode} freq={hcfg.write_frequency}")
+        except Exception as _e:
+            _fail_and_issue("Honcho connection failed", str(_e), f"Honcho unreachable: {_e}", issues)
+
+
+
 def _memory_provider_mem0(issues: list) -> None:
     from plugins.memory import import_provider_module
     mem0_cfg = import_provider_module("mem0")._load_config()

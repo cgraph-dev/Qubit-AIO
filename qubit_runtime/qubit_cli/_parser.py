@@ -367,7 +367,7 @@ def build_top_level_parser():
     ``chat_parser.set_defaults(func= cmd_chat)`` and registers further subparsers via
     ``subparsers.add_parser(...)``.
     """
-    parser = HermesArgumentParser(
+    parser = QubitArgumentParser(
         prog="qubit", description="Qubit Agent - AI assistant with tool-calling capabilities",
         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=_EPILOGUE)
     _add_top_level_flags(parser)

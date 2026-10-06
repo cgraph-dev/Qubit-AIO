@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 from qubit_cli._subprocess_compat import windows_hide_flags
+from qubit_cli import install_source
 
 logger = logging.getLogger("qubit_cli.update_cmd")  # log-record parity with the origin module
 
