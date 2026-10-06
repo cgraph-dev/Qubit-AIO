@@ -122,9 +122,18 @@ def has_side_effects(path: Path) -> tuple[bool, str]:
     return False, ""
 
 
-def to_module(root: Path, path: Path) -> str | None:
+def to_module(import_root: Path, path: Path) -> str | None:
+    """Dotted module name for `path`, relative to the IMPORT root (not the scan root).
+
+    These must not be confused. In a first version the scan root was also used for
+    module naming, so `--root qubit_runtime/qubit_cli/observability` named modules
+    `shared_metrics_events` and put that subdir on PYTHONPATH -- every package-
+    qualified import then failed (16/26 phantom failures) while the same module
+    imported fine from the repo root. The scan root narrows WHICH files to walk;
+    the import root decides how they are named and what goes on sys.path.
+    """
     try:
-        rel = path.relative_to(root)
+        rel = path.relative_to(import_root)
     except ValueError:
         return None
     parts = list(rel.with_suffix("").parts)
@@ -138,17 +147,26 @@ def to_module(root: Path, path: Path) -> str | None:
 
 
 _PROBE = (
-    "import importlib, sys, traceback\n"
+    "import importlib, sys\n"
     "mod = sys.argv[1]\n"
     "try:\n"
     "    importlib.import_module(mod)\n"
-    "    print('OK')\n"
     "except BaseException as e:\n"
-    "    print('FAIL ' + type(e).__name__ + ': ' + str(e)[:300])\n"
+    "    sys.stderr.write('VERDICT FAIL ' + type(e).__name__ + ': ' + str(e)[:300] + chr(10))\n"
+    "else:\n"
+    "    sys.stderr.write('VERDICT OK' + chr(10))\n"
 )
 
 
 def probe(mod: str, py: str, root: str, timeout: int, home: str) -> tuple[str, str]:
+    """Import `mod` in a child process. Returns (module, verdict).
+
+    The verdict is read from STDERR, not stdout. A first version printed it to
+    stdout and took the LAST line -- but modules legitimately print during import
+    (banner text, update notices), so the module's own output masked the verdict
+    and four healthy modules were reported as ModuleNotFoundError. stderr carries
+    the verdict; stdout is left to the module.
+    """
     env = dict(os.environ)
     env["QUBIT_HOME"] = home
     env["HERMES_RUNTIME_DIR"] = os.path.join(home, "runtime")
@@ -159,13 +177,49 @@ def probe(mod: str, py: str, root: str, timeout: int, home: str) -> tuple[str, s
                            capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return mod, f"TIMEOUT after {timeout}s"
-    out = (p.stdout or "").strip().split("\n")[-1] if p.stdout else ""
-    if out.startswith("OK"):
+    verdict = ""
+    for line in (p.stderr or "").split("\n"):
+        if line.startswith("VERDICT "):
+            verdict = line[len("VERDICT "):].strip()
+    if verdict == "OK":
         return mod, "OK"
-    if out.startswith("FAIL"):
-        return mod, out[5:].strip()
-    err = (p.stderr or "").strip().split("\n")[-1] if p.stderr else ""
-    return mod, f"NO-RESULT rc={p.returncode} {err[:200]}"
+    if verdict.startswith("FAIL"):
+        return mod, verdict[5:].strip()
+    tail = (p.stderr or "").strip().split("\n")[-1] if p.stderr else ""
+    return mod, f"NO-VERDICT rc={p.returncode} {tail[:200]}"
+
+
+def _pick_interpreter() -> str:
+    """The interpreter used for every child probe.
+
+    Must be the one that can actually import the tree. Running this script with a
+    bare ``python3`` resolves to /usr/bin/python3, which lacks the project's deps
+    (``ruamel`` among them) -- every child then reports ModuleNotFoundError and the
+    walk grades dozens of healthy modules as broken. That happened: 4 healthy
+    observability modules were reported failed while importing fine under the venv.
+
+    This mirrors sync_import_gate.py's hardened behaviour: prefer the repo venv,
+    else this interpreter -- but REFUSE if it cannot import the tree, because a
+    wrong number is worse than no number.
+    """
+    candidate = REPO / ".venv" / "bin" / "python"
+    if candidate.exists():
+        return str(candidate)
+    if (REPO / ".venv" / "Scripts" / "python.exe").exists():   # Windows layout
+        return str(REPO / ".venv" / "Scripts" / "python.exe")
+    # No venv: verify the current interpreter can import the tree at all.
+    probe = subprocess.run(
+        [sys.executable, "-c", "import ruamel.yaml"],
+        capture_output=True, text=True,
+        env={**os.environ, "PYTHONPATH": str(REPO / "qubit_runtime")},
+    )
+    if probe.returncode != 0:
+        raise SystemExit(
+            "REFUSING: no .venv found and this interpreter cannot import the tree "
+            f"({probe.stderr.strip().splitlines()[-1] if probe.stderr else 'unknown'}).\n"
+            "Run with the project interpreter, e.g. `.venv/bin/python scripts/safe_import_walk.py ...`"
+        )
+    return sys.executable
 
 
 def main() -> int:
@@ -184,16 +238,23 @@ def main() -> int:
     if not root.is_dir():
         print(f"FAIL: root not found: {root}", file=sys.stderr)
         return 2
+    # The IMPORT root is where package-qualified names resolve from -- always
+    # qubit_runtime (or the repo root if this is a root-level walk). The scan root
+    # may be a subdirectory of it; module names must still be computed against the
+    # import root or every package import fails.
+    import_root = (REPO / "qubit_runtime")
+    if not str(root).startswith(str(import_root)):
+        import_root = REPO
     home = Path(args.home)
     home.mkdir(parents=True, exist_ok=True)
-    py = sys.executable
+    py = _pick_interpreter()
 
     targets: list[tuple[str, str]] = []
     skipped: list[tuple[str, str]] = []
     for path in sorted(root.rglob("*.py")):
         if "__pycache__" in path.parts:
             continue
-        mod = to_module(root, path)
+        mod = to_module(import_root, path)
         if not mod:
             continue
         risky, why = has_side_effects(path)
@@ -202,7 +263,7 @@ def main() -> int:
             continue
         targets.append((mod, str(path)))
 
-    print(f"# safe import walk -- root={args.root}")
+    print(f"# safe import walk -- scan root={args.root}  import root={import_root.name}")
     print(f"# candidates: {len(targets)}   skipped (side-effecting): {len(skipped)}")
     print(f"# scratch home: {home}   timeout: {args.timeout}s   jobs: {args.jobs}")
     print()
@@ -210,7 +271,7 @@ def main() -> int:
     results: list[tuple[str, str]] = []
     t0 = time.time()
     with ProcessPoolExecutor(max_workers=args.jobs) as ex:
-        futs = [ex.submit(probe, m, py, str(root), args.timeout, str(home))
+        futs = [ex.submit(probe, m, py, str(import_root), args.timeout, str(home))
                 for m, _ in targets]
         for f in as_completed(futs):
             results.append(f.result())
