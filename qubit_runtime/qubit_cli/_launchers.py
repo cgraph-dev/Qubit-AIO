@@ -317,6 +317,86 @@ def _mint_shell_launcher(name: str, out_dir: Path, python_exe: Path, script: str
     return _write_shell(out_dir / name, [str(python_exe), "-I", "-c", script])
 
 
+def _first_token(line: str) -> Path | None:
+    """First whitespace-delimited token of *line*, honoring one quote pair.
+
+    The published launchers always carry the interpreter as the first token
+    (quoted only when the path holds spaces), so full shell lexing — which
+    would also eat Windows backslashes as escapes — is the wrong tool."""
+    text = line.strip()
+    if not text:
+        return None
+    if text[0] in "\"'":
+        end = text.find(text[0], 1)
+        if end == -1:
+            return None
+        return Path(text[1:end])
+    return Path(text.split(None, 1)[0])
+
+
+def _launcher_python(target: Path) -> Path | None:
+    """Embedded interpreter of an existing launcher, else None.
+
+    Fail-open: an unrecognized layout republishes exactly as before."""
+    try:
+        data = Path(target).read_bytes()
+    except OSError:
+        return None
+    line: str | None = None
+    suffix = Path(target).suffix.lower()
+    if suffix == ".exe":
+        # distlib native launcher: loader stub, "#!<python> -I" shebang, zip.
+        # The shebang follows the loader's last NUL byte. distlib leaves
+        # ScriptMaker.executable unquoted, and a Windows path may hold a space
+        # or "#!", so take the whole line up to " -I".
+        from zipfile import BadZipFile, ZipFile
+        try:
+            with ZipFile(target) as archive:
+                prefix = data[:archive.infolist()[0].header_offset]
+        except (BadZipFile, IndexError, OSError):
+            return None
+        start = prefix.find(b"#!", prefix.rfind(b"\0") + 1)
+        shebang = prefix[start + 2:].rstrip(b"\r\n") if start != -1 else b""
+        if not shebang.endswith(b" -I") or b"\n" in shebang:
+            return None
+        try:
+            return Path(shebang[:-3].decode("utf-8").strip('"'))
+        except UnicodeDecodeError:
+            return None
+    else:
+        try:
+            text = data.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            return None
+        lines = text.splitlines()
+        if suffix == ".cmd":
+            # "@echo off", then '"<python>" -I -c "<code>" %*'. The file's
+            # own \r\n pair gains a translated extra \r on Windows writes,
+            # so the command may sit past a blank line — never assume its index.
+            line = next((entry for entry in lines[1:] if entry.strip()), None)
+            if line is None:
+                return None
+        else:
+            # POSIX shell wrapper: "#!/bin/sh", then "exec <python> -I -c ...".
+            line = next((entry for entry in lines if entry.startswith("exec ")), None)
+            if line is None:
+                return None
+            # The writer quotes with shlex.join, which splices an apostrophe in as
+            # '"'"', so read the first token the way sh does. Only the first: the
+            # rest of the line opens a multi-line -c argument.
+            lexer = shlex.shlex(line.removeprefix("exec "), posix=True)
+            lexer.whitespace_split = True
+            try:
+                token = lexer.get_token()
+            except ValueError:
+                return None
+            return Path(token) if token else None
+    try:
+        return _first_token(line)
+    except (ValueError, OSError):
+        return None
+
+
 def _owns_launcher(target: Path, root: Path) -> bool:
     """Recognize our old source/venv launchers, never a mere mention in a comment."""
     if target.is_symlink():
