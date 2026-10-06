@@ -67,17 +67,37 @@ REPO = Path(__file__).resolve().parent.parent
 
 
 def _pick_interpreter(repo: Path) -> str:
-    """Use the project venv when present.
+    """Find a python that actually has this app's dependencies.
 
     Running the gate with the system python produced ~23 bogus failures
-    (ModuleNotFoundError: ruamel) that had nothing to do with the sync --
-    the harness was measuring its own missing dependencies. The venv is the
+    (ModuleNotFoundError: ruamel) that had nothing to do with the sync -- the
+    harness was measuring its own missing dependencies. The venv is the
     environment the app actually runs in, so that is what the gate must probe.
+
+    Also searches the PARENT directories: this gate is routinely run from a git
+    worktree (`/tmp/qb-syncN-agentM`) which has no `.venv` of its own, and the
+    old `return sys.executable` fallback then silently graded the merge with an
+    interpreter that cannot import the app at all -- reporting 21 phantom
+    failures on a tree that measures 29 OK / 0 FAIL under the real one. A wrong
+    measurement is worse than no measurement, so the probe now refuses to run
+    rather than produce a number nobody can trust.
     """
-    for cand in (repo / ".venv/bin/python", repo / ".venv/bin/python3"):
+    candidates = []
+    for base in (repo, *repo.parents):
+        candidates += [base / ".venv/bin/python", base / ".venv/bin/python3"]
+    candidates += [Path.home() / ".hermes/hermes-agent/venv/bin/python"]
+    for cand in candidates:
         if cand.exists():
             return str(cand)
-    return sys.executable
+    # No app interpreter anywhere. Refuse loudly instead of silently measuring
+    # an environment that cannot import the code under test.
+    raise SystemExit(
+        "sync_import_gate: no project venv found near "
+        f"{repo} (searched parents up to {repo.parents[-1]}). Refusing to run "
+        "under the system python, which lacks the app dependencies and would "
+        "report phantom ModuleNotFoundError failures. Pass a repo that has a "
+        ".venv, or run the gate from the main checkout."
+    )
 
 
 def probe(modules: list[str], repo: Path, home: str) -> dict[str, str]:
