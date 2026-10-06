@@ -2705,3 +2705,45 @@ files with gaps: 454
 
 ### qubit_runtime/tui_gateway/methods_session_model_guard.py  (1 missing)
   - create_overrides  <- tui_gateway/methods_session_model_guard.py
+
+---
+
+## New findings — lazy-import sweep (scripts/check_lazy_imports.py)
+
+The audit above was produced by comparing symbol NAME SETS per file. It cannot see
+a symbol that is merely *imported* from another module by a name that module never
+defines — the importer's own file has no gap, the definer's set is short, and the
+pair only breaks at runtime.
+
+`scripts/check_lazy_imports.py` closes that gap: it AST-scans every in-function
+`from <mod> import <name>` and asks the REAL interpreter whether `<mod>.<name>`
+resolves. A symbol imported inside a function body bypasses the top-level import
+gate entirely (`scripts/sync_import_gate.py`), which is why this class keeps
+reaching the operator as a runtime ImportError.
+
+Confirmed found and FIXED in this sweep (`class HermesCLI` was rebranded to
+`class QubitCLI` in `cli.py:889`; four call sites still imported the old name):
+
+    qubit_runtime/qubit_cli/cli_stream_mixin.py:425      from cli import HermesCLI
+    qubit_runtime/qubit_cli/cli_tui_mixin.py:615         from cli import HermesCLI
+    qubit_runtime/qubit_cli/cli_model_switch_mixin.py:241 from cli import HermesCLI
+    qubit_runtime/qubit_cli/cli_single_query.py:24       from cli import HermesCLI (TYPE_CHECKING)
+    qubit_runtime/tui_gateway/slash_worker.py:28         from cli import HermesCLI
+
+Still MISSING (beyond this audit's per-file set — these name symbols that exist
+nowhere in the tree at all):
+
+    tools/skills_sync_client_org.py:155   agent.skill_utils.read_active_org_id
+    tools/skills_sync_client.py:200       tools.skill_usage.set_sync
+    tools/skills_sync_client.py:200       tools.skill_usage.is_sync_enabled
+    tui_gateway/server.py:3369            tools.skill_usage._read_bundled_manifest_names
+    qubit_cli/main_desktop.py:2003        qubit_cli.main.explicit_cli_profile
+
+Each of the five is reachable on a real path (`_explicit_profile_args` for
+`qubit desktop`, `_active_org_id`, the skill-usage catalog endpoint). Two are
+guarded by `try/except` and therefore degrade silently instead of raising —
+which is worse for diagnosis: the feature quietly does nothing.
+
+Run the sweep after every sync slice:
+
+    .venv/bin/python scripts/check_lazy_imports.py

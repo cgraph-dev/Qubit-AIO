@@ -43,6 +43,12 @@ from .voice_edit.sound import beep
 from .voice_edit.desktop import DesktopAdapter
 from .voice_edit.overlay import make_overlay
 from .voice_edit.schema import SelectionSnapshot
+from .voice_edit.session_fsm import (
+    PendingAction,
+    SessionFSM,
+    SessionRegistry,
+    classify_confirmation,
+)
 from .voice_edit.stt_client import ParecMic, SttClient, SttError, transcribe_once
 from .voice_edit.talk_events import TalkEventSequencer
 from .voice_edit.talk_fsm import TalkStateMachine, reduce as reduce_talk
@@ -96,6 +102,12 @@ def _route_session_key(target: Any) -> str:
 #: TTL is the backstop for re-woken or hotkey confirmations.
 _PENDING_TASK_TTL_S = 120.0
 
+#: Stable session key for the helper's own voice session — the default when a
+#: turn carries no explicit route target (``mode:current`` / Right-Ctrl). A
+#: routed wake target's ``sessionKey`` scopes that turn instead, so a staged
+#: confirmation belongs to the session that staged it (voice_edit/session_fsm).
+_DEFAULT_VOICE_SESSION = "voice-chat"
+
 #: Backstop for one wake turn (journal 2026-10-04 10:17-10:18: turns that
 #: reach ``helper.wake.listening`` and never answer feel dead). The worker
 #: blocks in HTTP (route 120 s / task 180 s / ask 90 s / speak 60 s) with
@@ -120,6 +132,55 @@ def _read_cfg(cfg: Any, *path: str, default: Any = None) -> Any:
         return cfg.get(*path, default=default)
     except Exception:
         return default
+
+
+#: Continuous ("keep listening") mode: after a turn completes, re-arm the
+#: wake listener for a bounded run of follow-up commands so the user does
+#: not repeat the wake phrase for each command. OFF (the default) keeps
+#: today's single-turn behavior byte-identical.
+_CONTINUOUS_DEFAULT_WINDOW_S = 15.0
+_CONTINUOUS_MIN_WINDOW_S = 3.0
+_CONTINUOUS_MAX_WINDOW_S = 120.0
+_CONTINUOUS_DEFAULT_MAX_FOLLOWUPS = 5
+_CONTINUOUS_MIN_FOLLOWUPS = 1
+_CONTINUOUS_MAX_FOLLOWUPS = 20
+
+
+def continuous_settings(cfg: Any) -> "tuple[bool, float, int]":
+    """``(enabled, window_s, max_followups)`` for continuous mode.
+
+    Read from ``voice_edit.continuous_mode`` (default OFF),
+    ``voice_edit.continuous_window_s`` (default 15.0, clamped 3..120) and
+    ``voice_edit.continuous_max_followups`` (default 5, clamped 1..20). The
+    clamps are authoritative here so a hand-edited or out-of-range stored
+    value can never open an unbounded listening window. Never raises.
+    """
+    try:
+        on = _read_cfg(cfg, "voice_edit", "continuous_mode", default=False)
+        on = False if on is None else bool(on)
+    except Exception:
+        on = False
+    try:
+        raw_window = _read_cfg(cfg, "voice_edit", "continuous_window_s",
+                               default=None)
+        window = (float(_CONTINUOUS_DEFAULT_WINDOW_S) if raw_window is None
+                  else float(raw_window))
+    except Exception:
+        window = _CONTINUOUS_DEFAULT_WINDOW_S
+    if window != window:  # NaN — never arm with an unusable window
+        window = _CONTINUOUS_DEFAULT_WINDOW_S
+    window = max(_CONTINUOUS_MIN_WINDOW_S,
+                 min(window, _CONTINUOUS_MAX_WINDOW_S))
+    try:
+        raw_maxf = _read_cfg(cfg, "voice_edit", "continuous_max_followups",
+                             default=None)
+        maxf = (int(_CONTINUOUS_DEFAULT_MAX_FOLLOWUPS) if raw_maxf is None
+                else int(raw_maxf))
+    except Exception:
+        maxf = _CONTINUOUS_DEFAULT_MAX_FOLLOWUPS
+    maxf = max(_CONTINUOUS_MIN_FOLLOWUPS,
+               min(maxf, _CONTINUOUS_MAX_FOLLOWUPS))
+    return on, window, maxf
 
 
 def verbatim_transcript(text: Any, cfg_or_enabled: Any = False) -> str:
@@ -954,6 +1015,16 @@ class DesktopHelper:
         # on_wake_command_routed, consumed by _open_request). ``None`` for
         # Right-Ctrl turns and ``mode:current`` — the default session.
         self._wake_route_target: Any = None
+        # Session-scoped confirmation state (voice_edit/session_fsm.py): a
+        # staged "say yes" belongs to the session that staged it, so unrelated
+        # input in another session — or the wake path — can never silently
+        # overwrite it. ``_turn_session`` is captured per request in
+        # ``_open_request`` from the routed target (or the helper's own voice
+        # session), and ``_wake_turn_active`` marks the wake worker so the
+        # pending guard is traced as ``wake.pending_guard``.
+        self._sessions = SessionRegistry(ttl_s=_PENDING_TASK_TTL_S)
+        self._turn_session: str = _DEFAULT_VOICE_SESSION
+        self._wake_turn_active: bool = False
         self._fs_active = False
         self._fs_checked = 0.0
         self._gen = 0
@@ -1025,6 +1096,38 @@ class DesktopHelper:
             except Exception:
                 pass
         self._repeat_tamed = False
+
+    def _wake_busy(self) -> bool:
+        """Whether the hands-free wake loop must yield the microphone now.
+
+        True only while a helper session is actively capturing/processing or
+        our own reply is still audible (echo guard). Fullscreen is
+        DELIBERATELY not part of this gate: including it disabled the whole
+        wake loop for as long as any fullscreen game/video was focused
+        (journal 2026-10-06: 20+ minutes of ``busy_skip`` with the helper
+        otherwise idle and zero TTS events — the owner's "hey qubit worked
+        once then stopped" while Right-Ctrl, which has no such gate, kept
+        working). Typing into a fullscreen app is still refused at the
+        insertion layer (``voice_edit.block_fullscreen``) — that is the
+        correct place for the rule. Never raises: a broken probe reads as
+        not-busy so wake can never wedge on it.
+        """
+        try:
+            if self.state in (self.LISTENING, self.PROCESSING):
+                return True
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_speaking", False):
+                return True
+        except Exception:
+            pass
+        try:
+            if self._tts_echo_busy():
+                return True
+        except Exception:
+            pass
+        return False
 
     def _fullscreen_active(self) -> bool:
         """Cached (2s) check whether the focused window is fullscreen."""
@@ -1105,17 +1208,14 @@ class DesktopHelper:
         # command path; it pauses whenever a Right-Ctrl session is active.
         try:
             from .voice_edit.wake import WakeMonitor
-            # Busy = a session is actively capturing/processing, our own
-            # reply is still playing through the room (echo guard), or a
-            # full-screen app is focused. A PREVIEW left open must NOT block
-            # wake forever: a new wake simply supersedes it.
+            # Busy = a session is actively capturing/processing, or our own
+            # reply is still playing through the room (echo guard). See
+            # ``_wake_busy`` for why fullscreen is deliberately NOT part of
+            # this gate. A PREVIEW left open must NOT block wake forever: a
+            # new wake simply supersedes it.
             self._wake = WakeMonitor(
                 self.cfg, on_command=self.on_wake_command,
-                is_busy=lambda: (self.state in (self.LISTENING,
-                                                self.PROCESSING)
-                                 or getattr(self, "_speaking", False)
-                                 or self._tts_echo_busy()
-                                 or self._fullscreen_active()),
+                is_busy=self._wake_busy,
                 # Lane 1 (2026-10-03): let the wake loop's bare-confirm
                 # precheck see this helper's staged confirmation (e.g. the
                 # timer). Read-only TTL mirror — never stages, settles, or
@@ -1668,6 +1768,10 @@ class DesktopHelper:
         # ``mode:current``/absent target yields "" → today's default session.
         route_session = _route_session_key(self._wake_route_target)
         self._wake_route_target = None
+        # Scope this turn's confirmation state to the routed session (or the
+        # helper's voice session). Captured before the route target is cleared
+        # so _process_transcript sees the same session the request bound.
+        self._turn_session = route_session or _DEFAULT_VOICE_SESSION
         with self._lock:
             if not self.enabled() or self.state in (self.LISTENING,
                                                     self.PROCESSING):
@@ -2038,6 +2142,7 @@ class DesktopHelper:
         clarify path; dictate/answer/task/chat (which need no selection)
         are unaffected.
         """
+        self._wake_turn_active = True
         try:
             self._capture_selection_local()
             _trace("wake.command", chars=len(cmd),
@@ -2055,6 +2160,7 @@ class DesktopHelper:
             except Exception:
                 pass
         finally:
+            self._wake_turn_active = False
             try:
                 timer = getattr(threading.current_thread(), "_watchdog", None)
                 if timer is not None:
@@ -2214,24 +2320,174 @@ class DesktopHelper:
         self._talk_end()
         self._active = False
         self.state = self.IDLE
+        # Continuous ("keep listening") mode: a completed turn may keep the
+        # wake listener open for a bounded run of follow-up commands. A
+        # no-op unless ``voice_edit.continuous_mode`` is on.
+        self._maybe_arm_continuous()
+
+    def _maybe_arm_continuous(self) -> None:
+        """Keep listening for a bounded run of follow-up commands.
+
+        Called when a turn completes. Only when
+        ``voice_edit.continuous_mode`` is on. Deliberately:
+        * never arms over a live confirmation — the confirm prompt's own
+          ``_await_reply`` arm plus the wake loop's pending guard own the
+          next utterance, so a pending still only accepts yes/no;
+        * keeps a run's remaining budget (a fresh turn opens a new run, a
+          follow-up extends the current one, and an exhausted run stays
+          locked until a fresh wake);
+        * is gated by the wake loop's ``is_busy`` probe (which is
+          ``DesktopHelper._wake_busy``: capturing/processing/speaking/echo),
+          so a follow-up can never overlap Qubit working or talking.
+        Never raises; a missing/dead wake listener is simply a no-op.
+        """
+        try:
+            on, window, maxf = continuous_settings(self.cfg)
+        except Exception:
+            return
+        if not on:
+            return
+        wake = getattr(self, "_wake", None)
+        if wake is None:
+            return
+        try:
+            if self._wake_has_live_pending():
+                return
+        except Exception:
+            pass
+        try:
+            if bool(getattr(wake, "continuous_locked",
+                            lambda: False)()):
+                return
+        except Exception:
+            return
+        try:
+            if bool(getattr(wake, "continuous_active", lambda: False)()):
+                rearm = getattr(wake, "rearm_continuous", None)
+                if callable(rearm):
+                    rearm()
+                    _trace("continuous.rearmed", window_s=window)
+                return
+        except Exception:
+            pass
+        fn = getattr(wake, "expect_continuous", None)
+        if callable(fn):
+            try:
+                fn(window, maxf)
+                _trace("continuous.armed", window_s=window, max=maxf)
+            except Exception:
+                pass
+
+    # -- session-scoped confirmation state ---------------------------------
+    def _current_session_key(self) -> str:
+        """The session a turn belongs to: the routed session, else the voice
+        session. Never raises (junk degrades to the stable default key).
+        """
+        try:
+            key = str(getattr(self, "_turn_session", "") or "")
+        except Exception:
+            key = ""
+        if key:
+            return key
+        try:
+            routed = _route_session_key(getattr(self, "_wake_route_target",
+                                                None))
+        except Exception:
+            routed = ""
+        return routed or _DEFAULT_VOICE_SESSION
+
+    def _session_fsm(self) -> Any:
+        """The :class:`SessionFSM` for the current session (lazily created).
+
+        Lazy on first use so a helper built via ``__new__`` (test doubles /
+        restored instances) still has a working registry. Never raises out:
+        an unusable registry yields a throwaway FSM, so callers degrade to
+        the no-pending path instead of taking the turn down.
+        """
+        reg = getattr(self, "_sessions", None)
+        if not isinstance(reg, SessionRegistry):
+            reg = SessionRegistry(ttl_s=_PENDING_TASK_TTL_S)
+            try:
+                self._sessions = reg
+            except Exception:
+                pass
+        try:
+            return reg.fsm(self._current_session_key())
+        except Exception:
+            return SessionFSM(_DEFAULT_VOICE_SESSION, ttl_s=_PENDING_TASK_TTL_S)
+
+    @property
+    def _pending_task(self) -> Dict[str, Any]:
+        """Compat view of the current session's staged action (legacy tests).
+
+        The authority is the session FSM; this dict-shaped view exists only
+        so existing readers/tests keep working. Write through it to stage or
+        clear the current session's pending (empty dict clears).
+        """
+        try:
+            action = self._session_fsm().pending()
+        except Exception:
+            return {}
+        if action is None:
+            return {}
+        return {"text": action.text, "request_id": action.request_id,
+                "staged_at": action.staged_at, "ttl_s": action.ttl_s,
+                "kind": action.kind, "session": action.session}
+
+    @_pending_task.setter
+    def _pending_task(self, value: Any) -> None:
+        try:
+            fsm = self._session_fsm()
+        except Exception:
+            return
+        if not value:
+            try:
+                fsm.clear()
+                fsm.state = "idle"
+            except Exception:
+                pass
+            return
+        try:
+            text = str(value.get("text", "") or "")
+            request_id = str(value.get("request_id", "") or "")
+            raw_ts = value.get("staged_at", None)
+            kind = str(value.get("kind", "task") or "task")
+        except Exception:
+            return
+        # A missing/invalid stage time reads as already expired (matches the
+        # legacy malformed-probe contract) rather than a fresh confirmation.
+        if raw_ts is None:
+            staged_at = float("-inf")
+        else:
+            try:
+                staged_at = float(raw_ts)
+            except (TypeError, ValueError):
+                staged_at = float("-inf")
+        try:
+            ttl_s = float(value.get("ttl_s", fsm.ttl_s))
+        except (TypeError, ValueError):
+            ttl_s = fsm.ttl_s
+        try:
+            fsm._pending = PendingAction(
+                text=text, request_id=request_id, session=fsm.session,
+                staged_at=staged_at, ttl_s=ttl_s, kind=kind)
+            fsm.state = "awaiting_confirm"
+        except Exception:
+            pass
 
     def _wake_has_live_pending(self) -> bool:
         """Read-only liveness of the staged confirm-gated task (Lane 1).
 
-        Mirrors the TTL gate in ``_process_transcript`` without consuming
-        anything: True only while ``_pending_task`` is staged and unexpired
-        (``_PENDING_TASK_TTL_S`` on the same ``time.monotonic`` clock).
-        Never raises — an unreadable state degrades to False (no settle).
+        Delegates to the session FSM without consuming anything: True only
+        while an action is staged for the current session and unexpired
+        (``_PENDING_TASK_TTL_S`` on the FSM's monotonic clock). Never raises —
+        an unreadable state degrades to False (no settle).
         """
         try:
-            pending = getattr(self, "_pending_task", None)
-            if not pending:
+            fsm = self._session_fsm()
+            if fsm.pending() is None:
                 return False
-            try:
-                staged_at = float(pending.get("staged_at", 0.0))
-            except (TypeError, ValueError, AttributeError):
-                return False
-            return (time.monotonic() - staged_at) <= _PENDING_TASK_TTL_S
+            return not fsm.expired()
         except Exception:
             return False
 
@@ -2244,35 +2500,47 @@ class DesktopHelper:
         # touches chat/session state, so timers surface here — every voice
         # turn announces what fired while away (sleep: panel/History only).
         self._deliver_fired_timers()
-        # A staged task (mode "task") is confirm-gated: the next utterance is
-        # only honored if it is an affirmative/negative confirmation.
-        if self._pending_task:
-            staged_at = 0.0
-            try:
-                staged_at = float(self._pending_task.get("staged_at", 0.0))
-            except (TypeError, ValueError):
-                staged_at = 0.0
-            if time.monotonic() - staged_at > _PENDING_TASK_TTL_S:
-                # P0-3: confirmations must bind intent to recency — a "yes"
-                # hours later in an unrelated context must never execute a
-                # stale destructive-tier task.
-                _trace("task.expired", request_id=self.request_id)
-                self._pending_task = {}
-                self._ui_status("idle", "confirmation expired — say it again")
-                self._finish_error()
+        # A staged task (mode "task") is confirm-gated, and the confirmation
+        # is scoped to its session: unrelated input — including a command on
+        # the wake path — must NOT silently discard or overwrite it (the
+        # historical single-dict bug that ran the wrong action on a later
+        # "yes"). The session FSM resolves the utterance; only affirm / deny /
+        # expiry consume the staged action.
+        fsm = self._session_fsm()
+        if fsm.pending() is not None:
+            outcome, action = fsm.resolve(text)
+            if outcome == "run":
+                self._run_task(str(getattr(action, "text", "") or ""))
                 return
-            if self._affirmative(text):
-                task = str(self._pending_task.get("text", "") or "")
-                self._pending_task = {}
-                self._run_task(task)
-                return
-            if self._negative(text):
-                self._pending_task = {}
+            if outcome == "cancel":
                 self._ui_status("idle", "task cancelled")
                 self._finish_error()
                 return
-            # Anything else supersedes the pending task ("no" by default).
-            self._pending_task = {}
+            if outcome == "expired":
+                # P0-3: confirmations bind intent to recency — a "yes" hours
+                # later in an unrelated context must never execute a stale
+                # destructive-tier task.
+                _trace("task.expired", request_id=self.request_id,
+                       session=fsm.session)
+                self._ui_status("idle", "confirmation expired — say it again")
+                self._finish_error()
+                return
+            # Unrecognised input: keep the staged action and do NOT route or
+            # overwrite it (the core fix). The wake path traces the guard so
+            # the journal shows why a spoken command was held back.
+            if getattr(self, "_wake_turn_active", False):
+                _trace("wake.pending_guard", request_id=self.request_id,
+                       chars=len(text), session=fsm.session)
+            self._ui_status(
+                "clarify",
+                "you have a pending confirmation — say yes, no, or cancel")
+            self._notify_status(
+                "Qubit", "Pending confirmation — say yes, no, or cancel")
+            self._speak("You have a pending confirmation. "
+                        "Say yes to run it, no to cancel.")
+            self._await_reply("say yes, no, or cancel")
+            self._finish_error()
+            return
         self.state = self.PROCESSING
         self._ui_status("processing", text[-160:])
         route_fn = getattr(self.client, "route", None)
@@ -2328,19 +2596,13 @@ class DesktopHelper:
         # Whisper emits conversational punctuation ("Yes, please.") while
         # verbatim mode strips it — match on the alphanumeric core either
         # way so a politely-phrased confirmation never silently discards a
-        # staged task.
-        low = (text or "").strip().lower().strip(" .,!?:;")
-        low = re.sub(r"[^a-z0-9 ]", "", low)
-        return low in ("yes", "yeah", "yep", "yup", "confirm", "confirmed",
-                       "do it", "go ahead", "run it", "ok", "okay", "sure",
-                       "proceed", "yes please", "confirm task", "run the task")
+        # staged task. Delegates to the session FSM's classifier (the same
+        # word lists) so there is one confirmation vocabulary.
+        return classify_confirmation(text) == "affirm"
 
     @staticmethod
     def _negative(text: str) -> bool:
-        low = (text or "").strip().lower().strip(" .,!?:;")
-        low = re.sub(r"[^a-z0-9 ]", "", low)
-        return low in ("no", "nope", "nah", "cancel", "stop", "dont",
-                       "never mind", "nevermind", "abort", "no thanks")
+        return classify_confirmation(text) == "deny"
 
     def _await_reply(self, what: str = "reply") -> None:
         """Keep the mic waiting for the user's spoken answer.
@@ -2370,9 +2632,10 @@ class DesktopHelper:
             self._ui_status("error", "nothing to run")
             self._finish_error()
             return
-        self._pending_task = {"text": task, "request_id": self.request_id,
-                                "staged_at": time.monotonic()}
+        fsm = self._session_fsm()
+        fsm.propose(task, self.request_id)
         _trace("task.proposed", chars=len(task), request_id=self.request_id,
+               session=fsm.session,
                **(_dbg.text_fields(self.cfg, task=task)))
         self.state = self.PREVIEW
         self._preview = {
@@ -2426,6 +2689,8 @@ class DesktopHelper:
             self._notify_status("Qubit", reply[:200])
             self._history("task", text, reply)
             self._speak(reply)
+            # The task ran to completion: keep listening for a follow-up.
+            self._maybe_arm_continuous()
             return
         self._ui_error(str(out.get("code", "VOICE_EDIT_TASK_EMPTY")),
                        str(out.get("detail", "")))
@@ -2505,6 +2770,8 @@ class DesktopHelper:
             self._speak("Copied to clipboard.")
         elif clip_ok is False:
             self._speak("Clipboard copy failed.")
+        # The answer was delivered: keep listening for a follow-up.
+        self._maybe_arm_continuous()
 
     @staticmethod
     def _spoken_excerpt(text: str, sentences: int = 2) -> str:

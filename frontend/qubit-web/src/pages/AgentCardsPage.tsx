@@ -92,6 +92,7 @@ export default function AgentCardsPage() {
                 loading={surface.loading}
                 error={surface.error}
                 onReload={surface.reload}
+                onOpen={(task) => setSelected(task)}
                 context={surface.context}
               />
             </div>

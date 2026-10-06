@@ -146,8 +146,14 @@ describe("ComputerWorkspacePage", () => {
     ) as HTMLButtonElement;
     expect(terminal).toBeTruthy();
     await act(async () => terminal.click());
+    // Copy updated (om-computer-workspace.tsx:387): the shell gap is stated as
+    // "deliberately out of scope" with the exact audited desktop-control
+    // boundary, still never faking a command run.
     expect(container.textContent).toContain(
-      "Interactive shell execution has no Qubit backend",
+      "Shell execution is deliberately out of scope",
+    );
+    expect(container.textContent).toContain(
+      "nothing here pretends a command ran",
     );
   });
 

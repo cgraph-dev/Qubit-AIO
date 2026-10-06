@@ -132,6 +132,118 @@ def _save(cfg: Any, data: Dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+# ── Runtime store sync ──────────────────────────────────────────────────────
+# Two stores describe the same MCP servers: this dashboard registry
+# (``<state_dir>/mcp_servers.json``) and the vendored runtime's own
+# ``<runtime_home>/config.yaml`` ``mcp_servers`` map. The runtime's MCP client
+# (``tools/mcp_tool_config._load_mcp_config`` +
+# ``tools/mcp_tool_common.mcp_server_enabled``) reads ONLY config.yaml, so a
+# dashboard write that skipped it left the runtime connecting a server the
+# dashboard showed as off (and vice versa) until the operator hand-edited both.
+# Every dashboard write now mirrors to config.yaml; a mirror failure rolls the
+# dashboard store back so the two can never disagree.
+def _load_runtime_config(cfg: Any) -> Dict[str, Any]:
+    """Load the runtime config.yaml for *cfg* (publishing the cfg-scoped home first).
+
+    ``runtime_home_for_cfg`` publishes ``QUBIT_HOME`` so the vendored
+    ``qubit_cli.config`` resolves ``get_qubit_home()/config.yaml`` to this cfg's
+    runtime home (never the operator's external home), then ``ensure_path`` makes
+    the fork importable.
+    """
+    from . import qubit_runtime as QR
+
+    QR.runtime_home_for_cfg(cfg)
+    QR.ensure_path()
+    from qubit_cli.config import load_config
+
+    config = load_config()
+    return config if isinstance(config, dict) else {}
+
+
+def _save_runtime_config(config: Dict[str, Any]) -> None:
+    from qubit_cli.config import save_config
+
+    save_config(config)
+
+
+def _runtime_entry(record: Dict[str, Any], enabled: bool) -> Dict[str, Any]:
+    """Translate a dashboard registry record into a runtime ``mcp_servers`` entry.
+
+    Only the connectivity fields the runtime reads plus ``enabled`` are mirrored.
+    Credential ``env:`` references and the dashboard-only capability allowlist are
+    the brokered client's concern; an existing runtime entry is never rewritten
+    with them (a new entry is created without them) so credentials cannot be
+    shadowed by a second format.
+    """
+    entry: Dict[str, Any] = {"enabled": bool(enabled)}
+    if str(record.get("transport") or "stdio").lower() == "http":
+        if record.get("url"):
+            entry["url"] = str(record["url"])
+    else:
+        if record.get("command"):
+            entry["command"] = str(record["command"])
+        if record.get("args"):
+            entry["args"] = [str(arg) for arg in record["args"]]
+    return entry
+
+
+def _sync_runtime_upsert(cfg: Any, name: str, record: Dict[str, Any]) -> None:
+    """Mirror *record*'s enabled state (and connectivity, for a new entry) into config.yaml."""
+    config = _load_runtime_config(cfg)
+    servers = config.get("mcp_servers")
+    if not isinstance(servers, dict):
+        servers = {}
+        config["mcp_servers"] = servers
+    mirror = _runtime_entry(record, bool(record.get("enabled", False)))
+    existing = servers.get(name)
+    if isinstance(existing, dict):
+        merged = dict(existing)
+        merged["enabled"] = mirror["enabled"]
+        for key, value in mirror.items():
+            if key != "enabled" and key not in merged:
+                merged[key] = value
+        servers[name] = merged
+    else:
+        servers[name] = mirror
+    _save_runtime_config(config)
+
+
+def _sync_runtime_remove(cfg: Any, name: str) -> None:
+    """Drop *name* from the runtime config's ``mcp_servers`` map, if present."""
+    config = _load_runtime_config(cfg)
+    servers = config.get("mcp_servers")
+    if isinstance(servers, dict) and name in servers:
+        del servers[name]
+        if not servers:
+            config.pop("mcp_servers", None)
+        _save_runtime_config(config)
+
+
+def _commit(cfg: Any, data: Dict[str, Any], runtime_sync: Any) -> None:
+    """Persist the dashboard store, then mirror to config.yaml; roll back on failure."""
+    path = _store_path(cfg)
+    prior = path.read_bytes() if path.is_file() else None
+    _save(cfg, data)
+    try:
+        runtime_sync()
+    except Exception as exc:  # noqa: BLE001 - typed, and the stores must not diverge
+        if prior is None:
+            try:
+                path.unlink()
+            except OSError:
+                pass
+        else:
+            try:
+                path.write_bytes(prior)
+            except OSError:
+                pass
+        raise McpServerError(
+            "MCP_RUNTIME_SYNC_FAILED",
+            "the dashboard MCP store changed but the runtime mcp_servers config "
+            f"could not be synced; the dashboard write was rolled back: {exc}",
+        ) from exc
+
+
 def _bounded(value: Any, limit: int = MAX_FIELD_CHARS) -> str:
     return str(value or "").strip()[:limit]
 
@@ -368,7 +480,7 @@ def upsert(cfg: Any, name: str, fields: Dict[str, Any],
     clean_record["name"] = clean
     clean_record["updated_at"] = time.time()
     servers[clean] = clean_record
-    _save(cfg, data)
+    _commit(cfg, data, lambda: _sync_runtime_upsert(cfg, clean, clean_record))
     return {"state": "OK", "server": _public(clean_record)}
 
 
@@ -378,7 +490,7 @@ def delete(cfg: Any, name: str) -> Dict[str, Any]:
     existed = clean in data["servers"]
     data["servers"].pop(clean, None)
     if existed:
-        _save(cfg, data)
+        _commit(cfg, data, lambda: _sync_runtime_remove(cfg, clean))
     return {"state": "OK", "name": clean, "removed": existed}
 
 
@@ -390,7 +502,7 @@ def set_enabled(cfg: Any, name: str, enabled: bool) -> Dict[str, Any]:
         raise McpServerError("MCP_NOT_FOUND", f"no registered server {clean!r}")
     rec["enabled"] = bool(enabled)
     rec["updated_at"] = time.time()
-    _save(cfg, data)
+    _commit(cfg, data, lambda: _sync_runtime_upsert(cfg, clean, rec))
     return {"state": "OK", "server": _public(rec)}
 
 

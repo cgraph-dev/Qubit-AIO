@@ -173,7 +173,7 @@ def _build_child_env(*, rpc_endpoint: str, rpc_token: str, tmpdir: str,
     _pp_parts = [tmpdir]
     if _runtime_path is not None:
         _pp_parts.append(_runtime_path)
-    if _uses_hermes_python_environment(child_python):
+    if _uses_qubit_python_environment(child_python):
         _pp_parts.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     elif child_python not in _external_env_logged:
         # Surface once per interpreter so "import qubit_constants fails" is diagnosable.

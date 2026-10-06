@@ -25,7 +25,7 @@ import threading
 import time
 
 import cli as cli_mod
-from cli import HermesCLI
+from cli import QubitCLI as HermesCLI
 from tui_gateway._env import env_float
 from tui_gateway._stdin_recovery import handle_spurious_eof
 from rich.console import Console

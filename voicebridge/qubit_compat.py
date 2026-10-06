@@ -5465,6 +5465,52 @@ def _rebrand_chat_record(record: Any) -> Any:
     return out
 
 
+#: Over-fetch factor for the ``/qubit-chat`` picker: rows are fetched at
+#: ``limit * N`` so post-filter paging still returns a full page.
+_CHAT_PICKER_OVERFETCH = 4
+#: Message count at or below which a probe/test artifact is recognisable.
+_CHAT_PICKER_NOISE_MAX_MSGS = 2
+#: Session names probe and smoke tooling mints. Matched exactly (never a
+#: substring) so a real conversation titled similarly is never hidden.
+_CHAT_PICKER_NOISE_NAMES = frozenset({
+    "final-e2e-probe", "verify-readonly-1", "dashboard-chat",
+})
+
+
+def _is_chat_picker_noise(record: Any) -> bool:
+    """True for a throwaway row the ``/qubit-chat`` picker should hide.
+
+    Conservative by construction — it hides a row only when it is BOTH tiny
+    (``<= _CHAT_PICKER_NOISE_MAX_MSGS`` messages) AND machine-minted:
+
+    * ``created_source`` is ``dashboard`` or ``oneshot`` (probe/automation
+      origins; a human's typed conversation lands as ``tui``), or
+    * the title is one of the known probe names, or
+    * the title is the session id itself (the auto-title placeholder the
+      dashboard mints when nobody named the chat).
+
+    A real conversation is never hidden: it either exceeds the message floor or
+    carries a name a human chose. Erring toward SHOWING is deliberate — a
+    hidden real session is worse than a visible probe row.
+    """
+    if not isinstance(record, dict):
+        return False
+    try:
+        msgs = int(record.get("message_count", 0) or 0)
+    except (TypeError, ValueError):
+        msgs = 0
+    if msgs > _CHAT_PICKER_NOISE_MAX_MSGS:
+        return False
+    source = str(record.get("created_source") or record.get("source") or "")
+    title = str(record.get("title") or record.get("name") or "").strip()
+    sid = str(record.get("id") or "")
+    if title.lower() in _CHAT_PICKER_NOISE_NAMES:
+        return True
+    if title and sid and title == sid:
+        return True
+    return source in ("dashboard", "oneshot")
+
+
 def _rebrand_chat_result(res: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(res)
     if isinstance(out.get("reply"), str):
@@ -5532,7 +5578,21 @@ def h_chat_turn(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_chat_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/qubit/chat/sessions -> persisted chat sessions."""
+    """GET /api/qubit/chat/sessions -> persisted chat sessions.
+
+    Hides throwaway probe rows from the ``/qubit-chat`` picker.
+
+    MEASURED 2026-10-06: the canonical ``state.db`` holds 187 zero/one-message
+    rows plus ~11 two-message ``dashboard``/``oneshot`` artifacts from probes and
+    smoke tests (``final-e2e-probe``, ``verify-readonly-1``, ``HYGIENE_OK``, …).
+    They sort alongside real conversations in this picker and are pure noise —
+    ``/qubit-chat`` is the voice/report surface, so its list must show the
+    conversations a human actually had.
+
+    This filter is deliberately LOCAL to this route: the store is shared with
+    ``/chat``, the Sessions page and voice, and those surfaces must keep seeing
+    every row (recovery and inspection depend on it). Only the picker curates.
+    """
     from . import chat_transport as CT
     try:
         limit = max(1, min(int(q.get("limit", "50") or "50"), 100))
@@ -5543,10 +5603,15 @@ def h_chat_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     except ValueError:
         offset = 0
     query = str(q.get("q", q.get("query", "")) or "")
-    res = CT.store(cfg).list(limit=limit, offset=offset, query=query)
-    return _ok(sessions=[_rebrand_chat_record(row) for row in res["sessions"]],
-               total=res["total"],
-               limit=res["limit"], offset=res["offset"],
+    # Over-fetch so filtering does not shrink the page the caller asked for.
+    fetch = min(limit * _CHAT_PICKER_OVERFETCH + offset, 1000)
+    res = CT.store(cfg).list(limit=fetch, offset=0, query=query)
+    rows = [_rebrand_chat_record(r) for r in res.get("sessions", [])]
+    kept = [r for r in rows if not _is_chat_picker_noise(r)]
+    total = len(kept)
+    return _ok(sessions=kept[offset:offset + limit],
+               total=total,
+               limit=limit, offset=offset,
                state="OK", code=None, source="qubit-chat-store")
 
 
@@ -5587,6 +5652,13 @@ def h_chat_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                # A turn cut short by a process death: the client offers to resume
                # it so the operator does not have to retype `continue`.
                interrupted_turn=CT._pending_interrupted_turn(cfg, p.get("id", "")),
+               # A live staged action awaiting an explicit yes/no. The SPA reads
+               # this same bounded signal from turn events to render the confirm
+               # banner, so a page reload must carry it too (ChatPage
+               # `extractPendingConfirm(info)`). Absent when nothing is pending,
+               # so an idle session-show is byte-identical to before; redacted
+               # and size-bounded by `_pending_event_field`.
+               **CT._pending_event_field(cfg, p.get("id", "")),
                meta=meta if isinstance(meta, dict) else {})
 
 
@@ -5993,6 +6065,157 @@ def h_chat_image(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         **turn, "description": description,
         "vision_model": res.get("model", ""),
         "authority": "canonical vision.describe, then one agent turn"}
+
+
+#: Cap on a pasted file carried into the composer. Mirrors the image cap's
+#: intent: bounded so a pathological document cannot flood the turn. The
+#: extractor's own MAX_MAX_CHARS (20000) is the hard char ceiling; this is the
+#: transport bound for the bytes that arrive in the HTTP body.
+_CHAT_FILE_MAX_BYTES = 10 * 1024 * 1024
+_CHAT_FILE_DATA_URL_RE = re.compile(
+    r"^data:([A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+);base64,"
+    r"([A-Za-z0-9+/=\s]+)$")
+#: Composer text cap: same budget as the image turn text so a 20k-char PDF
+#: body cannot be dumped whole into the input box.
+_FILE_COMPOSE_MAX_CHARS = 20000
+#: Kinds the composer path accepts. PDF plus the plain-text family — the same
+#: set ``doc_extract.SUPPORTED_KINDS`` extracts. Anything else is a typed
+#: refusal rather than a silent binary dump.
+_CHAT_FILE_EXTENSIONS = (
+    ".pdf", ".txt", ".text", ".md", ".markdown", ".mdown",
+    ".log", ".transcript", ".trans", ".vtt", ".srt",
+)
+
+
+def _file_compose_text(filename: str, text: str, *, kind: str,
+                       truncated: bool) -> str:
+    """Compose the composer text for an attached document (step A).
+
+    Mirrors :func:`_vision_turn_text` but lands in the COMPOSER, not a turn:
+    the operator reviews and sends. The extraction is quoted in a marked block
+    so the agent (and the human) can tell extracted file text from the
+    operator's own question — the text is untrusted, and the marker says so.
+    """
+    body = str(text or "").strip()[:_FILE_COMPOSE_MAX_CHARS]
+    note = " (truncated)" if truncated else ""
+    name = str(filename or "document").strip() or "document"
+    return (f"[Attached {kind} file: {name}{note}]\n"
+            f"{body}")
+
+
+def h_chat_file(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/chat/file -> extract a pasted file for the composer.
+
+    Step A of the paste contract (owner ruling): extract, hand the text back
+    for the composer, and let the operator send it. This route NEVER submits a
+    turn — unlike ``/api/qubit/chat/image`` it returns text and stops, so a
+    fifty-page PDF cannot reach the model before the human has looked at it.
+
+    Two ingest shapes, one extraction result:
+    * ``data_url`` — bytes the browser holds (a real file-picker selection).
+    * ``path``     — a path the OS handed the page (drag-drop from the file
+      manager hands over a PATH, never bytes). Resolved through the same
+      confined ``files._resolve_inside`` boundary as ``/api/documents/extract``;
+      a path outside the approved roots answers the typed escape refusal.
+
+    Extraction goes through ``doc_extract`` — the same PDF/plain cores as
+    ``/api/documents/extract``, so a pasted file and a path-based extract
+    produce identical text. One extraction authority, never a second parser.
+    Bytes are never written to disk: no temp file, nothing to clean up.
+    """
+    import base64 as _b64
+    from pathlib import Path as _Path
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; chat file refused"}
+    from . import doc_extract as DE
+    raw_path = str(b.get("path", "") or "").strip()
+    if raw_path and not str(b.get("data_url", "") or ""):
+        # Path ingest (drag-drop). Confinement is the files layer's job, so a
+        # path outside the approved roots is a typed refusal, never a read.
+        try:
+            out = DE.extract(cfg, raw_path, max_chars=DE.MAX_MAX_CHARS,
+                             confirmed=True)
+        except Exception as exc:
+            code = getattr(exc, "code", None) or "DOC_EXTRACT_FAILED"
+            detail = getattr(exc, "detail", None) or str(exc)
+            status = 403 if code in ("DOC_EXTRACT_ESCAPE",
+                                     "DOC_EXTRACT_ESTOP") else 400
+            return status, {"ok": False, "state": "FAILED", "code": str(code),
+                            "detail": _redact(str(detail))[:300],
+                            "owner": "qubit-policy",
+                            "rollback": "nothing was written or sent"}
+        text = str(out.get("text", "") or "")
+        if not text.strip():
+            return 502, {"ok": False, "code": "DOC_EXTRACT_EMPTY",
+                         "detail": ("the file yielded no extractable text "
+                                    "(scanned image PDF? empty document?)")}
+        leaf = _Path(raw_path).name or "attachment"
+        composed = _file_compose_text(leaf, text,
+                                      kind=str(out.get("kind", "file")),
+                                      truncated=bool(out.get("truncated")))
+        return _ok(filename=leaf, kind=out.get("kind", ""),
+                   text=composed, char_count=out.get("char_count", 0),
+                   truncated=bool(out.get("truncated", False)),
+                   bytes=out.get("bytes", 0), sha256=out.get("sha256", ""),
+                   submitted=False,
+                   authority=("canonical doc_extract.extract over a confined "
+                              "path; text returned for the composer, no turn "
+                              "submitted"))
+    match = _CHAT_FILE_DATA_URL_RE.match(str(b.get("data_url", "") or ""))
+    if not match:
+        return 400, {"ok": False, "code": "BAD_FILE",
+                     "detail": "data_url must be a base64 <mime>;base64, data URL",
+                     "qubit_counterpart": "attach a file in Qubit Chat"}
+    b64 = match.group(2)
+    try:
+        raw = _b64.b64decode(re.sub(r"\s+", "", b64), validate=True)
+    except Exception:
+        return 400, {"ok": False, "code": "BAD_FILE",
+                     "detail": "file data URL is not valid base64",
+                     "qubit_counterpart": "attach a file in Qubit Chat"}
+    if not raw or len(raw) > _CHAT_FILE_MAX_BYTES:
+        return 400, {"ok": False, "code": "BAD_FILE",
+                     "detail": f"file must be 1..{_CHAT_FILE_MAX_BYTES} bytes",
+                     "qubit_counterpart": "attach a smaller file"}
+    filename = str(b.get("filename", "") or "").strip()
+    # The declared name decides the kind; it is only used to pick an extractor,
+    # never as a filesystem path (nothing is written), so a hostile name cannot
+    # escape anything. Normalize to a leaf and require a known extension.
+    leaf = _Path(filename).name or "attachment"
+    suffix = "." + leaf.rsplit(".", 1)[-1].lower() if "." in leaf else ""
+    if suffix not in _CHAT_FILE_EXTENSIONS:
+        return 400, {"ok": False, "code": "UNSUPPORTED_FILE",
+                     "detail": ("unsupported file type; supported: " +
+                                ", ".join(_CHAT_FILE_EXTENSIONS)),
+                     "qubit_counterpart": "attach a pdf/txt/md/log/transcript"}
+    try:
+        from . import doc_extract as DE
+        out = DE.extract_bytes(leaf, raw,
+                               max_chars=DE.MAX_MAX_CHARS)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or "DOC_EXTRACT_FAILED"
+        detail = getattr(exc, "detail", None) or str(exc)
+        return 400, {"ok": False, "state": "FAILED", "code": str(code),
+                     "detail": _redact(str(detail))[:300],
+                     "owner": "qubit-policy",
+                     "rollback": "nothing was written or sent"}
+    text = str(out.get("text", "") or "")
+    if not text.strip():
+        return 502, {"ok": False, "code": "DOC_EXTRACT_EMPTY",
+                     "detail": ("the file yielded no extractable text "
+                                "(scanned image PDF? empty document?)")}
+    composed = _file_compose_text(leaf, text, kind=str(out.get("kind", "file")),
+                                 truncated=bool(out.get("truncated")))
+    return _ok(filename=leaf, kind=out.get("kind", ""),
+               text=composed, char_count=out.get("char_count", 0),
+               truncated=bool(out.get("truncated", False)),
+               bytes=out.get("bytes", 0), sha256=out.get("sha256", ""),
+               submitted=False,
+               authority=("canonical doc_extract.extract_bytes; text "
+                          "returned for the composer, no turn submitted"))
 
 
 def h_chat_pty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -9132,6 +9355,7 @@ _r("POST", r"/api/qubit/chat/cancel", "h_chat_cancel")
 _r("POST", r"/api/qubit/chat/retry", "h_chat_retry")
 _r("POST", r"/api/qubit/chat/vision", "h_chat_vision")
 _r("POST", r"/api/qubit/chat/image", "h_chat_image")
+_r("POST", r"/api/qubit/chat/file", "h_chat_file")
 _r("POST", r"/api/qubit/chat/pty", "h_chat_pty")
 _r("GET", r"/api/dashboard/plugins", "h_plugins")
 # Real local plugin catalog (D-1): every entry has a real manifest + loader +
@@ -16679,6 +16903,7 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_chat_session_draft_content": h_chat_session_draft_content,
     "h_chat_session_comments": h_chat_session_comments,
     "h_chat_vision": h_chat_vision, "h_chat_image": h_chat_image,
+    "h_chat_file": h_chat_file,
     "h_chat_session_ci": h_chat_session_ci,
     "env_write": env_write,
     "env_delete": env_delete,

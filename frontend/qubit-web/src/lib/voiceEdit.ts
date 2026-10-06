@@ -45,6 +45,8 @@ export type CaptureSource = "auto" | "raw" | "aec";
 export type VoiceRouting = "local" | "api" | "auto";
 /** Text-to-speech provider for spoken answers. */
 export type TtsProvider = "piper" | "kokoro" | "edge" | "hybrid" | "openai";
+/** How voice turns are grouped into sessions (`voice_edit.voice_session_mode`). */
+export type VoiceSessionMode = "single" | "per_command";
 
 /** One installed local model reported by `GET /api/voice-edit/models`. */
 export interface LocalModel {
@@ -59,17 +61,39 @@ export interface CustomCommand {
   target: string;
 }
 
+/** A wake-route destination. The backend accepts exactly one of these shapes
+ *  (`voice_edit/wake_routing.py::normalize_route_target`); a bare string is
+ *  rejected, so the add form must always send the structured object. */
+export type WakeRouteTarget =
+  | { mode: "current" }
+  | { agentId: string }
+  | { sessionKey: string };
+
 /** One wake-routing rule: a spoken trigger routed to a target. */
 export interface WakeRoute {
   trigger: string;
-  target: string;
+  target: WakeRouteTarget;
 }
 
 /** Where recognized wake turns go (`voice_edit.wake_routing`). */
 export interface WakeRouting {
   version: number;
-  defaultTarget: string;
+  defaultTarget: WakeRouteTarget;
   routes: WakeRoute[];
+}
+
+/** Human-readable label for a route target. Tolerates legacy string targets
+ *  (older persisted stores) and malformed shapes without throwing. */
+export function formatWakeRouteTarget(
+  target: WakeRouteTarget | string | null | undefined,
+): string {
+  if (typeof target === "string") return target;
+  if (target && typeof target === "object") {
+    if ("mode" in target && target.mode === "current") return "current";
+    if ("agentId" in target) return `agent ${String(target.agentId)}`;
+    if ("sessionKey" in target) return `session ${String(target.sessionKey)}`;
+  }
+  return "unknown";
 }
 
 /** The wake-words/routing add-remove request fields the settings PUT accepts.
@@ -215,6 +239,24 @@ export interface VoiceEditSettings {
   wake_routing?: WakeRouting;
   /** Chrome-style transcripts: lowercase, no punctuation (backend default false). */
   verbatim_transcript?: boolean;
+  // ── Voice sessions (namespace + retention) ─────────────────────────
+  /** How voice turns are grouped into sessions:
+   *  `single` (one stable `voice-chat`) or `per_command` (one per command).
+   *  Backend default `single` (`voicebridge/voice_edit/voice_sessions.py`). */
+  voice_session_mode?: VoiceSessionMode;
+  /** Delete a voice session after this many seconds without activity (backend floor 60). */
+  voice_session_ttl_s?: number;
+  /** Cap on stored messages per voice session (backend floor 10). */
+  voice_session_max_messages?: number;
+  /** Keep at most this many voice sessions (backend floor 1). */
+  voice_session_max_sessions?: number;
+  // ── Continuous listening (bounded follow-up window) ────────────────
+  /** Keep the mic armed for a bounded follow-up after a turn (backend default false). */
+  continuous_mode?: boolean;
+  /** Follow-up listen window in seconds, clamped 3..120 (backend default 15). */
+  continuous_window_s?: number;
+  /** Max follow-up turns before requiring a fresh wake, clamped 1..20 (backend default 5). */
+  continuous_max_followups?: number;
   prompts: PromptRow[];
   per_app: Record<string, string>;
   /** User-defined aliases; absent on older backends (treat as []). */
@@ -308,6 +350,22 @@ export const WAKE_LIMITS = {
   kwsThreshold: { min: 0.05, max: 0.9 },
   asrFallbackMaxS: { min: 2, max: 25 },
   maxS: { min: 2, max: 25 },
+} as const;
+
+/** Backend clamps for voice-session retention
+ *  (`voice_edit/settings.py::update_voice_edit` enforces the floors; the maxima
+ *  are conservative sanity bounds the backend does not impose). */
+export const VOICE_SESSION_LIMITS = {
+  ttlS: { min: 60, max: 2592000 },
+  maxMessages: { min: 10, max: 100000 },
+  maxSessions: { min: 1, max: 10000 },
+} as const;
+
+/** Backend clamps for continuous listening
+ *  (`voice_edit/settings.py::update_voice_edit`). */
+export const CONTINUOUS_LIMITS = {
+  windowS: { min: 3, max: 120 },
+  maxFollowups: { min: 1, max: 20 },
 } as const;
 
 export function clampVoiceEditNumber(v: number, lo: number, hi: number): number {

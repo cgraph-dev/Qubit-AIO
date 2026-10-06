@@ -67,6 +67,14 @@ def packaged_gui_app_paths() -> "list[Path]":
         icons / size / "apps" / name for size in ("scalable", "24x24", "32x32", "48x48", "256x256", "512x512", "1024x1024") for name in ("qubit.png", "hermes.png")]
 
 
+def desktop_install_record() -> Path:
+    """Where ``qubit update`` records the installed ``Qubit.app`` copies it keeps current. The apps
+    are machine-wide, so the record sits under the default root whichever profile runs; deleting it
+    is what stops an uninstalled app from being put back by the next update."""
+    from qubit_constants import get_default_qubit_root  # noqa: PLC0415
+    return get_default_qubit_root() / "desktop-installed-apps.json"
+
+
 def agent_is_installed(qubit_home: Path) -> bool:
     """True when a usable Python agent install exists under QUBIT_HOME (gates the desktop UI's options).
     Package source or a venv alone is enough — a source checkout without a venv is still "the agent is here"."""

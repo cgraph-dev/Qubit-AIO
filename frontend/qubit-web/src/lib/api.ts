@@ -1214,6 +1214,39 @@ export const api = {
         body: JSON.stringify({ data_url: dataUrl, prompt, confirm: true }),
       },
     ),
+  /**
+   * A36: extract a pasted file (pdf/txt/md/log/transcript) and hand the text
+   * back for the COMPOSER — never submitted as a turn. The operator reviews
+   * and sends, so a large PDF cannot reach the model unread.
+   */
+  extractChatFile: (dataUrl: string, filename: string) =>
+    fetchJSON<{
+      text?: string;
+      kind?: string;
+      char_count?: number;
+      truncated?: boolean;
+    }>("/api/qubit/chat/file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data_url: dataUrl, filename }),
+    }),
+  /**
+   * A36b: the same extraction for a PATH handed over by the OS — a drag-drop
+   * from the file manager delivers a path, never bytes. Confinement is
+   * enforced server-side (the approved-roots boundary), so an out-of-root path
+   * answers a typed 403 rather than being read.
+   */
+  extractChatFilePath: (path: string) =>
+    fetchJSON<{
+      text?: string;
+      kind?: string;
+      char_count?: number;
+      truncated?: boolean;
+    }>("/api/qubit/chat/file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    }),
   listFiles: (path?: string) => {
     const query = path ? `?path=${encodeURIComponent(path)}` : "";
     return fetchJSON<ManagedFilesResponse>(`/api/files${query}`);
@@ -3642,6 +3675,18 @@ export interface InterruptedTurn {
   auto_continue?: boolean;
 }
 
+/**
+ * Bounded "awaiting confirmation" signal: the session has a live staged action
+ * that needs an explicit yes/no. Emitted on turn events (`done`/`progress`/…)
+ * and, when the backend exposes it, on session load so the banner can be
+ * restored after a reload. Shape is intentionally small; never carries the
+ * staged payload itself.
+ */
+export interface PendingConfirmation {
+  action_summary?: string;
+  staged_ms?: number;
+}
+
 export interface ChatStoreSessionResponse {
   session: ChatStoreSession;
   messages: ChatStoreMessage[];
@@ -3652,6 +3697,9 @@ export interface ChatStoreSessionResponse {
   /** A turn cut short by a process death (backend restart). Present only while
    * the marker survives, so the client can offer to resume it. */
   interrupted_turn?: InterruptedTurn | null;
+  /** A live staged action awaiting the operator's yes/no. Best-effort: absent
+   * when the backend has no staged confirmation for this session. */
+  pending_confirmation?: PendingConfirmation | null;
 }
 
 export interface ChatStoreCreateResponse {
@@ -3737,6 +3785,9 @@ export interface ChatStreamEvent {
   elapsed_ms?: number;
   message?: ChatStoreMessage;
   message_count?: number;
+  /** Bounded signal that the session has a live staged action awaiting an
+   * explicit yes/no. Present on turn events while it is staged. */
+  pending_confirmation?: PendingConfirmation;
   receipt?: {
     model?: string;
     runtime?: string;

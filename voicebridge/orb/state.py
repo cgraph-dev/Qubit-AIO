@@ -272,7 +272,8 @@ def _activity_is_active(activity: Any, now: float) -> bool:
 
 
 def resolve_orb_state(status: Any, events: Any, now: float,
-                      heartbeat: Any = None, activity: Any = None) -> str:
+                      heartbeat: Any = None, activity: Any = None,
+                      talk_events: Any = None) -> str:
     """Map a status payload + recent journal events to one orb state.
 
     ``heartbeat`` (optional) is the desktop-helper heartbeat mapping. It
@@ -295,12 +296,48 @@ def resolve_orb_state(status: Any, events: Any, now: float,
     frame), and it ends at the tracker's tail. ``None`` (the default)
     keeps the legacy behavior byte-identical.
 
+    ``talk_events`` (optional) is the authoritative typed talk-event
+    sequence for the current window (see
+    :mod:`voicebridge.orb.talk_state`). When it reduces to a state (not
+    ``None``), that state is returned verbatim -- the orb then matches the
+    voice FSM exactly. When it is ``None``/empty (or reduces to ``None``),
+    resolution falls through to the inference below, byte-identically to
+    before this seam existed.
+
+    One exception keeps the seam from hiding a live signal: the talk stream
+    models the Right-Ctrl path's ``input.speech_started`` but NOT the
+    hands-free wake path's mic-open edge, and it can be stale for
+    service/browser TTS. So when the authoritative state is ``idle`` (the
+    absence of any active boundary), the recency inference is re-run over the
+    JOURNAL alone (no status counter, no heartbeat) and any non-``idle``
+    result wins -- restoring listening/speaking/working for a fresh capture
+    or TTS edge while still honoring the pinned "talk idle overrides
+    heartbeat/status" contract.
+
     Never raises on malformed input; unknown/unreachable -> ``"idle"``.
     """
     try:
         now_f = float(now)
     except (TypeError, ValueError):
+        now_f = None
+    if talk_events is not None:
+        try:
+            from . import talk_state as _talk_state
+            authoritative = _talk_state.state_from_talk_events(talk_events)
+        except Exception:
+            authoritative = None
+        if authoritative is not None:
+            if authoritative == "idle" and now_f is not None:
+                try:
+                    inferred = resolve_orb_state({}, events, now_f)
+                except Exception:
+                    inferred = "idle"
+                if inferred != "idle":
+                    return inferred
+            return authoritative
+    if now_f is None:
         return "idle"
+    now_f = float(now_f)
     hb = heartbeat if isinstance(heartbeat, dict) else {}
     try:
         hb_state = str(hb.get("state") or "").strip().lower()

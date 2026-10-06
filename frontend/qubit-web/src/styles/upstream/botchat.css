@@ -126,6 +126,21 @@
   font-size: 15px;
   line-height: 23px;
 }
+/* Assistant Markdown body: the shared <Markdown> renderer replaces upstream's
+   react-native markdown component (ADAPTED). Keep block spacing tight inside
+   the bubble so the first/last block don't double the bubble padding, and let
+   the bubble own the text color. */
+.qb-assistant-md > :first-child {
+  margin-top: 0;
+}
+.qb-assistant-md > :last-child {
+  margin-bottom: 0;
+}
+.qb-assistant-md p,
+.qb-assistant-md ul,
+.qb-assistant-md ol {
+  margin: 0.5em 0;
+}
 .qb-bubble-meta {
   margin-top: 4px;
   font-size: 12px;

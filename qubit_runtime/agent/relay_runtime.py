@@ -306,8 +306,8 @@ class _ProcessRelayPluginConfiguration:
                 self._state = self._preflight(relay) or self._activate(relay)
                 if self._state is _RelayPluginConfigurationState.ACTIVE:
                     logger.info(
-                        "The Relay plugin host is active process-wide and applies to all profiles hosted by this "
-                        "Hermes process. Configuration files: %s",
+                        "Relay plugins are active process-wide and apply to all profiles hosted by this "
+                        "Qubit process. Configuration files: %s",
                         "; ".join(_activation_config_paths(self._activation)) or "none reported",
                     )
             self._owners.add(id(owner))
@@ -337,18 +337,42 @@ class _ProcessRelayPluginConfiguration:
                 "Qubit Relay plugin cleanup is still pending; refusing to replace the process-global configuration"
             )
             return _RelayPluginConfigurationState.FAILED
+        try:
+            existing_report = relay.plugin.report()
+        except Exception:
+            logger.warning(
+                "Qubit could not determine whether a process-global Relay plugin configuration is already "
+                "active; refusing to replace it", exc_info=True,
+            )
+            return _RelayPluginConfigurationState.FAILED
+        if existing_report is not None:
+            logger.warning(
+                "A process-global Relay plugin configuration is already active outside Qubit native ownership; "
+                "leaving it unchanged and disabling Qubit-managed Relay middleware for this process"
+            )
+            return _RelayPluginConfigurationState.FOREIGN
         return None
 
     def _initialize(self, relay: Any) -> bool:
-        """Initialize Relay and report whether the resolved configuration needs managed execution."""
-        config_path = _configured_plugin_inputs()
-        # An explicit file replaces Relay's user file; its system file always remains above either source.
-        activation = _resolve_plugin_awaitable(relay.plugin.initialize({}, additional_plugins_toml=config_path))
-        if activation is None:
-            raise RuntimeError("NeMo Relay plugin initialization returned no activation handle")
-        self._activation = activation
-        self._relay = relay
-        return _activation_requires_managed_execution(activation)
+        """Initialize Relay from the selected plugins.toml; False when none is selected."""
+        configured_inputs = _configured_plugin_inputs(relay)
+        if configured_inputs is None:
+            return False
+        plugin_config, dynamic_plugins = configured_inputs
+        if dynamic_plugins:
+            try:
+                initialize = relay.plugin.initialize_with_dynamic_plugins
+                activation = _resolve_plugin_awaitable(initialize(plugin_config, dynamic_plugins))
+                if activation is None:
+                    raise RuntimeError("NeMo Relay dynamic plugin initialization returned no activation handle")
+                self._activation = activation
+            except Exception as exc:
+                raise RuntimeError("Qubit Relay dynamic plugin activation failed") from exc
+        if self._activation is None:
+            # Reached only after explicit opt-in. Relay does not layer repository-local
+            # configuration onto this explicitly selected payload.
+            _resolve_plugin_awaitable(relay.plugin.initialize(plugin_config))
+        return True
 
     def release(self, owner: Any) -> None:
         """Release one host and clear Relay after the final host exits."""
@@ -375,9 +399,11 @@ class _ProcessRelayPluginConfiguration:
             return True
 
         def close_configuration() -> Any:
+            if activation is None:
+                return _resolve_plugin_awaitable(relay.plugin.clear_async())
             if callable(close := getattr(activation, "close", None)):
                 return _resolve_plugin_awaitable(close())
-            raise RuntimeError("NeMo Relay plugin activation has no close method")
+            raise RuntimeError("NeMo Relay dynamic plugin activation has no close method")
 
         for what, step in (
             ("subscriber flush", lambda: _resolve_plugin_awaitable(relay.subscribers.flush_async())),
@@ -1335,19 +1361,32 @@ def _load_nemo_relay() -> Any:
     return importlib.import_module("nemo_relay")
 
 
-def _configured_plugin_inputs() -> Path | None:
-    """Return the parseable explicit override, or ``None`` to use Relay discovery."""
-    config_path = _explicit_plugins_toml()
-    if config_path is None and (legacy_vars := configured_legacy_relay_env_vars(os.environ)):
-        logger.warning(
-            "Legacy NeMo Relay exporter variables are set but no %s was provided. %s no longer configure "
-            "Relay exporters; any standard user or system plugins.toml still applies. Run `qubit migrate "
-            "relay` (or `qubit update`, which runs it for every profile) to generate %s and select it in .env.",
-            RELAY_PLUGINS_CONFIG_ENV,
-            ", ".join(legacy_vars),
-            get_qubit_home() / "relay-plugins.toml",
-        )
-    return config_path
+def _configured_plugin_inputs(relay: Any) -> tuple[dict[str, Any], list[Any]] | None:
+    """Load the selected plugin inputs, or return ``None`` when none were selected."""
+    configured = os.environ.get(RELAY_PLUGINS_CONFIG_ENV, "").strip()
+    if not configured:
+        if legacy_vars := configured_legacy_relay_env_vars(os.environ):
+            logger.warning(
+                "Legacy NeMo Relay exporter variables are set but no %s was provided. %s no longer configure "
+                "Relay exporters; any standard user or system plugins.toml still applies. Run `qubit migrate "
+                "relay` (or `qubit update`, which runs it for every profile) to generate %s and select it in .env.",
+                RELAY_PLUGINS_CONFIG_ENV,
+                ", ".join(legacy_vars),
+                get_qubit_home() / "relay-plugins.toml",
+            )
+        return None
+    config_path = Path(configured).expanduser()
+    try:
+        with config_path.open("rb") as config_file:
+            config = tomllib.load(config_file)
+        if "dynamic_plugins" in config:
+            raise ValueError("Qubit [[dynamic_plugins]] records are unsupported; use Relay [[plugins.dynamic]] records")
+        dynamic_plugins = relay.plugin.load_dynamic_plugin_activation_specs(config_path) if "plugins" in config else []
+        return {k: v for k, v in config.items() if k != "plugins"}, dynamic_plugins
+    except Exception as exc:
+        raise _RelayPluginConfigurationLoadError(
+            f"Qubit Relay plugin configuration could not be loaded from {config_path}; continuing without Relay plugins"
+        ) from exc
 
 
 def _explicit_plugins_toml() -> Path | None:
@@ -1360,7 +1399,7 @@ def _explicit_plugins_toml() -> Path | None:
         with config_path.open("rb") as config_file:
             config = tomllib.load(config_file)
         if "dynamic_plugins" in config:
-            raise ValueError("Hermes [[dynamic_plugins]] records are unsupported; use Relay [[plugins.dynamic]] records")
+            raise ValueError("Qubit [[dynamic_plugins]] records are unsupported; use Relay [[plugins.dynamic]] records")
         return config_path
     except Exception as exc:
         raise _RelayPluginConfigurationLoadError(
@@ -1381,14 +1420,22 @@ class RelayPluginSources:
 def resolve_plugin_sources(relay: Any = None) -> RelayPluginSources:
     """Resolve the plugins.toml layers this process would load, without loading plugin code.
 
-    Relay's validator reads the same layers as initialization but does not take the process-wide host.
-    Raises when a file cannot be read or parsed.
+    Relay's validator reads the same configuration initialization feeds it, but does not take the
+    process-wide host. Raises when a file cannot be read or parsed.
     """
     relay = relay or _load_nemo_relay()
-    report = relay.plugin.validate({}, additional_plugins_toml=_explicit_plugins_toml())
-    diagnostics = [d for d in (report.get("config") or {}).get("diagnostics") or [] if isinstance(d, dict)]
+    config_path = _explicit_plugins_toml()
+    plugin_config: dict[str, Any] = {}
+    config_paths: list[str] = []
+    if config_path is not None:
+        with config_path.open("rb") as config_file:
+            plugin_config = {k: v for k, v in tomllib.load(config_file).items() if k != "plugins"}
+        config_paths = [str(config_path)]
+    report = relay.plugin.validate(plugin_config)
+    diagnostics = _relay_report_diagnostics(report)
+    reported_paths = report.get("config_paths") if isinstance(report, dict) else None
     return RelayPluginSources(
-        config_paths=tuple(str(path) for path in report.get("config_paths") or []),
+        config_paths=tuple(str(path) for path in (reported_paths or config_paths)),
         enabled=_report_requires_managed_execution(report),
         errors=tuple(str(d.get("message")) for d in diagnostics if d.get("level") == "error"),
         # Relay adds one "configuration_inherited" note per discovered file; config_paths already names them.
@@ -1397,6 +1444,17 @@ def resolve_plugin_sources(relay: Any = None) -> RelayPluginSources:
             if d.get("level") == "warning" and d.get("code") != "plugin.configuration_inherited"
         ),
     )
+
+
+def _relay_report_diagnostics(report: Any) -> list[dict[str, Any]]:
+    """Return Relay's diagnostics from either the nested or the flat report shape."""
+    if not isinstance(report, dict):
+        return []
+    nested = report.get("config")
+    candidates = nested.get("diagnostics") if isinstance(nested, dict) else None
+    if not isinstance(candidates, list):
+        candidates = report.get("diagnostics")
+    return [d for d in candidates or [] if isinstance(d, dict)]
 
 
 # Relay 0.9 exposes no active-host query; only initialize's two Conflict messages signal one.

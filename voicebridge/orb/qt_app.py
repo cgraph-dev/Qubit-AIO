@@ -38,6 +38,7 @@ from . import options as _options
 from . import persist as _persist
 from . import state as _state
 from . import stream as _stream
+from . import talk_state as _talk_state
 from .app import LevelSmoother as _LevelSmoother
 
 try:
@@ -823,10 +824,19 @@ if QWidget is not None:
             self._observe_output_activity(status, events, heartbeat)
             self.offline = status is None
             _prev_state = str(getattr(self, "orb_state", ""))
+            # Authoritative talk events (voice_edit.talk.* journal rows):
+            # when present they drive the orb state directly so it matches
+            # the voice FSM exactly; when absent, resolution falls back to
+            # the recency-window inference below, byte-identically.
+            try:
+                _talk_events = _talk_state.talk_events_from_journal(events)
+            except Exception:
+                _talk_events = None
             if status is not None:
                 raw = _state.resolve_orb_state(
                     status, events, time.time(), heartbeat=heartbeat,
-                    activity=getattr(self, "_activity", None))
+                    activity=getattr(self, "_activity", None),
+                    talk_events=_talk_events)
                 try:
                     if self._display is not None:
                         self.orb_state = self._display.update(

@@ -205,16 +205,21 @@ export function ChatToolsSummary({
   // Tools are counted across the real toolsets (the enabled ones are the
   // agent's live tool surface; disabled toolsets stay counted but are not
   // listed). Skills/plugins/MCP are counted directly.
-  const allToolsets = toolsets.data ?? [];
+  // Every registry is guarded on `Array.isArray`: a hostile/empty backend can
+  // answer `{}` where a list is expected, and `?? []` does not catch that (an
+  // object is not nullish) — which crashed the whole chat page on `.map`.
+  const allToolsets = Array.isArray(toolsets.data) ? toolsets.data : [];
   const enabledToolsets = allToolsets.filter((t) => t.enabled);
   const toolNames = Array.from(
-    new Set(enabledToolsets.flatMap((t) => t.tools ?? [])),
+    new Set(
+      enabledToolsets.flatMap((t) => (Array.isArray(t.tools) ? t.tools : [])),
+    ),
   );
   const toolsetNames = enabledToolsets.map((t) => t.name);
 
-  const skillRows = skills.data ?? [];
-  const pluginRows = plugins.data ?? [];
-  const mcpRows = mcp.data?.servers ?? [];
+  const skillRows = Array.isArray(skills.data) ? skills.data : [];
+  const pluginRows = Array.isArray(plugins.data) ? plugins.data : [];
+  const mcpRows = Array.isArray(mcp.data?.servers) ? mcp.data.servers : [];
   // Configured vs connected are different truths; the TUI banner counts the
   // latter. Surface both so the panel never overstates the live MCP surface.
   const mcpConnected = mcpRows.filter((s) => s.connected).length;

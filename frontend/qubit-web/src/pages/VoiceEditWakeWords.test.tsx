@@ -113,8 +113,8 @@ describe("VoiceEditPage wake words & routing", () => {
   it("renders the wake words and wake routes from settings", async () => {
     const wake_routing: WakeRouting = {
       version: 1,
-      defaultTarget: "current",
-      routes: [{ trigger: "hello", target: "current" }],
+      defaultTarget: { mode: "current" },
+      routes: [{ trigger: "hello", target: { mode: "current" } }],
     };
     mocks.settings.mockResolvedValue({
       settings: settings({
@@ -194,14 +194,14 @@ describe("VoiceEditPage wake words & routing", () => {
       settings: settings({
         wake_routing: {
           version: 1,
-          defaultTarget: "current",
-          routes: [{ trigger: "hello", target: "current" }],
+          defaultTarget: { mode: "current" },
+          routes: [{ trigger: "hello", target: { mode: "current" } }],
         },
       }),
     });
     mocks.saveSettings.mockResolvedValue({
       settings: settings({
-        wake_routing: { version: 1, defaultTarget: "current", routes: [] },
+        wake_routing: { version: 1, defaultTarget: { mode: "current" }, routes: [] },
       }),
     });
     const { default: VoiceEditPage } = await import("./VoiceEditPage");
@@ -245,7 +245,7 @@ describe("VoiceEditPage wake words & routing", () => {
       await Promise.resolve();
     });
     expect(mocks.saveSettings).toHaveBeenCalledWith({
-      wake_route_add: { trigger: "hey qubit", target: "current" },
+      wake_route_add: { trigger: "hey qubit", target: { mode: "current" } },
     });
   });
 });

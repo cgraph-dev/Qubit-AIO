@@ -136,7 +136,8 @@ def bridge_toplevel_keys(yaml_cfg: dict, gateway_section: Any, gw_data: dict) ->
 
 # --- platform sections -----------------------------------------------------------
 
-def merge_platform_sections(yaml_cfg: dict, gateway_cfg: Any, gw_data: dict) -> dict:
+def merge_platform_sections(yaml_cfg: dict, gateway_cfg: Any, gw_data: dict,
+                            also: Any = None) -> dict:
     """Merge every place a platform block may live into ``gw_data["platforms"]`` and return it.
 
     Order (later wins on shared keys, ``extra`` deep-merged so gateway.json defaults survive):
@@ -145,13 +146,23 @@ def merge_platform_sections(yaml_cfg: dict, gateway_cfg: Any, gw_data: dict) -> 
     ``enabled`` key in any block sets the ``_enabled_explicit`` marker consumed by the env pass.
     Top-level adapter keys (``gateway.api_server.port: 8642``) reach ``extra`` in
     ``PlatformConfig.from_dict``.
+
+    ``also`` (optional) scopes the merge to a set of platform names — used by the
+    left-core migration's per-platform probe; ``None`` merges every platform
+    (the default, unchanged).
     """
+    try:
+        only = frozenset(also) if also is not None else None
+    except TypeError:
+        only = None
     platforms_data = _dict_slot(gw_data, "platforms")
 
     def merge(source_platforms: Any) -> None:
         if not isinstance(source_platforms, dict):
             return
         for plat_name, plat_block in source_platforms.items():
+            if only is not None and plat_name not in only:
+                continue
             if not isinstance(plat_block, dict):
                 continue
             existing = platforms_data.get(plat_name, {})
@@ -167,7 +178,9 @@ def merge_platform_sections(yaml_cfg: dict, gateway_cfg: Any, gw_data: dict) -> 
     nested_gateway = gateway_cfg if isinstance(gateway_cfg, dict) else {}
     merge(nested_gateway.get("platforms"))
     merge(yaml_cfg.get("platforms"))
-    merge({k: v for k, v in nested_gateway.items() if k != "platforms" and isinstance(v, dict) and _is_platform_name(k)})
+    merge({k: v for k, v in nested_gateway.items()
+           if k != "platforms" and isinstance(v, dict) and _is_platform_name(k)
+           and (only is None or k in only)})
     return platforms_data
 
 

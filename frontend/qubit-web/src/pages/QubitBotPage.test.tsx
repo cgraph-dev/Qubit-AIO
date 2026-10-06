@@ -10,6 +10,7 @@
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const botMocks = vi.hoisted(() => ({
@@ -57,7 +58,13 @@ function renderPage() {
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
-    root!.render(<QubitBotPage />);
+    // QubitBotPage is a routed page (it calls useNavigate for the workspace
+    // link), so it must be rendered inside a Router in tests.
+    root!.render(
+      <MemoryRouter>
+        <QubitBotPage />
+      </MemoryRouter>,
+    );
   });
 }
 

@@ -1,0 +1,131 @@
+/*
+ * Chat work-status panel (C1).
+ *
+ * Styling only — the behaviour lives in `components/ChatWorkPanel.tsx`. Uses the
+ * dashboard's CSS custom properties so it follows the active theme/skin rather
+ * than pinning colours.
+ */
+
+.qubit-work-panel {
+  width: 100%;
+  border: 1px solid var(--border-subtle, rgb(255 255 255 / 10%));
+  border-radius: 0.5rem;
+  background: var(--surface-raised, rgb(255 255 255 / 4%));
+  font-size: 0.75rem;
+  line-height: 1.35;
+  overflow: hidden;
+}
+
+.qubit-work-panel[data-state="working"] {
+  border-color: var(--accent, rgb(120 180 255 / 45%));
+}
+
+.qubit-work-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+}
+
+.qubit-work-panel__toggle {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 0.15rem;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+/* No body to reveal: same footprint, but not a control (nothing to click). */
+.qubit-work-panel__toggle--static {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.qubit-work-panel__glyph {
+  flex: 0 0 auto;
+  /* Fixed width so the rotating glyph never reflows the row. */
+  display: inline-block;
+  width: 1em;
+  text-align: center;
+  color: var(--accent, rgb(120 180 255));
+}
+
+.qubit-work-panel__summary {
+  flex: 0 1 auto;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qubit-work-panel__spacer {
+  flex: 1 1 auto;
+}
+
+.qubit-work-panel__meta {
+  flex: 0 0 auto;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.qubit-work-panel__body {
+  border-top: 1px solid var(--border-subtle, rgb(255 255 255 / 8%));
+  padding: 0.35rem 0.6rem 0.45rem;
+  max-height: 9rem;
+  overflow-y: auto;
+}
+
+.qubit-work-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.qubit-work-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.qubit-work-panel__name {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qubit-work-panel__done {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.qubit-work-panel__dot {
+  flex: 0 0 auto;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 999px;
+  background: var(--text-tertiary, rgb(255 255 255 / 40%));
+}
+
+.qubit-work-panel__dot[data-status="running"] {
+  background: var(--accent, rgb(120 180 255));
+}
+
+.qubit-work-panel__check {
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+
+/* Respect a reduced-motion preference: the glyph is decorative, so freeze it. */
+@media (prefers-reduced-motion: reduce) {
+  .qubit-work-panel__glyph {
+    animation: none;
+  }
+}

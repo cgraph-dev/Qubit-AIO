@@ -21,7 +21,7 @@ from typing import Any
 logger = logging.getLogger("cli")
 
 if TYPE_CHECKING:
-    from cli import HermesCLI
+    from cli import QubitCLI as HermesCLI
 
 
 def _int_or(value, default: int) -> int:

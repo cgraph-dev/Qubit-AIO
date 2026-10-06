@@ -625,6 +625,9 @@ _restart_safe_waiter_job_ids: set = set()
 # in-flight key -> pid of the restart-safe external worker executing it (absent for in-process
 # runs), so a drain observer can name the process holding the gateway open.
 _running_worker_pids: dict[tuple, int] = {}
+# In-flight keys owned by a restart-safe external worker running in a transient user scope outside
+# the gateway cgroup (a systemd stop/restart cannot reach it; see get_restart_wait_cron_counts).
+_scope_isolated_job_ids: set = set()
 _running_lock = threading.Lock()
 
 # Per in-flight id: time.time() claim instant + the future owning its release (``_FUTURE_PENDING``
@@ -715,6 +718,11 @@ def get_wedged_job_ids() -> "frozenset[str]":
     alive (a delivery blocked on a dead transport, #115469), so the gateway restart drain reads this to
     skip them the way it skips wedged chat turns; restart is their remedy.
     """
+    return frozenset(key[1] for key in _wedged_inflight_keys())
+
+
+def _wedged_inflight_keys() -> "frozenset[tuple]":
+    """In-flight keys behind :func:`get_wedged_job_ids`, before the projection to bare job IDs."""
     now = time.time()
     with _running_lock:
         ages = {key: now - started for key, started in _running_since.items() if key in _running_job_ids}
@@ -744,7 +752,37 @@ def get_wedged_job_ids() -> "frozenset[str]":
                 if key in _running_job_ids:  # released meanwhile -> don't resurrect the entry
                     _running_allowance_s[key] = allowance
     return frozenset(
-        key[1] for key, age in ages.items() if age >= max(allowances[key], floor_seconds))
+        key for key, age in ages.items() if age >= max(allowances[key], floor_seconds))
+
+
+def get_restart_wait_cron_counts() -> dict:
+    """In-flight cron runs split for the gateway restart wait: ``awaitable``, ``wedged`` and
+    ``restart_safe`` (scoped external worker, not wedged). The three are disjoint and sum to the
+    number of in-flight runs.
+
+    A ``scoped`` worker runs in a transient user scope outside the gateway cgroup, so a systemd
+    stop/restart cannot reach it: the shutdown drain deliberately leaves it unmarked
+    (``mark_running_jobs_interrupted``) and its final send rides the durable delivery queue, drained
+    by whichever gateway is live next. Holding the restart wait for it only keeps the gateway in
+    ``draining`` (refusing new turns) for up to ``agent.restart_after_turn_timeout``. A ``degraded``
+    worker (external subprocess, no reachable user bus) stays in the gateway cgroup and dies with a
+    systemd stop, so it stays awaitable.
+
+    Counted per in-flight KEY, not per bare job ID: one multiplexed gateway can run the same job ID
+    in two profiles, and projecting to bare IDs first lets one profile's wedged or scoped run hide
+    the other profile's live run, which the restart would then kill (e.g. a scoped ``daily-brief``
+    in profile A next to a degraded ``daily-brief`` in profile B).
+    """
+    wedged = _wedged_inflight_keys()
+    with _running_lock:
+        inflight = _running_job_ids | _running_fire_owners.keys()
+        restart_safe = (_scope_isolated_job_ids & inflight) - wedged
+    wedged = wedged & inflight
+    return {
+        "awaitable": len(inflight - wedged - restart_safe),
+        "wedged": len(wedged),
+        "restart_safe": len(restart_safe),
+    }
 
 
 def is_job_running(job_id: str, home: Optional[Union[Path, str]] = None) -> bool:

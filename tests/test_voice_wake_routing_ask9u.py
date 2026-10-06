@@ -199,8 +199,9 @@ def test_task_dispatch_default_when_unset(monkeypatch):
     monkeypatch.setattr(TT, "run_tool_task", fake_tool)
     out = svc.task("do the thing", confirm=True, request_id=rid)
     assert out["ok"] is True
-    # Today's behavior: run_tool_task receives the empty session (its default).
-    assert seen.get("session") == ""
+    # Voice turns land in the dedicated voice session (voice-chat); a routed
+    # wake target still wins (tested separately).
+    assert seen.get("session") == "voice-chat"
     assert not any(op == "voice_edit.task_session" for op, _ in audits)
 
 
@@ -236,4 +237,4 @@ def test_malformed_session_id_never_raises_task(monkeypatch):
     monkeypatch.setattr(TT, "run_tool_task", fake_tool)
     out = svc.task("do the thing", confirm=True, request_id="bad")
     assert out["ok"] is True
-    assert seen.get("session") == ""
+    assert seen.get("session") == "voice-chat"

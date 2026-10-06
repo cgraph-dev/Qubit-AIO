@@ -361,6 +361,16 @@ DEFAULT_CONTEXT_LENGTHS = {
     "mimo-v2.6-pro-ultraspeed": 1048576, "mimo-v2.6-pro": 1048576, "mimo-v2.6-flash": 1048576,
     "mimo-v2-pro": 1048576, "mimo-v2.5-pro": 1048576, "mimo-v2.5": 1048576, "mimo-v2-omni": 262144, "mimo-v2-flash": 262144,
     "zai-org/GLM-5": 202752,
+    # Qubit-local Ollama models (voice bridge / ``/qubit-chat`` / native voice). Those
+    # paths build the agent without an endpoint URL, so the Ollama ``/api/show`` probes
+    # (steps 2/5e/7) never run and an unlisted model fell through to the 256K fallback.
+    # Values mirror what the runtime's own ``/api/show`` resolves live (``ollama show``):
+    # qubit-spark17 / qubit-spark4 advertise 1,048,576; qubit-brain4 is pinned to the
+    # Modelfile's ``num_ctx 4096`` (its GGUF max is 40,960) — the same value the
+    # resolver returns when it does have the Ollama endpoint, so with/without a
+    # base_url now agree instead of one of them being the 256K fallback.
+    "qubit-spark17": 1_048_576, "qubit-spark4": 1_048_576,
+    "qubit-brain4": 4096,
 }
 # xAI Grok models that ACCEPT `reasoning.effort` (verified live against
 # /v1/responses). Unlisted Grok models still reason natively but 400 on the
@@ -543,17 +553,41 @@ _HYPHENATED_GENERATION_RE = re.compile(
     rf"((?:{'|'.join(map(re.escape, _BOUNDARY_MATCHED_KEY_PREFIXES))})[a-z]+)-(\d{{1,2}})(?=[-:.@]|$)")
 
 
+def _key_at_token_start(text: str, key: str) -> bool:
+    """True when *key* occurs in *text* not immediately preceded by a letter.
+
+    Guards the catalog substring matcher against mid-word collisions: ``llama`` inside the
+    provider/runtime token ``ollama`` is not a match, so a local-provider string can never claim
+    the ``llama`` family's 131,072-token default and shadow a real registration. A legitimate
+    model slug still matches when the key starts the id or is separated by ``-``/``.``/``/``/
+    ``:``/``@`` (``llama-3.1``, ``meta-llama/Llama-3``). Only the leading edge is checked, so
+    generation-glued ids keep matching (``qwen3``, ``gemma4``)."""
+    start = 0
+    while True:
+        index = text.find(key, start)
+        if index == -1:
+            return False
+        if index == 0 or not text[index - 1].isalpha():
+            return True
+        start = index + 1
+
+
 def _catalog_key_matches(key: str, model_lower: str) -> bool:
     """Substring match with version separators normalised on both sides, so a relay slug like
     ``z-ai-glm-5-3`` still hits the ``glm-5.3`` entry instead of the ``glm`` catch-all (#97398).
     Boundary-matched families: a key must be followed by ``-:.@`` or the end, and a key ending in
-    ``-`` is the family default for bare names (``org/`` allowed) continuing with a lineup letter."""
+    ``-`` is the family default for bare names (``org/`` allowed) continuing with a lineup letter.
+    Every other key matches only at a token start (see :func:`_key_at_token_start`)."""
     if key.startswith(_BOUNDARY_MATCHED_KEY_PREFIXES):
         model_lower = _HYPHENATED_GENERATION_RE.sub(r"\1\2", model_lower)
         if key.endswith("-"):
             return re.match(re.escape(key) + "[a-z]", model_lower.rsplit("/", 1)[-1]) is not None
         return re.search(re.escape(key) + r"(?:[-:.@]|$)", model_lower) is not None
-    return key in model_lower or _normalize_model_version(key) in _normalize_model_version(model_lower)
+    if key in model_lower and _key_at_token_start(model_lower, key):
+        return True
+    normalized_key = _normalize_model_version(key)
+    normalized_model = _normalize_model_version(model_lower)
+    return normalized_key in normalized_model and _key_at_token_start(normalized_model, normalized_key)
 
 
 def _longest_key_match(table: Dict[str, int], model_lower: str) -> Optional[Tuple[str, int]]:

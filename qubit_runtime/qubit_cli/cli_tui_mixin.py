@@ -612,7 +612,7 @@ class CLITuiMixin:
         the terminal rows or the bottom border and trailing items get clipped on long lists
         (e.g. Ollama Cloud's 36+ models). ``state["_scroll_offset"]`` is updated in place.
         """
-        from cli import HermesCLI, _panel_box_width, _wrap_panel_text
+        from cli import QubitCLI as HermesCLI, _panel_box_width, _wrap_panel_text
         box_width = _panel_box_width(title, [hint] + labels, min_width=min_width, max_width=max_width)
         # ``_Panel.row`` pads every row to ``box_width - 2``, so that is the real
         # body width. Keep the wrap budget in sync with it and reserve the

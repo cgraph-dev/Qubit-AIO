@@ -189,6 +189,59 @@ export function slashCompletionText(item: SlashCommandItem): string {
 }
 
 /**
+ * Find the slash token under the caret, anywhere in the line.
+ *
+ * The composer used to test `/^\/[A-Za-z0-9_-]*$/.test(input)`, which only
+ * matched when the `/` was the FIRST character of the whole input — so typing
+ * `/` after any other character never opened the palette. The `/chat` terminal
+ * completer finds the token wherever it sits; this is the same behaviour.
+ *
+ * Returns `null` when there is no active token at the caret. A token must start
+ * at the beginning of the string or just after whitespace, so a URL like
+ * `http://x` never opens the palette, and it must run to the caret with no
+ * space in between (so `/model arg` closes it once an argument is typed).
+ */
+export function slashTokenAt(
+  input: string,
+  caret?: number,
+): { token: string; start: number } | null {
+  return prefixedTokenAt(input, "/", caret);
+}
+
+/**
+ * Find the `@`-mention token under the caret, anywhere in the line.
+ *
+ * Same boundary rules as :func:`slashTokenAt` — the mention hint had the
+ * identical start-anchored bug (`/^@[A-Za-z0-9_-]*$/` on the whole input), so
+ * `@` typed after other text never showed the hint.
+ */
+export function atTokenAt(
+  input: string,
+  caret?: number,
+): { token: string; start: number } | null {
+  return prefixedTokenAt(input, "@", caret);
+}
+
+function prefixedTokenAt(
+  input: string,
+  prefix: string,
+  caret?: number,
+): { token: string; start: number } | null {
+  if (!input) return null;
+  const end = caret === undefined ? input.length : caret;
+  if (end < 0 || end > input.length) return null;
+  // Walk back from the caret to the start of the current word.
+  let start = end;
+  while (start > 0 && !/\s/.test(input[start - 1])) start -= 1;
+  const word = input.slice(start, end);
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!new RegExp(`^${escaped}[A-Za-z0-9_-]*$`).test(word)) return null;
+  // Require a real boundary: start-of-input or whitespace before the prefix.
+  if (start > 0 && !/\s/.test(input[start - 1])) return null;
+  return { token: word, start };
+}
+
+/**
  * Filter the catalog for a composer token like "/mod": prefix matches first
  * (registry order kept), then substring matches. Empty query (bare "/")
  * returns the head of the registry.

@@ -5529,18 +5529,45 @@ def get_text_auxiliary_client(task: str = "", *, main_runtime: Optional[Dict[str
 _VISION_AUTO_PROVIDER_ORDER = ("openrouter", "nous", "deepinfra")
 
 
-def _main_model_supports_vision(provider: str, model: Optional[str]) -> bool:
-    """True when ``provider``/``model`` is known to accept image input; unknown capability → True (attempt the call)."""
+def _main_model_vision_capability(provider: str, model: Optional[str]) -> Optional[bool]:
+    """Tri-state image capability for ``provider``/``model``: True/False when resolved,
+    None when unknown. Never raises — a resolution failure reads as unknown."""
     try:
         from agent.image_routing import _lookup_supports_vision
         from qubit_cli.config import load_config_readonly
     except ImportError:
+        return None
+    try:
+        return _lookup_supports_vision(provider, model, load_config_readonly())
+    except Exception:  # pragma: no cover - defensive
+        return None
+
+
+def _main_model_supports_vision(provider: str, model: Optional[str]) -> bool:
+    """Permissive "is the main model worth attempting?" predicate: True unless the model is
+    *known* text-only (unknown capability → True), so new/custom providers are not blocked.
+
+    Routing code that must never send an image to an unverified endpoint (the vision
+    auto-route) must instead require :func:`_main_model_vision_capability` ``is True``; an
+    unknown capability there was the cause of HTTP 400s from text-only endpoints."""
+    return _main_model_vision_capability(provider, model) is not False
+
+
+def _provider_vision_capability_is_opaque(provider: str) -> bool:
+    """True when the catalog cannot decide a provider's image capability, so the historical
+    permissive attempt must be preserved: user-supplied ``custom`` endpoints and providers
+    whose auth is OAuth/external (copilot, codex, ...). Direct API-key providers are
+    catalog-authoritative — an unknown model there is not attempted (see #vision-unverified)."""
+    name = str(provider or "").strip().lower()
+    if name == "custom" or name.startswith("custom:"):
         return True
     try:
-        supports = _lookup_supports_vision(provider, model, load_config_readonly())
+        from providers import get_provider_profile
+
+        profile = get_provider_profile(provider)
     except Exception:  # pragma: no cover - defensive
-        return True
-    return True if supports is None else bool(supports)
+        return False
+    return profile is not None and getattr(profile, "auth_type", "api_key") != "api_key"
 
 
 def _normalize_vision_provider(provider: Optional[str]) -> str:
@@ -5615,9 +5642,11 @@ def _vision_main_provider_client(
 ) -> Tuple[Optional[Any], Optional[str]]:
     """Auto-detect step 1: try the main provider; (None, None) falls through to the aggregator chain."""
     # A provider vision default (static override or catalog discovery) is a *known* multimodal
-    # model; the pinned chat model usually isn't, so only fall back to it when no default exists.
+    # model. Otherwise the pinned chat model is only usable when its image capability is
+    # *verified* (config override / catalog / local probe). An unverified main model must NOT be
+    # attempted: unknown capability used to read as "try it", so a text-only endpoint answered
+    # HTTP 400 for every image instead of falling through to an aggregator or failing honestly.
     provider_vision_default = _resolve_provider_vision_default(main_provider)
-    vision_model = provider_vision_default or main_model
     if main_provider == "nous":
         # Qubit picks its vision model from Portal tier-aware slots inside _try_nous(vision=True);
         # passing the chat model would override that and 404. Only auxiliary.vision.model may.
@@ -5629,10 +5658,20 @@ def _vision_main_provider_client(
     if main_provider in _PROVIDERS_WITHOUT_VISION:  # endpoint rejects image input entirely
         logger.debug("Vision auto-detect: skipping main provider %s (no vision support) — falling through to aggregator chain", main_provider)
         return None, None
-    if not _main_model_supports_vision(main_provider, vision_model):
-        # Known text-only model. Log only the provider name (CodeQL clear-text-logging FPs).
+    if provider_vision_default:
+        vision_model = provider_vision_default
+    elif _main_model_vision_capability(main_provider, main_model) is True:
+        vision_model = main_model
+    elif _provider_vision_capability_is_opaque(main_provider):
+        # OAuth / user-supplied custom endpoint: the catalog cannot attest or refute vision,
+        # so keep the historical permissive attempt for a genuinely capable main model.
+        vision_model = main_model
+    else:
+        # Catalog-authoritative provider whose model is text-only OR not attested. Log only the
+        # provider name (CodeQL clear-text-logging FPs).
         logger.debug(
-            "Vision auto-detect: skipping main provider %s (reports no vision capability) — falling through to aggregator chain",
+            "Vision auto-detect: skipping main provider %s (image capability not verified) "
+            "— falling through to aggregator chain",
             main_provider,
         )
         return None, None
@@ -7474,6 +7513,15 @@ def _resolve_call_client(
                     "auto", async_mode=async_mode, main_runtime=main_runtime, task=task)
                 effective_provider = _effective_provider_for_client(client, "auto")
     if client is None:
+        if task == "vision":
+            # No vision-capable main model and no aggregator: report the real condition instead
+            # of letting the caller attempt an image call that 400s.
+            raise AuxiliaryClientUnavailable(
+                "vision is not configured: no vision-capable model is available "
+                f"(provider={resolved_provider or 'auto'}). Set auxiliary.vision.provider/model "
+                "to a vision backend, or declare model.supports_vision: true when the main "
+                "model accepts images."
+            )
         raise AuxiliaryClientUnavailable(f"No LLM provider configured for task={task} "
                                          f"provider={resolved_provider}. Run: qubit setup")
     return _ResolvedAuxRoute(client, final_model, resolved_provider, effective_provider)

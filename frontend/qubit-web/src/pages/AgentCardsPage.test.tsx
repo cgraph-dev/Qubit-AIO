@@ -158,11 +158,17 @@ describe("AgentCardsPage", () => {
     );
   });
 
-  it("states the delegation gap with a disabled submit, never a fake", async () => {
+  it("wires delegation to the real confirm-gated harness submit", async () => {
+    // Intentional change: `POST /api/qubit/harness/task_submit` is a live
+    // confirm-gated mutation, so the old "serves no task create route" stated
+    // gap no longer applies (om-agent-ui.tsx DelegateSheet docstring). The
+    // submit stays disabled until a prompt is typed — never a dead-looking
+    // button, and the copy states the real confirmation path.
     await renderAgentCards();
     const delegate = clickByText("Delegate task");
     expect(delegate.disabled).toBe(true);
-    expect(container.textContent).toContain("serves no task create route");
+    expect(container.textContent).toContain("Runs on the server as a real agent turn");
+    expect(container.textContent).toContain("asks for confirmation first");
   });
 
   it("shows the ideas tab with an honest empty state", async () => {
@@ -185,7 +191,11 @@ describe("AgentCardsPage", () => {
     await renderAgentCards();
     await act(async () => clickByText("Notifications").click());
     await waitFor(() => (container.textContent ?? "").includes("run 4"));
-    expect(container.textContent).toContain("no monitor store");
+    // The sheet renders the real alert-ledger receipts (id + detail), not a
+    // fabricated per-user inbox. The "no notification inbox" copy is only in
+    // the empty state (see NotificationsSheet), so with a run present the
+    // proof is the real receipt detail.
+    expect(container.textContent).toContain("fallback failed");
   });
 
   it("renders the live agent roster on the Apps tab", async () => {

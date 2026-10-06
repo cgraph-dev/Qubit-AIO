@@ -422,7 +422,7 @@ class CLIStreamMixin:
         """Emit filtered text to the streaming display."""
         from agent.markdown_tables import is_table_divider, looks_like_table_row
         from cli import (
-            HermesCLI, _ACCENT, _RST, _STREAM_PARTIAL_PREVIEW_LEN, _cprint, _strip_markdown_syntax, datetime)
+            QubitCLI as HermesCLI, _ACCENT, _RST, _STREAM_PARTIAL_PREVIEW_LEN, _cprint, _strip_markdown_syntax, datetime)
         if not text:
             return
         # Close a still-open reasoning box on the first content token so the answer streams

@@ -20,6 +20,7 @@ import uuid
 from typing import Any, Dict, Optional
 
 from . import debug as _dbg
+from . import voice_sessions
 from .brain import BrainRouter
 
 from .desktop import DesktopAdapter
@@ -98,6 +99,11 @@ def _full_turn_narration_only(text: str) -> bool:
     return not bool(_WORKER_ACTION_RE.search(t))
 
 REQUEST_TTL_S = 300.0
+
+#: Minimum interval between opportunistic voice-session retention sweeps. The
+#: sweep is best-effort and runs on a real turn (ask/task), so this keeps it off
+#: the hot path without needing a scheduler.
+_VOICE_PRUNE_INTERVAL_S = 600.0
 
 
 def _counts_turn(fn):
@@ -243,6 +249,25 @@ _REPEAT_RE = _re_module.compile(
     r"|\bcome\s+again\s*[?]?\s*$",
     _re_module.IGNORECASE)
 
+#: Deterministic chat-session report (report lane, 2026-10-06): "report on my
+#: chat" / "summarize the chat session" / "what did we do in that session"
+#: read the routed/current canonical transcript and speak a SHORT summary
+#: (never the raw transcript). Conservative: a report-ish verb must sit next
+#: to a chat/session/conversation noun, or an explicit "what did we do /
+#: what happened" frame must carry that noun — so ordinary questions ("what
+#: time is it"), a document ask ("summarize this document"), and a YouTube/
+#: email ask never match. The verb/noun match is bounded per sentence so it
+#: cannot bridge two unrelated clauses.
+_REPORT_CHAT_RE = _re_module.compile(
+    r"\b(report|recap|summari[sz]e|summary)\b[^.?!]*\b"
+    r"(chat|session|conversation)\b"
+    r"|\b(chat|session|conversation)\b[^.?!]*\b"
+    r"(report|recap|summari[sz]e|summary)\b"
+    r"|\bwhat\s+(did\s+)?we\s+(do|talk\s+about|discuss)\b[^.?!]*\b"
+    r"(chat|session|conversation)\b"
+    r"|\bwhat\s+happened\b[^.?!]*\b(chat|session|conversation)\b",
+    _re_module.IGNORECASE)
+
 
 def _looks_like_question(text: str) -> bool:
     t = (text or "").strip()
@@ -279,6 +304,87 @@ def _read_cfg(cfg: Any, *path: str, default: Any = None) -> Any:
         return default
 
 
+# --- TTS provider memoization (voice-turn latency, 2026-10-07) -------------
+#
+# MEASURED: ``qubit_compat.h_audio_speak`` (POST /api/audio/speak, the ONE
+# local TTS exit the desktop helper uses for every spoken reply) builds a
+# fresh provider with ``_tts_from_cfg(cfg)`` and calls ``load()`` on EVERY
+# request. For the piper/sherpa backend that is a full ONNX model reload:
+# ~1000-1140 ms of fixed cost per spoken reply, while the actual synthesis
+# is 40 ms (short reply) to ~300 ms (long). The voice-turn journal shows
+# ``answer -> tts.synthesize`` at a 1095 ms median, dominated by that reload.
+#
+# One warm provider per (config identity, ``tts`` section, model dir) removes
+# the fixed cost with NO audio change: the provider is stateless across
+# ``synthesize`` calls (piper serializes synthesis under its own global
+# lock) and this is exactly the object the orchestrator already reuses for
+# dashboard speech. ``install_tts_provider_cache`` swaps
+# ``qubit_compat._tts_from_cfg`` for a memoizing wrapper; it is idempotent
+# and fail-open, and ``_tts_from_cfg`` has exactly one caller
+# (``h_audio_speak``), so the wrapper's return contract is unchanged.
+_TTS_CACHE_LOCK = threading.Lock()
+
+
+def _tts_cache_key(cfg: Any) -> Any:
+    """Signature that must change for a DIFFERENT provider to be warranted.
+
+    Deliberately NOT ``id(cfg)``: the service and ``h_audio_speak`` may hold
+    distinct but equivalent config objects for the same profile, and they
+    must share ONE provider. Path + the whole ``tts`` section + model dir is
+    the semantic identity (a voice/backend/provider change rebuilds).
+    """
+    try:
+        return (str(getattr(cfg, "path", "") or ""),
+                repr(_read_cfg(cfg, "tts", default={}) or {}),
+                str(getattr(cfg, "model_dir", lambda: "")() or ""))
+    except Exception:  # noqa: BLE001 - cache key only, never fatal
+        return ("tts",)
+
+
+def _make_cached_tts_provider(original: Any) -> Any:
+    """Wrap a ``_tts_from_cfg(cfg)`` factory so each config builds ONCE.
+
+    The factory's own ``load()`` still runs on first use (it is what warms
+    the returned object); later callers get the SAME loaded object, so
+    ``load()`` is a no-op and only real synthesis time remains.
+    """
+    cache: Dict[Any, Any] = {}
+
+    def _cached(cfg: Any) -> Any:
+        key = _tts_cache_key(cfg)
+        with _TTS_CACHE_LOCK:
+            tts = cache.get(key)
+            if tts is None:
+                tts = original(cfg)
+                cache[key] = tts
+            return tts
+
+    _cached._qubit_tts_cached = True
+    _cached._qubit_tts_original = original
+    return _cached
+
+
+def install_tts_provider_cache(module: Any = None) -> bool:
+    """Install the shared-TTS wrapper on ``qubit_compat`` (default) or a
+    test double. Idempotent; any failure leaves the original behavior."""
+    if module is None:
+        try:
+            from .. import qubit_compat as _compat  # type: ignore
+        except Exception:  # noqa: BLE001 - never break the caller
+            return False
+        module = _compat
+    original = getattr(module, "_tts_from_cfg", None)
+    if original is None:
+        return False
+    if getattr(original, "_qubit_tts_cached", False):
+        return True
+    try:
+        module._tts_from_cfg = _make_cached_tts_provider(original)
+    except Exception:  # noqa: BLE001
+        return False
+    return True
+
+
 class VoiceEditService:
     def __init__(self, cfg: Any, *, engine: Optional[TransformEngine] = None,
                  desktop: Optional[DesktopAdapter] = None,
@@ -304,6 +410,15 @@ class VoiceEditService:
         #: Real in-flight turns (see _counts_turn). Seeds 0; sessions that
         #: merely began (orb click staging, helper begins) are not turns.
         self._inflight = 0
+        # Latency (2026-10-07): the first voice-edit request is the helper's
+        # ``session`` (begin) call, which always precedes its ``/api/audio/speak``
+        # call — so installing the shared-TTS wrapper here makes the very first
+        # spoken reply use the warm provider instead of reloading the model.
+        # Best-effort: a failure leaves the original per-request behavior.
+        try:
+            install_tts_provider_cache()
+        except Exception:  # noqa: BLE001
+            pass
 
     # -- authority helpers ----------------------------------------------
     def _estop(self) -> bool:
@@ -1142,18 +1257,43 @@ class VoiceEditService:
             pass
         return ""
 
-    def _voice_session(self) -> str:
-        """The stable session id for the spoken conversation.
+    def _voice_session(self, request_id: str = "") -> str:
+        """The session id for the spoken conversation.
 
-        A dedicated session keeps the voice dialogue coherent instead of
-        mixing it with unrelated dashboard/chat turns (and test probes) in the
-        shared default session; it is still the SAME one canonical store.
+        Delegates to :mod:`voicebridge.voice_edit.voice_sessions` so the
+        configured mode applies: ``single`` (default) returns one stable
+        ``voice-chat`` session so the voice dialogue stays coherent instead of
+        overlaying ``/chat``/dashboard sessions; ``per_command`` derives a
+        deterministic ``voice-<stamp>-<hash>`` id per request. Never raises.
         """
         try:
-            from ..agent import resolve_session_id
-            return resolve_session_id(self.cfg, "voice-chat")
-        except Exception:
-            return "voice-chat"
+            return voice_sessions.voice_session_id(
+                self.cfg, request_id=request_id or None)
+        except Exception:  # noqa: BLE001 - always a usable voice id
+            return voice_sessions.SINGLE_SESSION_ID
+
+    def _maybe_prune_voice_sessions(self, request_id: str = "") -> None:
+        """Opportunistically prune old voice sessions (throttled, best-effort).
+
+        Runs on a real turn so retention does not need a scheduler. Throttled
+        to :data:`_VOICE_PRUNE_INTERVAL_S`; never raises, never blocks a turn.
+        The session the in-flight turn is using is always protected, so
+        retention can never delete the transcript being read/written (and the
+        stable ``voice-chat`` session is protected unconditionally by
+        :func:`voicebridge.voice_edit.voice_sessions.prune`).
+        """
+        try:
+            now = time.monotonic()
+            last = float(getattr(self, "_voice_pruned_at", 0.0) or 0.0)
+            if last and (now - last) < _VOICE_PRUNE_INTERVAL_S:
+                return
+            self._voice_pruned_at = now
+            active = self._request_session(request_id) or self._voice_session(
+                request_id)
+            voice_sessions.prune(self.cfg, store=self._session_store,
+                                 protect=[active])
+        except Exception:  # noqa: BLE001 - retention is non-essential
+            pass
 
     def _request_session(self, request_id: str) -> str:
         """The routed session key bound to this request, else "".
@@ -1178,7 +1318,8 @@ class VoiceEditService:
         except Exception:  # noqa: BLE001 - routing is additive, never fatal
             return ""
 
-    def _conversation_context(self, pending: str) -> str:
+    def _conversation_context(self, pending: str, *,
+                              request_id: str = "") -> str:
         """Recency-weighted prior-turn context from the ONE canonical store.
 
         The most recent turns are rendered verbatim and LAST, with an explicit
@@ -1192,7 +1333,7 @@ class VoiceEditService:
             if store is None:
                 return ""
             msgs = [m for m in
-                    store.messages(self._voice_session(), limit=200)
+                    store.messages(self._voice_session(request_id), limit=200)
                     .get("messages", [])
                     if isinstance(m, dict)
                     and str(m.get("content") or "").strip()]
@@ -1464,6 +1605,17 @@ class VoiceEditService:
     def is_repeat_request(text: str) -> bool:
         """True when the utterance asks to hear the last answer again."""
         return bool(_REPEAT_RE.search(text or ""))
+
+    @staticmethod
+    def is_report_request(text: str) -> bool:
+        """True when the utterance asks for a report on a chat session.
+
+        Conservative by design (see :data:`_REPORT_CHAT_RE`): a report-ish
+        verb next to a chat/session/conversation noun, or an explicit
+        "what did we do / what happened" frame carrying that noun. Ordinary
+        questions, a document summarize, and mail/YouTube asks never match.
+        """
+        return bool(_REPORT_CHAT_RE.search(text or ""))
 
     def _repeat_last_answer(self) -> "tuple[str, str]":
         """The last spoken answer, verbatim, or ``("", "")`` to fall through.
@@ -1985,6 +2137,83 @@ class VoiceEditService:
             return social
         return "", ""
 
+    @staticmethod
+    def _session_transcript(rows: Any, *, limit: int = 40,
+                            per_line: int = 500) -> str:
+        """Compact "USER:/ASSISTANT:" transcript from canonical message rows.
+
+        Bounded (last ``limit`` rows, ``per_line`` chars each), user/assistant
+        only, whitespace-collapsed. Never raises; a malformed row is skipped.
+        """
+        out = []
+        try:
+            selected = list(rows)[-max(1, int(limit)):]
+        except Exception:
+            return ""
+        for m in selected:
+            if not isinstance(m, dict):
+                continue
+            role = str(m.get("role") or "").strip().lower()
+            if role == "user":
+                speaker = "USER"
+            elif role == "assistant":
+                speaker = "ASSISTANT"
+            else:
+                continue
+            content = " ".join(str(m.get("content") or "").split())
+            if not content:
+                continue
+            out.append(f"{speaker}: {content[:per_line]}")
+        return "\n".join(out)
+
+    def _report_answer(self, question: str, *,
+                       request_id: str = "") -> "tuple[str, str]":
+        """Spoken summary of a chat session's transcript (deterministic).
+
+        Recognizes the report/summarize-a-chat intent, resolves the session
+        (the routed ``req.session_id`` when set, else the current voice
+        session), reads the canonical transcript bounded to the last 40 rows,
+        and summarizes it with the existing :func:`chat_transport._summarize_report`
+        (bounded words). The RAW transcript is never returned/spoken: an empty
+        or missing transcript yields an honest answer, and a summarizer fault
+        yields a short literal. Returns ``(answer, "skill-report")`` or
+        ``("", "")`` to fall through. Never raises.
+        """
+        q = (question or "").strip()
+        if not q or not self.is_report_request(q):
+            return "", ""
+        session = self._request_session(request_id) or self._voice_session(
+            request_id)
+        rows: Any = []
+        try:
+            from .. import chat_transport as _CT
+            data = _CT.store(self.cfg).messages(session, limit=40)
+            if isinstance(data, dict):
+                rows = [m for m in (data.get("messages") or [])
+                        if isinstance(m, dict)]
+        except Exception:  # noqa: BLE001 - a store fault falls through
+            return "", ""
+        transcript = self._session_transcript(rows)
+        if not transcript:
+            return ("There's no session transcript to report on yet.",
+                    "skill-report")
+        summary = ""
+        try:
+            from .. import chat_transport as _CT
+            summary = str(_CT._summarize_report(transcript, self.cfg) or ""
+                          ).strip()
+        except Exception:  # noqa: BLE001 - degrade to a short literal
+            summary = ""
+        if not summary:
+            return ("I couldn't summarize that session right now.",
+                    "skill-report")
+        try:
+            from ..summarizer import clamp_words
+            summary = clamp_words(summary, 40)
+        except Exception:  # noqa: BLE001 - summary is already bounded upstream
+            pass
+        return summary, "skill-report"
+
     def _gmail_configured(self) -> bool:
         """A Gmail-capable connector exists (himalaya account file)."""
         from pathlib import Path as _Path
@@ -2349,6 +2578,7 @@ class VoiceEditService:
             raise VoiceEditError("VOICE_EDIT_EMPTY_QUESTION",
                                  "no question to answer")
         self._require_estop_clear()
+        self._maybe_prune_voice_sessions(request_id)
         # Slice 4a — manual sleep mode (owner decision 2026-10-03 §5 #1/#2).
         # "going to sleep" sets the mode (this turn is on-request: answered,
         # remembered, spoken like any direct answer). A directed "hey qubit"
@@ -2536,6 +2766,25 @@ class VoiceEditService:
             return {"ok": True, "answer": skill_answer, "mode": mode,
                     "provider": "local", "model": skill_model,
                     "spoken": False}
+        # Report lane (2026-10-06): "report on my chat" / "summarize the chat
+        # session" reads the routed/current canonical transcript and speaks a
+        # SHORT summary, deterministically — before the brain/full-turn, so it
+        # never becomes a long model answer. The audit carries counts and the
+        # resolved session id only, never transcript text.
+        report_answer, report_model = self._report_answer(
+            question, request_id=request_id)
+        if report_answer:
+            self._audit("voice_edit.report_chat", {
+                "request_id": request_id, "mode": mode,
+                "chars": len(question), "ok": True,
+                "answer_chars": len(report_answer), "provider": "local",
+                "model": report_model,
+                "session": self._request_session(request_id) or ""})
+            self._remember_ask_exchange(question, report_answer,
+                                        model=report_model)
+            return {"ok": True, "answer": report_answer, "mode": mode,
+                    "provider": "local", "model": report_model,
+                    "spoken": False}
         # Lane-3 net (2026-10-03): tool-shaped misses that reach ask() as
         # conversation must STAGE, never let the brain narrate a
         # confirmation with no backing task (the 04:53 UTC "Set THE timer"
@@ -2595,7 +2844,7 @@ class VoiceEditService:
             # structured conversation_prompt (the adapter formats dialogue
             # correctly); folding it into the prompt string made the small
             # local model echo the last answer.
-            convo = self._conversation_context(question)
+            convo = self._conversation_context(question, request_id=request_id)
             # Shorter, more varied spoken answers: simple questions get one
             # natural sentence; an explicit "explain/in detail/report" gets room
             # for a fuller answer. A per-turn style hint discourages repeating
@@ -2696,7 +2945,7 @@ class VoiceEditService:
         # default voice session byte-identical. Only the full-turn dispatch is
         # routed — the brain/deterministic fast paths stay on the voice session.
         routed_session = self._request_session(request_id)
-        session = routed_session or "voice-chat"
+        session = routed_session or self._voice_session(request_id)
         if routed_session:
             self._audit("voice_edit.full_turn_session", {
                 "request_id": request_id, "session_id": routed_session})
@@ -2856,6 +3105,7 @@ class VoiceEditService:
         if not clean:
             raise VoiceEditError("VOICE_EDIT_EMPTY_TASK", "no task to run")
         self._require_estop_clear()
+        self._maybe_prune_voice_sessions(request_id)
         if not confirm:
             self._audit("voice_edit.task.confirm_required", {
                 "request_id": request_id, "chars": len(clean),
@@ -2884,7 +3134,7 @@ class VoiceEditService:
         # never invented). Nothing pending -> fall through byte-identical.
         try:
             from .. import chat_transport as _CT
-            _sid = routed_session or self._voice_session()
+            _sid = routed_session or self._voice_session(request_id)
             _st = self._canonical_store()
             if _st is not None:
                 try:
@@ -2920,9 +3170,11 @@ class VoiceEditService:
         # one canonical session store (inside run_session) and are audited.
         try:
             from .tool_task import run_tool_task
-            res = run_tool_task(self.cfg, clean, session=routed_session,
-                                confirmed=True,
-                                estop_engaged=self._estop)
+            res = run_tool_task(
+                self.cfg, clean,
+                session=routed_session or self._voice_session(request_id),
+                confirmed=True,
+                estop_engaged=self._estop)
         except Exception as exc:
             code = str(getattr(exc, "code", "") or "VOICE_EDIT_TASK_FAILED")
             self._audit("voice_edit.task.error", {

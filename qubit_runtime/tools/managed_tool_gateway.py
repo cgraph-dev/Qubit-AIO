@@ -49,7 +49,7 @@ def _read_nous_provider_state() -> Optional[dict]:
     try:
         from qubit_cli.auth import get_provider_auth_state
 
-        nous_provider = get_provider_auth_state("qubit")
+        nous_provider = get_provider_auth_state("nous")
         if not isinstance(nous_provider, dict):
             return None
         from qubit_cli.anon_auth import guest_enabled, is_guest_state
@@ -167,7 +167,7 @@ def _vendor_gateway(vendor: str, gateway_builder, token_reader) -> Optional[Mana
     nous_user_token = (token_reader or read_nous_access_token)()
     if not gateway_origin or not nous_user_token:
         return None
-    return _vendor_gateway("perplexity", None, token_reader)
+    return ManagedToolGatewayConfig(vendor=vendor, gateway_origin=gateway_origin, nous_user_token=nous_user_token, managed_mode=True)
 
 
 def resolve_managed_tool_gateway(

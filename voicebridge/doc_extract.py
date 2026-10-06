@@ -398,6 +398,47 @@ def status(cfg: Any) -> Dict[str, Any]:
             "trust": "untrusted-file-text"}
 
 
+def extract_bytes(filename: str, raw: bytes, *, max_chars: int = DEFAULT_MAX_CHARS,
+                  page: Optional[int] = None) -> Dict[str, Any]:
+    """Extract a document that has no confined path (browser-pasted bytes).
+
+    Same extraction cores as :func:`extract` (``_extract_pdf`` /
+    ``_extract_plain``), so a pasted PDF and a `/api/documents/extract` call
+    produce identical text — one extraction authority, never a second parser.
+
+    Deliberately does NOT require an estop probe or an approved-root resolve:
+    the caller already owns the bytes (they arrived in the HTTP body, not from
+    the filesystem), so there is no path to confine. The size bound is the
+    caller's ``file_attachments``/chat cap; the char bound is enforced here.
+    """
+    kind = kind_for_path(filename)
+    if not kind:
+        raise DocExtractError(
+            UNSUPPORTED_CODE,
+            "unsupported document kind; supported: " +
+            ", ".join(SUPPORTED_KINDS))
+    if not raw:
+        raise DocExtractError(BAD_INPUT_CODE, "empty file")
+    limit = _bounded_limit(max_chars)
+    if kind == "pdf":
+        result = _extract_pdf(Path(str(filename or "document.pdf")), raw,
+                              limit, page)
+    else:
+        if page is not None:
+            raise DocExtractError(BAD_INPUT_CODE,
+                                  "page is only valid for PDF documents")
+        result = _extract_plain(kind, raw, limit)
+    digest = hashlib.sha256(raw).hexdigest()
+    result.update({"state": "OK", "schema": "qubit-doc-extract/1",
+                   "kind": kind, "path": "",
+                   "bytes": len(raw), "sha256": digest,
+                   "trust": "untrusted-file-text"})
+    _audit("extract_bytes", {"kind": kind, "sha256": digest,
+                             "char_count": result["char_count"],
+                             "truncated": result["truncated"]})
+    return result
+
+
 def kinds(cfg: Any) -> Dict[str, Any]:
     """Supported document kinds for voice/CLI discovery."""
     return {"state": "OK", "schema": "qubit-doc-extract-kinds/1",

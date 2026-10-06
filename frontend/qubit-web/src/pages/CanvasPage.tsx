@@ -14,7 +14,7 @@
  * `CANVAS_NOT_FOUND`, never a fake page.
  *
  * Built on the shipped openclaw render-helper contract
- * (`@/components/openclaw-ui`): a `SettingsPage` root holding a
+ * (`@/components/console-ui`): a `SettingsPage` root holding a
  * `SettingsPageHeader`, a summary tile strip, and `SettingsSection` groups.
  * `.settings-row__control` is emitted by the helper ONLY when a control is
  * passed — a control-free row never renders an empty wrapper.
@@ -54,7 +54,7 @@ import {
   SettingsStatus,
   SettingsSummary,
   SettingsValue,
-} from "@/components/openclaw-ui";
+} from "@/components/console-ui";
 
 interface PendingConfirm {
   detail: string;

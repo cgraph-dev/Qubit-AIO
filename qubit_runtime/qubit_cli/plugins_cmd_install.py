@@ -11,12 +11,28 @@ import logging
 import os
 import sys
 import tempfile
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from qubit_cli.cli_output import line_input
 
 logger = logging.getLogger(__name__)
+
+# Answers to the dependency questions, reused while one plugin is installed into several profile
+# homes that share one environment (memory-provider migration on ``qubit update``, #125794).
+_shared_answers: ContextVar[Optional[dict]] = ContextVar("plugin_dependency_answers", default=None)
+
+
+@contextmanager
+def shared_dependency_answers():
+    """Inside this block each dependency question is asked once; repeats reuse the first answer."""
+    token = _shared_answers.set({})
+    try:
+        yield
+    finally:
+        _shared_answers.reset(token)
 
 
 def _pc():
@@ -390,6 +406,24 @@ def _install_plugin_core(
     _pc()._copy_example_files(target, _pc()._console())
     installed_manifest = _pc()._read_manifest(target)
     return target, installed_manifest, installed_manifest.get("name") or target.name
+
+
+def recorded_install(install: Callable[[], tuple], *, catalog_name: Optional[str], identifier: str) -> tuple:
+    """Run one plugin install attempt (a core ``(target, manifest, installed_name)`` call) and record
+    it as a shared-metrics extension install: failed when it raises, success unless it replaced an
+    already-installed plugin (a reinstall is not an install)."""
+    from qubit_cli.observability.shared_metrics_events import record_extension_install
+
+    source = "catalog" if catalog_name else ("local" if identifier.startswith("file://") else "url")
+    before = set(_pc()._read_install_metadata())
+    try:
+        result = install()
+    except Exception:
+        record_extension_install(kind="plugin", source=source, name=catalog_name, outcome="failed")
+        raise
+    if result[2] not in before:
+        record_extension_install(kind="plugin", source=source, name=catalog_name, outcome="success")
+    return result
 
 
 def cmd_install(

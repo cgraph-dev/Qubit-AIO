@@ -38,7 +38,12 @@ SETTINGS_KEYS = ("routing", "local_profile", "api_profile", "allow_api",
                     # ``wake_words_default`` is view-only (the built-in list)
                     # and deliberately not an accepted key.
                     "wake_words", "wake_words_add", "wake_words_remove",
-                    "wake_routing", "wake_route_add", "wake_route_remove")
+                    "wake_routing", "wake_route_add", "wake_route_remove",
+                    # Continuous listening + voice-session isolation/retention.
+                    "continuous_mode", "continuous_window_s",
+                    "continuous_max_followups", "voice_session_mode",
+                    "voice_session_ttl_s", "voice_session_max_messages",
+                    "voice_session_max_sessions")
 # NOTE: "answer_questions" was removed from persistence+view (2026-09-30): it
 # persisted with zero readers repo-wide, and wiring a service consumer would
 # contradict the honest-UI invariant (no control may act without a rendered
@@ -296,6 +301,24 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
         "verbatim_transcript": bool(_read_cfg(cfg, "voice_edit",
                                               "verbatim_transcript",
                                               default=False)),
+        # Continuous listening: after a turn, keep the mic armed for a bounded
+        # follow-up window so a second command needs no fresh wake.
+        "continuous_mode": bool(_read_cfg(cfg, "voice_edit", "continuous_mode",
+                                          default=False)),
+        "continuous_window_s": float(_read_cfg(
+            cfg, "voice_edit", "continuous_window_s", default=15.0) or 15.0),
+        "continuous_max_followups": int(_read_cfg(
+            cfg, "voice_edit", "continuous_max_followups", default=5) or 5),
+        # Voice-session isolation/retention (voicebridge.voice_edit.voice_sessions).
+        "voice_session_mode": str(_read_cfg(
+            cfg, "voice_edit", "voice_session_mode", default="single")
+            or "single"),
+        "voice_session_ttl_s": int(_read_cfg(
+            cfg, "voice_edit", "voice_session_ttl_s", default=86400) or 86400),
+        "voice_session_max_messages": int(_read_cfg(
+            cfg, "voice_edit", "voice_session_max_messages", default=200) or 200),
+        "voice_session_max_sessions": int(_read_cfg(
+            cfg, "voice_edit", "voice_session_max_sessions", default=50) or 50),
         # Manual sleep mode (owner decision 2026-10-03 §5 #1): set by saying
         # "going to sleep" / "I'm going to sleep"; gates UNPROMPTED speech
         # only (completions/briefings), never on-request answers. Cleared by
@@ -388,6 +411,13 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
             "max_s": float(_read_cfg(
                 cfg, "voice_edit", "wake", "max_s",
                 default=15.0) or 15.0),
+            # Trailing-silence bound once a segment has confirmed real
+            # speech: bridges the natural pause after "hey qubit" (and a
+            # slow dictation's mid-utterance pause) so one clear wake stays
+            # ONE segment. Deliberately longer than ``silence_ms``.
+            "hold_silence_ms": float(_read_cfg(
+                cfg, "voice_edit", "wake", "hold_silence_ms",
+                default=1800.0) or 1800.0),
             "arm_window_s": float(_read_cfg(
                 cfg, "voice_edit", "wake", "arm_window_s",
                 default=6.0) or 6.0),
@@ -581,6 +611,18 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                     from .schema import VoiceEditError
                     raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                                          f"wake.{k} must be a number")
+        if "hold_silence_ms" in wake:
+            try:
+                clean_wake["hold_silence_ms"] = float(wake["hold_silence_ms"])
+            except (TypeError, ValueError):
+                from .schema import VoiceEditError
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     "wake.hold_silence_ms must be a number")
+            # Established-speech trailing silence: at least the base
+            # 300 ms floor, at most 6 s (a longer hold would keep a segment
+            # open well past any deliberate utterance).
+            clean_wake["hold_silence_ms"] = max(
+                300.0, min(clean_wake["hold_silence_ms"], 6000.0))
         if "silence_ms" in clean_wake:
             clean_wake["silence_ms"] = int(
                 max(300.0, min(clean_wake["silence_ms"], 5000.0)))
@@ -605,6 +647,41 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
         from .custom_commands import validate_aliases
         clean["custom_commands"] = validate_aliases(update["custom_commands"])
     from .schema import VoiceEditError
+    # Continuous listening (bounded follow-up window) + voice-session
+    # isolation/retention. Clamped so a bad value can never make the mic
+    # listen forever or the store unbounded.
+    if "continuous_mode" in update:
+        clean["continuous_mode"] = bool(update["continuous_mode"])
+    if "continuous_window_s" in update:
+        try:
+            _cw = float(update["continuous_window_s"])
+        except (TypeError, ValueError):
+            raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                 "continuous_window_s must be a number")
+        clean["continuous_window_s"] = max(3.0, min(_cw, 120.0))
+    if "continuous_max_followups" in update:
+        try:
+            _cf = int(update["continuous_max_followups"])
+        except (TypeError, ValueError):
+            raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                 "continuous_max_followups must be an integer")
+        clean["continuous_max_followups"] = max(1, min(_cf, 20))
+    if "voice_session_mode" in update:
+        _vm = str(update["voice_session_mode"] or "").strip().lower()
+        if _vm not in ("single", "per_command"):
+            raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                 "voice_session_mode must be single|per_command")
+        clean["voice_session_mode"] = _vm
+    for _rk, _floor in (("voice_session_ttl_s", 60),
+                        ("voice_session_max_messages", 10),
+                        ("voice_session_max_sessions", 1)):
+        if _rk in update:
+            try:
+                _rv = int(update[_rk])
+            except (TypeError, ValueError):
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     f"{_rk} must be an integer")
+            clean[_rk] = max(_floor, _rv)
     # Cross-section knobs (models + TTS + local wording). These live under
     # tts.* / intent.local_llm.* in the config (portable, not Qubit-specific),
     # but are edited here so the dashboard can present one Voice settings form.

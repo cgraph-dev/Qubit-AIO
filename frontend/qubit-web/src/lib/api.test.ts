@@ -987,19 +987,41 @@ describe("api.setModelAssignment", () => {
     ).rejects.toMatchObject({ code: "MODEL_ENDPOINT_REQUIRED" });
   });
 
-  it("refuses auxiliary task pins with a typed error", async () => {
-    const fetchMock = vi.fn<typeof fetch>();
+  it("sends auxiliary task pins through the same /api/model/set route", async () => {
+    // Intentional behavior change (commit f907a10d): the compat layer now
+    // persists auxiliary task pins into the runtime config's `auxiliary`
+    // section for upstream parity, so the old client-side `AUX_PIN_REFUSED`
+    // guard was removed. The pin must reach the canonical route with the
+    // auxiliary scope + task slot, not be refused before the request.
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      jsonResponse(
+        {
+          ok: true,
+          scope: "auxiliary",
+          provider: "opencode-go",
+          model: "deepseek-v4-flash",
+        },
+        200,
+      ),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      api.setModelAssignment({
-        scope: "auxiliary",
-        provider: "opencode-go",
-        model: "deepseek-v4-flash",
-        task: "vision",
-      }),
-    ).rejects.toMatchObject({ code: "AUX_PIN_REFUSED" });
-    expect(fetchMock).not.toHaveBeenCalled();
+    await api.setModelAssignment({
+      scope: "auxiliary",
+      provider: "opencode-go",
+      model: "deepseek-v4-flash",
+      task: "vision",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/model/set");
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      scope: "auxiliary",
+      provider: "opencode-go",
+      model: "deepseek-v4-flash",
+      task: "vision",
+    });
   });
 });
 

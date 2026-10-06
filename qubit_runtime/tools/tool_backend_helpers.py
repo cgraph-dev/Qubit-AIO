@@ -25,7 +25,14 @@ def _account_info(force_fresh: bool = False):
         # Branched call, not ``force_fresh=force_fresh``: tests stub the reader with zero-arg lambdas.
         account_info = (get_nous_portal_account_info(force_fresh=True) if force_fresh
                         else get_nous_portal_account_info())
-        return bool(account_info.logged_in) and account_info.tool_gateway_entitled
+        # Return the ACCOUNT SNAPSHOT (per this function's contract), not a
+        # bool: managed_nous_tools_enabled / fast_search_entitled /
+        # tool_gateway_entitled_for all read .logged_in / .error /
+        # .is_anonymous_tier / .tool_gateway_entitled off it. Returning a
+        # bool here raised AttributeError in every one of them (sync
+        # regression 2026-10-06: web tools, OpenAI TTS, image-gen and the
+        # managed tool gateway all went unavailable).
+        return account_info
     except Exception:
         return None
 

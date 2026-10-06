@@ -34,7 +34,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
 SCHEMA = "qubit-chat/1"
 SESSION_SCHEMA = "qubit-chat-session/1"
@@ -1187,6 +1187,28 @@ def _is_affirmative(text: Any) -> bool:
     return cleaned in _AFFIRMATIVE_PHRASES
 
 
+def _classify_confirmation(text: Any) -> str:
+    """Classify a follow-up as ``"affirm"`` / ``"deny"`` / ``"other"``.
+
+    Uses the voice turn FSM's own vocabulary
+    (:func:`voicebridge.voice_edit.session_fsm.classify_confirmation`, which
+    ports the helper's ``_affirmative``/``_negative`` word lists) while keeping
+    every phrase :func:`_is_affirmative` already accepted — so a politely
+    phrased "Yes, please." confirms and "no thanks" cancels exactly as they do
+    on the voice path, and no previously-settling phrase stops working. Junk or
+    empty input is ``"other"``; never raises.
+    """
+    if _is_affirmative(text):
+        return "affirm"
+    try:
+        from .voice_edit.session_fsm import classify_confirmation
+
+        verdict = str(classify_confirmation(text) or "other")
+    except Exception:  # noqa: BLE001 - a broken seam must not drop a confirm
+        verdict = "other"
+    return verdict if verdict in ("affirm", "deny") else "other"
+
+
 def _pending_registry(cfg: Any, sid: str) -> list:
     """Read-only pending staged registry confirmations for one chat session.
 
@@ -1558,6 +1580,111 @@ def _settle_task_affirmed(cfg: Any, st: Any, sid: str) -> Dict[str, Any]:
             "task": task_key, "status": "done",
             "confirmation_id": cid,
             "receipt": _branch_receipt("task", task=task_key, cfg=cfg)}
+
+
+# ---------------------------------------------------------------------------
+# Session-scoped pending-confirmation view + cancel (voice-FSM parity)
+# ---------------------------------------------------------------------------
+def _pending_confirmation(cfg: Any, sid: str) -> Optional[Dict[str, Any]]:
+    """The live pending confirmation for one /qubit-chat session, or None.
+
+    Session-scoped and TTL-bounded: reads the SAME durable journal records the
+    staging paths write (a staged build write or a staged registry
+    confirmation), filtered to *sid*; ``ApprovalJournal.pending()`` already
+    drops expired records, so a stale "yes" can never settle one. The returned
+    descriptor is redacted and bounded — the UI may render ``action_summary``
+    and ``staged_ms`` but a raw argument dump or a secret never crosses this
+    boundary. Never raises: an unreadable journal degrades to "no pending" so a
+    turn falls through byte-identically.
+    """
+    probe = _bounded(str(sid or "").strip(), 80) or DEFAULT_SESSION
+    newest: Optional[Tuple[float, str, str, str, float]] = None
+    for kind, entries in (("task", _pending_task(cfg, probe)),
+                          ("registry", _pending_registry(cfg, probe))):
+        for item in entries or []:
+            try:
+                created = float(getattr(item, "created_at", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                created = 0.0
+            if newest is not None and created < newest[0]:
+                continue
+            try:
+                expires = float(getattr(item, "expires_at", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                expires = 0.0
+            cid = str(getattr(item, "id", "") or "")
+            summary = _redact(str(getattr(item, "summary", "") or ""))[:200]
+            newest = (created, kind, cid, summary, expires)
+    if newest is None:
+        return None
+    created, kind, cid, summary, expires = newest
+    now = time.time()
+    return {
+        "kind": kind,
+        "confirmation_id": cid or None,
+        "action_summary": summary or "a pending action awaiting confirmation",
+        "staged_ms": int(max(0.0, now - created) * 1000),
+        "expires_ms": int(max(0.0, expires - now) * 1000),
+    }
+
+
+def _pending_event_field(cfg: Any, sid: str) -> Dict[str, Any]:
+    """``{"pending_confirmation": {...}}`` when live, else ``{}``.
+
+    Spreading this into an event leaves the event shape byte-identical when
+    nothing is pending — the "no-pending turns are unchanged" contract.
+    """
+    try:
+        pending = _pending_confirmation(cfg, sid)
+    except Exception:  # noqa: BLE001 - exposure must never break the turn
+        pending = None
+    return {"pending_confirmation": pending} if pending else {}
+
+
+def _cancel_confirmations(cfg: Any, st: Any, sid: str) -> Dict[str, Any]:
+    """Deny (cancel) the session's live pending confirmations, typed.
+
+    Called ONLY for an explicit denial follow-up on a session that already has
+    a live pending confirmation. Registry confirmations settle through the
+    shared ``voice_commands.cancel_pending`` path; staged build writes settle
+    through the journal's own ``respond("deny")``. Nothing is executed and no
+    other session is touched. A cancellation failure leaves the pending in
+    place — it is never silently dropped.
+    """
+    cancelled = 0
+    if _pending_registry(cfg, sid):
+        try:
+            from . import voice_commands as VC
+
+            ctx = VC.make_ctx(cfg, actor="dashboard:user", session=sid,
+                              source="user")
+            outcome = VC.cancel_pending(ctx)
+            receipt = dict(getattr(outcome, "receipt", None) or {})
+            cancelled += int(receipt.get("cancelled") or 0)
+        except Exception as exc:  # noqa: BLE001 - typed, pending stays
+            _audit("turn_confirm_cancel_error", session=sid, error=str(exc))
+    journal = _task_journal(cfg)
+    for item in _pending_task(cfg, sid):
+        cid = str(getattr(item, "id", "") or "")
+        if journal is None or not cid:
+            continue
+        try:
+            journal.respond(cid, "deny")
+            cancelled += 1
+        except Exception:  # noqa: BLE001 - best-effort per record
+            pass
+    if cancelled == 1:
+        speech = "Cancelled the pending confirmation."
+    elif cancelled:
+        speech = f"Cancelled {cancelled} pending confirmations."
+    else:
+        speech = "There is nothing pending to cancel."
+    if cancelled:
+        st.append(sid, "assistant", speech,
+                  meta={"route": "confirm", "cancelled": cancelled})
+    _audit("turn_confirm_cancelled", session=sid, cancelled=cancelled)
+    return {"ok": True, "text": speech, "reply": speech, "session_id": sid,
+            "session": sid, "route": "confirm", "cancelled": cancelled}
 
 
 def _ddg_web_fallback(query: str) -> Optional[Dict[str, Any]]:
@@ -3456,16 +3583,21 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
                     "code": appended.get("code"),
                     "detail": appended.get("detail", "")}
         return _finish_slash(cfg, st, sid, clean)
-    # T4: an affirmative follow-up ("yes"/"confirm"/"do it") on a session
-    # with a pending staged registry confirmation settles THAT record
-    # through the same shared journal path — never a fresh classify (which
-    # would chatter "I will open the browser…" and execute nothing).
-    # Non-affirmative text and affirmatives with nothing pending keep the
-    # legacy path byte-for-byte (no auto-execution without affirmation).
-    if clean and _is_affirmative(clean):
+    # T4/T5: a follow-up on a session with a live pending confirmation is
+    # resolved by intent through the SAME session-scoped durable journal the
+    # staged record lives in — an affirmation runs it (registry settle or the
+    # user-issued build grant; never a fresh classify, which would chatter
+    # "I will open the browser…" and execute nothing), an explicit denial
+    # cancels it, and any OTHER text is a non-consuming turn: the pending is
+    # preserved, never silently discarded. Affirmations/denials with nothing
+    # pending keep the legacy path byte-for-byte (no auto-execution, no
+    # phantom cancel).
+    if clean:
         _probe = str(session or DEFAULT_SESSION).strip()[:80] \
             or DEFAULT_SESSION
-        if _pending_registry(cfg, _probe):
+        _verdict = _classify_confirmation(clean)
+        if _verdict in ("affirm", "deny") and (
+                _pending_registry(cfg, _probe) or _pending_task(cfg, _probe)):
             created = _resolve_session(st, session, model=None, cfg=cfg)
             if created.get("state") != "OK":
                 return {"ok": False, "state": "FAILED",
@@ -3477,23 +3609,10 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
                 return {"ok": False, "state": "FAILED",
                         "code": appended.get("code"),
                         "detail": appended.get("detail", "")}
-            return _settle_affirmed(cfg, st, sid)
-        # T5: same bare-affirmation check — a "yes" with a pending staged
-        # build write settles THAT record (user-issued grant, one broker
-        # path), never a fresh classify. Non-affirmative text keeps the
-        # legacy path byte-for-byte (no auto-execution without affirmation).
-        if _pending_task(cfg, _probe):
-            created = _resolve_session(st, session, model=None, cfg=cfg)
-            if created.get("state") != "OK":
-                return {"ok": False, "state": "FAILED",
-                        "code": created.get("code"),
-                        "detail": created.get("detail", "")}
-            sid = created["session"]["id"]
-            appended = st.append(sid, "user", clean)
-            if appended.get("state") != "OK":
-                return {"ok": False, "state": "FAILED",
-                        "code": appended.get("code"),
-                        "detail": appended.get("detail", "")}
+            if _verdict == "deny":
+                return _cancel_confirmations(cfg, st, sid)
+            if _pending_registry(cfg, sid):
+                return _settle_affirmed(cfg, st, sid)
             return _settle_task_affirmed(cfg, st, sid)
     # Mid-sentence slash (one known /verb anywhere): executes that verb
     # against the real backend instead of entering the classifier/model path
@@ -4015,7 +4134,7 @@ def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
     yield {"event": "start", "session_id": sid, "session": sid,
            "model": routed.get("model"), "provider": routed.get("provider"),
            "streaming": False, "message": appended.get("message"),
-           "context": decision.public()}
+           "context": decision.public(), **_pending_event_field(cfg, sid)}
     res = _generate_remote(cfg, sid, clean, context, routed,
                            timeout_s=timeout_s, cancel=cancel,
                            context_meta=ctx_meta, decision=decision,
@@ -4029,7 +4148,8 @@ def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
     receipt["streaming"] = False
     yield {"event": "done", "ok": True, "reply": res["reply"],
            "session_id": sid, "session": sid,
-           "elapsed_ms": res.get("elapsed_ms"), "receipt": receipt}
+           "elapsed_ms": res.get("elapsed_ms"), "receipt": receipt,
+           **_pending_event_field(cfg, sid)}
 
 
 def _stream_branch(cfg: Any, st: Any, sid: str, clean: str,
@@ -4054,7 +4174,8 @@ def _stream_branch(cfg: Any, st: Any, sid: str, clean: str,
         return
     started = time.monotonic()
     yield {"event": "start", "session_id": sid, "session": sid,
-           "route": action, "message": appended.get("message")}
+           "route": action, "message": appended.get("message"),
+           **_pending_event_field(cfg, sid)}
     if action == "agent_task":
         yield from _stream_task(cfg, st, sid, task_text, started,
                                 timeout_s=timeout_s, cancel=cancel)
@@ -4065,7 +4186,8 @@ def _stream_branch(cfg: Any, st: Any, sid: str, clean: str,
     if not res.get("ok"):
         yield {"event": "error", "code": res.get("code", "BRANCH_FAILED"),
                "detail": res.get("detail", ""), "session_id": sid,
-               "route": action, "elapsed_ms": elapsed_ms}
+               "route": action, "elapsed_ms": elapsed_ms,
+               **_pending_event_field(cfg, sid)}
         return
     text = str(res.get("text") or res.get("reply") or "")
     yield {"event": "delta", "text": text, "session_id": sid}
@@ -4082,7 +4204,7 @@ def _stream_branch(cfg: Any, st: Any, sid: str, clean: str,
             receipt[key] = res[key]
     yield {"event": "done", "ok": True, "reply": text,
            "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
-           "receipt": receipt}
+           "receipt": receipt, **_pending_event_field(cfg, sid)}
 
 
 def _stream_task(cfg: Any, st: Any, sid: str, task_text: str, started: float,
@@ -4151,7 +4273,8 @@ def _stream_task(cfg: Any, st: Any, sid: str, task_text: str, started: float,
                "detail": staged.get("detail", ""), "session_id": sid,
                "route": "task", "task": key, "elapsed_ms": elapsed_ms,
                **({"confirmation_id": staged["confirmation_id"]}
-                  if staged.get("confirmation_id") else {})}
+                  if staged.get("confirmation_id") else {}),
+               **_pending_event_field(cfg, sid)}
         return
     out = _finish_task(cfg, st, sid, key, res)
     elapsed_ms = int((time.monotonic() - started) * 1000)
@@ -4178,7 +4301,8 @@ def _stream_task(cfg: Any, st: Any, sid: str, task_text: str, started: float,
            "receipt": {"runtime": "qubit-chat-worker", "route": "task",
                        "streaming": True, "task": key, "sources": [],
                        "model": _branch_model(cfg),
-                       "path": "voicebridge.chat_transport._stream_task"}}
+                       "path": "voicebridge.chat_transport._stream_task"},
+           **_pending_event_field(cfg, sid)}
 
 
 def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
@@ -4227,12 +4351,15 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                "detail": created.get("detail", "")}
         return
     sid = created["session"]["id"]
-    # T4: same affirmative-settle as turn() — a bare "yes" with pending
-    # staged work settles that record instead of reclassifying into chatter.
-    if clean and _is_affirmative(clean) and _pending_registry(cfg, sid):
+    # T4/T5: same session-scoped intent resolution as turn() — an
+    # affirmation runs the staged record, a denial cancels it, any other
+    # text leaves it staged. The pending state is surfaced on start/done so
+    # the UI can render "awaiting confirmation" without a raw dump.
+    _verdict = _classify_confirmation(clean) if clean else "other"
+    if _verdict == "affirm" and _pending_registry(cfg, sid):
         started = time.monotonic()
         yield {"event": "start", "session_id": sid, "session": sid,
-               "route": "registry"}
+               "route": "registry", **_pending_event_field(cfg, sid)}
         appended = st.append(sid, "user", clean)
         if appended.get("state") != "OK":
             yield {"event": "error", "code": appended.get("code"),
@@ -4249,13 +4376,14 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         yield {"event": "delta", "text": text_out, "session_id": sid}
         yield {"event": "done", "ok": True, "reply": text_out,
                "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
-               "receipt": res.get("receipt")}
+               "receipt": res.get("receipt"),
+               **_pending_event_field(cfg, sid)}
         return
     # T5: same affirmative-settle as turn() for staged build writes.
-    if clean and _is_affirmative(clean) and _pending_task(cfg, sid):
+    if _verdict == "affirm" and _pending_task(cfg, sid):
         started = time.monotonic()
         yield {"event": "start", "session_id": sid, "session": sid,
-               "route": "task"}
+               "route": "task", **_pending_event_field(cfg, sid)}
         appended = st.append(sid, "user", clean)
         if appended.get("state") != "OK":
             yield {"event": "error", "code": appended.get("code"),
@@ -4272,7 +4400,30 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         yield {"event": "delta", "text": text_out, "session_id": sid}
         yield {"event": "done", "ok": True, "reply": text_out,
                "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
-               "receipt": res.get("receipt")}
+               "receipt": res.get("receipt"),
+               **_pending_event_field(cfg, sid)}
+        return
+    # Deny: an explicit "no"/"cancel" on a session with live staged work
+    # cancels THAT record. Denials with nothing pending fall through
+    # byte-identically (a plain "no" is still a normal turn).
+    if _verdict == "deny" and (_pending_registry(cfg, sid)
+                               or _pending_task(cfg, sid)):
+        started = time.monotonic()
+        yield {"event": "start", "session_id": sid, "session": sid,
+               "route": "confirm", **_pending_event_field(cfg, sid)}
+        appended = st.append(sid, "user", clean)
+        if appended.get("state") != "OK":
+            yield {"event": "error", "code": appended.get("code"),
+                   "detail": appended.get("detail", ""), "session_id": sid}
+            return
+        res = _cancel_confirmations(cfg, st, sid)
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        text_out = str(res.get("text") or res.get("reply") or "")
+        yield {"event": "delta", "text": text_out, "session_id": sid}
+        yield {"event": "done", "ok": True, "reply": text_out,
+               "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
+               "route": "confirm",
+               "receipt": _branch_receipt("confirm", cfg=cfg)}
         return
     # Qubit-chat slash turns (DECISIONS #26): same real-backend execution
     # as turn(), streamed as a single truthful delta. Non-slash turns
@@ -4280,7 +4431,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     if clean.startswith("/"):
         started = time.monotonic()
         yield {"event": "start", "session_id": sid, "session": sid,
-               "route": "slash"}
+               "route": "slash", **_pending_event_field(cfg, sid)}
         appended = st.append(sid, "user", clean)
         if appended.get("state") != "OK":
             yield {"event": "error", "code": appended.get("code"),
@@ -4297,7 +4448,8 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         yield {"event": "delta", "text": text_out, "session_id": sid}
         yield {"event": "done", "ok": True, "reply": text_out,
                 "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
-                "receipt": res.get("receipt")}
+                "receipt": res.get("receipt"),
+                **_pending_event_field(cfg, sid)}
         return
     # Mid-sentence slash (same contract as turn() above): one known /verb
     # anywhere executes that verb; zero or 2+ fall through byte-identical.
@@ -4306,7 +4458,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         if _inline is not None:
             started = time.monotonic()
             yield {"event": "start", "session_id": sid, "session": sid,
-                   "route": "slash"}
+                   "route": "slash", **_pending_event_field(cfg, sid)}
             appended = st.append(sid, "user", clean)
             if appended.get("state") != "OK":
                 yield {"event": "error", "code": appended.get("code"),
@@ -4325,7 +4477,8 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
             yield {"event": "delta", "text": text_out, "session_id": sid}
             yield {"event": "done", "ok": True, "reply": text_out,
                    "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
-                   "receipt": res.get("receipt")}
+                   "receipt": res.get("receipt"),
+                   **_pending_event_field(cfg, sid)}
             return
     # Direct facts on the stream path (same contract as turn() above):
     # single truthful delta, route "facts", no model consulted.
@@ -4333,7 +4486,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     if _fact:
         started = time.monotonic()
         yield {"event": "start", "session_id": sid, "session": sid,
-               "route": "facts"}
+               "route": "facts", **_pending_event_field(cfg, sid)}
         appended = st.append(sid, "user", clean)
         if appended.get("state") != "OK":
             yield {"event": "error", "code": appended.get("code"),
@@ -4345,7 +4498,8 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         yield {"event": "done", "ok": True, "reply": _fact,
                "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
                "route": "facts", "model": "live-facts",
-               "receipt": res.get("receipt")}
+               "receipt": res.get("receipt"),
+               **_pending_event_field(cfg, sid)}
         return
     # Deterministic reread on the stream path (same contract as turn()):
     # single truthful delta, route "repeat", no model consulted.
@@ -4354,7 +4508,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         if _rlast:
             started = time.monotonic()
             yield {"event": "start", "session_id": sid, "session": sid,
-                   "route": "repeat"}
+                   "route": "repeat", **_pending_event_field(cfg, sid)}
             appended = st.append(sid, "user", clean)
             if appended.get("state") != "OK":
                 yield {"event": "error", "code": appended.get("code"),
@@ -4366,7 +4520,8 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
             yield {"event": "done", "ok": True, "reply": _rlast,
                    "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
                    "route": "repeat", "model": "repeat",
-                   "receipt": res.get("receipt")}
+                   "receipt": res.get("receipt"),
+                   **_pending_event_field(cfg, sid)}
             return
     decided = _decide_branch(clean, cfg)
     if decided.get("action") in BRANCH_ACTIONS:
@@ -4386,19 +4541,21 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                                 cancel=cancel, reasoning=reasoning_level)
         if agent_out is not None:
             yield {"event": "start", "session_id": sid, "session": sid,
-                   "route": "agent"}
+                   "route": "agent", **_pending_event_field(cfg, sid)}
             if not agent_out.get("ok"):
                 yield {"event": "error",
                        "code": agent_out.get("code", "MODEL_ERROR"),
                        "detail": agent_out.get("detail", ""),
-                       "session_id": sid, "route": "agent"}
+                       "session_id": sid, "route": "agent",
+                       **_pending_event_field(cfg, sid)}
                 return
             text_out = str(agent_out.get("reply") or "")
             yield {"event": "delta", "text": text_out, "session_id": sid}
             yield {"event": "done", "ok": True, "reply": text_out,
                    "session_id": sid, "session": sid,
                    "elapsed_ms": agent_out.get("elapsed_ms"),
-                   "receipt": agent_out.get("receipt")}
+                   "receipt": agent_out.get("receipt"),
+                   **_pending_event_field(cfg, sid)}
             return
     routed_probe = resolve_route(cfg, model, session=session, role=role)
     if routed_probe.get("kind") in ("api", "realtime", "plugin"):
@@ -4443,7 +4600,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     started = time.monotonic()
     yield {"event": "start", "session_id": sid, "session": sid,
            "model": resolved_model, "message": appended.get("message"),
-           "context": decision.public()}
+           "context": decision.public(), **_pending_event_field(cfg, sid)}
 
     out: "queue.Queue[Any]" = queue.Queue()
     done = object()
@@ -4644,7 +4801,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
            "session": sid, "elapsed_ms": elapsed_ms,
            "message": saved.get("message"),
            "message_count": saved.get("message_count"),
-           "receipt": receipt}
+           "receipt": receipt, **_pending_event_field(cfg, sid)}
 
 
 def sse_encode(event: Dict[str, Any]) -> str:

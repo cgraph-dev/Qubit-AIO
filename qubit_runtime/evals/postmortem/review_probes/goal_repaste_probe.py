@@ -32,7 +32,7 @@ os.environ['NO_PROXY'] = '*'
 os.environ['TZ'] = 'UTC'
 # Fail closed: these probes must never invoke a provider or external network.
 socket.socket.connect = lambda *a, **k: (_ for _ in ()).throw(RuntimeError('network prohibited in review probe'))
-from cli import HermesCLI
+from cli import QubitCLI as HermesCLI
 from qubit_cli import cli_commands_mixin, goals
 from gateway.slash_commands_goals import GatewayGoalCommandsMixin
 from gateway.config import Platform

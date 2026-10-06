@@ -161,7 +161,11 @@ describe("botchat stylesheet covers both pages", () => {
 
 describe("chat structural parity", () => {
   it("QubitBotPage renders the shared chat structure", async () => {
-    const el = renderNode(<QubitBotPage />);
+    const el = renderNode(
+      <MemoryRouter>
+        <QubitBotPage />
+      </MemoryRouter>,
+    );
     await flush();
     for (const cls of [
       "qb-chat",
@@ -200,7 +204,11 @@ describe("chat structural parity", () => {
 describe("QubitBotPage ported chat surface (openmuse chat.tsx)", () => {
   it("renders the hero with starter prompts and the pill composer", async () => {
     botMocks.getBotThread.mockResolvedValue({ result: { events: [] } });
-    const el = renderNode(<QubitBotPage />);
+    const el = renderNode(
+      <MemoryRouter>
+        <QubitBotPage />
+      </MemoryRouter>,
+    );
     await flush();
     expect(el.querySelector(".qb-hero")).not.toBeNull();
     expect(el.querySelectorAll(".qb-starter-btn").length).toBe(3);
@@ -216,7 +224,11 @@ describe("QubitBotPage ported chat surface (openmuse chat.tsx)", () => {
     botMocks.sendBotTurn.mockImplementationOnce(
       () => new Promise((resolve) => { release = resolve; }),
     );
-    const el = renderNode(<QubitBotPage />);
+    const el = renderNode(
+      <MemoryRouter>
+        <QubitBotPage />
+      </MemoryRouter>,
+    );
     await flush();
     // The composer is a multi-line <textarea> (upstream multiline TextInput).
     const composer = el.querySelector("#bot-composer") as HTMLTextAreaElement;
@@ -255,7 +267,11 @@ describe("QubitBotPage ported chat surface (openmuse chat.tsx)", () => {
 
   it("pauses the queue and surfaces 'Messages on hold' after a send failure", async () => {
     botMocks.sendBotTurn.mockRejectedValueOnce(new Error("boom"));
-    const el = renderNode(<QubitBotPage />);
+    const el = renderNode(
+      <MemoryRouter>
+        <QubitBotPage />
+      </MemoryRouter>,
+    );
     await flush();
     // The composer is a multi-line <textarea> (upstream multiline TextInput).
     const composer = el.querySelector("#bot-composer") as HTMLTextAreaElement;

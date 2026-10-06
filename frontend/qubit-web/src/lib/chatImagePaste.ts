@@ -69,6 +69,28 @@ export function firstImageFromClipboard(
   return imageFilesFromTransfer(data)[0] ?? null;
 }
 
+/**
+ * Pull the first file of ANY kind out of a DataTransfer, or null.
+ *
+ * Unlike :func:`firstImageFromClipboard`, this accepts a dropped PDF/text file
+ * too — the chat composer routes a dropped non-image through the document
+ * extraction path, so a file-manager drop is not silently ignored.
+ */
+export function firstFileFromTransfer(data: DataTransfer | null): File | null {
+  if (!data) return null;
+  if (data.items?.length) {
+    for (let i = 0; i < data.items.length; i++) {
+      const item = data.items[i];
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) return file;
+      }
+    }
+  }
+  if (data.files?.length) return data.files[0] ?? null;
+  return null;
+}
+
 /** True when a drag payload may contain an image (for dragover preventDefault). */
 export function transferMayContainImage(data: DataTransfer | null): boolean {
   if (!data) return false;

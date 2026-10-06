@@ -236,12 +236,17 @@ export function AgentActivityScreen({
   loading,
   error,
   onReload,
+  onOpen,
   context,
 }: {
   tasks: AgentTaskRow[];
   loading: boolean;
   error: string;
   onReload: () => void;
+  /** Open a task's detail. Without this the activity card is inert even though
+   *  it advertises `aria-label="Open task: …"` (AgentCardsPage wires it to the
+   *  TaskDetail panel). */
+  onOpen?: (task: AgentTaskRow) => void;
   context: AgentUiContext;
 }) {
   const [filter, setFilter] = useState("All");
@@ -283,7 +288,7 @@ export function AgentActivityScreen({
             />
           ))
         : visible.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard key={task.id} task={task} onOpen={() => onOpen?.(task)} />
           ))}
       {!loading && !visible.length ? (
         <div className="flex flex-col items-center gap-[13px] py-10 text-center">

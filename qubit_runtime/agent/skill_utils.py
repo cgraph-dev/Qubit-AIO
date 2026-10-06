@@ -31,6 +31,24 @@ EXCLUDED_SKILL_DIRS = frozenset((
 # via skill_view(skill, file_path=...), never scanned as standalone skills.
 SKILL_SUPPORT_DIRS = frozenset(("references", "templates", "assets", "scripts"))
 
+# Org mirrors live under skills/_org/<org_id>/ and are TOKEN-GATED: the sync
+# client writes the marker after verifying the token; no marker => no org skills
+# load. The marker persists offline so already-pulled org skills keep working.
+ORG_MIRROR_DIR_NAME = "_org"
+ORG_ACTIVE_MARKER = ".active_org"
+ORG_PROVENANCE_FILE = ".org-provenance.json"
+ORG_BASELINE_FILE = ".org-baseline.json"  # upstream fingerprint; detects local edits
+
+
+def read_active_org_id(skills_dir: Path) -> Optional[str]:
+    """The org id whose mirror may resolve, or None (no org skills load)."""
+    marker = skills_dir / ORG_MIRROR_DIR_NAME / ORG_ACTIVE_MARKER
+    try:
+        return (marker.read_text(encoding="utf-8-sig").strip() or None) if marker.exists() else None
+    except OSError:
+        return None
+
+
 def is_excluded_skill_path(path, *, root: Optional[Path] = None) -> bool:
     """True if *path* should be skipped by skill scanners (VCS/dependency/cache
     dirs + support packages). Apply to every SKILL.md from a direct ``rglob``."""

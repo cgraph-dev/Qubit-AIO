@@ -558,27 +558,103 @@ class _AudioVadSegmenter:
     odd sizes) and the endpointer state after the last subframe is the
     segment state. Buffering semantics match ``EnergyEndpointer``: the
     caller appends whole frames while the state is ``speech``/``done``.
+
+    Adaptive trailing silence (2026-10-06). The base
+    ``silence_timeout_s`` (live ``wake.silence_ms`` = 500 ms) ends a
+    segment at the first human pause, so the wake phrase and its command —
+    and a slow dictation and its own words — were split into separate
+    segments, and only the first was acted on. Once the VAD has confirmed
+    real speech (``speech_start_ms`` of voiced subframes), ``hold_silence_ms``
+    becomes the trailing-silence bound for the REST of that segment, so a
+    mid-utterance pause no longer ends the turn. Room drone never reaches
+    the VAD's speech state, so it is unaffected; ``max_utterance_s`` still
+    bounds every segment (and the ASR-fallback/media guards still apply to
+    whatever is captured). ``hold_silence_ms=None`` keeps the legacy
+    single-threshold behavior byte-identical.
     """
 
     _SUBFRAME_BYTES = 960  # 30 ms @ 16 kHz mono s16
+    _SUBFRAME_MS = 30
 
-    def __init__(self, audio_endpointer: Any, backend: str) -> None:
+    def __init__(self, audio_endpointer: Any, backend: str, *,
+                 hold_silence_ms: Optional[float] = None) -> None:
         self._ep = audio_endpointer
         self.backend = backend
         self._tail = b""
+        self._holding = False
+        # Captured from the base endpointer so ``reset`` can restore the
+        # tight threshold for the next segment (numerically: some base
+        # endpointers do not recompute their silence counter on a bare
+        # ``reset()``).
+        self._base_silence_frames = getattr(self._ep, "_silence_frames", None)
+        self._base_silence_timeout_s = getattr(
+            self._ep, "silence_timeout_s", None)
+        try:
+            ms = float(hold_silence_ms) if hold_silence_ms is not None else 0.0
+        except (TypeError, ValueError):
+            ms = 0.0
+        self._hold_frames = (max(1, int(round(ms / self._SUBFRAME_MS)))
+                             if ms > 0 else None)
 
     def reset(self) -> None:
         self._tail = b""
+        self._holding = False
+        if self._base_silence_frames is not None:
+            try:
+                self._ep._silence_frames = self._base_silence_frames
+            except Exception:
+                pass
+        if self._base_silence_timeout_s is not None:
+            try:
+                self._ep.silence_timeout_s = self._base_silence_timeout_s
+            except Exception:
+                pass
         self._ep.reset()
 
+    def _apply_hold(self) -> None:
+        """Switch to the hold threshold the moment real speech is confirmed.
+
+        Applying it at the speech-open edge (not after a fixed voiced
+        duration) is what bridges the natural breath a speaker takes right
+        after "hey qubit". Before speech opens the base threshold still
+        ends a noise blip quickly, and drone never reaches ``speech`` at
+        all under Silero.
+        """
+        if self._hold_frames is None or self._holding:
+            return
+        try:
+            if self._ep.state == "speech":
+                self._holding = True
+                self._ep._silence_frames = self._hold_frames
+                try:
+                    self._ep.silence_timeout_s = (
+                        self._hold_frames * self._SUBFRAME_MS / 1000.0)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     def add_frame(self, pcm: bytes) -> str:
-        data = self._tail + (pcm or b"")
+        try:
+            data = self._tail + (pcm or b"")
+        except Exception:
+            return self._safe_state()
         step = self._SUBFRAME_BYTES
         n_full = len(data) // step
         for i in range(n_full):
-            self._ep.add_frame(data[i * step:(i + 1) * step])
+            try:
+                self._ep.add_frame(data[i * step:(i + 1) * step])
+            except Exception:
+                pass
+            self._apply_hold()
         self._tail = data[n_full * step:]
-        return self._ep.state
+        return self._safe_state()
+
+    def _safe_state(self) -> str:
+        try:
+            return str(self._ep.state)
+        except Exception:
+            return "idle"
 
 
 def _build_audio_segmenter(cfg: Any) -> _AudioVadSegmenter:
@@ -595,16 +671,21 @@ def _build_audio_segmenter(cfg: Any) -> _AudioVadSegmenter:
     from ..audio.vad import Endpointer as _AudioEndpointer
     mode = _wake_vad_mode(cfg)
     backend = mode if mode in ("silero", "webrtc") else "silero"
+    base_silence_ms = float(_cfg(cfg, "voice_edit", "wake", "silence_ms",
+                                 default=900) or 900)
     ep = _AudioEndpointer(
         speech_start_ms=300,
-        silence_timeout_s=float(_cfg(cfg, "voice_edit", "wake", "silence_ms",
-                                     default=900) or 900) / 1000.0,
+        silence_timeout_s=base_silence_ms / 1000.0,
         max_utterance_s=_wake_max_s(cfg),
         rms_gate=float(_cfg(cfg, "voice_edit", "wake", "rms_gate",
                             default=0.0018) or 0.0018),
         vad_backend=backend,
     )
-    return _AudioVadSegmenter(ep, backend=backend)
+    # The hold must never be SHORTER than the base (that would make a
+    # confirmed-speech segment close faster than a noise blip).
+    hold_ms = max(_wake_hold_silence_ms(cfg), base_silence_ms)
+    return _AudioVadSegmenter(ep, backend=backend,
+                              hold_silence_ms=hold_ms)
 
 
 def _make_segmenter(cfg: Any,
@@ -746,6 +827,82 @@ def _is_command_shaped(cfg: Any, text: str) -> bool:
     return False
 
 
+# ---------------------------------------------------------------------------
+# Own-voice / media suppression (2026-10-06).
+#
+# Journal-proven false fire: a YouTube outro playing through the room
+# speakers ("I'm Qubit. Thank you for watching ...") reached the wake path
+# and was executed as a command, clobbering a real staged "open youtube"
+# confirmation. The prompt-echo guard only catches whisper parrots of its
+# own vocabulary, so a long non-command sentence from media / own voice is
+# dropped here before any emit or arm.
+#
+# Conservative by construction: a real command is expected to OPEN with a
+# command verb or question word ("open ...", "type this for me: ...",
+# "what ..."), so short commands and long verb-led dictation keep working
+# while media narration is discarded. The bound was 20 words, but the exact
+# reported false fire ("I'm Qubit. Thank you for watching. I hope you enjoyed.
+# I'll see you in the next video. Bye! Bye!") is only 19 words and slipped
+# through while the confirmation `_await_reply` had the listener armed; 12
+# keeps every short command (all well under 12 words or verb-led) and catches
+# the outro shape.
+# ---------------------------------------------------------------------------
+_MEDIA_WORD_LIMIT = 12
+
+#: First token that marks directed, command-shaped speech. Built from the
+#: same action / question vocabulary the local actions, router and Q&A
+#: already accept, so the guard never invents a second command model.
+_COMMAND_OPENERS = frozenset({
+    "open", "close", "launch", "start", "stop", "quit", "exit", "play",
+    "pause", "resume", "set", "create", "make", "add", "remove", "delete",
+    "send", "write", "type", "insert", "dictate", "read", "show", "hide",
+    "display", "list", "find", "search", "look", "get", "give", "tell",
+    "run", "do", "redo", "go", "visit", "navigate", "browse", "turn",
+    "enable", "disable", "mute", "unmute", "schedule", "remind",
+    "summarize", "summarise", "translate", "rewrite", "fix", "correct",
+    "shorten", "lengthen", "expand", "explain", "check", "switch", "copy",
+    "paste", "move", "rename", "download", "upload", "call", "answer",
+    "reply", "cancel", "confirm", "approve", "reject", "take", "put",
+    "help", "remember", "note", "save", "load", "record",
+    # Questions keep voice Q&A working ("what ...", "can you ...").
+    "what", "when", "where", "who", "whom", "whose", "why", "how", "which",
+    "can", "could", "would", "should", "will", "may", "might", "does",
+    "did", "is", "are", "was", "were", "am", "have", "has", "had",
+})
+
+
+def _is_media_like(text: Any) -> bool:
+    """True for a long, non-command-verb utterance (media / own voice).
+
+    "Longer than ``_MEDIA_WORD_LIMIT`` words" AND the opening token of the
+    command (after stripping a leading/trailing wake phrase, if any) is not
+    a command verb or question word. Conservative: a real command opens
+    with an action/question word, so a long narration that merely mentions
+    the wake name is media, not direction. Never raises (a malformed value
+    degrades to False = current behavior).
+    """
+    try:
+        raw = text if isinstance(text, str) else str(text or "")
+        toks = re.findall(r"[a-z0-9']+", raw.lower())
+        if len(toks) <= _MEDIA_WORD_LIMIT:
+            return False
+        opening = raw
+        try:
+            stripped = strip_wake(raw)
+            if stripped is None:
+                stripped = strip_wake_trailing(raw)
+            if stripped:
+                opening = stripped
+        except Exception:
+            opening = raw
+        otoks = re.findall(r"[a-z0-9']+", (opening or "").lower())
+        if not otoks:
+            return False
+        return otoks[0] not in _COMMAND_OPENERS
+    except Exception:
+        return False
+
+
 class WakeMonitor:
     """Always-listening wake detector feeding the existing STT authority."""
 
@@ -825,6 +982,19 @@ class WakeMonitor:
         self._armed_until = 0.0
         self._lock = threading.Lock()
         self.last_error = ""
+        # Continuous ("keep listening") mode state (2026-10-06). A bounded
+        # run of no-wake follow-up commands layered on the existing arm
+        # window. ``_continuous_active`` marks a run in progress,
+        # ``_continuous_remaining`` the follow-ups left, and
+        # ``_continuous_locked`` an exhausted run that now requires a fresh
+        # wake (so the helper's post-turn re-arm cannot silently restart it).
+        # A monitor that never receives ``expect_continuous`` keeps every
+        # field inert and behaves byte-identically to before.
+        self._continuous_active = False
+        self._continuous_locked = False
+        self._continuous_until = 0.0
+        self._continuous_window_s = 15.0
+        self._continuous_remaining = 0
 
     # -- lifecycle --------------------------------------------------------
     def enabled(self) -> bool:
@@ -862,8 +1032,95 @@ class WakeMonitor:
         try:
             with self._lock:
                 self._armed_until = time.monotonic() + max(1.0, wait)
+                # A confirmation/clarify arm is not a continuous run: reset
+                # any open run so a "yes" is never counted as a follow-up.
+                self._reset_continuous_locked()
         except Exception:
             pass
+
+    # -- continuous ("keep listening") mode -------------------------------
+    def _reset_continuous_locked(self) -> None:
+        """Clear continuous state. Caller must hold ``self._lock``."""
+        self._continuous_active = False
+        self._continuous_locked = False
+        self._continuous_until = 0.0
+        self._continuous_remaining = 0
+
+    def _reset_continuous(self) -> None:
+        """Clear continuous state (locks internally). Never raises."""
+        try:
+            with self._lock:
+                self._reset_continuous_locked()
+        except Exception:
+            pass
+
+    def expect_continuous(self, timeout_s: Optional[float] = None,
+                          max_followups: int = 5) -> None:
+        """Start a bounded run of no-wake follow-up commands.
+
+        Continuous ("keep listening") mode: after a turn completes the
+        helper calls this so a bare follow-up command routes through the
+        SAME arm mechanism without saying "hey qubit" again. Each accepted
+        follow-up resets the window and consumes one of ``max_followups``;
+        once the budget is spent the listener locks and the next utterance
+        requires a fresh wake. The window expires on its own. Never raises;
+        a malformed bound degrades to 1 follow-up.
+        """
+        try:
+            wait = float(timeout_s) if timeout_s else self.arm_window_s
+        except Exception:
+            wait = self.arm_window_s
+        wait = max(1.0, wait)
+        try:
+            maxf = int(max_followups)
+        except Exception:
+            maxf = 5
+        maxf = max(1, maxf)
+        try:
+            now = time.monotonic()
+            with self._lock:
+                self._armed_until = now + wait
+                self._continuous_active = True
+                self._continuous_locked = False
+                self._continuous_until = now + wait
+                self._continuous_window_s = wait
+                self._continuous_remaining = maxf
+        except Exception:
+            pass
+
+    def rearm_continuous(self) -> None:
+        """Extend the current run's window after a follow-up turn completes.
+
+        Keeps the remaining budget (only :meth:`expect_continuous` starts a
+        new run). No-op when no run is active or the run is locked/exhausted.
+        Never raises.
+        """
+        try:
+            with self._lock:
+                if (not self._continuous_active
+                        or self._continuous_remaining <= 0):
+                    return
+                now = time.monotonic()
+                self._armed_until = now + self._continuous_window_s
+                self._continuous_until = self._armed_until
+        except Exception:
+            pass
+
+    def continuous_active(self) -> bool:
+        """True while a bounded follow-up run is in progress. Never raises."""
+        try:
+            with self._lock:
+                return bool(self._continuous_active)
+        except Exception:
+            return False
+
+    def continuous_locked(self) -> bool:
+        """True when a run is exhausted and a fresh wake is required."""
+        try:
+            with self._lock:
+                return bool(self._continuous_locked)
+        except Exception:
+            return False
 
     def _new_mic(self) -> Any:
         if self._mic_factory is not None:
@@ -1090,8 +1347,6 @@ class WakeMonitor:
             negative = False if affirmative else is_bare_negative(text)
         except Exception:
             return False
-        if not affirmative and not negative:
-            return False
         try:
             probe = self._pending_probe
             helper_live = bool(probe()) if probe is not None else False
@@ -1100,8 +1355,18 @@ class WakeMonitor:
         ct_kind = _live_voice_pending(self.cfg)
         if not helper_live and not ct_kind:
             return False
+        if not affirmative and not negative:
+            # A live confirmation is open: any non-affirm/deny transcript
+            # (media, unrelated speech) is dropped and the pending KEPT —
+            # nothing may clobber a staged confirmation. (The forced/KWS
+            # path runs the same gate directly in _handle_transcript, since
+            # it never reaches this method.)
+            _trace("pending_guard", chars=len(text))
+            return True
         with self._lock:
             self._armed_until = 0.0
+            # A settled/cancelled confirmation ends any continuous run.
+            self._reset_continuous_locked()
         chars = len(text or "")
         if helper_live and ((affirmative and _helper_says_affirmative(text))
                             or (negative and _helper_says_negative(text))):
@@ -1135,6 +1400,42 @@ class WakeMonitor:
             return True
         return False
 
+    def _pending_live(self) -> bool:
+        """True while a confirmation is staged (helper in-process OR journal).
+
+        Read-only; mirrors the two sources ``_maybe_confirm_bypass`` consults
+        (the injected helper probe, then the CT journal for the voice
+        session). Never raises: a missing/broken probe contributes nothing,
+        and an unreadable journal degrades to no-pending.
+        """
+        try:
+            probe = self._pending_probe
+        except Exception:
+            probe = None
+        if probe is not None:
+            try:
+                if bool(probe()):
+                    return True
+            except Exception:
+                pass
+        try:
+            if _live_voice_pending(self.cfg):
+                return True
+        except Exception:
+            pass
+        return False
+
+    def _speaking(self) -> bool:
+        """True when the helper reports it is speaking / in its echo tail.
+
+        Delegates to the injected ``is_busy`` probe (the helper folds its own
+        TTS-echo window into it). Never raises.
+        """
+        try:
+            return bool(self.is_busy())
+        except Exception:
+            return False
+
     def _handle_segment(self, pcm: bytes, *, forced: bool = False) -> None:
         if len(pcm) < 4800:
             _trace("segment_too_short", bytes=len(pcm))
@@ -1149,14 +1450,80 @@ class WakeMonitor:
             return
         _trace("transcript", chars=len(text), engine=self.engine,
                **(_dbg.text_fields(self.cfg, text=text)))
-        if not text:
+        self._handle_transcript(text, forced=forced)
+
+    def _handle_transcript(self, text: Any, *, forced: bool = False) -> None:
+        """Route one already-transcribed segment (post-ASR decision seam).
+
+        Split out of :meth:`_handle_segment` so the decision logic is
+        directly testable with stubs. Guard order, each fail-open to today's
+        behavior on error:
+
+        1. empty transcript → nothing;
+        2. whisper prompt echo → drop (hallucination);
+        3. a live confirmation is pending → accept ONLY a bare
+           affirmative/negative (settled by :meth:`_maybe_confirm_bypass`);
+           any other transcript is dropped (``pending_guard``) and the
+           pending is KEPT — media/other speech can no longer clobber a
+           staged confirmation (nor emit while one is open);
+        4. long non-command-verb utterance (``_is_media_like``) → drop
+           (``media_drop``); this fires on the forced/KWS path, and on the
+           unarmed path while the helper is speaking / in its echo tail;
+        5. otherwise the existing forced (KWS) / bypass / armed / unarmed
+           routing is byte-identical.
+        """
+        try:
+            if not isinstance(text, str):
+                text = str(text or "")
+        except Exception:
             return
-        if is_prompt_echo(self.cfg, text):
-            _trace("prompt_echo_skip", chars=len(text))
-            return  # whisper parroted its initial_prompt on noise: hallucination
+        if not text.strip():
+            return
+        try:
+            if is_prompt_echo(self.cfg, text):
+                _trace("prompt_echo_skip", chars=len(text))
+                return
+        except Exception:
+            pass
+        if forced:
+            # The KWS-hit path emits directly (it never reaches
+            # _maybe_confirm_bypass), so it runs the same pending gate here:
+            # while a confirmation is staged, only a bare affirm/deny may
+            # emit; anything else is dropped and the pending KEPT. The
+            # non-forced path runs this gate inside _maybe_confirm_bypass
+            # (one _live_voice_pending read per segment).
+            try:
+                pending = self._pending_live()
+            except Exception:
+                pending = False
+            if pending:
+                try:
+                    allowed = (is_bare_affirmative(text)
+                               or is_bare_negative(text))
+                except Exception:
+                    allowed = False
+                if not allowed:
+                    _trace("pending_guard", chars=len(text), forced=True)
+                    return
         now = time.monotonic()
         with self._lock:
             armed = now < self._armed_until
+        try:
+            # Media/own-voice suppression also covers the ARMED window. The
+            # helper opens that window for a spoken follow-up (``_await_reply``
+            # after a firm "say yes" or a fired command), so any room/media
+            # audio in the next ~12 s used to be executed as the answer and
+            # CONSUMED the arm — the journal's YouTube outro ("I'm Qubit.
+            # Thank you for watching...") fired as a command, staged itself as
+            # a new confirmation, and real "hey qubit" commands were then
+            # dropped by the pending guard. Dropping here (return BEFORE the
+            # arm is consumed) keeps the window open for the real command.
+            if (forced or armed or self._speaking()) and _is_media_like(text):
+                _trace("media_drop", chars=len(text), forced=forced,
+                       armed=armed, speaking=self._speaking())
+                return
+        except Exception:
+            pass
         aliases = [self.phrase, *WAKE_ALIASES]
         # Owner-managed extra wake words (OpenClaw voicewake port): the
         # global list is appended so a custom phrase ("computer", "robot")
@@ -1168,8 +1535,11 @@ class WakeMonitor:
         except Exception:
             pass
         if forced:
-            # The keyword spotter fired: whatever ASR heard is the command.
-            # Strip the wake phrase if ASR rendered it, else use the whole text.
+            # The keyword spotter fired: a fresh directed wake starts a new
+            # conversation, so any previous continuous run is over.
+            self._reset_continuous()
+            # Whatever ASR heard is the command. Strip the wake phrase if ASR
+            # rendered it, else use the whole text.
             remainder = strip_wake(text, aliases=aliases)
             if remainder is None:
                 remainder = strip_wake_trailing(text, aliases=aliases)
@@ -1209,8 +1579,28 @@ class WakeMonitor:
                 _trace("armed_empty_repeat", chars=len(text))
                 beep(self.cfg, "wake")
                 return
+            # Continuous mode: an utterance accepted through a live
+            # follow-up run consumes one of its bounded budget. When the
+            # budget is spent the run locks (next utterance needs a fresh
+            # wake) instead of silently restarting. With continuous
+            # inactive this block is a no-op and the path is unchanged.
+            followup = False
             with self._lock:
                 self._armed_until = 0.0
+                if self._continuous_active and self._continuous_remaining > 0:
+                    followup = True
+                    self._continuous_remaining -= 1
+                    if self._continuous_remaining > 0:
+                        now2 = time.monotonic()
+                        self._armed_until = now2 + self._continuous_window_s
+                        self._continuous_until = self._armed_until
+                    else:
+                        self._continuous_active = False
+                        self._continuous_locked = True
+                        self._continuous_until = 0.0
+            if followup:
+                _trace("continuous.followup",
+                       remaining=max(0, self._continuous_remaining))
             self._emit(cmd)
             return
         remainder = strip_wake(text, aliases=aliases)
@@ -1222,6 +1612,8 @@ class WakeMonitor:
             if trailing is not None:
                 _trace("wake_trailing", chars=len(trailing))
                 beep(self.cfg, "wake")
+                # A fresh, deliberate wake ends any continuous run.
+                self._reset_continuous()
                 self._emit(trailing)
                 return
             _trace("discarded", chars=len(text),
@@ -1237,6 +1629,8 @@ class WakeMonitor:
             _trace("bare_wake_drop", chars=len(text))
             return
         beep(self.cfg, "wake")
+        # A fresh, deliberate wake ends any continuous run.
+        self._reset_continuous()
         if remainder.strip():
             self._emit(remainder)
         else:
@@ -1362,6 +1756,32 @@ def _wake_max_s(cfg: Any, default: float = 15.0) -> float:
     except Exception:
         v = default
     return max(2.0, min(v, 25.0))
+
+
+def _wake_hold_silence_ms(cfg: Any, default: float = 1800.0) -> float:
+    """Trailing silence for an ESTABLISHED wake segment (clamped 300..6000).
+
+    The base ``wake.silence_ms`` is deliberately short (live 500 ms) so the
+    listener reacts the instant a burst ends. That same tightness split
+    "hey qubit" from its command — and "type this for me:" from the slow
+    dictation that followed — into separate segments, so only the first
+    post-wake segment ever ran (journal 2026-10-06: `'Hey Qubit.'` then
+    `"What's my name?"` as two ``voice_edit.wake.segment`` rows; a slow
+    dictation split into `'Hey Qubit.'` / `'Type this for me.'` /
+    `'1 plus 1 equals 99.'`, the last two ``discarded`` unarmed).
+
+    Once the neural segmenter confirms real speech, a mid-utterance pause
+    up to this bound no longer ends the turn. Silero rejects room drone, so
+    this cannot create endless room-noise segments, and ``wake.max_s`` still
+    caps every segment. Never raises: an unreadable config falls back to the
+    default.
+    """
+    try:
+        v = float(_cfg(cfg, "voice_edit", "wake", "hold_silence_ms",
+                       default=default) or default)
+    except Exception:
+        v = default
+    return max(300.0, min(v, 6000.0))
 
 
 def _asr_fallback_allows(cfg: Any, pcm: bytes) -> bool:

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  firstFileFromTransfer,
   firstImageFromClipboard,
   imageFilesFromTransfer,
   transferMayContainImage,
@@ -69,6 +70,38 @@ describe("firstImageFromClipboard", () => {
       files: [new File([], "notes.txt", { type: "text/plain" })],
     });
     expect(firstImageFromClipboard(data)).toBeNull();
+  });
+});
+
+describe("firstFileFromTransfer", () => {
+  it("returns the first file of any kind (a dropped PDF is not ignored)", () => {
+    const pdf = new File([new Uint8Array([1])], "a.pdf", {
+      type: "application/pdf",
+    });
+    const data = makeData({ files: [pdf] });
+    expect(firstFileFromTransfer(data)).toBe(pdf);
+  });
+
+  it("finds a non-image file via items[].getAsFile()", () => {
+    const txt = new File([new Uint8Array([2])], "notes.txt", {
+      type: "text/plain",
+    });
+    const data = makeData({
+      items: [
+        makeItem("string", "text/plain", null),
+        makeItem("file", "text/plain", txt),
+      ],
+    });
+    expect(firstFileFromTransfer(data)).toBe(txt);
+  });
+
+  it("returns null for a text-only transfer", () => {
+    const data = makeData({ items: [makeItem("string", "text/plain", null)] });
+    expect(firstFileFromTransfer(data)).toBeNull();
+  });
+
+  it("returns null for null data", () => {
+    expect(firstFileFromTransfer(null)).toBeNull();
   });
 });
 

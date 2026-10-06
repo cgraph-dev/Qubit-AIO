@@ -13,7 +13,11 @@ import {
   VOICE_EDIT_ACTIONS,
   CUSTOM_COMMAND_ACTIONS,
   clampVoiceEditNumber,
+  formatWakeRouteTarget,
   WAKE_LIMITS,
+  VOICE_SESSION_LIMITS,
+  CONTINUOUS_LIMITS,
+  type VoiceSessionMode,
   type CustomCommand,
   type LocalModel,
   type PromptRow,
@@ -24,6 +28,7 @@ import {
   type VoiceEditSettings,
   type VoiceLogEntry,
   type WakeRoute,
+  type WakeRouteTarget,
 } from "@/lib/voiceEdit";
 
 function logTime(ts?: number): string {
@@ -82,6 +87,15 @@ function formatModelSize(bytes: number): string {
   return `≈${gb.toFixed(gb >= 10 ? 0 : 1)} GB`;
 }
 
+/** Human-readable voice-session TTL, e.g. 86400 -> "24 h". */
+function formatTtlSeconds(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "—";
+  if (seconds % 86400 === 0) return `${seconds / 86400} d`;
+  if (seconds % 3600 === 0) return `${seconds / 3600} h`;
+  if (seconds % 60 === 0) return `${seconds / 60} min`;
+  return `${seconds} s`;
+}
+
 /** Parse a comma-separated tag input into a clean, de-duplicated list. */
 function splitCues(raw: string): string[] {
   const seen = new Set<string>();
@@ -96,13 +110,17 @@ function splitCues(raw: string): string[] {
   return out;
 }
 
-/** Encode a wake-route target from the target-mode picker. "current" keeps the
- *  configured default target; the other modes are self-describing prefixes so
- *  the stored route reads back as `mode:value`. */
-function encodeRouteTarget(mode: string, value: string): string {
+/** Encode a wake-route target from the target-mode picker. The backend expects
+ *  exactly one structured shape — `{mode:"current"}`, `{agentId}`, or
+ *  `{sessionKey}` — never a string. Returns null when a non-current mode has no
+ *  value (the Add button stays disabled in that case). */
+function encodeRouteTarget(mode: string, value: string): WakeRouteTarget | null {
+  if (mode === "current") return { mode: "current" };
   const trimmed = value.trim();
-  if (mode === "current") return "current";
-  return trimmed ? `${mode}:${trimmed}` : mode;
+  if (!trimmed) return null;
+  if (mode === "agentId") return { agentId: trimmed };
+  if (mode === "sessionKey") return { sessionKey: trimmed };
+  return null;
 }
 
 /** One-line explanation for each text-to-speech provider. */
@@ -414,6 +432,16 @@ export default function VoiceEditPage() {
   // wake words: draft for the add input; the list itself comes from settings.
   const [wakeWordDraft, setWakeWordDraft] = useState("");
 
+  // voice sessions + continuous listening: drafted locally, saved as one
+  // clamped PUT each (settings.py::update_voice_edit).
+  const [sessionMode, setSessionMode] = useState<VoiceSessionMode>("single");
+  const [sessionTtl, setSessionTtl] = useState("86400");
+  const [sessionMaxMessages, setSessionMaxMessages] = useState("200");
+  const [sessionMaxSessions, setSessionMaxSessions] = useState("50");
+  const [continuousMode, setContinuousMode] = useState(false);
+  const [continuousWindow, setContinuousWindow] = useState("15");
+  const [continuousMaxFollowups, setContinuousMaxFollowups] = useState("5");
+
   // wake routing: draft for the add form (trigger + target mode + value).
   const [routeTrigger, setRouteTrigger] = useState("");
   const [routeMode, setRouteMode] = useState("current");
@@ -499,6 +527,27 @@ export default function VoiceEditPage() {
     setWakeMaxS(String(w.max_s ?? 8));
     setWakeVad(w.vad ?? "auto");
   }, [settings?.wake]);
+
+  useEffect(() => {
+    if (!settings) return;
+    setSessionMode(
+      settings.voice_session_mode === "per_command" ? "per_command" : "single",
+    );
+    setSessionTtl(String(settings.voice_session_ttl_s ?? 86400));
+    setSessionMaxMessages(String(settings.voice_session_max_messages ?? 200));
+    setSessionMaxSessions(String(settings.voice_session_max_sessions ?? 50));
+    setContinuousMode(settings.continuous_mode === true);
+    setContinuousWindow(String(settings.continuous_window_s ?? 15));
+    setContinuousMaxFollowups(String(settings.continuous_max_followups ?? 5));
+  }, [
+    settings?.voice_session_mode,
+    settings?.voice_session_ttl_s,
+    settings?.voice_session_max_messages,
+    settings?.voice_session_max_sessions,
+    settings?.continuous_mode,
+    settings?.continuous_window_s,
+    settings?.continuous_max_followups,
+  ]);
 
   useEffect(() => {
     setSttEngine(settings?.stt_engine ?? "");
@@ -635,6 +684,69 @@ export default function VoiceEditPage() {
       "wake settings saved",
     );
   }, [update, settings?.wake?.enabled, wakePhrase, wakeSilence, wakeRms, wakeEngine, wakeKws, wakeAsrFallback, wakeAsrFallbackMaxS, wakeMaxS, wakeVad]);
+
+  // Voice-session mode + retention save as one clamped PUT. Non-destructive:
+  // saving retention never deletes anything now (the backend prunes old voice
+  // sessions opportunistically on the voice hot path).
+  const saveVoiceSessions = useCallback(() => {
+    const ttl = Math.round(
+      clampVoiceEditNumber(
+        Number(sessionTtl), VOICE_SESSION_LIMITS.ttlS.min, VOICE_SESSION_LIMITS.ttlS.max,
+      ),
+    );
+    const maxMessages = Math.round(
+      clampVoiceEditNumber(
+        Number(sessionMaxMessages),
+        VOICE_SESSION_LIMITS.maxMessages.min, VOICE_SESSION_LIMITS.maxMessages.max,
+      ),
+    );
+    const maxSessions = Math.round(
+      clampVoiceEditNumber(
+        Number(sessionMaxSessions),
+        VOICE_SESSION_LIMITS.maxSessions.min, VOICE_SESSION_LIMITS.maxSessions.max,
+      ),
+    );
+    const mode: VoiceSessionMode =
+      sessionMode === "per_command" ? "per_command" : "single";
+    setSessionMode(mode);
+    setSessionTtl(String(ttl));
+    setSessionMaxMessages(String(maxMessages));
+    setSessionMaxSessions(String(maxSessions));
+    return update(
+      {
+        voice_session_mode: mode,
+        voice_session_ttl_s: ttl,
+        voice_session_max_messages: maxMessages,
+        voice_session_max_sessions: maxSessions,
+      },
+      "voice session settings saved",
+    );
+  }, [update, sessionMode, sessionTtl, sessionMaxMessages, sessionMaxSessions]);
+
+  // Continuous listening: the enable switch applies immediately (like the
+  // other checkboxes); the two numbers save clamped through one PUT.
+  const saveContinuous = useCallback(() => {
+    const windowS = clampVoiceEditNumber(
+      Number(continuousWindow),
+      CONTINUOUS_LIMITS.windowS.min, CONTINUOUS_LIMITS.windowS.max,
+    );
+    const maxFollowups = Math.round(
+      clampVoiceEditNumber(
+        Number(continuousMaxFollowups),
+        CONTINUOUS_LIMITS.maxFollowups.min, CONTINUOUS_LIMITS.maxFollowups.max,
+      ),
+    );
+    setContinuousWindow(String(windowS));
+    setContinuousMaxFollowups(String(maxFollowups));
+    return update(
+      {
+        continuous_mode: continuousMode,
+        continuous_window_s: windowS,
+        continuous_max_followups: maxFollowups,
+      },
+      "continuous listening saved",
+    );
+  }, [update, continuousMode, continuousWindow, continuousMaxFollowups]);
 
   const currentWakeWords = useCallback(
     (): string[] => settings?.wake_words ?? [],
@@ -1073,7 +1185,9 @@ export default function VoiceEditPage() {
                       data-testid={`wake-route-row-${i}`}
                     >
                       <code className="rounded bg-muted px-1">{route.trigger}</code>
-                      <span className="text-muted-foreground">→ {route.target}</span>
+                      <span className="text-muted-foreground">
+                        → {formatWakeRouteTarget(route.target)}
+                      </span>
                       <button
                         type="button"
                         className="rounded border border-border px-2 py-0.5 text-xs"
@@ -1140,15 +1254,13 @@ export default function VoiceEditPage() {
                   }
                   onClick={() => {
                     const trigger = routeTrigger.trim();
-                    if (!trigger) return;
+                    const target = encodeRouteTarget(routeMode, routeValue);
+                    if (!trigger || !target) return;
                     setRouteTrigger("");
                     setRouteValue("");
                     void update(
                       {
-                        wake_route_add: {
-                          trigger,
-                          target: encodeRouteTarget(routeMode, routeValue),
-                        },
+                        wake_route_add: { trigger, target },
                       },
                       `added route “${trigger}”`,
                     );
@@ -1277,6 +1389,157 @@ export default function VoiceEditPage() {
               </label>
             </div>
           </section>
+
+          <Section
+            title="Voice sessions"
+            testId="voice-edit-voice-sessions"
+            intro="Voice turns live in their own voice-* namespace so they never mix with your web chats. Choose whether they share one conversation or get one per command, and how long the store keeps them."
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm">
+                Session grouping
+                <select
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-session-mode"
+                  value={sessionMode}
+                  onChange={(e) =>
+                    setSessionMode(
+                      e.target.value === "per_command" ? "per_command" : "single",
+                    )
+                  }
+                >
+                  <option value="single">Single (one shared voice-chat conversation)</option>
+                  <option value="per_command">One session per command</option>
+                </select>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {sessionMode === "per_command"
+                    ? "Every command is fully isolated in its own session."
+                    : "Follow-ups anchor to the same transcript (voice-chat)."}
+                </span>
+              </label>
+              <label className="text-sm">
+                Keep sessions for (seconds)
+                <input
+                  type="number"
+                  min={VOICE_SESSION_LIMITS.ttlS.min}
+                  max={VOICE_SESSION_LIMITS.ttlS.max}
+                  step="60"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-session-ttl"
+                  value={sessionTtl}
+                  onChange={(e) => setSessionTtl(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Idle voice sessions are pruned after this (
+                  {formatTtlSeconds(Number(sessionTtl))}).
+                </span>
+              </label>
+              <label className="text-sm">
+                Max messages per session
+                <input
+                  type="number"
+                  min={VOICE_SESSION_LIMITS.maxMessages.min}
+                  max={VOICE_SESSION_LIMITS.maxMessages.max}
+                  step="10"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-session-max-messages"
+                  value={sessionMaxMessages}
+                  onChange={(e) => setSessionMaxMessages(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  An oversized session is reclaimed at the next voice turn.
+                </span>
+              </label>
+              <label className="text-sm">
+                Max kept sessions
+                <input
+                  type="number"
+                  min={VOICE_SESSION_LIMITS.maxSessions.min}
+                  max={VOICE_SESSION_LIMITS.maxSessions.max}
+                  step="1"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="voice-session-max-sessions"
+                  value={sessionMaxSessions}
+                  onChange={(e) => setSessionMaxSessions(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Only the newest sessions beyond this are reclaimed.
+                </span>
+              </label>
+            </div>
+            <button
+              type="button"
+              className="mt-2 rounded border border-border px-3 py-1 text-xs"
+              data-testid="voice-session-save"
+              disabled={busy}
+              onClick={() => void saveVoiceSessions()}
+            >
+              Save voice session settings
+            </button>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Pruning runs automatically on the voice path; the live
+              voice-chat session is never reclaimed.
+            </p>
+          </Section>
+
+          <Section
+            title="Continuous listening"
+            testId="voice-edit-continuous"
+            intro="After an answer, keep the mic armed for a short follow-up window so a second command needs no fresh wake phrase."
+          >
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                data-testid="continuous-mode"
+                checked={continuousMode}
+                onChange={(e) => void update({ continuous_mode: e.target.checked })}
+              />
+              Keep listening for a follow-up after each turn
+            </label>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm">
+                Follow-up window (seconds)
+                <input
+                  type="number"
+                  min={CONTINUOUS_LIMITS.windowS.min}
+                  max={CONTINUOUS_LIMITS.windowS.max}
+                  step="1"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="continuous-window"
+                  value={continuousWindow}
+                  onChange={(e) => setContinuousWindow(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  How long the mic stays armed after a turn (3–120).
+                </span>
+              </label>
+              <label className="text-sm">
+                Max follow-ups
+                <input
+                  type="number"
+                  min={CONTINUOUS_LIMITS.maxFollowups.min}
+                  max={CONTINUOUS_LIMITS.maxFollowups.max}
+                  step="1"
+                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                  data-testid="continuous-max-followups"
+                  value={continuousMaxFollowups}
+                  onChange={(e) => setContinuousMaxFollowups(e.target.value)}
+                />
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Follow-up turns allowed before a fresh wake (1–20).
+                </span>
+              </label>
+            </div>
+            <button
+              type="button"
+              className="mt-2 rounded border border-border px-3 py-1 text-xs"
+              data-testid="continuous-save"
+              disabled={busy}
+              onClick={() => void saveContinuous()}
+            >
+              Save continuous listening
+            </button>
+          </Section>
 
           <section
             className="rounded-lg border border-border p-4"

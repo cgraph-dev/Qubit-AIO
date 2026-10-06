@@ -238,7 +238,7 @@ def _commit_model_switch(
     ``picker``: tolerate context-resolution errors and label the config write "(--global)"; the
     typed path additionally records the one-turn restore snapshot. ``reasoning_effort`` (from
     ``--reasoning`` or the picker's effort step) is applied after the swap."""
-    from cli import HermesCLI, _cprint
+    from cli import QubitCLI as HermesCLI, _cprint
     old_model = cli.model
     snapshot = cli._snapshot_model_runtime() if one_turn else None
     if not cli._stage_and_swap_model(result, old_model):

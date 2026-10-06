@@ -28,7 +28,7 @@ import {
   SettingsSection,
   SettingsStatus,
   SettingsSummary,
-} from "@/components/openclaw-ui";
+} from "@/components/console-ui";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";

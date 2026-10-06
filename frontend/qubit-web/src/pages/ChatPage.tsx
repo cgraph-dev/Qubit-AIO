@@ -52,7 +52,7 @@ import { ChatSessionList } from "@/components/ChatSessionList";
 import { ChatSessionArtifacts } from "@/components/ChatSessionArtifacts";
 import { ChatToolsSummary } from "@/components/ChatToolsSummary";
 import { Markdown } from "@/components/Markdown";
-import { firstImageFromClipboard } from "@/lib/chatImagePaste";
+import { firstFileFromTransfer, firstImageFromClipboard } from "@/lib/chatImagePaste";
 
 // Lazily loaded so the informational dashboard event WebSocket (opened by
 // ChatSidebar) is code-split out of the normal-chat chunk and never runs on a
@@ -69,6 +69,7 @@ import {
   withBackoff,
   type ChatStoreMessage,
   type ChatStreamEvent,
+  type PendingConfirmation,
 } from "@/lib/api";
 import {
   asSpeechRecognition,
@@ -80,12 +81,17 @@ import {
 } from "@/lib/voice";
 import { useTranscriptionController } from "@/hooks/useTranscriptionController";
 import { useDesktopVoiceHelper } from "@/hooks/useDesktopVoiceHelper";
+import { useChatActivity } from "@/hooks/useChatActivity";
+import { ChatWorkPanel } from "@/components/ChatWorkPanel";
 import { cn } from "@/lib/utils";
 import {
+  atTokenAt,
   filterSlashCommands,
   slashCompletionText,
+  slashTokenAt,
   type SlashCommandItem,
 } from "@/lib/slashCommands";
+import { voiceEdit, type VoiceSessionMode } from "@/lib/voiceEdit";
 import { PluginSlot } from "@/plugins";
 import "./ChatPage.css";
 import "./ChatPage.studio.css";
@@ -148,6 +154,9 @@ function toChatMessage(message: ChatStoreMessage): ChatMessage {
     elapsed_ms?: number;
     tool_name?: string;
     tool_calls?: unknown;
+    route?: string;
+    task?: string;
+    sources?: unknown;
   };
   const parts = [
     meta.model ? `model=${meta.model}` : "",
@@ -158,12 +167,22 @@ function toChatMessage(message: ChatStoreMessage): ChatMessage {
     message.role === "system" ||
     Boolean(meta.tool_name) ||
     Array.isArray(meta.tool_calls);
+  // A persisted /chat-worker build turn carries meta.route="task" + meta.task;
+  // keep it rendering as a report with its task key + /chat link after a
+  // reload (the live stream sets these, but the reload path must too).
+  const isTask = meta.route === "task" && Boolean(meta.task);
+  const sources = Array.isArray(meta.sources)
+    ? meta.sources.filter((s): s is string => typeof s === "string")
+    : undefined;
   return {
     role: message.role === "user" ? "user" : "assistant",
     text: message.content ?? "",
     meta: parts.join(" ") || undefined,
     kind: isTool ? "tool" : "message",
     toolName: meta.tool_name ? String(meta.tool_name) : undefined,
+    report: isTask || undefined,
+    taskKey: isTask ? String(meta.task) : undefined,
+    sources: sources && sources.length > 0 ? sources : undefined,
   };
 }
 
@@ -190,10 +209,81 @@ function normalizeReasoning(value: unknown): string | null {
   return CHAT_REASONING_LEVELS.some((l) => l.id === key) ? key : null;
 }
 
+/**
+ * Best-effort read of a bounded pending-confirmation signal from a turn event
+ * or a session-load response. Returns null when the field is absent or empty,
+ * so callers can both SET (truthy) and CLEAR (falsy) from the same helper.
+ */
+function extractPendingConfirm(source: {
+  pending_confirmation?: PendingConfirmation | null;
+}): PendingConfirmation | null {
+  const pending = source?.pending_confirmation;
+  if (!pending || typeof pending !== "object") return null;
+  const action_summary =
+    typeof pending.action_summary === "string" && pending.action_summary
+      ? pending.action_summary
+      : undefined;
+  const staged_ms =
+    typeof pending.staged_ms === "number" ? pending.staged_ms : undefined;
+  if (action_summary === undefined && staged_ms === undefined) return null;
+  return { action_summary, staged_ms };
+}
+
 const STORAGE_PREFIX = "qubit.chat.transcript.";
 const SESSION_PROGRESS_PREFIX = "qubit.chat.progress.";
 const SESSION_KEY = "qubit.chat.session";
 const DEFAULT_SESSION = "dashboard-chat";
+/** How often a followed voice session re-reads its persisted transcript. */
+const VOICE_LIVE_POLL_MS = 2000;
+
+/** True when a chat-session id belongs to the voice bridge (`voice-*`). The
+ *  desktop helper routes Right-Ctrl / wake turns to a `voice-*` session
+ *  (`voicebridge/desktop_helper.py` `_DEFAULT_VOICE_SESSION`), so the prefix is
+ *  the stable contract for "this session receives voice turns". */
+function isVoiceSessionId(id: string | null | undefined): boolean {
+  return typeof id === "string" && id.startsWith("voice-");
+}
+
+/**
+ * Newest `voice-*` session id from a chat-session list, or null. "Newest" is
+ * the greatest last_active/started_at; a list with no timestamps falls back to
+ * the first voice row. Pure and non-fabricating — an empty list yields null.
+ */
+function pickNewestVoiceSession(
+  sessions:
+    | Array<{ id?: string; last_active?: number; started_at?: number }>
+    | null
+    | undefined,
+): string | null {
+  const voices = (sessions ?? []).filter((s) => isVoiceSessionId(s?.id));
+  if (voices.length === 0) return null;
+  const ts = (s: { last_active?: number; started_at?: number }) =>
+    s.last_active ?? s.started_at ?? 0;
+  const newest = voices.reduce((best, s) => (ts(s) > ts(best) ? s : best));
+  return newest.id ?? null;
+}
+
+/** Voice-session namespace + retention, read from the settings view. */
+interface VoiceSessionInfo {
+  mode: VoiceSessionMode;
+  ttlS: number;
+  maxMessages: number;
+  maxSessions: number;
+}
+
+/** Compact retention summary for the live-voice control, e.g.
+ *  "keep 50 · 24h TTL · 200 msgs". Pure and total. */
+function formatVoiceRetention(info: VoiceSessionInfo): string {
+  const ttl =
+    info.ttlS % 86400 === 0
+      ? `${info.ttlS / 86400}d`
+      : info.ttlS % 3600 === 0
+        ? `${info.ttlS / 3600}h`
+        : info.ttlS % 60 === 0
+          ? `${info.ttlS / 60}m`
+          : `${info.ttlS}s`;
+  return `keep ${info.maxSessions} · ${ttl} TTL · ${info.maxMessages} msgs`;
+}
 
 
 /**
@@ -370,6 +460,32 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     sessionRef.current = session;
   }, [session]);
 
+  // ── Live voice follow ────────────────────────────────────────────────
+  // `voice-*` sessions receive the desktop helper's Right-Ctrl / wake turns.
+  // While such a session is open (and the operator has not turned following
+  // off), the transcript re-reads the SAME server store it already loads from
+  // and appends only the new rows — no reload, no new backend route, no PTY.
+  const isVoiceSession = isVoiceSessionId(session);
+  const [followVoice, setFollowVoice] = useState(true);
+  const [newestVoiceSession, setNewestVoiceSession] = useState<string | null>(
+    null,
+  );
+  // Voice-session namespace + retention for the live control. Best-effort:
+  // a failed/unavailable settings read shows the mode note only, never a
+  // fabricated default presented as truth.
+  const [voiceSessionInfo, setVoiceSessionInfo] = useState<VoiceSessionInfo | null>(
+    null,
+  );
+  const [voiceSessionInfoError, setVoiceSessionInfoError] = useState(false);
+  const followLiveVoice = isVoiceSession && followVoice;
+  // The number of server rows already merged into `messages` for the open
+  // session (index-based dedupe: a poll appends only `slice(known)`).
+  const voiceSyncedRef = useRef(0);
+  const voiceSyncBusyRef = useRef(false);
+  // True only once the open session's transcript has settled, so a poll can
+  // never race the initial load and duplicate its rows.
+  const transcriptReadyRef = useRef(false);
+
   const [messages, setMessages] = useState<ChatMessage[]>(() =>
     loadTranscript(session),
   );
@@ -393,6 +509,14 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // D1 Task 5: the live /chat-worker build card. Set from `progress` frames,
   // marked done from the task `done` receipt; cleared on the next send.
   const [taskProgress, setTaskProgress] = useState<TaskProgress | null>(null);
+  // A bounded "awaiting confirmation" signal: the shared backend has a live
+  // staged action that needs an explicit yes/no. Set from turn events (and
+  // restored from session load); cleared when a turn resolves without the
+  // signal or when the session changes. The Confirm/Cancel affordance reuses
+  // the normal `send` path, so it settles through the same backend confirm.
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirmation | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [retryText, setRetryText] = useState<string | null>(null);
   // Live transcription (one controller for browser/local/terminal). The
@@ -516,11 +640,19 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     setStreamingText("");
     setError(null);
     setRetryText(null);
+    setPendingConfirm(null);
     setTranscriptState("loading");
+    // Re-baseline the live-voice merge counter for this session; it is set to
+    // the settled server row count once the transcript load completes.
+    voiceSyncedRef.current = 0;
+    transcriptReadyRef.current = false;
     api
       .listChatSessions(100, 0)
       .then((list) => {
         if (loadReqRef.current !== myReq) return null;
+        // Offer a one-click jump to the newest live voice session when the
+        // store exposes one (read-only; the affordance just switches resume).
+        setNewestVoiceSession(pickNewestVoiceSession(list.sessions));
         const exists = (list.sessions ?? []).some((s) => s.id === session);
         if (!exists) {
           // No server record yet. If the id is the unsaved default, this is
@@ -531,6 +663,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           // No persisted preference to load.
           setReasoning(null);
           setTranscriptState("ready");
+          voiceSyncedRef.current = 0;
+          transcriptReadyRef.current = true;
           return null;
         }
         setForeignSession(null);
@@ -546,6 +680,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           setTranscriptSession(session);
           saveTranscript(session, loaded);
           setTranscriptState("ready");
+          // The loaded rows are what a live-voice poll diffs against.
+          voiceSyncedRef.current = loaded.length;
+          transcriptReadyRef.current = true;
           // Session-persisted reasoning preference (server is authoritative;
           // a session without one keeps the model default).
           withBackoff(() => api.getChatSession(session), {
@@ -554,6 +691,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             .then((info) => {
               if (loadReqRef.current !== myReq) return;
               setReasoning(normalizeReasoning(info.meta?.reasoning));
+              // Best-effort restore of a live staged confirmation so a reload
+              // keeps the yes/no banner rather than hiding a pending action.
+              setPendingConfirm(extractPendingConfirm(info));
               // A turn cut short by a backend restart: re-issue it so the
               // operator does not have to retype `continue`. Guarded to once per
               // session per page load, so a crash loop cannot spin here.
@@ -574,6 +714,84 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         setError(err instanceof Error ? err.message : String(err ?? "load failed"));
       });
   }, [session]);
+
+  // Live voice follow: while the open session is a `voice-*` session (and
+  // following has not been turned off), re-read the persisted transcript on a
+  // short interval and on window focus, appending only the NEW rows. Dedupe is
+  // index-based via `voiceSyncedRef`, so a repeated poll of the same rows can
+  // never double-append and two genuinely identical utterances ("yes", "yes")
+  // are both kept. Read-only against the same store the initial load uses — no
+  // new backend route, no PTY; it stops the instant the session is not a voice
+  // session. Best-effort: a failed poll is swallowed and heals on the next tick.
+  useEffect(() => {
+    if (!followLiveVoice) return;
+    let alive = true;
+    const sync = () => {
+      if (voiceSyncBusyRef.current || !transcriptReadyRef.current) return;
+      voiceSyncBusyRef.current = true;
+      api
+        .getChatSessionMessages(session)
+        .then((res) => {
+          if (!alive) return;
+          const mapped = (res.messages ?? []).map(toChatMessage);
+          const known = voiceSyncedRef.current;
+          if (mapped.length > known) {
+            const additions = mapped.slice(known);
+            voiceSyncedRef.current = mapped.length;
+            setMessages((prev) => prev.concat(additions));
+          } else if (mapped.length < known) {
+            // The store shrank (e.g. a session reset). Re-baseline without
+            // dropping anything already rendered; the next poll appends anew.
+            voiceSyncedRef.current = mapped.length;
+          }
+        })
+        .catch(() => {
+          /* best-effort — the next tick retries */
+        })
+        .finally(() => {
+          voiceSyncBusyRef.current = false;
+        });
+    };
+    const interval = setInterval(sync, VOICE_LIVE_POLL_MS);
+    window.addEventListener("focus", sync);
+    return () => {
+      alive = false;
+      clearInterval(interval);
+      window.removeEventListener("focus", sync);
+    };
+  }, [followLiveVoice, session]);
+
+  // Read the voice-session namespace + retention from the settings view so the
+  // live control can show the real policy. Only fetched for a `voice-*`
+  // session (a normal chat has no voice control), and best-effort: any failure
+  // leaves the info null so the UI shows an honest unknown rather than a
+  // fabricated default.
+  useEffect(() => {
+    if (!isVoiceSession) return;
+    let alive = true;
+    (async () => {
+      try {
+        const out = await voiceEdit.settings();
+        if (!alive) return;
+        const s = out.settings;
+        setVoiceSessionInfo({
+          mode:
+            s.voice_session_mode === "per_command" ? "per_command" : "single",
+          ttlS: Number(s.voice_session_ttl_s ?? 86400),
+          maxMessages: Number(s.voice_session_max_messages ?? 200),
+          maxSessions: Number(s.voice_session_max_sessions ?? 50),
+        });
+        setVoiceSessionInfoError(false);
+      } catch {
+        if (!alive) return;
+        setVoiceSessionInfo(null);
+        setVoiceSessionInfoError(true);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [isVoiceSession, session]);
 
   // Keep the read-through cache in step with the rendered transcript.
   useEffect(() => saveTranscript(session, messages), [session, messages]);
@@ -662,6 +880,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       setStreamingText("");
       setTaskProgress(null);
       setMessages((prev) => prev.concat([{ role: "user", text }]));
+      // A locally-driven turn in a followed voice session appends rows the
+      // server will persist too; advance the merge counter so the next poll
+      // does not re-append them as "new".
+      if (followLiveVoice) voiceSyncedRef.current += 1;
 
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -676,12 +898,16 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       streamChatTurn(
         reasoning ? { text, session, reasoning } : { text, session },
         {
-          onDelta: (delta) => {
+          onDelta: (delta, event) => {
             if (controller.signal.aborted) return;
             setStreamingText((prev) => prev + delta);
+            const pending = extractPendingConfirm(event);
+            if (pending) setPendingConfirm(pending);
           },
           onProgress: (event) => {
             if (controller.signal.aborted) return;
+            const pending = extractPendingConfirm(event);
+            if (pending) setPendingConfirm(pending);
             const key = event.task ?? "";
             if (!key) return;
             setTaskProgress({
@@ -692,6 +918,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           },
           onDone: (event) => {
             if (controller.signal.aborted) return;
+            // Authoritative settle: a done frame that no longer carries the
+            // signal clears the banner; one that still carries it keeps it.
+            setPendingConfirm(extractPendingConfirm(event));
             const route = event.receipt?.route ?? event.route;
             const sources = event.receipt?.sources ?? event.sources;
             const taskKey = event.receipt?.task ?? event.task;
@@ -732,10 +961,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             // session metadata), so remount/refetch the session list: a brand
             // new default row or an updated ordering surfaces without a manual
             // refresh.
+            if (followLiveVoice) voiceSyncedRef.current += 1;
             setSessionListNonce((n) => n + 1);
           },
           onError: (event) => {
             if (controller.signal.aborted) return;
+            setPendingConfirm(extractPendingConfirm(event));
             setTaskProgress((prev) =>
               prev && prev.status === "working"
                 ? {
@@ -754,8 +985,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             // created/persisted before the error), so re-sync the list.
             setSessionListNonce((n) => n + 1);
           },
-          onCancelled: () => {
+          onCancelled: (event) => {
             if (controller.signal.aborted) return;
+            setPendingConfirm(extractPendingConfirm(event));
             setTaskProgress((prev) =>
               prev && prev.status === "working"
                 ? { ...prev, status: "cancelled", detail: "turn cancelled" }
@@ -778,7 +1010,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           if (!controller.signal.aborted) setBusy(false);
         });
     },
-    [busy, session, reasoning],
+    [busy, session, reasoning, followLiveVoice],
   );
 
   // Publish the sender for the load effect (which runs before `send` exists) so
@@ -851,20 +1083,28 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // until the token changes. No gateway socket is opened for this; the static
   // `SLASH_COMMANDS` catalog (same registry the TUI completer reads) is
   // filtered client-side.
-  const slashToken = /^\/[A-Za-z0-9_-]*$/.test(input) ? input : null;
+  // Slash autocomplete: the ACTIVE "/" token is the one under the caret, found
+  // anywhere in the line (`slashTokenAt`), matching the /chat terminal
+  // completer. The previous test anchored the token to the start of the whole
+  // input, so "/" typed mid-sentence never opened the palette.
+  const slashToken = slashTokenAt(input);
   const slashMatches = useMemo(
-    () => (slashToken === null ? [] : filterSlashCommands(slashToken)),
+    () => (slashToken === null ? [] : filterSlashCommands(slashToken.token)),
     [slashToken],
   );
   const slashVisible =
     slashToken !== null &&
-    slashToken !== slashDismissedFor &&
+    slashToken.token !== slashDismissedFor &&
     slashMatches.length > 0;
   const slashActive = slashMatches.length > 0 ? slashIndex % slashMatches.length : 0;
   // "@" mentions get a static hint row only (no filtering): skill/MCP names
   // resolve through the agent turn, so there is nothing to complete against.
-  const atHint =
-    !slashVisible && /^@[A-Za-z0-9_-]*$/.test(input) ? input : null;
+  const atHint = !slashVisible ? atTokenAt(input)?.token ?? null : null;
+
+  // C1: live agent/todo activity for this session, shown in ChatWorkPanel.
+  // Fail-soft by contract — a dead feed yields an empty roster, never an error
+  // that could disturb the transcript or composer.
+  const activity = useChatActivity(session);
 
   // Reset the highlight whenever the token changes (new filter = new list).
   useEffect(() => {
@@ -909,7 +1149,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         }
         if (event.key === "Escape") {
           event.preventDefault();
-          setSlashDismissedFor(slashToken);
+          setSlashDismissedFor(slashToken.token);
           return;
         }
         if (event.key === "Enter" && !event.shiftKey) {
@@ -967,6 +1207,24 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         );
       });
   }, [setSearchParams]);
+
+  // One-click "follow the live voice session": point the surface at the newest
+  // `voice-*` row the chat store exposed, so the live poll above starts. Uses
+  // the same `?resume=`/storage path as New chat — no new backend call.
+  const openVoiceSession = useCallback(
+    (id: string) => {
+      storageSet(SESSION_KEY, id);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("resume", id);
+          return next;
+        },
+        { replace: false },
+      );
+    },
+    [setSearchParams],
+  );
 
   const copyLast = useCallback(() => {
     const last = [...messages].reverse().find((m) => m.role === "assistant");
@@ -1051,24 +1309,37 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     if (debugOpen && debugState === "idle") loadDebug();
   }, [debugOpen, debugState, loadDebug]);
 
-  // A35: read a browser image to a data URL and describe it through the
-  // canonical vision backend, appending the description to the composer.
+  // A35/A36: read a browser file to a data URL and route it by kind.
+  //   image -> describe through the vision backend, append the description
+  //   doc   -> extract through the document backend, append the extract
+  // Either way the text lands in the COMPOSER; nothing is auto-sent.
   const describeImage = useCallback((file: File | null) => {
     if (!file) return;
+    const isImage = (file.type || "").startsWith("image/");
     setAttachState("describing");
     setAttachError(null);
     const reader = new FileReader();
     reader.onerror = () => {
-      setAttachError("image read failed");
+      setAttachError("file read failed");
       setAttachState("error");
     };
     reader.onload = () => {
       const dataUrl = typeof reader.result === "string" ? reader.result : "";
-      api
-        .describeChatImage(dataUrl)
-        .then((res) => {
-          const desc = (res.description ?? "").trim();
-          if (desc) setInput((prev) => (prev ? `${prev}\n${desc}` : desc));
+      if (!dataUrl) {
+        setAttachError("file read failed");
+        setAttachState("error");
+        return;
+      }
+      const call = isImage
+        ? api
+            .describeChatImage(dataUrl)
+            .then((res) => (res.description ?? "").trim())
+        : api
+            .extractChatFile(dataUrl, file.name)
+            .then((res) => (res.text ?? "").trim());
+      call
+        .then((text) => {
+          if (text) setInput((prev) => (prev ? `${prev}\n${text}` : text));
           setAttachState("idle");
         })
         .catch((err: unknown) => {
@@ -1089,6 +1360,49 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     },
     [describeImage],
   );
+
+  // A36b: a drag-drop from the file manager hands over a PATH (not bytes), and
+  // the OS path is what the operator sees. Route it to the path extractor so a
+  // dropped PDF behaves like a picked one instead of being typed as text (a
+  // bare path in the composer used to be sent literally and answered "Unknown
+  // slash command").
+  const onDropPath = useCallback((event: React.DragEvent<HTMLElement>) => {
+    const dt = event.dataTransfer;
+    if (!dt) return;
+    // A dropped FILE (a real browser drop) wins: use its bytes directly. This
+    // accepts ANY file kind, not just images — `describeImage` routes an image
+    // to the vision backend and a doc (PDF/text) to the extraction backend, so
+    // a dropped PDF behaves like a picked one instead of being silently ignored.
+    const dropped = firstFileFromTransfer(dt);
+    if (dropped) {
+      event.preventDefault();
+      describeImage(dropped);
+      return;
+    }
+    const text = dt.getData("text/uri-list") || dt.getData("text/plain") || "";
+    const first = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line && !line.startsWith("#"));
+    if (!first) return;
+    const raw = first.startsWith("file://")
+      ? decodeURIComponent(first.replace(/^file:\/\//, ""))
+      : first;
+    event.preventDefault();
+    setAttachState("describing");
+    setAttachError(null);
+    api
+      .extractChatFilePath(raw)
+      .then((res) => {
+        const body = (res.text ?? "").trim();
+        if (body) setInput((prev) => (prev ? `${prev}\n${body}` : body));
+        setAttachState("idle");
+      })
+      .catch((err: unknown) => {
+        setAttachError(err instanceof Error ? err.message : String(err));
+        setAttachState("error");
+      });
+  }, [describeImage]);
 
   const toggleSelected = useCallback((index: number) => {
     setSelectedMessages((prev) => {
@@ -1322,6 +1636,87 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               >
                 {model ? `model ${model}` : "model —"}
               </span>
+              {isVoiceSession ? (
+                <label
+                  className="flex items-center gap-1 text-xs text-text-tertiary"
+                  title="Follow this voice session live — new voice turns appear automatically"
+                >
+                  <input
+                    type="checkbox"
+                    data-testid="voice-follow-toggle"
+                    checked={followVoice}
+                    onChange={(event) => setFollowVoice(event.target.checked)}
+                    className="h-3 w-3 accent-current"
+                  />
+                  follow
+                </label>
+              ) : null}
+              {followLiveVoice ? (
+                <span
+                  data-testid="voice-live"
+                  data-state="live"
+                  role="status"
+                  aria-label="Live voice session active — voice turns appear automatically"
+                  title="Live voice session — new Right-Ctrl / wake turns appear here without a reload"
+                  className="inline-flex items-center gap-1 rounded border border-accent/40 bg-accent/10 px-1.5 py-0.5 text-xs text-midground"
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-accent"
+                    aria-hidden="true"
+                  />
+                  live voice
+                  <span data-testid="voice-live-count" className="font-mono">
+                    {messages.length}
+                  </span>
+                </span>
+              ) : null}
+              {newestVoiceSession && newestVoiceSession !== session ? (
+                <button
+                  type="button"
+                  data-testid="open-voice-session"
+                  onClick={() => {
+                    if (newestVoiceSession) openVoiceSession(newestVoiceSession);
+                  }}
+                  title={`Open the live voice session ${newestVoiceSession}`}
+                  className="rounded border border-accent/40 px-1.5 py-0.5 text-xs text-midground hover:bg-midground/10"
+                >
+                  Open live voice session
+                </button>
+              ) : null}
+              {isVoiceSession ? (
+                <div
+                  data-testid="voice-session-controls"
+                  className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-text-tertiary"
+                  title="Voice turns are isolated in the voice-* namespace; retention is edited in Voice settings."
+                >
+                  <span className="font-mono">{session}</span>
+                  {voiceSessionInfo ? (
+                    <span data-testid="voice-session-policy">
+                      {voiceSessionInfo.mode === "per_command"
+                        ? "per-command sessions"
+                        : "single shared session"}
+                      {" · "}
+                      {formatVoiceRetention(voiceSessionInfo)}
+                    </span>
+                  ) : voiceSessionInfoError ? (
+                    <span data-testid="voice-session-policy">
+                      retention unavailable
+                    </span>
+                  ) : (
+                    <span data-testid="voice-session-policy">
+                      loading retention…
+                    </span>
+                  )}
+                  <a
+                    href="/voice-edit"
+                    className="rounded px-1 py-0.5 text-midground hover:bg-midground/10"
+                    aria-label="Open voice session retention settings"
+                  >
+                    retention settings
+                  </a>
+                  <span>old voice sessions prune automatically</span>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex items-center gap-1">
@@ -1955,6 +2350,42 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             </div>
           ) : null}
 
+          {pendingConfirm ? (
+            <div
+              role="status"
+              data-testid="pending-confirmation"
+              aria-live="polite"
+              aria-label="Awaiting confirmation"
+              className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-accent/50 bg-accent/10 px-3 py-2 text-xs text-text-primary"
+            >
+              <div className="min-w-0 flex-1">
+                <span className="font-semibold">Awaiting confirmation</span>
+                <span className="ml-1 text-text-secondary">
+                  {pendingConfirm.action_summary
+                    ? pendingConfirm.action_summary
+                    : "a staged action needs your yes/no"}
+                </span>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => send("yes")}
+                disabled={busy}
+                aria-label="Confirm the staged action"
+              >
+                Confirm
+              </Button>
+              <Button
+                size="sm"
+                outlined
+                onClick={() => send("no")}
+                disabled={busy}
+                aria-label="Cancel the staged action"
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : null}
+
           <form
             onSubmit={onSubmit}
             className="qchat__composer mt-2 flex shrink-0 flex-wrap items-end gap-2 border-t border-current/10 pt-2"
@@ -2010,6 +2441,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 {voice.interimText}
               </div>
             ) : null}
+            <ChatWorkPanel
+              activity={activity}
+              busy={busy}
+            />
             <div className="relative min-w-full flex-1 sm:min-w-0">
               {slashVisible ? (
                 <div
@@ -2060,6 +2495,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={handleKeyDown}
                 onPaste={onPasteImage}
+                onDrop={onDropPath}
+                onDragOver={(event) => event.preventDefault()}
                 placeholder="Message Qubit… (Enter to send, Shift+Enter for newline)"
                 aria-label="Message Qubit"
                 className={cn(
@@ -2072,7 +2509,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             <input
               ref={attachInputRef}
               type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp,image/bmp"
+              accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,.pdf,.txt,.text,.md,.markdown,.mdown,.log,.transcript,.trans,.vtt,.srt"
               className="hidden"
               aria-hidden="true"
               tabIndex={-1}
@@ -2086,11 +2523,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               outlined
               onClick={() => attachInputRef.current?.click()}
               disabled={busy || attachState === "describing"}
-              aria-label="Attach image"
-              title="Attach or paste an image; Qubit describes it with vision"
+              aria-label="Attach image, PDF or file"
+              title="Attach or paste an image, PDF or text file; Qubit describes or extracts it into the composer"
               prefix={<ImagePlus className="h-4 w-4" />}
             >
-              {attachState === "describing" ? "Reading…" : "Image"}
+              {attachState === "describing" ? "Reading…" : "Attach"}
             </Button>
             <Button
               type="button"

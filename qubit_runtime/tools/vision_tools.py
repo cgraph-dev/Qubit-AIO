@@ -207,7 +207,7 @@ def _secure_cache_dir(new_subpath: str, old_name: str) -> Path:
     the mode to the leaf only, so an intermediate ``cache/`` keeps its default
     mode; it is shared with other subsystems and holds only directory names.
     """
-    cache_dir = get_hermes_dir(new_subpath, old_name)
+    cache_dir = get_qubit_dir(new_subpath, old_name)
     if _managed_install():
         # Managed mode: the NixOS-configured umask/setgid owns the mode, and
         # _secure_dir would no-op here anyway.

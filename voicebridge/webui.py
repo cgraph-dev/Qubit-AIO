@@ -48,6 +48,11 @@ log = get_logger()
 PCM_RATE = 16000
 PCM_WIDTH = 2  # Int16
 
+# SSE keepalive cadence: a `: ping` comment is written at least this often
+# even while real events flow, so proxies/browsers never reap an
+# idle-looking event-stream socket.
+_SSE_HEARTBEAT_S = 15.0
+
 # --------------------------------------------------------------------------
 # Transport-boundary redaction (Wave 5, G2).
 #
@@ -1378,10 +1383,21 @@ class WebUIHandler(BaseHTTPRequestHandler):
             run_filter = self.path.split("run_id=")[1].split("&")[0] or None
         cursor = int(last_id) if str(last_id).isdigit() else None
 
+        # SSE over BaseHTTPRequestHandler defaults to HTTP/1.0, which has no
+        # keep-alive: a response with no Content-Length is terminated by
+        # connection close, so every idle timeout or proxy hop tears the feed
+        # down and the client re-dials in a loop (the "events feed
+        # disconnected" churn). Advertise HTTP/1.1 for THIS route only — the
+        # rest of the handler stays on 1.0 because several routes write bodies
+        # without a length and would hang a persistent client.
+        self.protocol_version = "HTTP/1.1"
+        self.close_connection = True  # SSE is one response per connection
+
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Connection", "keep-alive")
         for k, v in cors_headers_for(self.app.allowed_origins,
                                      self.headers.get("Origin", "")):
             self.send_header(k, v)
@@ -1392,6 +1408,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
         try:
             self.wfile.write(b"retry: 3000\n\n")
             self.wfile.flush()
+            # Wall-clock heartbeat: `drain` only blocks when the queue is
+            # empty, so a busy feed would otherwise never emit a ping and
+            # intermediaries would reap the idle-looking socket. Ping on a
+            # fixed cadence regardless of traffic.
+            heartbeat_due = time.monotonic() + _SSE_HEARTBEAT_S
             while not sub.closed and self.app._server is not None:
                 items = sub.drain(timeout=15.0)
                 out = []
@@ -1400,8 +1421,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     out.append(": resync\nevent: resync\ndata: {}\n\n")
                 for rec in items:
                     out.append(hub.wire_frame(rec))
-                if not out:
+                if not out or time.monotonic() >= heartbeat_due:
                     out.append(": ping\n\n")
+                    heartbeat_due = time.monotonic() + _SSE_HEARTBEAT_S
                 self.wfile.write("".join(out).encode("utf-8"))
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):

@@ -334,6 +334,56 @@ ORGANIC_PHASE_GAIN = 0.22
 AURA_BASE = 0.18
 AURA_GAIN = 0.16
 
+#: Ambient breath: a slow, purely time-driven swell applied to the aura,
+#: glow and core radii so even idle never looks frozen. A pure function
+#: of the animation clock (never random); small enough that the
+#: un-modulated frame keeps its identity while visibly living.
+AMBIENT_BREATH_GAIN = 0.05
+AMBIENT_BREATH_HZ = 0.11
+
+#: Depth parallax: as voice energy rises the glow layers slide farther
+#: from center and the core counter-slides a little, so the flat stack
+#: reads as layered 3-D. Every term is gated on the energy (``pulse01``),
+#: so a no-audio frame stays byte-identical to the pre-polish renderer.
+PARALLAX_GAIN = 0.55
+CORE_PARALLAX_GAIN = 0.22
+
+#: Per-band hue micro-variation: weight of a slow deterministic
+#: oscillator that nudges each band a little toward its neighbour in
+#: the state family ramp. Stays inside the family, so the state hue
+#: remains dominant (a convex mix cannot flip the dominant channel).
+BAND_TINT_GAIN = 0.18
+
+#: Soft outward energy ripple: a translucent ring that rides the voice
+#: energy and fades as it expands (deterministic phase, decays). Gated
+#: on a live talk-meter / spectrum, so a bare frame never grows one.
+RIPPLE_SPEED = 0.35
+RIPPLE_GAIN = 0.10
+RIPPLE_ALPHA = 0.30
+
+# -- onset transient (owner 2026-10-07: sharper audio reactivity) ---------
+#
+# Onsets are broadband spikes: the loudest band jumps well above the band
+# average. :func:`onset_punch` scores exactly that (peak-vs-mean spikiness
+# scaled by level), so the orb's scale/glow can add a crisp extra punch on
+# attack and let it fall away as the audio decays (the host's
+# ``SpectrumSmoother`` supplies the fast attack / slow release + held caps).
+# Every term below is gated on a ``0`` punch, so a flat, silent or absent
+# spectrum renders byte-identically to the pre-polish renderer.
+ONSET_PUNCH_GAIN = 0.35      # extra scale on the living-pulse breath
+ONSET_AURA_GAIN = 0.22       # extra aura opacity/radius on attack
+ONSET_PARALLAX_GAIN = 0.25   # extra glow-layer slide on attack
+ONSET_CORE_GAIN = 0.12       # extra core-disc pulse on attack
+
+# -- equalizer bar gradient (owner 2026-10-07: richer bars) ---------------
+#
+# Each bar body is drawn as this many stacked vertical segments, dim at the
+# base and brighter toward the tip, so the bars read as a vertical gradient
+# instead of a flat stick. Every segment stays inside the state color
+# family (a mix toward the background cannot flip the dominant channel).
+BAR_GRADIENT_STEPS = 3
+BAR_TIP_GAIN = 0.35          # extra brightness of the topmost segment
+
 
 #: 5 wave bands as (amp, freq, speed, phase, opacity).
 #: Amps are in hero units and scaled to the orb radius at draw time.
@@ -403,6 +453,12 @@ SPEC_RELEASE_S = 0.4
 #: Peak-hold cap fall rate (units/second): caps hold the hit, then fall
 #: slowly away so transients leave a visible trace.
 SPEC_PEAK_FALL = 0.6
+
+#: Scalar energy-envelope follower constants (fast attack / slow release),
+#: mirroring :class:`SpectrumSmoother`'s pair; exposed so hosts can tame
+#: the voice pump so it eases instead of snapping.
+ENERGY_ATTACK_S = SPEC_ATTACK_S
+ENERGY_RELEASE_S = SPEC_RELEASE_S
 
 
 class SpectrumSmoother:
@@ -482,6 +538,62 @@ class SpectrumSmoother:
             pass
         return list(self.values)
 
+
+class EnergySmoother:
+    """Scalar fast-attack / slow-release follower for voice energy.
+
+    The audio envelope (a 0..1 loudness) drives the living pulse; folded
+    in raw it snaps to each new sample. This follower reuses the exact
+    exponential-approach math of :class:`SpectrumSmoother` on a single
+    scalar: it rises quickly toward a louder target and eases back
+    slowly, so the orb swells and settles instead of twitching. The
+    estimate is monotone (never overshoots its target) and purely
+    time-stepped; never raises.
+    """
+
+    def __init__(self, value: float = 0.0,
+                 attack_s: float = ENERGY_ATTACK_S,
+                 release_s: float = ENERGY_RELEASE_S) -> None:
+        try:
+            self.value = max(0.0, min(1.0, float(value)))
+        except (TypeError, ValueError):
+            self.value = 0.0
+        self.peaks = self.value
+        try:
+            self.attack_s = max(1e-3, float(attack_s))
+        except (TypeError, ValueError):
+            self.attack_s = ENERGY_ATTACK_S
+        try:
+            self.release_s = max(1e-3, float(release_s))
+        except (TypeError, ValueError):
+            self.release_s = ENERGY_RELEASE_S
+
+    def update(self, target: Any, dt: float = 1.0) -> float:
+        """Fold one energy sample in; return the eased 0..1 estimate."""
+        try:
+            step = max(0.0, float(dt))
+        except (TypeError, ValueError):
+            step = 1.0
+        try:
+            want = (0.0 if target is None
+                    else max(0.0, min(1.0, float(target))))
+        except (TypeError, ValueError):
+            want = 0.0
+        except Exception:
+            want = 0.0
+        try:
+            rate = (1.0 - math.exp(-step / self.attack_s)
+                    if want >= self.value
+                    else 1.0 - math.exp(-step / self.release_s))
+        except (OverflowError, ZeroDivisionError):
+            rate = 1.0
+        self.value = max(0.0, min(1.0, self.value + (want - self.value) * rate))
+        if self.value >= self.peaks:
+            self.peaks = self.value
+        else:
+            self.peaks = max(self.value, self.peaks - SPEC_PEAK_FALL * step)
+        return self.value
+
 #: Brightness floor paired with the gain floor: quiet listening dims but
 #: keeps its color family (state.py owns color; this only modulates
 #: amplitude/brightness, never the palette).
@@ -549,6 +661,54 @@ def spectrum_energy(spectrum: Any) -> Optional[float]:
         return max(0.0, min(1.0, 0.65 * peak + 0.35 * mean))
     except Exception:
         return None
+
+
+def onset_punch(spectrum: Any, peaks: Any = None) -> float:
+    """0..1 transient emphasis from a spectrum's spikiness (pure).
+
+    An onset is a broadband spike: the loudest band sits well above the
+    band average. This scores ``(peak - mean) / peak`` (0 for a flat or
+    silent spectrum, ~1 for an isolated spike) scaled by the peak level,
+    so a hard attack reads crisp while a steady tone reads 0 and a bare
+    frame carries no punch at all.
+
+    When ``peaks`` (the host's slow-falling per-band caps) are supplied,
+    the score is additionally gated by how close the loudest band is to
+    its held cap: a *fresh* hit tracks its cap (gate ~1) while a decaying
+    tail has already fallen away from it (gate < 1). Combined with the
+    host's fast-attack/slow-release smoother this yields an attack that
+    decays instead of a hard snap. Deterministic; never raises.
+    """
+    try:
+        vals = [max(0.0, min(1.0, float(v))) for v in spectrum]
+    except (TypeError, ValueError):
+        return 0.0
+    except Exception:
+        return 0.0
+    if not vals:
+        return 0.0
+    peak = max(vals)
+    if peak <= 0.0:
+        return 0.0
+    mean = sum(vals) / len(vals)
+    spike = max(0.0, peak - mean) / peak
+    punch = spike * (peak ** 1.5)
+    if peaks is not None:
+        try:
+            caps = [max(0.0, min(1.0, float(v))) for v in peaks]
+        except Exception:
+            caps = []
+        if len(caps) == len(vals):
+            try:
+                near = 0.0
+                for i, band in enumerate(vals):
+                    cap = caps[i]
+                    if cap > 1e-6:
+                        near = max(near, band / cap)
+                punch *= min(1.0, max(0.0, near))
+            except Exception:
+                pass
+    return max(0.0, min(1.0, punch))
 
 
 def _hex(rgb: Tuple[int, int, int]) -> str:
@@ -748,6 +908,47 @@ def _organic_phase(t: float, seed: float) -> float:
                 + 0.2 * math.sin(tt * 2.6 + sd * 0.77))
     except Exception:
         return 0.0
+
+
+def ambient_breath(t: float) -> float:
+    """Slow deterministic ambient swell in ``[1-GAIN, 1+GAIN]``.
+
+    The idle "alive" life: a single very slow sine of the frame clock
+    applied to the aura/glow/core radii. Pure function of ``t`` (no
+    randomness), so the renderer stays byte-pure. Never raises.
+    """
+    try:
+        return 1.0 + AMBIENT_BREATH_GAIN * math.sin(
+            float(t) * AMBIENT_BREATH_HZ * 2.0 * math.pi)
+    except (TypeError, ValueError, OverflowError):
+        return 1.0
+
+
+def band_shade(fam_bands: Any, index: int, t: float) -> Tuple[int, int, int]:
+    """Color for one band: family ramp + a subtle deterministic hue nudge.
+
+    Blends the band's family entry a little toward its neighbour with a
+    slow per-band oscillator, so the ramp shifts gently across bands
+    (color richness) instead of every band reading identically. A convex
+    mix *inside* the family guarantees the state's dominant channel is
+    preserved. Malformed input -> the plain family entry. Never raises.
+    """
+    try:
+        n = len(fam_bands)
+        i = int(index) % max(1, n)
+        a = fam_bands[i]
+        b = fam_bands[(i + 1) % n]
+        w = BAND_TINT_GAIN * (0.5 + 0.5 * math.sin(
+            float(t) * 0.6 + i * 1.3))
+        return (round(a[0] + (b[0] - a[0]) * w),
+                round(a[1] + (b[1] - a[1]) * w),
+                round(a[2] + (b[2] - a[2]) * w))
+    except Exception:
+        try:
+            fb = fam_bands[index % len(fam_bands)]
+            return (int(fb[0]), int(fb[1]), int(fb[2]))
+        except Exception:
+            return EMBER_CORE
 
 
 def band_point(x: float, t: float, spec: Tuple[float, float, float, float, float],
@@ -962,6 +1163,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     # the same frame (the existing loud==baseline contract).
     energy: Optional[float] = None
     pulse01 = 0.0
+    onset = 0.0
     if key in ("listening", "speaking"):
         try:
             if key == "listening":
@@ -979,9 +1181,19 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                     brightness = (float(brightness)
                                   * listening_brightness(energy))
                     pulse01 = pump
+            # Onset transient: how spikily the live spectrum hits. Only a
+            # real spectrum can carry it, so a no-audio frame keeps its
+            # exact geometry (``onset`` stays 0 -> every punch term is 0).
+            if spectrum is not None:
+                _spec_ok = _spec_vector(spectrum)
+                if _spec_ok is not None:
+                    _caps_ok = (_spec_vector(spec_peaks)
+                                if spec_peaks is not None else None)
+                    onset = onset_punch(_spec_ok, _caps_ok)
         except Exception:
             energy = None
             pulse01 = 0.0
+            onset = 0.0
     ring_count = int(params["rings"])
     ring_speed = params["ring_speed"]
     glow_layers = int(params["glow"])
@@ -1034,20 +1246,30 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     # -- living pulse + soft outer aura (pure fn of tt + audio energy) ----
     # ``breathe`` == 1.0 with no audio, so the un-modulated frame keeps
-    # its exact geometry; it only swells with real voice energy.
+    # its exact geometry; it only swells with real voice energy. The
+    # energy is eased (smoothstep) so the pump accelerates and settles
+    # instead of snapping; 0 and 1 map exactly to themselves, so the
+    # loud/quiet end-stop contracts are unchanged.
+    pulse_eased = _smoothstep(pulse01) if pulse01 > 0.0 else 0.0
+    onset_eased = _smoothstep(onset) if onset > 0.0 else 0.0
+    ambient = ambient_breath(tt)
     breathe = 1.0
-    if pulse01 > 0.0:
+    if pulse_eased > 0.0 or onset_eased > 0.0:
         try:
-            breathe = 1.0 + BREATH_GAIN * pulse01 * (
+            breathe = (1.0 + BREATH_GAIN * pulse_eased * (
                 0.8 + 0.2 * math.sin(tt * 0.7 * math.pi))
+                + ONSET_PUNCH_GAIN * onset_eased)
         except (ValueError, OverflowError):
             breathe = 1.0
     # Aura: two cheap translucent halos behind the glow that brighten with
-    # energy (no blur, no deps — big stippled ovals only).
+    # energy (no blur, no deps — big stippled ovals only). The ambient
+    # breath keeps them slowly swelling even when idle.
     for _ai, _frac in enumerate((0.98, 0.82)):
-        _rr = r_f * _frac * (1.0 + 0.02 * pulse01)
+        _rr = r_f * _frac * (1.0 + 0.02 * pulse_eased
+                             + 0.015 * onset_eased) * ambient
         _base = AURA_BASE * (1.0 if _ai == 0 else 0.8)
-        _alpha = min(1.0, (_base + AURA_GAIN * pulse01) * brightness)
+        _alpha = min(1.0, (_base + AURA_GAIN * pulse_eased
+                           + ONSET_AURA_GAIN * onset_eased) * brightness)
         _fill = _hex(_mix(fam["warm_b"], NEAR_BLACK, _alpha))
         _kw: Dict[str, Any] = {"fill": _fill, "outline": ""}
         if _ai == 0:
@@ -1057,6 +1279,9 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     # -- ambient mesh: 1-2 slowly-drifting radial glows, layered ovals ----
     # Two-frequency drift + the deterministic organic wobble so the glow
     # never marches mechanically (same t -> same offset, never random).
+    # Voice energy widens the parallax so the glow slabs slide ahead of
+    # the core (a layered 3-D read); at no energy the multiplier is 1.0,
+    # so a bare frame is byte-identical to the pre-polish renderer.
     _drift_wob = _organic_phase(tt, 3.0)
     drift_x = ((math.sin(tt * 0.23) * 0.75
                 + math.sin(tt * 0.41 + 1.1) * 0.25) * r_f * 0.12
@@ -1064,15 +1289,18 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     drift_y = ((math.cos(tt * 0.19 + 1.3) * 0.75
                 + math.cos(tt * 0.37 + 0.4) * 0.25) * r_f * 0.12
                + _drift_wob * r_f * 0.02)
+    parallax = (1.0 + PARALLAX_GAIN * pulse_eased
+                + ONSET_PARALLAX_GAIN * onset_eased)
     glow_sets = (
         (fam["warm_b"], (0.95, 0.72, 0.50)),
         (fam["mid"], (0.80, 0.60, 0.40)),
     )[:max(1, min(2, glow_layers))]
     for gi, (glow_rgb, fracs) in enumerate(glow_sets):
-        gx = cx_f + drift_x * (1 if gi == 0 else -1)
-        gy = cy_f + drift_y * (1 if gi == 0 else -1)
+        _sign = 1 if gi == 0 else -1
+        gx = cx_f + drift_x * _sign * parallax
+        gy = cy_f + drift_y * _sign * parallax
         for li, frac in enumerate(fracs):
-            rr = r_f * frac * breathe
+            rr = r_f * frac * breathe * ambient
             alpha = (0.10 + 0.08 * (len(fracs) - li) / len(fracs)) * brightness
             fill = _hex(_mix(glow_rgb, NEAR_BLACK, min(1.0, alpha * 2.2)))
             kw: Dict[str, Any] = {"fill": fill, "outline": ""}
@@ -1089,6 +1317,34 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _oval(cx_f - rr, cy_f - rr, cx_f + rr, cy_f + rr,
               outline=outline, width=2 if i == 0 else 1)
 
+    # -- soft outward energy ripple (gated on live audio; decays) ---------
+    # One translucent ring whose radius grows with the clock phase and
+    # whose opacity falls off as it expands, its depth scaled by the live
+    # talk-meter / spectrum level. It is only drawn when a real sample
+    # exists, so a bare or non-voice frame never grows one (byte-identical
+    # to the pre-polish renderer). Outline-only: it never enters ``fills``.
+    try:
+        if key == "speaking":
+            ripple_amp = (max(0.0, min(1.0, float(energy)))
+                          if energy is not None else 0.0)
+        elif key == "listening":
+            # ``pulse01`` already folds None -> the full old-helper
+            # reference (1.0), so level=None and level=1.0 stay identical.
+            ripple_amp = pulse01
+        else:
+            ripple_amp = 0.0
+        if ripple_amp > 0.02:
+            _rp = (tt * RIPPLE_SPEED) % 1.0
+            rphase = _rp if _rp >= 0 else _rp + 1.0
+            rr = r_f * (0.45 + 0.60 * rphase)
+            ralpha = min(1.0, RIPPLE_ALPHA * ripple_amp
+                         * (1.0 - rphase) * (0.4 + RIPPLE_GAIN) * brightness)
+            rout = _hex(_mix(fam["hi"], NEAR_BLACK, ralpha))
+            _oval(cx_f - rr, cy_f - rr, cx_f + rr, cy_f + rr,
+                  outline=rout, width=1)
+    except Exception:
+        pass
+
     # -- equalizer bars XOR 5 sine bands (voice states with a spectrum) ---
     bars_on = False
     try:
@@ -1102,16 +1358,27 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 rects = spec_bar_rects(bands, caps, cx_f, cy_f, r_f,
                                        band_gain)
                 for ri, rc in enumerate(rects):
-                    alpha = min(1.0, (0.30 + 0.70 * rc["value"])
-                                * brightness)
-                    fill = _hex(_mix(fam_bands[ri % len(fam_bands)],
-                                     NEAR_BLACK, alpha))
+                    base = band_shade(fam_bands, ri, tt)
+                    top = rc["top"]
+                    bottom = rc["bottom"]
+                    span = bottom - top
+                    steps = 1 if span < 2.0 else BAR_GRADIENT_STEPS
+                    # Vertical gradient: stacked segments, dim at the base
+                    # and brighter toward the tip (still one family hue).
+                    for si in range(steps):
+                        f0 = si / steps
+                        f1 = (si + 1) / steps
+                        y_hi = top + span * f0
+                        y_lo = top + span * f1
+                        shade = 0.55 + BAR_TIP_GAIN * (1.0 - f0)
+                        alpha = min(1.0, (0.24 + 0.66 * rc["value"])
+                                    * shade * brightness)
+                        fill = _hex(_mix(base, NEAR_BLACK, alpha))
+                        _line([rc["x"], y_hi, rc["x"], y_lo],
+                              fill=fill, width=3)
                     hw = rc["half_w"]
-                    _line([rc["x"], rc["top"], rc["x"], rc["bottom"]],
-                          fill=fill, width=3)
                     cap_alpha = min(1.0, 0.35 + 0.65 * brightness)
-                    cap_fill = _hex(_mix(fam_bands[ri % len(fam_bands)],
-                                         NEAR_BLACK, cap_alpha))
+                    cap_fill = _hex(_mix(base, NEAR_BLACK, cap_alpha))
                     _line([rc["x"] - hw, rc["peak_top"],
                            rc["x"] + hw, rc["peak_top"]],
                           fill=cap_fill, width=1)
@@ -1130,23 +1397,29 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 shifted.append(pts[k] + x0)
                 shifted.append(pts[k + 1])
             alpha = min(1.0, float(op) * brightness * 3.0)
-            fill = _hex(_mix(fam_bands[bi % len(fam_bands)],
+            fill = _hex(_mix(band_shade(fam_bands, bi, tt),
                              NEAR_BLACK, alpha))
             _line(shifted, fill=fill, width=2 if bi >= 3 else 1,
                   smooth=True)
 
     # -- core disc: solid ember heart (subtle energy pulse in radius) ------
+    # The core counter-slides a touch against the glow parallax (depth)
+    # and shares the ambient breath, so the heart visibly lives even idle.
     core_alpha = min(1.0, 0.55 + 0.35 * brightness)
     core = _hex(_mix(fam["core"], NEAR_BLACK, core_alpha))
     core_pulse = 1.0
-    if pulse01 > 0.0:
+    if pulse_eased > 0.0 or onset_eased > 0.0:
         try:
-            core_pulse = 1.0 + CORE_PULSE_GAIN * pulse01 * (
+            core_pulse = (1.0 + CORE_PULSE_GAIN * pulse_eased * (
                 0.5 + 0.5 * math.sin(tt * CORE_PULSE_HZ))
+                + ONSET_CORE_GAIN * onset_eased)
         except (ValueError, OverflowError):
             core_pulse = 1.0
-    cr = r_f * 0.34 * core_pulse
-    _oval(cx_f - cr, cy_f - cr, cx_f + cr, cy_f + cr,
+    core_dx = -drift_x * CORE_PARALLAX_GAIN * pulse_eased
+    core_dy = -drift_y * CORE_PARALLAX_GAIN * pulse_eased
+    cr = r_f * 0.34 * core_pulse * ambient
+    _oval(cx_f + core_dx - cr, cy_f + core_dy - cr,
+          cx_f + core_dx + cr, cy_f + core_dy + cr,
           fill=core, outline="")
 
     return {"ovals": ovals, "lines": lines, "points": points,
@@ -1193,6 +1466,8 @@ __all__ = [
     "ring_phase",
     "ring_alpha",
     "render",
+    "ambient_breath",
+    "band_shade",
     "listening_gain",
     "listening_brightness",
     "LISTEN_LEVEL_FLOOR",
@@ -1202,5 +1477,23 @@ __all__ = [
     "SPEC_RELEASE_S",
     "SPEC_PEAK_FALL",
     "SpectrumSmoother",
+    "ENERGY_ATTACK_S",
+    "ENERGY_RELEASE_S",
+    "EnergySmoother",
+    "AMBIENT_BREATH_GAIN",
+    "AMBIENT_BREATH_HZ",
+    "PARALLAX_GAIN",
+    "CORE_PARALLAX_GAIN",
+    "BAND_TINT_GAIN",
+    "RIPPLE_SPEED",
+    "RIPPLE_GAIN",
+    "RIPPLE_ALPHA",
+    "ONSET_PUNCH_GAIN",
+    "ONSET_AURA_GAIN",
+    "ONSET_PARALLAX_GAIN",
+    "ONSET_CORE_GAIN",
+    "BAR_GRADIENT_STEPS",
+    "BAR_TIP_GAIN",
+    "onset_punch",
     "spec_bar_rects",
 ]

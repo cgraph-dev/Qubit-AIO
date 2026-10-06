@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const taskMocks = vi.hoisted(() => ({
   getTaskLedger: vi.fn(),
-  getTaskSuggestions: vi.fn(),
+  getTaskIdeas: vi.fn(),
   cancelTask: vi.fn(),
   retryTask: vi.fn(),
   acceptIdea: vi.fn(),
@@ -108,7 +108,7 @@ beforeEach(() => {
   taskMocks.getTaskLedger.mockResolvedValue([
     { id: "t-1", title: "Summarize inbox", state: "done", session: "chat-1", updated_at: "" },
   ]);
-  taskMocks.getTaskSuggestions.mockResolvedValue([
+  taskMocks.getTaskIdeas.mockResolvedValue([
     { id: "s-1", prompt: "File the weekly report", title: "Re-run Weekly review", session: "", reason: "failed run", kind: "agent" },
   ]);
   taskMocks.cancelTask.mockResolvedValue({ ok: true });
@@ -141,9 +141,13 @@ describe("TaskInboxPage", () => {
   it("renders the ledger and read-only suggestions", async () => {
     await renderPage();
     await waitFor(() => container.textContent?.includes("Summarize inbox") ?? false);
-    expect(container.textContent).toContain("File the weekly report");
+    // The Ideas column renders `title || prompt` (TaskInboxPage.tsx:437); the
+    // fixture supplies a distinct title, so that is what shows.
+    expect(container.textContent).toContain("Re-run Weekly review");
     expect(taskMocks.getTaskLedger).toHaveBeenCalled();
-    expect(taskMocks.getTaskSuggestions).toHaveBeenCalled();
+    // The page now reads the live derived ideas inbox (`getTaskIdeas`), whose
+    // rows power the read-only "Ideas" column — see ocFamilyBoardApi.ts:355.
+    expect(taskMocks.getTaskIdeas).toHaveBeenCalled();
   });
 
   it("cancels via receipt with confirmation and retries via session", async () => {
@@ -184,10 +188,12 @@ describe("TaskInboxPage", () => {
     expect(health!.querySelector('[aria-label="1 Suggestions"]')).not.toBeNull();
     expect(columnTitles()).toEqual([
       "Task ledger",
-      "Suggestions (read-only)",
+      // The page now surfaces the live derived ideas inbox (accept/dismiss
+      // wired to the real ideas-* actions), not a read-only suggestions list.
+      "Ideas",
       "Cancel / retry via receipt or session",
       "Mentions (disabled with reason)",
-      "Suggestion writes (disabled with reason)",
+      "Ideas backend",
     ]);
     expect(container.textContent).toContain("Last refreshed");
   });
@@ -239,7 +245,7 @@ describe("TaskInboxPage", () => {
       container.querySelector("#task-inbox-search") as HTMLInputElement,
       "weekly",
     );
-    await waitFor(() => container.textContent?.includes("File the weekly report") ?? false);
+    await waitFor(() => container.textContent?.includes("Re-run Weekly review") ?? false);
     await act(async () => (container.querySelector("#task-inbox-hide-empty") as HTMLInputElement).click());
     await waitFor(() => {
       const titles = columnTitles();
