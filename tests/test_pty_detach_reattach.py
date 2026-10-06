@@ -10,6 +10,8 @@ terminal.
 
 from voicebridge import pty_ws
 
+import time
+
 
 class _Bridge:
     """Minimal bridge double: alive until ``closed``, then EOF (``None``)."""
@@ -138,3 +140,72 @@ def test_cancel_all_does_not_kill_detached_terminals():
 
     assert active_bridge.closed is True, "an active PTY is still cancelled"
     assert detached_bridge.closed is False, "a detached PTY must survive"
+
+
+def test_reattach_session_matches_by_resume_target():
+    """A browser CLOSE clears sessionStorage, so the reopened tab presents a NEW
+    ``?attach=`` key while the previous terminal is still detached and owns the
+    session lease. Re-attaching by the resume target keeps ONE terminal per
+    conversation; spawning a second would be refused ("open in another Qubit
+    window") until the orphan's idle timeout."""
+    srv = _srv()
+    bridge = _Bridge()
+    session = pty_ws._Session(bridge=bridge, ticket=_ticket("conv-key"),
+                              key="old-token", session_id="S-100")
+    srv._detached["old-token"] = session
+
+    back = srv._reattach_session("S-100")
+    assert back is session, "the live terminal for the resume target is re-adopted"
+    assert back.bridge is bridge
+
+
+def test_reattach_session_unknown_target_returns_none():
+    srv = _srv()
+    assert srv._reattach_session("never-seen") is None
+    assert srv._reattach_session("") is None
+
+
+def test_reattach_session_does_not_resurrect_a_dead_terminal():
+    srv = _srv()
+    bridge = _Bridge()
+    bridge.closed = True  # the child exited while detached
+    srv._detached["old-token"] = pty_ws._Session(
+        bridge=bridge, ticket=_ticket("conv-key"), key="old-token",
+        session_id="S-100")
+
+    assert srv._reattach_session("S-100") is None
+    assert "old-token" not in srv._detached
+
+
+def test_idle_detached_sweep_retires_an_orphan():
+    """The in-pump idle check needs a connected client, so a detached terminal
+    never reached it — the orphan (and its vendored session lease) lived until
+    the process exited. The explicit sweep retires it on the idle deadline."""
+    srv = _srv()
+    srv._idle = 10.0
+    dead_bridge = _Bridge()
+    orphan = pty_ws._Session(bridge=dead_bridge, ticket=_ticket("conv-key"),
+                             key="orphan-key", session_id="S-old")
+    orphan.last_activity = time.monotonic() - 60.0  # idle past the deadline
+    fresh_bridge = _Bridge()
+    fresh = pty_ws._Session(bridge=fresh_bridge, ticket=_ticket("conv-key"),
+                            key="fresh-key", session_id="S-new")
+    srv._detached["orphan-key"] = orphan
+    srv._detached["fresh-key"] = fresh
+
+    reaped = srv._sweep_idle_detached()
+
+    assert reaped == 1, "only the idle orphan is retired"
+    assert "orphan-key" not in srv._detached
+    assert dead_bridge.closed is True, "the orphan's terminal is actually killed"
+    assert "fresh-key" in srv._detached, "a recently active terminal survives"
+    assert fresh_bridge.closed is False
+
+
+def test_idle_detached_sweep_noop_when_all_fresh():
+    srv = _srv()
+    srv._idle = 30 * 60.0
+    srv._detached["a"] = pty_ws._Session(bridge=_Bridge(), ticket=_ticket("a"),
+                                         key="a", session_id="S-a")
+    assert srv._sweep_idle_detached() == 0
+    assert "a" in srv._detached

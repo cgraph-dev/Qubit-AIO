@@ -572,6 +572,12 @@ class _Session:
     # PTY should be kept alive for a re-attach.
     ended: bool = False
     key: str = ""  # stable conversation key used for detach/re-attach
+    # The canonical session id this terminal resumed/created (``?resume=`` after
+    # canonical mapping, or "" for a fresh chat). Used to re-attach a reconnecting
+    # client whose attach token changed — a browser CLOSE clears sessionStorage,
+    # so the reopened tab presents a NEW key and would otherwise spawn a second
+    # terminal that the live one's session lease refuses (#open-in-another-window).
+    session_id: str = ""
 
 
 class PtyWsServer:
@@ -824,6 +830,14 @@ class PtyWsServer:
                         or "TERMINAL_CONTEXT_BELOW_MINIMUM"),
                     _redact(str(guard.get("detail") or ""))[:220])
             return
+        # Retire detached terminals whose browser is long gone. The in-pump idle
+        # check cannot see them (no client), so without this sweep an orphan
+        # keeps its vendored session lease until the process exits — the cause
+        # of "This chat is open in another Qubit window" on a later resume.
+        try:
+            self._sweep_idle_detached()
+        except Exception as exc:  # noqa: BLE001 - a reap failure must not block the connect
+            log_event("webui.pty.idle_sweep_failed", detail=redact_text(str(exc))[:200])
         with self._lock:
             if len(self._active) >= self._max:
                 _reject(handler, 429, "PTY_LIMIT",
@@ -831,14 +845,29 @@ class PtyWsServer:
                 return
 
         # 1b) Re-attach to a terminal this conversation already owns. A browser
-        #     refresh drops the socket but must NOT kill an in-flight turn, so a
-        #     previously detached session for the same ticket session resumes
-        #     here instead of spawning a second terminal. An explicit
-        #     ``resume`` request, or a session whose terminal has exited, falls
-        #     through to a fresh spawn below.
+        #     refresh or close drops the socket but must NOT kill an in-flight
+        #     turn, so a previously detached session for the same conversation
+        #     resumes here instead of spawning a second terminal. This holds
+        #     even when the client supplies ``resume``: the detached terminal
+        #     already owns the session lease, so spawning a fresh one would be
+        #     refused with "open in another Qubit window" (the orphan is alive
+        #     for IDLE_TIMEOUT_S, and the lease is pid-fenced, so nothing reaps
+        #     it). ``resume`` still selects the target when NO live terminal
+        #     exists for this key. A session whose terminal has exited falls
+        #     through to a fresh spawn below (``_reattach`` retires it).
         key = str(attach or ticket.session or "")
-        if key and not resume:
+        if key:
             prior = self._reattach(key)
+            # A browser CLOSE clears sessionStorage, so the reopened tab presents a
+            # NEW attach token that matches no detached key. Fall back to the resume
+            # target: the live detached terminal for that session already owns its
+            # lease, so spawning a second one is refused ("open in another Qubit
+            # window") until the orphan's 30-minute idle timeout. Re-adopt it and
+            # keep the new key so future reloads of THIS tab re-attach by key.
+            if prior is None and resume:
+                prior = self._reattach_session(resume)
+                if prior is not None:
+                    prior.key = key
             if prior is not None:
                 session = prior
                 with self._lock:
@@ -881,7 +910,8 @@ class PtyWsServer:
                     _redact(str(detail))[:200])
             return
 
-        session = _Session(bridge=bridge, ticket=ticket, key=key)
+        session = _Session(bridge=bridge, ticket=ticket, key=key,
+                           session_id=str(meta.get("session_id") or ""))
         with self._lock:
             self._active[id(session)] = session
         try:
@@ -1006,6 +1036,30 @@ class PtyWsServer:
             session.loop = asyncio.new_event_loop()
         return bool(session.loop.run_until_complete(coro))
 
+    def _sweep_idle_detached(self) -> int:
+        """Retire detached terminals idle past ``idle_timeout_s``.
+
+        The idle check in ``_pump`` only runs while a CLIENT is connected, so a
+        detached terminal (browser closed) never reaches it — its 30-minute
+        timeout silently did nothing, and the only bound was the ``_max``-sized
+        ``_detached`` dict evicting the oldest. That leak kept orphan ``qubit
+        --tui`` processes (and the vendored session lease each holds) alive
+        indefinitely, which is what surfaced as "This chat is open in another
+        Qubit window" on the next resume. Sweep explicitly, from the connection
+        path, so an orphan is retired on schedule rather than never.
+        """
+        now = time.monotonic()
+        with self._lock:
+            stale = [s for s in self._detached.values()
+                     if now - s.last_activity > self._idle]
+        for session in stale:
+            try:
+                self._teardown(session)
+                log_event("webui.pty.session_idle_reap", pid=_safe_pid(session.bridge))
+            except Exception:
+                pass
+        return len(stale)
+
     def _teardown(self, session: _Session) -> None:
         with self._lock:
             self._active.pop(id(session), None)
@@ -1030,18 +1084,25 @@ class PtyWsServer:
         terminal thread keeps the dedicated loop so buffered async writes still
         land while detached.
         """
+        evicted: list[_Session] = []
         with self._lock:
             self._active.pop(id(session), None)
             if session.key:
                 self._detached[session.key] = session
                 # Bound the detached set the same way ``_active`` is bounded.
+                # Collect evictees here but tear them down AFTER releasing the
+                # lock: ``_teardown`` takes ``self._lock`` too, and a plain
+                # ``threading.Lock`` is not reentrant — calling it inside this
+                # block self-deadlocked the whole listener on the first eviction.
                 while len(self._detached) > self._max:
                     old_key = next(iter(self._detached))
                     if old_key == session.key:
                         break
                     old = self._detached.pop(old_key, None)
                     if old is not None:
-                        self._teardown(old)
+                        evicted.append(old)
+        for old in evicted:
+            self._teardown(old)
         log_event("webui.pty.session_detach", session=session.ticket.session,
                   pid=_safe_pid(session.bridge))
 
@@ -1078,6 +1139,27 @@ class PtyWsServer:
         session.cancelled = False
         session.ended = False
         return session
+
+    def _reattach_session(self, session_id: str) -> Optional[_Session]:
+        """Re-attach a reconnecting client to the live detached terminal for
+        ``session_id`` when its attach token no longer matches.
+
+        A browser close clears ``sessionStorage``, so the reopened tab presents a
+        fresh ``?attach=`` key and ``_reattach(key)`` finds nothing — the server
+        would spawn a second terminal for a session the live one still leases,
+        which the lease refuses. Re-adopting the detached terminal keeps one
+        terminal per conversation across a close/reopen. Stale entries (terminal
+        exited) are retired here exactly as in ``_reattach``.
+        """
+        target = str(session_id or "").strip()
+        if not target:
+            return None
+        with self._lock:
+            match = next((k for k, s in self._detached.items()
+                          if s.session_id and s.session_id == target), None)
+        if match is None:
+            return None
+        return self._reattach(match)
 
 
 def _safe_pid(bridge: Any) -> int:
