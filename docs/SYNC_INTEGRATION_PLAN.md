@@ -1,0 +1,103 @@
+# Upstream integration — where we are, what's missing, how to stop the slop
+
+Baseline: pin `69948c0057` → `a036b13793` (2026-09-25 → 2026-10-06).
+**5,441 commits, 5,142 files** (`git rev-list --count 69948c0057..a036b13793`).
+
+## The number that matters is not 5,142
+
+5,142 is the file delta. Most of it is not integration work:
+
+| Bucket | Files | Verdict |
+|---|---|---|
+| `apps/` (Electron desktop) | 1,640 | not our surface — the shipped dashboard is the web SPA on 8890 |
+| `tests/` | 1,320 | 1,029 of the missing symbols live here; a prior blind sync created a mis-routed duplicate tree and caused mass failures |
+| `website/` `locales/` `.github/` `nix/` `pm/` | ~370 | build/docs/CI — low risk, low value |
+
+**The real surface is the capability audit**, not the file count:
+`docs/SYNC_CAPABILITY_GAPS.md` → **1,833 missing symbols across 454 files**, of which
+**199 runtime files / 656 symbols** (excluding tests + scripts).
+
+## Corrected measurements (the old numbers were wrong)
+
+Two silent-failure bugs made every prior measurement understate the gap:
+
+1. **`BASE_SHA` was `bd0affe5`** (2026-10-02) — 1,313 commits short of current upstream.
+   Reported 4,128 commits / 4,438 files. Real: 5,441 / 5,142.
+2. **`__root__` was passed as a git pathspec** (`-- __root__`), which matches nothing.
+   It reported **0 files** and a `--run __root__` would have merged nothing while
+   reporting success — silently skipping the 49-file primitive layer
+   (`utils.py`, `qubit_state_errors.py`, `qubit_constants.py`).
+
+Both are fixed. The capability audit therefore went from **346 → 1,833** missing symbols.
+
+## Why the primitive layer goes first
+
+Consumers import symbols DEFINED in more primitive modules. Three real failures came
+from the primitive layer landing late or not at all:
+
+- `utils.mkstemp_beside`
+- `qubit_state_errors.SessionActiveWriteGuardError`
+- `qubit_platform.host.products.is_nvidia_n1x_pci_id`
+
+Plus two found on 2026-10-06 (same class — symbol dropped, call site survived):
+
+- `tui_gateway/server.py` did not import `turn_marker.marker_writer_state`
+  → `NameError` killed every resume of a crash-interrupted session.
+- `qubit_cli/plugins.py` was missing `publish_gateway_message_host` /
+  `clear_published_gateway_message_host` / `_attach_published_gateway_host`
+  → `ImportError` killed the gateway daemon at startup; systemd hit its restart limit.
+
+**This class is the actual "AI slop"**: a rename or partial port drops a symbol, the
+import site survives, and the failure surfaces far away as a runtime crash.
+
+## The mechanical guard (do this for every slice)
+
+```bash
+python3 scripts/sync_import_gate.py --save /tmp/gate_before.json      # baseline
+python3 scripts/sync_upstream.py --apply --subtree <sub> --json-out /tmp/o.json
+python3 scripts/sync_import_gate.py --compare /tmp/gate_before.json   # exit 1 = regression
+```
+
+The gate compares failure **identity**, not counts — a count-only gate once missed a
+regression where a benign failure was replaced by a new one and the count stayed at 2.
+
+## Entry-point resolution sweep (the class-level fix)
+
+Beyond the curated module list in the gate, the whole-tree check that would have caught
+both 2026-10-06 bugs is:
+
+> for every `from X import Y` / `X.Y` in the vendored tree, assert `Y` exists on `X`.
+
+Nothing currently does this exhaustively. Recommended before declaring the sync done.
+
+## Ordering
+
+`__root__` → primitives → `agent`/`tools`/`gateway` → `tui_gateway`/`cron`/`providers`
+→ surfaces. Never reorganize this by file count.
+
+## Deletions — never auto-apply
+
+154 upstream deletions include `apps/desktop/electron/plugin-compat-notice.ts` and
+`.../plugin-settings-form.tsx` (plugin-compat UI — the surface for our own adapter work),
+plus brand assets. Check against `docs/PARITY.md` per file. Mirroring upstream deletions
+blindly deletes features we still ship.
+
+## Independence status
+
+`voicebridge/agent_compat/` makes foreign-plugin compatibility a name-mapping problem
+rather than a chase-every-commit problem. It is test-enforced:
+
+- `test_adapters_carry_no_runtime_dependency_on_the_foreign_agent`
+- `test_unmodified_foreign_plugin_executes` (real unmodified upstream plugin)
+- `test_framework_is_not_used_in_tree`
+
+None of the three external dependencies is a runtime dependency:
+
+| Dependency | Runtime need | Safe to remove |
+|---|---|---|
+| `~/.cache/qubit-pins/*` | none (build-time only; zero runtime refs) | yes, but loses the sync baseline + adapter test fixture |
+| `hermes-dashboard.service` (:9119) | none | yes |
+| `openclaw-gateway.service` (:18789) | none | yes |
+
+`agent_compat.install()` is built and tested but **not yet called anywhere** — the last
+mile of not depending on foreign plugins.
