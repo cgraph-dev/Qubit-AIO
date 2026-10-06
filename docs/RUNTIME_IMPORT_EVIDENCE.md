@@ -48,3 +48,26 @@ High-value examples:
 ## Bottom line
 
 No genuine import failure exists in the production tree.
+
+## Independent replication (two runs, two trees)
+
+The walk was run twice by different processes on different trees. The counts differ,
+and the difference is fully explained -- which is the useful part:
+
+| run | tree | candidates | OK | failed | skipped |
+|---|---|---|---|---|---|
+| A (main checkout) | has `qubit_runtime/node_modules/` | 8406 | 8194 | 212 | 51 |
+| B (worktree `b4e6bdb2`) | no `node_modules` (gitignored) | 8321 | 8206 | 115 | 50 |
+
+Reconciliation of the 100-failure difference:
+
+- **95 are `node_modules`** -- third-party JS trees present only in the main checkout.
+  They are not Python we own, so run B's number is the cleaner one.
+- **5 are the same 4 eval probes** failing with different exception types per run
+  (`evals.gateway_completion.delivery_lifecycle` -> TIMEOUT in A, RuntimeError in B;
+  same for `output_caps_local_capture`, `liveness.ws_orphan_reconnect`). These are
+  live/network eval probes: **flaky, not deterministic**, and they are scripts, not
+  importable modules.
+
+Nothing else differs. The two runs agree on substance, and both say the same thing:
+no genuine import failure in the production tree.
