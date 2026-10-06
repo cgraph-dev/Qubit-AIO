@@ -59,6 +59,29 @@ export interface CustomCommand {
   target: string;
 }
 
+/** One wake-routing rule: a spoken trigger routed to a target. */
+export interface WakeRoute {
+  trigger: string;
+  target: string;
+}
+
+/** Where recognized wake turns go (`voice_edit.wake_routing`). */
+export interface WakeRouting {
+  version: number;
+  defaultTarget: string;
+  routes: WakeRoute[];
+}
+
+/** The wake-words/routing add-remove request fields the settings PUT accepts.
+ *  Each carries a single item; the backend validates it and echoes the full
+ *  settings view back. */
+export interface WakeEditPatch {
+  wake_words_add?: string;
+  wake_words_remove?: string;
+  wake_route_add?: WakeRoute;
+  wake_route_remove?: string;
+}
+
 /** Actions an alias may target (mirrors `custom_commands.CUSTOM_ACTIONS`). */
 export const CUSTOM_COMMAND_ACTIONS: string[] = [
   "open_website",
@@ -184,6 +207,12 @@ export interface VoiceEditSettings {
     /** Segmentation backend: auto|silero|webrtc|energy (backend default "auto"). */
     vad?: string;
   };
+  /** Additional wake words/phrases beyond `wake.phrase` (backend default []). */
+  wake_words?: string[];
+  /** Factory default wake words, offered by the "reset to defaults" affordance. */
+  wake_words_default?: string[];
+  /** Where recognized wake turns are routed. */
+  wake_routing?: WakeRouting;
   /** Chrome-style transcripts: lowercase, no punctuation (backend default false). */
   verbatim_transcript?: boolean;
   prompts: PromptRow[];

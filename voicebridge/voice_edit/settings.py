@@ -31,7 +31,14 @@ SETTINGS_KEYS = ("routing", "local_profile", "api_profile", "allow_api",
                    "detail_model", "detail_cues", "voice_recent_turns",
                     "verbatim_transcript", "custom_commands",
                     "sleep_mode", "waveform_visible", "waveform_ingame",
-                    "web_paid_first", "ollama_model", "runner_alias")
+                    "web_paid_first", "ollama_model", "runner_alias",
+                    # Wake words + wake routing are Qubit-owned JSON stores
+                    # (never persisted into voice_edit YAML); accepted here so
+                    # the one settings surface can read and mutate them.
+                    # ``wake_words_default`` is view-only (the built-in list)
+                    # and deliberately not an accepted key.
+                    "wake_words", "wake_words_add", "wake_words_remove",
+                    "wake_routing", "wake_route_add", "wake_route_remove")
 # NOTE: "answer_questions" was removed from persistence+view (2026-09-30): it
 # persisted with zero readers repo-wide, and wiring a service consumer would
 # contradict the honest-UI invariant (no control may act without a rendered
@@ -46,6 +53,34 @@ def _kws_available(cfg: Any) -> bool:
         return find_model_dir(cfg) is not None
     except Exception:
         return False
+
+
+def _wake_words_list() -> list:
+    """Effective wake-word list (persisted, else defaults). Never raises."""
+    try:
+        from . import wake_words
+        return list(wake_words.active_triggers())
+    except Exception:
+        return []
+
+
+def _wake_words_defaults() -> list:
+    """The built-in default wake-word list. Never raises."""
+    try:
+        from . import wake_words
+        return list(wake_words.DEFAULT_TRIGGERS)
+    except Exception:
+        return ["hey qubit"]
+
+
+def _wake_routing_view() -> Dict[str, Any]:
+    """The persisted wake-routing config as a JSON-safe dict. Never raises."""
+    try:
+        from . import wake_routing
+        return wake_routing.load_config().to_dict()
+    except Exception:
+        return {"version": 1, "defaultTarget": {"mode": "current"},
+                "routes": [], "updatedAtMs": 0}
 
 
 def _read_cfg(cfg: Any, *path: str, default: Any = None) -> Any:
@@ -358,6 +393,11 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
                 default=6.0) or 6.0),
             "kws_available": _kws_available(cfg),
         },
+        # Wake words + wake routing stores (read-only view). Mutations go
+        # through ``update_voice_edit`` onto the same two JSON stores.
+        "wake_words": _wake_words_list(),
+        "wake_words_default": _wake_words_defaults(),
+        "wake_routing": _wake_routing_view(),
         "prompts": defaults,
         "per_app": per_app,
         "custom_commands": list(
@@ -399,6 +439,75 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
     for key in SETTINGS_KEYS:
         if key in update:
             clean[key] = update[key]
+    # --- Wake words / wake routing (separate Qubit-owned JSON stores) --------
+    # These keys mutate dedicated stores, never voice_edit YAML. Every value is
+    # validated and normalized BEFORE any write so a bad field in a multi-key
+    # request can never leave partial state. The store helpers themselves never
+    # raise; only a structurally bad request is rejected, with the existing
+    # ``VOICE_EDIT_BAD_SETTINGS`` shape.
+    from .schema import VoiceEditError
+    for _wk in ("wake_words", "wake_words_add", "wake_words_remove",
+                "wake_routing", "wake_route_add", "wake_route_remove"):
+        clean.pop(_wk, None)
+    wake_words_save: Optional[list] = None
+    wake_routing_save: Any = None
+    if any(k in update for k in ("wake_words", "wake_words_add",
+                                 "wake_words_remove")):
+        from . import wake_words as _ww
+        if "wake_words" in update:
+            raw_words = update["wake_words"]
+            if not isinstance(raw_words, (list, tuple)):
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     "wake_words must be a list")
+            words = list(raw_words)
+        else:
+            words = _ww.load_triggers()
+        if "wake_words_add" in update:
+            add_word = update["wake_words_add"]
+            if not isinstance(add_word, str):
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     "wake_words_add must be a string")
+            words = _ww.add_trigger(words, add_word)
+        if "wake_words_remove" in update:
+            rem_word = update["wake_words_remove"]
+            if not isinstance(rem_word, str):
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     "wake_words_remove must be a string")
+            words = _ww.remove_trigger(words, rem_word)
+        wake_words_save = words
+    if any(k in update for k in ("wake_routing", "wake_route_add",
+                                 "wake_route_remove")):
+        from . import wake_routing as _wr
+        if "wake_routing" in update:
+            raw_routing = update["wake_routing"]
+            if not isinstance(raw_routing, dict):
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     "wake_routing must be an object")
+            routing = _wr.parse_config(raw_routing)
+        else:
+            routing = _wr.load_config()
+        if "wake_route_add" in update:
+            spec = update["wake_route_add"]
+            if not isinstance(spec, dict):
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     "wake_route_add must be an object")
+            trig = spec.get("trigger")
+            target = _wr.normalize_route_target(spec.get("target"))
+            if (not isinstance(trig, str) or not trig.strip()
+                    or len(trig.strip()) > _wr.MAX_TRIGGER_LENGTH
+                    or not _wr.normalize_trigger(trig) or target is None):
+                raise VoiceEditError(
+                    "VOICE_EDIT_BAD_SETTINGS",
+                    "wake_route_add needs a trigger and exactly one target "
+                    "(mode|agentId|sessionKey)")
+            routing = _wr.add_route(routing, trig, target)
+        if "wake_route_remove" in update:
+            rem_trig = update["wake_route_remove"]
+            if not isinstance(rem_trig, str):
+                raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                     "wake_route_remove must be a string")
+            routing = _wr.remove_route(routing, rem_trig)
+        wake_routing_save = routing
     if "prompts" in update:
         prompts = update["prompts"]
         if not isinstance(prompts, dict):
@@ -527,7 +636,8 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                                  "local_temperature must be a number")
     if "local_think" in update:
         llm_patch["think"] = bool(update["local_think"])
-    if not clean and not tts_patch and not llm_patch:
+    if (not clean and not tts_patch and not llm_patch
+            and wake_words_save is None and wake_routing_save is None):
         raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                              "no recognised settings in request")
     for key in ("beep", "debug_log", "block_fullscreen", "noise_suppression",
@@ -682,16 +792,27 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
         patch["intent"] = dict(intent_patch)
         if llm_patch:
             patch["intent"]["local_llm"] = llm_patch
-    merged = _deep_merge(data, patch)
-    if "per_app" in clean and clean["per_app"] == {}:
-        # PUT per_app:{} clears stored per-app mappings (a deep merge would
-        # silently keep them); the live-cfg sync deletes the node too.
-        ve = merged.get("voice_edit")
-        if isinstance(ve, dict):
-            ve.pop("per_app", None)
-    bak = _write_yaml(path, merged)
-    _sync_live_cfg(cfg, patch)
-    return bak
+    if patch:
+        merged = _deep_merge(data, patch)
+        if "per_app" in clean and clean["per_app"] == {}:
+            # PUT per_app:{} clears stored per-app mappings (a deep merge would
+            # silently keep them); the live-cfg sync deletes the node too.
+            ve = merged.get("voice_edit")
+            if isinstance(ve, dict):
+                ve.pop("per_app", None)
+        bak = _write_yaml(path, merged)
+        _sync_live_cfg(cfg, patch)
+        result: Path = bak
+    else:
+        # Wake-store-only PUT: nothing to persist into voice_edit YAML.
+        result = path
+    if wake_words_save is not None:
+        from . import wake_words as _ww
+        _ww.save_triggers(wake_words_save)
+    if wake_routing_save is not None:
+        from . import wake_routing as _wr
+        _wr.save_config(wake_routing_save)
+    return result
 
 
 def restore_default_prompt(cfg: Any, action: str) -> Path:

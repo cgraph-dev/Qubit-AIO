@@ -23,6 +23,7 @@ import {
   type VoiceCommandsCatalog,
   type VoiceEditSettings,
   type VoiceLogEntry,
+  type WakeRoute,
 } from "@/lib/voiceEdit";
 
 function logTime(ts?: number): string {
@@ -93,6 +94,15 @@ function splitCues(raw: string): string[] {
     }
   }
   return out;
+}
+
+/** Encode a wake-route target from the target-mode picker. "current" keeps the
+ *  configured default target; the other modes are self-describing prefixes so
+ *  the stored route reads back as `mode:value`. */
+function encodeRouteTarget(mode: string, value: string): string {
+  const trimmed = value.trim();
+  if (mode === "current") return "current";
+  return trimmed ? `${mode}:${trimmed}` : mode;
 }
 
 /** One-line explanation for each text-to-speech provider. */
@@ -401,6 +411,14 @@ export default function VoiceEditPage() {
   const [wakeMaxS, setWakeMaxS] = useState("8");
   const [wakeVad, setWakeVad] = useState("auto");
 
+  // wake words: draft for the add input; the list itself comes from settings.
+  const [wakeWordDraft, setWakeWordDraft] = useState("");
+
+  // wake routing: draft for the add form (trigger + target mode + value).
+  const [routeTrigger, setRouteTrigger] = useState("");
+  const [routeMode, setRouteMode] = useState("current");
+  const [routeValue, setRouteValue] = useState("");
+
   // per-app mapping: new-row draft (app class + action)
   const [newApp, setNewApp] = useState("");
   const [newAction, setNewAction] = useState("rewrite");
@@ -617,6 +635,50 @@ export default function VoiceEditPage() {
       "wake settings saved",
     );
   }, [update, settings?.wake?.enabled, wakePhrase, wakeSilence, wakeRms, wakeEngine, wakeKws, wakeAsrFallback, wakeAsrFallbackMaxS, wakeMaxS, wakeVad]);
+
+  const currentWakeWords = useCallback(
+    (): string[] => settings?.wake_words ?? [],
+    [settings?.wake_words],
+  );
+
+  const currentWakeRoutes = useCallback(
+    (): WakeRoute[] => settings?.wake_routing?.routes ?? [],
+    [settings?.wake_routing],
+  );
+
+  // Reconcile the live wake words onto the backend's factory defaults: add the
+  // missing defaults, remove the extras. Composed from the single-item
+  // add/remove PUT fields; each step adopts the server echo (no optimistic
+  // state) so a mid-way failure leaves the earlier steps honestly applied.
+  const resetWakeWords = useCallback(async () => {
+    const current = currentWakeWords();
+    const defaults = settings?.wake_words_default ?? [];
+    const have = new Set(current.map((w) => w.toLowerCase()));
+    const wanted = new Set(defaults.map((w) => w.toLowerCase()));
+    const toAdd = defaults.filter((w) => !have.has(w.toLowerCase()));
+    const toRemove = current.filter((w) => !wanted.has(w.toLowerCase()));
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      setStatus("wake words already at defaults");
+      return;
+    }
+    setBusy(true);
+    try {
+      for (const word of toAdd) {
+        const out = await voiceEdit.saveSettings({ wake_words_add: word });
+        setSettings(out.settings);
+      }
+      for (const word of toRemove) {
+        const out = await voiceEdit.saveSettings({ wake_words_remove: word });
+        setSettings(out.settings);
+      }
+      setStatus("wake words reset to defaults");
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [currentWakeWords, settings?.wake_words_default]);
 
   const runPreview = useCallback(async () => {
     setBusy(true);
@@ -905,6 +967,197 @@ export default function VoiceEditPage() {
             <p className="mt-1 text-xs text-muted-foreground">
               Wake-word changes take effect after the desktop helper restarts.
             </p>
+            <div className="mt-4" data-testid="voice-edit-wake-words">
+              <h3 className="text-sm font-semibold">Wake words</h3>
+              <p className="mb-2 mt-1 text-xs text-muted-foreground">
+                Extra words or phrases that also start hands-free listening,
+                alongside the wake phrase above.
+              </p>
+              {currentWakeWords().length === 0 ? (
+                <p
+                  className="mb-2 text-xs text-muted-foreground"
+                  data-testid="voice-edit-wake-words-empty"
+                >
+                  No wake words configured.
+                </p>
+              ) : (
+                <ul className="mb-2 flex flex-col gap-1">
+                  {currentWakeWords().map((word) => (
+                    <li
+                      key={word}
+                      className="flex items-center gap-2 text-sm"
+                      data-testid={`wake-word-row-${word}`}
+                    >
+                      <code className="rounded bg-muted px-1">{word}</code>
+                      <button
+                        type="button"
+                        className="rounded border border-border px-2 py-0.5 text-xs"
+                        aria-label={`Remove wake word ${word}`}
+                        data-testid={`wake-word-remove-${word}`}
+                        disabled={busy}
+                        onClick={() =>
+                          void update(
+                            { wake_words_remove: word },
+                            `removed wake word “${word}”`,
+                          )
+                        }
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="text-sm">
+                  Add a wake word
+                  <input
+                    className="mt-1 w-44 rounded border border-border bg-background p-1"
+                    data-testid="wake-word-input"
+                    placeholder="e.g. computer"
+                    value={wakeWordDraft}
+                    onChange={(e) => setWakeWordDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && wakeWordDraft.trim() && !busy) {
+                        const word = wakeWordDraft.trim();
+                        setWakeWordDraft("");
+                        void update({ wake_words_add: word }, `added wake word “${word}”`);
+                      }
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="rounded border border-border px-3 py-1 text-xs"
+                  data-testid="wake-word-add"
+                  disabled={busy || !wakeWordDraft.trim()}
+                  onClick={() => {
+                    const word = wakeWordDraft.trim();
+                    if (!word) return;
+                    setWakeWordDraft("");
+                    void update({ wake_words_add: word }, `added wake word “${word}”`);
+                  }}
+                >
+                  Add
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-border px-3 py-1 text-xs"
+                  data-testid="wake-words-reset"
+                  disabled={busy}
+                  onClick={() => void resetWakeWords()}
+                >
+                  Reset to defaults
+                </button>
+              </div>
+            </div>
+            <div className="mt-4" data-testid="voice-edit-wake-routing">
+              <h3 className="text-sm font-semibold">Wake routing</h3>
+              <p className="mb-2 mt-1 text-xs text-muted-foreground">
+                Send a spoken trigger to a specific target. “current” follows the
+                configured default; the other modes name an agent or session.
+              </p>
+              {currentWakeRoutes().length === 0 ? (
+                <p
+                  className="mb-2 text-xs text-muted-foreground"
+                  data-testid="voice-edit-wake-routing-empty"
+                >
+                  No wake routes configured.
+                </p>
+              ) : (
+                <ul className="mb-2 flex flex-col gap-1">
+                  {currentWakeRoutes().map((route, i) => (
+                    <li
+                      key={`${route.trigger}-${i}`}
+                      className="flex items-center gap-2 text-sm"
+                      data-testid={`wake-route-row-${i}`}
+                    >
+                      <code className="rounded bg-muted px-1">{route.trigger}</code>
+                      <span className="text-muted-foreground">→ {route.target}</span>
+                      <button
+                        type="button"
+                        className="rounded border border-border px-2 py-0.5 text-xs"
+                        aria-label={`Remove route ${route.trigger}`}
+                        data-testid={`wake-route-remove-${route.trigger}`}
+                        disabled={busy}
+                        onClick={() =>
+                          void update(
+                            { wake_route_remove: route.trigger },
+                            `removed route “${route.trigger}”`,
+                          )
+                        }
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="text-sm">
+                  Trigger
+                  <input
+                    className="mt-1 w-40 rounded border border-border bg-background p-1"
+                    data-testid="wake-route-trigger"
+                    placeholder="e.g. hey qubit"
+                    value={routeTrigger}
+                    onChange={(e) => setRouteTrigger(e.target.value)}
+                  />
+                </label>
+                <label className="text-sm">
+                  Target
+                  <select
+                    className="mt-1 rounded border border-border bg-background p-1"
+                    data-testid="wake-route-target-mode"
+                    value={routeMode}
+                    onChange={(e) => setRouteMode(e.target.value)}
+                  >
+                    <option value="current">current</option>
+                    <option value="agentId">agent id</option>
+                    <option value="sessionKey">session key</option>
+                  </select>
+                </label>
+                {routeMode !== "current" ? (
+                  <label className="text-sm">
+                    Value
+                    <input
+                      className="mt-1 w-40 rounded border border-border bg-background p-1"
+                      data-testid="wake-route-target-value"
+                      placeholder={routeMode === "agentId" ? "agent id" : "session key"}
+                      value={routeValue}
+                      onChange={(e) => setRouteValue(e.target.value)}
+                    />
+                  </label>
+                ) : null}
+                <button
+                  type="button"
+                  className="rounded border border-border px-3 py-1 text-xs"
+                  data-testid="wake-route-add"
+                  disabled={
+                    busy ||
+                    !routeTrigger.trim() ||
+                    (routeMode !== "current" && !routeValue.trim())
+                  }
+                  onClick={() => {
+                    const trigger = routeTrigger.trim();
+                    if (!trigger) return;
+                    setRouteTrigger("");
+                    setRouteValue("");
+                    void update(
+                      {
+                        wake_route_add: {
+                          trigger,
+                          target: encodeRouteTarget(routeMode, routeValue),
+                        },
+                      },
+                      `added route “${trigger}”`,
+                    );
+                  }}
+                >
+                  Add route
+                </button>
+              </div>
+            </div>
             <label className="mt-2 flex items-center gap-2 text-sm">
               Brain routing (local model decides ambiguous commands)
               <input

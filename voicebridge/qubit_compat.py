@@ -5741,6 +5741,26 @@ _CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 _CHAT_DATA_URL_RE = re.compile(
     r"^data:(image/(?:png|jpeg|gif|webp|bmp));base64,([A-Za-z0-9+/=\s]+)$")
 
+#: Cap on the pasted description carried into a turn. The vision prompt is
+#: already bounded to 2000 chars and the reply is redacted; this keeps a
+#: pathological description from crowding out the user's own question.
+_VISION_TURN_MAX_CHARS = 6000
+
+
+def _vision_turn_text(prompt: str, description: str) -> str:
+    """Compose the turn text for an attached image.
+
+    A bare attach still has to ask something, or the agent turn has no
+    instruction; an explicit prompt is kept verbatim in front of the
+    description so the user's question stays the request and the vision
+    output is context.
+    """
+    desc = str(description or "").strip()[:_VISION_TURN_MAX_CHARS]
+    ask = str(prompt or "").strip()
+    head = ask or "What is in this image, and what should I know about it?"
+    return (f"{head}\n\n[Attached image, described by the vision model:"
+            f"\n{desc}]")
+
 
 def h_chat_vision(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
@@ -5930,6 +5950,49 @@ def h_chat_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
               "MALFORMED": 400, "MODEL_NOT_ALLOWED": 400}.get(
                   str(res.get("code")), 502)
     return status, res
+
+
+def h_chat_image(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/chat/image -> attach an image to a `/chat` session.
+
+    `/qubit-chat` (ChatPage) has always had an attach/paste path; `/chat`
+    (TerminalChatPage) had none — its paste handler is deliberately left alone
+    because xterm owns it. This is the equivalent for the terminal surface AND
+    the bytes bridge for an image dropped onto the desktop orb.
+
+    The image is described through the canonical ``/api/qubit/chat/vision``
+    handler (one authority, one audit, same bounded state-dir temp file), then
+    the description is submitted as ONE agent turn on the given session so the
+    conversation continues with the image in context. Never a second vision
+    stack, never a fabricated description.
+    """
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; chat session refused"}
+    session = str(b.get("session", "") or "dashboard-chat")
+    prompt = str(b.get("prompt", "") or "")
+    submit = bool(b.get("submit", True))
+    status, res = h_chat_vision(cfg, q, {**b, "confirm": True}, p)
+    if status != 200 or not res.get("ok"):
+        return status, res
+    description = str(res.get("description", "") or "").strip()
+    if not description:
+        return 502, {"ok": False, "code": "VISION_FAILED",
+                     "detail": "vision backend returned no description"}
+    if not submit:
+        return 200, _ok(session=session, description=description,
+                        model=res.get("model", ""), submitted=False,
+                        authority="canonical vision.describe; not submitted")
+    from . import chat_transport as CT
+
+    turn = CT.turn(cfg, _vision_turn_text(prompt, description),
+                   session=session)
+    return (200 if turn.get("ok") else 502), {
+        **turn, "description": description,
+        "vision_model": res.get("model", ""),
+        "authority": "canonical vision.describe, then one agent turn"}
 
 
 def h_chat_pty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -9068,6 +9131,7 @@ _r("DELETE", r"/api/qubit/chat/sessions/(?P<id>[^/]+)",
 _r("POST", r"/api/qubit/chat/cancel", "h_chat_cancel")
 _r("POST", r"/api/qubit/chat/retry", "h_chat_retry")
 _r("POST", r"/api/qubit/chat/vision", "h_chat_vision")
+_r("POST", r"/api/qubit/chat/image", "h_chat_image")
 _r("POST", r"/api/qubit/chat/pty", "h_chat_pty")
 _r("GET", r"/api/dashboard/plugins", "h_plugins")
 # Real local plugin catalog (D-1): every entry has a real manifest + loader +
@@ -16614,7 +16678,7 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_chat_session_drafts": h_chat_session_drafts,
     "h_chat_session_draft_content": h_chat_session_draft_content,
     "h_chat_session_comments": h_chat_session_comments,
-    "h_chat_vision": h_chat_vision,
+    "h_chat_vision": h_chat_vision, "h_chat_image": h_chat_image,
     "h_chat_session_ci": h_chat_session_ci,
     "env_write": env_write,
     "env_delete": env_delete,

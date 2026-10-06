@@ -192,11 +192,21 @@ def find_vision_model(url: str, want: str,
                       f"vision-capable model")
 
 
-def _guard(size_mib: float) -> int:
-    """VRAM headroom check (seam for hermetic tests)."""
-    from .vram_guard import guard_load
+def _guard(size_mib: float, url: str = "") -> int:
+    """VRAM headroom check (seam for hermetic tests).
 
-    return guard_load(size_mib, what="vision model")
+    The deep-tier cycle expires the resident fast model immediately after
+    this check, so its current GPU footprint is spendable here. Without
+    counting it, a vision model larger than the gap left by the resident
+    tier is refused forever even though the swap exists to make that load
+    possible (the RTX 3070 Ti case: 5900 MiB vision model, ~1900 MiB free,
+    ~1800 MiB reclaimable).
+    """
+    from .vram_guard import guard_load, resident_mib
+
+    reclaimable = resident_mib(url) if url else 0
+    return guard_load(size_mib, what="vision model", url=url,
+                      reclaimable_mib=reclaimable)
 
 
 def _extract_reply(body: Any) -> str:
@@ -283,17 +293,19 @@ def status(cfg: Any, timeout_s: float = 10.0) -> Dict[str, Any]:
                 "schema": "qubit-vision-status/1",
                 "model": settings["model"],
                 "detail": _redact(exc.detail)[:200]}
-    from .vram_guard import free_vram_mib
+    from .vram_guard import free_vram_mib, resident_mib
 
     free = free_vram_mib()
+    reclaimable = resident_mib(url)
     verdict = "READY"
     if free is None:
         verdict = "UNMEASURED"
-    elif free < found["size_mib"] + 512:
+    elif free + reclaimable < found["size_mib"] + 512:
         verdict = "VRAM_SHORT"
     return {"state": verdict, "schema": "qubit-vision-status/1",
             "model": found["name"], "size_mib": round(found["size_mib"], 1),
             "digest": found["digest"], "free_vram_mib": free,
+            "resident_reclaimable_mib": reclaimable,
             "max_mb": settings["max_mb"]}
 
 
@@ -321,7 +333,7 @@ def describe(cfg: Any, image: str, *, prompt: str = "", model: str = "",
     if found["size_mib"] <= 0:
         raise VisionError(NO_BACKEND_CODE,
                           "vision model reports no size; refusing blind load")
-    free = _guard(found["size_mib"])
+    free = _guard(found["size_mib"], url)
     with open(meta["path"], "rb") as fh:
         image_b64 = base64.b64encode(fh.read()).decode("ascii")
 

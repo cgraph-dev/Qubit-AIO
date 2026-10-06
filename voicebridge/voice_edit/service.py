@@ -1155,6 +1155,29 @@ class VoiceEditService:
         except Exception:
             return "voice-chat"
 
+    def _request_session(self, request_id: str) -> str:
+        """The routed session key bound to this request, else "".
+
+        The wake-routing path binds the target's ``sessionKey`` on the request
+        at :meth:`begin` (``desktop_helper._open_request`` passes
+        ``session_id=route_session``); ask/task read it back here so a routed
+        wake command runs its full-turn/tool dispatch on that session instead
+        of the default voice session. An empty/absent/expired request — or a
+        malformed (non-string, un-stringable) id — returns "" so callers keep
+        today's byte-identical default. Never raises.
+        """
+        rid = str(request_id or "")
+        if not rid:
+            return ""
+        try:
+            with self._lock:
+                req = self._reqs.get(rid)
+            if req is None:
+                return ""
+            return str(getattr(req, "session_id", "") or "")
+        except Exception:  # noqa: BLE001 - routing is additive, never fatal
+            return ""
+
     def _conversation_context(self, pending: str) -> str:
         """Recency-weighted prior-turn context from the ONE canonical store.
 
@@ -2668,10 +2691,19 @@ class VoiceEditService:
             self._audit("voice_edit.full_turn_error", {
                 "request_id": request_id, "error": f"import: {exc}"[:160]})
             return None
+        # Wake routing: a routed target's sessionKey (bound on the request at
+        # begin) runs this full turn on that session; empty/absent keeps the
+        # default voice session byte-identical. Only the full-turn dispatch is
+        # routed — the brain/deterministic fast paths stay on the voice session.
+        routed_session = self._request_session(request_id)
+        session = routed_session or "voice-chat"
+        if routed_session:
+            self._audit("voice_edit.full_turn_session", {
+                "request_id": request_id, "session_id": routed_session})
         try:
             model = self._select_model(
                 _read_cfg(self.cfg, "voice_edit", "chat_model", default=""))
-            res = CT.turn(self.cfg, question, session="voice-chat",
+            res = CT.turn(self.cfg, question, session=session,
                           model=model or None, actor="voice:user",
                           timeout_s=120.0)
         except Exception as exc:
@@ -2832,6 +2864,14 @@ class VoiceEditService:
                 "VOICE_EDIT_CONFIRM_REQUIRED",
                 "the task needs explicit confirmation before it runs",
                 status=409)
+        # Wake routing: a routed target's sessionKey runs this task on that
+        # session; empty/absent keeps the default voice session byte-identical.
+        # The routed key also scopes the CT-staged settle below, so a
+        # confirmation staged in the routed session settles in the same one.
+        routed_session = self._request_session(request_id)
+        if routed_session:
+            self._audit("voice_edit.task_session", {
+                "request_id": request_id, "session_id": routed_session})
         # Slice-1b: a voice "yes" settles a CT-staged confirmation first.
         # ask()'s _full_turn_answer leaves CONFIRM_REQUIRED unspoken (it
         # returns None so the brain answer stands) so voice never promises an
@@ -2844,7 +2884,7 @@ class VoiceEditService:
         # never invented). Nothing pending -> fall through byte-identical.
         try:
             from .. import chat_transport as _CT
-            _sid = self._voice_session()
+            _sid = routed_session or self._voice_session()
             _st = self._canonical_store()
             if _st is not None:
                 try:
@@ -2880,7 +2920,8 @@ class VoiceEditService:
         # one canonical session store (inside run_session) and are audited.
         try:
             from .tool_task import run_tool_task
-            res = run_tool_task(self.cfg, clean, confirmed=True,
+            res = run_tool_task(self.cfg, clean, session=routed_session,
+                                confirmed=True,
                                 estop_engaged=self._estop)
         except Exception as exc:
             code = str(getattr(exc, "code", "") or "VOICE_EDIT_TASK_FAILED")

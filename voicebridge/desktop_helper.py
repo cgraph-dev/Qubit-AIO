@@ -34,7 +34,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from .logging_setup import log_event
 from .chat_transport import parse_route_word
@@ -44,6 +44,8 @@ from .voice_edit.desktop import DesktopAdapter
 from .voice_edit.overlay import make_overlay
 from .voice_edit.schema import SelectionSnapshot
 from .voice_edit.stt_client import ParecMic, SttClient, SttError, transcribe_once
+from .voice_edit.talk_events import TalkEventSequencer
+from .voice_edit.talk_fsm import TalkStateMachine, reduce as reduce_talk
 
 
 def _trace(stage: str, **fields: Any) -> None:
@@ -51,6 +53,42 @@ def _trace(stage: str, **fields: Any) -> None:
         log_event(f"voice_edit.helper.{stage}", **fields)
     except Exception:
         pass
+
+
+def _route_target_fields(target: Any) -> "tuple[str, str, str]":
+    """(kind, agent_id, session_key) for a wake route target (never raises).
+
+    Accepts the :class:`~voicebridge.voice_edit.wake_routing.RouteTarget`
+    dataclass or its plain-dict wire shape. Junk → current.
+    """
+    try:
+        if isinstance(target, dict):
+            if target.get("mode") == "current":
+                return "current", "", ""
+            agent = str(target.get("agentId") or "")
+            session = str(target.get("sessionKey") or "")
+            if agent and not session:
+                return "agent", agent, ""
+            if session and not agent:
+                return "session", "", session
+            return "current", "", ""
+        return (str(getattr(target, "kind", "") or ""),
+                str(getattr(target, "agent_id", None) or ""),
+                str(getattr(target, "session_key", None) or ""))
+    except Exception:
+        return "current", "", ""
+
+
+def _route_session_key(target: Any) -> str:
+    """The target's ``sessionKey`` when it routes to a session, else "".
+
+    Only an explicit session target yields a key: an ``agentId`` has no safe
+    session derivation on this surface (no agent→session registry is in
+    scope), so it falls back to the current session and is recorded/audited
+    instead. Never raises.
+    """
+    kind, _agent, session = _route_target_fields(target)
+    return session if kind == "session" else ""
 
 
 #: How long a staged "say yes" confirmation stays valid. Voice confirmations
@@ -231,8 +269,13 @@ class HelperClient:
     def status(self) -> Dict[str, Any]:
         return self._request("GET", "/api/voice-edit/status", timeout=10)
 
-    def begin(self) -> Dict[str, Any]:
-        return self._request("POST", "/api/voice-edit/session", {})
+    def begin(self, session_id: str = "") -> Dict[str, Any]:
+        # Optional session binding (wake routing / OpenClaw ``voicewake.routing``
+        # port): the service ``begin``/``route`` pair already carries the
+        # request's session id. Empty keeps the payload byte-identical to the
+        # pre-routing call.
+        payload = {"session_id": session_id} if session_id else {}
+        return self._request("POST", "/api/voice-edit/session", payload)
 
     def capture(self, rid: str) -> Dict[str, Any]:
         return self._request("POST", f"/api/voice-edit/{rid}/capture", {})
@@ -873,7 +916,8 @@ class DesktopHelper:
                  desktop: Optional[DesktopAdapter] = None,
                  mic_factory: Optional[Callable[[], Any]] = None,
                  stt_factory: Optional[Callable[[str], Any]] = None,
-                 notify: Optional[Callable[[str, str], None]] = None) -> None:
+                 notify: Optional[Callable[[str, str], None]] = None,
+                 talk: Optional[Any] = None) -> None:
         self.cfg = cfg
         self.client = client
         self.overlay = overlay
@@ -906,6 +950,10 @@ class DesktopHelper:
         self._hb_stop = threading.Event()
         self._hb_thread: Optional[threading.Thread] = None
         self._wake: Any = None
+        # Resolved wake route target for the current turn (set by
+        # on_wake_command_routed, consumed by _open_request). ``None`` for
+        # Right-Ctrl turns and ``mode:current`` — the default session.
+        self._wake_route_target: Any = None
         self._fs_active = False
         self._fs_checked = 0.0
         self._gen = 0
@@ -937,6 +985,10 @@ class DesktopHelper:
         # see _note_capture_frame). The per-frame in-memory publish is
         # free; the file rewrite is throttled.
         self._level_hb_at = 0.0
+        # One ordered typed-talk stream for this helper (OpenClaw
+        # ``talk/talk-events`` port). Every boundary below emits through it so
+        # observers/FSM reconstruct a turn exactly; ``talk=`` is the test seam.
+        self._talk: Any = talk if talk is not None else TalkEventSequencer()
 
     def _tame_key_repeat(self) -> None:
         """Disable X auto-repeat for Right-Ctrl (and Left-Ctrl).
@@ -1072,7 +1124,12 @@ class DesktopHelper:
                 # 2026-10-03 (silent-discard fix): route command-shaped
                 # unarmed discards to the heard-preview status line.
                 # Status line only — the hook never beeps/speaks/emits.
-                on_hint=self._on_wake_hint)
+                on_hint=self._on_wake_hint,
+                # OpenClaw ``voicewake.routing`` port: resolve the spoken
+                # command to a target session/agent and carry it to the turn
+                # (see on_wake_command_routed). Absent/malformed route falls
+                # back to the plain single-arg path.
+                on_command_route=self.on_wake_command_routed)
             if self._wake.enabled():
                 self._wake.start()
         except Exception:
@@ -1343,6 +1400,7 @@ class DesktopHelper:
         """
         _trace("stop_listening", active=self._active, state=self.state)
         self._active = False
+        self._talk_emit("input.speech_stopped")
         tail = float(_read_cfg(self.cfg, "voice_edit", "release_tail_ms",
                                default=500) or 500) / 1000.0
         if tail <= 0:
@@ -1397,6 +1455,55 @@ class DesktopHelper:
 
     def _ui_error(self, code: str, detail: str) -> None:
         self._ui(self.overlay.show_error, code, detail)
+
+    # -- typed talk events (fail-soft; never break a turn) ---------------
+    def _talk_emit(self, event_type: str, **fields: Any) -> None:
+        """Emit one typed talk boundary (journaled as ``voice_edit.talk.*``).
+
+        Wrapped fail-soft: a broken/raising/absent sequencer can NEVER break a
+        voice turn (it is observability, not control flow).
+        """
+        try:
+            self._talk.emit(event_type, journal=True, **fields)
+        except Exception:
+            pass
+
+    def _talk_begin(self) -> None:
+        """Mint a new talk turn id (one per Right-Ctrl/wake turn). Fail-soft."""
+        try:
+            self._talk.begin_turn()
+        except Exception:
+            pass
+
+    def _talk_end(self) -> None:
+        """Clear the active talk turn. Fail-soft."""
+        try:
+            self._talk.end_turn()
+        except Exception:
+            pass
+
+    def talk_events(self) -> Tuple[Dict[str, Any], ...]:
+        """Read-only snapshot of the recent typed talk events (for observers)."""
+        try:
+            return tuple(self._talk.snapshot().get("events", ()))
+        except Exception:
+            return ()
+
+    def talk_state(self) -> str:
+        """Orb state reduced (pure FSM) from this helper's talk events in order.
+
+        Sequential last-wins (the stream is already ordered by ``seq``); use
+        :meth:`voice_edit.talk_fsm.TalkStateMachine.apply_many` when a batch
+        needs the orb's overlap priority (listening > speaking > working >
+        thinking > idle). Never raises.
+        """
+        try:
+            state = "idle"
+            for event in self.talk_events():
+                state = reduce_talk(state, event)
+            return state
+        except Exception:
+            return "idle"
 
     def _history(self, kind: str, heard: str, result: str) -> None:
         """Append one interaction to the panel's persistent history.
@@ -1555,6 +1662,12 @@ class DesktopHelper:
         only then captures the selection, so the first words spoken on keydown
         are never lost to the capture round-trip.
         """
+        # Consume any wake route target for THIS turn (set by
+        # on_wake_command_routed). Cleared unconditionally so a refused turn
+        # can never leak the target into a later Right-Ctrl request. A
+        # ``mode:current``/absent target yields "" → today's default session.
+        route_session = _route_session_key(self._wake_route_target)
+        self._wake_route_target = None
         with self._lock:
             if not self.enabled() or self.state in (self.LISTENING,
                                                     self.PROCESSING):
@@ -1566,9 +1679,11 @@ class DesktopHelper:
                     return False
                 if st.get("estop"):
                     self._ui_status("error", "emergency stop engaged")
+                    self._talk_emit("error", code="VOICE_EDIT_ESTOP")
                     return False
             except HelperError as exc:
                 self._ui_status("error", f"{exc.code}")
+                self._talk_emit("error", code=exc.code)
                 return False
             # Accurate mode: cue the wait for the background prewarm, bounded,
             # so the user is not left waiting blind on the first activation.
@@ -1580,10 +1695,21 @@ class DesktopHelper:
             self.snapshot = None
             self._gen += 1
             try:
-                rid = str(self.client.begin().get("request_id", ""))
+                begin_fn = self.client.begin
+                if route_session:
+                    try:
+                        out = begin_fn(session_id=route_session)
+                    except TypeError:
+                        # compatibility seam (older/fake clients): no session
+                        # kwarg — fall back to the plain call, current session.
+                        out = begin_fn()
+                else:
+                    out = begin_fn()
+                rid = str(out.get("request_id", ""))
                 self.request_id = rid
             except HelperError as exc:
                 self._ui_status("error", f"{exc.code}: {exc.detail}")
+                self._talk_emit("error", code=exc.code)
                 self._active = False
                 return False
             # Key-DOWN edge (2026-10-04 onset fix): open the mic NOW, before
@@ -1627,6 +1753,9 @@ class DesktopHelper:
                 pump.start()
             self.state = self.LISTENING
             self._listen_started_at = time.monotonic()
+            self._talk_begin()
+            self._talk_emit("input.speech_started",
+                            request_id=self.request_id)
             return True
 
     def _pump_pre_roll(self) -> None:
@@ -1751,6 +1880,24 @@ class DesktopHelper:
             self._ui_status("heard", str(detail or "")[-160:])
         except Exception:
             pass
+
+    def on_wake_command_routed(self, command: str, target: Any) -> None:
+        """A wake utterance WITH a resolved route target (OpenClaw port).
+
+        Records the target for the turn (consumed by :meth:`_open_request`,
+        which binds the request's session to the target's ``sessionKey``) and
+        audits it, then delegates to the existing :meth:`on_wake_command`
+        path — behaviour for ``{"mode": "current"}`` / an unresolvable target
+        is byte-identical to today (the current session). Never raises.
+        """
+        try:
+            self._wake_route_target = target
+            kind, agent_id, session_key = _route_target_fields(target)
+            _trace("wake_route", kind=kind, agent_id=agent_id,
+                   session_key=session_key)
+        except Exception:
+            self._wake_route_target = None
+        self.on_wake_command(command)
 
     def on_wake_command(self, command: str) -> None:
         """A hands-free wake utterance arrived (already transcribed).
@@ -1897,9 +2044,12 @@ class DesktopHelper:
                     request_id=self.request_id,
                     **(_dbg.text_fields(self.cfg, command=cmd)))
             self._transcript = cmd
+            self._talk_emit("transcript.final", chars=len(cmd),
+                            source="wake")
             self._process_transcript(cmd)
         except Exception as exc:
             _trace("wake.turn_error", detail=str(exc)[:160])
+            self._talk_emit("error", code="VOICE_EDIT_WAKE_TURN_ERROR")
             try:
                 self._finish_error()
             except Exception:
@@ -2037,8 +2187,10 @@ class DesktopHelper:
         if not self._transcript:
             self._ui_status("error", self._stt_fallback_reason
                             or "no speech recognised")
+            self._talk_emit("error", code="VOICE_EDIT_NO_TRANSCRIPT")
             self._finish_error()
             return
+        self._talk_emit("transcript.final", chars=len(self._transcript))
         self._process_transcript()
 
     def _ready_cue(self) -> None:
@@ -2054,9 +2206,12 @@ class DesktopHelper:
 
     def _on_stt_error(self, code: str, detail: str) -> None:
         self._ui_error(code, detail)
+        self._talk_emit("error", code=code)
         self._finish_error()
 
     def _finish_error(self) -> None:
+        self._talk_emit("response.done")
+        self._talk_end()
         self._active = False
         self.state = self.IDLE
 
@@ -2128,6 +2283,7 @@ class DesktopHelper:
                 out = self.client.transform(self.request_id, text)
         except HelperError as exc:
             self._ui_error(exc.code, exc.detail)
+            self._talk_emit("error", code=exc.code)
             self._finish_error()
             return
         mode = out.get("mode")
@@ -2239,15 +2395,19 @@ class DesktopHelper:
             return
         self.state = self.PROCESSING
         self._ui_status("processing", "running task…")
+        self._talk_emit("response.started", mode="task")
+        self._talk_emit("tool.call", name="task")
         try:
             out = self.client.task(text, confirm=True,
                                    request_id=self.request_id)
         except HelperError as exc:
             self._ui_error(exc.code, exc.detail)
             self._notify_status("Qubit", f"{exc.code}: {exc.detail}")
+            self._talk_emit("error", code=exc.code)
             self._finish_error()
             return
         reply = str(out.get("reply", "") or "")
+        self._talk_emit("tool.result", ok=bool(out.get("ok")))
         _trace("task.result", ok=bool(out.get("ok")),
                reply_chars=len(reply),
                **(_dbg.text_fields(self.cfg, task=text, reply=reply)))
@@ -2286,6 +2446,7 @@ class DesktopHelper:
             self._ui_status("working", "working in /chat…")
             self._speak("On it — working on that in chat.")
         self._ui_status("processing", "answering…")
+        self._talk_emit("response.started", mode=mode)
         spoken = False
         # Owner ask (2026-10-04 voice-final lane): a redo/rewrite answer
         # carries clipboard fields (service copied the output write-only —
@@ -2317,6 +2478,7 @@ class DesktopHelper:
                 reply = self.client.ask(question, self.request_id)
         except HelperError as exc:
             self._ui_error(exc.code, exc.detail)
+            self._talk_emit("error", code=exc.code)
             self._finish_error()
             return
         if not reply:
@@ -2515,6 +2677,8 @@ class DesktopHelper:
         path = ""
         self._speaking = True
         self._barge_interrupted = False
+        self._talk_emit("response.audio.delta", chars=len(spoken))
+        self._talk_emit("playback.started", chars=len(spoken))
         try:
             fd, path = tempfile.mkstemp(suffix=".wav", prefix="qubit-answer-")
             with os.fdopen(fd, "wb") as fh:
@@ -2525,6 +2689,7 @@ class DesktopHelper:
                 stderr=subprocess.DEVNULL)
             if self._play_with_barge_in(proc):
                 self._barge_interrupted = True
+                self._talk_emit("interrupt")
                 self._ui_status("interrupted", "stopped — speak again")
         except Exception as exc:  # never fatal
             _trace("speak_failed", detail=str(exc)[:120])
@@ -2534,6 +2699,8 @@ class DesktopHelper:
             # moment Qubit stops talking instead of lingering for the whole
             # recency window (live 2026-10-05).
             _trace("speak_done", chars=len(text))
+            self._talk_emit("playback.stopped", chars=len(text))
+            self._talk_emit("response.done")
             if path:
                 try:
                     os.unlink(path)
@@ -2712,6 +2879,8 @@ class DesktopHelper:
         self._pending_task = {}
         self._active = False
         self.state = self.IDLE
+        self._talk_emit("response.done")
+        self._talk_end()
         self._ui_status("idle", "cancelled")
 
     # -- helpers ----------------------------------------------------------

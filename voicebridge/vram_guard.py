@@ -33,24 +33,62 @@ def free_vram_mib(timeout_s: float = 3.0) -> Optional[int]:
         return None
 
 
+def resident_mib(url: str, *, timeout_s: float = 5.0) -> int:
+    """Bytes currently held on the GPU by the local runtime, in MiB.
+
+    Reads ``/api/ps`` (``size_vram``), the runtime's own account of what it
+    has loaded. Returns 0 when nothing is resident OR when the runtime does
+    not report it (a CPU-placed model reports ``size_vram: 0``), so an
+    unmeasurable probe never refuses a legitimate load.
+    """
+    import json as _json
+    import urllib.request as _u
+
+    try:
+        req = _u.Request(f"{url.rstrip('/')}/api/ps")
+        with _u.urlopen(req, timeout=timeout_s) as resp:
+            body = _json.loads(resp.read().decode())
+    except Exception:  # noqa: BLE001 - unmeasurable -> 0, never a refusal
+        return 0
+    total = 0
+    for m in body.get("models", []) or []:
+        try:
+            total += int(m.get("size_vram", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+    return total // (1024 * 1024)
+
+
 def guard_load(size_mib: float, *, headroom_mib: float = DEFAULT_HEADROOM_MIB,
-               what: str = "model") -> int:
+               what: str = "model", url: str = "",
+               reclaimable_mib: int = 0) -> int:
     """Refuse BEFORE any load unless free VRAM covers size + headroom.
 
     Returns the measured free MiB on success; raises VRAMGuardError
     (typed refusal) otherwise or when measurement is unavailable — an
     unmeasurable guard fails closed.
+
+    ``reclaimable_mib`` is memory the caller is about to hand back before
+    the load happens (the deep-tier cycle expires the resident fast model).
+    Counting it is not a fudge: the caller must reclaim it *before* loading,
+    and the deep-tier cycle does. Without it, any model too large to coexist
+    with the resident tier is refused permanently even though the swap path
+    was built to make exactly that load possible.
     """
     free = free_vram_mib()
     if free is None:
         raise VRAMGuardError(
             f"VRAM guard cannot measure free memory; refusing to load {what}")
+    budget = free + max(0, int(reclaimable_mib))
     needed = size_mib + headroom_mib
-    if free < needed:
-        raise VRAMGuardError(
-            f"VRAM guard: {what} needs {needed:.0f} MiB "
-            f"({size_mib:.0f}+{headroom_mib:.0f} headroom), "
-            f"only {free} MiB free")
+    if budget < needed:
+        detail = (f"VRAM guard: {what} needs {needed:.0f} MiB "
+                  f"({size_mib:.0f}+{headroom_mib:.0f} headroom), "
+                  f"only {free} MiB free")
+        if reclaimable_mib > 0:
+            detail += (f" ({reclaimable_mib} MiB reclaimable from the "
+                       f"resident tier)")
+        raise VRAMGuardError(detail)
     return free
 
 

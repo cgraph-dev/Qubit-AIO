@@ -758,9 +758,17 @@ class WakeMonitor:
                  arm_window_s: float = 6.0,
                  segmenter_factory: Optional[Callable[[Any], Any]] = None,
                  pending_probe: Optional[Callable[[], bool]] = None,
-                 on_hint: Optional[Callable[[str], None]] = None) -> None:
+                 on_hint: Optional[Callable[[str], None]] = None,
+                 on_command_route: Optional[Callable[[str, Any], None]] = None,
+                 ) -> None:
         self.cfg = cfg
         self.on_command = on_command
+        # Optional routed emitter (OpenClaw ``voicewake.routing`` port): when
+        # supplied, ``_emit`` resolves the command to a :class:`RouteTarget`
+        # and calls ``on_command_route(command, target)`` instead of the plain
+        # ``on_command(command)``. Absent/None keeps the single-arg contract
+        # byte-identical, and any routing failure falls back to ``on_command``.
+        self.on_command_route = on_command_route
         self.is_busy = is_busy
         self.phrase = phrase or str(_cfg(cfg, "voice_edit", "wake", "phrase",
                                          default=DEFAULT_PHRASE) or DEFAULT_PHRASE)
@@ -1237,13 +1245,42 @@ class WakeMonitor:
 
     def _emit(self, command: str) -> None:
         cmd = (command or "").strip()
-        if cmd:
-            _trace("command", chars=len(cmd),
-                   **(_dbg.text_fields(self.cfg, command=cmd)))
+        if not cmd:
+            return
+        _trace("command", chars=len(cmd),
+               **(_dbg.text_fields(self.cfg, command=cmd)))
+        route = self.on_command_route
+        if route is not None:
+            target = None
             try:
-                self.on_command(cmd)
-            except Exception as exc:
-                self.last_error = str(exc)[:160]
+                from . import wake_routing as _wr
+                target = _wr.resolve_target(cmd, _wr.load_config())
+            except Exception:
+                target = None
+            if target is not None:
+                self._trace_route(target)
+                try:
+                    route(cmd, target)
+                    return
+                except Exception as exc:
+                    # A faulty routed sink must never swallow the command:
+                    # fall through to the plain emitter byte-identically.
+                    self.last_error = str(exc)[:160]
+        try:
+            self.on_command(cmd)
+        except Exception as exc:
+            self.last_error = str(exc)[:160]
+
+    def _trace_route(self, target: Any) -> None:
+        """Trace the resolved route (kind + mode/agent/session; never secrets)."""
+        try:
+            _trace("wake.route",
+                   kind=str(getattr(target, "kind", "") or ""),
+                   mode=str(getattr(target, "mode", None) or ""),
+                   agent_id=str(getattr(target, "agent_id", None) or ""),
+                   session_key=str(getattr(target, "session_key", None) or ""))
+        except Exception:
+            pass
 
     def _maybe_hint(self, text: str) -> None:
         """Post one visible hint for a command-shaped unarmed discard.

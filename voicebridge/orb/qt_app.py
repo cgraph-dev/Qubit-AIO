@@ -29,6 +29,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from . import client as _client
+from . import activity as _activity
 from . import ember as _ember
 from . import fullscreen as _fs
 from . import geometry as _geo
@@ -341,6 +342,14 @@ if QWidget is not None:
             self._stream_timer = None
             self._last_status: Any = None
             self._last_heartbeat: Any = None
+            # Output-activity tracker (OpenClaw port, 2026-10-06): keeps
+            # the speaking state exact when a TTS journal event is missed.
+            # A TTS frame observed -> mark_audio; a speak marker ->
+            # mark_playback_started; speak_done/expiry -> mark_stream_ending.
+            try:
+                self._activity = _activity.OutputActivityTracker()
+            except Exception:
+                self._activity = None
             if poll:
                 try:
                     self._stream_queue = queue.Queue(maxsize=1)
@@ -737,6 +746,55 @@ if QWidget is not None:
             except Exception:
                 return {"status": None, "events": [], "settings": None}
 
+        def _observe_output_activity(self, status: Any, events: Any,
+                                     heartbeat: Any) -> None:
+            """Feed one apply round into the output-activity tracker.
+
+            Pure bookkeeping (no widget, no HTTP beyond the passed
+            payload): a TTS/spectrum frame observed now -> ``mark_audio``
+            (refreshes the activity tail); the newest speak marker newer
+            than its done marker -> ``mark_playback_started`` (opening a
+            new stream when the previous one had ended); a newer
+            done marker or a passed tail with playback evidence ->
+            ``mark_stream_ending``. Never raises.
+            """
+            try:
+                act = getattr(self, "_activity", None)
+                if act is None:
+                    return
+                now = time.time()
+                speak_ts, done_ts = _state.speaking_markers(events, now)
+                if speak_ts is not None and (done_ts is None
+                                             or speak_ts > done_ts):
+                    snap = act.snapshot()
+                    if snap.get("streamEnding"):
+                        act.mark_stream_opened()
+                    act.mark_playback_started()
+                elif done_ts is not None and (speak_ts is None
+                                              or done_ts > speak_ts):
+                    act.mark_stream_ending()
+                # A TTS timeline frame under the play head is live audio.
+                frame = None
+                try:
+                    frame = _client.spec_tts_frame_from_payload(status)
+                except Exception:
+                    frame = None
+                if frame is None and heartbeat is not None:
+                    try:
+                        frame = _client.spec_tts_frame_from_payload(heartbeat)
+                    except Exception:
+                        frame = None
+                if frame is not None:
+                    act.mark_audio({"audioMs":
+                                    _client.SPEC_TTS_FRAME_S * 1000.0})
+                elif (act.snapshot().get("chunks", 0) > 0
+                      and not act.is_active(now)):
+                    # Expiry watchdog: audio was emitted but no frame has
+                    # arrived for a full tail -> the stream has ended.
+                    act.mark_stream_ending()
+            except Exception:
+                pass
+
         def _apply_poll_payload(self, payload: Dict[str, Any]) -> None:
             """Apply one fetched round on the GUI thread (widgets allowed)."""
             try:
@@ -759,11 +817,16 @@ if QWidget is not None:
             # stream tick can re-resolve without another HTTP round-trip.
             self._last_status = status
             self._last_heartbeat = heartbeat
+            # Advance output-activity tracking BEFORE resolving: a frame
+            # observed this round makes activity live, which extends the
+            # speaking span across a momentarily-empty TTS timeline.
+            self._observe_output_activity(status, events, heartbeat)
             self.offline = status is None
             _prev_state = str(getattr(self, "orb_state", ""))
             if status is not None:
                 raw = _state.resolve_orb_state(
-                    status, events, time.time(), heartbeat=heartbeat)
+                    status, events, time.time(), heartbeat=heartbeat,
+                    activity=getattr(self, "_activity", None))
                 try:
                     if self._display is not None:
                         self.orb_state = self._display.update(

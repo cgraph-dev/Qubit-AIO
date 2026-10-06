@@ -619,6 +619,33 @@ def _normalize_skill_names(value: Any) -> Optional[set]:
     return None
 
 
+def _normalize_plugin_names(value: Any) -> Optional[set]:
+    """Config value -> set of non-empty plugin names, or ``None`` if unknown.
+
+    The ``plugins.disabled``/``plugins.enabled`` config keys are typed as lists
+    (``qubit_cli.config`` config-type table) but ``qubit config set`` may store
+    a list as a JSON/Python-literal string and YAML allows a bare scalar. Mirrors
+    :func:`_normalize_skill_names` so an unrecognized destination value is
+    reported (``None``) instead of being mangled.
+    """
+    if value is None:
+        return set()
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("["):
+            try:
+                parsed = ast.literal_eval(text)
+            except (ValueError, SyntaxError):
+                parsed = None
+            if isinstance(parsed, list):
+                return {str(item).strip() for item in parsed
+                        if str(item).strip()}
+        return {text} if text else set()
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return {str(item).strip() for item in value if str(item).strip()}
+    return None
+
+
 def _platform_disabled_names(value: Any) -> set:
     """Union of ``skills.platform_disabled`` names (per-platform dict or list)."""
     names: set = set()
@@ -798,27 +825,117 @@ def _source_plugin_states(home: Path) -> List[Dict[str, Any]]:
 
 
 def _import_plugin_state(cfg: Any, home: Path) -> Dict[str, Any]:
-    """Report source plugin enable/disable state; there is no safe API.
+    """Union source plugin DISABLED state into the Qubit runtime config.
 
-    ``voicebridge.plugin_runtime`` validates a full manifest
-    (``id``/``kind``/``entrypoint``/``digest``) through a confirmation-gated
-    ``register``/``install`` and stores no enable/disable field; its load/save
-    helpers are private. There is therefore no public API to record a plugin
-    NAME + enabled/disabled state, and inventing a second store is forbidden.
-    This reads the source state (read-only) and returns a typed ``unsupported``
-    report naming the exact reason instead of fabricating a destination write.
+    The plugin *directories* are copied by ``_copy_missing`` (row 11); this
+    carries the semantic enable/disable bit so a plugin disabled in the source
+    home does not silently arrive ENABLED in Qubit.
+
+    The destination gate lives in the vendored tree, not in a Qubit-owned
+    second store: ``qubit_cli.plugins_discovery._get_disabled_plugins`` reads
+    ``plugins.disabled`` (a deny-list that *wins* over ``plugins.enabled``) and
+    ``_get_enabled_plugins`` reads ``plugins.enabled`` (an opt-in allow-list
+    whose *absence* means "nothing enabled yet"). So the safe, non-inventing
+    write is the deny-list: every source plugin whose ``state.json`` says
+    DISABLED is unioned into ``<runtime_home>/config.yaml`` ``plugins.disabled``.
+
+    Asymmetry is deliberate and one-directional — **only DISABLED is carried**.
+    The source says nothing about positive enablement (and the vendor model has
+    no "enabled list"), so ``plugins.enabled`` is never touched: migration can
+    never mark something ENABLED that was disabled at source. An UNKNOWN/ENABLED
+    source plugin is simply not added to the deny-list.
+
+    Strictly additive on the destination: an existing ``plugins.disabled`` entry
+    is never removed and the rest of the destination config is preserved. The
+    write goes through ``qubit_cli.config.atomic_config_write`` (the
+    comment-preserving writer — never a raw YAML dump of a config path). An
+    unreadable or unrecognized destination config is left untouched and reported
+    as a typed skip rather than risk data loss. A re-run adds nothing
+    (idempotent).
     """
-    return {
-        "state": "UNSUPPORTED",
-        "code": "PLUGIN_STATE_NO_PUBLIC_API",
-        "detail": "voicebridge.plugin_runtime has no public API to record a "
-                  "plugin enable/disable state: register()/install() require a "
-                  "full validated manifest and a confirmation-gated write, the "
-                  "store has no enabled/disabled field, and its _load/_save "
-                  "helpers are private. No second store was created.",
-        "source_plugins": _source_plugin_states(home),
-        "recorded": [],
+    report: Dict[str, Any] = {
+        "state": "SKIPPED", "source_plugins": [], "source_disabled": [],
+        "added": [], "already_present": [], "skipped": [],
+        "code": "", "detail": "",
     }
+    source_plugins = _source_plugin_states(home)
+    report["source_plugins"] = source_plugins
+    disabled = sorted({str(p["name"]) for p in source_plugins
+                       if p.get("state") == "DISABLED"})
+    report["source_disabled"] = disabled
+    if not disabled:
+        report.update(state="NOOP", code="",
+                      detail="source has no explicitly disabled plugin")
+        return report
+
+    dest_yaml = _qubit_home(cfg) / "config.yaml"
+    try:
+        from qubit_cli.config import (
+            atomic_config_write, read_user_config_raw,
+        )
+    except Exception as exc:  # noqa: BLE001 - vendored tree unavailable
+        report.update(state="SKIPPED", code="PLUGIN_STATE_NO_CONFIG_API",
+                      detail=f"qubit_cli.config unavailable "
+                             f"({type(exc).__name__}); destination config not "
+                             f"touched")
+        report["skipped"].append("qubit_cli.config unavailable")
+        return report
+    try:
+        dest_data = read_user_config_raw(dest_yaml)
+    except Exception as exc:  # noqa: BLE001 - never corrupt a bad file
+        report.update(
+            state="SKIPPED", code="PLUGIN_STATE_DEST_UNREADABLE",
+            detail=f"destination config.yaml unreadable ({type(exc).__name__}); "
+                   f"left untouched")
+        report["skipped"].append("destination config.yaml unreadable")
+        return report
+    if not isinstance(dest_data, dict):
+        report.update(
+            state="SKIPPED", code="PLUGIN_STATE_DEST_NOT_MAPPING",
+            detail="destination config.yaml is not a mapping; left untouched")
+        report["skipped"].append("destination config.yaml is not a mapping")
+        return report
+    plugins = dest_data.get("plugins")
+    if plugins is None:
+        plugins = {}
+    elif not isinstance(plugins, dict):
+        report.update(
+            state="SKIPPED", code="PLUGIN_STATE_DEST_PLUGINS_NOT_MAPPING",
+            detail="destination plugins is not a mapping; left untouched")
+        report["skipped"].append("destination plugins is not a mapping")
+        return report
+    existing = _normalize_plugin_names(plugins.get("disabled"))
+    if existing is None:
+        report.update(
+            state="SKIPPED", code="PLUGIN_STATE_DEST_DISABLED_UNKNOWN",
+            detail="destination plugins.disabled is an unrecognized type; left "
+                   "untouched")
+        report["skipped"].append("destination plugins.disabled unrecognized")
+        return report
+    added = sorted(set(disabled) - existing)
+    report["already_present"] = sorted(set(disabled) & existing)
+    if not added:
+        report.update(state="NOOP", code="",
+                      detail="destination already contains every source "
+                             "disabled plugin")
+        return report
+    plugins["disabled"] = sorted(existing | set(added))
+    dest_data["plugins"] = plugins
+    dest_yaml.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        atomic_config_write(dest_yaml, dest_data)
+    except Exception as exc:  # noqa: BLE001 - a refused write is reported, not raised
+        report.update(
+            state="SKIPPED", code="PLUGIN_STATE_WRITE_REFUSED",
+            detail=f"destination config write refused ({type(exc).__name__}); "
+                   f"left untouched")
+        report["skipped"].append("destination config write refused")
+        return report
+    report["added"] = added
+    report["path"] = str(dest_yaml)
+    report.update(state="OK", code="",
+                  detail=f"{len(added)} disabled plugin name(s) merged")
+    return report
 
 
 def _source_mcp_servers(home: Path) -> Dict[str, Dict[str, Any]]:
@@ -1071,7 +1188,10 @@ def _import_assets(cfg: Any, home: Path, bdir: Path, *,
     skill_state = _import_skill_state(cfg, home)
     if not dest_cfg_existed and (dest_home / "config.yaml").is_file():
         created_files.append(str(dest_home / "config.yaml"))
-    # Plugin enabled-state has no safe destination API (typed unsupported).
+    # Plugin enabled-state: union the source DISABLED names into the destination
+    # runtime config.yaml `plugins.disabled` deny-list (write through the
+    # comment-preserving qubit_cli.config writer). Only disables are carried, so
+    # migration can never enable something the source had disabled.
     plugin_state = _import_plugin_state(cfg, home)
     # Objective B: import MCP server definitions into the canonical registry.
     # The registry is backed up for rollback; a created store is removed on

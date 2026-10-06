@@ -66,18 +66,37 @@ FALSE-POSITIVE HANDLING
      real ``Name``/``Attribute`` AST nodes are checked, so forward references in
      quotes cause no false positives.
 
-Additional precision rules (learned from the first noisy run of this tool):
-  * A PEP 562 module-level ``__getattr__`` marks the whole module surface dynamic
-    -> nothing is reported against it.
-  * A module containing an ``_OriginProxy``-style attribute proxy, or a
-    module-level star import, is likewise treated as dynamic.
-  * ``X.Y`` is only checked when ``X`` is bound by ``import X`` /
-    ``import X.Y as Z`` / ``from P import submod`` (submod resolves to a module
-    file). ``from M import sym`` followed by ``sym.attr`` is an *object*
-    attribute read, not a module attribute read, and is never reported -- that
-    misbinding was the single largest false-positive source.
-  * Names assigned inside functions (bare ``global``-style writes like
-    ``_lock = ...`` in a function body) count as part of the module surface.
+Additional precision rules (each was added after a noisy run to kill a specific
+false-positive class):
+  * Module attribute reads (``X.Y``) are checked ONLY when ``X`` is a true module
+    binding in its lexical scope: ``import X`` / ``import X.Y as Z`` / ``from P
+    import submod`` (submod resolves to a module file). ``from M import sym``
+    followed by ``sym.attr`` is an *object* attribute read, never a module read.
+  * Alias bindings respect lexical scope: a function parameter or local of the
+    same name shadows a module alias (``def body(server)`` / ``def f(config)``).
+    Without this, ~40% of findings were phantom.
+  * A module is treated as DYNAMIC (surface unknowable -> never reported against)
+    if it has a PEP 562 ``__getattr__``, a module-level ``from x import *``, an
+    ``_OriginProxy``-style attribute proxy, a ``globals().update(...)`` /
+    ``registry.export(globals())`` / ``setattr(sys.modules[__name__], ...)``
+    injection, or a ``...register(sys.modules[__name__])`` call — the
+    ``tui_gateway/server.py`` pattern that rebinds ~40 split handler modules.
+  * Module surface includes names assigned inside top-level ``if``/``try``/
+    ``with`` blocks and ``global``-declared names.
+  * Bare single-segment names resolve against the importing file's own directory
+    first ONLY when the name is not a real tree module (skills/optional-skills
+    scripts import their siblings that way); the ``voicebridge`` tree never
+    provides bare aliases.
+
+Output has THREE buckets:
+  * HARD            -- a real in-tree miss that would raise at runtime.
+  * OPTIONAL        -- the import is guarded by try/except (ImportError,
+                       ModuleNotFoundError, Exception, BaseException, or bare) or
+                       sits in an except-handler fallback, or is TYPE_CHECKING-
+                       only. Handled by design; not a crash.
+  * UNVERIFIED      -- a name/module we could not resolve and could NOT prove is
+                       in-tree (third-party or repo-root). Reported for
+                       completeness, never counted as a failure.
 
 USAGE
 -----

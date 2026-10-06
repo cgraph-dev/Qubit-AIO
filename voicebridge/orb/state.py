@@ -240,8 +240,39 @@ def _latest_event_ts(events: Any, now: float, names: set,
     return latest
 
 
+def speaking_markers(events: Any, now: float,
+                     ) -> Tuple[Optional[float], Optional[float]]:
+    """Newest ``(speak_ts, done_ts)`` inside the speaking window.
+
+    Either side is ``None`` when that marker is absent/stale. Pure, never
+    raises; used to drive the output-activity tracker's playback state.
+    """
+    return (
+        _latest_event_ts(events, now, _SPEAKING_EVENTS, SPEAK_WINDOW_S),
+        _latest_event_ts(events, now, _SPEAK_DONE_EVENTS, SPEAK_WINDOW_S),
+    )
+
+
+def _activity_is_active(activity: Any, now: float) -> bool:
+    """Read an optional output-activity signal. Never raises.
+
+    Accepts an :class:`~voicebridge.orb.activity.OutputActivityTracker`
+    (calls ``is_active(now)``) or a plain truthy/falsy value, so both the
+    live orb and hermetic tests can feed the same optional seam.
+    """
+    if activity is None:
+        return False
+    try:
+        probe = getattr(activity, "is_active", None)
+        if callable(probe):
+            return bool(probe(now))
+        return bool(activity)
+    except Exception:
+        return False
+
+
 def resolve_orb_state(status: Any, events: Any, now: float,
-                      heartbeat: Any = None) -> str:
+                      heartbeat: Any = None, activity: Any = None) -> str:
     """Map a status payload + recent journal events to one orb state.
 
     ``heartbeat`` (optional) is the desktop-helper heartbeat mapping. It
@@ -256,6 +287,13 @@ def resolve_orb_state(status: Any, events: Any, now: float,
       to idle when the 4 s event window expires (live 2026-10-06: a
       95-char weather answer was green only ~2.5 s then orange while the
       agent was still talking).
+
+    ``activity`` (optional) is an output-activity signal — an
+    :class:`~voicebridge.orb.activity.OutputActivityTracker` or a plain
+    truthy value. While it reads active, ``speaking`` stays true even if
+    the heartbeat TTS timeline is momentarily empty (a missed/unseen
+    frame), and it ends at the tracker's tail. ``None`` (the default)
+    keeps the legacy behavior byte-identical.
 
     Never raises on malformed input; unknown/unreachable -> ``"idle"``.
     """
@@ -327,6 +365,13 @@ def resolve_orb_state(status: Any, events: Any, now: float,
                                            SPEAK_WINDOW_S)
                 if done_ts is None or speak_ts > done_ts:
                     speaking = True
+        # Output-activity extension (2026-10-06): a live tracker keeps
+        # green while reply audio flows even when the heartbeat timeline
+        # is momentarily empty (a missed frame/event). Inactive -> the
+        # legacy decision above stands unchanged (this only extends, it
+        # never curtails the done-marker rule).
+        if not speaking and _activity_is_active(activity, now_f):
+            speaking = True
         if speaking:
             return "speaking"
         # -- 3. working (amber): a tool/action run is live when its start
@@ -410,5 +455,6 @@ __all__ = [
     "MIN_DWELL_S",
     "DisplayState",
     "resolve_orb_state",
+    "speaking_markers",
     "plan_toggle",
 ]
