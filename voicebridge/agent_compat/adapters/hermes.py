@@ -15,6 +15,26 @@ HOW THE TABLES WERE DERIVED (all measured, not guessed)
   imported anywhere in the ecosystem, so this table is short by fact, not by omission.
 * ``env_aliases`` — measured: all 69 distinct ``HERMES_*`` env names used by plugins are already
   live in Qubit's tree (0 unknown), so only the one genuinely renamed home variable is listed.
+* ``skill_roots`` — measured on this machine with
+  ``find ~/.hermes -maxdepth 3 -type d -name skills`` (→ the user tree ``~/.hermes/skills``,
+  holding 215 ``SKILL.md`` files at depths ``<name>/SKILL.md`` and
+  ``<category>/<name>/SKILL.md``) and ``ls ~/.hermes/skills``. The same command also matched two
+  roots we do NOT claim: the install's own shipped copy under the home dir, and a bundled
+  browser tool's ``skills`` dir — neither is the agent's user skill tree, so both are
+  deliberately left out.
+* ``skill_frontmatter_aliases`` — measured over the frontmatter of the 215 live skills and the
+  58 skills in the pinned tree: the keys in use are ``name, description, version, author,
+  license, platforms, metadata, prerequisites, dependencies, tags, triggers, environments,
+  required_credential_files``. None of these is a rename of a Qubit key — the host parses the
+  SAME keys — so this table is EMPTY by fact. It is declared (not omitted) so the mechanism is
+  visible and a future renamed key has an obvious home.
+* ``mcp_config_paths`` / ``mcp_config_keys`` — measured: ``find ~/.hermes -maxdepth 2 -iname
+  '*mcp*'`` found NO standalone MCP config file (no ``.mcp.json`` / ``mcp.json`` /
+  ``mcp_servers.json``; the only hits are logs, a lock, a schema cache, and the ``skills/mcp``
+  folder). MCP servers are inlined in the main ``config.yaml`` under the top-level key
+  ``mcp_servers:`` (confirmed: ``grep -n mcp ~/.hermes/config.yaml`` → line 617, with two
+  entries, ``cgraph-graft`` and ``openclaw-voice-bridge-graft``). So the path is ``config.yaml``
+  and the key is ``mcp_servers``, NOT a separate file.
 * ``reserved`` — the names Qubit deliberately keeps, recorded so a future contributor sees the
   intent rather than "fixing" an apparent gap.
 """
@@ -75,5 +95,13 @@ ADAPTER = ForeignAdapter(
     detection_markers=("hermes_cli", "hermes_agent", "hermes_platform", "hermes_state"),
     # -- conventional plugin dirs
     content_roots=("~/.hermes/plugins", "./.hermes/plugins"),
+    # -- where the agent keeps SKILLS (each a dir with SKILL.md); user tree only, measured
+    skill_roots=("~/.hermes/skills",),
+    # -- no frontmatter key is renamed (host parses the same keys) — empty by measurement
+    skill_frontmatter_aliases={},
+    # -- where the agent registers MCP servers: inline in its main config, not a separate file
+    mcp_config_paths=("~/.hermes/config.yaml",),
+    # -- the top-level key those entries live under
+    mcp_config_keys=("mcp_servers",),
     reserved=_RESERVED,
 )

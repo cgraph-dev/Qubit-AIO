@@ -30,11 +30,100 @@ logger = logging.getLogger("qubit_cli.plugins")
 #: read-old fallback for upstream distributions that still advertise it.
 QUBIT_ENTRY_POINTS_GROUP = "qubit_agent.plugins"
 ENTRY_POINTS_GROUP = "hermes_agent.plugins"
-ENTRY_POINTS_GROUPS = (QUBIT_ENTRY_POINTS_GROUP, ENTRY_POINTS_GROUP)
+#: Qubit's own groups, always honoured.
+_OWN_ENTRY_POINT_GROUPS = (QUBIT_ENTRY_POINTS_GROUP, ENTRY_POINTS_GROUP)
 QUBIT_ENTRY_POINT_CAPABILITIES_GROUP = "qubit_agent.plugin_capabilities"
 ENTRY_POINT_CAPABILITIES_GROUP = "hermes_agent.plugin_capabilities"
 ENTRY_POINT_CAPABILITIES_GROUPS = (
     QUBIT_ENTRY_POINT_CAPABILITIES_GROUP, ENTRY_POINT_CAPABILITIES_GROUP)
+
+
+# ── Foreign-content extension point (neutral; this module knows no adapter) ───
+#
+# The vendored tree must never import a Qubit-side package: a clean rename would
+# then silently rot (the external-only invariant, enforced by the test suite).
+# So the dependency is INVERTED — this module owns a plain registry of callables,
+# and the Qubit layer (voicebridge) registers into it at its own startup. The
+# tree stays installable and runnable with no voicebridge present; a registered
+# provider is optional capability, never a dependency.
+#
+# A provider is any object exposing the three plain callables below. It is
+# duck-typed on purpose: the tree must not import the provider's types either.
+_foreign_providers: List[Any] = []
+
+
+def register_foreign_provider(provider: Any) -> None:
+    """Register a foreign-content provider (idempotent by object identity).
+
+    The provider supplies foreign entry-point groups to scan and participates
+    in activating whatever mechanism it needs. Called by the Qubit layer at
+    startup — never by this tree. A provider that raises is dropped, not
+    propagated: foreign support must never break plugin discovery.
+    """
+    if provider is None or any(p is provider for p in _foreign_providers):
+        return
+    _foreign_providers.append(provider)
+
+
+def clear_foreign_providers() -> None:
+    """Drop every registered provider (test seam / teardown)."""
+    _foreign_providers.clear()
+
+
+def _provider_call(provider: Any, method: str) -> Any:
+    """Call ``provider.<method>()`` defensively; None when absent or raising."""
+    fn = getattr(provider, method, None)
+    if not callable(fn):
+        return None
+    try:
+        return fn()
+    except Exception:  # noqa: BLE001 - a broken provider must not break discovery
+        logger.warning("Foreign provider %s.%s() failed", type(provider).__name__, method, exc_info=True)
+        return None
+
+
+def install_foreign_adapters() -> int:
+    """Let every registered provider activate its mechanism; return how many did.
+
+    Idempotent. Called by the plugin-discovery funnel BEFORE any plugin import
+    runs, so foreign content is loadable by the time it is imported. Returns 0
+    when nothing is registered — a no-op, not a failure.
+    """
+    activated = 0
+    for provider in tuple(_foreign_providers):
+        if _provider_call(provider, "activate") is not None or callable(getattr(provider, "activate", None)):
+            activated += 1
+    return activated
+
+
+def foreign_entry_point_groups() -> tuple:
+    """Entry-point groups the registered providers want scanned, IN ADDITION to ours.
+
+    Empty when nothing is registered, so default behaviour is unchanged.
+    """
+    groups: List[str] = []
+    for provider in tuple(_foreign_providers):
+        reported = _provider_call(provider, "entry_point_groups") or ()
+        for group in reported:
+            if isinstance(group, str) and group not in groups:
+                groups.append(group)
+    return tuple(groups)
+
+
+def entry_point_groups() -> tuple:
+    """Every entry-point group a plugin may be published under, deduped.
+
+    Qubit's own groups plus any provider-contributed groups. Discovery and the
+    entry-point loader must consult this SAME set — they previously disagreed
+    (discovery scanned a tuple, the loader selected a single group), so a
+    plugin discoverable under one group could be unreachable at load time.
+    """
+    groups = list(_OWN_ENTRY_POINT_GROUPS)
+    for group in foreign_entry_point_groups():
+        if group not in groups:
+            groups.append(group)
+    return tuple(groups)
+
 
 # Per-harness manifest directories plugin repos ship for OTHER agent harnesses (e.g. obra/superpowers keeps one
 # plugin.json per harness). Their plugin.json is not an Agent Plugins v1 manifest and can never validate, so
@@ -98,7 +187,7 @@ def discover_entrypoint_manifests() -> List["PluginManifest"]:
     manifests: List[PluginManifest] = []
     try:
         eps = importlib.metadata.entry_points()
-        group_eps = _select_entry_point_groups(eps, ENTRY_POINTS_GROUPS)
+        group_eps = _select_entry_point_groups(eps, entry_point_groups())
         capability_eps = _select_entry_point_groups(
             eps, ENTRY_POINT_CAPABILITIES_GROUPS)
     except Exception as exc:

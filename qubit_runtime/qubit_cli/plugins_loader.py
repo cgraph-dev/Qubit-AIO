@@ -677,7 +677,14 @@ class PluginLoaderMixin:
     def _load_entrypoint_module(self, manifest: PluginManifest) -> Union[types.ModuleType, Callable[..., Any]]:
         """Load a pip-installed plugin via its entry-point reference: the module for a bare ``module`` target,
         the referenced attribute (normally ``register``) for the ``module:function`` form."""
-        for ep in _select_entry_point_group(importlib.metadata.entry_points(), ENTRY_POINTS_GROUP):
+        # Scan the SAME group set discovery used (own + foreign adapter groups). Selecting
+        # only ``ENTRY_POINTS_GROUP`` here meant a plugin discoverable under
+        # ``qubit_agent.plugins`` (or a foreign group) was found by discovery but raised
+        # "entry point not found" at load time — discovered, never loadable.
+        from qubit_cli.plugins_discovery import entry_point_groups, _select_entry_point_groups
+        for ep in _select_entry_point_groups(importlib.metadata.entry_points(), entry_point_groups()):
             if ep.name == manifest.name:
                 return ep.load()
-        raise ImportError(f"Entry point '{manifest.name}' not found in group '{ENTRY_POINTS_GROUP}'")
+        raise ImportError(
+            f"Entry point '{manifest.name}' not found in any plugin group: "
+            f"{', '.join(entry_point_groups())}")

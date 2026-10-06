@@ -25,9 +25,9 @@ def default_adapters() -> List[ForeignAdapter]:
     Every module in this package is self-contained data, so this import is safe even when the
     foreign agent's own software is not installed.
     """
-    from . import hermes
+    from . import hermes, openclaw
 
-    return [hermes.ADAPTER]
+    return [hermes.ADAPTER, openclaw.ADAPTER]
 
 
 __all__ = ["default_adapters"]

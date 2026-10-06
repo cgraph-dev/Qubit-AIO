@@ -7,6 +7,8 @@ The engine is deliberately small and has four parts:
 * :class:`ForeignAdapter` — the data describing one foreign agent's naming.
 * :class:`ImportAliaser` — a ``sys.meta_path`` finder that resolves the foreign module names.
 * :class:`EnvAliaser` / :class:`SymbolAliaser` — environment and attribute aliasing.
+* :class:`SkillLoader` — enumerate the foreign agent's skill directories (``SKILL.md``).
+* :class:`McpConfigLoader` — read the foreign agent's MCP server entries from its config.
 * :class:`AdapterRegistry` — holds adapters and answers "does this directory belong to one?"
 
 Everything is idempotent and reversible; ``reset()`` restores the process to stock Python.
@@ -68,6 +70,25 @@ class ForeignAdapter:
         corrupted 172 URLs during the vendor sync).
     content_roots:
         Conventional on-disk plugin directories for this agent, used as a discovery hint.
+    skill_roots:
+        Conventional on-disk directories where this agent keeps **skills** — each a directory
+        containing a ``SKILL.md``. Distinct from ``content_roots`` (which holds plugins):
+        a skill is data the host can enumerate and load, not code it imports. Paths may be
+        ``~``-relative. A missing root is a graceful no-op, never an error — the foreign
+        agent's skill tree is optional content, not a dependency.
+    skill_frontmatter_aliases:
+        Foreign frontmatter key -> real key, applied to a skill's YAML frontmatter so a foreign
+        ``SKILL.md`` parses under the host's key names. An allowlist: an unlisted key is left
+        untouched, and a real key that is already present is never overwritten.
+    mcp_config_paths:
+        Conventional on-disk config files where this agent registers **MCP servers** (a name
+        plus a ``command``/``url`` launch spec). A foreign agent may keep MCP entries in a
+        dedicated JSON/YAML file or inline under a key in its main config; list either shape
+        here. Missing paths are a graceful no-op, never an error.
+    mcp_config_keys:
+        The top-level config key(s) under which MCP server entries live, when they are inlined
+        in a config file (e.g. ``("mcp_servers",)``). Tried in order; the first mapping found
+        wins. Empty means the file IS the ``{name: entry}`` mapping at top level.
     reserved:
         Names this agent must NOT alias because Qubit deliberately keeps them (its own
         entry-point group, legacy data paths, wire-format strings). Listed so a future
@@ -82,6 +103,10 @@ class ForeignAdapter:
     entry_point_groups: Tuple[str, ...] = ()
     detection_markers: Tuple[str, ...] = ()
     content_roots: Tuple[str, ...] = ()
+    skill_roots: Tuple[str, ...] = ()
+    skill_frontmatter_aliases: Dict[str, str] = field(default_factory=dict)
+    mcp_config_paths: Tuple[str, ...] = ()
+    mcp_config_keys: Tuple[str, ...] = ()
     reserved: Tuple[str, ...] = ()
 
     # ------------------------------------------------------------------ alias resolution
@@ -320,6 +345,286 @@ class SymbolAliaser:
                 setattr(mod, foreign, target)
                 applied.append(f"{module_name}.{foreign}->{real}")
         return applied
+
+
+# -------------------------------------------------------------------- skills / MCP loading
+
+@dataclass(frozen=True)
+class SkillEntry:
+    """One foreign skill discovered on disk.
+
+    ``directory`` is the skill's own folder (the one holding ``SKILL.md``), ``name`` is the
+    frontmatter ``name`` (falling back to the folder name), and ``frontmatter`` is the parsed
+    mapping after ``skill_frontmatter_aliases`` were applied — so a caller sees the host's key
+    names, not the foreign agent's.
+    """
+
+    directory: pathlib.Path
+    name: str
+    frontmatter: Dict[str, object]
+
+
+@dataclass(frozen=True)
+class McpServerEntry:
+    """One foreign MCP server read from the foreign agent's config.
+
+    ``name`` is the registry key and ``spec`` is the raw ``{command/url/...}`` mapping, kept
+    verbatim so the host can hand it to its own MCP loader without this layer interpreting it.
+    """
+
+    name: str
+    spec: Dict[str, object]
+    source: pathlib.Path
+
+
+def _read_frontmatter(text: str) -> Dict[str, object]:
+    """Parse the YAML frontmatter block of a ``SKILL.md``.
+
+    Minimal on purpose — no third-party YAML import in this layer. Handles the ``key: value``
+    and ``key:`` forms the skills ecosystem actually uses; a value is kept as a string when it
+    is not obviously a scalar. Returns ``{}`` when there is no frontmatter, so a malformed or
+    frontmatter-less file degrades to "no metadata" rather than raising.
+    """
+    if not text.startswith("---"):
+        return {}
+    end = text.find("\n---", 3)
+    if end == -1:
+        return {}
+    block = text[3:end]
+    data: Dict[str, object] = {}
+    for raw in block.splitlines():
+        line = raw.rstrip()
+        if not line or line.lstrip().startswith("#") or line[0] in " \t":
+            continue  # blank, comment, or a nested key (kept flat here; top-level only)
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+        data[key] = value
+    return data
+
+
+class SkillLoader:
+    """Enumerate a foreign agent's skills, applying foreign frontmatter key aliases.
+
+    A skill is a directory containing ``SKILL.md``. Foreign roots are scanned recursively
+    (skills live at ``<root>/<name>`` and ``<root>/<category>/<name>`` in the wild), so the
+    loader does not assume a depth. A **missing root is a graceful no-op** — an empty report,
+    never an exception and never a fabricated entry: the foreign agent simply may not be
+    installed, and that is not an error.
+
+    The frontmatter aliases are an allowlist: an unlisted foreign key is left as-is, and a
+    real key already present is never overwritten (mirroring ``SymbolAliaser``).
+    """
+
+    def __init__(self, adapters: Sequence[ForeignAdapter]) -> None:
+        self._roots: List[pathlib.Path] = []
+        self._aliases: Dict[str, str] = {}
+        for adapter in adapters:
+            for root in adapter.skill_roots:
+                expanded = pathlib.Path(os.path.expanduser(root))
+                if expanded not in self._roots:
+                    self._roots.append(expanded)
+            for foreign, real in adapter.skill_frontmatter_aliases.items():
+                # An explicit real key already claimed by another adapter wins; first wins.
+                self._aliases.setdefault(foreign, real)
+
+    def roots(self) -> List[pathlib.Path]:
+        """The (expanded) skill roots this loader will scan."""
+        return list(self._roots)
+
+    def _alias_frontmatter(self, data: Dict[str, object]) -> Dict[str, object]:
+        out = dict(data)
+        for foreign, real in self._aliases.items():
+            if foreign in out and real not in out:
+                out[real] = out.pop(foreign)
+        return out
+
+    def enumerate(self) -> List[SkillEntry]:
+        """Return every skill under the configured roots. Empty when none/missing."""
+        found: List[SkillEntry] = []
+        for root in self._roots:
+            if not root.is_dir():
+                continue  # missing root: graceful no-op, never an error
+            for skill_md in sorted(root.rglob("SKILL.md")):
+                try:
+                    text = skill_md.read_text(errors="ignore")
+                except OSError:  # pragma: no cover - unreadable file mid-scan
+                    continue
+                fm = self._alias_frontmatter(_read_frontmatter(text))
+                name = str(fm.get("name") or skill_md.parent.name)
+                found.append(SkillEntry(directory=skill_md.parent, name=name, frontmatter=fm))
+        return found
+
+    def report(self) -> Dict[str, object]:
+        """A JSON-friendly summary: the roots scanned and the skills found."""
+        skills = self.enumerate()
+        return {
+            "roots": [str(r) for r in self._roots],
+            "skills": [
+                {"name": s.name, "directory": str(s.directory), "frontmatter": s.frontmatter}
+                for s in skills
+            ],
+            "count": len(skills),
+        }
+
+
+class McpConfigLoader:
+    """Read a foreign agent's MCP server entries without launching anything.
+
+    An MCP server is a CONFIG ENTRY (a name plus a ``command``/``url`` launch spec). A foreign
+    agent keeps these either in a dedicated config file or inline under a key in its main
+    config; ``mcp_config_keys`` names that key. **No entry is connected, and a spec is never
+    interpreted** — this returns the raw mapping for the host's own MCP registry to act on.
+
+    A **missing config path is a graceful no-op** (empty list), never an exception. A path that
+    exists but cannot be parsed contributes nothing for that path and no fabricated entry.
+    JSON is parsed with the stdlib; a ``.yaml``/``.yml`` file is parsed with a minimal
+    top-level reader so this layer carries no YAML dependency.
+    """
+
+    def __init__(self, adapters: Sequence[ForeignAdapter]) -> None:
+        self._paths: List[pathlib.Path] = []
+        self._keys: Tuple[str, ...] = ()
+        keys: List[str] = []
+        for adapter in adapters:
+            for path in adapter.mcp_config_paths:
+                expanded = pathlib.Path(os.path.expanduser(path))
+                if expanded not in self._paths:
+                    self._paths.append(expanded)
+            for key in adapter.mcp_config_keys:
+                if key not in keys:
+                    keys.append(key)
+        self._keys = tuple(keys)
+
+    def paths(self) -> List[pathlib.Path]:
+        """The (expanded) config paths this loader will read."""
+        return list(self._paths)
+
+    def _load_mapping(self, path: pathlib.Path) -> Optional[Dict[str, object]]:
+        """Load a config file into a top-level mapping, or None if unreadable/unparseable."""
+        try:
+            text = path.read_text(errors="ignore")
+        except OSError:
+            return None
+        suffix = path.suffix.lower()
+        if suffix == ".json":
+            try:
+                import json
+
+                data = json.loads(text)
+            except (ValueError, TypeError):
+                return None
+            return data if isinstance(data, dict) else None
+        if suffix in (".yaml", ".yml"):
+            return _read_yaml_top_level(text)
+        # Unknown extension: try JSON first (the MCP convention), then YAML.
+        try:
+            import json
+
+            data = json.loads(text)
+            if isinstance(data, dict):
+                return data
+        except (ValueError, TypeError):
+            pass
+        return _read_yaml_top_level(text)
+
+    def _entries_from(self, mapping: Dict[str, object]) -> Dict[str, object]:
+        """Pick the server mapping out of a loaded config, honouring ``mcp_config_keys``."""
+        if not self._keys:
+            return mapping
+        for key in self._keys:
+            candidate = mapping.get(key)
+            if isinstance(candidate, dict):
+                return candidate
+        return {}
+
+    def read(self) -> List[McpServerEntry]:
+        """Return every MCP server entry found across the configured paths."""
+        entries: List[McpServerEntry] = []
+        seen: set = set()
+        for path in self._paths:
+            if not path.is_file():
+                continue  # missing path: graceful no-op, never an error
+            mapping = self._load_mapping(path)
+            if mapping is None:
+                continue  # unparseable: contributes nothing, invents nothing
+            servers = self._entries_from(mapping)
+            for name, spec in servers.items():
+                if name in seen or not isinstance(spec, dict):
+                    continue
+                seen.add(name)
+                entries.append(McpServerEntry(name=name, spec=spec, source=path))
+        return entries
+
+    def report(self) -> Dict[str, object]:
+        """A JSON-friendly summary: the paths read and the servers found."""
+        servers = self.read()
+        return {
+            "paths": [str(p) for p in self._paths],
+            "servers": [
+                {"name": s.name, "spec": s.spec, "source": str(s.source)} for s in servers
+            ],
+            "count": len(servers),
+        }
+
+
+def _read_yaml_top_level(text: str) -> Optional[Dict[str, object]]:
+    """Parse a YAML document into nested dicts/lists by indentation, without PyYAML.
+
+    Deliberately minimal (no third-party import in this layer): it understands the block
+    subset the MCP config actually uses — nested ``key:`` mappings, ``key: value`` scalars,
+    and ``- item`` sequences — and nothing more exotic. Returns ``{}`` for empty/garbage input
+    rather than raising, so a bad file yields no entries and never a fabricated one.
+    """
+    root: Dict[str, object] = {}
+    # Each stack entry is (indent, container) for the mapping currently being populated.
+    stack: List[Tuple[int, Dict[str, object]]] = [(-1, root)]
+    pending_list_key: Optional[Tuple[Dict[str, object], str]] = None
+    for raw in text.splitlines():
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip())
+        line = raw.strip()
+
+        # A sequence item belongs to the most recent `key:` that opened a list.
+        if line.startswith("- "):
+            if pending_list_key is not None:
+                container, key = pending_list_key
+                seq = container.get(key)
+                if not isinstance(seq, list):
+                    seq = []
+                    container[key] = seq
+                seq.append(line[2:].strip())
+            continue
+
+        if ":" not in line:
+            pending_list_key = None
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+
+        # Pop any mapping whose indent is at or beyond this key's own indent.
+        while stack and indent <= stack[-1][0]:
+            stack.pop()
+        container = stack[-1][1] if stack else root
+
+        if value == "":
+            # Opens a nested mapping OR, if followed by `- ` items, a sequence.
+            child: Dict[str, object] = {}
+            container[key] = child
+            stack.append((indent, child))
+            pending_list_key = (container, key)
+        else:
+            container[key] = value
+            pending_list_key = None
+    return root
 
 
 # ------------------------------------------------------------------------------- the registry

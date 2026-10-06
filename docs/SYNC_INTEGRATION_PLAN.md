@@ -3,6 +3,45 @@
 Baseline: pin `69948c0057` → `a036b13793` (2026-09-25 → 2026-10-06).
 **5,441 commits, 5,142 files** (`git rev-list --count 69948c0057..a036b13793`).
 
+## Session-lease bug — "This chat is open in another Qubit window" (fixed 2026-10-06)
+
+Recurring, user-visible, and NOT an upstream bug — it is in our PTY launcher.
+
+**Symptom:** close the browser, reopen an old session → refused with
+`This chat is open in another Qubit window/terminal. Details: session <id> opened by tui 38m ago.`
+Lease holder is an orphan `qubit --tui` whose browser is long gone, still alive.
+
+**Mechanism (three facts that compose into the failure):**
+
+1. `voicebridge/pty_ws.py::detach_all()` / the disconnect path **deliberately does not kill
+   the PTY** — by design, a browser *refresh* must not destroy an in-flight turn. The
+   terminal survives as a detached session, still owning the vendored session lease.
+2. `IDLE_TIMEOUT_S = 30 * 60.0` — that orphan stays alive, and keeps its lease, for **30
+   minutes** after the browser closes.
+3. The lease is **pid-fenced** (`qubit_cli/active_sessions.py::_prune_dead`): it is only
+   reclaimed when the holder's *process* dies. A live-but-clientless TUI is never pruned,
+   and it self-vouches on every sweep, so nothing reaps it.
+
+So a reopen attempts to resume a session whose lease is held by a live orphan → refusal.
+
+**Why re-attach did not save us:** `pty_ws.py` had
+`if key and not resume:` — the re-attach branch was skipped whenever a resume target was
+supplied, and `_default_spawn` *always* sets `resume`. Browsers additionally clear
+`sessionStorage` on close, so the reopened tab presents a **new** `?attach=` token that
+matches no detached key. Both paths therefore fell through to a fresh spawn.
+
+**Fix:**
+- `pty_ws.py`: dropped the `not resume` guard so a detached terminal is always re-adopted;
+  added `_Session.session_id` (the canonical resume target) and `_reattach_session()` so a
+  rotated attach token re-attaches by resume target instead of spawning a second terminal.
+- Regression coverage: `tests/test_pty_detach_reattach.py` (3 new tests) + a standalone
+  probe at `runtime/cache/scratch/probe_reattach.py` that drives the real `serve()` path.
+
+**Still open (deliberate, not done):** the frontend could keep the attach token across a
+browser close (localStorage + a live-document guard) so the *server* re-attach is not the
+only safety net. `sessionStorage` cannot do this by design; see
+`frontend/qubit-web/src/lib/pty-attach-token.ts`.
+
 ## The number that matters is not 5,142
 
 5,142 is the file delta. Most of it is not integration work:

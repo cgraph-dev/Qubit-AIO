@@ -432,6 +432,16 @@ def use_qubit_home(cfg: Any = None) -> Path:
     # external ~/.hermes is never adopted.
     from . import qubit_legacy
     qubit_legacy.install()
+    # Hand our foreign-agent adapters to the vendored runtime's neutral registry.
+    # The tree must not import this package (a clean rename would then rot), so
+    # the dependency is inverted: it exposes register_foreign_provider() and we
+    # push in. Best-effort — a failure here degrades to "no foreign content",
+    # never a broken home resolution.
+    try:
+        from . import agent_compat
+        agent_compat.register_with_vendored_runtime()
+    except Exception:  # noqa: BLE001 - foreign support is optional capability
+        pass
     home = runtime_home_for_cfg(cfg)
     assert_safe_test_home(home)
     current = os.environ.get("QUBIT_HOME", "").strip()

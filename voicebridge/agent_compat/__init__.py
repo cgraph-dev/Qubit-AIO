@@ -61,6 +61,10 @@ from .framework import (
     ImportAliaser,
     EnvAliaser,
     SymbolAliaser,
+    SkillLoader,
+    SkillEntry,
+    McpConfigLoader,
+    McpServerEntry,
     AdapterRegistry,
     registry,
     install,
@@ -77,6 +81,10 @@ __all__ = [
     "ImportAliaser",
     "EnvAliaser",
     "SymbolAliaser",
+    "SkillLoader",
+    "SkillEntry",
+    "McpConfigLoader",
+    "McpServerEntry",
     "AdapterRegistry",
     "registry",
     "install",
@@ -85,6 +93,8 @@ __all__ = [
     "install_for",
     "active_adapters",
     "reset",
+    "VendoredPluginProvider",
+    "register_with_vendored_runtime",
 ]
 
 
@@ -101,5 +111,58 @@ def _register_defaults() -> None:
     for adapter in default_adapters():
         registry.register(adapter)
 
+
+class VendoredPluginProvider:
+    """Presents this framework to the vendored runtime's neutral extension point.
+
+    THE DEPENDENCY DIRECTION. The vendored tree (``qubit_runtime/``) must not
+    import this package — that would make a clean rename rot silently. So the
+    tree exposes a plain registry (``qubit_cli.plugins_discovery
+    .register_foreign_provider``) that knows nothing about adapters, and THIS
+    object is pushed into it from the Qubit side. The tree runs unchanged with
+    no voicebridge present; with it, foreign content becomes discoverable and
+    importable.
+
+    Duck-typed by design: the tree calls ``activate()`` and
+    ``entry_point_groups()`` and never imports this class, so neither side
+    depends on the other's types.
+    """
+
+    #: The three callables the vendored tree looks for are activate() and
+    #: entry_point_groups(); ``name`` is informational for logs.
+
+    @property
+    def name(self) -> str:
+        return "agent_compat"
+
+    def activate(self) -> list:
+        """Install the import aliaser (idempotent) and report active adapter names."""
+        install()
+        return [a.name for a in active_adapters()]
+
+    def entry_point_groups(self) -> tuple:
+        """Entry-point groups every registered adapter wants scanned."""
+        return registry.entry_point_groups()
+
+
+def register_with_vendored_runtime() -> bool:
+    """Push this framework into the vendored runtime's foreign-content registry.
+
+    Idempotent and safe to call repeatedly. Returns False (never raises) when
+    the vendored tree is not importable — this package is usable standalone
+    (its own tests do exactly that) and must not hard-require the tree.
+    """
+    try:
+        from qubit_cli.plugins_discovery import register_foreign_provider
+    except Exception:  # noqa: BLE001 - standalone use has no vendored tree
+        return False
+    try:
+        register_foreign_provider(_PROVIDER)
+    except Exception:  # noqa: BLE001 - never break a caller's startup
+        return False
+    return True
+
+
+_PROVIDER = VendoredPluginProvider()
 
 _register_defaults()

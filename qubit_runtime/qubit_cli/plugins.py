@@ -1365,6 +1365,17 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
                 logger.info("HERMES_SAFE_MODE=1 — plugin discovery skipped")
                 self._discovered = True
                 return
+            # Activate foreign-agent compatibility BEFORE any plugin import runs, so a
+            # plugin written against another agent's naming (``import hermes_cli``,
+            # ``hermes_agent.plugins`` entry points) resolves to Qubit's own modules and
+            # is discoverable. Idempotent; a no-op when the framework is absent, so a
+            # checkout without voicebridge behaves exactly as before.
+            try:
+                from qubit_cli.plugins_discovery import install_foreign_adapters
+                if adapters := install_foreign_adapters():
+                    logger.debug("Foreign agent-compat active (%d adapter(s))", adapters)
+            except Exception:  # noqa: BLE001 - aliasing must never block discovery
+                logger.debug("Foreign agent-compat install skipped", exc_info=True)
             # Flag set up front as a re-entrancy guard (register() can trigger discovery again) but
             # reset on failure so a failed scan is NOT cached as "discovered with an empty registry"
             # — callers swallow the exception and would be stranded on the early return above.

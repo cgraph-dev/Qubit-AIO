@@ -304,3 +304,187 @@ def test_framework_is_not_used_in_tree():
             offenders.append(str(py.relative_to(REPO)))
 
     assert not offenders, "in-tree code must not import the compat layer: " + ", ".join(offenders)
+
+
+# ============================================================ skills / MCP loading
+
+def _skill(root: Path, rel: str, body: str) -> Path:
+    """Write a ``SKILL.md`` under *root*/rel and return the skill directory."""
+    d = root / rel
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "SKILL.md").write_text(body)
+    return d
+
+
+def test_skill_loaders_new_fields_are_data_not_code():
+    """The new fields default empty, so a brand-new adapter needs no engine edit."""
+    bare = fw.ForeignAdapter(name="bare")
+
+    assert bare.skill_roots == ()
+    assert bare.mcp_config_paths == ()
+    assert bare.skill_frontmatter_aliases == {}
+    assert fw.SkillLoader([bare]).enumerate() == []
+    assert fw.McpConfigLoader([bare]).read() == []
+
+
+def test_skill_loader_enumerates_nested_skill_dirs(tmp_path):
+    """Skills are found at BOTH ``<root>/<name>`` and ``<root>/<category>/<name>``."""
+    _skill(tmp_path, "solo", "---\nname: solo\ndescription: one\n---\nbody\n")
+    _skill(tmp_path, "group/nested", "---\nname: nested\ndescription: two\n---\nbody\n")
+
+    entries = fw.SkillLoader([fw.ForeignAdapter(name="x", skill_roots=(str(tmp_path),))]).enumerate()
+    names = {e.name for e in entries}
+
+    assert names == {"solo", "nested"}
+    assert all((e.directory / "SKILL.md").is_file() for e in entries)
+
+
+def test_skill_loader_missing_root_is_empty_and_never_raises(tmp_path):
+    """A missing root is a GRACEFUL no-op: empty report, no exception, no fabricated entry."""
+    missing = tmp_path / "does-not-exist"
+    adapter = fw.ForeignAdapter(name="x", skill_roots=(str(missing),))
+    loader = fw.SkillLoader([adapter])
+
+    assert loader.enumerate() == []          # does not raise
+    report = loader.report()
+    assert report["count"] == 0
+    assert report["skills"] == []
+    assert report["roots"] == [str(missing)]  # the root is still reported as scanned
+
+
+def test_skill_frontmatter_alias_is_allowlisted_and_never_overrides(tmp_path):
+    """A foreign frontmatter key is aliased only when listed, and a real key already wins."""
+    _skill(tmp_path, "renamed", "---\nname: renamed\nhermes_title: Hello\n---\nbody\n")
+    _skill(tmp_path, "both", "---\nname: both\ntitle: real\nhermes_title: foreign\n---\nbody\n")
+
+    adapter = fw.ForeignAdapter(
+        name="x",
+        skill_roots=(str(tmp_path),),
+        skill_frontmatter_aliases={"hermes_title": "title"},
+    )
+    by_name = {e.name: e.frontmatter for e in fw.SkillLoader([adapter]).enumerate()}
+
+    assert by_name["renamed"]["title"] == "Hello"     # aliased
+    assert "hermes_title" not in by_name["renamed"]   # moved, not duplicated
+    assert by_name["both"]["title"] == "real"         # real key never overwritten
+
+
+def test_skill_loader_falls_back_to_folder_name_without_frontmatter(tmp_path):
+    """A ``SKILL.md`` with no frontmatter still yields an entry named after its folder."""
+    _skill(tmp_path, "plain", "no frontmatter here\n")
+
+    (entry,) = fw.SkillLoader([fw.ForeignAdapter(name="x", skill_roots=(str(tmp_path),))]).enumerate()
+
+    assert entry.name == "plain"
+    assert entry.frontmatter == {}
+
+
+def test_mcp_loader_reads_json_servers_file(tmp_path):
+    """The ``mcpServers`` convention: a JSON file whose entries are read verbatim."""
+    import json
+
+    cfg = tmp_path / "mcp.json"
+    cfg.write_text(json.dumps({"mcpServers": {"echo": {"command": "run", "args": ["--x"]}}}))
+
+    adapter = fw.ForeignAdapter(
+        name="x", mcp_config_paths=(str(cfg),), mcp_config_keys=("mcpServers",)
+    )
+    (entry,) = fw.McpConfigLoader([adapter]).read()
+
+    assert entry.name == "echo"
+    assert entry.spec == {"command": "run", "args": ["--x"]}  # raw, uninterpreted
+    assert entry.source == cfg
+
+
+def test_mcp_loader_reads_inline_yaml_key(tmp_path):
+    """MCP entries inlined under a top-level key in YAML (the shape hermes uses)."""
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "model: sonnet\n"
+        "mcp_servers:\n"
+        "  graft:\n"
+        "    command: graft\n"
+        "    args:\n"
+        "      - mcp\n"
+        "      - /repo\n"
+        "    enabled: true\n"
+        "other: 1\n"
+    )
+
+    adapter = fw.ForeignAdapter(
+        name="x", mcp_config_paths=(str(cfg),), mcp_config_keys=("mcp_servers",)
+    )
+    (entry,) = fw.McpConfigLoader([adapter]).read()
+
+    assert entry.name == "graft"
+    assert entry.spec["command"] == "graft"
+    assert entry.spec["args"] == ["mcp", "/repo"]
+
+
+def test_mcp_loader_missing_path_is_empty_and_never_raises(tmp_path):
+    """A missing config path is a GRACEFUL no-op, never an exception and never an entry."""
+    adapter = fw.ForeignAdapter(
+        name="x",
+        mcp_config_paths=(str(tmp_path / "absent.json"),),
+        mcp_config_keys=("mcpServers",),
+    )
+    loader = fw.McpConfigLoader([adapter])
+
+    assert loader.read() == []              # does not raise
+    assert loader.report()["count"] == 0
+
+
+def test_mcp_loader_malformed_config_invents_nothing(tmp_path):
+    """An unparseable file contributes NO entries — no placeholder, no fabricated server."""
+    cfg = tmp_path / "broken.json"
+    cfg.write_text("{ this is not json")
+
+    adapter = fw.ForeignAdapter(
+        name="x", mcp_config_paths=(str(cfg),), mcp_config_keys=("mcpServers",)
+    )
+
+    assert fw.McpConfigLoader([adapter]).read() == []
+
+
+def test_mcp_loader_ignores_entries_when_key_is_absent(tmp_path):
+    """A config with no matching key yields nothing rather than treating the file as a map."""
+    import json
+
+    cfg = tmp_path / "config.json"
+    cfg.write_text(json.dumps({"model": "sonnet", "unrelated": {"a": 1}}))
+
+    adapter = fw.ForeignAdapter(
+        name="x", mcp_config_paths=(str(cfg),), mcp_config_keys=("mcpServers",)
+    )
+
+    assert fw.McpConfigLoader([adapter]).read() == []
+
+
+def test_hermes_adapter_declares_measured_skill_and_mcp_fields():
+    """The hermes adapter carries the measured fields (fails if a path was invented)."""
+    assert hermes.ADAPTER.skill_roots, "hermes adapter must declare its skill root"
+    assert hermes.ADAPTER.mcp_config_paths, "hermes adapter must declare its MCP config path"
+    assert hermes.ADAPTER.mcp_config_keys == ("mcp_servers",)
+
+
+def test_hermes_skill_and_mcp_loaders_work_against_the_live_tree():
+    """End-to-end against the REAL hermes install when present; skipped otherwise.
+
+    Guarded on existence so the suite still passes on a checkout without the foreign agent —
+    which is the whole point of the layer being optional content.
+    """
+    import os
+
+    root = Path(os.path.expanduser("~/.hermes/skills"))
+    if not root.is_dir():
+        pytest.skip("no live hermes skill tree on this machine")
+
+    skills = fw.SkillLoader([hermes.ADAPTER]).enumerate()
+    assert skills, "expected the live tree to yield at least one skill"
+    assert all((s.directory / "SKILL.md").is_file() for s in skills)
+
+    cfg = Path(os.path.expanduser("~/.hermes/config.yaml"))
+    if cfg.is_file():
+        servers = fw.McpConfigLoader([hermes.ADAPTER]).read()
+        # The loader must not raise; whatever the file contains, each entry is a real mapping.
+        assert all(isinstance(s.spec, dict) for s in servers)
