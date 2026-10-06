@@ -56,6 +56,13 @@ SUBSYSTEMS = [
 
 
 def count(sub: str) -> int:
+    if sub == "__root__":
+        # Root-level files only (see build_plan): no real pathspec exists for this.
+        out = subprocess.run(
+            ["git", "-C", str(PIN), "diff", "--name-only",
+             f"{PIN_SHA}..{BASE_SHA}"],
+            capture_output=True, text=True, check=False).stdout
+        return len([ln for ln in out.splitlines() if ln and "/" not in ln])
     out = subprocess.run(
         ["git", "-C", str(PIN), "diff", "--name-only", f"{PIN_SHA}..{BASE_SHA}", "--", sub],
         capture_output=True, text=True, check=False).stdout

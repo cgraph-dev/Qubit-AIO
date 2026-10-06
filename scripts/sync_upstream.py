@@ -196,7 +196,14 @@ class Plan:
 
 def build_plan(subtree: str | None) -> Plan:
     args = ["diff", "--name-status", f"{PIN_SHA}..{BASE_SHA}"]
-    if subtree:
+    if subtree == "__root__":
+        # ``__root__`` is the driver's label for ROOT-LEVEL files, which is not a
+        # real pathspec: ``-- __root__`` matched nothing and silently dropped all
+        # 42 root modules (utils.py, hermes_state_errors.py, ...) — precisely the
+        # primitive layer whose absence produced the dropped-symbol ImportErrors
+        # an earlier sync hit. Filter by depth instead of passing a bogus path.
+        args.append("--")
+    elif subtree:
         args.append(subtree)
     plan = Plan()
     for line in git_out(*args).splitlines():
@@ -204,6 +211,8 @@ def build_plan(subtree: str | None) -> Plan:
         if len(parts) < 2:
             continue
         st, path = parts[0][0], parts[1]
+        if subtree == "__root__" and "/" in path:
+            continue
         if skip(path):
             plan.skipped.append(path)
             continue
