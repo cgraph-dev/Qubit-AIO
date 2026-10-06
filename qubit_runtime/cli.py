@@ -1795,3 +1795,11 @@ if __name__ == "__main__":
     import fire
 
     fire.Fire(main)
+
+
+# Compat alias: upstream code imports the pre-rename spelling. Qubit renamed the
+# class to ``QubitCLI``; synced call sites still say ``HermesCLI`` (tui_gateway/
+# slash_worker.py:28 imports it at module level, so its absence breaks every
+# slash command). One object under both names — a second class would fork CLI
+# state silently.
+HermesCLI = QubitCLI
