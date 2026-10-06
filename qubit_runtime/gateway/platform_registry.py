@@ -38,6 +38,16 @@ def _caller_plugin_scope() -> Optional[str]:
     return _plugin_scope_from_callable(type("_Caller", (), {"__module__": module_name}))
 
 
+def core_ships_platform(name: str) -> bool:
+    """*name* is a platform core ships an adapter for: a static ``Platform`` member or a bundled
+    ``plugins/platforms/`` plugin. A user plugin may replace such an adapter but never mark it
+    ``trusted_inbound``: its senders are people, and that flag waives allowlists and pairing."""
+    from gateway.config import Platform
+    value = str(name or "").strip().lower()
+    return value in {Platform[member].value for member in Platform._member_names_} or (
+        value in Platform._scan_bundled_plugin_platforms()[0])
+
+
 @dataclass
 class PlatformEntry:
     """Metadata and factory for a single platform adapter."""

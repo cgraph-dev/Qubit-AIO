@@ -43,6 +43,15 @@ logger = logging.getLogger("gateway.run")
 _UNSET = object()  # "no per-profile human_delay snapshot": fall back to the primary's value
 
 
+def _adapter_unavailable_message(platform: Platform, *, retrying: bool = True) -> str:
+    """Actionable ``adapter_unavailable`` status text, shared by startup and the reconnect watcher so
+    ``qubit status`` keeps the plugin/deps/credentials hint after the first retry."""
+    message = (
+        f"No adapter available for enabled {platform.value}; check the plugin, dependencies, and credentials."
+    )
+    return f"{message} Retrying in the background." if retrying else message
+
+
 class _UnresolvedProfileHome:
     """A NAMED routed profile whose home does not resolve — never the same thing as ``None``
     ("this body is the launch profile's own work"). Overloading ``None`` for both let an inbound
