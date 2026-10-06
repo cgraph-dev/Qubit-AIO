@@ -1,74 +1,82 @@
-# Sync completeness audit — did the 5,441 actually land?
+# Sync completeness — CORRECTED audit (rebrand-aware)
 
-**Verdict: NO. 640 upstream files are short-ported — present, but stopped at an
-earlier revision than the baseline we supposedly synced.**
+**This supersedes the figures in the first version of this document. My original
+audit was wrong in a specific, measurable way, and an independent agent caught it.**
 
-## Method
+## The bug
 
-`scripts/audit_sync_completeness.py`. For every upstream `.py` file at our baseline
-`a036b13793`, route it to our path (rename map applied), then compare the set of
-top-level `def`/`class`/assigned names. A file is:
+The audit routed the FILE PATH through the rename map (`hermes_cli/` ->
+`qubit_cli/`) but compared **SYMBOL NAMES literally**. So upstream's `_hermes_home`
+read as missing while our tree has `_qubit_home` -- which it does, 51 references
+against upstream's 43. Pure artifact.
 
-* **CURRENT** — we have every symbol upstream has at the baseline
-* **SHORT-PORT** — present, but missing symbols that exist in the *baseline* blob.
-  We never even reached the revision we claimed to sync from.
-* **ABSENT** — no counterpart at all
+## The measurement
 
-Symbol-level, not byte-level: a byte diff is dominated by `hermes_*`/`qubit_*`
-rebranding churn, which is why the earlier "95% present" file-count test looked fine.
+Re-derived every reported production gap and re-checked it under the rebrand
+transform (`/tmp/fp_check.py`, 218 production files, 584 re-derived symbols):
 
-## Result
+| | count |
+|---|---|
+| re-derived missing symbols | 584 |
+| **FALSE POSITIVE** (present under rebranded name) | **200 (34%)** |
+| **REAL missing** | **384 (66%)** |
+
+An independent agent hand-checked 3 files, found all 3 to be artifacts, and
+estimated ~87% false-positive / ~32 real. **That estimate was too aggressive** --
+it extrapolated from a small, favourable sample. Measured across all 584, the rate
+is 34%. Both directions of error matter: 87% would have hidden real work.
+
+## Corrected audit output (baseline `a036b13793`)
 
 ```
-upstream .py files at baseline : 8161
-  EXISTS                       : 7906
-  ABSENT                       :  255
-  CURRENT                      : 7266
-  SHORT-PORT                   :  640 files / 1624 missing symbols
-  BEHIND-HEAD                  :    0 files (we are at the baseline, as expected)
+upstream .py files : 8161
+  EXISTS           : 7906
+  ABSENT           :  255
+  CURRENT          : 7530   (was 7266 before the rebrand fix)
+  SHORT-PORT       :  376 files / 1254 missing symbols   (was 640 / 1624)
 ```
-
-Split of the 640:
 
 | | files | missing symbols |
 |---|---|---|
-| tests | 422 | 1,040 |
-| **PRODUCTION** | **218** | **584** |
+| tests | 251 | 832 |
+| **PRODUCTION** | **125** | **422** |
 
-## Production short-ports by subsystem
+## ABSENT bucket (255) — classified
 
-| symbols | files | subsystem |
-|---|---|---|
-| **313** | **113** | `hermes_cli` (-> `qubit_cli`) |
-| 66 | 13 | `tui_gateway` |
-| 51 | 26 | `tools` |
-| 39 | 11 | `plugins` |
-| 23 | 14 | `gateway` |
-| 22 | 13 | `agent` |
-| 17 | 5 | `cron` |
-| 15 | 1 | `hermes_constants.py` |
-| 11 | 4 | `pm` |
-| 5 | 5 | `optional-skills` |
-| 4 | 1 | `hermes_state_holders.py` |
-| 4 | 1 | `providers` |
-| 2 | 1 | `toolsets.py` |
+- test files never ported: **95**
+- deliberate omissions: **0**
+- **genuinely missing production code: 0**
 
-## The evidence that started this
+## The number to use
 
-`qubit_cli/update_lock.py` exists with **10** top-level defs. Upstream at the SAME
-baseline had grown it to **70**. Four sibling modules in that feature
-(`update_pause_record.py`, `update_cmd_commit.py`, `update_custody.py`,
-`anon_challenge.py`) are missing outright.
+**~422 missing production symbols across 125 files.** That is the real remaining
+work at the baseline. Not 1,624 (my first figure -- inflated 34% by rebrands), and
+not ~32 (the hand-checked estimate -- deflated by an unrepresentative sample).
 
-One file stopping short is a bug. 640 files stopping short is a systematic property of
-how the sync was applied — which means the earlier "95% present / ~85-90% complete"
-figures were measuring presence, not currency, and the real completion number is lower.
+Top production files (corrected):
 
-## Hazard recorded while producing this
+```
+18  tui_gateway/server.py
+14  hermes_cli/observability/relay_shared_metrics.py
+14  tui_gateway/methods_tools.py
+13  hermes_cli/profiles.py
+12  plugins/plugin_loader.py
+11  hermes_cli/tips.py
+11  hermes_cli/uninstall.py
+10  cron/scheduler.py
+10  hermes_cli/kanban_db_workspace.py
+10  tui_gateway/methods_config.py
+```
 
-The first attempt to get a wider JSON output ran a COPY of the script from `/tmp`.
-`REPO = Path(__file__).parent.parent` then resolved to `/tmp`, and the audit reported
-**8,161 absent / 0 present** — a plausible-looking result that is a pure artifact of
-where the script sat. This is hazard class 10 (a tool resolving paths relative to the
-wrong checkout) reappearing. The script now REFUSES to run when its computed repo root
-is not a Qubit checkout.
+## Also true, and separate
+
+Closing every short-port still leaves the tree NOT current: upstream is **953
+commits / 644 .py files** past the baseline, with **160 BEHIND-HEAD files / 691
+symbols**. Short-ports are "we never finished the revision we chose"; behind-head is
+"upstream moved on after we chose it". Both are real; they are different jobs.
+
+## Lesson
+
+Two audits disagreed, and the resolution was neither of them -- it was the specific
+false-positive measurement. When two measurements conflict, measure the disputed
+quantity directly rather than picking the more recent or more confident claim.
