@@ -21,7 +21,6 @@ PLATFORMS: OrderedDict[str, PlatformInfo] = OrderedDict([
     ("signal",         PlatformInfo(label="📡 Signal",          default_toolset="qubit-signal")),
     ("bluebubbles",    PlatformInfo(label="💙 BlueBubbles",     default_toolset="qubit-bluebubbles")),
     ("email",          PlatformInfo(label="📧 Email",           default_toolset="qubit-email")),
-    ("homeassistant",  PlatformInfo(label="🏠 Home Assistant",  default_toolset="qubit-homeassistant")),
     ("mattermost",     PlatformInfo(label="💬 Mattermost",      default_toolset="qubit-mattermost")),
     ("matrix",         PlatformInfo(label="💬 Matrix",          default_toolset="qubit-matrix")),
     ("dingtalk",       PlatformInfo(label="💬 DingTalk",        default_toolset="qubit-dingtalk")),

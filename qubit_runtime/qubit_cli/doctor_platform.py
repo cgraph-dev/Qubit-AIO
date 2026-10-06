@@ -538,7 +538,7 @@ def _check_web_dashboard_import(should_fix: bool, f: Finding) -> None:
     """
     from qubit_cli.doctor import PROJECT_ROOT
 
-    env = dict(os.environ, HERMES_DISABLE_LAZY_INSTALLS="1")
+    env = dict(os.environ, QUBIT_DISABLE_LAZY_INSTALLS="1")
     try:
         proc = subprocess.run(
             [sys.executable, "-c", "import qubit_cli.web_server"],

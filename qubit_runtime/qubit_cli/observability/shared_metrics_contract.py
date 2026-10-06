@@ -15,80 +15,80 @@ from agent.relay_runtime import (
 from qubit_cli.platforms import PLATFORMS
 from toolsets import BUILTIN_TOOL_NAMES, BUILTIN_TOOLSET_NAMES
 
-SCHEMA_KEY = "hermes.metrics.schema_version"
+SCHEMA_KEY = "qubit.metrics.schema_version"
 # A random per-emit token (no payload) on rows whose producer waits to learn they were SAVED: facts
 # recovered from a file that is deleted only then. Events persist on the Relay thread.
 COMMIT_TICKET_KEY = "hermes.shared_metrics.commit_ticket"
-SCHEMA_VERSION = "hermes.metrics.event.v3"
-MODEL_CALL_SCOPE = "hermes.model_call"
+SCHEMA_VERSION = "qubit.metrics.event.v3"
+MODEL_CALL_SCOPE = "qubit.model_call"
 MODEL_CALL_PROFILE_MODEL = "unknown"
-TASK_SCOPE = "hermes.task_run"
-TOOL_CALL_SCOPE = "hermes.tool_call"
-CLIENT_ACTIVE_MARK = "hermes.client.active"
-TOOL_APPROVAL_MARK = "hermes.tool_approval"
-SKILL_LIFECYCLE_MARK = "hermes.skill.lifecycle"
-SKILL_LOAD_MARK = "hermes.skill.load"
-INSTALL_SNAPSHOT_MARK = "hermes.install.snapshot"
-SESSION_MARK = "hermes.session"
+TASK_SCOPE = "qubit.task_run"
+TOOL_CALL_SCOPE = "qubit.tool_call"
+CLIENT_ACTIVE_MARK = "qubit.client.active"
+TOOL_APPROVAL_MARK = "qubit.tool_approval"
+SKILL_LIFECYCLE_MARK = "qubit.skill.lifecycle"
+SKILL_LOAD_MARK = "qubit.skill.load"
+INSTALL_SNAPSHOT_MARK = "qubit.install.snapshot"
+SESSION_MARK = "qubit.session"
 SETUP_COMPLETED_MARK = "hermes.setup.completed"
-MODEL_TOKENS_MARK = "hermes.model_tokens"
+MODEL_TOKENS_MARK = "qubit.model_tokens"
 COMPRESSION_MARK = "hermes.compression"
-MODEL_SWITCH_MARK = "hermes.model_switch"
-FALLBACK_MARK = "hermes.fallback"
-SLASH_COMMAND_MARK = "hermes.slash_command"
-EXTENSION_INSTALL_MARK = "hermes.extension.install"
+MODEL_SWITCH_MARK = "qubit.model_switch"
+FALLBACK_MARK = "qubit.fallback"
+SLASH_COMMAND_MARK = "qubit.slash_command"
+EXTENSION_INSTALL_MARK = "qubit.extension.install"
 # ---- v4 install ----
-STARTUP_LATENCY_MARK = "hermes.startup.latency"
+STARTUP_LATENCY_MARK = "qubit.startup.latency"
 SUBSCRIBER_NAME = "hermes.nemo_relay.shared_metrics"
-CLIENT_ACTIVE_METRIC = "hermes.client.active"
-LEGACY_MODEL_CALL_METRIC = "hermes.model_call.count"
-MODEL_ROUTE_METRIC = "hermes.model_route.count"
-TASK_STARTED_METRIC = "hermes.task_run.started"
-TASK_FINISHED_METRIC = "hermes.task_run.finished"
-TASK_DURATION_METRIC = "hermes.task_run.duration"
-TOOL_CALL_METRIC = "hermes.tool_call.count"
-TOOL_LATENCY_METRIC = "hermes.tool_call.latency"
-TOOL_APPROVAL_METRIC = "hermes.tool_approval.count"
-SKILL_LIFECYCLE_METRIC = "hermes.skill.lifecycle.count"
-SKILL_LOAD_METRIC = "hermes.skill.load.count"
-TOOL_USAGE_METRIC = "hermes.tool.usage.count"
-INSTALL_SNAPSHOT_METRIC = "hermes.install.snapshot"
-SESSION_METRIC = "hermes.session.count"
-MILESTONE_METRIC = "hermes.install.milestone"
+CLIENT_ACTIVE_METRIC = "qubit.client.active"
+LEGACY_MODEL_CALL_METRIC = "qubit.model_call.count"
+MODEL_ROUTE_METRIC = "qubit.model_route.count"
+TASK_STARTED_METRIC = "qubit.task_run.started"
+TASK_FINISHED_METRIC = "qubit.task_run.finished"
+TASK_DURATION_METRIC = "qubit.task_run.duration"
+TOOL_CALL_METRIC = "qubit.tool_call.count"
+TOOL_LATENCY_METRIC = "qubit.tool_call.latency"
+TOOL_APPROVAL_METRIC = "qubit.tool_approval.count"
+SKILL_LIFECYCLE_METRIC = "qubit.skill.lifecycle.count"
+SKILL_LOAD_METRIC = "qubit.skill.load.count"
+TOOL_USAGE_METRIC = "qubit.tool.usage.count"
+INSTALL_SNAPSHOT_METRIC = "qubit.install.snapshot"
+SESSION_METRIC = "qubit.session.count"
+MILESTONE_METRIC = "qubit.install.milestone"
 SETUP_COMPLETED_METRIC = "hermes.setup.completed"
-MODEL_TOKENS_METRIC = "hermes.model_tokens.sum"
+MODEL_TOKENS_METRIC = "qubit.model_tokens.sum"
 COMPRESSION_METRIC = "hermes.compression.count"
-MODEL_SWITCH_METRIC = "hermes.model_switch.count"
-FALLBACK_METRIC = "hermes.fallback.count"
-SLASH_COMMAND_METRIC = "hermes.slash_command.count"
-EXTENSION_INSTALL_METRIC = "hermes.extension.install.count"
+MODEL_SWITCH_METRIC = "qubit.model_switch.count"
+FALLBACK_METRIC = "qubit.fallback.count"
+SLASH_COMMAND_METRIC = "qubit.slash_command.count"
+EXTENSION_INSTALL_METRIC = "qubit.extension.install.count"
 # ---- v4 loop ----
-MEMORY_OP_MARK = "hermes.memory.op"
-CURATOR_RUN_MARK = "hermes.curator.run"
-DELEGATION_RUN_MARK = "hermes.delegation.run"
-EXECUTION_BACKEND_MARK = "hermes.execution_backend"
-MEMORY_OP_METRIC = "hermes.memory.op.count"
-CURATOR_RUN_METRIC = "hermes.curator.run.count"
-DELEGATION_RUN_METRIC = "hermes.delegation.run.count"
-EXECUTION_BACKEND_METRIC = "hermes.execution_backend.count"
+MEMORY_OP_MARK = "qubit.memory.op"
+CURATOR_RUN_MARK = "qubit.curator.run"
+DELEGATION_RUN_MARK = "qubit.delegation.run"
+EXECUTION_BACKEND_MARK = "qubit.execution_backend"
+MEMORY_OP_METRIC = "qubit.memory.op.count"
+CURATOR_RUN_METRIC = "qubit.curator.run.count"
+DELEGATION_RUN_METRIC = "qubit.delegation.run.count"
+EXECUTION_BACKEND_METRIC = "qubit.execution_backend.count"
 # ---- end v4 loop ----
 # ---- v4 model ----
-MODEL_TOOL_QUALITY_MARK = "hermes.model_tool_quality"
-MODEL_FRICTION_MARK = "hermes.model_friction"
-CONTEXT_PEAK_MARK = "hermes.context_peak"
-MODEL_TOOL_QUALITY_METRIC = "hermes.model_tool_quality.count"
-MODEL_FRICTION_METRIC = "hermes.model_friction.count"
-CONTEXT_PEAK_METRIC = "hermes.context_peak.count"
+MODEL_TOOL_QUALITY_MARK = "qubit.model_tool_quality"
+MODEL_FRICTION_MARK = "qubit.model_friction"
+CONTEXT_PEAK_MARK = "qubit.context_peak"
+MODEL_TOOL_QUALITY_METRIC = "qubit.model_tool_quality.count"
+MODEL_FRICTION_METRIC = "qubit.model_friction.count"
+CONTEXT_PEAK_METRIC = "qubit.context_peak.count"
 # ---- end v4 model ----
 # ---- v4 install ----
-STARTUP_LATENCY_METRIC = "hermes.startup.latency"
+STARTUP_LATENCY_METRIC = "qubit.startup.latency"
 # ---- v5 engagement ----
 # Not a counter: one attended turn's serving model, folded into the local daily engagement rollup.
-ENGAGEMENT_TURN_MARK = "hermes.engagement.turn"
-ENGAGEMENT_DAY_METRIC = "hermes.engagement.day.count"
-ENGAGEMENT_SURFACE_METRIC = "hermes.engagement.surface_day.count"
-MODEL_SWITCH_AFTER_MARK = "hermes.model_switch_after"
-MODEL_SWITCH_AFTER_METRIC = "hermes.model_switch_after.count"
+ENGAGEMENT_TURN_MARK = "qubit.engagement.turn"
+ENGAGEMENT_DAY_METRIC = "qubit.engagement.day.count"
+ENGAGEMENT_SURFACE_METRIC = "qubit.engagement.surface_day.count"
+MODEL_SWITCH_AFTER_MARK = "qubit.model_switch_after"
+MODEL_SWITCH_AFTER_METRIC = "qubit.model_switch_after.count"
 # ---- end v5 engagement ----
 MODEL_IDENTIFIER_MAX_LENGTH = 256
 PROVIDER_IDENTIFIER_MAX_LENGTH = 64
@@ -105,9 +105,11 @@ TASK_END_REASONS = frozenset({
     "system_aborted", "timed_out", "unknown", "user_cancelled",
 })
 TASK_TERMINATIONS = frozenset({"none", "system_aborted", "timed_out", "unknown", "user_cancelled"})
+# ``one_shot``: a finite CLI run (``qubit -z``, ``qubit chat -q`` off a TTY, ``-Q``, ``--oneshot``) that
+# answers one prompt and exits — a person's shell line or their script, never the REPL.
 TASK_ENTRYPOINTS = frozenset({
-    "api", "background", "batch", "delegated", "gateway_message", "interactive", "other", "python",
-    "scheduled_task", "unknown",
+    "api", "background", "batch", "delegated", "gateway_message", "interactive", "one_shot", "other",
+    "python", "scheduled_task", "unknown",
 })
 DURATION_BUCKETS = frozenset({
     "1s_to_5s", "2m_to_10m", "30s_to_2m", "5s_to_30s", "gte_10m", "lt_1s",
@@ -585,6 +587,452 @@ DESKTOP_DISLIKE_DIRECTIONS = frozenset({"away_from_default", "none", "to_default
 DESKTOP_SETTING_KEY_MAX_LENGTH = 96
 # ---- end v5 desktop actions ----
 
+# ---- v3 taxonomies -------------------------------------------------------------------------
+MODEL_CALL_ROLES = frozenset({"auxiliary", "primary"})
+MODEL_OUTCOMES = frozenset({"cancelled", "failed", "success"})
+# The classifier's own closed enum, so the exported vocabulary is exactly what recovery acts on.
+MODEL_ERROR_CLASSES = frozenset(reason.value for reason in FailoverReason) | {"none"}
+TASK_FAILURE_CLASSES = MODEL_ERROR_CLASSES | frozenset({
+    "context_compression", "empty_response", "exception", "local_error", "other", "persistence",
+    "repeated_errors", "restart_limit", "session_busy", "shutdown",
+})
+# Surfaces that are not messaging platforms keep their own execution_surface value.
+# ``relay``: a connector inbound whose platform neither the inbound nor a single-platform connector names.
+_CORE_GATEWAY_PLATFORMS = (frozenset(PLATFORMS) - {"api_server", "cli", "cron"}) | {"none", "plugin", "relay"}
+TOOL_NAMES = BUILTIN_TOOL_NAMES | {"mcp", "plugin", "unknown"}
+TOOL_ERROR_CLASSES = frozenset({
+    "blocked", "contract_violation", "exception", "interrupted", "invalid_arguments", "none",
+    "timeout", "tool_error", "unknown",
+})
+SIZE_BUCKETS = frozenset({
+    "0", "1", "2", "3_to_5", "6_to_10", "11_to_25", "26_to_100", "101_to_250", "gte_251",
+})
+
+
+def _bundled_memory_providers() -> frozenset[str]:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2] / "plugins" / "memory"
+    try:
+        return frozenset(p.name for p in root.iterdir() if (p / "__init__.py").is_file())
+    except OSError:
+        return frozenset()
+
+
+class _CatalogValues:
+    """A closed enum backed by a public catalog (see shared_metrics_catalog), loaded on first use."""
+
+    def __init__(self, *loaders: str, extra: frozenset[str]) -> None:
+        self.loaders, self.extra = loaders, extra
+
+    def values(self) -> frozenset[str]:
+        from . import shared_metrics_catalog as catalog
+
+        return self.extra.union(*(catalog._safe(getattr(catalog, name)) for name in self.loaders))
+
+    def __contains__(self, value: object) -> bool:
+        return value in self.extra or value in self.values()
+
+
+# A provider that moved from plugins/memory/ to the plugin catalog keeps its public name; any other
+# third-party provider reports as "plugin".
+MEMORY_PROVIDERS = _CatalogValues("plugin_catalog_names", extra=_bundled_memory_providers() | {"builtin", "plugin"})
+
+# ---- decision-data taxonomies ----------------------------------------------------------------
+SESSION_DURATION_BUCKETS = frozenset({"lt_1m", "1m_to_5m", "5m_to_30m", "30m_to_2h", "2h_to_8h", "gte_8h"})
+INSTALL_AGE_BUCKETS = frozenset({
+    "lt_1h", "1h_to_1d", "1d_to_7d", "7d_to_30d", "30d_to_90d", "gte_90d", "unknown",
+})
+MILESTONES = frozenset({
+    "setup_completed", "first_task_started", "first_task_success", "first_tool_success",
+    "first_gateway_message", "first_scheduled_task", "first_delegation", "first_skill_created",
+    "first_skill_reused", "first_mcp_tool_success", "first_long_session",
+})
+SETUP_SURFACES = frozenset({"cli", "desktop", "other"})
+TOKEN_TYPES = frozenset({"input", "output", "cache_read", "cache_write", "reasoning"})
+TTFT_BUCKETS = frozenset({
+    "lt_500ms", "500ms_to_1s", "1s_to_2s", "2s_to_5s", "5s_to_15s", "gte_15s", "not_streamed", "unknown",
+})
+COMPRESSION_TRIGGERS = frozenset({"auto", "manual", "other", "overflow"})
+COMPRESSION_OUTCOMES = frozenset({"failed", "skipped", "success"})
+CONTEXT_FILL_BUCKETS = frozenset({"lt_50", "50_to_75", "75_to_90", "90_to_100", "gte_100", "unknown"})
+EXTENSION_KINDS = frozenset({"mcp_server", "plugin", "skill"})
+EXTENSION_SOURCES = frozenset({"bundled", "catalog", "hub", "local", "other", "url"})
+EXTENSION_OUTCOMES = frozenset({"failed", "success"})
+# Every built-in backend in tools/terminal_tool_config.py::_BUILTIN_BACKENDS.
+TERMINAL_BACKENDS = frozenset({
+    "daytona", "docker", "local", "managed_modal", "modal", "other", "singularity", "ssh", "vercel_sandbox",
+})
+AUX_TASKS = _CatalogValues("aux_task_names", extra=frozenset({"none", "other"}))
+SLASH_COMMANDS = _CatalogValues("slash_command_names", extra=frozenset({"plugin", "skill", "unknown"}))
+SKILL_NAMES = _CatalogValues("bundled_skill_names", extra=frozenset({"custom"}))
+EXTENSION_NAMES = _CatalogValues(
+    "bundled_skill_names", "mcp_catalog_names", "plugin_catalog_names", extra=frozenset({"custom"})
+)
+DISPLAY_LANGUAGES = _CatalogValues("display_languages", extra=frozenset({"other"}))
+# ---- v4 model ----
+TOOL_CALL_ISSUES = frozenset({
+    "empty_arguments", "invalid_json", "none", "repaired", "schema_mismatch", "unknown_tool",
+})
+FRICTION_SIGNALS = frozenset({"interrupt", "quick_abandon", "retry", "switch_away", "undo"})
+CONTEXT_WINDOW_BUCKETS = frozenset({
+    "lt_32k", "32k_to_128k", "128k_to_256k", "256k_to_1m", "gte_1m", "unknown",
+})
+LIMIT_HIT_VALUES = frozenset({"no", "yes"})
+# ---- end v4 model ----
+
+# ---- v4 loop ----
+MEMORY_OPS = frozenset({"add", "other", "read", "remove", "replace", "search"})
+MEMORY_OP_OUTCOMES = frozenset({"failed", "rejected", "success"})
+# Who asked: the user's turn, or the unattended self-improvement review fork.
+MEMORY_OP_ORIGINS = frozenset({"background_review", "foreground"})
+CURATOR_OUTCOMES = frozenset({"failed", "skipped", "success"})
+CURATOR_TRIGGERS = frozenset({"manual", "scheduled"})
+DELEGATION_OUTCOMES = frozenset({"cancelled", "failed", "partial", "success"})
+DELEGATION_DEPTHS = frozenset({"1", "2", "3", "gte_4"})
+DELEGATION_MODES = frozenset({"background", "foreground"})
+EXECUTION_KINDS = frozenset({"browser", "code", "terminal"})
+# Shipped browser backends: tools/browser_{camofox,lightpanda,tool_cdp,tool_cloud,extension_router}.py
+# plus the bundled cloud providers in plugins/browser/.
+BROWSER_BACKENDS = frozenset({
+    "browser-use", "browserbase", "camofox", "cdp", "extension", "firecrawl", "lightpanda", "local", "other",
+})
+CODE_BACKENDS = frozenset({"local", "other", "remote"})
+EXECUTION_BACKENDS_BY_KIND = {
+    "browser": BROWSER_BACKENDS, "code": CODE_BACKENDS, "terminal": TERMINAL_BACKENDS,
+}
+EXECUTION_BACKENDS = BROWSER_BACKENDS | CODE_BACKENDS | TERMINAL_BACKENDS
+EXECUTION_OUTCOMES = frozenset({"failed", "success"})
+# ---- end v4 loop ----
+# ---- v4 gateway ----
+PLATFORM_HEALTH_MARK = PLATFORM_HEALTH_METRIC = "qubit.platform.health"
+PLATFORM_DELIVERY_MARK = PLATFORM_DELIVERY_METRIC = "qubit.platform.delivery"
+REPLY_LATENCY_MARK = REPLY_LATENCY_METRIC = "qubit.gateway.reply_latency"
+CRON_RUN_MARK = CRON_RUN_METRIC = "qubit.cron.run"
+# Plugin platforms are named only when Nous ships them (plugins/platforms/) or the installer proved a
+# plugin-catalog install (shared_metrics_catalog.platform_metric_name); every other one is ``plugin``.
+_PLATFORM_CATALOGS = ("bundled_platform_names", "catalog_platform_names")
+GATEWAY_PLATFORMS = _CatalogValues(*_PLATFORM_CATALOGS, extra=_CORE_GATEWAY_PLATFORMS)
+
+
+def _gateway_adapter_platforms() -> frozenset[str]:
+    """The gateway's own adapter vocabulary: ``Platform``'s declared members (relay, msgraph_webhook
+    and api_server are adapters but not setup-wizard platforms; plugin pseudo-members are not
+    declared). Loaded on first use: gateway.config is too heavy for this module's import."""
+    from gateway.config import Platform
+
+    return frozenset(member.value for member in Platform)
+
+
+class _AdapterPlatforms(_CatalogValues):
+    def values(self) -> frozenset[str]:
+        return super().values() | _gateway_adapter_platforms()
+
+
+ADAPTER_PLATFORMS = _AdapterPlatforms(*_PLATFORM_CATALOGS, extra=_CORE_GATEWAY_PLATFORMS | {"api_server"})
+PLATFORM_HEALTH_EVENTS = frozenset({"connect_ok", "connect_failed", "reconnect", "disconnect"})
+PLATFORM_ERROR_CLASSES = frozenset({"none", "auth", "network", "rate_limited", "config", "other"})
+DELIVERY_OUTCOMES = frozenset({"sent", "failed"})
+DELIVERY_FAILURE_CLASSES = frozenset({"none", "rate_limited", "too_long", "auth", "network", "forbidden", "other"})
+REPLY_LATENCY_BUCKETS = frozenset({"lt_2s", "2s_to_5s", "5s_to_15s", "15s_to_60s", "gte_60s"})
+CRON_RUN_OUTCOMES = frozenset({"success", "failed", "missed", "skipped"})
+CRON_DELIVERY_KINDS = frozenset({"local", "platform", "webhook", "none", "other"})
+
+# ---- v4 install ----
+STARTUP_SURFACES = frozenset({"cli", "desktop_attach", "gateway_boot", "serve_boot", "tui"})
+STARTUP_LATENCY_BUCKETS = frozenset({
+    "lt_500ms", "500ms_to_1s", "1s_to_2s", "2s_to_5s", "5s_to_10s", "gte_10s",
+})
+RELEASE_CHANNELS = frozenset({"dev", "main", "stable", "unknown"})
+VERSION_AGE_BUCKETS = frozenset({"lt_7d", "7d_to_30d", "30d_to_90d", "gte_90d", "unknown"})
+BEHIND_BUCKETS = COUNT_BUCKETS | {"unknown"}
+RAM_BUCKETS = frozenset({
+    "lt_8g", "8g_to_16g", "16g_to_32g", "32g_to_64g", "64g_to_128g", "gte_128g", "unknown",
+})
+GPU_CLASSES = frozenset({"amd", "apple_silicon", "intel", "none", "nvidia", "unknown"})
+YES_NO = frozenset({"no", "yes"})
+_INSTALL_V4_SNAPSHOT_DIMENSIONS = {
+    "behind_bucket": BEHIND_BUCKETS, "gpu_class": GPU_CLASSES, "local_model_provider_used": YES_NO,
+    "ram_bucket": RAM_BUCKETS, "release_channel": RELEASE_CHANNELS, "version_age_bucket": VERSION_AGE_BUCKETS,
+}
+
+# ---- v5 engagement ----
+ENGAGEMENT_SURFACES = frozenset({"acp", "cli", "cron", "desktop", "gateway", "tui"})
+ACTIVE_MINUTES_BUCKETS = frozenset({"0", "lt_5m", "5m_to_30m", "30m_to_2h", "2h_to_6h", "gte_6h"})
+SURFACES_USED_BUCKETS = frozenset({"0", "1", "2", "3", "gte_4"})
+TURNS_BEFORE_SWITCH_BUCKETS = frozenset({"1", "2_to_3", "4_to_10", "11_to_30", "gte_31"})
+# SIZE_BUCKETS plus a longer tail: agentic conversations run to thousands of messages.
+LONG_SIZE_BUCKETS = SIZE_BUCKETS | frozenset({"251_to_1000", "gte_1001"})
+_LONG_SIZE_THRESHOLDS = (
+    (1, "0"), (2, "1"), (3, "2"), (6, "3_to_5"), (11, "6_to_10"), (26, "11_to_25"),
+    (101, "26_to_100"), (251, "101_to_250"), (1001, "251_to_1000"),
+)
+
+
+def long_size_bucket(count: int) -> str:
+    return _bucket(max(0, int(count)), _LONG_SIZE_THRESHOLDS, "gte_1001")
+# ---- end v5 engagement ----
+
+# ---- v4 reliability ----
+UPDATE_RUN_MARK = UPDATE_RUN_METRIC = "qubit.update.run"
+UPDATE_STAGE_MARK = UPDATE_STAGE_METRIC = "qubit.update.stage"
+PROCESS_EXIT_MARK = PROCESS_EXIT_METRIC = "qubit.process.exit"
+UPDATE_KINDS = frozenset({"cli", "desktop"})
+UPDATE_OUTCOMES = frozenset({"failed", "noop", "refused", "success"})
+# `qubit update` pipeline stages, in pipeline order (the receipt's stage marks use these names).
+UPDATE_STAGE_ORDER = ("plan", "snapshot", "apply", "deps", "build", "restart", "verify")
+UPDATE_STAGES = frozenset(UPDATE_STAGE_ORDER)
+# Desktop's packaged updaters (electron-updater, App Installer, Store) fail at their own steps.
+DESKTOP_UPDATE_STAGES = frozenset({"apply", "download", "restart", "verify"})
+UPDATE_FAILED_STAGES = UPDATE_STAGES | DESKTOP_UPDATE_STAGES | {"none", "other"}
+UPDATE_STAGE_OUTCOMES = frozenset({"failed", "skipped", "success"})
+UPDATE_DURATION_BUCKETS = frozenset({"lt_30s", "30s_to_2m", "2m_to_5m", "5m_to_15m", "gte_15m"})
+# package = an OS/app-store style installer applied the update (Desktop packaged builds).
+UPDATE_APPLY_MODES = frozenset({"external", "git", "package", "unknown", "zip"})
+PROCESS_KINDS = frozenset({"cli", "cron", "gateway", "other", "serve", "tui"})
+PROCESS_EXIT_KINDS = frozenset({"clean", "crash", "killed", "watchdog"})
+CRASH_CLASSES = frozenset({"import_error", "memory_error", "none", "os_error", "other", "runtime_error"})
+_UPDATE_DURATION_THRESHOLDS = (
+    (30_000, "lt_30s"), (120_000, "30s_to_2m"), (300_000, "2m_to_5m"), (900_000, "5m_to_15m"),
+)
+_DAY_MS = 86_400_000
+_VERSION_AGE_THRESHOLDS = ((7 * _DAY_MS, "lt_7d"), (30 * _DAY_MS, "7d_to_30d"), (90 * _DAY_MS, "30d_to_90d"))
+
+
+# ---- v5 signals ----
+TOOL_UNAVAILABLE_MARK = TOOL_UNAVAILABLE_METRIC = "qubit.tool_unavailable.count"
+PROVIDER_SETUP_MARK = PROVIDER_SETUP_METRIC = "qubit.provider_setup.count"
+FEATURE_ADOPTION_METRIC = "qubit.feature_adoption.count"
+# Not a counter: a first-use fact the subscriber turns into at most one adoption row per feature.
+FEATURE_USED_MARK = "qubit.feature.used"
+PROVIDER_SETUP_SURFACES = frozenset({"cli_model", "cli_setup", "dashboard", "desktop", "tui"})
+PROVIDER_SETUP_EVENTS = frozenset({"abandoned", "completed", "failed", "started"})
+PROVIDER_SETUP_FAILURE_CLASSES = frozenset({"auth", "cancelled", "network", "no_models", "none", "other"})
+FEATURES = frozenset({
+    "browser", "bot_mode", "cron", "curator", "delegation", "desktop", "gateway_platform", "kanban", "mcp",
+    "memory", "plugins", "projects", "skills_created", "tui", "voice",
+})
+DAYS_SINCE_INSTALL_BUCKETS = frozenset({"same_day", "1d_to_7d", "7d_to_30d", "30d_to_90d", "gte_90d", "unknown"})
+FEATURE_DISABLED_MARK = FEATURE_DISABLED_METRIC = "qubit.feature_disabled.count"
+FEATURE_DISABLED_KINDS = frozenset({
+    "compression", "curator", "memory", "platform", "plugin", "setting", "skill", "toolset",
+})
+FEATURE_DISABLED_SURFACES = frozenset({"cli_config", "cli_slash", "cli_tools", "dashboard", "desktop", "tui"})
+FEATURE_DISABLED_EVENTS = frozenset({"disabled", "re_enabled"})
+FEATURE_DISABLED_NAME_MAX_LENGTH = 64
+# ---- end v5 signals ----
+
+
+def update_duration_bucket(duration_ms: Any) -> str:
+    """Bucket an update (or update stage) wall time; non-numbers count as instant."""
+    value = _non_negative_number(duration_ms) or 0
+    return _bucket(value, _UPDATE_DURATION_THRESHOLDS, "gte_15m")
+
+
+def version_age_bucket(age_ms: Any) -> str:
+    """Bucket the age of the version an update started from; unknown when not measurable."""
+    value = _non_negative_number(age_ms)
+    return "unknown" if value is None else _bucket(value, _VERSION_AGE_THRESHOLDS, "gte_90d")
+# ---- end v4 reliability ----
+
+# ---- v5 harness ----
+FILE_EDIT_MARK = "qubit.file_edit"
+LOOP_GUARD_MARK = "qubit.loop_guard"
+TOOL_RECOVERY_MARK = "qubit.tool_recovery"
+TERMINAL_OUTCOME_MARK = "qubit.terminal.outcome"
+MODEL_REPLY_ISSUE_MARK = "qubit.model_reply_issue"
+FILE_EDIT_METRIC = "qubit.file_edit.count"
+LOOP_GUARD_METRIC = "qubit.loop_guard.count"
+TOOL_RECOVERY_METRIC = "qubit.tool_recovery.count"
+TERMINAL_OUTCOME_METRIC = "qubit.terminal.outcome.count"
+MODEL_REPLY_ISSUE_METRIC = "qubit.model_reply_issue.count"
+FILE_EDIT_TOOLS = frozenset({"patch", "write_file"})
+FILE_EDIT_MODES = frozenset({"replace", "v4a", "whole_file"})
+FILE_EDIT_OUTCOMES = frozenset({"already_applied", "ambiguous", "applied", "failed", "no_match"})
+
+
+def _fuzzy_match_strategies() -> frozenset[str]:
+    # The patch tool's own strategy chain, so a new strategy is a new bucket, never "none".
+    from tools.fuzzy_match import STRATEGIES
+
+    return frozenset(name for name, _fn in STRATEGIES)
+
+
+FILE_EDIT_STRATEGIES = _fuzzy_match_strategies() | {"none"}
+LOOP_GUARD_SIGNALS = frozenset({"iteration_cap", "loop_detected", "repeated_tool_call"})
+LOOP_GUARD_DETECTORS = frozenset({
+    "exact_failure", "idempotent_no_progress", "identical_call_streak", "identical_cycle", "iteration_budget",
+    "same_tool_failure", "subagent_cap", "web_search_cap",
+})
+TOOL_RECOVERY_OUTCOMES = frozenset({"error", "gave_up", "no_tool_call", "success"})
+TOOL_RECOVERY_NEXT_TOOLS = frozenset({"different", "none", "same"})
+TERMINAL_COMMAND_KINDS = frozenset({
+    "build", "container", "file_ops", "git", "network", "node", "other", "package_manager", "python",
+    "shell", "shell_builtin", "test_runner",
+})
+TERMINAL_OUTCOMES = frozenset({"killed", "nonzero", "ok", "timeout"})
+MODEL_REPLY_ISSUES = frozenset({"empty", "none", "reasoning_only", "refusal", "truncated_length"})
+# ---- end v5 harness ----
+# ---- v5 efficiency ----
+TASK_COST_MARK = TASK_COST_METRIC = "qubit.task_cost.count"
+WASTED_TOKENS_MARK = WASTED_TOKENS_METRIC = "qubit.wasted_tokens.count"
+TOOL_OUTPUT_TRUNCATION_MARK = TOOL_OUTPUT_TRUNCATION_METRIC = "qubit.tool_output_truncation.count"
+TOOL_OVERHEAD_MARK = TOOL_OVERHEAD_METRIC = "qubit.tool_overhead.count"
+TOOL_ENABLED_UNUSED_MARK = TOOL_ENABLED_UNUSED_METRIC = "qubit.tool_enabled_unused.count"
+CACHE_BREAK_MARK = CACHE_BREAK_METRIC = "qubit.cache_break.count"
+# Prompt + completion tokens of one user turn, summed over its primary calls.
+TURN_TOKEN_BUCKETS = frozenset({
+    "lt_2k", "2k_to_10k", "10k_to_50k", "50k_to_200k", "200k_to_1m", "gte_1m", "unknown",
+})
+TASK_COST_OUTCOMES = frozenset({"completed", "failed", "interrupted"})
+# Tool and API calls of one agentic turn: COUNT_BUCKETS stops at gte_11, far below real loops.
+TURN_ACTIVITY_BUCKETS = frozenset({
+    "0", "1", "2", "3_to_5", "6_to_10", "11_to_25", "26_to_50", "51_to_100", "gte_101",
+})
+WASTE_REASONS = frozenset({"interrupt", "retry", "undo"})
+# Characters of one raw tool result, before Hermes spills or truncates it.
+TOOL_OUTPUT_SIZE_BUCKETS = frozenset({
+    "lt_1k", "1k_to_10k", "10k_to_50k", "50k_to_100k", "100k_to_500k", "gte_500k", "unknown",
+})
+TOOL_SCHEMA_TOKEN_BUCKETS = frozenset({
+    "0", "lt_2k", "2k_to_5k", "5k_to_10k", "10k_to_20k", "20k_to_40k", "gte_40k",
+})
+# Toolsets Hermes ships; MCP servers and plugin toolsets collapse to custom.
+TOOLSET_NAMES = BUILTIN_TOOLSET_NAMES | {"custom"}
+# compression is the expected cause; the rest are Hermes invalidating a warm prefix (bugs or
+# user-driven), or the provider reporting a cold read Hermes did not cause.
+CACHE_BREAK_CAUSES = frozenset({
+    "cache_expired", "compression", "model_switch", "provider_reported_miss", "system_prompt_rebuild",
+    "toolset_change",
+})
+# ---- end v5 efficiency ----
+# ---- v5 desktop ----
+# Desktop love/hate: which areas get used, what gets in the way, where first run stops. Every value
+# is a code-defined Desktop surface id (apps/desktop/src/store/desktop-metrics.ts mirrors these
+# sets); anything the client names outside them collapses to `other` before it is recorded.
+DESKTOP_FEATURE_USE_MARK = DESKTOP_FEATURE_USE_METRIC = "qubit.desktop.feature_use"
+DESKTOP_FRICTION_MARK = DESKTOP_FRICTION_METRIC = "qubit.desktop.friction"
+DESKTOP_ONBOARDING_MARK = DESKTOP_ONBOARDING_METRIC = "qubit.desktop.onboarding"
+# Settings views are `SETTINGS_VIEWS` in apps/desktop/src/app/settings/index.tsx (the legacy
+# `connections` tab redirects to `gateway`).
+DESKTOP_SETTINGS_AREAS = frozenset({
+    "settings_about", "settings_billing", "settings_config_advanced", "settings_config_appearance",
+    "settings_config_browser", "settings_config_chat", "settings_config_memory", "settings_config_model",
+    "settings_config_safety", "settings_config_voice", "settings_config_workspace", "settings_gateway",
+    "settings_keybinds", "settings_keys", "settings_notifications", "settings_other", "settings_providers",
+    "settings_sessions", "settings_vault",
+})
+DESKTOP_FEATURE_AREAS = DESKTOP_SETTINGS_AREAS | {
+    # panes and panels
+    "browser_pane", "file_pane", "review_pane", "terminal_pane",
+    # overlays and pickers
+    "command_palette", "find_in_page", "model_picker", "session_picker", "session_switcher",
+    # first-class features
+    "bot_mode", "projects", "session_search", "skins", "voice_conversation", "voice_dictation",
+    # full pages (APP_ROUTES in apps/desktop/src/app/routes.ts, plus contributed plugin pages)
+    "agents", "artifacts", "capabilities", "command_center", "cron", "extension_page", "kanban", "messaging",
+    "profiles", "session_import", "starmap", "webhooks",
+    "other",
+}
+# notice_dismissed: stable toast ids and dismissible strips the Desktop code defines.
+DESKTOP_NOTICE_IDS = frozenset({
+    "artifacts_partial_load", "background_queue_stuck", "backend_skew", "billing_banner", "billing_block",
+    "build_discontinued", "client_behind", "composer_queue_stuck", "credits",
+    "free_tier_notice", "gateway_error", "gui_skew", "install_method", "mcp_health", "model_warning",
+    "onboarding_handoff", "restored_draft", "runtime_not_ready", "session_compress", "terminal_backend", "tip",
+    "update_available", "voice_live_unavailable", "voice_stop_hint", "other",
+})
+# error_toast: the notifyError summary rule that matched (apps/desktop/src/store/notifications.ts).
+DESKTOP_ERROR_TOAST_CATEGORIES = frozenset({
+    "api_key_missing", "api_key_rejected", "disk_full", "gateway_auth_failed", "method_not_allowed",
+    "microphone_permission", "pool_slot_timeout", "restart_required", "rpc_out_of_sync", "storage_failure",
+    "timeout", "unclassified", "other",
+})
+DESKTOP_SLOW_FRAME_BUCKETS = frozenset({"100ms_to_250ms", "250ms_to_1s", "1s_to_5s", "gte_5s"})
+DESKTOP_FRICTION_DETAILS: dict[str, frozenset[str]] = {
+    "backend_disconnect": frozenset({"backend_exit", "network", "timeout", "other"}),
+    "error_toast": DESKTOP_ERROR_TOAST_CATEGORIES,
+    "notice_dismissed": DESKTOP_NOTICE_IDS,
+    # Electron render-process-gone reasons: crashed -> crash; oom; killed; anything else -> other.
+    "renderer_crash": frozenset({"crash", "killed", "oom", "other"}),
+    "slow_frame": DESKTOP_SLOW_FRAME_BUCKETS,
+}
+DESKTOP_FRICTION_KINDS = frozenset(DESKTOP_FRICTION_DETAILS)
+DESKTOP_FRICTION_DETAIL_VALUES = frozenset().union(*DESKTOP_FRICTION_DETAILS.values())
+# The Desktop first-run flows: the classic provider overlay (store/onboarding.ts), the guided flow
+# (store/onboarding-gate.ts phases + committed guide cards), free-tier sign-in, then the consent
+# answer and the first message.
+DESKTOP_ONBOARDING_STEPS = frozenset({
+    "choose_later", "consent", "first_message", "free_tier_ready", "guide", "guide_connectors",
+    "guide_first_build", "guide_layout", "guide_look", "guide_skip", "model_pick", "provider_api_key",
+    "provider_local", "provider_oauth", "provider_setup", "sign_in",
+})
+DESKTOP_ONBOARDING_EVENTS = frozenset({"abandoned", "completed", "reached"})
+# Bot Mode (a bot's canonical chat or a bot side-chat in front) vs regular Sessions mode, per day.
+DESKTOP_MODE_USE_MARK = DESKTOP_MODE_USE_METRIC = "qubit.desktop.mode_use"
+DESKTOP_MODES = frozenset({"bots", "sessions"})
+DESKTOP_ACTIVE_MINUTES_BUCKETS = frozenset({"0", "lt_5m", "5m_to_30m", "30m_to_2h", "2h_to_6h", "gte_6h"})
+_DESKTOP_ACTIVE_THRESHOLDS = ((300_000, "lt_5m"), (1_800_000, "5m_to_30m"), (7_200_000, "30m_to_2h"),
+                              (21_600_000, "2h_to_6h"))
+
+
+def desktop_active_minutes_bucket(active_ms: Any) -> str:
+    """Bucket a day's active time in one Desktop mode; nothing measurable reads 0."""
+    value = _non_negative_number(active_ms) or 0
+    return "0" if value <= 0 else _bucket(value, _DESKTOP_ACTIVE_THRESHOLDS, "gte_6h")
+# ---- end v5 desktop ----
+
+# ---- v5 desktop actions ----
+# Button presses per day. Action ids are the Desktop keybinding registry (KEYBIND_ACTIONS in
+# apps/desktop/src/lib/keybinds/actions.ts) plus the typed button table DESKTOP_BUTTON_ACTIONS in
+# apps/desktop/src/store/desktop-metrics.ts; contributed/plugin actions collapse to `other`.
+DESKTOP_ACTION_USE_MARK = DESKTOP_ACTION_USE_METRIC = "qubit.desktop.action_use"
+DESKTOP_KEYBIND_ACTION_IDS = frozenset({
+    "appearance.toggleMode", "composer.cancel", "composer.dictate", "composer.focus", "composer.help",
+    "composer.history", "composer.mention", "composer.modelPicker", "composer.newline", "composer.queue",
+    "composer.reasoningDown", "composer.reasoningUp", "composer.send", "composer.sendQueued", "composer.slash",
+    "composer.steer", "composer.voice", "conversation.scrollPageDown", "conversation.scrollPageUp",
+    "hud.snapToPointer", "keybinds.openPanel", "nav.agents", "nav.artifacts", "nav.capabilities",
+    "nav.commandCenter", "nav.commandPalette", "nav.cron", "nav.messaging", "nav.profiles", "nav.settings",
+    "profile.create", "profile.default", "profile.next", "profile.prev", "profile.toggleAll",
+    "session.archive", "session.focusSearch", "session.new", "session.newTab", "session.newWindow",
+    "session.next", "session.prev", "session.togglePin", "view.closeTab", "view.closeTerminal",
+    "view.cycleSidebarGrouping", "view.findInPage", "view.findNext", "view.findPrevious", "view.flipPanes",
+    "view.newTerminal", "view.nextTerminal", "view.prevTerminal", "view.reopenTab", "view.selectionToComposer",
+    "view.showBrowser", "view.showFiles", "view.showTerminal", "view.terminalCopy", "view.terminalPaste",
+    "view.toggleHud", "view.toggleProfileRail", "view.toggleReview", "view.toggleRightSidebar",
+    "view.toggleSidebar", "view.toggleSimpleMode", "view.toggleStatusbar", "view.toggleTabStrip",
+    "workspace.newWorktree", "workspace.openFolder",
+})
+DESKTOP_BUTTON_ACTION_IDS = frozenset({"composer.attach", "message.copy", "message.retry"})
+DESKTOP_ACTION_IDS = DESKTOP_KEYBIND_ACTION_IDS | DESKTOP_BUTTON_ACTION_IDS | {"other"}
+DESKTOP_ACTION_VIAS = frozenset({"click", "menu", "palette", "shortcut"})
+# Dislike signals, each naming its target from a closed set (setting keys are DEFAULT_CONFIG leaf
+# paths, checked against the live schema by shared_metrics_desktop and shape-checked here).
+DESKTOP_DISLIKE_MARK = DESKTOP_DISLIKE_METRIC = "qubit.desktop.dislike"
+DESKTOP_FLOW_IDS = frozenset({
+    "command_palette", "free_tier_sign_in", "keybind_capture", "model_picker", "project_create", "provider_oauth",
+    "session_picker", "session_switcher", "other",
+})
+DESKTOP_FEATURE_TOGGLES = frozenset({
+    "backdrop", "bot_activity_toasts", "composer_popout_gestures", "intro_splash", "native_notifications",
+    "notification_kind", "reactions", "thread_timeline", "tips", "tours", "vibe_hearts", "other",
+})
+DESKTOP_UNDO_TARGETS = frozenset({"closed_tab", "restored_draft", "other"})
+DESKTOP_DISLIKE_TARGETS: dict[str, frozenset[str]] = {
+    "cancelled": DESKTOP_FLOW_IDS,
+    "feature_disabled": DESKTOP_FEATURE_TOGGLES,
+    "quick_close": DESKTOP_FEATURE_AREAS,
+    "rage_click": DESKTOP_ACTION_IDS,
+    "setting_off_default": frozenset({"setting"}),
+    "undo": DESKTOP_UNDO_TARGETS,
+}
+DESKTOP_DISLIKE_SIGNALS = frozenset(DESKTOP_DISLIKE_TARGETS)
+DESKTOP_DISLIKE_TARGET_VALUES = frozenset().union(*DESKTOP_DISLIKE_TARGETS.values())
+DESKTOP_DISLIKE_DIRECTIONS = frozenset({"away_from_default", "none", "to_default"})
+DESKTOP_SETTING_KEY_MAX_LENGTH = 96
+# ---- end v5 desktop actions ----
+
 _ARCHITECTURE_ALIASES = {
     "amd64": "x86_64", "x64": "x86_64", "x86_64": "x86_64",
     "aarch64": "arm64", "arm64": "arm64",
@@ -928,6 +1376,33 @@ _LEGACY_METRIC_FIELDS: dict[str, tuple[frozenset[str], ...]] = {
         _METRIC_FIELDS[INSTALL_SNAPSHOT_METRIC] - set(_INSTALL_V4_SNAPSHOT_DIMENSIONS),
     ),
 }
+# Fields v2 carried on the per-task and per-tool-call rows. Together they made nearly every task and
+# tool call its own row; v3 moves duration/retries/latency to the small split counters above (call
+# counts per task are already on qubit.task_cost.count). Their values stay in the contract so rows
+# recorded before an upgrade still validate and package.
+_TASK_FINISHED_V2_ONLY = frozenset(
+    {"duration_bucket", "model_call_count_bucket", "retry_count_bucket", "tool_call_count_bucket"}
+)
+_TOOL_CALL_V2_ONLY = frozenset({"latency_bucket", "retry_count_bucket"})
+_METRIC_FIELDS[TASK_FINISHED_METRIC] -= _TASK_FINISHED_V2_ONLY
+_METRIC_FIELDS[TOOL_CALL_METRIC] -= _TOOL_CALL_V2_ONLY
+# Older field sets still accepted at packaging so counters recorded before an upgrade drain.
+_LEGACY_METRIC_FIELDS: dict[str, tuple[frozenset[str], ...]] = {
+    MODEL_ROUTE_METRIC: (
+        frozenset(_MODEL_ROUTE_MAX_LENGTHS), _METRIC_FIELDS[MODEL_ROUTE_METRIC] - {"ttft_bucket"},
+    ),
+    TASK_STARTED_METRIC: (_METRIC_FIELDS[TASK_STARTED_METRIC] - {"platform"},),
+    TASK_FINISHED_METRIC: (frozenset(_COUNTER_DIMENSION_VALUES[TASK_FINISHED_METRIC]) - {"failure_class", "platform"},),
+    TOOL_CALL_METRIC: (frozenset(_COUNTER_DIMENSION_VALUES[TOOL_CALL_METRIC]),),
+    SKILL_LOAD_METRIC: (_METRIC_FIELDS[SKILL_LOAD_METRIC] - {"skill_name"},),
+    INSTALL_SNAPSHOT_METRIC: (_METRIC_FIELDS[INSTALL_SNAPSHOT_METRIC] - {
+        "display_language", "install_age_bucket", "main_provider", "messaging_platform_count_bucket",
+        "terminal_backend", *_INSTALL_V4_SNAPSHOT_DIMENSIONS,
+    },
+        # ---- v4 install ----
+        _METRIC_FIELDS[INSTALL_SNAPSHOT_METRIC] - set(_INSTALL_V4_SNAPSHOT_DIMENSIONS),
+    ),
+}
 # ---- v5 engagement ----
 _LEGACY_METRIC_FIELDS[SESSION_METRIC] = (_METRIC_FIELDS[SESSION_METRIC] - set(SESSION_VOLUME_DIMENSIONS),)
 # ---- end v5 engagement ----
@@ -1127,15 +1602,17 @@ def _auxiliary_model_call_dimensions(event: Any) -> dict[str, str] | None:
             scope_category="end", category_profile=None,
         )
         or not isinstance(data, dict)
-        or set(data) - {"response_model"} != {"model", "outcome", "provider"}
+        or set(data) - {"response_model", "error_class"} != {"model", "outcome", "provider"}
         or data.get("outcome") not in _LEGACY_MODEL_OUTCOMES
     ):
         return None
     outcome = data["outcome"]
-    dimensions = model_route_fields(
-        data, call_role="auxiliary", outcome=outcome,
-        error_class="none" if outcome == "success" else "unknown",
-    )
+    # Same reading as a primary call: a cancelled call reports ``none``, a failure without a
+    # classified reason ``unknown``, a success the last error it recovered from.
+    error_class = "none" if outcome == "cancelled" else data.get("error_class") or "none"
+    if outcome == "failed" and error_class == "none":
+        error_class = "unknown"
+    dimensions = model_route_fields(data, call_role="auxiliary", outcome=outcome, error_class=error_class)
     return dimensions if counter_dimensions_are_valid(MODEL_ROUTE_METRIC, dimensions) else None
 
 
@@ -1162,7 +1639,7 @@ def task_duration_counter(event: Any) -> tuple[str, dict[str, str]] | None:
 
 
 # The task end payload (task_terminal_fields) also carries per-task call counts for other Relay
-# subscribers; hermes.task_cost.count already buckets them, so no counter projects them here.
+# subscribers; qubit.task_cost.count already buckets them, so no counter projects them here.
 _TASK_END_FIELDS = (
     _METRIC_FIELDS[TASK_FINISHED_METRIC] | _METRIC_FIELDS[TASK_DURATION_METRIC]
     | {"model_call_count_bucket", "tool_call_count_bucket"}
@@ -1482,8 +1959,8 @@ _TOOL_CATEGORY_PREFIXES = (
     ("mcp", "mcp"),
     ("browser", "browser"),
     (("image", "tts", "video", "vision"), "media"),
-    ("homeassistant", "home_automation"),
-    (("discord", "email", "feishu", "hermes-yuanbao", "slack", "sms"), "communication"),
+    ("homeassistant", "home_automation"),  # the homeassistant catalog plugin's toolset
+    (("discord", "email", "feishu", "qubit-yuanbao", "slack", "sms"), "communication"),
 )
 
 
