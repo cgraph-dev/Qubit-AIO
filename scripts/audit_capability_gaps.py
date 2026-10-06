@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Capability audit: what did the 4,128 upstream commits ADD that Qubit lacks?
+"""Capability audit: what did the 5,441 upstream commits ADD that Qubit lacks?
 
 The point of pulling the delta is not just to merge files -- it is to enumerate
-capability. Every symbol/function/class upstream introduced at bd0affe5 that
+capability. Every symbol/function/class upstream introduced at a036b13793 that
 Qubit's tree does not define, and every file upstream added that Qubit does not
 have, is a CONCRETE, NAMED port item instead of a vague "not fully synced".
 
 Method (deliberately content-based, not existence-based -- an earlier audit
 falsely reported 20 unsynced modules by treating "file exists" as "file synced"):
 
-  1. Diff the pin range 69948c0057..bd0affe5 in the upstream repo.
+  1. Diff the pin range 69948c0057..a036b13793 in the upstream repo.
   2. For ADDED/MODIFIED python files, extract upstream's ADDED top-level
      definitions (def/class/ALL_CAPS) from the diff's '+' lines.
   3. Map each upstream path to its Qubit counterpart (rename map).
@@ -26,9 +26,9 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-PIN = Path.home() / ".cache/qubit-pins/hermes-agent"
+PIN = Path.home() / ".hermes/hermes-agent"
 REPO = Path(__file__).resolve().parent.parent
-FROM, TO = "69948c0057", "bd0affe5"
+FROM, TO = "69948c0057", "a036b13793"
 
 SKIP_PREFIXES = (".github/", "contributors/", "node_modules/", ".git/")
 
