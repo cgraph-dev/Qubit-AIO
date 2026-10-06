@@ -109,10 +109,53 @@ both 2026-10-06 bugs is:
 
 Nothing currently does this exhaustively. Recommended before declaring the sync done.
 
+## Progress log
+
+### 2026-10-06 — slices 1–3 applied (`43e3a2b2`, pushed)
+
+| Slice | Files | Result |
+|---|---|---|
+| `__root__` | 49 | 26 MERGED / 17 CONFLICT / 4 ADDED — all conflicts resolved |
+| `agent` | 181 | 141 MERGED / 33 CONFLICT / 7 ADDED — all conflicts resolved |
+| `tools` | 195 | 83 files changed |
+
+**Import gate: 8 OK / 21 FAIL → 29 OK / 0 FAIL.** 161 files, 0 compile failures,
+gateway restarts clean (`healthy: true`, `n_running`, `n_restarts: 0`).
+
+Defects found (all the same dropped-symbol class):
+
+1. Translator left `from hermes_cli...` in 9 merged `tools/`+`agent/` files — its
+   path-masking skipped module-path-like tokens. Rewritten to `qubit_cli`.
+2. `qubit_constants` lacked the upstream spellings of six helpers the synced code
+   imports (`get_hermes_home`, `get_hermes_dir`, `display_hermes_home`,
+   `with_hermes_node_path`, …). Three are imported **lazily inside functions**, so
+   the top-level gate never saw them. Added as 1:1 re-binds at module end.
+3. `_QUBIT_PROVIDER_ENV_BLOCKLIST` imported by two files but only
+   `_HERMES_PROVIDER_ENV_BLOCKLIST` defined. Aliased at the definition so exactly
+   ONE blocklist object exists.
+4. Ported missing module `qubit_cli/left_core_migration.py` (450 lines).
+
+**Known remaining gap:** `plugins/computer_use/` is a new upstream plugin; the
+`plugins` subsystem has not been synced yet.
+
+### Entry-point resolution sweep — run it as the acceptance gate
+
+The curated 29-module gate is not enough: defects 2 above were invisible to it
+because the imports are function-local. The sweep that finds them:
+
+> import every local module; for every `from <local-module> import <name>`, assert
+> `<name>` resolves on the imported object.
+
+At time of writing it reports 1 real module gap (`plugins.computer_use`) and the
+`qubit_cli.*` submodule "misses" that are Python's lazy-submodule resolution, which
+must be filtered (they are not attribute failures).
+
 ## Ordering
 
 `__root__` → primitives → `agent`/`tools`/`gateway` → `tui_gateway`/`cron`/`providers`
-→ surfaces. Never reorganize this by file count.
+→ surfaces. Never reorganize this by file count. Remaining: `plugins` (136),
+`gateway` (102), `tui_gateway` (68), `cron` (21), `web` (42), `locales` (35),
+`ui-tui` (135), plus `scripts`/`evals`/`pm`/`apps`.
 
 ## Deletions — never auto-apply
 
