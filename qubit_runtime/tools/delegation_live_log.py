@@ -41,14 +41,14 @@ def live_transcript_root(home: Optional[Path] = None) -> Path:
     """Root directory for live transcripts (profile-safe, never ~/.hermes).
 
     Pass ``home`` when the caller holds stable parent-owned profile state
-    (e.g. the parent agent's SessionDB path). Ambient ``get_qubit_home()``
+    (e.g. the parent agent's SessionDB path). Ambient ``get_hermes_home()``
     consults a ContextVar that raw ``threading.Thread`` boundaries drop, so
     in a multi-profile process an ambient resolve can land transcripts under
     whatever profile the process-wide ``QUBIT_HOME`` names at that moment
     (#91996).
     """
-    from qubit_constants import get_qubit_dir
-    return get_qubit_dir("cache/delegation", "delegation_cache", home=home) / "live"
+    from qubit_constants import get_hermes_dir
+    return get_hermes_dir("cache/delegation", "delegation_cache", home=home) / "live"
 
 
 @contextmanager
@@ -325,14 +325,3 @@ def prune_stale_live_dirs(max_age_days: int = LIVE_RETENTION_DAYS, root: Optiona
             except OSError:
                 continue
     return removed
-
-
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def new_live_delegation_id() -> str:
-    """Same shape as async_delegation's ids so the dir name matches the handle."""
-    return f"deleg_{uuid.uuid4().hex[:8]}"
-# ---- END PLUGIN-COMPAT ----

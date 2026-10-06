@@ -117,7 +117,7 @@ def _get_backend() -> str:
 
 def _autodetect_backend() -> Optional[str]:
     """Autodetect rungs above the keyless tier, or None. Explicit user credentials beat the managed-gateway
-    probe (a Qubit OAuth token's tier may not grant web access; the gateway then fails at runtime with no
+    probe (a Nous OAuth token's tier may not grant web access; the gateway then fails at runtime with no
     fallback). Free tiers trail paid."""
     backend_candidates = (
         ("tavily", _has_env("TAVILY_API_KEY")), ("perplexity", _has_env("PERPLEXITY_API_KEY")),
@@ -156,9 +156,9 @@ def _keyless_backend() -> Optional[str]:
 
 
 def _managed_web_search() -> bool:
-    """True when web_search is on the managed Qubit route: the stored ``qubit`` selection, or a
+    """True when web_search is on the managed Nous route: the stored ``nous`` selection, or a
     never-configured install whose autodetect lands on the gateway — the entitled Firecrawl gateway, or
-    free Perplexity fast search for any Qubit identity when nothing else is configured (search-only: the
+    free Perplexity fast search for any Nous identity when nothing else is configured (search-only: the
     extract ladder is untouched). A stored vendor selection never is."""
     if _configured_backend("search_backend"):
         return False
@@ -564,40 +564,3 @@ registry.register(
     check_fn=check_web_api_key, requires_env=_web_requires_env(), is_async=True, emoji="📄",
     max_result_size_chars=100_000,
 )
-
-
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from typing import Dict  # noqa: F401,E402
-from typing import TYPE_CHECKING  # noqa: F401,E402
-import asyncio  # noqa: F401,E402
-import httpx  # noqa: F401,E402
-import re  # noqa: F401,E402
-import sys  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'DEFAULT_EXTRACT_CHAR_LIMIT': ('tools.web_tools_truncate', 'DEFAULT_EXTRACT_CHAR_LIMIT'),
-    'Firecrawl': ('plugins.web.firecrawl.provider', 'Firecrawl'),
-    'MAX_STORED_TEXT_CHARS': ('tools.web_tools_truncate', 'MAX_STORED_TEXT_CHARS'),
-    'build_vendor_gateway_url': ('tools.managed_tool_gateway', 'build_vendor_gateway_url'),
-    'managed_nous_tools_enabled': ('tools.tool_backend_helpers', 'managed_nous_tools_enabled'),
-    'normalize_url_for_request': ('tools.url_safety', 'normalize_url_for_request'),
-    'nous_tool_gateway_unavailable_message': ('tools.tool_backend_helpers', 'nous_tool_gateway_unavailable_message'),
-    'prefers_gateway': ('tools.tool_backend_helpers', 'prefers_gateway'),
-    'resolve_managed_tool_gateway': ('tools.managed_tool_gateway', 'resolve_managed_tool_gateway'),
-    'sensitive_query_param_name': ('tools.url_safety', 'sensitive_query_param_name'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from qubit_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

@@ -22,8 +22,10 @@ def _account_info(force_fresh: bool = False):
     zero-argument lambda, so the falsy path must invoke it without keyword arguments."""
     try:
         from qubit_cli.nous_account import get_nous_portal_account_info
-        return (get_nous_portal_account_info(force_fresh=True) if force_fresh
-                else get_nous_portal_account_info())
+        # Branched call, not ``force_fresh=force_fresh``: tests stub the reader with zero-arg lambdas.
+        account_info = (get_nous_portal_account_info(force_fresh=True) if force_fresh
+                        else get_nous_portal_account_info())
+        return bool(account_info.logged_in) and account_info.tool_gateway_entitled
     except Exception:
         return None
 

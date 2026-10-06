@@ -218,7 +218,7 @@ def message_agent_tool(target: str = "", message: str = "", task_id: Optional[st
     except Exception as exc:  # pragma: no cover — defensive
         return _err(f"Bot Mode gate check failed: {exc}")
     from qubit_cli.observability.shared_metrics_signals import record_feature_used
-    record_feature_used("bot_mode", qubit_home=home)
+    record_feature_used("bot_mode", hermes_home=home)
 
     root, me = _qubit_root(Path(home)), _self_profile_name(Path(home))
     roster_homes = dict(_roster(root))
@@ -575,6 +575,29 @@ def _local_delivery_home(argv: list[str]) -> Path | None:
     from tools.bot_mode_probe import _qubit_root, _roster
 
     return dict(_roster(_qubit_root(Path(_default_home())))).get(argv[2])
+
+
+def _live_outcome_unknown(dm_file: str, cause: object) -> str:
+    """The runner's stdout when a live admission may have happened but its outcome is unknown."""
+    return json.dumps({"status": "ambiguous", "delivery_id": _dm_delivery_id(dm_file),
+                       "error": f"Live admission outcome unknown: {cause}. Do not resend.",
+                       "evidence_file": dm_file})
+
+
+def _runner_argv(args: list[str]) -> tuple[Optional[str], str, str, list[str]] | None:
+    """Split ``--run-delivery [--author <json>] <mode> <dm_file> <argv…>`` into
+    ``(author_json, mode, dm_file, argv)``; None when malformed. Stdlib only: the boot-failure
+    report runs it when no Hermes import is available."""
+    if args[:1] != ["--run-delivery"]:
+        return None
+    rest, author = args[1:], None
+    if rest[:1] == ["--author"]:
+        if len(rest) < 2:
+            return None
+        author, rest = rest[1], rest[2:]
+    if len(rest) < 2 or rest[0] not in ("stdin", "query-file"):
+        return None
+    return author, rest[0], rest[1], rest[2:]
 
 
 def _live_outcome_unknown(dm_file: str, cause: object) -> str:

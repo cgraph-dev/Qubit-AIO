@@ -189,6 +189,20 @@ def reset_qubit_home_key_cache() -> None:
     _HOME_KEY_CACHE.clear()
 
 
+# Upstream (post-pin) code calls ``get_hermes_home()`` by that name throughout the
+# modules this tree syncs in (tools/environments/docker.py, tools/mcp_tool_config.py,
+# tools/bot_desktop/*, tools/environments/local_env_policy.py, ...). Qubit renamed the
+# function to ``get_qubit_home``; without these aliases every synced call site raises
+# ImportError. The upstream spelling is a COMPAT SURFACE for imported code, not a brand
+# choice — Qubit's own modules keep calling ``get_qubit_home``. Declared here, after the
+# names they alias, so no forward reference is created.
+get_hermes_home = get_qubit_home
+get_hermes_home_override = get_qubit_home_override
+set_hermes_home_override = set_qubit_home_override
+reset_hermes_home_override = reset_qubit_home_override
+hermes_home_key = qubit_home_key
+
+
 def normalize_scope(scope: str | Path | None) -> str | None:
     """Normalize a WRITE-side registry scope key, preserving ``None``.
 
@@ -1469,3 +1483,21 @@ def normalize_scope(scope: str | Path | None) -> str | None:
     """
     return qubit_home_key(scope) if scope is not None else None
 
+
+
+# --------------------------------------------------------------------------- #
+# Upstream-name compat aliases.
+#
+# The synced (post-pin) upstream code imports these by their UPSTREAM names, often
+# lazily inside a function — which is why the top-level import gate never sees them
+# and they surface later as a runtime ImportError. Qubit renamed each with an
+# identical signature, so each alias below is a 1:1 re-bind, not a shim.
+#
+# This is a compat surface for imported code, NOT a branding decision: Qubit's own
+# modules keep calling the qubit-spelled names. Declared at the END of the module so
+# every target is already defined (no forward reference).
+# --------------------------------------------------------------------------- #
+get_hermes_dir = get_qubit_dir
+with_hermes_node_path = with_qubit_node_path
+display_hermes_home = display_qubit_home
+iter_hermes_node_dirs = iter_qubit_node_dirs

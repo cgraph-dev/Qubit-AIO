@@ -210,7 +210,7 @@ def _spawn_remote_kernel(env, env_type: str, owner: str, task_env_id: str,
     from tools.code_execution_rpc import _execute_checked, _private_dirs_cmd
     from tools.code_execution_tool import (
         MAX_STDOUT_BYTES, _ship_file_to_remote, _env_temp_dir,
-        _ship_env_file_and_launch, generate_qubit_tools_module,
+        _ship_env_file_and_launch, generate_hermes_tools_module,
     )
     kernel_dir = f"{_env_temp_dir(env)}/hermes_rkernel_{uuid.uuid4().hex[:12]}"
     q_dir = shlex.quote(kernel_dir)
@@ -227,7 +227,7 @@ def _spawn_remote_kernel(env, env_type: str, owner: str, task_env_id: str,
         _ship_file_to_remote(env, f"{kernel_dir}/kernel_runner.py", REMOTE_KERNEL_RUNNER_SOURCE.format(
             cell_source=RUNNER_CELL_SOURCE, capture_limit=MAX_STDOUT_BYTES, idle_exit=idle_exit))
         _ship_file_to_remote(env, f"{kernel_dir}/qubit_tools.py",
-                             generate_qubit_tools_module(list(sandbox_tools), transport="file"))
+                             generate_hermes_tools_module(list(sandbox_tools), transport="file"))
         # kernel.env is removed after sourcing: the runner's env keeps the
         # values, so the token file need not sit at rest for the kernel's
         # lifetime. runner.log is pre-created 600 so the launch redirect never
@@ -431,11 +431,3 @@ def _run_attached_cell(kernel: RemoteKernel, key: Tuple, code: str, *, env, task
     if cell_status == "error" and result["traceback"]:
         result["error"] = result["traceback"].strip().splitlines()[-1]
     return result
-
-
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-import base64  # noqa: F401,E402
-# ---- END PLUGIN-COMPAT ----

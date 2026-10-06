@@ -191,13 +191,13 @@ def _secure_cache_dir(new_subpath: str, old_name: str) -> Path:
     directories the NixOS module's ``systemd.tmpfiles`` rules pre-create, so
     they are made lazily at runtime; a hardcoded 0700 here would be the only
     thing setting their mode and would silently override a design that pins
-    ``stateDir/.qubit`` to ``2770`` and runs the gateway with ``UMask =
-    "0007"`` so "interactive users in the qubit group can read/write"
+    ``stateDir/.hermes`` to ``2770`` and runs the gateway with ``UMask =
+    "0007"`` so "interactive users in the hermes group can read/write"
     gateway-created state. On such a host the gateway and a hostUsers CLI
     share one ``$QUBIT_HOME``, so a 0700 cache created by whichever ran
     first makes vision fail with EACCES for the other. Skipping the explicit
     mode there lets the inherited setgid + umask land 2770, matching
-    ``ensure_qubit_home``'s managed branch and its ``logs/curator``
+    ``ensure_hermes_home``'s managed branch and its ``logs/curator``
     lazy-mkdir precedent.
 
     Running it unconditionally also heals a directory an older Hermes left at
@@ -207,7 +207,7 @@ def _secure_cache_dir(new_subpath: str, old_name: str) -> Path:
     the mode to the leaf only, so an intermediate ``cache/`` keeps its default
     mode; it is shared with other subsystems and holds only directory names.
     """
-    cache_dir = get_qubit_dir(new_subpath, old_name)
+    cache_dir = get_hermes_dir(new_subpath, old_name)
     if _managed_install():
         # Managed mode: the NixOS-configured umask/setgid owns the mode, and
         # _secure_dir would no-op here anyway.
@@ -559,8 +559,8 @@ def _supports_media_in_tool_results(provider: str, model: str) -> bool:
 def _accepts_tool_result_images(provider: str, model: str, cfg: Optional[Dict[str, Any]]) -> bool:
     """One gate for both native lanes — the ``vision_analyze`` fast path and the ``computer_use`` capture route
     (#115248): the profile's ``supports_vision_tool_messages=False`` veto first, then either the provider's tool
-    results are known to carry media or the capability lookup (config override → catalog → probes → profile)
-    attests the model as vision-capable."""
+    results are known to carry media or the per-model capability lookup (config override → catalog incl. the
+    profile's ``model_capabilities`` → local probes) attests the model as vision-capable."""
     if _profile_rejects_tool_media(provider, model):
         return False
     if _supports_media_in_tool_results(provider, model):

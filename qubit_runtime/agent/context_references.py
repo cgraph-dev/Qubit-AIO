@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Awaitable, Callable
 
+from agent.file_safety import HOME_CREDENTIAL_DIRS
 from agent.model_metadata import CHARS_PER_TOKEN, estimate_tokens_rough
 from qubit_cli._subprocess_compat import IS_WINDOWS, harden_git_argv, noninteractive_git_env, windows_hide_flags
 from qubit_cli.sqlite_safe_read import LiveConnectionError, offline_file_access
@@ -90,7 +91,6 @@ _FILE_VALUE_PATTERN = re.compile(
 TRAILING_PUNCTUATION = ",.;!?"
 _OPENERS = {")": "(", "]": "[", "}": "{"}
 _NEEDS_QUOTING = re.compile(r"""[\s()\[\]{}<>"'`]""")
-_SENSITIVE_HOME_DIRS = (".ssh", ".aws", ".gnupg", ".kube", ".docker", ".azure", ".config/gh")
 _SENSITIVE_HERMES_DIRS = (Path("skills") / ".hub",)
 _SENSITIVE_HOME_FILES = tuple(Path(p) for p in (
     ".ssh/authorized_keys", ".ssh/id_rsa", ".ssh/id_ed25519", ".ssh/config", ".bashrc", ".zshrc",
@@ -505,6 +505,27 @@ def _agent_staged_path(path: Path) -> bool:
         return False
 
 
+def _agent_staged_path(path: Path) -> bool:
+    """True when *path* sits in a Hermes dir the gateway stages for the agent.
+
+    Those are the ``_CACHE_DIRS`` roots — ``attachments/`` (file drops),
+    ``images/`` (image uploads), ``cache/*`` (platform downloads) and now
+    ``composer-pastes/`` (large text pastes) — the gateway's OWN payload, never
+    a workspace escape, and they live outside the workspace by construction: on
+    a remote execution backend (ssh and friends) the workspace root is a path
+    on THAT host (#110174), so the workspace check below rejected every staged
+    attachment there. The bytes are staged to (or already live on) the gateway
+    either way, so the ref still expands — text inlines; binaries point at the
+    backend-visible path via ``to_agent_visible_cache_path``.
+    """
+    try:
+        from tools.credential_files import get_cache_directory_mounts
+        return any(_is_under(path, Path(entry["host_path"]).expanduser().resolve())
+                   for entry in get_cache_directory_mounts())
+    except Exception:
+        return False
+
+
 def _resolve_path(cwd: Path, target: str, *, allowed_root: Path | None = None) -> Path:
     from agent.file_safety import is_nt_namespace_path
     if is_nt_namespace_path(target):  # raw-string check: resolving such a path is the NTLM-leak trigger
@@ -525,7 +546,7 @@ def _ensure_reference_path_allowed(path: Path) -> None:
     from qubit_constants import get_qubit_home
     home, qubit_home = Path(os.path.expanduser("~")).resolve(), get_qubit_home().resolve()
     blocked_exact = {home / rel for rel in _SENSITIVE_HOME_FILES} | {qubit_home / ".env"}
-    blocked_dirs = [home / rel for rel in _SENSITIVE_HOME_DIRS] + [qubit_home / rel for rel in _SENSITIVE_HERMES_DIRS]
+    blocked_dirs = [home / rel for rel in HOME_CREDENTIAL_DIRS] + [qubit_home / rel for rel in _SENSITIVE_HERMES_DIRS]
     if path in blocked_exact:
         raise ValueError("path is a sensitive credential file and cannot be attached")
     if any(_is_under(path, blocked_dir) for blocked_dir in blocked_dirs):

@@ -32,7 +32,7 @@ _STATIC_PROVIDER_ENV_BLOCKLIST = frozenset({
     "SLACK_HOME_CHANNEL_NAME", "SLACK_ALLOWED_USERS", "WHATSAPP_ENABLED",
     "WHATSAPP_MODE", "WHATSAPP_ALLOWED_USERS", "SIGNAL_HTTP_URL", "SIGNAL_ACCOUNT",
     "SIGNAL_ALLOWED_USERS", "SIGNAL_GROUP_ALLOWED_USERS", "SIGNAL_HOME_CHANNEL",
-    "SIGNAL_HOME_CHANNEL_NAME", "SIGNAL_IGNORE_STORIES", "HASS_TOKEN", "HASS_URL",
+    "SIGNAL_HOME_CHANNEL_NAME", "SIGNAL_IGNORE_STORIES",
     "EMAIL_ADDRESS", "EMAIL_PASSWORD", "EMAIL_IMAP_HOST", "EMAIL_SMTP_HOST",
     "EMAIL_HOME_ADDRESS", "EMAIL_HOME_ADDRESS_NAME", "HERMES_DASHBOARD_SESSION_TOKEN",
     "GATEWAY_ALLOWED_USERS", "GH_TOKEN", "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH",
@@ -52,9 +52,17 @@ _STATIC_PROVIDER_ENV_BLOCKLIST = frozenset({
 })
 
 
+def _left_core_env(*, secrets_only: bool) -> frozenset:
+    """Env of features that left core for a catalog plugin (``qubit_cli.left_core_migration``):
+    stripped exactly as when core shipped them, plugin installed or not."""
+    from qubit_cli.left_core_migration import LEFT_CORE
+    return frozenset(name for feature in LEFT_CORE
+                     for name in feature.secret_env + (() if secrets_only else feature.private_env))
+
+
 def _build_provider_env_blocklist() -> frozenset:
     """Derive the blocklist from provider, tool, and gateway config."""
-    blocked: set[str] = set(_STATIC_PROVIDER_ENV_BLOCKLIST)
+    blocked: set[str] = set(_STATIC_PROVIDER_ENV_BLOCKLIST) | _left_core_env(secrets_only=False)
     try:
         from qubit_cli.auth import PROVIDER_REGISTRY
         for pconfig in PROVIDER_REGISTRY.values():
@@ -116,7 +124,15 @@ def _build_adapter_secret_env() -> frozenset:
 # discovers provider plugins that expect a fully initialized auth registry.
 _PROVIDER_ENV_BLOCKLIST = _build_provider_env_blocklist()
 _ADAPTER_SECRET_ENV = _build_adapter_secret_env()
-_QUBIT_PROVIDER_ENV_BLOCKLIST = _PROVIDER_ENV_BLOCKLIST | _ADAPTER_SECRET_ENV
+_HERMES_PROVIDER_ENV_BLOCKLIST = _PROVIDER_ENV_BLOCKLIST | _ADAPTER_SECRET_ENV
+
+# Qubit-spelled alias. The translator renamed this constant at some call sites
+# (tools/environments/local.py, tools/env_passthrough.py) but not at its definition,
+# so imports of ``_QUBIT_PROVIDER_ENV_BLOCKLIST`` failed while the same object was
+# defined one name over. Kept as an alias rather than a second definition so there is
+# exactly ONE blocklist object — a duplicated frozenset would drift silently and a
+# credential blocked through one name would pass through the other.
+_QUBIT_PROVIDER_ENV_BLOCKLIST = _HERMES_PROVIDER_ENV_BLOCKLIST
 
 _HOME_ADAPTER_SECRET_CACHE: dict[str, tuple] = {}
 
@@ -130,8 +146,8 @@ def _home_adapter_secret_env() -> frozenset:
     or flat manifest unreadable or unparsable) keeps the names this home already had and is not
     cached, so a failed discovery never releases a known denial and recovery is seen at once."""
     from qubit_cli.config import platform_manifest_secret_scan, platform_manifest_stamp
-    from qubit_constants import get_qubit_home, qubit_home_key
-    home = get_qubit_home()
+    from qubit_constants import get_hermes_home, qubit_home_key
+    home = get_hermes_home()
     key, stamp = qubit_home_key(home), platform_manifest_stamp(home)
     cached = _HOME_ADAPTER_SECRET_CACHE.get(key)
     if cached is None or cached[0] is None or cached[0] != stamp:
@@ -166,10 +182,10 @@ def _is_provider_env_blocklisted(name: str, _registered: "frozenset | None" = No
     """``name`` is a blocklisted provider/tool credential or adapter secret, matched the way the
     platform's environment resolves names: exact plus case-folded. On Windows the environment
     block is case-insensitive, so ``openai_api_key`` IS ``OPENAI_API_KEY``; consistent with
-    ``_is_qubit_internal_secret``, which already folds (``key.upper()``). Loops pass
+    ``_is_hermes_internal_secret``, which already folds (``key.upper()``). Loops pass
     ``_registered`` so the registry is read once per env, not once per key."""
     upper = name.upper()
-    if name in _QUBIT_PROVIDER_ENV_BLOCKLIST or upper in _QUBIT_PROVIDER_ENV_BLOCKLIST:
+    if name in _HERMES_PROVIDER_ENV_BLOCKLIST or upper in _HERMES_PROVIDER_ENV_BLOCKLIST:
         return True
     return upper in (_registered_adapter_secret_env() if _registered is None else _registered)
 
@@ -374,7 +390,7 @@ _ALWAYS_STRIP_KEYS: frozenset[str] = frozenset({
     # _is_qubit_internal_secret, but _ID has no secret suffix, so it must be
     # enumerated here to stay stripped on the inherit_credentials=True path.
     "GATEWAY_RELAY_ID", "GATEWAY_RELAY_SECRET", "GATEWAY_RELAY_DELIVERY_KEY",
-    "HASS_TOKEN", "EMAIL_PASSWORD", "HERMES_DASHBOARD_SESSION_TOKEN",
+    "EMAIL_PASSWORD", "HERMES_DASHBOARD_SESSION_TOKEN",
     # Dashboard auth: the basic-auth password and session-signing secret, the OIDC client
     # secret and the drain bearer. They let a holder mint or forge dashboard sessions, and no
     # child (credentialed CLIs included) consumes them.
@@ -382,5 +398,5 @@ _ALWAYS_STRIP_KEYS: frozenset[str] = frozenset({
     "HERMES_DASHBOARD_OIDC_CLIENT_SECRET", "HERMES_DASHBOARD_DRAIN_SECRET",
     # Remote-compute / infrastructure secrets
     "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "DAYTONA_API_KEY",
-}) | _ADAPTER_SECRET_ENV  # every declared adapter secret is Tier 1, like the bot tokens above
+}) | _ADAPTER_SECRET_ENV | _left_core_env(secrets_only=True)  # every declared adapter secret is Tier 1
 _ALWAYS_STRIP_FOLDED: frozenset[str] = frozenset(k.upper() for k in _ALWAYS_STRIP_KEYS)

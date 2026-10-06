@@ -22,7 +22,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from qubit_constants import get_qubit_home
+from qubit_constants import get_hermes_home
 from tools.environments.base import BaseEnvironment, EnvironmentConnectionError, _SHELL_ENV_NAME_RE
 from tools.terminal_tool_config import (
     _host_path_key, _is_windows_drive_path, cwd_follows_host_mount,
@@ -47,7 +47,7 @@ _DOCKER_SEARCH_PATHS = [
 
 _docker_executable: Optional[str] = None  # resolved once, cached
 _ENV_VAR_NAME_RE = _SHELL_ENV_NAME_RE
-_ENVIRONMENT_LABEL_KEY = "qubit-environment"
+_ENVIRONMENT_LABEL_KEY = "hermes-environment"
 
 
 def _normalize_forward_env_names(forward_env: list[str] | None) -> list[str]:
@@ -152,7 +152,7 @@ def _is_volatile_mount_spec(spec: str) -> bool:
         return False
 
 
-def _reuse_environment_fingerprint(*, image: str, mount_args: list[str], qubit_home: str) -> str:
+def _reuse_environment_fingerprint(*, image: str, mount_args: list[str], hermes_home: str) -> str:
     """Hash immutable configuration so reuse cannot silently attach to stale mounts.
 
     Hash requested values rather than exposing profile paths and volume sources in labels.
@@ -163,13 +163,13 @@ def _reuse_environment_fingerprint(*, image: str, mount_args: list[str], qubit_h
     matched for users with any symlink under ``skills/``. The container path stays in the
     hash, so moving where that mount lands still forces a fresh container.
     """
-    normalized_home = os.path.normcase(os.path.abspath(os.path.expanduser(qubit_home)))
+    normalized_home = os.path.normcase(os.path.abspath(os.path.expanduser(hermes_home)))
     canonical_mounts = [
         (f"<volatile-tempdir-mount>:{spec.split(':', 1)[1]}"
          if _is_volatile_mount_spec(spec) else spec)
         for spec in mount_args]
     payload = json.dumps(
-        {"image": image, "mount_args": canonical_mounts, "qubit_home": normalized_home},
+        {"image": image, "mount_args": canonical_mounts, "hermes_home": normalized_home},
         sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
 
@@ -314,7 +314,7 @@ _BASE_SECURITY_ARGS = [
 
 # Fork-bomb guard, applied only when the pids cgroup controller is available. The pids cgroup counts
 # THREADS, and a sandbox that hosts the Bot Screen runs a desktop in here: measured on
-# qubit-sandbox:desktop, the idle container is 2 tasks, Xvnc + Xfce + dbus 44, one Chromium with one
+# hermes-sandbox:desktop, the idle container is 2 tasks, Xvnc + Xfce + dbus 44, one Chromium with one
 # tab 212, plus the agent's own agent-browser Chromium with two tabs 488. The old 256 was hit in normal
 # use and every further `docker exec` (browser command, cua-driver, thumbnail, CDP forward) died with
 # runc's "procReady not received". 2048 leaves room for a working browser and is still three orders of
@@ -738,7 +738,7 @@ class DockerEnvironment(BaseEnvironment):
         if not shared_container_key:
             self._labels[_ENVIRONMENT_LABEL_KEY] = _reuse_environment_fingerprint(
                 image=image, mount_args=[*writable_args, *volume_args],
-                qubit_home=str(get_qubit_home()))
+                hermes_home=str(get_hermes_home()))
         # Saved for container recreation on "No such container" recovery.
         self._image = image
         self._image_pinned = image_pinned
@@ -909,7 +909,7 @@ class DockerEnvironment(BaseEnvironment):
         # A container built from another image. Explicitly configured image (config.yaml /
         # TERMINAL_DOCKER_IMAGE): the user changed it, so the old container is not their sandbox any
         # more — recreate (the image is immutable after creation). Default image: a default flip
-        # (nikolaik base -> qubit-sandbox:desktop) must not replace a sandbox someone has state in;
+        # (nikolaik base -> hermes-sandbox:desktop) must not replace a sandbox someone has state in;
         # keep it and let the CLI / Screen pane ask. Same rule Modal (snapshot wins) and Daytona
         # (labeled sandbox wins) already apply.
         actual_image = self._container_image(container_id)
@@ -917,7 +917,7 @@ class DockerEnvironment(BaseEnvironment):
             if not self._image_pinned:
                 logger.warning(
                     "Existing container %s runs image %s; the default docker_image is now %s. Keeping "
-                    "the existing sandbox — approve the switch with `qubit config set "
+                    "the existing sandbox — approve the switch with `hermes config set "
                     "terminal.docker_image %s` (files in /root and /workspace carry over) or pin the "
                     "current image to stop this notice (task=%s, profile=%s).",
                     container_id[:12], actual_image, self._image, self._image, task_label, profile_name)

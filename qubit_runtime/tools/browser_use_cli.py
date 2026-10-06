@@ -144,7 +144,7 @@ def _blocked_url_in_code(code: str) -> Optional[str]:
 def _base_subprocess_env() -> dict:
     from tools.browser_tool import _build_browser_env
     env = _build_browser_env()
-    # The harness runs on Qubit's own interpreter, but a bundled Desktop install boots that
+    # The harness runs on Hermes's own interpreter, but a bundled Desktop install boots that
     # interpreter with its site dir on PYTHONPATH (no venv to activate), and the harness's daemon
     # re-runs sys.executable. Point PYTHONPATH at the harness's site dir, replacing whatever the
     # agent process inherited, so both the CLI and its daemon import the same packages.
@@ -257,15 +257,15 @@ def default_downgrade_notice() -> Optional[str]:
             stamp.parent.mkdir(parents=True, exist_ok=True)
             stamp.touch()
             os.utime(stamp, (now, now))
-        return ("browser-harness is missing from Qubit's Python environment — using the built-in browser tools. "
-                "Run `qubit update` to re-sync it, or set `browser.backend: off` in config.yaml to silence this.")
+        return ("browser-harness is missing from Hermes's Python environment — using the built-in browser tools. "
+                "Run `hermes update` to re-sync it, or set `browser.backend: off` in config.yaml to silence this.")
     except Exception as e:  # pragma: no cover — a notice must never break startup
         logger.debug("browser-use downgrade notice failed: %s", e)
         return None
 
 
 def _harness_site_dir() -> Optional[str]:
-    """The site dir Qubit's interpreter imports ``browser_harness`` from, or None."""
+    """The site dir Hermes's interpreter imports ``browser_harness`` from, or None."""
     spec = importlib.util.find_spec("browser_harness")
     if spec is None or not spec.origin:
         return None
@@ -273,7 +273,7 @@ def _harness_site_dir() -> Optional[str]:
 
 
 def _find_cli() -> Optional[List[str]]:
-    """The Browser Use CLI's engine (browser-harness) is a core dependency of Qubit's own venv,
+    """The Browser Use CLI's engine (browser-harness) is a core dependency of Hermes's own venv,
     so every install, the Desktop bundle included, runs it on the current interpreter."""
     if _harness_site_dir() is None:
         return None
@@ -411,7 +411,7 @@ def _resolve_managed_chromium_cdp(env: dict, task_id: Optional[str], session_nam
     cdp = str(((res or {}).get("data") or {}).get("cdpUrl") or "") if (res or {}).get("success") else ""
     if not cdp:
         return (f"The local browser could not be started: {(res or {}).get('error') or 'agent-browser returned no CDP endpoint'} "
-                "Run `qubit tools` → Browser Automation to (re)install Chromium, or switch backends.")
+                "Run `hermes tools` → Browser Automation to (re)install Chromium, or switch backends.")
     cdp = _reach_sandbox_cdp(cdp)
     _set_cdp_env(env, cdp)
     env[_PRIVATE_BROWSER_SENTINEL] = "1"  # one Chromium per cache key: nothing to share a tab with
@@ -638,8 +638,8 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
 
     cmd = _find_cli()
     if not cmd:
-        return tool_error("browser-harness is missing from Qubit's Python environment. "
-                          "Run `qubit update` to re-sync it.")
+        return tool_error("browser-harness is missing from Hermes's Python environment. "
+                          "Run `hermes update` to re-sync it.")
 
     env = _base_subprocess_env()
     if session:

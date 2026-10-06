@@ -3,7 +3,7 @@
 Same launcher, same lease, same pane: only WHERE Xvnc + Xfce run changes. ``runtime`` decides between the
 gateway host and this module via ``placement()``; callers keep using ``runtime.start/stop/status/desktop_env``.
 
-Layout inside the sandbox, under ``<sandbox tmp>/qubit-bot-desktop/<profile>/``: ``launcher.sh`` (copied in
+Layout inside the sandbox, under ``<sandbox tmp>/hermes-bot-desktop/<profile>/``: ``launcher.sh`` (copied in
 at start), ``env`` (published DISPLAY/XAUTHORITY/DBUS), ``rfb.sock`` (Xvnc's unix socket), ``launcher.pid``.
 Host-side state under ``<QUBIT_HOME>/bot-desktop/``: ``sandbox.json`` = ``{"env_key": ..., "display": ...}``
 so status() knows which terminal environment owns the screen without re-deriving it.
@@ -23,17 +23,17 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from qubit_constants import get_qubit_home
+from qubit_constants import get_hermes_home
 from tools.environments import streams
 
 logger = logging.getLogger(__name__)
 
-# The user desktop processes run as inside the sandbox image. nikolaik (and qubit-sandbox:desktop on top of
+# The user desktop processes run as inside the sandbox image. nikolaik (and hermes-sandbox:desktop on top of
 # it) ships uid 1000 `pn`; a root Xvnc/Chromium/cua-driver is the wrong shape (Chromium refuses the sandbox,
 # AT-SPI wants a user session). Falls back to the exec default when the image has no such user.
 DESKTOP_USER = "pn"
 _REQUIRED = ("Xvnc", "xfwm4", "xfce4-panel", "xfdesktop", "xfsettingsd", "dbus-run-session", "xauth", "xdpyinfo", "xprop")
-SANDBOX_IMAGE_HINT = "nousresearch/qubit-sandbox:desktop"
+SANDBOX_IMAGE_HINT = "nousresearch/hermes-sandbox:desktop"
 
 _RELAY = (
     "import os,socket,sys,threading\n"
@@ -53,7 +53,7 @@ _RELAY = (
 
 
 def _marker() -> Path:
-    return get_qubit_home() / "bot-desktop" / "sandbox.json"
+    return get_hermes_home() / "bot-desktop" / "sandbox.json"
 
 
 def _read_marker() -> Dict[str, Any]:
@@ -100,7 +100,7 @@ def marker_sandbox_alive(marker: Dict[str, Any]) -> bool:
 
 
 def _remote_dir(env: Any, profile: str) -> str:
-    return f"{env.get_temp_dir().rstrip('/')}/qubit-bot-desktop/{profile}"
+    return f"{env.get_temp_dir().rstrip('/')}/hermes-bot-desktop/{profile}"
 
 
 def desktop_home(env: Any) -> str:
@@ -122,7 +122,7 @@ def desktop_home(env: Any) -> str:
 def browser_profile_dir(env: Any) -> str:
     """The ONE ``--user-data-dir`` the agent's agent-browser and the dock's Browser icon share inside the
     sandbox (same rule as the host: two profiles would mean the human logs into a jar the bot never sees)."""
-    return f"{desktop_home(env).rstrip('/')}/.qubit/bot-desktop/browser-profile"
+    return f"{desktop_home(env).rstrip('/')}/.hermes/bot-desktop/browser-profile"
 
 
 _CHROMIUM_PROBE = (

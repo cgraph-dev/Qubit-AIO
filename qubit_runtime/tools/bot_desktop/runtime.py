@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
 
-from qubit_constants import get_qubit_home
+from qubit_constants import get_hermes_home
 from tools.bot_desktop import placement
 
 logger = logging.getLogger(__name__)
