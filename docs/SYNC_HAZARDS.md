@@ -158,3 +158,23 @@ call: a cross-slice dependency is not a defect in the slice that exposes it.
 Six of the eight are one shape: **a fallback or a default that produces a
 plausible wrong answer instead of failing.** Prefer a loud refusal. When a tool
 can measure the wrong thing, make it stop rather than guess.
+
+## 14. An "import every module" walk executes side-effecting modules
+
+A runtime-evidence pass swept the whole tree with ``importlib.import_module`` and
+assumed import was safe. It is not. Importing ``qubit_cli/update_cmd_fleet.py``
+*ran the updater*: the probe's stderr shows "Handing off to the new updater
+(package manager)... Installing Python dependencies". The scan's own output is
+therefore contaminated (it contains sandbox/tool-call JSON, not just import
+results) and cannot be read as a clean pass/fail.
+
+Contained in this instance only because the probe set an isolated ``QUBIT_HOME``;
+the live installs dir was untouched and both services stayed active. Had it run
+against the real home, importing one module would have started a dependency
+install mid-verification.
+
+**Rule:** never import-sweep a tree without (a) an isolated HOME/temp env AND
+(b) a skip list for modules whose top level has side effects. Identify them by
+``if __name__ == "__main__"`` plus module-level calls, or run each import in a
+subprocess with a hard timeout and a scratch HOME. An import walk is code
+execution and must be treated as such.
