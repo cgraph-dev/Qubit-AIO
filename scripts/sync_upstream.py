@@ -95,17 +95,29 @@ def route(path: str) -> str:
     carrying the identifier (hermes.shared_metrics.v3.schema.json ->
     qubit.shared_metrics.v3.schema.json), since the rename was applied to file
     NAMES as well as directories.
+
+    A leading ``tests/`` is stripped and re-applied, because upstream mirrors
+    the source tree under it: ``tests/hermes_cli/test_x.py`` must become
+    ``tests/qubit_cli/test_x.py``. Without this the path falls through the
+    prefix rules unchanged and lands in a hermes_* -named test tree, which
+    re-infects pytest collection. Verified defect: 362 planned files mapped to
+    qubit_runtime/tests/hermes_cli/ instead of .../tests/qubit_cli/.
     """
-    for up in sorted(PREFIX_RULES, key=len, reverse=True):
-        if path == up:
-            return PREFIX_RULES[up]
-        if path.startswith(up + "/"):
-            return PREFIX_RULES[up] + path[len(up):]
-    # bare filename / nested component identifier rename
-    head, sep, tail = path.rpartition("/")
-    if tail.startswith("hermes"):
-        tail = "qubit" + tail[len("hermes"):]
-        return f"{head}{sep}{tail}"
+    for prefix in ("tests/", ""):
+        if prefix and not path.startswith(prefix):
+            continue
+        rest = path[len(prefix):] if prefix else path
+        for up in sorted(PREFIX_RULES, key=len, reverse=True):
+            if rest == up:
+                return prefix + PREFIX_RULES[up]
+            if rest.startswith(up + "/"):
+                return prefix + PREFIX_RULES[up] + rest[len(up):]
+        # bare filename / nested component identifier rename
+        head, sep, tail = rest.rpartition("/")
+        if tail.startswith("hermes"):
+            return f"{prefix}{head}{sep}qubit{tail[len('hermes'):]}"
+        if prefix:
+            return path  # tests/ subtree, nothing to rename
     return path
 
 
