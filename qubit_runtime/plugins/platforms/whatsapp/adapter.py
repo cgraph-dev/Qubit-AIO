@@ -65,6 +65,18 @@ def _windows_listener_pids(port: int) -> list:
     return _safe_ints(p[4] for p in rows if len(p) >= 5 and p[3] == "LISTENING" and p[1].endswith(f":{port}"))
 
 
+def _port_listener_pids(port: int) -> list:
+    """Listening PIDs on ``port`` for this platform: netstat on Windows, lsof/ss elsewhere."""
+    return _windows_listener_pids(port) if _IS_WINDOWS else _listener_pids_on_port(port)
+
+
+def _session_dir(extra) -> Path:
+    """Absolute session dir: --session, bridge.pid and every /health ``session`` comparison (gateway and standalone
+    sends) share this one string, or a gateway restarted from another cwd would see its own bridge as foreign."""
+    return Path(os.path.abspath(os.path.expanduser(str((extra or {}).get(
+        "session_path", get_qubit_dir("platforms/whatsapp/session", "whatsapp/session"))))))
+
+
 def _pid_looks_like_node_bridge(pid: int) -> bool:
     """Fail-closed: the live process must be a ``node`` executable (a scan-time PID can be a stranger by kill time).
 
@@ -85,7 +97,7 @@ def _pid_looks_like_node_bridge(pid: int) -> bool:
 def _kill_port_process(port: int) -> None:
     """Kill any node bridge *listening* on the given TCP port (never a client); SIGTERM on POSIX, taskkill /F on Windows."""
     with suppress(Exception):
-        for pid in (_windows_listener_pids(port) if _IS_WINDOWS else _listener_pids_on_port(port)):
+        for pid in _port_listener_pids(port):
             # Killing a mistyped or recycled PID is unrecoverable — verify first.
             if pid <= 0 or not _pid_looks_like_node_bridge(pid):
                 logger.warning("[whatsapp] Not killing PID %s on port %d: process is not a node bridge (or identity unverifiable)", pid, port)
@@ -121,22 +133,31 @@ def _unlink_quietly(path: Path) -> None:
         path.unlink()
 
 
+def _read_bridge_pidfile(session_path: Path) -> tuple:
+    """``(pid, kernel_start_time, port)`` from ``bridge.pid``; all ``None`` when absent or unparseable.
+    Line 1 = pid, optional line 2 = kernel start time, optional line 3 = the ``--port`` it was spawned
+    with (legacy files: pid only, or pid + start time)."""
+    pid_file = session_path / "bridge.pid"
+    if not pid_file.exists():
+        return None, None, None
+    try:
+        lines = [ln.strip() for ln in pid_file.read_text(encoding="utf-8-sig").split("\n")]
+        pid = int(lines[0])
+        recorded_start = int(lines[1]) if len(lines) > 1 and lines[1] else None
+        recorded_port = int(lines[2]) if len(lines) > 2 and lines[2] else None
+    except (ValueError, OSError, TypeError, IndexError):
+        return None, None, None
+    return pid, recorded_start, recorded_port
+
+
 def _kill_stale_bridge_by_pidfile(session_path: Path) -> None:
     """Kill an orphaned bridge recorded in ``bridge.pid``, after :func:`_bridge_pid_is_ours`."""
     from gateway.status import _pid_exists
     pid_file = session_path / "bridge.pid"
     if not pid_file.exists():
         return
-    pid = None
-    recorded_start = None
-    try:
-        # Format: line 1 = pid, optional line 2 = kernel start time. Legacy
-        # files written before the guard existed have only the pid.
-        lines = pid_file.read_text(encoding="utf-8-sig").split("\n")
-        pid = int(lines[0].strip())
-        if len(lines) > 1 and lines[1].strip():
-            recorded_start = int(lines[1].strip())
-    except (ValueError, OSError, TypeError, IndexError):
+    pid, recorded_start, _ = _read_bridge_pidfile(session_path)
+    if pid is None:
         _unlink_quietly(pid_file)
         return
     if _bridge_pid_is_ours(pid, recorded_start):
@@ -241,6 +262,50 @@ def check_whatsapp_requirements() -> bool:
         return False
 
 
+def _import_aiohttp():
+    import aiohttp
+    if not hasattr(aiohttp, "ClientSession"):  # half-removed install leaves a namespace shell (#71308)
+        where = getattr(aiohttp, "__file__", None) or list(getattr(aiohttp, "__path__", ()))  # a plain aiohttp.py has no __path__
+        raise ImportError(f"aiohttp at {where} is an incomplete install")
+    return aiohttp
+
+
+def ensure_aiohttp() -> Optional[tuple[str, bool]]:
+    """None once aiohttp imports (PM installs the ``sms`` extra, which is exactly aiohttp, when it is missing), else
+    (why not, retryable).
+
+    Every bridge call imports aiohttp; a sealed env without it used to fail each /health poll silently and loop
+    forever on "did not start in 15s" while the bridge was healthy (#126358).
+    """
+    try:
+        _import_aiohttp()
+        return None
+    except ImportError as exc:
+        if not isinstance(exc, ModuleNotFoundError):
+            return str(exc), False  # present but broken: PM sees it as installed, reinstalling is the user's call
+    from pm.environments import running_from_selected_environment
+    from pm.environments_adopt import restart_needed
+    from pm.extras import ensure_import
+    from pm.install import lazy_installs_allowed
+    from pm.paths import repo_root
+
+    # Read before the sync moves the selection. A foreign interpreter (dev venv, Nix) can never lazy-install; one an
+    # update left on an older generation can after a restart.
+    root = repo_root()
+    installable = lazy_installs_allowed() and (running_from_selected_environment(root) or restart_needed(root) is not None)
+    try:
+        ensure_import("sms")
+    except (RuntimeError, OSError, ValueError) as exc:  # InstallError/DownloadError; anything else escapes as transient
+        # Only policy or a foreign interpreter is final. A busy dependency lock, a failed download and "installed;
+        # restart Qubit to activate it" stay retryable: as final errors they exit the gateway 78 and keep it down.
+        return str(exc) or type(exc).__name__, installable
+    try:
+        _import_aiohttp()
+        return None
+    except ImportError as exc:
+        return f"{exc} after installing the sms extra", False
+
+
 # Env vars bridge.js consumes; injected because a multiplexed subprocess's os.environ lacks the secondary profile's .env.
 _BRIDGE_PASSTHROUGH_ENV = (
     "WHATSAPP_ALLOWED_USERS", "WHATSAPP_ALLOW_FROM", "WHATSAPP_DM_POLICY", "WHATSAPP_GROUP_POLICY",
@@ -291,7 +356,10 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         self._bridge_process: Optional[subprocess.Popen] = None
         self._bridge_port: int = extra.get("bridge_port", 3000)
         self._bridge_script: str = extra.get("bridge_script", str(self._DEFAULT_BRIDGE_DIR / "bridge.js"))
-        self._session_path = Path(extra.get("session_path", get_qubit_dir("platforms/whatsapp/session", "whatsapp/session")))
+        # One shared absolute session dir (see _session_dir): --session, bridge.pid
+        # and every /health `session` comparison must agree, or a gateway restarted
+        # from another cwd treats its own bridge as a foreign one.
+        self._session_path = _session_dir(extra)
         self._reply_prefix: Optional[str] = extra.get("reply_prefix")
         self._dm_policy = str(_extra_or_secret(extra, "dm_policy", "WHATSAPP_DM_POLICY", "pairing")).strip().lower()
         self._allow_from = self._coerce_allow_list(self._select_dm_allowlist(extra, ("WHATSAPP_ALLOWED_USERS",), _wenv))
