@@ -538,6 +538,7 @@ from cron.jobs import (
     _ensure_cron_dir, advance_next_runs, claim_dispatch, claim_job_for_fire, fire_claim_fence,
     clear_run_claim, get_due_jobs, heartbeat_fire_claim, heartbeat_run_claim, mark_job_run,
     save_job_output, self_removal_delivery_allowed, self_removal_delivery_scope, use_cron_store)
+from cron.execution_identity import enter_cron_execution, exit_cron_execution
 from cron.executions import (
     _TERMINAL_STATES, HANDOFF_ADOPTION_GRACE_SECONDS, create_execution, finish_execution,
     get_execution, mark_execution_handoff_pending, mark_execution_running,
@@ -625,6 +626,12 @@ _restart_safe_waiter_job_ids: set = set()
 # in-flight key -> pid of the restart-safe external worker executing it (absent for in-process
 # runs), so a drain observer can name the process holding the gateway open.
 _running_worker_pids: dict[tuple, int] = {}
+# In-flight keys whose external worker runs in its OWN transient systemd scope
+# (``GatewayChildDispatch.mode == "scoped"``). Only that worker outlives a gateway restart: a
+# systemd stop kills the service cgroup, so a ``degraded`` direct subprocess (no reachable user
+# bus) dies with the gateway even though it is external. The gateway's restart after-turn wait
+# skips exactly this set — see ``get_restart_wait_cron_counts``.
+_scope_isolated_job_ids: set = set()
 _running_lock = threading.Lock()
 
 # Per in-flight id: time.time() claim instant + the future owning its release (``_FUTURE_PENDING``
@@ -696,14 +703,16 @@ def get_running_job_ids() -> "frozenset[str]":
 
 
 def get_running_job_details() -> list[dict]:
-    """Per in-flight job: ``{"job_id", "elapsed_s", "worker_pid"}`` (``worker_pid`` None for in-process
-    runs). The drain wait publishes this so ``qubit update`` can say WHICH job it is waiting on."""
+    """Per in-flight job: ``{"job_id", "elapsed_s", "worker_pid", "restart_safe"}`` (``worker_pid``
+    None for in-process runs; ``restart_safe`` True when the worker owns its own systemd scope). The
+    drain wait publishes this so ``qubit update`` can say WHICH job it is waiting on."""
     now = time.time()
     with _running_lock:
         return [
             {"job_id": key[1],
              "elapsed_s": round(now - _running_since[key], 1) if key in _running_since else None,
-             "worker_pid": _running_worker_pids.get(key)}
+             "worker_pid": _running_worker_pids.get(key),
+             "restart_safe": key in _scope_isolated_job_ids}
             for key in sorted(_running_job_ids | _running_fire_owners.keys())
         ]
 
@@ -715,6 +724,11 @@ def get_wedged_job_ids() -> "frozenset[str]":
     alive (a delivery blocked on a dead transport, #115469), so the gateway restart drain reads this to
     skip them the way it skips wedged chat turns; restart is their remedy.
     """
+    return frozenset(key[1] for key in _wedged_inflight_keys())
+
+
+def _wedged_inflight_keys() -> "frozenset[tuple]":
+    """In-flight keys behind :func:`get_wedged_job_ids`, before the projection to bare job IDs."""
     now = time.time()
     with _running_lock:
         ages = {key: now - started for key, started in _running_since.items() if key in _running_job_ids}
@@ -744,7 +758,37 @@ def get_wedged_job_ids() -> "frozenset[str]":
                 if key in _running_job_ids:  # released meanwhile -> don't resurrect the entry
                     _running_allowance_s[key] = allowance
     return frozenset(
-        key[1] for key, age in ages.items() if age >= max(allowances[key], floor_seconds))
+        key for key, age in ages.items() if age >= max(allowances[key], floor_seconds))
+
+
+def get_restart_wait_cron_counts() -> dict:
+    """In-flight cron runs split for the gateway restart wait: ``awaitable``, ``wedged`` and
+    ``restart_safe`` (scoped external worker, not wedged). The three are disjoint and sum to the
+    number of in-flight runs.
+
+    A ``scoped`` worker runs in a transient user scope outside the gateway cgroup, so a systemd
+    stop/restart cannot reach it: the shutdown drain deliberately leaves it unmarked
+    (``mark_running_jobs_interrupted``) and its final send rides the durable delivery queue, drained
+    by whichever gateway is live next. Holding the restart wait for it only keeps the gateway in
+    ``draining`` (refusing new turns) for up to ``agent.restart_after_turn_timeout``. A ``degraded``
+    worker (external subprocess, no reachable user bus) stays in the gateway cgroup and dies with a
+    systemd stop, so it stays awaitable.
+
+    Counted per in-flight KEY, not per bare job ID: one multiplexed gateway can run the same job ID
+    in two profiles, and projecting to bare IDs first lets one profile's wedged or scoped run hide
+    the other profile's live run, which the restart would then kill (e.g. a scoped ``daily-brief``
+    in profile A next to a degraded ``daily-brief`` in profile B).
+    """
+    wedged = _wedged_inflight_keys()
+    with _running_lock:
+        inflight = _running_job_ids | _running_fire_owners.keys()
+        restart_safe = (_scope_isolated_job_ids & inflight) - wedged
+    wedged = wedged & inflight
+    return {
+        "awaitable": len(inflight - wedged - restart_safe),
+        "wedged": len(wedged),
+        "restart_safe": len(restart_safe),
+    }
 
 
 def is_job_running(job_id: str, home: Optional[Union[Path, str]] = None) -> bool:
@@ -759,6 +803,24 @@ def is_job_running(job_id: str, home: Optional[Union[Path, str]] = None) -> bool
     key = _inflight_key(job_id, home)
     with _running_lock:
         return key in _running_job_ids or key in _running_fire_owners
+
+
+def _record_external_cron_worker(job_id: str, pid: Any, *, scope_isolated: bool) -> None:
+    """Record the external worker holding *job_id* so a drain observer can name it, and whether
+    its scope isolates it from this process.
+
+    ``scope_isolated`` is the strong form of restart-safety: only a ``scoped`` dispatch
+    (``GatewayChildDispatch``) puts the worker in its own transient systemd scope, outside the
+    gateway cgroup. A ``degraded`` worker is still external but shares the cgroup and dies with a
+    systemd stop, so it must NOT be listed as restart-safe. Called once per accepted handoff;
+    both maps are cleared by ``release_running_job`` and by the worker waiter's ``finally``.
+    """
+    key = _inflight_key(job_id)
+    with _running_lock:
+        with contextlib.suppress(TypeError, ValueError):
+            _running_worker_pids[key] = int(pid)
+        if scope_isolated:
+            _scope_isolated_job_ids.add(key)
 
 
 def try_register_running_job(job_id: str) -> bool:
@@ -803,6 +865,7 @@ def release_running_job(job_id: str, home: Optional[Union[Path, str]] = None) ->
         _running_allowance_s.pop(key, None)
         _running_futures.pop(key, None)
         _running_worker_pids.pop(key, None)
+        _scope_isolated_job_ids.discard(key)
 
 
 def _inflight_min_allowance_minutes() -> float:
@@ -2152,6 +2215,11 @@ def _finalize_cron_session(session_db, agent, job_id: str, job_name: str, cron_s
         logger.debug("Job '%s': failed to close SQLite session store: %s", job_id, e)
 
 
+def _normalize_newlines(text: str) -> str:
+    """CRLF/CR -> LF, matching what text-mode reads of the archive return."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _run_doc_header(job: dict, title: str, job_id: str, prompt: str) -> str:
     """Header of the persisted run document (title, ids, schedule, prompt)."""
     return (
@@ -3131,6 +3199,63 @@ def _deliver_crash_failure(
     return delivery_error, delivery_outcome
 
 
+def _install_fire_secret_scope() -> "tuple[contextvars.Token, Optional[contextvars.Token]]":
+    """Install the firing profile's secret scope for the span ``_run_one_job_body`` runs, delivery
+    included, and return the tokens ``_reset_fire_secret_scope`` needs.
+
+    Hydrate the profile's external secret sources BEFORE freezing the scope — the order
+    gateway/run.py and the external cron worker already use: ``build_profile_secret_scope`` only
+    READS the per-home source map, so a scope frozen first would carry no vault-backed value.
+
+    For a fire routed to a profile other than the process's own (``routed_profile_fire`` on the
+    fire's home — every entry point: ticker, dashboard Run now, CLI) also run under multiplex semantics — for
+    exactly this span and no wider. The desktop backend ticks every local profile from a process
+    that is not a multiplexer, so nothing else isolates that fire; and switching the context on
+    here rather than at the tick means no read is ever fail-closed without a scope to read — the
+    restart-safe handoff in ``run_one_job`` runs before this and keeps today's semantics (#107692).
+    """
+    from agent.secret_scope import (
+        build_profile_secret_scope, set_multiplex_context, set_secret_scope)
+    from cron.scheduler_provider import routed_profile_fire
+    from qubit_cli.env_loader import hydrate_profile_secret_sources
+
+    home = Path(_get_qubit_home())
+    hydrate_profile_secret_sources(home)
+    scope_token = set_secret_scope(build_profile_secret_scope(home), profile_home=str(home))
+    context_token = set_multiplex_context(True) if routed_profile_fire() else None
+    return scope_token, context_token
+
+
+def _reset_fire_secret_scope(tokens: "tuple[contextvars.Token, Optional[contextvars.Token]]") -> None:
+    """Undo ``_install_fire_secret_scope`` — the context first, so multiplex semantics never
+    outlive the scope they depend on."""
+    from agent.secret_scope import reset_multiplex_context, reset_secret_scope
+
+    scope_token, context_token = tokens
+    if context_token is not None:
+        reset_multiplex_context(context_token)
+    reset_secret_scope(scope_token)
+
+
+@contextlib.contextmanager
+def _fire_secret_scope():
+    """``_install_fire_secret_scope`` for the ``with`` block, reset on the way out."""
+    tokens = _install_fire_secret_scope()
+    try:
+        yield
+    finally:
+        _reset_fire_secret_scope(tokens)
+
+
+def _start_owned_run(job: dict, execution_id: str) -> "Optional[contextvars.Token]":
+    """Win the run's ``claimed`` → ``running`` CAS and bind its cron identity; ``None`` when the run
+    lost ownership first. A restart-safe worker already won it by adopting the row."""
+    if os.environ.get("_HERMES_CRON_EXTERNAL_WORKER") == execution_id:
+        record = get_execution(execution_id)
+    elif (record := mark_execution_running(execution_id)) is None:
+        return None
+    return enter_cron_execution(job, execution_id, record or {})
+
 
 def _run_one_job_body(
     job: dict, *, adapters=None, loop=None, verbose: bool = False,
@@ -3154,6 +3279,7 @@ def _run_one_job_body(
 
     _scope_token = None
     _terminal_scope_token = None
+    _identity_token = None
     try:
         # Commit a finite one-shot's dispatch BEFORE its side effect so a tick dying mid-run cannot
         # re-fire it forever on restart. No-op for recurring/infinite jobs (at-most-times).
@@ -3171,8 +3297,9 @@ def _run_one_job_body(
         # Claimed durably before dispatch; becomes running only right before the actual run.
         # Detached workers transition to running while adopting; in-process paths must win the
         # claimed->running CAS here before any user script or agent side effect may begin.
-        external_owner = os.environ.get("_HERMES_CRON_EXTERNAL_WORKER") == execution_id
-        if not external_owner and mark_execution_running(execution_id) is None:
+        # The identity plugins read via ctx.current_cron_execution() is bound only on that win.
+        _identity_token = _start_owned_run(job, execution_id)
+        if _identity_token is None:
             logger.warning("Cron job %s lost execution ownership before start; skipping", job["id"])
             return True
 
@@ -3351,12 +3478,17 @@ def _run_one_job_body(
     finally:
         # Function-level on purpose: must scope delivery, deferred teardown, claim-loss handling and
         # bookkeeping — not just run_job. Do not move into the run block's finally.
+        exit_cron_execution(_identity_token)
         if _scope_token is not None:
             reset_secret_scope(_scope_token)
         if _terminal_scope_token is not None:
             from tools.terminal_scope import reset_terminal_scope
 
             reset_terminal_scope(_terminal_scope_token)
+
+
+class _ExternalWorkerPostHandoffError(RuntimeError):
+    """The waiter failed after the worker was spawned and may own the execution."""
 
 
 def _wait_for_external_cron_worker_body(
@@ -3419,10 +3551,14 @@ def _wait_for_external_cron_worker(
         return _wait_for_external_cron_worker_body(
             process, execution_id=execution_id
         )
+    except Exception as wait_error:
+        raise _ExternalWorkerPostHandoffError(str(wait_error)) from wait_error
     finally:
         if job_id is not None:
+            _key = _inflight_key(job_id)
             with _running_lock:
-                _restart_safe_waiter_job_ids.discard(_inflight_key(job_id))
+                _restart_safe_waiter_job_ids.discard(_key)
+                _scope_isolated_job_ids.discard(_key)
         # The execution is terminal or its worker is dead: nobody will read a
         # payload or acknowledgement left behind by a late/unread handoff.
         for stale in handoff_files:
@@ -3603,14 +3739,17 @@ def _launch_external_cron_worker(job: dict) -> bool:
                     handoff_files=(payload_path, stderr_path),
                 )
             logger.info(
-                "Cron job '%s' handed to restart-safe worker pid=%s execution=%s",
+                "Cron job '%s' handed to restart-safe worker pid=%s execution=%s dispatch=%s",
                 job_id,
                 acknowledgement.get("pid"),
                 execution_id,
+                dispatch.mode,
             )
-            with _running_lock, contextlib.suppress(TypeError, ValueError):
-                _running_worker_pids[_inflight_key(job_id)] = int(
-                    acknowledgement.get("pid") or process.pid)
+            _record_external_cron_worker(
+                job_id,
+                acknowledgement.get("pid") or process.pid,
+                scope_isolated=dispatch.mode == "scoped",
+            )
             return _wait_for_external_cron_worker(
                 process,
                 execution_id=execution_id,
