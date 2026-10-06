@@ -90,6 +90,69 @@ For `tests/hermes_cli/...`, `route()` leaves the path unchanged because the
 303-file tree from a previous run already exists, so this re-infects pytest
 collection. Caught by a pre-apply routing check before anything was written.
 
+## 9. A baseline measured on a DIRTY tree
+
+The worst one, because it corrupts every downstream judgement. The sweep printed a
+bare `prod_hard` number and it was read as a committed baseline. Five agents were
+told the floor was **0**; the same commit measured **19** in a clean worktree, and
+**12** after one more fix landed. The `0` was real for the main checkout only
+because its working tree carried ~79 uncommitted files that *delete the features*
+whose symbols were missing — `tools/computer_use/permissions.py` had the entire
+multi-backend `get_active_provider()` path stripped out, which is silencing a
+metric by removing the code, not fixing it.
+
+Cost: five agents spent iterations disputing the number instead of merging, and two
+of them wrote "your stated baseline is not reproducible" into their reports.
+
+**Fixed twice over:** the sweep now prints `HEAD`, the uncommitted-file count, and
+an explicit `RESULTS REFLECT UNCOMMITTED WORK` warning; and the reproducible
+baseline is committed as `docs/generated/entry_point_baseline.json`, generated from
+a clean detached worktree. Measure baselines in a worktree, never in a checkout you
+have been editing.
+
+## 10. A tool that resolves paths relative to the wrong checkout
+
+`sync_driver.py` hardcoded `REPO = Path("/home/trick/Projects/Repos/qubit-voicebridge")`
+while its sibling `sync_upstream.py` derived `REPO` from `__file__`. In a worktree
+the driver therefore read **main's** dirt (and refused), and would have applied the
+merge **into main**, destroying worktree isolation — the exact failure the
+per-worktree design exists to prevent. Three agents hit it and bypassed the driver
+by invoking `sync_upstream.py --apply --subtree` directly; one fixed it in its own
+worktree.
+
+**Rule:** any script that writes into a repo derives its root from `__file__`. A
+hardcoded absolute path is a latent cross-checkout write.
+
+## 11. `git stash` is repo-global, not worktree-local
+
+Worktrees share one stash stack. Two agents ran `git stash push -u` / `pop`
+concurrently; one popped a *foreign* stash and briefly had another agent's
+`tui_gateway` slice in its tree; another silently consumed the wrong entry. Both
+recovered, but one had its applied slice briefly vanish.
+
+**Rule:** never `git stash` in a shared-worktree campaign. To park work, use
+`git worktree` isolation itself, or commit. Two agents independently wrote "do not
+use git stash in this worktree" into their handoffs.
+
+## 12. A guard that fires on the wrong token
+
+`PROTECT_RULES[1]` (the bare-host mask) matches any `X.sh` token because `sh` is in
+its TLD list, so `from hermes_cli.observability.shared_metrics_gateway import ...`
+was masked and **never rebranded**, leaking `hermes_cli` into merged files. The
+agent that found it patched its own slice by post-processing and deliberately left
+the shared tool alone to avoid colliding with sibling worktrees. **Still unfixed.**
+
+## 13. A guard that silently does not cover the new feature
+
+Upstream's new plugin-isolation feature makes already-merged plugins code import
+`qubit_cli.plugin_isolation` (`ISOLATION_HOST`, `isolation_mode`,
+`in_process_import_refusal`, `user_plugin_host`). Those definitions live in a slice
+that had not landed, so merging `plugins` *added* 8 findings while resolving 5. The
+agent correctly **did not stub them** — a stub would be a second, silently
+drifting object (hazard #1). It verified they are function-local imports and
+therefore import-safe, and reported them as deferred, not fixed. That is the right
+call: a cross-slice dependency is not a defect in the slice that exposes it.
+
 ## The throughline
 
 Six of the eight are one shape: **a fallback or a default that produces a
