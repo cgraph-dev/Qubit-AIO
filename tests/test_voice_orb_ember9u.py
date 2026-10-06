@@ -97,10 +97,10 @@ def test_all_known_states_resolve():
 
 # -- fps cap + pause + reduced motion ------------------------------------------
 
-def test_fps_cap_is_33ms():
-    assert E.FRAME_MS == 33
-    assert E.should_advance(0.0, 32.9) is False
-    assert E.should_advance(0.0, 33.0) is True
+def test_fps_cap_is_16ms():
+    assert E.FRAME_MS == 16
+    assert E.should_advance(0.0, 15.9) is False
+    assert E.should_advance(0.0, 16.0) is True
     assert E.should_advance(100.0, 200.0) is True
 
 
@@ -134,7 +134,7 @@ def test_reduced_motion_render_static():
 # -- frame-level proof (offscreen: FakeCanvas stats, never a window) -----------
 
 def test_render_frame_stats_per_state():
-    for st in ("idle", "listening", "thinking", "speaking", "error"):
+    for st in ("idle", "listening", "thinking", "working", "speaking", "error"):
         fc = FakeCanvas()
         stats = E.render(fc, 48, 48, 48, 4.2, st)
         # 5 bands always drawn; rings per state; glow + core ovals.
@@ -142,22 +142,17 @@ def test_render_frame_stats_per_state():
         assert stats["points"] > 100, st
         assert stats["ovals"] >= 1 + 3, st  # core + min rings
         assert stats["min_y"] >= 0.0 and stats["max_y"] <= 96.0, st
-        # Per-state family (owner contract 2026-10-05: ORANGE idle,
-        # GREEN voice (listening + speaking share one green family),
-        # YELLOW thinking, RED error) — each mixed toward near-black.
-        # Green mixes keep green dominant but blue can exceed red
-        # (family core is (60,220,120)), so voice states assert g-max.
+        # Per-state family (owner palette 2026-10-06: each action its own
+        # hue; both renderers tint from E.STATE_CORES). Assert the fill hue
+        # is preserved from the state's core (mix toward white keeps the
+        # dominant channel dominant).
+        core = E.STATE_CORES[st]
+        core_dom = max(range(3), key=lambda i: core[i])
         for fill in stats["fills"]:
             assert fill.startswith("#") and len(fill) == 7, fill
             r, g, b = (int(fill[i:i + 2], 16) for i in (1, 3, 5))
-            if st == "idle":
-                assert r >= g >= b, (st, fill)
-            elif st in ("listening", "speaking"):
-                assert g >= r and g >= b, (st, fill)
-            elif st == "thinking":
-                assert r >= g > b, (st, fill)
-            elif st == "error":
-                assert r > g and r > b, (st, fill)
+            assert max(range(3), key=lambda i: (r, g, b)[i]) == core_dom, (
+                st, fill, core)
 
 
 def test_render_rings_expand_and_fade():

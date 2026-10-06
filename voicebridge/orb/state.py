@@ -2,11 +2,12 @@
 
 Mirrors the dashboard widget mapping
 (``frontend/qubit-web/src/lib/voice/waveform-state.ts``,
-``resolveWaveformState``): priority listening > speaking > thinking >
-idle (speaking outranks thinking since 2026-10-04 — a fresh stt.final
-inside its 12 s window used to mask an already-playing reply yellow);
-anything unknown falls back to idle so the orb can never get
-stuck animating a state it does not understand.
+``resolveWaveformState``): priority listening > speaking > working >
+thinking > idle (speaking outranks thinking since 2026-10-04 — a fresh
+stt.final inside its 12 s window used to mask an already-playing reply
+yellow; working was added 2026-10-06 so a running tool/action reads
+distinctly from a bare model turn); anything unknown falls back to idle
+so the orb can never get stuck animating a state it does not understand.
 
 Signal grounding (all read-only, all fail-closed):
 
@@ -44,7 +45,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-ORB_STATES = ("idle", "listening", "thinking", "speaking")
+ORB_STATES = ("idle", "listening", "thinking", "working", "speaking")
 
 #: Capture-side journal events that mean the mic path is live right now.
 #: The wake path emits the prefixed names (the bare ``wake.command`` never
@@ -67,6 +68,20 @@ _LISTENING_EVENTS = frozenset({
 #: Transcript-complete events: capture done, the turn is likely running.
 _THINKING_EVENTS = frozenset({"stt.final", "stt.completed"})
 
+#: Tool/action execution events: the agent is DOING something (a distinct
+#: amber "working" action, vs the indigo "thinking" of a bare model turn).
+#: ``broker.exec.*`` is the canonical tool-execution envelope; the
+#: ``worker.exec.*`` pair covers the headless worker path.
+_WORKING_START_EVENTS = frozenset(
+    {"broker.exec.start", "worker.exec.start", "worker.dispatch"})
+_WORKING_END_EVENTS = frozenset(
+    {"broker.exec.finish", "worker.exec.finish"})
+
+#: A tool/action run is treated as live this long after its start marker
+#: when no finish marker arrived (crash/leak backstop, same spirit as
+#: THINK_WINDOW_S).
+WORK_WINDOW_S = 120.0
+
 #: TTS-side journal events that mean Qubit is audibly replying.
 _SPEAKING_EVENTS = frozenset(
     {"tts.speak", "tts.synthesize", "voice_edit.helper.speak"})
@@ -79,6 +94,13 @@ _SPEAK_DONE_EVENTS = frozenset(
     {"voice_edit.helper.speak_done", "tts.done", "tts.speak_done"})
 
 LISTEN_WINDOW_S = 3.0
+#: Transcript-completion ceiling while a turn is in flight
+#: (``active_requests > 0``): the counter alone cannot stick thinking —
+#: it is cross-checked against the newest ``stt.final``/``stt.completed``
+#: marker, so a leaked count clears at most this long past the last
+#: transcript evidence (fail-closed: no evidence at all still trusts the
+#: counter). Once the counter returns to 0 only the short idle window
+#: below applies.
 THINK_WINDOW_S = 12.0
 SPEAK_WINDOW_S = 4.0
 
@@ -98,7 +120,7 @@ PENDING_TTL_S = 120.0
 #: cannot flap listening<->idle on one stale/missing event. Listening
 #: onset is instant (capture must read live the moment it starts) and
 #: error is immediate (not-working must never wait out a dwell).
-MIN_DWELL_S = 1.0
+MIN_DWELL_S = 0.35
 
 
 def _normalize_candidate(candidate: Any) -> str:
@@ -141,7 +163,7 @@ class DisplayState:
             return self.displayed
         # Instant onsets: listening must read live at once; error
         # (not-working) must never wait out a dwell.
-        if want in ("listening", "error"):
+        if want in ("listening", "speaking", "error"):
             self.displayed = want
             self._changed_at = now_f
             return self.displayed
@@ -218,8 +240,22 @@ def _latest_event_ts(events: Any, now: float, names: set,
     return latest
 
 
-def resolve_orb_state(status: Any, events: Any, now: float) -> str:
+def resolve_orb_state(status: Any, events: Any, now: float,
+                      heartbeat: Any = None) -> str:
     """Map a status payload + recent journal events to one orb state.
+
+    ``heartbeat`` (optional) is the desktop-helper heartbeat mapping. It
+    carries two EXACT signals the poll's recency windows cannot match:
+
+    - ``state`` == ``"listening"`` / ``"processing"``: the helper's own
+      Right-Ctrl state machine (mic open / turn running), so onset and
+      offset are exact instead of a fixed window.
+    - ``spec_tts`` (non-empty) + ``spec_tts_ts``: the synthesized reply's
+      band timeline. Its presence means audio is playing RIGHT NOW, so a
+      long reply stays green for its whole duration instead of dropping
+      to idle when the 4 s event window expires (live 2026-10-06: a
+      95-char weather answer was green only ~2.5 s then orange while the
+      agent was still talking).
 
     Never raises on malformed input; unknown/unreachable -> ``"idle"``.
     """
@@ -227,7 +263,25 @@ def resolve_orb_state(status: Any, events: Any, now: float) -> str:
         now_f = float(now)
     except (TypeError, ValueError):
         return "idle"
+    hb = heartbeat if isinstance(heartbeat, dict) else {}
     try:
+        hb_state = str(hb.get("state") or "").strip().lower()
+    except Exception:
+        hb_state = ""
+    hb_tts_aware = "spec_tts" in hb
+    tts_active = False
+    tts_ts = 0.0
+    if hb_tts_aware:
+        try:
+            tts_active = bool(hb.get("spec_tts"))
+            tts_ts = float(hb.get("spec_tts_ts") or 0.0)
+        except Exception:
+            tts_active = False
+    try:
+        # -- 1. listening: helper state is exact (Right-Ctrl mic open);
+        #       the wake path arrives as capture events below.
+        if hb_state == "listening":
+            return "listening"
         recent_listen = _recent_event_names(events, now_f, LISTEN_WINDOW_S)
         listening_hit = recent_listen & _LISTENING_EVENTS
         if listening_hit:
@@ -254,16 +308,40 @@ def resolve_orb_state(status: Any, events: Any, now: float) -> str:
                 return "listening"
             # Echo re-arm: fall through to the speaking/thinking/idle chain
             # (the fresh speak marker below will normally read speaking).
-        # Speaking is ACTIVE while the newest speak marker is newer than the
-        # newest done marker — so green ends the moment playback finishes
-        # instead of lingering for the recency window.
-        speak_ts = _latest_event_ts(events, now_f, _SPEAKING_EVENTS,
-                                    SPEAK_WINDOW_S)
-        if speak_ts is not None:
+        # -- 2. speaking. EXACT span from the helper's TTS timeline when
+        #       available (green for the whole reply); the event window is
+        #       kept as an onset fallback (and for older helpers / other
+        #       TTS paths). A done/barge-in marker newer than the timeline
+        #       start cuts green immediately.
+        speaking = False
+        if hb_tts_aware and tts_active:
             done_ts = _latest_event_ts(events, now_f, _SPEAK_DONE_EVENTS,
-                                       SPEAK_WINDOW_S)
-            if done_ts is None or speak_ts > done_ts:
-                return "speaking"
+                                       3600.0)
+            if done_ts is None or done_ts <= tts_ts:
+                speaking = True
+        if not speaking:
+            speak_ts = _latest_event_ts(events, now_f, _SPEAKING_EVENTS,
+                                        SPEAK_WINDOW_S)
+            if speak_ts is not None:
+                done_ts = _latest_event_ts(events, now_f, _SPEAK_DONE_EVENTS,
+                                           SPEAK_WINDOW_S)
+                if done_ts is None or speak_ts > done_ts:
+                    speaking = True
+        if speaking:
+            return "speaking"
+        # -- 3. working (amber): a tool/action run is live when its start
+        #       marker is newer than its finish marker (and not ancient).
+        work_start = _latest_event_ts(events, now_f,
+                                      _WORKING_START_EVENTS, WORK_WINDOW_S)
+        if work_start is not None:
+            work_end = _latest_event_ts(events, now_f,
+                                        _WORKING_END_EVENTS, WORK_WINDOW_S)
+            if work_end is None or work_start > work_end:
+                return "working"
+        # -- 4. thinking: the helper's PROCESSING state is exact; the
+        #       service turn counter + transcript events cover the rest.
+        if hb_state == "processing":
+            return "thinking"
         active = 0
         if isinstance(status, dict):
             try:
@@ -271,7 +349,22 @@ def resolve_orb_state(status: Any, events: Any, now: float) -> str:
             except (TypeError, ValueError):
                 active = 0
         if active > 0:
-            return "thinking"
+            # In-flight cap (2026-10-05): the counter alone cannot stick
+            # thinking forever (a leaked count has no age), so it is
+            # cross-checked against the newest turn evidence. Fresh
+            # evidence inside THINK_WINDOW_S -> thinking; stale evidence
+            # (older than the ceiling) falls through to the short idle
+            # window below (which is also stale -> idle). No evidence at
+            # all trusts the status (fail-closed: the counter is the only
+            # signal and contradicting it would hide a real turn).
+            fresh = _latest_event_ts(events, now_f, _THINKING_EVENTS,
+                                     THINK_WINDOW_S)
+            if fresh is not None:
+                return "thinking"
+            ever = _latest_event_ts(events, now_f, _THINKING_EVENTS, 3600.0)
+            if ever is None:
+                return "thinking"
+            # Stale: fall through (short idle window -> idle).
         # Turn over: only the SHORT idle window honors a transcript marker,
         # so a stale stt.final cannot stick yellow for the whole 12 s
         # ceiling once nothing is in flight.

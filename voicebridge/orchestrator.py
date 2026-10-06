@@ -1447,7 +1447,39 @@ class VoiceOrchestrator:
         except Exception:
             log_event("stt.prewarm.failed")
 
+    def _warm_mcp_discovery(self) -> None:
+        """Start this process's MCP discovery once, at boot.
+
+        MCP discovery is deliberately NOT a module-level side effect of the
+        vendored ``model_tools``: every long-lived entry point runs it itself at
+        startup (``tui_gateway/entry.py``, ``gateway/run.py``,
+        ``acp_adapter/entry.py``). This service is such an entry point -- it
+        serves ``/qubit-chat`` and the PTT turn -- but never ran it, so those
+        turns built an ``AIAgent`` without any MCP server ever being contacted.
+
+        ``agent._run_vendored_session`` now ensures discovery before each build.
+        This warm start is what makes the FIRST turn pay nothing for it: a cold
+        start begins discovery at that turn and only waits the bounded
+        ``mcp_discovery_timeout`` (1.5 s), while connecting this home's stdio
+        servers takes far longer -- so the first turn would still run without
+        MCP tools. Started here it overlaps ASR/TTS loading. Idempotent
+        (a second call joins the same thread) and best-effort: never fatal.
+        """
+        try:
+            from . import qubit_runtime as _qr
+            _qr.use_qubit_home(self.cfg)
+            _qr.ensure_path()
+            from qubit_cli.mcp_startup import (  # type: ignore
+                start_background_mcp_discovery)
+            start_background_mcp_discovery(
+                logger=get_logger(), thread_name="qubit-chat-mcp-discovery")
+        except Exception as exc:  # noqa: BLE001 - warm start is best-effort
+            log_event("agent.mcp_warm_start.failed", error=str(exc)[:160])
+
     def start(self) -> None:
+        # Begin MCP discovery now, so it overlaps ASR/TTS loading instead of
+        # delaying the first agent turn (see _warm_mcp_discovery).
+        self._warm_mcp_discovery()
         # worker lane first (may inform TTS choice)
         self._connect_worker()
         # ASR

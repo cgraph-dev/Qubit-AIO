@@ -213,11 +213,34 @@ _BRIEF_ME_RE = _re_module.compile(
 #: trigger; deliberately narrow — "I miss my old phone" is not a digest
 #: request (the verb needs the what/away/catch frame). The turn itself is
 #: on-request and never sleep-gated, mirroring brief_me(); only UNPROMPTED
-#: digest delivery consults sleep mode (and currently has no callers — the
+#: digest delivery consults sleep (and currently has no callers — the
 #: gate is in place for when a caller arrives).
+#: Sweep lane (2026-10-05): the bare-newness branches ("anything new" /
+#: "what's new") must not fire on topical newness — "what's new on YouTube"
+#: and "is there anything new on Netflix?" are skill/entertainment turns,
+#: not away-digests. Those two branches carry a negative lookahead for a
+#: topic continuation (on/about/in/at/for/with/from); the framed branches
+#: ("catch me up on Q3" IS a digest request) are untouched.
 _DIGEST_REQUEST_RE = _re_module.compile(
     r"\bwhat\s+did\s+i\s+miss\b|\bwhile\s+i\s+was\s+away\b"
-    r"|\bcatch\s+me\s+up\b|\banything\s+new\b|\bwhat'?s\s+new\b",
+    r"|\bcatch\s+me\s+up\b"
+    r"|\banything\s+new\b(?!\s+(on|about|in|at|for|with|from)\b)"
+    r"|\bwhat'?s\s+new\b(?!\s+(on|about|in|at|for|with|from)\b)",
+    _re_module.IGNORECASE)
+
+#: Deterministic reread (sweep lane, 2026-10-05): "say that again" /
+#: "read that back" / "repeat that" replays the last spoken answer instead
+#: of being dropped (router ignore) or chattered about (brain). End-anchored
+#: and punct-tolerant like the briefing shapes: "say that" (no again),
+#: "read the news", and "repeat after me" never match. "what did you say"
+#: is question-shaped but answered here, before the brain, so the replay is
+#: verbatim instead of a paraphrase.
+_REPEAT_RE = _re_module.compile(
+    r"\bsay\s+(that|it)\s+again\s*[.?!]*\s*$"
+    r"|\bread\s+(that|it)\s+back\s*[.?!]*\s*$"
+    r"|\brepeat\s+(that|it)\s*[.?!]*\s*$"
+    r"|\bwhat\s+did\s+you\s+(just\s+)?say\s*[?]?\s*$"
+    r"|\bcome\s+again\s*[?]?\s*$",
     _re_module.IGNORECASE)
 
 
@@ -1310,8 +1333,14 @@ class VoiceEditService:
         in particular "show me the waveform settings" (verb not adjacent
         to "waveform") and "waveform on the screen" (noun-first shape not
         utterance-final) never match.
+        Sweep lane (2026-10-05): any utterance about settings ("show
+        waveform in game settings", "open the waveform settings") is a
+        settings question, never a visibility flip — the old substring
+        match flipped the widget on the settings question (§84).
         """
         t = text or ""
+        if _re_module.search(r"\bsettings?\b", t, _re_module.IGNORECASE):
+            return None
         if _WAVEFORM_SHOW_RE.search(t):
             return "show"
         if _WAVEFORM_HIDE_RE.search(t):
@@ -1389,13 +1418,54 @@ class VoiceEditService:
     # in sleep. Neither path uses a model (deterministic, local-first).
     @staticmethod
     def is_briefing_request(text: str) -> bool:
-        """True when the utterance asks for a spoken briefing."""
-        return bool(_BRIEF_ME_RE.search(text or ""))
+        """True when the utterance asks for a spoken briefing.
+
+        Sweep lane (2026-10-05): an explicit brevity instruction ("be
+        brief", "please be brief.") is a style constraint on the NEXT
+        answer, never a request to hear the briefing — without this guard
+        it spoke a full briefing. The pinned mishear shapes ("brief",
+        "breathe.", "Breathe me.", "Brave me.") contain no "be brief"
+        and are unaffected.
+        """
+        t = text or ""
+        if _re_module.search(r"\bbe\s+brief\b", t, _re_module.IGNORECASE):
+            return False
+        return bool(_BRIEF_ME_RE.search(t))
 
     @staticmethod
     def is_digest_request(text: str) -> bool:
         """True when the utterance asks for the "while away" digest."""
         return bool(_DIGEST_REQUEST_RE.search(text or ""))
+
+    @staticmethod
+    def is_repeat_request(text: str) -> bool:
+        """True when the utterance asks to hear the last answer again."""
+        return bool(_REPEAT_RE.search(text or ""))
+
+    def _repeat_last_answer(self) -> "tuple[str, str]":
+        """The last spoken answer, verbatim, or ``("", "")`` to fall through.
+
+        Reads the ONE canonical store's voice session (same read
+        ``_conversation_context`` uses) and returns the newest non-empty
+        assistant message. Pure read: nothing is written, so a repeat never
+        duplicates the transcript. Never raises; an empty history falls
+        through to the brain/full-turn path byte-identical.
+        """
+        try:
+            store = self._canonical_store()
+            if store is None:
+                return "", ""
+            msgs = [m for m in
+                    store.messages(self._voice_session(), limit=50)
+                    .get("messages", [])
+                    if isinstance(m, dict)
+                    and str(m.get("role") or "") == "assistant"
+                    and str(m.get("content") or "").strip()]
+            if not msgs:
+                return "", ""
+            return str(msgs[-1].get("content") or "").strip(), "repeat"
+        except Exception:
+            return "", ""
 
     def _tool_shaped_proposal(self, text: str) -> Optional[Dict[str, Any]]:
         """Deterministic local tool for ``text``, or None (Lane-3 net).
@@ -2364,6 +2434,26 @@ class VoiceEditService:
         # reply drafts: a digest question is never a reply draft.
         if self.is_digest_request(question):
             return self.away_digest(request_id=request_id)
+        # Sweep lane (2026-10-05) — deterministic reread. "say that again"
+        # reached ask() as conversation and the brain paraphrased (or the
+        # router dropped it as ignore before it ever got here); the last
+        # spoken answer replays verbatim with no model in the loop. Runs
+        # with the briefing/digest block (on-request, never sleep-gated)
+        # and before reply drafts (no shape overlap — parse_reply needs a
+        # channel/recipient/body). Empty history falls through (None path
+        # below is brain/full-turn byte-identical). The replay is a pure
+        # re-speak: nothing is persisted, so the transcript never duplicates.
+        if self.is_repeat_request(question):
+            repeat_answer, repeat_model = self._repeat_last_answer()
+            if repeat_answer:
+                self._audit("voice_edit.ask", {
+                    "request_id": request_id, "mode": mode,
+                    "chars": len(question), "ok": True,
+                    "answer_chars": len(repeat_answer), "provider": "local",
+                    "model": repeat_model})
+                return {"ok": True, "answer": repeat_answer, "mode": mode,
+                        "provider": "local", "model": repeat_model,
+                        "spoken": False}
         staged = self._reply_draft(question)
         if staged is not None:
             kind, payload = staged

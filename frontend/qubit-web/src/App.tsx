@@ -80,7 +80,6 @@ import { useProfileScope } from "@/contexts/useProfileScope";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { ProfileScopeBanner } from "@/components/ProfileScopeBanner";
 import { MemoryPressureBanner } from "@/components/MemoryPressureBanner";
-import { WaveformOverlayMount } from "@/components/WaveformOverlayMount";
 import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
 import "@/styles/sidebar-studio.css";
@@ -1024,7 +1023,6 @@ export default function App() {
         </div>
       </div>
 
-      <WaveformOverlayMount />
       <PluginSlot name="overlay" />
     </div>
     </ProfileProvider>

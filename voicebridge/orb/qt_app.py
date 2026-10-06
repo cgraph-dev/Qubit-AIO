@@ -33,8 +33,11 @@ from . import ember as _ember
 from . import fullscreen as _fs
 from . import geometry as _geo
 from . import monitors as _mon
+from . import options as _options
 from . import persist as _persist
 from . import state as _state
+from . import stream as _stream
+from .app import LevelSmoother as _LevelSmoother
 
 try:
     from PySide6.QtCore import Qt, QTimer
@@ -50,8 +53,8 @@ except Exception as exc:  # headless / Qt-less: pure helpers still work
 
 #: Same cadence as the Tk view (single source of truth lives here too;
 #: values match ``app.FRAME_MS``/``app.POLL_MS`` and are pinned by test).
-FRAME_MS = 33
-POLL_MS = 1000
+FRAME_MS = 16
+POLL_MS = 500
 NOTICE_S = 5.0
 
 #: Collapsed dot fill (same contract as the Tk view).
@@ -92,19 +95,64 @@ def zone_at(x: float, y: float, size: int, collapsed: bool) -> str:
     return "main"
 
 
-def band_pen(band_index: int, orb_state: Any) -> Tuple[Tuple[int, int, int], float, int]:
+def _is_listening_state(orb_state: Any) -> bool:
+    """True only for the listening state (level modulates it alone)."""
+    try:
+        return str(orb_state or "").strip().lower() == "listening"
+    except Exception:
+        return False
+
+
+def _is_voice_state(orb_state: Any) -> bool:
+    """True for listening + speaking (the equalizer states, spec 2026-10-05)."""
+    try:
+        return str(orb_state or "").strip().lower() in (
+            "listening", "speaking")
+    except Exception:
+        return False
+
+
+def spec_bars_wanted(orb_state: Any, spectrum: Any) -> bool:
+    """True when the Qt paint path draws equalizer bars (pure).
+
+    Listening/speaking with a valid 12-float spectrum -> bars;
+    thinking/idle/error (no audio to analyse) or a missing/malformed
+    spectrum -> today's sine loop. Never raises.
+    """
+    try:
+        if not _is_voice_state(orb_state):
+            return False
+        return _ember.spec_bar_rects(spectrum, None, 48, 48, 46) != []
+    except Exception:
+        return False
+
+
+def band_pen(band_index: int, orb_state: Any,
+             level: Any = None, family: Any = None,
+             brightness_scale: Any = None
+             ) -> Tuple[Tuple[int, int, int], float, int]:
     """(rgb, alpha 0..1, width px) for one ember wave band.
 
     Color reads the single-source per-state table
-    (``ember.band_colors``); opacity/width keep the ``ember.render``
-    rule (opacity x brightness x 3, wide top bands). Pure, never raises.
+    (``ember.band_colors``), or ``family`` when a caller is cross-fading
+    states (``ember.ColorTransition``). Opacity/width keep the
+    ``ember.render`` rule (opacity x brightness x 3, wide top bands).
+    ``level`` modulates ONLY the listening state's brightness;
+    ``brightness_scale`` (from a spectrum-energy / mic level) modulates
+    any state uniformly. ``None`` everywhere renders exactly today's
+    loop (same contract as ``ember.render``). Pure, never raises.
     """
     try:
         params = _ember.resolve_params(orb_state)
         spec = _ember.BAND_SPECS[int(band_index) % len(_ember.BAND_SPECS)]
         op = float(spec[4])
         bright = float(params["brightness"])
-        fams = _ember.band_colors(orb_state)
+        if brightness_scale is not None:
+            bright *= float(brightness_scale)
+        elif level is not None and _is_listening_state(orb_state):
+            bright *= float(_ember.listening_brightness(level))
+        fams = (_ember.bands_from_family(family) if family is not None
+                else _ember.band_colors(orb_state))
         rgb = fams[int(band_index) % len(fams)]
         alpha = min(1.0, op * bright * 3.0)
         width = 2 if int(band_index) >= 3 else 1
@@ -113,18 +161,27 @@ def band_pen(band_index: int, orb_state: Any) -> Tuple[Tuple[int, int, int], flo
         return ((255, 84, 0), 0.1, 1)
 
 
-def core_stops(orb_state: Any) -> List[Tuple[float, Tuple[int, int, int, int]]]:
+def core_stops(orb_state: Any, level: Any = None, family: Any = None,
+               brightness_scale: Any = None
+               ) -> List[Tuple[float, Tuple[int, int, int, int]]]:
     """Radial-gradient stops for the state heart (offset, rgba).
 
     Highlight/mid read the single-source per-state family
-    (``ember.state_colors``): bright warm highlight at the center,
-    full state core mid, transparent edge. Pure, never raises.
+    (``ember.state_colors``), or ``family`` when cross-fading.
+    ``level`` modulates ONLY the listening state's brightness;
+    ``brightness_scale`` modulates any state uniformly. Pure, never
+    raises.
     """
     try:
-        fam = _ember.state_colors(orb_state)
+        fam = (dict(family) if family is not None
+               else _ember.state_colors(orb_state))
         hi = tuple(int(v) for v in fam["hi"])
         core = tuple(int(v) for v in fam["core"])
         bright = float(_ember.resolve_params(orb_state)["brightness"])
+        if brightness_scale is not None:
+            bright *= float(brightness_scale)
+        elif level is not None and _is_listening_state(orb_state):
+            bright *= float(_ember.listening_brightness(level))
     except (TypeError, ValueError):
         hi, core, bright = (255, 200, 120), (255, 84, 0), 0.45
     try:
@@ -139,10 +196,21 @@ def core_stops(orb_state: Any) -> List[Tuple[float, Tuple[int, int, int, int]]]:
     ]
 
 
-def ring_pen(phase01: float, index: int, orb_state: Any) -> Tuple[float, int]:
-    """(alpha 0..1, width px) for one pulse ring. Pure, never raises."""
+def ring_pen(phase01: float, index: int, orb_state: Any,
+             level: Any = None, brightness_scale: Any = None
+             ) -> Tuple[float, int]:
+    """(alpha 0..1, width px) for one pulse ring.
+
+    ``level`` modulates ONLY the listening state's brightness;
+    ``brightness_scale`` modulates any state uniformly. Pure, never
+    raises.
+    """
     try:
         bright = float(_ember.resolve_params(orb_state)["brightness"])
+        if brightness_scale is not None:
+            bright *= float(brightness_scale)
+        elif level is not None and _is_listening_state(orb_state):
+            bright *= float(_ember.listening_brightness(level))
         alpha = _ember.ring_alpha(phase01, bright)
         return (min(1.0, 0.25 + float(alpha) * 2), 2 if int(index) == 0 else 1)
     except (TypeError, ValueError):
@@ -155,7 +223,9 @@ if QWidget is not None:
 
         def __init__(self, poll: bool = True,
                      client_factory: Optional[Callable[[], Any]] = None,
-                     fullscreen_probe: Optional[Callable[[], bool]] = None) -> None:
+                     fullscreen_probe: Optional[Callable[[], bool]] = None,
+                     options: Any = None,
+                     enable_tray: bool = False) -> None:
             super().__init__(
                 None,
                 Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
@@ -172,6 +242,53 @@ if QWidget is not None:
             self.offline = False
             self.notice_until = 0.0
             self.ingame_override = False
+            # Talk-meter render state (same rule as the Tk view): the
+            # smoothed 0..1 level the paint path passes to the pen
+            # helpers; None = no level available (old helper/offline)
+            # -> exactly today's loop. Only the listening render path
+            # reads it (helpers gate by state).
+            try:
+                self._level_smoother = _LevelSmoother()
+            except Exception:
+                self._level_smoother = None
+            self._frame_level: Optional[float] = None
+            # Equalizer render state (same additive pattern as the Tk
+            # view): smoothed 12-float spectrum + peak caps; None = no
+            # spectrum yet -> today's sine loop. Listening reads live
+            # bands, speaking reads the TTS timeline frame.
+            try:
+                self._spec_smoother = _ember.SpectrumSmoother()
+            except Exception:
+                self._spec_smoother = None
+            self._frame_spec: Optional[list] = None
+            self._frame_peaks: Optional[list] = None
+            # Raw targets recorded by the poll; the paint path advances
+            # the per-frame smoothers from these so bars/brightness glide.
+            self._spec_target: Optional[list] = None
+            self._level_target: Optional[float] = None
+            self._anim_last: Optional[float] = None
+            # App options (size / opacity / speed / lock / per-action
+            # colors). None -> built-in defaults (tests never read the
+            # user's on-disk file); ``__main__`` passes load_options().
+            self._options = (_options.clamp_options(options)
+                             if options is not None else _options.OrbOptions())
+            try:
+                _geo.set_orb_size(self._options.size_px)
+            except Exception:
+                pass
+            self._speed = float(self._options.speed)
+            self._test_state: Optional[str] = None
+            self._test_until = 0.0
+            self._panel: Any = None
+            self._tray: Any = None
+            # Fluid color: every state change cross-fades through Oklab,
+            # honouring the user's per-action color overrides.
+            try:
+                self._color_transition = _ember.ColorTransition(
+                    self.orb_state,
+                    overrides=_options.color_overrides(self._options))
+            except Exception:
+                self._color_transition = None
             self._pending_rid: Optional[str] = None
             self._pending_ts = 0.0
             self._client_factory = client_factory or _default_client
@@ -215,6 +332,153 @@ if QWidget is not None:
             self._sig_timer.setInterval(250)
             self._sig_timer.timeout.connect(self._signal_tick)
             self._sig_timer.start()
+            # Live voice-journal tail: the orb reacts to physical voice
+            # boundaries (mic/TTS/transcript) at append time instead of
+            # waiting for the next HTTP poll. The poll stays for status /
+            # settings / heartbeat; events come from the journal.
+            self._journal = None
+            self._stream_queue = None
+            self._stream_timer = None
+            self._last_status: Any = None
+            self._last_heartbeat: Any = None
+            if poll:
+                try:
+                    self._stream_queue = queue.Queue(maxsize=1)
+                    self._journal = _stream.JournalTail(
+                        on_event=lambda _ev: self._mark_stream_dirty())
+                    self._journal.start()
+                    self._stream_timer = QTimer(self)
+                    self._stream_timer.setInterval(100)
+                    self._stream_timer.timeout.connect(self._stream_tick)
+                    self._stream_timer.start()
+                except Exception:
+                    self._journal = None
+            self._apply_window_opacity()
+            if enable_tray:
+                self._maybe_start_tray()
+
+        # -- live event stream (journal tail) ------------------------------
+        def _mark_stream_dirty(self) -> None:
+            """Called from the tail thread: signal 'events changed'."""
+            try:
+                q = self._stream_queue
+                if q is not None:
+                    q.put_nowait(True)
+            except Exception:
+                pass
+
+        def _stream_tick(self) -> None:
+            """GUI-thread: on new journal events, re-resolve state instantly.
+
+            Reuses the full apply path (state resolution + samples + test
+            override) with the journal's recent events and the last polled
+            status/heartbeat — no HTTP, so onset is ~100 ms instead of a
+            poll interval.
+            """
+            try:
+                q = self._stream_queue
+                if q is None:
+                    return
+                dirty = False
+                while True:
+                    try:
+                        q.get_nowait()
+                        dirty = True
+                    except Exception:
+                        break
+                if not dirty:
+                    return
+                events = self._journal.recent() if self._journal is not None else []
+                self._apply_poll_payload({
+                    "status": self._last_status,
+                    "events": events,
+                    "heartbeat": self._last_heartbeat,
+                })
+            except Exception:
+                pass
+
+        # -- app layer: options / tray / settings panel --------------------
+        def _apply_window_opacity(self) -> None:
+            try:
+                self.setWindowOpacity(float(self._options.opacity))
+            except Exception:
+                pass
+
+        def apply_options(self, opts: Any) -> None:
+            """Clamp, persist and apply new options live. Never raises."""
+            try:
+                self._options = _options.clamp_options(opts)
+                _options.save_options(self._options)
+                _geo.set_orb_size(self._options.size_px)
+                self._speed = float(self._options.speed)
+                self._apply_window_opacity()
+                try:
+                    self._color_transition = _ember.ColorTransition(
+                        self.orb_state,
+                        overrides=_options.color_overrides(self._options))
+                except Exception:
+                    pass
+                self._apply_geometry()
+                tray = getattr(self, "_tray", None)
+                if tray is not None:
+                    try:
+                        tray.set_locked(self._options.locked)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        def set_test_state(self, state: Any, seconds: Any = 4.0) -> None:
+            """Force a state for a few seconds (tray/panel 'test' actions)."""
+            try:
+                key = str(state or "").strip().lower()
+                if key not in _ember.STATE_CORES:
+                    return
+                self._test_state = key
+                self._test_until = time.monotonic() + max(
+                    0.5, min(30.0, float(seconds)))
+            except Exception:
+                pass
+
+        def open_settings(self) -> None:
+            """Show the settings panel (created once, lazily). Never raises."""
+            try:
+                from . import panel as _panel
+                cls = getattr(_panel, "SettingsPanel", None)
+                if cls is None:
+                    return
+                if getattr(self, "_panel", None) is None:
+                    self._panel = cls(self._options,
+                                      on_change=self.apply_options,
+                                      on_test=self.set_test_state)
+                try:
+                    self._panel.set_options(self._options)
+                except Exception:
+                    pass
+                self._panel.show()
+                self._panel.raise_()
+            except Exception:
+                pass
+
+        def _maybe_start_tray(self) -> None:
+            try:
+                if not self._options.show_tray:
+                    return
+                from . import tray as _tray
+                self._tray = _tray.OrbTray(
+                    on_toggle=self.request_toggle,
+                    on_settings=self.open_settings,
+                    on_quit=self.request_quit,
+                    on_test=self.set_test_state,
+                    on_lock=lambda locked: self.apply_options(
+                        _options.updated(self._options, locked=bool(locked))),
+                    options=self._options,
+                    parent=self,
+                )
+                if not self._tray.start():
+                    self._tray = None
+            except Exception:
+                self._tray = None
 
         # -- geometry (same rules as the Tk view) -------------------------
         def _target_rect(self) -> Any:
@@ -313,6 +577,10 @@ if QWidget is not None:
                     self.setCursor(Qt.PointingHandCursor)
                 except Exception:
                     pass
+                return
+            # Position lock (options): pressing still toggles voice on
+            # release, but the window never drags.
+            if getattr(self._options, "locked", False):
                 return
             try:
                 dx = float(ev.globalPosition().x()) - press["x"]
@@ -481,11 +749,21 @@ if QWidget is not None:
                     events = []
             except AttributeError:
                 events = []
+            try:
+                heartbeat = payload.get("heartbeat", None)
+                if not isinstance(heartbeat, dict):
+                    heartbeat = None
+            except AttributeError:
+                heartbeat = None
+            # Remember the latest polled status/heartbeat so the journal
+            # stream tick can re-resolve without another HTTP round-trip.
+            self._last_status = status
+            self._last_heartbeat = heartbeat
             self.offline = status is None
             _prev_state = str(getattr(self, "orb_state", ""))
             if status is not None:
                 raw = _state.resolve_orb_state(
-                    status, events, time.time())
+                    status, events, time.time(), heartbeat=heartbeat)
                 try:
                     if self._display is not None:
                         self.orb_state = self._display.update(
@@ -503,6 +781,16 @@ if QWidget is not None:
                         self.orb_state = "error"
                 except Exception:
                     self.orb_state = "error"
+            # Test override (tray/panel "Test animation"): hold the forced
+            # state for its window, then release back to the live feed.
+            try:
+                if self._test_state is not None:
+                    if time.monotonic() < self._test_until:
+                        self.orb_state = self._test_state
+                    else:
+                        self._test_state = None
+            except Exception:
+                pass
             # Transition-only journal row (2026-10-04: "stuck green"
             # reports are undecidable without it — no row means the
             # poll itself stopped firing). Never raises, never text.
@@ -514,6 +802,44 @@ if QWidget is not None:
                                to=_now_state)
             except Exception:
                 pass
+            # Talk-meter + equalizer SAMPLES: the poll only records the
+            # raw target here; the paint path advances the smoothers per
+            # frame (60fps) so brightness and bars glide between the 1s
+            # polls instead of stepping. None = no level/spectrum yet.
+            try:
+                try:
+                    _cli = self._get_client()
+                except Exception:
+                    _cli = None
+                get_level = getattr(_cli, "mic_level", None)
+                self._level_target = (get_level(status)
+                                      if callable(get_level) else None)
+            except Exception:
+                self._level_target = None
+            try:
+                try:
+                    _cli = self._get_client()
+                except Exception:
+                    _cli = None
+                cur = str(getattr(self, "orb_state", "") or ""
+                          ).strip().lower()
+                fresh: Optional[list] = None
+                if cur == "listening":
+                    get_spec = getattr(_cli, "spectrum", None)
+                    if callable(get_spec):
+                        fresh = get_spec(status)
+                    else:
+                        fresh = _client.spec_bands_from_payload(status)
+                elif cur == "speaking":
+                    get_tts = getattr(_cli, "tts_frame", None)
+                    if callable(get_tts):
+                        fresh = get_tts(status)
+                    else:
+                        fresh = _client.spec_tts_frame_from_payload(
+                            status)
+                self._spec_target = fresh
+            except Exception:
+                self._spec_target = None
             # Settings is a third blocking HTTP round-trip on the GUI
             # thread (a slow bridge wedged the painted state for the whole
             # tick), yet the ingame override flips rarely. It is fetched
@@ -571,8 +897,61 @@ if QWidget is not None:
             except Exception:
                 pass
 
+        def _advance_anim(self, now_mono: float) -> None:
+            """Advance the per-frame level/spectrum smoothers (60fps).
+
+            Bars and brightness then glide continuously between the 1s
+            polls instead of stepping. Never raises.
+            """
+            try:
+                last = getattr(self, "_anim_last", None)
+                self._anim_last = now_mono
+                if last is None:
+                    return
+                dt = max(0.0, min(0.25, now_mono - float(last)))
+                if dt <= 0.0:
+                    return
+                # Level: fast-attack / slow-release exponential follower.
+                tgt = getattr(self, "_level_target", None)
+                if tgt is None:
+                    self._frame_level = None
+                else:
+                    cur = getattr(self, "_frame_level", None)
+                    cur = 0.0 if cur is None else float(cur)
+                    tau = 0.07 if float(tgt) >= cur else 0.28
+                    a = 1.0 - math.exp(-dt / tau)
+                    self._frame_level = cur + (float(tgt) - cur) * a
+                # Spectrum: per-band fast-attack / slow-release + caps.
+                smoother = getattr(self, "_spec_smoother", None)
+                if smoother is None:
+                    self._frame_spec = getattr(self, "_spec_target", None)
+                    self._frame_peaks = None
+                    return
+                target = getattr(self, "_spec_target", None)
+                if target is None and not bool(getattr(smoother, "fed", False)):
+                    self._frame_spec = None
+                    self._frame_peaks = None
+                    return
+                self._frame_spec = smoother.update(target, dt=dt)
+                try:
+                    self._frame_peaks = list(
+                        getattr(smoother, "peaks", []) or [])
+                except Exception:
+                    self._frame_peaks = None
+                try:
+                    if target is None and max(
+                            [0.0] + [float(v) for v in
+                                     (self._frame_spec or [])]) < 1e-3:
+                        self._frame_spec = None
+                        self._frame_peaks = None
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
         def _frame_tick(self) -> None:
             try:
+                self._advance_anim(time.monotonic())
                 if self.visible and _ember.needs_frame(
                         True, self._pos.collapsed):
                     self.update()
@@ -581,6 +960,17 @@ if QWidget is not None:
 
         def _signal_tick(self) -> None:
             if self._quit_requested:
+                try:
+                    if self._journal is not None:
+                        self._journal.stop()
+                except Exception:
+                    pass
+                try:
+                    tray = getattr(self, "_tray", None)
+                    if tray is not None:
+                        tray.stop()
+                except Exception:
+                    pass
                 try:
                     self.close()
                 finally:
@@ -638,7 +1028,19 @@ if QWidget is not None:
                 t = float(getattr(self, "_paint_t", 0.0) or 0.0)
                 if _reduced_motion():
                     t = 0.0
-                fam = _ember.state_colors(self.orb_state)
+                else:
+                    try:
+                        t = t * float(getattr(self, "_speed", 1.0))
+                    except Exception:
+                        pass
+                tr = getattr(self, "_color_transition", None)
+                if tr is not None:
+                    try:
+                        fam = tr.update(self.orb_state, now_mono)
+                    except Exception:
+                        fam = _ember.state_colors(self.orb_state)
+                else:
+                    fam = _ember.state_colors(self.orb_state)
                 size = _geo.DOT_PX if self._pos.collapsed else _geo.ORB_PX
                 p = QPainter(self)
                 p.setRenderHint(QPainter.Antialiasing, True)
@@ -656,12 +1058,37 @@ if QWidget is not None:
                 speed = params["speed"]
                 bright = params["brightness"]
                 gain = params["band_gain"]
+                # Voice pump: listening reads the mic talk-meter, speaking
+                # reads the TTS spectrum energy so Qubit's own voice
+                # deforms the orb too. ``gain`` scales the bars; ``bscale``
+                # scales brightness for the inline glow/ring math; the pen
+                # helpers receive ``brightness_scale`` so their own bright
+                # matches. ``_lvl`` stays None (no double-apply).
+                _lvl = None
+                _bscale = None
+                try:
+                    _key = str(self.orb_state or "").strip().lower()
+                    if _key == "listening":
+                        _lf = getattr(self, "_frame_level", None)
+                        if _lf is not None:
+                            _bscale = _ember.listening_brightness(_lf)
+                            gain = float(gain) * _ember.listening_gain(_lf)
+                    elif _key == "speaking":
+                        _en = _ember.spectrum_energy(
+                            getattr(self, "_frame_spec", None))
+                        if _en is not None:
+                            _bscale = _ember.listening_brightness(_en)
+                            gain = float(gain) * _ember.listening_gain(_en)
+                except Exception:
+                    _bscale = None
+                _bright_eff = float(bright) * (
+                    float(_bscale) if _bscale is not None else 1.0)
 
                 # ambient mesh: two drifting radial glows
                 for gi in range(2):
                     dx = math.sin(t * 0.23) * R * 0.12 * (1 if gi == 0 else -1)
                     dy = math.cos(t * 0.19 + 1.3) * R * 0.12 * (1 if gi == 0 else -1)
-                    a = (0.10 if gi == 0 else 0.07) * bright
+                    a = (0.10 if gi == 0 else 0.07) * _bright_eff
                     cr_, cg_, cb_ = (int(v) for v in fam["core"])
                     grad = QRadialGradient(cx + dx, cy + dy, R * 1.1)
                     grad.setColorAt(0.0, QColor(cr_, cg_, cb_, int(255 * min(1.0, a * 2.2))))
@@ -675,36 +1102,73 @@ if QWidget is not None:
                 for i in range(n):
                     ph = _ember.ring_phase(t, i, n, params["ring_speed"])
                     rr = max(1.0, ph * R)
-                    alpha, width = ring_pen(ph, i, self.orb_state)
+                    alpha, width = ring_pen(ph, i, self.orb_state,
+                                            level=_lvl,
+                                            brightness_scale=_bscale)
                     p.setPen(QPen(QColor(wa_[0], wa_[1], wa_[2], int(255 * alpha)), width))
                     p.setBrush(Qt.NoBrush)
                     p.drawEllipse(cx - rr, cy - rr, rr * 2, rr * 2)
 
-                # wave bands: summed sines x gaussian envelope, real alpha
-                width = R * 2.0
-                x0 = cx - R
-                for bi, spec in enumerate(_ember.BAND_SPECS):
-                    path = QPainterPath()
-                    x = 0.0
-                    first = True
-                    while x <= width:
-                        y = _ember.band_point(
-                            x, t, spec, width, cy, R, gain, speed)
-                        if first:
-                            path.moveTo(x0 + x, y)
-                            first = False
-                        else:
-                            path.lineTo(x0 + x, y)
-                        x += 4
-                    rgb, alpha, wpx = band_pen(bi, self.orb_state)
-                    p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
-                                          int(255 * alpha)), wpx))
-                    p.drawPath(path)
+                # equalizer bars XOR wave bands: a smoothed spectrum in
+                # the listening/speaking states draws 12 log-scaled
+                # vertical bars (+ peak-hold cap ticks) in the state's
+                # color family; every other state (or no spectrum) draws
+                # exactly today's sine loop (fail-soft).
+                _spec = getattr(self, "_frame_spec", None)
+                _peaks = getattr(self, "_frame_peaks", None)
+                _rects = (_ember.spec_bar_rects(
+                    _spec, _peaks, cx, cy, R, gain)
+                    if spec_bars_wanted(self.orb_state, _spec) else [])
+                if _rects:
+                    for ri, rc in enumerate(_rects):
+                        bar_path = QPainterPath()
+                        bar_path.moveTo(rc["x"], rc["top"])
+                        bar_path.lineTo(rc["x"], rc["bottom"])
+                        rgb, alpha, wpx = band_pen(
+                            ri, self.orb_state, level=_lvl, family=fam,
+                            brightness_scale=_bscale)
+                        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
+                                              int(255 * alpha)),
+                                     max(wpx, 3)))
+                        p.drawPath(bar_path)
+                        cap_path = QPainterPath()
+                        cap_path.moveTo(rc["x"] - rc["half_w"],
+                                        rc["peak_top"])
+                        cap_path.lineTo(rc["x"] + rc["half_w"],
+                                        rc["peak_top"])
+                        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
+                                              int(255 * alpha)), 1))
+                        p.drawPath(cap_path)
+                else:
+                    # wave bands: summed sines x gaussian envelope, real alpha
+                    width = R * 2.0
+                    x0 = cx - R
+                    for bi, spec in enumerate(_ember.BAND_SPECS):
+                        path = QPainterPath()
+                        x = 0.0
+                        first = True
+                        while x <= width:
+                            y = _ember.band_point(
+                                x, t, spec, width, cy, R, gain, speed)
+                            if first:
+                                path.moveTo(x0 + x, y)
+                                first = False
+                            else:
+                                path.lineTo(x0 + x, y)
+                            x += 4
+                        rgb, alpha, wpx = band_pen(bi, self.orb_state,
+                                                   level=_lvl, family=fam,
+                                                   brightness_scale=_bscale)
+                        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
+                                              int(255 * alpha)), wpx))
+                        p.drawPath(path)
 
                 # core disc: ember heart with transparent falloff
                 cr = R * 0.40
                 core = QRadialGradient(cx, cy, cr)
-                for stop, rgba in core_stops(self.orb_state):
+                for stop, rgba in core_stops(self.orb_state, level=_lvl,
+                                             family=fam,
+                                             brightness_scale=_bscale):
                     core.setColorAt(stop, QColor(*rgba))
                 p.setPen(Qt.NoPen)
                 p.setBrush(core)
@@ -751,4 +1215,5 @@ __all__ = [
     "band_pen",
     "core_stops",
     "ring_pen",
+    "spec_bars_wanted",
 ]

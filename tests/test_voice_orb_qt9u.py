@@ -70,8 +70,8 @@ def test_zone_at_matches_tk_rule():
 def test_cadence_matches_tk_view():
     from voicebridge.orb import app as tk_app
     from voicebridge.orb import qt_app as qa
-    assert qa.FRAME_MS == tk_app.FRAME_MS == 33
-    assert qa.POLL_MS == tk_app.POLL_MS == 1000
+    assert qa.FRAME_MS == tk_app.FRAME_MS == 16
+    assert qa.POLL_MS == tk_app.POLL_MS == 500
     assert qa.NOTICE_S == tk_app.NOTICE_S
 
 
@@ -210,3 +210,84 @@ def test_qt_widget_paints_frame():
         assert img.pixelColor(77, 77).alpha() > 200  # core solid (154px orb)
     finally:
         w.close()
+
+
+@pytest.mark.skipif(NO_DISPLAY, reason="needs an X11 display for Qt")
+def test_qt_orb_applies_options_and_test_state(monkeypatch, tmp_path):
+    pytest.importorskip("PySide6.QtWidgets", reason="Qt-less env")
+    from PySide6.QtWidgets import QApplication
+    from voicebridge.orb import geometry as G
+    from voicebridge.orb import options as O
+    from voicebridge.orb import qt_app as qa
+
+    saved_save = O.save_options
+    monkeypatch.setattr(O, "save_options",
+                        lambda opts, path=None: saved_save(opts, tmp_path / "o.json"))
+    saved_px = G.ORB_PX
+    app = QApplication.instance() or QApplication([])
+    opts = O.OrbOptions(size_px=200, opacity=0.8, speed=1.5, locked=True,
+                        show_tray=False, colors={"listening": "#00FF00"})
+    w = qa.QtVoiceOrb(poll=False, client_factory=lambda: None,
+                      fullscreen_probe=lambda: False, options=opts,
+                      enable_tray=False)
+    try:
+        assert G.ORB_PX == 200
+        assert abs(w.windowOpacity() - 0.8) < 0.05
+        assert w._options.locked is True and abs(w._speed - 1.5) < 1e-6
+        assert w._color_transition._overrides == {"listening": (0, 255, 0)}
+        w.apply_options(O.updated(w._options, size_px=9999, opacity=0.5))
+        assert G.ORB_PX == O.SIZE_MAX
+        assert abs(w.windowOpacity() - 0.5) < 0.05
+        # test-state override wins over the feed, then expires
+        w.set_test_state("speaking", 5.0)
+        w._apply_poll_payload({"status": None, "events": []})
+        assert w.orb_state == "speaking"
+        w._test_until = 0.0
+        w._apply_poll_payload({"status": None, "events": []})
+        assert w.orb_state == "error"  # back to the live feed (offline)
+    finally:
+        w.close()
+        G.ORB_PX = saved_px
+
+
+@pytest.mark.skipif(NO_DISPLAY, reason="needs an X11 display for Qt")
+def test_qt_orb_position_lock_blocks_drag(monkeypatch, tmp_path):
+    pytest.importorskip("PySide6.QtWidgets", reason="Qt-less env")
+    from PySide6.QtWidgets import QApplication
+    from voicebridge.orb import geometry as G
+    from voicebridge.orb import options as O
+    from voicebridge.orb import qt_app as qa
+
+    saved_save = O.save_options
+    monkeypatch.setattr(O, "save_options",
+                        lambda opts, path=None: saved_save(opts, tmp_path / "o.json"))
+    saved_px = G.ORB_PX
+    app = QApplication.instance() or QApplication([])
+    w = qa.QtVoiceOrb(poll=False, client_factory=lambda: None,
+                      fullscreen_probe=lambda: False,
+                      options=O.OrbOptions(locked=True), enable_tray=False)
+    try:
+        w.move(100, 100)
+        w._pos = G.OrbPosition(x=100, y=100)
+        w._press = {"x": 0.0, "y": 0.0, "ox": 100, "oy": 100,
+                    "zone": "main", "dragging": False}
+
+        class _Ev:
+            def globalPosition(self):
+                class P:
+                    def x(self_inner):
+                        return 500.0
+
+                    def y(self_inner):
+                        return 500.0
+                return P()
+
+            def position(self):
+                return self.globalPosition()
+
+        w.mouseMoveEvent(_Ev())
+        assert (w._pos.x, w._pos.y) == (100, 100)
+        assert w._press["dragging"] is False
+    finally:
+        w.close()
+        G.ORB_PX = saved_px

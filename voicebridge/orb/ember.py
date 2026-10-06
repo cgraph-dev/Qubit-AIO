@@ -32,7 +32,7 @@ import math
 from typing import Any, Dict, List, Tuple
 
 #: Frame budget: ~30fps cap for Tk (``after(33)`` in the host).
-FRAME_MS = 33
+FRAME_MS = 16
 
 #: Ember-orange family on near-black (own palette values in that family).
 EMBER_CORE = (255, 84, 0)
@@ -42,52 +42,264 @@ EMBER_WARM_B = (255, 180, 80)
 EMBER_HI = (255, 200, 120)
 NEAR_BLACK = (11, 13, 18)
 
-#: Per-state color table (single source; both renderers read this).
-#: Owner contract (2026-10-05, supersedes the 2026-10-04 verbatim rule):
-#: GREEN = VOICE (listening and speaking share ONE green family — the
-#: agent hearing you and the agent talking to you read as the same
-#: voice-active state), YELLOW = THINKING (turn in flight, no audio
-#: either way), ORANGE = IDLE, RED = NOT WORKING. Core+bands+rings+
-#: glows all tint from the same family entry so the state reads as one
-#: color; gradients are preserved (each family carries its own
-#: hi/mid/warm ramp). Motion params in _STATE_PARAMS are untouched.
-STATE_COLORS: Dict[str, Dict[str, Tuple[int, int, int]]] = {
-    "idle": {
-        "core": (255, 84, 0),
-        "mid": (255, 100, 30),
-        "warm_a": (255, 140, 60),
-        "warm_b": (255, 180, 80),
-        "hi": (255, 200, 120),
-    },
-    "listening": {
-        "core": (60, 220, 120),
-        "mid": (80, 226, 136),
-        "warm_a": (112, 236, 162),
-        "warm_b": (150, 244, 190),
-        "hi": (190, 250, 216),
-    },
-    "thinking": {
-        "core": (255, 205, 70),
-        "mid": (255, 214, 94),
-        "warm_a": (255, 226, 122),
-        "warm_b": (255, 238, 152),
-        "hi": (255, 247, 185),
-    },
-    "speaking": {
-        "core": (60, 220, 120),
-        "mid": (80, 226, 136),
-        "warm_a": (112, 236, 162),
-        "warm_b": (150, 244, 190),
-        "hi": (190, 250, 216),
-    },
-    "error": {
-        "core": (255, 60, 50),
-        "mid": (255, 84, 70),
-        "warm_a": (255, 122, 104),
-        "warm_b": (255, 162, 142),
-        "hi": (255, 202, 186),
-    },
+#: Per-state CORE color. Owner palette 2026-10-06 (supersedes the
+#: 2026-10-05 "GREEN = VOICE both directions" contract — the owner asked
+#: for a distinct hue per action so YOU and QUBIT are never the same
+#: color): idle ember-orange, listening CYAN (the owner's mic / you
+#: talking), thinking INDIGO (model turn in flight), working AMBER (a
+#: tool/agent action is running), speaking VIOLET (Qubit's TTS voice),
+#: error red. Hues are deliberately far apart on the wheel so every
+#: transition reads at a glance.
+STATE_CORES: Dict[str, Tuple[int, int, int]] = {
+    "idle": (255, 84, 0),
+    "listening": (34, 211, 238),
+    "thinking": (99, 102, 241),
+    "working": (251, 191, 36),
+    "speaking": (192, 132, 252),
+    "error": (255, 60, 50),
 }
+
+
+def _family(core: Tuple[int, int, int]) -> Dict[str, Tuple[int, int, int]]:
+    """Expand one core RGB into the 5-step ramp the renderers read.
+
+    ``core`` -> ``mid``/``warm_a``/``warm_b``/``hi`` by mixing a growing
+    fraction toward white, so the gradient stack keeps the same shape in
+    every state while tinting wholly from the state's hue.
+    """
+    r, g, b = core
+
+    def _toward_white(t: float) -> Tuple[int, int, int]:
+        return (round(r + (255 - r) * t),
+                round(g + (255 - g) * t),
+                round(b + (255 - b) * t))
+
+    return {"core": (r, g, b), "mid": _toward_white(0.10),
+            "warm_a": _toward_white(0.24), "warm_b": _toward_white(0.38),
+            "hi": _toward_white(0.55)}
+
+
+#: Per-state color table (single source; both renderers read this).
+#: Core+bands+rings+glows all tint from the same family entry so the
+#: state reads as one color; each family carries its own hi/mid/warm
+#: ramp. Motion params in ``_STATE_PARAMS`` are untouched.
+STATE_COLORS: Dict[str, Dict[str, Tuple[int, int, int]]] = {
+    name: _family(core) for name, core in STATE_CORES.items()
+}
+
+
+def _coerce_core(core: Any) -> Optional[Tuple[int, int, int]]:
+    """Validate/clamp an override RGB; malformed -> None. Never raises."""
+    try:
+        r, g, b = (int(v) for v in core)
+    except Exception:
+        return None
+    return (max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)))
+
+
+def state_core(state: Any, overrides: Any = None) -> Tuple[int, int, int]:
+    """Per-state core RGB (unknown -> idle). Never raises.
+
+    ``overrides`` is an optional ``{state: (r, g, b)}`` map: when it holds
+    the (normalized) state, that core wins; otherwise the single-source
+    ``STATE_CORES`` table answers exactly as before. A malformed override
+    falls back to the table rather than raising.
+    """
+    key = _state_key(state)
+    if overrides is not None:
+        try:
+            if isinstance(overrides, dict):
+                for cand in (state, key):
+                    try:
+                        if cand in overrides:
+                            got = _coerce_core(overrides[cand])
+                            if got is not None:
+                                return got
+                            break
+                    except TypeError:
+                        continue
+        except Exception:
+            pass
+    return STATE_CORES[key]
+
+
+def family_from_core(core: Any) -> Dict[str, Tuple[int, int, int]]:
+    """Public ramp builder (see ``_family``); malformed -> idle family."""
+    try:
+        r, g, b = (int(v) for v in core)
+        return _family((r, g, b))
+    except Exception:
+        return dict(STATE_COLORS["idle"])
+
+
+def bands_from_family(fam: Any) -> Tuple[Tuple[int, int, int], ...]:
+    """5 band colors from a family dict (core,mid,warm_a,warm_b,mid)."""
+    try:
+        return (fam["core"], fam["mid"], fam["warm_a"],
+                fam["warm_b"], fam["mid"])
+    except Exception:
+        return BAND_COLORS
+
+
+# -- perceptual color blend (fluid state transitions) --------------------
+#
+# Interpolating saturated hues in raw sRGB passes through muddy greys.
+# These helpers convert through Oklab (Björn Ottosson) so a cyan->violet
+# cross-fade stays vivid the whole way. All pure; never raise.
+
+def _srgb_to_linear(c: float) -> float:
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _linear_to_srgb(c: float) -> float:
+    return 12.92 * c if c <= 0.0031308 else 1.055 * (c ** (1.0 / 2.4)) - 0.055
+
+
+def rgb_to_oklab(rgb: Tuple[int, int, int]) -> Tuple[float, float, float]:
+    """sRGB 0..255 -> Oklab (L, a, b). Never raises (bad input -> black)."""
+    try:
+        r, g, b = (_srgb_to_linear(max(0.0, min(1.0, v / 255.0)))
+                   for v in rgb)
+        l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
+        m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
+        s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
+        l_ = max(0.0, l) ** (1.0 / 3.0)
+        m_ = max(0.0, m) ** (1.0 / 3.0)
+        s_ = max(0.0, s) ** (1.0 / 3.0)
+        return (0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+                1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+                0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_)
+    except Exception:
+        return (0.0, 0.0, 0.0)
+
+
+def oklab_to_rgb(lab: Tuple[float, float, float]) -> Tuple[int, int, int]:
+    """Oklab -> sRGB 0..255 (gamut-clamped). Never raises."""
+    try:
+        cap = 1.5
+        L = max(-cap, min(cap, float(lab[0])))
+        a = max(-cap, min(cap, float(lab[1])))
+        b = max(-cap, min(cap, float(lab[2])))
+        l_ = L + 0.3963377774 * a + 0.2158037573 * b
+        m_ = L - 0.1055613458 * a - 0.0638541728 * b
+        s_ = L - 0.0894841775 * a - 1.2914855480 * b
+        l = l_ ** 3
+        m = m_ ** 3
+        s = s_ ** 3
+        r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s
+        g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s
+        bb = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+        out = []
+        for v in (r, g, bb):
+            try:
+                srgb = _linear_to_srgb(v)
+            except (ValueError, OverflowError):
+                srgb = 0.0
+            out.append(int(round(255.0 * max(0.0, min(1.0, srgb)))))
+        return (out[0], out[1], out[2])
+    except Exception:
+        return (0, 0, 0)
+
+
+def blend_core(a: Any, b: Any, t: float) -> Tuple[int, int, int]:
+    """Hue-swept, saturation-preserving blend of two core RGBs.
+
+    Interpolates in Oklab's polar form (LCh): hue travels the shortest
+    arc and chroma is interpolated directly, so a cyan->violet OR an
+    orange->cyan cross-fade stays vivid instead of passing through a
+    muddy grey (which raw-Oklab/sRGB lerp does at the midpoint).
+    ``t`` 0 -> a, 1 -> b. Never raises.
+    """
+    try:
+        tt = max(0.0, min(1.0, float(t)))
+        la = rgb_to_oklab(a)
+        lb = rgb_to_oklab(b)
+        ca = math.hypot(la[1], la[2])
+        cb = math.hypot(lb[1], lb[2])
+        ha = math.atan2(la[2], la[1])
+        hb = math.atan2(lb[2], lb[1])
+        dh = (hb - ha + math.pi) % (2.0 * math.pi) - math.pi
+        if ca < 1e-6:
+            ha = hb
+        if cb < 1e-6:
+            hb = ha
+        L = la[0] + (lb[0] - la[0]) * tt
+        C = ca + (cb - ca) * tt
+        h = ha + dh * tt
+        return oklab_to_rgb((L, C * math.cos(h), C * math.sin(h)))
+    except Exception:
+        try:
+            return tuple(int(v) for v in a)
+        except Exception:
+            return (255, 84, 0)
+
+
+def _smoothstep(t: float) -> float:
+    try:
+        x = max(0.0, min(1.0, float(t)))
+    except (TypeError, ValueError):
+        return 1.0
+    return x * x * (3.0 - 2.0 * x)
+
+
+#: Cross-fade time between state colors. Active-state entry ~200ms with
+#: an ease; anything the poll can do from 1s cadence reads as a smooth
+#: fade rather than a hard switch.
+COLOR_TRANSITION_S = 0.40
+
+
+class ColorTransition:
+    """Smoothly cross-fades the orb's color family between states.
+
+    One instance per view. ``update(state, now)`` returns the current
+    interpolated family dict (ready for ``render``/``band_pen``). A state
+    change starts a fresh ``COLOR_TRANSITION_S`` fade from wherever the
+    color currently is, so rapid transitions never snap. Pure time math;
+    never raises.
+    """
+
+    def __init__(self, state: Any = "idle", now: Any = None,
+                 duration: Any = COLOR_TRANSITION_S,
+                 overrides: Any = None) -> None:
+        self._overrides = overrides if isinstance(overrides, dict) else None
+        self._from = state_core(state, self._overrides)
+        self._to = self._from
+        self._current = self._from
+        try:
+            self._duration = max(1e-3, float(duration))
+        except (TypeError, ValueError):
+            self._duration = COLOR_TRANSITION_S
+        try:
+            self._changed = None if now is None else float(now)
+        except (TypeError, ValueError):
+            self._changed = None
+
+    def update(self, state: Any, now: Any) -> Dict[str, Tuple[int, int, int]]:
+        target = state_core(state, self._overrides)
+        try:
+            now_f = float(now)
+        except (TypeError, ValueError):
+            return family_from_core(self._current)
+        if target != self._to:
+            self._from = self._current
+            self._to = target
+            self._changed = now_f
+        if self._changed is None:
+            self._current = self._to
+        else:
+            held = now_f - self._changed
+            if held <= 0:
+                self._current = self._from
+            elif held >= self._duration:
+                self._current = self._to
+            else:
+                self._current = blend_core(
+                    self._from, self._to, _smoothstep(held / self._duration))
+        return family_from_core(self._current)
+
+    @property
+    def core(self) -> Tuple[int, int, int]:
+        return self._current
 
 #: Not-working indicator (offline/notice dots): the error family core.
 INDICATOR_RED = (255, 60, 50)
@@ -97,6 +309,31 @@ INDICATOR_RED = (255, 60, 50)
 #: untouched (phase identical regardless of frame count); only a hitch
 #: / suspend / dropped-frame burst clamps instead of teleporting.
 MAX_DT = 0.25
+
+# -- polish tuning (owner 2026-10-06: alive / organic / beautiful) --------
+#
+# All of these are pure functions of the frame clock: the same ``t``
+# always renders the same frame (no randomness anywhere), and every
+# energy term is gated so that "no audio" leaves the geometry exactly as
+# it was (bands only gain a small deterministic phase wobble).
+
+#: ``speed_scale`` clamp: multiplier applied to the animation clock ``tt``.
+SPEED_SCALE_MIN = 0.2
+SPEED_SCALE_MAX = 3.0
+
+#: Energy-driven living pulse: core disc + glow scale with voice energy.
+BREATH_GAIN = 0.07
+#: Subtle deterministic core heartbeat (fraction of the core radius).
+CORE_PULSE_GAIN = 0.06
+CORE_PULSE_HZ = 2.4
+#: Max organic band-phase wobble in radians (several frequencies summed).
+ORGANIC_PHASE_GAIN = 0.22
+#: Soft outer aura: base alpha + energy boost (extra translucent ovals).
+#: The base is kept high enough that mixing toward the blue-tinted
+#: NEAR_BLACK never flips the fill's dominant channel.
+AURA_BASE = 0.18
+AURA_GAIN = 0.16
+
 
 #: 5 wave bands as (amp, freq, speed, phase, opacity).
 #: Amps are in hero units and scaled to the orb radius at draw time.
@@ -132,6 +369,10 @@ _STATE_PARAMS: Dict[str, Dict[str, float]] = {
                   "rings": 4, "ring_speed": 0.30, "glow": 2},
     "thinking": {"speed": 1.0, "brightness": 0.70, "band_gain": 0.8,
                  "rings": 5, "ring_speed": 0.45, "glow": 2},
+    # Amber "working" (a tool/agent action is running): faster orbit than
+    # thinking so a long action visibly differs from a model turn.
+    "working": {"speed": 1.5, "brightness": 0.85, "band_gain": 0.9,
+                "rings": 6, "ring_speed": 0.60, "glow": 2},
     "speaking": {"speed": 1.8, "brightness": 1.0, "band_gain": 1.2,
                  "rings": 3, "ring_speed": 0.25, "glow": 2},
     "error": {"speed": 1.0, "brightness": 0.90, "band_gain": 0.8,
@@ -144,6 +385,102 @@ _STATE_PARAMS: Dict[str, Dict[str, float]] = {
 #: but never to a flat line, so the listening color stays visibly alive.
 #: Speech at level 1.0 reproduces exactly today's loop (gain 1.0).
 LISTEN_LEVEL_FLOOR = 0.15
+
+#: Equalizer bars (spec design 2026-10-05): 12 log-spaced bands, drawn
+#: in the state's color family for the two voice states only
+#: (listening + speaking share the owner-contract green). Thinking /
+#: idle / error ignore the spectrum and render byte-identical to today;
+#: ``None`` renders exactly today's sine loop (fail-soft). Reduced
+#: motion draws the same bars with frozen time (a static snapshot —
+#: bars carry no time phase, so they are inherently still).
+SPEC_BARS = 12
+
+#: Per-band fast-attack (~100ms) / slow-release (~400ms) time constants
+#: for :class:`SpectrumSmoother` (exponential approach per update).
+SPEC_ATTACK_S = 0.1
+SPEC_RELEASE_S = 0.4
+
+#: Peak-hold cap fall rate (units/second): caps hold the hit, then fall
+#: slowly away so transients leave a visible trace.
+SPEC_PEAK_FALL = 0.6
+
+
+class SpectrumSmoother:
+    """Per-band fast-attack/slow-release follower + peak-hold caps.
+
+    ``update(target, dt)`` folds one poll's 12-float band vector in and
+    returns the smoothed 12-float list; ``update(None, dt)`` decays
+    toward flat (stale eases, never freezes mid-air). ``peaks`` holds
+    the slow-falling per-band caps the renderer draws as ticks. Pure
+    math, no I/O; never raises. Same instance pattern as the orb views'
+    ``LevelSmoother`` (one instance per view, updated on the poll tick).
+    """
+
+    def __init__(self, bands: int = SPEC_BARS,
+                 attack_s: float = SPEC_ATTACK_S,
+                 release_s: float = SPEC_RELEASE_S,
+                 peak_fall: float = SPEC_PEAK_FALL) -> None:
+        try:
+            n = max(1, int(bands))
+        except (TypeError, ValueError):
+            n = SPEC_BARS
+        self.values: List[float] = [0.0] * n
+        self.peaks: List[float] = [0.0] * n
+        try:
+            self.attack_s = max(1e-3, float(attack_s))
+        except (TypeError, ValueError):
+            self.attack_s = SPEC_ATTACK_S
+        try:
+            self.release_s = max(1e-3, float(release_s))
+        except (TypeError, ValueError):
+            self.release_s = SPEC_RELEASE_S
+        try:
+            self.peak_fall = max(0.0, float(peak_fall))
+        except (TypeError, ValueError):
+            self.peak_fall = SPEC_PEAK_FALL
+        #: True once a real vector was ever folded in (lets the caller
+        #: tell "no spectrum yet" (render the legacy loop) from
+        #: "spectrum gone stale" (ease the bars to flat)).
+        self.fed = False
+
+    def update(self, target: Any, dt: float = 1.0) -> List[float]:
+        """Fold one sample in; return the smoothed band list."""
+        try:
+            step = max(0.0, float(dt))
+        except (TypeError, ValueError):
+            step = 1.0
+        try:
+            want = ([max(0.0, min(1.0, float(v))) for v in target]
+                    if target is not None else [0.0] * len(self.values))
+            if len(want) != len(self.values):
+                want = [0.0] * len(self.values)
+            elif target is not None:
+                self.fed = True
+        except (TypeError, ValueError):
+            want = [0.0] * len(self.values)
+        except Exception:
+            want = [0.0] * len(self.values)
+        try:
+            a_rate = 1.0 - math.exp(-step / self.attack_s)
+            r_rate = 1.0 - math.exp(-step / self.release_s)
+        except (OverflowError, ZeroDivisionError):
+            a_rate, r_rate = 1.0, 1.0
+        out: List[float] = []
+        try:
+            for i, cur in enumerate(self.values):
+                w = want[i]
+                rate = a_rate if w >= cur else r_rate
+                nxt = cur + (w - cur) * rate
+                out.append(nxt)
+                peak = self.peaks[i]
+                if nxt >= peak:
+                    self.peaks[i] = nxt
+                else:
+                    self.peaks[i] = max(nxt, peak - self.peak_fall * step)
+            self.values = out
+        except Exception:
+            pass
+        return list(self.values)
 
 #: Brightness floor paired with the gain floor: quiet listening dims but
 #: keeps its color family (state.py owns color; this only modulates
@@ -180,6 +517,38 @@ def listening_brightness(level: Any) -> float:
     except Exception:
         return 1.0
     return LISTEN_BRIGHT_FLOOR + (1.0 - LISTEN_BRIGHT_FLOOR) * lvl
+
+
+def _speed_scale(value: Any) -> float:
+    """Clamp an animation-clock multiplier to [0.2, 3.0]; bad -> 1.0."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return 1.0
+    except Exception:
+        return 1.0
+    if not (v >= SPEED_SCALE_MIN):
+        v = SPEED_SCALE_MIN
+    return min(SPEED_SCALE_MAX, v)
+
+
+def spectrum_energy(spectrum: Any) -> Optional[float]:
+    """Scalar 0..1 loudness of a 12-band spectrum (drives the voice pump).
+
+    A blend of the loudest band and the mean (so a few active low bands
+    still read loud, but a single spike cannot slam the orb to full).
+    ``None``/malformed -> ``None`` (caller renders with no modulation).
+    Never raises.
+    """
+    try:
+        vals = [max(0.0, min(1.0, float(v))) for v in spectrum]
+        if not vals:
+            return None
+        peak = max(vals)
+        mean = sum(vals) / len(vals)
+        return max(0.0, min(1.0, 0.65 * peak + 0.35 * mean))
+    except Exception:
+        return None
 
 
 def _hex(rgb: Tuple[int, int, int]) -> str:
@@ -357,24 +726,58 @@ def gaussian_envelope(x: float, w: float) -> float:
         return 0.0
 
 
+def _organic_phase(t: float, seed: float) -> float:
+    """Deterministic pseudo-noise phase offset in ~[-1, 1].
+
+    Several incommensurate sines of the frame clock (seeded per band by
+    its phase) so the summed bands drift / breathe organically instead
+    of marching mechanically. Pure function of ``t`` (and the seed):
+    identical ``t`` always yields the identical offset — NEVER random.
+    Never raises.
+    """
+    try:
+        tt = float(t)
+        sd = float(seed)
+    except (TypeError, ValueError):
+        return 0.0
+    except Exception:
+        return 0.0
+    try:
+        return (0.5 * math.sin(tt * 0.9 + sd * 0.13)
+                + 0.3 * math.sin(tt * 1.7 + sd * 0.41)
+                + 0.2 * math.sin(tt * 2.6 + sd * 0.77))
+    except Exception:
+        return 0.0
+
+
 def band_point(x: float, t: float, spec: Tuple[float, float, float, float, float],
                width: float, cy: float, radius: float,
-               band_gain: float = 1.0, speed: float = 1.0) -> float:
+               band_gain: float = 1.0, speed: float = 1.0,
+               organic: float = 1.0) -> float:
     """Y of one summed-sine band at canvas x (3 harmonics x envelope).
 
     Own scaling: the hero amp is mapped so ``REF_AMP`` spans the orb
     radius, times the per-state band gain; the harmonic sum is
     normalized so the peak equals that scaled amp at envelope 1.0.
     The result is clamped to the orb disc (Tk cannot clip to a circle).
+    ``organic`` scales a small deterministic per-band phase wobble
+    (0 disables it); it is a pure function of ``t``, never random.
     """
     try:
         amp, freq, spd, phase, _op = spec
         tt = float(t) * float(speed)
+        try:
+            org = (_organic_phase(float(t), float(phase))
+                   * ORGANIC_PHASE_GAIN * float(organic))
+        except (TypeError, ValueError):
+            org = 0.0
         amp_px = float(amp) * (float(radius) / REF_AMP) * float(band_gain)
         f = float(freq)
-        h1 = float(x) * f + tt * float(spd) + float(phase)
-        h2 = float(x) * f * 2.7 + tt * float(spd) * 1.3 + float(phase) * 1.7
-        h3 = float(x) * f * 5.1 + tt * float(spd) * 2.1 + float(phase) * 0.6
+        h1 = float(x) * f + tt * float(spd) + float(phase) + org
+        h2 = (float(x) * f * 2.7 + tt * float(spd) * 1.3
+              + float(phase) * 1.7 + org * 1.7)
+        h3 = (float(x) * f * 5.1 + tt * float(spd) * 2.1
+              + float(phase) * 0.6 + org * 0.6)
         wave = (math.sin(h1) + H2_WEIGHT * math.sin(h2)
                 + H3_WEIGHT * math.sin(h3)) / H_NORM
         y = float(cy) + amp_px * wave * gaussian_envelope(float(x), float(width))
@@ -406,6 +809,82 @@ def band_polyline(spec: Tuple[float, float, float, float, float], t: float,
     return pts
 
 
+def _spec_vector(values: Any) -> Optional[List[float]]:
+    """Validated 12-float 0..1 spectrum, else None (fail-soft)."""
+    try:
+        vals = list(values)
+    except (TypeError, ValueError):
+        return None
+    except Exception:
+        return None
+    if len(vals) != SPEC_BARS:
+        return None
+    out: List[float] = []
+    try:
+        for v in vals:
+            f = float(v)
+            if f != f:
+                return None
+            out.append(max(0.0, min(1.0, f)))
+    except (TypeError, ValueError):
+        return None
+    except Exception:
+        return None
+    return out
+
+
+def _bar_height(value: float, radius: float, band_gain: float) -> float:
+    """Log-scaled bar half-height: 0 -> 0, 1 -> radius * gain."""
+    try:
+        return max(0.0, float(radius) * math.log10(1.0 + 9.0 * value)
+                   * float(band_gain))
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
+
+
+def spec_bar_rects(spectrum: Any, peaks: Any, cx: float, cy: float,
+                   radius: float,
+                   band_gain: float = 1.0) -> List[Dict[str, Any]]:
+    """12 vertical-bar geometries for a spectrum (pure, hermetic).
+
+    Even layout across the orb disc; heights log-scaled so quiet bands
+    stay visible and loud bands never clip past the disc. Each rect is
+    ``{"band", "x", "top", "bottom", "peak_top", "value", "half_w"}``.
+    Malformed spectrum -> ``[]`` (the caller falls back to the sine
+    loop). Never raises; carries no time phase (bars are a snapshot).
+    """
+    bands = _spec_vector(spectrum)
+    if bands is None:
+        return []
+    caps = _spec_vector(peaks) if peaks is not None else list(bands)
+    if caps is None:
+        caps = list(bands)
+    try:
+        cx_f, cy_f = float(cx), float(cy)
+        r_f = max(4.0, float(radius))
+        gain = max(0.0, float(band_gain))
+    except (TypeError, ValueError):
+        return []
+    width = r_f * 2.0
+    slot = width / SPEC_BARS
+    rects: List[Dict[str, Any]] = []
+    for i in range(SPEC_BARS):
+        h = min(r_f, _bar_height(bands[i], r_f, gain))
+        ph = min(r_f, _bar_height(max(bands[i], caps[i]), r_f, gain))
+        x = cx_f - r_f + (i + 0.5) * slot
+        rects.append({
+            "band": i,
+            "x": x,
+            "top": max(cy_f - r_f, cy_f - h),
+            "bottom": min(cy_f + r_f, cy_f + h),
+            "peak_top": max(cy_f - r_f, cy_f - ph),
+            "value": bands[i],
+            "half_w": max(1.0, slot * 0.28),
+            "height": h,
+        })
+    return rects
+
+
 def ring_phase(t: float, index: int, count: int, ring_speed: float) -> float:
     """0..1 expansion phase of one pulse ring (evenly staggered)."""
     try:
@@ -426,41 +905,92 @@ def ring_alpha(phase01: float, brightness: float) -> float:
 
 def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
            state: Any = "idle", reduced_motion: bool = False,
-           level: Any = None) -> Dict[str, Any]:
+           level: Any = None, spectrum: Any = None,
+           spec_peaks: Any = None, colors: Any = None,
+           speed_scale: Any = 1.0) -> Dict[str, Any]:
     """Draw one ember-orb frame on a canvas-like object.
 
     Draw order (back to front): ambient glow ovals (stippled falloff),
-    pulse rings (expanding outlines), wave bands (polylines), core disc.
-    ``level`` is the talk-meter 0..1 float (or None): it modulates ONLY
-    the listening state's band_gain/brightness (silence visibly settles,
+    pulse rings (expanding outlines), wave bands (polylines) OR
+    equalizer bars, core disc.
+    ``level`` is the talk-meter 0..1 float (or None): it modulates the
+    listening state's band_gain/brightness (silence visibly settles,
     speech visibly pumps) while every other state renders byte-identical
-    with or without it, and ``None`` renders exactly today's loop. Color
-    always comes from the state family (state.py owns color).
+    with or without it, and ``None`` renders exactly today's loop.
+    ``spectrum`` is the smoothed 12-float equalizer vector (or None):
+    in the listening/speaking states it replaces the 5 sine polylines
+    with 12 log-scaled vertical bars (+ slow-falling peak-hold cap
+    ticks from ``spec_peaks``) in the same color family, and its energy
+    drives the speaking state's pump (Qubit's own voice deforms the
+    orb); thinking/working/idle/error ignore it (no audio to analyse —
+    byte-identical rendering); ``None`` (or malformed) renders exactly
+    today's sine loop (fail-soft). Bars carry no time phase, so
+    reduced-motion draws the identical static snapshot.
+    ``colors`` (optional) overrides the palette: a family dict from
+    ``ColorTransition.update`` (or a bare core RGB tuple) lets a caller
+    cross-fade state colors frame-by-frame; ``None`` reads the state's
+    static family exactly as before.
+    ``speed_scale`` (optional, default 1.0) multiplies the internal
+    animation clock ``tt`` (clamped to 0.2..3.0); 1.0 leaves the clock
+    untouched. The polish terms — a deterministic organic band wobble, a
+    soft outer aura, and an energy-driven living pulse on the core disc
+    and glow — are all pure functions of ``tt`` and the audio energy, so
+    the same inputs always render the same frame (never random).
     Returns frame stats for hermetic proof (no window needed):
-    ``{"ovals", "lines", "points", "min_y", "max_y", "fills"}``.
+    ``{"ovals", "lines", "points", "min_y", "max_y", "fills", "bars"}``.
     Never raises; a ``None`` canvas still yields stats shape with zeros.
     """
     params = resolve_params(state)
-    fam = state_colors(state)
-    fam_bands = band_colors(state)
+    key = _state_key(state)
+    if isinstance(colors, dict):
+        fam = dict(colors)
+        fam_bands = bands_from_family(fam)
+    elif colors is not None:
+        fam = family_from_core(colors)
+        fam_bands = bands_from_family(fam)
+    else:
+        fam = state_colors(state)
+        fam_bands = band_colors(state)
     speed = params["speed"]
     brightness = params["brightness"]
     band_gain = params["band_gain"]
-    if _state_key(state) == "listening" and level is not None:
+    # Voice pump + polish energy: listening reads the mic talk-meter,
+    # speaking reads the TTS spectrum energy — both settle and swell with
+    # the actual audio. ``pulse01`` (0..1) is the living-pulse depth; for
+    # listening, no level reads as the full reference (listening_gain
+    # treats None as 1.0), so level=None and level=1.0 render byte-for-byte
+    # the same frame (the existing loud==baseline contract).
+    energy: Optional[float] = None
+    pulse01 = 0.0
+    if key in ("listening", "speaking"):
         try:
-            band_gain = float(band_gain) * listening_gain(level)
-            brightness = float(brightness) * listening_brightness(level)
+            if key == "listening":
+                pulse01 = listening_gain(level)
+                if level is not None:
+                    band_gain = float(band_gain) * listening_gain(level)
+                    brightness = (float(brightness)
+                                  * listening_brightness(level))
+            else:
+                energy = (spectrum_energy(spectrum)
+                          if spectrum is not None else None)
+                if energy is not None:
+                    pump = listening_gain(energy)
+                    band_gain = float(band_gain) * pump
+                    brightness = (float(brightness)
+                                  * listening_brightness(energy))
+                    pulse01 = pump
         except Exception:
-            pass
+            energy = None
+            pulse01 = 0.0
     ring_count = int(params["rings"])
     ring_speed = params["ring_speed"]
     glow_layers = int(params["glow"])
-    tt = effective_time(t, reduced_motion)
+    tt = effective_time(t, reduced_motion) * _speed_scale(speed_scale)
     try:
         cx_f, cy_f, r_f = float(cx), float(cy), max(4.0, float(radius))
     except (TypeError, ValueError):
         return {"ovals": 0, "lines": 0, "points": 0, "min_y": 0.0,
-                "max_y": 0.0, "fills": []}
+                "max_y": 0.0, "fills": [], "bars": False}
     width = r_f * 2.0
     ovals = 0
     lines = 0
@@ -502,9 +1032,38 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         except Exception:
             pass
 
+    # -- living pulse + soft outer aura (pure fn of tt + audio energy) ----
+    # ``breathe`` == 1.0 with no audio, so the un-modulated frame keeps
+    # its exact geometry; it only swells with real voice energy.
+    breathe = 1.0
+    if pulse01 > 0.0:
+        try:
+            breathe = 1.0 + BREATH_GAIN * pulse01 * (
+                0.8 + 0.2 * math.sin(tt * 0.7 * math.pi))
+        except (ValueError, OverflowError):
+            breathe = 1.0
+    # Aura: two cheap translucent halos behind the glow that brighten with
+    # energy (no blur, no deps — big stippled ovals only).
+    for _ai, _frac in enumerate((0.98, 0.82)):
+        _rr = r_f * _frac * (1.0 + 0.02 * pulse01)
+        _base = AURA_BASE * (1.0 if _ai == 0 else 0.8)
+        _alpha = min(1.0, (_base + AURA_GAIN * pulse01) * brightness)
+        _fill = _hex(_mix(fam["warm_b"], NEAR_BLACK, _alpha))
+        _kw: Dict[str, Any] = {"fill": _fill, "outline": ""}
+        if _ai == 0:
+            _kw["stipple"] = "gray12"
+        _oval(cx_f - _rr, cy_f - _rr, cx_f + _rr, cy_f + _rr, **_kw)
+
     # -- ambient mesh: 1-2 slowly-drifting radial glows, layered ovals ----
-    drift_x = math.sin(tt * 0.23) * r_f * 0.12
-    drift_y = math.cos(tt * 0.19 + 1.3) * r_f * 0.12
+    # Two-frequency drift + the deterministic organic wobble so the glow
+    # never marches mechanically (same t -> same offset, never random).
+    _drift_wob = _organic_phase(tt, 3.0)
+    drift_x = ((math.sin(tt * 0.23) * 0.75
+                + math.sin(tt * 0.41 + 1.1) * 0.25) * r_f * 0.12
+               + _drift_wob * r_f * 0.02)
+    drift_y = ((math.cos(tt * 0.19 + 1.3) * 0.75
+                + math.cos(tt * 0.37 + 0.4) * 0.25) * r_f * 0.12
+               + _drift_wob * r_f * 0.02)
     glow_sets = (
         (fam["warm_b"], (0.95, 0.72, 0.50)),
         (fam["mid"], (0.80, 0.60, 0.40)),
@@ -513,7 +1072,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         gx = cx_f + drift_x * (1 if gi == 0 else -1)
         gy = cy_f + drift_y * (1 if gi == 0 else -1)
         for li, frac in enumerate(fracs):
-            rr = r_f * frac
+            rr = r_f * frac * breathe
             alpha = (0.10 + 0.08 * (len(fracs) - li) / len(fracs)) * brightness
             fill = _hex(_mix(glow_rgb, NEAR_BLACK, min(1.0, alpha * 2.2)))
             kw: Dict[str, Any] = {"fill": fill, "outline": ""}
@@ -530,30 +1089,69 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _oval(cx_f - rr, cy_f - rr, cx_f + rr, cy_f + rr,
               outline=outline, width=2 if i == 0 else 1)
 
-    # -- 5 wave bands: summed sines x gaussian envelope --------------------
-    x0 = cx_f - r_f
-    for bi, spec in enumerate(BAND_SPECS):
-        _amp, _f, _s, _p, op = spec
-        pts = band_polyline(spec, tt, width, cy_f, r_f, band_gain, speed)
-        shifted: List[float] = []
-        for k in range(0, len(pts), 2):
-            shifted.append(pts[k] + x0)
-            shifted.append(pts[k + 1])
-        alpha = min(1.0, float(op) * brightness * 3.0)
-        fill = _hex(_mix(fam_bands[bi % len(fam_bands)],
-                         NEAR_BLACK, alpha))
-        _line(shifted, fill=fill, width=2 if bi >= 3 else 1,
-              smooth=True)
+    # -- equalizer bars XOR 5 sine bands (voice states with a spectrum) ---
+    bars_on = False
+    try:
+        if _state_key(state) in ("listening", "speaking"):
+            bands = _spec_vector(spectrum)
+            if bands is not None:
+                caps = (_spec_vector(spec_peaks)
+                        if spec_peaks is not None else list(bands))
+                if caps is None:
+                    caps = list(bands)
+                rects = spec_bar_rects(bands, caps, cx_f, cy_f, r_f,
+                                       band_gain)
+                for ri, rc in enumerate(rects):
+                    alpha = min(1.0, (0.30 + 0.70 * rc["value"])
+                                * brightness)
+                    fill = _hex(_mix(fam_bands[ri % len(fam_bands)],
+                                     NEAR_BLACK, alpha))
+                    hw = rc["half_w"]
+                    _line([rc["x"], rc["top"], rc["x"], rc["bottom"]],
+                          fill=fill, width=3)
+                    cap_alpha = min(1.0, 0.35 + 0.65 * brightness)
+                    cap_fill = _hex(_mix(fam_bands[ri % len(fam_bands)],
+                                         NEAR_BLACK, cap_alpha))
+                    _line([rc["x"] - hw, rc["peak_top"],
+                           rc["x"] + hw, rc["peak_top"]],
+                          fill=cap_fill, width=1)
+                bars_on = True
+    except Exception:
+        bars_on = False
+    if not bars_on:
+        # -- 5 wave bands: summed sines x gaussian envelope ---------------
+        x0 = cx_f - r_f
+        for bi, spec in enumerate(BAND_SPECS):
+            _amp, _f, _s, _p, op = spec
+            pts = band_polyline(spec, tt, width, cy_f, r_f, band_gain,
+                                speed)
+            shifted: List[float] = []
+            for k in range(0, len(pts), 2):
+                shifted.append(pts[k] + x0)
+                shifted.append(pts[k + 1])
+            alpha = min(1.0, float(op) * brightness * 3.0)
+            fill = _hex(_mix(fam_bands[bi % len(fam_bands)],
+                             NEAR_BLACK, alpha))
+            _line(shifted, fill=fill, width=2 if bi >= 3 else 1,
+                  smooth=True)
 
-    # -- core disc: solid ember heart ---------------------------------------
+    # -- core disc: solid ember heart (subtle energy pulse in radius) ------
     core_alpha = min(1.0, 0.55 + 0.35 * brightness)
     core = _hex(_mix(fam["core"], NEAR_BLACK, core_alpha))
-    cr = r_f * 0.34
+    core_pulse = 1.0
+    if pulse01 > 0.0:
+        try:
+            core_pulse = 1.0 + CORE_PULSE_GAIN * pulse01 * (
+                0.5 + 0.5 * math.sin(tt * CORE_PULSE_HZ))
+        except (ValueError, OverflowError):
+            core_pulse = 1.0
+    cr = r_f * 0.34 * core_pulse
     _oval(cx_f - cr, cy_f - cr, cx_f + cr, cy_f + cr,
           fill=core, outline="")
 
     return {"ovals": ovals, "lines": lines, "points": points,
-            "min_y": min_y, "max_y": max_y, "fills": fills}
+            "min_y": min_y, "max_y": max_y, "fills": fills,
+            "bars": bars_on}
 
 
 __all__ = [
@@ -566,6 +1164,18 @@ __all__ = [
     "EMBER_HI",
     "NEAR_BLACK",
     "STATE_COLORS",
+    "STATE_CORES",
+    "COLOR_TRANSITION_S",
+    "SPEED_SCALE_MIN",
+    "SPEED_SCALE_MAX",
+    "state_core",
+    "family_from_core",
+    "bands_from_family",
+    "rgb_to_oklab",
+    "oklab_to_rgb",
+    "blend_core",
+    "ColorTransition",
+    "spectrum_energy",
     "INDICATOR_RED",
     "BAND_SPECS",
     "resolve_params",
@@ -587,4 +1197,10 @@ __all__ = [
     "listening_brightness",
     "LISTEN_LEVEL_FLOOR",
     "LISTEN_BRIGHT_FLOOR",
+    "SPEC_BARS",
+    "SPEC_ATTACK_S",
+    "SPEC_RELEASE_S",
+    "SPEC_PEAK_FALL",
+    "SpectrumSmoother",
+    "spec_bar_rects",
 ]

@@ -204,3 +204,77 @@ def test_stream_slash_model_streams_real_reply(monkeypatch):
     assert "delta" in kinds and kinds[-1] == "done", events
     done = events[-1]
     assert "qubit-spark17" in str(done.get("reply") or ""), done
+
+
+# -- inline slash (mid-sentence, one known /verb) -------------------------
+
+def test_inline_slash_extracts_single_known_verb():
+    from voicebridge import chat_transport as CT
+
+    assert CT.extract_inline_slash(
+        "please run /model here")["name"] == "model"
+    assert CT.extract_inline_slash(
+        "run /reasoning now")["name"] == "reasoning"
+    assert CT.extract_inline_slash("(see /status.)")["name"] == "status"
+
+
+def test_inline_slash_ignores_paths_urls_unknown_and_multi():
+    from voicebridge import chat_transport as CT
+
+    assert CT.extract_inline_slash("see /tmp/foo for details") is None
+    assert CT.extract_inline_slash(
+        "open https://github.com/x/y now") is None
+    assert CT.extract_inline_slash("hello there") is None
+    assert CT.extract_inline_slash("what is /frobnicate xyz") is None
+    assert CT.extract_inline_slash(
+        "use /model and /skills together") is None
+
+
+def test_inline_slash_turn_executes_real_backend(monkeypatch):
+    fake = _FakeStore()
+    CT = _hermetic(monkeypatch, fake)
+    monkeypatch.setattr(
+        CT, "resolve_route",
+        lambda cfg, req=None, **kw: {"ok": True, "model": "qubit-spark17",
+                                     "provider": "ollama", "kind": "local",
+                                     "profile_id": "qubit-spark17"})
+    out = CT.turn({}, "please run /model here",
+                  session="slash-inline-9u")
+    assert out.get("ok") is True, out
+    assert out.get("route") == "slash", out
+    assert "qubit-spark17" in out["reply"], out
+    rows = fake.rows.get("slash-inline-9u") or []
+    assert rows and rows[0]["content"] == "please run /model here", rows
+
+
+def test_inline_slash_path_sentence_never_enters_slash(monkeypatch):
+    fake = _FakeStore()
+    CT = _hermetic(monkeypatch, fake)
+
+    def _boom(cfg, text, **kw):
+        raise AssertionError("slash path must not run for a path sentence")
+
+    monkeypatch.setattr(CT, "run_qubitchat_slash", _boom)
+    monkeypatch.setattr(CT, "_finish_slash", _boom)
+    monkeypatch.setattr(CT, "_decide_branch",
+                        lambda text, cfg: {"action": "answer_local",
+                                           "kind": "conversation",
+                                           "task_text": text, "params": {},
+                                           "reason": "test"})
+    monkeypatch.setattr(CT, "resolve_route",
+                        lambda cfg, req=None, **kw: {"ok": False,
+                                                    "code": "MODEL_NOT_ALLOWED",
+                                                    "detail": "test pin"})
+    out = CT.turn({}, "see /tmp/foo for details",
+                  session="slash-inline-path-9u")
+    assert out.get("route") != "slash", out
+
+
+def test_reasoning_slash_answers_guidance_not_unknown(monkeypatch):
+    fake = _FakeStore()
+    CT = _hermetic(monkeypatch, fake)
+    out = CT.turn({}, "/reasoning", session="slash-reasoning-9u")
+    assert out.get("ok") is True, out
+    reply = str(out.get("reply") or "")
+    assert "Unknown slash command" not in reply, reply
+    assert "easoning" in reply, reply

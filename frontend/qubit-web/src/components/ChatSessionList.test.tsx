@@ -257,4 +257,52 @@ describe("ChatSessionList", () => {
       container.querySelectorAll(".qchat__session-row--active").length,
     ).toBe(0);
   });
+
+  it("pins an active session absent from the fetched list to the top", async () => {
+    // A canonical/worker resume id is often not in the chat-store list. The
+    // active row must still render first, highlighted, and labelled with it.
+    await renderList("canonical-worker-42");
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("First chat"),
+    );
+
+    const rows = container.querySelectorAll('[data-testid="session-row"]');
+    expect(rows.length).toBe(2);
+
+    const active = rows[0] as HTMLElement;
+    expect(active.textContent).toContain("canonical-worker-42");
+    expect(active.className).toContain("qchat__session-row--active");
+    expect(active.getAttribute("aria-current")).toBe("true");
+
+    const other = rows[1] as HTMLElement;
+    expect(other.textContent).toContain("First chat");
+    expect(other.className).not.toContain("qchat__session-row--active");
+    expect(other.getAttribute("aria-current")).toBeNull();
+  });
+
+  it("refetches when the window regains focus (live update)", async () => {
+    await renderList();
+    await vi.waitFor(() =>
+      expect(apiMocks.listChatSessions).toHaveBeenCalledTimes(1),
+    );
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await vi.waitFor(() =>
+      expect(apiMocks.listChatSessions).toHaveBeenCalledTimes(2),
+    );
+  });
+
+  it("clears the live-refresh interval on unmount", async () => {
+    const clearSpy = vi.spyOn(window, "clearInterval");
+    await renderList();
+    await vi.waitFor(() =>
+      expect(apiMocks.listChatSessions).toHaveBeenCalled(),
+    );
+    await act(async () => root.unmount());
+    // Stop the shared afterEach from unmounting the same root twice.
+    root = undefined as unknown as Root;
+    expect(clearSpy).toHaveBeenCalled();
+    clearSpy.mockRestore();
+  });
 });

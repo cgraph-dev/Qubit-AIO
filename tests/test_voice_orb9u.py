@@ -95,8 +95,32 @@ def test_capture_signal_counts_as_listening_not_command_accept():
         {}, [_ev("voice_edit.wake.command", 2.0, now)], now) == "idle"
 
 
-def test_state_names_match_widget_vocabulary():
-    assert set(orb_state.ORB_STATES) == {"idle", "listening", "thinking", "speaking"}
+def test_state_names_are_the_os_orb_vocabulary():
+    # Owner palette 2026-10-06: the OS orb is the only orb; "working" is a
+    # first-class action (amber) alongside idle/listening/thinking/speaking.
+    assert set(orb_state.ORB_STATES) == {
+        "idle", "listening", "thinking", "working", "speaking"}
+
+
+def test_working_state_on_tool_exec_events():
+    now = time.time()
+    # A live tool/action run (start newer than finish) reads "working".
+    assert orb_state.resolve_orb_state(
+        {"active_requests": 1},
+        [_ev("broker.exec.start", 1.0, now)], now) == "working"
+    # Finished -> no longer working (falls back to thinking while in flight).
+    assert orb_state.resolve_orb_state(
+        {"active_requests": 1},
+        [_ev("broker.exec.start", 3.0, now),
+         _ev("broker.exec.finish", 1.0, now)], now) == "thinking"
+    # No tool events -> plain thinking.
+    assert orb_state.resolve_orb_state(
+        {"active_requests": 1}, [_ev("stt.final", 1.0, now)], now) == "thinking"
+    # Working outranks thinking but not speaking.
+    speak_win = [_ev("broker.exec.start", 1.0, now),
+                 _ev("voice_edit.helper.speak", 0.5, now)]
+    assert orb_state.resolve_orb_state(
+        {"active_requests": 1}, speak_win, now) == "speaking"
 
 
 def test_capturing_suppressed_while_speak_recency_active():
@@ -188,16 +212,16 @@ def test_default_position_is_bottom_right_inside_screen():
 
 
 def test_orb_default_size_is_big_waveform():
-    # Owner 2026-10-04 (de-chrome lane): 20% smaller than the 192px build
-    # spec (45 * 1.5 = 67.5 -> 68); the collapsed dot stays 16px
-    # (compat constant only — the collapsed state is unreachable live).
-    assert orb_geo.ORB_PX == 68
+    # Owner 2026-10-06: enlarged to 168px so the equalizer is legible;
+    # the collapsed dot stays 16px (compat constant only — the collapsed
+    # state is unreachable live).
+    assert orb_geo.ORB_PX == 168
     assert orb_geo.DOT_PX == 16
-    assert orb_geo.window_size_px(False) == 68
+    assert orb_geo.window_size_px(False) == 168
     assert orb_geo.window_size_px(True) == 16
     pos = orb_geo.default_position(4500, 1080)
-    assert (pos.x, pos.y) == (4500 - 68 - orb_geo.MARGIN,
-                              1080 - 68 - orb_geo.MARGIN)
+    assert (pos.x, pos.y) == (4500 - orb_geo.ORB_PX - orb_geo.MARGIN,
+                              1080 - orb_geo.ORB_PX - orb_geo.MARGIN)
     assert pos.collapsed is False
 
 
@@ -591,8 +615,8 @@ def test_tk_initial_geometry_applies_persisted_position():
             # position suffix plus the canvas at the new size (live
             # mapping size is proven separately via getwindowgeometry).
             assert orb.root.geometry().endswith(f"+{want.x}+{want.y}")
-            assert int(orb.canvas.cget("width")) == size == 68
-            assert int(orb.canvas.cget("height")) == size == 68
+            assert int(orb.canvas.cget("width")) == size == orb_geo.ORB_PX
+            assert int(orb.canvas.cget("height")) == size == orb_geo.ORB_PX
         finally:
             orb.close()
     finally:

@@ -1,7 +1,7 @@
 """Orb poll off the mainloop: worker thread + queue handoff (2026-10-05).
 
 Root causes (proven live): ``_poll_tick`` ran 2-3 blocking HTTP calls
-(status + log + every-5th settings, 10 s timeouts each) on the Tk
+(status + log + every-5th settings, 2 s timeouts each) on the Tk
 mainloop, so 33 ms frame ticks starved and the animation froze exactly
 during turns; POLL_MS=2000 + MIN_DWELL 1 s lagged color 0-3 s behind
 reality; ``orb.state`` transition rows were invisible via
@@ -14,7 +14,7 @@ Contract pinned here:
 - ``_poll_tick`` drains the queue and applies on the mainloop; it only
   fetches synchronously when no worker is alive (tests/--once-style
   paths), never while a worker owns fetching.
-- POLL_MS is 1000 in both views; status/log timeouts are 2 s.
+- POLL_MS is 500 in both views; status/log timeouts are 2 s.
 - ``orb.`` is an allowed log prefix (read-only visibility, no text).
 
 Hermetic: fake clients/queues, bare orbs (no Tk/Qt, no display).
@@ -35,10 +35,12 @@ from voicebridge.voice_edit import logview  # noqa: E402
 
 # -- cadence / timeouts / prefix --------------------------------------------
 
-def test_poll_ms_is_1000_both_views():
+def test_poll_ms_is_500_both_views():
+    # Owner 2026-10-06: 1s poll + dwell lagged color up to ~2s; halved
+    # to 500ms for "super responsive" state changes (localhost only).
     from voicebridge.orb import qt_app as qa
-    assert orb_app.POLL_MS == 1000
-    assert qa.POLL_MS == orb_app.POLL_MS == 1000
+    assert orb_app.POLL_MS == 500
+    assert qa.POLL_MS == orb_app.POLL_MS == 500
 
 
 def _timeout_recorder(payload):

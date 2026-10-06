@@ -100,6 +100,8 @@ interface ChatMessage {
   toolName?: string;
   /** Wave C/D1: a finished /chat-worker build report (markdown + sources). */
   report?: boolean;
+  /** Full /chat-worker report body when `text` is the concise summary. */
+  reportText?: string;
   /** Wave C web-branch source URLs, rendered under the reply. */
   sources?: string[];
   /** Wave C build-task key this message reports on. */
@@ -375,6 +377,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const [transcriptState, setTranscriptState] = useState<
     "loading" | "ready" | "error"
   >("loading");
+  // A ?resume= id that is NOT a Qubit-chat session (e.g. a canonical /chat
+  // worker id): don't hijack this page's conversation — offer to open it in
+  // the /chat terminal instead. Null when the current session is ours.
+  const [foreignSession, setForeignSession] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [input, setInput] = useState("");
   // Slash autocomplete selection + Esc-dismissal (single-token "/" prefix only;
@@ -478,6 +484,24 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     if (resumeParam) storageSet(SESSION_KEY, resumeParam);
   }, [resumeParam]);
 
+  // Mirror the resolved session into the URL (like /chat?resume=<id>) so the
+  // address bar is a faithful deep link: bare /qubit-chat gains
+  // ?resume=<session> on load via replace (no history spam). Guarded on
+  // !resumeParam so it never loops; the session memo recomputes to the
+  // identical string, so the transcript-load effect below does not re-fire.
+  useEffect(() => {
+    if (!resumeParam && session) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("resume", session);
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [resumeParam, session, setSearchParams]);
+
   // Load the selected session's persisted transcript from the Qubit chat
   // store (`GET /api/qubit/chat/sessions/<id>/messages`). Resolve the session
   // against `listChatSessions()` first so a not-yet-created session (e.g. the
@@ -499,12 +523,17 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         if (loadReqRef.current !== myReq) return null;
         const exists = (list.sessions ?? []).some((s) => s.id === session);
         if (!exists) {
-          // No server record yet: keep the cached/empty transcript and the
-          // model default (no persisted preference to load).
+          // No server record yet. If the id is the unsaved default, this is
+          // simply a fresh Qubit chat. If it is some OTHER id (a canonical
+          // /chat worker id), do NOT hijack this page: flag it as foreign so
+          // the UI offers to open it in /chat and keeps this page usable.
+          setForeignSession(session === DEFAULT_SESSION ? null : session);
+          // No persisted preference to load.
           setReasoning(null);
           setTranscriptState("ready");
           return null;
         }
+        setForeignSession(null);
         // Retry the transcript read through a backend bounce (`voicebridge run`
         // restarting) instead of freezing on one failed fetch: the page should
         // recover on its own when the service comes back.
@@ -677,12 +706,19 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               prev.concat([
                 {
                   role: "assistant",
-                  text: event.reply ?? "",
+                  // Build turns: write back the CONCISE summary (what the
+                  // voice layer speaks) and keep the full report behind a
+                  // "Full /chat report" disclosure.
+                  text:
+                    route === "task" && event.summary
+                      ? event.summary
+                      : event.reply ?? "",
                   meta: streamMeta(event),
-                  // The task `done` delta already carries the full Spark
-                  // report text; flag it so it renders through the shared
-                  // markdown renderer with its task key attached.
                   report: route === "task" && Boolean(taskKey),
+                  reportText:
+                    route === "task" && event.summary && event.summary !== event.reply
+                      ? event.reply
+                      : undefined,
                   taskKey: taskKey,
                   sources:
                     Array.isArray(sources) && sources.length > 0
@@ -692,6 +728,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               ]),
             );
             setStreamingText("");
+            // The turn persisted on the canonical session store (the reply and
+            // session metadata), so remount/refetch the session list: a brand
+            // new default row or an updated ordering surfaces without a manual
+            // refresh.
+            setSessionListNonce((n) => n + 1);
           },
           onError: (event) => {
             if (controller.signal.aborted) return;
@@ -709,6 +750,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             );
             setRetryText(text);
             setStreamingText("");
+            // A failed turn may still have touched the session row (it was
+            // created/persisted before the error), so re-sync the list.
+            setSessionListNonce((n) => n + 1);
           },
           onCancelled: () => {
             if (controller.signal.aborted) return;
@@ -719,6 +763,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             );
             setStreamingText("");
             setVoiceNotice("turn cancelled — the shared backend aborted it");
+            setSessionListNonce((n) => n + 1);
           },
         },
         controller.signal,
@@ -1326,6 +1371,32 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             </div>
           </div>
 
+          {foreignSession ? (
+            <div
+              data-testid="foreign-session-banner"
+              className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/5 px-3 py-2 text-xs"
+            >
+              <Terminal className="h-3.5 w-3.5 shrink-0 text-midground" />
+              <span className="text-text-secondary">
+                <span className="font-mono">{foreignSession}</span> is a
+                {" "}/chat session, not a Qubit Chat session.
+              </span>
+              <a
+                href={`/chat?resume=${encodeURIComponent(foreignSession)}`}
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-midground hover:bg-midground/10"
+              >
+                open in /chat
+              </a>
+              <button
+                type="button"
+                onClick={startFresh}
+                className="ml-auto rounded px-1.5 py-0.5 text-text-tertiary hover:bg-midground/10 hover:text-foreground"
+              >
+                start a new Qubit chat
+              </button>
+            </div>
+          ) : null}
+
           <div
             className="qchat__run-hud"
             role="group"
@@ -1699,13 +1770,36 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                         message.text
                       )}
                     </div>
+                    {message.reportText ? (
+                      <details
+                        data-testid="message-report-full"
+                        className="mt-1 text-xs"
+                      >
+                        <summary className="cursor-pointer text-text-tertiary hover:text-foreground">
+                          Full /chat report
+                        </summary>
+                        <div className="mt-1 whitespace-pre-wrap break-words text-text-secondary">
+                          <Markdown content={message.reportText} />
+                        </div>
+                      </details>
+                    ) : null}
                     {message.taskKey ? (
                       <div
                         data-testid="message-task-key"
-                        className="mt-1 text-xs text-text-tertiary"
+                        className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-tertiary"
                       >
-                        task <span className="font-mono">{message.taskKey}</span>
-                        {message.report ? " · Spark report" : ""}
+                        <span>
+                          task <span className="font-mono">{message.taskKey}</span>
+                          {message.report ? " · Spark report" : ""}
+                        </span>
+                        <a
+                          href={`/chat?resume=${encodeURIComponent(message.taskKey)}`}
+                          aria-label={`Open /chat session ${message.taskKey}`}
+                          className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-midground hover:bg-midground/10"
+                        >
+                          <Terminal className="h-3 w-3" />
+                          open in /chat
+                        </a>
                       </div>
                     ) : null}
                     {message.sources && message.sources.length > 0 ? (
@@ -1772,6 +1866,15 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                         {taskProgress.detail}
                       </div>
                     ) : null}
+                    <a
+                      href={`/chat?resume=${encodeURIComponent(taskProgress.key)}`}
+                      data-testid="task-open-chat"
+                      aria-label={`Open the /chat session ${taskProgress.key} in the terminal`}
+                      className="mt-1 inline-flex items-center gap-1.5 rounded px-1 py-0.5 text-xs text-midground hover:bg-midground/10"
+                    >
+                      <Terminal className="h-3.5 w-3.5" />
+                      open in /chat
+                    </a>
                   </li>
                 ) : null}
                 {busy && streamingText ? (
@@ -2091,7 +2194,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             <div className="qchat__sessions min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
-                activeSessionId={resumeParam}
+                activeSessionId={session}
                 profile={scopedProfile}
                 onNewChat={startFresh}
               />

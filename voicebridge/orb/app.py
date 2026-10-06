@@ -43,8 +43,8 @@ PERI = (168, 184, 255)
 GREY = (139, 148, 158)
 AMBER = (227, 179, 65)
 
-FRAME_MS = 33
-POLL_MS = 1000
+FRAME_MS = 16
+POLL_MS = 500
 NOTICE_S = 5.0
 
 TRANSPARENT_KEY = "#ff00ff"
@@ -74,7 +74,10 @@ def draw_orb_frame(canvas: Any, size: int, state: Any, t: float, *,
                    collapsed: bool = False, offline: bool = False,
                    notice: bool = False,
                    reduced_motion: bool = False,
-                   level: Any = None) -> Dict[str, Any]:
+                   level: Any = None,
+                   spectrum: Any = None,
+                   spec_peaks: Any = None,
+                   colors: Any = None) -> Dict[str, Any]:
     """Draw one orb frame on a canvas-like object (no Tk needed by itself).
 
     Owner 2026-10-04: the animated states render through
@@ -114,10 +117,12 @@ def draw_orb_frame(canvas: Any, size: int, state: Any, t: float, *,
         cx = cy = size_i / 2
         stats = _ember.render(canvas, cx, cy, max(4.0, size_i / 2 - 2),
                               t, state, reduced_motion=reduced_motion,
-                              level=level)
+                              level=level, spectrum=spectrum,
+                              spec_peaks=spec_peaks, colors=colors)
     except Exception:
         stats = {"ovals": 0, "lines": 0, "points": 0,
-                 "min_y": 0.0, "max_y": float(size_i), "fills": []}
+                 "min_y": 0.0, "max_y": float(size_i), "fills": [],
+                 "bars": False}
     try:
         s = size_i / 96.0  # indicator scale factor (positions tuned at 96px)
         try:
@@ -230,6 +235,28 @@ class VoiceOrb:
         # render path reads it (ember gates by state).
         self._level_smoother = LevelSmoother()
         self._frame_level: Optional[float] = None
+        # Equalizer render state (additive, same instance pattern): the
+        # smoothed 12-float spectrum the frame tick passes to
+        # draw_orb_frame; None = no spectrum yet (old helper/offline) ->
+        # exactly today's sine loop. Only the listening (live bands) and
+        # speaking (TTS timeline frame) render paths read it (ember gates
+        # by state); stale eases to flat via the smoother's None-decay
+        # and drops back to the legacy loop once fully decayed.
+        try:
+            self._spec_smoother = _ember.SpectrumSmoother()
+        except Exception:
+            self._spec_smoother = None
+        self._frame_spec: Optional[list] = None
+        self._frame_peaks: Optional[list] = None
+        # Raw poll targets + per-frame advanced smoothers (fluid motion).
+        self._spec_target: Optional[list] = None
+        self._level_target: Optional[float] = None
+        self._anim_last: Optional[float] = None
+        # Fluid state-color cross-fade (Oklab; one instance per view).
+        try:
+            self._color_transition = _ember.ColorTransition(self.state)
+        except Exception:
+            self._color_transition = None
         self._toggle_requested = False
         self._quit_requested = False
 
@@ -610,10 +637,17 @@ class VoiceOrb:
                 events = []
         except AttributeError:
             events = []
+        try:
+            heartbeat = payload.get("heartbeat", None)
+            if not isinstance(heartbeat, dict):
+                heartbeat = None
+        except AttributeError:
+            heartbeat = None
         self.offline = status is None
         _prev_state = str(getattr(self, "state", ""))
         if status is not None:
-            raw = _state.resolve_orb_state(status, events, time.time())
+            raw = _state.resolve_orb_state(status, events, time.time(),
+                                           heartbeat=heartbeat)
             try:
                 if self._display is not None:
                     self.state = self._display.update(
@@ -642,27 +676,41 @@ class VoiceOrb:
                            to=_now_state)
         except Exception:
             pass
-        # Talk-meter sample (no extra HTTP: the accessor parses the
-        # status payload it already fetched, else the local helper
-        # heartbeat file). Smoothed so 2 s polls don't flap; None
-        # keeps today's loop. Fake clients without the accessor stay
-        # on the legacy loop.
+        # Talk-meter + equalizer SAMPLES: the poll only records the raw
+        # targets here; the frame tick advances the smoothers at 60fps so
+        # brightness/bars glide between polls instead of stepping.
         try:
             try:
                 _cli = self._get_client()
             except Exception:
                 _cli = None
             get_level = getattr(_cli, "mic_level", None)
-            raw = get_level(status) if callable(get_level) else None
-            if raw is None:
-                self._frame_level = None
-            else:
-                smoother = getattr(self, "_level_smoother", None)
-                if smoother is None:
-                    smoother = self._level_smoother = LevelSmoother()
-                self._frame_level = smoother.update(raw)
+            self._level_target = (get_level(status)
+                                  if callable(get_level) else None)
         except Exception:
-            pass
+            self._level_target = None
+        try:
+            try:
+                _cli = self._get_client()
+            except Exception:
+                _cli = None
+            cur = str(getattr(self, "state", "") or "").strip().lower()
+            fresh: Optional[list] = None
+            if cur == "listening":
+                get_spec = getattr(_cli, "spectrum", None)
+                if callable(get_spec):
+                    fresh = get_spec(status)
+                else:
+                    fresh = _client.spec_bands_from_payload(status)
+            elif cur == "speaking":
+                get_tts = getattr(_cli, "tts_frame", None)
+                if callable(get_tts):
+                    fresh = get_tts(status)
+                else:
+                    fresh = _client.spec_tts_frame_from_payload(status)
+            self._spec_target = fresh
+        except Exception:
+            self._spec_target = None
         # Ingame override: applied only when this round fetched settings
         # (every 5th tick, never while offline); otherwise the last value
         # stands — a slow bridge used to wedge the painted state for the
@@ -748,11 +796,58 @@ class VoiceOrb:
         except Exception:
             pass
 
+    def _advance_anim(self, now_mono: float) -> None:
+        """Advance the per-frame level/spectrum smoothers (60fps). Never raises."""
+        try:
+            last = getattr(self, "_anim_last", None)
+            self._anim_last = now_mono
+            if last is None:
+                return
+            dt = max(0.0, min(0.25, now_mono - float(last)))
+            if dt <= 0.0:
+                return
+            tgt = getattr(self, "_level_target", None)
+            if tgt is None:
+                self._frame_level = None
+            else:
+                cur = getattr(self, "_frame_level", None)
+                cur = 0.0 if cur is None else float(cur)
+                tau = 0.07 if float(tgt) >= cur else 0.28
+                a = 1.0 - math.exp(-dt / tau)
+                self._frame_level = cur + (float(tgt) - cur) * a
+            smoother = getattr(self, "_spec_smoother", None)
+            if smoother is None:
+                self._frame_spec = getattr(self, "_spec_target", None)
+                self._frame_peaks = None
+                return
+            target = getattr(self, "_spec_target", None)
+            if target is None and not bool(getattr(smoother, "fed", False)):
+                self._frame_spec = None
+                self._frame_peaks = None
+                return
+            self._frame_spec = smoother.update(target, dt=dt)
+            try:
+                self._frame_peaks = list(
+                    getattr(smoother, "peaks", []) or [])
+            except Exception:
+                self._frame_peaks = None
+            try:
+                if target is None and max(
+                        [0.0] + [float(v) for v in
+                                 (self._frame_spec or [])]) < 1e-3:
+                    self._frame_spec = None
+                    self._frame_peaks = None
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     def _frame_tick(self) -> None:
         try:
             if self.visible:
                 try:
                     now_mono = time.monotonic()
+                    self._advance_anim(now_mono)
                     self._paint_t = _ember.advance_render_time(
                         getattr(self, "_paint_t", 0.0),
                         getattr(self, "_paint_last_mono", None),
@@ -793,6 +888,13 @@ class VoiceOrb:
             c.delete("all")
             bg = TRANSPARENT_KEY if self.transparent_bg else FALLBACK_BG
             c.configure(bg=bg)
+            colors = None
+            tr = getattr(self, "_color_transition", None)
+            if tr is not None:
+                try:
+                    colors = tr.update(self.state, time.monotonic())
+                except Exception:
+                    colors = None
             draw_orb_frame(
                 c, size, self.state, t,
                 collapsed=self._pos.collapsed,
@@ -800,6 +902,9 @@ class VoiceOrb:
                 notice=time.time() < self.notice_until,
                 reduced_motion=_reduced_motion(),
                 level=getattr(self, "_frame_level", None),
+                spectrum=getattr(self, "_frame_spec", None),
+                spec_peaks=getattr(self, "_frame_peaks", None),
+                colors=colors,
             )
         except Exception:
             pass

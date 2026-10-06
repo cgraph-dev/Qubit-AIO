@@ -13,7 +13,8 @@ from __future__ import annotations
 def test_state_color_table_single_source():
     from voicebridge.orb import ember as E
     assert hasattr(E, "STATE_COLORS"), "single-source per-state color table"
-    for name in ("idle", "listening", "thinking", "speaking", "error"):
+    for name in ("idle", "listening", "thinking", "working",
+                 "speaking", "error"):
         assert name in E.STATE_COLORS, name
         fam = E.STATE_COLORS[name]
         for key in ("core", "mid", "warm_a", "warm_b", "hi"):
@@ -24,28 +25,26 @@ def test_state_color_table_single_source():
 
 def test_state_colors_documented_hues():
     from voicebridge.orb import ember as E
-    idle = E.state_colors("idle")
-    assert tuple(idle["core"]) == (255, 84, 0)
-    # Owner contract 2026-10-05 (supersedes 2026-10-04): GREEN = HEARING
-    # YOU (listening), YELLOW = THINKING/ANSWERING (thinking + speaking).
-    lst = E.state_colors("listening")
-    assert tuple(lst["core"]) == (60, 220, 120)
-    r, g, b = lst["core"]
-    assert g > r and g > b and r < 120, (r, g, b)
-    # speaking renders the voice green (agent talking to you)
-    spk = E.state_colors("speaking")
-    assert tuple(spk["core"]) == (60, 220, 120)
-    r, g, b = spk["core"]
-    assert g > r and g > b and r < 120, (r, g, b)
-    # thinking: yellow (R dominant).
-    thk = E.state_colors("thinking")
-    assert tuple(thk["core"]) == (255, 205, 70)
-    r, g, b = thk["core"]
-    assert r >= g > b and b < 120, (r, g, b)
+    # Owner palette 2026-10-06 (supersedes the 2026-10-05 green=voice
+    # contract): one distinct hue per action.
+    assert tuple(E.state_colors("idle")["core"]) == (255, 84, 0)
+    # you talking: cyan (blue > green > red)
+    r, g, b = E.state_colors("listening")["core"]
+    assert b > g > r and r < 120, (r, g, b)
+    # model turn in flight: indigo/blue-violet (blue dominant)
+    r, g, b = E.state_colors("thinking")["core"]
+    assert b > r and b > g, (r, g, b)
+    # tool/action running: amber (red > green > blue)
+    r, g, b = E.state_colors("working")["core"]
+    assert r > g > b, (r, g, b)
+    # Qubit talking: violet/magenta (red+blue over green)
+    r, g, b = E.state_colors("speaking")["core"]
+    assert r > g and b > g, (r, g, b)
     # error/not-working: red (R dominant)
-    err = E.state_colors("error")
-    r, g, b = err["core"]
+    r, g, b = E.state_colors("error")["core"]
     assert r > g and r > b and r >= 200, (r, g, b)
+    # The two VOICE directions must never share a family again.
+    assert E.STATE_COLORS["listening"] != E.STATE_COLORS["speaking"]
 
 
 def test_band_colors_per_state_no_dup_literals():
@@ -53,12 +52,15 @@ def test_band_colors_per_state_no_dup_literals():
     idle_bands = E.band_colors("idle")
     assert len(idle_bands) == 5
     assert tuple(idle_bands[0]) == (255, 84, 0)
-    # listening bands are green-family (agent hears you)
+    # listening bands are cyan-family (you talking): blue dominant
     r, g, b = E.band_colors("listening")[0]
-    assert g > r, (r, g, b)
-    # speaking bands are the voice green (agent talking to you)
+    assert b > r and b > g, (r, g, b)
+    # speaking bands are violet-family (Qubit talking): red+blue > green
     r, g, b = E.band_colors("speaking")[0]
-    assert g > r and g > b, (r, g, b)
+    assert r > g and b > g, (r, g, b)
+    # working bands are amber: red dominant
+    r, g, b = E.band_colors("working")[0]
+    assert r > g > b, (r, g, b)
     # unknown -> idle
     assert E.band_colors("warp-drive") == E.band_colors("idle")
 

@@ -118,6 +118,48 @@ def wake_match_kind(text: str,
     return None
 
 
+#: Trailing address ("open youtube, qubit"): the wake name at the very end,
+#: preceded by a COMMA. The comma gate is deliberate — OpenClaw's
+#: activation-name matcher requires a strong boundary at the edge, and a
+#: bare trailing "qubit" in a normal sentence ("what is qubit") must never
+#: turn into a command. Trailing address is deliberate, so unlike the
+#: leading bare path it is allowed to execute.
+_TRAILING_NAME = r"(?:qubit|cubit|qbit|cupid|cubid|cue bit|cube it|qubits)"
+_TRAILING_BARE_RE = re.compile(
+    r",\s*" + _TRAILING_NAME + r"\s*[.!?]*\s*$", re.IGNORECASE)
+
+
+def strip_wake_trailing(text: str,
+                        aliases: Optional[List[str]] = None) -> Optional[str]:
+    """Return the command text BEFORE a trailing wake name.
+
+    ``"open youtube, qubit"`` -> ``"open youtube"``. Requires the name to be
+    the utterance-final token(s) after a comma (strong boundary), so ordinary
+    sentences that merely end in "qubit" never match. Returns ``None`` when
+    there is no trailing name or nothing precedes it. Never raises.
+    """
+    cleaned = (text if isinstance(text, str) else "").strip()
+    if not cleaned:
+        return None
+    low = cleaned.lower()
+    for phrase in (aliases or list(WAKE_ALIASES)):
+        try:
+            m = re.search(r",\s*" + re.escape(phrase.lower())
+                          + r"\s*[.!?]*\s*$", low)
+        except re.error:
+            continue
+        if m:
+            before = cleaned[:m.start()].rstrip(" \t,.:;!?—-")
+            if before:
+                return before
+    m = _TRAILING_BARE_RE.search(low)
+    if m:
+        before = cleaned[:m.start()].rstrip(" \t,.:;!?—-")
+        if before:
+            return before
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Lane 1 (2026-10-03): bare-confirm bypass predicates.
 #
@@ -1108,10 +1150,21 @@ class WakeMonitor:
         with self._lock:
             armed = now < self._armed_until
         aliases = [self.phrase, *WAKE_ALIASES]
+        # Owner-managed extra wake words (OpenClaw voicewake port): the
+        # global list is appended so a custom phrase ("computer", "robot")
+        # works exactly like the built-in aliases. Lazy import avoids the
+        # wake <-> wake_words cycle; a bad store never breaks the loop.
+        try:
+            from . import wake_words as _ww
+            aliases = [self.phrase, *WAKE_ALIASES, *_ww.active_triggers()]
+        except Exception:
+            pass
         if forced:
             # The keyword spotter fired: whatever ASR heard is the command.
             # Strip the wake phrase if ASR rendered it, else use the whole text.
             remainder = strip_wake(text, aliases=aliases)
+            if remainder is None:
+                remainder = strip_wake_trailing(text, aliases=aliases)
             cmd = remainder if remainder is not None else text
             if cmd.strip():
                 # P1-4: a fired intent consumes any open arm, exactly like
@@ -1135,6 +1188,8 @@ class WakeMonitor:
             return
         if armed:
             remainder = strip_wake(text, aliases=aliases)
+            if remainder is None:
+                remainder = strip_wake_trailing(text, aliases=aliases)
             cmd = remainder if remainder is not None else text
             if not cmd.strip():
                 # 2026-10-03 (journal 19:17): a bare-wake repeat ("Hey
@@ -1152,6 +1207,15 @@ class WakeMonitor:
             return
         remainder = strip_wake(text, aliases=aliases)
         if remainder is None:
+            # Trailing address ("open youtube, qubit"): the wake name at the
+            # utterance end after a comma. Deliberate, so it executes (the
+            # leading bare-drop guard below does not apply).
+            trailing = strip_wake_trailing(text, aliases=aliases)
+            if trailing is not None:
+                _trace("wake_trailing", chars=len(trailing))
+                beep(self.cfg, "wake")
+                self._emit(trailing)
+                return
             _trace("discarded", chars=len(text),
                    **(_dbg.text_fields(self.cfg, text=text)))
             self._maybe_hint(text)
@@ -1369,5 +1433,6 @@ def _ws_url(cfg: Any) -> str:
 
 
 __all__ = ["WakeMonitor", "strip_wake", "wake_match_kind",
+           "strip_wake_trailing",
            "EnergyEndpointer", "BufferMic",
            "DEFAULT_PHRASE", "WAKE_ALIASES", "VAD_MODES"]

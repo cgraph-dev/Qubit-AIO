@@ -9,11 +9,12 @@ the orb can never be lost off-screen.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
-#: Orb window edge length in px (~68px orb per the owner order
-#: 2026-10-04: 50% bigger than the 45px build — 45 * 1.5 =
-#: 67.5, rounded to 68).
-ORB_PX = 68
+#: Orb window edge length in px. Owner 2026-10-06: enlarged from 68 to
+#: 168 so the equalizer bars/rings are legible (68px was too small to
+#: read as a real equalizer).
+ORB_PX = 168
 
 #: Collapsed dot edge length in px.
 DOT_PX = 16
@@ -60,6 +61,24 @@ def default_position(screen_w: int, screen_h: int) -> OrbPosition:
 def window_size_px(collapsed: bool = False) -> int:
     """Edge length of the window for the mode (orb 154px, dot 16px)."""
     return DOT_PX if collapsed else ORB_PX
+
+
+def set_orb_size(px: Any) -> int:
+    """Override the module ``ORB_PX`` at runtime (clamped 48..400).
+
+    Runtime seam for the options size slider: every geometry helper and
+    both views read ``ORB_PX``, so one call resizes the whole orb.
+    Returns the value actually set; never raises.
+    """
+    global ORB_PX
+    try:
+        v = max(48, min(400, int(round(float(px)))))
+    except (TypeError, ValueError):
+        return ORB_PX
+    except Exception:
+        return ORB_PX
+    ORB_PX = v
+    return ORB_PX
 
 
 def is_fully_onscreen(x: int, y: int, screen_w: int, screen_h: int,
@@ -249,6 +268,7 @@ __all__ = [
     "ScreenSize",
     "default_position",
     "window_size_px",
+    "set_orb_size",
     "is_fully_onscreen",
     "resolve_initial_position",
     "clamp_position",

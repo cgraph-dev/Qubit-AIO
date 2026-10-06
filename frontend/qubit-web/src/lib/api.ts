@@ -3730,6 +3730,8 @@ export interface ChatStreamEvent {
   route?: string;
   /** Wave C web-branch source URLs (done receipt). */
   sources?: string[];
+  /** Concise spoken/summary form of a build-task report (done frame). */
+  summary?: string;
   session_id?: string;
   session?: string;
   elapsed_ms?: number;

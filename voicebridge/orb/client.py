@@ -104,6 +104,24 @@ def mic_level_from_payload(payload: Any, now: Any = None) -> Optional[float]:
 _HELPER_CMDLINE_MARK = "voicebridge.desktop_helper"
 
 
+#: Equalizer spectrum: 12 log-spaced bands 80Hz-8kHz, 0.0..1.0 each
+#: (spec design 2026-10-05). Published by the helper into heartbeat
+#: extras as ``spec_bands`` + ``spec_ts`` (live mic) and ``spec_tts`` +
+#: ``spec_tts_ts`` (reply band timeline); the orb only parses what the
+#: already-fetched status/heartbeat payload carries — zero extra HTTP.
+SPEC_BAND_COUNT = 12
+
+#: A live band vector older than this reads as silence (fail-soft:
+#: stale eases to flat, never freezes mid-air). Same clock discipline
+#: as ``MIC_LEVEL_MAX_AGE_S`` (monotonic seconds on the helper clock).
+SPEC_MAX_AGE_S = 1.0
+
+#: One TTS timeline frame covers this many seconds of reply audio
+#: (the publish side FFTs 100ms windows; playback position / this =
+#: the frame index).
+SPEC_TTS_FRAME_S = 0.1
+
+
 class OrbError(Exception):
     def __init__(self, code: str, detail: str = "") -> None:
         super().__init__(f"{code}: {detail}" if detail else code)
@@ -236,7 +254,7 @@ class OrbClient:
         call — the poll tick keeps its last override then. Never logs the
         token.
         """
-        out = self._request("GET", "/api/voice-edit/settings", timeout=10)
+        out = self._request("GET", "/api/voice-edit/settings", timeout=2)
         try:
             settings = out.get("settings", {})
             return dict(settings) if isinstance(settings, dict) else {}
@@ -262,9 +280,44 @@ class OrbClient:
         except Exception:
             return None
 
+    def spectrum(self, status: Any = None,
+                 now: Any = None) -> Optional[list]:
+        """Freshest live spectrum with no extra HTTP call (never raises).
+
+        Parses ``spec_bands``/``spec_ts`` from the given status payload
+        first, else from the local helper heartbeat file. Returns the
+        12-float list, or ``None`` when stale/absent (old helper /
+        offline -> the renderer keeps today's loop). No audio capture.
+        """
+        try:
+            fresh = spec_bands_from_payload(status, now=now)
+            if fresh is not None:
+                return fresh
+            return spec_bands_from_payload(_helper_heartbeat(), now=now)
+        except Exception:
+            return None
+
+    def tts_frame(self, status: Any = None,
+                 now_mono: Any = None) -> Optional[list]:
+        """TTS-timeline frame under the play head (never raises).
+
+        Same source discipline as :meth:`spectrum`: the already-fetched
+        status payload first, the helper heartbeat file second. Past
+        the reply end (or absent) -> ``None``. No extra HTTP, no audio
+        capture.
+        """
+        try:
+            frame = spec_tts_frame_from_payload(status, now_mono=now_mono)
+            if frame is not None:
+                return frame
+            return spec_tts_frame_from_payload(_helper_heartbeat(),
+                                               now_mono=now_mono)
+        except Exception:
+            return None
+
     def begin_session(self) -> Dict[str, Any]:
         """Stage a voice request (the helper's own flow starts here)."""
-        return self._request("POST", "/api/voice-edit/session", {}, timeout=10)
+        return self._request("POST", "/api/voice-edit/session", {}, timeout=2)
 
     def cancel_request(self, request_id: str) -> Dict[str, Any]:
         """Cancel a staged voice request (existing cancel verb)."""
@@ -273,7 +326,7 @@ class OrbClient:
         if not rid:
             raise OrbError("ORB_BAD_REQUEST_ID", "no staged request to cancel")
         return self._request("POST", f"/api/voice-edit/{rid}/cancel", {},
-                             timeout=10)
+                             timeout=2)
 
     def trigger_helper_capture(self) -> Dict[str, Any]:
         """Ask the running desktop helper to start/finish one PTT capture.
@@ -346,7 +399,8 @@ def fetch_poll_payload(cli: Any, tick: int) -> Dict[str, Any]:
             settings = dict(got) if isinstance(got, dict) else {}
         except Exception:
             settings = None
-    return {"status": status, "events": events, "settings": settings}
+    return {"status": status, "events": events, "settings": settings,
+            "heartbeat": _helper_heartbeat()}
 
 
 def offer_latest(q: Any, payload: Dict[str, Any]) -> None:
@@ -407,10 +461,167 @@ def _helper_cmdline(pid: int) -> str:
         return ""
 
 
+def _spec_extras(payload: Any) -> Dict[str, Any]:
+    """Heartbeat extras mapping out of a status/heartbeat payload.
+
+    Reads the payload itself, else its ``"extras"`` sub-mapping (the
+    publish side may nest the spectrum beside other extras). Anything
+    else -> ``{}``. Never raises, never opens the mic.
+    """
+    try:
+        if isinstance(payload, dict):
+            if "spec_bands" in payload or "spec_tts" in payload:
+                return payload
+            nested = payload.get("extras", None)
+            if isinstance(nested, dict):
+                return nested
+    except Exception:
+        pass
+    return {}
+
+
+def _clamp_spec_vector(raw: Any) -> Optional[list]:
+    """12 finite floats clamped 0..1, else None. Never raises."""
+    try:
+        vals = list(raw)
+    except (TypeError, ValueError):
+        return None
+    except Exception:
+        return None
+    if len(vals) != SPEC_BAND_COUNT:
+        return None
+    out: list = []
+    try:
+        for v in vals:
+            f = float(v)
+            if f != f:  # NaN is never a band level
+                return None
+            out.append(max(0.0, min(1.0, f)))
+    except (TypeError, ValueError):
+        return None
+    except Exception:
+        return None
+    return out
+
+
+def spec_bands_from_payload(payload: Any, now: Any = None) -> Optional[list]:
+    """Fresh live spectrum from a heartbeat/status payload (pure).
+
+    Returns the fresh 12-float list when ``spec_bands``/``spec_ts``
+    are present and fresher than :data:`SPEC_MAX_AGE_S`; ``None`` when
+    absent, malformed, wrong length, or stale (fail-soft: the caller
+    renders today's sine loop, or eases a live smoother to flat).
+    Never raises; performs no I/O (and never opens the mic).
+    """
+    try:
+        extras = _spec_extras(payload)
+        if "spec_bands" not in extras or "spec_ts" not in extras:
+            return None
+        bands = _clamp_spec_vector(extras["spec_bands"])
+        if bands is None:
+            return None
+        ts = float(extras["spec_ts"])
+    except (TypeError, ValueError):
+        return None
+    except Exception:
+        return None
+    try:
+        now_f = float(now) if now is not None else time.monotonic()
+    except (TypeError, ValueError):
+        return None
+    except Exception:
+        return None
+    try:
+        age = now_f - ts
+    except Exception:
+        return None
+    if not (age >= 0.0):
+        age = 0.0  # NaN/future stamp: not a trustworthy fresh value
+    try:
+        if age > float(SPEC_MAX_AGE_S):
+            return None
+    except Exception:
+        return None
+    return bands
+
+
+def spec_tts_frame_from_payload(payload: Any,
+                                now_mono: Any = None) -> Optional[list]:
+    """The TTS-timeline frame for the current playback position (pure).
+
+    ``spec_tts`` is the reply's band timeline (one 12-float frame per
+    :data:`SPEC_TTS_FRAME_S`); ``spec_tts_ts`` is the monotonic second
+    playback started. Returns the frame under the play head, or
+    ``None`` when absent/malformed, before the start (clamped to the
+    first frame instead), or past the reply end (stale = silence).
+    Never raises; performs no I/O (and never opens the mic).
+    """
+    try:
+        extras = _spec_extras(payload)
+        if "spec_tts" not in extras or "spec_tts_ts" not in extras:
+            return None
+        frames = list(extras["spec_tts"])
+        start = float(extras["spec_tts_ts"])
+    except (TypeError, ValueError):
+        return None
+    except Exception:
+        return None
+    if not frames:
+        return None
+    try:
+        now_f = float(now_mono) if now_mono is not None else time.monotonic()
+    except (TypeError, ValueError):
+        return None
+    except Exception:
+        return None
+    try:
+        idx = int((now_f - start) / float(SPEC_TTS_FRAME_S))
+    except (TypeError, ValueError):
+        return None
+    except Exception:
+        return None
+    if idx < 0:
+        idx = 0
+    if idx >= len(frames):
+        return None  # past reply end: silence, never a frozen mid-air bar
+    return _clamp_spec_vector(frames[idx])
+
+
+def frame_spectrum_for_state(state: Any, payload: Any,
+                             now: Any = None,
+                             now_mono: Any = None) -> Optional[list]:
+    """Which spectrum (if any) a state renders (pure, never raises).
+
+    ``listening`` reads the live bands, ``speaking`` reads the TTS
+    timeline frame at the current playback position; every other state
+    returns ``None`` (thinking/idle/error have no audio to analyse and
+    render byte-identical with or without a payload). No I/O.
+    """
+    try:
+        key = str(state or "").strip().lower()
+    except Exception:
+        return None
+    try:
+        if key == "listening":
+            return spec_bands_from_payload(payload, now=now)
+        if key == "speaking":
+            mono = now_mono if now_mono is not None else now
+            return spec_tts_frame_from_payload(payload, now_mono=mono)
+    except Exception:
+        return None
+    return None
+
+
 __all__ = [
     "DEFAULT_BASE",
     "MIC_LEVEL_MAX_AGE_S",
     "mic_level_from_payload",
+    "SPEC_BAND_COUNT",
+    "SPEC_MAX_AGE_S",
+    "SPEC_TTS_FRAME_S",
+    "spec_bands_from_payload",
+    "spec_tts_frame_from_payload",
+    "frame_spectrum_for_state",
     "OrbError",
     "service_base",
     "service_token",

@@ -27,6 +27,7 @@ import json
 import os
 import queue
 import re
+import signal
 import sys
 import threading
 import time
@@ -481,6 +482,309 @@ def mic_level_for_heartbeat() -> Dict[str, float]:
         return {"mic_level": 0.0, "mic_level_ts": 0.0}
 
 
+#: Real-equalizer spectrum publish (orb-equalizer spec 2026-10-05, PUBLISH
+#: side only). The helper — the single mic owner — FFTs its own capture
+#: frames plus the TTS reply wav and publishes band levels through the
+#: existing heartbeat extras. Never audio bytes, never text. The orb only
+#: reads these numbers (consume/render live in the orb lane).
+_SPEC_N_BANDS = 12
+_SPEC_MIN_HZ = 80.0
+_SPEC_MAX_HZ = 8000.0
+#: dB map: _SPEC_FLOOR_DB (and below) -> 0.0, _SPEC_TOP_DB (and above) -> 1.0.
+#: The floor is the noise gate: digital silence reads exactly 0.0, never
+#: flicker; room noise sits near the floor, speech/music ride mid-scale.
+_SPEC_FLOOR_DB = -60.0
+_SPEC_TOP_DB = -6.0
+#: Live analysis window (s); TTS timeline slice (s). 100 ms both directions.
+_SPEC_WINDOW_S = 0.1
+#: TTS timeline cap, in 100 ms frames: 600 = 60 s = 7200 floats worst case.
+#: Typical replies are seconds; longer replies truncate (documented, the tail
+#: is dropped, never the head). Bounds the heartbeat payload.
+_SPEC_TTS_MAX_FRAMES = 600
+#: Consumer grace past reply-end before the timeline reads as silence.
+_SPEC_TTS_GRACE_S = 1.0
+
+_SPEC_LOCK = threading.Lock()
+_SPEC = {"bands": [0.0] * _SPEC_N_BANDS, "ts": 0.0}
+_SPEC_BUF = bytearray()
+_SPEC_TTS = {"frames": [], "ts": 0.0, "dur": 0.0}
+
+
+def reset_spec_state() -> None:
+    """Clear published spectrum state (test seam). Never raises."""
+    try:
+        with _SPEC_LOCK:
+            _SPEC["bands"] = [0.0] * _SPEC_N_BANDS
+            _SPEC["ts"] = 0.0
+            del _SPEC_BUF[:]
+            _SPEC_TTS["frames"] = []
+            _SPEC_TTS["ts"] = 0.0
+            _SPEC_TTS["dur"] = 0.0
+    except Exception:
+        pass
+
+
+def spec_bands_for_pcm(pcm: Any, *, sample_rate: int = 16000) -> list:
+    """12 log-spaced band levels for one 100 ms mono-s16 window (pure).
+
+    ``sample_rate`` sets the window length (``rate // 10`` samples) and the
+    rFFT bin frequencies; bands span ~80 Hz-8 kHz (bands above Nyquist on
+    low-rate audio read 0.0). Returns 12 floats in 0.0..1.0 (rounded to 4
+    decimals); short (< one window) / empty / malformed input returns 12
+    zeros. Never raises. numpy only (no scipy).
+    """
+    zeros = [0.0] * _SPEC_N_BANDS
+    try:
+        rate = int(sample_rate or 16000)
+        if rate <= 0:
+            rate = 16000
+        need = rate // 10
+        data = bytes(pcm)
+        import array as _array
+        import sys as _sys
+        raw = _array.array("h", data[:(len(data) // 2) * 2])
+        if not raw or len(raw) < need:
+            return list(zeros)
+        if _sys.byteorder != "little":
+            raw.byteswap()
+        import math as _math
+        import numpy as _np
+        x = _np.asarray(raw[:need], dtype=_np.float64) / 32768.0
+        windowed = x * _np.hanning(need)
+        mag = _np.abs(_np.fft.rfft(windowed)) / need
+        freqs = _np.fft.rfftfreq(need, 1.0 / rate)
+        edges = _np.logspace(_math.log10(_SPEC_MIN_HZ),
+                             _math.log10(_SPEC_MAX_HZ), _SPEC_N_BANDS + 1)
+        out = []
+        for i in range(_SPEC_N_BANDS):
+            lo, hi = float(edges[i]), float(edges[i + 1])
+            sel = mag[(freqs >= lo) & (freqs < hi)]
+            m = float(sel.mean()) if sel.size else 0.0
+            db = 20.0 * _math.log10(m + 1e-9)
+            v = (db - _SPEC_FLOOR_DB) / (_SPEC_TOP_DB - _SPEC_FLOOR_DB)
+            out.append(round(max(0.0, min(1.0, v)), 4))
+        return out
+    except Exception:
+        return list(zeros)
+
+
+def publish_spec_frame(frame: Any, *, sample_rate: int = 16000) -> list:
+    """Accumulate one captured frame into 100 ms spectrum windows.
+
+    Called on the helper-owned capture path (via :class:`LevelTapMic`, same
+    site as :func:`publish_mic_level`). Frames arrive at mic cadence (~300 ms
+    = 3 windows); partial windows buffer until complete. Stores the freshest
+    12 bands + ``time.monotonic`` ts; returns the latest bands. Garbage input
+    keeps the last publish. Never raises. At most 10 windows FFT'd per call
+    (flood guard; surplus oldest bytes dropped).
+    """
+    try:
+        data = bytes(frame)
+    except Exception:
+        data = b""
+    if not data:
+        try:
+            with _SPEC_LOCK:
+                return list(_SPEC["bands"])
+        except Exception:
+            return [0.0] * _SPEC_N_BANDS
+    try:
+        rate = int(sample_rate or 16000)
+        if rate <= 0:
+            rate = 16000
+        win_bytes = (rate // 10) * 2
+        with _SPEC_LOCK:
+            _SPEC_BUF.extend(data)
+            # Flood guard: never hold more than 2 windows + this call's work.
+            max_keep = win_bytes * 12
+            if len(_SPEC_BUF) > max_keep:
+                del _SPEC_BUF[:len(_SPEC_BUF) - max_keep]
+            done = 0
+            while len(_SPEC_BUF) >= win_bytes and done < 10:
+                window = bytes(_SPEC_BUF[:win_bytes])
+                del _SPEC_BUF[:win_bytes]
+                done += 1
+                # FFT outside the next lock acquisition is fine (pure), but
+                # the window bytes are already detached — compute inline.
+                bands = spec_bands_for_pcm(window, sample_rate=rate)
+                _SPEC["bands"] = bands
+                _SPEC["ts"] = time.monotonic()
+            return list(_SPEC["bands"])
+    except Exception:
+        pass
+    try:
+        with _SPEC_LOCK:
+            return list(_SPEC["bands"])
+    except Exception:
+        return [0.0] * _SPEC_N_BANDS
+
+
+def read_spec_bands() -> "tuple[list, float]":
+    """Freshest published ``(12 bands, monotonic_ts)``. Never raises."""
+    try:
+        with _SPEC_LOCK:
+            return (list(_SPEC.get("bands", [0.0] * _SPEC_N_BANDS)),
+                    float(_SPEC.get("ts", 0.0) or 0.0))
+    except Exception:
+        return ([0.0] * _SPEC_N_BANDS, 0.0)
+
+
+def spec_for_heartbeat() -> Dict[str, Any]:
+    """Additive heartbeat extras carrying the live spectrum. Never raises.
+
+    Keys: ``spec_bands`` (12 floats 0.0..1.0, freshest 100 ms window) +
+    ``spec_ts`` (``time.monotonic`` seconds of the window). The consumer
+    treats a value older than ~1 s as silence (flat baseline).
+    """
+    try:
+        bands, ts = read_spec_bands()
+        clean = [max(0.0, min(1.0, float(v))) for v in (bands or [])]
+        while len(clean) < _SPEC_N_BANDS:
+            clean.append(0.0)
+        return {"spec_bands": clean[:_SPEC_N_BANDS], "spec_ts": float(ts)}
+    except Exception:
+        return {"spec_bands": [0.0] * _SPEC_N_BANDS, "spec_ts": 0.0}
+
+
+def wav_to_spec_timeline(wav: Any) -> "tuple[list, int, float]":
+    """Whole-wav band timeline: ``(frames, sample_rate, duration_s)`` (pure).
+
+    Parses the RIFF/WAVE header (16-bit PCM; mono used as-is, multi-channel
+    averaged to mono) and FFTs each 100 ms slice via
+    :func:`spec_bands_for_pcm`; a short tail slice is zero-padded to a full
+    window so the final word is kept. Truncates to ``_SPEC_TTS_MAX_FRAMES``
+    (head kept, tail dropped); ``duration_s`` covers the KEPT timeline.
+    Malformed input returns ``([], 16000, 0.0)``. Never raises; never logs
+    audio or text (only band levels leave this function).
+    """
+    try:
+        data = bytes(wav)
+    except Exception:
+        return ([], 16000, 0.0)
+    try:
+        import array as _array
+        import struct as _struct
+        import sys as _sys
+        if len(data) < 44 or data[0:4] != b"RIFF" or data[8:12] != b"WAVE":
+            return ([], 16000, 0.0)
+        pos = 12
+        rate = 0
+        channels = 0
+        pcm_data = b""
+        size = len(data)
+        while pos + 8 <= size:
+            tag = data[pos:pos + 4]
+            (chunk_len,) = _struct.unpack_from("<I", data, pos + 4)
+            body = pos + 8
+            if tag == b"fmt " and chunk_len >= 16 and body + 16 <= size:
+                (_fmt, channels, rate, _br, _ba, bits) = _struct.unpack_from(
+                    "<HHIIHH", data, body)
+                if _fmt != 1 or bits != 16 or channels <= 0 or rate <= 0:
+                    return ([], 16000, 0.0)
+            elif tag == b"data" and body + chunk_len <= size + 1:
+                end = min(body + chunk_len, size)
+                pcm_data = data[body:end]
+            pos = body + chunk_len + (chunk_len & 1)
+            if rate and pcm_data:
+                break
+        if not rate or not pcm_data:
+            return ([], 16000, 0.0)
+        raw = _array.array("h", pcm_data[:(len(pcm_data) // 2) * 2])
+        if not raw:
+            return ([], rate, 0.0)
+        if _sys.byteorder != "little":
+            raw.byteswap()
+        if channels > 1:
+            n_frames = len(raw) // channels
+            mono = _array.array("h", [0]) * n_frames
+            for i in range(n_frames):
+                base = i * channels
+                mono[i] = int(sum(raw[base:base + channels]) / channels)
+            raw = mono
+        win = rate // 10
+        frames = []
+        total = len(raw)
+        idx = 0
+        while idx < total and len(frames) < _SPEC_TTS_MAX_FRAMES:
+            sl = raw[idx:idx + win]
+            if len(sl) < win:
+                pad = _array.array("h", [0]) * (win - len(sl))
+                sl = sl + pad
+            frames.append(spec_bands_for_pcm(sl.tobytes(),
+                                             sample_rate=rate))
+            idx += win
+        return (frames, rate, len(frames) * _SPEC_WINDOW_S)
+    except Exception:
+        return ([], 16000, 0.0)
+
+
+def publish_spec_tts(wav: Any, *, started_at: float = 0.0) -> Dict[str, Any]:
+    """Publish the reply's band timeline at TTS synth time. Never raises.
+
+    FFTs the whole wav ONCE (via :func:`wav_to_spec_timeline`) and stores
+    the frames with the playback-start monotonic ts (``started_at``; defaults
+    to now — synth-complete is ms before playback starts, immaterial for
+    100 ms bars). Returns the stored payload dict. Garbage wav stores an
+    empty (immediately stale) timeline.
+    """
+    try:
+        frames, _rate, dur = wav_to_spec_timeline(wav)
+        try:
+            ts = float(started_at) or time.monotonic()
+        except Exception:
+            ts = time.monotonic()
+        if ts <= 0.0:
+            ts = time.monotonic()
+        with _SPEC_LOCK:
+            _SPEC_TTS["frames"] = frames
+            _SPEC_TTS["ts"] = ts
+            _SPEC_TTS["dur"] = float(dur)
+            return {"spec_tts": [list(f) for f in frames],
+                    "spec_tts_ts": ts, "spec_tts_dur": float(dur)}
+    except Exception:
+        pass
+    try:
+        with _SPEC_LOCK:
+            return {"spec_tts": [list(f) for f in _SPEC_TTS.get("frames", [])],
+                    "spec_tts_ts": float(_SPEC_TTS.get("ts", 0.0) or 0.0),
+                    "spec_tts_dur": float(_SPEC_TTS.get("dur", 0.0) or 0.0)}
+    except Exception:
+        return {"spec_tts": [], "spec_tts_ts": 0.0, "spec_tts_dur": 0.0}
+
+
+def read_spec_tts() -> "tuple[list, float, float]":
+    """Stored ``(frames, playback-start monotonic ts, duration_s)`` copies."""
+    try:
+        with _SPEC_LOCK:
+            return ([list(f) for f in _SPEC_TTS.get("frames", [])],
+                    float(_SPEC_TTS.get("ts", 0.0) or 0.0),
+                    float(_SPEC_TTS.get("dur", 0.0) or 0.0))
+    except Exception:
+        return ([], 0.0, 0.0)
+
+
+def spec_tts_for_heartbeat() -> Dict[str, Any]:
+    """Additive heartbeat extras carrying the TTS timeline. Never raises.
+
+    Keys: ``spec_tts`` (list of 12-float frames, 10/s, head-truncated at
+    ``_SPEC_TTS_MAX_FRAMES``) + ``spec_tts_ts`` (playback-start monotonic
+    seconds) + ``spec_tts_dur`` (kept-timeline seconds). The consumer derives
+    position as ``now - spec_tts_ts`` and reads past reply-end (+grace) as
+    silence. While no reply is in flight the frames list is EMPTY (payload
+    stays tiny); keys are always present so the schema is stable.
+    """
+    try:
+        frames, ts, dur = read_spec_tts()
+        now = time.monotonic()
+        if frames and ts > 0.0 and dur > 0.0 \
+                and now <= ts + dur + _SPEC_TTS_GRACE_S:
+            return {"spec_tts": frames, "spec_tts_ts": ts,
+                    "spec_tts_dur": dur}
+    except Exception:
+        pass
+    return {"spec_tts": [], "spec_tts_ts": 0.0, "spec_tts_dur": 0.0}
+
+
 class LevelTapMic:
     """Wrap a helper-owned mic; publish per-frame peak, pass audio through.
 
@@ -508,6 +812,12 @@ class LevelTapMic:
                 level = publish_mic_level(frame)
             except Exception:
                 level = 0.0
+            # Real-equalizer live spectrum: same helper-owned frames the
+            # level tap sees (audio bytes pass through unchanged).
+            try:
+                publish_spec_frame(frame)
+            except Exception:
+                pass
             cb = self.__dict__.get("_on_frame")
             if cb is not None:
                 try:
@@ -848,6 +1158,14 @@ class DesktopHelper:
         }
         try:
             extra.update(mic_level_for_heartbeat())
+        except Exception:
+            pass
+        try:
+            extra.update(spec_for_heartbeat())
+        except Exception:
+            pass
+        try:
+            extra.update(spec_tts_for_heartbeat())
         except Exception:
             pass
         return extra
@@ -2182,6 +2500,14 @@ class DesktopHelper:
             return
         if not wav:
             return
+        # Real-equalizer TTS timeline: FFT the reply wav ONCE at synth time
+        # (ts = synth-complete ≈ playback start, ms apart). Published even
+        # when no local player exists — the consumer reads it against the
+        # journaled speak window, not against this process.
+        try:
+            publish_spec_tts(wav)
+        except Exception:
+            pass
         player = "paplay" if shutil.which("paplay") else (
             "aplay" if shutil.which("aplay") else "")
         if not player:
@@ -2462,6 +2788,65 @@ def build_cfg() -> Any:
     return Config.load()
 
 
+def take_over_previous_helper(*, kill: Any = None, sleep: Any = None,
+                              monotonic: Any = None,
+                              exclude: Optional[int] = None) -> Optional[int]:
+    """End a leftover helper so exactly one owns the mic. Returns its PID or None.
+
+    Two helpers each open the mic and run their own wake loop, so one spoken
+    phrase fires two turns (owner 2026-10-05: "voice trigger twice"). A
+    systemd-managed helper takes over from a stale manual/leftover one: send
+    SIGTERM, then wait (bounded) for it to release the mic. Nothing is
+    signalled unless the heartbeat names a fresh, cmdline-validated helper pid
+    (``heartbeat.other_live_pid``). Never raises; never blocking beyond the
+    wait bound. ``kill``/``sleep``/``monotonic`` are injected for tests.
+    """
+    kill = kill or os.kill
+    sleep = sleep or time.sleep
+    monotonic = monotonic or time.monotonic
+    try:
+        from .voice_edit import heartbeat as _hb
+        pid = _hb.other_live_pid(
+            exclude=os.getpid() if exclude is None else int(exclude))
+    except Exception:
+        return None
+    if not pid:
+        return None
+    _trace("singleton.takeover", pid=pid)
+    try:
+        kill(pid, signal.SIGTERM)
+    except OSError:
+        return pid
+    deadline = monotonic() + 3.0
+    while monotonic() < deadline:
+        try:
+            kill(pid, 0)
+        except OSError:
+            return pid
+        sleep(0.1)
+    return pid
+
+
+def _install_term_handler(helper: "DesktopHelper") -> None:
+    """Release the mic on SIGTERM so a takeover/stop never orphans ``parec``.
+
+    Without this, ``kill``/systemd-stop terminates the process without running
+    ``shutdown()``, leaving the capture child alive and the mic busy — the
+    leftover that produced double triggers. Never raises.
+    """
+    def _term(_signum: int, _frame: Any) -> None:
+        try:
+            helper.shutdown()
+        except Exception:
+            pass
+        raise SystemExit(0)
+
+    try:
+        signal.signal(signal.SIGTERM, _term)
+    except (ValueError, OSError):
+        pass
+
+
 def main(argv: Optional[list] = None) -> int:
     parser = argparse.ArgumentParser(prog="qubit-voice-typing",
                                      description="Qubit global voice typing/editing")
@@ -2491,6 +2876,11 @@ def main(argv: Optional[list] = None) -> int:
     client = HelperClient(resolve_service_base(cfg), resolve_token(cfg))
     helper = DesktopHelper(cfg, client=client, overlay=overlay, desktop=desktop,
                            notify=_notify_send)
+    # Single mic authority: end a leftover helper before we open the mic, and
+    # make sure OUR shutdown runs on SIGTERM so we never orphan the capture
+    # child ourselves (double helpers = double voice triggers, owner 2026-10-05).
+    take_over_previous_helper()
+    _install_term_handler(helper)
     if not helper.start():
         return 3
     # Overlay action callbacks run on the Tk main thread already when the window

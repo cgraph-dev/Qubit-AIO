@@ -2139,11 +2139,19 @@ ACTIONS: Dict[str, LocalAction] = {
                                           r"\b(youtube|music|video)(?:'s)?\s+next\b"],
                                 confirm=False),
     "youtube_stop": LocalAction("youtube_stop", "stop youtube playback and close tabs", _a_youtube_stop,
-                                patterns=[r"\b(stop|close)\s+(the\s+)?(youtube|music|song|video)\b",
-                                          r"\b(stop|close) (the music|it|this)\b",
-                                          r"\bshut (it|the music) (down|off)\b",
-                                           r"\bclose (the )?(youtube|music) tabs?\b",
-                                           r"\b(quit|close|stop)\s+(the\s+)?youtube\b"]),
+                                 # Sweep lane (2026-10-05): the bare-pronoun
+                                 # branches ("close it", "stop it", "shut it
+                                 # down") fired with no music context — this
+                                 # action CLOSES TABS, so a pronoun alone must
+                                 # clarify, never stop. Music-named branches
+                                 # ("the music", youtube/song/video) keep
+                                 # their owners; "close this window/tab" is
+                                 # claimed earlier by the window/tab pre-check.
+                                 patterns=[r"\b(stop|close)\s+(the\s+)?(youtube|music|song|video)\b",
+                                           r"\b(stop|close) the music\b",
+                                           r"\bshut the music (down|off)\b",
+                                            r"\bclose (the )?(youtube|music) tabs?\b",
+                                            r"\b(quit|close|stop)\s+(the\s+)?youtube\b"]),
     "lock": LocalAction("lock", "lock the screen", _a_lock,
                         patterns=[r"\b(lock|lock the screen)\b"]),
     "brightness_up": LocalAction("brightness_up", "raise screen brightness", _a_brightness_up,

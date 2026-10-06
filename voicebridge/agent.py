@@ -8,6 +8,7 @@ orchestrator, CLI task path) shares one execution contract.
 """
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any, Callable, Dict, Optional
 
@@ -436,6 +437,24 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
     if persist_user:
         _persist_session_turn(store, sid, "user", text,
                               model=model or None)
+    # MCP discovery is deliberately NOT a module-level side effect of
+    # ``model_tools``: every entry point runs it at startup itself (cli.py,
+    # tui_gateway/entry.py, gateway/run.py, acp_adapter/entry.py). This turn is
+    # another such entry point. Without the call the AIAgent built below
+    # snapshots its tool schema before the configured MCP servers register, so
+    # /qubit-chat runs with zero ``mcp__*`` tools while /chat has them.
+    # Idempotent (a no-op once this home's discovery thread has run) and
+    # fail-open: a missing helper or a slow server never blocks past the bound.
+    try:
+        from qubit_cli.mcp_startup import (  # type: ignore
+            ensure_mcp_discovery_before_agent_build)
+        ensure_mcp_discovery_before_agent_build(
+            logger=logging.getLogger(__name__),
+            thread_name="qubit-chat-mcp-discovery")
+    except Exception:  # noqa: BLE001 - discovery is best-effort, never fatal
+        logging.getLogger(__name__).debug(
+            "MCP discovery readiness check failed before agent build",
+            exc_info=True)
     started = time.monotonic()
     agent = None
     try:

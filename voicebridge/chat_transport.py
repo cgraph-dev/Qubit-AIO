@@ -1037,6 +1037,17 @@ def decide_turn_action(text: Any, *, cfg: Any = None,
                 "task_text": task_text or raw, "params": {},
                 "reason": reason}
     if kind in ("coding", "agent"):
+        # A WEAK/partial hint match is not a build order. The old code sent it
+        # to the headless build worker, which produced nonsense for an
+        # investigation request ("check why X is not working 1:1, what are we
+        # missing" -> "Dashboard ready at http://0.0.0.0:8898/", live
+        # 2026-10-05). Send it to the tool-capable agent instead: it can
+        # investigate with real tools AND build when the request truly is a
+        # build. Only a strong hint delegates to the build worker.
+        if "partial" in str(reason).lower():
+            return {"action": "answer_local", "kind": kind,
+                    "task_text": task_text or raw, "params": {},
+                    "reason": reason}
         return {"action": "agent_task", "kind": kind,
                 "task_text": task_text or raw, "params": dict(params),
                 "reason": reason}
@@ -2972,6 +2983,42 @@ def parse_qubitchat_slash(text: Any) -> Optional[Dict[str, Any]]:
     return {"command": "unknown", "name": name, "args": args}
 
 
+def extract_inline_slash(text: Any) -> Optional[Dict[str, Any]]:
+    """Find one mid-sentence /verb token, or None (pure, never raises).
+
+    Leading-slash turns keep going through :func:`parse_qubitchat_slash`
+    byte-identical; this covers "please run /model here" style turns. Only a
+    KNOWN verb matches, with a whitespace/start boundary on the left and a
+    whitespace/punctuation/end boundary on the right, so paths (``/tmp/x``),
+    URLs (``https://…``), and ``file://`` can never match (``.``/``/``/``:``
+    are not verb chars and ``tmp``/``etc`` are not verbs). Zero or 2+ matches
+    return None (a multi-command sentence is never guessed).
+    """
+    try:
+        raw = str(text or "")
+    except Exception:
+        return None
+    if not raw or "/" not in raw:
+        return None
+    try:
+        pattern = (r"(?:^|[\s(\[{\'\"`])/"
+                    r"([A-Za-z0-9_-]+)"
+                    r"(?=[\s.,?!;:)\]}'\"`]|$)")
+        total = 0
+        single = ""
+        for match in re.finditer(pattern, raw):
+            name = str(match.group(1) or "").lower()
+            if name in SLASH_COMMANDS:
+                total += 1
+                single = name
+        if total != 1:
+            return None
+        return {"command": single, "name": single, "args": "",
+                "inline": True, "slash_text": f"/{single}"}
+    except Exception:
+        return None
+
+
 def _slash_help_reply(unknown: str = "") -> str:
     head = (f"Unknown slash command '/{unknown}'. "
             if unknown else "Slash commands. ")
@@ -3088,6 +3135,7 @@ _SLASH_TERMINAL_GUIDANCE = {
     "personality": "terminal persona control — run it in /chat; assistant identity lives in Profiles.",
     "profile": "terminal profile switch — run it in /chat; the MODEL card on this page switches this surface.",
     "refine": "terminal refine flow — run it in /chat.",
+    "reasoning": "terminal reasoning control — use the Reasoning selector on this page's side panel instead.",
     "reload-mcp": "reloads MCP servers — open the MCP page on this dashboard instead (test + reload controls there).",
     "reload-skills": "reloads the skill catalog — open the Skills page on this dashboard instead.",
     "reset": "resets the terminal session — run it in /chat; to start fresh here use New chat.",
@@ -3277,6 +3325,56 @@ def _finish_fact(cfg: Any, st: Any, sid: str, reply: str) -> Dict[str, Any]:
             "receipt": _branch_receipt("facts", task=reply, cfg=cfg)}
 
 
+#: Deterministic reread (sweep lane, 2026-10-05): "say that again" replays
+#: the last assistant message verbatim instead of entering the classifier
+#: (which tags it clarify) or the model (which paraphrases). Same shapes as
+#: ``voice_edit/service.py::_REPEAT_RE`` (kept local: this module is
+#: imported by the service, so importing it back would cycle).
+import re as _re_module
+_REPEAT_RE = _re_module.compile(
+    r"\bsay\s+(that|it)\s+again\s*[.?!]*\s*$"
+    r"|\bread\s+(that|it)\s+back\s*[.?!]*\s*$"
+    r"|\brepeat\s+(that|it)\s*[.?!]*\s*$"
+    r"|\bwhat\s+did\s+you\s+(just\s+)?say\s*[?]?\s*$"
+    r"|\bcome\s+again\s*[?]?\s*$",
+    _re_module.IGNORECASE)
+
+
+def _repeat_request(text: Any) -> bool:
+    """True when the turn asks to hear the last answer again. Pure."""
+    try:
+        return bool(_REPEAT_RE.search(str(text or "")))
+    except Exception:
+        return False
+
+
+def _last_assistant_text(st: Any, sid: str) -> str:
+    """Newest non-empty assistant message, or "" (never raises)."""
+    try:
+        msgs = (st.messages(sid, limit=50) or {}).get("messages", [])
+        for m in reversed(msgs):
+            if not isinstance(m, dict):
+                continue
+            if str(m.get("role") or "") != "assistant":
+                continue
+            content = str(m.get("content") or "").strip()
+            if content:
+                return content
+    except Exception:
+        pass
+    return ""
+
+
+def _finish_repeat(cfg: Any, st: Any, sid: str, reply: str) -> Dict[str, Any]:
+    """Persist a reread replay as the turn's assistant message."""
+    st.append(sid, "assistant", reply,
+              meta={"route": "repeat", "model": "repeat"})
+    _audit("turn_repeat", session=sid)
+    return {"ok": True, "text": reply, "reply": reply, "route": "repeat",
+            "model": "repeat", "session_id": sid, "session": sid,
+            "receipt": _branch_receipt("repeat", task=reply, cfg=cfg)}
+
+
 def _finish_slash(cfg: Any, st: Any, sid: str, clean: str) -> Dict[str, Any]:
     """Persist a slash outcome as the turn's assistant message (turn shape)."""
     res = run_qubitchat_slash(cfg, clean, session_id=sid)
@@ -3397,6 +3495,27 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
                         "code": appended.get("code"),
                         "detail": appended.get("detail", "")}
             return _settle_task_affirmed(cfg, st, sid)
+    # Mid-sentence slash (one known /verb anywhere): executes that verb
+    # against the real backend instead of entering the classifier/model path
+    # (which would chatter about the slash text). Runs after affirmation
+    # settles (a bare "yes" is never a slash) and before facts, so facts keep
+    # priority. Zero or 2+ verbs fall through byte-identical.
+    if clean and not clean.startswith("/"):
+        _inline = extract_inline_slash(clean)
+        if _inline is not None:
+            created = _resolve_session(st, session, model=None, cfg=cfg)
+            if created.get("state") != "OK":
+                return {"ok": False, "state": "FAILED",
+                        "code": created.get("code"),
+                        "detail": created.get("detail", "")}
+            sid = created["session"]["id"]
+            appended = st.append(sid, "user", clean)
+            if appended.get("state") != "OK":
+                return {"ok": False, "state": "FAILED",
+                        "code": appended.get("code"),
+                        "detail": appended.get("detail", "")}
+            return _finish_slash(cfg, st, sid,
+                                 str(_inline.get("slash_text") or ""))
     # Direct facts (DECISIONS #26 — same facts voice answers): clock/weather
     # never consult the model. Runs after slash + affirmation settles (those
     # own their shapes) and before the classifier, so "weather in X" cannot
@@ -3415,6 +3534,20 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
                     "code": appended.get("code"),
                     "detail": appended.get("detail", "")}
         return _finish_fact(cfg, st, sid, _fact)
+    # Deterministic reread (sweep lane, 2026-10-05): replays the last
+    # assistant message verbatim. Runs with the facts fast path (after
+    # slash + affirmation settles, before the classifier) so "say that
+    # again" cannot narrate or paraphrase. Empty history falls through
+    # byte-identical (no session write yet — resolve/append only on hit).
+    if _repeat_request(clean):
+        _created = _resolve_session(st, session, model=None, cfg=cfg)
+        if _created.get("state") == "OK":
+            _rsid = _created["session"]["id"]
+            _last = _last_assistant_text(st, _rsid)
+            if _last:
+                _appended = st.append(_rsid, "user", clean)
+                if _appended.get("state") == "OK":
+                    return _finish_repeat(cfg, st, _rsid, _last)
     decided = _decide_branch(clean, cfg)
     if decided.get("action") in BRANCH_ACTIONS:
         created = _resolve_session(st, session, model=None, cfg=cfg)
@@ -4035,8 +4168,12 @@ def _stream_task(cfg: Any, st: Any, sid: str, task_text: str, started: float,
            "detail": "worker finished", "session_id": sid,
            "elapsed_ms": elapsed_ms}
     report = str(out.get("report") or out.get("text") or "")
+    # Concise spoken/summary form (`_finish_task` already produced it): the
+    # full report stays available, but /qubit-chat writes back and speaks
+    # the SHORT summary so the voice agent doesn't read the whole build log.
+    summary = str(out.get("text") or "").strip() or report
     yield {"event": "delta", "text": report, "session_id": sid}
-    yield {"event": "done", "ok": True, "reply": report,
+    yield {"event": "done", "ok": True, "reply": report, "summary": summary,
            "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
            "receipt": {"runtime": "qubit-chat-worker", "route": "task",
                        "streaming": True, "task": key, "sources": [],
@@ -4159,9 +4296,37 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         text_out = str(res.get("text") or res.get("reply") or "")
         yield {"event": "delta", "text": text_out, "session_id": sid}
         yield {"event": "done", "ok": True, "reply": text_out,
-               "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
-               "receipt": res.get("receipt")}
+                "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
+                "receipt": res.get("receipt")}
         return
+    # Mid-sentence slash (same contract as turn() above): one known /verb
+    # anywhere executes that verb; zero or 2+ fall through byte-identical.
+    if clean and not clean.startswith("/"):
+        _inline = extract_inline_slash(clean)
+        if _inline is not None:
+            started = time.monotonic()
+            yield {"event": "start", "session_id": sid, "session": sid,
+                   "route": "slash"}
+            appended = st.append(sid, "user", clean)
+            if appended.get("state") != "OK":
+                yield {"event": "error", "code": appended.get("code"),
+                       "detail": appended.get("detail", ""), "session_id": sid}
+                return
+            res = _finish_slash(cfg, st, sid,
+                                str(_inline.get("slash_text") or ""))
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            if not res.get("ok"):
+                yield {"event": "error",
+                       "code": res.get("code", "SLASH_FAILED"),
+                       "detail": res.get("detail", ""), "session_id": sid,
+                       "route": "slash", "elapsed_ms": elapsed_ms}
+                return
+            text_out = str(res.get("text") or res.get("reply") or "")
+            yield {"event": "delta", "text": text_out, "session_id": sid}
+            yield {"event": "done", "ok": True, "reply": text_out,
+                   "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
+                   "receipt": res.get("receipt")}
+            return
     # Direct facts on the stream path (same contract as turn() above):
     # single truthful delta, route "facts", no model consulted.
     _fact = _direct_fact_answer(clean)
@@ -4182,6 +4347,27 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                "route": "facts", "model": "live-facts",
                "receipt": res.get("receipt")}
         return
+    # Deterministic reread on the stream path (same contract as turn()):
+    # single truthful delta, route "repeat", no model consulted.
+    if _repeat_request(clean):
+        _rlast = _last_assistant_text(st, sid)
+        if _rlast:
+            started = time.monotonic()
+            yield {"event": "start", "session_id": sid, "session": sid,
+                   "route": "repeat"}
+            appended = st.append(sid, "user", clean)
+            if appended.get("state") != "OK":
+                yield {"event": "error", "code": appended.get("code"),
+                       "detail": appended.get("detail", ""), "session_id": sid}
+                return
+            res = _finish_repeat(cfg, st, sid, _rlast)
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            yield {"event": "delta", "text": _rlast, "session_id": sid}
+            yield {"event": "done", "ok": True, "reply": _rlast,
+                   "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
+                   "route": "repeat", "model": "repeat",
+                   "receipt": res.get("receipt")}
+            return
     decided = _decide_branch(clean, cfg)
     if decided.get("action") in BRANCH_ACTIONS:
         yield from _stream_branch(cfg, st, sid, clean, decided,

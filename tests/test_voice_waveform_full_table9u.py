@@ -183,11 +183,12 @@ INGAME_HIDE = [
 ]
 
 # (utterance, fires_widget, fires_ingame) — near-misses.
-# "show waveform in game settings" is documented pre-existing behaviour (§84):
-# the bare widget substring fires; the OVERRIDE must not.
+# "show waveform in game settings" is a settings question and fires NEITHER
+# (sweep lane 2026-10-05 fixed the §84 pre-existing substring flip: the bare
+# widget match no longer fires when the utterance is about settings).
 NEAR_MISS = [
-    ("show waveform in game settings", True, False),
-    ("show wave form in game settings", True, False),
+    ("show waveform in game settings", False, False),
+    ("show wave form in game settings", False, False),
     ("show me the waveform settings", False, False),
     ("show me the wave form settings", False, False),
     ("waveform on the screen", False, False),
@@ -309,9 +310,16 @@ def test_near_miss_table(tmp_path, utterance, fires_widget, fires_ingame):
 def test_near_miss_settings_question_never_fires_override(tmp_path):
     cfg = _cfg_with_file(tmp_path)
     svc = _svc(cfg)
-    out = svc.ask("show waveform in game settings")
-    assert out.get("mode") != "waveform-ingame", out
+    # Route-level only (no ask(): a settings question is not a deterministic
+    # stage, so ask() would fall through to the brain/model path).
+    out = _route(svc, "show waveform in game settings")
+    assert out.get("decision", {}).get("reason") not in (
+        "waveform-visible", "waveform-ingame"), out
+    assert svc.waveform_command("show waveform in game settings") is None
+    assert svc.waveform_ingame_command(
+        "show waveform in game settings") is None
     assert settings_mod.settings_view(cfg)["waveform_ingame"] is False
+    assert settings_mod.settings_view(cfg)["waveform_visible"] is False
 
 
 @pytest.mark.parametrize("utterance", INGAME_SHOW + INGAME_HIDE)

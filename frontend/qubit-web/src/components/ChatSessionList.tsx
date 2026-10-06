@@ -20,16 +20,19 @@
 
 import { Button } from "@nous-research/ui/ui/components/button";
 import { ListItem } from "@nous-research/ui/ui/components/list-item";
-import { AlertCircle, MessageSquarePlus, RefreshCw } from "lucide-react";
+import { AlertCircle, MessageSquarePlus, RefreshCw, Terminal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { useI18n } from "@/i18n";
 import { ChatWorkspacePicker } from "@/components/ChatWorkspacePicker";
+import { mergeActiveFirst } from "@/components/chatSessionOrder";
 import { api, type ChatStoreSession } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 
 const SESSION_LIMIT = 30;
+/** Best-effort live refresh cadence for the switcher while the tab is open. */
+const SESSION_REFRESH_MS = 15_000;
 /** Which session store this list reads. `chat` keeps the Qubit-native
  * chat-session store (`GET /api/qubit/chat/sessions`, voice channel);
  * `canonical` reads the canonical receipts store (`GET /api/sessions`,
@@ -126,13 +129,43 @@ export function ChatSessionList({
   useEffect(() => {
     // Dashboard data surfaces fetch from an effect on mount + scope change;
     // keep this local and explicit until the shared lint profile is updated
-    // for async loaders (matches FilesPage).
+    // for async loaders (matches FilesPage). Re-runs when `activeSessionId`
+    // changes so the row you are on moves to the top as soon as the host
+    // switches sessions; `reloadNonce` is the manual Refresh trigger.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-    // `reloadNonce` is a manual refetch trigger (Refresh button / row pick).
-  }, [load, reloadNonce]);
+  }, [load, reloadNonce, activeSessionId]);
+
+  // Live updates (best-effort, no new deps): stay fresh while the tab is open
+  // without a manual Refresh. Refetch on window focus, when the tab becomes
+  // visible, and on a modest interval. `load`'s monotonic `reqRef` token keeps
+  // a slow response from clobbering a newer one; all listeners + the interval
+  // are torn down on unmount.
+  useEffect(() => {
+    const onFocus = () => load();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    const interval = window.setInterval(load, SESSION_REFRESH_MS);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [load]);
 
   const reload = useCallback(() => setReloadNonce((n) => n + 1), []);
+
+  // The active session must always be visible and on top, even when the host's
+  // resume id is a canonical/worker id the chat-store list does not contain
+  // (mergeActiveFirst prepends a synthetic row for that case). Pure + DOM-free
+  // so the ordering contract is unit-tested alongside its own module.
+  const orderedSessions = useMemo(
+    () => mergeActiveFirst(sessions, activeSessionId),
+    [sessions, activeSessionId],
+  );
 
   // Picking a row sets `/chat?resume=<id>`. Re-picking the row already in
   // the terminal is a no-op (avoids a needless PTY teardown).
@@ -199,7 +232,7 @@ export function ChatSessionList({
         </div>
       );
     }
-    if (!sessions || sessions.length === 0) {
+    if (orderedSessions.length === 0) {
       return (
         <div className="px-2 py-6 text-center text-xs text-text-secondary">
           {t.sessions.noSessions}
@@ -208,7 +241,7 @@ export function ChatSessionList({
     }
     return (
       <div className="flex flex-col gap-0.5">
-        {sessions.map((s) => {
+        {orderedSessions.map((s) => {
           const isActive = s.id === activeSessionId;
           return (
             <ListItem
@@ -240,13 +273,26 @@ export function ChatSessionList({
                     <span className="truncate">{s.source}</span>
                   </>
                 )}
+                {/* Reach the terminal session where the agent actually runs
+                    (the /chat PTY). stopPropagation keeps the row's own
+                    "resume in this page" click intact. */}
+                <a
+                  href={`/chat?resume=${encodeURIComponent(s.id)}`}
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label={`Open session ${s.id} in the /chat terminal`}
+                  title="Open in /chat"
+                  className="ml-auto inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-midground hover:bg-midground/10"
+                >
+                  <Terminal className="h-3 w-3" />
+                  /chat
+                </a>
               </span>
             </ListItem>
           );
         })}
       </div>
     );
-  }, [activeSessionId, error, loading, pick, reload, sessions, t]);
+  }, [activeSessionId, error, loading, orderedSessions, pick, reload, t]);
 
   return (
     // Not an <aside>: the containing #chat-side-panel is the complementary

@@ -480,6 +480,11 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           // later drop starts its backoff from the base again.
           reconnectAttemptRef.current = 0;
           setPtyState("open");
+          // A connect/reconnect is activity: remount the session list so it
+          // refetches and re-sorts the active (resumed) session to the top.
+          // The list also self-refreshes on focus/visibility/interval; this
+          // page adds no polling of its own.
+          setSessionListNonce((n) => n + 1);
           setNotice(null);
           blockedInputNoticeRef.current = false;
           // A live socket means the backend is back: reset the outer-retry
@@ -1179,7 +1184,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
-                activeSessionId={resumeParam || null}
+                activeSessionId={resumeTarget}
                 profile={scopedProfile}
                 onNewChat={handleNewChat}
                 workspaceCwd={workspaceCwd}

@@ -4843,3 +4843,37 @@ Tests/qubit_state/ + tests/hermes_state/ are the same defect (21 files).
 Resolving conftest.py was still correct and necessary, but on its own it silenced a
 symptom, not the cause. Fix = route the tests subtree through the rename map (or delete
 the stale duplicates after verifying nothing is unique to them).
+
+### FIX — /qubit-chat agent turn had no MCP tools; bridge never ran discovery — 2026-10-06
+
+Root cause (verified, not inferred): MCP discovery is deliberately NOT a module-level side
+effect of `model_tools` — every entry point runs it itself at startup (`cli.py`,
+`tui_gateway/entry.py`, `gateway/run.py`, `acp_adapter/entry.py`). The bridge
+(`python -m voicebridge run`, which serves `/qubit-chat` and the PTT turn) was not one of
+them: `grep -rn "mcp_startup|start_background_mcp_discovery|discover_mcp_tools" voicebridge/`
+returned nothing, so `_run_vendored_session` built an `AIAgent` without any MCP server ever
+being contacted. `/chat` discovers; `/qubit-chat` did not.
+
+Fix (2 sites, both best-effort/guarded):
+- `voicebridge/agent.py::_run_vendored_session` — `ensure_mcp_discovery_before_agent_build(...)`
+  before `AIAgent(`, mirroring `qubit_cli/oneshot.py:566` and `acp_adapter/session.py:525`.
+- `voicebridge/orchestrator.py::start` → new `_warm_mcp_discovery()` — start discovery once at
+  boot (mirrors `tui_gateway/entry.py`). Required, not cosmetic: this home's discovery takes
+  ~15 s while the bounded per-turn wait is `mcp_discovery_timeout` = 1.5 s, so a cold first
+  turn would still run without MCP tools.
+
+CORRECTION to the earlier reading: the AIAgent *schema* is NOT the metric. Tool Search
+progressive disclosure (`tools/tool_search.py`) collapses deferrable MCP/plugin tools behind
+`tool_search`/`tool_describe`/`tool_call` — the built schema is 33 tools with zero `mcp__*`
+in BOTH the broken and fixed cases, and on `/chat` too. The metric is the reachable catalog.
+
+Measured (real `_run_vendored_session`, stub `AIAgent`, same QUBIT_HOME):
+  before: raw catalog  70 tools /   6 mcp__*  (1 server, from the on-disk mcp_schema_cache)
+  after : raw catalog 221 tools / 157 mcp__*  (7 servers)
+  `tool_search(["graft"])` after: matches mcp__cgraph_graft__*, mcp__qubit_graft__*, ...
+
+Regression check: `tests/test_agent_tool_capable_worker9u.py`, `test_agent_tool_source8u.py`,
+`test_agent8u.py` = 27 passed. `tests/test_orchestrator_session_authority9u.py`,
+`test_voice_e2e_hermetic9u.py`, `test_voice_canonical8u.py` = 30 passed, 1 failed
+(`test_right_ctrl_local_engine_transcript_enters_canonical_turn`) — reproduced with both
+edited files stashed, so it is PRE-EXISTING, not caused by this change. Not committed.

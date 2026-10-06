@@ -397,6 +397,35 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(FakeWebSocket.instances[0].url).toContain("resume=session-1");
   });
 
+  it("passes the canonical PTY session to the list as the active row", async () => {
+    // The active session id handed to ChatSessionList must be the canonical
+    // session the PTY is on (the resume target), so the list can highlight it
+    // and sort it first even after a refresh.
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "qubit-go",
+      provider: "opencode-go",
+      model: "deepseek",
+      context_tokens: 200000,
+      context_verified: true,
+    }));
+    const { default: TerminalChatPage } = await import("./TerminalChatPage");
+    await render(
+      <MemoryRouter initialEntries={["/chat?resume=session-1"]}>
+        <TerminalChatPage isActive />
+      </MemoryRouter>,
+    );
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Panel session"),
+    );
+    const active = container.querySelector('[aria-current="true"]');
+    expect(active).not.toBeNull();
+    expect(active!.className).toContain("qchat__session-row--active");
+    expect(active!.textContent).toContain("Panel session");
+  });
+
   it("starts a fresh PTY (no resume) when ?resume is absent", async () => {
     apiMocks.wsTicket.mockImplementation(async () => ({
       ticket: "tkt",

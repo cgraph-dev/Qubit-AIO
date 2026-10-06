@@ -124,8 +124,8 @@ def test_default_lands_on_primary_not_virtual_corner():
     assert target is not None
     pos = orb_geo.default_position_for_rect(target)
     # Bottom-right of DP-2 (0..2580), NOT of the 4500-wide virtual desktop.
-    assert (pos.x, pos.y) == (2580 - 68 - orb_geo.MARGIN,
-                              1080 - 68 - orb_geo.MARGIN)
+    assert (pos.x, pos.y) == (2580 - orb_geo.ORB_PX - orb_geo.MARGIN,
+                              1080 - orb_geo.ORB_PX - orb_geo.MARGIN)
     assert pos.x + orb_geo.ORB_PX <= 2580
     assert pos.collapsed is False
 

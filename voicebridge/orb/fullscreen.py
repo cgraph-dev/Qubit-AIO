@@ -21,9 +21,17 @@ from typing import Any, Callable, List, Optional, Tuple
 _ACTIVE_RE = re.compile(r"window id #\s*(0x[0-9a-fA-F]+|\d+)")
 
 
+#: Per-probe subprocess budget: the probe runs on the orb mainloop inside
+#: the existing state poll, so each xprop call gets ~0.5 s, never the old
+#: 3 s (a sick X server wedged up to ~6 s of frames per tick). Both calls
+#: fail-closed to "not fullscreen" on timeout, so a slow server only
+#: skips one hide/show round instead of freezing the orb.
+XPROP_TIMEOUT_S = 0.5
+
+
 def _default_run(argv: List[str], **kw: Any) -> Any:
     return subprocess.run(
-        argv, capture_output=True, text=True, timeout=3,
+        argv, capture_output=True, text=True, timeout=XPROP_TIMEOUT_S,
         **{k: v for k, v in kw.items() if k != "timeout"})
 
 
@@ -44,7 +52,7 @@ def active_window_id(
     run = run or _default_run
     try:
         out = _out_of(run(["xprop", "-root", "_NET_ACTIVE_WINDOW"],
-                           timeout=3))
+                            timeout=XPROP_TIMEOUT_S))
     except Exception:
         return None
     try:
@@ -67,7 +75,7 @@ def window_states(win_id: str,
         return []
     try:
         out = _out_of(run(["xprop", "-id", win_id, "_NET_WM_STATE"],
-                           timeout=3))
+                            timeout=XPROP_TIMEOUT_S))
     except Exception:
         return []
     try:
@@ -130,4 +138,5 @@ def next_visibility(fullscreen_focused: bool, visible: bool,
 
 
 __all__ = ["active_window_id", "window_states",
-           "active_window_is_fullscreen", "next_visibility"]
+           "active_window_is_fullscreen", "next_visibility",
+           "XPROP_TIMEOUT_S"]

@@ -82,4 +82,47 @@ def live(*, fresh_s: float = FRESH_S) -> bool:
     return True
 
 
-__all__ = ["write", "clear", "read", "live", "path", "SCHEMA"]
+def _pid_is_helper(pid: int) -> bool:
+    """True when ``pid``'s cmdline looks like a Qubit desktop helper.
+
+    Guards against a recycled PID: the heartbeat records a bare pid, so a
+    stale file could otherwise point at an unrelated process. Reads
+    ``/proc/<pid>/cmdline``; when that is unavailable (non-Linux) it returns
+    False — a takeover must never signal a process it cannot identify.
+    Never raises.
+    """
+    try:
+        raw = Path(f"/proc/{int(pid)}/cmdline").read_bytes()
+    except Exception:
+        return False
+    return "voicebridge.desktop_helper" in raw.replace(b"\0", b" ").decode(
+        "utf-8", "replace")
+
+
+def other_live_pid(exclude: int = 0) -> Optional[int]:
+    """A live desktop-helper PID other than ``exclude``, else ``None``.
+
+    Two helpers both open the mic and both run a wake loop, so one spoken
+    phrase fires two turns. The service instance takes over from a leftover
+    helper at startup using this. Requires a fresh heartbeat, a running pid,
+    and a helper cmdline — a stale file, dead pid, or unrelated process is
+    ignored. Never raises.
+
+    On a host without ``/proc`` (macOS/Windows) cmdline validation is
+    unavailable and this returns ``None`` (no takeover).
+    """
+    if not live():
+        return None
+    data = read() or {}
+    try:
+        pid = int(data.get("pid", 0) or 0)
+    except (TypeError, ValueError):
+        return None
+    if pid <= 0 or pid == int(exclude or 0):
+        return None
+    if not _pid_is_helper(pid):
+        return None
+    return pid
+
+
+__all__ = ["write", "clear", "read", "live", "other_live_pid", "path", "SCHEMA"]

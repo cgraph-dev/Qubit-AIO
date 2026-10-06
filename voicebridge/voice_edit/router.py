@@ -108,6 +108,22 @@ _BARE_OPEN_WORDS = frozenset({
 })
 
 
+# Sweep lane (2026-10-05): a reread ("say that again", "read that back",
+# "repeat that") is an answer turn — the service replays the last spoken
+# answer verbatim. Without this the classifier tags them clarify (dropped
+# as ignore) or conversation (brain chatter). End-anchored like the
+# briefing shapes; "say that" / "read the news" / "repeat after me" never
+# match. Mirrors ``service._REPEAT_RE`` (kept local: this module never
+# imports the service at module scope — see _looks_like_question).
+_REPEAT_RE = re.compile(
+    r"\bsay\s+(that|it)\s+again\s*[.?!]*\s*$"
+    r"|\bread\s+(that|it)\s+back\s*[.?!]*\s*$"
+    r"|\brepeat\s+(that|it)\s*[.?!]*\s*$"
+    r"|\bwhat\s+did\s+you\s+(just\s+)?say\s*[?]?\s*$"
+    r"|\bcome\s+again\s*[?]?\s*$",
+    re.IGNORECASE)
+
+
 def _is_bare_open(text: str) -> bool:
     """True for open with no object (bare verb, pronoun, or politeness).
 
@@ -277,6 +293,13 @@ class VoiceRouter:
         if _BARE_OPEN_RE.match(text) or _is_bare_open(text):
             return RouteDecision("chat", reason="bare_open_clarify",
                                  task_text=text, intent="clarify")
+
+        # Rule 3c -- reread (sweep lane 2026-10-05): "say that again" is an
+        # answer turn (the service replays the last answer verbatim), never
+        # clarify (dropped as ignore) or task. Checked before the question
+        # rule so the verbatim replay wins over a brain paraphrase.
+        if _REPEAT_RE.search(text):
+            return RouteDecision("answer", reason="repeat", task_text=text)
 
         # Rule 4 -- no selection, a question is answered, never typed. An
         # anchored system ask ("what can you do", "how do i use you") is a

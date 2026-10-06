@@ -151,11 +151,14 @@ def _resolve_backend() -> str:
         return "tk"
 
 
-def cmd_run_qt(hidden: bool, quit_after: float) -> int:
+def cmd_run_qt(hidden: bool, quit_after: float,
+               tray: bool = True, settings: bool = False) -> int:
     from PySide6.QtWidgets import QApplication
+    from . import options as _options
     from . import qt_app as _qa
     app = QApplication([])
-    orb = _qa.QtVoiceOrb(poll=True)
+    orb = _qa.QtVoiceOrb(poll=True, options=_options.load_options(),
+                         enable_tray=bool(tray))
 
     import signal as _sig
     def _on_usr1(signum: int, frame: Any) -> None:
@@ -178,6 +181,11 @@ def cmd_run_qt(hidden: bool, quit_after: float) -> int:
             pass
     if not hidden:
         orb.show()
+    if settings:
+        try:
+            orb.open_settings()
+        except Exception:
+            pass
     t0 = time.monotonic()
     try:
         app.exec()
@@ -209,7 +217,8 @@ def cmd_run_qt(hidden: bool, quit_after: float) -> int:
     return 0
 
 
-def cmd_run(hidden: bool, quit_after: float) -> int:
+def cmd_run(hidden: bool, quit_after: float,
+            tray: bool = True, settings: bool = False) -> int:
     # Headless/GUI-safe: with no display there is no window to show.
     # Exit 0 (not failure) so Restart=on-failure never storms on a
     # headless host; the orb simply stays inactive until a display exists.
@@ -230,7 +239,7 @@ def cmd_run(hidden: bool, quit_after: float) -> int:
     backend = _resolve_backend()
     if backend == "qt":
         try:
-            return cmd_run_qt(hidden, quit_after)
+            return cmd_run_qt(hidden, quit_after, tray=tray, settings=settings)
         except Exception as exc:
             sys.stderr.write(json.dumps({
                 "event": "orb.qt_fallback",
@@ -286,6 +295,10 @@ def main(argv: Optional[list] = None) -> int:
     parser.add_argument("--backend", choices=("auto", "qt", "tk"),
                         default=None,
                         help="renderer backend (default: $QUBIT_ORB_BACKEND or auto->qt)")
+    parser.add_argument("--no-tray", action="store_true",
+                        help="run without the system-tray icon")
+    parser.add_argument("--settings", action="store_true",
+                        help="open the settings panel on start")
     args = parser.parse_args(argv)
     if args.once:
         return cmd_once()
@@ -297,7 +310,8 @@ def main(argv: Optional[list] = None) -> int:
         return cmd_quit()
     if args.backend:
         os.environ["QUBIT_ORB_BACKEND"] = args.backend
-    return cmd_run(args.hidden, args.quit_after)
+    return cmd_run(args.hidden, args.quit_after,
+                   tray=not args.no_tray, settings=args.settings)
 
 
 if __name__ == "__main__":
