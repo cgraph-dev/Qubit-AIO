@@ -16,6 +16,7 @@ import textwrap
 import threading
 import time
 from contextlib import contextmanager, suppress
+from agent.i18n import t
 from agent.think_scrubber import THINK_TAG_NAMES
 from qubit_cli.banner import format_banner_version_label
 from rich.console import Console
@@ -461,7 +462,7 @@ def _post_stream_transform_output(response: str, result: dict | None) -> str:
     if original and response.startswith(original):
         return response[len(original):]
 
-    return f"\n[Response transformed after streaming]\n{response}"
+    return f"\n{t('cli.render.response_transformed')}\n{response}"
 
 
 def _coerce_output_history_limit(value) -> int:
@@ -918,14 +919,14 @@ def _build_compact_banner() -> str:
     if (getattr(_skin, "name", "default") if _skin else "default") == "default":
         tiny_line = "☤ QUBIT QUBIT"
     else:
-        tiny_line = _skin.get_branding("agent_name", "Qubit Agent") if _skin else "Qubit Agent"
-    line1 = f"{tiny_line} - AI Agent Framework"
+        tiny_line = _skin.get_branding("agent_name", "Hermes Agent") if _skin else "Hermes Agent"
+    line1 = t("cli.render.banner_tagline", name=tiny_line)
 
     if os.environ.get("HERMES_FAST_STARTUP_BANNER") == "1":
         from qubit_cli import __release_date__ as _release_date
         from qubit_cli.version_info import get_version_info
 
-        version_line = f"Qubit Agent v{get_version_info().derived_version} ({_release_date})"
+        version_line = t("cli.render.banner_version", version=get_version_info().derived_version, date=_release_date)
     else:
         version_line = format_banner_version_label()
 
