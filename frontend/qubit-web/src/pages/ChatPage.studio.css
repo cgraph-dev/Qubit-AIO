@@ -363,3 +363,52 @@
 @media (prefers-reduced-motion: reduce) {
   .qchat *, .qchat *::before, .qchat *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* ── Active-session emphasis (ChatSessionList right-hand session list) ──
+   Scoped strictly to the active row via `.qchat__session-row--active`,
+   applied only in ChatSessionList.tsx. Inactive rows are untouched.
+   Static treatment (accent bar + tint + bold) stays unmistakable when
+   motion is off; the pulse is GPU-friendly (box-shadow) and the breathing
+   left bar runs on transform/opacity. */
+.qchat__session-row--active {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background-color: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  font-weight: 600;
+  animation: qchat-session-active-pulse 2.4s ease-in-out infinite;
+}
+/* Breathing accent bar (replaces the static border-l-2): a 3px primary
+   stripe whose opacity gently breathes, GPU-cheap (no layout/repaint of
+   surrounding content). */
+.qchat__session-row--active::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--color-primary);
+  border-radius: 999px;
+  transform-origin: left center;
+  animation: qchat-session-bar-breathe 2.4s ease-in-out infinite;
+}
+@keyframes qchat-session-active-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 55%, transparent), 0 0 0 0 color-mix(in srgb, var(--color-primary) 0%, transparent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 80%, transparent), 0 0 14px 2px color-mix(in srgb, var(--color-primary) 40%, transparent); }
+}
+@keyframes qchat-session-bar-breathe {
+  0%, 100% { opacity: .6; transform: scaleY(.85); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+/* Explicit opt-out: static high-contrast active row, no motion. (The global
+   `.qchat` reduced-motion rule above already zeroes durations; this keeps the
+   intent local and the static accents explicit.) */
+@media (prefers-reduced-motion: reduce) {
+  .qchat__session-row--active,
+  .qchat__session-row--active::before {
+    animation: none !important;
+  }
+  .qchat__session-row--active {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 70%, transparent);
+  }
+  .qchat__session-row--active::before { opacity: 1; transform: none; }
+}

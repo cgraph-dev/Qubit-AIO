@@ -1,0 +1,466 @@
+"""Generic adapter engine: make Qubit host any other agent's ecosystem content.
+
+Design notes live in ``__init__.py``. This module holds the mechanism; adapters hold the data.
+
+The engine is deliberately small and has four parts:
+
+* :class:`ForeignAdapter` — the data describing one foreign agent's naming.
+* :class:`ImportAliaser` — a ``sys.meta_path`` finder that resolves the foreign module names.
+* :class:`EnvAliaser` / :class:`SymbolAliaser` — environment and attribute aliasing.
+* :class:`AdapterRegistry` — holds adapters and answers "does this directory belong to one?"
+
+Everything is idempotent and reversible; ``reset()`` restores the process to stock Python.
+"""
+from __future__ import annotations
+
+import importlib
+import importlib.abc
+import importlib.util
+import os
+import pathlib
+import sys
+import threading
+import types
+from dataclasses import dataclass, field
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+
+
+class AgentCompatUnresolved(ImportError):
+    """A foreign module name was requested that no adapter can resolve.
+
+    Raised loudly on purpose. Returning a placeholder module here would make foreign
+    content appear to work while doing nothing — the failure mode this whole layer exists
+    to prevent.
+    """
+
+
+# ----------------------------------------------------------------------------------- adapter data
+
+@dataclass(frozen=True)
+class ForeignAdapter:
+    """One foreign agent's naming conventions, as data.
+
+    Adding support for another agent means constructing one of these — usually with no new
+    code. Every mapping is an allowlist; nothing here performs a blanket substitution.
+
+    Attributes
+    ----------
+    name:
+        Short identifier, e.g. ``"hermes"``. Used in messages and by ``active_adapters()``.
+    module_aliases:
+        Exact foreign module name -> real module name, resolved in THIS process.
+    prefix_aliases:
+        Foreign module-name PREFIX -> real prefix, for decomposed module families where
+        enumerating every sibling would rot (``("hermes_state_", "qubit_state_")``).
+    symbol_aliases:
+        Real module name -> ``{foreign_symbol: real_symbol}``. Applied as attributes on the
+        already-imported module, for cases where the module kept its name but an attribute
+        was renamed.
+    env_aliases:
+        Foreign env var -> real env var. Values are mirrored foreign -> real only, and a
+        real variable that is already set is never overwritten.
+    entry_point_groups:
+        Entry-point groups this agent's plugin ecosystem publishes under. Qubit keeps
+        accepting them so pip-installed plugins stay discoverable.
+    detection_markers:
+        Module prefixes whose presence in source marks a directory as this agent's content.
+        Detection reads import statements only — never prose (matching prose is what
+        corrupted 172 URLs during the vendor sync).
+    content_roots:
+        Conventional on-disk plugin directories for this agent, used as a discovery hint.
+    reserved:
+        Names this agent must NOT alias because Qubit deliberately keeps them (its own
+        entry-point group, legacy data paths, wire-format strings). Listed so a future
+        contributor sees the intent instead of "fixing" an apparent omission.
+    """
+
+    name: str
+    module_aliases: Dict[str, str] = field(default_factory=dict)
+    prefix_aliases: Dict[str, str] = field(default_factory=dict)
+    symbol_aliases: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    env_aliases: Dict[str, str] = field(default_factory=dict)
+    entry_point_groups: Tuple[str, ...] = ()
+    detection_markers: Tuple[str, ...] = ()
+    content_roots: Tuple[str, ...] = ()
+    reserved: Tuple[str, ...] = ()
+
+    # ------------------------------------------------------------------ alias resolution
+
+    def resolve_module(self, name: str) -> Optional[str]:
+        """Map a foreign module name to its real name, or None when this adapter has no opinion."""
+        direct = self.module_aliases.get(name)
+        if direct:
+            return direct
+        for foreign_prefix, real_prefix in self.prefix_aliases.items():
+            if name == foreign_prefix.rstrip(".") or name.startswith(foreign_prefix):
+                return real_prefix + name[len(foreign_prefix):]
+        return None
+
+    def is_reserved(self, name: str) -> bool:
+        """True when *name* is deliberately kept as-is (must not be aliased)."""
+        return any(name == r or name.startswith(r) for r in self.reserved)
+
+
+# ------------------------------------------------------------------------- import aliasing engine
+
+class _AliasLoader(importlib.abc.Loader):
+    """Returns an already-imported module for an aliased name (no re-execution)."""
+
+    def __init__(self, module: types.ModuleType) -> None:
+        self._module = module
+
+    def create_module(self, spec):  # noqa: D102
+        return self._module
+
+    def exec_module(self, module):  # noqa: D102
+        return None
+
+
+class ImportAliaser(importlib.abc.MetaPathFinder):
+    """Resolve foreign module names to their real counterparts, preserving module IDENTITY.
+
+    IDENTITY IS THE WHOLE POINT. The alias must hand back the *same* module object the rest of
+    the process uses, so a foreign plugin that mutates (say) the plugin registry is mutating the
+    live registry, not a private copy.
+
+    WHY BINDINGS ARE PRE-SEEDED, NOT LEFT TO A RACE:
+    ``find_spec`` alone is not enough. If a caller imports the alias first, this finder imports
+    the real module and registers it — but a later ``import <real_name>`` still re-runs the
+    default machinery and builds a SECOND object with the same ``__name__`` and fresh state.
+    So :meth:`preload` imports each target once and writes BOTH names into ``sys.modules`` up
+    front; whichever name is requested first, CPython finds an initialised entry and never
+    executes the file twice.
+    """
+
+    def __init__(self, adapters: Sequence[ForeignAdapter]) -> None:
+        self._adapters = tuple(adapters)
+
+    # -- lookup
+
+    def _map(self, name: str) -> Optional[str]:
+        for adapter in self._adapters:
+            if adapter.is_reserved(name):
+                return None
+            mapped = adapter.resolve_module(name)
+            if mapped:
+                return mapped
+        return None
+
+    # -- importlib hook
+
+    def find_spec(self, fullname, path=None, target=None):  # noqa: D102
+        mapped = self._map(fullname)
+        if not mapped:
+            return None
+        real = self._bind(fullname, mapped)
+        return importlib.util.spec_from_loader(
+            fullname, _AliasLoader(real), is_package=hasattr(real, "__path__")
+        )
+
+    # -- binding
+
+    def _bind(self, alias: str, target: str) -> types.ModuleType:
+        """Import *target* once and bind BOTH names to the identical object."""
+
+        real = sys.modules.get(target)
+        if real is None:
+            try:
+                real = importlib.import_module(target)
+            except ImportError as exc:
+                raise AgentCompatUnresolved(
+                    f"agent_compat: {alias!r} aliases to {target!r}, which failed to import: "
+                    f"{exc}. Add the correct target to the adapter's module_aliases."
+                ) from exc
+
+        existing = sys.modules.get(alias)
+        if existing is not None and existing is not real:
+            raise AgentCompatUnresolved(
+                f"agent_compat: {alias!r} is already loaded as a distinct module object "
+                f"(duplicate state). Expected the same object as {target!r}."
+            )
+
+        # Both names -> one object. This is what keeps a foreign plugin's mutations visible.
+        sys.modules[alias] = real
+        sys.modules[target] = real
+        return real
+
+    def preload(self) -> List[str]:
+        """Bind exact aliases AND discover prefix-family members up front.
+
+        Exact aliases are bound directly. Prefix rules (``hermes_state_`` -> ``qubit_state_``)
+        cannot be pre-bound from the table alone, because the siblings are only knowable by
+        looking at what exists — so we enumerate the real modules that match a real prefix and
+        bind each corresponding alias. Without this a prefix-aliased module is imported twice
+        (once per name) and the foreign copy diverges from the host's, which is the same
+        duplicate-module bug the exact-alias preload exists to prevent.
+        """
+        bound: List[str] = []
+        for adapter in self._adapters:
+            for alias, target in adapter.module_aliases.items():
+                if not _importable(target):
+                    continue
+                self._bind(alias, target)
+                bound.append(f"{alias}->{target}")
+            for foreign_prefix, real_prefix in adapter.prefix_aliases.items():
+                for real_name, alias_name in _prefix_family(real_prefix, foreign_prefix):
+                    if not _importable(real_name):
+                        continue
+                    if adapter.is_reserved(alias_name):
+                        continue
+                    try:
+                        self._bind(alias_name, real_name)
+                    except AgentCompatUnresolved:
+                        continue  # a genuine collision; leave it to fail loudly at use
+                    bound.append(f"{alias_name}->{real_name}")
+        return bound
+
+
+def _importable(name: str) -> bool:
+    """True when *name* can be imported (cheap probe; avoids binding a broken alias)."""
+    if name in sys.modules:
+        return True
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _prefix_family(real_prefix: str, foreign_prefix: str) -> List[Tuple[str, str]]:
+    """Enumerate ``(real_module, foreign_alias)`` pairs for a prefix rule.
+
+    Prefix rules describe a FAMILY (``qubit_state_*`` has 20+ siblings), so the members are
+    discovered from what actually exists rather than enumerated in the adapter table, which
+    would rot as the host adds modules.
+
+    Only top-level modules are discovered: a prefix rule like ``hermes_cli.`` maps a package's
+    DEEP names, and those are resolved on demand by ``find_spec`` (the package itself is bound
+    by an exact alias), so enumerating them here would be wasted work.
+    """
+    pairs: List[Tuple[str, str]] = []
+    if real_prefix.endswith("."):
+        # A package-prefix rule; the package is handled by the exact alias, and deep names
+        # resolve through find_spec. Nothing to pre-seed.
+        return pairs
+
+    for entry in sorted(sys.path):
+        if not entry:
+            continue
+        try:
+            base = pathlib.Path(entry)
+            if not base.is_dir():
+                continue
+            for path in base.glob(f"{real_prefix}*.py"):
+                stem = path.stem
+                if stem != real_prefix.rstrip("_"):
+                    pairs.append((stem, foreign_prefix + stem[len(real_prefix):]))
+        except OSError:  # pragma: no cover - unreadable sys.path entry
+            continue
+    return pairs
+
+
+# ------------------------------------------------------------------- env / symbol aliasing
+
+class EnvAliaser:
+    """Mirror foreign env vars onto the real names Qubit reads.
+
+    Direction is one-way (foreign -> real) and never destructive: an explicitly-set real
+    variable wins, so a profile can never be silently retargeted by a foreign plugin.
+    """
+
+    def __init__(self, adapters: Sequence[ForeignAdapter]) -> None:
+        self._pairs: List[Tuple[str, str]] = []
+        for adapter in adapters:
+            for old, new in adapter.env_aliases.items():
+                if (old, new) not in self._pairs:
+                    self._pairs.append((old, new))
+
+    def apply(self) -> List[str]:
+        """Apply the mirrors. Returns the pairs actually written."""
+        applied: List[str] = []
+        for old, new in self._pairs:
+            value = os.environ.get(old)
+            if value and not os.environ.get(new):
+                os.environ[new] = value
+                applied.append(f"{old}->{new}")
+        return applied
+
+    def pairs(self) -> List[Tuple[str, str]]:
+        return list(self._pairs)
+
+
+class SymbolAliaser:
+    """Expose foreign attribute names on the real modules that renamed them.
+
+    ``from tools.xai_http import hermes_xai_user_agent`` cannot be fixed by module aliasing:
+    the module resolves, the attribute does not. We attach the foreign name as an alias of the
+    real one on the SAME module object, so foreign code gets the live function, not a copy.
+
+    Existing attributes are never overridden — if the foreign name genuinely exists, it wins.
+    """
+
+    def __init__(self, adapters: Sequence[ForeignAdapter]) -> None:
+        self._aliases: Dict[str, Dict[str, str]] = {}
+        for adapter in adapters:
+            for module_name, mapping in adapter.symbol_aliases.items():
+                self._aliases.setdefault(module_name, {}).update(mapping)
+
+    def apply(self) -> List[str]:
+        applied: List[str] = []
+        for module_name, mapping in self._aliases.items():
+            try:
+                mod = importlib.import_module(module_name)
+            except ImportError:
+                continue  # optional module absent in this install
+            for foreign, real in mapping.items():
+                if hasattr(mod, foreign):
+                    continue  # already present (or a genuine name) — never override
+                target = getattr(mod, real, None)
+                if target is None:
+                    continue  # the rename we expected isn't there; leave it to fail loudly
+                setattr(mod, foreign, target)
+                applied.append(f"{module_name}.{foreign}->{real}")
+        return applied
+
+
+# ------------------------------------------------------------------------------- the registry
+
+class AdapterRegistry:
+    """Holds the known foreign-agent adapters and answers detection questions."""
+
+    def __init__(self) -> None:
+        self._adapters: List[ForeignAdapter] = []
+
+    def register(self, adapter: ForeignAdapter) -> ForeignAdapter:
+        """Register an adapter (idempotent by name; later registrations replace earlier)."""
+        self._adapters = [a for a in self._adapters if a.name != adapter.name]
+        self._adapters.append(adapter)
+        return adapter
+
+    def unregister(self, name: str) -> None:
+        self._adapters = [a for a in self._adapters if a.name != name]
+
+    def all(self) -> List[ForeignAdapter]:
+        return list(self._adapters)
+
+    def get(self, name: str) -> Optional[ForeignAdapter]:
+        for a in self._adapters:
+            if a.name == name:
+                return a
+        return None
+
+    # -- detection
+
+    def detect(self, directory: os.PathLike | str, *, scan_files: Optional[Iterable] = None):
+        """Return the adapter whose markers appear in *directory*'s source, or None.
+
+        Detection reads IMPORT STATEMENTS, never prose. A README that merely says the
+        foreign agent's name must not trigger an adapter — matching prose is exactly how the
+        vendor sync corrupted URLs.
+        """
+        base = pathlib.Path(directory)
+        targets = list(scan_files) if scan_files is not None else list(base.rglob("*.py"))
+        for path in targets:
+            try:
+                text = pathlib.Path(path).read_text(errors="ignore")
+            except OSError:
+                continue
+            for adapter in self._adapters:
+                for marker in adapter.detection_markers:
+                    if f"import {marker}" in text or f"from {marker}" in text:
+                        return adapter
+        return None
+
+    def entry_point_groups(self) -> Tuple[str, ...]:
+        """Every foreign entry-point group Qubit should keep accepting."""
+        groups: List[str] = []
+        for adapter in self._adapters:
+            for g in adapter.entry_point_groups:
+                if g not in groups:
+                    groups.append(g)
+        return tuple(groups)
+
+
+#: Process-wide adapter registry. Import adapters and register them here.
+registry = AdapterRegistry()
+
+
+# ------------------------------------------------------------------------------------ install
+
+_lock = threading.Lock()
+_finder: Optional[ImportAliaser] = None
+_env_applied = False
+
+
+def active_adapters() -> List[ForeignAdapter]:
+    """Adapters currently registered (not necessarily installed)."""
+    return registry.all()
+
+
+def installed() -> bool:
+    """True when the import aliaser is active."""
+    return _finder is not None and _finder in sys.meta_path
+
+
+def install(*, env: bool = False, adapters: Optional[Sequence[ForeignAdapter]] = None) -> ImportAliaser:
+    """Install aliasing for the registered adapters (idempotent).
+
+    ``env=True`` additionally mirrors environment aliases. Import aliasing is safe to enable
+    globally; environment aliasing mutates process state, so it is opt-in at the call site.
+    """
+    global _finder, _env_applied
+    with _lock:
+        chosen = tuple(adapters) if adapters is not None else tuple(registry.all())
+        if _finder is None or _finder not in sys.meta_path:
+            _finder = ImportAliaser(chosen)
+            sys.meta_path.insert(0, _finder)
+        # Pre-seed so neither import order can produce a duplicate module.
+        _finder.preload()
+        SymbolAliaser(chosen).apply()
+        if env and not _env_applied:
+            EnvAliaser(chosen).apply()
+            _env_applied = True
+    return _finder
+
+
+def uninstall() -> None:
+    """Remove the finder and drop aliased entries (test seam)."""
+    global _finder, _env_applied
+    with _lock:
+        if _finder is not None and _finder in sys.meta_path:
+            sys.meta_path.remove(_finder)
+        if _finder is not None:
+            aliased = {
+                alias
+                for adapter in _finder._adapters  # noqa: SLF001 (same package)
+                for alias in adapter.module_aliases
+            }
+            for name in aliased:
+                sys.modules.pop(name, None)
+        _finder = None
+        _env_applied = False
+
+
+def reset() -> None:
+    """Full teardown: uninstall and clear the registry (test seam)."""
+    uninstall()
+    registry._adapters = []  # noqa: SLF001 (same package)
+
+
+def install_for(
+    directory: os.PathLike | str,
+    *,
+    adapter: Optional[ForeignAdapter] = None,
+    env: bool = False,
+) -> Optional[ForeignAdapter]:
+    """Install aliasing when *directory* holds a known foreign agent's content.
+
+    Returns the adapter that matched (or None when nothing matched and nothing is installed).
+    Passing *adapter* skips detection.
+    """
+    chosen = adapter or registry.detect(directory)
+    if chosen is None:
+        return None
+    if chosen not in registry.all():
+        registry.register(chosen)
+    install(env=env)
+    return chosen

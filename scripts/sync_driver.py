@@ -5,6 +5,11 @@ The 4,128-commit sync (4,438 files) is too large to apply in one pass: a bad
 merge anywhere is un-attributable. This runs one subsystem at a time, records
 the outcome, and refuses to advance unless the previous subsystem was verified.
 
+Baseline: PIN_SHA 69948c0057 -> BASE_SHA a036b13793 = 5,441 commits / 5,142
+files (2026-09-25 -> 2026-10-06). The earlier bd0affe5 waypoint (4,128 / 4,438)
+stopped 1,313 commits short of current upstream; it is retained only in
+SYNC_CONFLICT_PLAN.md history.
+
 Subsystems are ordered smallest-risk-first so a failure early costs little.
 Root-level files are handled last (they carry the entry points).
 
@@ -23,9 +28,9 @@ from pathlib import Path
 
 REPO = Path("/home/trick/Projects/Repos/qubit-voicebridge")
 STATE = REPO / "docs" / "generated" / "sync_driver_state.json"
-PIN = Path("/home/trick/.cache/qubit-pins/hermes-agent")
+PIN = Path("/home/trick/.hermes/hermes-agent")
 PIN_SHA = "69948c0057"
-BASE_SHA = "bd0affe5"
+BASE_SHA = "a036b13793"
 
 # Dependency-ordered, NOT smallest-first: consumers import symbols DEFINED in
 # more primitive modules, so those must land first or the consumer merge

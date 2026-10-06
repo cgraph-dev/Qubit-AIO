@@ -67,16 +67,19 @@ vi.mock("@nous-research/ui/ui/components/list-item", () => ({
   ListItem: ({
     children,
     onClick,
+    className,
     ...rest
   }: {
     children?: ReactNode;
     onClick?: () => void;
+    className?: string;
     "aria-current"?: "true" | undefined;
   }) => (
     <div
       role="button"
       tabIndex={0}
       data-testid="session-row"
+      className={className}
       onClick={onClick}
       aria-current={rest["aria-current"]}
     >
@@ -99,7 +102,7 @@ let root: Root;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
-async function renderList() {
+async function renderList(activeSessionId: string | null = null) {
   const { ChatSessionList } = await import("./ChatSessionList");
   container = document.createElement("div");
   document.body.append(container);
@@ -108,7 +111,7 @@ async function renderList() {
     root.render(
       <MemoryRouter initialEntries={["/chat"]}>
         <LocationProbe />
-        <ChatSessionList activeSessionId={null} />
+        <ChatSessionList activeSessionId={activeSessionId} />
       </MemoryRouter>,
     ),
   );
@@ -199,5 +202,59 @@ describe("ChatSessionList", () => {
     await renderList();
     expect(container.querySelector("aside")).toBeNull();
     expect(container.querySelectorAll('[role="complementary"]').length).toBe(0);
+  });
+
+  it("emphasizes the active row with the animation hook and keeps aria-current", async () => {
+    apiMocks.listChatSessions.mockResolvedValueOnce({
+      sessions: [
+        {
+          id: "chat-1",
+          title: "First chat",
+          name: null,
+          source: "qubit-chat",
+          message_count: 3,
+          last_active: Date.now() / 1000 - 120,
+        },
+        {
+          id: "chat-2",
+          title: "Second chat",
+          name: null,
+          source: "qubit-chat",
+          message_count: 1,
+          last_active: Date.now() / 1000 - 600,
+        },
+      ],
+      total: 2,
+      limit: 30,
+      offset: 0,
+    });
+    await renderList("chat-1");
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Second chat"),
+    );
+
+    const rows = container.querySelectorAll('[data-testid="session-row"]');
+    expect(rows.length).toBe(2);
+
+    // Active row: emphasis hook class + aria-current, and NOT the plain hover style.
+    const active = rows[0] as HTMLElement;
+    expect(active.className).toContain("qchat__session-row--active");
+    expect(active.getAttribute("aria-current")).toBe("true");
+
+    // Inactive row keeps today's look exactly (no emphasis hook).
+    const inactive = rows[1] as HTMLElement;
+    expect(inactive.className).not.toContain("qchat__session-row--active");
+    expect(inactive.className).toContain("text-text-secondary");
+    expect(inactive.getAttribute("aria-current")).toBeNull();
+  });
+
+  it("does not mark any row active when no session is selected", async () => {
+    await renderList(null);
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("First chat"),
+    );
+    expect(
+      container.querySelectorAll(".qchat__session-row--active").length,
+    ).toBe(0);
   });
 });

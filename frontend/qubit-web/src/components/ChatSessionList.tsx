@@ -219,7 +219,7 @@ export function ChatSessionList({
                 "flex-col items-start gap-0.5 rounded px-2 py-1.5",
                 "normal-case tracking-normal",
                 isActive
-                  ? "bg-primary/10 text-foreground border-l-2 border-primary"
+                  ? "qchat__session-row--active bg-primary/15 font-medium text-foreground"
                   : "text-text-secondary hover:bg-midground/5 hover:text-foreground",
               )}
             >
