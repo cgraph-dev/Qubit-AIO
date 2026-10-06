@@ -213,10 +213,24 @@ def _joined_output(r) -> str:
     return "\n".join(p for p in (r.stdout or "", r.stderr or "") if p).strip()
 
 
+def _session_toolsets(session) -> tuple:
+    """``(enabled, disabled)`` a session's read-back RPCs must reflect: the live agent's sets once built,
+    else what that session's profile would build with — ``_load_enabled_toolsets`` under the session's
+    profile scope, the same read ``_build_agent``/``_refresh_live_sessions`` make and the key
+    ``profiles.configure`` pins. A session whose agent is not built yet (``session.create`` with no
+    prompt) otherwise read back as "everything enabled" (#117977). ``None`` = all toolsets.
+    No session → the launch profile's config."""
+    agent = session.get("agent") if session else None
+    if agent is not None:
+        return getattr(agent, "enabled_toolsets", None), getattr(agent, "disabled_toolsets", None)
+    with _session_profile_runtime_scope(session or {}):
+        return _load_enabled_toolsets(_resolve_agent_platform(_session_source(session))), _load_disabled_toolsets()
+
+
 def _toolset_rows(params: dict, *, with_tools: bool) -> list[dict]:
     toolsets = _tools_mod("toolsets")
     session = _sessions.get(params.get("session_id", ""))
-    enabled = set((getattr(session["agent"], "enabled_toolsets", []) if session else _load_enabled_toolsets()) or [])
+    enabled = set(_session_toolsets(session)[0] or [])
     items = []
     for name in sorted(toolsets.get_all_toolsets().keys()):
         if info := toolsets.get_toolset_info(name):
@@ -617,13 +631,51 @@ def _session_home_scope(session, cwd: str | None = None, profile: str | None = N
             hc.reset_qubit_home_override(token)
 
 
-def _is_profile_skill_command(session: dict, base: str) -> bool:
-    """True when ``/base`` is a skill command of the session's profile. False on failure."""
+def _profile_skill_command(session: dict, base: str) -> bool | None:
+    """True when ``/base`` is a skill of the session profile.
+
+    False when the scan succeeded and it is not. None when the scan raised —
+    callers must not treat that as "not a skill". Fail-open sends the command to
+    the slash worker, which ok-replies the loading banner and drops the prompt.
+    """
     try:
         with _session_home_scope(session):
-            return f"/{base}" in _tools_mod("agent.skill_commands").get_skill_commands()
+            return f"/{base}" in _tools_mod("agent.skill_commands").get_interactive_skill_commands()
+    except Exception:
+        return None
+
+
+_SKILL_WORKER_REFUSED = "skill command refused before process: /"
+
+
+def _skill_dispatch_or_refuse(rid, sid, base, arg):
+    """Return command.dispatch's directive, or a hard error. Never an ok banner."""
+    dispatched = _methods["command.dispatch"](rid, {"name": base, "arg": arg, "session_id": sid})
+    if "error" in dispatched or (dispatched.get("result") or {}).get("type"):
+        return dispatched
+    return _err(rid, 4018, f"skill command: use command.dispatch for /{base}")
+
+
+def _worker_refused_skill(exc: BaseException) -> bool:
+    return _SKILL_WORKER_REFUSED in str(exc)
+
+
+def _is_registry_command(base: str) -> bool:
+    """True when ``base`` is a built-in the slash worker may still run.
+
+    Skill auto-registration skips names that collide with the registry, so a
+    built-in cannot be the skill whose prompt the worker would drop.
+    """
+    try:
+        return _tools_mod("qubit_cli.commands").resolve_command(base) is not None
     except Exception:
         return False
+
+
+# Back-compat alias: older call sites in this module used ``_is_profile_skill_command``
+# as the boolean guard. :func:`_profile_skill_command` is the tri-state source of truth;
+# the alias keeps exactly one definition (hazard #1) under both names.
+_is_profile_skill_command = _profile_skill_command
 
 
 def _dispatch_plugin(rid, params, session, name, arg):
@@ -780,6 +832,13 @@ def _cmd_retry(rid, params, session, name, arg):
     return _ok(rid, {"type": "send", "message": content})
 
 
+def _tui_model_friction(signal, session, turns=1):
+    from qubit_cli.observability.shared_metrics_model import record_model_friction
+    record_model_friction(
+        signal, session_id=session.get("session_key"), agent=session.get("agent"),
+        qubit_home=session.get("profile_home"), turns=turns)
+
+
 def _cmd_steer(rid, params, session, name, arg):
     if not arg:
         return _err(rid, 4004, "usage: /steer <prompt>")
@@ -914,11 +973,84 @@ def _cmd_compress(rid, params, session, name, arg):
         return _err(rid, 5009, f"compress failed: {exc}")
 
 
+# ── /memory + /skills staged-write review ───────────────────────────────────
+#
+# The store must resolve under the SAME home as the command, which is why these run inside the
+# dispatcher's `_session_home_scope(session)` block: `load_on_disk_store()` reads the profile's
+# MEMORY.md/USER.md and its memory char limits (see the scope note on `_session_home_scope`,
+# #110695).
+_MEMORY_USAGE = ("Unknown /memory subcommand. "
+                 "Use: pending, approve <id>, reject <id>, approval <on|off>.")
+_SKILLS_USAGE = ("Unknown /skills subcommand here. "
+                 "Use: pending, approve <id>, reject <id>, diff <id>, approval <on|off>. "
+                 "(Search/install/browse are terminal-side.)")
+
+
+def _pending_subcommand_store(session):
+    """Memory store for the session's own profile: the live agent's store when there is one, else a
+    freshly loaded on-disk store — mirroring cli.py's /memory handler and the gateway's (Desktop/TUI
+    sessions have no long-lived agent store). ``None`` when even that fails, which the shared handler
+    reports as 'memory store unavailable' instead of claiming the write was applied."""
+    if session:
+        with contextlib.suppress(Exception):
+            store = getattr(session.get("agent"), "_memory_store", None)
+            if store is not None:
+                return store
+    with contextlib.suppress(Exception):
+        return _tools_mod("tools.memory_tool").load_on_disk_store()
+    return None
+
+
+def _write_approval_mode_setter(subsystem: str):
+    """Persist ``<subsystem>.write_approval`` into the SESSION's profile config (this runs inside
+    ``_session_home_scope``, so ``_write_config_key`` writes the right profile's config.yaml)."""
+    return lambda enabled: _write_config_key(f"{subsystem}.write_approval", bool(enabled))
+
+
+def _run_pending_review(rid, subsystem: str, arg: str, session, *, unknown: str):
+    from qubit_cli.write_approval_commands import handle_pending_subcommand
+    from tools import write_approval as wa
+    out = handle_pending_subcommand(
+        subsystem, (arg or "").split(),
+        memory_store=_pending_subcommand_store(session) if subsystem == wa.MEMORY else None,
+        set_mode_fn=_write_approval_mode_setter(subsystem))
+    return _exec_out(rid, out if out is not None else unknown)
+
+
+def _cmd_memory(rid, params, session, name, arg):
+    """/memory — review staged memory writes, approve/reject them, toggle the gate."""
+    return _run_pending_review(rid, "memory", arg, session, unknown=_MEMORY_USAGE)
+
+
+def _cmd_skills(rid, params, session, name, arg):
+    """/skills write-approval subcommands only; the hub subcommands stay with the slash worker.
+
+    Returns None (falls through to the routing refusal, unchanged behaviour) for anything outside
+    the review surface — ``search``/``install``/``browse``/``inspect`` are the CLI skills hub's,
+    never a staged-write review. The allowlist mirrors the registry-declared review slice
+    (``CommandDef("skills", desktop_subcommands=...)`` in qubit_cli/commands.py)."""
+    sub = (arg or "").split()
+    commands = _tools_mod("qubit_cli.commands")
+    allowed = getattr(commands.resolve_command("skills"), "desktop_subcommands", None) or ()
+    if not sub or sub[0].lower() not in allowed:
+        return None
+    from tools import write_approval as wa
+    # The gate being off must not strand writes that are already staged (gateway parity): still
+    # answer when a pile exists, and point at the toggle when there is nothing to review.
+    if (sub[0].lower() not in {"approval", "mode"} and not wa.write_approval_enabled(wa.SKILLS)
+            and wa.pending_count(wa.SKILLS) == 0):
+        return _exec_out(rid, "Skill write approval is off (skills.write_approval). "
+                              "Enable it with /skills approval on, then review staged writes "
+                              "with /skills pending.")
+    return _run_pending_review(rid, "skills", arg, session, unknown=_SKILLS_USAGE)
+
+
 _SLASH_BUILTINS = {
     "queue": _cmd_queue, "q": _cmd_queue, "learn": _cmd_learn, "plan": _cmd_plan, "init": _cmd_init,
     "moa": _cmd_moa, "focus": _cmd_focus, "retry": _cmd_retry, "steer": _cmd_steer, "goal": _cmd_goal,
     "loop": _cmd_loop, "undo": _cmd_undo, "snapshot": _cmd_snapshot, "snap": _cmd_snapshot,
-    "compress": _cmd_compress, "compact": _cmd_compress}
+    "compress": _cmd_compress, "compact": _cmd_compress,
+    "memory": _cmd_memory, "skills": _cmd_skills}
 
 @method("command.dispatch")
 def _(rid, params: dict) -> dict:
@@ -965,8 +1097,18 @@ def _(rid, params: dict) -> dict:
         target = base if base in _PENDING_INPUT_COMMANDS else _bundle_key_for(base)
     if target is not None:
         return _methods["command.dispatch"](rid, {"name": target.lstrip("/"), "arg": arg, "session_id": sid})
-    if _is_profile_skill_command(session, base):
+    # Recognized skills keep the 4018 gate so clients command.dispatch. A scan
+    # exception must not fail open into the worker: return the dispatch payload
+    # (or a hard error) here, or the loading banner swallows the prompt.
+    skill_hit = _profile_skill_command(session, base)
+    if skill_hit is True:
         return _err(rid, 4018, f"skill command: use command.dispatch for /{base}")
+    if skill_hit is None:
+        dispatched = _skill_dispatch_or_refuse(rid, sid, base, arg)
+        # A built-in cannot collide with a skill slug, so the worker may still
+        # run it. Anything else might be the skill the scan failed to see.
+        if (dispatched.get("result") or {}).get("type") or not _is_registry_command(base):
+            return dispatched
     if plugin_handler := _plugin_command_handler(base) if base else None:
         try:
             return _ok(rid, {"output": _run_plugin_command(plugin_handler, arg, session) or "(no output)"})
@@ -989,13 +1131,17 @@ def _(rid, params: dict) -> dict:
                 except Exception as e:
                     return _err(rid, 5030, f"slash worker start failed: {e}")
     try:
-        payload = {"output": worker.run(cmd) or "(no output)"}
+        output = worker.run(cmd)
+        payload = {"output": output or "(no output)"}
         if warning := _mirror_slash_side_effects(sid, session, cmd):
             payload["warning"] = warning
         if base in _SESSION_CONTROL_SLASHES:
             _publish_session_control_snapshot(sid, session)
         return _ok(rid, payload)
     except Exception as e:
+        if _worker_refused_skill(e):
+            # Refused before process_command; the worker is still healthy.
+            return _skill_dispatch_or_refuse(rid, sid, base, arg)
         with contextlib.suppress(Exception):
             worker.close()
         session["slash_worker"] = None
