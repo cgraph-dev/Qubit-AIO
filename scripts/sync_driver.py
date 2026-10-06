@@ -48,8 +48,10 @@ BASE_SHA = "a036b13793"
 SUBSYSTEMS = [
     "__root__",                           # -1: root-level .py modules (49 files)
     "locales", "nix", "docker",           # 0: inert
+    "hermes_platform", "qubit_platform",  # 0: platform primitives
     "plugins", "optional-skills",         # 1: leaf capability
     "agent", "tools", "gateway",          # 2: core   (applied 2026-10-06)
+    "hermes_cli", "qubit_cli",            # 2: the CLI subsystem (377 upstream files)
     "tui_gateway", "web", "cron", "acp_adapter", "evals", "pm", "scripts",
     "tests", "tests-js",                  # 3: upstream test suite + JS tests
     "ui-tui", "apps",                     # 4: surfaces + bulk

@@ -355,6 +355,32 @@ DEFAULT_BOARD = "default"
 _CURRENT_BOARD_OVERRIDE: ContextVar[str | None] = ContextVar(
     "hermes_kanban_current_board_override", default=None,
 )
+# Machine flows that enumerate boards (gateway notifier / watcher / dispatcher
+# ticks) resolve board paths env-pin-first — see pin_first_board_resolution().
+_PIN_FIRST_BOARD_RESOLUTION: ContextVar[bool] = ContextVar(
+    "hermes_kanban_pin_first_board_resolution", default=False,
+)
+
+
+@contextlib.contextmanager
+def pin_first_board_resolution():
+    """Resolve board paths env-pin-first for machine flows that enumerate boards.
+
+    The gateway notifier, per-subscription cursor writes and the embedded
+    dispatcher poll every board slug from ``list_boards()`` — the slug is not
+    caller intent, it is an iteration variable. On a box whose environment pins
+    ``HERMES_KANBAN_DB`` (the dispatcher default) every slug must map to that
+    one pinned file: the notifier dedupes resolved DB paths, and per-slug
+    paths read empty boards nobody writes, silently killing wake
+    notifications. Explicit cross-board intent (CLI ``--board``, a model
+    tool's ``board=``) is a USER property and must never run inside this
+    context; with no pin set this context changes nothing.
+    """
+    token = _PIN_FIRST_BOARD_RESOLUTION.set(True)
+    try:
+        yield
+    finally:
+        _PIN_FIRST_BOARD_RESOLUTION.reset(token)
 
 
 @contextlib.contextmanager
@@ -493,16 +519,40 @@ def _dir_holds_board(d: Path) -> bool:
     return (d / "board.json").exists() or (d / "kanban.db").exists()
 
 
+def _explicit_board_intent_pinned() -> bool:
+    """Whether an explicit ``board=`` (or scoped ``--board``) must still resolve
+    through the ``HERMES_KANBAN_DB``-style env pins instead of its own board dir.
+
+    True for machine flows wrapped in :func:`pin_first_board_resolution` and
+    for every execution the dispatcher fences: its own workers (they carry
+    ``HERMES_KANBAN_TASK``) and delegated children / descendants (the
+    ``HERMES_DELEGATED_CHILD_CONTEXT`` marker). The pins ARE the "workers
+    physically cannot see other boards" isolation (5ec6baa), and
+    ``agent.delegation_context.kanban_path_is_fenced`` checks the pinned path /
+    fenced root — an explicit board that resolved elsewhere would also escape
+    that fence."""
+    if _PIN_FIRST_BOARD_RESOLUTION.get():
+        return True
+    from agent.delegation_context import explicit_board_intent_is_pinned
+    return explicit_board_intent_is_pinned()
+
+
 def _board_path(
     env_var: Optional[str], board: Optional[str], default_parts: tuple[str, ...], leaf: str,
 ) -> Path:
-    """Shared resolver: ``env_var`` override, else legacy ``<root>/<default_parts>``
-    for the ``default`` board, else ``board_dir(slug)/leaf``."""
-    if env_var:
-        override = os.environ.get(env_var, "").strip()
-        if override:
-            return Path(override).expanduser()
+    """Shared resolver. An explicit ``board=`` argument — or the scoped
+    ``--board`` context (:func:`scoped_current_board`) — outranks the ``env_var``
+    pin ONLY where no fence applies (see :func:`_explicit_board_intent_pinned`):
+    user-facing cross-board intent (CLI ``--board``, a model tool's ``board=``)
+    is honored, but machine flows that enumerate boards (gateway notifier /
+    watcher / dispatcher ticks) and dispatched or delegated workers keep
+    resolving through the pin. Without explicit intent the ``env_var`` override
+    pins the file, else legacy ``<root>/<default_parts>`` for the ``default``
+    board, else ``board_dir(slug)/leaf``."""
+    pin = os.environ.get(env_var, "").strip() if env_var else ""
     slug = _normalize_board_slug(board)
+    if pin and (slug is None or _explicit_board_intent_pinned()):
+        return Path(pin).expanduser()
     if slug is None:
         slug = get_current_board()
     if slug == DEFAULT_BOARD:

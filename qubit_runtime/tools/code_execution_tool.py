@@ -966,3 +966,8 @@ registry.register(
     handler=_execute_code_handler, check_fn=check_sandbox_requirements, emoji="🐍",
     max_result_size_chars=100_000,
 )
+
+
+# Compat alias: callers import the upstream spelling (caught by
+# scripts/check_entry_point_resolution.py -- tools/code_kernel_remote.py:211).
+generate_hermes_tools_module = generate_qubit_tools_module

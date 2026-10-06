@@ -149,3 +149,9 @@ def _strip_qubit_owned_pythonpath(env: dict) -> None:
         env.pop("PYTHONPATH", None)
     if stripped:
         logger.debug("Stripped Qubit-owned entries from PYTHONPATH: %s", stripped)
+
+
+# Compat alias: callers import the upstream spelling (caught by
+# scripts/check_entry_point_resolution.py -- tools/code_execution_env.py:156).
+# One object, both names, so the strip policy cannot diverge between spellings.
+_strip_hermes_owned_pythonpath = _strip_qubit_owned_pythonpath

@@ -589,7 +589,7 @@ def _run_plugin_command(handler, arg: str, session=None) -> str:
 
 
 @contextlib.contextmanager
-def _session_home_scope(session, cwd: str | None = None):
+def _session_home_scope(session, cwd: str | None = None, profile: str | None = None):
     """Bind QUBIT_HOME and the logical cwd to the session for the block.
 
     Skill/bundle/quick-command resolution is home-keyed (``skills.external_dirs``, ``skill-bundles/``,
@@ -598,10 +598,13 @@ def _session_home_scope(session, cwd: str | None = None):
     are cwd-keyed (``find_project_root`` reads the session-bound cwd first): these RPCs run on the socket
     thread with no session context, where the terminal scope resolves a placeholder ``terminal.cwd`` to
     ``$HOME`` and no project skill ever registers or dispatches (#114359). ``cwd`` overrides the session
-    record (a session-less catalog request binds the workspace a new session would be seeded with)."""
+    record (a session-less catalog request binds the workspace a new session would be seeded with).
+    ``profile`` scopes a session-less call (a Desktop draft names its rail-selected profile) (#124651)."""
     hc = _tools_mod("qubit_constants")
     rc = _tools_mod("agent.runtime_cwd")
     profile_home = session.get("profile_home") if session else None
+    if not session and profile:
+        profile_home = str(_profile_home(profile) or "") or None
     cwd = cwd or (str(session.get("cwd") or "") if session else "")
     token = hc.set_qubit_home_override(profile_home) if profile_home else None
     cwd_token = rc.set_session_cwd(cwd) if cwd else None
