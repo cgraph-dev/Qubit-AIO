@@ -31,6 +31,7 @@ from agent.display import (
     _detect_tool_failure,
 )
 from agent.compression_marker import _COMPRESSION_MARKER_PREFIX
+from agent.interrupt_control import _REASON_USER_INTERRUPT, interrupt_skip_wording
 from agent.message_sanitization import coalesce_tool_call_id
 from agent.inline_tool_executors import (
     INLINE_TOOL_EXECUTORS,
@@ -302,7 +303,7 @@ class _ToolCallRef:
 
     def emit_cancelled(self, agent, start_time: float) -> str:
         """Synthesize the ``cancelled`` result for a KeyboardInterrupt mid-tool and emit its hook."""
-        message = "Tool execution cancelled by user interrupt"
+        message = f"Tool execution cancelled. {interrupt_skip_wording(agent)}"
         result = json.dumps({"error": message, "status": "cancelled"}, ensure_ascii=False)
         self.emit_post(
             agent, result, duration_ms=int((time.time() - start_time) * 1000),
@@ -1344,7 +1345,7 @@ class _ConcurrentBatch:
             return None
         except KeyboardInterrupt:
             with contextlib.suppress(Exception):
-                agent.interrupt("keyboard interrupt")
+                agent.interrupt("keyboard interrupt", tool_reason=_REASON_USER_INTERRUPT)
             result = ref.emit_cancelled(agent, start)
             duration = time.time() - start
             logger.info("tool %s cancelled (%.2fs)", ref.name, duration)
@@ -1753,12 +1754,13 @@ def _run_sequential_call(
     except KeyboardInterrupt:
         if not dispatch.handles_keyboard_interrupt:
             raise
-        _spinner_result = ref.emit_cancelled(agent, tool_start_time)
+        # Publish the user-interrupt reason BEFORE emitting, so the hook sees it (as the concurrent path does).
         with contextlib.suppress(Exception):
-            agent.interrupt("keyboard interrupt")
+            agent.interrupt("keyboard interrupt", tool_reason=_REASON_USER_INTERRUPT)
+        _spinner_result = ref.emit_cancelled(agent, tool_start_time)
         _append_skipped_tool_results(
             agent, messages, remaining_calls, ref.task_id,
-            content="[Tool execution cancelled — {name} was skipped due to keyboard interrupt]",
+            content=f"[Tool execution cancelled — {{name}} was skipped. {interrupt_skip_wording(agent)}]",
         )
         raise
     except Exception as tool_error:
