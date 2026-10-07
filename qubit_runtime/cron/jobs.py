@@ -30,6 +30,7 @@ from pathlib import Path
 from qubit_constants import get_qubit_home
 from cron.constants import CLAIM_TTL_INACTIVITY_HEADROOM, FIRE_CLAIM_SKEW_SECONDS, FIRE_CLAIM_TTL_SECONDS
 from cron.env_settings import cron_env_setting
+from cron import store_health
 from typing import Optional, Dict, List, Any, Callable, Set, Tuple, Union, Collection
 
 logger = logging.getLogger(__name__)
@@ -1405,8 +1406,11 @@ def load_jobs() -> List[Dict[str, Any]]:
         raise RuntimeError(
             f"Cron database corrupted: expected {{'jobs': [...]}}, got {type(data).__name__}")
     if jobs and repair:
-        save_jobs(jobs)
-        logger.warning("Auto-repaired jobs.json (%s)", repair)
+        try:
+            save_jobs(jobs)
+            logger.warning("Auto-repaired jobs.json (%s)", repair)
+        except OSError as exc:  # repaired in memory; the next load retries the persist
+            store_health.note_unwritable(exc, f"jobs.json repair ({repair}) not persisted", "load")
     _record_load_stamp(pre_read_stamp)
     return jobs
 
@@ -1557,6 +1561,7 @@ def _save_jobs_unlocked(
             # Invalidate (never refresh) the stamp: a refresh would let a nested save certify disk
             # against an OUTER caller's stale payload. Later saves take the full merge (fail-safe).
             _record_load_stamp(None)
+            store_health.note_writable(jobs_file.parent)
             return
     except BaseException:
         _unlink_quiet(tmp_path)

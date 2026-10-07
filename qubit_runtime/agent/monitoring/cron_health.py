@@ -18,6 +18,7 @@ from cron.jobs import (
     load_jobs,
 )
 from cron.scheduler import get_running_job_ids
+from cron.store_health import degraded_records
 from qubit_time import now as _now
 
 logger = logging.getLogger(__name__)
@@ -151,6 +152,11 @@ _METRIC_GROUPS: tuple[tuple[Callable[[list[GatewayMetric]], None], str], ...] = 
     (_single_metric("hermes.cron.scheduler.catch_up_occurrences", lambda: get_catch_up_occurrence_count()), "cron catch-up metric unavailable"),
     (_job_metrics, "cron job metrics unavailable"),
     (_single_metric("hermes.cron.jobs.running", lambda: len(get_running_job_ids())), "cron running-job metric unavailable"),
+    # Host-wide: the exporter runs in the launch profile's scope, but every served profile's ticker
+    # shares this process, so a secondary profile's outage must not read as healthy.
+    (_single_metric("hermes.cron.store.writable", lambda: int(not degraded_records())), "cron store metric unavailable"),
+    (_single_metric("hermes.cron.store.skipped_runs", lambda: sum(r.skipped_runs for r in degraded_records())),
+     "cron store metric unavailable"),
 )
 
 
