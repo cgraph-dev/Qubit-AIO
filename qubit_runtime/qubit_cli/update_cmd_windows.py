@@ -1288,6 +1288,13 @@ def _resume_windows_gateways_after_update(token: dict | None) -> None:
     from qubit_cli.update_cmd import _m
     if not token or not token.get("resume_needed"):
         return
+    if token.get("platform") == "posix":  # Linux/macOS pre-swap pause (update_cmd_posix_pause)
+        try:
+            from qubit_cli.update_cmd_posix_pause import resume_paused_set
+        except ImportError:  # landed by the sibling wave; keep the Windows path until then
+            pass
+        else:
+            return resume_paused_set(token)
     # The foreground call sites register this same function via atexit as a safety net for
     # process death before they get a chance to run it themselves (#115563). Once execution
     # actually reaches here — foreground or the atexit fallback itself — ownership is taken:
@@ -1296,7 +1303,7 @@ def _resume_windows_gateways_after_update(token: dict | None) -> None:
     # ``unregister`` is a no-op when this function was never registered.
     import atexit
     atexit.unregister(_resume_windows_gateways_after_update)
-    if not _m()._is_windows():
+    if not _m()._is_windows() and token.get("platform") != "posix":
         token["resume_needed"] = False
         return
     # Regenerate launcher scripts before respawning so a legacy pythonw-era
