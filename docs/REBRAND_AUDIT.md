@@ -101,3 +101,30 @@ rebrand artifacts" and that specific files had "0 real gaps". I checked both by 
 at least 1** (`_record_external_cron_worker`) — neither is a rebrand artifact. The
 suspicion was healthy; the conclusions were wrong. Verify before applying a correction,
 in both directions.
+
+
+## Priority correction after verification
+
+The rebrand audit listed 4 PascalCase classes as having "zero Qubit twin". I verified
+each: all four are **defined and their tests pass** (`20 passed, 1 skipped` across
+`test_acp_images.py`, `test_mcp_oauth_user_agent.py`, `test_openai_picker_curated.py`).
+
+| class | defined in | Qubit twin | tests |
+|---|---|---|---|
+| `HermesOverlay` | `qubit_cli/providers.py` | none | pass (use Hermes name) |
+| `HermesACPAgent` | `acp_adapter/server.py` | none | pass (use Hermes name) |
+| `HermesMCPOAuthProvider` | `tools/mcp_oauth_manager.py` | none | pass (use Hermes name) |
+| `HermesConsoleEngine` | `qubit_cli/console_engine.py` | **added** | was uncollectable, now runs |
+
+So these are **naming debt, not breakage**: nothing imports a Qubit name that doesn't
+exist. The one that WAS breakage — `HermesConsoleEngine`, because a test imported
+`QubitConsoleEngine` — is fixed.
+
+This matters for sequencing. Rebranding these four is **cosmetic-completion work**, safe
+to do last. The urgent items remain:
+1. the milestone gap (966 commits, ~446 production symbols)
+2. user-visible brand leaks (service names, task names, dot-dirs) — these are what a user
+   actually sees
+3. stale tests asserting old brand while code prints the new one
+
+Doing the class renames first would be optimising the metric rather than the product.
