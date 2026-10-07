@@ -2398,6 +2398,7 @@ cli:
     compressed_into: "La sesión {session_id} se comprimió en {descendant}; reanudando la descendiente con tu transcripción."
     cannot_resume: "No se puede reanudar la sesión: {error}"
     cannot_resume_prefix: "No se puede reanudar la sesión:"
+    kanban_owned: "⛔ La sesión {session_id} es una transcripción de un worker de Kanban. Reanudarla aquí crearía un escritor que el tablero Kanban no puede observar ni supervisar — reintenta o desbloquea la tarjeta en el tablero para que el dispatcher sea dueño de la siguiente ejecución."
     resumed_session: "↻ Sesión reanudada"
     counts_one: "({count} mensaje del usuario, {total} mensajes en total)"
     counts_other: "({count} mensajes del usuario, {total} mensajes en total)"

@@ -2398,6 +2398,7 @@ cli:
     compressed_into: "La sessione {session_id} è stata compressa in {descendant}; riprendo la sessione discendente con la tua trascrizione."
     cannot_resume: "Impossibile riprendere la sessione: {error}"
     cannot_resume_prefix: "Impossibile riprendere la sessione:"
+    kanban_owned: "⛔ La sessione {session_id} è la trascrizione di un worker Kanban. Riprenderla qui creerebbe uno scrittore che la board Kanban non può osservare né supervisionare — invece riprova o sblocca la card sulla board, così il dispatcher possiede la prossima esecuzione."
     resumed_session: "↻ Sessione ripresa"
     counts_one: "({count} messaggio utente, {total} messaggi in totale)"
     counts_other: "({count} messaggi utente, {total} messaggi in totale)"
