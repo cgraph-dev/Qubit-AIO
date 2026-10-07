@@ -26,6 +26,12 @@ LOCAL_STT_COMMAND_ENV = "HERMES_LOCAL_STT_COMMAND"
 LOCAL_STT_LANGUAGE_ENV = "HERMES_LOCAL_STT_LANGUAGE"
 COMMON_LOCAL_BIN_DIRS = ("/opt/homebrew/bin", "/usr/local/bin")
 
+# /v1/stt's server default moved from grok-voice-transcribe-1.0 to 2.0 between Sep 17 and
+# Sep 21 2026 and 1.0 is slated for retirement; naming the model keeps the wire deterministic
+# and lets STT_XAI_MODEL / stt.xai.model pin 1.0 for a rollback.
+XAI_STT_MODEL_ENV = "STT_XAI_MODEL"
+LEGACY_XAI_STT_MODEL = "grok-stt"
+
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 OPENAI_BASE_URL = os.getenv("STT_OPENAI_BASE_URL", "https://api.openai.com/v1")
 XAI_STT_BASE_URL = os.getenv("XAI_STT_BASE_URL", "https://api.x.ai/v1")
@@ -36,9 +42,24 @@ SUPPORTED_FORMATS = {".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm", 
 LOCAL_NATIVE_AUDIO_FORMATS = {".wav", ".aiff", ".aif"}
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
 
-# Known model sets for auto-correction
-OPENAI_MODELS = {"whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe", "gpt-transcribe"}
-GROQ_MODELS = {"whisper-large-v3", "whisper-large-v3-turbo", "distil-whisper-large-v3-en"}
+# Per-provider model catalogs keyed by ``stt.<provider>`` section, default first. This one table
+# feeds the `qubit tools` picker, the dashboard selects and the auto-correction sets below.
+# DeepInfra has no static list: its picker reads the live catalog.
+STT_MODEL_CATALOG = {
+    "local": ["base", "tiny", "small", "medium", "large-v3"],
+    "groq": ["whisper-large-v3-turbo", "whisper-large-v3"],
+    "openai": ["whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe", "gpt-transcribe"],
+    "mistral": ["voxtral-mini-latest", "voxtral-mini-2602"],
+    "xai": ["grok-voice-transcribe-2.0", "grok-voice-transcribe-1.0"],
+    "elevenlabs": ["scribe_v2", "scribe_v1"]}
+# ElevenLabs historically uses ``model_id`` instead of ``model``.
+STT_MODEL_CONFIG_KEY = {"elevenlabs": "model_id"}
+
+# Known model sets for auto-correction. Groq shut distil-whisper-large-v3-en down on
+# 2025-08-23 (console.groq.com/docs/deprecations); a config still naming it is remapped.
+OPENAI_MODELS = frozenset(STT_MODEL_CATALOG["openai"])
+GROQ_MODELS = frozenset(STT_MODEL_CATALOG["groq"])
+RETIRED_GROQ_MODELS = frozenset({"distil-whisper-large-v3-en"})
 
 # Providers with native handlers. Kept in sync with ``agent.transcription_registry._BUILTIN_NAMES``
 # (a regression test fails on drift); plugins may not register under these names and the
@@ -101,3 +122,12 @@ def _config_number(cfg: Dict[str, Any], key: str, default, cast=float):
         return cast(cfg.get(key, default))
     except (TypeError, ValueError):
         return default
+
+
+def normalize_xai_stt_model(model: Any) -> str:
+    """Return a valid xAI STT model: blank or Qubit's old ``grok-stt`` alias -> ``STT_XAI_MODEL`` (read
+    per call, so a profile's env applies), else the catalog default."""
+    value = str(model or "").strip()
+    if not value or value == LEGACY_XAI_STT_MODEL:
+        return os.getenv(XAI_STT_MODEL_ENV, "").strip() or STT_MODEL_CATALOG["xai"][0]
+    return value
