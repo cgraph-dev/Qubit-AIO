@@ -16,6 +16,7 @@ from pydantic import Field
 from .base import Params, Payload, Result, WireEnum
 from .common import ConnectorOwner, ProfileParams
 from .registry import event, method
+from qubit_cli.plugin_install_phase import InstallPhase
 
 
 class ConnectionTargetKind(WireEnum):
@@ -135,6 +136,7 @@ class ConnectionOperationTarget(Payload):
     app_state: CatalogAppState | None = None
     # On an installed skill row: the qualified skill name the model can now load.
     skill: str | None = None
+    phase: InstallPhase | None = None
 
 
 class ConnectionRequestPayload(Payload):
