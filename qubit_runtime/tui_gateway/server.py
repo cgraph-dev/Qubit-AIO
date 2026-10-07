@@ -1973,15 +1973,19 @@ def _gui_surface_toolsets(platform: str) -> set[str]:
     return set(CLIENT_SURFACE_TOOLSETS) if platform == "desktop" else {"project"}
 
 
-def _with_session_toolsets(selection, platform: str | None) -> list[str]:
-    """*selection* plus what the session carries whatever its config says (the client surface's
-    toolsets when *platform* is given; the ones its PROFILE's role reserves, from the backend-written
-    profile.yaml under the session's home override), minus toolsets reserved for another role."""
-    from toolsets import profile_role_toolsets
-    granted, denied = profile_role_toolsets()
-    surface = _gui_surface_toolsets(platform) if platform is not None else set()
-    kept = [name for name in selection if name not in denied]
-    return [*kept, *sorted((surface | granted) - set(kept))]
+def _with_session_toolsets(selection, platform: str) -> list[str]:
+    """*selection* plus the client surface's toolsets the session carries whatever its config says.
+
+    The fold-in happens after ``_get_platform_tools`` already subtracted ``agent.disabled_toolsets``,
+    so the same subtraction is applied to the fold-in itself — otherwise ``disabled_toolsets:
+    [project]`` is a no-op on desktop/TUI, the only surfaces where the client toolsets exist
+    (#54433). ``desktop_ui`` is kept regardless: it is the client's own control surface, not a
+    model toolset."""
+    fold_in = _gui_surface_toolsets(platform) - set(selection)
+    disabled = set(_load_disabled_toolsets() or [])
+    if disabled:
+        fold_in -= disabled - {"desktop_ui"}
+    return [*selection, *sorted(fold_in)]
 
 
 def _tui_notice(text: str) -> None:
@@ -2050,12 +2054,12 @@ def _load_enabled_toolsets(platform: str | None = None) -> list[str] | None:
     if explicit and validate_toolset is not None:
         resolved = _resolve_explicit_toolsets(explicit, validate_toolset)
         if resolved is not False:
-            # An operator pin replaces the surface fold-in but never strips the profile's own role toolsets.
-            return resolved if resolved is None else _with_session_toolsets(resolved, None)
+            # An operator pin replaces the surface fold-in.
+            return resolved
         fallback_notice = "[tui] no valid HERMES_TUI_TOOLSETS entries; using configured CLI toolsets"
     try:
         from qubit_cli.config import load_config
-        from qubit_cli.tools_config import _get_platform_tools
+        from qubit_cli.tools_config import _get_platform_tools, _platform_toolsets_explicitly_saved
         cfg = load_config()
         # include_default_mcp_servers=True is the runtime variant (the agent must be able to call
         # default MCP servers); the config-editing variant would silently drop MCP tools from the TUI.
@@ -2065,7 +2069,16 @@ def _load_enabled_toolsets(platform: str | None = None) -> list[str] | None:
         enabled = _get_platform_tools(cfg, "cli", include_default_mcp_servers=True)
         if fallback_notice is not None:
             _tui_notice(fallback_notice)
-        return sorted(_with_session_toolsets(enabled, session_platform)) if enabled else None
+        if enabled:
+            return sorted(_with_session_toolsets(enabled, session_platform))
+        # An explicitly saved list that resolves to nothing (``platform_toolsets.cli: []`` with no
+        # enabled MCP servers) is an explicit zero-tool state, not "no filter": fail closed with []
+        # instead of None (#82010). The client-surface fold-in must not resurrect tools the user
+        # explicitly switched off, so [] is returned bare. Only an ABSENT/unset key keeps the
+        # None = "no restriction" default below.
+        if _platform_toolsets_explicitly_saved(cfg, "cli"):
+            return []
+        return None
     except Exception:
         if fallback_notice is not None:
             _tui_notice("[tui] no valid HERMES_TUI_TOOLSETS entries and configured CLI toolsets could not be loaded; enabling all toolsets")
@@ -2655,6 +2668,7 @@ def _make_agent(
             reasoning_config_override if reasoning_config_override is not None else _load_reasoning_config(str(model or ""))),
         service_tier=service_tier_override if service_tier_override is not None else _load_service_tier(),
         enabled_toolsets=_load_enabled_toolsets(platform),
+        disabled_toolsets=_load_disabled_toolsets(),
         # OpenRouter provider_routing prefs (gateway + CLI parity).
         providers_allowed=_pr.get("only"), providers_ignored=_pr.get("ignore"), providers_order=_pr.get("order"),
         provider_sort=_pr.get("sort"), provider_require_parameters=_pr.get("require_parameters", False),
@@ -2667,7 +2681,9 @@ def _make_agent(
         checkpoints_enabled=_resolve_checkpoints_enabled(cfg),
         pass_session_id=is_truthy_value(os.environ.get("HERMES_TUI_PASS_SESSION_ID")),
         skip_context_files=ignore_rules, skip_memory=ignore_rules, fallback_model=_load_fallback_model(),
-        **_agent_cbs(sid))
+        # The resolved provider's request body (a custom entry's extra_body), as the CLI/cron/gateway pass it.
+        request_overrides=runtime.get("request_overrides"),
+        prefill_messages=_load_prefill_messages() or None, **_agent_cbs(sid))
     if context_cwd_is_launch_artifact is None:
         context_cwd_is_launch_artifact = _context_cwd_is_launch_artifact(session)
     agent._context_cwd_is_launch_artifact = bool(context_cwd_is_launch_artifact)

@@ -75,7 +75,7 @@ _CODING_TOOLS = _core_without("image_generate", "text_to_speech", "cronjob_manag
 
 # Toolsets a CLIENT adds to its own sessions (tui_gateway/server.py::_gui_surface_toolsets), never
 # config: another surface lacking them made no configuration choice.
-CLIENT_SURFACE_TOOLSETS = frozenset({"project", "desktop_ui"})
+CLIENT_SURFACE_TOOLSETS = frozenset({"project", "desktop_ui", "catalog"})
 
 # Core toolset definitions: individual tools or references to other toolsets.
 TOOLSETS = {
@@ -149,6 +149,12 @@ TOOLSETS = {
         ["read_terminal", "close_terminal", "desktop_preview", "drive_preview",
          "annotate_preview", "read_window_below", "focus_pane", "react_to_message",
          "gui_tour", "show_tip"],
+    ),
+    # ``platforms``: the session platforms this toolset exists for (TOOLSET_SESSION_PLATFORMS).
+    "catalog": _ts(
+        "Desktop catalog plugin/skill install requests through the approval card (GUI sessions only)",
+        ["manage_catalog"],
+        platforms=frozenset({"desktop"}),
     ),
     # Enabled per SESSION whose PROFILE carries ``role: setup`` in its backend-written
     # profile.yaml (tui_gateway/server.py::_load_enabled_toolsets); stripped from every
