@@ -12,6 +12,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from agent.message_metadata import append_message
+from agent.reasoning_promotion import answer_in_reasoning_capability
 from agent.repetition_guard import STOP_PATH_MIN_CHARS, is_runaway_repetition
 from agent.turn_failure_copy import stamp_failure
 from agent.turn_empty_response import recover_empty_response
@@ -111,6 +112,7 @@ def finish_text_response(
             )
             for d in getattr(assistant_message, "reasoning_details", None) or ()
         )
+        and answer_in_reasoning_capability(agent)
     ):
         _promoted = agent._extract_reasoning(assistant_message) or None
         if _promoted:
