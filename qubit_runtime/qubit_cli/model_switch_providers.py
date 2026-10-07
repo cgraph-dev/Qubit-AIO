@@ -843,7 +843,7 @@ def _lap_builtin_rows(b: _PickerBuild, data: dict, user_providers: dict) -> None
     for hermes_id, mdev_id, pconfig, env_vars in _iter_builtin_candidates(data, b.excluded, b.seen_slugs):
         # Per-profile scope, never raw os.environ: a secondary profile's picker otherwise listed the
         # LAUNCH profile's env-keyed providers and hid its own .env-keyed ones.
-        if not (_any_env(env_vars, _scoped_key_env) or _raw_pool_usable(qubit_id, for_picker=b.for_picker)):
+        if not (_any_env(env_vars, _scoped_key_env) or _raw_pool_usable(hermes_id, for_picker=b.for_picker)):
             continue
         model_ids = _live_or_curated_ids(hermes_id, b.curated, non_blocking=b.non_blocking_catalogs)
         # A providers.<built-in>.models block extends the discovered catalog; section 3 cannot
@@ -884,7 +884,7 @@ def _overlay_has_creds(b: _PickerBuild, pid: str, hermes_slug: str, overlay) -> 
         # Full auto-seeding pool check catches external stores (Codex CLI ~/.codex/auth.json)
         # not yet in auth.json.
         try:
-            if _credential_pool_is_usable(qubit_slug, for_picker=b.for_picker):
+            if _credential_pool_is_usable(hermes_slug, for_picker=b.for_picker):
                 has_creds = True
             elif b.for_picker:
                 # Show providers whose pool is entirely in cooldown: limits are per-model for
