@@ -8,6 +8,11 @@ const apiMocks = vi.hoisted(() => ({
     capabilities: { supports_reasoning: false },
     model: "test/model",
   })),
+  patchChatSession: vi.fn(async (id: string, patch: { model?: string }) => ({
+    ok: true,
+    session: { id, model: patch.model ?? null },
+  })),
+  setModelAssignment: vi.fn(async () => ({ ok: true, terminal_follows: true })),
 }));
 
 const reloadMocks = vi.hoisted(() => ({
@@ -15,15 +20,33 @@ const reloadMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/api", () => ({
-  api: { getModelInfo: apiMocks.getModelInfo },
+  api: {
+    getModelInfo: apiMocks.getModelInfo,
+    patchChatSession: apiMocks.patchChatSession,
+    setModelAssignment: apiMocks.setModelAssignment,
+  },
   QUBIT_BASE_PATH: "",
 }));
 vi.mock("@/lib/dashboard-auth-reload", () => ({
   maybeReloadForLoopbackWsAuthFailure:
     reloadMocks.maybeReloadForLoopbackWsAuthFailure,
 }));
+const pickerMocks = vi.hoisted(() => ({
+  lastProps: null as null | {
+    onApply?: (a: {
+      provider: string;
+      model: string;
+      confirmExpensiveModel?: boolean;
+      persistGlobal?: boolean;
+    }) => unknown;
+  },
+}));
+
 vi.mock("@/components/ModelPickerDialog", () => ({
-  ModelPickerDialog: () => null,
+  ModelPickerDialog: (props: unknown) => {
+    pickerMocks.lastProps = props as typeof pickerMocks.lastProps;
+    return null;
+  },
 }));
 vi.mock("@/components/ModelReloadConfirm", () => ({
   ModelReloadConfirm: () => null,
@@ -32,8 +55,18 @@ vi.mock("@/components/ReasoningPicker", () => ({
   ReasoningPicker: () => null,
 }));
 vi.mock("@nous-research/ui/ui/components/button", () => ({
-  Button: ({ children, title }: { children?: ReactNode; title?: string }) => (
-    <button title={title}>{children}</button>
+  Button: ({
+    children,
+    title,
+    onClick,
+  }: {
+    children?: ReactNode;
+    title?: string;
+    onClick?: () => void;
+  }) => (
+    <button title={title} onClick={onClick}>
+      {children}
+    </button>
   ),
 }));
 vi.mock("@nous-research/ui/ui/components/badge", () => ({
@@ -319,5 +352,122 @@ describe("ChatSidebar SSE event feed", () => {
 
     expect(container.querySelector("aside")).toBeNull();
     expect(container.querySelectorAll('[role="complementary"]').length).toBe(0);
+  });
+
+  it("relays a live session.updated model for OUR session to the host", async () => {
+    // A per-session pick writes session.updated on the SSE feed; the sidebar
+    // must surface the new stored model to the host (so the panel and the
+    // ChatPage state agree) without a page reload — the reported defect.
+    const onSessionModelChange = vi.fn();
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(
+      <ChatSidebar
+        channel="chat-1"
+        sessionId="dashboard-live"
+        onSessionModelChange={onSessionModelChange}
+      />,
+    );
+    await flushMicrotasks();
+
+    stream.send(
+      'id: 7\ndata: {"type":"CUSTOM","name":"session.updated","value":{"session_id":"dashboard-live","session":{"id":"dashboard-live","model":"deepseek-v4.1-flash"}}}\n\n',
+    );
+    await flushMicrotasks();
+
+    expect(onSessionModelChange).toHaveBeenCalledWith("deepseek-v4.1-flash");
+  });
+
+  it("ignores a live session.updated for a DIFFERENT session (no cross-talk)", async () => {
+    const onSessionModelChange = vi.fn();
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(
+      <ChatSidebar
+        channel="chat-1"
+        sessionId="dashboard-mine"
+        onSessionModelChange={onSessionModelChange}
+      />,
+    );
+    await flushMicrotasks();
+
+    stream.send(
+      'id: 8\ndata: {"type":"CUSTOM","name":"session.updated","value":{"session_id":"dashboard-other","session":{"id":"dashboard-other","model":"x"}}}\n\n',
+    );
+    await flushMicrotasks();
+
+    expect(onSessionModelChange).not.toHaveBeenCalled();
+  });
+
+  it("re-reads the effective model on a live model.changed frame", async () => {
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(<ChatSidebar channel="chat-1" />);
+    await flushMicrotasks();
+    const before = apiMocks.getModelInfo.mock.calls.length;
+
+    stream.send(
+      'id: 9\ndata: {"type":"CUSTOM","name":"model.changed","value":{"provider":"opencode-go","model":"deepseek-v4.1-flash","scope":"main"}}\n\n',
+    );
+    await flushMicrotasks();
+
+    expect(apiMocks.getModelInfo.mock.calls.length).toBeGreaterThan(before);
+  });
+
+  it("writes a bound session's model per-session (never the global set)", async () => {
+    // With a sessionId the pick must PATCH the session, not POST the global
+    // /api/model/set — otherwise two surfaces share one model and the pick
+    // does not apply to the open conversation.
+    const onSessionModelChange = vi.fn();
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(
+      <ChatSidebar
+        channel="chat-1"
+        sessionId="dashboard-bound"
+        onSessionModelChange={onSessionModelChange}
+      />,
+    );
+    await flushMicrotasks();
+
+    // Open the picker so ModelPickerDialog mounts and records its props.
+    const pickerButton = container.querySelector("button[title]");
+    await act(async () => {
+      pickerButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushMicrotasks();
+
+    const onApply = pickerMocks.lastProps?.onApply;
+    expect(typeof onApply).toBe("function");
+    await act(async () => {
+      await onApply!({ provider: "opencode-go", model: "deepseek-v4.1-flash" });
+    });
+
+    expect(apiMocks.patchChatSession).toHaveBeenCalledWith("dashboard-bound", {
+      model: "deepseek-v4.1-flash",
+    });
+    expect(apiMocks.setModelAssignment).not.toHaveBeenCalled();
+    expect(onSessionModelChange).toHaveBeenCalledWith("deepseek-v4.1-flash");
+  });
+
+  it("keeps the GLOBAL set path when no session is bound (/chat)", async () => {
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(<ChatSidebar channel="chat-1" />);
+    await flushMicrotasks();
+
+    const pickerButton = container.querySelector("button[title]");
+    await act(async () => {
+      pickerButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushMicrotasks();
+
+    const onApply = pickerMocks.lastProps?.onApply;
+    await act(async () => {
+      await onApply!({ provider: "opencode-go", model: "deepseek-v4.1-flash" });
+    });
+
+    expect(apiMocks.setModelAssignment).toHaveBeenCalled();
+    expect(apiMocks.patchChatSession).not.toHaveBeenCalled();
   });
 });
