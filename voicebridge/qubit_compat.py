@@ -2233,9 +2233,21 @@ def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         # floor, and honestly stays (with the reason) when it cannot run it.
         follow = _terminal_follow_main_model(
             cfg, str(applied.get("profile_id") or ""))
+        applied_provider = str(applied.get("provider", provider))
+        applied_model = str(applied.get("model", model))
+        # Announce the main-model change on the single SSE feed so every open
+        # surface (MODEL card, /chat, other tabs) repaints without a reload.
+        # ``terminal_follows``/``terminal_detail`` ride along so the UI can
+        # explain honestly when /chat kept its pinned model (a below-floor
+        # pick) instead of claiming a switch the terminal did not take.
+        _publish_chat_frame(cfg, "model.changed",
+                            {"provider": applied_provider,
+                             "model": applied_model, "scope": "main",
+                             "terminal_follows": follow["terminal_follows"],
+                             "terminal_detail": follow["terminal_detail"]})
         return 200, {"ok": True, "scope": "main",
-                     "provider": str(applied.get("provider", provider)),
-                     "model": str(applied.get("model", model)),
+                     "provider": applied_provider,
+                     "model": applied_model,
                      "warning": str(applied.get("warning") or ""),
                      "terminal_profile_id": follow["terminal_profile_id"],
                      "terminal_follows": follow["terminal_follows"],
@@ -2278,6 +2290,10 @@ def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        {"confirm_required": True,
                         "confirm_message": _redact(out.get("speech", ""))[:300]})
     ok = out.get("state") == "executed"
+    if ok:
+        _publish_chat_frame(cfg, "model.changed",
+                            {"provider": "ollama-local", "model": model,
+                             "scope": "main"})
     # ModelAssignmentResponse wire shape.
     return (200 if ok else 400), {
         "ok": ok, "scope": "main", "provider": "ollama-local", "model": model,
@@ -5467,6 +5483,33 @@ def _rebrand_chat_record(record: Any) -> Any:
     return out
 
 
+def _publish_chat_frame(cfg: Any, name: str, value: Dict[str, Any]) -> None:
+    """Announce one chat-session mutation on the single SSE event feed.
+
+    The producer half of the chat live-update contract (client consumer:
+    ``frontend/qubit-web/src/lib/chatLiveEvents.ts``). The running WebUI hands
+    its ``EventHub`` to ``cfg._qubit_chat_hub`` at init (``webui.py``), so a
+    compat handler — which only receives ``cfg`` — can publish without opening
+    a second event path. A create / model pick / rename / delete mutates the
+    store; without this broadcast the open SPA had no signal and only a manual
+    page reload showed the change (the reported defect).
+
+    Fail-soft: a missing hub (headless use, a cfg that forbids attributes) or
+    any publish error must never fail the session operation itself. Redaction
+    and journal sequencing are applied by the hub's own append path.
+    """
+    hub = getattr(cfg, "_qubit_chat_hub", None)
+    make_event = getattr(cfg, "_qubit_chat_make_event", None)
+    if hub is None or make_event is None:
+        return
+    try:
+        hub.publish(make_event("CUSTOM", name=name, value=value))
+    except Exception:  # noqa: BLE001 - a broadcast must never fail the write
+        import logging
+        logging.getLogger("voicebridge.qubit_compat").debug(
+            "chat live frame publish failed", exc_info=True)
+
+
 #: Over-fetch factor for the ``/qubit-chat`` picker: rows are fetched at
 #: ``limit * N`` so post-filter paging still returns a full page.
 _CHAT_PICKER_OVERFETCH = 4
@@ -5650,7 +5693,13 @@ def h_chat_session_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     res = CT.store(cfg).create(str(b.get("name", "") or ""),
                                session_id=b.get("id"), model=chosen_model)
     if res.get("state") == "OK":
-        return _ok(session=_rebrand_chat_record(res["session"]),
+        record = _rebrand_chat_record(res["session"])
+        sid = str(res["session"].get("id") or b.get("id") or "")
+        # Announce the create so an already-open SPA (session list, model card)
+        # updates without a manual refresh (chat live-update contract).
+        _publish_chat_frame(cfg, "session.created",
+                            {"session_id": sid, "session": record})
+        return _ok(session=record,
                    messages=res.get("messages", []))
     status = 409 if res.get("state") == "EXISTS" else 400
     return status, {"ok": False, "code": res.get("code"),
@@ -5965,7 +6014,16 @@ def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if res.get("state") != "OK":
         return 400, {"ok": False, "code": res.get("code"),
                      "detail": res.get("detail", "")}
-    return _ok(session=_rebrand_chat_record(res["session"]))
+    record = _rebrand_chat_record(res["session"])
+    # Announce the mutation: a per-session model pick, rename, archive, or
+    # reasoning change reaches an open SPA live (the model card repaints from
+    # ``session.model``; the list refetches membership). This is what makes a
+    # model switch show a visible effect without a page refresh.
+    _publish_chat_frame(cfg, "session.updated",
+                        {"session_id": str(res["session"].get("id")
+                                           or p.get("id", "")),
+                         "session": record})
+    return _ok(session=record)
 
 
 def h_chat_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -5995,7 +6053,12 @@ def h_chat_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if res.get("state") != "OK":
         return 400, {"ok": False, "code": res.get("code"),
                      "detail": res.get("detail", "")}
-    return _ok(state="OK", session=_rebrand_chat_record(res.get("session")))
+    record = _rebrand_chat_record(res.get("session"))
+    sid = str((record or {}).get("id") or p.get("id", ""))
+    # Announce the delete so the open session list drops the row live.
+    _publish_chat_frame(cfg, "session.deleted",
+                        {"session_id": sid, "session": record})
+    return _ok(state="OK", session=record)
 
 
 def h_chat_session_export(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
