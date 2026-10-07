@@ -1099,6 +1099,34 @@ def _effective(cfg: Any, profile: ModelProfile, *, source: str
         context_tokens=context_tokens)
 
 
+def _usable_as_default(cfg: Any, profile: Optional[ModelProfile],
+                       role: str) -> bool:
+    """Whether a persisted ACTIVE pointer may stand in for the default.
+
+    The active pointer is a stored *preference*, exactly like the configured
+    ``model`` default — so it must clear the same usability bar before it is
+    returned: it must be registered, enabled, carry the requested ``chat``
+    role, and (for the long-context chat surface) declare at least the
+    ``/chat`` context floor. An active profile that fails any of these is
+    skipped so resolution falls through to the operator's configured default
+    instead of resolving to a model the turn cannot actually use.
+
+    Without this, a persisted ``active`` pointing at a low-context local
+    record (``qubit-brain`` at 4096) beat a perfectly good configured default
+    (``deepseek-v4.1-flash``) on every no-pin turn and the runtime raised its
+    "Ollama runtime context is too small for Qubit tool use" guard.
+    """
+    if profile is None or not profile.enabled:
+        return False
+    if role not in (profile.roles or []):
+        return False
+    if role == DEFAULT_ROLE:
+        declared = int(profile.context_tokens or 0)
+        if declared and declared < terminal_min_context_tokens(cfg):
+            return False
+    return True
+
+
 def _pick(cfg: Any, *, role: str, profile_id: Optional[str],
           session: Optional[str]) -> Tuple[ModelProfile, str]:
     if profile_id:
@@ -1124,12 +1152,15 @@ def _pick(cfg: Any, *, role: str, profile_id: Optional[str],
     # Persisted owner "active" selection (canonical set-active op shared by
     # CLI, dashboard, and voice). Explicit requests and session overrides win;
     # a missing/disabled active profile falls through rather than breaking the
-    # default path.
+    # default path. The active pointer must ALSO clear the same usability bar
+    # as the configured default (role eligibility + the chat context floor),
+    # so an unusable stored selection (e.g. a 4096-ctx local record) can never
+    # beat a good configured default on a no-pin turn.
     active = _read_active_record(cfg)
     apid = str(active.get("profile", "") or "")
     if apid and str(active.get("role", "") or DEFAULT_ROLE) in (role, "*"):
         p = get_profile(cfg, apid)
-        if p is not None and p.enabled:
+        if p is not None and _usable_as_default(cfg, p, role):
             return p, "active"
     # The embedding role is a local embedding adapter, not the generative
     # default. Resolve it canonically without adding a second shipped profile
