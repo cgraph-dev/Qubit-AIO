@@ -183,6 +183,9 @@ def arm_commit_point(git_cmd, root: Path, expected_sha: str, **move) -> str | No
     (``disarm_commit_obligations``), and the caller must stop before git writes a file.
     Linux/macOS gateways are paused first: this is every route's first checkout move.
     """
+    from qubit_cli.update_cmd_posix_pause import pause_at_commit_point
+    if refused := pause_at_commit_point():
+        return refused
     try:
         from qubit_cli.update_cmd_posix_pause import pause_at_commit_point
     except ImportError:  # landed by the sibling wave; the commit point proceeds unpaused until then

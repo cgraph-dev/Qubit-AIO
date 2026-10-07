@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "当前没有活跃的目标。"
   config_read_failed: "⚠️ 无法读取 config.yaml：{error}"
   config_save_failed: "⚠️ 无法保存配置：{error}"
+  cron_store:
+    unwritable: "⚠️ Cron 存储 {store} 自 {since} 起无法写入（{error}）。在恢复可写之前，计划任务将被跳过。修复方法：{fix}。"
+    recovered: "✅ Cron 存储 {store} 已恢复可写；跳过了 {skipped} 次运行，每个任务将补跑一次。"
   model:
     error_prefix: "错误：{error}"
     switched: "已切换模型为 `{model}`"

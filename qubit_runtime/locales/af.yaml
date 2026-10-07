@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "Geen aktiewe doelwit nie."
   config_read_failed: "⚠️ Kon nie config.yaml lees nie: {error}"
   config_save_failed: "⚠️ Kon nie konfigurasie stoor nie: {error}"
+  cron_store:
+    unwritable: "⚠️ Cron-winkel {store} is nie skryfbaar nie ({error}) sedert {since}. Geskeduleerde take word oorgeslaan totdat dit weer skryfwerk aanvaar. Regstelling: {fix}."
+    recovered: "✅ Cron-winkel {store} is weer skryfbaar; {skipped} oorgeslane lopie(s), elke taak haal een keer in."
   model:
     error_prefix: "Fout: {error}"
     switched: "Model verander na `{model}`"

@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "Kein aktives Ziel."
   config_read_failed: "⚠️ config.yaml konnte nicht gelesen werden: {error}"
   config_save_failed: "⚠️ Konfiguration konnte nicht gespeichert werden: {error}"
+  cron_store:
+    unwritable: "⚠️ Cron-Speicher {store} ist seit {since} nicht beschreibbar ({error}). Geplante Jobs werden übersprungen, bis er wieder Schreibzugriffe annimmt. Lösung: {fix}."
+    recovered: "✅ Cron-Speicher {store} ist wieder beschreibbar; {skipped} übersprungene Ausführung(en), jeder Job wird einmal nachgeholt."
   model:
     error_prefix: "Fehler: {error}"
     switched: "Modell gewechselt zu `{model}`"

@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "Não há objetivo ativo."
   config_read_failed: "⚠️ Não foi possível ler config.yaml: {error}"
   config_save_failed: "⚠️ Não foi possível guardar a configuração: {error}"
+  cron_store:
+    unwritable: "⚠️ O armazenamento do cron {store} não aceita gravação ({error}) desde {since}. Os trabalhos agendados estão sendo ignorados até que volte a aceitar gravações. Correção: {fix}."
+    recovered: "✅ O armazenamento do cron {store} voltou a aceitar gravação; {skipped} execução(ões) ignorada(s), cada trabalho será recuperado uma vez."
   model:
     error_prefix: "Erro: {error}"
     switched: "Modelo alterado para `{model}`"

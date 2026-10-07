@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "Nessun obiettivo attivo."
   config_read_failed: "⚠️ Impossibile leggere config.yaml: {error}"
   config_save_failed: "⚠️ Impossibile salvare la configurazione: {error}"
+  cron_store:
+    unwritable: "⚠️ L'archivio cron {store} non è scrivibile ({error}) dal {since}. I job pianificati vengono saltati finché non accetta di nuovo scritture. Soluzione: {fix}."
+    recovered: "✅ L'archivio cron {store} è di nuovo scrivibile; {skipped} esecuzione/i saltata/e, ogni job viene recuperato una volta."
   model:
     error_prefix: "Errore: {error}"
     switched: "Modello cambiato a `{model}`"

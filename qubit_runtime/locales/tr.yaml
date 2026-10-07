@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "Aktif hedef yok."
   config_read_failed: "⚠️ config.yaml okunamadı: {error}"
   config_save_failed: "⚠️ Yapılandırma kaydedilemedi: {error}"
+  cron_store:
+    unwritable: "⚠️ Cron deposu {store} {since} tarihinden beri yazılamıyor ({error}). Yeniden yazma kabul edene kadar zamanlanmış işler atlanıyor. Çözüm: {fix}."
+    recovered: "✅ Cron deposu {store} yeniden yazılabilir; {skipped} atlanan çalıştırma, her iş bir kez telafi edilecek."
   model:
     error_prefix: "Hata: {error}"
     switched: "Model `{model}` olarak değiştirildi"

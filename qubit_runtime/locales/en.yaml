@@ -51,6 +51,9 @@ gateway:
   no_active_goal: "No active goal."
   config_read_failed: "⚠️ Could not read config.yaml: {error}"
   config_save_failed: "⚠️ Could not save config: {error}"
+  cron_store:
+    unwritable: "⚠️ Cron store {store} is not writable ({error}) since {since}. Scheduled jobs are being skipped until it accepts writes again. Fix: {fix}."
+    recovered: "✅ Cron store {store} is writable again; {skipped} skipped run(s), catching up once per job."
   model:
     error_prefix: "Error: {error}"
     switched: "Model switched to `{model}`"

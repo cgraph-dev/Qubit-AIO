@@ -37,7 +37,7 @@ def _load_plugin_router():
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)

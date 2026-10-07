@@ -22,18 +22,6 @@ from qubit_cli.update_inventory import _gateway_service_matches_profile
 # Log-record parity with the origin module.
 logger = logging.getLogger("qubit_cli.update_cmd")
 
-
-def _already_restarted() -> dict:
-    """Gateways the POSIX pause (``update_cmd_posix_pause``) already restarted on the new code.
-
-    The fleet restart skips them so it never drains a set a second time. Empty until that module
-    lands (a sibling wave): the Windows/legacy path then behaves exactly as before."""
-    try:
-        from qubit_cli.update_cmd_posix_pause import already_restarted
-    except ImportError:  # pragma: no cover - the real module ships in the same release
-        return {"labels": [], "units": set(), "pids": set()}
-    return already_restarted()
-
 # Under QUBIT_HOME (not next to the venv): records the fleet-restart obligation
 # after a pull advanced HEAD; cleared only when the restart completes or nothing ran.
 # The existing ``.update-incomplete`` / ``.lazy-refresh-incomplete`` markers gate dependency/venv repair;
@@ -957,12 +945,15 @@ def _restart_macos_launchd_gateways(
         if listing.returncode != 0:
             failed_or_stale_units.append("launchd (listing failed)")
             return
+    from qubit_cli.update_cmd_posix_pause import already_restarted
     current_label = get_launchd_label()
-    resumed = _already_restarted()["labels"]  # paused for the update, restarted on the new code
+    resumed = already_restarted()["labels"]  # paused for the update, restarted on the new code
     _restarted, _failed = ([], []) if current_label in resumed else _restart_launchd_gateway_after_update(
         supervision_verify=True, self_restart_pending=self_restart_pending)
     restarted_services.extend(_restarted)
     failed_or_stale_units.extend(_failed)
+    current_label = get_launchd_label()
+
     derived_labels = launchd_gateway_labels_for_install()
     # Units labelled before the profile-name suffix scheme (ai.hermes.gateway-<hash>) are invisible
     # to the derivation; legacy_launchd_labels_for_install() credits one only when its plist is
@@ -973,7 +964,7 @@ def _restart_macos_launchd_gateways(
         print(f"  ↻ legacy-labelled units of this install join the restart: {', '.join(legacy_labels)}")
     from qubit_cli.update_fleet_scope import describe_skipped_runtime, launchd_label_foreign_home
     for label in derived_labels + legacy_labels:
-        if label == current_label or label in resumed:
+        if label == current_label:
             continue
         # Labels are account-global: root B's default profile derives the same bare label root A
         # installed. A plist pinning a foreign QUBIT_HOME is another install's job (#93349).
@@ -1425,9 +1416,10 @@ def _restart_systemd_gateway_units(
             "together with: qubit gateway migrate"
         )
 
+    from qubit_cli.update_cmd_posix_pause import already_restarted
     for key in keys:
         scope, scope_cmd, svc_name = targets[key]
-        if key in _already_restarted()["units"]:  # paused for the update, restarted on the new code
+        if key in already_restarted()["units"]:  # paused for the update, restarted on the new code
             restarted_scoped_units.add(key)
             continue
         # Scope-qualify before the next unit; ``finally`` so a mid-pass abort keeps settled units.
@@ -1523,8 +1515,9 @@ def _restart_manual_gateways(out: _GatewayRestartOutcome, _drain_budget) -> None
         _wait_for_gateway_exit,
     )
     # Exclude just-restarted service PIDs so we don't kill what systemd/launchd spawned.
+    from qubit_cli.update_cmd_posix_pause import already_restarted
     # Plus the gateways this update paused and already restarted on the new code.
-    service_pids = _get_service_pids(all_profiles=True) | _already_restarted()["pids"]
+    service_pids = _get_service_pids(all_profiles=True) | already_restarted()["pids"]
     manual_pids = find_gateway_pids(exclude_pids=service_pids, all_profiles=True)
     profile_processes = {
         proc.pid: proc
