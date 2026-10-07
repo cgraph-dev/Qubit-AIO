@@ -819,7 +819,7 @@ def main() -> int:
         / "qubit_cli"
         / "observability"
         / "schemas"
-        / "qubit.shared_metrics.v3.schema.json",
+        / "hermes.shared_metrics.v3.schema.json",
     )
 
     print("Qubit -> NeMo Relay shared-metrics smoke test passed")
