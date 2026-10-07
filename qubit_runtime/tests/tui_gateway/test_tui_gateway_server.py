@@ -12022,13 +12022,13 @@ def test_file_attach_workspace_storage_follows_the_owning_profiles_config(monkey
             },
         )
 
-        staged_a = workspace_a / ".hermes" / "attachments" / "report.txt"
+        staged_a = workspace_a / ".qubit" / "attachments" / "report.txt"
         assert resp["result"]["attached"] is True
         assert resp["result"]["path"] == str(staged_a)
         assert staged_a.read_text(encoding="utf-8") == "hello"
         # Workspace staging lands inside the allowed ref root: the ref is
         # workspace-relative, not an absolute out-of-workspace path.
-        assert resp["result"]["ref_text"] == "@file:.hermes/attachments/report.txt"
+        assert resp["result"]["ref_text"] == "@file:.qubit/attachments/report.txt"
         assert not (home_a / "attachments").exists()
 
         # Same serve process, second profile WITHOUT the opt-in: staging stays
