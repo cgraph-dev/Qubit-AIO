@@ -252,9 +252,9 @@ def _managed_launcher(command: str) -> Optional[tuple[str, list[str]]]:
         launcher = pm.uv_launcher(command)
         dirs = [str(launcher.parent)] if launcher is not None else []
     else:
-        from qubit_constants import with_hermes_node_path
+        from qubit_constants import with_qubit_node_path
 
-        dirs = [d for d in with_hermes_node_path({"PATH": ""})["PATH"].split(os.pathsep) if d]
+        dirs = [d for d in with_qubit_node_path({"PATH": ""})["PATH"].split(os.pathsep) if d]
     executable = shutil.which(command, path=os.pathsep.join(dirs)) if dirs else None
     if executable is None:
         raise RuntimeError(f"Hermes-managed {command} is not installed; run `hermes pm install {package}`")
