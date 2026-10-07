@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -188,3 +189,26 @@ class TestExitCodes:
         assert data["finding_count"] == 1
         assert data["findings"][0]["severity"] == "HIGH"
         assert data["findings"][0]["fixed_versions"] == ["1.1"]
+
+
+class TestVenvDiscovery:
+    """Regression: source/PM installs carry qubit-agent 0.0.0, which matches every advisory."""
+
+    def _versions(self, monkeypatch, base_version):
+        from qubit_cli import version_info
+
+        dists = [SimpleNamespace(metadata={"Name": n}, version="0.0.0") for n in ("qubit_agent", "requests")]
+        monkeypatch.setattr("importlib.metadata.distributions", lambda: dists)
+        info = version_info.VersionInfo(
+            base_version=base_version, derived_version=base_version, distance=None, commit="abc", branch=None, source="build"
+        )
+        monkeypatch.setattr(version_info, "get_version_info", lambda: info)
+        return {c.name: c.version for c in sa._discover_venv()}
+
+    def test_placeholder_agent_version_resolves_to_running_release(self, monkeypatch):
+        versions = self._versions(monkeypatch, "0.21.5")
+        assert versions["qubit_agent"] == "0.21.5"
+        assert versions["requests"] == "0.0.0"  # only the agent's own placeholder is rewritten
+
+    def test_unknown_release_skips_placeholder(self, monkeypatch):
+        assert self._versions(monkeypatch, "unknown") == {"requests": "0.0.0"}

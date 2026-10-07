@@ -473,3 +473,162 @@ def test_off_thread_setup_records_in_the_owning_profile(marks, tmp_path, monkeyp
         assert flow.marker.parent == setup_metrics.markers_dir(home)
         setup_metrics.finish_provider_setup(flow, "completed")
     assert seen == [str(h) for h in (home_a, home_a, home_b, home_b, home_a, home_a)]
+
+
+def test_cancel_or_lapsed_code_is_never_a_failure_and_poller_errors_keep_their_class(marks, monkeypatch):
+    """A user cancel / a sign-in code left to run out is ``abandoned`` on every surface; a dashboard
+    poller's exception keeps its closed class instead of the bare session ``error`` -> ``other``."""
+    import httpx
+
+    from qubit_cli.auth_constants import _codex_err, _xai_err
+    from qubit_cli.auth_device_flow import _poll_for_token
+    from qubit_cli.auth_error_copy import device_flow_error
+    from qubit_cli.web_server_oauth import _oauth_poller, _oauth_sessions
+
+    monkeypatch.setattr(setup_metrics, "web_setup_surface", lambda: "desktop")
+    with setup_metrics.provider_setup_surface("cli_model"):  # CLI: Ctrl-C mid sign-in
+        with pytest.raises(KeyboardInterrupt), setup_metrics.cli_provider_setup("nous"):
+            raise KeyboardInterrupt
+    flow = setup_metrics.begin_oauth_setup("openai-codex", None)  # web start route: cancelled pre-response
+    setup_metrics.finish_provider_setup(flow, "failed", setup_metrics.setup_failure_class(KeyboardInterrupt()))
+
+    class Pending:  # the real Nous poll loop running out of time on authorization_pending
+        status_code = 400
+
+        def json(self):
+            return {"error": "authorization_pending"}
+
+    with pytest.raises(TimeoutError) as lapsed:
+        _poll_for_token(SimpleNamespace(post=lambda *a, **k: Pending()), "https://p", "c", "d", 0, 1)
+    dropped = _xai_err("xAI OIDC discovery failed", "xai_discovery_failed")
+    dropped.__cause__ = httpx.ConnectError("down")
+    for provider, exc in [
+        ("nous", lapsed.value), ("xai-oauth", _xai_err("Timed out", "device_code_timeout")),
+        ("openai-codex", _codex_err("Login timed out after 15 minutes.", "device_code_timeout")),
+        ("nous", device_flow_error("access_denied", "declined")), ("xai-oauth", dropped),
+        ("nous", device_flow_error("invalid_client", "nope")),
+    ]:
+        sess = {"status": "pending", "profile": None}
+        _oauth_sessions["probe"] = sess
+        setup_metrics.attach_oauth_setup(sess, setup_metrics.begin_oauth_setup(provider, None))
+
+        @_oauth_poller(provider)
+        def poller(_sid, _sess, exc=exc):
+            raise exc
+
+        poller("probe")
+        setup_metrics.settle_oauth_setup(sess)
+    _oauth_sessions.pop("probe", None)
+    assert [r for r in _setup_rows(marks.rows) if r[2] != "started"] == [
+        ("cli_model", "nous", "abandoned", "none"), ("desktop", "openai-codex", "abandoned", "none"),
+        ("desktop", "nous", "abandoned", "none"), ("desktop", "xai-oauth", "abandoned", "none"),
+        ("desktop", "openai-codex", "abandoned", "none"), ("desktop", "nous", "abandoned", "none"),
+        ("desktop", "xai-oauth", "failed", "network"), ("desktop", "nous", "failed", "auth"),
+    ]
+
+
+def _wire(status, body):
+    """A real httpx client whose every POST gets one canned response (JSON dict, else raw text)."""
+    import httpx
+
+    def reply(request):
+        if isinstance(body, Exception):
+            raise body
+        return httpx.Response(status, request=request, **({"json": body} if isinstance(body, dict) else {"text": body}))
+
+    return httpx.Client(transport=httpx.MockTransport(reply))
+
+
+def _poll(provider, status, body):
+    """The real device-code poll loop on a fake clock (each sleep advances it)."""
+    def run(monkeypatch):
+        from qubit_cli import auth_device_flow
+        from qubit_cli.auth_xai import _xai_oauth_poll_device_token
+
+        clock = [0.0]
+        fake_time = SimpleNamespace(monotonic=lambda: clock[0], sleep=lambda s: clock.__setitem__(0, clock[0] + max(s, 1)))
+        monkeypatch.setattr(auth_device_flow, "time", fake_time)
+        if provider == "nous":
+            return auth_device_flow._poll_for_token(_wire(status, body), "https://p", "c", "d", 30, 1)
+        return _xai_oauth_poll_device_token(
+            _wire(status, body), token_endpoint="https://x/token", device_code="d", expires_in=30, poll_interval=1)
+    return run
+
+
+def _guest_sign_in(token_status, token_body):
+    """The Desktop free-tier sign-in (guest promotion): the real ``run_sign_in`` generator recorded
+    onto a dashboard session; the promotion completes, the token poll gets ``token_*`` until expiry."""
+    def run(monkeypatch):
+        import httpx
+
+        from qubit_cli import anon_auth, auth_device_flow
+        from qubit_cli.web_server_oauth import _record_sign_in_state
+
+        clock = [0.0]
+        fake_time = SimpleNamespace(monotonic=lambda: clock[0], sleep=lambda s: clock.__setitem__(0, clock[0] + max(s, 1)))
+        monkeypatch.setattr(auth_device_flow, "time", fake_time)
+        monkeypatch.setattr(anon_auth, "current_nous_state", lambda: {
+            "auth_method": anon_auth.ANON_AUTH_METHOD, "anon_token": "t", "portal_base_url": "https://p"})
+        monkeypatch.setattr(anon_auth, "guest_enabled", lambda: True)
+        monkeypatch.setattr(anon_auth, "_anon_headers", lambda: {})
+        replies = {
+            "/api/oauth/device/code": (200, {"device_code": "d", "user_code": "U", "verification_uri": "https://p/v",
+                                             "verification_uri_complete": "https://p/v?c=U", "expires_in": 30, "interval": 1}),
+            "/api/anonymous/promotion-intent": (200, {"claim_code": "C", "claim_url": "/claim", "interval": 1}),
+            "/api/anonymous/promotion-status": (200, {"status": "completed"}),
+            "/api/oauth/token": (token_status, token_body)}
+
+        def reply(request):
+            status, body = replies[request.url.path]
+            return httpx.Response(status, **({"json": body} if isinstance(body, dict) else {"text": body}))
+        sess = {"status": "pending"}
+        for state in anon_auth.run_sign_in(client_factory=lambda *_: httpx.Client(transport=httpx.MockTransport(reply))):
+            _record_sign_in_state(sess, state)
+        return sess
+    return run
+
+
+def _codex_start(status, body):
+    """The dashboard start route: the worker thread's failure crosses into an HTTPException."""
+    def run(monkeypatch):
+        import asyncio
+
+        import qubit_cli.web_routers.oauth as routes
+
+        client = _wire(status, body)
+        monkeypatch.setattr(routes, "_codex_post", lambda _httpx, url, **kw: client.post(url, **kw))
+        asyncio.run(routes._start_codex_device_code(None))
+    return run
+
+
+@pytest.mark.parametrize("producer, ending", [
+    (_poll("nous", 400, {"error": "authorization_pending"}), ("abandoned", "none")),  # code left unapproved
+    (_poll("nous", 503, "<html>503 unavailable</html>"), ("failed", "network")),  # outage until it ran out
+    (_poll("xai", 400, {"error": "access_denied"}), ("abandoned", "none")),  # consent declined
+    (_poll("xai", 400, {"error": "expired_token"}), ("abandoned", "none")),  # the server let the code lapse
+    (_poll("xai", 400, {"error": "invalid_client"}), ("failed", "auth")),
+    (_codex_start(401, {"error": "invalid_client"}), ("failed", "auth")),
+    (_codex_start(0, ConnectionRefusedError("down")), ("failed", "network")),
+    (_codex_start(503, "<html>503</html>"), ("failed", "network")),
+    (_guest_sign_in(400, {"error": "authorization_pending"}), ("abandoned", "none")),
+    (_guest_sign_in(503, "<html>503 unavailable</html>"), ("failed", "network")),
+], ids=["nous-pending", "nous-503", "xai-denied", "xai-expired", "xai-refused", "codex-401", "codex-down",
+        "codex-503", "guest-pending", "guest-503"])
+def test_wire_failures_keep_the_producers_class_to_the_recorded_end(marks, monkeypatch, producer, ending):
+    """Real poll loops / start route / free-tier sign-in against wire responses: a lapse or a decline
+    is a walk-away, an outage or a refusal stays a failure, across the worker -> HTTPException and
+    sign-in state -> session boundaries too."""
+    import asyncio
+
+    import qubit_cli.web_routers.oauth as routes
+
+    monkeypatch.setattr(setup_metrics, "web_setup_surface", lambda: "desktop")
+    flow = setup_metrics.begin_oauth_setup("nous", None)
+    try:
+        sess = producer(monkeypatch)
+    except Exception as exc:
+        asyncio.run(routes._end_oauth_setup_metric(flow, exc))
+    else:  # a sign-in generator ends on a state, recorded onto its session
+        setup_metrics.attach_oauth_setup(sess, flow)
+        setup_metrics.settle_oauth_setup(sess)
+    assert [r[2:] for r in _setup_rows(marks.rows)] == [("started", "none"), ending]

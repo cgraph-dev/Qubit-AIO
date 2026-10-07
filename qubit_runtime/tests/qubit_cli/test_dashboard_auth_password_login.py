@@ -354,3 +354,17 @@ class TestLoginPageRender:
         finally:
             clear_providers()
 
+
+@pytest.mark.parametrize("peer", [("203.0.113.7", 12345), None])
+def test_client_ip_uses_asgi_peer_not_forwarded_header(peer: tuple[str, int] | None) -> None:
+    from fastapi import Request
+
+    from qubit_cli.dashboard_auth.request_utils import client_ip
+
+    # Preserve the ASGI address, including one normalized by trusted upstream
+    # middleware; a missing peer must not fall back to an untrusted header.
+    request = Request({
+        "type": "http", "client": peer,
+        "headers": [(b"x-forwarded-for", b"198.51.100.1, 192.0.2.1")],
+    })
+    assert client_ip(request) == (peer[0] if peer else "")

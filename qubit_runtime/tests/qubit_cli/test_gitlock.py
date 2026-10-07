@@ -203,7 +203,11 @@ def test_recovery_marks_unmarked_packs_and_retries_the_same_fetch(crash_stderr, 
 # `git gc --auto` (git's own gc.autoPackLimit decides when it is worth it). Real git against a
 # local blobless clone: these pin how the pieces interact, not their command lines.
 
-from qubit_cli.gitlock import consolidate_lazy_fetch_packs, disable_tree0_auto_maintenance  # noqa: E402
+from qubit_cli.gitlock import (  # noqa: E402
+    consolidate_lazy_fetch_packs,
+    disable_tree0_auto_maintenance,
+    settle_partial_clone_maintenance,
+)
 
 _GIT_ENV = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
 
@@ -355,3 +359,44 @@ def test_update_debris_cleanup_folds_and_reports_a_fold_that_runs_out_of_time(
 
     clear_git_debris(partial_clone)
     assert len(_packs(partial_clone)) < before
+
+
+def test_gits_own_gc_does_not_lazy_fetch_the_trees_of_commits_a_bloom_graph_has_not_seen(tmp_path: Path) -> None:
+    """A gc that folds the packs, left to write a commit-graph, adds one pack per unseen commit."""
+    seed, up, clone = _blobless_clone(tmp_path, 12)
+    full = tmp_path / "full"
+    _run_git("clone", "-q", up.as_uri(), str(full), cwd=tmp_path)
+    _run_git("commit-graph", "write", "--reachable", "--changed-paths", cwd=full)
+    graph = clone / ".git" / "objects" / "info"
+    for entry in (full / ".git" / "objects" / "info").glob("commit-graph*"):
+        (shutil.copytree if entry.is_dir() else shutil.copy)(entry, graph / entry.name)
+    for i in range(10):
+        (seed / "new.txt").write_text(f"n{i}\n", encoding="utf-8")
+        _run_git("add", "-A", cwd=seed)
+        _run_git("commit", "-qm", f"n{i}", cwd=seed)
+    _run_git("push", "-q", str(up), "main", cwd=seed)
+    _run_git("-c", "maintenance.auto=false", "fetch", "-q", "origin", cwd=clone)
+    _run_git("-c", "maintenance.auto=false", "log", "-p", cwd=clone)
+    _run_git("config", "gc.autoPackLimit", "3", cwd=clone)
+    assert len(_packs(clone)) > 3
+
+    settle_partial_clone_maintenance(clone)
+    _run_git("-c", "gc.autoDetach=false", "gc", "--auto", cwd=clone)
+
+    assert len(_packs(clone)) == 1
+
+
+def test_a_checkout_the_first_cut_configured_folds_again(partial_clone: Path) -> None:
+    """73c17151f61 persisted ``gc.auto=0`` (beside ``maintenance.auto=false`` and
+    ``fetch.writeCommitGraph=false``); left in place, ``gc --auto`` is a no-op and no fold ever runs."""
+    for key, value in (("gc.auto", "0"), ("fetch.writeCommitGraph", "false")):
+        _run_git("config", key, value, cwd=partial_clone)
+    assert len(_packs(partial_clone)) > 2
+
+    settle_partial_clone_maintenance(partial_clone)
+    _run_git("-c", "gc.autoDetach=false", "gc", "--auto", cwd=partial_clone)
+
+    assert len(_packs(partial_clone)) == 1
+    left = subprocess.run(["git", "config", "--local", "--get-regexp", r"^(maintenance\.auto|gc\.auto)$"],
+                          cwd=partial_clone, capture_output=True, text=True).stdout
+    assert left == ""

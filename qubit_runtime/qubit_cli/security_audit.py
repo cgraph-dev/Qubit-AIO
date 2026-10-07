@@ -64,7 +64,7 @@ def _discover_venv() -> list[Component]:
         except Exception:
             continue
         version = (dist.version or "").strip()
-        if name.lower().replace("_", "-") == "qubit" and version == "0.0.0":
+        if name.lower().replace("_", "-") == "qubit-agent" and version == "0.0.0":
             # pyproject declares 0.0.0 in source trees, which matches every advisory ever filed:
             # audit the running release instead, and skip the dist when no release is known.
             from qubit_cli.version_info import get_version_info

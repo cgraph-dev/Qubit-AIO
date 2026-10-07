@@ -13,6 +13,8 @@ import tarfile
 
 import pytest
 
+from agent.file_safety import HOME_CREDENTIAL_DIRS
+from plugins.teams_pipeline.store import DEFAULT_TEAMS_PIPELINE_STORE_FILENAME
 from qubit_cli.profiles import export_profile
 
 # Long enough to match agent.redact prefix patterns (sk- + 10+ chars).
@@ -134,3 +136,34 @@ class TestExportSecretScrub:
         assert _LEAKED_KEY not in archived
         assert _LEAKED_KEY in outside.read_text()
         assert link.is_symlink()
+
+
+_EXTRA_STORES = {
+    ".op.env", "npmrc", "honcho.json", "google_chat_user_token.json", "google_chat_user_oauth_pending",
+    "workspace/meetings/node_token.json", "weixin/accounts", ".copilot_jwt.json", "proxy", "chrome-debug",
+    "home/.git-credentials", "home/.config/gh/hosts.yml", "backups", "state-snapshots",
+    DEFAULT_TEAMS_PIPELINE_STORE_FILENAME, "mem0.json",
+    "browser-profiles/live/Default/Cookies", "browser_profiles/default/Default/Login Data",
+    "mcp-tokens/srv.json", "vault/vault.key", "platforms/pairing/approved.json", "slack_tokens.json",
+    "webhook_subscriptions.json", ".ssh/id_rsa", ".aws/credentials", ".gnupg/x", ".kube/config", ".envrc",
+}
+# Single-file stores whose name has no dot; every other dotless store is a token directory.
+_DOTLESS_FILES = {"npmrc"}
+# Dot-named stores that are directories: the OS credential dirs shared with file_safety.
+_DOT_DIRS = set(HOME_CREDENTIAL_DIRS)
+
+
+def _seed_stores(root):
+    """Lay every credential store into a profile-shaped tree at *root*; returns their paths."""
+    from qubit_cli.profiles import PROFILE_CREDENTIAL_PATHS
+
+    stores = _EXTRA_STORES | PROFILE_CREDENTIAL_PATHS
+    (root / "platforms").mkdir(parents=True)
+    (root / "config.yaml").write_text("model: gpt-4\n")
+    (root / "platforms" / "keep.json").write_text("{}")
+    for rel in stores:
+        is_dir = rel in _DOT_DIRS or ("." not in rel.rsplit("/", 1)[-1] and rel not in _DOTLESS_FILES)
+        target = root / rel / "store" if is_dir else root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("fake-credential")
+    return stores
