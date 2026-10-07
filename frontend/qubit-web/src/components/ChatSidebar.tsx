@@ -42,6 +42,7 @@ import {
   isEventsFeedMessage,
 } from "@/lib/events-reconnect";
 import { titleFromSessionInfoPayload } from "@/lib/chat-title";
+import { chatLiveFrame } from "@/lib/chatLiveEvents";
 
 import { cn } from "@/lib/utils";
 import { AlertCircle, ChevronDown, RefreshCw } from "lucide-react";
@@ -119,6 +120,8 @@ export function ChatSidebar({
   channel,
   profile,
   terminalModel,
+  sessionId,
+  onSessionModelChange,
   className,
   onDashboardNewSessionRequest,
   onSessionTitleChange,
@@ -296,8 +299,42 @@ export function ChatSidebar({
         if (title !== undefined) {
           onSessionTitleChange?.(title);
         }
-      } else if (type === "dashboard.new_session_requested") {
+        return;
+      }
+      if (type === "dashboard.new_session_requested") {
         onDashboardNewSessionRequest?.();
+        return;
+      }
+
+      // Chat-session live-update frames (the server's producer half). A
+      // session create / model pick / rename / delete and a global model
+      // assignment all arrive as a CUSTOM envelope — reading `type` alone is
+      // the literal "CUSTOM", so unwrap `name`/`value` here. Without this the
+      // MODEL card kept a stale label until a page reload (the reported
+      // defect).
+      const live = chatLiveFrame(frame as unknown as Record<string, unknown>);
+      if (!live) return;
+      if (live.isModelChange) {
+        refreshEffectiveModel();
+        return;
+      }
+      if (live.isSession) {
+        // Our own session changed (a per-session model pick writes
+        // session.updated): re-read the effective model so the card repaints
+        // immediately, and mirror the new title into the host.
+        if (live.sessionId && sessionId && live.sessionId === sessionId) {
+          const m = live.session
+            ? String(live.session.model || "")
+            : "";
+          if (m) onSessionModelChange?.(m);
+        }
+        const title = live.session
+          ? titleFromSessionInfoPayload(live.session)
+          : undefined;
+        if (title !== undefined) {
+          onSessionTitleChange?.(title);
+        }
+        refreshEffectiveModel();
       }
     };
 
@@ -582,6 +619,33 @@ export function ChatSidebar({
           onApply={async ({ provider, model, confirmExpensiveModel }) => {
             setModelNotice(null);
             setPendingReloadModel(null);
+            // PER-SESSION pick when this panel is bound to a session (the
+            // /qubit-chat sidebar always is). Write THIS session's stored
+            // model through the canonical store — never the global
+            // ``model.default`` — so two surfaces keep independent models and
+            // the pick applies to the conversation actually open, immediately,
+            // with no reload. This is the write the prop contract above
+            // promises; it previously fell through to the global branch,
+            // which is why a session model could not be switched.
+            if (sessionId) {
+              try {
+                const res = await api.patchChatSession(sessionId, {
+                  model,
+                });
+                const applied =
+                  String(res?.session?.model || model).split("/").slice(-1)[0] ||
+                  model;
+                onSessionModelChange?.(String(res?.session?.model || model));
+                setModelNotice(`Model set to ${applied} for this session.`);
+              } catch (e) {
+                setError(
+                  e instanceof Error
+                    ? e.message
+                    : "failed to set this session's model",
+                );
+              }
+              return;
+            }
             const result = await api.setModelAssignment(
               {
                 confirm_expensive_model: confirmExpensiveModel,

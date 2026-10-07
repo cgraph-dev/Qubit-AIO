@@ -191,6 +191,16 @@ async function renderChat() {
   );
 }
 
+/** Render /chat at an explicit URL (e.g. a `?resume=` deep link). */
+async function renderChatAt(path: string) {
+  const { default: ChatPage } = await import("./ChatPage");
+  await render(
+    <MemoryRouter initialEntries={[path]}>
+      <ChatPage isActive />
+    </MemoryRouter>,
+  );
+}
+
 function textarea(): HTMLTextAreaElement {
   return container.querySelector("textarea") as HTMLTextAreaElement;
 }
@@ -321,6 +331,61 @@ describe("Qubit ChatPage", () => {
     await renderChat();
     await vi.waitFor(() =>
       expect(container.textContent).toContain("Start a new run."),
+    );
+    expect(apiMocks.getChatSessionMessages).not.toHaveBeenCalled();
+  });
+
+  it("resumes a session hidden from the curated picker list via a direct probe", async () => {
+    // The list route hides auto-titled ``dashboard-<hex>`` rows, so a real
+    // session the user just created is ABSENT from it. Resuming must still
+    // work: the page probes the canonical session directly and, on success,
+    // loads its transcript instead of mislabelling it "foreign".
+    const hiddenId = "dashboard-9997c619acdb";
+    apiMocks.listChatSessions.mockResolvedValueOnce({
+      sessions: [],
+      total: 0,
+      limit: 100,
+      offset: 0,
+    });
+    apiMocks.getChatSession.mockResolvedValueOnce({
+      session: { id: hiddenId },
+      messages: [],
+      message_count: 2,
+      meta: {},
+    } as never);
+    apiMocks.getChatSessionMessages.mockResolvedValueOnce({
+      session_id: hiddenId,
+      messages: [
+        { role: "user", content: "resumed question" },
+        { role: "assistant", content: "resumed answer" },
+      ],
+      total: 2,
+    });
+    await renderChatAt(`/chat?resume=${hiddenId}`);
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("resumed answer"),
+    );
+    expect(apiMocks.getChatSessionMessages).toHaveBeenCalledWith(hiddenId);
+    // Not flagged foreign.
+    expect(
+      container.querySelector('[data-testid="foreign-session-banner"]'),
+    ).toBeNull();
+  });
+
+  it("flags a genuinely unknown resume id as foreign (no transcript read)", async () => {
+    const strangerId = "not-a-real-session";
+    apiMocks.listChatSessions.mockResolvedValueOnce({
+      sessions: [],
+      total: 0,
+      limit: 100,
+      offset: 0,
+    });
+    apiMocks.getChatSession.mockRejectedValueOnce(new Error("404: missing"));
+    await renderChatAt(`/chat?resume=${strangerId}`);
+    await vi.waitFor(() =>
+      expect(
+        container.querySelector('[data-testid="foreign-session-banner"]'),
+      ).not.toBeNull(),
     );
     expect(apiMocks.getChatSessionMessages).not.toHaveBeenCalled();
   });

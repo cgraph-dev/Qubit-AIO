@@ -39,6 +39,20 @@ class TestHidesProbeArtifacts:
         assert _is_chat_picker_noise(
             _rec("dashboard-efaef61a656d", "dashboard-efaef61a656d", 2, "dashboard"))
 
+    def test_hides_a_multiturn_untitled_new_chat(self):
+        """A New chat that ran a turn or two must not leak its ``dashboard-<hex>``.
+
+        New chat mints an untitled ``dashboard-<hex>`` row and pins it to the
+        local brain; each turn writes user+assistant messages, so the row reaches
+        4 (and more) messages. The count-gated floor let those through — the
+        picker then showed raw ids. ``title == id`` is the count-independent
+        signal that the row was never named.
+        """
+        for msgs in (3, 4, 6, 10):
+            assert _is_chat_picker_noise(
+                _rec("dashboard-efaef61a656d", "dashboard-efaef61a656d", msgs,
+                     "dashboard"))
+
     def test_hides_zero_message_dashboard_row(self):
         assert _is_chat_picker_noise(_rec("dashboard-abc", "", 0, "dashboard"))
 

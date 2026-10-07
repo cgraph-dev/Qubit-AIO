@@ -614,7 +614,13 @@ def local_brain_model(cfg: Any) -> Optional[str]:
        default rather than pinning a model the operator turned off;
     2. ``intent.local_llm.model`` — the canonical BRAIN selection path (the
        same path ``voicebridge.profiles`` and ``voicebridge.local_models``
-       read), when set;
+       read), when set — but only when it is a genuinely chat-capable model.
+       A configured id that resolves to a registered profile WITHOUT the
+       ``chat`` role (eg ``qubit-brain4``) is NOT returned: such a profile
+       cannot answer (all output lands in ``thinking``), and pinning it as the
+       default made every new ``/qubit-chat`` conversation unroutable. A
+       configured id that is not a registered profile (an operator's own
+       Ollama tag) is returned as-is, preserving the raw overrides.
     3. otherwise the shipped local profile's model, resolved through the one
        resolver (``DEFAULT_LOCAL_ID``), but only when that profile is enabled
        and genuinely local.
@@ -640,7 +646,26 @@ def local_brain_model(cfg: Any) -> Optional[str]:
             except Exception:  # noqa: BLE001
                 configured = None
             if isinstance(configured, str) and configured.strip():
-                return configured.strip()
+                configured = configured.strip()
+                # The ``chat``-role gate must guard the CONFIGURED path too,
+                # not just the shipped-default fallback below. ``qubit-brain4``
+                # is the configured local brain (it runs the classifier /
+                # runner roles) but its registered record deliberately omits
+                # ``chat`` because it returns empty content. Returning it here
+                # (the pre-2026-10-07 early return) pinned every NEW
+                # ``/qubit-chat`` session to a model that dies at the 64K
+                # context guard. Only reject when the id maps to a KNOWN
+                # profile lacking ``chat`` — an unregistered operator tag still
+                # passes through unchanged.
+                _prof = _resolver._profile_for_model(cfg, configured, "chat")
+                _known = (
+                    _prof is not None
+                    or _resolver.get_profile(cfg, configured) is not None
+                )
+                if not _known or _prof is not None:
+                    return configured
+                # Known profile without ``chat``: fall through to the shipped
+                # local default / caller's own default.
         profile = _resolver.get_profile(cfg, _resolver.DEFAULT_LOCAL_ID)
         if (profile is not None and profile.enabled
                 and profile.locality == "local" and profile.model):
@@ -734,6 +759,22 @@ def resolve_route(cfg: Any, requested: Optional[str] = None, *,
         # refusal (egress/allowlist, which carries its own code) is preserved.
         _fallback_code = str(routed.get("code") or "")
         if _fallback_code in ("UNKNOWN_PROFILE", "MODEL_NOT_ALLOWED") and req:
+            # A requested id that names a registered profile's MODEL (not its
+            # id) — eg ``deepseek-v4.1-flash`` for profile
+            # ``opencode-go-deepseek-v4.1-flash`` — must route THROUGH that
+            # profile: the provider, base_url, kind and egress policy all come
+            # from it. Falling back to the local brain and patching only the
+            # model name left provider=``ollama`` on a hosted model, so the
+            # turn 404'd at local Ollama (measured live: "model
+            # 'deepseek-v4.1-flash' not found" @ http://localhost:11434/v1).
+            _by_model = _resolver._profile_for_model(cfg, req, role)
+            if _by_model is not None and _by_model.enabled:
+                _routed = _resolver.resolve_model(cfg, _by_model.id, role=role,
+                                                  session=session)
+                if _routed.get("ok"):
+                    _routed = dict(_routed)
+                    _routed["session_pinned_model"] = req
+                    return _routed
             _base = _resolver.resolve_model(cfg, None, role=role, session=session)
             if _base.get("ok"):
                 _routed = dict(_base)
@@ -790,6 +831,38 @@ def resolve_route(cfg: Any, requested: Optional[str] = None, *,
             routed = dict(routed)
             routed["model"] = pinned
             routed["session_pinned_model"] = pinned
+        else:
+            # No pin and no request: the resolver defaulted to whatever the
+            # persisted "active" pointer names. When that is a LOCAL profile
+            # whose declared window is below Qubit's tool-use floor
+            # (MINIMUM_CONTEXT_LENGTH, 64K), every tool-capable `/qubit-chat`
+            # turn dies at the runtime guard ("Ollama loaded ... only 4,096
+            # tokens"). The installed local brains are all 4K Qwen3-4B
+            # records, so this is the common case. Prefer the operator's
+            # configured remote default (eg opencode-go/deepseek-v4.1-flash)
+            # when it is registered and executable — the same "never silently
+            # run a short-context model" rule `terminal_context_guard` applies
+            # to /chat. Never overrides an explicit request or a session pin.
+            _routed_local = str(routed.get("kind") or "") == "local"
+            _ctx = int(routed.get("context_tokens") or 0)
+            try:
+                from .providers import resolver as _r2
+                _floor = _r2.terminal_min_context_tokens(cfg)
+            except Exception:  # noqa: BLE001 - fall back to the shipped floor
+                _floor = 65536
+            if _routed_local and _ctx < _floor:
+                _configured = _resolver.configured_default_model(cfg)
+                _cprof = (_resolver._profile_for_model(cfg, _configured, role)
+                          if _configured else None)
+                if _cprof is not None and _cprof.enabled \
+                        and _cprof.kind != "local":
+                    _routed = _resolver.resolve_model(cfg, _cprof.id,
+                                                      role=role,
+                                                      session=session)
+                    if _routed.get("ok"):
+                        _routed = dict(_routed)
+                        _routed["short_context_default_bypassed"] = routed.get("model")
+                        return _routed
     return routed
 
 

@@ -8,14 +8,36 @@ const apiMocks = vi.hoisted(() => ({
     capabilities: { supports_reasoning: false },
     model: "test/model",
   })),
+  patchChatSession: vi.fn(async () => ({
+    ok: true,
+    session: { id: "s-1", model: "deepseek-v4.1-flash" },
+  })),
+  setModelAssignment: vi.fn(async () => ({ ok: true, scope: "main" })),
 }));
 
 const reloadMocks = vi.hoisted(() => ({
   maybeReloadForLoopbackWsAuthFailure: vi.fn(() => false),
 }));
 
+// Captured ModelPickerDialog props so a test can invoke the real `onApply`
+// without rendering the dialog UI.
+const pickerProps = vi.hoisted(() => ({
+  onApply: undefined as
+    | ((args: {
+        provider: string;
+        model: string;
+        confirmExpensiveModel?: boolean;
+      }) => unknown)
+    | undefined,
+  onClose: undefined as (() => void) | undefined,
+}));
+
 vi.mock("@/lib/api", () => ({
-  api: { getModelInfo: apiMocks.getModelInfo },
+  api: {
+    getModelInfo: apiMocks.getModelInfo,
+    patchChatSession: apiMocks.patchChatSession,
+    setModelAssignment: apiMocks.setModelAssignment,
+  },
   QUBIT_BASE_PATH: "",
 }));
 vi.mock("@/lib/dashboard-auth-reload", () => ({
@@ -23,7 +45,18 @@ vi.mock("@/lib/dashboard-auth-reload", () => ({
     reloadMocks.maybeReloadForLoopbackWsAuthFailure,
 }));
 vi.mock("@/components/ModelPickerDialog", () => ({
-  ModelPickerDialog: () => null,
+  ModelPickerDialog: (props: {
+    onApply?: (args: {
+      provider: string;
+      model: string;
+      confirmExpensiveModel?: boolean;
+    }) => unknown;
+    onClose?: () => void;
+  }) => {
+    pickerProps.onApply = props.onApply;
+    pickerProps.onClose = props.onClose;
+    return null;
+  },
 }));
 vi.mock("@/components/ModelReloadConfirm", () => ({
   ModelReloadConfirm: () => null,
@@ -32,8 +65,18 @@ vi.mock("@/components/ReasoningPicker", () => ({
   ReasoningPicker: () => null,
 }));
 vi.mock("@nous-research/ui/ui/components/button", () => ({
-  Button: ({ children, title }: { children?: ReactNode; title?: string }) => (
-    <button title={title}>{children}</button>
+  Button: ({
+    children,
+    title,
+    onClick,
+  }: {
+    children?: ReactNode;
+    title?: string;
+    onClick?: () => void;
+  }) => (
+    <button title={title} onClick={onClick}>
+      {children}
+    </button>
   ),
 }));
 vi.mock("@nous-research/ui/ui/components/badge", () => ({
@@ -91,6 +134,10 @@ async function flushMicrotasks() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  pickerProps.onApply = undefined;
+  pickerProps.onClose = undefined;
+  apiMocks.patchChatSession.mockClear();
+  apiMocks.setModelAssignment.mockClear();
   stream = makeStream();
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(stream.response);
@@ -319,5 +366,68 @@ describe("ChatSidebar SSE event feed", () => {
 
     expect(container.querySelector("aside")).toBeNull();
     expect(container.querySelectorAll('[role="complementary"]').length).toBe(0);
+  });
+
+  it("writes the PER-SESSION model when bound to a session (no global set)", async () => {
+    const onSessionModelChange = vi.fn();
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(
+      <ChatSidebar
+        channel="chat-1"
+        sessionId="dashboard-abc123"
+        onSessionModelChange={onSessionModelChange}
+      />,
+    );
+    await flushMicrotasks();
+
+    // Open the picker (the model Button) so ModelPickerDialog mounts and its
+    // onApply is captured.
+    await act(async () => {
+      container.querySelector("button")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    await flushMicrotasks();
+    expect(pickerProps.onApply).toBeTypeOf("function");
+
+    await act(async () => {
+      await pickerProps.onApply?.({
+        provider: "opencode-go",
+        model: "deepseek-v4.1-flash",
+      });
+    });
+
+    // The per-session write fires with the picked model; the GLOBAL assignment
+    // must NOT be touched when a session is bound.
+    expect(apiMocks.patchChatSession).toHaveBeenCalledWith("dashboard-abc123", {
+      model: "deepseek-v4.1-flash",
+    });
+    expect(apiMocks.setModelAssignment).not.toHaveBeenCalled();
+    expect(onSessionModelChange).toHaveBeenCalledWith("deepseek-v4.1-flash");
+  });
+
+  it("falls back to the global assignment when no session is bound", async () => {
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(<ChatSidebar channel="chat-1" />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      container.querySelector("button")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    await flushMicrotasks();
+
+    await act(async () => {
+      await pickerProps.onApply?.({
+        provider: "opencode-go",
+        model: "deepseek-v4.1-flash",
+      });
+    });
+
+    expect(apiMocks.setModelAssignment).toHaveBeenCalled();
+    expect(apiMocks.patchChatSession).not.toHaveBeenCalled();
   });
 });

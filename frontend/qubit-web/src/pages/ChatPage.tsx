@@ -82,6 +82,8 @@ import {
 import { useTranscriptionController } from "@/hooks/useTranscriptionController";
 import { useDesktopVoiceHelper } from "@/hooks/useDesktopVoiceHelper";
 import { useChatActivity } from "@/hooks/useChatActivity";
+import { useChatLiveEvents } from "@/hooks/useChatLiveEvents";
+import { type ChatSessionFrame } from "@/lib/chatLiveEvents";
 import { ChatWorkPanel } from "@/components/ChatWorkPanel";
 import { ReadAloudButton } from "@/components/ReadAloudButton";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -667,12 +669,32 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     transcriptReadyRef.current = false;
     api
       .listChatSessions(100, 0)
-      .then((list) => {
+      .then(async (list) => {
         if (loadReqRef.current !== myReq) return null;
         // Offer a one-click jump to the newest live voice session when the
         // store exposes one (read-only; the affordance just switches resume).
         setNewestVoiceSession(pickNewestVoiceSession(list.sessions));
-        const exists = (list.sessions ?? []).some((s) => s.id === session);
+        const inList = (list.sessions ?? []).some((s) => s.id === session);
+        // The list route is CURATED (`_is_chat_picker_noise` hides probe rows,
+        // auto-titled ``dashboard-<hex>`` rows, and tiny dashboard rows) and
+        // paged (a resume target older than the fetch window is absent even
+        // though it exists). Using it as the resume existence gate is what made
+        // an existing session — e.g. one just created by "New chat" and never
+        // titled — look "foreign" and unresumable. For an EXPLICIT resume
+        // target, probe the canonical session DIRECTLY (`GET /sessions/:id`),
+        // which is authoritative and unfiltered; only a genuine 404 (the fetch
+        // rejects) or an empty body means there is no record. The unsaved
+        // default (`dashboard-chat`) is a fresh-chat placeholder, never probed.
+        let exists = inList;
+        if (!exists && session !== DEFAULT_SESSION) {
+          try {
+            const info = await api.getChatSession(session);
+            exists = !!info?.session?.id;
+          } catch {
+            exists = false;
+          }
+          if (loadReqRef.current !== myReq) return null;
+        }
         if (!exists) {
           // No server record yet. If the id is the unsaved default, this is
           // simply a fresh Qubit chat. If it is some OTHER id (a canonical
@@ -852,6 +874,46 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         setSupportsReasoning(false);
       });
   }, [scopedProfile]);
+
+  // Live chat-session updates: the server announces every session create /
+  // model pick / rename / delete on the single SSE feed (a CUSTOM frame). This
+  // is the client half of the live-update contract — without it the open page
+  // kept stale state until a manual reload (the reported defect). One reader
+  // here fans out to the session list (bump its nonce) and to the MODEL card
+  // (re-read the effective model for the active session).
+  const refreshModelLive = useCallback(() => {
+    api
+      .getModelInfo(scopedProfile)
+      .then((info) => {
+        setModel(info.model || "");
+        setSupportsReasoning(info.capabilities?.supports_reasoning === true);
+      })
+      .catch(() => {
+        /* keep last-known */
+      });
+  }, [scopedProfile]);
+
+  useChatLiveEvents(
+    useCallback(
+      (frame: ChatSessionFrame) => {
+        if (frame.isSession) {
+          // A create / rename / delete changes the list membership or order;
+          // the remount (nonce-keyed) refetches. The active session's own
+          // model follows when the updated row is ours.
+          setSessionListNonce((n) => n + 1);
+          if (frame.session && frame.sessionId === session) {
+            const m = String(frame.session.model || "");
+            if (m) setSessionModel(m);
+          }
+          return;
+        }
+        if (frame.isModelChange) {
+          refreshModelLive();
+        }
+      },
+      [session, refreshModelLive],
+    ),
+  );
 
   // Resolve the selected speech input engine once from the canonical config
   // (`voice.input_engine`). Read-only; the setting changes speech input only —
@@ -1211,6 +1273,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         // Persist first so a reload lands on the fresh session even before the
         // URL effect runs; the `?resume=` param then drives the session memo.
         storageSet(SESSION_KEY, newId);
+        // Seed THIS session's model from the create response so the side panel
+        // shows the fresh session's model immediately (the transcript effect
+        // also reads it, but that is async — this avoids a one-frame stale
+        // card). Also applies when the create was announced live.
+        setSessionModel(String(res?.session?.model || ""));
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev);

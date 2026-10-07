@@ -2184,6 +2184,29 @@ def h_model_moa(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       "(8Q gateway) is the Qubit counterpart")
 
 
+def _publish_model_changed(cfg: Any, provider: str, model: str,
+                           scope: str) -> None:
+    """Announce a model assignment on the event feed (live-update producer).
+
+    A model pick mutated config/``model.default`` but broadcast nothing, so the
+    MODEL card and the reasoning gate kept the stale value until a full reload.
+    Publishing ``model.changed`` lets the open SPA re-read ``/api/model/info``
+    and repaint without a page refresh. Fail-soft: no hub (build without the
+    typed stream) or a publish error is swallowed — the write already landed.
+    """
+    hub = getattr(cfg, "_qubit_chat_hub", None)
+    make_event = getattr(cfg, "_qubit_chat_make_event", None)
+    if hub is None or make_event is None:
+        return
+    try:
+        hub.publish(make_event(
+            "CUSTOM", name="model.changed",
+            value={"provider": str(provider or ""), "model": str(model or ""),
+                   "scope": str(scope or "main")}))
+    except Exception:  # noqa: BLE001 - announcement is never fatal
+        pass
+
+
 def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import dashboard_ops as OPS
@@ -2233,6 +2256,8 @@ def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         # floor, and honestly stays (with the reason) when it cannot run it.
         follow = _terminal_follow_main_model(
             cfg, str(applied.get("profile_id") or ""))
+        _publish_model_changed(cfg, str(applied.get("provider", provider)),
+                               str(applied.get("model", model)), "main")
         return 200, {"ok": True, "scope": "main",
                      "provider": str(applied.get("provider", provider)),
                      "model": str(applied.get("model", model)),
@@ -5486,6 +5511,12 @@ _CHAT_PICKER_NOISE_NAME_RE = re.compile(
     r"(?:^|[-_])(?:e2e|probe|smoke|hygiene|readonly|verify)(?:$|[-_])",
     re.IGNORECASE,
 )
+#: A store-MINTED session id: ``qubit_session_store.create`` generates
+#: ``dashboard-<12 hex>`` for an unnamed New chat. An unnamed row reports its id
+#: as the title, so this shape (plus ``title == id``) identifies a New chat the
+#: user never named — a real conversation the user titled by hand, or a
+#: deliberately named row like ``voice-chat``, has a different id shape.
+_DASHBOARD_AUTO_ID_RE = re.compile(r"^dashboard-[0-9a-f]{6,}$")
 
 
 def _is_chat_picker_noise(record: Any) -> bool:
@@ -5514,6 +5545,21 @@ def _is_chat_picker_noise(record: Any) -> bool:
         return True
     if title and _CHAT_PICKER_NOISE_NAME_RE.search(title):
         return True
+    # Signal 1b: an UNNAMED New-chat row. ``qubit_session_store.list`` falls
+    # back to the id as the title whenever a row has neither ``title`` nor
+    # ``display_name`` (``"title": title or s.get("id")``), so an untitled New
+    # chat shows its raw generated id in the picker. Count-INDEPENDENT on
+    # purpose: a New chat that ran a turn or two lands at 3-4 messages and would
+    # otherwise slip past the ``_CHAT_PICKER_NOISE_MAX_MSGS`` floor below.
+    #
+    # Scoped to the GENERATED ``dashboard-<hex>`` id shape so it never hides a
+    # long-lived, deliberately-id-named session (a chat ''voice-chat''/
+    # ''orig-live'' row also reports ``title == id`` because it is untitled, yet
+    # it is a real conversation and must stay visible). The record only reaches
+    # here with no human title (the title it carries IS the id) and an id that
+    # the store minted — both conditions a hand-made session cannot satisfy.
+    if (title == sid and _DASHBOARD_AUTO_ID_RE.match(sid)):
+        return True
     # Signal 2: tiny AND machine-sourced.
     try:
         msgs = int(record.get("message_count", 0) or 0)
@@ -5521,8 +5567,6 @@ def _is_chat_picker_noise(record: Any) -> bool:
         msgs = 0
     if msgs > _CHAT_PICKER_NOISE_MAX_MSGS:
         return False
-    if title and sid and title == sid:
-        return True
     source = str(record.get("created_source") or record.get("source") or "")
     return source in ("dashboard", "oneshot")
 
@@ -5631,6 +5675,38 @@ def h_chat_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                state="OK", code=None, source="qubit-chat-store")
 
 
+def publish_chat_session_event(cfg: Any, name: str,
+                               session: Any) -> None:
+    """Publish a chat-session mutation as a ``CUSTOM`` frame on the event hub.
+
+    The dashboard sidebar/``/chat`` session list live-updates its state from
+    the single SSE event feed (``/api/events/stream``). Before this, a session
+    create / model pick / rename / delete mutated the store but broadcast
+    NOTHING, so the SPA had no signal and only a full page reload showed the
+    change — the "I need to refresh the page" defect. This is the producer half
+    of upstream's live-update contract: the mutation endpoint announces itself
+    on the same feed every other live surface already reads.
+
+    ``name`` is one of ``session.created`` / ``session.updated`` /
+    ``session.deleted`` (the frontend reducer's vocabulary). ``session`` is the
+    already-rebranded wire record (or ``{"id": ...}`` for a delete). Fail-soft:
+    the hub is optional (a build without the typed stream has none) and a
+    publish error must never fail the mutation.
+    """
+    hub = getattr(cfg, "_qubit_chat_hub", None)
+    make_event = getattr(cfg, "_qubit_chat_make_event", None)
+    if hub is None or make_event is None:
+        return
+    try:
+        rec = session if isinstance(session, dict) else {}
+        sid = str(rec.get("id", "") or "")
+        hub.publish(make_event(
+            "CUSTOM", name=name,
+            value={"session_id": sid, "session": rec}))
+    except Exception:  # noqa: BLE001 - announcement is never fatal
+        pass
+
+
 def h_chat_session_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import chat_transport as CT
@@ -5650,7 +5726,9 @@ def h_chat_session_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     res = CT.store(cfg).create(str(b.get("name", "") or ""),
                                session_id=b.get("id"), model=chosen_model)
     if res.get("state") == "OK":
-        return _ok(session=_rebrand_chat_record(res["session"]),
+        record = _rebrand_chat_record(res["session"])
+        publish_chat_session_event(cfg, "session.created", record)
+        return _ok(session=record,
                    messages=res.get("messages", []))
     status = 409 if res.get("state") == "EXISTS" else 400
     return status, {"ok": False, "code": res.get("code"),
@@ -5965,7 +6043,9 @@ def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if res.get("state") != "OK":
         return 400, {"ok": False, "code": res.get("code"),
                      "detail": res.get("detail", "")}
-    return _ok(session=_rebrand_chat_record(res["session"]))
+    record = _rebrand_chat_record(res["session"])
+    publish_chat_session_event(cfg, "session.updated", record)
+    return _ok(session=record)
 
 
 def h_chat_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -5995,6 +6075,11 @@ def h_chat_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if res.get("state") != "OK":
         return 400, {"ok": False, "code": res.get("code"),
                      "detail": res.get("detail", "")}
+    # Announce the delete on the live feed so an open session list drops the
+    # row without a manual refresh. The row is gone from the store, so publish
+    # only its id (the frontend reducer keys on ``session_id``).
+    publish_chat_session_event(
+        cfg, "session.deleted", {"id": str(p.get("id", "") or "")})
     return _ok(state="OK", session=_rebrand_chat_record(res.get("session")))
 
 
