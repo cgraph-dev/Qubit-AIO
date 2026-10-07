@@ -36,6 +36,7 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Union
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from qubit_constants import get_qubit_home, qubit_home_key
+from qubit_cli.observability.shared_metrics_gateway import note_cron_execution, note_cron_skipped
 from cron.env_settings import cron_env_setting
 from qubit_cli._subprocess_compat import windows_hide_flags
 from qubit_cli.config import (
@@ -4216,17 +4217,23 @@ def _submit_with_guard(job: dict, pool: concurrent.futures.ThreadPoolExecutor, p
     # discard the LAUNCH home's key and leak every secondary profile's claim.
     _claim_home = _get_qubit_home()
     # Record the attempt before dispatch; recovery marks abandoned rows unknown (no retry).
+    execution = None
     try:
         execution = create_execution(
             job_id, source="builtin", scheduled_instant=job.get("_scheduled_instant"))
         dispatched_job = dict(job, execution_id=execution["id"])
+        note_cron_execution(dispatched_job)
         _ctx = contextvars.copy_context()
     except Exception as execution_err:
         # Release the claim so the next tick retries instead of wedging "already running".
         release_running_job(job_id, home=_claim_home, owner=registration_owner)
         _clear_run_claim_best_effort()
-        logger.exception(
-            "Job '%s' not dispatched: execution creation failed: %s", job_label, execution_err)
+        if execution is not None:  # the receipt was persisted; a later step failed
+            settle_unstarted_execution(execution["id"], job_id, (
+                f"Dispatch preparation failed: {type(execution_err).__name__}: {execution_err}"))
+        logger.exception("Job '%s' not dispatched: %s failed: %s", job_label,
+                         "execution creation" if execution is None else "dispatch preparation",
+                         execution_err)
         return None
 
     def _run_and_release(j=dispatched_job, ctx=_ctx, home=_claim_home):
