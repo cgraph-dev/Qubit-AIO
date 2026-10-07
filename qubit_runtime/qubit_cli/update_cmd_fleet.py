@@ -60,63 +60,26 @@ def _fleet_restart_pending_marker_path() -> Path:
     return get_qubit_home() / _FLEET_RESTART_PENDING_NAME
 
 
-def _write_legacy_fleet_restart_pending_marker(
-    *, expected_sha: str = "", runtimes: list[dict] | None = None
-) -> bool:
-    """Arm the LEGACY per-``QUBIT_HOME`` marker. True when written. Never raises.
+def _write_fleet_restart_pending_marker(*, expected_sha: str = "", runtimes: list[dict] | None = None,
+                                        owner: str = "") -> bool:
+    """Arm the HOST pull→restart obligation. Never raises; False when no store every profile reads took it.
 
-    Fallback only: ``$QUBIT_HOME`` is writable by construction (the updater already writes its
-    receipts there), so it still carries the obligation when the host state dir cannot.
-    """
-    path = _fleet_restart_pending_marker_path()
-    try:
-        lines = [f"started={_time.time()}", f"pid={os.getpid()}"]
-        if expected_sha:
-            lines.append(f"expected_sha={expected_sha}")
-        if runtimes is not None:
-            lines.append("inventory=" + json.dumps({"version": 1, "runtimes": runtimes}))
-        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        return True
-    except OSError as exc:
-        logger.debug("Could not write legacy fleet-restart-pending marker: %s", exc)
-        return False
-
-
-def _write_fleet_restart_pending_marker(*, expected_sha: str = "", runtimes: list[dict] | None = None) -> None:
-    """Arm the HOST pull→restart obligation. Never raises.
-
-    An unwritable host state dir (``HERMES_GATEWAY_LOCK_DIR`` on a read-only mount, a container
-    UID that does not own ``$HOME``) must never disarm the obligation: an update interrupted
-    after this point would then leave stale code running with no warning and no catch-up restart
-    (#117275). The legacy per-home marker — which every reader here still honours — carries it
-    instead, and a host that can write neither says so out loud.
+    An unwritable host state dir falls back to this profile's per-home marker, which settles the
+    debt only on an install proven to have no other profile; otherwise the arm returns False and
+    the commit point refuses to move (``update_host_obligation.arm_host_obligation``, review S2).
     """
     if runtimes == []:
         # An explicit empty inventory owes no restart (e.g. Desktop-hosted `serve` with no
         # gateway services). Arming the marker here leaves a breadcrumb nothing can discharge:
         # a no-gateway host would then fail every later ``qubit update`` (#115311).
-        return
+        return True
     from qubit_cli.update_cmd import _m
-    from qubit_cli.update_host_obligation import host_obligation_path, write_host_obligation
+    from qubit_cli.update_host_obligation import arm_host_obligation
     if _m()._pytest_owns_live_checkout(_fleet_restart_pending_marker_path().parent):
         logger.debug("Skipping fleet-restart-pending obligation under pytest (live checkout)")
-        return
-    if write_host_obligation(
-            expected_sha=expected_sha, runtimes=runtimes, profile=_current_profile_name()):
-        return
-    if _write_legacy_fleet_restart_pending_marker(expected_sha=expected_sha, runtimes=runtimes):
-        logger.warning(
-            "Host update-restart obligation (%s) is unwritable; armed the per-home marker %s instead.",
-            host_obligation_path(), _fleet_restart_pending_marker_path())
-        return
-    logger.error(
-        "Could not arm the update-restart obligation in %s or %s; an interrupted update will not warn.",
-        host_obligation_path(), _fleet_restart_pending_marker_path())
-    print(
-        "  ⚠ Could not record the pending gateway-restart obligation (state dir not writable) — "
-        "restart gateways with `qubit gateway restart` if this update is interrupted.",
-        file=sys.stderr,
-    )
+        return True
+    return arm_host_obligation(_fleet_restart_pending_marker_path(), expected_sha=expected_sha, runtimes=runtimes,
+                               profile=_current_profile_name(), owner=owner)
 
 
 def _current_profile_name() -> str:
