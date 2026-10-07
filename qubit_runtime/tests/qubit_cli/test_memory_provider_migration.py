@@ -261,3 +261,33 @@ def test_recovery_copy_without_a_catalog_memory_entry_keeps_the_generic_hint(tmp
     assert mig.catalog_install_hint("no-such-provider") is None
     doctor_state._memory_provider_generic("no-such-provider")
     assert "run: qubit memory setup" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(("name", "installs"), [("hindsight", True), ("someplugin", False)])
+def test_startup_recovery_never_asks_a_dependency_question(tmp_path, monkeypatch, name, installs):
+    """Agent init cannot answer a prompt: in the CLI the question hangs the turn behind the chat input,
+    with no terminal it is refused on every process start. A provider that shipped in core installs
+    with its built-in's consent even on a terminal; any other one is not attempted and names the command."""
+    import io
+
+    from qubit_cli import plugins_cmd
+    from pm import install as pm_install
+
+    class _Tty(io.StringIO):
+        def isatty(self):
+            return True
+
+    (tmp_path / "config.yaml").write_text(f"memory:\n  provider: {name}\n", encoding="utf-8")
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    monkeypatch.setattr("sys.stdin", _Tty())
+    monkeypatch.setattr("sys.stdout", _Tty())
+    monkeypatch.setattr(mig, "_attempted", set())
+    monkeypatch.setattr(mig, "catalog_source", lambda n: n)
+    monkeypatch.setattr(pm_install, "lazy_installs_allowed", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda *_a: pytest.fail("agent init asked a question"))
+    seen: list[dict] = []
+    monkeypatch.setattr(plugins_cmd, "dashboard_install_plugin", lambda *a, **kw: seen.append(kw) or {"ok": False})
+    said: list[str] = []
+    mig.recover_at_startup(name, say=said.append)
+    assert [kw["assume_deps_consent"] for kw in seen] == ([True] if installs else [])
+    assert installs or f"`qubit plugins install {name}`" in said[-1]
