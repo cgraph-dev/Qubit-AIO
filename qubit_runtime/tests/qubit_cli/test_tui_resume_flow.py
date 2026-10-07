@@ -304,3 +304,60 @@ def test_launch_tui_local_session_starts_in_launch_dir_not_terminal_cwd(monkeypa
     else:
         assert "QUBIT_TUI_CWD" not in env
         assert Path(env["TERMINAL_CWD"]).resolve() == configured.resolve()
+
+
+@pytest.mark.parametrize("run_fails", [False, True], ids=["success", "failure"])
+def test_oneshot_closes_its_relay_root_before_agent_teardown(monkeypatch, run_fails):
+    """qubit -z hard-exits past atexit, so _run_agent itself must finalize the Relay root it opened:
+    keyed to the id at turn entry (compression may rotate it), on failure too, before agent.close()."""
+    from qubit_cli import lifecycle
+    from qubit_cli.oneshot import _run_agent
+
+    events = []
+
+    class FakeAgent:
+        def __init__(self, **_kwargs):
+            self.session_id = "entry-id"
+            self.platform = "cli"
+            self.suppress_status_output = False
+            self.stream_delta_callback = self.tool_gen_callback = object()
+
+        def run_conversation(self, _prompt, **_kwargs):
+            self.session_id = "compressed-child-id"
+            if run_fails:
+                raise RuntimeError("agent failed")
+            return {"final_response": "ok", "failed": False, "partial": False}
+
+        def shutdown_memory_provider(self, *_args):
+            events.append("memory")
+
+        def close(self):
+            events.append("agent_close")
+
+    def mod(name, **attrs):
+        module = types.ModuleType(name)
+        for key, value in attrs.items():
+            setattr(module, key, value)
+        return module
+
+    monkeypatch.setitem(sys.modules, "run_agent", mod("run_agent", AIAgent=FakeAgent))
+    monkeypatch.setitem(sys.modules, "qubit_state_registry", mod("qubit_state_registry", acquire=lambda db_path=None: None))
+    monkeypatch.setitem(sys.modules, "qubit_cli.config", mod("qubit_cli.config", load_config=lambda: {"model": {"default": "m"}}))
+    monkeypatch.setitem(sys.modules, "qubit_cli.models",
+                        mod("qubit_cli.models", detect_provider_for_model=lambda *_a, **_k: None))
+    monkeypatch.setitem(sys.modules, "qubit_cli.runtime_provider", mod(
+        "qubit_cli.runtime_provider",
+        resolve_runtime_with_fallback=lambda _cfg, **_k: ({"api_key": "k", "base_url": "u", "provider": "p",
+                                                           "api_mode": "chat_completions", "credential_pool": None}, None),
+    ))
+    monkeypatch.setitem(sys.modules, "qubit_cli.tools_config",
+                        mod("qubit_cli.tools_config", _get_platform_tools=lambda *_a, **_k: set()))
+    monkeypatch.setattr(lifecycle, "finalize_session", lambda **kw: events.append(("finalize", kw)))
+
+    if run_fails:
+        with pytest.raises(RuntimeError, match="agent failed"):
+            _run_agent("finish this")
+    else:
+        assert _run_agent("finish this")[0] == "ok"
+    assert events == [("finalize", {"session_id": "entry-id", "platform": "cli", "reason": "shutdown"}),
+                      "memory", "agent_close"]
