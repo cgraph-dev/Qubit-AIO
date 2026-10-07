@@ -31,6 +31,7 @@ from qubit_cli import update_receipt as _completion_receipt, update_cmd_config a
 from qubit_cli._old_updater import stop_for_relaunch
 from qubit_cli._early_recovery import git_operation_in_progress, interrupted_pull_marker
 from qubit_cli import update_cmd_commit as _commit
+from qubit_cli import update_cmd_posix_pause as _posix_pause
 from qubit_cli import update_cmd_check as _check
 
 # Re-exports: every split-module name stays reachable (and monkeypatchable) as update_cmd.<name>.
@@ -375,6 +376,9 @@ def _gateway_prompt(prompt_text: str, default: str = "", timeout: float = 300.0)
     import uuid as _uuid
     from qubit_constants import get_qubit_home
 
+    if _posix_pause.gateways_paused():  # the gateway that would relay it is stopped for the update
+        print(f"  → {prompt_text} → {default or '(empty)'} (gateways are paused for the update)")
+        return default
     home = get_qubit_home()
     prompt_path = home / ".update_prompt.json"
     response_path = home / ".update_response"
@@ -1067,6 +1071,9 @@ def _prepare_checkout_for_update(
         # Keep the running code AND its branch identity for syntax rollback.
         moved_from_sha = _capture_head_sha(git_cmd, _m().PROJECT_ROOT)
         rollback_branch = current_branch
+        # The switch (or its -B fallback) is this update's first tree write: pause the gateways now
+        # so the new tree is not loaded into old processes on their next lazy import.
+        _posix_pause.pause_at_commit_point()
         track_result = _git_run(git_cmd, ["checkout", branch])
         if track_result.returncode != 0:
             track_result = _git_run(git_cmd, ["checkout", "-B", branch, f"origin/{branch}"])
@@ -1444,7 +1451,9 @@ def _cmd_update_impl(args, gateway_mode: bool):
     _record_pre_update_backup_outcome(args, pre_update_snapshot_id)
     _record_snapshot_stage(args, pre_update_snapshot_id)
 
-    _windows_gateway_resume = _m()._pause_windows_gateways_for_update()
+    # Windows pauses here (venv locks); Linux/macOS only arm a pause the commit point performs.
+    _windows_gateway_resume = _m()._pause_windows_gateways_for_update() or _posix_pause.arm_pause(
+        no_gateway_restart=opts.no_gateway_restart)
     if _windows_gateway_resume:
         import atexit as _atexit
         _atexit.register(_m()._resume_windows_gateways_after_update, _windows_gateway_resume)

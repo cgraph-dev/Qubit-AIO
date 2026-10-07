@@ -40,13 +40,17 @@ def _abort_on_error(prefix: str):
         raise RuntimeError(f"{prefix}: {exc}") from exc
 
 
+def _planned_stop_marker_path(profile_path: Path) -> Path:
+    return Path(profile_path) / ".gateway-planned-stop.json"
+
+
 def _write_update_planned_stop_marker(profile_path: Path, pid: int) -> bool:
     """Write a planned-stop marker into a specific profile home."""
     try:
         from gateway.status import _get_process_start_time
         from utils import atomic_json_write
         atomic_json_write(
-            Path(profile_path) / ".gateway-planned-stop.json",
+            _planned_stop_marker_path(profile_path),
             {"target_pid": pid, "target_start_time": _get_process_start_time(pid), "stopper_pid": os.getpid(),
              "written_at": datetime.now(timezone.utc).isoformat()},
             indent=None, separators=(",", ":"),
@@ -1296,6 +1300,9 @@ def _resume_windows_gateways_after_update(token: dict | None) -> None:
     # ``unregister`` is a no-op when this function was never registered.
     import atexit
     atexit.unregister(_resume_windows_gateways_after_update)
+    if token.get("platform") == "posix":  # Linux/macOS pre-swap pause (update_cmd_posix_pause)
+        from qubit_cli.update_cmd_posix_pause import resume_paused_set
+        return resume_paused_set(token)
     if not _m()._is_windows():
         token["resume_needed"] = False
         return
