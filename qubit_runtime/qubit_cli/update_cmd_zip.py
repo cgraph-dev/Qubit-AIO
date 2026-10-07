@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Collection, Optional
 
 from qubit_cli import install_source
+from qubit_cli.update_cmd_common import _record_stop
 
 # Log-record parity with the origin module.
 logger = logging.getLogger("qubit_cli.update_cmd")
@@ -226,6 +227,7 @@ def _abort_zip_update_if_dirty_tree() -> None:
     print("  Overlaying the ZIP would overwrite uncommitted edits and permanently delete untracked files.")
     print(_STASH_HINT)
     print("  To inspect: git status --porcelain")
+    _record_stop("local_changes_blocked")
     _m().sys.exit(1)
 
 
@@ -322,6 +324,18 @@ def _stage_entries(extracted: str, entries: list[str], project_root: str) -> lis
     return staged
 
 
+def _zip_stop_class(exc: BaseException, *, downloaded: bool) -> str:
+    """Closed stop token for a failed ZIP update: by exception type and errno, never its text."""
+    import errno
+
+    if getattr(exc, "errno", None) == errno.ENOSPC or (
+            isinstance(exc, RuntimeError) and str(exc).startswith("not enough free disk space")):
+        return "disk_full"  # _require_staging_space's own refusal, or ENOSPC mid-copy
+    if isinstance(exc, SyntaxError):
+        return "target_syntax_error"  # the pre-commit gate refused the extracted tree; nothing moved
+    return "zip_failed" if downloaded else "download_failed"
+
+
 def _download_and_swap_zip(branch: str, zip_url: str) -> None:
     """Download the source ZIP for *branch* and two-phase swap it into the checkout.
     ``sys.exit(1)`` on any failure; the install ends fully updated or fully rolled back.
@@ -334,9 +348,11 @@ def _download_and_swap_zip(branch: str, zip_url: str) -> None:
     from urllib.request import urlretrieve
     print("→ Downloading latest version...")
     tmp_dir = tempfile.mkdtemp(prefix="hermes-update-")
+    downloaded = False
     try:
         zip_path = os.path.join(tmp_dir, f"hermes-agent-{branch}.zip")
         urlretrieve(zip_url, zip_path)
+        downloaded = True
         print("→ Extracting...")
         _extract_zip_safely(zip_path, tmp_dir)
         extracted = _extracted_root(tmp_dir, branch)
@@ -354,6 +370,7 @@ def _download_and_swap_zip(branch: str, zip_url: str) -> None:
                 print(f"✗ ZIP fallback aborted before the swap: {recheck_reason}.")
                 print("  Files appeared in the checkout while the update was downloading; committing the swap would delete them.")
                 print(_STASH_HINT)
+                _record_stop("local_changes_blocked")
                 _m().sys.exit(1)
             _commit_staged_replacements(staged)
         except Exception:
@@ -368,6 +385,7 @@ def _download_and_swap_zip(branch: str, zip_url: str) -> None:
         # Two-phase replace commits all or rolls all back, so no mixed tree here — don't push a needless reinstall.
         print("  Your existing install was left in place.")
         print("  Re-run `qubit update` to retry; if the agent won't start, reinstall from " + install_source.base_url())
+        _record_stop(_zip_stop_class(e, downloaded=downloaded))
         _m().sys.exit(1)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -393,6 +411,7 @@ def _update_via_zip(args, *, had_desktop_app_before_update: bool = False,
             "or NTFS filter holding files open) and rerun `qubit update "
             f"--branch {branch}`, or update against main with `qubit update`."
         )
+        _record_stop("branch_unsupported")
         _m().sys.exit(1)
     _abort_zip_update_if_dirty_tree()
     # Older callers lack the snapshot/receipt/lifecycle handoff. Refuse before swap.
