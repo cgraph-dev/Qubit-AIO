@@ -58,3 +58,33 @@ does — and it reported `permissions.py` as a short-port for exactly this reaso
    that shape here; both were real.
 3. Add a gate check: for every file both branches touch, if one side's revision is an
    ancestor of the other's, flag it. Silent reverts are invisible to conflict detection.
+
+
+## IMPORTANT CORRECTION — the `check_silent_revert.py` checker over-reports
+
+It flagged **14 files** as silent reverts. **Only 2 were real.** I verified by checking
+whether the merged tree retained `sync/final`'s improvements:
+
+| file | marker | merged | sync/final | verdict |
+|---|---|---|---|---|
+| `qubit_cli/main.py` | `explicit_cli_profile` | 6 | 6 | intact |
+| `agent/skill_utils.py` | `read_active_org_id` | 1 | 1 | intact |
+| `observability/relay_shared_metrics.py` | `rotate_segment` | 3 | 3 | intact |
+| `qubit_cli/gui_uninstall.py` | `desktop_install_record` | 4 | 3 | intact |
+| `tools/skill_usage.py` | `set_sync` | 1 | 1 | intact |
+
+All 14 flagged files came through the merge with the newer content. The two REAL reverts
+were `tools/computer_use/backend.py` and `tools/computer_use/permissions.py` — and the
+diagnostic that separated them was **deletions**, not ancestry:
+
+- real revert: `28 deleted / 3 added` and `13 deleted / 1 added`
+- false positive: `18 deleted / 0 added`, `16 / 0`, `10 / 0` — these ADDED code
+
+"Version A is an ancestor of version B" is normal whenever both branches touched the same
+file. It is not evidence of a revert. The reliable signature is **the voice side deleting
+more lines than it added from a file it had no business shrinking**, cross-checked against
+whether the merged result retains the newer marker.
+
+A checker that reports 14 when 2 are real is worse than no checker: it trains the reader
+to ignore it. Fixed guidance for the next pass: require `deletions > additions` AND
+`deletions > 5`, then confirm by marker presence in the merged tree.
