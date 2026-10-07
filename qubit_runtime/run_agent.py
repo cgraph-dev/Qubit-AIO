@@ -37,6 +37,12 @@ from datetime import datetime
 from pathlib import Path
 
 from qubit_constants import get_qubit_home
+from agent.session_source import CLI_FAMILY_SOURCES, session_source_for
+
+
+# Kept for call sites/tests written against the historical inline helper; the canonical
+# implementation now lives in ``agent.session_source`` (imported above).
+_session_source_for_agent = session_source_for
 
 
 def _launch_cwd_for_session(source: str) -> Optional[str]:
@@ -51,34 +57,6 @@ def _launch_cwd_for_session(source: str) -> Optional[str]:
         return os.getcwd()
     except OSError:  # cwd was unlinked out from under us
         return None
-
-
-# Sources that label the human conversation an interactive UI transport hosts. A finite ``qubit chat -q`` /
-# one-shot child spawned from such a session inherits HERMES_SESSION_SOURCE (the terminal tool bridges the
-# session env into child processes) but is NOT that conversation: labelling it ``tui``/``desktop`` lists it
-# in the TUI/WebUI pickers as a resumable chat and lets ``qubit -c`` in the TUI continue it (#112550).
-# Automation sources (kanban, tool, cron, a2a, ...) are inherited on purpose.
-_UI_TRANSPORT_SOURCES = frozenset({"tui", "desktop"})
-
-# Finite non-interactive CLI runs (``qubit chat -q``/``--oneshot``, ``qubit -z``) get their own source so human
-# pickers hide them without title/cwd heuristics; ``qubit -c`` still treats them as CLI history.
-ONESHOT_SOURCE = "oneshot"
-CLI_FAMILY_SOURCES = frozenset({"cli", ONESHOT_SOURCE})
-
-
-def _session_source_for_agent(platform: Optional[str]) -> str:
-    try:
-        from gateway.session_context import get_session_env
-    except Exception:
-        get_session_env = os.environ.get
-    source = str(get_session_env("HERMES_SESSION_SOURCE", "") or "").strip()
-    single_query = get_session_env("HERMES_SINGLE_QUERY_SESSION", "") == "1"
-    explicit = get_session_env("HERMES_SESSION_SOURCE_EXPLICIT", "") == "1"
-    if single_query and not explicit and source in _UI_TRANSPORT_SOURCES:
-        source = ""
-    if single_query and not source and (platform or "cli") == "cli":
-        return ONESHOT_SOURCE
-    return source or platform or "cli"
 
 
 def _gateway_origin_json(agent: "AIAgent") -> Optional[str]:

@@ -105,16 +105,19 @@ def test_detached_worker_teardown_waits_for_future():
     with patch("cron.scheduler._finalize_cron_session") as finalize, \
          patch("cron.scheduler._teardown_cron_agent") as teardown_agent:
         assert defer_teardown_to_running_worker(
-            future, fake_db, agent, "detached-worker", "detached worker", "cron_detached-worker") is True
+            future, fake_db, agent, "detached-worker", "detached worker", "cron_detached-worker",
+            workdir=None) is True
         finalize.assert_not_called()
         teardown_agent.assert_not_called()
 
         future.set_result({"final_response": "late"})
 
-        finalize.assert_called_once_with(fake_db, agent, "detached-worker", "detached worker", "cron_detached-worker")
+        finalize.assert_called_once_with(fake_db, agent, "detached-worker", "detached worker",
+                                          "cron_detached-worker", workdir=None)
         teardown_agent.assert_called_once_with(agent, "detached-worker")
     assert defer_teardown_to_running_worker(
-        future, fake_db, agent, "detached-worker", "detached worker", "cron_detached-worker") is False
+        future, fake_db, agent, "detached-worker", "detached worker", "cron_detached-worker",
+        workdir=None) is False
 
 
 def test_dispatch_guard_releases_after_sessiondb_finalization_hang(tmp_path):
