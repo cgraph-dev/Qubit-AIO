@@ -631,13 +631,9 @@ def _memory_provider_mem0(issues: list) -> None:
                         "Mem0 is set as memory provider but API key is missing", issues)
 
 
-# provider -> (checker, ImportError row, ImportError issue, label for "check failed")
-_MEMORY_PROVIDER_CHECKS = {
-    "honcho": (_memory_provider_honcho, ("honcho-ai not installed", "run qubit memory setup"),
-               "Honcho dependencies missing — run qubit memory setup, then restart Qubit", "Honcho"),
-    "mem0": (_memory_provider_mem0, ("Mem0 plugin not loadable", "run qubit memory setup"),
-             "Mem0 dependencies missing — run qubit memory setup, then restart Qubit", "Mem0"),
-}
+# provider -> (checker, ImportError row, ImportError issue, label for "check failed"); every provider
+# still bundled or catalog-installed uses the generic check.
+_MEMORY_PROVIDER_CHECKS: dict = {}
 
 
 def _memory_provider_generic(name: str) -> None:
