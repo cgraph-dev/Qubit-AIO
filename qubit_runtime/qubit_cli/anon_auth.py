@@ -50,6 +50,11 @@ ANON_SECRET_ENV = "HERMES_ANON_API_SECRET"
 # tier did not exist. ``guest_enabled`` is the only reader. Not a user preference: never written to
 # config.yaml or .env, never shown in setup. Deleted at GA together with this comment.
 GUEST_ONBOARDING_ENV = "HERMES_GUEST_ONBOARDING"
+# Preview cohort for the free tier's connector set, sent once on account creation so the account
+# service can record it on the account. Exactly "true" or "false" is sent as that boolean; anything
+# else (unset included) omits the field and the service applies its default. Self-reported and
+# baked into desktop bundles in plain text: the service must treat it as a preference, never proof.
+PREVIEW_FULL_CONNECTORS_ENV = "HERMES_PREVIEW_FULL_CONNECTORS"
 GUEST_MINT_TIMEOUT_SECONDS = 5.0
 # Copy shared by every surface that names the free tier (R-USR-1): never guest / anonymous / account.
 FREE_TIER_LABEL = "Qubit · free tier"
@@ -94,8 +99,11 @@ ANON_ACCOUNT_LOCKED = "anon_account_locked"    # dead, and no replacement is min
 ANON_CREDENTIAL_DEAD = "anon_credential_dead"  # reaped or claimed: replaced silently, once
 ANON_UNREACHABLE = "anon_unreachable"          # timeout, DNS, refused connection
 ANON_SERVER_ERROR = "anon_server_error"        # 5xx, non-JSON, malformed success body
+ANON_CHALLENGE_REQUIRED = "anon_challenge_required"  # a browser check is still pending (``anon_challenge``)
+ANON_SIGNIN_REQUIRED = "anon_signin_required"  # refused without an account, or a 428 this version can't run
 # Codes a later attempt cannot fix (for this process / this version).
-ANON_TERMINAL_CODES = frozenset({ANON_GATE_CLOSED, ANON_POW_REQUIRED, ANON_ACCOUNT_LOCKED})
+ANON_TERMINAL_CODES = frozenset({
+    ANON_GATE_CLOSED, ANON_POW_REQUIRED, ANON_ACCOUNT_LOCKED, ANON_SIGNIN_REQUIRED})
 # Codes that mean the account service itself is not answering: a sign-in (which goes through the
 # same service) cannot help either, so surfaces offer "try again" / "another provider" only.
 ANON_UNREACHABLE_CODES = frozenset({ANON_UNREACHABLE, ANON_SERVER_ERROR})
@@ -110,6 +118,10 @@ ANON_FAILURE_COPY = {
                        "Signing in is free and skips the wait.",
     ANON_POW_REQUIRED: "The Qubit server asked for a proof of work, but that isn't implemented in your "
                        "Agent yet. Sign in with a Qubit account to continue.",
+    # ``ANON_CHALLENGE_REQUIRED`` / ``ANON_SIGNIN_REQUIRED`` copy is upstream's verbatim: it names no
+    # product (no guest / anonymous / credential), so the hermes->qubit rebrand does not touch it.
+    ANON_CHALLENGE_REQUIRED: "Finish the quick check in your browser, then try again.",
+    ANON_SIGNIN_REQUIRED: "Free guest access isn't available here. Sign in with a Qubit account to continue.",
     ANON_ACCOUNT_LOCKED: f"This session can't continue without signing in. {_SIGNIN_IS_FREE}",
     ANON_CREDENTIAL_DEAD: "Your session ended. A new one starts on its own.",
     ANON_UNREACHABLE: "The Qubit service couldn't be reached. Check your internet connection and try again.",
@@ -270,7 +282,8 @@ def anon_secret() -> str:
 
 
 def _anon_headers() -> Dict[str, str]:
-    headers = {"content-type": "application/json"}
+    from qubit_cli.anon_challenge import user_agent
+    headers = {"content-type": "application/json", "user-agent": user_agent()}
     if secret := anon_secret():
         headers[ANON_SECRET_HEADER] = secret
     return headers
@@ -290,9 +303,13 @@ _NAS_REFUSALS: Dict[tuple, tuple] = {
     (429, None): (AuthError, ANON_RATE_LIMITED),
     (503, "temporarily_disabled"): (AuthError, ANON_GATE_PAUSED),
 }
+# An endpoint-specific verdict: builds the error from the refusal's JSON body.
+_Verdict = Callable[[Dict[str, Any]], AuthError]
 
 
-def _raise_for_anon_status(response: httpx.Response, *, action: str) -> Dict[str, Any]:
+def _raise_for_anon_status(
+    response: httpx.Response, *, action: str, overrides: Optional[Dict[tuple, _Verdict]] = None,
+) -> Dict[str, Any]:
     try:
         payload = response.json()
     except ValueError:
@@ -305,6 +322,11 @@ def _raise_for_anon_status(response: httpx.Response, *, action: str) -> Dict[str
         return payload
     if error.startswith("pow_"):
         error = "pow_"  # pow_required / pow_invalid / pow_replayed are one verdict
+    # An endpoint's own verdicts (same keys as ``_NAS_REFUSALS``) win over the table.
+    if overrides:
+        build = overrides.get((status, error)) or overrides.get((status, None))
+        if build:
+            raise build(payload)
     cls, code = (_NAS_REFUSALS.get((status, error)) or _NAS_REFUSALS.get((status, None))
                  or ((AuthError, ANON_POW_REQUIRED) if error == "pow_" else (AuthError, ANON_SERVER_ERROR)))
     if code == ANON_SERVER_ERROR:
@@ -314,9 +336,17 @@ def _raise_for_anon_status(response: httpx.Response, *, action: str) -> Dict[str
               retryable=code not in ANON_TERMINAL_CODES)
 
 
+def mint_request_body() -> Dict[str, Any]:
+    """The ``/api/anonymous/create`` body: ``{"preview_full_connectors": bool}`` when the env var is
+    exactly ``true`` / ``false``, else ``{}``."""
+    raw = (os.environ.get(PREVIEW_FULL_CONNECTORS_ENV) or "").strip()
+    return {"preview_full_connectors": raw == "true"} if raw in ("true", "false") else {}
+
+
 def mint_guest(client: httpx.Client, portal_base_url: str) -> Dict[str, Any]:
     """``POST /api/anonymous/create`` -> ``{user_id, org_id, token, idle_ttl_days}``. Token shown once."""
-    response = client.post(f"{portal_base_url.rstrip('/')}/api/anonymous/create", headers=_anon_headers(), json={})
+    response = client.post(
+        f"{portal_base_url.rstrip('/')}/api/anonymous/create", headers=_anon_headers(), json=mint_request_body())
     payload = _raise_for_anon_status(response, action="sign-up")
     token = payload.get("token")
     if not isinstance(token, str) or not token.startswith("anon_"):
@@ -325,17 +355,41 @@ def mint_guest(client: httpx.Client, portal_base_url: str) -> Dict[str, Any]:
     return payload
 
 
-def exchange_anon_jwt(client: httpx.Client, portal_base_url: str, anon_token: str) -> Dict[str, Any]:
+def exchange_anon_jwt(
+    client: httpx.Client, portal_base_url: str, anon_token: str, *, auth_state: Dict[str, Any],
+) -> Dict[str, Any]:
     """``POST /api/anonymous/token {token}`` -> ``{access_token, expires_in, inference_base_url, ...}``.
 
-    Raises :class:`AnonCredentialDead` on 404 ``unknown_token`` / 401 (reaped or claimed).
+    Raises :class:`AnonCredentialDead` on 404 ``unknown_token`` / 401 (reaped or claimed), and
+    :class:`~qubit_cli.anon_challenge.AnonChallengeRequired` (carrying what the status poll needs:
+    portal, credential, and the *auth_state* whose ``tls`` block the mint used) on a browser challenge.
     """
+    from qubit_cli import anon_challenge
     response = client.post(
-        f"{portal_base_url.rstrip('/')}/api/anonymous/token", headers=_anon_headers(), json={"token": anon_token})
-    payload = _raise_for_anon_status(response, action="token exchange")
+        f"{portal_base_url.rstrip('/')}/api/anonymous/token", headers=_anon_headers(),
+        json={"token": anon_token, "client": anon_challenge.client_info()})
+
+    def challenge(body: Dict[str, Any]) -> AuthError:
+        return anon_challenge.challenge_error(
+            body, portal_base_url=portal_base_url, anon_token=anon_token, auth_state=auth_state)
+
+    def signin(body: Dict[str, Any]) -> AuthError:
+        # Refused without an account, or a 428 this version has no primitive for: either way the
+        # honest way forward is a sign-in, in the service's own words when it sent some.
+        return anon_challenge.signin_required_error(body.get("message"))
+
+    def proof_of_work(_body: Dict[str, Any]) -> AuthError:
+        # The PoW verdict, kept out of the 428 sign-in catch-all below.
+        return _anon_err(ANON_FAILURE_COPY[ANON_POW_REQUIRED], ANON_POW_REQUIRED)
+
+    # The challenge gate sits on the token exchange only; every other endpoint keeps the table.
+    payload = _raise_for_anon_status(response, action="token exchange", overrides={
+        (428, "challenge_required"): challenge, (428, "pow_"): proof_of_work, (428, None): signin,
+        (403, "signin_required"): signin, (403, "access_denied"): signin})
     if not isinstance(payload.get("access_token"), str) or not payload["access_token"]:
         logger.info("Qubit free tier token exchange returned no token")
         raise _anon_err(ANON_FAILURE_COPY[ANON_SERVER_ERROR], ANON_SERVER_ERROR)
+    anon_challenge.note_optional_challenges(payload, portal_base_url)
     return payload
 
 
@@ -591,7 +645,8 @@ def refresh_guest_state(state: Dict[str, Any], client: httpx.Client) -> None:
     if not isinstance(anon_token, str) or not anon_token:
         raise AnonCredentialDead(ANON_FAILURE_COPY[ANON_CREDENTIAL_DEAD], code=ANON_CREDENTIAL_DEAD)
     from qubit_cli.auth import _nous_portal_base_url
-    apply_exchange_to_state(state, exchange_anon_jwt(client, _nous_portal_base_url(state), anon_token))
+    apply_exchange_to_state(state, exchange_anon_jwt(
+        client, _nous_portal_base_url(state), anon_token, auth_state=state))
 
 
 def clear_dead_guest(reason: str, *, dead_token: Optional[str] = None) -> None:
