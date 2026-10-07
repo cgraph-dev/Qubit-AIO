@@ -12,8 +12,9 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import time
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -570,3 +571,110 @@ def update_tree_job() -> int:
         raise ctypes.WinError(error)
     _JOBS.append(job)  # never closed: the handle closes when this process dies, killing the tree
     return job
+
+
+# --- the marker mutex (A7 rule 1) -------------------------------------------------------------
+
+MUTEX_SUFFIX = ".lock"
+# Bounded wait for the sidecar: holders never run git/builds/network inside it.
+MUTEX_WAIT_SECONDS = 10.0
+
+
+class MarkerBusy(OSError):
+    """The marker mutex stayed held past :data:`MUTEX_WAIT_SECONDS`: report busy."""
+
+
+_MUTEX_HELD = threading.local()
+
+
+def marker_mutex_path(path: Path) -> Path:
+    """``<marker>.lock``: the sidecar every marker MUTATION holds a kernel lock on. Never deleted
+    (deleting it would split the lock across two inodes)."""
+    return path.with_name(path.name + MUTEX_SUFFIX)
+
+
+def _windows_open_exclusive(path: Path):
+    """The Windows sidecar mutex: the file opened with NO sharing (``FileShare.None`` in the
+    PowerShell scripts, ``share_mode(0)`` in marker.rs). ``None`` = someone else has it open."""
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                                     wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    kernel32.CreateFileW.restype = wintypes.HANDLE
+    invalid = ctypes.c_void_p(-1).value
+    for access, disposition in ((0xC0000000, 4), (0x80000000, 3)):  # RW OPEN_ALWAYS; R OPEN_EXISTING
+        handle = kernel32.CreateFileW(str(path), access, 0, None, disposition, 0x80, None)
+        if handle and handle != invalid:
+            return handle
+        error = ctypes.get_last_error()
+        if error == 32:  # ERROR_SHARING_VIOLATION: held
+            return None
+        if error != 5:  # anything but access denied: no read-only retry helps
+            break
+    raise ctypes.WinError(error)
+
+
+def _windows_close(handle) -> None:
+    import ctypes
+
+    ctypes.WinDLL("kernel32").CloseHandle(handle)
+
+
+def _mutex_acquire(path: Path, wait: float):
+    deadline = time.monotonic() + wait
+    if sys.platform == "win32":
+        while True:
+            handle = _windows_open_exclusive(path)
+            if handle is not None:
+                return handle
+            if time.monotonic() >= deadline:
+                raise MarkerBusy(f"{path} is held by another update")
+            time.sleep(0.02)
+    import fcntl
+
+    try:
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+    except PermissionError:
+        fd = os.open(path, os.O_RDONLY)  # flock works on a read-only fd (root-owned sidecar)
+    try:
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return fd
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise MarkerBusy(f"{path} is held by another update") from None
+                time.sleep(0.02)
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+@contextmanager
+def marker_mutex(path: Path, *, wait: float = MUTEX_WAIT_SECONDS):
+    """Hold the kernel lock on ``<marker>.lock`` (A7 rule 1): read -> judge -> mutate of the marker
+    at ``path`` happens entirely inside. Re-entrant per thread; the kernel releases it if we die.
+    Raises :class:`MarkerBusy` after ``wait`` seconds, ``OSError`` when it cannot be opened."""
+    key = str(marker_mutex_path(path))
+    held = getattr(_MUTEX_HELD, "keys", None)
+    if held is None:
+        held = _MUTEX_HELD.keys = {}
+    if held.get(key):
+        held[key] += 1
+        try:
+            yield
+        finally:
+            held[key] -= 1
+        return
+    handle = _mutex_acquire(Path(key), wait)
+    held[key] = 1
+    try:
+        yield
+    finally:
+        held.pop(key, None)
+        if sys.platform == "win32":
+            _windows_close(handle)
+        else:
+            os.close(handle)  # closing the only fd of this open file description drops the flock
