@@ -25,7 +25,7 @@ def _running_venv_site_packages() -> Path:
 
 def _physical_repo_root(tmp_path: Path) -> Path:
     """Create the physical repo checkout directory for junction tests."""
-    physical_root = tmp_path / "physical-home" / "qubit"
+    physical_root = tmp_path / "physical-home" / "hermes-agent"
     physical_root.mkdir(parents=True)
     return physical_root
 
@@ -44,7 +44,7 @@ DISCORD_AUTO_THREAD SLACK_HOME_CHANNEL SLACK_HOME_CHANNEL_NAME SLACK_ALLOWED_USE
 WHATSAPP_ENABLED WHATSAPP_MODE WHATSAPP_ALLOWED_USERS SIGNAL_HTTP_URL SIGNAL_ACCOUNT
 SIGNAL_ALLOWED_USERS SIGNAL_GROUP_ALLOWED_USERS SIGNAL_HOME_CHANNEL SIGNAL_HOME_CHANNEL_NAME
 SIGNAL_IGNORE_STORIES HASS_TOKEN HASS_URL EMAIL_ADDRESS EMAIL_PASSWORD EMAIL_IMAP_HOST
-EMAIL_SMTP_HOST EMAIL_HOME_ADDRESS EMAIL_HOME_ADDRESS_NAME QUBIT_DASHBOARD_SESSION_TOKEN
+EMAIL_SMTP_HOST EMAIL_HOME_ADDRESS EMAIL_HOME_ADDRESS_NAME HERMES_DASHBOARD_SESSION_TOKEN
 GATEWAY_ALLOWED_USERS GATEWAY_ALLOW_ALL_USERS GH_TOKEN GITHUB_APP_ID
 GITHUB_APP_PRIVATE_KEY_PATH GITHUB_APP_INSTALLATION_ID MODAL_TOKEN_ID MODAL_TOKEN_SECRET
 DAYTONA_API_KEY VERCEL_OIDC_TOKEN VERCEL_TOKEN VERCEL_PROJECT_ID VERCEL_TEAM_ID GATEWAY_RELAY_ID
@@ -125,9 +125,9 @@ def test_force_prefix_is_not_plugin_passthrough(child_env, monkeypatch, builder,
     assert not is_env_passthrough("AUXILIARY_VISION_API_KEY")
     assert is_env_passthrough("SERVICE_TOKEN")
     monkeypatch.setenv("OPENAI_API_KEY", "fake-parent")
-    monkeypatch.setenv("_QUBIT_FORCE_OPENAI_API_KEY", "base-forced")
-    extra = {"_QUBIT_FORCE_OPENAI_BASE_URL": "extra-forced",
-             "_QUBIT_FORCE_AUXILIARY_VISION_API_KEY": "never-forward",
+    monkeypatch.setenv("_HERMES_FORCE_OPENAI_API_KEY", "base-forced")
+    extra = {"_HERMES_FORCE_OPENAI_BASE_URL": "extra-forced",
+             "_HERMES_FORCE_AUXILIARY_VISION_API_KEY": "never-forward",
              "AUXILIARY_VISION_API_KEY": "never-forward", "MY_CUSTOM_VAR": "caller-value"}
     factories = {
         "foreground": lambda: local._make_run_env(extra),
@@ -140,7 +140,7 @@ def test_force_prefix_is_not_plugin_passthrough(child_env, monkeypatch, builder,
     assert result.get("OPENAI_BASE_URL") == extra_force
     assert result["MY_CUSTOM_VAR"] == "caller-value"
     assert "AUXILIARY_VISION_API_KEY" not in result
-    assert not any(k.startswith("_QUBIT_FORCE_") for k in result)
+    assert not any(k.startswith("_HERMES_FORCE_") for k in result)
     # Even a buggy plugin hook cannot bypass dynamic-secret exclusion.
     with patch("tools.env_passthrough.is_env_passthrough", return_value=True):
         assert "AUXILIARY_VISION_API_KEY" not in factories[builder]()
@@ -263,7 +263,7 @@ def test_launcher_alias_provenance(child_env, monkeypatch, link_at, profile):
     from qubit_cli.gateway_windows import _preserve_qubit_home_path
     from qubit_cli.profiles import resolve_profile_env
     physical_home = child_env / "physical-home"
-    physical_root = physical_home / "qubit"
+    physical_root = physical_home / "hermes-agent"
     physical_root.mkdir(parents=True)
     configured = child_env / "configured-home"
     if link_at == "home":
@@ -271,14 +271,14 @@ def test_launcher_alias_provenance(child_env, monkeypatch, link_at, profile):
     else:
         configured.mkdir()
         if link_at == "repo":
-            _make_directory_link(configured / "qubit", physical_root)
+            _make_directory_link(configured / "hermes-agent", physical_root)
         else:
-            (configured / "qubit").mkdir()
+            (configured / "hermes-agent").mkdir()
     (configured / "profiles/coder").mkdir(parents=True)
     (configured / "profiles/coder/config.yaml").write_text("{}\n", encoding="utf-8")
-    unrelated = child_env / "user-tools/qubit"
+    unrelated = child_env / "user-tools/hermes-agent"
     unrelated.mkdir(parents=True)
-    lexical_root = configured / "qubit"
+    lexical_root = configured / "hermes-agent"
     monkeypatch.setenv("QUBIT_HOME", str(configured))
     assert Path(resolve_profile_env("default")) == configured
     assert Path(resolve_profile_env("coder")) == configured / "profiles/coder"
@@ -293,7 +293,7 @@ def test_launcher_alias_provenance(child_env, monkeypatch, link_at, profile):
     pp._strip_qubit_owned_pythonpath(env)
     assert env["PYTHONPATH"].split(os.pathsep) == (entries if link_at == "unrelated" else entries[1:])
     if profile:
-        assert active_home / "qubit" not in aliases
+        assert active_home / "hermes-agent" not in aliases
 
 
 @pytest.mark.parametrize("has_facts", [True, False])
@@ -343,7 +343,7 @@ def test_qubit_bin_resolution_and_unresolved_noop(child_env, monkeypatch):
     bin_dir = child_env / "bin"
     bin_dir.mkdir()
     monkeypatch.setattr(local, "_QUBIT_BIN_DIR", local._SENTINEL)
-    monkeypatch.setattr(local.shutil, "which", lambda name: str(bin_dir / "qubit") if name == "qubit" else None)
+    monkeypatch.setattr(local.shutil, "which", lambda name: str(bin_dir / "hermes") if name == "hermes" else None)
     assert local._resolve_qubit_bin_dir() == str(bin_dir)
     monkeypatch.setattr(local, "_QUBIT_BIN_DIR", None)
     assert local._prepend_qubit_bin_dir("/usr/bin") == "/usr/bin"
@@ -403,14 +403,14 @@ class TestNativeEnvironmentContracts:
 
         venv_sp = str(_running_site())
         # Windows form: C:\...\venv\Lib\site-packages (backslashes)
-        qubit_win = venv_sp
+        hermes_win = venv_sp
         user_win = "D:\\\\user\\\\lib"
         env = {
-            "PYTHONPATH": ";".join([qubit_win, user_win]),
+            "PYTHONPATH": ";".join([hermes_win, user_win]),
         }
         _strip_qubit_owned_pythonpath(env)
         entries = env["PYTHONPATH"].split(";")
-        assert qubit_win not in entries
+        assert hermes_win not in entries
         assert user_win in entries
 
     def test_empty_pythonpath_unchanged(self):
@@ -462,7 +462,7 @@ class TestNativeEnvironmentContracts:
         import tools.environments.local as local
         from tools.environments import local_pythonpath
 
-        repo_root = tmp_path / "qubit"
+        repo_root = tmp_path / "hermes-agent"
         runtime_venv = repo_root / "venv"
         runtime_sp = runtime_venv / "Lib" / "site-packages"
         runtime_sp.mkdir(parents=True)
@@ -492,7 +492,7 @@ class TestNativeEnvironmentContracts:
         import tools.environments.local as local
         from tools.environments import local_pythonpath
 
-        repo_root = tmp_path / "qubit"
+        repo_root = tmp_path / "hermes-agent"
         repo_root.mkdir()
         unrelated_venv = tmp_path / "user-venv"
         unrelated_sp = unrelated_venv / "Lib" / "site-packages"
@@ -598,7 +598,7 @@ class TestNativeEnvironmentContracts:
         def _mock_handle_function_call(function_name, function_args, task_id=None, user_task=None):
             return '{"output": "mock", "exit_code": 0}'
 
-        qubit_root = str(Path(cet.__file__).resolve().parents[1])
+        hermes_root = str(Path(cet.__file__).resolve().parents[1])
         venv_sp = str(_running_venv_site_packages())
         user_a = "/home/user/my-lib"
         user_b = "/opt/project/lib"
@@ -629,7 +629,7 @@ class TestNativeEnvironmentContracts:
              patch("subprocess.Popen", side_effect=_fake_popen), \
              patch.dict(os.environ, {
                  "PYTHONPATH": os.pathsep.join(
-                     [qubit_root, venv_sp, user_a, user_b]),
+                     [hermes_root, venv_sp, user_a, user_b]),
              }):
             execute_code(code="pass", task_id="test-int", enabled_tools=[])
 
@@ -644,7 +644,7 @@ class TestNativeEnvironmentContracts:
         # composition contract (identity on POSIX).
         norm_parts = [os.path.normcase(p) for p in parts]
         norm_staging = os.path.normcase(captured["staging"])
-        norm_root = os.path.normcase(qubit_root)
+        norm_root = os.path.normcase(hermes_root)
         norm_venv = os.path.normcase(venv_sp)
         norm_user_a = os.path.normcase(user_a)
         norm_user_b = os.path.normcase(user_b)
@@ -725,7 +725,7 @@ class TestNativeEnvironmentContracts:
             configured_home,
         )
 
-        assert launcher_entry == configured_home / "qubit"
+        assert launcher_entry == configured_home / "hermes-agent"
         assert launcher_entry in aliases
 
         monkeypatch.setattr(local, "_qubit_repo_root_aliases", aliases)
@@ -759,7 +759,7 @@ class TestNativeEnvironmentContracts:
         from qubit_cli.profiles import resolve_profile_env
 
         physical_home = tmp_path / "physical-home"
-        physical_root = physical_home / "qubit"
+        physical_root = physical_home / "hermes-agent"
         physical_root.mkdir(parents=True)
         (physical_home / "profiles" / "coder").mkdir(parents=True)
         (physical_home / "profiles" / "coder" / "config.yaml").write_text("{}\n")  # identity marker
@@ -771,7 +771,7 @@ class TestNativeEnvironmentContracts:
 
         # Launcher contract: the configured spelling is the env and the root.
         monkeypatch.setenv("QUBIT_HOME", str(configured_home))
-        lexical_root = configured_home / "qubit"
+        lexical_root = configured_home / "hermes-agent"
 
         # Profile re-home keeps the configured spelling (physically identical
         # through the link; lexically the launcher spelling is preserved).
@@ -794,7 +794,7 @@ class TestNativeEnvironmentContracts:
 
     def test_repo_level_junction_recovers_lexical_alias(self, tmp_path, monkeypatch):
         """The repo itself may be a junction under the configured root
-        (e.g. D:\\qubit\\qubit -> C:\\...\\qubit) while the
+        (e.g. D:\\qubit\\hermes-agent -> C:\\...\\hermes-agent) while the
         editable import spelling resolves to the physical location.  The
         alias builder must recover the lexical spelling via exact-identity
         proof (strict resolve), not a name-based guess.
@@ -805,13 +805,13 @@ class TestNativeEnvironmentContracts:
         physical_root = _physical_repo_root(tmp_path)
         configured_home = tmp_path / "configured-home"
         configured_home.mkdir()
-        # repo-level link: <configured-home>/qubit -> physical repo
+        # repo-level link: <configured-home>/hermes-agent -> physical repo
         try:
-            _make_directory_link(configured_home / "qubit", physical_root)
+            _make_directory_link(configured_home / "hermes-agent", physical_root)
         except OSError as exc:
             pytest.skip(f"directory link unavailable on this host: {exc}")
 
-        lexical_root = configured_home / "qubit"
+        lexical_root = configured_home / "hermes-agent"
         aliases = local_pythonpath._build_qubit_repo_root_aliases(
             physical_root.resolve(),
             physical_root,
@@ -835,8 +835,8 @@ class TestNativeEnvironmentContracts:
 
         physical_root = _physical_repo_root(tmp_path)
         configured_home = tmp_path / "configured-home"
-        (configured_home / "qubit").mkdir(parents=True)
-        unrelated = tmp_path / "user-tools" / "qubit"
+        (configured_home / "hermes-agent").mkdir(parents=True)
+        unrelated = tmp_path / "user-tools" / "hermes-agent"
         unrelated.mkdir(parents=True)
 
         aliases = local_pythonpath._build_qubit_repo_root_aliases(
@@ -844,18 +844,18 @@ class TestNativeEnvironmentContracts:
             physical_root,
             configured_home,
         )
-        for lookalike in (configured_home / "qubit", unrelated):
+        for lookalike in (configured_home / "hermes-agent", unrelated):
             assert not any(local_pythonpath._same_path(a, lookalike) for a in aliases)
 
         monkeypatch.setattr(local, "_qubit_repo_root_aliases", aliases)
-        for lookalike in (configured_home / "qubit", unrelated):
+        for lookalike in (configured_home / "hermes-agent", unrelated):
             env = {"PYTHONPATH": os.pathsep.join([str(lookalike), "/home/user/my-lib"])}
             local_pythonpath._strip_qubit_owned_pythonpath(env)
             assert env["PYTHONPATH"].split(os.pathsep) == [str(lookalike), "/home/user/my-lib"]
 
     def test_profile_home_with_repo_level_junction(self, tmp_path, monkeypatch):
         """Profile re-home + repo-level junction together: the configured home
-        is <root>/profiles/<name> while the repo is a link at <root>/qubit.
+        is <root>/profiles/<name> while the repo is a link at <root>/hermes-agent.
         The root spelling must be derived (profiles -> grandparent) and then
         the lexical repo alias recovered from it.
         """
@@ -866,19 +866,19 @@ class TestNativeEnvironmentContracts:
         configured_root = tmp_path / "configured-root"
         (configured_root / "profiles" / "coder").mkdir(parents=True)
         try:
-            _make_directory_link(configured_root / "qubit", physical_root)
+            _make_directory_link(configured_root / "hermes-agent", physical_root)
         except OSError as exc:
             pytest.skip(f"directory link unavailable on this host: {exc}")
 
         configured_home = configured_root / "profiles" / "coder"
-        lexical_root = configured_root / "qubit"
+        lexical_root = configured_root / "hermes-agent"
         aliases = local_pythonpath._build_qubit_repo_root_aliases(
             physical_root.resolve(),
             physical_root,
             configured_home,
         )
         assert any(local_pythonpath._same_path(a, lexical_root) for a in aliases)
-        assert not any(local_pythonpath._same_path(a, configured_home / "qubit") for a in aliases)
+        assert not any(local_pythonpath._same_path(a, configured_home / "hermes-agent") for a in aliases)
 
         monkeypatch.setattr(local, "_qubit_repo_root_aliases", aliases)
         env = {"PYTHONPATH": os.pathsep.join([str(lexical_root), "/home/user/my-lib"])}
@@ -901,11 +901,11 @@ class TestNativeEnvironmentContracts:
         configured_home = tmp_path / "configured-home"
         configured_home.mkdir()
         try:
-            _make_directory_link(configured_home / "qubit", physical_root)
+            _make_directory_link(configured_home / "hermes-agent", physical_root)
         except OSError as exc:
             pytest.skip(f"directory link unavailable on this host: {exc}")
 
-        lexical_root = configured_home / "qubit"
+        lexical_root = configured_home / "hermes-agent"
         aliases = local_pythonpath._build_qubit_repo_root_aliases(
             physical_root.resolve(),
             physical_root,
@@ -957,7 +957,7 @@ class TestPythonhomeSanitized:
         seed = {
             "PATH": "/usr/bin:/bin",
             "HOME": "/home/user",
-            "PYTHONHOME": "/opt/qubit-venv",
+            "PYTHONHOME": "/opt/hermes-venv",
         }
         with patch.dict(os.environ, seed, clear=True):
             if builder == "_make_run_env":
@@ -984,13 +984,13 @@ class TestPythonhomeSanitized:
         base = {
             "PATH": "/usr/bin:/bin",
             "HOME": "/home/user",
-            "PYTHONHOME": "/opt/qubit-venv",
-            "VIRTUAL_ENV": "/opt/qubit-venv",
+            "PYTHONHOME": "/opt/hermes-venv",
+            "VIRTUAL_ENV": "/opt/hermes-venv",
             "SERVICE_TOKEN": "s3cr3t",
         }
         result = build_subprocess_env(base, scrub_secrets=False)
-        assert result.get("PYTHONHOME") == "/opt/qubit-venv"
-        assert result.get("VIRTUAL_ENV") == "/opt/qubit-venv"
+        assert result.get("PYTHONHOME") == "/opt/hermes-venv"
+        assert result.get("VIRTUAL_ENV") == "/opt/hermes-venv"
         assert result.get("SERVICE_TOKEN") == "s3cr3t"
 
 
@@ -1157,7 +1157,7 @@ class TestBlocklistCoverage:
             "EMAIL_SMTP_HOST",
             "EMAIL_HOME_ADDRESS",
             "EMAIL_HOME_ADDRESS_NAME",
-            "QUBIT_DASHBOARD_SESSION_TOKEN",
+            "HERMES_DASHBOARD_SESSION_TOKEN",
             "GATEWAY_ALLOWED_USERS",
             "GH_TOKEN",
             "GITHUB_APP_ID",
@@ -1180,8 +1180,8 @@ class TestSanePathIncludesHomebrew:
     @pytest.fixture(autouse=True)
     def _disable_qubit_bin_injection(self):
         """These tests assert the sane-path merge in isolation. Disable the
-        qubit-install-dir prepend (a separate concern, covered by
-        TestQubitBinDirOnPath) so a real ``qubit`` on the test runner's PATH
+        hermes-install-dir prepend (a separate concern, covered by
+        TestHermesBinDirOnPath) so a real ``qubit`` on the test runner's PATH
         doesn't shift the asserted PATH layout."""
         from tools.environments import local as local_mod
         saved = local_mod._QUBIT_BIN_DIR

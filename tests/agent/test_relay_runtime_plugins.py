@@ -295,8 +295,8 @@ def test_legacy_exporter_env_without_plugins_toml_warns_and_stays_disabled(
     caplog,
 ):
     monkeypatch.delenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, raising=False)
-    monkeypatch.setenv("QUBIT_NEMO_RELAY_ATOF_ENABLED", "1")
-    monkeypatch.setenv("QUBIT_NEMO_RELAY_ATIF_EXPORT_TIMEOUT_S", "30")
+    monkeypatch.setenv("HERMES_NEMO_RELAY_ATOF_ENABLED", "1")
+    monkeypatch.setenv("HERMES_NEMO_RELAY_ATIF_EXPORT_TIMEOUT_S", "30")
     relay = _FakeRelay()
 
     with caplog.at_level("WARNING"):
@@ -309,8 +309,8 @@ def test_legacy_exporter_env_without_plugins_toml_warns_and_stays_disabled(
             is relay_runtime._RelayPluginConfigurationState.DISABLED
         )
         assert relay.events == []
-        assert "QUBIT_NEMO_RELAY_ATOF_ENABLED" in caplog.text
-        assert "QUBIT_NEMO_RELAY_ATIF_EXPORT_TIMEOUT_S" in caplog.text
+        assert "HERMES_NEMO_RELAY_ATOF_ENABLED" in caplog.text
+        assert "HERMES_NEMO_RELAY_ATIF_EXPORT_TIMEOUT_S" in caplog.text
     finally:
         host.shutdown()
 
@@ -799,7 +799,7 @@ def test_session_close_does_not_flush_during_concurrent_managed_publication(
 
     event_loop_thread = threading.Thread(
         target=run_on_event_loop_thread,
-        name="qubit-relay-session-close-regression",
+        name="hermes-relay-session-close-regression",
         daemon=True,
     )
     event_loop_thread.start()

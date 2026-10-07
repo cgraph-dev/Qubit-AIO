@@ -110,8 +110,8 @@ def _make_execute_only_env(forward_env=None):
     # Base class attributes needed by unified execute()
     env._session_id = "test123"
     env._snapshot_path = "/tmp/hermes-snap-test123.sh"
-    env._cwd_file = "/tmp/qubit-cwd-test123.txt"
-    env._cwd_marker = "__QUBIT_CWD_test123__"
+    env._cwd_file = "/tmp/hermes-cwd-test123.txt"
+    env._cwd_marker = "__HERMES_CWD_test123__"
     env._snapshot_ready = True
     env._last_sync_time = None
     env._init_env_args = []
@@ -155,7 +155,7 @@ def test_init_env_args_uses_qubit_dotenv_for_empty_shell_env(monkeypatch):
 
     Regression: the disk fallback used to fire only on `value is None`, so a
     present-but-empty `MY_SECRET=""` skipped it and was forwarded as `-e
-    MY_SECRET=`, clobbering the correct value sitting in ~/.qubit/.env.
+    MY_SECRET=`, clobbering the correct value sitting in ~/.hermes/.env.
     """
     env = _make_execute_only_env(["MY_SECRET"])
 
@@ -356,7 +356,7 @@ def test_egress_node_options_overrides_conflicting_ca_flag(monkeypatch):
     monkeypatch.setattr(docker_env, "find_docker", lambda: "/usr/bin/docker")
     monkeypatch.setattr(
         docker_env, "_egress_proxy_args_for_docker",
-        lambda: ([], {"_QUBIT_EGRESS_NODE_OPTIONS_APPEND": "--use-openssl-ca"}, []),
+        lambda: ([], {"_HERMES_EGRESS_NODE_OPTIONS_APPEND": "--use-openssl-ca"}, []),
     )
     calls = _mock_subprocess_run(monkeypatch)
 
@@ -527,9 +527,9 @@ def _labels_in_run_args(run_args):
 
 
 def test_run_command_tags_qubit_agent_label(monkeypatch):
-    """Every container qubit starts must carry the qubit=1 label
+    """Every container hermes-agent starts must carry the hermes-agent=1 label
     so the orphan reaper (and external operators) can identify them with a
-    single ``docker ps --filter label=qubit=1`` call. Regression test
+    single ``docker ps --filter label=hermes-agent=1`` call. Regression test
     for issue #20561 — without the label there is no global sweep target."""
     monkeypatch.setattr(docker_env, "find_docker", lambda: "/usr/bin/docker")
     calls = _mock_subprocess_run(monkeypatch)
@@ -537,8 +537,8 @@ def test_run_command_tags_qubit_agent_label(monkeypatch):
     _make_dummy_env(task_id="my-task")
 
     labels = _labels_in_run_args(_run_args_from_calls(calls))
-    assert "qubit=1" in labels, (
-        f"qubit=1 label missing; got labels: {sorted(labels)}"
+    assert "hermes-agent=1" in labels, (
+        f"hermes-agent=1 label missing; got labels: {sorted(labels)}"
     )
 
 
@@ -570,7 +570,7 @@ def test_run_command_sanitizes_unsafe_task_id(monkeypatch):
 
     labels = _labels_in_run_args(_run_args_from_calls(calls))
     # Each non-OK character becomes an underscore; the safe chars survive.
-    assert "qubit-task-id=task_with_weird_chars" in labels, (
+    assert "hermes-task-id=task_with_weird_chars" in labels, (
         f"sanitized task-id label missing; got: {sorted(labels)}"
     )
 
@@ -691,9 +691,9 @@ def test_shared_container_key_replaces_profile_identity(monkeypatch):
 
     # Deterministic across processes/profiles, not the profile label, and
     # digest-suffixed (label sanitization alone is lossy).
-    assert a._labels["qubit-profile"] == b._labels["qubit-profile"]
-    assert a._labels["qubit-profile"] != "research"
-    assert a._labels["qubit-profile"].startswith("team_workspace-")
+    assert a._labels["hermes-profile"] == b._labels["hermes-profile"]
+    assert a._labels["hermes-profile"] != "research"
+    assert a._labels["hermes-profile"].startswith("team_workspace-")
 
 
 def test_distinct_shared_keys_never_collide(monkeypatch):
@@ -707,17 +707,17 @@ def test_distinct_shared_keys_never_collide(monkeypatch):
     # Sanitize-collision pair: both stems clean to "team_workspace".
     a = _make_dummy_env(task_id="abc", shared_container_key="team/workspace")
     b = _make_dummy_env(task_id="abc", shared_container_key="team_workspace")
-    assert a._labels["qubit-profile"] != b._labels["qubit-profile"]
+    assert a._labels["hermes-profile"] != b._labels["hermes-profile"]
 
     # Truncation pair: identical first 63 chars, differ after.
     long_a = "x" * 70 + "A"
     long_b = "x" * 70 + "B"
     c = _make_dummy_env(task_id="abc", shared_container_key=long_a)
     d = _make_dummy_env(task_id="abc", shared_container_key=long_b)
-    assert c._labels["qubit-profile"] != d._labels["qubit-profile"]
+    assert c._labels["hermes-profile"] != d._labels["hermes-profile"]
     # Both stay within Docker's 63-char label-value bound.
-    assert len(c._labels["qubit-profile"]) <= 63
-    assert len(d._labels["qubit-profile"]) <= 63
+    assert len(c._labels["hermes-profile"]) <= 63
+    assert len(d._labels["hermes-profile"]) <= 63
 
 
 def test_empty_shared_container_key_preserves_profile_isolation(monkeypatch):
@@ -727,7 +727,7 @@ def test_empty_shared_container_key_preserves_profile_isolation(monkeypatch):
 
     env = _make_dummy_env(task_id="abc", shared_container_key="")
 
-    assert env._labels["qubit-profile"] == "research"
+    assert env._labels["hermes-profile"] == "research"
 
 
 # ── Cross-process container reuse (issue #20561) ──────────────────
@@ -816,7 +816,7 @@ def test_egress_enabled_does_not_reuse_pre_egress_container(monkeypatch):
         docker_env,
         "_egress_proxy_args_for_docker",
         lambda: (
-            ["-v", "/tmp/ca:/etc/ssl/certs/qubit-egress-ca.crt:ro"],
+            ["-v", "/tmp/ca:/etc/ssl/certs/hermes-egress-ca.crt:ro"],
             {"HTTPS_PROXY": "http://host.docker.internal:9090"},
             ["--add-host", "host.docker.internal:host-gateway"],
         ),
@@ -832,7 +832,7 @@ def test_egress_enabled_does_not_reuse_pre_egress_container(monkeypatch):
             if sub == "ps":
                 # Simulate an old pre-egress container: without the egress label
                 # filter it would match; with the filter Docker returns no match.
-                assert any(str(part).startswith("label=qubit-egress=") for part in cmd)
+                assert any(str(part).startswith("label=hermes-egress=") for part in cmd)
                 return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
             if sub == "run":
                 return subprocess.CompletedProcess(cmd, 0, stdout="fresh-cid\n", stderr="")
@@ -878,7 +878,7 @@ def test_reuse_probe_format_is_podman_compatible(monkeypatch):
                             stderr="Error: can't evaluate field Label in type struct",
                         )
                     assert any(
-                        str(part) == "label=qubit-egress=off" for part in cmd
+                        str(part) == "label=hermes-egress=off" for part in cmd
                     ), "egress=off posture must be expressed as a label filter"
                     return subprocess.CompletedProcess(
                         cmd, 0, stdout="podman-cid\trunning\n", stderr="",
@@ -1519,7 +1519,7 @@ def test_s6_image_skips_docker_init_and_mounts_run_exec(monkeypatch):
     monkeypatch.setattr(docker_env, "find_docker", lambda: "/usr/bin/docker")
     calls = _mock_subprocess_run_with_entrypoint(monkeypatch, '["/init"]')
 
-    _make_dummy_env(image="qubit:latest")
+    _make_dummy_env(image="hermes-agent:latest")
 
     run_calls = [c for c in calls if isinstance(c[0], list) and len(c[0]) >= 2 and c[0][1] == "run"]
     assert run_calls, "docker run should have been called"

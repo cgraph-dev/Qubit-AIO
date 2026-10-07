@@ -253,7 +253,7 @@ class TestMoaAggregatorSharedResolution:
     def _write_moa_config(tmp_path, monkeypatch, default_preset="opus-gpt"):
         import qubit_yaml as yaml
 
-        home = tmp_path / ".qubit"
+        home = tmp_path / ".hermes"
         home.mkdir(exist_ok=True)
         (home / "config.yaml").write_text(
             yaml.safe_dump(
@@ -274,11 +274,11 @@ class TestMoaAggregatorSharedResolution:
                             "nous-mix": {
                                 "enabled": True,
                                 "reference_models": [
-                                    {"provider": "nous", "model": "qubit-4-70b"}
+                                    {"provider": "nous", "model": "hermes-4-70b"}
                                 ],
                                 "aggregator": {
                                     "provider": "nous",
-                                    "model": "qubit-4-405b",
+                                    "model": "hermes-4-405b",
                                 },
                             },
                         },
@@ -375,7 +375,7 @@ class TestBuildCallKwargsMaxTokens:
             ("zai", "glm-5.2", "https://api.z.ai/api/coding/paas/v4", "max_tokens"),
             ("openrouter", "deepseek/deepseek-v4-flash:nitro", "https://openrouter.ai/api/v1", "max_tokens"),
             ("copilot", "gpt-5.5", "https://api.githubcopilot.com", "max_completion_tokens"),
-            ("nous", "qubit-4", "https://inference-api.nousresearch.com/v1", "max_tokens"),
+            ("nous", "hermes-4", "https://inference-api.nousresearch.com/v1", "max_tokens"),
         ],
     )
     def test_moa_task_sends_max_tokens_on_openai_compatible(self, provider, model, base_url, expected_key):
@@ -449,7 +449,7 @@ class TestNousTagsScoping:
 
         kwargs = aux._build_call_kwargs(
             provider="nous",
-            model="qubit-4",
+            model="hermes-4",
             messages=[{"role": "user", "content": "hi"}],
         )
 
@@ -492,7 +492,7 @@ class TestResolveCodexCredentialToken:
     """Token half of ``_resolve_codex_credential_and_base`` with no pool (auth.json only)."""
 
     def test_valid_auth_store(self, tmp_path, monkeypatch):
-        qubit_home = tmp_path / "qubit"
+        qubit_home = tmp_path / "hermes"
         qubit_home.mkdir(parents=True, exist_ok=True)
         (qubit_home / "auth.json").write_text(json.dumps({
             "version": 1,
@@ -518,7 +518,7 @@ class TestResolveCodexCredentialToken:
         payload = base64.urlsafe_b64encode(payload_data).rstrip(b"=").decode()
         expired_jwt = f"{header}.{payload}.fakesig"
 
-        qubit_home = tmp_path / "qubit"
+        qubit_home = tmp_path / "hermes"
         qubit_home.mkdir(parents=True, exist_ok=True)
         (qubit_home / "auth.json").write_text(json.dumps({
             "version": 1,
@@ -543,7 +543,7 @@ class TestResolveCodexCredentialToken:
         payload = base64.urlsafe_b64encode(payload_data).rstrip(b"=").decode()
         valid_jwt = f"{header}.{payload}.fakesig"
 
-        qubit_home = tmp_path / "qubit"
+        qubit_home = tmp_path / "hermes"
         qubit_home.mkdir(parents=True, exist_ok=True)
         (qubit_home / "auth.json").write_text(json.dumps({
             "version": 1,
@@ -563,21 +563,21 @@ class TestResolveXaiOAuthForAux:
     def test_uses_pool_backed_credentials_without_singleton(self, tmp_path, monkeypatch):
         """Auxiliary xAI OAuth must see pool-only credentials.
 
-        ``qubit auth status`` already reports these as logged in; compression
+        ``hermes auth status`` already reports these as logged in; compression
         should not fall through to "no auxiliary provider configured" just
         because the singleton auth-store entry is absent.
         """
         from agent.credential_pool import AUTH_TYPE_OAUTH, PooledCredential, load_pool
         from qubit_cli.auth import DEFAULT_XAI_OAUTH_BASE_URL
 
-        qubit_home = tmp_path / "qubit"
+        qubit_home = tmp_path / "hermes"
         qubit_home.mkdir(parents=True, exist_ok=True)
         (qubit_home / "auth.json").write_text(json.dumps({
             "version": 1,
             "providers": {},
         }))
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
-        monkeypatch.delenv("QUBIT_XAI_BASE_URL", raising=False)
+        monkeypatch.delenv("HERMES_XAI_BASE_URL", raising=False)
         monkeypatch.delenv("XAI_BASE_URL", raising=False)
 
         pool = load_pool("xai-oauth")
@@ -602,14 +602,14 @@ class TestResolveXaiOAuthForAux:
         from agent.credential_pool import AUTH_TYPE_OAUTH, PooledCredential, load_pool
         from qubit_cli.auth import DEFAULT_XAI_OAUTH_BASE_URL
 
-        qubit_home = tmp_path / "qubit"
+        qubit_home = tmp_path / "hermes"
         qubit_home.mkdir(parents=True, exist_ok=True)
         (qubit_home / "auth.json").write_text(json.dumps({
             "version": 1,
             "providers": {},
         }))
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
-        monkeypatch.setenv("QUBIT_XAI_BASE_URL", "https://example.x.ai/v1/")
+        monkeypatch.setenv("HERMES_XAI_BASE_URL", "https://example.x.ai/v1/")
 
         pool = load_pool("xai-oauth")
         pool.add_entry(PooledCredential(
@@ -713,7 +713,7 @@ class TestBuildCodexClient:
             patch("agent.auxiliary_client._select_pool_entry", return_value=(True, entry)),
             patch("agent.auxiliary_client.OpenAI") as mock_openai,
         ):
-            monkeypatch.setenv("QUBIT_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
+            monkeypatch.setenv("HERMES_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
             mock_openai.return_value = MagicMock()
             from agent.auxiliary_client import _build_codex_client
 
@@ -730,7 +730,7 @@ class TestBuildCodexClient:
             patch("agent.auxiliary_client._read_codex_singleton_token", return_value="codex-auth-token"),
             patch("agent.auxiliary_client.OpenAI") as mock_openai,
         ):
-            monkeypatch.setenv("QUBIT_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
+            monkeypatch.setenv("HERMES_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
             mock_openai.return_value = MagicMock()
             from agent.auxiliary_client import resolve_provider_client
 
@@ -800,7 +800,7 @@ class TestResolveProviderClientUniversalModelFallback:
 
     Aux tasks (title generation, vision, session search, etc.) routinely
     reach this function without an explicit model — the user's main
-    provider was picked via ``qubit model``, no per-task override is
+    provider was picked via ``hermes model``, no per-task override is
     set, and the expectation is "just use my main model for side tasks
     too."  The resolver fills in ``model`` from a 3-step universal
     fallback before any provider branch runs:
@@ -902,7 +902,7 @@ class TestExpiredCodexFallback:
         payload = base64.urlsafe_b64encode(payload_data).rstrip(b"=").decode()
         expired_jwt = f"{header}.{payload}.fakesig"
 
-        qubit_home = tmp_path / "qubit"
+        qubit_home = tmp_path / "hermes"
         qubit_home.mkdir(parents=True, exist_ok=True)
         (qubit_home / "auth.json").write_text(json.dumps({
             "version": 1,
@@ -3979,7 +3979,7 @@ class TestCodexAuxiliaryAdapterReservedToolAliases:
         from agent.codex_responses_adapter import classify_responses_route
         from agent.transports.codex import ResponsesApiTransport
 
-        # Deterministic xAI branch: a non-xAI web backend keeps client dispatch under ``qubit_web_search``.
+        # Deterministic xAI branch: a non-xAI web backend keeps client dispatch under ``hermes_web_search``.
         monkeypatch.setattr("agent.transports.codex._xai_prefers_native_web_search", lambda: False)
         adapter = _CodexCompletionsAdapter(SimpleNamespace(base_url=base_url), "m")
         resp_kwargs, _, _ = adapter._build_responses_kwargs(
@@ -3993,13 +3993,13 @@ class TestCodexAuxiliaryAdapterReservedToolAliases:
         assert resp_kwargs["tools"] == main_kwargs["tools"]
         assert all(t["strict"] is False for t in resp_kwargs["tools"])
         assert {t["name"] for t in resp_kwargs["tools"]} == {
-            f"qubit_{n}" if n in aliased else n
+            f"hermes_{n}" if n in aliased else n
             for n in ("web_search", "search_files", "people_search", "read_file", "tool_search")
         }
         # Replayed history names the tool the way this request declares it; the alias map rides on the payload.
         history_names = [i["name"] for i in resp_kwargs["input"] if i.get("type") == "function_call"]
-        assert history_names == ["qubit_search_files" if "search_files" in aliased else "search_files"]
-        assert resp_kwargs.get("_wire_aliases", {}) == {f"qubit_{n}": n for n in aliased}
+        assert history_names == ["hermes_search_files" if "search_files" in aliased else "search_files"]
+        assert resp_kwargs.get("_wire_aliases", {}) == {f"hermes_{n}": n for n in aliased}
 
     def test_create_maps_aliases_back_and_never_sends_alias_map(self):
         sent = {}
@@ -4010,7 +4010,7 @@ class TestCodexAuxiliaryAdapterReservedToolAliases:
                 return SimpleNamespace(
                     status="completed", id="resp_1", usage=None,
                     output=[SimpleNamespace(type="function_call", call_id="c9", id="fc_9",
-                                            name="qubit_search_files", arguments='{"pattern": "x"}')],
+                                            name="hermes_search_files", arguments='{"pattern": "x"}')],
                 )
 
         adapter = _CodexCompletionsAdapter(
@@ -4020,7 +4020,7 @@ class TestCodexAuxiliaryAdapterReservedToolAliases:
 
         wire_tools = sent.get("tools") or sent.get("extra_body", {}).get("tools")  # SDK transform bypass moves bulk fields
         assert "_wire_aliases" not in sent and "_wire_aliases" not in sent.get("extra_body", {})
-        assert "qubit_search_files" in {t["name"] for t in wire_tools}
+        assert "hermes_search_files" in {t["name"] for t in wire_tools}
         assert [tc.function.name for tc in response.choices[0].message.tool_calls] == ["search_files"]
 
 
@@ -4826,7 +4826,7 @@ class TestNoProgressTimeoutTaskConfigGating:
         import qubit_yaml as yaml
         from agent import auxiliary_client as aux
 
-        home = tmp_path / ".qubit"
+        home = tmp_path / ".hermes"
         home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(home))
 

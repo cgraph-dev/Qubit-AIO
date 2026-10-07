@@ -8,7 +8,7 @@ Covers:
      reasoning floors like deepseek's 600s) at ``max(60, remaining * 0.5)``;
    - the cap never RAISES the timeout above what it would otherwise be;
    - explicit user configuration (provider ``stale_timeout_seconds`` or the
-     ``QUBIT_API_CALL_STALE_TIMEOUT`` env var) always wins untouched;
+     ``HERMES_API_CALL_STALE_TIMEOUT`` env var) always wins untouched;
    - no budget => completely unchanged behavior.
 
 2. One-time-ness of the 80% wrap-up notice injection in
@@ -36,7 +36,7 @@ def _write_config(tmp_path: Path, body: str) -> None:
 def _make_agent(tmp_path, monkeypatch, config_body: str = "", **overrides):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
     (tmp_path / ".env").write_text("", encoding="utf-8")
-    monkeypatch.delenv("QUBIT_API_CALL_STALE_TIMEOUT", raising=False)
+    monkeypatch.delenv("HERMES_API_CALL_STALE_TIMEOUT", raising=False)
     _write_config(tmp_path, config_body)
 
     from run_agent import AIAgent
@@ -147,11 +147,11 @@ def test_explicit_provider_config_wins_over_budget_cap(monkeypatch, tmp_path):
     assert agent._compute_non_stream_stale_timeout({"input": "hi"}) == 1800.0
 
 def test_explicit_env_var_wins_over_budget_cap(monkeypatch, tmp_path):
-    """QUBIT_API_CALL_STALE_TIMEOUT is explicit config — never capped."""
+    """HERMES_API_CALL_STALE_TIMEOUT is explicit config — never capped."""
     import run_agent
     monkeypatch.setattr(run_agent, "get_provider_stale_timeout", lambda *a, **k: None)
     agent = _make_agent(tmp_path, monkeypatch, run_budget_seconds=900)
-    monkeypatch.setenv("QUBIT_API_CALL_STALE_TIMEOUT", "1200")
+    monkeypatch.setenv("HERMES_API_CALL_STALE_TIMEOUT", "1200")
     agent._run_budget_started_at = time.time() - 800
     assert agent._compute_non_stream_stale_timeout({"input": "hi"}) == 1200.0
 

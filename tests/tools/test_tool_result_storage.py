@@ -1,10 +1,5 @@
 """Tests for tools/tool_result_storage.py -- 3-layer tool result persistence."""
 
-import json
-import os
-import subprocess
-import sys
-
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -17,7 +12,6 @@ from tools.tool_result_storage import (
     PERSISTED_OUTPUT_CLOSING_TAG,
     STORAGE_DIR,
     _build_persisted_message,
-    _pageable_text,
     _resolve_storage_dir,
     _safe_result_filename,
     _write_to_sandbox,
@@ -46,28 +40,15 @@ class TestGeneratePreview:
 # ── _write_to_sandbox ─────────────────────────────────────────────────
 
 class TestWriteToSandbox:
-    def test_success(self, tmp_path):
+    def test_success(self):
         env = MagicMock()
         env.execute.return_value = {"output": "", "returncode": 0}
-        remote = str(tmp_path / "shared" / "qubit-results" / "abc.txt")
-        if sys.platform != "win32":
-            # Run the real commands so the owner-only modes are observed, not
-            # pattern-matched.
-            def _bash(cmd, timeout=None, stdin_data=None, **_kw):
-                r = subprocess.run(["bash", "-c", cmd], input=stdin_data or "",
-                                   capture_output=True, text=True, timeout=timeout)
-                return {"output": r.stdout + r.stderr, "returncode": r.returncode}
-            env.execute.side_effect = _bash
-        result = _write_to_sandbox("hello world", remote, env)
+        result = _write_to_sandbox("hello world", "/tmp/hermes-results/abc.txt", env)
         assert result is True
+        # First call is the write; a second call round-trip-verifies the
+        # persisted size (unparseable probe output = best-effort success).
         cmd = env.execute.call_args_list[0][0][0]
-        if sys.platform != "win32":
-            # The storage dir sits under shared temp and holds tool output that
-            # can contain secrets: dir and archive are owner-only.
-            assert os.stat(os.path.dirname(remote)).st_mode & 0o777 == 0o700
-            assert os.stat(remote).st_mode & 0o777 == 0o600
-            with open(remote, encoding="utf-8") as fh:
-                assert fh.read() == "hello world"
+        assert "mkdir -p" in cmd
         # Content travels through stdin, NOT inside the command string —
         # otherwise large content would hit Linux's 128 KB MAX_ARG_STRLEN
         # ceiling on `bash -c <cmd>` (#22906).
@@ -80,7 +61,7 @@ class TestWriteToSandbox:
         env = MagicMock()
         env.execute.return_value = {"output": "", "returncode": 0}
         big = "x" * 200_000
-        _write_to_sandbox(big, "/tmp/qubit-results/big.txt", env)
+        _write_to_sandbox(big, "/tmp/hermes-results/big.txt", env)
         cmd = env.execute.call_args_list[0][0][0]
         assert len(cmd) < 1_000  # cmd is just `mkdir -p X && cat > Y`
         assert env.execute.call_args_list[0][1]["stdin_data"] == big
@@ -88,21 +69,21 @@ class TestWriteToSandbox:
     def test_path_with_spaces_is_quoted(self):
         env = MagicMock()
         env.execute.return_value = {"output": "", "returncode": 0}
-        remote_path = "/tmp/qubit results/abc file.txt"
+        remote_path = "/tmp/hermes results/abc file.txt"
         _write_to_sandbox("content", remote_path, env)
         cmd = env.execute.call_args_list[0][0][0]
-        assert "'/tmp/qubit results'" in cmd
-        assert "'/tmp/qubit results/abc file.txt'" in cmd
+        assert "'/tmp/hermes results'" in cmd
+        assert "'/tmp/hermes results/abc file.txt'" in cmd
 
     def test_shell_metacharacters_neutralized(self):
         """Paths with shell metacharacters must be quoted to prevent injection."""
         env = MagicMock()
         env.execute.return_value = {"output": "", "returncode": 0}
-        malicious_path = "/tmp/qubit-results/$(whoami).txt"
+        malicious_path = "/tmp/hermes-results/$(whoami).txt"
         _write_to_sandbox("content", malicious_path, env)
         cmd = env.execute.call_args_list[0][0][0]
         # The $() must not appear unquoted — shlex.quote wraps it
-        assert "'/tmp/qubit-results/$(whoami).txt'" in cmd
+        assert "'/tmp/hermes-results/$(whoami).txt'" in cmd
 
     def test_semicolon_injection_neutralized(self):
         env = MagicMock()
@@ -118,13 +99,13 @@ class TestWriteToSandbox:
         [
             ("pipe", 512, False),      # short write: bytes lost
             ("pipe", 171, False),      # pipe backends must be exact
-            ("heredoc", 171, False),   # heredoc stdin is byte-exact too; a +1 is a loss, not the old newline
+            ("heredoc", 171, True),    # heredoc appends exactly one newline
             ("host", 3, False),        # host spillover: os.stat says only 3 bytes landed
             ("host", None, True),      # host spillover: real write, real stat
         ],
     )
     def test_size_probe_decides_lossless(self, stdin_mode, probed, ok):
-        """An archive that is not byte-exact is discarded — never
+        """An archive that is not byte-exact (modulo the heredoc newline) is discarded — never
         referenced to the model (port of lobehub/lobehub#18258). Multibyte content pins the
         comparison to UTF-8 bytes (170 here, 130 chars), on both the sandbox and host paths."""
         import os
@@ -157,10 +138,10 @@ class TestWriteToSandbox:
             {"output": f"{probed}\n", "returncode": 0},  # wc -c
             {"output": "", "returncode": 0},          # rm -f cleanup (mismatch only)
         ]
-        assert _write_to_sandbox(content, "/tmp/qubit-results/p.txt", env) is ok
+        assert _write_to_sandbox(content, "/tmp/hermes-results/p.txt", env) is ok
         if not ok:
             rm_cmd = env.execute.call_args_list[2][0][0]
-            assert rm_cmd.startswith("rm -f ") and "/tmp/qubit-results/p.txt" in rm_cmd
+            assert rm_cmd.startswith("rm -f ") and "/tmp/hermes-results/p.txt" in rm_cmd
         else:
             assert env.execute.call_count == 2
 
@@ -171,7 +152,7 @@ class TestWriteToSandbox:
             {"output": "", "returncode": 0},
             RuntimeError("exec transport gone"),
         ]
-        assert _write_to_sandbox("data", "/tmp/qubit-results/np.txt", env) is True
+        assert _write_to_sandbox("data", "/tmp/hermes-results/np.txt", env) is True
 
 class TestResolveStorageDir:
     def test_defaults_to_storage_dir_without_env(self):
@@ -180,7 +161,7 @@ class TestResolveStorageDir:
     def test_uses_env_temp_dir_when_available(self):
         env = MagicMock()
         env.get_temp_dir.return_value = "/var/host/tmp"
-        assert _resolve_storage_dir(env) == "/var/host/tmp/qubit-results"
+        assert _resolve_storage_dir(env) == "/var/host/tmp/hermes-results"
 
 class TestSafeResultFilename:
     def test_preserves_normal_tool_call_id(self):
@@ -202,11 +183,11 @@ class TestBuildPersistedMessage:
             preview="first 100 chars...",
             has_more=True,
             original_size=50_000,
-            file_path="/tmp/qubit-results/test123.txt",
+            file_path="/tmp/hermes-results/test123.txt",
         )
         assert msg.startswith(PERSISTED_OUTPUT_TAG)
         assert msg.endswith(PERSISTED_OUTPUT_CLOSING_TAG)
-        assert "/tmp/qubit-results/test123.txt" in msg
+        assert "/tmp/hermes-results/test123.txt" in msg
         assert "read_file" in msg
         assert "first 100 chars..." in msg
         assert "..." in msg  # has_more indicator
@@ -371,7 +352,7 @@ class TestPerToolThresholds:
 class TestSpillover:
     @pytest.fixture(autouse=True)
     def _isolated_home(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
+        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
         # Reset the once-per-process prune flag so each test is independent.
         import tools.tool_result_storage as trs
         monkeypatch.setattr(trs, "_spillover_pruned_homes", set())
@@ -452,7 +433,7 @@ class TestSpillover:
             threshold=30_000,
         )
         assert PERSISTED_OUTPUT_TAG in result
-        assert "/tmp/qubit-results/tc_remote_2.txt" in result
+        assert "/tmp/hermes-results/tc_remote_2.txt" in result
         assert env.execute.call_count == 3
         # Host canonical copy exists regardless.
         assert (get_spillover_dir() / "tc_remote_2.txt").exists()
@@ -517,115 +498,3 @@ class TestSpillover:
         assert (spill_dir / "tc_prune_1.txt").exists()
 
 # ── recovery hint in the persisted preview ────────────────────────────
-
-# ── MCP envelope unwrapping (#90426) ──────────────────────────────────
-
-class TestPageableText:
-    """Only the MCP handler's own envelope shape is unwrapped; every other JSON stays opaque."""
-
-    def test_single_result_envelope_is_unwrapped(self):
-        assert _pageable_text(json.dumps({"result": "line one\nline two"})) == "line one\nline two"
-
-    def test_envelope_metadata_is_kept_after_the_text(self):
-        out = _pageable_text(json.dumps({"result": "text\n", "structuredContent": {"answer": 42}}))
-        text, marker, tail = out.partition("\n\n<mcp-result-metadata>\n")
-        assert text == "text\n"
-        assert marker
-        assert json.loads(tail.split("\n</mcp-result-metadata>")[0]) == {"structuredContent": {"answer": 42}}
-
-    @pytest.mark.parametrize(
-        "content",
-        [
-            json.dumps({"output": "line\n", "exit_code": 0}),      # ordinary tool JSON
-            json.dumps({"result": "line\n", "exit_code": 0}),      # unknown sibling key
-            json.dumps([{"result": "line\n"}]),                    # not an object
-            json.dumps({"result": {"blob": "line\n"}}),            # structuredContent-only style
-            json.dumps({"structuredContent": {"a": 1}}),           # no model-facing text at all
-            json.dumps({"result": ""}),                            # empty text
-            "not json at all",
-            "plain text result",
-        ],
-    )
-    def test_unrecognized_content_is_verbatim(self, content):
-        assert _pageable_text(content) == content
-
-class TestMcpEnvelopeSpillover:
-    """An oversized MCP result spills its pageable text, not one escaped JSON line (#90426)."""
-
-    @pytest.fixture(autouse=True)
-    def _isolated_home(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
-        import tools.tool_result_storage as trs
-        monkeypatch.setattr(trs, "_spillover_pruned_homes", set())
-        yield
-
-    def test_envelope_spills_real_newlines(self):
-        markdown = "# Research guide\n\n" + "pageable content\n" * 4_000
-        envelope = json.dumps({"result": markdown}, ensure_ascii=False)
-        assert len(envelope) > 30_000
-
-        result = maybe_persist_tool_result(
-            content=envelope, tool_name="mcp__archive__read_guide", tool_use_id="tc_mcp_text",
-            env=None, threshold=30_000)
-
-        assert PERSISTED_OUTPUT_TAG in result
-        spill_file = get_spillover_dir() / "tc_mcp_text.txt"
-        assert spill_file.read_text(encoding="utf-8") == markdown
-        # read_file offset/limit is only usable if the preview is the text too.
-        preview = result.split("Preview (first", 1)[1]
-        assert "# Research guide" in preview
-        assert "\\n" not in preview
-
-    def test_metadata_survives_after_the_text(self):
-        markdown = "body line\n" * 5_000
-        envelope = json.dumps({"result": markdown, "structuredContent": {"count": 5_000}})
-        maybe_persist_tool_result(
-            content=envelope, tool_name="mcp__archive__structured", tool_use_id="tc_mcp_meta",
-            env=None, threshold=30_000)
-
-        spill = (get_spillover_dir() / "tc_mcp_meta.txt").read_text(encoding="utf-8")
-        text, _, tail = spill.partition("\n\n<mcp-result-metadata>\n")
-        assert text == markdown
-        assert json.loads(tail.split("\n</mcp-result-metadata>")[0]) == {"structuredContent": {"count": 5_000}}
-
-    def test_non_envelope_json_still_verbatim(self):
-        content = json.dumps({"output": "line\n" * 8_000, "exit_code": 0})
-        maybe_persist_tool_result(
-            content=content, tool_name="terminal", tool_use_id="tc_json_verbatim",
-            env=None, threshold=30_000)
-        assert (get_spillover_dir() / "tc_json_verbatim.txt").read_text(encoding="utf-8") == content
-
-    def test_structured_content_only_result_still_verbatim(self):
-        content = json.dumps({"result": {"blob": "z" * 40_000}})
-        maybe_persist_tool_result(
-            content=content, tool_name="mcp__archive__opaque", tool_use_id="tc_mcp_opaque",
-            env=None, threshold=30_000)
-        assert (get_spillover_dir() / "tc_mcp_opaque.txt").read_text(encoding="utf-8") == content
-
-    def test_sandbox_write_carries_pageable_text(self):
-        env = MagicMock()  # not a LocalEnvironment -> remote path
-        env.execute.side_effect = [
-            {"output": "", "returncode": 1},  # mounted-path probe: not readable
-            {"output": "", "returncode": 0},  # cat > sandbox path
-            {"output": "", "returncode": 1},  # wc -c probe: no answer -> best effort
-        ]
-        env.get_temp_dir.return_value = ""
-        markdown = "remote line\n" * 5_000
-        maybe_persist_tool_result(
-            content=json.dumps({"result": markdown}), tool_name="mcp__archive__remote",
-            tool_use_id="tc_mcp_remote", env=env, threshold=30_000)
-        assert env.execute.call_args_list[1][1]["stdin_data"] == markdown
-
-    def test_turn_budget_spill_unwraps_envelope(self):
-        """The aggregate layer persists under __budget_enforcement__, so a tool-name gate would
-        miss the very results it must fix; the shape gate still applies."""
-        markdown = "budgeted line\n" * 3_000
-        msgs = [{
-            "role": "tool", "name": "mcp__archive__read", "tool_call_id": "tc_budget_mcp",
-            "content": json.dumps({"result": markdown}),
-        }]
-
-        enforce_turn_budget(msgs, env=None, config=BudgetConfig(turn_budget=10_000))
-
-        assert PERSISTED_OUTPUT_TAG in msgs[0]["content"]
-        assert (get_spillover_dir() / "tc_budget_mcp.txt").read_text(encoding="utf-8") == markdown

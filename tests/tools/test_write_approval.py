@@ -16,8 +16,8 @@ import pytest
 
 @pytest.fixture
 def qubit_home(monkeypatch):
-    d = tempfile.mkdtemp(prefix="qubit_wa_test_")
-    home = os.path.join(d, ".qubit")
+    d = tempfile.mkdtemp(prefix="hermes_wa_test_")
+    home = os.path.join(d, ".hermes")
     os.makedirs(home)
     monkeypatch.setenv("QUBIT_HOME", home)
     yield home
@@ -353,28 +353,28 @@ def test_staged_hint_names_the_review_command_on_slash_surfaces(qubit_home):
 def test_staged_hint_names_the_pending_dir_on_headless_surfaces(qubit_home, monkeypatch):
     from tools import write_approval as wa
     _set_approval("memory", True)
-    monkeypatch.setenv("QUBIT_CRON_SESSION", "1")
+    monkeypatch.setenv("HERMES_CRON_SESSION", "1")
     r = _stage_one_memory_write()
     assert "review with /memory pending" not in r["message"], r["message"]
     assert "pending records live in" in r["message"]
     assert str(wa._pending_path(wa.MEMORY, "").parent) in r["message"]
-    monkeypatch.delenv("QUBIT_CRON_SESSION")
+    monkeypatch.delenv("HERMES_CRON_SESSION")
 
-    monkeypatch.setenv("QUBIT_KANBAN_TASK", "task-7")
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-7")
     r = _stage_one_memory_write()
     assert "review with /memory pending" not in r["message"], r["message"]
-    monkeypatch.delenv("QUBIT_KANBAN_TASK")
+    monkeypatch.delenv("HERMES_KANBAN_TASK")
 
-    monkeypatch.setenv("QUBIT_SESSION_PLATFORM", "api_server")
+    monkeypatch.setenv("HERMES_SESSION_PLATFORM", "api_server")
     r = _stage_one_memory_write()
     assert "review with /memory pending" not in r["message"], r["message"]
     assert "pending records live in" in r["message"]
-    monkeypatch.delenv("QUBIT_SESSION_PLATFORM")
+    monkeypatch.delenv("HERMES_SESSION_PLATFORM")
     assert wa.pending_count("memory") == 3
 
 
 def test_staged_hint_keeps_command_for_chat_gateway_platform(qubit_home, monkeypatch):
     _set_approval("memory", True)
-    monkeypatch.setenv("QUBIT_SESSION_PLATFORM", "telegram")
+    monkeypatch.setenv("HERMES_SESSION_PLATFORM", "telegram")
     r = _stage_one_memory_write()
     assert "/memory pending" in r["message"], r["message"]
