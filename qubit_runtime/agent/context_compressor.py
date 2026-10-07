@@ -32,6 +32,7 @@ from agent.auxiliary_client import (
     extract_content_or_reasoning,
 )
 from agent.context_engine import ContextEngine, sanitize_memory_context
+from agent.context_compressor_prellm import PreLlmSkipMixin
 from agent.context_compressor_summary import SummaryDispatchMixin
 from agent.error_classifier import FailoverReason, classify_api_error
 from agent.micro_compaction import MicroCompactionMixin
@@ -1160,10 +1161,6 @@ _ACTIVE_TASK_MAX_CHARS = 1400
 # full protect_last_n would recreate the nothing-compactable large-tool-output case.
 _MAX_TAIL_MESSAGE_FLOOR = 8
 
-# Skip the LLM call when the compressible middle is below this fraction of the
-# threshold (and a prior ineffectiveness strike exists); dropping alone suffices.
-# See #60451.
-_FEASIBILITY_SKIP_MIDDLE_FRACTION = 0.10
 # Under pressure, demote large tool outputs even inside the protected region but
 # keep this many trailing messages verbatim.
 _PRESSURE_KEEP_RECENT_MESSAGES = 3
@@ -2177,7 +2174,7 @@ Describe agent/tool work only as completed actions, state, or historical work.]"
 }
 
 
-class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngine):
+class ContextCompressor(SummaryDispatchMixin, PreLlmSkipMixin, MicroCompactionMixin, ContextEngine):
     """Default context engine: prune tool results, protect head/tail, summarize the middle
     with an LLM, and iteratively update the previous summary on later compactions."""
 
@@ -2396,6 +2393,8 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
         self._anti_thrash_recovery_deadline = self._structural_no_op_backoff_until = 0.0
         # Observability only; never feeds the strike latch or the fallback streak.
         self._prellm_skip_count = 0
+        # Summary-model bench probe deadline; 0.0 = unarmed (durable copy re-read via _load_fallback_probe_at).
+        self._fallback_probe_at = 0.0
         # Only a healthy completed summary resets this; ordinary fitting responses do not.
         self._fallback_compression_streak = 0
         # Armed at a completed boundary; consumed by the next real prompt count in update_from_response().
@@ -2424,12 +2423,13 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
         self._consecutive_timeout_failures = self._consecutive_truncation_failures = self._fallback_compression_streak = 0
         self._consecutive_overload_aborts = 0
         self._ineffective_compression_count = self._prellm_skip_count = 0
-        self._anti_thrash_recovery_deadline = self._structural_no_op_backoff_until = 0.0
+        self._anti_thrash_recovery_deadline = self._structural_no_op_backoff_until = self._fallback_probe_at = 0.0
         self._reset_proactive_prune_rearm()
         self.get_active_compression_failure_cooldown()
         self._load_fallback_compression_streak()
         self._load_ineffective_compression_count()
         self._load_anti_thrash_recovery_deadline()
+        self._load_fallback_probe_at()
         self._load_consecutive_overload_aborts()
         self._load_proactive_prune_rearm_tokens()
 
@@ -2442,6 +2442,7 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
         previous_fallback_streak = self._fallback_compression_streak
         previous_ineffective_count = self._ineffective_compression_count
         previous_overload_aborts = self._consecutive_overload_aborts
+        previous_probe_at = self._fallback_probe_at
         if boundary_reason == "compression" and old_session_id:
             # Parent row carries the streak/strike state across the rotation.
             def _parent(method: str, label: str, current: int) -> int:
@@ -2461,6 +2462,8 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
         if boundary_reason == "compression":
             # Rotation creates a fresh child row first; carry the streak until boundary bookkeeping persists it.
             self._fallback_compression_streak = previous_fallback_streak
+            # The bench probe deadline lives in the model-config blob, which the child row lacks.
+            self._set_fallback_probe_at(previous_probe_at)
             # No later bookkeeping writes the strike counter, so persist it onto the child row now (#54923).
             if self._ineffective_compression_count != previous_ineffective_count:
                 self._ineffective_compression_count = previous_ineffective_count
@@ -5415,32 +5418,6 @@ Write only the summary body. Do not include any preamble or prefix."""
             compress_start + 1, compress_end, n_turns, compress_start, tail_msgs,
         )
 
-    def _feasibility_skip(
-        self, telemetry: Dict[str, Any], turns_to_summarize: List[Dict[str, Any]],
-        compress_start: int, compress_end: int,
-    ) -> bool:
-        """Pre-LLM skip after a real-usage ineffectiveness strike (reads the counter, never writes)."""
-        if self._ineffective_compression_count < 1:
-            return False
-        # Reuse the telemetry estimate so log and telemetry agree; None means the regions helper
-        # no-op'd (0 is valid).
-        middle_tokens = telemetry.get("middle_window_tokens")
-        middle_tokens = estimate_messages_tokens_rough(turns_to_summarize) if middle_tokens is None else middle_tokens
-        if middle_tokens >= int(self.threshold_tokens * _FEASIBILITY_SKIP_MIDDLE_FRACTION):
-            return False
-        self._last_feasibility_skip = True
-        self._prellm_skip_count += 1
-        telemetry["prellm_skip_count"] = self._prellm_skip_count
-        if not self.quiet_mode:
-            logger.warning(
-                "Compression: middle section (%d tokens at indices %d-%d) is below %.0f%% of threshold (%d tokens) — "
-                "skipping LLM summarization, proceeding with deterministic message dropping. prellm_skip_count=%d",
-                middle_tokens, compress_start, compress_end,
-                _FEASIBILITY_SKIP_MIDDLE_FRACTION * 100,
-                self.threshold_tokens, self._prellm_skip_count,
-            )
-        return True
-
     def _abort_on_summary_failure(
         self, telemetry: Dict[str, Any], n_skipped: int, previous_summary_before_scan: Optional[str],
     ) -> bool:
@@ -5738,8 +5715,11 @@ Write only the summary body. Do not include any preamble or prefix."""
         from agent.conversation_compression import _raise_if_stale_attempt
 
         _raise_if_stale_attempt(self)
-        feasibility_skip = not force and self._feasibility_skip(telemetry, turns_to_summarize, compress_start, compress_end)
-        summary = None  # feasibility skip: no LLM call; Phase 4 inserts the deterministic fallback
+        feasibility_skip = not force and (
+            self._fallback_streak_skip(telemetry)
+            or self._feasibility_skip(telemetry, turns_to_summarize, compress_start, compress_end)
+        )
+        summary = None  # pre-LLM summary skip (feasibility or benched model): no LLM call; Phase 4 inserts the deterministic fallback
         if not feasibility_skip:
             summary = self._summarize_window(
                 messages, turns_to_summarize, scan, focus_topic, memory_context, bypass_cooldown,
