@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import errno
 import os
+import re
 import subprocess
 import sys
 import time
@@ -244,6 +245,53 @@ def interrupted_pull_marker(root: Path) -> Path:
     return _git_dir(root) / INTERRUPTED_PULL_MARKER
 
 
+# The repair's own code is in the tree a killed move tears (``qubit_bootstrap``, this module, the
+# package initializer, the lock/custody modules). ``update_cmd_commit.arm_tree_move`` publishes this
+# closure, as committed at the marker's ``pre``, beside the marker before git writes; a minted
+# launcher whose checkout import fails runs the repair from there, reading the same files from git's
+# objects first when no updater published them (``_launchers._CLOSURE_REPAIR``).
+# The modules import only the stdlib and each other; the package initializer is published empty.
+RECOVERY_CLOSURE_DIR = "hermes-update-recovery"
+RECOVERY_CLOSURE = ("qubit_runtime/qubit_cli/_early_recovery.py", "qubit_runtime/qubit_cli/update_lock.py",
+                    "qubit_runtime/qubit_cli/update_custody.py")
+
+
+# ``<blob id> <path>`` per published file (``RECOVERY_CLOSURE`` + the empty package initializer):
+# a closure is used only when every file hashes to its id (a power loss can leave the renamed dir
+# with files git's objects never had), else it is rebuilt from git's objects.
+RECOVERY_CLOSURE_MANIFEST = "MANIFEST"
+RECOVERY_CLOSURE_INIT = "qubit_runtime/qubit_cli/__init__.py"
+
+
+def recovery_closure_dir(root: Path, pre: str) -> Path:
+    if not is_object_id(pre):  # never a revision (``HEAD``) or a path (``../x``) under the git dir
+        raise ValueError(f"not a commit id: {pre!r}")
+    return _git_dir(root) / RECOVERY_CLOSURE_DIR / pre
+
+
+def is_object_id(value: str) -> bool:
+    return bool(re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", value or ""))
+
+
+def blob_id(data: bytes, like: str) -> str:
+    """Git's object id of a blob holding ``data``, in ``like``'s object format (SHA-1 or SHA-256)."""
+    import hashlib
+
+    return hashlib.new("sha1" if len(like) == 40 else "sha256", b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def recovery_closure_verified(closure: Path, pre: str) -> bool:
+    """Every closure file present with exactly the bytes its manifest names, and nothing missing."""
+    try:
+        listed = dict(line.split(" ", 1)[::-1] for line in
+                      (closure / RECOVERY_CLOSURE_MANIFEST).read_text(encoding="utf-8-sig").splitlines())
+        return (set(listed) == {*RECOVERY_CLOSURE, RECOVERY_CLOSURE_INIT}
+                and listed[RECOVERY_CLOSURE_INIT] == blob_id(b"", pre)
+                and all(blob_id((closure / rel).read_bytes(), pre) == oid for rel, oid in listed.items()))
+    except (OSError, ValueError):
+        return False
+
+
 def _trees_git_could_write(git, pre: str, target: str) -> tuple[list[str], set[str]]:
     """The trees the killed git was moving the checkout to, and the paths whose new content is unknowable.
 
@@ -412,6 +460,15 @@ def _held_open(path: Path) -> bool:
     return False
 
 
+def _lock_identity(lock: Path) -> str:
+    """``inode:mtime_ns`` of a lock file, "" when there is none: a recreated lock is a new generation."""
+    try:
+        st = lock.stat()
+    except OSError:
+        return ""
+    return f"{st.st_ino}:{st.st_mtime_ns}"
+
+
 def _release_dead_index_lock(git_dir: Path) -> bool:
     """Drop the killed git's ``index.lock`` (it refuses every git command); False while a live git holds it."""
     lock = git_dir / "index.lock"
@@ -431,8 +488,38 @@ def _release_dead_index_lock(git_dir: Path) -> bool:
     return True
 
 
-def restore_interrupted_pull(project_root: Path | None = None) -> bool:
+def write_durable_text(path: Path, text: str) -> None:
+    """``text`` at ``path`` as one durable record, never a half-written one.
+
+    The temp is an unpredictable name created exclusively (no-follow) beside ``path``: a pre-existing
+    name there is never written through (its symlink or hardlink would carry the record onto another
+    file) and never deleted (it may be a user's file: review Z5). fsync before the rename: an empty
+    record over a mixed tree is no record.
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    while True:
+        tmp = path.with_name(f"{path.name}.{os.urandom(6).hex()}.tmp")
+        try:
+            fd = os.open(tmp, flags, 0o644)
+            break
+        except FileExistsError:
+            continue  # 48 random bits taken: draw again, never reuse the name
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def restore_interrupted_pull(project_root: Path | None = None, *, after_failure: bool = False) -> bool:
     """Put back the files a killed ``qubit update`` had half-moved to the new commit.
+
+    ``after_failure``: the updater itself calls this when git exited non-zero mid-move (a locked or
+    read-only file): same restore, and the marker stays whenever the tree is not verified whole.
 
     Returns True when the tree changed under this process: modules it already imported may be the
     half-written ones, so the caller must relaunch (``relaunch_after_restore``).
@@ -445,7 +532,7 @@ def restore_interrupted_pull(project_root: Path | None = None) -> bool:
     launches take turns (``_restore_claim``); a launch that waited out another's restore relaunches.
 
     Limits, by design: a torn ``qubit_cli/__init__.py``, ``qubit_bootstrap.py``, ``agent/__init__.py``
-    or ``agent/jiter_preload.py`` (imported before the ``hermes-agent`` hook) fails before this runs. A file git also changes that the user deleted, emptied or cut to a prefix of git's version
+    or ``agent/jiter_preload.py`` (imported before the ``qubit-agent`` hook) fails before this runs. A file git also changes that the user deleted, emptied or cut to a prefix of git's version
     looks exactly like git's own half-written file and is restored too, as is a user edit to a
     conflicted path or, on git < 2.38, to a path both sides of a custom-branch merge changed.
     """
@@ -456,19 +543,21 @@ def restore_interrupted_pull(project_root: Path | None = None) -> bool:
             return False
         with _restore_claim(marker.parent) as claimed:
             if not claimed:
+                if after_failure:
+                    return False  # the marker stays: the updater reports the move as not settled
                 print("⚠ Another Qubit launch is still repairing the checkout after an interrupted "
                       "`qubit update`; if this one fails, launch again in a moment.", file=sys.stderr)
                 return False
             if not marker.is_file():
                 return True  # another launch finished while this one started: rerun from its tree
-            return _restore_holding_claim(root, marker)
+            return _restore_holding_claim(root, marker, after_failure=after_failure)
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
         # Never block launch: the import that follows surfaces any real breakage.
         print(f"⚠ Could not check for an interrupted `qubit update`: {exc}", file=sys.stderr)
     return False
 
 
-def _restore_holding_claim(root: Path, marker: Path) -> bool:
+def _restore_holding_claim(root: Path, marker: Path, *, after_failure: bool = False) -> bool:
     global _merge_advice_shown
     git_dir = marker.parent
     fields = dict(line.partition("=")[::2] for line in marker.read_text(encoding="utf-8-sig").splitlines())

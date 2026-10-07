@@ -30,6 +30,7 @@ from pm.receipt import accept_worker_receipt as _accept_completion_pm_receipt
 from qubit_cli import update_receipt as _completion_receipt, update_cmd_config as _completion_config
 from qubit_cli._old_updater import stop_for_relaunch
 from qubit_cli._early_recovery import git_operation_in_progress, interrupted_pull_marker
+from qubit_cli import update_cmd_commit as _commit
 from qubit_cli import update_cmd_check as _check
 
 # Re-exports: every split-module name stays reachable (and monkeypatchable) as update_cmd.<name>.
@@ -1420,6 +1421,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
     # _old_updater.in_historical_update(); historical on-disk updaters do not
     # declare this local, so only they hand off through retired shims.
     _qubit_current_updater_frame = True
+    _commit.begin_update_attempt()  # nothing an earlier update in this process armed is ours (O5)
     git_operation = git_operation_in_progress(_m().PROJECT_ROOT)
     if git_operation:
         root = _m().PROJECT_ROOT
@@ -1567,6 +1569,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
             sys.exit(1)
 
         current_branch = _current_branch_name(git_cmd, check=True)
+        _commit.record_run_start(git_cmd, _m().PROJECT_ROOT)
         _plan = _prepare_checkout_for_update(
             git_cmd, branch, current_branch, is_fork=is_fork, assume_yes=assume_yes,
             gateway_mode=gateway_mode, gw_input_fn=gw_input_fn, switch_branch=opts.switch_branch,
