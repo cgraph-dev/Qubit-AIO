@@ -333,9 +333,12 @@ def check_real_turn() -> None:
         check("turn: real _chat_run_agent turn against local ollama", True,
               "SKIP: no local ollama on :11434 (no model to drive a real turn)")
         return
-    # Prefer a Qubit-facing local model, else the first offered.
-    pick = next((m for m in models if m.startswith(("qubit-spark", "qubit-brain", "qubit-d5"))),
-                models[0])
+    # Prefer a Qubit-facing local model with a real window; qubit-brain is known-good,
+    # qubit-spark is a small 1.7B build that can still trip its own context. Fall back
+    # to whatever is offered so the check works on a stock box with any local model.
+    _pref = ("qubit-brain", "qubit-d5", "qubit-cand", "qwen3-vl")
+    pick = next((m for m in models if m.startswith(_pref)), None) or \
+           next((m for m in models if m.startswith("qubit-")), models[0])
 
     code = r'''
 import os, sys, json
