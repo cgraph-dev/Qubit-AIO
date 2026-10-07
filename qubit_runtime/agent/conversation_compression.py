@@ -30,6 +30,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
 from agent.auxiliary_client import AuxiliaryExplicitCancellation
 from agent.context_engine import automatic_compaction_status_message, sanitize_memory_context
+from agent.conversation_compression_codex import _codex_compaction_cooldown_remaining
 from agent.conversation_compression_telemetry import _emit_aborted_attempt_telemetry, _emit_compression_attempt_telemetry
 from agent.memory_provider import PRE_COMPRESS_CHECKPOINT_API_VERSION
 from agent.model_metadata import estimate_messages_tokens_rough, estimate_request_tokens_rough
@@ -4321,23 +4322,6 @@ def compress_context(
         finally:
             if _commit_fence_entered:
                 commit_fence.finish_commit()
-
-
-def _codex_compaction_cooldown_remaining(agent: Any) -> float:
-    """Seconds left on this session's compaction-failure cooldown (0 = clear)."""
-    compressor = getattr(agent, "context_compressor", None)
-    getter = getattr(compressor, "get_active_compression_failure_cooldown", None)
-    if not callable(getter):
-        return 0.0
-    try:
-        state = getter(refresh=True)
-    except Exception:
-        logger.debug("codex compaction cooldown lookup failed", exc_info=True)
-        return 0.0
-    try:
-        return max(0.0, float(state.get("remaining_seconds") or 0.0)) if state else 0.0
-    except (TypeError, ValueError):
-        return 0.0
 
 
 def _record_codex_compaction_failure(agent: Any, error: str) -> None:
