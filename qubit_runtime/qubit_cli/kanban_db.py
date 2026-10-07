@@ -31,6 +31,8 @@ from typing import Any, Iterable, Optional
 
 from toolsets import get_toolset_names
 
+from qubit_cli.kanban_workflow import DEFAULT_STATUSES as VALID_STATUSES
+
 _log = logging.getLogger(__name__)
 
 
@@ -103,7 +105,6 @@ def _git_out(cwd: Path, *args: str, timeout: int = 30) -> Optional[str]:
 
 # --- Constants ---
 
-VALID_STATUSES = {"triage", "todo", "scheduled", "ready", "running", "blocked", "review", "done", "archived"}
 VALID_INITIAL_STATUSES = {"running", "blocked"}
 
 # Typed block reasons (routing in ``_route_block``); ``None`` = legacy un-typed.
