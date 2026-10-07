@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "アクティブな目標はありません。"
   config_read_failed: "⚠️ config.yaml を読み込めませんでした: {error}"
   config_save_failed: "⚠️ 設定を保存できませんでした: {error}"
+  cron_store:
+    unwritable: "⚠️ cron ストア {store} は {since} から書き込みできません（{error}）。書き込みが可能になるまで、スケジュール済みジョブはスキップされます。対処: {fix}。"
+    recovered: "✅ cron ストア {store} は再び書き込み可能になりました。スキップされた実行 {skipped} 件、各ジョブは 1 回だけ追いつき実行されます。"
   model:
     error_prefix: "エラー: {error}"
     switched: "モデルを `{model}` に切り替えました"

@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "Нет активной цели."
   config_read_failed: "⚠️ Не удалось прочитать config.yaml: {error}"
   config_save_failed: "⚠️ Не удалось сохранить конфигурацию: {error}"
+  cron_store:
+    unwritable: "⚠️ Хранилище cron {store} недоступно для записи ({error}) с {since}. Запланированные задания пропускаются, пока запись снова не станет возможной. Исправление: {fix}."
+    recovered: "✅ Хранилище cron {store} снова доступно для записи; пропущено запусков: {skipped}, каждое задание будет выполнено один раз."
   model:
     error_prefix: "Ошибка: {error}"
     switched: "Модель изменена на `{model}`"

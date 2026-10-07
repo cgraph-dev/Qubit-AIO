@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "لا يوجد هدف نشط."
   config_read_failed: "⚠️ تعذّر قراءة config.yaml: {error}"
   config_save_failed: "⚠️ تعذّر حفظ الإعدادات: {error}"
+  cron_store:
+    unwritable: "⚠️ مخزن cron ‏{store} غير قابل للكتابة ({error}) منذ {since}. يتم تخطي المهام المجدولة حتى يقبل الكتابة مجددًا. الحل: {fix}."
+    recovered: "✅ مخزن cron ‏{store} قابل للكتابة مجددًا؛ {skipped} تشغيل/تشغيلات متخطاة، وستُعوَّض كل مهمة مرة واحدة."
   model:
     error_prefix: "خطأ: {error}"
     switched: "تم التبديل إلى النموذج `{model}`"

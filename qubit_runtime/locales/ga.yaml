@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "Níl aon sprioc ghníomhach ann."
   config_read_failed: "⚠️ Níorbh fhéidir config.yaml a léamh: {error}"
   config_save_failed: "⚠️ Níorbh fhéidir an chumraíocht a shábháil: {error}"
+  cron_store:
+    unwritable: "⚠️ Níl stór cron {store} inscríofa ({error}) ó {since}. Táthar ag scipeáil jabanna sceidealaithe go dtí go nglacann sé le scríobh arís. Réiteach: {fix}."
+    recovered: "✅ Tá stór cron {store} inscríofa arís; {skipped} rith scipeáilte, gach jab ag teacht suas uair amháin."
   model:
     error_prefix: "Earráid: {error}"
     switched: "Athraíodh an tsamhail go `{model}`"

@@ -48,6 +48,9 @@ gateway:
   no_active_goal: "目前沒有作用中的目標。"
   config_read_failed: "⚠️ 無法讀取 config.yaml：{error}"
   config_save_failed: "⚠️ 無法儲存設定：{error}"
+  cron_store:
+    unwritable: "⚠️ Cron 儲存區 {store} 自 {since} 起無法寫入（{error}）。在恢復可寫入之前，排程工作將被略過。修復方式：{fix}。"
+    recovered: "✅ Cron 儲存區 {store} 已恢復可寫入；略過了 {skipped} 次執行，每個工作將補執行一次。"
   model:
     error_prefix: "錯誤：{error}"
     switched: "已切換模型為 `{model}`"
