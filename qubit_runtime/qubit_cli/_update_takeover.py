@@ -101,7 +101,17 @@ def main() -> int:
         # update liveness checks while the waiting parent still holds its lock.
         command = [str(python), "-I", "-B", "-X", "utf8", str(Path(request["root"]) / "qubit_cli/update_finish.py"),
                    str(context), str(result)]
-        code = subprocess.run(command, cwd=request["root"], env=env).returncode
+        # update_finish builds the checkout: every such child runs under custody. POSIX gets the
+        # lock fd; Windows inside an update is created suspended and bound to the update's
+        # kill-on-close job before it runs (``update_custody.popen_post_commit``).
+        from qubit_cli.update_custody import popen_post_commit
+
+        with popen_post_commit(command, label="update finish child", cwd=request["root"], env=env) as child:
+            try:
+                code = child.wait()
+            except BaseException:
+                child.kill()
+                raise
         if code != 0 and not result.is_file():
             _record_failure(request, result, code, f"completion child exited {code} without acknowledgement")
         return code
