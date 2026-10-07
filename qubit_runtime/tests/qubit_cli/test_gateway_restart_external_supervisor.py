@@ -97,3 +97,35 @@ def test_plain_manual_gateway_still_uses_stop_and_run(restart_calls, monkeypatch
     _run_restart()
     assert restart_calls["sigusr1"] is None, "no supervisor marker: the detached fallback is the restart"
     assert restart_calls["started"], "a plain manually-run gateway must still be restarted in-process"
+
+
+@pytest.mark.parametrize("cgroup, hints", [
+    ("/system.slice/qubit.service", ["sudo systemctl restart qubit.service"]),
+    ("/user.slice/user-1000.slice/user@1000.service/app.slice/qubit.service",
+     ["systemctl --user restart qubit.service"]),
+    (None, ["systemctl --user restart qubit.service", "sudo systemctl restart qubit.service"]),
+])
+def test_service_managed_gateway_refuses_fallback_takeover(restart_calls, monkeypatch, capsys, cgroup, hints):
+    """A gateway supervised under ANY unit name must not be taken over by the fallback (#126474).
+
+    Pre-convention ``qubit.service`` unit, no ``--external-supervisor`` marker, control socket
+    unreachable while busy serving webhooks: the identify/argv probe missed it, so the fallback
+    SIGKILLed a live gateway and spawned an unsupervised orphan in the caller's cgroup while the
+    unit's ``Restart=`` flapped against the stolen lock for hours. The hint follows the unit's
+    scope; an unknown scope prints both forms.
+    """
+    monkeypatch.setattr(gw, "_capture_gateway_argv",
+                        lambda pid: ["/usr/bin/python", "-m", "qubit_cli.main", "gateway", "run"])
+    monkeypatch.setattr("qubit_cli.main_dashboard._get_systemd_service_for_pid",
+                        lambda pid: "qubit.service" if pid == 4321 else None)
+    monkeypatch.setattr("qubit_cli.main_dashboard._get_pid_cgroup_path",
+                        lambda pid: cgroup if pid == 4321 else None)
+    with pytest.raises(SystemExit) as exc:
+        _run_restart()
+    assert exc.value.code == 1
+    assert not restart_calls["stopped"], "must not SIGTERM a service-managed gateway"
+    assert not restart_calls["started"], "must not spawn an unsupervised orphan"
+    out = capsys.readouterr().out
+    for hint in hints:
+        assert hint in out
+    assert out.count("systemctl") == len(hints), "a known scope must print only its own command"
