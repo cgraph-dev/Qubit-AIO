@@ -439,6 +439,68 @@ FEATURE_DISABLED_EVENTS = frozenset({"disabled", "re_enabled"})
 FEATURE_DISABLED_NAME_MAX_LENGTH = 64
 # ---- end v5 signals ----
 
+# ---- iuf c1 ----
+# Why an extension install failed, named at each failure exit of the three emitters
+# (qubit_cli/skills_hub.py::_install_skill, qubit_cli/plugins_cmd_install.py::recorded_install,
+# qubit_cli/mcp_catalog.py::recorded_catalog_install / record_mcp_install); ``none`` on success.
+# A raised exception with no class of its own is classified by its TYPE: network / permission /
+# filesystem_error, anything else ``exception:<Type>``, which keeps only the ``exception`` prefix
+# (as on compression rows). Never the error message.
+EXTENSION_COMMON_FAILURE_CLASSES = frozenset({
+    "exception", "filesystem_error", "network", "none", "other", "permission",
+})
+EXTENSION_SKILL_FAILURE_CLASSES = EXTENSION_COMMON_FAILURE_CLASSES | frozenset({
+    "ambiguous",          # a short name matched several skills in different registries
+    "auth_rejected",      # GitHub refused every configured credential (401)
+    "fetch_failed",       # no registry served the files (unreachable, 404, removed)
+    "invalid_bundle",     # unsafe path, symlink or invalid skill name in the bundle
+    "invalid_name",       # a URL skill with no usable name (non-interactive, bad --name, cancelled prompt)
+    "not_found",          # a short name no registry knows, or a pinned registry that does not exist
+    "rate_limited",       # the GitHub API rate limit was exhausted
+    "scan_blocked",       # the security scan refused the bundle
+    "stale_index",        # listed in a registry index whose files no longer exist upstream
+})
+EXTENSION_PLUGIN_FAILURE_CLASSES = EXTENSION_COMMON_FAILURE_CLASSES | frozenset({
+    "already_installed",  # the plugin already exists / is pinned and needs --force or --ref
+    "clone_failed",       # git clone / fetch / checkout of the plugin repository failed or timed out
+    "deps_declined",      # the user declined the Python dependency prompt
+    "deps_failed",        # PM could not prepare the plugin's dependencies
+    "git_missing",        # git is not installed
+    "incompatible",       # newer manifest_version, unsupported platform / GPU / runtime version
+    "invalid_source",     # the identifier or subdirectory does not name a usable git source
+    "manifest_invalid",   # unreadable or malformed plugin.yaml / plugin.json / dependency declaration
+    "non_interactive",    # Python dependencies need consent and nobody could answer (no --yes-deps)
+    "removed_from_catalog",  # on the catalog kill list
+    "scan_blocked",       # the security scan refused the plugin
+})
+EXTENSION_MCP_FAILURE_CLASSES = EXTENSION_COMMON_FAILURE_CLASSES | frozenset({
+    "auth_required",      # the server refused the sign-in (OAuth error, HTTP 401/403)
+    "bootstrap_failed",   # a catalog entry's bootstrap command exited non-zero
+    "clone_failed",       # git clone / checkout of a catalog entry's repository failed
+    "config_invalid",     # no such catalog entry, undeclared env var, or a manifest that cannot be built
+    "config_rejected",    # Qubit refused a suspicious command/args configuration
+    "connect_failed",     # the probe could not reach or initialize the server
+    "git_missing",        # git is not installed
+    "missing_credentials",  # a required credential was not provided
+    "server_start_failed",  # the stdio server command is missing, or its native module needs another Node
+})
+EXTENSION_KIND_FAILURE_CLASSES = {
+    "mcp_server": EXTENSION_MCP_FAILURE_CLASSES, "plugin": EXTENSION_PLUGIN_FAILURE_CLASSES,
+    "skill": EXTENSION_SKILL_FAILURE_CLASSES,
+}
+EXTENSION_FAILURE_CLASSES = (
+    EXTENSION_SKILL_FAILURE_CLASSES | EXTENSION_PLUGIN_FAILURE_CLASSES | EXTENSION_MCP_FAILURE_CLASSES
+)
+# The skills-hub adapter that resolved or served a skill: every ``SOURCE_ID`` the router in
+# tools/skills_hub_search.py::create_source_router builds. ``none`` = no adapter was involved
+# (bundled restores, plugin and MCP rows), ``unresolved`` = a hub lookup no adapter answered,
+# ``other`` = an adapter id this list does not name.
+EXTENSION_REGISTRY_IDS = frozenset({
+    "browse-sh", "clawhub", "github", "hermes-index", "lobehub", "official", "skills-sh", "url", "well-known",
+})
+EXTENSION_REGISTRIES = EXTENSION_REGISTRY_IDS | frozenset({"none", "other", "unresolved"})
+# ---- end iuf c1 ----
+
 
 def update_duration_bucket(duration_ms: Any) -> str:
     """Bucket an update (or update stage) wall time; non-numbers count as instant."""
@@ -945,6 +1007,68 @@ FEATURE_DISABLED_EVENTS = frozenset({"disabled", "re_enabled"})
 FEATURE_DISABLED_NAME_MAX_LENGTH = 64
 # ---- end v5 signals ----
 
+# ---- iuf c1 ----
+# Why an extension install failed, named at each failure exit of the three emitters
+# (qubit_cli/skills_hub.py::_install_skill, qubit_cli/plugins_cmd_install.py::recorded_install,
+# qubit_cli/mcp_catalog.py::recorded_catalog_install / record_mcp_install); ``none`` on success.
+# A raised exception with no class of its own is classified by its TYPE: network / permission /
+# filesystem_error, anything else ``exception:<Type>``, which keeps only the ``exception`` prefix
+# (as on compression rows). Never the error message.
+EXTENSION_COMMON_FAILURE_CLASSES = frozenset({
+    "exception", "filesystem_error", "network", "none", "other", "permission",
+})
+EXTENSION_SKILL_FAILURE_CLASSES = EXTENSION_COMMON_FAILURE_CLASSES | frozenset({
+    "ambiguous",          # a short name matched several skills in different registries
+    "auth_rejected",      # GitHub refused every configured credential (401)
+    "fetch_failed",       # no registry served the files (unreachable, 404, removed)
+    "invalid_bundle",     # unsafe path, symlink or invalid skill name in the bundle
+    "invalid_name",       # a URL skill with no usable name (non-interactive, bad --name, cancelled prompt)
+    "not_found",          # a short name no registry knows, or a pinned registry that does not exist
+    "rate_limited",       # the GitHub API rate limit was exhausted
+    "scan_blocked",       # the security scan refused the bundle
+    "stale_index",        # listed in a registry index whose files no longer exist upstream
+})
+EXTENSION_PLUGIN_FAILURE_CLASSES = EXTENSION_COMMON_FAILURE_CLASSES | frozenset({
+    "already_installed",  # the plugin already exists / is pinned and needs --force or --ref
+    "clone_failed",       # git clone / fetch / checkout of the plugin repository failed or timed out
+    "deps_declined",      # the user declined the Python dependency prompt
+    "deps_failed",        # PM could not prepare the plugin's dependencies
+    "git_missing",        # git is not installed
+    "incompatible",       # newer manifest_version, unsupported platform / GPU / runtime version
+    "invalid_source",     # the identifier or subdirectory does not name a usable git source
+    "manifest_invalid",   # unreadable or malformed plugin.yaml / plugin.json / dependency declaration
+    "non_interactive",    # Python dependencies need consent and nobody could answer (no --yes-deps)
+    "removed_from_catalog",  # on the catalog kill list
+    "scan_blocked",       # the security scan refused the plugin
+})
+EXTENSION_MCP_FAILURE_CLASSES = EXTENSION_COMMON_FAILURE_CLASSES | frozenset({
+    "auth_required",      # the server refused the sign-in (OAuth error, HTTP 401/403)
+    "bootstrap_failed",   # a catalog entry's bootstrap command exited non-zero
+    "clone_failed",       # git clone / checkout of a catalog entry's repository failed
+    "config_invalid",     # no such catalog entry, undeclared env var, or a manifest that cannot be built
+    "config_rejected",    # Qubit refused a suspicious command/args configuration
+    "connect_failed",     # the probe could not reach or initialize the server
+    "git_missing",        # git is not installed
+    "missing_credentials",  # a required credential was not provided
+    "server_start_failed",  # the stdio server command is missing, or its native module needs another Node
+})
+EXTENSION_KIND_FAILURE_CLASSES = {
+    "mcp_server": EXTENSION_MCP_FAILURE_CLASSES, "plugin": EXTENSION_PLUGIN_FAILURE_CLASSES,
+    "skill": EXTENSION_SKILL_FAILURE_CLASSES,
+}
+EXTENSION_FAILURE_CLASSES = (
+    EXTENSION_SKILL_FAILURE_CLASSES | EXTENSION_PLUGIN_FAILURE_CLASSES | EXTENSION_MCP_FAILURE_CLASSES
+)
+# The skills-hub adapter that resolved or served a skill: every ``SOURCE_ID`` the router in
+# tools/skills_hub_search.py::create_source_router builds. ``none`` = no adapter was involved
+# (bundled restores, plugin and MCP rows), ``unresolved`` = a hub lookup no adapter answered,
+# ``other`` = an adapter id this list does not name.
+EXTENSION_REGISTRY_IDS = frozenset({
+    "browse-sh", "clawhub", "github", "hermes-index", "lobehub", "official", "skills-sh", "url", "well-known",
+})
+EXTENSION_REGISTRIES = EXTENSION_REGISTRY_IDS | frozenset({"none", "other", "unresolved"})
+# ---- end iuf c1 ----
+
 
 def update_duration_bucket(duration_ms: Any) -> str:
     """Bucket an update (or update stage) wall time; non-numbers count as instant."""
@@ -1306,6 +1430,9 @@ _COUNTER_DIMENSION_VALUES: dict[str, dict[str, frozenset[str]]] = {
     EXTENSION_INSTALL_METRIC: {
         "kind": EXTENSION_KINDS, "name": EXTENSION_NAMES, "outcome": EXTENSION_OUTCOMES,
         "source": EXTENSION_SOURCES,
+        # ---- iuf c1 ----
+        "failure_class": EXTENSION_FAILURE_CLASSES, "registry": EXTENSION_REGISTRIES,
+        # ---- end iuf c1 ----
     },
     # ---- v4 loop ----
     MEMORY_OP_METRIC: {
@@ -1602,7 +1729,22 @@ def counter_dimensions_are_valid(metric_name: str, dimensions: dict[str, Any]) -
             else value in contract[field]
         )
         for field in fields
+    ) and _extension_install_fields_agree(metric_name, dimensions)
+
+
+# ---- iuf c1 ----
+def _extension_install_fields_agree(metric_name: str, dimensions: dict[str, Any]) -> bool:
+    """Cross-field rule the per-field enums cannot state: an install row's ``failure_class`` is in
+    its kind's set and is ``none`` exactly on success; only skill rows name a registry."""
+    if metric_name != EXTENSION_INSTALL_METRIC or "failure_class" not in dimensions:
+        return True  # other metrics, and the pre-split shape without failure_class/registry
+    kind, failure_class = dimensions["kind"], dimensions["failure_class"]
+    return (
+        failure_class in EXTENSION_KIND_FAILURE_CLASSES[kind]
+        and (failure_class == "none") == (dimensions["outcome"] == "success")
+        and (kind == "skill" or dimensions["registry"] == "none")
     )
+# ---- end iuf c1 ----
 
 
 def _relay_metadata(
