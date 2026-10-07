@@ -14,13 +14,32 @@ from typing import Optional
 
 
 def _constants_path(getter_name: str) -> Path:
-    """Call ``qubit_constants.<getter_name>()`` (local import avoids cycles); ``~/.hermes`` on any failure."""
+    """Call ``qubit_constants.<getter_name>()`` (local import avoids cycles).
+
+    This feeds the credential read/write guards, so the failure path MUST NOT
+    silently redirect the guarded roots to a foreign tree. The old fallback
+    returned ``~/.hermes`` — the DELETED pre-rebrand location — so a transient
+    ``qubit_constants`` failure silently pointed every guard at a stale path and
+    disabled the real containment. Instead:
+
+      1. use ``qubit_constants`` (authoritative);
+      2. on failure, fall back only to a path that is provably ours — the live
+         ``QUBIT_HOME`` env var, which is what ``qubit_constants`` itself reads;
+      3. if even that is unavailable, raise, so the caller fails closed rather
+         than guarding the wrong directory.
+    """
     try:
         import qubit_constants
 
         return getattr(qubit_constants, getter_name)()
-    except Exception:
-        return Path(os.path.expanduser("~/.hermes"))
+    except Exception as exc:
+        env_home = os.environ.get("QUBIT_HOME", "").strip()
+        if env_home:
+            return Path(os.path.expanduser(os.path.expandvars(env_home)))
+        raise RuntimeError(
+            f"file_safety: cannot resolve {getter_name!r} and no QUBIT_HOME is set; "
+            "refusing to fall back to a foreign path (guards would be misdirected)"
+        ) from exc
 
 
 def _qubit_home_path() -> Path:
