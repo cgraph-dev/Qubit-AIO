@@ -47,6 +47,13 @@ _MAX_ANCESTRY_DEPTH = 128
 # Tauri updater (UPDATE_EXIT_CONCURRENT in update.rs) to show "Qubit is still running".
 UPDATE_EXIT_CONCURRENT = 2
 
+# Checkout lock file NAMES: a cross-language contract shared byte-for-byte with the Rust
+# installer (``apps/bootstrap-installer/src-tauri/src/marker.rs``) and the Electron updater
+# (``electron/update-marker.ts`` / ``marker-helper.ts``). KEPT verbatim -- renaming Python alone
+# would let two updaters lock different paths and run concurrently against one checkout.
+CHECKOUT_LOCK_NAME = ".hermes-update.lock"
+GIT_CHECKOUT_LOCK_NAME = "hermes-update.lock"
+
 
 def update_marker_path() -> Path:
     """Path of the shared update marker.
@@ -364,3 +371,202 @@ class UpdateLock:
 
     def __exit__(self, *_exc) -> None:
         self.release()
+
+
+# --- the checkout lock (custody for the updater's children) --------------------------------
+#
+# Ported 1:1 from the milestone ``hermes_cli/update_lock.py`` (upstream ee8dd6c886). The checkout
+# kernel lock keeps the install locked while ANY process of the update tree can still write it,
+# and is handed to a child through ``pass_fds`` (POSIX) or the update's kill-on-close job (Windows).
+# ``update_custody`` is the only consumer: it calls :func:`checkout_lock_fds`,
+# :func:`custody_spawn_kwargs`, :func:`bind_child_to_update_tree`, :func:`resume_suspended_child`,
+# :func:`_bind_to_kill_on_close_job`, :func:`update_tree_job`, :func:`_git_common_dir`.
+#
+# The lock-file NAMES below (``.hermes-update.lock`` / ``hermes-update.lock``) are a cross-language
+# contract shared byte-for-byte with the Rust installer (``marker.rs``) and the Electron updater
+# (``update-marker.ts`` / ``marker-helper.ts``). Renaming them in Python alone would let two
+# updaters lock DIFFERENT paths and run concurrently against one checkout. KEPT verbatim.
+
+# This process's hold on the checkout lock: {"path", "fd", "owned", "depth"}. "owned" means
+# we opened and locked it; otherwise the fd was inherited from the `qubit update` that holds
+# it (pass_fds) and belongs to the whole tree — it is never unlocked or closed here.
+_HELD: dict | None = None
+_JOBS: list = []
+
+
+def _default_install_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _git_common_dir(root: Path) -> Path | None:
+    """The repository's common git dir, read from disk (no git process: -I -S children).
+
+    ``.git`` is the dir itself, or a ``gitdir: <path>`` file (linked worktree, submodule) whose
+    target may name the shared dir in ``commondir``. ``None`` when ``root`` is no checkout.
+    """
+    dot = root / ".git"
+    try:
+        if dot.is_dir():
+            gitdir = dot
+        elif dot.is_file():
+            text = dot.read_text(encoding="utf-8-sig").strip()
+            if not text.startswith("gitdir:"):
+                return None
+            gitdir = root / text[len("gitdir:"):].strip()  # an absolute target replaces root
+        else:
+            return None
+        common = gitdir / "commondir"
+        if common.is_file():
+            gitdir = gitdir / common.read_text(encoding="utf-8-sig").strip()
+    except OSError:
+        return None
+    return Path(os.path.normpath(gitdir))
+
+
+def checkout_lock_path(install_root: Path | str | None = None) -> Path:
+    root = Path(install_root or _default_install_root())
+    common = _git_common_dir(root)
+    return root / CHECKOUT_LOCK_NAME if common is None else common / GIT_CHECKOUT_LOCK_NAME
+
+
+def _inherited_lock_fd(path: Path) -> int | None:
+    """An fd this process inherited that holds the lock on ``path`` (POSIX ``pass_fds``)."""
+    if sys.platform == "win32":
+        return None
+    try:
+        target = os.stat(path)
+        fd_dir = "/proc/self/fd" if os.path.isdir("/proc/self/fd") else "/dev/fd"
+        candidates = [int(name) for name in os.listdir(fd_dir) if name.isdigit()]
+    except OSError:
+        return None
+    import fcntl
+
+    for fd in candidates:
+        try:
+            # pass_fds clears CLOEXEC in the exec'd child. Local opens (including the
+            # concurrent status probe) retain it and must never donate their lifetime:
+            # their owner may close the fd while our update still holds custody.
+            if not os.get_inheritable(fd):
+                continue
+            st = os.fstat(fd)
+            if (st.st_dev, st.st_ino) != (target.st_dev, target.st_ino):
+                continue
+            # Succeeds only when this open file description already holds the lock (or the
+            # lock is free, in which case taking it on an fd we hold is still correct).
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except OSError:
+            continue
+    return None
+
+
+def checkout_lock_fds(install_root: Path | str | None = None) -> tuple[int, ...]:
+    """Fds a child of the update tree must inherit (``subprocess`` ``pass_fds``) so the
+    checkout stays locked while it runs, even after its parent is killed. POSIX only."""
+    if sys.platform == "win32":
+        return ()
+    if _HELD is not None:
+        return () if _HELD["fd"] is None else (_HELD["fd"],)
+    fd = _inherited_lock_fd(checkout_lock_path(install_root))
+    return () if fd is None else (fd,)
+
+
+def custody_spawn_kwargs() -> dict:
+    """``subprocess`` kwargs that keep a checkout MUTATOR (git, the Node source build) in the
+    update tree's custody (R2): POSIX children inherit the held lock fd, so the checkout stays
+    locked until the last of them exits even if this process is killed. ``{}`` when this process
+    holds no checkout lock, and on Windows (bind the Popen with bind_child_to_update_tree)."""
+    if sys.platform == "win32" or _HELD is None or _HELD["fd"] is None:
+        return {}
+    return {"pass_fds": (_HELD["fd"],)}
+
+
+CREATE_SUSPENDED = 0x00000004
+
+
+def bind_child_to_update_tree(proc: subprocess.Popen) -> OSError | None:
+    """Windows: put an update-tree child in a kill-on-close job owned by this process, so the
+    child (and everything it spawns) dies when the lock owner dies and frees the lock.
+
+    Create ``proc`` with :data:`CREATE_SUSPENDED` and resume it after the bind
+    (:func:`resume_suspended_child`): it runs no instruction before, so nothing it starts can
+    escape the job. The job allows breakaway: a process the tree starts
+    with ``CREATE_BREAKAWAY_FROM_JOB`` (the gateways an update restarts or resumes) leaves it and
+    outlives the update; every other descendant stays bound. POSIX children inherit the lock fd
+    instead (:func:`checkout_lock_fds`). Returns ``None`` when bound, else the refusal (logged):
+    the caller runs post-commit work, which must not fail over a weaker lock, so it records the
+    refusal and runs the child, which joins the lock holding its own lease byte (R5b): the
+    checkout stays busy until it exits, even after the owner's death.
+    """
+    if sys.platform != "win32":
+        return None
+    try:
+        _bind_to_kill_on_close_job(proc)
+    except OSError as exc:
+        logger.warning("Could not bind update child %s to the update's job: %s", proc.pid, exc)
+        return exc
+    return None
+
+
+def resume_suspended_child(proc: subprocess.Popen) -> None:
+    """Windows: resume a :data:`CREATE_SUSPENDED` child (a no-op for a running one). A failed
+    resume kills it and raises ``OSError``."""
+    import ctypes
+
+    ntdll = ctypes.WinDLL("ntdll")
+    ntdll.NtResumeProcess.argtypes = [ctypes.c_void_p]
+    ntdll.NtResumeProcess.restype = ctypes.c_long
+    if ntdll.NtResumeProcess(int(proc._handle)) != 0:
+        proc.kill()
+        raise OSError(f"could not resume update child {proc.pid}")
+
+
+def _bind_to_kill_on_close_job(proc: subprocess.Popen) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+    if not kernel32.AssignProcessToJobObject(update_tree_job(), int(proc._handle)):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
+def update_tree_job() -> int:
+    """Windows: this process's kill-on-close job for the update tree (created once, never
+    closed: the handle closes when this process dies, killing every process still in it)."""
+    if _JOBS:
+        return _JOBS[0]
+    import ctypes
+    from ctypes import wintypes
+
+    class _Basic(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                    ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                    ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD),
+                    ("SchedulingClass", wintypes.DWORD)]
+
+    class _Extended(ctypes.Structure):
+        _fields_ = [("BasicLimitInformation", _Basic), ("IoInfo", ctypes.c_ulonglong * 6),
+                    ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+                    ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+    kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+    kernel32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    kernel32.SetInformationJobObject.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    job = kernel32.CreateJobObjectW(None, None)  # unnamed, non-inheritable: only we hold it
+    if not job:
+        raise ctypes.WinError(ctypes.get_last_error())
+    limits = _Extended()
+    # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK
+    limits.BasicLimitInformation.LimitFlags = 0x2000 | 0x0800
+    if not kernel32.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
+        error = ctypes.get_last_error()
+        kernel32.CloseHandle(job)
+        raise ctypes.WinError(error)
+    _JOBS.append(job)  # never closed: the handle closes when this process dies, killing the tree
+    return job
