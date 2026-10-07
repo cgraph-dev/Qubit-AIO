@@ -2,7 +2,12 @@
 import ast, json, re, subprocess, sys
 from pathlib import Path
 
-REPO = Path("/home/trick/Projects/Repos/qubit-voicebridge")
+# Derive from __file__, NOT a hardcoded path. Hardcoding the main checkout made this
+# audit grade MAIN's symbols when run from a worktree: it reported 16 "GENUINELY ABSENT"
+# symbols and all 16 were false positives (each existed as a real `def` in the flagged
+# file). A porter acting on that list would create duplicate objects (hazard #1).
+# Same bug class as sync_driver.py line 29, fixed the same way.
+REPO = Path(__file__).resolve().parent.parent
 RUNTIME = REPO / "qubit_runtime"
 UP = Path("/home/trick/.hermes/hermes-agent")
 BASE = "a036b13793"
