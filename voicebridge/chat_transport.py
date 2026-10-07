@@ -640,7 +640,18 @@ def local_brain_model(cfg: Any) -> Optional[str]:
             except Exception:  # noqa: BLE001
                 configured = None
             if isinstance(configured, str) and configured.strip():
-                return configured.strip()
+                # The configured local brain must clear the SAME chat gate as
+                # the shipped default below: a record that does not carry the
+                # ``chat`` role (or cannot meet the long-context floor) must
+                # never be handed back as a NEW chat's default. Returning
+                # ``intent.local_llm.model`` blindly is how new dashboard
+                # sessions got pinned to ``qubit-brain4`` — a profile that
+                # deliberately excludes ``chat`` and emits all output into
+                # ``thinking`` with empty content — so the chat-role gate that
+                # only ran on the fallback path below was bypassed on the
+                # configured path. Fall through to the resolver's configured
+                # default instead.
+                return _gate_local_brain(cfg, _resolver, configured.strip())
         profile = _resolver.get_profile(cfg, _resolver.DEFAULT_LOCAL_ID)
         if (profile is not None and profile.enabled
                 and profile.locality == "local" and profile.model):
@@ -652,13 +663,56 @@ def local_brain_model(cfg: Any) -> Optional[str]:
             # it here made every new conversation unroutable and littered the
             # sidebar with dead rows. Fall through so the caller keeps the
             # resolver's configured default instead.
-            _roles = set(getattr(profile, "roles", ()) or ())
-            if "chat" not in _roles:
+            if not _local_brain_is_chat_eligible(cfg, profile):
                 return None
             return str(profile.model)
     except Exception:  # noqa: BLE001 - a preference, never fatal
         return None
     return None
+
+
+def _local_brain_is_chat_eligible(cfg: Any, profile: Any) -> bool:
+    """Whether a local brain record may be the default for a NEW chat.
+
+    Requires the ``chat`` role and (when it declares one) at least the
+    ``/chat`` context floor. Mirrors :func:`_gate_local_brain` so the
+    configured and shipped paths apply ONE gate.
+    """
+    from .providers import resolver as _resolver
+
+    if "chat" not in set(getattr(profile, "roles", ()) or ()):
+        return False
+    declared = int(getattr(profile, "context_tokens", 0) or 0)
+    if declared and declared < _resolver.terminal_min_context_tokens(cfg):
+        return False
+    return True
+
+
+def _gate_local_brain(cfg: Any, resolver: Any, token: str) -> Optional[str]:
+    """Gate a configured local-brain model token through the chat-role rules.
+
+    ``token`` is a model NAME or profile id (``intent.local_llm.model``). When
+    it maps to a registered profile it must be chat-eligible; when it maps to
+    no registered record it is treated as an unregistered local name and only
+    kept if the built-in records already accept it — otherwise ``None`` so the
+    caller keeps the resolver's configured default.
+    """
+    try:
+        profile = resolver._profile_for_model(cfg, token, resolver.DEFAULT_ROLE)
+    except Exception:  # noqa: BLE001
+        profile = None
+    if profile is None:
+        try:
+            profile = resolver.get_profile(cfg, token)
+        except Exception:  # noqa: BLE001
+            profile = None
+    if profile is None:
+        # An unregistered local name cannot be proven chat-capable; refuse it
+        # as a NEW-chat default rather than pinning an unknown record.
+        return None
+    if not _local_brain_is_chat_eligible(cfg, profile):
+        return None
+    return str(profile.model or token)
 
 
 def _pinned_session_model(cfg: Any, session: Optional[str]) -> Optional[str]:
@@ -734,31 +788,54 @@ def resolve_route(cfg: Any, requested: Optional[str] = None, *,
         # refusal (egress/allowlist, which carries its own code) is preserved.
         _fallback_code = str(routed.get("code") or "")
         if _fallback_code in ("UNKNOWN_PROFILE", "MODEL_NOT_ALLOWED") and req:
-            _base = _resolver.resolve_model(cfg, None, role=role, session=session)
+            # Resolve the ENDPOINT that actually serves the requested name
+            # instead of inheriting the (local) active profile's endpoint.
+            # ``req`` may be a model NAME (``deepseek-v4.1-flash``) rather than
+            # a profile id (``opencode-go-deepseek-v4.1-flash``); the
+            # registered record whose ``model`` matches names the correct
+            # provider/base_url/credential. Only when no registered profile
+            # matches do we fall back to the configured default's endpoint and
+            # then to the plain ``model`` config section — never to the local
+            # brain's ``http://localhost:11434/v1``, which produced a 404 for
+            # a hosted id.
+            _named = _resolver._profile_for_model(cfg, req, role)
+            _base = None
+            if _named is not None and _named.enabled:
+                _base = {"ok": True, "model": _named.model,
+                         "provider": _named.provider, "profile_id": _named.id,
+                         "kind": _named.kind, "route": _named.kind,
+                         "locality": _named.locality, "executable": True,
+                         "egress_required": _named.locality == "external",
+                         "egress_allowed": _named.egress_consent == "allow",
+                         "base_url": str(_named.base_url or ""),
+                         "key_ref": str(_named.key_ref or ""),
+                         "context_tokens": int(_named.context_tokens or 0)}
+            else:
+                _base = _resolver.resolve_model(cfg, None, role=role,
+                                                session=session)
             if _base.get("ok"):
                 _routed = dict(_base)
                 _routed["model"] = req
-                # The inherited profile is the local brain, so its provider
-                # (``ollama``) is WRONG for a hosted id like
-                # ``deepseek-v4.1-flash`` — sending that to local Ollama would
-                # 404. Take the provider/base_url from the configured model
-                # section, which is where a hosted default (and the picker's
-                # own write) actually points.
-                _cfg_model = {}
-                try:
-                    _cfg_model = cfg.get("model", {}) or {}
-                except Exception:  # noqa: BLE001 - odd cfg objects degrade below
+                # A name-matched profile already carries its own endpoint; only
+                # patch provider/base_url from the configured ``model`` section
+                # when nothing matched by name, which is where a hosted default
+                # (and the picker's own write) actually points.
+                if _named is None:
                     _cfg_model = {}
-                if isinstance(_cfg_model, dict):
-                    _prov = str(_cfg_model.get("provider") or "").strip()
-                    if _prov:
-                        _routed["provider"] = _prov
-                    _buri = str(_cfg_model.get("base_url") or "").strip()
-                    if _buri:
-                        _routed["base_url"] = _buri
-                    _key_env = str(_cfg_model.get("key_env") or "").strip()
-                    if _key_env:
-                        _routed["key_env"] = _key_env
+                    try:
+                        _cfg_model = cfg.get("model", {}) or {}
+                    except Exception:  # noqa: BLE001 - odd cfg degrades below
+                        _cfg_model = {}
+                    if isinstance(_cfg_model, dict):
+                        _prov = str(_cfg_model.get("provider") or "").strip()
+                        if _prov:
+                            _routed["provider"] = _prov
+                        _buri = str(_cfg_model.get("base_url") or "").strip()
+                        if _buri:
+                            _routed["base_url"] = _buri
+                        _key_env = str(_cfg_model.get("key_env") or "").strip()
+                        if _key_env:
+                            _routed["key_env"] = _key_env
                 _routed["session_pinned_model"] = req
                 _routed["registry_bypass"] = True
                 return _routed
