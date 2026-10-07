@@ -2012,11 +2012,12 @@ def _(rid, params: dict) -> dict:
     session, err = _sess(params, rid)
     if err:
         return err
-    if session.get("running"):
-        return _err(rid, 4009, busy_message("compress"))
     sid = params.get("session_id", "")
     try:
-        return _compress_live(rid, sid, session, _str_param(params, "focus_topic"))
+        with _manual_compress_turn(sid, session):
+            return _compress_live(rid, sid, session, _str_param(params, "focus_topic"))
+    except CompressionBusy as e:
+        return _err(rid, 4009, str(e))
     except CompressionLockHeld as e:
         _status_update(sid, "ready")
         from agent.manual_compression_feedback import describe_compression_lock_skip
