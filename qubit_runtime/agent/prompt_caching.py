@@ -55,15 +55,33 @@ def _apply_cache_marker(msg: dict, cache_marker: dict, native_anthropic: bool = 
         if not (role in ("tool", "assistant") and not native_anthropic):
             msg["cache_control"] = cache_marker
     elif isinstance(content, str):
-        stable_prefix = find_stable_prefix(content) if role == "user" else None
-        if stable_prefix is not None and content[len(stable_prefix):].strip():
-            # Builder-declared boundary: the scaffold carries the breakpoint and the volatile
-            # tail rides unmarked. Request-local only — the stored message stays a string.
-            msg["content"] = [_text_part(stable_prefix, cache_marker), _text_part(content[len(stable_prefix):])]
-        else:
-            msg["content"] = [_text_part(content, cache_marker)]
+        # Builder-declared boundary: the scaffold carries the breakpoint and the volatile tail
+        # rides unmarked. Request-local only — the stored message stays a string.
+        msg["content"] = _scaffold_parts(msg, cache_marker) or [_text_part(content, cache_marker)]
     elif isinstance(content, list) and content and isinstance(content[-1], dict):
         content[-1]["cache_control"] = cache_marker
+
+
+def _scaffold_parts(msg: dict, cache_marker: dict | None = None) -> list | None:
+    """``[scaffold, tail]`` parts of a string user message with a registered scaffold, the
+    marker (if any) on the scaffold; ``find_stable_prefix`` keeps the tail non-blank."""
+    content = msg.get("content")
+    prefix = find_stable_prefix(content) if msg.get("role") == "user" and isinstance(content, str) else None
+    return None if prefix is None else [_text_part(prefix, cache_marker), _text_part(content[len(prefix):])]
+
+
+def _split_unmarked_scaffolds(messages: List[Dict[str, Any]]) -> None:
+    """Send every registered scaffold message as [scaffold, tail] parts, marked or not (in place).
+
+    Provider caches key on content, and two text parts are different content from one string:
+    a skill message split while it held a breakpoint must keep the same parts after the rolling
+    marker window moves past it, or the next request re-writes the whole scaffold (#81867).
+    Each hit refreshes the scaffold's registry LRU slot, so a scaffold still in history stays
+    registered and the failover stripper can still recognise its split.
+    """
+    for i, msg in enumerate(messages):
+        if isinstance(msg, dict) and (parts := _scaffold_parts(msg)):
+            messages[i] = {**msg, "content": parts}
 
 
 def _can_carry_marker(msg: dict, native_anthropic: bool, tool_part_markers: bool = True) -> bool:
@@ -289,6 +307,7 @@ def build_prompt_cache_plan(
     for endpoint in _completed_transaction_endpoint_indexes(messages, native_anthropic=True)[-2:]:
         messages[endpoint] = copy.deepcopy(messages[endpoint])
         _apply_cache_marker(messages[endpoint], marker, native_anthropic=True)
+    _split_unmarked_scaffolds(messages)
 
     return PromptCachePlan(messages=messages, tools=planned_tools)
 
@@ -331,5 +350,6 @@ def apply_anthropic_cache_control(
     for idx in non_sys[-(4 - breakpoints_used):]:
         messages[idx] = copy.deepcopy(messages[idx])
         _apply_cache_marker(messages[idx], marker, native_anthropic=native_anthropic, tool_part_markers=tool_part_markers)
+    _split_unmarked_scaffolds(messages)
 
     return messages
