@@ -485,9 +485,15 @@ def _restore_holding_claim(root: Path, marker: Path) -> bool:
     stash = fields.get("stash", "").strip()
 
     def git(*args: str, stdin: str | None = None) -> subprocess.CompletedProcess:
-        return subprocess.run(["git", "--literal-pathspecs", "-C", str(root), *args], input=stdin,
-                              capture_output=True, text=True, encoding="utf-8", errors="replace",
-                              timeout=120, stdin=None if stdin is not None else subprocess.DEVNULL)
+        # Every restore writer runs under custody (``update_custody.run_git``): the custody config
+        # in argv and, inside an update, the lock fd or the update's kill-on-close job, so a killed
+        # repair never leaves a git child rewriting the checkout under the next launch.
+        from qubit_cli.update_custody import run_git
+
+        base = ["git", "--literal-pathspecs", "-C", str(root)]
+        return run_git(base, list(args), input=stdin, capture_output=True, timeout=120,
+                       stdin=None if stdin is not None else subprocess.DEVNULL,
+                       text=True, encoding="utf-8", errors="replace")
 
     if not pre or not target or git("rev-parse", "HEAD").stdout.strip() != pre:
         marker.unlink()  # git finished (HEAD moved) or the marker is unusable
