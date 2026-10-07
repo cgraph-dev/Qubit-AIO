@@ -194,12 +194,14 @@ def _complete_selected(request: dict) -> None:
     update_cmd._sweep_bytecode_after_update(request["branch"])
     # Launchers, products and post-build maintenance live in one place so an
     # install and an update cannot end in different states.
+    followups: list[tuple[str, str]] = []
     complete = complete_source_checkout(
         root, desktop=request["desktop"], assume_yes=request["assume_yes"],
         gateway_mode=request["gateway_mode"], pre_update_snapshot_id=request["snapshot_id"],
         pre_update_version=request["pre_update_version"],
         completion_message=request.get("completion_message"),
-        announce=None if request.get("completion_message") else "\n✓ Code updated!")
+        announce=None if request.get("completion_message") else "\n✓ Code updated!",
+        followups=followups, before_build=lambda: _resume_paused_before_build(request))
     from qubit_cli.update_receipt import record_stage
     record_stage("build", "success" if complete else "failed")
     if complete:
@@ -238,6 +240,23 @@ def _complete_selected(request: dict) -> None:
     update_cmd._resume_windows_gateways_and_merge_outcome(restart, request["windows_resume"], request["gateway_mode"])
     update_cmd._verify_fleet_after_update(
         restart, _pre_update_plan=plan, _windows_gateway_resume=request["windows_resume"], update_complete=complete)
+
+
+def _resume_paused_before_build(request: dict) -> None:
+    """Restart the gateways the POSIX pause stopped: the dependencies are synced and the launchers
+    published, the product builds (minutes) have not started. A gateway needs nothing later to
+    boot. A failure stays owed: the post-build resume retries it and records the outcome.
+
+    POSIX only: the fleet restart skips what this restarted (``already_restarted``). A Windows set
+    keeps resuming after the fleet restart, which would otherwise drain it a second time."""
+    token = request.get("windows_resume")
+    if not token or not token.get("resume_needed") or token.get("platform") != "posix":
+        return
+    from qubit_cli.update_cmd import _m
+    try:
+        _m()._resume_windows_gateways_after_update(token)
+    except Exception as exc:  # health: allow BLE001 -- retried (and recorded) after the build
+        print(f"  ⚠ Paused gateway restart incomplete ({exc}); retrying after the build")
 
 
 class _ForwardedOutput:

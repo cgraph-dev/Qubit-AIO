@@ -968,11 +968,14 @@ def _migrate_relay_exporter_env() -> None:
 
 def _run_post_update_maintenance(
     *, assume_yes, gateway_mode, pre_update_snapshot_id, had_desktop_app_before_update,
-    pre_update_version, completion_message=None,
+    pre_update_version, completion_message=None, followups=None,
 ) -> bool:
     """Post-build housekeeping and completion, returning the SQLite runtime verdict.
 
     Ancillary repairs and notices are best-effort; an unsafe runtime withholds success.
+    ``followups`` (``list[tuple[str, str]] | None``): the caller's owed-tail list; accepted for
+    source_completion parity. This module records its own step failures through ``_best_effort``
+    and the caller's ``step()`` wrapper, so the list needs no appends here.
     """
     from qubit_cli.update_cmd import _check_and_apply_config_migration, _m
     # macOS TCC: Desktop bundles are re-signed each update, so old grants can go stale
