@@ -187,3 +187,8 @@ def test_status_route_reports_the_moved_engine(legacy_env, monkeypatch):
 
     assert status["runtime_installed"] and status["runtime_backend"] == backend
     assert status["tag"] == "b10964" and not status["update_available"]
+
+
+def legacy_digests(package, target, pinned):
+    """What a pre-PM manifest records: llama.cpp's own release assets, never PM's extra archives."""
+    return pinned[:len(package._asset_names("10964", target))]
