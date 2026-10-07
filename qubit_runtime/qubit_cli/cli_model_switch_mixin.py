@@ -281,7 +281,7 @@ def _commit_model_switch(
     # The row records what THIS session runs even on --global (else a later resume restores the
     # stale creation-time model); --once is restored after one turn and never touches the row.
     if not one_turn:
-        HermesCLI._persist_model_switch_to_session(cli, result)
+        QubitCLI._persist_model_switch_to_session(cli, result)
 
 
 def _show_model_picker(cli, ctx, force_refresh: bool) -> None:
