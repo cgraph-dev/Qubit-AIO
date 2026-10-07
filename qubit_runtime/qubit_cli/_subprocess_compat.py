@@ -794,6 +794,19 @@ def _legacy_kill_process_tree(proc: "subprocess.Popen") -> None:
             pass
 
 
+def kill_and_drain(proc: "subprocess.Popen", seconds: float) -> "tuple | None":
+    """Tree-kill *proc* (:func:`kill_process_tree`), then read what its pipes still hold for at
+    most *seconds*: ``(stdout, stderr)``, or ``None`` when a descendant the kill missed still
+    holds them. Those pipes are left to ``communicate()``'s reader threads, never closed
+    (closing a pipe a thread is reading blocks; a ``with Popen`` exit would close them)."""
+    kill_process_tree(proc)
+    try:
+        return proc.communicate(timeout=seconds)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        proc.stdin = proc.stdout = proc.stderr = None
+        return None
+
+
 def bounded_probe_run(
     argv: Sequence[str], *, timeout: float, errors: str = "replace",
     env: "Mapping[str, str] | None" = None, cwd: "str | os.PathLike[str] | None" = None,
