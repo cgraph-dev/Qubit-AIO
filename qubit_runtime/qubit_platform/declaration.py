@@ -45,6 +45,7 @@ class RequiresSpec:
 
     app: bool = False
     min_version: Optional[str] = None
+    gpu: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,10 @@ class Declaration:
     @property
     def min_version(self) -> Optional[str]:
         return self.requires.min_version
+
+    @property
+    def required_gpu(self) -> Optional[str]:
+        return self.requires.gpu
 
     def app_for(self, os_family: str) -> Optional[AppDef]:
         return self.app.for_os(os_family) if self.app else None
@@ -160,9 +165,12 @@ def parse_requires(raw: Any, app: Optional[AppSpec], *, where: str) -> RequiresS
     if raw is None:
         return RequiresSpec()
     _require_mapping(where, "requires", raw)
-    unknown = set(raw) - {"app", "min_version"}
+    unknown = set(raw) - {"app", "min_version", "gpu"}
     if unknown:
         raise DeclarationError(f"{where}: requires has unknown keys {sorted(unknown)}")
+    gpu = raw.get("gpu")
+    if gpu is not None and (not isinstance(gpu, str) or gpu not in GPU_LABELS):
+        raise DeclarationError(f"{where}: requires.gpu must be one of {sorted(GPU_LABELS)}")
     needs_app = raw.get("app", False)
     if not isinstance(needs_app, bool):
         raise DeclarationError(f"{where}: requires.app must be a boolean")
@@ -175,11 +183,14 @@ def parse_requires(raw: Any, app: Optional[AppSpec], *, where: str) -> RequiresS
         if not needs_app:
             raise DeclarationError(f"{where}: requires.min_version needs requires.app: true")
         assert app is not None
-        unversioned = sorted(osf for osf, d in app.per_os.items() if d.version_kind == "none")
+        # Linux has no version source, so a Linux block is gated on presence only; Windows and macOS must read
+        # one, and a Linux-only declaration has nothing to compare.
+        unversioned = [osf for osf in sorted(app.per_os) if app.per_os[osf].version_kind == "none"
+                       and (osf != "linux" or len(app.per_os) == 1)]
         if unversioned:
             raise DeclarationError(
                 f"{where}: requires.min_version needs a version source under app.{unversioned[0]} (kind is none)")
-    return RequiresSpec(app=needs_app, min_version=min_version)
+    return RequiresSpec(app=needs_app, min_version=min_version, gpu=gpu)
 
 
 def parse_declaration(name: str, raw_app: Any, raw_requires: Any, *, where: str) -> Declaration:

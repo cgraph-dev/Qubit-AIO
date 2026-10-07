@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 LivenessKind = Literal["static", "server_json", "interactive_session"]
 LivenessState = Literal[
     "app_not_running",
-    "hermes_not_connected",
+    "qubit_not_connected",
     "endpoint_unavailable",
     "no_interactive_session",
     "version_too_old",
@@ -111,7 +111,7 @@ def liveness_for(server_name: str) -> Liveness:
 def _action(state: LivenessState, app_name: str, gpu_label: str) -> tuple[str, Retry]:
     actions: dict[LivenessState, tuple[str, Retry]] = {
         "app_not_running": (f"Start {app_name}, then try again.", "after_user_action"),
-        "hermes_not_connected": (f"Reconnect {app_name} in Hermes, then try again.", "after_user_action"),
+        "qubit_not_connected": (f"Reconnect {app_name} in Qubit, then try again.", "after_user_action"),
         "endpoint_unavailable": (f"Open {app_name} and enable its local connection, then try again.", "after_user_action"),
         "no_interactive_session": (f"Open an interactive desktop session and start {app_name}, then try again.", "never_here"),
         "version_too_old": (f"Update {app_name}, then try again.", "after_user_action"),
@@ -152,11 +152,11 @@ def status(server_name: str) -> Status | None:
                 # The app runs and its endpoint answers: the only thing missing is Hermes' own
                 # MCP connection to it. Telling the user to "start" an app that IS running is
                 # the wrong instruction (#119975).
-                state = "hermes_not_connected"
+                state = "qubit_not_connected"
     else:
         # static / unknown liveness kinds cannot observe the app, so they cannot conclude it
         # is not running; the honest answer is that Hermes is not connected (#119975).
-        state = "hermes_not_connected"
+        state = "qubit_not_connected"
     action, retry = _action(state, decl.name, declaration.gpu_label(decl.required_gpu))
     return Status(state, available, live, action, retry)
 
@@ -182,7 +182,7 @@ def describe(decl: declaration.Declaration, available: Availability, liveness_st
         reason = f"{app_name} needs an interactive desktop session."
     elif liveness_state == "endpoint_unavailable":
         reason = f"{app_name}'s local endpoint is unavailable."
-    elif liveness_state == "hermes_not_connected":
+    elif liveness_state == "qubit_not_connected":
         reason = f"{app_name}'s MCP connection is missing."
     else:
         reason = f"{app_name} is not running."

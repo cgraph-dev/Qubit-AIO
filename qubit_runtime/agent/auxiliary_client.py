@@ -3016,9 +3016,10 @@ def _build_xai_oauth_aux_client(model: str) -> Tuple[Optional[Any], Optional[str
 
 
 def _codex_base_url_override() -> str:
-    """Profile-scoped ``HERMES_CODEX_BASE_URL`` (same read as the API-key env vars: under a
-    multiplexer the routed profile's .env decides the endpoint, never a sibling's process env)."""
-    return _scoped_key_env("HERMES_CODEX_BASE_URL").rstrip("/")
+    """Profile-scoped Codex base-URL override (same read as the API-key env vars: under a
+    multiplexer the routed profile's .env decides the endpoint, never a sibling's process env).
+    ``QUBIT_CODEX_BASE_URL`` is Qubit-first; ``HERMES_CODEX_BASE_URL`` stays the compat alias."""
+    return (_scoped_key_env("QUBIT_CODEX_BASE_URL") or _scoped_key_env("HERMES_CODEX_BASE_URL")).rstrip("/")
 
 
 def _build_codex_client(model: str) -> Tuple[Optional[Any], Optional[str]]:
