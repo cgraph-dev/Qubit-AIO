@@ -1,5 +1,4 @@
-"""Interactive messaging-platform setup wizards: WhatsApp (bridge + Cloud API), Slack manifest,
-Skill Sync.
+"""Interactive messaging-platform setup wizards: WhatsApp (bridge + Cloud API), Slack manifest.
 
 Split out of ``qubit_cli/main.py``. Names that still live in main are imported lazily at call time.
 """

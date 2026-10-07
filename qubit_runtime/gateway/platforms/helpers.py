@@ -84,6 +84,16 @@ def carry_inbound_dedup(caches: Optional[dict], adapter: Any) -> None:
             current.absorb(previous)
 
 
+def hand_over_held_inbound(predecessor: Any, adapter: Any) -> None:
+    """Move inbound the retired instance is holding to its now-published replacement (#132829).
+
+    Runs at publish time, not before connect: a candidate that fails to connect never owns the
+    queue, and the predecessor keeps holding until a replacement is registered."""
+    adopt = getattr(adapter, "adopt_held_inbound", None)
+    if predecessor is not None and callable(adopt):
+        adopt(predecessor)
+
+
 # Worker-thread handoff used by the off-loop persist paths.  A module attribute
 # so tests can replace THIS seam instead of patching ``asyncio.to_thread``
 # globally.

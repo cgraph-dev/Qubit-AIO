@@ -26,13 +26,13 @@ from typing import Callable, Mapping, Optional
 # `appId` into extraMetadata.desktopName, and Electron hands that string to the compositor
 # verbatim (Wayland app_id, CHROME_DESKTOP). GNOME links a window to a launcher by StartupWMClass
 # or by a `<app_id>.desktop` file name, so the entry has to carry the same id — under the old
-# "hermes.desktop" name a packaged launch matches neither rung and lands on the placeholder icon.
-APP_ID = "com.nousresearch.hermes"
+# "qubit.desktop" name a packaged launch matches neither rung and lands on the placeholder icon.
+APP_ID = "com.nousresearch.qubit"
 DESKTOP_ENTRY_NAME = f"{APP_ID}.desktop"
 
 # Entry name written before the app-id rename; a successful install converts it into a hidden
 # alias (NoDisplay=true) so pre-rename taskbar pins keep resolving (see _alias_legacy_desktop_entry).
-LEGACY_DESKTOP_ENTRY_NAME = "hermes.desktop"
+LEGACY_DESKTOP_ENTRY_NAME = "qubit.desktop"
 
 # XDG startup notification: set by an app-grid / menu launch, absent for terminal and detached
 # (updater relaunch) launches. See launched_from_shell().
@@ -832,7 +832,7 @@ def install_desktop_entry(project_root: Path) -> Optional[Path]:
     # the copy is impossible (read-only tree); themed name when the checkout has no icon at all.
     icon_value = str(icon) if icon.is_file() else "hermes"
     if icon.is_file() and _install_icon_to_hicolor(icon):
-        icon_value = "hermes"
+        icon_value = "qubit"
     contents = render_desktop_entry(exec_command, icon_value)
 
     try:

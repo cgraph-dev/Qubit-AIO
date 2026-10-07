@@ -9,8 +9,9 @@ from typing import Callable
 def build_logs_parser(subparsers, *, cmd_logs: Callable) -> None:
     """Attach the ``logs`` subcommand to ``subparsers``."""
     logs_parser = subparsers.add_parser(
-        "logs", help="View and filter Qubit log files",
-        description="View, tail, and filter agent.log / errors.log / gateway.log / gui.log / desktop.log",
+        "logs",
+        help="View and filter Hermes log files",
+        description="View, tail, and filter agent.log / errors.log / gateway.log / gui.log / desktop.log / update.log / desktop-update-handoff.log",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Examples:
@@ -20,6 +21,8 @@ Examples:
     qubit logs gateway -n 100     Show last 100 lines of gateway.log
     qubit logs gui -f             Follow gui.log in real time
     qubit logs desktop -f         Follow desktop.log (Electron app boot/backend)
+    qubit logs update             Show last 50 lines of update.log (qubit update mirror)
+    qubit logs handoff            Show last 50 lines of desktop-update-handoff.log
     qubit logs --level WARNING    Only show WARNING and above
     qubit logs --session abc123   Filter by session ID
     qubit logs --component tools  Only show tool-related lines
@@ -28,8 +31,10 @@ Examples:
     qubit logs list               List available log files with sizes
 """)
     logs_parser.add_argument(
-        "log_name", nargs="?", default="agent",
-        help="Log to view: agent (default), errors, gateway, gui, or 'list' to show available files",
+        "log_name",
+        nargs="?",
+        default="agent",
+        help="Log to view: agent (default), errors, gateway, gui, desktop, update, handoff, or 'list' to show available files",
     )
     logs_parser.add_argument(
         "-n", "--lines", type=int, default=50, help="Number of lines to show (default: 50)")

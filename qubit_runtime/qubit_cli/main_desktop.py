@@ -1245,8 +1245,8 @@ def _install_rebuilt_macos_bundles(
                 if downgrade:
                     problems.append(f"{app} not refreshed: {downgrade}")
                     continue
-        tmp = app.parent / f"{app.name}.hermes-update-new"
-        old = app.parent / f"{app.name}.hermes-update-old"
+        tmp = app.parent / f"{app.name}.qubit-update-new"
+        old = app.parent / f"{app.name}.qubit-update-old"
         shutil.rmtree(tmp, ignore_errors=True)
         shutil.rmtree(old, ignore_errors=True)
         try:

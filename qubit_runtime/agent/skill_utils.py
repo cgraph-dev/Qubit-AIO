@@ -50,6 +50,26 @@ def read_active_org_id(skills_dir: Path) -> Optional[str]:
         return None
 
 
+def _org_rel_parts(path, skills_dir: Path) -> Tuple[str, ...]:
+    """Path parts of *path* relative to *skills_dir* if it is under ``_org/``, else ``()``."""
+    try:
+        parts = Path(path).resolve().relative_to(Path(skills_dir).resolve()).parts
+    except (OSError, ValueError):
+        return ()
+    return parts if parts and parts[0] == ORG_MIRROR_DIR_NAME else ()
+
+
+def is_org_mirror_path(path, skills_dir: Path) -> bool:
+    """True when *path* is inside the org mirror (``_org/``)."""
+    return bool(_org_rel_parts(path, skills_dir))
+
+
+def org_id_of_path(path, skills_dir: Path) -> Optional[str]:
+    """The ``<org_id>`` segment for a path under ``_org/<org_id>/...``."""
+    parts = _org_rel_parts(path, skills_dir)
+    return parts[1] if len(parts) >= 2 else None
+
+
 def is_excluded_skill_path(path, *, root: Optional[Path] = None) -> bool:
     """True if *path* should be skipped by skill scanners (VCS/dependency/cache
     dirs + support packages). Apply to every SKILL.md from a direct ``rglob``."""

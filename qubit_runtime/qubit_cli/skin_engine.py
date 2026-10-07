@@ -25,8 +25,9 @@ class SkinConfig:
     branding: Dict[str, str] = field(default_factory=dict)
     tool_prefix: str = "┊"
     tool_emojis: Dict[str, str] = field(default_factory=dict)  # per-tool emoji overrides
-    banner_logo: str = ""    # Rich-markup ASCII art logo (replaces HERMES_AGENT_LOGO)
-    banner_hero: str = ""    # Rich-markup hero art (replaces HERMES_CADUCEUS)
+    banner_logo: str = ""    # Rich-markup ASCII art logo (replaces QUBIT_AGENT_LOGO)
+    banner_hero: str = ""    # Rich-markup hero art (replaces QUBIT_CADUCEUS)
+    custom_css: str = ""     # Raw CSS injected as a <style> tag on the desktop GUI (32 KiB cap)
 
     def get_color(self, key: str, fallback: str = "") -> str:
         return self.colors.get(key, fallback)
@@ -403,7 +404,8 @@ def _build_skin_config(data: Dict[str, Any]) -> SkinConfig:
         spinner=merged("spinner"), branding=merged("branding"),
         tool_prefix=data.get("tool_prefix", default.get("tool_prefix", "┊")),
         tool_emojis=section("tool_emojis"), banner_logo=data.get("banner_logo", ""),
-        banner_hero=data.get("banner_hero", ""))
+        banner_hero=data.get("banner_hero", ""),
+        custom_css=str(data.get("customCSS", "")).strip()[:32768])
 
 
 def list_skins() -> List[Dict[str, str]]:

@@ -158,14 +158,39 @@ def _home_consent(home: Path) -> bool:
         reset_qubit_home_override(token)
 
 
-def _install_into(home: Path) -> Callable[[str], dict]:
+def _interactive() -> bool:
+    return sys.stdin is not None and sys.stdout is not None and sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _unattended_consent() -> bool:
+    """Without a terminal (Desktop, gateway, ``qubit update`` from a script) nobody can answer the
+    dependency prompt, so every provider that declares Python deps would fail to migrate. The
+    configured ``memory.provider`` plus ``security.allow_lazy_installs`` (read for the active home,
+    i.e. the one being migrated) is the same consent that let the bundled provider install its deps
+    on demand; with a terminal the user is still asked."""
+    from pm.install import lazy_installs_allowed
+
+    return not _interactive() and lazy_installs_allowed()
+
+
+def _home_consent(home: Path) -> bool:
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+    token = set_qubit_home_override(home)
+    try:
+        return _unattended_consent()
+    finally:
+        reset_qubit_home_override(token)
+
+
+def _install_into(home: Path, *, consent: Optional[bool] = None) -> Callable[[str], dict]:
     def _install(name: str) -> dict:
         from qubit_cli.plugins_cmd import dashboard_install_plugin
         from qubit_constants import reset_qubit_home_override, set_qubit_home_override
         token = set_qubit_home_override(home)
         try:
             return dashboard_install_plugin("", force=False, enable=True, catalog_name=name,
-                                            assume_deps_consent=name in _LEFT_CORE and _unattended_consent())
+                                            assume_deps_consent=(name in _LEFT_CORE and _unattended_consent())
+                                            if consent is None else consent)
         finally:
             reset_qubit_home_override(token)
     return _install
@@ -254,4 +279,14 @@ def recover_at_startup(name: str, *, say: Optional[Callable[[str], None]] = None
                f"security.allow_lazy_installs is off, so Hermes did not fetch it: "
                f"run `{_install_command(name, home)}`.")
         return False
-    return migrate_home(home, install=_install_into(home), say=report) == name
+    # Agent init cannot answer a dependency prompt: under the CLI the prompt_toolkit input owns the
+    # terminal (the question hangs the turn), elsewhere there is no terminal (the install is refused,
+    # every process). So it installs with consent or not at all: a provider that shipped in core
+    # carries the consent its built-in had; any other one needs the user's own install.
+    if name not in _LEFT_CORE:
+        if _pending_provider(home, say=report) == name:
+            report(f"⚠ Memory provider '{name}' is not installed, so external memory is off for this session. "
+                   f"It never shipped with Hermes, so Hermes installs it only when you ask: "
+                   f"run `{_install_command(name, home)}`.")
+        return False
+    return migrate_home(home, install=_install_into(home, consent=True), say=report) == name

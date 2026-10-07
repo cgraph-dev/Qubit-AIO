@@ -35,13 +35,21 @@ def desktop_userdata_dir() -> Path:
 
 
 def source_built_gui_artifacts(qubit_home: Path) -> "list[Path]":
-    """GUI build artifacts produced by ``qubit desktop`` inside the checkout (same ``hermes-agent/`` layout
-    install.sh uses). The Python agent runs from source + venv and never needs the Electron build output or
-    node_modules (the workspace-root node_modules only carries Electron, ~200MB)."""
-    agent_root = qubit_home / "hermes-agent"
+    """GUI build artifacts produced by ``qubit desktop`` inside the checkout (same ``qubit/`` layout
+    install.sh uses). The workspace-root node_modules is shared with the TUI, dashboard and other
+    workspaces, so only the desktop workspace's own dependencies belong to GUI removal."""
+    agent_root = qubit_home / "qubit"
     desktop_dir = agent_root / "apps" / "desktop"
     return [desktop_dir / "dist", desktop_dir / "release", desktop_dir / "node_modules",
-            agent_root / "node_modules", qubit_home / "desktop-build-stamp.json"]
+            qubit_home / "desktop-build-stamp.json"]
+
+
+def desktop_install_record() -> Path:
+    """Where ``qubit update`` records the installed ``Hermes.app`` copies it keeps current. The apps
+    are machine-wide, so the record sits under the default root whichever profile runs; deleting it
+    is what stops an uninstalled app from being put back by the next update."""
+    from qubit_constants import get_default_qubit_root  # noqa: PLC0415
+    return get_default_qubit_root() / "desktop-installed-apps.json"
 
 
 def packaged_gui_app_paths() -> "list[Path]":
@@ -59,12 +67,16 @@ def packaged_gui_app_paths() -> "list[Path]":
             [Path(program_files) / "Qubit"] if program_files else [])
     # Linux: an AppImage lives wherever the user put it and deb/rpm files belong to the package manager
     # (see the hint in ``uninstall_gui``), so only the desktop entry + hicolor icons are cleaned here.
-    from qubit_cli.linux_desktop_entry import desktop_entry_path
+    from qubit_cli.linux_desktop_entry import LEGACY_DESKTOP_ENTRY_NAME, desktop_entry_path
     data_base = _env_dir("XDG_DATA_HOME", home / ".local" / "share")
     icons = data_base / "icons" / "hicolor"
     # "scalable" plus every fixed-size dir the installer may have written (panel sizes + older native copies).
-    return [desktop_entry_path(), data_base / "applications" / "Hermes.desktop"] + [
-        icons / size / "apps" / name for size in ("scalable", "24x24", "32x32", "48x48", "256x256", "512x512", "1024x1024") for name in ("qubit.png", "hermes.png")]
+    # The legacy entry is a hidden alias of the app-id entry since #124492 — remove it with the real one.
+    return [desktop_entry_path(),
+            data_base / "applications" / LEGACY_DESKTOP_ENTRY_NAME,
+            data_base / "applications" / "Hermes.desktop"] + [
+        icons / size / "apps" / "qubit.png"
+        for size in ("scalable", "24x24", "32x32", "48x48", "256x256", "512x512", "1024x1024")]
 
 
 def desktop_install_record() -> Path:
@@ -82,8 +94,11 @@ def agent_is_installed(qubit_home: Path) -> bool:
 
 
 def gui_is_installed(qubit_home: Path) -> bool:
-    """Return True when any desktop GUI artifact exists (built or packaged)."""
-    return any(p.exists() for p in (*source_built_gui_artifacts(qubit_home), *packaged_gui_app_paths(), desktop_userdata_dir()))
+    """Return True when any desktop GUI artifact or install record exists."""
+    return any(p.exists() for p in (
+        *source_built_gui_artifacts(qubit_home), *packaged_gui_app_paths(),
+        desktop_userdata_dir(), desktop_install_record(),
+    ))
 
 
 def gui_install_summary(qubit_home: "Path | None" = None) -> dict:
@@ -141,7 +156,7 @@ def uninstall_gui(qubit_home: "Path | None" = None, *, remove_userdata: bool = T
                 removed.append(path)
         return found
     log_info("Removing built GUI artifacts (renderer, release, node_modules)...")
-    _remove_existing(source_built_gui_artifacts(home))
+    _remove_existing([*source_built_gui_artifacts(home), desktop_install_record()])
     log_info("Removing installed desktop app...")
     if not _remove_existing(packaged_gui_app_paths()):
         log_info("No packaged desktop app found in standard locations")
