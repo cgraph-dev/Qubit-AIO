@@ -20,13 +20,16 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from qubit_constants import get_qubit_home, qubit_home_key
 
 # Home key -> home path for every profile this process ticks, republished each ticker cycle so a
 # profile created or tombstoned mid-run is reflected without a restart.
 _ticked_homes: dict[str, Path] = {}
+# Home key -> resolved cron store, taken while the home exists: a departed profile's home may be
+# gone by the time its store state is dropped, and a symlinked cron/ resolves elsewhere.
+_ticked_stores: dict[str, str] = {}
 _ticked_lock = threading.Lock()
 
 
@@ -37,19 +40,28 @@ def register_ticked_homes(homes) -> None:
     live until process exit, so serving (or churning) many profiles leaks one ThreadPoolExecutor
     and its worker threads per home ever ticked.
     """
-    resolved = {}
+    from cron.store_health import forget_stores, store_key
+
+    resolved, stores = {}, {}
     for home in homes:
         path = Path(home)
-        resolved[qubit_home_key(path)] = path
+        key = qubit_home_key(path)
+        resolved[key] = path
+        stores[key] = store_key(path)
     with _ticked_lock:
         departed = set(_ticked_homes) - set(resolved)
+        # A store another still-ticked profile reaches (cron/ symlinked to one place) keeps its state.
+        departed_stores = {_ticked_stores[k] for k in departed if k in _ticked_stores} - set(stores.values())
         _ticked_homes.clear()
         _ticked_homes.update(resolved)
+        _ticked_stores.clear()
+        _ticked_stores.update(stores)
     if departed:
         # Late import: cron.scheduler imports this module.
         from cron.scheduler import discard_parallel_pools
 
         discard_parallel_pools(departed)
+        forget_stores(departed_stores)
 
 
 def ticked_homes() -> dict:
