@@ -1338,7 +1338,7 @@ def _resolve_last_session(source: str = "cli") -> Optional[str]:
     """
     # A finite `qubit -z`/`chat -q` run is CLI history too: `qubit -z … --resume latest` chains on it.
     if source == "cli":
-        from run_agent import CLI_FAMILY_SOURCES
+        from agent.session_source import CLI_FAMILY_SOURCES
         source = sorted(CLI_FAMILY_SOURCES)
     with _session_db() as db:
         ws_key = _resolve_workspace_key()

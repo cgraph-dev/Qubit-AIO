@@ -59,9 +59,9 @@ def _agent_source(
     platform = getattr(agent, "platform", None)
     try:
         # Lazy: run_agent imports this module.
-        from run_agent import _session_source_for_agent
+        from agent.session_source import session_source_for
 
-        source = str(_session_source_for_agent(platform) or "").strip()
+        source = str(session_source_for(platform) or "").strip()
         if source:
             return source
     except Exception:
