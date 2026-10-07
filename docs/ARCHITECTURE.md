@@ -1,8 +1,10 @@
 # Qubit ARCHITECTURE — one unified agent
 
 Qubit is **one agent** assembled from three layers, all driven through a single
-authority path. It is a rebranded fork of the upstream reference (renamed to the Qubit
-namespace), plus a voice control surface, plus upstream-compatible adapters.
+authority path. It is a **personal AI agent** (see [IDENTITY.md](IDENTITY.md))
+built on vendored upstream source renamed into the Qubit namespace, plus a voice
+control surface, plus upstream-compatible adapters. Upstream is provenance, not
+identity.
 
 ## Layers
 

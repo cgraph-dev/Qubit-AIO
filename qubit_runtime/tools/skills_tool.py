@@ -578,7 +578,7 @@ def skill_view(
             legacy = resolve_legacy_skill_name(name)
             if legacy != name:
                 error2, skill_dir2, skill_md2 = _locate_skill(
-                    legacy, local_category_name, project_dirs, all_dirs)
+                    legacy, local_category_name, roots)
                 if error2 is None:
                     error, skill_dir, skill_md, name = None, skill_dir2, skill_md2, legacy
         if error is not None:

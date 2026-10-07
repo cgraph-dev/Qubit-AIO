@@ -601,6 +601,55 @@ def configured_model(cfg: Any) -> str:
         return DEFAULT_MODEL
 
 
+def local_brain_model(cfg: Any) -> Optional[str]:
+    """The configured local brain model, or ``None`` when none is configured.
+
+    ``/qubit-chat`` is the voice + report surface, so its NEW conversations
+    default to the local profile instead of the resolver's configured API
+    default (which is what makes a fresh dashboard row show the remote model).
+    Resolution is config-driven and never a hard-coded alias:
+
+    1. ``intent.local_llm.enabled`` — an explicit ``false`` disables the local
+       brain, so this returns ``None`` and the caller degrades to the existing
+       default rather than pinning a model the operator turned off;
+    2. ``intent.local_llm.model`` — the canonical BRAIN selection path (the
+       same path ``voicebridge.profiles`` and ``voicebridge.local_models``
+       read), when set;
+    3. otherwise the shipped local profile's model, resolved through the one
+       resolver (``DEFAULT_LOCAL_ID``), but only when that profile is enabled
+       and genuinely local.
+
+    Any failure yields ``None`` (never a fabricated model), so callers keep
+    their shipped default.
+    """
+    try:
+        from .providers import resolver as _resolver
+
+        try:
+            get = cfg.get
+        except AttributeError:
+            get = None
+        if get is not None:
+            try:
+                if get("intent", "local_llm", "enabled", default=True) is False:
+                    return None
+            except Exception:  # noqa: BLE001 - an unreadable flag is not a "no"
+                pass
+            try:
+                configured = get("intent", "local_llm", "model", default=None)
+            except Exception:  # noqa: BLE001
+                configured = None
+            if isinstance(configured, str) and configured.strip():
+                return configured.strip()
+        profile = _resolver.get_profile(cfg, _resolver.DEFAULT_LOCAL_ID)
+        if (profile is not None and profile.enabled
+                and profile.locality == "local" and profile.model):
+            return str(profile.model)
+    except Exception:  # noqa: BLE001 - a preference, never fatal
+        return None
+    return None
+
+
 def _pinned_session_model(cfg: Any, session: Optional[str]) -> Optional[str]:
     """The model recorded on a chat session, if any (the ``/chat`` authority).
 
@@ -3535,7 +3584,8 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
          cancel: Optional[Callable[[], bool]] = None,
          role: str = "chat",
          actor: str = "dashboard:user",
-         reasoning: Optional[str] = None) -> Dict[str, Any]:
+         reasoning: Optional[str] = None,
+         force_agent: bool = False) -> Dict[str, Any]:
     """Run one persisted agent turn on the shared Qubit brain path.
 
     ``reasoning`` (None/minimal/low/medium/high/max) is validated FIRST so
@@ -3547,6 +3597,12 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
     broker-backed local action, shared voice registry, headless /chat
     worker) instead of the model path. Anything else keeps the legacy
     model flow byte-for-byte.
+
+    ``force_agent`` (attached-image/vision turns): the text is CONTEXT, not an
+    instruction, so the classifier must not steal it. The turn routes straight
+    through the SAME tool-capable agent ``/chat`` drives, with the legacy model
+    path only as the no-runtime fallback — never a fast-path action
+    (``screenshot``) or the coding build worker.
     """
     if _estop(cfg):
         return {"ok": False, "state": "UNAVAILABLE", "code": "EMERGENCY_STOP",
@@ -3563,6 +3619,14 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
                 "detail": str(exc)[:200]}
     clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
     st = store(cfg)
+    # Attached-image/vision turns carry a description that the fast-path
+    # classifier would hijack (a "screenshot"/"image" phrase matches the local
+    # screenshot action; a question matches the coding build worker), so they
+    # must reach the tool-capable agent directly. See :func:`_agent_turn`.
+    if force_agent:
+        return _agent_turn(cfg, clean, session=session, model=model,
+                           timeout_s=timeout_s, cancel=cancel, role=role,
+                           reasoning=reasoning_level)
     # Qubit-chat slash turns (DECISIONS #26): a leading "/" executes against
     # the real backend registries instead of entering the classifier/model
     # path (which would chatter about or narrate the slash text). Non-slash
@@ -3611,9 +3675,14 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
                         "detail": appended.get("detail", "")}
             if _verdict == "deny":
                 return _cancel_confirmations(cfg, st, sid)
-            if _pending_registry(cfg, sid):
-                return _settle_affirmed(cfg, st, sid)
-            return _settle_task_affirmed(cfg, st, sid)
+            # Settle the SAME record the UI surfaced: ``_pending_confirmation``
+            # returns the newest staged action across both kinds, so a "yes"
+            # must follow its ``kind``. Selecting registry first would settle an
+            # older registry action while the banner showed a newer build write.
+            _surfaced = _pending_confirmation(cfg, sid)
+            if _surfaced and str(_surfaced.get("kind") or "") == "task":
+                return _settle_task_affirmed(cfg, st, sid)
+            return _settle_affirmed(cfg, st, sid)
     # Mid-sentence slash (one known /verb anywhere): executes that verb
     # against the real backend instead of entering the classifier/model path
     # (which would chatter about the slash text). Runs after affirmation
@@ -3870,11 +3939,22 @@ def _agent_chat(cfg: Any, st: Any, sid: str, clean: str, *,
 
     if not str(sid or "").strip() or not str(clean or "").strip():
         return None
+    # Work-panel producer: republish the vendored runtime's tool-progress feed
+    # (subagent.* lifecycle + the tool.completed result) as CUSTOM frames on the
+    # webui SSE hub, scoped to this session. None when no hub is attached (a
+    # headless caller) — the runtime then uses its no-op default, unchanged.
+    try:
+        from .events.chat_progress import build_progress_sink
+
+        progress_sink = build_progress_sink(cfg, sid)
+    except Exception:  # noqa: BLE001 - panel glue is never fatal to a turn
+        progress_sink = None
     try:
         out = AG.run_agent_turn(
             cfg, clean, session=sid, reasoning=reasoning,
             estop_engaged=lambda: _estop(cfg)
-            or (cancel is not None and bool(cancel())))
+            or (cancel is not None and bool(cancel())),
+            progress_sink=progress_sink)
     except AG.AgentDenied as exc:
         _audit("turn_agent_denied", session=sid, code=exc.code)
         code = "EMERGENCY_STOP" if exc.code == "EMERGENCY_STOP" \
@@ -3910,6 +3990,51 @@ def _agent_chat(cfg: Any, st: Any, sid: str, clean: str, *,
     return {"ok": True, "reply": reply, "text": reply, "session": sid,
             "session_id": sid, "route": "agent",
             "elapsed_ms": out.get("elapsed_ms"), "receipt": receipt}
+
+
+def _agent_turn(cfg: Any, text: str, *, session: Optional[str] = None,
+                model: Optional[str] = None,
+                timeout_s: Optional[float] = None,
+                cancel: Optional[Callable[[], bool]] = None,
+                role: str = "chat",
+                reasoning: Optional[str] = None) -> Dict[str, Any]:
+    """One turn forced through the tool-capable agent (attached-image path).
+
+    Unlike :func:`turn`, this never consults the classifier: an attached image's
+    description is context the agent must reason over, so a fast-path action
+    match (``screenshot``) or the coding build worker must not steal it. Runs
+    the SAME ``_agent_chat`` seam ``/chat`` uses; the legacy model path is the
+    only fallback, and only when no tool-capable vendored runtime is available
+    (never a fabricated reply).
+    """
+    st = store(cfg)
+    routed = resolve_route(cfg, model, session=session, role=role)
+    if not routed.get("ok"):
+        return routed
+    resolved_model = routed["model"]
+    created = _resolve_session(st, session, model=resolved_model, cfg=cfg)
+    if created.get("state") != "OK":
+        return {"ok": False, "state": "FAILED", "code": created.get("code"),
+                "detail": created.get("detail", "")}
+    sid = created["session"]["id"]
+    if not text:
+        return {"ok": False, "state": "FAILED", "code": "MALFORMED",
+                "detail": "turn needs non-empty text", "session_id": sid}
+    agent_out = _agent_chat(cfg, st, sid, text, timeout_s=timeout_s,
+                            cancel=cancel, reasoning=reasoning)
+    if agent_out is not None:
+        return agent_out
+    context, ctx_meta, decision = _context_prompt(
+        st, sid, cfg=cfg, model_context_tokens=routed.get("context_tokens"),
+        pending_text=text)
+    appended = st.append(sid, "user", text)
+    if appended.get("state") != "OK":
+        return {"ok": False, "state": "FAILED", "code": appended.get("code"),
+                "detail": appended.get("detail", "")}
+    return _generate(cfg, sid, text, resolved_model, context,
+                     timeout_s=timeout_s, cancel=cancel, routed=routed,
+                     role=role, context_meta=ctx_meta, decision=decision,
+                     reasoning=reasoning)
 
 
 def _generate(cfg: Any, sid: str, clean: str, resolved_model: str,
@@ -4356,45 +4481,32 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     # text leaves it staged. The pending state is surfaced on start/done so
     # the UI can render "awaiting confirmation" without a raw dump.
     _verdict = _classify_confirmation(clean) if clean else "other"
-    if _verdict == "affirm" and _pending_registry(cfg, sid):
+    # T4/T5: settle the SAME staged record the UI surfaced. A bare affirmation
+    # follows the newest pending's ``kind`` (``_pending_confirmation``), so a
+    # build-write banner is never settled by an older registry confirmation
+    # (and vice-versa). Any other text leaves it staged.
+    _surfaced_pending = (_pending_confirmation(cfg, sid)
+                         if _verdict == "affirm" else None)
+    if _verdict == "affirm" and _surfaced_pending:
+        _settle_kind = str(_surfaced_pending.get("kind") or "registry")
+        _settle_route = "task" if _settle_kind == "task" else "registry"
         started = time.monotonic()
         yield {"event": "start", "session_id": sid, "session": sid,
-               "route": "registry", **_pending_event_field(cfg, sid)}
+               "route": _settle_route, **_pending_event_field(cfg, sid)}
         appended = st.append(sid, "user", clean)
         if appended.get("state") != "OK":
             yield {"event": "error", "code": appended.get("code"),
                    "detail": appended.get("detail", ""), "session_id": sid}
             return
-        res = _settle_affirmed(cfg, st, sid)
+        if _settle_kind == "task":
+            res = _settle_task_affirmed(cfg, st, sid)
+        else:
+            res = _settle_affirmed(cfg, st, sid)
         elapsed_ms = int((time.monotonic() - started) * 1000)
         if not res.get("ok"):
             yield {"event": "error", "code": res.get("code", "BRANCH_FAILED"),
                    "detail": res.get("detail", ""), "session_id": sid,
-                   "route": "registry", "elapsed_ms": elapsed_ms}
-            return
-        text_out = str(res.get("text") or res.get("reply") or "")
-        yield {"event": "delta", "text": text_out, "session_id": sid}
-        yield {"event": "done", "ok": True, "reply": text_out,
-               "session_id": sid, "session": sid, "elapsed_ms": elapsed_ms,
-               "receipt": res.get("receipt"),
-               **_pending_event_field(cfg, sid)}
-        return
-    # T5: same affirmative-settle as turn() for staged build writes.
-    if _verdict == "affirm" and _pending_task(cfg, sid):
-        started = time.monotonic()
-        yield {"event": "start", "session_id": sid, "session": sid,
-               "route": "task", **_pending_event_field(cfg, sid)}
-        appended = st.append(sid, "user", clean)
-        if appended.get("state") != "OK":
-            yield {"event": "error", "code": appended.get("code"),
-                   "detail": appended.get("detail", ""), "session_id": sid}
-            return
-        res = _settle_task_affirmed(cfg, st, sid)
-        elapsed_ms = int((time.monotonic() - started) * 1000)
-        if not res.get("ok"):
-            yield {"event": "error", "code": res.get("code", "BRANCH_FAILED"),
-                   "detail": res.get("detail", ""), "session_id": sid,
-                   "route": "task", "elapsed_ms": elapsed_ms}
+                   "route": _settle_route, "elapsed_ms": elapsed_ms}
             return
         text_out = str(res.get("text") or res.get("reply") or "")
         yield {"event": "delta", "text": text_out, "session_id": sid}

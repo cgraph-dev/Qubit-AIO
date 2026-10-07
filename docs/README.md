@@ -16,6 +16,7 @@ the frozen contract), and must never read or write the archive.**
 
 | Doc | Purpose |
 |---|---|
+| [IDENTITY.md](IDENTITY.md) | What Qubit is: a personal AI agent (not "a fork") that absorbs other agents' capabilities and exceeds them. Canonical identity. |
 | [STATUS.md](STATUS.md) | Current, evidence-backed truth. Update every session. |
 | [FINDINGS_2026-09-22.md](FINDINGS_2026-09-22.md) | Audit: doc corrections + real misconfigurations/errors. |
 | [PARITY.md](PARITY.md) | The parity target: the live reference dashboard, route/control/tool/voice parity. |

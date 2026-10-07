@@ -68,6 +68,32 @@ def _profile_unsupported_formats(provider: Optional[str], base_url: Optional[str
     return tuple(getattr(profile, "unsupported_response_formats", ()) or ()) if profile is not None else ()
 
 
+def _model_family_unsupported_formats(model: Optional[str]) -> tuple:
+    """A relay/aggregator serving a profiled provider's models under its own provider name
+    (``opencode-go`` proxies ``deepseek-v4.1-flash``) inherits that family's declared unsupported
+    types. The relay's rejection for such a model carries no capability marker, so the per-route
+    rejection memo can never learn it; matching the model id against the registered profile names
+    drops the field up front instead. Only profiles that actually declare a restriction contribute,
+    so a first-party model (``openai/gpt-5-mini``) is untouched."""
+    flat = str(model or "").strip().lower().rsplit("/", 1)[-1]
+    if not flat:
+        return ()
+    try:
+        from providers import list_providers
+        profiles = list_providers()
+    except Exception:
+        return ()
+    for profile in profiles:
+        name = str(getattr(profile, "name", "") or "").strip().lower()
+        if not name:
+            continue
+        if flat == name or flat.startswith(name + "-") or flat.startswith(name + "."):
+            formats = tuple(getattr(profile, "unsupported_response_formats", ()) or ())
+            if formats:
+                return formats
+    return ()
+
+
 def is_capability_rejection(error: Optional[BaseException]) -> bool:
     """Whether a structured-output rejection speaks to the route/model's capability (memoisable) rather
     than to this request's schema (retry once, remember nothing)."""
@@ -99,6 +125,7 @@ def without_unsupported_response_format(
         return extra_body
     known_unsupported = (
         format_type in _profile_unsupported_formats(provider, base_url)
+        or format_type in _model_family_unsupported_formats(model)
         or (_route_key(provider, base_url), str(model or ""), format_type) in _REJECTED_ROUTES
     )
     if not known_unsupported:

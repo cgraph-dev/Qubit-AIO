@@ -57,6 +57,31 @@ function num(value: unknown): number | undefined {
 }
 
 /**
+ * Resolve the application event name + payload from one AG-UI wire frame.
+ *
+ * The feed wraps application events in a ``CUSTOM`` envelope:
+ * ``{"type":"CUSTOM","name":"todo.updated","value":{...}}``. Reading ``type``
+ * alone yields the literal string ``"CUSTOM"``, so ``name === "todo.updated"``
+ * and ``name.startsWith("subagent.")`` can never match — the panel stayed
+ * empty. For a CUSTOM frame the real name is ``rec.name`` and the payload is
+ * ``rec.value``; every other frame keeps the legacy name/payload fallbacks so a
+ * non-CUSTOM event (or a bare shape) still resolves exactly as before.
+ */
+export function resolveActivityFrame(rec: Record<string, unknown>): {
+  name: string;
+  payload: unknown;
+} {
+  const type = str(rec.type);
+  if (type === "CUSTOM") {
+    return { name: str(rec.name) || str(rec.event), payload: rec.value };
+  }
+  return {
+    name: type || str(rec.event),
+    payload: rec.data ?? rec.payload ?? rec,
+  };
+}
+
+/**
  * Normalize a `todo.updated` payload into panel rows.
  *
  * The wire shape is ``{todos: JsonValue[], revision: number}``; individual rows
@@ -160,9 +185,9 @@ export function useChatActivity(session: string, enabled = true): AgentActivity 
       }
       const rec = asRecord(parsed);
       if (!rec) return;
-      // The AG-UI envelope carries the event name; fall back to the SSE field.
-      const name = str(rec.type) || str(rec.event) || frame.event;
-      const payload = rec.data ?? rec.payload ?? rec;
+      // The AG-UI envelope carries the event name inside a ``CUSTOM`` frame
+      // (``{type:"CUSTOM", name, value}``); resolve the real name + payload.
+      const { name, payload } = resolveActivityFrame(rec);
       if (name === "todo.updated") {
         const todos = normalizeTodoState(payload);
         setActivity((prev) => ({ ...prev, todos }));

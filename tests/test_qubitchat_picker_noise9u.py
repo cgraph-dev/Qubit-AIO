@@ -67,6 +67,39 @@ class TestKeepsRealConversations:
         """Two messages but a human-chosen title and no probe provenance."""
         assert not _is_chat_picker_noise(_rec("w", "quick question", 2, "tui"))
 
+    def test_keeps_a_long_conversation_mentioning_a_probe_word(self):
+        """The probe vocabulary must be delimited; prose must not trigger it."""
+        assert not _is_chat_picker_noise(
+            _rec("v", "my e2e deployment notes", 40, "tui"))
+
+    def test_keeps_dashboard_chats_that_are_real(self):
+        assert not _is_chat_picker_noise(_rec("u", "voice-chat", 592, "dashboard"))
+        assert not _is_chat_picker_noise(
+            _rec("t", "Continue previous conversation", 213, "dashboard"))
+
+
+class TestProbeNamesAreCountIndependent:
+    """A name only tooling mints is hidden regardless of message count.
+
+    The first cut gated the name rule behind the <=2-message floor, so
+    `e2e-final-probe` (4 messages) slipped through — the floor returned early
+    and the name check never ran.
+    """
+
+    def test_hides_a_four_message_probe_name(self):
+        assert _is_chat_picker_noise(
+            _rec("e2e-final-probe", "e2e-final-probe", 4, "dashboard"))
+
+    def test_hides_a_probe_name_with_many_messages(self):
+        assert _is_chat_picker_noise(
+            _rec("p", "smoke-suite-run", 40, "dashboard"))
+
+    def test_readonly_is_recognised_delimited(self):
+        assert _is_chat_picker_noise(_rec("q", "verify-readonly-1", 3, "dashboard"))
+
+    def test_undelimited_probe_word_is_kept(self):
+        assert _is_chat_picker_noise(_rec("f", "probe the market", 2, "tui")) is False
+
 
 class TestDefensive:
     def test_non_dict_is_not_noise(self):

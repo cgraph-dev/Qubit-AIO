@@ -1215,6 +1215,30 @@ export const api = {
       },
     ),
   /**
+   * A35 fix (owner intent): attach a pasted/dropped/picked image to a chat
+   * session and route the turn through the AGENT.
+   *
+   * `POST /api/qubit/chat/image` (`h_chat_image`) describes the image through
+   * the canonical vision model, then submits ONE agent turn on the session with
+   * that description in context. This replaces the old describe-only path that
+   * injected the description TEXT into the composer, so the text-only local
+   * brain answered without ever seeing the image. The agent (with its vision
+   * tool) does the work; its reply is returned and persisted server-side, so a
+   * transcript reload restores it.
+   */
+  submitChatImage: (dataUrl: string, session: string, prompt = "") =>
+    fetchJSON<ChatImageTurnResponse>("/api/qubit/chat/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data_url: dataUrl,
+        session,
+        prompt,
+        confirm: true,
+        submit: true,
+      }),
+    }),
+  /**
    * A36: extract a pasted file (pdf/txt/md/log/transcript) and hand the text
    * back for the COMPOSER — never submitted as a turn. The operator reviews
    * and sends, so a large PDF cannot reach the model unread.
@@ -3761,6 +3785,26 @@ export interface ChatCiResponse {
   session_id?: string;
   ci?: ChatCiEntry[];
   total?: number;
+}
+
+/**
+ * Outcome of `POST /api/qubit/chat/image` (`h_chat_image`): the canonical
+ * vision description plus the agent turn it submitted on the session. `reply`
+ * is the agent's answer (what the transcript shows); the user message and reply
+ * are persisted server-side.
+ */
+export interface ChatImageTurnResponse {
+  ok?: boolean;
+  reply?: string;
+  description?: string;
+  vision_model?: string;
+  session?: string;
+  session_id?: string;
+  elapsed_ms?: number;
+  message?: ChatStoreMessage;
+  message_count?: number;
+  receipt?: { model?: string; runtime?: string; path?: string; route?: string };
+  authority?: string;
 }
 
 /** Parsed SSE frame from `POST /api/qubit/chat/stream`. */

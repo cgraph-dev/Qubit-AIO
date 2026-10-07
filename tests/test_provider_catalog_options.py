@@ -1,6 +1,6 @@
 """Provider/model catalogue parity — ``/api/model/options`` delegation.
 
-Owner decision #5: Qubit is a rebranded fork of the real Hermes foundation, so
+Owner decision #5: Qubit's runtime is a maintained rebrand of real upstream source, so
 the dashboard model picker must delegate to the vendored
 ``qubit_cli.inventory`` builder (the SAME builder the reference dashboard
 serves), not a hand-rolled 3-profile stub.

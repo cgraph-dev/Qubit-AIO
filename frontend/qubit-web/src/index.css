@@ -46,6 +46,10 @@
    vertical-text guard for the viking nav rows). Qubit-original chrome. */
 @import './styles/upstream/viking-settings.css';
 
+/* Kitchen console (`.kitchen-*`): the intake surface for absorbing other
+   agents/apps. Qubit-original chrome. */
+@import './styles/upstream/kitchen.css';
+
 /* Scan the published design-system bundle so its utility classes survive
    Tailwind's JIT purge. */
 @source '../node_modules/@nous-research/ui/dist';

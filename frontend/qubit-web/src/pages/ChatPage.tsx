@@ -83,12 +83,17 @@ import { useTranscriptionController } from "@/hooks/useTranscriptionController";
 import { useDesktopVoiceHelper } from "@/hooks/useDesktopVoiceHelper";
 import { useChatActivity } from "@/hooks/useChatActivity";
 import { ChatWorkPanel } from "@/components/ChatWorkPanel";
+import { ReadAloudButton } from "@/components/ReadAloudButton";
+import { CommandPalette } from "@/components/CommandPalette";
+import { ReportList } from "@/components/ReportList";
 import { cn } from "@/lib/utils";
+import { type PaletteItem } from "@/lib/commandPalette";
 import {
   atTokenAt,
   filterSlashCommands,
   slashCompletionText,
   slashTokenAt,
+  SLASH_COMMANDS,
   type SlashCommandItem,
 } from "@/lib/slashCommands";
 import { voiceEdit, type VoiceSessionMode } from "@/lib/voiceEdit";
@@ -392,6 +397,13 @@ function parseTurnError(err: unknown): string {
   return body || raw;
 }
 
+/**
+ * Default ask submitted with a pasted/dropped image when the composer is empty.
+ * Mirrors the server's `_vision_turn_text` default so the transcript's user
+ * bubble matches what the agent was asked.
+ */
+const DEFAULT_IMAGE_ASK = "What is in this image, and what should I know about it?";
+
 type VoiceEngine = "browser" | "local" | "terminal" | "auto";
 
 const VOICE_ENGINES = ["auto", "browser", "local", "terminal"] as const;
@@ -564,6 +576,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   );
   // A43: debug overlay over the canonical runtime inventory + logs.
   const [debugOpen, setDebugOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [debugState, setDebugState] = useState<
     "idle" | "loading" | "ready" | "error"
   >("idle");
@@ -1309,13 +1322,91 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     if (debugOpen && debugState === "idle") loadDebug();
   }, [debugOpen, debugState, loadDebug]);
 
-  // A35/A36: read a browser file to a data URL and route it by kind.
-  //   image -> describe through the vision backend, append the description
-  //   doc   -> extract through the document backend, append the extract
-  // Either way the text lands in the COMPOSER; nothing is auto-sent.
-  const describeImage = useCallback((file: File | null) => {
-    if (!file) return;
-    const isImage = (file.type || "").startsWith("image/");
+  // A35/A36 + owner fix: read a browser file to a data URL and route it by kind.
+  //   image -> AGENT turn: `/api/qubit/chat/image` describes it with the
+  //            canonical vision model AND submits one agent turn on this
+  //            session, so the agent (with its vision tool) does the work and
+  //            its reply lands in the transcript. The old path only described
+  //            the image and injected the text into the composer, so the
+  //            text-only local brain answered without ever seeing it.
+  //   doc   -> extract through the document backend into the COMPOSER, where
+  //            the operator reviews before sending (review-before-send stays).
+  const submitImageToAgent = useCallback(
+    (file: File) => {
+      // A turn is already in flight: never start a concurrent image turn.
+      if (busy) return;
+      setAttachState("describing");
+      setAttachError(null);
+      const reader = new FileReader();
+      reader.onerror = () => {
+        setAttachError("file read failed");
+        setAttachState("error");
+      };
+      reader.onload = () => {
+        const dataUrl = typeof reader.result === "string" ? reader.result : "";
+        if (!dataUrl) {
+          setAttachError("file read failed");
+          setAttachState("error");
+          return;
+        }
+        // The composer text (if any) is the user's question about the image;
+        // with no prompt a sensible default ask is used. Either way the image
+        // is routed to the agent, never described into the text-only brain.
+        const prompt = input.trim();
+        const userText = prompt || DEFAULT_IMAGE_ASK;
+        setInput("");
+        setError(null);
+        setRetryText(null);
+        setStreamingText("");
+        setTaskProgress(null);
+        setPendingConfirm(null);
+        setBusy(true);
+        setMessages((prev) => prev.concat([{ role: "user", text: userText }]));
+        // The server persists these rows too; advance the merge counter so a
+        // live-voice poll does not re-append them as "new".
+        if (followLiveVoice) voiceSyncedRef.current += 1;
+        api
+          .submitChatImage(dataUrl, session, prompt)
+          .then((res) => {
+            const reply = (res.reply ?? "").trim();
+            if (!reply) {
+              setError(
+                "[VISION_NO_REPLY] the agent returned no reply for the image",
+              );
+              setRetryText(userText);
+              return;
+            }
+            setMessages((prev) =>
+              prev.concat([
+                {
+                  role: "assistant",
+                  text: reply,
+                  meta: res.receipt?.model
+                    ? `model=${res.receipt.model}`
+                    : undefined,
+                },
+              ]),
+            );
+            if (followLiveVoice) voiceSyncedRef.current += 1;
+          })
+          .catch((err: unknown) => {
+            setError(parseTurnError(err));
+            setRetryText(userText);
+          })
+          .finally(() => {
+            setAttachState("idle");
+            setBusy(false);
+            setSessionListNonce((n) => n + 1);
+          });
+      };
+      reader.readAsDataURL(file);
+    },
+    [busy, input, session, followLiveVoice],
+  );
+
+  // A36: documents keep the review-before-send contract — extract and hand the
+  // text to the COMPOSER; nothing is auto-sent.
+  const extractDocumentToComposer = useCallback((file: File) => {
     setAttachState("describing");
     setAttachError(null);
     const reader = new FileReader();
@@ -1330,15 +1421,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         setAttachState("error");
         return;
       }
-      const call = isImage
-        ? api
-            .describeChatImage(dataUrl)
-            .then((res) => (res.description ?? "").trim())
-        : api
-            .extractChatFile(dataUrl, file.name)
-            .then((res) => (res.text ?? "").trim());
-      call
-        .then((text) => {
+      api
+        .extractChatFile(dataUrl, file.name)
+        .then((res) => {
+          const text = (res.text ?? "").trim();
           if (text) setInput((prev) => (prev ? `${prev}\n${text}` : text));
           setAttachState("idle");
         })
@@ -1349,6 +1435,18 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     };
     reader.readAsDataURL(file);
   }, []);
+
+  const describeImage = useCallback(
+    (file: File | null) => {
+      if (!file) return;
+      if ((file.type || "").startsWith("image/")) {
+        submitImageToAgent(file);
+      } else {
+        extractDocumentToComposer(file);
+      }
+    },
+    [submitImageToAgent, extractDocumentToComposer],
+  );
 
   const onPasteImage = useCallback(
     (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
@@ -1430,6 +1528,96 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         /* clipboard unavailable — ignore */
       });
   }, [messages, selectedMessages]);
+
+  // ── Ctrl-K command palette: a keyboard twin of the page's own affordances.
+  // It runs nothing itself — every row routes back into a handler the page
+  // already owns (send, session switch, panel toggles), so there is no second
+  // chat surface and no new backend route.
+  const paletteItems = useMemo<PaletteItem[]>(() => {
+    const rows: PaletteItem[] = [
+      {
+        id: "action:clear-selection",
+        kind: "action",
+        label: "Clear message selection",
+        keywords: "deselect reset",
+        disabled: selectedMessages.size === 0,
+      },
+      {
+        id: "action:copy-selected",
+        kind: "action",
+        label: "Copy selected messages",
+        keywords: "clipboard",
+        disabled: selectedMessages.size === 0,
+      },
+      {
+        id: "action:debug",
+        kind: "action",
+        label: debugOpen ? "Hide debug overlay" : "Show debug overlay",
+        keywords: "logs runtime inspect",
+      },
+    ];
+    // Slash commands the surface already resolves (same catalog the composer's
+    // `/` popover uses, so the palette never invents a command).
+    for (const cmd of SLASH_COMMANDS) {
+      rows.push({
+        id: `command:${cmd.name}`,
+        kind: "command",
+        label: cmd.name,
+        detail: cmd.description,
+        keywords: "slash",
+      });
+    }
+    for (const m of messages) {
+      if (m.role !== "assistant" || !m.text) continue;
+      rows.push({
+        id: `report:${m.taskKey || m.text.slice(0, 24)}`,
+        kind: "report",
+        label: m.text.slice(0, 80),
+        detail: "Read aloud",
+        keywords: "report speak voice",
+      });
+    }
+    return rows;
+  }, [debugOpen, messages, selectedMessages.size]);
+
+  const runPaletteItem = useCallback(
+    (item: PaletteItem) => {
+      setPaletteOpen(false);
+      if (item.kind === "action") {
+        if (item.id === "action:clear-selection") {
+          setSelectedMessages(new Set());
+          return;
+        }
+        if (item.id === "action:copy-selected") {
+          copySelected();
+          return;
+        }
+        if (item.id === "action:debug") {
+          setDebugOpen((v) => !v);
+          return;
+        }
+      }
+      if (item.kind === "command") {
+        sendRef.current?.(item.label);
+        return;
+      }
+      if (item.kind === "report") {
+        setPaletteOpen(false);
+      }
+    },
+    [copySelected],
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // The controller owns the committed text; the composer keeps what was typed
   // before the utterance. On each new final we append only the delta.
@@ -2119,6 +2307,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 {messages.map((message, index) => (
                   <li
                     key={`${message.role}-${index}`}
+                    data-message-index={index}
                     className={cn(
                       "qchat__message rounded-lg border px-3 py-2 text-sm",
                       message.kind === "tool"
@@ -2165,6 +2354,14 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                         message.text
                       )}
                     </div>
+                    {message.role === "assistant" && message.text ? (
+                      <div className="mt-1 flex items-center gap-2">
+                        <ReadAloudButton
+                          messageId={message.taskKey || `m${index}`}
+                          text={message.text}
+                        />
+                      </div>
+                    ) : null}
                     {message.reportText ? (
                       <details
                         data-testid="message-report-full"
@@ -2343,10 +2540,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           {attachError ? (
             <div
               role="alert"
+              data-testid="attach-error"
               data-state="degraded"
               className="mt-2 border border-warning/50 bg-warning/10 px-3 py-2 text-xs text-warning"
             >
-              Image attach failed: {attachError}
+              Attach failed: {attachError}
             </div>
           ) : null}
 
@@ -2445,6 +2643,15 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               activity={activity}
               busy={busy}
             />
+            <ReportList
+              messages={messages}
+              onOpen={(index) => {
+                setPaletteOpen(false);
+                document
+                  .querySelector(`[data-message-index="${index}"]`)
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            />
             <div className="relative min-w-full flex-1 sm:min-w-0">
               {slashVisible ? (
                 <div
@@ -2524,7 +2731,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               onClick={() => attachInputRef.current?.click()}
               disabled={busy || attachState === "describing"}
               aria-label="Attach image, PDF or file"
-              title="Attach or paste an image, PDF or text file; Qubit describes or extracts it into the composer"
+              title="Attach or paste an image (routed to the agent), or a PDF/text file (extracted into the composer to review before sending)"
               prefix={<ImagePlus className="h-4 w-4" />}
             >
               {attachState === "describing" ? "Reading…" : "Attach"}
@@ -2641,6 +2848,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       </div>
 
       <PluginSlot name="chat:bottom" />
+      <CommandPalette
+        open={paletteOpen}
+        items={paletteItems}
+        onClose={() => setPaletteOpen(false)}
+        onSelect={runPaletteItem}
+      />
     </div>
   );
 }

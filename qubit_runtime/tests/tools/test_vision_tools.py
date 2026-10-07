@@ -206,15 +206,16 @@ class TestErrorLoggingExcInfo:
         """Temp file cleanup failure should log warning with exc_info."""
         # A data: URL resolves to bytes without any network, materializes to a
         # vision temp file, then the analysis runs — exercising the temp-cleanup
-        # path in the finally block. A tiny valid JPEG (magic bytes) passes the
-        # resolver's magic-byte sniff.
-        jpeg_b64 = base64.b64encode(b"\xff\xd8\xff" + b"\x00" * 32).decode("ascii")
-        data_url = f"data:image/jpeg;base64,{jpeg_b64}"
+        # path in the finally block. The fixture must be a REAL decodable raster:
+        # the tool now validates decodability before the provider call (a
+        # magic-bytes-only fake would be rejected as VISION_IMAGE_INVALID).
+        png_b64 = base64.b64encode(VALID_PNG).decode("ascii")
+        data_url = f"data:image/png;base64,{png_b64}"
 
         with (
             patch(
                 "tools.vision_tools._image_to_base64_data_url",
-                return_value="data:image/jpeg;base64,abc",
+                return_value="data:image/png;base64,abc",
             ),
             caplog.at_level(logging.WARNING, logger="tools.vision_tools"),
         ):

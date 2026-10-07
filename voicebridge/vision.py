@@ -22,9 +22,28 @@ restore + warm probe, always restored via ``finally``):
   is the resident-restore report (automatic) plus no state written.
 
 Model routing stays brokered: the call uses the configured Ollama
-endpoint (same governor path as chat), the model comes from
-``intent.vision.model`` (default ``qwen3-vl:8b`` — also the ``turbo``
-tier), and nothing executes outside the gateway response.
+endpoint (same governor path as chat), and nothing executes outside the
+gateway response.
+
+Model authority (single source). The effective vision model is resolved by
+:func:`voicebridge.providers.resolver.default_vision_profile` — the SAME
+``role="vision"`` ladder the agent tool path uses, so this surface and the
+resolver can never disagree. That ladder, highest precedence first, is:
+
+1. an explicit ``model=`` / ``--model`` argument to :func:`describe`;
+2. ``auxiliary.vision.model`` (the reference per-task aux pin);
+3. ``intent.vision.model`` (the Qubit-native vision surface's own pin);
+4. a registered profile that declares ``supports_vision``;
+5. a known vision-capable local model that is actually installed;
+6. the shipped local VLM (``DEFAULT_VISION_MODEL``).
+
+:func:`find_vision_model` then binds that configured id to the concrete
+installed tag: the configured exact id/tag first, then the same family prefix
+(preferring ``:latest``), then — for a recognised VLM family or an unset id —
+any installed vision-capable model. A configured tag suffix is never silently
+dropped for whichever family sibling ``/api/tags`` happens to list first, and a
+custom-named configured model that is not installed is a typed refusal rather
+than a silent substitution for a different family.
 """
 from __future__ import annotations
 
@@ -32,6 +51,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import time
 import urllib.request
 from pathlib import Path
@@ -77,6 +97,27 @@ def _redact(text: str) -> str:
     return redact_text(text)
 
 
+def _vision_authority_model(cfg: Any) -> str:
+    """Effective vision model id from the one resolver (the authority).
+
+    Reads :func:`voicebridge.providers.resolver.default_vision_profile` so the
+    CLI/dashboard vision surface and the resolver's ``role="vision"`` report the
+    SAME model (precedence documented in the module docstring). Best-effort: a
+    resolution failure yields ``""`` and the caller falls back to
+    ``intent.vision.model`` — this function never raises.
+    """
+    try:
+        from .providers import resolver as _resolver
+
+        profile = _resolver.default_vision_profile(cfg)
+        model = str(getattr(profile, "model", "") or "").strip()
+        if model:
+            return model
+    except Exception:  # noqa: BLE001 - resolution failure falls back below
+        pass
+    return ""
+
+
 def _settings(cfg: Any) -> Dict[str, Any]:
     get = (lambda *p, default=None: cfg.get(*p, default=default)) \
         if hasattr(cfg, "get") else (lambda *p, default=None: default)
@@ -89,9 +130,15 @@ def _settings(cfg: Any) -> Dict[str, Any]:
         max_mb = float(get("intent", "vision", "max_mb", default=DEFAULT_MAX_MB))
     except (TypeError, ValueError):
         max_mb = DEFAULT_MAX_MB
+    # The configured model comes from the ONE resolver vision ladder, so this
+    # surface and ``role="vision"`` agree; ``intent.vision.model`` remains the
+    # fallback when resolution is unavailable.
+    configured = _vision_authority_model(cfg)
+    model = configured or str(get("intent", "vision", "model",
+                                  default=DEFAULT_VISION_MODEL)
+                              or DEFAULT_VISION_MODEL)
     return {
-        "model": str(get("intent", "vision", "model",
-                         default=DEFAULT_VISION_MODEL) or DEFAULT_VISION_MODEL),
+        "model": model,
         "max_mb": max(1.0, min(max_mb, 100.0)),
         "timeout_s": max(MIN_TIMEOUT_S, min(timeout, MAX_TIMEOUT_S)),
     }
@@ -170,21 +217,110 @@ def _tags(url: str, timeout_s: float = 10.0) -> List[Dict[str, Any]]:
     return models if isinstance(models, list) else []
 
 
+#: Family prefixes that mark a locally installed model as vision-capable. The
+#: last-resort rung of :func:`find_vision_model` when the configured family is
+#: not installed at all. Deliberately conservative (a false positive would load
+#: a text model for image analysis); the ``vl``/``vlm``/``vision`` name token
+#: check catches the rest.
+_VISION_FAMILY_HINTS = (
+    "qwen3-vl", "qwen2.5-vl", "qwen2-vl", "qwen2.5vl", "qwen3vl",
+    "llava", "bakllava", "llama3.2-vision", "minicpm-v", "moondream",
+    "cogvlm", "internvl",
+)
+_VISION_NAME_TOKENS = ("vl", "vlm", "vision")
+
+
+def _vision_family(name: str) -> str:
+    """The family prefix before the first ``:`` (lower-cased)."""
+    return str(name or "").split(":", 1)[0].strip().lower()
+
+
+def _is_known_vision_family(name: str) -> bool:
+    """True when the family prefix names a recognised VLM family."""
+    family = _vision_family(name)
+    return bool(family) and any(
+        family == hint or family.startswith(hint) for hint in _VISION_FAMILY_HINTS)
+
+
+def _looks_vision_capable(name: str) -> bool:
+    """True when *name* looks like an installed vision model (family or token)."""
+    if _is_known_vision_family(name):
+        return True
+    tokens = (t for t in re.split(r"[^a-z0-9]+", str(name).lower()) if t)
+    return any(token in _VISION_NAME_TOKENS for token in tokens)
+
+
+def _vision_match_rank(name: str, want: str) -> Optional[int]:
+    """Rank an installed *name* against the configured *want* (lower = better).
+
+    ``0`` — the configured exact id/tag (including the implicit ``:latest``);
+    ``2`` — the same family prefix; ``3`` — any installed vision-capable model,
+    but only when the configured model is itself a recognised VLM family (or
+    unset) so a custom-named configured model is never silently swapped for a
+    different family; ``None`` — no match. This is the precedence contract: the
+    configured tag is honoured before a family sibling, which is honoured
+    before a known-VLM fallback.
+    """
+    nl = str(name or "").strip().lower()
+    if not nl:
+        return None
+    wl = str(want or "").strip().lower()
+    if wl:
+        if nl == wl:
+            return 0
+        if ":" not in wl and nl == f"{wl}:latest":
+            return 0
+        want_family = _vision_family(wl)
+        if want_family and _vision_family(nl) == want_family:
+            return 2
+        # A custom configured family that is not installed is a typed
+        # NO_BACKEND, never a silent substitution for a different model.
+        if not _is_known_vision_family(wl):
+            return None
+    if _looks_vision_capable(nl):
+        return 3
+    return None
+
+
 def find_vision_model(url: str, want: str,
                       timeout_s: float = 10.0) -> Dict[str, Any]:
-    """Locate the vision model in /api/tags (read-only, never loads)."""
-    base = (want or "").strip().split(":")[0].lower()
+    """Locate the best installed match for *want* (read-only, never loads).
+
+    Precedence: the CONFIGURED exact model id/tag first, then the same family
+    prefix (preferring ``:latest``), then — for a recognised VLM family or an
+    unset id — any installed vision-capable model. A configured tag suffix is
+    therefore honoured instead of being dropped for whichever family sibling
+    ``/api/tags`` lists first, and a custom configured model that is not
+    installed is a typed refusal rather than a silent substitution. Raises the
+    typed ``VISION_NO_BACKEND`` only when the endpoint answers but nothing
+    matches, and ``VISION_UPSTREAM`` when the endpoint cannot be reached.
+    """
+    want = (want or "").strip()
+    best_rank: Optional[int] = None
+    best: Optional[Dict[str, Any]] = None
     for entry in _tags(url, timeout_s):
         if not isinstance(entry, dict):
             continue
-        name = str(entry.get("name", ""))
-        if name.split(":")[0].lower() == base and base:
+        name = str(entry.get("name", "") or "").strip()
+        rank = _vision_match_rank(name, want)
+        if rank is None:
+            continue
+        # Lower rank wins; within a rank, prefer the implicit ``:latest`` tag,
+        # then keep the endpoint's own order (stable and deterministic).
+        prefer_latest = name.lower().endswith(":latest")
+        best_latest = bool(best) and str(best["name"]).lower().endswith(":latest")
+        if best is None or rank < best_rank or (
+            rank == best_rank and prefer_latest and not best_latest
+        ):
             try:
                 size_mib = float(entry.get("size", 0) or 0) / (1024 * 1024)
             except (TypeError, ValueError):
                 size_mib = 0.0
-            return {"name": name, "size_mib": size_mib,
+            best = {"name": name, "size_mib": size_mib,
                     "digest": str(entry.get("digest", ""))[:40]}
+            best_rank = rank
+    if best is not None:
+        return best
     raise VisionError(NO_BACKEND_CODE,
                       f"vision model {want!r} not installed; pull it with "
                       f"`ollama pull {want}` on a machine with headroom, or "

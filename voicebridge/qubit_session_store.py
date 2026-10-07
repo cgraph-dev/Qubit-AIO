@@ -44,6 +44,11 @@ SOURCE = "dashboard"
 AUTHORITY = "voicebridge.qubit_session_store.QubitSessionStore"
 STATE_DB_FILENAME = "state.db"
 
+#: The identity the ``/chat`` terminal passes when it ensures its session
+#: (``voicebridge.terminal_bridge``). Used so the local-brain default applies
+#: only to NEW dashboard conversations and never re-defaults ``/chat``.
+_TERMINAL_IDENTITY = "terminal:chat"
+
 _DBS: Dict[str, Any] = {}
 _DBS_LOCK = threading.Lock()
 #: Resolved canonical ``state.db`` path -> the single Qubit-side writer owner.
@@ -465,6 +470,19 @@ class QubitSessionStore:
             return {"state": "EXISTS", "code": "SESSION_EXISTS",
                     "detail": f"session {sid!r} already exists"}
         title = _bounded(name, MAX_NAME_CHARS).strip() or None
+        # A NEW dashboard conversation defaults to the configured local brain
+        # (``/qubit-chat`` is the voice + report surface), read from config via
+        # ``chat_transport.local_brain_model`` — never a hard-coded alias. An
+        # explicit ``model`` still wins, and the vendored ``/chat`` terminal
+        # (``identity="terminal:chat"``) is never re-defaulted, so ``/chat``
+        # behaviour and every EXISTING session's stored model are untouched.
+        if not model and str(identity) != _TERMINAL_IDENTITY:
+            try:
+                from .chat_transport import local_brain_model
+
+                model = local_brain_model(self._cfg)
+            except Exception:  # noqa: BLE001 - keep the shipped default
+                model = None
         self._db.create_session(sid, source=SOURCE, model=model,
                                 display_name=title)
         if created_at or updated_at:

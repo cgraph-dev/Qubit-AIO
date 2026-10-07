@@ -360,7 +360,9 @@ def _vendor_tool_names(result: Any) -> "list[str]":
 def _run_vendored_session(cfg: Any, text: str, sid: str, *,
                           check: Callable[[], bool], store: Any,
                           reasoning: Optional[str],
-                          persist_user: bool = False
+                          persist_user: bool = False,
+                          event_sink: Optional[Callable[[str, dict], None]] = None,
+                          progress_sink: Optional[Callable[..., None]] = None
                           ) -> "Optional[Dict[str, Any]]":
     """Run one tool-capable agent turn through the vendored ``AIAgent``.
 
@@ -368,6 +370,22 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
     same tool set (skills, plugins, MCP), sends the tool schema to the model,
     and executes tool calls. Owner directive docs/DECISIONS.md #26 requires the
     /qubit-chat worker to be this agent, never a tool-less shim.
+
+    ``event_sink`` is the typed-progress bridge: the vendored ``AIAgent``
+    already emits ``(name, payload)`` pairs through its ``event_callback``
+    (``run_agent.py``), and a caller that owns the SSE hub forwards them as
+    ``CUSTOM`` frames so ``/qubit-chat``'s work panel sees real todos and
+    subagent activity. It is optional and purely additive — without it the
+    vendored event hooks fall back to their no-op defaults.
+
+    ``progress_sink`` is the *tool-progress* bridge and the one that actually
+    carries the work-panel events: the vendored runtime fires
+    ``tool_progress_callback`` with the child-agent lifecycle
+    (``subagent.*``, relayed by ``tools/delegate_tool_progress``) and with the
+    ``tool.completed`` result from which the todo snapshot is projected. It is
+    wired into ``AIAgent(tool_progress_callback=...)``; see
+    ``voicebridge/events/chat_progress.py``. Also optional and additive.
+
 
     Returns the ``run_session``-shaped outcome on a real run, or ``None`` when
     the vendored runtime is not importable (hermetic tests, an install that
@@ -473,6 +491,8 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             credential_pool=runtime.get("credential_pool"),
             reasoning_config=_vendor_reasoning_config(reasoning),
             clarify_callback=_vendor_clarify_callback,
+            event_callback=event_sink,
+            tool_progress_callback=progress_sink,
         )
         result = agent.run_conversation(text) or {}
     except AgentDenied:
@@ -562,7 +582,9 @@ def run_session(cfg: Any, task_text: str, *, session: str,
                 max_steps: int = 4,
                 timeout_s: Optional[float] = None,
                 estop_engaged: Optional[Callable[[], bool]] = None,
-                cancelled: Optional[Callable[[], bool]] = None) -> Dict[str, Any]:
+                cancelled: Optional[Callable[[], bool]] = None,
+                progress_sink: Optional[Callable[..., None]] = None
+                ) -> Dict[str, Any]:
     """Run a bounded multi-step worker session natively.
 
     Prefers the vendored tool-capable ``AIAgent`` (the terminal /chat agent:
@@ -627,7 +649,8 @@ def run_session(cfg: Any, task_text: str, *, session: str,
     # plugins, MCP) and actually calls tools; the planner below is the
     # fallback for environments without the vendored runtime.
     vendored = _run_vendored_session(cfg, clean, sid, check=check,
-                                     store=store, reasoning=reasoning)
+                                     store=store, reasoning=reasoning,
+                                     progress_sink=progress_sink)
     if vendored is not None:
         vendored.setdefault("session_id", sid)
         return vendored
@@ -723,7 +746,9 @@ def run_session(cfg: Any, task_text: str, *, session: str,
 
 def run_agent_turn(cfg: Any, text: str, *, session: str,
                    reasoning: Optional[str] = None,
-                   estop_engaged: Optional[Callable[[], bool]] = None
+                   estop_engaged: Optional[Callable[[], bool]] = None,
+                   event_sink: Optional[Callable[[str, dict], None]] = None,
+                   progress_sink: Optional[Callable[..., None]] = None
                    ) -> "Optional[Dict[str, Any]]":
     """Run one general turn through the tool-capable vendored agent.
 
@@ -766,7 +791,9 @@ def run_agent_turn(cfg: Any, text: str, *, session: str,
             reasoning = None
     store = _canonical_session_store(cfg)
     return _run_vendored_session(cfg, clean, sid, check=check, store=store,
-                                 reasoning=reasoning, persist_user=True)
+                                 reasoning=reasoning, persist_user=True,
+                                 event_sink=event_sink,
+                                 progress_sink=progress_sink)
 
 
 def refuse_estop() -> Dict[str, Any]:

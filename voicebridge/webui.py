@@ -2043,7 +2043,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
     def _qubit_backend_enabled(self) -> bool:
         """Cutover flag: serve safe dashboard reads from the vendored Qubit
-        backend. Stage 2 default is on: the Qubit-owned fork is the runtime
+        backend. Stage 2 default is on: the vendored runtime is the runtime
         authority for safe reads. Set ``webui.qubit_backend: false`` (or
         revert the Stage 2 commit) to fall back to the compatibility layer."""
         try:
@@ -4172,6 +4172,17 @@ class WebUI:
             from .events.runs import RunCoordinator, StateTracker
             typed = EventJournal(_sd / "typed-events.jsonl")
             self._events_hub = EventHub(typed)
+            # Hand the hub to the shared ``cfg`` so a ``/qubit-chat`` turn
+            # (chat_transport -> agent.run_agent_turn) can republish the
+            # vendored tool-progress feed as CUSTOM frames without a second
+            # mechanism: the same object reaches dispatch, the turn, and here.
+            # Best-effort — a cfg that forbids attributes just skips the panel.
+            try:
+                if orchestrator is not None:
+                    orchestrator.cfg._qubit_chat_hub = self._events_hub
+                    orchestrator.cfg._qubit_chat_make_event = make_event
+            except Exception:  # noqa: BLE001 - producer wiring is optional
+                log.debug("chat progress sink attach failed", exc_info=True)
             self.runs = RunCoordinator(
                 self._events_hub,
                 abort_hook=self._abort_hook_for_cancel())

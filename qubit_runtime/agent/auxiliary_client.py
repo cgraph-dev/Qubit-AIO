@@ -861,6 +861,67 @@ def _resolve_provider_vision_default(provider: str) -> Optional[str]:
         return None
 
 
+# --- typed vision failure classification -----------------------------------
+#: Typed codes for a failed vision call so callers (tool-result JSON, API
+#: layer) answer a named error instead of pattern-matching a raw HTTP 400/502
+#: string. An invalid/undecodable image is a CALLER error, not a provider
+#: outage: it must never read as a generic upstream failure.
+VISION_UPSTREAM = "VISION_UPSTREAM"
+VISION_IMAGE_INVALID = "VISION_IMAGE_INVALID"
+VISION_IMAGE_TOO_LARGE = "VISION_IMAGE_TOO_LARGE"
+VISION_UNSUPPORTED_MODEL = "VISION_UNSUPPORTED_MODEL"
+VISION_AUTH = "VISION_AUTH"
+VISION_TIMEOUT = "VISION_TIMEOUT"
+
+_VISION_IMAGE_INVALID_HINTS = (
+    "failed to load image", "load image or audio", "invalid image", "bad image",
+    "could not process image", "unable to process image", "image decode",
+    "decode image", "invalid_request_error", "image_url", "malformed image",
+    "broken png", "corrupt image",
+)
+_VISION_IMAGE_LARGE_HINTS = (
+    "image is too large", "image too large", "payload too large", "413",
+    "maximum size", "exceeds the maximum", "image size limit",
+)
+_VISION_UNSUPPORTED_HINTS = (
+    "does not support image", "not support image", "image input is not "
+    "supported", "multimodal", "unrecognized request argument", "content_policy",
+)
+_VISION_AUTH_HINTS = (
+    "unauthorized", "forbidden", "invalid api key", "authentication",
+    "permission denied",
+)
+_VISION_TIMEOUT_HINTS = ("timeout", "timed out", "deadline exceeded")
+
+
+def classify_vision_exception(exc: BaseException) -> str:
+    """Map an auxiliary vision provider exception to a typed code.
+
+    Ordered most-specific first; the fallback is ``VISION_UPSTREAM``. An
+    invalid/undecodable image (the provider answers HTTP 400 — e.g. Ollama's
+    "Failed to load image or audio file") is classified as
+    ``VISION_IMAGE_INVALID`` so it is not surfaced as a raw 502. Never raises.
+    """
+    try:
+        text = str(exc or "").lower()
+        status = getattr(exc, "status_code", None)
+        if status is None:
+            status = getattr(exc, "code", None)
+    except Exception:  # noqa: BLE001 - classification must never raise
+        return VISION_UPSTREAM
+    if any(hint in text for hint in _VISION_TIMEOUT_HINTS):
+        return VISION_TIMEOUT
+    if any(hint in text for hint in _VISION_UNSUPPORTED_HINTS):
+        return VISION_UNSUPPORTED_MODEL
+    if any(hint in text for hint in _VISION_IMAGE_INVALID_HINTS):
+        return VISION_IMAGE_INVALID
+    if any(hint in text for hint in _VISION_IMAGE_LARGE_HINTS):
+        return VISION_IMAGE_TOO_LARGE
+    if status in (401, 403) or any(hint in text for hint in _VISION_AUTH_HINTS):
+        return VISION_AUTH
+    return VISION_UPSTREAM
+
+
 # Endpoints that reject image input: vision auto-detect skips these to the aggregator chain
 # instead of returning a client that 404s (Kimi Coding Plan Anthropic wire has no image_in).
 _PROVIDERS_WITHOUT_VISION: frozenset = frozenset({"kimi-coding", "kimi-coding-cn"})
@@ -5553,6 +5614,22 @@ def _main_model_supports_vision(provider: str, model: Optional[str]) -> bool:
     return _main_model_vision_capability(provider, model) is not False
 
 
+def _main_model_vision_is_config_declared(provider: str, model: Optional[str]) -> bool:
+    """True only when config.yaml *explicitly* declares vision for provider/model.
+
+    Distinguishes an operator/plugin declaration (``model.supports_vision`` /
+    ``providers.<p>.models.<m>.supports_vision``) from a models.dev *catalog* guess.
+    A catalog verdict can be wrong for an endpoint that rejects image input (e.g. an
+    OpenAI-compatible aggregator advertising a vision-capable chat model), so the
+    auto-route treats catalog-only attestation as weaker evidence."""
+    try:
+        from agent.image_routing import _supports_vision_override
+        from qubit_cli.config import load_config_readonly
+        return _supports_vision_override(load_config_readonly(), provider, model or "") is True
+    except Exception:  # noqa: BLE001 - an unreadable config reads as "not declared"
+        return False
+
+
 def _provider_vision_capability_is_opaque(provider: str) -> bool:
     """True when the catalog cannot decide a provider's image capability, so the historical
     permissive attempt must be preserved: user-supplied ``custom`` endpoints and providers
@@ -5572,6 +5649,26 @@ def _provider_vision_capability_is_opaque(provider: str) -> bool:
 
 def _normalize_vision_provider(provider: Optional[str]) -> str:
     return _normalize_aux_provider(provider)
+
+
+def _local_server_vision_base_url(provider: str) -> Optional[str]:
+    """The standard endpoint for a configured local-server vision lane, or None.
+
+    A local-server alias (``provider: ollama`` / vllm / llama.cpp) has no first-class
+    provider registry entry. With no explicit ``auxiliary.vision.base_url`` the generic
+    custom branch would borrow the *main* runtime endpoint, silently sending the
+    configured vision model to the main (often text-only) provider. Resolve the
+    server's own local URL instead so the configured vision provider actually wins.
+    Only Ollama ships a canonical resolver; other aliases stay on the existing path.
+    """
+    if str(provider or "").strip().lower() != "ollama":
+        return None
+    try:
+        from qubit_cli.models_local import _get_ollama_base_url
+        base = str(_get_ollama_base_url() or "").strip()
+    except Exception:  # noqa: BLE001 - a resolver failure must not break vision routing
+        base = ""
+    return base or "http://localhost:11434"
 
 
 def _deepinfra_strict_vision_backend(model: Optional[str]) -> Tuple[Optional[Any], Optional[str]]:
@@ -5711,9 +5808,22 @@ def _vision_auto_route(
             main_provider, main_model = _agg_provider, _agg_model
             runtime = dict(runtime, base_url="", api_key="", api_mode="")
     if main_provider and main_provider not in {"auto", "", "moa"}:
-        client, default_model = _vision_main_provider_client(main_provider, main_model, runtime, resolved_model, resolved_api_mode)
-        if client is not None:
-            return _finalize_vision_client(main_provider, client, default_model, resolved_model, async_mode)
+        # A main model whose image capability is only catalog-attested (models.dev), on a
+        # provider that is not itself a dedicated vision backend, may still reject images
+        # at the endpoint (HTTP 400). Prefer a dedicated vision aggregator first for those;
+        # fall back to the main model only when no aggregator resolves. A config-declared
+        # or provider-default vision model is genuinely trusted and keeps main-first order.
+        prefer_aggregator = (
+            main_provider not in _VISION_AUTO_PROVIDER_ORDER
+            and not _resolve_provider_vision_default(main_provider)
+            and _main_model_vision_capability(main_provider, main_model) is True
+            and not _main_model_vision_is_config_declared(main_provider, main_model)
+            and not _provider_vision_capability_is_opaque(main_provider)
+        )
+        if not prefer_aggregator:
+            client, default_model = _vision_main_provider_client(main_provider, main_model, runtime, resolved_model, resolved_api_mode)
+            if client is not None:
+                return _finalize_vision_client(main_provider, client, default_model, resolved_model, async_mode)
     # Aggregators use their dedicated vision model, not the user's main model.
     for candidate in _VISION_AUTO_PROVIDER_ORDER:
         if candidate == main_provider:
@@ -5721,8 +5831,42 @@ def _vision_auto_route(
         sync_client, default_model = _resolve_strict_vision_backend(candidate)
         if sync_client is not None:
             return _finalize_vision_client(candidate, sync_client, default_model, resolved_model, async_mode)
+    if main_provider and main_provider not in {"auto", "", "moa"} and prefer_aggregator:
+        # Catalog-only main model as the last resort when no dedicated aggregator resolved.
+        client, default_model = _vision_main_provider_client(main_provider, main_model, runtime, resolved_model, resolved_api_mode)
+        if client is not None:
+            return _finalize_vision_client(main_provider, client, default_model, resolved_model, async_mode)
     logger.debug("Auxiliary vision client: none available")
     return None, None, None
+
+
+def _vision_aggregator_only_route(
+    async_mode: bool,
+) -> Tuple[Optional[str], Optional[Any], Optional[str]]:
+    """Dedicated vision aggregators only (OpenRouter → Nous → DeepInfra); never the main provider.
+
+    Used when an explicitly pinned ``auxiliary.vision`` route cannot resolve: falling back
+    to the main model there is exactly the defect (the main endpoint is often text-only for
+    images). ``None`` lets the caller raise the typed "vision is not configured" error."""
+    for candidate in _VISION_AUTO_PROVIDER_ORDER:
+        sync_client, default_model = _resolve_strict_vision_backend(candidate)
+        if sync_client is not None:
+            return _finalize_vision_client(candidate, sync_client, default_model, None, async_mode)
+    return None, None, None
+
+
+def _vision_task_route_is_pinned(task: str = "vision") -> bool:
+    """True when ``auxiliary.<task>`` explicitly pins a provider/model/base_url.
+
+    An ``auto`` provider plus empty model/base_url means "no opinion" (the auto chain may
+    use the main provider); anything else is an operator-chosen route that must win."""
+    cfg = _get_auxiliary_task_config(task) or {}
+    provider = str(cfg.get("provider") or "").strip().lower()
+    if provider and provider != "auto":
+        return True
+    if str(cfg.get("model") or "").strip():
+        return True
+    return bool(str(cfg.get("base_url") or "").strip())
 
 
 # ZAI vision must use the OpenAI-compatible endpoint: the Anthropic wire rejects max_tokens on
@@ -5746,6 +5890,21 @@ def resolve_vision_provider_client(
     )
     # The raw name keeps a llama.cpp alias distinguishable from bare ``custom`` for the last resolve.
     raw_requested, requested = requested, _normalize_vision_provider(requested)
+    if not resolved_base_url and str(raw_requested or "").strip().lower() in _LOCAL_SERVER_ALIASES:
+        # A configured local-server vision lane (provider: ollama / vllm / llama.cpp) has no
+        # registry entry, so without an explicit base_url the generic custom branch would
+        # borrow the *main* runtime endpoint — sending the vision model to the text-only
+        # main provider. Resolve the server's own local endpoint instead so the configured
+        # vision provider wins. Empty ``main_runtime`` prevents any main-endpoint borrow.
+        local_base = _local_server_vision_base_url(raw_requested)
+        if local_base:
+            client, final_model = _get_cached_client(
+                raw_requested, resolved_model, async_mode, base_url=local_base,
+                api_key=resolved_api_key, api_mode=resolved_api_mode, main_runtime={},
+                is_vision=True,
+            )
+            if client is not None:
+                return requested, client, final_model
     if resolved_base_url:
         provider_for_base_override = requested if requested and requested not in {"", "auto"} else "custom"
         client, final_model = resolve_provider_client(
@@ -7468,17 +7627,29 @@ def _resolve_call_client(
     explicit-provider fallback_chain / auto-chain rescue; RuntimeError when nothing is configured."""
     effective_provider = resolved_provider
     if task == "vision":
+        # An explicitly pinned auxiliary.vision route is authoritative. If it fails, do NOT
+        # fall back to the main provider: the main chat model is often only *catalog*
+        # vision-attested and its endpoint may reject images (HTTP 400) — the exact defect
+        # this branch used to hit. Try dedicated vision aggregators only, else fail typed.
+        vision_pinned = _vision_task_route_is_pinned(task)
         effective_provider, client, final_model = resolve_vision_provider_client(
             provider=resolved_provider if resolved_provider != "auto" else provider,
             model=resolved_model or model, base_url=resolved_base_url or base_url,
             api_key=resolved_api_key or api_key, async_mode=async_mode, main_runtime=main_runtime,
         )
         if client is None and resolved_provider != "auto" and not resolved_base_url:
-            logger.warning("Vision provider %s unavailable, falling back to auto vision backends",
-                           resolved_provider)
-            effective_provider, client, final_model = resolve_vision_provider_client(
-                provider="auto", model=resolved_model, async_mode=async_mode,
-                main_runtime=main_runtime)
+            if vision_pinned:
+                logger.warning(
+                    "Configured vision provider %s unavailable; trying dedicated vision "
+                    "backends (the main model is not used for a pinned vision route)",
+                    resolved_provider)
+                effective_provider, client, final_model = _vision_aggregator_only_route(async_mode)
+            else:
+                logger.warning("Vision provider %s unavailable, falling back to auto vision backends",
+                               resolved_provider)
+                effective_provider, client, final_model = resolve_vision_provider_client(
+                    provider="auto", model=resolved_model, async_mode=async_mode,
+                    main_runtime=main_runtime)
         if client is not None:
             resolved_provider = effective_provider or resolved_provider
     else:

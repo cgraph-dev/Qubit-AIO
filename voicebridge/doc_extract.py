@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import io
 import re
 import zlib
 from pathlib import Path
@@ -332,7 +333,13 @@ def _extract_pdf(target: Path, raw: bytes, limit: int, page: Any
         return _extract_pdf_stdlib(raw, limit, page)
     try:
         module = importlib.import_module(backend)
-        reader = module.PdfReader(str(target))
+        # A real confined path (``extract``) is opened by path; browser-pasted
+        # bytes (``extract_bytes``) have no file on disk, so feed the in-memory
+        # buffer. pypdf/PyPDF2 accept an open file-like object identically.
+        if target is not None and target.is_file():
+            reader = module.PdfReader(str(target))
+        else:
+            reader = module.PdfReader(io.BytesIO(raw))
         pages = list(reader.pages)
     except DocExtractError:
         raise

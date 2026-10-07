@@ -51,7 +51,7 @@ from .actions import (
     ActionError, ActionSpec, ActionValidationError, ActionGate, ActionRunner,
     ActionStore, ADAPTER_GHOST, RB_IMPOSSIBLE, RB_NONE, RB_REVERSIBLE,
     ST_ADAPTER_DISABLED, ST_OK, _render_preview,
-    register_action_spec,
+    action_spec, register_action_spec,
 )
 from .broker import CapabilityBroker, ToolBinding
 from .capabilities import CapabilitySpec, Tier
