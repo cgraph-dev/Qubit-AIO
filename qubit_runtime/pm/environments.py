@@ -510,12 +510,16 @@ def activate_dependencies(project_root: Path) -> None:
                    *[entry for entry in sys.path if Path(entry).resolve() != selected.resolve()]]
     os.environ["PYTHONPATH"] = os.pathsep.join([str(project_root.resolve()), str(selected)])
     os.environ.pop("VIRTUAL_ENV", None)
-    executable_dir = venv_bin_dir(environment)
     # The venv's own `qubit`/`qubit-acp` console scripts are editable installs bound to
     # the build-time source snapshot, not this checkout (#124627): a child that resolves
     # `qubit` off PATH must hit the checkout's own launcher first, never the venv's copy.
-    prefix = [str(path) for path in (project_root.resolve() / ".qubit" / "bin", executable_dir)
-              if path.is_dir()]
+    # A sealed payload's launchers live in <payload>/bin instead.
+    directories = [payload_command_dir(project_root) or project_root.resolve() / ".qubit" / "bin"]
+    # A shipped venv's Windows redirectors read pyvenv.cfg `home`, which still names the
+    # build machine, so every executable in its Scripts fails on the user's machine.
+    if not (os.name == "nt" and environment == payload_venv(project_root)):
+        directories.append(venv_bin_dir(environment))
+    prefix = [str(path) for path in directories if path.is_dir()]
     if prefix:
         os.environ["PATH"] = os.pathsep.join([*prefix, os.environ.get("PATH", "")])
 
