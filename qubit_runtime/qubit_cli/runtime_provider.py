@@ -525,9 +525,10 @@ def _pool_entry_mode_and_url(provider, entry, model_cfg, effective_model, base_u
         api_mode, default_url = _POOL_ENTRY_SIMPLE_MODES[provider]
         if provider == "openai-codex":
             # Pool entries retain the canonical ChatGPT URL, but the profile-wide
-            # HERMES_CODEX_BASE_URL override must apply consistently to every
-            # credential source, including pooled OAuth credentials.
-            override_url = get_secret_str("HERMES_CODEX_BASE_URL", "").strip().rstrip("/")
+            # QUBIT_CODEX_BASE_URL override (HERMES_CODEX_BASE_URL kept as the compat alias) must
+            # apply consistently to every credential source, including pooled OAuth credentials.
+            override_url = (get_secret_str("QUBIT_CODEX_BASE_URL", "").strip().rstrip("/")
+                            or get_secret_str("HERMES_CODEX_BASE_URL", "").strip().rstrip("/"))
             if override_url:
                 return api_mode, override_url
             # model.base_url is the secondary proxy override (same rule as the generic tail below:

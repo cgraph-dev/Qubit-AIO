@@ -69,14 +69,18 @@ def _codex_access_token_is_expiring(access_token: Any, skew_seconds: int) -> boo
 
 
 def _codex_base_url() -> str:
-    return os.getenv("HERMES_CODEX_BASE_URL", "").strip().rstrip("/") or DEFAULT_CODEX_BASE_URL
+    """Codex backend base URL override. ``QUBIT_CODEX_BASE_URL`` is the Qubit-first name;
+    ``HERMES_CODEX_BASE_URL`` stays honored as the compat alias (frozen env surface)."""
+    return (os.getenv("QUBIT_CODEX_BASE_URL", "").strip()
+            or os.getenv("HERMES_CODEX_BASE_URL", "").strip()).rstrip("/") or DEFAULT_CODEX_BASE_URL
 
 
 def _codex_pool_route_base_url(entry_base_url: Optional[str] = "") -> str:
     """Base URL the chat route sends a pooled Codex credential to — the same rule
-    ``runtime_provider._pool_entry_mode_and_url`` applies (``HERMES_CODEX_BASE_URL`` > ``model.base_url``
-    while the row still carries the canonical URL > the row's own URL). A pooled gateway key belongs to
-    that host only; composing it with the ambient default sends it to chatgpt.com (#121486)."""
+    ``runtime_provider._pool_entry_mode_and_url`` applies (``QUBIT_CODEX_BASE_URL`` >
+    ``model.base_url`` while the row still carries the canonical URL > the row's own URL). A pooled
+    gateway key belongs to that host only; composing it with the ambient default sends it to
+    chatgpt.com (#121486)."""
     base = _stripped(entry_base_url).rstrip("/")
     try:
         from qubit_cli.config import load_config_readonly
@@ -89,28 +93,8 @@ def _codex_pool_route_base_url(entry_base_url: Optional[str] = "") -> str:
         # Profile-scoped override only (never the raw process env: a multiplexed sibling's gateway).
         with suppress(Exception):
             from agent.secret_scope import get_secret_str
-            base = _stripped(get_secret_str("HERMES_CODEX_BASE_URL", "")).rstrip("/") or base
-        return base or DEFAULT_CODEX_BASE_URL
-
-
-def _codex_pool_route_base_url(entry_base_url: Optional[str] = "") -> str:
-    """Base URL the chat route sends a pooled Codex credential to — the same rule
-    ``runtime_provider._pool_entry_mode_and_url`` applies (``QUBIT_CODEX_BASE_URL`` > ``model.base_url``
-    while the row still carries the canonical URL > the row's own URL). A pooled gateway key belongs to
-    that host only; composing it with the ambient default sends it to chatgpt.com (#121486)."""
-    base = _stripped(entry_base_url).rstrip("/")
-    try:
-        from qubit_cli.config import load_config_readonly
-        from qubit_cli.runtime_provider import _pool_entry_mode_and_url
-        model_cfg = load_config_readonly().get("model")
-        return _pool_entry_mode_and_url(
-            "openai-codex", None, model_cfg if isinstance(model_cfg, dict) else {}, "", base)[1]
-    except Exception:
-        logger.debug("Codex pool route base resolution failed", exc_info=True)
-        # Profile-scoped override only (never the raw process env: a multiplexed sibling's gateway).
-        with suppress(Exception):
-            from agent.secret_scope import get_secret_str
-            base = _stripped(get_secret_str("QUBIT_CODEX_BASE_URL", "")).rstrip("/") or base
+            base = (_stripped(get_secret_str("QUBIT_CODEX_BASE_URL", ""))
+                    or _stripped(get_secret_str("HERMES_CODEX_BASE_URL", ""))).rstrip("/") or base
         return base or DEFAULT_CODEX_BASE_URL
 
 
