@@ -527,7 +527,9 @@ from cron.execution_identity import enter_cron_execution, exit_cron_execution
 from cron.executions import (
     _TERMINAL_STATES, HANDOFF_ADOPTION_GRACE_SECONDS, create_execution, finish_execution,
     get_execution, mark_execution_handoff_pending, mark_execution_running,
-    recover_interrupted_executions)
+    recover_interrupted_executions, settle_unstarted_execution)
+from cron.scheduler_liveness import ExecutionProgressStamper, _inactivity_watchdog_loop
+from agent.session_activity import AwakeIdleMeter
 
 # Response marker that suppresses delivery (output is still saved locally for audit).
 SILENT_MARKER = "[SILENT]"
@@ -1199,30 +1201,6 @@ def _consume_interrupted_flag(job_id: str, token: Optional[object] = None) -> bo
             _interrupted_job_ids.discard(key)
             hit = True
         return hit
-
-
-def _inactivity_watchdog_loop(
-    *, get_idle_seconds: Callable[[], float], limit_s: float, poll_s: float, stop: threading.Event,
-    future_done: Callable[[], bool],
-) -> bool:
-    """Poll idle time until limit (-> True), stop, or the future completes (-> False). Uses
-    ``threading.Event.wait``, not asyncio, so a blocked event loop cannot disable the watchdog.
-
-    Driven by ``threading.Event.wait`` (a kernel timeout), not asyncio, so a blocked event-loop /
-    ``run_job`` thread cannot disable this watchdog the way ``asyncio.sleep`` / ``wait_for`` would (family A
-    of #94285 — the 4118s-idle-on-a-600s-limit cron hang). Returns True when *limit_s* of inactivity was
-    observed.
-    """
-    while not stop.wait(poll_s):
-        if future_done():
-            return False
-        try:
-            idle = float(get_idle_seconds() or 0.0)
-        except Exception:
-            idle = 0.0
-        if idle >= limit_s:
-            return True
-    return False
 
 
 def _cron_inactivity_seconds() -> float:
@@ -2000,6 +1978,8 @@ def _run_agent_with_watchdog(
         except Exception:
             logger.debug("Job '%s': run_claim heartbeat failed", job_name, exc_info=True)
 
+    # Establish suspend accounting before the worker can stamp its first activity.
+    _awake_idle = AwakeIdleMeter()
     _cron_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     # Carry scheduler-scoped ContextVar state (e.g. env passthrough) into the worker thread.
     _cron_context = contextvars.copy_context()
@@ -2025,11 +2005,15 @@ def _run_agent_with_watchdog(
             return
         if _inactivity_watchdog_loop(
             get_idle_seconds=_idle_seconds, limit_s=_cron_inactivity_limit, poll_s=_POLL_INTERVAL,
-            stop=_watch_stop, future_done=_cron_future.done):
+            stop=_watch_stop, future_done=_cron_future.done, meter=_awake_idle):
             _inactivity_timeout = True
 
     _watch_thread = threading.Thread(
         target=_watch_inactivity, name=f"cron-inactivity-{str(job_id)[:8]}", daemon=True)
+    # Ledger progress stamps: the stale-claim sweep measures silence since the last stamp.
+    _progress = ExecutionProgressStamper(
+        str(job.get("execution_id") or ""), job_name, idle_seconds=_idle_seconds,
+        every_seconds=_RUN_CLAIM_HEARTBEAT_SECONDS)
     try:
         if _cron_inactivity_limit is not None:
             # Separate daemon thread so a hung get_activity_summary can't stop the limit firing.
@@ -2051,6 +2035,7 @@ def _run_agent_with_watchdog(
                     break
                 _abort_if_fire_claim_lost()
                 _heartbeat_run_claim_if_due()
+                _progress.tick()
     except Exception:
         _cron_pool.shutdown(wait=False, cancel_futures=True)
         raise
@@ -4173,7 +4158,12 @@ def _sweep_mcp_orphans() -> None:
 def _process_due_job(job: dict, adapters, loop, verbose: bool) -> bool:
     """Run one due job via the shared ``run_one_job`` body."""
     # Claim only when the worker actually starts, so a queued lease can't expire first.
-    claimed = claim_job_for_fire(job["id"], return_job=True)
+    try:
+        claimed = claim_job_for_fire(job["id"], return_job=True)
+    except BaseException as exc:  # settle first, then surface the real error
+        settle_unstarted_execution(
+            job["execution_id"], job["id"], f"Fire claim failed: {type(exc).__name__}: {exc}")
+        raise
     if not claimed:
         finish_execution(
             job["execution_id"], success=False, error="Fire claim lost; execution was not started.")
