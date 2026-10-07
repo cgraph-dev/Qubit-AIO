@@ -869,3 +869,12 @@ def run_console_repl(
             print(result.output, file=stderr if result.status == "error" else stdout)
         if result.status == "exit":
             return 0
+
+
+# Compat alias: the class was never rebranded (25 production references still say
+# ``HermesConsoleEngine``), but the test module imports ``QubitConsoleEngine``, so
+# that import failed outright:
+#   ImportError: cannot import name 'QubitConsoleEngine' from 'qubit_cli.console_engine'
+# One object under both names. A rename would break the 25 call sites; two classes
+# would fork engine state silently (hazard #1).
+QubitConsoleEngine = HermesConsoleEngine
