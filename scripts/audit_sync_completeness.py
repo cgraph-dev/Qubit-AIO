@@ -28,13 +28,59 @@ we ported from an even earlier revision is a SEPARATE problem (a short-port). Th
 script flags both: `short_port` (we trail our own baseline) and `behind_head` (we
 trail current upstream).
 
+THE REBRAND SUBTRACTION (both branches)
+---------------------------------------
+This audit compares SYMBOL NAMES. Upstream's symbols are Hermes-named; ours are
+Qubit-named for the same role. A naive name compare therefore re-reports every
+rebranded symbol as "missing". Measured damage, twice:
+
+  * the `short_port` branch was the worst offender -- it did NOT apply the rename
+    subtraction at all, so ALL 32 flagged production symbols across 20 files came
+    back as missing. Every one was a false positive (28 by rebrand spelling, 4 by
+    documented semantic rename / supersession / move). ZERO genuine.
+  * the top-45 `behind_head` sample listed 396 symbols; 145 (37%) were rebrand
+    ghosts -- we already had `_qubit_holder_subcommand` for `_hermes_holder_subcommand`,
+    `_get_real_qubit_home` for `_get_real_hermes_home`, `QUBIT_HERO` for
+    `HERMES_CADUCEUS`, `QubitTokenStorage` for `HermesTokenStorage`, etc.
+
+So the audit's headline numbers overstated the gap by roughly a third. This version
+applies the SAME rename subtraction to BOTH branches, using the rename engine that
+actually did the rebrand (`scripts/qubit_rebrand.py` -- MODULE_TOKENS, CLASS_TOKENS,
+IDENTIFIER_TOKENS, ENV_TOKENS) rather than a hand-rolled prefix guess. It counts a
+symbol PRESENT when:
+
+  1. its own name is a top-level def in our routed file, OR
+  2. its hermes->qubit twin (from the engine's token map, longest-match first) is a
+     top-level def in our routed file, OR
+  3. its twin (or its own name) is a top-level def ANYWHERE in our tree -- this
+     catches symbols that MOVED to a sibling module during the sync, OR
+  4. it appears in SEMANTIC_RENAMES -- a small, evidence-backed table of renames the
+     mechanical token map cannot express (`HERMES_CADUCEUS`->`QUBIT_HERO`,
+     `_SCRIPT_REL`->`_CANONICAL_SCRIPT_REL`/`_LEGACY_SCRIPT_REL`, ...). Every entry
+     cites where it was proven.
+
+FALSE NEGATIVES ARE WORSE THAN FALSE POSITIVES
+----------------------------------------------
+Subtracting a symbol that is genuinely missing HIDES real work. So a twin is only
+subtracted when it is PROVEN to resolve as an AST definition (in our file or
+tree-wide) -- never on a bare string match, which would credit a name that appears
+only in a comment. When the rule is unsure, the symbol stays counted MISSING. Cases
+that resolve by neither the twin map nor SEMANTIC_RENAMES are reported explicitly so
+a human can judge them, rather than silently dropped.
+
+`preserved_wire_identifiers` (the frozen manifest's 14 wire tokens -- `hermes_flow`,
+`X-Hermes-Session-Token`, `hermes-kanban`, ...) are deliberately NOT renamed and are
+never credited by the twin pass.
+
 Usage:
     python3 scripts/audit_sync_completeness.py [--json out.json] [--top 40]
+    python3 scripts/audit_sync_completeness.py --rev ad12263a5ed4 --show-symbols
 """
 from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import json
 import re
 import subprocess
@@ -68,50 +114,106 @@ ROUTES = {
 RUNTIME = REPO / "qubit_runtime"
 
 
-def sh(args: list[str], cwd: Path | None = None) -> str:
+# ---------------------------------------------------------------------------
+# Rebrand map -- loaded from the engine that performed the rebrand.
+# ---------------------------------------------------------------------------
+def _load_rebrand_tokens() -> dict[str, str]:
+    """Merge the rebrand engine's exact token maps into one lookup.
+
+    Importing the engine (rather than re-deriving) means the audit and the actual
+    rebrand can never drift: if a token is added to the map, this audit picks it
+    up on the next run. The module is import-safe (its only side effect is behind
+    a ``__main__`` guard).
+    """
+    engine = REPO / "scripts" / "qubit_rebrand.py"
+    if not engine.is_file():
+        return {}
+    spec = importlib.util.spec_from_file_location("_qubit_rebrand_engine", engine)
+    if spec is None or spec.loader is None:
+        return {}
+    mod = importlib.util.module_from_spec(spec)
     try:
-        p = subprocess.run(args, cwd=str(cwd) if cwd else None,
-                           capture_output=True, text=True, timeout=600)
-        return p.stdout
-    except Exception:
-        return ""
+        spec.loader.exec_module(mod)
+    except Exception:                                     # noqa: BLE001
+        return {}
+    tokens: dict[str, str] = {}
+    for attr in ("MODULE_TOKENS", "CLASS_TOKENS", "IDENTIFIER_TOKENS", "ENV_TOKENS"):
+        mapping = getattr(mod, attr, None)
+        if isinstance(mapping, dict):
+            tokens.update(mapping)
+    return tokens
 
 
-def route(path: str) -> str:
-    """Upstream path -> our path, applying the rename map under tests/ too."""
-    for prefix in ("tests/", ""):
-        if prefix and not path.startswith(prefix):
-            continue
-        rest = path[len(prefix):] if prefix else path
-        segs = rest.split("/")
-        if segs and segs[0] in ROUTES:
-            segs[0] = ROUTES[segs[0]]
-        if segs and segs[-1].startswith("hermes"):
-            segs[-1] = "qubit" + segs[-1][len("hermes"):]
-        return prefix + "/".join(segs)
-    return path
+REBRAND_TOKENS = _load_rebrand_tokens()
+
+# Wire tokens that are deliberately NOT renamed (frozen manifest
+# `preserved_wire_identifiers`). A symbol naming one of these is never credited
+# by the twin pass even if a mechanical transform would produce a twin.
+PRESERVED_WIRE = {
+    "__HERMES_BASE_PATH__", "__HERMES_SESSION_TOKEN__", "__HERMES_AUTH_REQUIRED__",
+    "__HERMES_PLUGINS__", "__HERMES_PLUGIN_SDK__", "X-Hermes-Session-Token",
+    "hermes_flow", "hermes.tokenReloadAttempted", "hermes-kanban", "hermes-flow",
+    "hermes_achievements", "hermes-achievements", "HERMES_QWEN_", "qubit-hermes",
+}
+
+# Renames the mechanical token map cannot express: a different NAME for the same
+# role (not a spelling transform). Each entry is evidence-backed; the comment
+# names where it was proven. Keep this table TINY and cited -- it is the one place
+# a mistake becomes a false negative.
+SEMANTIC_RENAMES: dict[str, str] = {
+    # docs/PRODUCTION_SHORT_PORT_CLOSED_2026-10-07.md: banner.py defines
+    # QUBIT_HERO (:80) where upstream defined HERMES_CADUCEUS (:80); used same
+    # way at the same call site (`banner_hero or <name>`).
+    "HERMES_CADUCEUS": "QUBIT_HERO",
+    # docs/PRODUCTION_SHORT_PORT_CLOSED_2026-10-07.md + owner decision #21
+    # (2026-09-23), documented in-code at claw.py:24-33: the single _SCRIPT_REL
+    # was split into _CANONICAL_SCRIPT_REL + _LEGACY_SCRIPT_REL.
+    "_SCRIPT_REL": "_CANONICAL_SCRIPT_REL",
+    # docs/PRODUCTION_SHORT_PORT_CLOSED_2026-10-07.md: the nous provider plugin
+    # renamed its module-level INSTANCE `nous` -> `qubit` (:69, `qubit =
+    # NousProfile(...)`), preserving `name="nous"` and `register_provider(qubit)`.
+    # `rebrand("nous")` returns "nous" unchanged (no "hermes" substring), which is
+    # why the mechanical pass cannot see it.
+    "nous": "qubit",
+    # docs/PRODUCTION_SHORT_PORT_CLOSED_2026-10-07.md + REBRAND_AUDIT.md: the
+    # fleet marker dropped the "legacy" qualifier; ours defines the same marker
+    # as `_write_fleet_restart_pending_marker` (hermes_cli/update_cmd_fleet.py:63
+    # -> qubit_cli/update_cmd_fleet.py:63).
+    "_write_legacy_fleet_restart_pending_marker": "_write_fleet_restart_pending_marker",
+}
 
 
 def rebrand(sym: str) -> str:
-    """Upstream symbol name -> the name Qubit's rename gives it.
+    """Upstream symbol name -> the name Qubit's rename gives it. Identity if none.
 
-    WHY: the audit routes the FILE PATH through the rename map but compared SYMBOL
-    NAMES literally. So upstream `_hermes_home` read as missing when our tree has
-    `_qubit_home` (43 refs upstream, 51 ours) -- a pure artifact. Measured on the
-    218 flagged production files: **200 of 584 reported-missing symbols (34%)** are
-    present under the rebranded name. An agent hand-checking 3 files estimated 87%
-    from that sample; the true rate is 34%, which is why this is measured across all
-    584 rather than extrapolated.
+    Resolution order mirrors ``qubit_rebrand._rewrite_text``:
+      1. exact token from the engine's map (module / class / identifier / env),
+      2. documented semantic rename,
+      3. longest-first prefix transform (``_hermes_`` before ``hermes_``),
+      4. bare ``hermes``->``qubit`` for embedded occurrences.
 
-    Skipping this check sends porters to re-add symbols that already exist, creating
-    the duplicate-object hazard (#1) the SYNC_HAZARDS register warns about.
+    Returns ``sym`` unchanged when nothing applies, so callers can detect "no
+    rename" by ``rebrand(sym) == sym``.
     """
+    if sym in PRESERVED_WIRE:
+        return sym
+    if sym in REBRAND_TOKENS:
+        return REBRAND_TOKENS[sym]
+    if sym in SEMANTIC_RENAMES:
+        return SEMANTIC_RENAMES[sym]
     for up, qb in (("_HERMES_", "_QUBIT_"), ("HERMES_", "QUBIT_"),
-                   ("_hermes_", "_qubit_"), ("hermes_", "qubit_")):
+                   ("_hermes_", "_qubit_"), ("hermes_", "qubit_"),
+                   ("Hermes", "Qubit")):
         if sym.startswith(up):
             return qb + sym[len(up):]
+    # Leading-underscore private helper (`_hermes_repo_root`, `_hermes_home`).
+    if sym.startswith("_hermes"):
+        return "_qubit" + sym[len("_hermes"):]
+    # Embedded occurrences anywhere in the name.
     if "hermes" in sym:
         return sym.replace("hermes", "qubit")
+    if "Hermes" in sym:
+        return sym.replace("Hermes", "Qubit")
     return sym
 
 
@@ -136,8 +238,78 @@ def top_defs(src: str) -> set[str]:
     return out
 
 
+def sh(args: list[str], cwd: Path | None = None) -> str:
+    try:
+        p = subprocess.run(args, cwd=str(cwd) if cwd else None,
+                           capture_output=True, text=True, timeout=600)
+        return p.stdout
+    except Exception:
+        return ""
+
+
+def route(path: str) -> str:
+    """Upstream path -> our path, applying the rename map under tests/ too."""
+    for prefix in ("tests/", ""):
+        if prefix and not path.startswith(prefix):
+            continue
+        rest = path[len(prefix):] if prefix else path
+        segs = rest.split("/")
+        if segs and segs[0] in ROUTES:
+            segs[0] = ROUTES[segs[0]]
+        if segs and segs[-1].startswith("hermes"):
+            segs[-1] = "qubit" + segs[-1][len("hermes"):]
+        return prefix + "/".join(segs)
+    return path
+
+
 def blob(rev: str, path: str) -> str:
     return sh(["git", "-C", str(UP), "show", f"{rev}:{path}"])
+
+
+_SKIP_PARTS = {"node_modules", "__pycache__", ".venv", "venv", "dist", "build",
+               ".git", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+
+
+def build_tree_def_index() -> dict[str, set[str]]:
+    """name -> set of our files defining it, tree-wide.
+
+    Built once. Needed to credit symbols that MOVED to a sibling module during
+    the sync (e.g. `_codex_compaction_cooldown_remaining`, imported by
+    agent/conversation_compression.py from agent.conversation_compression_codex).
+    A same-file-only compare reports such a symbol as missing forever.
+    """
+    index: dict[str, set[str]] = defaultdict(set)
+    for p in RUNTIME.rglob("*.py"):
+        if any(part in _SKIP_PARTS for part in p.parts):
+            continue
+        try:
+            src = p.read_text(errors="replace")
+        except OSError:
+            continue
+        for name in top_defs(src):
+            index[name].add(str(p.relative_to(REPO)))
+    return index
+
+
+def resolve(sym: str, our_defs: set[str], tree_defs: dict[str, set[str]]) -> str | None:
+    """How `sym` is present in our tree, or None if genuinely missing.
+
+    Returns a short provenance tag ('def', 'rebrand', 'move') for the report.
+    Order: same-file def, then rebranded twin in the same file, then the twin (or
+    the name itself) as a def anywhere in the tree (a move).
+    """
+    if sym in our_defs:
+        return "def"
+    twin = rebrand(sym)
+    if twin != sym:
+        if twin in our_defs:
+            return "rebrand"
+        if tree_defs.get(twin):
+            return "move"
+    # A symbol whose own name moved (no rename involved).
+    if tree_defs.get(sym) and sym not in our_defs:
+        return "move"
+    return None
 
 
 def main() -> int:
@@ -147,6 +319,10 @@ def main() -> int:
     ap.add_argument("--top", type=int, default=40)
     ap.add_argument("--rev", default=HEAD,
                     help=f"upstream revision to audit against (default {HEAD})")
+    ap.add_argument("--show-symbols", action="store_true",
+                    help="emit the counted (missing) symbol names into the JSON, "
+                         "per file -- the JSON otherwise carries only counts, which "
+                         "forces every reader to write a scratch twin to debug it")
     args = ap.parse_args()
 
     # Every upstream .py file at the reference revision.
@@ -154,19 +330,24 @@ def main() -> int:
                             args.rev]).split("\n") if p.endswith(".py")]
     print(f"# sync completeness audit -- upstream {args.rev} vs our tree")
     print(f"# upstream .py files: {len(files)}")
+    print(f"# rebrand token map: {len(REBRAND_TOKENS)} engine tokens, "
+          f"{len(SEMANTIC_RENAMES)} semantic renames, "
+          f"{len(PRESERVED_WIRE)} preserved wire ids")
+
+    # One tree-wide def index; used to credit moved symbols. ~20s for the tree.
+    tree_defs = build_tree_def_index()
 
     exists = 0
     absent: list[str] = []
     short_port: list[tuple[str, int, int]] = []   # present but trails our own baseline
     behind_head: list[tuple[str, int, int]] = []
+    # path -> {missing_symbols, by: {sym: provenance_that_would_credit_it}}
+    detail: dict[str, dict] = {}
     current = 0
 
-    # Cache blobs per revision to avoid re-shelling.
-    for i, up_path in enumerate(files):
+    for up_path in files:
         our_path = route(up_path)
         ours = RUNTIME / our_path
-        head_src = blob(args.rev, up_path)
-        head_syms = top_defs(head_src)
         if not ours.exists():
             absent.append(up_path)
             continue
@@ -176,25 +357,29 @@ def main() -> int:
         except OSError:
             our_src = ""
         our_syms = top_defs(our_src)
-        # Subtract names that exist under the rebranded spelling, or the report
-        # inflates with pure rebrand artifacts (measured rate: 34%).
-        our_src_text = our_src
-        rebranded_present = {sym for sym in (head_syms - our_syms)
-                             if rebrand(sym) != sym
-                             and re.search(rf"\b{re.escape(rebrand(sym))}\b", our_src_text)}
-        missing = (head_syms - our_syms) - rebranded_present
-        if not missing:
+        head_syms = top_defs(blob(args.rev, up_path))
+
+        # --- the rename subtraction, applied to EVERY comparison below ---
+        # A head symbol is "present" if it resolves in our tree by any credited
+        # route (same-file def / rebranded twin / move).
+        missing_head = sorted(
+            s for s in (head_syms - our_syms)
+            if resolve(s, our_syms, tree_defs) is None)
+        if not missing_head:
             current += 1
             continue
 
-        # Distinguish: did upstream add these AFTER our baseline, or do we trail
-        # even our own baseline? Compare against the baseline blob.
         base_syms = top_defs(blob(BASELINE, up_path))
-        missing_at_base = base_syms - our_syms
-        if missing_at_base:
-            short_port.append((up_path, len(missing_at_base), len(base_syms)))
+        missing_base = sorted(
+            s for s in (base_syms - our_syms)
+            if resolve(s, our_syms, tree_defs) is None)
+
+        if missing_base:
+            short_port.append((up_path, len(missing_base), len(base_syms)))
+            detail[up_path] = {"missing": missing_base, "branch": "short_port"}
         else:
-            behind_head.append((up_path, len(missing), len(head_syms)))
+            behind_head.append((up_path, len(missing_head), len(head_syms)))
+            detail[up_path] = {"missing": missing_head, "branch": "behind_head"}
 
     total_missing_syms = sum(n for _, n, _ in short_port) + sum(n for _, n, _ in behind_head)
     print(f"# EXISTS: {exists}   ABSENT: {len(absent)}   CURRENT: {current}")
@@ -216,7 +401,7 @@ def main() -> int:
             print(f"  {v:5}  {k}")
 
     if args.json:
-        Path(args.json).write_text(json.dumps({
+        payload = {
             "rev": args.rev, "upstream_py": len(files), "exists": exists,
             "absent": len(absent), "current": current,
             "short_port_files": len(short_port),
@@ -227,8 +412,12 @@ def main() -> int:
                 {"path": p, "missing": n, "baseline_defs": t}
                 for p, n, t in sorted(short_port, key=lambda x: -x[1])],
             "absent_paths": absent[:2000],
-        }, indent=2))
-        print(f"\nJSON written: {args.json}")
+        }
+        if args.show_symbols:
+            payload["symbols"] = detail
+        Path(args.json).write_text(json.dumps(payload, indent=2))
+        print(f"\nJSON written: {args.json}"
+              + ("  (incl. per-file symbols via --show-symbols)" if args.show_symbols else ""))
     return 0
 
 
