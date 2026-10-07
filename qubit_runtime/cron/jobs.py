@@ -2845,6 +2845,9 @@ class _DueScan:
     now: datetime
     needs_save: bool = False
     removed: Set[str] = field(default_factory=set)
+    # Miss/catch-up metrics, emitted once the save that persists the scan's repairs lands: an
+    # unwritable store re-finds the same miss every tick, so counting before the save over-counts.
+    on_saved: List[Callable[[], None]] = field(default_factory=list)
 
     def find(self, job_id: Any) -> Optional[Dict[str, Any]]:
         return next((rj for rj in self.raw_jobs if rj["id"] == job_id), None)
@@ -3282,7 +3285,15 @@ def _get_due_jobs_locked() -> List[Dict[str, Any]]:
                 job.get("name") or job.get("id") or "?")
 
     if scan.needs_save:
-        save_jobs(raw_jobs, removed_ids=scan.removed or None)
+        try:
+            save_jobs(raw_jobs, removed_ids=scan.removed or None)
+        except OSError as exc:  # repairs live in memory; the next tick retries the persist
+            store_health.note_unwritable(exc, "due-scan repairs not persisted", "scan")
+            return due
+    # Only now is a skipped one-shot claimed or durably due on disk: normal grace applies again.
+    store_health.end_recovery_window(_current_cron_store().cron_dir)
+    for emit in scan.on_saved:
+        emit()
     return due
 
 
