@@ -784,7 +784,7 @@ def _ensure_chrome_debug_data_dir(data_dir: str) -> None:
     Local Storage live here. Created with a bare ``os.makedirs`` it inherits
     the umask and lands 0755, so every other local account could list and
     read those stores. ``QUBIT_HOME`` is 0700 by default, which contains the
-    damage — but the documented ``HERMES_HOME_MODE=0701`` hatch (so nginx can
+    damage — but the documented ``QUBIT_HOME_MODE=0701`` hatch (so nginx can
     traverse to a served subdirectory) makes a 0755 child genuinely
     world-readable.
 
@@ -792,7 +792,7 @@ def _ensure_chrome_debug_data_dir(data_dir: str) -> None:
     window where the profile sits world-readable before a follow-up chmod.
     Policy is then reconciled by ``qubit_cli.config._secure_dir``, the house
     helper, rather than a hand-rolled chmod: it skips managed/NixOS installs,
-    honours ``HERMES_HOME_MODE``, and applies ``HERMES_UID``/``HERMES_GID``
+    honours ``QUBIT_HOME_MODE``, and applies ``QUBIT_UID``/``QUBIT_GID``
     ownership so a root-created dir does not lock out uid-mapped Docker
     workers (#34107).
 
@@ -835,7 +835,7 @@ def _open_launch_stderr_log(path: str):
 
     Opened with a plain ``open(path, "wb")`` this lands 0644 under a default
     umask — a fixed, guessable name inside the profile dir hardened just
-    above. Under ``HERMES_HOME_MODE=0701`` the directory is traversable but
+    above. Under ``QUBIT_HOME_MODE=0701`` the directory is traversable but
     unlistable, so a predictable filename is exactly the case that stays
     reachable; the uuid-named files elsewhere in the profile do not.
 

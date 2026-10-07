@@ -612,7 +612,7 @@ class TestFetchNewMessages(unittest.TestCase):
         mock_imap.uid.side_effect = uid_handler
 
         with patch("imaplib.IMAP4_SSL", return_value=mock_imap):
-            results = adapter._fetch_new_messages()
+            results = adapter._fetch_new_messages(lambda _c: True)
 
         # Only UID 3 should be fetched (1 and 2 already seen)
         self.assertEqual(len(results), 1)
@@ -768,7 +768,7 @@ class TestPollLoop(unittest.TestCase):
         mock_imap.uid.side_effect = uid_handler
 
         with patch("imaplib.IMAP4_SSL", return_value=mock_imap):
-            results = adapter._fetch_new_messages()
+            results = adapter._fetch_new_messages(lambda _c: True)
 
         self.assertEqual(len(results), 1)
         self.assertIn(b"1", adapter._seen_uids)     # fetched → seen
@@ -805,7 +805,7 @@ class TestPollLoop(unittest.TestCase):
             "plugins.platforms.email.adapter.EmailAdapter._parse_fetched_message",
             side_effect=[ValueError("unparseable"), {"subject": "good"}],
         ):
-            results = adapter._fetch_new_messages()
+            results = adapter._fetch_new_messages(lambda _c: True)
 
         # Poison message consumed (seen, skipped); good message survived.
         self.assertEqual(len(results), 1)
@@ -996,7 +996,7 @@ class TestImapConnectionCleanup(unittest.TestCase):
         mock_imap.uid.side_effect = uid_handler
 
         with patch("imaplib.IMAP4_SSL", return_value=mock_imap):
-            results = adapter._fetch_new_messages()
+            results = adapter._fetch_new_messages(lambda _c: True)
 
         self.assertEqual(results, [])
         mock_imap.logout.assert_called_once()

@@ -24,7 +24,7 @@ from qubit_cli.auth_constants import (
     _decode_jwt_claims, AUTH_LOCK_TIMEOUT_SECONDS, AuthError,
     CODEX_ACCESS_TOKEN_REFRESH_SKEW_SECONDS, CODEX_OAUTH_CLIENT_ID, CODEX_OAUTH_TOKEN_URL,
     CODEX_OAUTH_USER_AGENT, CODEX_RATE_LIMITED_CODE, DEFAULT_CODEX_BASE_URL, _codex_err, httpx)
-from utils import env_float
+from utils import env_float, normalize_proxy_env_vars
 
 if TYPE_CHECKING:  # annotation-only; the runtime import would be a cycle
     from qubit_cli.auth import ProviderConfig
@@ -90,6 +90,27 @@ def _codex_pool_route_base_url(entry_base_url: Optional[str] = "") -> str:
         with suppress(Exception):
             from agent.secret_scope import get_secret_str
             base = _stripped(get_secret_str("HERMES_CODEX_BASE_URL", "")).rstrip("/") or base
+        return base or DEFAULT_CODEX_BASE_URL
+
+
+def _codex_pool_route_base_url(entry_base_url: Optional[str] = "") -> str:
+    """Base URL the chat route sends a pooled Codex credential to — the same rule
+    ``runtime_provider._pool_entry_mode_and_url`` applies (``QUBIT_CODEX_BASE_URL`` > ``model.base_url``
+    while the row still carries the canonical URL > the row's own URL). A pooled gateway key belongs to
+    that host only; composing it with the ambient default sends it to chatgpt.com (#121486)."""
+    base = _stripped(entry_base_url).rstrip("/")
+    try:
+        from qubit_cli.config import load_config_readonly
+        from qubit_cli.runtime_provider import _pool_entry_mode_and_url
+        model_cfg = load_config_readonly().get("model")
+        return _pool_entry_mode_and_url(
+            "openai-codex", None, model_cfg if isinstance(model_cfg, dict) else {}, "", base)[1]
+    except Exception:
+        logger.debug("Codex pool route base resolution failed", exc_info=True)
+        # Profile-scoped override only (never the raw process env: a multiplexed sibling's gateway).
+        with suppress(Exception):
+            from agent.secret_scope import get_secret_str
+            base = _stripped(get_secret_str("QUBIT_CODEX_BASE_URL", "")).rstrip("/") or base
         return base or DEFAULT_CODEX_BASE_URL
 
 
@@ -422,6 +443,8 @@ def _codex_http_client(**kwargs: Any) -> "httpx.Client":
     token refresh / device login / usage probes time out where the official Codex CLI (which races families
     per RFC 8305) works.
     """
+    normalize_proxy_env_vars()  # a bracketed-IPv6 NO_PROXY entry ([::1], Clash Verge/mihomo) makes the bare
+    # trust_env client below raise InvalidURL at construction (#118159) — sanitize before building it.
     client = httpx.Client(event_hooks={"response": [_cap_codex_response_body]}, **kwargs)
     with suppress(Exception):
         from agent.process_bootstrap import enable_happy_eyeballs_on_client

@@ -37,6 +37,11 @@ HANDOFF_PID_ENV = "HERMES_UPDATE_HANDOFF_PID"
 # only exists so an unexpected chain can never spin the walk.
 _MAX_ANCESTRY_DEPTH = 128
 
+# Bound on the parent chain walked by _is_ancestor_pid. Real ancestries are a
+# handful of links (init -> desktop -> staged updater -> shim -> us); the cap
+# only exists so an unexpected chain can never spin the walk.
+_MAX_ANCESTRY_DEPTH = 128
+
 # Exit code meaning "another updater/instance owns this install right now" — the same
 # contract as the Windows shim / venv-holder guards in _cmd_update_impl, matched by the
 # Tauri updater (UPDATE_EXIT_CONCURRENT in update.rs) to show "Qubit is still running".

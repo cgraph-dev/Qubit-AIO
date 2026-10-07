@@ -134,6 +134,16 @@ def _denied_source(row: dict) -> bool:
     return (row.get("source") or "").strip().lower() in _LISTING_DENY_SOURCES
 
 
+def _auto_resume_denied_source(row: dict) -> bool:
+    """``_denied_source`` plus ``source='unknown'``: auto-resume must never land on a
+    token-accounting guard placeholder (#54320). The guard mints those rows when legacy
+    message rows lack a ``sessions`` row, and such a placeholder can outrank the session
+    the user actually opened. Human-facing listings keep showing them (they may be a
+    real session awaiting repair); only the pick-a-session-for-me paths skip them."""
+    source = (row.get("source") or "").strip().lower()
+    return source in _LISTING_DENY_SOURCES or source == "unknown"
+
+
 def _listing_rows(db, limit: int, **kwargs) -> list:
     """Human-facing ``list_sessions_rich`` rows (most recent first), deny-list applied."""
     rows = db.list_sessions_rich(source=None, limit=limit, order_by_last_active=True, compact_rows=True, **kwargs)
@@ -683,6 +693,35 @@ def _resume_adopt_stranded(ctx: _Resume) -> None:
         logger.exception("stranded-session adoption failed for %s", ctx.target)
 
 
+def _resume_materialize_minted(ctx: _Resume) -> None:
+    """Row for a minted-but-never-persisted key (#96793): adopt the id, not 4007.
+
+    ``session.create`` mints the stored key but intentionally writes no state.db row
+    until the first prompt (no "Untitled" litter). If the backend dies in that window,
+    the key exists client-side (pinned tile, stored id) but has no row anywhere — and
+    after a restart the in-memory live-lazy lookup above can't find it either, so the
+    resume 4007ed forever. When the target is a well-formed server-minted key, mint
+    the row here and let the normal resume path continue with empty history. Abandoned
+    drafts still leave no row: nothing is written until a client explicitly resumes
+    the exact key. ``create_session`` is an upsert, so a concurrently persisted row is
+    not clobbered (only its NULL model/source columns would fill in).
+    """
+    try:
+        ctx.db.create_session(
+            ctx.target,
+            source=_resolve_session_source(_str_param(ctx.params, "source") or None),
+            model=_resolve_model(),
+            profile_name=profile_name_for_home(ctx.profile_home) or _response_profile_name(ctx.profile),
+        )
+        ctx.found = ctx.db.get_session(ctx.target)
+        logger.info(
+            "materialized session row for minted-but-unpersisted key %s (resume no longer 4007s)",
+            ctx.target,
+        )
+    except Exception:
+        logger.warning("failed to materialize session row for %s", ctx.target, exc_info=True)
+
+
 def _resume_locate(ctx: _Resume) -> dict | None:
     """Resolve ``ctx.target`` to a stored row (``ctx.found``); a dict is an early response."""
     ctx.found = ctx.db.get_session(ctx.target)
@@ -702,6 +741,9 @@ def _resume_locate(ctx: _Resume) -> dict | None:
         return _resume_live_unpersisted(ctx, live_sid, live)
     if ctx.owns_db:
         _resume_adopt_stranded(ctx)
+    if not ctx.found and not ctx.lazy and _is_server_minted_key(ctx.target) \
+            and not _any_live_session_claims_key(ctx.target):
+        _resume_materialize_minted(ctx)
     return None if ctx.found else _err(ctx.rid, 4007, "session not found")
 
 
@@ -2076,7 +2118,46 @@ def _branch_source_history(db, session: dict, old_key: str) -> list:
     return history or _visible_branch_history(in_memory_history)
 
 
+def _branch_idempotent_hit(existing_sid: str, session: dict, omit_messages: bool) -> dict:
+    """The SAME result shape a fresh ``_branch_live`` returns for the existing child."""
+    history = session.get("history") or []
+    key = session.get("session_key") or ""
+    response = {"session_id": existing_sid, "stored_session_id": key,
+                "title": session.get("branch_title") or _branch_title_for(session),
+                "parent": session.get("parent_session_id"), "message_count": len(history),
+                "info": _fallback_session_info(session)}
+    if omit_messages:
+        response["messages_omitted"] = True
+    else:
+        response["messages"] = _history_to_messages(history, profile_home=session.get("profile_home"))
+    return response
+
+
+def _branch_title_for(session: dict) -> str:
+    """The child's persisted title from its stored row, best-effort."""
+    with contextlib.suppress(Exception):
+        with _session_db(session) as db:
+            if db is not None:
+                return db.get_session_title(session.get("session_key") or "") or ""
+    return ""
+
+
 def _branch_live(rid, params: dict, session: dict, *, omit_messages: bool = False) -> dict:
+    # Idempotency (#65410, same registry as session.create): a client retrying a
+    # branch whose first response was lost gets the SAME child, not a duplicate.
+    idem_key = _str_param(params, "idempotency_key") or None
+    if idem_key is not None:
+        with _sessions_lock:
+            now_gc = time.time()
+            existing_sid, ts = _idempotency_keys.get(idem_key, (None, 0.0))
+            if existing_sid is not None and existing_sid in _sessions:
+                if now_gc - ts <= _IDEMPOTENCY_KEY_TTL:
+                    # Refresh the TTL so back-to-back retries don't age out mid-flight.
+                    _idempotency_keys[idem_key] = (existing_sid, now_gc)
+                    return _ok(rid, _branch_idempotent_hit(existing_sid, _sessions[existing_sid], omit_messages))
+                _idempotency_keys.pop(idem_key, None)
+            # Stale key (child closed) or first attempt: fall through to a fresh
+            # branch, which re-registers the key below.
     # Write into the parent's profile-scoped state.db; the launch handle would orphan rows.
     with _session_db(session) as db:
         if db is None:
@@ -2091,7 +2172,8 @@ def _branch_live(rid, params: dict, session: dict, *, omit_messages: bool = Fals
         try:
             title = params.get("name", "") or _branch_title(db, old_key)
             home = session.get("profile_home")
-            _persist_branch(db, new_key, old_key, title, history, source=source, cwd=_session_cwd(session),
+            _persist_branch(db, new_key, old_key, title, history, source=source,
+                            cwd=None if _is_remote_launch_cwd(session) else _session_cwd(session),
                             profile_name=profile_name_for_home(home) or _current_profile_name(),
                             model=_session_default_model(session), copy_fields=_BRANCH_COPY_FIELDS,
                             title_source="user" if params.get("name") else "derived",
@@ -2102,6 +2184,13 @@ def _branch_live(rid, params: dict, session: dict, *, omit_messages: bool = Fals
         agent = _build_branch_agent(session, new_sid, new_key, history, source)
     except Exception as e:
         return _err(rid, 5000, f"agent init failed on branch: {e}")
+    if idem_key is not None:
+        with _sessions_lock:
+            _idempotency_keys[idem_key] = (new_sid, time.time())
+            # The fresh reply's title, so an idempotent hit answers the SAME one
+            # without a DB round-trip.
+            if new_sid in _sessions:
+                _sessions[new_sid]["branch_title"] = title
     response = {"session_id": new_sid, "stored_session_id": new_key, "title": title, "parent": old_key,
                 "message_count": len(history), "info": _session_info(agent, _sessions.get(new_sid))}
     if omit_messages:
@@ -2122,36 +2211,62 @@ def _(rid, params: dict, session: dict) -> dict:
     return _branch_live(rid, params, session, omit_messages=True)
 
 
+def _resume_wake_after_interrupt() -> None:
+    """Re-arm a wake lease held by the interrupt caller or a voice capture.
+
+    ``_wake_resume_if_owner`` no-ops unless that object holds the lease, so an
+    in-progress capture owned by someone else is not stolen. Interrupt already
+    silenced TTS before it can return an error; this matches that cut. A
+    ``not_interrupted`` hosted-task mismatch must not call it.
+    """
+    with _voice_sid_lock:
+        voice_owner = _voice_wake_owner
+    seen = []
+    for owner in (_caller_transport(), voice_owner):
+        if owner is None or any(owner is item for item in seen):
+            continue
+        seen.append(owner)
+        _wake_resume_if_owner(owner)
+
+
 # ── interrupt / steer / redirect ─────────────────────────────────────
 @method("session.interrupt")
 def _(rid, params: dict) -> dict:
     _tts_stream_stop()  # keypress barge-in also silences streaming TTS (voice is process-global)
-    session, err = _sess_nowait(params, rid)
-    if err:
-        return err
-    if expected := _str_param(params, "expected_hosted_task_id"):
+    resume_wake = True
+    try:
+        session, err = _sess_nowait(params, rid)
+        if err:
+            return err
+        if expected := _str_param(params, "expected_hosted_task_id"):
+            with session["history_lock"]:
+                task = session.get("_hosted_room_task")
+                if not (session.get("running") and isinstance(task, dict) and task.get("task_id") == expected):
+                    return _ok(rid, {"status": "not_interrupted", "interrupted": False})
+        sid = str(params.get("session_id") or "")
+        if _session_uses_compute_host(session):
+            try:
+                _interrupt_session_turn(sid, session, request_id=f"interrupt-{rid}")
+            except Exception as exc:
+                return _err(rid, 5019, f"compute-host interrupt failed: {exc}")
+            return _ok(rid, {"status": "interrupted", "turn_isolation": True})
+        session, err = _sess(params, rid)
+        if err:
+            return err
+        _interrupt_session_turn(sid, session)
+        # Retire the crash-recovery marker NOW: until the run thread's finally, a backend exit looks like a crash
+        # and session.resume auto-continues the turn the user just stopped (the extra key covers compression
+        # rotating session_key mid-turn).
         with session["history_lock"]:
-            task = session.get("_hosted_room_task")
-            if not (session.get("running") and isinstance(task, dict) and task.get("task_id") == expected):
-                return _ok(rid, {"status": "not_interrupted", "interrupted": False})
-    sid = str(params.get("session_id") or "")
-    if _session_uses_compute_host(session):
-        try:
-            _interrupt_session_turn(sid, session, request_id=f"interrupt-{rid}")
-        except Exception as exc:
-            return _err(rid, 5019, f"compute-host interrupt failed: {exc}")
-        return _ok(rid, {"status": "interrupted", "turn_isolation": True})
-    session, err = _sess(params, rid)
-    if err:
-        return err
-    _interrupt_session_turn(sid, session)
-    # Retire the crash-recovery marker NOW: until the run thread's finally, a backend exit looks like a crash
-    # and session.resume auto-continues the turn the user just stopped (the extra key covers compression
-    # rotating session_key mid-turn).
-    with session["history_lock"]:
-        active_marker_key = str(session.pop("_active_turn_marker_key", "") or "")
-    _retire_turn_marker(session, active_marker_key)
-    return _ok(rid, {"status": "interrupted"})
+            active_marker_key = str(session.pop("_active_turn_marker_key", "") or "")
+        _retire_turn_marker(session, active_marker_key)
+        return _ok(rid, {"status": "interrupted"})
+    finally:
+        if resume_wake:
+            try:
+                _resume_wake_after_interrupt()
+            except Exception:
+                logger.debug("session.interrupt wake resume failed", exc_info=True)
 
 
 def _apply_correction(rid, session: dict, verb: str, text: str, accepted_status: str) -> dict:

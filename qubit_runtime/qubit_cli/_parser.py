@@ -205,6 +205,8 @@ def _add_top_level_flags(parser: argparse.ArgumentParser) -> None:
               help="Troubleshooting mode: disable ALL customizations — user config, AGENTS.md/memory injection, plugins, and MCP servers (implies --ignore-user-config and --ignore-rules)")
     inherited(parser, "--tui", action="store_true", default=False,
               help="Launch the modern TUI instead of the classic REPL")
+    inherited(parser, "--native", "--tui-native", dest="tui_native", action="store_true", default=False,
+              help="With --tui: use native terminal scrollback and disable mouse tracking")
     inherited(parser, "--cli", action="store_true", default=False,
               help="Force the classic prompt_toolkit REPL (overrides display.interface=tui)")
     inherited(parser, "--dev", dest="tui_dev", action="store_true", default=False,
@@ -308,6 +310,8 @@ def _build_chat_parser(subparsers) -> argparse.ArgumentParser:
         help="Session source tag for filtering (default: cli). Use 'tool' for third-party integrations that should not appear in user session lists.")
     inherited(chat_parser, "--tui", action="store_true", default=SUPPRESS,
               help="Launch the modern TUI instead of the classic REPL")
+    inherited(chat_parser, "--native", "--tui-native", dest="tui_native", action="store_true", default=SUPPRESS,
+              help="Use native terminal scrollback and disable mouse tracking")
     inherited(chat_parser, "--cli", action="store_true", default=SUPPRESS,
               help="Force the classic prompt_toolkit REPL (overrides display.interface=tui)")
     inherited(chat_parser, "--dev", dest="tui_dev", action="store_true", default=SUPPRESS,
@@ -315,7 +319,22 @@ def _build_chat_parser(subparsers) -> argparse.ArgumentParser:
     return chat_parser
 
 
-class HermesArgumentParser(argparse.ArgumentParser):
+def _plugin_command_install_hint(prog: str, value: str):
+    """Install command when *value* names a catalog memory plugin that resolves nowhere: its
+    ``qubit <name>`` command exists only once the plugin is installed. Top level only; never raises."""
+    if prog != "qubit" or not re.fullmatch(r"[a-z0-9_-]{1,64}", value):
+        return None
+    try:
+        from plugins.memory import find_provider_dir
+        if find_provider_dir(value) is not None:
+            return None
+        from qubit_cli.memory_provider_migration import catalog_install_hint
+        return catalog_install_hint(value, category="memory")
+    except Exception:
+        return None
+
+
+class QubitArgumentParser(argparse.ArgumentParser):
     """argparse parser whose unknown-subcommand error is three short lines, not a 70-name dump.
 
     Stock argparse prints the full usage block plus ``(choose from 'chat', 'model', …)`` when
@@ -330,7 +349,11 @@ class HermesArgumentParser(argparse.ArgumentParser):
             # (argparse hands add_parser() the parent's class), so the copy stays correct for both.
             lines = [f"{self.prog}: '{value}' is not a `{self.prog}` command."]
             close = difflib.get_close_matches(str(value), list(action.choices), n=3, cutoff=0.6)
-            if close:
+            install = _plugin_command_install_hint(self.prog, str(value))
+            if install:
+                # A provider that left core (``qubit honcho``) registers its command only once installed.
+                lines.append(f"The '{value}' memory plugin is not installed. Install it with: {install}")
+            elif close:
                 lines.append(f"Did you mean: {', '.join(close)}?")
             lines.append(f"Run `{self.prog} --help` to see all commands.")
             self.exit(2, "\n".join(lines) + "\n")
@@ -344,7 +367,7 @@ def build_top_level_parser():
     ``chat_parser.set_defaults(func= cmd_chat)`` and registers further subparsers via
     ``subparsers.add_parser(...)``.
     """
-    parser = HermesArgumentParser(
+    parser = QubitArgumentParser(
         prog="qubit", description="Qubit Agent - AI assistant with tool-calling capabilities",
         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=_EPILOGUE)
     _add_top_level_flags(parser)

@@ -36,6 +36,7 @@ from qubit_cli.backup_restore import (
     _detect_prefix,
     _extract_member_atomically,
     _import_db_member,
+    _restore_auth_json,
     _safe_restore_db,
     _validate_backup_zip,
 )
@@ -1152,8 +1153,8 @@ def _create_prefixed_full_backup(
     Returns the path, or ``None`` if nothing to back up, the write failed, or the archive is
     incomplete (kept as ``<prefix><timestamp>.incomplete.zip``, excluded from retention).
     Never raises."""
-    hermes_root = qubit_home or get_default_qubit_root()
-    if not hermes_root.is_dir():
+    qubit_root = qubit_home or get_default_qubit_root()
+    if not qubit_root.is_dir():
         return None
     backup_dir = hermes_root / _PRE_UPDATE_BACKUPS_DIR
     try:
@@ -1162,7 +1163,7 @@ def _create_prefixed_full_backup(
         logger.warning("Could not create %s backup dir %s: %s", what, backup_dir, exc)
         return None
     out_path = backup_dir / f"{prefix}{datetime.now().strftime('%Y-%m-%d-%H%M%S')}.zip"
-    if _write_full_zip_backup(out_path, hermes_root) is None:
+    if _write_full_zip_backup(out_path, qubit_root) is None:
         # Incomplete runs publish straight to ``*.incomplete.zip`` (all-failed runs are discarded);
         # cap those salvages at one without letting them rotate complete backups out.
         _prune_incomplete_zips(backup_dir, prefix, prune_what)
@@ -1187,36 +1188,6 @@ def create_pre_migration_backup(
     raises."""
     return _create_prefixed_full_backup(
         qubit_home, _PRE_MIGRATION_PREFIX, max(keep, 0), "pre-migration", "pre-migration backup")
-
-
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-
-def copy_db_and_verify(src: Path, dst: Path) -> bool:
-    """Like :func:`_safe_copy_db` but verifies the destination after copy.
-
-    Returns True only when the copy succeeded AND the destination is valid
-    SQLite (header + integrity check). Verification honours the default
-    size ceiling — a multi-GB destination gets the header + schema probe
-    rather than a full ``PRAGMA integrity_check`` that would page through
-    the whole file.
-    """
-    if not _safe_copy_db(src, dst):
-        return False
-    integrity = verify_sqlite_integrity(dst, run_pragma=True)
-    if not integrity.get("valid"):
-        try:
-            dst.unlink(missing_ok=True)
-        except OSError:
-            pass
-        logger.warning("Backup of %s failed integrity verification: %s", src, integrity.get("message"))
-        return False
-    return True
-
-
-# ---- END PLUGIN-COMPAT ----
 
 
 # ---------------------------------------------------------------------------
@@ -1509,6 +1480,21 @@ def list_quick_snapshots(
     return results
 
 
+def _is_trusted_root_auth_alias(path: Path, home: Path) -> bool:
+    """True only for a file symlink resolving to this restore home's default-root auth store."""
+    if not path.is_symlink():
+        return False
+    try:
+        root = get_default_qubit_root(home=home).resolve(strict=False)
+        if home.resolve(strict=False) == root:
+            return False
+        trusted = (root / "auth.json").resolve(strict=False)
+        trusted.relative_to(root)
+        return path.resolve(strict=False) == trusted
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
 def restore_quick_snapshot(
     snapshot_id: str,
     qubit_home: Optional[Path] = None,
@@ -1516,7 +1502,8 @@ def restore_quick_snapshot(
     """Restore state from a quick snapshot.
 
     Overwrites current state files with the snapshot's copies.
-    Returns True if at least one file was restored.
+    Returns True if at least one file was restored and the listed auth.json
+    was not refused or skipped.
     """
     home = qubit_home or get_qubit_home()
     root = _quick_snapshot_root(home)
@@ -1547,6 +1534,7 @@ def restore_quick_snapshot(
         meta = json.load(f)
 
     restored = 0
+    auth_restore_failed = False
     for rel in meta.get("files", {}):
         # Security: reject absolute paths and traversals in manifest entries
         src = snap_dir / rel
@@ -1554,16 +1542,27 @@ def restore_quick_snapshot(
             src.resolve().relative_to(snap_dir.resolve())
         except ValueError:
             logger.error("Manifest path traversal blocked: %s", rel)
+            if rel == "auth.json":
+                auth_restore_failed = True
             continue
 
         dst = home / rel
         try:
             dst.resolve().relative_to(home.resolve())
         except ValueError:
-            logger.error("Manifest path traversal blocked: %s", rel)
-            continue
+            # Named profiles may deliberately share the machine-root auth store via an
+            # auth.json symlink. Let only that exact trusted alias reach _restore_auth_json;
+            # every other manifest destination outside the profile remains a traversal.
+            if rel != "auth.json" or not _is_trusted_root_auth_alias(dst, home):
+                logger.error("Manifest path traversal blocked: %s", rel)
+                if rel == "auth.json":
+                    auth_restore_failed = True
+                continue
 
         if not src.exists():
+            if rel == "auth.json":
+                logger.error("Snapshot auth.json listed in manifest is missing: %s", src)
+                auth_restore_failed = True
             continue
 
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -1579,14 +1578,25 @@ def restore_quick_snapshot(
                     # dst left as it was. Count as a failure, not a restore.
                     logger.error("Failed to restore %s: refused or source integrity check failed (see previous log)", rel)
                     continue
+            elif rel == "auth.json":
+                # Refresh tokens for these OAuth providers rotate on use. A historical
+                # snapshot can therefore contain a spent pair even though the current
+                # auth.json has the live successor. Restore the historical auth state
+                # while retaining that live single-use grant under the auth-store lock.
+                if not _restore_auth_json(src, dst):
+                    logger.error("Failed to restore %s safely", rel)
+                    auth_restore_failed = True
+                    continue
             else:
                 shutil.copy2(src, dst)
             restored += 1
         except (OSError, PermissionError) as exc:
             logger.error("Failed to restore %s: %s", rel, exc)
+            if rel == "auth.json":
+                auth_restore_failed = True
 
     logger.info("Restored %d files from snapshot %s", restored, snapshot_id)
-    return restored > 0
+    return restored > 0 and not auth_restore_failed
 
 
 def _count_cron_jobs(path: Path) -> Optional[int]:

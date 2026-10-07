@@ -39,21 +39,32 @@ from qubit_time import get_timezone
 from utils import atomic_replace, atomic_write_text
 
 # croniter is imported lazily (slow import, only needed for cron exprs). HAS_CRONITER stays a
-# module attribute: a monkeypatched value wins because _ensure_croniter only probes while None.
+# module attribute: a monkeypatched value wins because _ensure_croniter only probes while None
+# (and past `_croniter_retry_at`).
 croniter = None
 HAS_CRONITER: Optional[bool] = None
+# Monotonic deadline before the next croniter import probe after an ImportError (not latched).
+_CRONITER_RETRY_SECONDS = 60.0
+_croniter_retry_at: float = 0.0
 
 
 def _ensure_croniter() -> bool:
-    """Import croniter on first use; honor a pre-set HAS_CRONITER override."""
-    global croniter, HAS_CRONITER
-    if HAS_CRONITER is None:
+    """Import croniter on first use; honor a pre-set HAS_CRONITER override.
+
+    An ImportError is NOT latched: caching False would pin a single transient failure
+    (wrong interpreter, shadowed path) for the whole process lifetime, leaving every
+    recurring job's next_run_at None until a gateway restart (#127182). Stay None and
+    re-probe once ``_CRONITER_RETRY_SECONDS`` have passed (so a genuinely absent package does
+    not cost a finder walk per call on every due-scan tick), and due-scan recovery re-arms the
+    schedules as soon as the import succeeds. An explicit True/False override always wins."""
+    global croniter, HAS_CRONITER, _croniter_retry_at
+    if HAS_CRONITER is None and time.monotonic() >= _croniter_retry_at:
         try:
             from croniter import croniter as _croniter
             croniter = _croniter
             HAS_CRONITER = True
         except ImportError:
-            HAS_CRONITER = False
+            _croniter_retry_at = time.monotonic() + _CRONITER_RETRY_SECONDS
     return bool(HAS_CRONITER)
 
 

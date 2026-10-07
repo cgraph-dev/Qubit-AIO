@@ -33,7 +33,7 @@ _MAX_RECORDED = 1024
 _LAUNCH_ID_MAX_LEN = 64
 # ``os.execvp`` keeps the PID, so a relaunched process (``sessions browse`` -> resume) would count
 # the picker time as startup; relaunch() stamps its PID here right before the exec.
-RELAUNCHED_PID_ENV = "HERMES_RELAUNCHED_PID"
+RELAUNCHED_PID_ENV = "QUBIT_RELAUNCHED_PID"
 
 
 def latency_bucket(elapsed_ms: Any) -> str | None:
@@ -132,7 +132,7 @@ def cli_prompt_ready_handler():
 def record_cli_one_shot_ready() -> None:
     """A ``-q`` run is ready to dispatch its query. Kanban workers are dispatched processes, not a
     user waiting on a prompt, so they stay out of the CLI startup distribution."""
-    if not os.environ.get("HERMES_KANBAN_TASK"):
+    if not os.environ.get("QUBIT_KANBAN_TASK"):
         record_process_ready("cli")
 
 

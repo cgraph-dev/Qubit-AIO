@@ -4,12 +4,65 @@
 
 from .method_ctx import HandlerRegistry, bind_module
 
+from ._env import env_int
 from qubit_constants import DEFAULT_INDICATOR_STYLE, INDICATOR_STYLES
 from qubit_constants import display_qubit_home as _display_qubit_home
+
+import atexit
+import concurrent.futures
+import threading
 
 _registry = HandlerRegistry()
 method = _registry.method
 _profile_scoped = _registry.profile_scoped
+
+
+# ── setup readiness single-flight (#65151) ─────────────────────────────────
+#
+# Readiness probes are Desktop-polled and execute on the shared RPC pool via
+# ``_LONG_HANDLERS``. A slow probe (blocked keyring, OAuth refresh, GIL pressure)
+# used to run one provider-resolution call per overlapping poll, each occupying
+# another shared worker while they all resolved the same state. The probe now
+# runs on this small dedicated executor, single-flighted per
+# ``(kind, profile, requested provider)``:
+#
+# * the first caller submits the probe and waits a bounded budget;
+# * an overlapping poll for a still-running probe waits a short join grace for
+#   it — the Desktop fires setup.status + setup.runtime_check from independent
+#   consumers at the same seam (boot, the post-assignment ``setup.ready``
+#   broadcast), and answering the retryable error AT ONCE made both legs of
+#   one consumer transiently unknown, which the onboarding gate read as
+#   not-ready and the overlay never closed. Fast (config-read) probes settle
+#   well inside the grace, so an overlapping poll reads the shared result; a
+#   probe still running after it answers a retryable error instead —
+#   a JSON-RPC error, never a fabricated ``ok`` (the result contract requires
+#   the real shape, and the desktop already treats an errored runtime_check as
+#   unknown, keeping setup.status authoritative);
+# * a probe that outlives the budget answers the same retryable error while it
+#   keeps running in the background; the in-flight entry is cleared when it
+#   settles, so the next poll starts a fresh probe and never reads a stale one.
+_readiness_pool = concurrent.futures.ThreadPoolExecutor(
+    max_workers=max(2, min(4, env_int("HERMES_TUI_RPC_POOL_WORKERS", 8))),
+    thread_name_prefix="tui-readiness")
+atexit.register(lambda: _readiness_pool.shutdown(wait=False, cancel_futures=True))
+_readiness_lock = threading.Lock()
+_readiness_inflight: dict[tuple, concurrent.futures.Future] = {}
+_READINESS_SHARE_WAIT_SECONDS = 4.0
+# Join grace for an overlapping poll on a still-running probe: fast (config-read)
+# probes settle in milliseconds, so an overlapping consumer at the same seam
+# (statusbar + onboarding, both polling setup.status / setup.runtime_check) reads
+# the shared result instead of an unknown-readiness error pair — which the
+# onboarding gate read as not-ready and the blocking overlay never closed.
+# Kept well under a second: a joiner occupies its shared RPC worker for at most
+# the grace, so overlapping polls still cannot starve the pool (#65151).
+_READINESS_JOIN_GRACE_SECONDS = 0.5
+# setup.status's probe legitimately blocks on the boot bootstrap's record
+# (free_tier_bootstrap.SETUP_READY_WAIT_SECONDS = 8s): its join budget must
+# cover that wait or every boot poll would answer the retryable error.
+_READINESS_STATUS_SHARE_WAIT_SECONDS = 12.0
+# Retryable-transient code for "the probe is still running / outlived its
+# budget"; the client treats an errored runtime_check as unknown readiness.
+_READINESS_IN_PROGRESS_ERR = 5097
 
 
 def _projects_handler(name: str):
@@ -246,12 +299,62 @@ def _(rid, params: dict) -> dict:
 
 # ── setup readiness
 
-def _readiness_check(rid, params, probe):
+def _readiness_cleared(key):
+    """Done-callback for a single-flighted probe: forget the entry (the next poll
+    re-probes — completed answers are never cached), and surface a failure nobody
+    waited for (every caller timed out) in the log instead of dropping it."""
+    def _clear(future):
+        with _readiness_lock:
+            if _readiness_inflight.get(key) is future:
+                _readiness_inflight.pop(key, None)
+        if not future.cancelled() and future.exception() is not None:
+            logger.debug("readiness probe %s failed after its callers returned: %s",
+                         key, future.exception())
+    return _clear
+
+
+def _readiness_share(rid, key, run_probe, wait_seconds):
+    """Run ``run_probe`` single-flighted under ``key`` on the dedicated readiness pool.
+
+    The first caller submits the probe and waits up to ``wait_seconds``; a caller that finds a
+    still-running probe waits the short join grace for it first — the Desktop fires
+    setup.status + setup.runtime_check from independent consumers at the same seam (boot, the
+    post-assignment ``setup.ready`` broadcast), and answering the retryable error at once made
+    both legs of one consumer transiently unknown, which its onboarding gate read as not-ready.
+    Fast (config-read) probes settle well inside the grace, so an overlapping poll reads the
+    shared result; one that outlives the grace answers a retryable error, freeing its shared RPC
+    worker (the probe keeps running for the first caller). A probe that outlives ``wait_seconds``
+    answers the same retryable error while it continues in the background."""
+    with _readiness_lock:
+        future = _readiness_inflight.get(key)
+        owner = future is None
+        if owner:
+            future = _readiness_pool.submit(run_probe)
+            _readiness_inflight[key] = future
+    if owner:
+        # Registered OUTSIDE the lock: a probe that already settled runs the
+        # callback inline on this thread, and the callback acquires the same
+        # non-reentrant lock — under the lock that self-deadlocks the RPC
+        # worker and every later readiness call blocks on it (the gateway
+        # hangs answering setup.status / setup.runtime_check at all).
+        future.add_done_callback(_readiness_cleared(key))
+    try:
+        return _ok(rid, future.result(timeout=wait_seconds if owner else
+                                      min(wait_seconds, _READINESS_JOIN_GRACE_SECONDS)))
+    except concurrent.futures.TimeoutError:
+        logger.warning("readiness probe %s exceeded its budget (%.1fs); it continues in the background",
+                       key, wait_seconds)
+        return _err(rid, _READINESS_IN_PROGRESS_ERR,
+                    "readiness check still in progress; retrying next tick")
+
+
+def _readiness_check(rid, params, probe, *, probe_key, wait_seconds):
     """Shared shell of setup.status / setup.runtime_check. ``probe(profile, scoped)`` runs inside the
     optional ``profile`` param's QUBIT_HOME + ``.env`` secret scope (ContextVars: concurrent checks
     stay isolated); ``scoped`` is the ``{"profile": ...}`` payload stamp (``{}`` for the launch
     profile). An unknown profile answers ``ok=False`` (never a JSON-RPC error, never a quiet answer
-    for the launch profile instead)."""
+    for the launch profile instead). ``probe_key`` + the profile single-flight the probe, and
+    ``wait_seconds`` bounds how long this shared-RPC worker waits for it (#65151)."""
     profile = str(params.get("profile") or "").strip() if isinstance(params, dict) else ""
     home = None
     if profile:
@@ -264,9 +367,14 @@ def _readiness_check(rid, params, probe):
     # run under its own frozen secret scope too (``_profile_runtime_scope_tokens`` binds nothing in
     # a single-profile process), or the first profile-scoped read inside the resolver
     # (``HERMES_CODEX_BASE_URL`` for openai-codex) fails closed and the UI shows onboarding.
-    with _session_profile_runtime_scope({"profile_home": str(home) if home is not None else None}):
-        payload = probe(profile, {"profile": profile} if profile else {})
-    return _ok(rid, payload)
+    def run_probe():
+        # Applied on the readiness pool thread: ContextVars do not cross threads, and
+        # concurrent probes (different profiles) stay isolated exactly as they did when
+        # each ran on its caller's handler thread.
+        with _session_profile_runtime_scope({"profile_home": str(home) if home is not None else None}):
+            return probe(profile, {"profile": profile} if profile else {})
+
+    return _readiness_share(rid, (probe_key, profile), run_probe, wait_seconds)
 
 
 @method("setup.status")
@@ -301,7 +409,8 @@ def _(rid, params: dict) -> dict:
             return {"provider_configured": record.provider_configured, "ready": True,
                     "free_tier": record.free_tier, "other_providers": record.other_providers,
                     "inference_provider": record.inference_provider, **record.failure_fields(), **scoped}
-        return _readiness_check(rid, params, probe)
+        return _readiness_check(rid, params, probe, probe_key="status",
+                                wait_seconds=_READINESS_STATUS_SHARE_WAIT_SECONDS)
     except Exception as e:
         return _err(rid, 5016, str(e))
 
@@ -351,7 +460,8 @@ def _(rid, params: dict) -> dict:
                     "source": runtime.get("source"),
                     "free_tier": provider == "nous" and route_is_welcome_host(runtime.get("base_url")),
                     **scoped}
-        return _readiness_check(rid, params, probe)
+        return _readiness_check(rid, params, probe, probe_key=f"runtime:{requested or ''}",
+                                wait_seconds=_READINESS_SHARE_WAIT_SECONDS)
     except Exception as e:
         return _ok(rid, {"ok": False, "error": str(e)})
 
@@ -364,6 +474,18 @@ def _safe_client_label(label: str) -> str:
     return safe.lstrip(".").strip()
 
 
+def _redact_client_text(text: str, cap: int) -> str:
+    """Strict-scrub client text, then cap it. The scrub sees at most 3x the cap: the
+    first line end in [2x, 3x) cap, else a hard 2x-cap cut, so a key cut by the cap
+    still gets redacted but an unbounded (even single-line) RPC param cannot make
+    the superlinear scrub run on megabytes."""
+    from qubit_cli.debug_redaction import redact_debug_support_text
+
+    cut = text.find("\n", 2 * cap, 3 * cap)
+    window = text[: cut + 1] if cut >= 0 else text[: 2 * cap]
+    return redact_debug_support_text(window, max_chars=cap)
+
+
 @method("diagnostics.share_nous")
 def _(rid, params: dict) -> dict:
     """Upload a redacted debug bundle to Qubit-internal diagnostics storage — same collection +
@@ -372,23 +494,22 @@ def _(rid, params: dict) -> dict:
     upload failures render inline. Optional: ``error_context`` (-> ``error-context.txt``),
     ``extra_files`` ({label -> text}), ``log_lines`` (default 200); all force-redacted."""
     try:
-        from qubit_cli.debug import _redact_log_text, build_nous_bundle, collect_share_bundle
+        from qubit_cli.debug import build_nous_bundle, collect_share_bundle
         from qubit_cli.diagnostics_upload import share_to_nous
         log_lines = params.get("log_lines")
         if not isinstance(log_lines, int) or not (10 <= log_lines <= 2000):
             log_lines = 200
         bundle = collect_share_bundle(log_lines=log_lines, redact=True)
-        # Client text goes through the SAME upload-safe redactor as backend logs (force secret
-        # redaction + email masking), never the weaker bare secret pass.
+        # Redact complete client values before applying their support-upload caps.
         error_context = params.get("error_context")
         if isinstance(error_context, str) and error_context.strip():
-            bundle["error-context.txt"] = _redact_log_text(error_context.strip()[:8_000])
+            bundle["error-context.txt"] = _redact_client_text(error_context.strip(), 8_000)
         # Bounded: at most 4 files, 512KB each, sanitized labels — not an arbitrary upload surface.
         extra_files = params.get("extra_files")
         for label, text in list(extra_files.items())[:4] if isinstance(extra_files, dict) else ():
             safe_label = _safe_client_label(label) if isinstance(label, str) else ""
             if safe_label and isinstance(text, str) and text.strip():
-                bundle[f"client/{safe_label}"] = _redact_log_text(text[:524_288])
+                bundle[f"client/{safe_label}"] = _redact_client_text(text, 524_288)
         res = share_to_nous(build_nous_bundle(bundle, redact=True))
         view_url = res.get("viewUrl") or res.get("view_url")
         upload_id = res.get("id")

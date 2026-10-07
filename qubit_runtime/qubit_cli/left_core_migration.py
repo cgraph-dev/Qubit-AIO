@@ -6,14 +6,14 @@ names, config keys and env vars, so migrating is only "install the plugin". Each
 contract is the one memory providers established (``memory_provider_migration``, whose helpers this
 reuses; memory is not a row because its plugin name comes from ``memory.provider``, not a table):
 
-* ``hermes update`` installs the plugin for every profile home sharing the venv that uses the feature.
+* ``qubit update`` installs the plugin for every profile home sharing the venv that uses the feature.
 * Agent start and gateway start retry once per process for the active home (Desktop users update
-  through the app and never run ``hermes update``), honouring ``security.allow_lazy_installs``.
+  through the app and never run ``qubit update``), honouring ``security.allow_lazy_installs``.
 * After a failed attempt (catalog miss or unreachable, failed install) starts skip the row for
   :data:`STARTUP_RETRY_SECONDS`, so an offline machine pays the network round trip once, not on every
-  ``hermes chat``; ``hermes update`` always retries.
+  ``qubit chat``; ``qubit update`` always retries.
 * A home gets the plugin automatically at most once (``_left_core_installed`` in its config.yaml):
-  ``hermes plugins remove`` afterwards is the user's choice and sticks.
+  ``qubit plugins remove`` afterwards is the user's choice and sticks.
 
 Installs go through the normal catalog install path at the reviewed pin (kill list, dependency
 constraints, enable). Unattended dependency consent covers only these rows: the feature shipped in
@@ -140,12 +140,12 @@ LEFT_CORE: tuple[LeftCoreFeature, ...] = (
 def platform_install_hint(platform: str) -> str:
     """For an unknown platform name that left core: the sentence that names its install command for
     the active home, else ``""``. Appended to "unknown platform" errors (``send_message``)."""
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     feature = next((f for f in LEFT_CORE if f.platform and f.platform == platform), None)
     if feature is None:
         return ""
     return (f". {feature.label} moved out of core into the '{feature.plugin}' plugin: install it with "
-            f"`{_install_command(feature.plugin, Path(get_hermes_home()))}`")
+            f"`{_install_command(feature.plugin, Path(get_qubit_home()))}`")
 
 
 _attempted: set[str] = set()
@@ -201,7 +201,7 @@ def _record_migration(home: Path, feature: LeftCoreFeature) -> None:
     conversion per home and row, independent of installation: a plugin installed before the update
     (it stays inert on a core that still ships the feature) still needs it. Completion is marked
     under ``_left_core_scoped`` so a later run never undoes a choice the user made since
-    (``hermes tools``). Raises when config.yaml cannot be read or written."""
+    (``qubit tools``). Raises when config.yaml cannot be read or written."""
     from qubit_cli.config import atomic_config_write, read_user_config_raw
     from qubit_cli.toolset_validation import parse_platform_toolsets_value
     path = home / "config.yaml"
@@ -276,19 +276,19 @@ def _pending(home: Path, *, say: Callable[[str], None], process_env: bool = Fals
             _record_migration(home, feature)
         except Exception as exc:
             say(f"  ⚠ {feature.label} moved out of core into the '{feature.plugin}' plugin: its per-platform "
-                f"toolset selection could not be kept ({exc}). Check `hermes tools`"
+                f"toolset selection could not be kept ({exc}). Check `qubit tools`"
                 + ("." if present else f" and run `{_install_command(feature.plugin, home)}`."))
             continue
         if present:
             continue
         if backoff and _failed_recently(home, feature):
-            logger.info("%s plugin install failed recently for %s; retrying after %ds or on `hermes update`",
+            logger.info("%s plugin install failed recently for %s; retrying after %ds or on `qubit update`",
                         feature.label, home, STARTUP_RETRY_SECONDS)
             continue
         if catalog_source(feature.plugin) is None:
             _note_failure(home, feature)
             say(f"  ⚠ {feature.label} moved out of core into the '{feature.plugin}' plugin, which this "
-                f"Qubit cannot find in the plugin catalog yet. Run `{_install_command(feature.plugin, home)}` "
+                f"Hermes cannot find in the plugin catalog yet. Run `{_install_command(feature.plugin, home)}` "
                 f"once it is listed.")
             continue
         out.append(feature)
@@ -298,13 +298,13 @@ def _pending(home: Path, *, say: Callable[[str], None], process_env: bool = Fals
 def _install_into(home: Path) -> Callable[[str], dict]:
     def _install(name: str) -> dict:
         from qubit_cli.plugins_cmd import dashboard_install_plugin
-        from qubit_constants import reset_hermes_home_override, set_hermes_home_override
-        token = set_hermes_home_override(home)
+        from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+        token = set_qubit_home_override(home)
         try:
             return dashboard_install_plugin("", force=False, enable=True, catalog_name=name,
                                             assume_deps_consent=_unattended_consent())
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
     return _install
 
 
@@ -348,7 +348,7 @@ def migrate_home(home: Path, *, install: Callable[[str], dict], say: Callable[[s
 
 
 def migrate_all_homes(*, say: Callable[[str], None] = print) -> list[str]:
-    """``hermes update`` hook: every profile home sharing this venv. Grouped by plugin and each home's
+    """``qubit update`` hook: every profile home sharing this venv. Grouped by plugin and each home's
     unattended consent like the memory migration: homes of one group share dependency answers, and a
     failure names the rest of its group in one line instead of failing them one by one."""
     from qubit_cli.plugins_cmd_install import shared_dependency_answers
@@ -388,7 +388,7 @@ def migrate_all_homes(*, say: Callable[[str], None] = print) -> list[str]:
                     break
     except KeyboardInterrupt:
         say("  ⚠ Plugin migration cancelled. Profiles already migrated keep their plugin; run "
-            "`hermes plugins install <name>` (with `-p <profile>`) for the rest.")
+            "`qubit plugins install <name>` (with `-p <profile>`) for the rest.")
     return installed
 
 
@@ -406,9 +406,9 @@ def recover_at_startup(*, say: Optional[Callable[[str], None]] = None) -> list[s
     (an agent's startup-warning sink) outcomes are delivered now, together with any a gateway-start
     attempt queued for this home; without it they are logged and queued for the home's first agent.
     Returns installed plugin names."""
-    from qubit_constants import get_hermes_home, qubit_home_key
+    from qubit_constants import get_qubit_home, qubit_home_key
 
-    home = Path(get_hermes_home())
+    home = Path(get_qubit_home())
     key = qubit_home_key(home)
 
     def deliver(message: str) -> None:
@@ -440,7 +440,7 @@ def recover_at_startup(*, say: Optional[Callable[[str], None]] = None) -> list[s
         if not lazy_installs_allowed():
             for feature in features:
                 report(f"⚠ {feature.label} moved out of core and its '{feature.plugin}' plugin is not "
-                       f"installed, so it is off. security.allow_lazy_installs is off, so Qubit did not "
+                       f"installed, so it is off. security.allow_lazy_installs is off, so Hermes did not "
                        f"fetch it: run `{_install_command(feature.plugin, home)}`.")
             return []
         installed = []
@@ -448,7 +448,7 @@ def recover_at_startup(*, say: Optional[Callable[[str], None]] = None) -> list[s
             if _install_one(home, feature, install=_install_into(home), say=report):
                 installed.append(feature.plugin)
                 if say is not None and feature.platform and _gateway_serves(home):
-                    report(f"Restart the gateway (`hermes gateway restart`) so it serves {feature.label}.")
+                    report(f"Restart the gateway (`qubit gateway restart`) so it serves {feature.label}.")
         return installed
     except Exception as exc:  # never take agent/gateway start down
         logger.warning("left-core plugin migration failed: %s", exc, exc_info=True)

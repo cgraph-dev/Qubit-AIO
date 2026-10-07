@@ -48,6 +48,20 @@ def replay_epoch() -> str:
     return _REPLAY_EPOCH
 
 
+def _freeze_params(params: dict) -> bytes:
+    """Serialize one replay snapshot before the caller can mutate its object graph."""
+    return json.dumps(params, ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8", errors="surrogatepass"
+    )
+
+
+def _thaw_params(payload: bytes, seq: int) -> dict:
+    """Rebuild a client event object and restore the server-owned sequence number."""
+    event = json.loads(payload.decode("utf-8", errors="surrogatepass"))
+    event["seq"] = seq
+    return event
+
+
 def _stamp_event(obj: dict) -> None:
     """Stamp one outgoing event frame (mutates obj in place) and record it."""
     if obj.get("method") != "event":
