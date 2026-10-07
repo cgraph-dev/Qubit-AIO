@@ -18,6 +18,7 @@ from typing import Optional
 
 from qubit_cli import kanban_db as kb
 from qubit_cli import kanban_db_connect as kbc
+from qubit_cli import kanban_workflow
 from qubit_cli import kanban_db_dispatch as kbd
 from qubit_cli import kanban_db_workspace as kbw
 from qubit_cli import kanban_db_notify as kbn
@@ -1139,7 +1140,7 @@ def _cmd_stats(args: argparse.Namespace) -> int:
     if _json_out(args, stats):
         return 0
     print("By status:")
-    for k in ("triage", "todo", "scheduled", "ready", "running", "blocked", "done"):
+    for k in kanban_workflow.DEFAULT_WORKFLOW.keys():
         print(f"  {k:8s}  {stats['by_status'].get(k, 0)}")
     if stats["by_assignee"]:
         print("\nBy assignee:")
