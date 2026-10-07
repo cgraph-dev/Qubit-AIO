@@ -509,4 +509,55 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(FakeWebSocket.instances[1].url).not.toContain("resume=");
     expect(apiMocks.createChatSession).not.toHaveBeenCalled();
   });
+
+  it("persists the rotated attach token and sends fresh=1 on New chat", async () => {
+    // Regression: New chat used to rotate the attach token ONLY in the
+    // in-memory ref. A later reload re-read sessionStorage (still the OLD
+    // token) and the server's step-1b re-adoption threw the operator back into
+    // the previous detached terminal — "pressed New chat, it reloaded and
+    // nothing happened". The rotated token MUST be persisted so a reload
+    // re-attaches to the terminal New chat spawned, and the WS must carry
+    // `fresh=1` so the server can never re-adopt the old one (upstream parity:
+    // chat_py.py `fresh` handling).
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "qubit-go",
+      provider: "opencode-go",
+      model: "deepseek",
+      context_tokens: 200000,
+      context_verified: true,
+    }));
+    // Seed a stored token the way a real reload would see one.
+    window.sessionStorage.setItem("qubit.pty.token.chat", "qubit-attach-stored-1");
+
+    await renderTerminal();
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
+    // The first (mount) socket never asks for a forced-fresh start.
+    expect(FakeWebSocket.instances[0].url).not.toContain("fresh=");
+    // Snapshot whatever token the mount used — New chat must replace it.
+    const tokenBefore = window.sessionStorage.getItem("qubit.pty.token.chat");
+
+    const newChat = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("New chat"),
+    );
+    await act(async () => {
+      newChat!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(2));
+    const secondUrl = FakeWebSocket.instances[1].url;
+    // The fresh socket asks the server to ignore any active-session fallback.
+    expect(secondUrl).toContain("fresh=1");
+    // ...and its attach token is the NEW one, already persisted for the next
+    // reload (not the stale stored value that caused the re-adoption).
+    const persisted = window.sessionStorage.getItem("qubit.pty.token.chat");
+    expect(persisted).not.toBe("qubit-attach-stored-1");
+    expect(persisted).not.toBe(tokenBefore);
+    expect(persisted).toBeTruthy();
+    expect(secondUrl).toContain(`attach=${persisted}`);
+
+    window.sessionStorage.removeItem("qubit.pty.token.chat");
+  });
 });

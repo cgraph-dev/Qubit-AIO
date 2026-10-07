@@ -789,7 +789,7 @@ class PtyWsServer:
     def serve(self, handler: Any, *, ticket_value: str, cols: int, rows: int,
               resume: str, profile: str, origin_ok: bool,
               peer_ok: bool, workspace_cwd: str = "",
-              attach: str = "") -> None:
+              attach: str = "", fresh: bool = False) -> None:
         """Run one WS-PTY session to completion (called from the handler thread)."""
         # 1) Auth + boundary checks BEFORE the handshake so a rejection is an
         #    HTTP status, never an accepted socket.
@@ -810,6 +810,14 @@ class PtyWsServer:
             _reject(handler, 423, "ESTOP_ENGAGED",
                     "Qubit emergency stop is engaged; terminal refused.")
             return
+        # Forced-fresh intent (New chat): drop any resume target so the vendored
+        # TUI forges a NEW session, and suppress step-1b re-adoption below so a
+        # fresh press can never inherit a still-live detached terminal
+        # (reference parity: hermes_cli/web_routers/chat_ws.py sets resume=None
+        # when force_fresh). The client also rotates the attach token; this is
+        # the server-side half that survives a reload carrying a stale token.
+        if fresh:
+            resume = ""
         # /chat is the long-context surface: refuse a below-floor profile with
         # a typed configuration error BEFORE any PTY is spawned. Never open a
         # terminal that would silently truncate, and never fall back to Brain4.
@@ -856,7 +864,7 @@ class PtyWsServer:
         #     exists for this key. A session whose terminal has exited falls
         #     through to a fresh spawn below (``_reattach`` retires it).
         key = str(attach or ticket.session or "")
-        if key:
+        if key and not fresh:
             prior = self._reattach(key)
             # A browser CLOSE clears sessionStorage, so the reopened tab presents a
             # NEW attach token that matches no detached key. Fall back to the resume

@@ -141,6 +141,7 @@ function terminalWsUrl(
   resume?: string,
   cwd?: string,
   attach?: string,
+  fresh?: boolean,
 ): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const qs = new URLSearchParams({
@@ -153,6 +154,12 @@ function terminalWsUrl(
   // spawning a fresh one. The server validates/ensures the id against the one
   // canonical store (`terminal_bridge.canonical_terminal_session`).
   if (resume) qs.set("resume", resume);
+  // Forced-fresh intent (New chat / "Start new session"): tells the server to
+  // ignore any active-session fallback and force an empty resume, so a fresh
+  // press can NEVER re-adopt a detached terminal (upstream parity:
+  // chat_ws.py turns `fresh=1` into resume=None + unlink). Sent only for an
+  // explicit New chat, never on a plain reload/reconnect.
+  if (fresh) qs.set("fresh", "1");
   // Workspace for a FRESH chat (the server ignores it on resume, which keeps
   // its own cwd). Same wire the reference uses: /api/pty?cwd=.
   if (cwd) qs.set("cwd", cwd);
@@ -261,18 +268,30 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // 1:1 path while the async claim settles; `ptyAttachToken()` then confirms
   // the claim and the ref keeps the value for the life of this document.
   const attachRef = useRef<string>("");
-  const attachToken = useCallback((rotate = false): string => {
-    if (!rotate && attachRef.current) return attachRef.current;
+  // Rotate (New chat) MUST persist the new token, not just mutate the ref: a
+  // reload re-reads `sessionStorage` and, with a stale token, the server's
+  // step-1b `_reattach(staleKey)` re-adopts the still-live DETACHED terminal —
+  // so New chat silently reverted to the old chat on the next reload and the
+  // operator had to press it several times. `ptyAttachToken(rotate=true)` mints
+  // a token, WRITES it to sessionStorage and claims its Web Lock; we keep that
+  // exact token as the wire value so a reload re-attaches to the terminal New
+  // chat actually spawned. Resolved asynchronously (`connect` awaits it) so the
+  // mint and the wire value are the helper's single token.
+  const attachToken = useCallback(async (rotate = false): Promise<string> => {
     if (rotate) {
-      attachRef.current = `qubit-attach-${crypto.randomUUID()}`;
-      return attachRef.current;
+      const token = await ptyAttachToken(true);
+      attachRef.current = token;
+      return token;
     }
+    if (attachRef.current) return attachRef.current;
     let stored = "";
     try {
       stored = window.sessionStorage.getItem(PTY_ATTACH_TOKEN_KEY) ?? "";
     } catch {
       /* private mode / storage blocked — fall through to a fresh id */
     }
+    // Seed the ref synchronously so the very FIRST connect does not fall
+    // through to the legacy 1:1 socket while the async claim settles.
     attachRef.current = stored || `qubit-attach-${crypto.randomUUID()}`;
     return attachRef.current;
   }, []);
@@ -307,18 +326,19 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // Stable indirection for the self-scheduled reconnect: `connect` cannot
   // reference itself inside its own initializer, so it schedules the latest
   // callback through this ref instead (assigned after each render).
-  const connectRef = useRef<() => void>(() => {});
+  const connectRef = useRef<(profileId?: string, forceFresh?: boolean) => void>(() => {});
   // "New chat" clears the resume param and spawns a genuinely fresh PTY
   // (upstream semantics): with no `?resume=` the server emits no resume env,
   // so the vendored TUI forges a brand-new session instead of resuming an
   // old one. Nothing is minted up front — the new session appears once the
   // TUI creates it. The ref is seeded BEFORE the URL update so the resume
   // effect no-ops and exactly one reconnect happens (no double-spawn).
-  // A NEW chat must not inherit the previous terminal, so the attach token
-  // is rotated here: the next connect spawns a genuinely fresh PTY.
+  // A NEW chat must not inherit the previous terminal, so `connect` rotates
+  // the attach token AND persists it (attachToken(true) writes sessionStorage)
+  // and sends `?fresh=1` so the server can never re-adopt the old detached
+  // PTY on a later reload (upstream parity: chat_ws.py `fresh` handling).
   const handleNewChat = useCallback(() => {
     setNotice(null);
-    attachToken(true);
     resumeRef.current = "";
     setSearchParams(
       (prev) => {
@@ -328,9 +348,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
       },
       { replace: false },
     );
-    connectRef.current();
+    connectRef.current(undefined, true);
     setSessionListNonce((n) => n + 1);
-  }, [attachToken, setSearchParams]);
+  }, [setSearchParams]);
 
   const clearPerConnectionTimers = useCallback(() => {
     if (connectingTimerRef.current) {
@@ -380,7 +400,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     if (!disposedRef.current) setHydrating(false);
   }, []);
 
-  const connect = useCallback((profileId?: string) => {
+  const connect = useCallback((profileId?: string, forceFresh = false) => {
     const term = termRef.current;
     if (!term || disposedRef.current) return;
     // Tear down any previous terminal BEFORE opening a new one. Without this
@@ -438,20 +458,26 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     withBackoff(() => api.wsTicket(picked, undefined, resumeRef.current || undefined), {
       shouldStop: () => disposedRef.current,
     })
-      .then((ticket) => {
+      .then(async (ticket) => {
         if (disposedRef.current) return;
         setGrant(ticket);
         if (ticket.profile_id) {
           selectedRef.current = ticket.profile_id;
         }
+        // Resolve the attach token (async for a rotated/fresh one, which
+        // persists + claims before we open the socket) so a reload re-attaches
+        // to the terminal THIS connect spawns.
+        const attach = await attachToken(forceFresh);
+        if (disposedRef.current) return;
         const ws = new WebSocket(
           terminalWsUrl(
             ticket.ticket,
             cols,
             rows,
-            resumeRef.current,
+            forceFresh ? "" : resumeRef.current,
             workspaceRef.current,
-            attachToken(),
+            attach,
+            forceFresh,
           ),
         );
         ws.binaryType = "arraybuffer";
@@ -664,7 +690,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   }, [attachToken, beginResumeReplay, clearPerConnectionTimers, finishResumeHydration]);
 
   useEffect(() => {
-    connectRef.current = () => connect();
+    connectRef.current = (profileId, forceFresh) => connect(profileId, forceFresh);
   }, [connect]);
 
   // Reconnect when the resume target changes (a session row was picked, or

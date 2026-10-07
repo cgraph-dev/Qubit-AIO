@@ -2249,7 +2249,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
             origin_ok=P.origin_allowed(self, self.app.allowed_origins),
             peer_ok=P.peer_allowed(self),
             workspace_cwd=_workspace_cwd(q.get("cwd", "")),
-            attach=q.get("attach", ""))
+            attach=q.get("attach", ""),
+            # Forced-fresh intent (New chat / "Start new session"). The vendored
+            # reference sends `fresh=1` and turns it into resume=None + an
+            # unlink of the channel's active-session file so a fresh press can
+            # never re-adopt a detached terminal (chat_ws.py:465-475). Accept
+            # the same truthy spellings.
+            fresh=str(q.get("fresh", "")).strip().lower() in
+            {"1", "true", "yes", "on"})
         return True
 
     def _maybe_stt_upgrade(self) -> bool:
