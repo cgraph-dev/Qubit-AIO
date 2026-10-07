@@ -8,28 +8,15 @@ const apiMocks = vi.hoisted(() => ({
     capabilities: { supports_reasoning: false },
     model: "test/model",
   })),
-  patchChatSession: vi.fn(async () => ({
+  patchChatSession: vi.fn(async (id: string, patch: { model?: string }) => ({
     ok: true,
-    session: { id: "s-1", model: "deepseek-v4.1-flash" },
+    session: { id, model: patch.model ?? null },
   })),
-  setModelAssignment: vi.fn(async () => ({ ok: true, scope: "main" })),
+  setModelAssignment: vi.fn(async () => ({ ok: true, terminal_follows: true })),
 }));
 
 const reloadMocks = vi.hoisted(() => ({
   maybeReloadForLoopbackWsAuthFailure: vi.fn(() => false),
-}));
-
-// Captured ModelPickerDialog props so a test can invoke the real `onApply`
-// without rendering the dialog UI.
-const pickerProps = vi.hoisted(() => ({
-  onApply: undefined as
-    | ((args: {
-        provider: string;
-        model: string;
-        confirmExpensiveModel?: boolean;
-      }) => unknown)
-    | undefined,
-  onClose: undefined as (() => void) | undefined,
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -44,17 +31,20 @@ vi.mock("@/lib/dashboard-auth-reload", () => ({
   maybeReloadForLoopbackWsAuthFailure:
     reloadMocks.maybeReloadForLoopbackWsAuthFailure,
 }));
-vi.mock("@/components/ModelPickerDialog", () => ({
-  ModelPickerDialog: (props: {
-    onApply?: (args: {
+const pickerMocks = vi.hoisted(() => ({
+  lastProps: null as null | {
+    onApply?: (a: {
       provider: string;
       model: string;
       confirmExpensiveModel?: boolean;
+      persistGlobal?: boolean;
     }) => unknown;
-    onClose?: () => void;
-  }) => {
-    pickerProps.onApply = props.onApply;
-    pickerProps.onClose = props.onClose;
+  },
+}));
+
+vi.mock("@/components/ModelPickerDialog", () => ({
+  ModelPickerDialog: (props: unknown) => {
+    pickerMocks.lastProps = props as typeof pickerMocks.lastProps;
     return null;
   },
 }));
@@ -134,10 +124,6 @@ async function flushMicrotasks() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  pickerProps.onApply = undefined;
-  pickerProps.onClose = undefined;
-  apiMocks.patchChatSession.mockClear();
-  apiMocks.setModelAssignment.mockClear();
   stream = makeStream();
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(stream.response);
@@ -368,63 +354,117 @@ describe("ChatSidebar SSE event feed", () => {
     expect(container.querySelectorAll('[role="complementary"]').length).toBe(0);
   });
 
-  it("writes the PER-SESSION model when bound to a session (no global set)", async () => {
+  it("relays a live session.updated model for OUR session to the host", async () => {
+    // A per-session pick writes session.updated on the SSE feed; the sidebar
+    // must surface the new stored model to the host (so the panel and the
+    // ChatPage state agree) without a page reload — the reported defect.
     const onSessionModelChange = vi.fn();
     const { ChatSidebar } = await import("./ChatSidebar");
 
     await render(
       <ChatSidebar
         channel="chat-1"
-        sessionId="dashboard-abc123"
+        sessionId="dashboard-live"
         onSessionModelChange={onSessionModelChange}
       />,
     );
     await flushMicrotasks();
 
-    // Open the picker (the model Button) so ModelPickerDialog mounts and its
-    // onApply is captured.
+    stream.send(
+      'id: 7\ndata: {"type":"CUSTOM","name":"session.updated","value":{"session_id":"dashboard-live","session":{"id":"dashboard-live","model":"deepseek-v4.1-flash"}}}\n\n',
+    );
+    await flushMicrotasks();
+
+    expect(onSessionModelChange).toHaveBeenCalledWith("deepseek-v4.1-flash");
+  });
+
+  it("ignores a live session.updated for a DIFFERENT session (no cross-talk)", async () => {
+    const onSessionModelChange = vi.fn();
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(
+      <ChatSidebar
+        channel="chat-1"
+        sessionId="dashboard-mine"
+        onSessionModelChange={onSessionModelChange}
+      />,
+    );
+    await flushMicrotasks();
+
+    stream.send(
+      'id: 8\ndata: {"type":"CUSTOM","name":"session.updated","value":{"session_id":"dashboard-other","session":{"id":"dashboard-other","model":"x"}}}\n\n',
+    );
+    await flushMicrotasks();
+
+    expect(onSessionModelChange).not.toHaveBeenCalled();
+  });
+
+  it("re-reads the effective model on a live model.changed frame", async () => {
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(<ChatSidebar channel="chat-1" />);
+    await flushMicrotasks();
+    const before = apiMocks.getModelInfo.mock.calls.length;
+
+    stream.send(
+      'id: 9\ndata: {"type":"CUSTOM","name":"model.changed","value":{"provider":"opencode-go","model":"deepseek-v4.1-flash","scope":"main"}}\n\n',
+    );
+    await flushMicrotasks();
+
+    expect(apiMocks.getModelInfo.mock.calls.length).toBeGreaterThan(before);
+  });
+
+  it("writes a bound session's model per-session (never the global set)", async () => {
+    // With a sessionId the pick must PATCH the session, not POST the global
+    // /api/model/set — otherwise two surfaces share one model and the pick
+    // does not apply to the open conversation.
+    const onSessionModelChange = vi.fn();
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(
+      <ChatSidebar
+        channel="chat-1"
+        sessionId="dashboard-bound"
+        onSessionModelChange={onSessionModelChange}
+      />,
+    );
+    await flushMicrotasks();
+
+    // Open the picker so ModelPickerDialog mounts and records its props.
+    const pickerButton = container.querySelector("button[title]");
     await act(async () => {
-      container.querySelector("button")?.dispatchEvent(
-        new MouseEvent("click", { bubbles: true }),
-      );
+      pickerButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await flushMicrotasks();
-    expect(pickerProps.onApply).toBeTypeOf("function");
 
+    const onApply = pickerMocks.lastProps?.onApply;
+    expect(typeof onApply).toBe("function");
     await act(async () => {
-      await pickerProps.onApply?.({
-        provider: "opencode-go",
-        model: "deepseek-v4.1-flash",
-      });
+      await onApply!({ provider: "opencode-go", model: "deepseek-v4.1-flash" });
     });
 
-    // The per-session write fires with the picked model; the GLOBAL assignment
-    // must NOT be touched when a session is bound.
-    expect(apiMocks.patchChatSession).toHaveBeenCalledWith("dashboard-abc123", {
+    expect(apiMocks.patchChatSession).toHaveBeenCalledWith("dashboard-bound", {
       model: "deepseek-v4.1-flash",
     });
     expect(apiMocks.setModelAssignment).not.toHaveBeenCalled();
     expect(onSessionModelChange).toHaveBeenCalledWith("deepseek-v4.1-flash");
   });
 
-  it("falls back to the global assignment when no session is bound", async () => {
+  it("keeps the GLOBAL set path when no session is bound (/chat)", async () => {
     const { ChatSidebar } = await import("./ChatSidebar");
 
     await render(<ChatSidebar channel="chat-1" />);
     await flushMicrotasks();
 
+    const pickerButton = container.querySelector("button[title]");
     await act(async () => {
-      container.querySelector("button")?.dispatchEvent(
-        new MouseEvent("click", { bubbles: true }),
-      );
+      pickerButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await flushMicrotasks();
 
+    const onApply = pickerMocks.lastProps?.onApply;
     await act(async () => {
-      await pickerProps.onApply?.({
-        provider: "opencode-go",
-        model: "deepseek-v4.1-flash",
-      });
+      await onApply!({ provider: "opencode-go", model: "deepseek-v4.1-flash" });
     });
 
     expect(apiMocks.setModelAssignment).toHaveBeenCalled();

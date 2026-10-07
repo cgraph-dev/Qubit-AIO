@@ -1,5 +1,5 @@
 /**
- * Chat-session live-update frames (client half of upstream's live contract).
+ * Chat-session live-update frames (client half of the live-update contract).
  *
  * The server announces every chat-session mutation on the single SSE event
  * feed as an AG-UI ``CUSTOM`` frame:
@@ -11,9 +11,10 @@
  *
  * Before this producer/consumer pair existed, a create / model pick / rename /
  * delete mutated the store but broadcast nothing, so the open SPA had no
- * signal and only a full page reload showed the change. This module is the one
- * place that recognises those frames — every surface (sidebar model card,
- * session list, ChatPage model state) subscribes through it instead of
+ * signal and only a full page reload showed the change — the reported "model
+ * switch does nothing / pages need a manual refresh" defect. This module is
+ * the one place that recognises those frames; every surface (sidebar model
+ * card, session list, ChatPage model state) subscribes through it instead of
  * re-parsing the envelope.
  *
  * The feed wraps application events in ``CUSTOM``, so reading ``type`` alone
@@ -48,14 +49,15 @@ export function chatLiveFrame(rec: Record<string, unknown>): ChatSessionFrame | 
   const type = typeof rec.type === "string" ? rec.type : "";
   // Application events ride a CUSTOM envelope; tolerate a bare top-level
   // `name`/`value` too so a shape tweak cannot silently kill live updates.
+  // Reading `type` alone yields the literal "CUSTOM", so the real name must
+  // come from `rec.name`.
   const name =
     type === "CUSTOM"
       ? typeof rec.name === "string"
         ? rec.name
         : ""
       : "";
-  const bareName = typeof rec.name === "string" ? rec.name : "";
-  const resolved = name || bareName;
+  const resolved = name || (typeof rec.name === "string" ? rec.name : "");
   if (!resolved) return null;
 
   const isSession =

@@ -8,6 +8,7 @@ const WIRE = [
   '{"type":"CUSTOM","timestamp":1791348047482,"name":"session.updated","value":{"session_id":"probe-live-1","session":{"id":"probe-live-1","name":"probe-renamed","model":null}}}',
   '{"type":"CUSTOM","timestamp":1791348047485,"name":"session.updated","value":{"session_id":"probe-live-1","session":{"id":"probe-live-1","name":"probe-renamed","model":"deepseek-v4.1-flash"}}}',
   '{"type":"CUSTOM","timestamp":1791348047488,"name":"session.deleted","value":{"session_id":"probe-live-1","session":{"id":"probe-live-1"}}}',
+  '{"type":"CUSTOM","timestamp":1791348047491,"name":"model.changed","value":{"provider":"opencode-go","model":"deepseek-v4.1-flash","scope":"main"}}',
 ];
 
 describe("producer/consumer wire agreement (real captured frames)", () => {
@@ -30,7 +31,13 @@ describe("producer/consumer wire agreement (real captured frames)", () => {
     expect(f?.isSession).toBe(true);
     expect(f?.sessionId).toBe("probe-live-1");
   });
-  it("a unrelated frame is ignored (no false trigger)", () => {
+  it("model.changed is recognised as a model change (not a session frame)", () => {
+    const f = chatLiveFrame(JSON.parse(WIRE[4]));
+    expect(f?.name).toBe("model.changed");
+    expect(f?.isModelChange).toBe(true);
+    expect(f?.isSession).toBe(false);
+  });
+  it("an unrelated frame is ignored (no false trigger)", () => {
     const f = chatLiveFrame({ type: "RUN_STARTED", run_id: "x" });
     expect(f).toBeNull();
   });

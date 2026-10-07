@@ -669,32 +669,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     transcriptReadyRef.current = false;
     api
       .listChatSessions(100, 0)
-      .then(async (list) => {
+      .then((list) => {
         if (loadReqRef.current !== myReq) return null;
         // Offer a one-click jump to the newest live voice session when the
         // store exposes one (read-only; the affordance just switches resume).
         setNewestVoiceSession(pickNewestVoiceSession(list.sessions));
-        const inList = (list.sessions ?? []).some((s) => s.id === session);
-        // The list route is CURATED (`_is_chat_picker_noise` hides probe rows,
-        // auto-titled ``dashboard-<hex>`` rows, and tiny dashboard rows) and
-        // paged (a resume target older than the fetch window is absent even
-        // though it exists). Using it as the resume existence gate is what made
-        // an existing session — e.g. one just created by "New chat" and never
-        // titled — look "foreign" and unresumable. For an EXPLICIT resume
-        // target, probe the canonical session DIRECTLY (`GET /sessions/:id`),
-        // which is authoritative and unfiltered; only a genuine 404 (the fetch
-        // rejects) or an empty body means there is no record. The unsaved
-        // default (`dashboard-chat`) is a fresh-chat placeholder, never probed.
-        let exists = inList;
-        if (!exists && session !== DEFAULT_SESSION) {
-          try {
-            const info = await api.getChatSession(session);
-            exists = !!info?.session?.id;
-          } catch {
-            exists = false;
-          }
-          if (loadReqRef.current !== myReq) return null;
-        }
+        const exists = (list.sessions ?? []).some((s) => s.id === session);
         if (!exists) {
           // No server record yet. If the id is the unsaved default, this is
           // simply a fresh Qubit chat. If it is some OTHER id (a canonical
@@ -1276,7 +1256,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         // Seed THIS session's model from the create response so the side panel
         // shows the fresh session's model immediately (the transcript effect
         // also reads it, but that is async — this avoids a one-frame stale
-        // card). Also applies when the create was announced live.
+        // card).
         setSessionModel(String(res?.session?.model || ""));
         setSearchParams(
           (prev) => {

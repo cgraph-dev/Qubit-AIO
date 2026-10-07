@@ -176,6 +176,13 @@ export function ChatSidebar({
       });
   }, [profile, terminalModel?.model, terminalModel?.provider]);
 
+  // The SSE effect below is long-lived (it only rebuilds on channel/version),
+  // so it must read the LATEST refresh callback rather than a stale closure
+  // captured at subscribe time. A ref keeps the model card honest after a live
+  // session.updated / model.changed without re-dialing the stream.
+  const refreshEffectiveModelRef = useRef(refreshEffectiveModel);
+  refreshEffectiveModelRef.current = refreshEffectiveModel;
+
   // Profile or chat channel change tears down the stream. Bump `version` (same
   // path as the manual Reconnect button) so the SSE reader resubscribes —
   // otherwise the old reader's close handler can leave a stale error banner
@@ -309,23 +316,21 @@ export function ChatSidebar({
       // Chat-session live-update frames (the server's producer half). A
       // session create / model pick / rename / delete and a global model
       // assignment all arrive as a CUSTOM envelope — reading `type` alone is
-      // the literal "CUSTOM", so unwrap `name`/`value` here. Without this the
-      // MODEL card kept a stale label until a page reload (the reported
-      // defect).
+      // the literal "CUSTOM", so unwrap `name`/`value` via chatLiveFrame.
+      // Without this the MODEL card kept a stale label until a page reload
+      // (the reported defect).
       const live = chatLiveFrame(frame as unknown as Record<string, unknown>);
       if (!live) return;
       if (live.isModelChange) {
-        refreshEffectiveModel();
+        refreshEffectiveModelRef.current();
         return;
       }
       if (live.isSession) {
         // Our own session changed (a per-session model pick writes
-        // session.updated): re-read the effective model so the card repaints
-        // immediately, and mirror the new title into the host.
+        // session.updated): relay the new model to the host and re-read the
+        // effective model so the card repaints immediately.
         if (live.sessionId && sessionId && live.sessionId === sessionId) {
-          const m = live.session
-            ? String(live.session.model || "")
-            : "";
+          const m = live.session ? String(live.session.model || "") : "";
           if (m) onSessionModelChange?.(m);
         }
         const title = live.session
@@ -334,7 +339,7 @@ export function ChatSidebar({
         if (title !== undefined) {
           onSessionTitleChange?.(title);
         }
-        refreshEffectiveModel();
+        refreshEffectiveModelRef.current();
       }
     };
 
@@ -624,19 +629,18 @@ export function ChatSidebar({
             // model through the canonical store — never the global
             // ``model.default`` — so two surfaces keep independent models and
             // the pick applies to the conversation actually open, immediately,
-            // with no reload. This is the write the prop contract above
-            // promises; it previously fell through to the global branch,
-            // which is why a session model could not be switched.
+            // with no reload. Falling through to the global branch here is
+            // why a session model could not be switched.
             if (sessionId) {
               try {
-                const res = await api.patchChatSession(sessionId, {
-                  model,
-                });
-                const applied =
-                  String(res?.session?.model || model).split("/").slice(-1)[0] ||
-                  model;
-                onSessionModelChange?.(String(res?.session?.model || model));
-                setModelNotice(`Model set to ${applied} for this session.`);
+                const res = await api.patchChatSession(sessionId, { model });
+                const applied = String(res?.session?.model || model);
+                onSessionModelChange?.(applied);
+                setModelNotice(
+                  `Model set to ${applied.split("/").slice(-1)[0]} for this session.`,
+                );
+                // Re-read the card from the server's authoritative row.
+                refreshEffectiveModel();
               } catch (e) {
                 setError(
                   e instanceof Error
@@ -644,7 +648,7 @@ export function ChatSidebar({
                     : "failed to set this session's model",
                 );
               }
-              return;
+              return undefined;
             }
             const result = await api.setModelAssignment(
               {

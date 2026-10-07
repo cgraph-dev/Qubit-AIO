@@ -1,11 +1,11 @@
 /**
  * Subscribe to chat-session live-update frames from the single Qubit SSE feed.
  *
- * One reader for the whole `/chat` surface: the session list, the MODEL card,
+ * One reader for the whole ``/chat`` surface: the session list, the MODEL card,
  * and ChatPage's own model state all need to react to `session.created` /
  * `session.updated` / `session.deleted` / `model.changed`. Rather than each
- * mounting its own stream (three sockets/reconnects), ChatPage mounts this
- * once and fans the frames out through callbacks.
+ * mounting its own stream (three sockets/reconnects), ChatPage mounts this once
+ * and fans the frames out through a callback.
  *
  * Reuses `openEventsStream` + `parseSseChunk` (the same parser, auth path and
  * reconnect policy the sidebar and `useChatActivity` use) — no second event
@@ -67,6 +67,9 @@ export function useChatLiveEvents(
         });
         if (unmounting) return;
         if (!conn.ok || !conn.reader) {
+          // An auth rejection cannot recover by retrying — stop rather than
+          // spin, mirroring `useChatActivity`.
+          if (conn.authRequired) return;
           scheduleReconnect();
           return;
         }
@@ -83,6 +86,9 @@ export function useChatLiveEvents(
             const parsed = parseSseChunk(buffer);
             buffer = parsed.rest;
             if (parsed.resync) {
+              // Server-side cursor gap: keep the cursor (the journal replay
+              // fills the gap), drop this now-stale connection, reconnect once.
+              lastSeq = null;
               try {
                 await reader.cancel();
               } catch {
@@ -111,10 +117,8 @@ export function useChatLiveEvents(
         if (unmounting) return;
         if (!reconnectTimer) scheduleReconnect();
       } catch {
-        // The stream transport itself failed to initialize (e.g. a broken or
-        // unmocked base path). The hook's contract is fail-soft: a stream
-        // error must never throw into React and break the whole page, so we
-        // simply retry on the bounded backoff and leave the caller's state.
+        // The stream transport itself failed to initialize. Fail-soft: retry
+        // on the bounded backoff and leave the caller's state untouched.
         if (!unmounting) scheduleReconnect();
       }
     };
