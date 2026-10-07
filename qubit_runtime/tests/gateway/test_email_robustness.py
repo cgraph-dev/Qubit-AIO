@@ -56,7 +56,7 @@ class TestImapResponseGuard(unittest.TestCase):
         mock_imap = MagicMock()
         mock_imap.uid.side_effect = uid_handler
         with patch("imaplib.IMAP4_SSL", return_value=mock_imap):
-            return adapter._fetch_new_messages()
+            return adapter._fetch_new_messages(lambda _c: True)
 
     def test_normal_response_parses(self):
         results = self._fetch_with([("OK", [(b"1 (RFC822 {123}", _raw_email())])])
