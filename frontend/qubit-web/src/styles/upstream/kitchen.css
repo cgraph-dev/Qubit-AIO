@@ -1,0 +1,278 @@
+/* ------------------------------------------------------------------
+ * Kitchen console (`/kitchen`) — `.kitchen-*` primitives.
+ *
+ * WHY THIS FILE EXISTS
+ * The Kitchen is the intake surface for absorbing other agents/apps into
+ * Qubit (docs/IDENTITY.md): stage a repo or a folder, and the page frames
+ * the decomposition → capability-map → 1:1 plan → absorb pipeline. It has
+ * no upstream console to port from, so this is Qubit-original chrome.
+ *
+ * All colours resolve through the Qubit theme tokens (with fallbacks) so
+ * the sheet follows the active theme; nothing here hard-codes a palette
+ * and no legacy brand appears.
+ * ------------------------------------------------------------------ */
+
+.kitchen-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 1.25rem);
+  width: 100%;
+  min-width: 0;
+}
+
+.kitchen-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.kitchen-note {
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-left: 2px solid color-mix(in srgb, var(--color-foreground, #e8f0e4) 45%, transparent);
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 5%, transparent);
+  font-size: var(--control-ui-text-sm, 13px);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ---- panels ------------------------------------------------------- */
+
+.kitchen-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-4, 1rem);
+  border: 1px solid color-mix(in srgb, var(--color-foreground, #e8f0e4) 14%, transparent);
+  border-radius: var(--radius-md, 0.5rem);
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 3%, transparent);
+}
+
+.kitchen-panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+}
+
+.kitchen-panel__title {
+  margin: 0;
+  font-size: var(--control-ui-text-sm, 13px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-foreground, #e8f0e4);
+}
+
+.kitchen-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 10%, transparent);
+}
+
+/* ---- intake modes ------------------------------------------------- */
+
+.kitchen-modes {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+  flex-wrap: wrap;
+}
+
+.kitchen-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--color-foreground, #e8f0e4) 16%, transparent);
+  border-radius: var(--radius-md, 0.5rem);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--control-ui-text-sm, 13px);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.kitchen-mode:hover {
+  color: var(--color-foreground, #e8f0e4);
+  border-color: color-mix(in srgb, var(--color-foreground, #e8f0e4) 30%, transparent);
+}
+
+.kitchen-mode.is-active {
+  color: var(--color-foreground, #e8f0e4);
+  border-color: color-mix(in srgb, var(--color-foreground, #e8f0e4) 45%, transparent);
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 8%, transparent);
+}
+
+/* ---- forms -------------------------------------------------------- */
+
+.kitchen-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+}
+
+.kitchen-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.kitchen-field__label {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.kitchen-actions {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+}
+
+/* ---- folder drop -------------------------------------------------- */
+
+.kitchen-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: var(--space-6, 1.75rem) var(--space-4, 1rem);
+  border: 1px dashed color-mix(in srgb, var(--color-foreground, #e8f0e4) 28%, transparent);
+  border-radius: var(--radius-md, 0.5rem);
+  text-align: center;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.kitchen-drop.is-dragging {
+  border-color: color-mix(in srgb, var(--color-foreground, #e8f0e4) 55%, transparent);
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 8%, transparent);
+}
+
+.kitchen-drop__count {
+  margin-top: 0.6rem;
+  font-family: var(--theme-font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ---- staged list -------------------------------------------------- */
+
+.kitchen-empty {
+  margin: 0;
+  font-size: var(--control-ui-text-sm, 13px);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.kitchen-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.kitchen-list > li {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.kitchen-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 0.5rem);
+  background: transparent;
+  color: var(--color-foreground, #e8f0e4);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.kitchen-item:hover {
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 6%, transparent);
+}
+
+.kitchen-item.is-selected {
+  border-color: color-mix(in srgb, var(--color-foreground, #e8f0e4) 35%, transparent);
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 8%, transparent);
+}
+
+.kitchen-item__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kitchen-item__meta {
+  flex-shrink: 0;
+  font-family: var(--theme-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.kitchen-item__remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem;
+  border: none;
+  border-radius: var(--radius-md, 0.5rem);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.kitchen-item__remove:hover {
+  color: var(--color-foreground, #e8f0e4);
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 8%, transparent);
+}
+
+/* ---- pipeline ----------------------------------------------------- */
+
+.kitchen-pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.kitchen-step {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-md, 0.5rem);
+  background: color-mix(in srgb, var(--color-foreground, #e8f0e4) 4%, transparent);
+}
+
+.kitchen-step__title {
+  margin: 0;
+  font-size: var(--control-ui-text-sm, 13px);
+  font-weight: 600;
+  color: var(--color-foreground, #e8f0e4);
+}
+
+.kitchen-step__body {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--muted);
+}

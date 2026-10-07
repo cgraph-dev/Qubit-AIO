@@ -1162,6 +1162,16 @@ def _import_assets(cfg: Any, home: Path, bdir: Path, *,
                       "(owner decision #9: no reference provider config)"}
     else:
         model_result = _import_model_profile(cfg, home)
+    # Owner directive #6: every installed local model must be selectable in the
+    # provider panel. Register the installed local chat/vision models as real
+    # profiles (idempotent, only when present on the local runtime) so the
+    # picker row lists them. Independent of the reference model import above.
+    try:
+        from .providers import resolver as R
+        local_models_result = R.ensure_local_model_profiles(cfg)
+    except Exception as exc:  # noqa: BLE001 - registration must not break import
+        local_models_result = {"state": "FAILED",
+                               "detail": f"{type(exc).__name__}"}
     added: List[str] = []
     # B-04: import projects, attachments, skills, plugins and hooks (not just
     # skills/plugins/hooks). Skip-existing, so no destination file is lost.
@@ -1278,6 +1288,7 @@ def _import_assets(cfg: Any, home: Path, bdir: Path, *,
                           "(actions.json) and were not fabricated")
     return {
         "model_profile": model_result,
+        "local_models": local_models_result,
         "added_files": added,
         "created_files": created_files,
         "cron": cron_result,

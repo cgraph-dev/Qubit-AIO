@@ -269,12 +269,12 @@ class TestReconcilerProperties:
             with write_txn(connection):
                 connection.execute(
                     "INSERT INTO counter_aggregates("
-                    " period_start, metric_name, hermes_version, os_family,"
+                    " period_start, metric_name, qubit_version, os_family,"
                     " architecture, install_method, dimensions_json, value,"
                     " packaged_value"
                     ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
-                        yesterday, "hermes.client.active", "0.0.0-test",
+                        yesterday, "qubit.client.active", "0.0.0-test",
                         "macos", "arm64", "git", "{}", 1, 0,
                     ),
                 )

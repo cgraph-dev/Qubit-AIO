@@ -17,6 +17,7 @@ from qubit_cli.config import cfg_get
 from qubit_cli.web_routers._common import config_scoped_to_thread
 from qubit_cli.web_server_dashboard import (
     _BUILTIN_DASHBOARD_THEMES, _discover_user_themes, _invalidate_plugins_hub_cache, _merged_plugins_hub,
+    normalize_theme_name,
 )
 from qubit_cli.web_server_memory import _normalize_memory_provider_name, _require_memory_provider_ready
 from qubit_cli.web_models import (
@@ -55,7 +56,7 @@ async def get_dashboard_themes(profile: Optional[str] = None):
     from `~/.hermes/dashboard-themes/*.yaml` ship their normalised `definition`."""
     def _run():
         config = load_config()
-        active = cfg_get(config, "dashboard", "theme", default="default")
+        active = normalize_theme_name(cfg_get(config, "dashboard", "theme", default="default"))
         themes = list(_BUILTIN_DASHBOARD_THEMES)
         seen = {t["name"] for t in themes}
         for t in _discover_user_themes():
@@ -70,9 +71,11 @@ async def get_dashboard_themes(profile: Optional[str] = None):
 
 @router.put("/api/dashboard/theme")
 async def set_dashboard_theme(body: ThemeSetBody, profile: Optional[str] = None):
-    """Set the active dashboard theme (persists to config.yaml)."""
-    await asyncio.to_thread(_set_dashboard_key, "theme", body.name, profile)
-    return {"ok": True, "theme": body.name}
+    """Set the active dashboard theme (persists to config.yaml). A legacy theme id
+    (``nous-blue``) is accepted and stored under its canonical Qubit id."""
+    name = normalize_theme_name(body.name)
+    await asyncio.to_thread(_set_dashboard_key, "theme", name, profile)
+    return {"ok": True, "theme": name}
 
 
 # Curated font-override ids, kept in sync with FONT_CHOICES in web/src/themes/fonts.ts. The

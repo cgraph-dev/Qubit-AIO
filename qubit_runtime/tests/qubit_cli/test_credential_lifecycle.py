@@ -148,7 +148,7 @@ def test_update_rotates_config_yaml_model_mirror(qubit_home):
 # ---------------------------------------------------------------------------
 # Desktop PUT /api/env — #96058: credential_pool must be materialized so the
 # live runtime picks up the new key without waiting for its next background
-# load_pool() or a separate `hermes auth add`.
+# load_pool() or a separate `qubit auth add`.
 # ---------------------------------------------------------------------------
 
 
@@ -163,12 +163,12 @@ def test_put_api_env_materializes_credential_pool_entry(qubit_home):
 
     Pre-fix: save_provider_env_credential only mutated .env. The live pool
     kept authenticating with a stale higher-precedence config.yaml mirror or
-    the old cached credential until a separate ``hermes auth add opencode-go``
+    the old cached credential until a separate ``qubit auth add opencode-go``
     ran. auth.json mtime was unchanged before/after Save (#96058).
 
     Post-fix: the same PUT /api/env call must also materialize an entry under
     ``credential_pool.<provider>`` in auth.json so the next request
-    authenticates immediately, matching ``hermes auth add <provider> --type
+    authenticates immediately, matching ``qubit auth add <provider> --type
     api-key`` behavior.
     """
     # Start clean: empty auth.json so the only way a pool entry shows up is
@@ -309,3 +309,36 @@ def test_scrub_never_touches_providers_base_url_alias(qubit_home):
 # ---------------------------------------------------------------------------
 
 
+
+
+# ---------------------------------------------------------------------------
+# GET /api/env — provider_primary pass-through for the Desktop Keys tab
+# ---------------------------------------------------------------------------
+# The Desktop groups a provider card's rows by provider_label and picks the
+# card's main "Paste key" field from `provider_primary` first. That flag is
+# computed per catalog entry in _catalog_provider_env_metadata (index == 0 of
+# the provider's own api_key_env_vars) but _row used to drop it, so a card's
+# own first credential arrived with provider_primary=None and the grouping
+# fell back to the first non-advanced key var — which, for a profile-shared
+# credential contributed by peer providers (DASHSCOPE_API_KEY is index >= 1
+# of alibaba-coding-plan-cn), could be a FOREIGN tier's key.
+
+
+def test_get_api_env_passes_provider_primary_through(qubit_home):
+    """Every provider card's own index-0 credential must stay its main field."""
+    resp = client.get("/api/env", headers=HEADERS)
+    assert resp.status_code == 200, resp.text
+    env = resp.json()
+
+    # The CN Coding Plan card: its own key is its primary; the shared
+    # DASHSCOPE_API_KEY alias joins the card marked primary=False.
+    assert env["ALIBABA_CODING_PLAN_CN_API_KEY"]["provider_primary"] is True
+    dashscope = env["DASHSCOPE_API_KEY"]["provider_profiles"]
+    cn_profile = next(
+        p for p in dashscope if p["provider"] == "alibaba-coding-plan-cn"
+    )
+    assert cn_profile["primary"] is False, (
+        "DASHSCOPE_API_KEY is a fallback alias for alibaba-coding-plan-cn; "
+        "marking it primary would re-point the card's main field away from "
+        "ALIBABA_CODING_PLAN_CN_API_KEY"
+    )

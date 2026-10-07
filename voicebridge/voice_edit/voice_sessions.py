@@ -306,9 +306,76 @@ def prune(cfg: Any, *, now: Any = None, store: Any = None,
         return result
 
 
+def ensure_voice_session(cfg: Any, session_id: Optional[str] = None, *,
+                         store: Any = None,
+                         model: Optional[str] = None) -> Dict[str, Any]:
+    """Ensure a dashboard-source session exists for a voice/PTT/wake turn.
+
+    Owner directive (2026-07): a Right-Ctrl / wake / voice command must CREATE a
+    session in ``/qubit-chat`` — the picker lists dashboard-source rows, so the
+    voice session must be a ``source="dashboard"`` row at the local-brain default
+    (the wave-2 default) rather than a phantom id that only appears once a turn
+    happens to persist.
+
+    Identity resolution mirrors the turn path exactly:
+
+    * an explicit routed target (``session_id`` — the wake route binding) wins
+      unchanged, so a routed command's session is the one that shows;
+    * otherwise the canonical :func:`voice_session_id` (``voice-chat`` in
+      ``single`` mode, ``voice-<stamp>-<hash>`` in ``per_command`` mode).
+
+    The write is the canonical ``store.ensure(...)`` on
+    :class:`~voicebridge.qubit_session_store.QubitSessionStore` — the SAME store
+    the turn path and ``/qubit-chat`` write (never a second store). ``ensure``
+    is a no-op when the row already exists, so an existing voice transcript is
+    never overwritten and its stored model is never re-defaulted (the injected
+    ``model`` is only consulted by ``create`` for a NEW row).
+
+    ``model`` defaults to :func:`voicebridge.chat_transport.local_brain_model`
+    (config-driven; ``None`` if the local brain is disabled). Best-effort and
+    additive: any fault is swallowed (the caller's turn is unchanged) and the
+    typed result records what happened. Never raises.
+    """
+    result: Dict[str, Any] = {"ok": False, "session_id": "", "state": "SKIPPED",
+                              "created": False, "model": None}
+    try:
+        explicit = str(session_id or "").strip()
+        sid = explicit[:80] if explicit else voice_session_id(cfg)
+        result["session_id"] = sid
+        canonical = _store(cfg, store)
+        if canonical is None:
+            result["state"] = "STORE_UNAVAILABLE"
+            return result
+        if model is None:
+            try:
+                from ..chat_transport import local_brain_model
+                model = local_brain_model(cfg)
+            except Exception:  # noqa: BLE001 - a preference, never fatal
+                model = None
+        result["model"] = model
+        # Did the row already exist? ``ensure`` only consults ``model`` when it
+        # must create, so this distinguishes "created a dashboard session" from
+        # "the existing session was reused" (its stored model untouched).
+        try:
+            existed = canonical.show(sid).get("state") == "OK"
+        except Exception:  # noqa: BLE001 - best-effort probe
+            existed = False
+        ensured = canonical.ensure(sid, model=model)
+        state = str(ensured.get("state") or "") if isinstance(ensured, dict) else ""
+        if state != "OK":
+            result["state"] = state or "ENSURE_FAILED"
+            return result
+        result["ok"] = True
+        result["state"] = "OK"
+        result["created"] = not existed
+        return result
+    except Exception:  # noqa: BLE001 - additive, never fatal
+        return result
+
+
 __all__ = [
     "VOICE_SESSION_PREFIX", "SINGLE_SESSION_ID", "DEFAULT_TTL_S",
     "DEFAULT_MAX_MESSAGES_PER_SESSION", "DEFAULT_MAX_SESSIONS",
     "session_mode", "voice_session_id", "is_voice_session",
-    "retention_policy", "prune",
+    "retention_policy", "prune", "ensure_voice_session",
 ]

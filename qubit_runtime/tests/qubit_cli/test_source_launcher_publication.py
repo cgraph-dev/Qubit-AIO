@@ -18,8 +18,8 @@ BOOT_FILES = (
     "pm/environments.py", "pm/filesystem.py", "pm/paths.py", "qubit_cli/runtime_state.py",
     "qubit_cli/_early_recovery.py", "qubit_cli/_parser.py",
     "qubit_cli/venv_sync.py", "qubit_cli/steward.py",
-    "qubit_cli/stderr_timestamp.py", "qubit_cli/install_source.py",
-    "scripts/hermes-gateway",
+    "qubit_cli/stderr_timestamp.py",
+    "scripts/qubit-gateway",
 )
 
 
@@ -45,13 +45,10 @@ def fixture_tree(tmp_path, monkeypatch):
     # Windows resolves its default under LOCALAPPDATA, not HOME.
     if os.name == "nt":
         monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    # The Qubit-owned platform default is ``.qubit`` (``qubit_constants._QUBIT_HOME_DIR``;
-    # the pre-rebrand ``.hermes`` is read-old only). Launchers resolve this default at
-    # use, so the fixture home the selected generation is committed under must match it.
     home = tmp_path / ("qubit" if os.name == "nt" else ".qubit")
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.delenv("HERMES_RUNTIME_DIR", raising=False)
+    monkeypatch.delenv("QUBIT_RUNTIME_DIR", raising=False)
     store = home / "tools"
     store.mkdir(parents=True)
     interpreter = Path(sys._base_executable).resolve()
@@ -94,7 +91,7 @@ def test_source_launchers_boot_selected_generation_from_custom_home(tmp_path, mo
         select_generation(repo, number, number)
         env = dict(os.environ)
         env.pop("QUBIT_HOME", None)
-        env.pop("HERMES_RUNTIME_DIR", None)
+        env.pop("QUBIT_RUNTIME_DIR", None)
         env["PYTHONHOME"] = str(tmp_path / "foreign-python")
         env["PYTHONPATH"] = str(tmp_path / "foreign-deps")
         for launcher in launchers:
@@ -119,7 +116,6 @@ def test_launcher_resolves_default_home_at_use_not_publication(tmp_path, monkeyp
     new_user_home = tmp_path / "second-user"
     new_user_home.mkdir()
     monkeypatch.setenv("HOME", str(new_user_home))
-    # Qubit-owned default home (read-old ``.hermes`` is accepted but not the default).
     monkeypatch.setenv("QUBIT_HOME", str(new_user_home / ".qubit"))
     select_generation(repo, "second", "from-second-user")
     env = dict(os.environ)
@@ -143,7 +139,7 @@ def test_profile_publication_preserves_shared_launcher_default_home(tmp_path, mo
 
     repo, home, interpreter = fixture_tree(tmp_path, monkeypatch)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_INSTALL_ROOT", str(repo))
+    monkeypatch.setenv("QUBIT_INSTALL_ROOT", str(repo))
     profile = home / "profiles" / "coder"
     profile.mkdir(parents=True)
     (home / "active_profile").write_text("default\n", encoding="utf-8")
@@ -209,16 +205,16 @@ def test_posix_materializer_publishes_only_executable_shell_launchers(tmp_path, 
     assert {p.name for p in launchers} == set(_launchers.ENTRY_POINTS)
     assert all(os.access(p, os.X_OK) for p in launchers)
     assert set(out.iterdir()) == set(launchers)
-    local = repo / ".hermes" / "bin"
+    local = repo / ".qubit" / "bin"
     assert {p.name for p in local.iterdir()} == set(_launchers.ENTRY_POINTS)
-    launcher = local / "hermes"
+    launcher = local / "qubit"
     expected = launcher.read_bytes()
     launcher.write_bytes(b"\xef\xbb\xbf" + expected if corruption == "bom" else expected.replace(b"\n", b"\r\n"))
     assert _launchers.ensure_install_launchers(repo, out)
     # Shell executables need exact bytes: neither a BOM before #! nor CRLF is
     # interchangeable with the generated script, even if text decoding agrees.
     assert launcher.read_bytes() == expected
-    result = subprocess.run([str(out / "hermes"), "--print-runtime-command"],
+    result = subprocess.run([str(out / "qubit"), "--print-runtime-command"],
                             capture_output=True, text=True, encoding="utf-8", timeout=30)
     assert result.returncode == 0, result.stderr
     assert Path(json.loads(result.stdout)[0]).samefile(_interpreter)
@@ -242,29 +238,31 @@ def test_materializer_cli_refuses_missing_store_without_publishing(tmp_path, mon
 
 
 @pytest.mark.platforms("posix")
-def test_boot_migrates_legacy_conveniences_to_selected_runtime(tmp_path, monkeypatch):
+@pytest.mark.parametrize("legacy_hermes", ["venv-python", "venv-console-script"])
+def test_boot_migrates_legacy_conveniences_to_selected_runtime(tmp_path, monkeypatch, legacy_hermes):
     repo, home, interpreter = fixture_tree(tmp_path, monkeypatch)
     monkeypatch.setattr(Path, "home", lambda: home)
-    monkeypatch.setenv("HERMES_INSTALL_ROOT", str(repo))
+    monkeypatch.setenv("QUBIT_INSTALL_ROOT", str(repo))
     select_generation(repo, 'current', 'migrated')
     out = home / ".local" / "bin"
     out.mkdir(parents=True)
     # Old venv and sibling-ACP wrappers, with an unrelated command sharing bin.
-    # The historical ACP wrapper is a sibling-hermes forwarder: the launcher
-    # command names stay `hermes`/`hermes-acp` (WINDOWS_BIN_LAUNCHERS, the
-    # repo-root `hermes` script, install.sh), so _owns_launcher adopts it only
-    # when it execs the sibling `hermes` — not a rebranded `qubit`.
-    (out / "hermes").write_text(f'#!/bin/sh\nexec "{repo}/venv/bin/python" "{repo}/hermes" "$@"\n', encoding="utf-8")
-    (out / "hermes-acp").write_text(
-        '#!/usr/bin/env bash\n# Qubit Agent — ACP launcher (written by `qubit update`).\n'
-        f'exec "{out}/hermes" acp "$@"\n', encoding="utf-8")
-    foreign = f'#!/bin/sh\n# user note about {repo}\nexit 19\n'
-    (out / "hermes-agent").write_text(foreign, encoding="utf-8")
+    old_wrapper = (f'#!/bin/sh\nexec "{repo}/venv/bin/python" "{repo}/qubit" "$@"\n'
+                   if legacy_hermes == "venv-python" else
+                   f'#!/usr/bin/env bash\nunset PYTHONPATH\nunset PYTHONHOME\n'
+                   f'exec "{repo}/venv/bin/qubit" "$@"\n')
+    (out / "qubit").write_text(old_wrapper, encoding="utf-8")
+    (out / "qubit-acp").write_text(
+        '#!/usr/bin/env bash\n# Hermes Agent — ACP launcher (written by `qubit update`).\n'
+        f'exec "{out}/qubit" acp "$@"\n', encoding="utf-8")
+    # Mentions this install only in a comment and runs another checkout's venv.
+    foreign = f'#!/bin/sh\n# user note about {repo}/venv/bin/qubit\nexec "{tmp_path}/other/venv/bin/qubit" "$@"\n'
+    (out / "qubit").write_text(foreign, encoding="utf-8")
 
     result = _launchers.expose_cli()
     assert result["ok"], result
-    assert set(result["written"]) == {"hermes", "hermes-acp"}
-    for name in ("hermes", "hermes-acp"):
+    assert set(result["written"]) == {"qubit", "qubit-acp"}
+    for name in ("qubit", "qubit-acp"):
         run = subprocess.run([str(out / name), "quoted argument"], cwd=tmp_path,
                              capture_output=True, text=True, timeout=30, encoding="utf-8")
         assert run.returncode == 7, run.stderr
@@ -272,7 +270,7 @@ def test_boot_migrates_legacy_conveniences_to_selected_runtime(tmp_path, monkeyp
         assert receipt["value"] == "migrated"
         assert receipt["argv"] == ["quoted argument"]
         assert Path(receipt["exe"]).samefile(interpreter)
-    assert (out / "hermes-agent").read_text(encoding="utf-8-sig") == foreign
+    assert (out / "qubit").read_text(encoding="utf-8-sig") == foreign
     before = {p: p.stat().st_mtime_ns for p in out.iterdir()}
     assert _launchers.expose_cli()["written"] == []
     assert before == {p: p.stat().st_mtime_ns for p in out.iterdir()}
@@ -285,7 +283,7 @@ def _command_survives_generation_collection(tmp_path, monkeypatch, surface):
     out = tmp_path / "bin"
     out.mkdir()
     _launchers.ensure_install_launchers(repo, out)
-    launcher = next(path for path in out.iterdir() if path.stem == "hermes")
+    launcher = next(path for path in out.iterdir() if path.stem == "qubit")
     args = ["café ' quoted", "", "$HOME; not a shell"]
     command = []
     for value in ("old", "new"):
@@ -293,7 +291,7 @@ def _command_survives_generation_collection(tmp_path, monkeypatch, surface):
         (selected.parent / ".lease-managed").touch()
         if value == "old":
             if surface == "legacy":
-                command = [sys.executable, "-I", str(repo / "scripts/hermes-gateway"), "--help"]
+                command = [sys.executable, "-I", str(repo / "scripts/qubit-gateway"), "--help"]
                 args = ["gateway", "--help"]
             elif surface == "ssh":
                 from qubit_cli.windows_ssh_runtime import _resolve_direct_command
@@ -325,8 +323,12 @@ def _command_survives_generation_collection(tmp_path, monkeypatch, surface):
     assert collect_generations(repo, min_age_seconds=0) == [selected.parent.parent / "old"]
     result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=30, encoding="utf-8")
     assert result.returncode == 7, result.stderr
-    assert json.loads(result.stdout)["value"] == "new"
-    assert json.loads(result.stdout)["argv"] == args
+    receipt = result.stdout
+    if surface == "launchd":
+        # stderr_timestamp stamps the child's stdout lines ("YYYY-MM-DD HH:MM:SS,mmm ").
+        receipt = receipt.split(" ", 2)[2]
+    assert json.loads(receipt)["value"] == "new"
+    assert json.loads(receipt)["argv"] == args
 
 
 @pytest.mark.parametrize("surface", ["published", "systemd", "launchd", "ssh", "legacy"])
@@ -357,17 +359,17 @@ def test_running_source_launcher_can_republish_itself(tmp_path, monkeypatch, lau
         "from qubit_cli._launchers import ensure_install_launchers, ENTRY_POINTS\n"
         "def main():\n"
         "    root = Path(__file__).resolve().parents[1]\n"
-        "    written = ensure_install_launchers(root, root / '.hermes/bin')\n"
+        "    written = ensure_install_launchers(root, root / '.qubit/bin')\n"
         "    print('published', len(written), len(ENTRY_POINTS), flush=True)\n"
         "    return 0 if len(written) == len(ENTRY_POINTS) else 1\n",
         encoding="utf-8",
     )
-    out = repo / ".hermes/bin"
+    out = repo / ".qubit/bin"
     if launcher_form == "cmd":
         monkeypatch.setattr(_launchers, "_load_script_maker", lambda: None)
     launchers = _launchers.ensure_install_launchers(repo, out)
     assert len(launchers) == len(_launchers.ENTRY_POINTS)
-    command = next(Path(p) for p in launchers if Path(p).stem == "hermes")
+    command = next(Path(p) for p in launchers if Path(p).stem == "qubit")
     assert command.suffix == (".cmd" if launcher_form == "cmd" else ".exe")
     result = subprocess.run([str(command)], cwd=tmp_path, capture_output=True,
                             text=True, encoding="utf-8", timeout=30)
@@ -381,7 +383,7 @@ def test_running_source_launcher_can_republish_itself(tmp_path, monkeypatch, lau
 @pytest.mark.platforms("windows")
 def test_repin_without_distlib_retires_stale_native_launcher(tmp_path, monkeypatch):
     repo, home, _interpreter = fixture_tree(tmp_path, monkeypatch)
-    local = repo / ".hermes/bin"
+    local = repo / ".qubit/bin"
     original = Path(_launchers.ensure_install_launchers(repo, local)[0])
     assert original.suffix == ".exe"
     new_python = home / "tools" / "repinned" / "python.exe"
@@ -390,8 +392,8 @@ def test_repin_without_distlib_retires_stale_native_launcher(tmp_path, monkeypat
     (home / "tools/facts.json").write_text(
         json.dumps({"packages": {"python": {"entry": "repinned"}}}), encoding="utf-8")
     monkeypatch.setattr(_launchers, "_load_script_maker", lambda: None)
-    result = _launchers.stage_launcher("hermes", repo, local)
-    assert result == local / "hermes.cmd"
+    result = _launchers.stage_launcher("qubit", repo, local)
+    assert result == local / "qubit.cmd"
     assert not original.exists()  # cmd.exe must not run the old exe first
     assert result is not None and str(new_python) in result.read_text(encoding="utf-8-sig")
 
@@ -401,17 +403,17 @@ def test_windows_repair_upgrades_healthy_old_pm_external_launchers(tmp_path, mon
     from qubit_cli._install_repair import ensure_windows_bin_launchers
 
     repo, home, interpreter = fixture_tree(tmp_path, monkeypatch)
-    managed = home / "hermes-agent"
+    managed = home / "qubit"
     shutil.move(repo, managed)
     external = home / "bin"
     external.mkdir()
     for name in _launchers.ENTRY_POINTS:
         (external / f"{name}.exe").write_bytes(b"old PM launcher without a venv binding")
     assert ensure_windows_bin_launchers(managed, user_path_entries=[])
-    local = managed / ".hermes" / "bin"
-    launcher = local / "hermes.exe"
+    local = managed / ".qubit" / "bin"
+    launcher = local / "qubit.exe"
     if not launcher.exists():
-        launcher = local / "hermes.cmd"
+        launcher = local / "qubit.cmd"
     result = subprocess.run([str(launcher), "--print-runtime-command"], capture_output=True,
                             text=True, timeout=30, encoding="utf-8")
     assert result.returncode == 0, result.stderr
@@ -457,7 +459,7 @@ def test_pre_pm_base_dependencies_activate_only_at_boot(tmp_path, monkeypatch):
 
 def test_external_interpreter_keeps_its_owned_dependencies(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "empty-store"))
+    monkeypatch.setenv("QUBIT_RUNTIME_DIR", str(tmp_path / "empty-store"))
     command = _launchers.runtime_command(ROOT, code="import ruamel.yaml; print('external-runtime-ready')")
     result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=30, encoding="utf-8")
     assert result.returncode == 0, result.stderr
@@ -516,18 +518,18 @@ def test_sync_migrates_old_store_wrapper_before_python_collection(tmp_path, monk
         python.symlink_to(interpreter)
         (store / "facts.json").write_text(json.dumps({"schema": 1, "packages": {"python": {"entry": version}}}), encoding="utf-8")
         if version == "python-A":
-            _launchers.mint_launcher("hermes", repo, out, python, None)
+            _launchers.mint_launcher("qubit", repo, out, python, None)
         else:
             if create:
                 publish_launchers(repo)
             else:
                 publish_launchers(repo, create=False)
-                assert set(out.iterdir()) == {out / "hermes"}
+                assert set(out.iterdir()) == {out / "qubit"}
                 assert not (home / "bin").exists()
                 assert not (home / "config.yaml").exists()
                 assert not (home / "skills").exists()
     shutil.rmtree(store / "python-A")
-    result = subprocess.run([str(out / "hermes")], cwd=tmp_path,
+    result = subprocess.run([str(out / "qubit")], cwd=tmp_path,
                             capture_output=True, text=True, timeout=30, encoding="utf-8")
     assert result.returncode == 7, result.stderr
     assert json.loads(result.stdout)["value"] == "ready"
@@ -545,6 +547,6 @@ def test_update_import_probe_uses_selected_dependencies(tmp_path, monkeypatch):
     (site / "selected_probe.py").write_text("VALUE = 'selected'\n", encoding="utf-8")
     (install_state_dir(repo) / "facts.json").write_text(
         json.dumps({"packages": {"venv": {"environment": str(selected)}}}), encoding="utf-8")
-    (repo / "hermes_integrity_probe.py").write_text("import selected_probe\n", encoding="utf-8")
-    monkeypatch.setattr(update_cmd, "_UPDATE_CRITICAL_MODULES", ("hermes_integrity_probe",))
+    (repo / "qubit_integrity_probe.py").write_text("import selected_probe\n", encoding="utf-8")
+    monkeypatch.setattr(update_cmd, "_UPDATE_CRITICAL_MODULES", ("qubit_integrity_probe",))
     assert update_cmd_validation._critical_module_import_failures(repo, report_runtime_errors=True) == {}

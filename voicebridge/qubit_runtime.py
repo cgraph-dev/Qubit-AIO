@@ -2,11 +2,11 @@
 
 Per `docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md`, the product's
 agent loop, CLI, dashboard, sessions, tools, skills, models, memory, tasks and
-runtime execute from the vendored fork under ``qubit_runtime/`` (a byte-identical
-fork of the pinned upstream `2237be35`, MIT, Copyright (c) 2025 Nous Research).
+runtime execute from the vendored runtime under ``qubit_runtime/`` (a
+byte-identical copy of the pinned upstream `2237be35`, MIT, Copyright (c) 2025 Nous Research).
 No external Qubit installation is imported or supervised.
 
-This module is the single entry point that puts the fork on ``sys.path`` and
+This module is the single entry point that puts the vendored runtime on ``sys.path`` and
 invokes its CLI. Qubit's own launcher and dashboard call through here so the
 same runtime backs CLI, dashboard and voice.
 """

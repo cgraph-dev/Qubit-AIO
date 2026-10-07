@@ -67,7 +67,7 @@ def test_runtime_selected_copilot_exchanges_ambient_pool_token(tmp_path, monkeyp
     `--provider copilot`) must still hand the EXCHANGED token and the enterprise base_url to the
     client: the seeder leaves an ambient gh-CLI credential raw while copilot is not configured
     (#114740), and a raw token 400s on enterprise-only models."""
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     (qubit_home / "auth.json").write_text(json.dumps({"version": 1, "credential_pool": {}}))
@@ -128,7 +128,7 @@ def test_codex_pool_honors_qubit_codex_base_url(monkeypatch):
 
     monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "openai-codex")
     monkeypatch.setattr(rp, "load_pool", lambda provider: _Pool())
-    monkeypatch.setenv("HERMES_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
+    monkeypatch.setenv("QUBIT_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
 
     resolved = rp.resolve_runtime_provider(requested="openai-codex")
 
@@ -153,7 +153,7 @@ def test_codex_pool_honors_model_base_url(monkeypatch):
 
     monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "openai-codex")
     monkeypatch.setattr(rp, "load_pool", lambda provider: _Pool())
-    monkeypatch.delenv("HERMES_CODEX_BASE_URL", raising=False)
+    monkeypatch.delenv("QUBIT_CODEX_BASE_URL", raising=False)
     monkeypatch.setattr(rp, "_get_model_config", lambda: {
         "provider": "openai-codex", "default": "gpt-5.3-codex", "base_url": "http://127.0.0.1:8400/backend-api/codex/"})
 
@@ -161,6 +161,66 @@ def test_codex_pool_honors_model_base_url(monkeypatch):
 
     assert resolved["base_url"] == "http://127.0.0.1:8400/backend-api/codex"
     assert resolved["api_mode"] == "codex_responses"
+
+
+def _xai_pool(url):
+    class _Entry:
+        access_token = "pool-token"
+        source = "env:XAI_API_KEY"
+        base_url = url
+
+    class _Pool:
+        def has_credentials(self):
+            return True
+
+        def select(self, **_kwargs):
+            return _Entry()
+
+    return _Pool()
+
+
+def test_xai_pool_honors_model_base_url_when_row_is_registry_host(monkeypatch):
+    """#121347: an env-seeded xAI row keeps https://api.x.ai/v1. model.base_url is the
+    relay override, same as the other API-key providers, and must not be shadowed."""
+    monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "xai")
+    monkeypatch.setattr(rp, "load_pool", lambda provider: _xai_pool("https://api.x.ai/v1"))
+    monkeypatch.delenv("XAI_BASE_URL", raising=False)
+    monkeypatch.setattr(rp, "_get_model_config", lambda: {
+        "provider": "xai", "default": "grok-4", "base_url": "http://127.0.0.1:8765/v1/"})
+
+    resolved = rp.resolve_runtime_provider(requested="xai")
+
+    assert resolved["provider"] == "xai"
+    assert resolved["api_key"] == "pool-token"
+    assert resolved["base_url"] == "http://127.0.0.1:8765/v1"
+    assert resolved["api_mode"] == "codex_responses"
+
+
+def test_xai_pool_keeps_explicit_credential_endpoint(monkeypatch):
+    """A pool row that is not the registry host is an explicit endpoint and wins over model.base_url."""
+    monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "xai")
+    monkeypatch.setattr(rp, "load_pool", lambda provider: _xai_pool("https://relay.example/v1"))
+    monkeypatch.delenv("XAI_BASE_URL", raising=False)
+    monkeypatch.setattr(rp, "_get_model_config", lambda: {
+        "provider": "xai", "default": "grok-4", "base_url": "http://127.0.0.1:8765/v1"})
+
+    resolved = rp.resolve_runtime_provider(requested="xai")
+
+    assert resolved["base_url"] == "https://relay.example/v1"
+    assert resolved["api_mode"] == "codex_responses"
+
+
+def test_xai_pool_ignores_another_providers_base_url(monkeypatch):
+    """A stale model.base_url saved for a different provider must not receive the xAI key."""
+    monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "xai")
+    monkeypatch.setattr(rp, "load_pool", lambda provider: _xai_pool("https://api.x.ai/v1"))
+    monkeypatch.delenv("XAI_BASE_URL", raising=False)
+    monkeypatch.setattr(rp, "_get_model_config", lambda: {
+        "provider": "deepseek", "default": "deepseek-v4-pro", "base_url": "http://127.0.0.1:8765/v1"})
+
+    resolved = rp.resolve_runtime_provider(requested="xai")
+
+    assert resolved["base_url"] == "https://api.x.ai/v1"
 
 
 class TestCustomProviderPoolLoopbackNoKeyExemption:
@@ -610,17 +670,36 @@ def test_openrouter_key_takes_priority_over_openai_key(monkeypatch):
 
 
 def test_openai_key_used_when_no_openrouter_key(monkeypatch):
-    """OPENAI_API_KEY is used as fallback when OPENROUTER_API_KEY is not set."""
+    """A legacy OpenRouter key (sk-or-) kept in OPENAI_API_KEY is the fallback when
+    OPENROUTER_API_KEY is not set."""
     monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "openrouter")
     monkeypatch.setattr(rp, "_get_model_config", lambda: {})
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
     monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-fallback")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-or-v1-legacy-fallback")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     resolved = rp.resolve_runtime_provider(requested="openrouter")
 
-    assert resolved["api_key"] == "sk-openai-fallback"
+    assert resolved["api_key"] == "sk-or-v1-legacy-fallback"
+
+
+def test_real_openai_key_is_never_routed_or_sent_to_openrouter(monkeypatch):
+    """A non-OpenRouter OPENAI_API_KEY with OPENAI_BASE_URL unset neither auto-selects OpenRouter
+    nor becomes the bearer for openrouter.ai; auto-detection lands on openai-api as documented."""
+    from qubit_cli.auth import resolve_provider
+    from qubit_cli.runtime_provider_backends import _resolve_openrouter_runtime
+    monkeypatch.setattr(rp, "_get_model_config", lambda: {})
+    monkeypatch.setattr("qubit_cli.config.load_config", lambda: {"model": {}})
+    monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda: False)
+    for var in ("OPENAI_BASE_URL", "OPENROUTER_BASE_URL", "OPENROUTER_API_KEY", "CUSTOM_BASE_URL"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-proj-real-openai-key")
+
+    assert resolve_provider("auto") == "openai-api"
+    resolved = _resolve_openrouter_runtime(requested_provider="openrouter")
+    assert resolved["base_url"] == "https://openrouter.ai/api/v1"
+    assert resolved["api_key"] == ""
 
 
 @pytest.mark.parametrize("openai_base_url, expected_key", [
@@ -1156,7 +1235,7 @@ def test_explicit_openrouter_config_mirror_bypasses_pool(monkeypatch):
     assert resolved["api_key"] == "router-key"
     assert resolved.get("credential_pool") is None
 
-    # The canonical URL that `hermes setup` persists is NOT a mirror: the pool must still serve it.
+    # The canonical URL that `qubit setup` persists is NOT a mirror: the pool must still serve it.
     monkeypatch.setattr(rp, "_get_model_config", lambda: {"provider": "openrouter", "base_url": "https://openrouter.ai/api/v1"})
     canonical = rp.resolve_runtime_provider(requested="openrouter")
     assert canonical["api_key"] == "pool-key" and canonical.get("credential_pool") is not None
@@ -2090,7 +2169,7 @@ def test_bare_custom_resolves_model_key_env_for_configured_base_url(monkeypatch)
     monkeypatch.setenv("CUSTOM_BASE_URL", "https://other.example.test/v1")
     assert rp.resolve_runtime_provider(requested="custom")["api_key"] == "no-key-required"
 
-    # Direct-alias rung (`hermes --resume` provider change, `/model` direct aliases pass explicit_base_url):
+    # Direct-alias rung (`qubit --resume` provider change, `/model` direct aliases pass explicit_base_url):
     # the declared key follows the configured endpoint and stays home for any other endpoint.
     monkeypatch.delenv("CUSTOM_BASE_URL", raising=False)
     direct = rp.resolve_runtime_provider(requested="custom", explicit_base_url="https://api.example.test/v1")
@@ -2117,7 +2196,7 @@ def test_configured_key_env_resolving_empty_is_logged(monkeypatch, caplog):
 # ── model.openai_runtime: codex_app_server on every ladder rung (#115169) ─────────────────
 
 _CODEX_STORE_CREDS = {"base_url": "https://chatgpt.com/backend-api/codex", "api_key": "tok",
-                      "source": "hermes-auth-store", "last_refresh": 1}
+                      "source": "qubit-auth-store", "last_refresh": 1}
 
 
 def _codex_rung(monkeypatch, rung: str) -> dict:

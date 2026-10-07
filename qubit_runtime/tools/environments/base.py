@@ -515,7 +515,7 @@ class BaseEnvironment(ABC):
                     if output.total_chars == 0:
                         rendered = rendered.lstrip()
                     # The flag tells Hermes' own deadline apart from a command's own ``exit 124``.
-                    return {**self._finalize_wait_result(output, rendered, 124), "hermes_timed_out": True}
+                    return {**self._finalize_wait_result(output, rendered, 124), "qubit_timed_out": True}
                 touch_activity_if_due(_activity_state, "terminal command running")
                 trace.heartbeat()
                 time.sleep(_poll_sleep)
@@ -708,7 +708,7 @@ class BaseEnvironment(ABC):
                 result = self._finalize_wait_result(collector, collector.render(suffix=suffix).lstrip("\n"), 124)
             else:
                 result = {"output": suffix.lstrip(), "returncode": 124}
-            result["hermes_timed_out"] = True
+            result["qubit_timed_out"] = True
         else:
             result = bounded.value
         self._update_cwd(result)

@@ -83,6 +83,8 @@ export const ROUTE_TITLES: Record<string, string> = {
   // ("/agent-cards" -> "Agent-cards").
   "/computer": "Agent Computer",
   "/agent-cards": "Agent Work & Artifacts",
+  // Kitchen: the intake surface for absorbing other agents/apps.
+  "/kitchen": "Kitchen",
 };
 
 export function resolvePageTitle(

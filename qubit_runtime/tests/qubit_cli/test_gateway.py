@@ -12,7 +12,7 @@ import pytest
 import qubit_cli.gateway as gateway
 
 
-_BREAKAWAY_MARKER = "_HERMES_GATEWAY_BREAKAWAY"
+_BREAKAWAY_MARKER = "_QUBIT_GATEWAY_BREAKAWAY"
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +45,7 @@ def _run_native_windows_gateway_start_diag(
         import qubit_cli.gateway as gateway_cli
 
         async def start_gateway(**kwargs):
-            assert "_HERMES_GATEWAY_BREAKAWAY" not in os.environ
+            assert "_QUBIT_GATEWAY_BREAKAWAY" not in os.environ
             return True
 
         fake_run = types.ModuleType("gateway.run")
@@ -75,9 +75,9 @@ def _run_native_windows_gateway_start_diag(
     env.update(
         {
             "QUBIT_HOME": str(tmp_path),
-            "HERMES_GATEWAY_DETACHED": "1",
-            "HERMES_GATEWAY_EXIT_DIAG": "1",
-            "HERMES_GATEWAY_MAX_STARTS": "0",
+            "QUBIT_GATEWAY_DETACHED": "1",
+            "QUBIT_GATEWAY_EXIT_DIAG": "1",
+            "QUBIT_GATEWAY_MAX_STARTS": "0",
             "PYTHONIOENCODING": "utf-8",
         }
     )
@@ -157,7 +157,7 @@ def test_gateway_run_subprocess_preserves_daemon_exit_codes(
 
         import qubit_cli.gateway as gateway_cli
 
-        outcome = os.environ["HERMES_TEST_GATEWAY_OUTCOME"]
+        outcome = os.environ["QUBIT_TEST_GATEWAY_OUTCOME"]
 
         async def start_gateway(**kwargs):
             if outcome == "failure":
@@ -181,8 +181,8 @@ def test_gateway_run_subprocess_preserves_daemon_exit_codes(
     env = {
         **os.environ,
         "QUBIT_HOME": str(tmp_path),
-        "HERMES_GATEWAY_EXIT_DIAG": "0",
-        "HERMES_TEST_GATEWAY_OUTCOME": outcome,
+        "QUBIT_GATEWAY_EXIT_DIAG": "0",
+        "QUBIT_TEST_GATEWAY_OUTCOME": outcome,
         "INVOCATION_ID": "systemd-test",
     }
 
@@ -252,6 +252,40 @@ def test_s6_runtime_snapshot_reports_supervised_service(monkeypatch, tmp_path):
     assert snapshot.gateway_pids == (123,)
 
 
+def _run_status_with_snapshot(monkeypatch, snapshot) -> str:
+    """``_cmd_status`` for a host with no installed systemd/launchd/Windows service."""
+    import io
+    from contextlib import redirect_stdout
+
+    monkeypatch.setattr("qubit_cli.gateway_profile_lifecycle.print_parked_status", lambda: False)
+    monkeypatch.setattr(gateway, "get_gateway_runtime_snapshot", lambda system=False: snapshot)
+    monkeypatch.setattr(gateway, "_installed_service_kind_for", lambda probe: None)
+    monkeypatch.setattr(gateway, "named_profile_served_by_running_multiplexer", lambda: False)
+    for name in ("_print_runtime_health", "_print_multiplex_standalone_reason", "_print_served_ingress_urls",
+                 "_print_duplicate_credential_warnings", "_print_other_profiles_gateway_status",
+                 "_print_standalone_by_config"):
+        monkeypatch.setattr(gateway, name, lambda *a, **k: None)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        gateway._cmd_status(SimpleNamespace(deep=False, full=False, system=False))
+    return buf.getvalue()
+
+
+def test_s6_supervised_gateway_without_scannable_pid_reports_running(monkeypatch):
+    """#125390: s6 service up, process scan empty (`python -c` launcher argv is unmatched per
+    #123881 and containers have no gateway.pid) — the default profile must not report an outage."""
+    snapshot = gateway.GatewayRuntimeSnapshot(
+        manager="s6 (container supervisor)", service_installed=True, service_running=True, gateway_pids=())
+    out = _run_status_with_snapshot(monkeypatch, snapshot)
+    assert out.startswith("✓ Gateway is running (supervised by s6 (container supervisor))")
+    assert "not running" not in out
+
+
+def test_manual_gateway_without_pids_still_reports_stopped(monkeypatch):
+    out = _run_status_with_snapshot(monkeypatch, gateway.GatewayRuntimeSnapshot(manager="manual process"))
+    assert out.startswith("✗ Gateway is not running")
+
+
 
 
 
@@ -316,7 +350,7 @@ def test_spawn_detached_gateway_timestamps_stderr(monkeypatch, tmp_path):
 
 @pytest.mark.platforms("posix")  # systemd user-linger is Linux-only (drives os.getuid())
 def test_systemd_install_checks_linger_status(monkeypatch, tmp_path):
-    unit_path = tmp_path / "systemd" / "user" / "hermes-gateway.service"
+    unit_path = tmp_path / "systemd" / "user" / "qubit-gateway.service"
 
     monkeypatch.setattr(gateway, "get_systemd_unit_path", lambda system=False: unit_path)
     # Synthetic unit with a non-temp home: the real generator bakes the
@@ -326,7 +360,7 @@ def test_systemd_install_checks_linger_status(monkeypatch, tmp_path):
         gateway,
         "generate_systemd_unit",
         lambda system=False, run_as_user=None: (
-            '[Service]\nEnvironment="QUBIT_HOME=/home/alice/.hermes"\n'
+            '[Service]\nEnvironment="QUBIT_HOME=/home/alice/.qubit"\n'
         ),
     )
 
@@ -375,7 +409,7 @@ def test_gateway_install_noninteractive_skips_legacy_unit_prompt(monkeypatch, tm
     monkeypatch.setattr(gateway, "remove_legacy_qubit_units", lambda interactive=False: calls.append(("remove_legacy",)))
     monkeypatch.setattr(gateway, "print_legacy_unit_warning", lambda: None)
 
-    fake_path = tmp_path / "hermes-gateway.service"
+    fake_path = tmp_path / "qubit-gateway.service"
     monkeypatch.setattr(gateway, "get_systemd_unit_path", lambda system=False: fake_path)
     monkeypatch.setattr(gateway, "generate_systemd_unit", lambda system=False, run_as_user=None: "[Service]")
     monkeypatch.setattr(gateway, "_run_systemctl", lambda *a, **kw: None)
@@ -482,7 +516,7 @@ class TestWaitForGatewayExit:
 
 
 class TestRestartWaitsForApiServerPort:
-    """Regression for #91547: ``hermes gateway restart`` waited only for the old PID; on macOS the
+    """Regression for #91547: ``qubit gateway restart`` waited only for the old PID; on macOS the
     replacement then hit EADDRINUSE and ran with no API server."""
 
     def test_port_is_reported_free_once_the_old_listener_closes(self):
@@ -677,7 +711,7 @@ class TestReapUnsupervisedGatewayOrphansMacOS:
 
     Regression guard: without the ``is_macos()`` exclusion of
     ``_get_service_pids()``, the reaper would SIGTERM the launchd-supervised
-    gateway every time Hermes Desktop opens (``hermes serve`` calls
+    gateway every time Hermes Desktop opens (``qubit serve`` calls
     ``_reap_unsupervised_gateway_orphans`` during startup).
     """
 
@@ -727,7 +761,7 @@ class TestReapUnsupervisedGatewayOrphansWindows:
     Regression guard: without the Windows exemption of the recorded healthy
     gateway PID (and its parent chain), the reaper would SIGTERM/SIGKILL a
     Scheduled-Task-supervised gateway every time Hermes Desktop opens
-    (``hermes serve`` calls ``_reap_unsupervised_gateway_orphans`` during
+    (``qubit serve`` calls ``_reap_unsupervised_gateway_orphans`` during
     startup). The Scheduled-Task bootstrap's argv matches the gateway scan,
     so it is reaped as an "orphan" — and when the bootstrap dies, the
     detached gateway it spawned exits with it (#86098).
@@ -848,6 +882,40 @@ class TestReapUnsupervisedGatewayOrphansWindows:
 
 
 
+class TestReaperStartupGrace:
+    """``min_age_s`` spares a gateway still claiming gateway.pid/lock (#122533).
+
+    A booting gateway is argv-visible before it is record-visible; reaping it writes
+    a planned-stop marker it consumes on startup and exits 0 with no supervisor. An
+    undeterminable age must read as too young, never widen the reap.
+    """
+
+    def test_grace_spares_booting_and_unknown_age_but_reaps_stale_orphan(self, monkeypatch):
+        booting, unknown, stale = 55501, 55502, 99998
+        ages = {booting: 2.0, stale: 900.0}
+
+        def _age(pid):
+            if pid not in ages:
+                raise RuntimeError("probe failed")
+            return ages[pid]
+
+        monkeypatch.setattr(gateway, "supports_systemd_services", lambda: False)
+        monkeypatch.setattr("gateway.status.get_running_pid", lambda cleanup_stale=True: None)
+        monkeypatch.setattr(
+            gateway, "find_gateway_pids",
+            lambda exclude_pids=None: [p for p in (booting, unknown, stale) if p not in (exclude_pids or set())],
+        )
+        monkeypatch.setattr("qubit_cli.dashboard_procs._process_age_seconds", _age)
+        monkeypatch.setattr(gateway.os, "kill", lambda pid, sig: None)
+        monkeypatch.setattr("gateway.status._pid_exists", lambda pid: False)
+        monkeypatch.setattr("time.sleep", lambda _: None)
+        marked = []
+        monkeypatch.setattr("gateway.status.write_planned_stop_marker", marked.append)
+
+        assert gateway._reap_unsupervised_gateway_orphans(min_age_s=180.0) is True
+        assert marked == [stale]
+
+
 class TestReaperCandidateIsSupervisorOwned:
     """Regression for the Windows pidfile-less supervisor-owned case (#83683).
 
@@ -900,15 +968,15 @@ class TestWindowsScheduledTaskSupervisorGuard:
             raise AssertionError("subprocess must not run off Windows")
 
         monkeypatch.setattr(gateway.subprocess, "run", _boom_run)
-        assert gateway._windows_scheduled_task_supervises("HermesGateway") is False
-        assert gateway._windows_scheduled_task_state("HermesGateway") is None
+        assert gateway._windows_scheduled_task_supervises("QubitGateway") is False
+        assert gateway._windows_scheduled_task_state("QubitGateway") is None
 
     def test_supervises_ready_and_queued_but_not_disabled(self, monkeypatch):
         states = {"Running": True, "Ready": True, "Queued": True, "Disabled": False, "MISSING": False}
 
         for state, expected in states.items():
             monkeypatch.setattr(gateway, "_windows_scheduled_task_state", lambda name, s=state: s)
-            assert gateway._windows_scheduled_task_supervises("Hermes_Gateway") is expected, state
+            assert gateway._windows_scheduled_task_supervises("Qubit_Gateway") is expected, state
 
 
 
@@ -923,7 +991,7 @@ def test_find_windows_gateway_services_ignores_task_scheduler_ancestor(monkeypat
     import psutil
     import qubit_cli.gateway_windows as gateway_windows
 
-    monkeypatch.setattr(gateway_windows, "hermes_service_roots", lambda: (r"C:\hermes\hermes-agent",))
+    monkeypatch.setattr(gateway_windows, "qubit_service_roots", lambda: (r"C:\qubit\qubit",))
     profile = SimpleNamespace(profile="default", pid=18480, create_time=18480.0)
 
     class FakeService:
@@ -955,7 +1023,7 @@ def test_find_windows_gateway_services_ignores_task_scheduler_ancestor(monkeypat
         )
 
     assert run(FakeService("Schedule", r"C:\Windows\system32\svchost.exe -k netsvcs -p -s Schedule")) == []
-    owned = run(FakeService("gw", r'"C:\hermes\hermes-agent\venv\Scripts\hermes.exe" gateway run'))
+    owned = run(FakeService("gw", r'"C:\qubit\qubit\venv\Scripts\qubit.exe" gateway run'))
     assert [(s.name, s.service_pid, s.gateway_pid) for s in owned] == [("gw", 2360, 18480)]
 
     # QueryServiceConfig unreadable to this user (hardened or malformed third-party service): not
@@ -970,8 +1038,8 @@ def test_find_windows_gateway_services_ignores_task_scheduler_ancestor(monkeypat
 
     assert run(UnreadableConfigService("Hardened", psutil.AccessDenied(2360, "Hardened"))) == []
     assert run(UnreadableConfigService("BrokenMui", OSError(15100, "MUI file missing"))) == []
-    named = run(UnreadableConfigService("HermesGateway", OSError(15100, "MUI file missing")))
-    assert [(s.name, s.service_pid, s.gateway_pid) for s in named] == [("HermesGateway", 2360, 18480)]
+    named = run(UnreadableConfigService("QubitGateway", OSError(15100, "MUI file missing")))
+    assert [(s.name, s.service_pid, s.gateway_pid) for s in named] == [("QubitGateway", 2360, 18480)]
 
 
 

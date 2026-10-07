@@ -1,6 +1,6 @@
 """Fleet-wide config migration (#91277 Phase 2 — #20438/#54926/#79048 class).
 
-`hermes update` migrated only the active profile's config.yaml; sibling
+`qubit update` migrated only the active profile's config.yaml; sibling
 profiles silently drifted config versions until their gateway hit a config
 the new code couldn't read. `_migrate_sibling_profile_configs()` runs the
 same non-interactive safe migration for every sibling home, scoped via the
@@ -33,10 +33,18 @@ def _latest_version() -> int:
     return int(DEFAULT_CONFIG["_config_version"])
 
 
-def _setup(monkeypatch, tmp_path, active_home: Path):
+def _setup(monkeypatch, tmp_path, active_home: Path, *, default_home: Path | None = None):
     import qubit_cli.profiles as profiles_mod
 
     monkeypatch.setattr(profiles_mod, "_get_profiles_root", lambda: tmp_path / "profiles")
+    # Default lives at the install root, not under profiles/; absent unless a test passes it,
+    # so no test can reach the real ~/.qubit.
+    missing = tmp_path / "no-such-default-home"
+    monkeypatch.setattr(
+        profiles_mod,
+        "_get_default_qubit_home",
+        lambda: default_home if default_home is not None else missing,
+    )
     import qubit_constants
 
     monkeypatch.setattr(
@@ -120,3 +128,40 @@ def test_override_is_reset_after_run(monkeypatch, tmp_path):
     before = get_qubit_home_override()
     update_cmd._migrate_sibling_profile_configs()
     assert get_qubit_home_override() == before
+
+
+def test_named_active_migrates_default_outside_profiles(monkeypatch, tmp_path):
+    """Default lives at the install root, not under profiles/. A named-profile
+    update must still migrate it. Snapshots already treat default as a sibling
+    (#66140). Walking profiles/ only leaves it behind."""
+    default_home = _write_profile(tmp_path, "default-home", 12)
+    active = _write_profile(tmp_path / "profiles", "work", _latest_version())
+    _setup(monkeypatch, tmp_path, active, default_home=default_home)
+
+    migrated = update_cmd._migrate_sibling_profile_configs()
+
+    names = [m[0] for m in migrated]
+    assert "default" in names
+    entry = next(m for m in migrated if m[0] == "default")
+    assert entry[1] == 12 and entry[2] == _latest_version()
+    on_disk = yaml.safe_load((default_home / "config.yaml").read_text())
+    assert on_disk["_config_version"] == _latest_version()
+    assert on_disk["model"]["provider"] == "nous"
+    # named active is the invoking home: its own migrate path handles it
+    assert "work" not in names
+
+
+def test_default_active_still_migrates_named_siblings(monkeypatch, tmp_path):
+    """Invoking from default must still migrate named profiles under profiles/."""
+    default_home = _write_profile(tmp_path, "default-home", _latest_version())
+    sibling = _write_profile(tmp_path / "profiles", "research", 12)
+    _setup(monkeypatch, tmp_path, default_home, default_home=default_home)
+
+    migrated = update_cmd._migrate_sibling_profile_configs()
+
+    names = [m[0] for m in migrated]
+    assert "default" not in names
+    assert "research" in names
+    on_disk = yaml.safe_load((sibling / "config.yaml").read_text())
+    assert on_disk["_config_version"] == _latest_version()
+    assert yaml.safe_load((default_home / "config.yaml").read_text())["_config_version"] == _latest_version()

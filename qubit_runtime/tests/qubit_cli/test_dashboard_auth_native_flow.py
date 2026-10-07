@@ -185,7 +185,7 @@ def _walk_native_login(client, *, redirect_uri, challenge, state="cli-state"):
     loop_qs = parse_qs(loop.query)
     # No session cookie must be set on the native callback response.
     set_cookie = r2.headers.get("set-cookie", "")
-    assert "hermes_session_at" not in set_cookie, (
+    assert "qubit_session_at" not in set_cookie, (
         f"native callback must NOT set a session cookie; got {set_cookie!r}"
     )
     return loop_qs["code"][0], loop_qs["state"][0]
@@ -452,6 +452,88 @@ def _start_native_password_login(client, *, challenge, state="desk-state"):
     return r.cookies
 
 
+def test_native_redirect_uri_boundary_matches_browser_authority(gated_client):
+    """Only canonical loopback authorities survive the upstream OAuth callback."""
+    verifier, challenge = _make_pkce()
+    rejected = (
+        "http://attacker.example\\@127.0.0.1/callback",  # browser authority = attacker host
+        "http://user@127.0.0.1/callback",
+        "http://@127.0.0.1/callback",
+        "http://%31%32%37%2e%30%2e%30%2e%31/callback",
+        "http://127.0.0.1%2fattacker.example/callback",
+        "http://127.1/callback",
+        "http://2130706433/callback",
+        "http://0x7f000001/callback",
+        "http://127.0.0.1/callback#fragment",
+        "http://127.0.0.1/callback#",
+        "http://127.0.0.1:/callback",
+        "http://127.0.0.1:053999/callback",
+        "http://127.0.0.1:65536/callback",
+        "http://127.0.0.1:not-a-port/callback",
+        "http://[0:0:0:0:0:0:0:1]/callback",
+        "\thttp://127.0.0.1:53999/callback",
+        "http://127.0.0.1:53999/\tcallback",
+    )
+    for redirect_uri in rejected:
+        r = gated_client.get(
+            "/auth/native/authorize",
+            params={
+                "provider": "stub",
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+                "redirect_uri": redirect_uri,
+                "state": "desk-state",
+            },
+        )
+        assert r.status_code == 400, (redirect_uri, r.status_code, r.text)
+        assert "set-cookie" not in r.headers
+
+    accepted = (
+        (
+            "HTTP://127.0.0.1:53999/callback/path?existing=one",
+            "http://127.0.0.1:53999/callback/path?existing=one",
+        ),
+        (
+            "http://[::1]:54000/callback/path?existing=two",
+            "http://[::1]:54000/callback/path?existing=two",
+        ),
+    )
+    for redirect_uri, canonical in accepted:
+        started = gated_client.get(
+            "/auth/native/authorize",
+            params={
+                "provider": "stub",
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+                "redirect_uri": redirect_uri,
+                "state": "desk-state",
+            },
+        )
+        assert started.status_code == 302, (redirect_uri, started.status_code, started.text)
+        upstream = urlparse(started.headers["location"])
+        upstream_query = parse_qs(upstream.query)
+        completed = gated_client.get(
+            "/auth/callback",
+            params={
+                "code": upstream_query["code"][0],
+                "state": upstream_query["state"][0],
+            },
+            cookies=started.cookies,
+        )
+        assert completed.status_code == 302, completed.text
+        target = completed.headers["location"]
+        assert target.startswith(f"{canonical}&code="), target
+        query = parse_qs(urlparse(target).query)
+        expected_query = parse_qs(urlparse(canonical).query)
+        assert query["existing"] == expected_query["existing"]
+        assert query["state"] == ["desk-state"]
+        redeemed = gated_client.post(
+            "/auth/native/token",
+            json={"code": query["code"][0], "code_verifier": verifier},
+        )
+        assert redeemed.status_code == 200, redeemed.text
+
+
 def test_native_password_login_full_roundtrip(pw_gated_client):
     """authorize → /login → password-login → loopback code → bearer tokens."""
     verifier, challenge = _make_pkce()
@@ -474,7 +556,7 @@ def test_native_password_login_full_roundtrip(pw_gated_client):
     code = qs["code"][0]
     # No browser session on the native branch; the PKCE cookie is cleared.
     set_cookie = r.headers.get("set-cookie", "")
-    assert "hermes_session_at" not in set_cookie, (
+    assert "qubit_session_at" not in set_cookie, (
         f"native password login must NOT set a session cookie; got {set_cookie!r}"
     )
     assert "pkce" in set_cookie  # the clearing Set-Cookie
@@ -570,7 +652,7 @@ def test_native_password_login_rejects_cross_provider_completion(
     assert r.status_code == 400, r.text
     assert "different provider" in r.json()["detail"]
     set_cookie = r.headers.get("set-cookie", "")
-    assert "hermes_session_at" not in set_cookie
+    assert "qubit_session_at" not in set_cookie
 
     # The pending entry survived — provider A completes normally.
     r2 = pw_gated_client.post(
@@ -599,7 +681,7 @@ def test_password_login_without_broker_still_mints_cookies(pw_gated_client):
     assert r.status_code == 200, r.text
     assert r.json()["next"] == "/"
     set_cookie = r.headers.get("set-cookie", "")
-    assert "hermes_session_at" in set_cookie
+    assert "qubit_session_at" in set_cookie
 
 
 # ---------------------------------------------------------------------------

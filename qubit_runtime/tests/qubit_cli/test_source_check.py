@@ -9,12 +9,6 @@ from uuid import uuid4
 
 import pytest
 
-from qubit_cli import install_source
-
-# The passive checker keys its GitHub probes on the official repo identity,
-# which the product derives from the single installer source.
-OFFICIAL = install_source.official_repository()
-
 # The fixture below serves channel records over loopback; the reader's real HTTP path is the subject.
 pytestmark = pytest.mark.real_release_channels
 
@@ -42,8 +36,8 @@ def installation(tmp_path, monkeypatch):
     home = tmp_path / "profile"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.delenv("HERMES_REVISION", raising=False)
-    monkeypatch.delenv("HERMES_MANAGED", raising=False)
+    monkeypatch.delenv("QUBIT_REVISION", raising=False)
+    monkeypatch.delenv("QUBIT_MANAGED", raising=False)
     # Git probes may use real local remotes, never the external network.
     monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file")
 
@@ -95,8 +89,7 @@ def installation(tmp_path, monkeypatch):
 
     def local(request, *args, **kwargs):
         url = urlsplit(request.full_url)
-        allowed = {"api.github.com", urlsplit(install_source.release_assets_base_url()).hostname}
-        assert url.hostname in allowed
+        assert url.hostname in {"api.github.com", "qubit-assets.nousresearch.com"}
         rewritten = urllib.request.Request(
             f"http://127.0.0.1:{server.server_port}{url.path}" + (f"?{url.query}" if url.query else ""),
             headers=dict(request.header_items()))
@@ -269,7 +262,7 @@ def test_channel_failure_never_probes_or_heals_a_branch(installation, name, fail
     elif failure == "malformed":
         body = "not JSON"
     elif failure == "foreign":
-        body["repository"] = OFFICIAL
+        body["repository"] = "NousResearch/qubit"
     else:
         body["policy"] = "preview"
         del body["delivery"]
@@ -317,14 +310,14 @@ def test_unpublished_main_record_follows_the_branch(installation):
 def test_running_revision_is_not_applied_to_an_explicit_target(installation, monkeypatch):
     from qubit_cli.source_check import check_for_updates
     root, linked, home, base, head, responses, requests, git = installation
-    monkeypatch.setenv("HERMES_REVISION", "e" * 40)
-    monkeypatch.setenv("HERMES_INSTALL_ROOT", str(root))
+    monkeypatch.setenv("QUBIT_REVISION", "e" * 40)
+    monkeypatch.setenv("QUBIT_INSTALL_ROOT", str(root))
     responses["/repos/fixture/fork/commits/feature%2Fgui"] = (200, head)
     assert check_for_updates(install_root=linked, home=home)["currentSha"] == head
     # Default invocation retains the Nix revision probe even without a Git checkout.
     monkeypatch.setattr("qubit_cli.config.get_project_root", lambda: home)
-    responses[MAIN_CHANNEL] = (200, source_channel("main", OFFICIAL))
-    responses[f"/repos/{OFFICIAL}/commits/main"] = (200, "e" * 40)
+    responses[MAIN_CHANNEL] = (200, source_channel("main", "NousResearch/qubit"))
+    responses["/repos/NousResearch/qubit/commits/main"] = (200, "e" * 40)
     assert check_for_updates(home=home)["behind"] == 0
 
 
@@ -343,6 +336,84 @@ def test_deleted_desktop_branch_is_persisted_only_after_definitive_probe(install
     assert status["branch"] == "main"
     assert json.loads(branch_file.read_text(encoding="utf-8")) == {"branch": "main", "other": "café"}
     assert not branch_file.read_bytes().startswith(b"\xef\xbb\xbf")
+
+
+def _bare_origin(installation):
+    """Point the checkout at a real bare remote holding main; no GitHub repository is involved."""
+    root, linked, home, base, head, responses, requests, git = installation
+    remote = home / "remote.git"
+    git("init", "--bare", "-b", "main", str(remote))
+    git("remote", "set-url", "origin", str(remote))
+    git("push", "-q", "origin", "main")
+    git("fetch", "-q", "origin")
+
+
+def _commit_on(git, branch, message):
+    git("checkout", "-q", branch)
+    git("commit", "-q", "--allow-empty", "-m", message)
+    sha = git("rev-parse", "HEAD")
+    git("checkout", "-q", "main")
+    return sha
+
+
+@pytest.mark.parametrize("pinned_by", ["desktop", "current"])
+def test_never_pushed_branch_keeps_its_pin(installation, pinned_by):
+    """#105042: an empty advertisement for a branch that was never pushed is not a deletion."""
+    from qubit_cli.source_check import check_for_updates
+    root, linked, home, base, head, responses, requests, git = installation
+    _bare_origin(installation)
+    git("branch", "local-work")
+    _commit_on(git, "local-work", "unpushed work")
+    branch_file = home / "desktop-update.json"
+    if pinned_by == "desktop":
+        branch_file.write_text(json.dumps({"branch": "local-work"}))
+    else:
+        git("checkout", "-q", "local-work")
+    status = check_for_updates(install_root=root, home=home, branch_config_path=branch_file)
+    assert status["branch"] == "local-work", status
+    assert status["error"] == "branch-local-only"
+    assert status["localOnly"] is True
+    assert "never been pushed" in status["message"]
+    assert "targetSha" not in status
+    if pinned_by == "desktop":
+        assert json.loads(branch_file.read_text()) == {"branch": "local-work"}
+    else:
+        assert not branch_file.exists()
+    assert requests == [MAIN_CHANNEL]
+
+
+@pytest.mark.parametrize("merge", ["fast-forward", "rebase", "unmerged"])
+def test_deleted_remote_branch_heals_only_when_its_commits_are_in_main(installation, merge):
+    from qubit_cli.source_check import check_for_updates
+    root, linked, home, base, head, responses, requests, git = installation
+    _bare_origin(installation)
+    git("branch", "pushed")
+    work = _commit_on(git, "pushed", "published work")
+    git("push", "-q", "-u", "origin", "pushed")
+    if merge == "fast-forward":
+        git("merge", "-q", "--ff-only", "pushed")
+    elif merge == "rebase":
+        git("commit", "-q", "--allow-empty", "-m", "upstream moved on")
+        git("cherry-pick", "--allow-empty", work)
+    if merge != "unmerged":
+        git("push", "-q", "origin", "main")
+    # Upstream deletes the branch; the prune removes the tracking ref but keeps the upstream config.
+    git("push", "-q", "origin", "--delete", "pushed")
+    git("fetch", "-q", "--prune", "origin")
+    assert git("for-each-ref", "refs/remotes/origin/pushed") == ""
+    branch_file = home / "desktop-update.json"
+    branch_file.write_text(json.dumps({"branch": "pushed"}))
+    status = check_for_updates(install_root=root, home=home, branch_config_path=branch_file)
+    if merge == "unmerged":
+        assert status["branch"] == "pushed", status
+        assert status["error"] == "branch-local-only"
+        assert "not in main" in status["message"]
+        assert json.loads(branch_file.read_text())["branch"] == "pushed"
+    else:
+        assert "error" not in status, status
+        assert status["branch"] == "main"
+        assert status["targetSha"] == git("rev-parse", "origin/main")
+        assert json.loads(branch_file.read_text())["branch"] == "main"
 
 
 def test_inherited_git_target_cannot_redirect_an_explicit_install(installation, monkeypatch):
@@ -376,10 +447,10 @@ def test_source_admission_is_stamp_owned_not_path_owned(installation, mechanism)
 def test_embedded_revision_keeps_https_ref_advertisement_recovery(installation, monkeypatch):
     from qubit_cli.source_check import check_for_updates
     root, linked, home, base, head, responses, requests, git = installation
-    monkeypatch.setenv("HERMES_REVISION", head)
+    monkeypatch.setenv("QUBIT_REVISION", head)
     monkeypatch.setattr("qubit_cli.config.get_project_root", lambda: home)
     monkeypatch.setattr("qubit_cli.config.detect_install_method", lambda root: "nix")
-    responses[MAIN_CHANNEL] = (200, source_channel("main", OFFICIAL))
+    responses[MAIN_CHANNEL] = (200, source_channel("main", "NousResearch/qubit"))
     original = subprocess.run
     probes = []
 
@@ -392,7 +463,7 @@ def test_embedded_revision_keeps_https_ref_advertisement_recovery(installation, 
     monkeypatch.setattr(subprocess, "run", advertise)
     assert check_for_updates(home=home)["behind"] == 0
     assert len(probes) == 1
-    assert install_source.official_repo_url() in probes[0][0]
+    assert "https://github.com/NousResearch/qubit.git" in probes[0][0]
     assert probes[0][1]["stdin"] == subprocess.DEVNULL
     assert probes[0][1]["env"]["GIT_TERMINAL_PROMPT"] == "0"
 
@@ -416,12 +487,12 @@ def test_malformed_optional_changelog_and_cache_do_not_hide_the_update(installat
                         f"/repos/fixture/fork/compare/{head}...{'a' * 40}"] * 2
 
 
-@pytest.mark.parametrize("repository,heals", [(OFFICIAL, True), ("fixture/fork", False)])
+@pytest.mark.parametrize("repository,heals", [("NousResearch/qubit", True), ("fixture/fork", False)])
 def test_official_ssh_healing_uses_public_https_without_retargeting_forks(installation, monkeypatch, repository, heals):
     from qubit_cli.source_check import check_for_updates
     root, linked, home, base, head, responses, requests, git = installation
     git("remote", "set-url", "origin", f"git@github.com:{repository}.git")
-    git("config", f"url.{root.as_uri()}.insteadOf", install_source.official_repo_url())
+    git("config", f"url.{root.as_uri()}.insteadOf", "https://github.com/NousResearch/qubit.git")
     monkeypatch.setenv("GIT_SSH_COMMAND", "false")
     branch_file = home / "desktop-update.json"
     branch_file.write_text(json.dumps({"branch": "deleted"}))

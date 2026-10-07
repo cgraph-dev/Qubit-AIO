@@ -79,7 +79,8 @@ def _toolset_listed(config: dict, names: frozenset[str]) -> bool:
 def homeassistant_in_use(home: Path, *, process_env: bool = False) -> bool:
     """What made core run Home Assistant for *home*: ``HASS_TOKEN`` in its ``.env`` (it enabled both
     the gateway platform and the tools), the platform on in its gateway config
-    (:func:`platform_configured_on`), or the ``homeassistant`` / ``hermes-homeassistant`` toolset selected for a
+    (:func:`platform_configured_on`), or the ``homeassistant`` / ``qubit-homeassistant`` toolset (or
+    its read-old ``hermes-homeassistant`` spelling) selected for a
     platform. *process_env* (the active home at startup only) also counts a ``HASS_TOKEN`` the
     process received from its environment (systemd unit, Docker, shell export)."""
     from agent.secret_scope import load_env_file
@@ -94,7 +95,7 @@ def homeassistant_in_use(home: Path, *, process_env: bool = False) -> bool:
             pass
     if platform_configured_on(home, "homeassistant"):
         return True
-    return _toolset_listed(_read_config(home), frozenset({"homeassistant", "hermes-homeassistant"}))
+    return _toolset_listed(_read_config(home), frozenset({"homeassistant", "qubit-homeassistant", "hermes-homeassistant"}))
 
 
 @dataclass(frozen=True)
@@ -114,7 +115,7 @@ class LeftCoreFeature:
     # platform whose known_plugin_toolsets does not name it, so :func:`_record_migration` records
     # them there wherever core had them off.
     toolsets: tuple[str, ...] = ()
-    # Platforms whose core default composite (``hermes-<platform>``) never carried those toolsets.
+    # Platforms whose core default composite (``qubit-<platform>``) never carried those toolsets.
     off_platforms: tuple[str, ...] = ()
     # Gateway platform the plugin ships: a running gateway serves it only after a restart.
     platform: str = ""
@@ -158,11 +159,15 @@ def plugin_present(plugin: str, home: Path) -> bool:
 
 def _core_carried(feature: LeftCoreFeature, selection: list) -> bool:
     """Whether core resolved *feature*'s toolsets on for a platform selecting *selection*: named
-    directly, or through a ``hermes`` / ``hermes-<platform>`` composite that included them."""
+    directly, or through a ``qubit`` / ``qubit-<platform>`` composite (or its read-old ``hermes``
+    spelling) that included them."""
     def carries(name: str) -> bool:
-        if name in feature.toolsets or name == "hermes":
+        if name in feature.toolsets or name in {"hermes", "qubit"}:
             return True
-        return name.startswith("hermes-") and name[len("hermes-"):].replace("-", "_") not in feature.off_platforms
+        for prefix in ("qubit-", "hermes-"):
+            if name.startswith(prefix):
+                return name[len(prefix):].replace("-", "_") not in feature.off_platforms
+        return False
     return any(carries(str(name)) for name in selection)
 
 

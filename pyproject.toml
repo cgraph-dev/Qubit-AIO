@@ -85,6 +85,13 @@ dependencies = [
     # SVG renderer for the icon generator used by source builds.
     "resvg-py==0.4.0",
     "websockets==15.0.1",
+    # PDF text-layer extraction (voicebridge/doc_extract.py::PDF_BACKENDS). The
+    # stdlib fallback (_extract_pdf_stdlib) only scrapes uncompressed / raw
+    # FlateDecode content streams and degrades or fails on real-world PDFs
+    # (reportlab/xref-offset streams, multi-page, object streams); pypdf is the
+    # preferred backend and pdf_backend() resolves it first. The stdlib path
+    # stays as the zero-dependency fallback for installs that lack pypdf.
+    "pypdf>=6,<7",
 ]
 
 [project.optional-dependencies]

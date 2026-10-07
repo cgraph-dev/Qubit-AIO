@@ -128,6 +128,22 @@ def test_state_db_guard_passes_valid_db(tmp_path, monkeypatch):
     assert step_state_db_guard() == {"ok": True}
 
 
+# ── step_drop_live_plugin_catalog ────────────────────────────────────
+
+
+def test_boot_drops_the_live_plugin_catalog_cache(tmp_path, monkeypatch):
+    """Bundled-app updates skip `qubit update`'s tail; the boot step covers them (#119340)."""
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    cache = tmp_path / "cache" / "plugin-catalog.json"
+    cache.parent.mkdir()
+    cache.write_text("{}", encoding="utf-8")
+
+    assert ("drop_live_plugin_catalog", post_update.step_drop_live_plugin_catalog) in post_update.BOOT_HOME_STEPS
+    assert post_update.step_drop_live_plugin_catalog() == {"ok": True}
+    assert not cache.exists()
+    assert post_update.step_drop_live_plugin_catalog() == {"ok": True}  # absent cache is fine
+
+
 # ── machine-step registry ────────────────────────────────────────────
 
 
@@ -155,7 +171,7 @@ def test_provisioning_does_not_use_human_diagnostics(tmp_path, monkeypatch):
     (runtime / "facts.json").write_text(json.dumps({"schema": 1, "packages": {}}))
     lock = tmp_path / "lock.json"
     lock.write_text(json.dumps({"schema": 1, "packages": {"node": {"version": "test"}}}))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(runtime))
+    monkeypatch.setenv("QUBIT_RUNTIME_DIR", str(runtime))
     monkeypatch.setattr(paths, "lockfile_path", lambda: lock)
     monkeypatch.setattr(engine, "sealed", lambda: False)
     monkeypatch.setattr(engine, "lazy_installs_allowed", lambda: True)

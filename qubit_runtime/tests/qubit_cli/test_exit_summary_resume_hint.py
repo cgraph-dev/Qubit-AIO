@@ -3,11 +3,14 @@
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-from cli import HermesCLI
+from cli import QubitCLI
+from qubit_cli.main_tui_launch import _print_tui_exit_summary
+
+import qubit_cli.main  # noqa: F401 — _print_tui_exit_summary imports it lazily; load it at collection time
 
 
 def _make_cli(session_id="20260524_000001_abc123"):
-    cli_obj = HermesCLI.__new__(HermesCLI)
+    cli_obj = QubitCLI.__new__(QubitCLI)
     cli_obj.session_id = session_id
     # _print_exit_summary requires a populated conversation history (msg_count > 0)
     # to print the resume hint at all. One synthetic user turn is enough.
@@ -21,7 +24,7 @@ def _make_cli(session_id="20260524_000001_abc123"):
 class TestExitSummaryResumeHint:
     """The exit-line ``Resume this session with:`` hint must include the
     active profile (`-p <name>`) so session IDs round-trip across
-    profile boundaries — sessions live under `~/.hermes-profiles/<profile>/`,
+    profile boundaries — sessions live under `~/.qubit-profiles/<profile>/`,
     so a hint copied without `-p` from a non-default profile won't find
     the session.
     """
@@ -80,4 +83,34 @@ class TestExitSummaryResumeHint:
         out = capsys.readouterr().out
         # Resume hint still printed without -p.
         assert "qubit --resume 20260524_000001_abc123" in out
+        assert " -p " not in out
+
+
+def _tui_session_db(*_args, **_kwargs):
+    db = MagicMock()
+    db.get_session.return_value = {"message_count": 3}
+    db.get_session_title.return_value = "My TUI Session"
+    return db
+
+
+class TestTuiExitSummaryResumeHint:
+    """``_print_tui_exit_summary`` (qubit_cli/main_tui_launch.py) is a separate entry
+    point from the classic CLI summary above and must carry the same ``-p`` flag (#125078)."""
+
+    def test_tui_hints_include_profile_flag_for_named_profile(self, capsys):
+        with patch("qubit_state.SessionDB", _tui_session_db), patch(
+            "qubit_cli.profiles.get_active_profile_name", return_value="dev"
+        ):
+            _print_tui_exit_summary("20260524_000001_abc123")
+        out = capsys.readouterr().out
+        assert "qubit --tui --resume 20260524_000001_abc123 -p dev" in out
+        assert 'qubit --tui -c "My TUI Session" -p dev' in out
+
+    def test_tui_hints_no_profile_flag_on_default(self, capsys):
+        with patch("qubit_state.SessionDB", _tui_session_db), patch(
+            "qubit_cli.profiles.get_active_profile_name", return_value="default"
+        ):
+            _print_tui_exit_summary("20260524_000001_abc123")
+        out = capsys.readouterr().out
+        assert "qubit --tui --resume 20260524_000001_abc123" in out
         assert " -p " not in out

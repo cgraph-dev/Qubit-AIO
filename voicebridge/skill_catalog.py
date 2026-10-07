@@ -298,13 +298,13 @@ def catalog_entries(cfg: Any) -> List[Dict[str, Any]]:
             disabled = set()
         try:
             from tools.skill_usage import (  # type: ignore
-                _read_bundled_manifest_names,
+                _read_bundled_names,
                 _read_hub_installed_names,
                 activity_count,
                 load_usage,
             )
 
-            bundled_names = set(_read_bundled_manifest_names() or [])
+            bundled_names = set(_read_bundled_names() or [])
             hub_names = set(_read_hub_installed_names() or [])
             usage = load_usage() or {}
         except Exception:  # noqa: BLE001 - usage/provenance are annotations, not the catalog

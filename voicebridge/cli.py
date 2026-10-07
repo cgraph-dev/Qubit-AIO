@@ -3315,7 +3315,7 @@ def build_parser() -> argparse.ArgumentParser:
         _ffp = add(_ff_name, help=_ff_help)
         _ffp.add_argument(
             "fork_args", nargs=argparse.REMAINDER,
-            help=f"arguments forwarded to the Qubit-owned fork {_ff_name} "
+            help=f"arguments forwarded to the vendored {_ff_name} "
                  "command (read-only subcommands forward verbatim; mutating "
                  "subcommands require --confirm)")
 

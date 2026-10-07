@@ -44,6 +44,11 @@ SOURCE = "dashboard"
 AUTHORITY = "voicebridge.qubit_session_store.QubitSessionStore"
 STATE_DB_FILENAME = "state.db"
 
+#: The identity the ``/chat`` terminal passes when it ensures its session
+#: (``voicebridge.terminal_bridge``). Used so the local-brain default applies
+#: only to NEW dashboard conversations and never re-defaults ``/chat``.
+_TERMINAL_IDENTITY = "terminal:chat"
+
 _DBS: Dict[str, Any] = {}
 _DBS_LOCK = threading.Lock()
 #: Resolved canonical ``state.db`` path -> the single Qubit-side writer owner.
@@ -465,6 +470,19 @@ class QubitSessionStore:
             return {"state": "EXISTS", "code": "SESSION_EXISTS",
                     "detail": f"session {sid!r} already exists"}
         title = _bounded(name, MAX_NAME_CHARS).strip() or None
+        # A NEW dashboard conversation defaults to the configured local brain
+        # (``/qubit-chat`` is the voice + report surface), read from config via
+        # ``chat_transport.local_brain_model`` — never a hard-coded alias. An
+        # explicit ``model`` still wins, and the vendored ``/chat`` terminal
+        # (``identity="terminal:chat"``) is never re-defaulted, so ``/chat``
+        # behaviour and every EXISTING session's stored model are untouched.
+        if not model and str(identity) != _TERMINAL_IDENTITY:
+            try:
+                from .chat_transport import local_brain_model
+
+                model = local_brain_model(self._cfg)
+            except Exception:  # noqa: BLE001 - keep the shipped default
+                model = None
         self._db.create_session(sid, source=SOURCE, model=model,
                                 display_name=title)
         if created_at or updated_at:
@@ -666,6 +684,36 @@ class QubitSessionStore:
         self._db.set_session_archived(sid, False)
         return {"state": "OK", "session": self._rec(self._session(sid) or rec)}
 
+    def set_model(self, session_id: str, model: str) -> Dict[str, Any]:
+        """Pin a chat session's model — PER SESSION, never the global default.
+
+        The per-surface model store the operator's own panel writes: this
+        changes ONLY the addressed session's ``sessions.model`` row (reusing the
+        vendored ``update_session_model`` writer, the same one ``/chat``'s
+        ``/model`` command uses), so a pick on one surface cannot drag another
+        session's model or the global ``model.default`` along. ``None``/empty is
+        a typed refusal — an absent model must never silently clear the row.
+
+        The caller validates the model against the registry first; this method
+        stores exactly what it is handed (fail-safe: an unknown row is a typed
+        MISSING, never a fabricated success).
+        """
+        sid = _bounded(session_id, 80)
+        rec = self._session(sid)
+        if rec is None:
+            return {"state": "MISSING", "code": "SESSION_NOT_FOUND",
+                    "detail": f"no chat session {sid!r}"}
+        clean = str(model or "").strip()
+        if not clean:
+            return {"state": "FAILED", "code": "MALFORMED",
+                    "detail": "set_model needs a non-empty model"}
+        try:
+            self._db.update_session_model(sid, clean)
+        except Exception as exc:  # noqa: BLE001 - a write failure is typed
+            return {"state": "FAILED", "code": "MODEL_SET_FAILED",
+                    "detail": str(exc)[:200]}
+        return {"state": "OK", "session": self._rec(self._session(sid) or rec)}
+
     def append(self, session_id: str, role: str, content: str, *,
                meta: Optional[Dict[str, Any]] = None,
                model: Optional[str] = None,
@@ -679,7 +727,15 @@ class QubitSessionStore:
             sid, role=str(role), content=_bounded(content, MAX_TEXT_CHARS),
             tool_name=meta.get("tool_name"), tool_calls=meta.get("tool_calls"),
             tool_call_id=meta.get("tool_call_id"), timestamp=timestamp)
-        if model:
+        # Append a message. ``model`` is an ADVISORY hint for a brand-new row
+        # only — it must never overwrite a model the operator already pinned on
+        # this session. The turn path passes the model it just ran, so
+        # blindly updating here clobbered every per-session pick on the next
+        # message (`/qubit-chat` set to qubit-spark17 silently became the
+        # global default after one turn). The per-session pin is owned by
+        # `set_model` / the panel's own write, not by message persistence.
+        _rec = self._session(sid) or {}
+        if model and not _rec.get("model"):
             try:
                 self._db.update_session_model(sid, str(model))
             except Exception:

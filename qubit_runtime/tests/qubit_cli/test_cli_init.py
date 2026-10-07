@@ -1,4 +1,4 @@
-"""Tests for HermesCLI initialization -- catches configuration bugs
+"""Tests for QubitCLI initialization -- catches configuration bugs
 that only manifest at runtime (not in mocked unit tests)."""
 
 import os
@@ -7,11 +7,12 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from agent.i18n import t
 
 
 
 def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
-    """Create a HermesCLI instance with minimal mocking."""
+    """Create a QubitCLI instance with minimal mocking."""
     import importlib
 
     _clean_config = {
@@ -26,7 +27,7 @@ def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
     }
     if config_overrides:
         _clean_config.update(config_overrides)
-    clean_env = {"LLM_MODEL": "", "HERMES_MAX_ITERATIONS": ""}
+    clean_env = {"LLM_MODEL": "", "QUBIT_MAX_ITERATIONS": ""}
     if env_overrides:
         clean_env.update(env_overrides)
     prompt_toolkit_stubs = {
@@ -53,7 +54,7 @@ def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
             _cli_mod = importlib.reload(_cli_mod)
             with patch.object(_cli_mod, "get_tool_definitions", return_value=[]), \
                  patch.dict(_cli_mod.__dict__, {"CLI_CONFIG": _clean_config}):
-                return _cli_mod.HermesCLI(**kwargs)
+                return _cli_mod.QubitCLI(**kwargs)
     finally:
         # The reload above re-executed cli.py while prompt_toolkit was stubbed
         # with MagicMocks, permanently rebinding cli's module globals
@@ -167,7 +168,33 @@ class TestBusyInputMode:
         cli.process_command("/queue move 1 9")
         assert cli._pending_input_items() == ["only item"]
 
+    @pytest.mark.parametrize("command, usage_key", [
+        ("/queue rm", "cli.queue.usage_remove"),
+        ("/queue rm 1 extra", "cli.queue.usage_remove"),
+        ("/queue rm \u2461", "cli.queue.usage_remove"),         # ② : isdigit() but not int()
+        ("/queue rm " + "9" * 5000, "cli.queue.usage_remove"),  # past int()'s digit limit
+        ("/queue edit \u00b2 new text", "cli.queue.usage_edit"),  # ²
+        ("/queue move \u2466 1", "cli.queue.usage_move"),       # ⑦
+        ("/queue move 1 \u2466", "cli.queue.usage_move"),
+    ], ids=["rm-bare", "rm-trailing-words", "rm-circled-digit", "rm-over-int-limit",
+            "edit-superscript", "move-src-circled", "move-dst-circled"])
+    def test_queue_malformed_index_prints_usage_instead_of_raising(self, command, usage_key):
+        """A bad index used to raise ValueError out of the slash handler, which
+        escapes the prompt_toolkit key handler and kills the TUI."""
+        cli = _make_cli()
+        import cli as _cli_mod
+        printed = []
+        with patch.object(_cli_mod, "_cprint", side_effect=lambda s, *a, **k: printed.append(s)):
+            cli.process_command("/queue first prompt")
+            cli.process_command(command)
+        assert cli._pending_input_items() == ["first prompt"]
+        assert printed[-1].strip() == t(usage_key)
 
+    def test_queue_edit_accepts_tab_after_index(self):
+        cli = _make_cli()
+        cli.process_command("/queue first prompt")
+        cli.process_command("/queue edit 1\treplacement")
+        assert cli._pending_input_items() == ["replacement"]
 
 
     def test_interrupt_mode_routes_busy_enter_to_interrupt(self):
@@ -325,11 +352,11 @@ class TestHistoryDisplay:
         output = capsys.readouterr().out
 
         assert "[You #1]" in output
-        assert "[Qubit #2]" in output
+        assert "[Hermes #2]" in output
         assert "(requested 2 tool calls)" in output
         assert "[Tools]" in output
         assert "(2 tool messages hidden)" in output
-        assert "[Qubit #3]" in output
+        assert "[Hermes #3]" in output
         assert "[You #4]" in output
         assert "[You #5]" not in output
         assert "A" * 250 in output
@@ -350,7 +377,7 @@ class TestHistoryDisplay:
             {
                 "id": "20260401_201329_d85961",
                 "title": "Checking Running Hermes Agent",
-                "preview": "check running gateways for hermes agent",
+                "preview": "check running gateways for qubit agent",
                 "last_active": 0,
             },
         ]
@@ -358,7 +385,7 @@ class TestHistoryDisplay:
         cli._handle_resume_command("/resume")
         output = capsys.readouterr().out
 
-        assert "Recent sessions" in output
+        assert t("cli.session.recent_header") in output
         assert "Checking Running Hermes Agent" in output
 
 
@@ -378,7 +405,7 @@ class TestHistoryDisplay:
             {
                 "id": "20260401_201329_d85961",
                 "title": "Checking Running Hermes Agent",
-                "preview": "check running gateways for hermes agent",
+                "preview": "check running gateways for qubit agent",
                 "last_active": 0,
             },
         ]
@@ -389,7 +416,7 @@ class TestHistoryDisplay:
         output = capsys.readouterr().out
 
         assert "Unknown command" not in output
-        assert "Recent sessions" in output
+        assert t("cli.session.recent_header") in output
         assert "Checking Running Hermes Agent" in output
         assert "20260401_201329_d85961" in output
 
@@ -414,7 +441,7 @@ class TestNestedDictModelDefaultPairing:
     """A dict-valued ``model.default`` must keep its nested provider paired.
 
     ``model.default: {provider: ..., model: ...}`` canonicalizes to the string
-    model AND the nested provider, so ``HermesCLI`` routes the model through
+    model AND the nested provider, so ``QubitCLI`` routes the model through
     that provider instead of discarding it and falling back to the outer
     merged ``model.provider`` (``"auto"`` — authoritative at runtime
     resolution, which would route the model through the wrong active
@@ -510,7 +537,7 @@ class TestRootLevelProviderOverride:
         """model.provider takes priority — root-level provider is only a fallback."""
         import qubit_yaml as yaml
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -533,7 +560,7 @@ class TestRootLevelProviderOverride:
         """Legacy root-level provider still populates model.provider in the CLI loader."""
         import qubit_yaml as yaml
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -556,7 +583,7 @@ class TestRootLevelProviderOverride:
         """Legacy root-level base_url still populates model.base_url in the CLI loader."""
         import qubit_yaml as yaml
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -578,7 +605,7 @@ class TestRootLevelProviderOverride:
         """Classic CLI must expose terminal.vercel_runtime to terminal_tool.py."""
         import qubit_yaml as yaml
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         monkeypatch.delenv("TERMINAL_VERCEL_RUNTIME", raising=False)
@@ -744,7 +771,7 @@ class TestPluginToolsetStartupValidation:
     def _init_toolsets(monkeypatch, toolsets, *, registry, plugin_keys):
         import cli as _cli_mod
 
-        stub = object.__new__(_cli_mod.HermesCLI)
+        stub = object.__new__(_cli_mod.QubitCLI)
         printed: list[str] = []
         stub._console_print = printed.append
         monkeypatch.setattr(_cli_mod, "validate_toolset", lambda name: name in registry)
@@ -780,3 +807,19 @@ class TestPluginToolsetStartupValidation:
 
 
 
+
+
+@pytest.mark.parametrize(
+    "env, expected",
+    [
+        ({"OPENROUTER_API_KEY": "", "OPENAI_API_KEY": "fake-openai-project-key"}, ""),
+        ({"OPENROUTER_API_KEY": "", "OPENAI_API_KEY": "sk-or-v1-fake-in-openai-var"}, "sk-or-v1-fake-in-openai-var"),
+        ({"OPENROUTER_API_KEY": "sk-or-v1-fake-router", "OPENAI_API_KEY": "fake-openai-project-key"}, "sk-or-v1-fake-router"),
+    ],
+    ids=["real-openai-key-not-seeded", "sk-or-in-openai-var", "openrouter-key-wins"],
+)
+def test_openrouter_startup_key_never_holds_a_real_openai_key(env, expected):
+    # The startup key can reach /model before the first turn resolves runtime,
+    # so it must already follow the sk-or- gate for openrouter.ai.
+    cli = _make_cli(env_overrides=env)
+    assert (cli.api_key or "") == expected

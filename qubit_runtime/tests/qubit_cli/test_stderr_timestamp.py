@@ -17,6 +17,21 @@ from gateway.restart import (
 )
 from qubit_cli import stderr_timestamp
 
+
+def _script(tmp_path, name: str, source: str) -> str:
+    """Write *source* to a real script file and return its path.
+
+    Gateway-lookalike children must run from a FILE, never ``python -c <src> <tail>``: a ``-c``
+    command line is an interpreter running inline source, and the identity matchers deliberately
+    refuse to read the trailing argv off one — that tail belongs to a program the inline source
+    may spawn LATER, which is how the post-update restart watcher was mistaken for a live
+    gateway (#107002).
+    """
+    path = tmp_path / name
+    path.write_text(source, encoding="utf-8")
+    return str(path)
+
+
 _STALE_GATEWAY_ARGV = [
     sys.executable,
     "-m",
@@ -25,7 +40,7 @@ _STALE_GATEWAY_ARGV = [
     "run",
     "--replace",
 ]
-_LAUNCHD_ENV = {"PATH": "/usr/bin", "XPC_SERVICE_NAME": "ai.hermes.gateway-butler"}
+_LAUNCHD_ENV = {"PATH": "/usr/bin", "XPC_SERVICE_NAME": "ai.qubit.gateway-butler"}
 
 
 def test_main_timestamps_each_stderr_line(tmp_path):
@@ -56,6 +71,38 @@ def test_main_timestamps_each_stderr_line(tmp_path):
     assert re.fullmatch(f"{timestamp} first failure", lines[0])
     assert re.fullmatch(f"{timestamp} second failure without newline", lines[1])
     assert lines[2] == "2026-07-15 12:34:56,789 already timestamped"
+
+
+def test_wrapper_timestamps_child_stdout_into_its_own_stdout(tmp_path):
+    """launchd appends the wrapper's stdout to gateway.log; a raw print() there has no stamp,
+    so ``qubit logs gateway --since`` can never filter it out."""
+    stdout_log = tmp_path / "gateway.log"
+    error_log = tmp_path / "gateway.error.log"
+    code = (
+        "import sys\n"
+        "print('[whatsapp] Bridge started on port 3000')\n"
+        "sys.stderr.write('stderr line\\n')\n"
+        "sys.stdout.write('2026-07-15 12:34:56,789 INFO already timestamped\\n')\n"
+        "sys.stdout.write('last line without newline')\n"
+        "sys.exit(7)\n"
+    )
+
+    with open(stdout_log, "ab") as out:
+        rc = subprocess.run(
+            [sys.executable, "-m", "qubit_cli.stderr_timestamp", "--error-log", str(error_log), "--",
+             sys.executable, "-c", code],
+            stdout=out,
+            timeout=30,
+        ).returncode
+
+    assert rc == 7
+    timestamp = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}"
+    lines = stdout_log.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 3
+    assert re.fullmatch(f"{timestamp} \\[whatsapp\\] Bridge started on port 3000", lines[0])
+    assert lines[1] == "2026-07-15 12:34:56,789 INFO already timestamped"
+    assert re.fullmatch(f"{timestamp} last line without newline", lines[2])
+    assert re.fullmatch(f"{timestamp} stderr line", error_log.read_text(encoding="utf-8").strip())
 
 
 def test_prepare_upgrades_stale_gateway_argv_under_launchd():
@@ -92,7 +139,7 @@ def test_prepare_skips_interactive_xpc_zero_even_for_gateway_argv():
 
 
 def test_child_launchd_label_env_exports_only_qubit_job_labels():
-    assert stderr_timestamp._child_launchd_label_env(_LAUNCHD_ENV) == {LAUNCHD_LABEL_ENV: "ai.hermes.gateway-butler"}
+    assert stderr_timestamp._child_launchd_label_env(_LAUNCHD_ENV) == {LAUNCHD_LABEL_ENV: "ai.qubit.gateway-butler"}
     # Interactive shells and the grandchild itself read "0": nothing to export. App-coalition labels
     # (IDE integrated terminals) are not a Hermes job identity either.
     for env in ({"PATH": "/usr/bin", "XPC_SERVICE_NAME": "0"}, {"PATH": "/usr/bin"},
@@ -100,10 +147,10 @@ def test_child_launchd_label_env_exports_only_qubit_job_labels():
         assert stderr_timestamp._child_launchd_label_env(env) == {}
 
 
-@pytest.mark.parametrize("xpc, expected", [("ai.hermes.gateway-butler", "ai.hermes.gateway-butler"), ("0", "unset")],
+@pytest.mark.parametrize("xpc, expected", [("ai.qubit.gateway-butler", "ai.qubit.gateway-butler"), ("0", "unset")],
                          ids=["launchd-job", "foreground-xpc-zero"])
 def test_main_forwards_launchd_label_to_child_only_under_launchd(tmp_path, monkeypatch, xpc, expected):
-    """The gateway grandchild must resolve its job (drain cap, restart route) from HERMES_LAUNCHD_LABEL;
+    """The gateway grandchild must resolve its job (drain cap, restart route) from QUBIT_LAUNCHD_LABEL;
     a foreground/unsupervised start must not inherit a fabricated one."""
     monkeypatch.setenv("XPC_SERVICE_NAME", xpc)
     monkeypatch.delenv(LAUNCHD_LABEL_ENV, raising=False)
@@ -119,22 +166,26 @@ def test_main_forwards_launchd_label_to_child_only_under_launchd(tmp_path, monke
     assert marker_path.read_text(encoding="utf-8") == expected
 
 
-# The child is ``python -c <record argv>`` carrying a "gateway run" tail as inert data, which is
-# exactly what the guard's real-gateway spawn check matches; it exits at once.
+# The child is a SCRIPT carrying a "gateway run" tail, which is what the guard's real-gateway
+# spawn check matches; it exits at once. Not ``python -c <src> <tail>``: a ``-c`` command line is
+# an interpreter running inline source, and the identity matchers refuse to read the trailing argv
+# off one — that tail belongs to a program the inline source may spawn LATER (#107002).
 @pytest.mark.spawns_gateway_lookalike
 def test_main_injects_flag_into_stale_gateway_child(tmp_path, monkeypatch):
     """Stale plist inner argv must grow --external-supervisor in the grandchild."""
-    monkeypatch.setenv("XPC_SERVICE_NAME", "ai.hermes.gateway-butler")
+    monkeypatch.setenv("XPC_SERVICE_NAME", "ai.qubit.gateway-butler")
     monkeypatch.delenv(EXTERNAL_GATEWAY_SUPERVISOR_ENV, raising=False)
     log_path = tmp_path / "gateway.error.log"
     marker_path = tmp_path / "argv.txt"
-    code = (
+    script = _script(
+        tmp_path,
+        "record_argv.py",
         "import sys\n"
-        f"from pathlib import Path\n"
+        "from pathlib import Path\n"
         f"Path({str(marker_path)!r}).write_text("
-        "'\\n'.join(sys.argv[1:]), encoding='utf-8')\n"
+        "'\\n'.join(sys.argv[1:]), encoding='utf-8')\n",
     )
-    stale = [sys.executable, "-c", code, "-m", "qubit_cli.main", "gateway", "run", "--replace"]
+    stale = [sys.executable, script, "-m", "qubit_cli.main", "gateway", "run", "--replace"]
 
     rc = stderr_timestamp.main(
         ["--error-log", str(log_path), "--", *stale]
@@ -147,7 +198,7 @@ def test_main_injects_flag_into_stale_gateway_child(tmp_path, monkeypatch):
 
 
 def test_main_does_not_mark_arbitrary_launchd_child(tmp_path, monkeypatch):
-    monkeypatch.setenv("XPC_SERVICE_NAME", "ai.hermes.gateway-butler")
+    monkeypatch.setenv("XPC_SERVICE_NAME", "ai.qubit.gateway-butler")
     monkeypatch.delenv(EXTERNAL_GATEWAY_SUPERVISOR_ENV, raising=False)
     log_path = tmp_path / "gateway.error.log"
     marker_path = tmp_path / "marker.txt"
@@ -208,6 +259,8 @@ def test_main_maps_gateway_ex_config_to_clean_stop(tmp_path):
     please-restart code (75) or a non-gateway child's 78."""
     log_path = tmp_path / "gateway.error.log"
     gateway_tail = ["-m", "qubit_cli.main", "gateway", "run"]
+    exit_config = _script(tmp_path, "exit_config.py", f"raise SystemExit({GATEWAY_FATAL_CONFIG_EXIT_CODE})\n")
+    exit_restart = _script(tmp_path, "exit_restart.py", f"raise SystemExit({GATEWAY_SERVICE_RESTART_EXIT_CODE})\n")
 
     rc_config = stderr_timestamp.main(
         [
@@ -215,8 +268,7 @@ def test_main_maps_gateway_ex_config_to_clean_stop(tmp_path):
             str(log_path),
             "--",
             sys.executable,
-            "-c",
-            f"raise SystemExit({GATEWAY_FATAL_CONFIG_EXIT_CODE})",
+            exit_config,
             *gateway_tail,
         ]
     )
@@ -226,8 +278,7 @@ def test_main_maps_gateway_ex_config_to_clean_stop(tmp_path):
             str(log_path),
             "--",
             sys.executable,
-            "-c",
-            f"raise SystemExit({GATEWAY_SERVICE_RESTART_EXIT_CODE})",
+            exit_restart,
             *gateway_tail,
         ]
     )
@@ -237,8 +288,7 @@ def test_main_maps_gateway_ex_config_to_clean_stop(tmp_path):
             str(log_path),
             "--",
             sys.executable,
-            "-c",
-            f"raise SystemExit({GATEWAY_FATAL_CONFIG_EXIT_CODE})",
+            exit_config,
         ]
     )
 
@@ -250,7 +300,7 @@ def test_main_maps_gateway_ex_config_to_clean_stop(tmp_path):
 
 @pytest.mark.platforms("posix")  # POSIX signals
 def test_wrapper_forwards_sigusr1_restart_request_to_child(tmp_path):
-    """Regression for #101426: launchd owns the wrapper's PID, so ``hermes update`` sends its
+    """Regression for #101426: launchd owns the wrapper's PID, so ``qubit update`` sends its
     drain-aware SIGUSR1 to the wrapper. It must reach the gateway child and the wrapper must
     report the child's planned exit code — not die of the signal itself (which makes launchd
     treat the restart as a crash and apply its back-off to every sibling profile)."""

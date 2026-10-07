@@ -185,8 +185,8 @@ export const roseTheme: DashboardTheme = {
 };
 
 /** Light mode — vivid Qubit-blue accents on a cream canvas. */
-export const nousBlueTheme: DashboardTheme = {
-  name: "nous-blue",
+export const qubitBlueTheme: DashboardTheme = {
+  name: "qubit-blue",
   label: "Qubit Blue",
   description: "Light mode — vivid Qubit-blue accents on cream canvas",
   palette: {
@@ -231,7 +231,7 @@ export const defaultLargeTheme: DashboardTheme = {
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   default: defaultTheme,
   "default-large": defaultLargeTheme,
-  "nous-blue": nousBlueTheme,
+  "qubit-blue": qubitBlueTheme,
   midnight: midnightTheme,
   ember: emberTheme,
   mono: monoTheme,

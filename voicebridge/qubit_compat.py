@@ -3357,12 +3357,14 @@ def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/mcp/servers -> real configured MCP inventory (names only).
+    """GET /api/mcp/servers -> real configured MCP inventory.
 
     Reads the same ``voicebridge.integration_status.mcp_status`` the CLI and
-    voice surfaces use. Qubit never mounts a server, so each row is
-    inventory-only with the mount policy attached; no command, URL, or
-    credential reference is exposed.
+    voice surfaces use. Each row carries the real ``connected`` flag derived
+    from the cached live-discovery state (``MS.list_servers``); no command,
+    URL, or credential reference is fabricated. A server whose live
+    ``tools/list`` was recorded reads connected; an inventory-only row stays
+    honestly disconnected.
     """
     from . import mcp_servers as MS
     try:
@@ -3393,7 +3395,7 @@ def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         "invocable": bool(s.get("invocable")),
         "invocation_code": s.get("invocation_code"),
         "tools": None,
-        "connected": False,
+        "connected": bool(s.get("connected")),
         "status": str(s.get("status", "")),
         "source": str(s.get("source", "qubit-registry")),
         "policy": "config registry; no unauthenticated mount",
@@ -3401,8 +3403,8 @@ def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(servers=servers, state="OK" if not servers else "CONFIGURED",
                mount_policy="no unauthenticated MCP mounting; research-only "
                             "use stays separately authorized and broker-gated",
-               detail="registered inventory; Qubit never mounts or connects "
-                      "MCP servers")
+               detail="registered inventory; `connected` reflects the recorded "
+                      "live MCP discovery (tools/list) for each server")
 
 
 def h_mcp_catalog_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -5475,39 +5477,53 @@ _CHAT_PICKER_NOISE_MAX_MSGS = 2
 _CHAT_PICKER_NOISE_NAMES = frozenset({
     "final-e2e-probe", "verify-readonly-1", "dashboard-chat",
 })
+#: Name shapes generated only by probe/smoke tooling. The probe vocabulary must
+#: appear as a whole hyphen/underscore-delimited WORD (so "my e2e deployment
+#: notes" never matches, while "e2e-final-probe" and "verify-readonly-1" do),
+#: and the rule is only consulted for a tiny row — a long conversation is never
+#: hidden by its name.
+_CHAT_PICKER_NOISE_NAME_RE = re.compile(
+    r"(?:^|[-_])(?:e2e|probe|smoke|hygiene|readonly|verify)(?:$|[-_])",
+    re.IGNORECASE,
+)
 
 
 def _is_chat_picker_noise(record: Any) -> bool:
     """True for a throwaway row the ``/qubit-chat`` picker should hide.
 
-    Conservative by construction — it hides a row only when it is BOTH tiny
-    (``<= _CHAT_PICKER_NOISE_MAX_MSGS`` messages) AND machine-minted:
+    Two independent signals, both conservative — either one hides the row:
 
-    * ``created_source`` is ``dashboard`` or ``oneshot`` (probe/automation
-      origins; a human's typed conversation lands as ``tui``), or
-    * the title is one of the known probe names, or
-    * the title is the session id itself (the auto-title placeholder the
-      dashboard mints when nobody named the chat).
+    * **Probe-shaped name** — the title carries probe/smoke vocabulary as a
+      whole word (``e2e-final-probe``, ``verify-readonly-1``). Such a name is
+      only ever minted by tooling, so the message count does not matter.
+    * **Tiny AND machine-sourced** — ``<= _CHAT_PICKER_NOISE_MAX_MSGS`` messages
+      from ``created_source`` ``dashboard``/``oneshot``, or an auto-title
+      placeholder (title == the session id).
 
-    A real conversation is never hidden: it either exceeds the message floor or
-    carries a name a human chose. Erring toward SHOWING is deliberate — a
-    hidden real session is worse than a visible probe row.
+    A real conversation is never hidden: it either carries a probe name (which a
+    human would not choose) or exceeds the message floor while being human-typed
+    (``tui``). Erring toward SHOWING is deliberate — a hidden real session is
+    worse than a visible probe row.
     """
     if not isinstance(record, dict):
         return False
+    title = str(record.get("title") or record.get("name") or "").strip()
+    sid = str(record.get("id") or "")
+    # Signal 1: a name only tooling mints. Count-independent.
+    if title.lower() in _CHAT_PICKER_NOISE_NAMES:
+        return True
+    if title and _CHAT_PICKER_NOISE_NAME_RE.search(title):
+        return True
+    # Signal 2: tiny AND machine-sourced.
     try:
         msgs = int(record.get("message_count", 0) or 0)
     except (TypeError, ValueError):
         msgs = 0
     if msgs > _CHAT_PICKER_NOISE_MAX_MSGS:
         return False
-    source = str(record.get("created_source") or record.get("source") or "")
-    title = str(record.get("title") or record.get("name") or "").strip()
-    sid = str(record.get("id") or "")
-    if title.lower() in _CHAT_PICKER_NOISE_NAMES:
-        return True
     if title and sid and title == sid:
         return True
+    source = str(record.get("created_source") or record.get("source") or "")
     return source in ("dashboard", "oneshot")
 
 
@@ -5625,8 +5641,14 @@ def h_chat_session_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     routed = CT.resolve_model(cfg, b.get("model"))
     if not routed.get("ok"):
         return 400, routed
+    # No explicit model in the request -> let the canonical store apply the
+    # dashboard default (the configured local brain) instead of forcing the
+    # resolver's configured API default onto a fresh /qubit-chat row. An
+    # explicit request is still the operator's choice and is validated above.
+    requested = str(b.get("model") or "").strip()
+    chosen_model = routed["model"] if requested else None
     res = CT.store(cfg).create(str(b.get("name", "") or ""),
-                               session_id=b.get("id"), model=routed["model"])
+                               session_id=b.get("id"), model=chosen_model)
     if res.get("state") == "OK":
         return _ok(session=_rebrand_chat_record(res["session"]),
                    messages=res.get("messages", []))
@@ -5920,9 +5942,23 @@ def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             return 400, {"ok": False, "code": "REASONING_INVALID",
                          "detail": str(exc)[:200]}
         res = st.meta_patch(p.get("id", ""), {"reasoning": level})
+    elif "model" in b:
+        # PER-SESSION model pin — the /qubit-chat panel's own write. Validated
+        # through the canonical resolver FIRST (an unknown model is a typed
+        # refusal, never a silent store), then written to THIS session's
+        # ``sessions.model`` row alone. The global ``model.default`` (what
+        # ``/api/model/set`` scope=main rewrites) is never touched, so
+        # /qubit-chat and /chat keep independent models.
+        requested = str(b.get("model") or "").strip()
+        routed = CT.resolve_model(cfg, requested)
+        if not routed.get("ok"):
+            return 400, {"ok": False, "code": routed.get("code",
+                                                         "MODEL_NOT_ALLOWED"),
+                         "detail": routed.get("detail", "")}
+        res = st.set_model(p.get("id", ""), str(routed.get("model") or requested))
     else:
         return 400, {"ok": False, "code": "MALFORMED",
-                     "detail": "patch needs name, archived, or reasoning"}
+                     "detail": "patch needs name, archived, reasoning, or model"}
     if res.get("state") == "MISSING":
         return 404, {"ok": False, "code": res.get("code"),
                      "detail": res.get("detail", "")}
@@ -6038,6 +6074,13 @@ def h_chat_image(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     the description is submitted as ONE agent turn on the given session so the
     conversation continues with the image in context. Never a second vision
     stack, never a fabricated description.
+
+    The turn is submitted with ``force_agent=True``: the description is context
+    the agent must reason over, so the fast-path classifier must not hijack it
+    (an "image"/"screenshot" phrase matches the local screenshot action; a
+    question matches the coding build worker). The SAME tool-capable agent
+    ``/chat`` drives handles the turn and its reply is what the transcript
+    shows.
     """
     if _estop(cfg):
         return 403, {"ok": False, "state": "UNAVAILABLE",
@@ -6054,13 +6097,15 @@ def h_chat_image(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 502, {"ok": False, "code": "VISION_FAILED",
                      "detail": "vision backend returned no description"}
     if not submit:
-        return 200, _ok(session=session, description=description,
-                        model=res.get("model", ""), submitted=False,
-                        authority="canonical vision.describe; not submitted")
+        # ``_ok`` already returns ``(200, body)`` — wrapping it again would
+        # nest the tuple and break serialization on the review path.
+        return _ok(session=session, description=description,
+                   model=res.get("model", ""), submitted=False,
+                   authority="canonical vision.describe; not submitted")
     from . import chat_transport as CT
 
     turn = CT.turn(cfg, _vision_turn_text(prompt, description),
-                   session=session)
+                   session=session, force_agent=True)
     return (200 if turn.get("ok") else 502), {
         **turn, "description": description,
         "vision_model": res.get("model", ""),
@@ -17226,6 +17271,9 @@ def themes_response(cfg: Any) -> Dict[str, Any]:
         stored = str(_prefs(cfg).get("theme", "") or "").strip()
     except Exception:  # noqa: BLE001 - prefs miss falls back to default
         stored = ""
+    # Read-old: a preference persisted under the legacy theme id resolves to
+    # its canonical Qubit id instead of silently falling back to the overlay.
+    stored = {"nous-blue": "qubit-blue"}.get(stored, stored)
     if stored in names:
         active = stored
     elif "qubit" in names:

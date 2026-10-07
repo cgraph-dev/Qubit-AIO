@@ -42,7 +42,7 @@ def test_resolve_verifies_exact_manifest_and_preserves_retirement_constraints():
         manifest, record = seed_manifest(pub, request, objects)
         record["policy"] = "stable-release"
         objects["releases/channels/next-preview.json"] = canonical_json(record)
-        reader = ChannelReader(url + "/bucket", repository="example/hermes-agent")
+        reader = ChannelReader(url + "/bucket", repository="example/qubit")
         assert reader.resolve("next-preview").manifest == manifest
         old = pub._read("old-preview")[0]
         old.update(state="retired", destination="next-preview", minimumVersion="1.0.0",
@@ -72,6 +72,75 @@ def test_names_are_validated_without_normalizing(name):
         validate_name(name)
 
 
+def test_update_reads_retry_transient_http_and_honor_retry_after(monkeypatch):
+    from email.message import Message
+    from urllib.error import HTTPError
+    from qubit_cli.release_channels import ChannelReader, retrying_reads
+
+    url = "http://127.0.0.1:12345/releases/fixture.json"
+    headers = Message()
+    headers["Retry-After"] = "7"
+    attempts = []
+    waits = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def geturl(self):
+            return url
+
+        def read(self, _limit):
+            return b"fixture"
+
+    def opener(request, timeout):
+        assert timeout == 30
+        attempts.append(request.full_url)
+        if len(attempts) == 1:
+            raise HTTPError(url, 503, "unavailable", headers, None)
+        return Response()
+
+    monkeypatch.setattr("pm.network.time.sleep", waits.append)
+    reader = ChannelReader("http://127.0.0.1:12345", opener=opener)
+    with retrying_reads():
+        assert reader.read_bytes("releases/fixture.json") == b"fixture"
+    assert attempts == [url, url]
+    assert waits == [7.0]
+
+
+def test_passive_reads_and_missing_objects_make_one_attempt(monkeypatch):
+    """Offline looks transient (ENETUNREACH); a passive check must not back off on it."""
+    import errno
+    from email.message import Message
+    from urllib.error import HTTPError, URLError
+    from qubit_cli.release_channels import ChannelError, ChannelNotFound, ChannelReader, retrying_reads
+
+    waits = []
+    monkeypatch.setattr("pm.network.time.sleep", waits.append)
+
+    def reader(fault, calls):
+        def opener(request, timeout):
+            calls.append(request.full_url)
+            raise fault
+        return ChannelReader("https://releases.example", opener=opener)
+
+    calls = []
+    offline = URLError(OSError(errno.ENETUNREACH, "Network is unreachable"))
+    with pytest.raises(ChannelError, match="unavailable"):
+        reader(offline, calls).read_bytes("releases/channels/main.json")
+    assert len(calls) == 1
+
+    calls.clear()
+    missing = HTTPError("https://releases.example/x", 404, "missing", Message(), None)
+    with retrying_reads(), pytest.raises(ChannelNotFound):
+        reader(missing, calls).read_bytes("releases/channels/stable.json")
+    assert len(calls) == 1
+    assert waits == []
+
+
 def test_reader_rejects_cycles_identity_substitution_and_cross_authority():
     from qubit_cli.release_channels import ChannelReader, ChannelError, canonical_json
     with object_server() as (url, objects, headers, requests, faults):
@@ -79,7 +148,7 @@ def test_reader_rejects_cycles_identity_substitution_and_cross_authority():
         pub.create("alpha")
         request = pub.allocate("alpha", "a" * 40, "1.2.3")
         manifest, record = seed_manifest(pub, request, objects)
-        reader = ChannelReader(url + "/bucket", repository="example/hermes-agent")
+        reader = ChannelReader(url + "/bucket", repository="example/qubit")
         substituted = deepcopy(manifest)
         substituted["request"]["identity"]["appId"] = "ai.other.identity"
         raw = canonical_json(substituted)
@@ -88,11 +157,11 @@ def test_reader_rejects_cycles_identity_substitution_and_cross_authority():
         objects["releases/channels/alpha.json"] = canonical_json(record)
         with pytest.raises(ChannelError, match="identity"):
             reader.resolve("alpha")
-        record["repository"] = "other/hermes-agent"
+        record["repository"] = "other/qubit"
         objects["releases/channels/alpha.json"] = canonical_json(record)
         with pytest.raises(ChannelError, match="authority"):
             reader.resolve("alpha")
-        record["repository"] = "example/hermes-agent"
+        record["repository"] = "example/qubit"
         record.update(state="retired", destination="alpha", minimumVersion="1.0.0", lastHead=record["head"],
                       destinationHead=record["head"], receiverProtocol=1,
                       receiver={"kind": "discontinued"})
@@ -183,7 +252,7 @@ def test_malformed_record_and_unqualified_retirement_never_resolve():
 def test_malformed_wire_types_are_channel_errors(field, value):
     from qubit_cli.release_channels import validate_record, ChannelError
     from scripts.releases.channels import preview_identity
-    record = {"schema": 1, "name": "arbitrary", "repository": "example/hermes-agent", "policy": "preview",
+    record = {"schema": 1, "name": "arbitrary", "repository": "example/qubit", "policy": "preview",
               "state": "active", "revision": 1, "nextSequence": 1, "head": None,
               "identity": preview_identity("arbitrary", "a" * 16)}
     record[field] = value
@@ -194,7 +263,7 @@ def test_malformed_wire_types_are_channel_errors(field, value):
 def stable_request(version="1.2.3", archive_ref=None):
     from scripts.releases.channels import preview_identity
     request = {"schema": 1, "buildId": "a" * 32, "channel": "stable", "sequence": 1,
-               "repository": "example/hermes-agent", "commit": "b" * 40,
+               "repository": "example/qubit", "commit": "b" * 40,
                "sourceVersion": version, "version": version, "windowsVersion": version + ".0",
                "releaseTag": "v" + version, "identity": preview_identity("stable", "a" * 16),
                "bundleEnv": {}, "publicBase": "https://releases.example"}

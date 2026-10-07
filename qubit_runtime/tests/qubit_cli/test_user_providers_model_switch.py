@@ -71,11 +71,11 @@ def test_list_authenticated_providers_includes_full_models_list_from_user_provid
 
 def test_list_authenticated_providers_enumerates_dict_format_models(monkeypatch):
     """providers: dict entries with ``models:`` as a dict keyed by model id
-    (canonical Qubit write format) should surface every key in the picker.
+    (canonical Hermes write format) should surface every key in the picker.
 
     Regression: the ``providers:`` dict path previously only accepted
     list-format ``models:`` and silently dropped dict-format entries,
-    even though Qubit's own writer and downstream readers use dict format.
+    even though Hermes's own writer and downstream readers use dict format.
     """
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     monkeypatch.setattr("qubit_cli.providers.HERMES_OVERLAYS", {})
@@ -176,12 +176,12 @@ def test_list_authenticated_providers_uses_live_models_for_user_provider(monkeyp
 
 
 def test_list_authenticated_providers_accepts_base_url_and_singular_model(monkeypatch):
-    """providers: dict entries written in canonical Qubit shape
+    """providers: dict entries written in canonical Hermes shape
     (``base_url`` + singular ``model``) should resolve the same as the
     legacy ``api`` + ``default_model`` shape.
 
     Regression: section 3 previously only read ``api``/``url`` and
-    ``default_model``, so new-shape entries written by Qubit's own writer
+    ``default_model``, so new-shape entries written by Hermes's own writer
     surfaced with empty ``api_url`` and no default.
     """
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
@@ -211,6 +211,48 @@ def test_list_authenticated_providers_accepts_base_url_and_singular_model(monkey
     assert custom["api_url"] == "http://example.com/v1"
     assert custom["models"] == ["gpt-5.4", "grok-4.20-beta", "minimax-m2.7"]
     assert custom["total_models"] == 3
+
+
+def test_list_authenticated_providers_splits_comma_default_model_chain(monkeypatch):
+    """Comma-separated ``default_model`` chains surface as individually selectable entries.
+
+    Regression (fixes #50557): a volcengine-agent-plan style fallback chain in
+    ``providers:`` rendered as one dropdown entry in the Desktop picker, which
+    feeds off this payload. The raw chain stays first as the default (fallback)
+    pick; the split ids follow, deduped in order.
+    """
+    monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
+    monkeypatch.setattr("qubit_cli.providers.HERMES_OVERLAYS", {})
+    monkeypatch.setattr("qubit_cli.models.fetch_api_models", lambda *_a, **_kw: None)
+
+    user_providers = {
+        "volcengine-agent-plan": {
+            "name": "VOLCENGINE-AGENT-PLAN",
+            "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+            "default_model": "deepseek-v4-flash, deepseek-v4-pro, glm-5.2, deepseek-v4-flash",
+        }
+    }
+
+    providers = list_authenticated_providers(
+        current_provider="volcengine-agent-plan",
+        user_providers=user_providers,
+        custom_providers=[],
+        max_models=50,
+    )
+
+    user_prov = next(
+        (p for p in providers if p.get("is_user_defined") and p["slug"] == "volcengine-agent-plan"),
+        None,
+    )
+
+    assert user_prov is not None
+    assert user_prov["models"] == [
+        "deepseek-v4-flash, deepseek-v4-pro, glm-5.2, deepseek-v4-flash",
+        "deepseek-v4-flash",
+        "deepseek-v4-pro",
+        "glm-5.2",
+    ]
+    assert user_prov["total_models"] == 4
 
 
 def test_list_authenticated_providers_dedupes_when_user_and_custom_overlap(monkeypatch):
@@ -617,7 +659,7 @@ def test_current_custom_model_not_leaked_into_other_provider_rows(monkeypatch):
 
 
 def test_overlay_provider_row_merges_configured_models(monkeypatch):
-    """A ``providers.<overlay>.models`` block extends a Qubit-overlay row (azure-foundry) the way
+    """A ``providers.<overlay>.models`` block extends a Hermes-overlay row (azure-foundry) the way
     it already extends built-in rows; the picker used to show only the live/current id (#27989)."""
     from qubit_cli.providers import HERMES_OVERLAYS
 
@@ -631,7 +673,7 @@ def test_overlay_provider_row_merges_configured_models(monkeypatch):
         current_provider="azure-foundry", max_models=50,
         user_providers={"azure-foundry": {"models": ["gpt-5.5", "shared", "gpt-4.1-mini"]}})
     row = next(r for r in rows if r["slug"] == "azure-foundry")
-    assert row["source"] == "hermes"
+    assert row["source"] == "qubit"
     assert row["models"] == ["gpt-5.5", "shared", "gpt-4.1-mini", "gpt-5.6-sol"]
     assert row["total_models"] == 4
 
@@ -678,7 +720,7 @@ def test_cli_picker_provider_select_reads_the_disk_cached_catalog(monkeypatch):
         _invalidate=lambda **_k: None,
         _close_model_picker=lambda: pytest.fail("picker closed"),
     )
-    cli_mod.HermesCLI._handle_model_picker_selection.__get__(self_, SimpleNamespace)(persist_global=True)
+    cli_mod.QubitCLI._handle_model_picker_selection.__get__(self_, SimpleNamespace)(persist_global=True)
 
     assert seen == ["azure-foundry"]
     assert self_._model_picker_state["stage"] == "model"

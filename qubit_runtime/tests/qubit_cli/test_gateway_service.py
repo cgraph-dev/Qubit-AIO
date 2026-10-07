@@ -5,7 +5,9 @@ import os
 import plistlib
 import re
 import shlex
+import signal
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,6 +18,7 @@ pwd = pytest.importorskip("pwd")
 grp = pytest.importorskip("grp")
 
 import qubit_cli.gateway as gateway_cli
+from qubit_cli.gateway_launchd import launchd_program_arguments
 from gateway import status
 from gateway.restart import (
     DEFAULT_GATEWAY_CRON_DRAIN_TIMEOUT,
@@ -27,13 +30,12 @@ from gateway.restart import (
 
 
 def _osascript_exec_argv(program_args: list[str]) -> list[str]:
-    """The argv a launchd ``ProgramArguments`` of ``/usr/bin/osascript -e <script>`` hands to ``exec`` —
-    undoing the AppleScript string escaping, then POSIX shell quoting, the way osascript and /bin/sh will."""
-    assert program_args[:2] == ["/usr/bin/osascript", "-e"] and len(program_args) == 3, program_args
-    script = program_args[2]
-    prefix, suffix = 'do shell script "', '"'
-    assert script.startswith(prefix) and script.endswith(suffix), script
-    shell = re.sub(r"\\(.)", r"\1", script[len(prefix):-len(suffix)])
+    """The argv the launchd JXA wrapper's libc ``system()`` hands to ``exec``."""
+    assert program_args[:4] == ["/usr/bin/osascript", "-l", "JavaScript", "-e"], program_args
+    assert len(program_args) == 5, program_args
+    script = program_args[4]
+    start = script.index("$.system(") + len("$.system(")
+    shell, _ = json.JSONDecoder().raw_decode(script, start)
     exec_, *argv = shlex.split(shell)
     assert exec_ == "exec", shell
     return argv
@@ -110,14 +112,14 @@ class TestSystemdServiceRefresh:
         ``Environment=`` line. Without this guard, any test that drives
         ``run_gateway()`` end-to-end on a real Linux dev box silently
         rewrites the developer's installed gateway unit with a
-        ``/tmp/pytest-of-.../hermes_test`` QUBIT_HOME — silently breaking
+        ``/tmp/pytest-of-.../qubit_test`` QUBIT_HOME — silently breaking
         their gateway on the next boot. The guard sniffs the generated
         unit body for tmpdir markers and refuses the write. Tests that
         legitimately exercise the refresh flow patch
         ``generate_systemd_unit`` to return synthetic content that doesn't
         carry those markers.
         """
-        unit_path = tmp_path / "hermes-gateway.service"
+        unit_path = tmp_path / "qubit-gateway.service"
         unit_path.write_text("old unit\n", encoding="utf-8")
 
         monkeypatch.setattr(
@@ -127,7 +129,7 @@ class TestSystemdServiceRefresh:
         polluted_unit = (
             "[Service]\n"
             'Environment="QUBIT_HOME=/tmp/pytest-of-alice/pytest-42/'
-            'popen-gw0/test_x/hermes_test"\n'
+            'popen-gw0/test_x/qubit_test"\n'
         )
         monkeypatch.setattr(
             gateway_cli,
@@ -159,23 +161,23 @@ class TestTempHomeServiceDefinitionGuard:
     """_temp_home_in_service_definition() — structural temp-dir detection."""
 
     def test_detects_tmp_home_in_systemd_unit(self):
-        unit = '[Service]\nEnvironment="QUBIT_HOME=/tmp/hermes-e2e-41264"\n'
+        unit = '[Service]\nEnvironment="QUBIT_HOME=/tmp/qubit-e2e-41264"\n'
         assert (
             gateway_cli._temp_home_in_service_definition(unit)
-            == "/tmp/hermes-e2e-41264"
+            == "/tmp/qubit-e2e-41264"
         )
 
     def test_detects_tempdir_env_home(self, monkeypatch, tmp_path):
         import tempfile as _tempfile
 
         monkeypatch.setattr(_tempfile, "gettempdir", lambda: str(tmp_path))
-        unit = f'[Service]\nEnvironment="QUBIT_HOME={tmp_path}/hermes-home"\n'
+        unit = f'[Service]\nEnvironment="QUBIT_HOME={tmp_path}/qubit-home"\n'
         assert gateway_cli._temp_home_in_service_definition(unit) is not None
 
 
 class TestRequireServiceInstalled:
     def test_exits_with_install_hint_when_unit_missing(self, tmp_path, monkeypatch, capsys):
-        unit_path = tmp_path / "hermes-gateway.service"
+        unit_path = tmp_path / "qubit-gateway.service"
         monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path)
 
         with pytest.raises(SystemExit) as exc_info:
@@ -187,7 +189,7 @@ class TestRequireServiceInstalled:
         assert "qubit gateway install" in out
 
     def test_passes_when_unit_exists(self, tmp_path, monkeypatch):
-        unit_path = tmp_path / "hermes-gateway.service"
+        unit_path = tmp_path / "qubit-gateway.service"
         unit_path.write_text("[Unit]\n", encoding="utf-8")
         monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path)
 
@@ -195,14 +197,18 @@ class TestRequireServiceInstalled:
 
 
 class TestServiceIdentityForForeignHome:
-    """A QUBIT_HOME that is neither ``~/.hermes`` nor ``~/.hermes/profiles/<name>`` must never resolve to
-    the default profile's ``hermes-gateway`` unit (a temp-home harness uninstalled the production gateway)."""
+    """A QUBIT_HOME that is neither ``~/.qubit`` nor ``~/.qubit/profiles/<name>`` must never resolve to
+    the default profile's ``qubit-gateway`` unit (a temp-home harness uninstalled the production gateway)."""
 
     @pytest.fixture
     def machine_home(self, tmp_path, monkeypatch):
         home = tmp_path / "home"
         home.mkdir()
         monkeypatch.setattr(Path, "home", lambda: home)
+        # The user unit dir follows the ACCOUNT home (#98699), which is read from the environment.
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.delenv("QUBIT_REAL_HOME", raising=False)
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         return home
 
     def test_foreign_home_gets_its_own_unit(self, machine_home, tmp_path, monkeypatch):
@@ -210,8 +216,8 @@ class TestServiceIdentityForForeignHome:
         foreign.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(foreign))
 
-        default_unit = machine_home / ".config" / "systemd" / "user" / "hermes-gateway.service"
-        assert gateway_cli.get_service_name() != "hermes-gateway"
+        default_unit = machine_home / ".config" / "systemd" / "user" / "qubit-gateway.service"
+        assert gateway_cli.get_service_name() != "qubit-gateway"
         assert gateway_cli.get_systemd_unit_path() != default_unit
         assert gateway_cli.get_systemd_unit_path().parent == default_unit.parent
 
@@ -220,14 +226,14 @@ class TestServiceIdentityForForeignHome:
         (default_home / "profiles" / "alpha").mkdir(parents=True)
 
         monkeypatch.setenv("QUBIT_HOME", str(default_home))
-        assert gateway_cli.get_service_name() == "hermes-gateway"
+        assert gateway_cli.get_service_name() == "qubit-gateway"
 
         monkeypatch.setenv("QUBIT_HOME", str(default_home / "profiles" / "alpha"))
-        assert gateway_cli.get_service_name() == "hermes-gateway-alpha"
+        assert gateway_cli.get_service_name() == "qubit-gateway-alpha"
 
     def test_sudo_user_default_home_keeps_bare_service_name(self, machine_home, tmp_path, monkeypatch):
         sudo_home = tmp_path / "alice"
-        sudo_default = sudo_home / ".hermes"
+        sudo_default = sudo_home / ".qubit"
         sudo_default.mkdir(parents=True)
         monkeypatch.setattr(os, "geteuid", lambda: 0)
         monkeypatch.setenv("SUDO_USER", "alice")
@@ -235,18 +241,18 @@ class TestServiceIdentityForForeignHome:
 
         # Before unit sync, sudo resolves the root process's native home.
         monkeypatch.delenv("QUBIT_HOME", raising=False)
-        assert gateway_cli.get_service_name() == "hermes-gateway"
+        assert gateway_cli.get_service_name() == "qubit-gateway"
 
         # After unit sync, QUBIT_HOME points at the invoking user's native home.
         monkeypatch.setenv("QUBIT_HOME", str(sudo_default))
-        assert gateway_cli.get_service_name() == "hermes-gateway"
+        assert gateway_cli.get_service_name() == "qubit-gateway"
 
 
 class TestUninstallRefusesForeignUnit:
     """systemd_uninstall must not stop/disable/unlink a unit pinned to another QUBIT_HOME."""
 
     def test_unit_for_other_home_is_left_alone(self, tmp_path, monkeypatch, capsys):
-        unit_path = tmp_path / "hermes-gateway.service"
+        unit_path = tmp_path / "qubit-gateway.service"
         unit_path.write_text('[Service]\nEnvironment="QUBIT_HOME=/somewhere/else"\n', encoding="utf-8")
         monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "mine"))
         monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path)
@@ -263,14 +269,14 @@ class TestUninstallRefusesForeignUnit:
 
 class TestGetCronDrainTimeout:
     def test_missing_config_falls_back_to_default(self, monkeypatch):
-        monkeypatch.delenv("HERMES_CRON_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("QUBIT_CRON_DRAIN_TIMEOUT", raising=False)
         monkeypatch.setattr(gateway_cli, "read_raw_config", lambda: {})
         assert (
             gateway_cli._get_cron_drain_timeout() == DEFAULT_GATEWAY_CRON_DRAIN_TIMEOUT
         )
 
     def test_zero_in_config_is_opt_out(self, monkeypatch):
-        monkeypatch.delenv("HERMES_CRON_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("QUBIT_CRON_DRAIN_TIMEOUT", raising=False)
         monkeypatch.setattr(
             gateway_cli,
             "read_raw_config",
@@ -279,7 +285,7 @@ class TestGetCronDrainTimeout:
         assert gateway_cli._get_cron_drain_timeout() == 0.0
 
     def test_env_overrides_config(self, monkeypatch):
-        monkeypatch.setenv("HERMES_CRON_DRAIN_TIMEOUT", "45")
+        monkeypatch.setenv("QUBIT_CRON_DRAIN_TIMEOUT", "45")
         monkeypatch.setattr(
             gateway_cli,
             "read_raw_config",
@@ -300,8 +306,8 @@ class TestGeneratedSystemdUnits:
         """#94759: default restart_drain_timeout=0 still leaves a 30s cron
         floor plus cleanup reserve. The old max(60, drain+30)=60 unit
         SIGKILLed that in-budget drain."""
-        monkeypatch.delenv("HERMES_RESTART_DRAIN_TIMEOUT", raising=False)
-        monkeypatch.delenv("HERMES_CRON_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("QUBIT_RESTART_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("QUBIT_CRON_DRAIN_TIMEOUT", raising=False)
         monkeypatch.setattr(gateway_cli, "_get_restart_drain_timeout", lambda: 0.0)
         monkeypatch.setattr(
             gateway_cli,
@@ -346,7 +352,7 @@ class TestGeneratedSystemdUnits:
         """#14613: glibc reads LD_LIBRARY_PATH only at process start, so the unit file is the
         only place it can reach CUDA-backed tools; quotes/backslashes must survive systemd quoting."""
         # The absent-env branch falls back to the installed unit: keep the host's real one out.
-        monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: tmp_path / "hermes-gateway.service")
+        monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: tmp_path / "qubit-gateway.service")
         monkeypatch.setenv("LD_LIBRARY_PATH", '/opt/cu"da/lib64:/opt/back\\slash/lib')
 
         unit = gateway_cli.generate_systemd_unit(system=False)
@@ -357,48 +363,6 @@ class TestGeneratedSystemdUnits:
         monkeypatch.delenv("LD_LIBRARY_PATH")
         assert "LD_LIBRARY_PATH" not in gateway_cli.generate_systemd_unit(system=False)
 
-
-    def test_user_unit_does_not_leak_profile_node_symlink_target(self, tmp_path, monkeypatch):
-        # Regression for the multi-profile gateway restart-loop flap (#48700):
-        # ~/.local/bin/node is often a symlink into a *specific* profile's node
-        # install. The generated unit's PATH must contain the symlink's own
-        # directory (~/.local/bin), NOT the resolved profile target — otherwise
-        # one profile's node path leaks into every profile's unit, making
-        # systemd_unit_is_current() perpetually false and forcing a
-        # daemon-reload restart loop on every boot.
-        local_bin = tmp_path / ".local" / "bin"
-        profile_node_bin = tmp_path / ".hermes" / "profiles" / "jarvis" / "node" / "bin"
-        local_bin.mkdir(parents=True)
-        profile_node_bin.mkdir(parents=True)
-        real_node = profile_node_bin / "node"
-        real_node.write_text("#!/bin/sh\n")
-        link_node = local_bin / "node"
-        link_node.symlink_to(real_node)
-
-        monkeypatch.setattr(gateway_cli.shutil, "which", lambda cmd: str(link_node) if cmd == "node" else None)
-
-        unit = gateway_cli.generate_systemd_unit(system=False)
-
-        assert str(local_bin) in unit
-        assert str(profile_node_bin) not in unit
-
-    def test_launchd_plist_does_not_leak_profile_node_symlink_target(self, tmp_path, monkeypatch):
-        # Same #48700 regression for the macOS twin generate_launchd_plist().
-        local_bin = tmp_path / ".local" / "bin"
-        profile_node_bin = tmp_path / ".hermes" / "profiles" / "jarvis" / "node" / "bin"
-        local_bin.mkdir(parents=True)
-        profile_node_bin.mkdir(parents=True)
-        real_node = profile_node_bin / "node"
-        real_node.write_text("#!/bin/sh\n")
-        link_node = local_bin / "node"
-        link_node.symlink_to(real_node)
-
-        monkeypatch.setattr(gateway_cli.shutil, "which", lambda cmd: str(link_node) if cmd == "node" else None)
-
-        plist = gateway_cli.generate_launchd_plist()
-
-        assert str(local_bin) in plist
-        assert str(profile_node_bin) not in plist
 
     def test_launchd_plist_persists_configured_nofile_soft_limit(self, monkeypatch):
         """The generated plist must carry SoftResourceLimits/NumberOfFiles so a
@@ -430,6 +394,76 @@ class TestGeneratedSystemdUnits:
         assert "SoftResourceLimits" not in plist
 
 
+class TestWslInteropPaths:
+    """_build_wsl_interop_paths() — only Windows-interop tool dirs belong in the unit's PATH.
+
+    #73163: scraping every ``/mnt/`` entry from the shell PATH persisted heavy
+    Desktop-app/git/node dirs into the gateway unit's Environment=PATH, and the
+    Plan 9 interop (9p) connections those dirs force at gateway start can
+    exhaust the 9p server connection limit. which()-resolved tool dirs and the
+    hardcoded System32 set already cover interop.
+    """
+
+    def test_arbitrary_mount_entries_are_not_scraped_from_shell_path(self, monkeypatch):
+        monkeypatch.setattr(gateway_cli, "is_wsl", lambda: True)
+        monkeypatch.setenv(
+            "PATH",
+            os.pathsep.join(
+                [
+                    "/usr/local/bin",
+                    "/mnt/d/heavy-app/bin",
+                    "/mnt/d/tools/git/cmd",
+                    "/mnt/c/Users/me/AppData/Local/Programs/desktop/bin",
+                ]
+            ),
+        )
+        monkeypatch.setattr(gateway_cli.shutil, "which", lambda name: None)
+        # The hardcoded candidates (System32…) don't exist on this macOS host, so the
+        # expected result is empty — no /mnt/ entry survives.
+        monkeypatch.setattr(Path, "exists", lambda self: False)
+
+        result = gateway_cli._build_wsl_interop_paths([])
+
+        assert result == []
+
+    def test_which_resolved_tool_dirs_and_system32_set_are_included(self, monkeypatch):
+        monkeypatch.setattr(gateway_cli, "is_wsl", lambda: True)
+        monkeypatch.setenv(
+            "PATH",
+            "/usr/local/bin:/mnt/d/heavy-app/bin:/mnt/c/WINDOWS/system32",
+        )
+
+        def fake_which(name):
+            resolved = {
+                "powershell.exe": "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe",
+                "cmd.exe": "/mnt/c/WINDOWS/system32/cmd.exe",
+                "explorer.exe": "/mnt/c/WINDOWS/explorer.exe",
+                "wsl.exe": "/mnt/c/Windows/System32/wsl.exe",
+            }
+            return resolved.get(name)
+
+        monkeypatch.setattr(gateway_cli.shutil, "which", fake_which)
+        monkeypatch.setattr(Path, "exists", lambda self: True)
+
+        result = gateway_cli._build_wsl_interop_paths(["/mnt/d/heavy-app/bin"])
+
+        # which()-resolved dirs land even when absent from the caller's PATH entry list.
+        assert "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0" in result
+        assert "/mnt/c/WINDOWS/system32" in result
+        # Hardcoded System32 family, gated on existence like on a real install.
+        assert "/mnt/c/WINDOWS" in result
+        assert "/mnt/c/WINDOWS/System32/Wbem" in result
+        # Heavy shell-PATH /mnt/ entries never enter, and dedupe keeps out the
+        # entry the caller already has.
+        assert "/mnt/d/heavy-app/bin" not in result
+
+    def test_outside_wsl_nothing_is_added(self, monkeypatch):
+        monkeypatch.setattr(gateway_cli, "is_wsl", lambda: False)
+        monkeypatch.setenv("PATH", "/usr/local/bin:/mnt/c/WINDOWS/system32")
+
+        assert gateway_cli._build_wsl_interop_paths([]) == []
+
+
 class TestGatewayStopCleanup:
     @pytest.mark.platforms("linux")
     def test_stop_only_kills_current_profile_by_default(self, tmp_path, monkeypatch):
@@ -440,7 +474,7 @@ class TestGatewayStopCleanup:
         reached when the host really isn't macOS/Windows (the old
         ``is_macos → False`` stub is gone).
         """
-        unit_path = tmp_path / "hermes-gateway.service"
+        unit_path = tmp_path / "qubit-gateway.service"
         unit_path.write_text("unit\n", encoding="utf-8")
 
         monkeypatch.setattr(gateway_cli, "supports_systemd_services", lambda: True)
@@ -487,7 +521,7 @@ class TestLaunchdServiceRecovery:
         """#43842: when the refresh runs inside the gateway's own process tree,
         a direct bootout would kill this CLI before bootstrap. The reload must
         be delegated to a detached helper instead."""
-        plist_path = tmp_path / "ai.hermes.gateway.plist"
+        plist_path = tmp_path / "ai.qubit.gateway.plist"
         plist_path.write_text("<plist>old content</plist>", encoding="utf-8")
 
         monkeypatch.setattr(gateway_cli, "get_launchd_plist_path", lambda: plist_path)
@@ -497,7 +531,7 @@ class TestLaunchdServiceRecovery:
             "generate_launchd_plist",
             lambda: (
                 "<plist>--replace\n<key>QUBIT_HOME</key>"
-                "<string>/Users/alice/.hermes</string></plist>"
+                "<string>/Users/alice/.qubit</string></plist>"
             ),
         )
         # Pretend the gateway is running and that we ARE inside its tree.
@@ -562,7 +596,7 @@ class TestLaunchdServiceRecovery:
         2026-08-05: the in-process retry loop was killed mid-bootstrap and
         nothing re-registered the label. So always prefer the detached helper.
         """
-        plist_path = tmp_path / "ai.hermes.gateway.plist"
+        plist_path = tmp_path / "ai.qubit.gateway.plist"
         plist_path.write_text("<plist>old content</plist>", encoding="utf-8")
 
         monkeypatch.setattr(gateway_cli, "get_launchd_plist_path", lambda: plist_path)
@@ -572,7 +606,7 @@ class TestLaunchdServiceRecovery:
             "generate_launchd_plist",
             lambda: (
                 "<plist>--replace\n<key>QUBIT_HOME</key>"
-                "<string>/Users/alice/.hermes</string></plist>"
+                "<string>/Users/alice/.qubit</string></plist>"
             ),
         )
         # Gateway running, but we are NOT inside its tree.
@@ -613,7 +647,7 @@ class TestLaunchdServiceRecovery:
         issued while it drains fails EIO ("already loaded"), which is how the
         retry budget got burned on 2026-08-05 (4 attempts, all rc=5).
         """
-        plist_path = tmp_path / "ai.hermes.gateway.plist"
+        plist_path = tmp_path / "ai.qubit.gateway.plist"
         plist_path.write_text("<plist>old content</plist>", encoding="utf-8")
 
         monkeypatch.setattr(gateway_cli, "get_launchd_plist_path", lambda: plist_path)
@@ -623,7 +657,7 @@ class TestLaunchdServiceRecovery:
             "generate_launchd_plist",
             lambda: (
                 "<plist>--replace\n<key>QUBIT_HOME</key>"
-                "<string>/Users/alice/.hermes</string></plist>"
+                "<string>/Users/alice/.qubit</string></plist>"
             ),
         )
         monkeypatch.setattr("gateway.status.get_running_pid", lambda *a, **k: 4242)
@@ -665,7 +699,7 @@ class TestLaunchdServiceRecovery:
         reloaded. The in-process path waits out the old gateway's drain first so
         its retry budget isn't spent on guaranteed-EIO bootstraps.
         """
-        plist_path = tmp_path / "ai.hermes.gateway.plist"
+        plist_path = tmp_path / "ai.qubit.gateway.plist"
         plist_path.write_text("<plist>old content</plist>", encoding="utf-8")
 
         monkeypatch.setattr(gateway_cli, "get_launchd_plist_path", lambda: plist_path)
@@ -675,7 +709,7 @@ class TestLaunchdServiceRecovery:
             "generate_launchd_plist",
             lambda: (
                 "<plist>--replace\n<key>QUBIT_HOME</key>"
-                "<string>/Users/alice/.hermes</string></plist>"
+                "<string>/Users/alice/.qubit</string></plist>"
             ),
         )
         monkeypatch.setattr("gateway.status.get_running_pid", lambda *a, **k: 4242)
@@ -701,7 +735,7 @@ class TestLaunchdServiceRecovery:
                 # the success check correctly refuses to stop retrying.
                 return SimpleNamespace(
                     returncode=0,
-                    stdout='{\n\t"PID" = 5150;\n\t"Label" = "ai.hermes.gateway";\n};',
+                    stdout='{\n\t"PID" = 5150;\n\t"Label" = "ai.qubit.gateway";\n};',
                     stderr="",
                 )
             return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -739,7 +773,7 @@ class TestLaunchdServiceRecovery:
 
     def test_launchd_status_reports_fallback_when_unsupported_and_pid_running(self, tmp_path, monkeypatch, capsys):
         """When the unsupported marker exists and a fallback PID is running."""
-        plist_path = tmp_path / "ai.hermes.gateway.plist"
+        plist_path = tmp_path / "ai.qubit.gateway.plist"
         plist_path.write_text(gateway_cli.generate_launchd_plist(), encoding="utf-8")
         monkeypatch.setattr(gateway_cli, "get_launchd_plist_path", lambda: plist_path)
 
@@ -747,7 +781,7 @@ class TestLaunchdServiceRecovery:
             if isinstance(cmd, list) and cmd[:2] == ["launchctl", "list"]:
                 return SimpleNamespace(
                     returncode=0,
-                    stdout='{\n    "Label" = "ai.hermes.gateway";\n    "OnDemand" = true;\n}',
+                    stdout='{\n    "Label" = "ai.qubit.gateway";\n    "OnDemand" = true;\n}',
                     stderr="",
                 )
             return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -838,7 +872,7 @@ class TestLaunchdUnsupportedFallbackPolicy:
         exc = subprocess.CalledProcessError(
             5, ["launchctl", "bootstrap"], stderr="Bootstrap failed: 5: Input/output error"
         )
-        monkeypatch.setattr(gateway_cli, "get_launchd_label", lambda: "ai.hermes.gateway")
+        monkeypatch.setattr(gateway_cli, "get_launchd_label", lambda: "ai.qubit.gateway")
         monkeypatch.setattr(
             gateway_cli, "_launchctl_label_supervising_process", lambda label: True
         )
@@ -853,7 +887,7 @@ class TestLaunchdUnsupportedFallbackPolicy:
     def test_eio_without_a_supervised_process_still_falls_back(self, monkeypatch):
         """The detached fallback for a domain that really cannot manage the job is unchanged."""
         exc = subprocess.CalledProcessError(125, ["launchctl", "kickstart"])
-        monkeypatch.setattr(gateway_cli, "get_launchd_label", lambda: "ai.hermes.gateway")
+        monkeypatch.setattr(gateway_cli, "get_launchd_label", lambda: "ai.qubit.gateway")
         monkeypatch.setattr(
             gateway_cli, "_launchctl_label_supervising_process", lambda label: False
         )
@@ -1141,7 +1175,7 @@ class TestGatewaySystemServiceRouting:
         """
         calls = []
 
-        monkeypatch.setattr(gateway_cli, "get_launchd_label", lambda: "ai.hermes.gateway")
+        monkeypatch.setattr(gateway_cli, "get_launchd_label", lambda: "ai.qubit.gateway")
         monkeypatch.setattr(gateway_cli, "_launchd_domain", lambda: "gui/501")
         monkeypatch.setattr("gateway.status.get_running_pid", lambda *a, **k: 654)
         monkeypatch.setattr(gateway_cli, "_request_gateway_self_restart", lambda pid: False)
@@ -1190,7 +1224,7 @@ class TestGatewaySystemServiceRouting:
         # ``-k`` after a successful graceful exit would kill the replacement.
         assert not any(call[0] == "kickstart" for call in calls)
         # The success message must follow an observed replacement PID.
-        assert ("observe", "ai.hermes.gateway", 654, "gui/501") in calls
+        assert ("observe", "ai.qubit.gateway", 654, "gui/501") in calls
         out = capsys.readouterr().out
         assert "up to 27s" in out
         assert "up to 0s" not in out
@@ -1208,7 +1242,7 @@ class TestGatewaySystemServiceRouting:
         """
         calls = []
 
-        monkeypatch.setattr(gateway_cli, "get_launchd_label", lambda: "ai.hermes.gateway")
+        monkeypatch.setattr(gateway_cli, "get_launchd_label", lambda: "ai.qubit.gateway")
         monkeypatch.setattr(gateway_cli, "_launchd_domain", lambda: "gui/501")
         monkeypatch.setattr("gateway.status.get_running_pid", lambda *a, **k: 654)
         monkeypatch.setattr(gateway_cli, "_request_gateway_self_restart", lambda pid: False)
@@ -1251,7 +1285,7 @@ class TestGatewaySystemServiceRouting:
         on a real macOS host only ``launchd_restart`` is stubbed (it would touch
         the user's real launchd domain).
         """
-        plist_path = tmp_path / "ai.hermes.gateway.plist"
+        plist_path = tmp_path / "ai.qubit.gateway.plist"
         plist_path.write_text("plist\n", encoding="utf-8")
 
         monkeypatch.setattr(gateway_cli, "get_launchd_plist_path", lambda: plist_path)
@@ -1259,7 +1293,7 @@ class TestGatewaySystemServiceRouting:
             gateway_cli,
             "launchd_restart",
             lambda: (_ for _ in ()).throw(
-                gateway_cli.subprocess.CalledProcessError(5, ["launchctl", "kickstart", "-k", "gui/501/ai.hermes.gateway"])
+                gateway_cli.subprocess.CalledProcessError(5, ["launchctl", "kickstart", "-k", "gui/501/ai.qubit.gateway"])
             ),
         )
 
@@ -1285,7 +1319,7 @@ def _seed_pm_environment(tmp_path, monkeypatch, with_venv_fact=True):
     from pm.environments import install_state_dir
 
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))  # installs_root() under the test root
-    project_root = tmp_path / "payload" / "hermes-agent"
+    project_root = tmp_path / "payload" / "qubit"
     project_root.mkdir(parents=True)
     state = install_state_dir(project_root)
     environment = state / "environments" / "gen-1"
@@ -1309,7 +1343,7 @@ class TestServicePathDirsPmVenv:
         monkeypatch.setattr("sys.prefix", "/usr")
         monkeypatch.setattr("sys.base_prefix", "/usr")
         monkeypatch.delenv("VIRTUAL_ENV", raising=False)
-        monkeypatch.delenv("HERMES_RUNTIME_DIR", raising=False)
+        monkeypatch.delenv("QUBIT_RUNTIME_DIR", raising=False)
 
         project_root, environment = _seed_pm_environment(tmp_path, monkeypatch)
         venv_bin = environment / "bin"
@@ -1321,7 +1355,7 @@ class TestServicePathDirsPmVenv:
         assert str(venv_bin) not in dirs
 
 
-def _seed_pm_node_facts(hermes_root):
+def _seed_pm_node_facts(qubit_root):
     """Write a pm installed-state file recording node/npm store entries.
 
     _append_node_dir_for_service() resolves managed Node through pm's
@@ -1330,7 +1364,7 @@ def _seed_pm_node_facts(hermes_root):
     way a real `pm install` writes it — via the same Facts schema, read back
     through Facts.env_for().
     """
-    store_root = hermes_root / "tools"
+    store_root = qubit_root / "tools"
     node_dir = store_root / "node-v22.0.0"
     npm_dir = store_root / "npm-9.0.0" / "bin"
     node_dir.mkdir(parents=True)
@@ -1356,48 +1390,49 @@ def _seed_pm_node_facts(hermes_root):
     return [str(npm_dir), str(node_dir)]
 
 
-class TestSystemUnitHermesHome:
+class TestSystemUnitQubitHome:
     """QUBIT_HOME in system units must reference the target user, not root."""
 
-    def test_no_pm_node_facts_uses_only_ambient_fallback(
+    def test_no_pm_node_never_bakes_the_invokers_path_node(
         self, monkeypatch, tmp_path
     ):
-        (tmp_path / ".hermes" / "tools").mkdir(parents=True)
+        """Hermes runs only its PM-managed Node: a PATH node is never written into a unit."""
+        (tmp_path / ".qubit" / "tools").mkdir(parents=True)
         monkeypatch.setattr(
             gateway_cli.shutil, "which", lambda name: "/opt/external-node/bin/node"
         )
         entries: list[str] = []
 
-        gateway_cli._append_node_dir_for_service(entries, tmp_path / ".hermes")
+        gateway_cli._append_node_dir_for_service(entries, tmp_path / ".qubit")
 
-        assert entries == ["/opt/external-node/bin"]
+        assert entries == []
 
-    def test_stale_pm_facts_without_dirs_use_only_ambient_fallback(
+    def test_stale_pm_facts_without_dirs_contribute_nothing(
         self, monkeypatch, tmp_path
     ):
-        """Recorded entries whose store dirs are gone contribute nothing."""
+        """Recorded entries whose store dirs are gone contribute nothing, and no PATH node replaces them."""
         import shutil as _shutil
 
-        hermes_root = tmp_path / ".hermes"
-        for entry in _seed_pm_node_facts(hermes_root):
+        qubit_root = tmp_path / ".qubit"
+        for entry in _seed_pm_node_facts(qubit_root):
             _shutil.rmtree(entry)
         monkeypatch.setattr(
             gateway_cli.shutil, "which", lambda name: "/opt/external-node/bin/node"
         )
         entries: list[str] = []
 
-        gateway_cli._append_node_dir_for_service(entries, hermes_root)
+        gateway_cli._append_node_dir_for_service(entries, qubit_root)
 
-        assert entries == ["/opt/external-node/bin"]
+        assert entries == []
 
     def test_managed_node_makes_system_unit_independent_of_callers_path(
         self, monkeypatch, tmp_path
     ):
         """A target-managed Node must suppress caller-specific PATH fallbacks."""
         target_home = tmp_path / "home" / "alice"
-        target_hermes = target_home / ".hermes"
+        target_hermes = target_home / ".qubit"
         root_home = tmp_path / "root"
-        root_hermes = root_home / ".hermes"
+        root_hermes = root_home / ".qubit"
         managed_dirs = _seed_pm_node_facts(target_hermes)
         root_hermes.mkdir(parents=True)
 
@@ -1422,23 +1457,10 @@ class TestSystemUnitHermesHome:
             assert managed_dir in root_unit
         assert "/root/bin" not in root_unit
 
-    def test_node_path_lookup_remains_fallback_without_managed_node(
-        self, monkeypatch, tmp_path
-    ):
-        """External Node installs still work when pm has no node installed."""
-        monkeypatch.setattr(
-            gateway_cli.shutil, "which", lambda name: "/opt/external-node/bin/node"
-        )
-        entries: list[str] = []
-
-        gateway_cli._append_node_dir_for_service(entries, tmp_path / ".hermes")
-
-        assert entries == ["/opt/external-node/bin"]
-
     def test_system_unit_orders_after_target_user_manager(self, monkeypatch, tmp_path):
         """#104893: restart-safe workers need user@<uid>.service; the system unit must not race it at boot."""
         monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
-        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
         monkeypatch.setattr(
             gateway_cli, "_system_service_identity",
             lambda run_as_user=None: ("alice", "alice", str(tmp_path), 1001),
@@ -1456,7 +1478,7 @@ class TestSystemUnitHermesHome:
     def test_installed_unit_keeps_ld_library_path_when_the_shell_lacks_it(self, monkeypatch, tmp_path):
         """The unit is regenerated and compared on every start/restart/status; a later shell without
         the export (ssh, cron, sudo) must see the installed unit as current, not "repair" the line away."""
-        unit_path = tmp_path / "hermes-gateway.service"
+        unit_path = tmp_path / "qubit-gateway.service"
         monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path)
         monkeypatch.setenv("LD_LIBRARY_PATH", "/opt/cuda/lib64:/opt/pct%dir/lib")
         unit_path.write_text(gateway_cli.generate_systemd_unit(system=False), encoding="utf-8")
@@ -1489,7 +1511,7 @@ class TestSystemUnitHermesHome:
         caller_home.mkdir()
         target_home.mkdir()
         monkeypatch.setattr(Path, "home", staticmethod(lambda: caller_home))
-        monkeypatch.setenv("QUBIT_HOME", str(caller_home / ".hermes"))
+        monkeypatch.setenv("QUBIT_HOME", str(caller_home / ".qubit"))
         monkeypatch.setattr(
             gateway_cli, "_system_service_identity",
             lambda run_as_user=None: ("alice", "alice", str(target_home), 1001),
@@ -1501,8 +1523,8 @@ class TestSystemUnitHermesHome:
 
         unit = gateway_cli.generate_systemd_unit(system=True, run_as_user="alice")
 
-        assert f'QUBIT_HOME={target_home / ".hermes"}' in unit
-        assert str(caller_home / ".hermes") not in unit
+        assert f'QUBIT_HOME={target_home / ".qubit"}' in unit
+        assert str(caller_home / ".qubit") not in unit
 
     def test_user_unit_unaffected_by_change(self):
         # User-scope units should still use the calling user's QUBIT_HOME
@@ -1512,14 +1534,14 @@ class TestSystemUnitHermesHome:
         assert f'QUBIT_HOME={qubit_home}' in unit
 
 
-class TestSystemUnitRefreshSyncsHermesHome:
-    """sudo system refresh must not flip TimeoutStopSec via /root/.hermes."""
+class TestSystemUnitRefreshSyncsQubitHome:
+    """sudo system refresh must not flip TimeoutStopSec via /root/.qubit."""
 
     def test_refresh_adopts_unit_qubit_home_before_rewriting(self, tmp_path, monkeypatch):
         root_home = tmp_path / "root"
         alice_home = tmp_path / "alice"
-        root_hermes = root_home / ".hermes"
-        alice_hermes = alice_home / ".hermes"
+        root_hermes = root_home / ".qubit"
+        alice_hermes = alice_home / ".qubit"
         root_hermes.mkdir(parents=True)
         alice_hermes.mkdir(parents=True)
         (root_hermes / "config.yaml").write_text(
@@ -1529,7 +1551,7 @@ class TestSystemUnitRefreshSyncsHermesHome:
             "agent:\n  restart_drain_timeout: 180\n", encoding="utf-8"
         )
 
-        unit_path = tmp_path / "hermes-gateway.service"
+        unit_path = tmp_path / "qubit-gateway.service"
         monkeypatch.setattr(Path, "home", staticmethod(lambda: root_home))
         monkeypatch.setattr(
             gateway_cli,
@@ -1542,7 +1564,7 @@ class TestSystemUnitRefreshSyncsHermesHome:
         monkeypatch.setattr(gateway_cli.shutil, "which", lambda cmd: None)
         monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path)
         monkeypatch.setattr(gateway_cli, "_run_systemctl", lambda *a, **k: None)
-        monkeypatch.delenv("HERMES_RESTART_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("QUBIT_RESTART_DRAIN_TIMEOUT", raising=False)
 
         # Correct installed unit (operator's QUBIT_HOME + drain timeout).
         monkeypatch.setenv("QUBIT_HOME", str(alice_hermes))
@@ -1560,7 +1582,7 @@ class TestSystemUnitRefreshSyncsHermesHome:
 
 
 
-class TestHermesHomeForTargetUser:
+class TestQubitHomeForTargetUser:
     """Unit tests for _qubit_home_for_target_user()."""
 
     def test_remaps_default_home(self, monkeypatch):
@@ -1712,7 +1734,7 @@ class TestProfileArg:
         """sudo system install must keep the target user's named profile in ExecStart."""
         root_home = tmp_path / "root"
         target_home = tmp_path / "home" / "alice"
-        root_profile = root_home / ".hermes" / "profiles" / "mybot"
+        root_profile = root_home / ".qubit" / "profiles" / "mybot"
         root_profile.mkdir(parents=True)
 
         monkeypatch.setattr(Path, "home", lambda: root_home)
@@ -1731,10 +1753,10 @@ class TestProfileArg:
         command = shlex.split(next(line.split("=", 1)[1] for line in unit.splitlines()
                                    if line.startswith("ExecStart=")))
         assert command[-4:] == ["--profile", "mybot", "gateway", "run"]
-        assert f'QUBIT_HOME={target_home / ".hermes" / "profiles" / "mybot"}' in unit
+        assert f'QUBIT_HOME={target_home / ".qubit" / "profiles" / "mybot"}' in unit
 
     def test_launchd_plist_wraps_gateway_stderr_with_timestamps(self, tmp_path, monkeypatch):
-        profile_dir = tmp_path / ".hermes" / "profiles" / "mybot"
+        profile_dir = tmp_path / ".qubit" / "profiles" / "mybot"
         profile_dir.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         monkeypatch.setenv("QUBIT_HOME", str(profile_dir))
@@ -1745,7 +1767,8 @@ class TestProfileArg:
         program_args = plistlib.loads(plist.encode("utf-8"))["ProgramArguments"]
 
         # The job is launched through osascript so macOS Local Network Privacy attributes the
-        # gateway's sockets to a platform binary (#71206); the real command is the exec'd child,
+        # gateway's sockets to a platform binary (#71206); JXA system() waits without the
+        # Standard Additions user-cancel polling loop. The real command is the exec'd child,
         # whose python runs through the PM installation launcher (-I -c bootstrap ...).
         exec_argv = _osascript_exec_argv(program_args)
         assert exec_argv[-4:] == [">>", str(profile_dir / "logs" / "gateway.log"),
@@ -1759,8 +1782,8 @@ class TestProfileArg:
         assert "--replace" not in program_args
 
     def test_launchd_osascript_wrapper_round_trips_shell_hostile_paths(self, tmp_path, monkeypatch):
-        """A home with spaces, quotes and a backslash survives shlex + AppleScript + plist quoting."""
-        profile_dir = tmp_path / 'my "odd" dir \\ here' / ".hermes"
+        """A home with spaces, quotes and a backslash survives shlex + JXA + plist quoting."""
+        profile_dir = tmp_path / 'my "odd" dir \\ here' / ".qubit"
         profile_dir.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         monkeypatch.setenv("QUBIT_HOME", str(profile_dir))
@@ -1775,8 +1798,63 @@ class TestProfileArg:
         # The wrapper's own ps line must never be taken for the gateway (stop/status would signal osascript).
         assert status.looks_like_gateway_command_line(" ".join(program_args)) is False
 
+    @pytest.mark.platforms("macos")
+    def test_launchd_osascript_wrapper_preserves_process_group_and_exit_status(self, tmp_path):
+        """The non-polling JXA wait keeps lifecycle signals and KeepAlive failure semantics intact."""
+        stdout_log = tmp_path / "stdout.log"
+        stderr_log = tmp_path / "stderr.log"
+        command = [
+            sys.executable,
+            "-c",
+            "import os, sys; print(os.getpgrp()); sys.exit(23)",
+        ]
+
+        # A fresh session makes the wrapper its own group leader (as launchd does), so the child
+        # staying in the wrapper's group is observable rather than inherited from the runner.
+        wrapper = subprocess.Popen(
+            launchd_program_arguments(command, stdout_log, stderr_log), start_new_session=True
+        )
+
+        try:
+            returncode = wrapper.wait(timeout=10)
+        finally:
+            if wrapper.poll() is None:
+                os.killpg(wrapper.pid, signal.SIGKILL)
+                wrapper.wait()
+
+        assert returncode == 23
+        assert int(stdout_log.read_text()) == wrapper.pid
+        assert stderr_log.read_text() == ""
+
+    @pytest.mark.platforms("macos")
+    def test_launchd_command_path_timestamps_gateway_stdout(self, tmp_path):
+        """gateway.log is also the logging handler's file: a raw print() through the plist's
+        osascript + stderr_timestamp chain must arrive stamped or ``--since`` cannot filter it."""
+        stdout_log = tmp_path / "gateway.log"
+        stderr_log = tmp_path / "gateway.error.log"
+        command = [
+            sys.executable, "-m", "qubit_cli.stderr_timestamp", "--error-log", str(stderr_log), "--",
+            sys.executable, "-c", "print('[whatsapp] Bridge started on port 3000')",
+        ]
+
+        wrapper = subprocess.Popen(
+            launchd_program_arguments(command, stdout_log, stderr_log), start_new_session=True
+        )
+        try:
+            returncode = wrapper.wait(timeout=30)
+        finally:
+            if wrapper.poll() is None:
+                os.killpg(wrapper.pid, signal.SIGKILL)
+                wrapper.wait()
+
+        assert returncode == 0
+        assert re.fullmatch(
+            r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \[whatsapp\] Bridge started on port 3000\n",
+            stdout_log.read_text(encoding="utf-8"),
+        )
+
     def test_launchd_plist_path_uses_real_user_home_not_profile_home(self, tmp_path, monkeypatch):
-        profile_dir = tmp_path / ".hermes" / "profiles" / "orcha"
+        profile_dir = tmp_path / ".qubit" / "profiles" / "orcha"
         profile_dir.mkdir(parents=True)
         machine_home = tmp_path / "machine-home"
         machine_home.mkdir()
@@ -1790,7 +1868,7 @@ class TestProfileArg:
 
         plist_path = gateway_cli.get_launchd_plist_path()
 
-        assert plist_path == machine_home / "Library" / "LaunchAgents" / "ai.hermes.gateway-orcha.plist"
+        assert plist_path == machine_home / "Library" / "LaunchAgents" / "ai.qubit.gateway-orcha.plist"
 
 
 class TestRemapPathForUser:
@@ -1800,10 +1878,10 @@ class TestRemapPathForUser:
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "root")
         (tmp_path / "root").mkdir()
         result = gateway_cli._remap_path_for_user(
-            str(tmp_path / "root" / ".hermes" / "hermes-agent"),
+            str(tmp_path / "root" / ".qubit" / "qubit"),
             str(tmp_path / "alice"),
         )
-        assert result == str(tmp_path / "alice" / ".hermes" / "hermes-agent")
+        assert result == str(tmp_path / "alice" / ".qubit" / "qubit")
 
 
 class TestSystemUnitPathRemapping:
@@ -1812,7 +1890,7 @@ class TestSystemUnitPathRemapping:
     def test_system_unit_has_no_root_paths(self, monkeypatch, tmp_path):
         root_home = tmp_path / "root"
         root_home.mkdir()
-        project = root_home / ".hermes" / "hermes-agent"
+        project = root_home / ".qubit" / "qubit"
         project.mkdir(parents=True)
         venv_bin = project / "venv" / "bin"
         venv_bin.mkdir(parents=True)
@@ -1821,8 +1899,8 @@ class TestSystemUnitPathRemapping:
         target_home = "/home/alice"
 
         monkeypatch.setattr(Path, "home", lambda: root_home)
-        monkeypatch.setenv("QUBIT_HOME", str(root_home / ".hermes"))
-        monkeypatch.setattr(gateway_cli, "get_qubit_home", lambda: root_home / ".hermes")
+        monkeypatch.setenv("QUBIT_HOME", str(root_home / ".qubit"))
+        monkeypatch.setattr(gateway_cli, "get_qubit_home", lambda: root_home / ".qubit")
         monkeypatch.setattr(gateway_cli, "PROJECT_ROOT", project)
 
         monkeypatch.setattr(gateway_cli, "get_python_path", lambda: str(venv_bin / "python"))
@@ -1841,8 +1919,8 @@ class TestSystemUnitPathRemapping:
         # always exists) — NOT the source checkout under it. Pinning cwd to the
         # checkout is the rot bug fixed alongside this: a relocated/removed
         # checkout would crash-loop the unit on CHDIR (status=200).
-        assert "WorkingDirectory=/home/alice/.hermes" in unit
-        assert "WorkingDirectory=/home/alice/.hermes/hermes-agent" not in unit
+        assert "WorkingDirectory=/home/alice/.qubit" in unit
+        assert "WorkingDirectory=/home/alice/.qubit/qubit" not in unit
 
 
 class TestDockerAwareGateway:
@@ -1860,7 +1938,7 @@ class TestDockerAwareGateway:
         from qubit_cli.gateway_command_errors import SystemctlUnavailableError
 
         with pytest.raises(SystemctlUnavailableError):
-            gateway_cli._run_systemctl(["start", "hermes-gateway"])
+            gateway_cli._run_systemctl(["start", "qubit-gateway"])
 
 
     def test_install_in_container_prints_docker_guidance(self, monkeypatch, capsys):
@@ -1935,23 +2013,23 @@ class TestDockerAwareGateway:
         assert "--system" in capsys.readouterr().out
 
 
-class TestLegacyHermesUnitDetection:
+class TestLegacyQubitUnitDetection:
     """Tests for _find_legacy_qubit_units / has_legacy_qubit_units.
 
     These guard against the scenario that tripped Luis in April 2026: an
-    older install left a ``hermes.service`` unit behind when the service was
-    renamed to ``hermes-gateway.service``. After PR #5646 (signal recovery
+    older install left a ``qubit.service`` unit behind when the service was
+    renamed to ``qubit-gateway.service``. After PR #5646 (signal recovery
     via systemd), the two services began SIGTERM-flapping over the same
     Telegram bot token in a 30-second cycle.
 
-    The detector must flag ``hermes.service`` ONLY when it actually runs our
+    The detector must flag ``qubit.service`` ONLY when it actually runs our
     gateway, and must NEVER flag profile units
-    (``hermes-gateway-<profile>.service``) or unrelated third-party services.
+    (``qubit-gateway-<profile>.service``) or unrelated third-party services.
     """
 
     # Minimal ExecStart that looks like our gateway
     _OUR_UNIT_TEXT = (
-        "[Unit]\nDescription=Qubit Gateway\n[Service]\n"
+        "[Unit]\nDescription=Hermes Gateway\n[Service]\n"
         "ExecStart=/usr/bin/python -m qubit_cli.main gateway run --replace\n"
     )
 
@@ -1973,8 +2051,8 @@ class TestLegacyHermesUnitDetection:
         """When a user has BOTH user-scope and system-scope legacy units,
         both are reported so the migration step can remove them together."""
         user_dir, system_dir = self._setup_search_paths(tmp_path, monkeypatch)
-        (user_dir / "hermes.service").write_text(self._OUR_UNIT_TEXT, encoding="utf-8")
-        (system_dir / "hermes.service").write_text(self._OUR_UNIT_TEXT, encoding="utf-8")
+        (user_dir / "qubit.service").write_text(self._OUR_UNIT_TEXT, encoding="utf-8")
+        (system_dir / "qubit.service").write_text(self._OUR_UNIT_TEXT, encoding="utf-8")
 
         results = gateway_cli._find_legacy_qubit_units()
 
@@ -1998,10 +2076,10 @@ class TestLegacyHermesUnitDetection:
             "ExecStart=/venv/bin/python /opt/qubit/gateway/run.py",
         ]
         for i, execstart in enumerate(variants):
-            name = "hermes.service" if i == 0 else "hermes.service"  # same name
+            name = "qubit.service" if i == 0 else "qubit.service"  # same name
             # Test each variant fresh
-            (user_dir / "hermes.service").write_text(
-                f"[Unit]\nDescription=Old Qubit\n[Service]\n{execstart}\n",
+            (user_dir / "qubit.service").write_text(
+                f"[Unit]\nDescription=Old Hermes\n[Service]\n{execstart}\n",
                 encoding="utf-8",
             )
             results = gateway_cli._find_legacy_qubit_units()
@@ -2009,11 +2087,11 @@ class TestLegacyHermesUnitDetection:
 
 
 
-class TestRemoveLegacyHermesUnits:
+class TestRemoveLegacyQubitUnits:
     """Tests for remove_legacy_qubit_units (the migration action)."""
 
     _OUR_UNIT_TEXT = (
-        "[Unit]\nDescription=Qubit Gateway\n[Service]\n"
+        "[Unit]\nDescription=Hermes Gateway\n[Service]\n"
         "ExecStart=/usr/bin/python -m qubit_cli.main gateway run --replace\n"
     )
 
@@ -2041,7 +2119,7 @@ class TestRemoveLegacyHermesUnits:
 
     def test_removes_user_scope_legacy_unit(self, tmp_path, monkeypatch, capsys):
         user_dir, _, calls = self._setup(tmp_path, monkeypatch)
-        legacy = user_dir / "hermes.service"
+        legacy = user_dir / "qubit.service"
         legacy.write_text(self._OUR_UNIT_TEXT, encoding="utf-8")
 
         removed, remaining = gateway_cli.remove_legacy_qubit_units(interactive=False)
@@ -2051,20 +2129,20 @@ class TestRemoveLegacyHermesUnits:
         assert not legacy.exists()
         # Must have invoked stop → disable → daemon-reload on user scope
         cmds_joined = [" ".join(c) for c in calls]
-        assert any("--user stop hermes.service" in c for c in cmds_joined)
-        assert any("--user disable hermes.service" in c for c in cmds_joined)
+        assert any("--user stop qubit.service" in c for c in cmds_joined)
+        assert any("--user disable qubit.service" in c for c in cmds_joined)
         assert any("--user daemon-reload" in c for c in cmds_joined)
 
     def test_does_not_touch_profile_units_during_migration(
         self, tmp_path, monkeypatch, capsys
     ):
-        """Teknium's constraint: profile units (hermes-gateway-coder.service)
+        """Teknium's constraint: profile units (qubit-gateway-coder.service)
         must survive a migration call, even if we somehow include them in the
         search dir."""
         user_dir, _, _ = self._setup(tmp_path, monkeypatch, as_root=True)
-        profile_unit = user_dir / "hermes-gateway-coder.service"
+        profile_unit = user_dir / "qubit-gateway-coder.service"
         profile_unit.write_text(self._OUR_UNIT_TEXT, encoding="utf-8")
-        default_unit = user_dir / "hermes-gateway.service"
+        default_unit = user_dir / "qubit-gateway.service"
         default_unit.write_text(self._OUR_UNIT_TEXT, encoding="utf-8")
 
         removed, remaining = gateway_cli.remove_legacy_qubit_units(interactive=False)
@@ -2126,7 +2204,7 @@ class TestSystemdInstallOffersLegacyRemoval:
         monkeypatch.setattr(gateway_cli, "prompt_yes_no", lambda *a, **k: True)
 
         # Mock the rest of the install flow
-        unit_path = tmp_path / "hermes-gateway.service"
+        unit_path = tmp_path / "qubit-gateway.service"
         monkeypatch.setattr(
             gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path
         )
@@ -2163,7 +2241,7 @@ class TestSystemdInstallOffersLegacyRemoval:
         monkeypatch.setattr(gateway_cli, "print_legacy_unit_warning", lambda: None)
         monkeypatch.setattr(gateway_cli, "prompt_yes_no", lambda *a, **k: False)
 
-        unit_path = tmp_path / "hermes-gateway.service"
+        unit_path = tmp_path / "qubit-gateway.service"
         monkeypatch.setattr(
             gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path
         )
@@ -2207,7 +2285,7 @@ class TestSystemdInstallOffersLegacyRemoval:
         monkeypatch.setattr(gateway_cli, "remove_legacy_qubit_units", fake_remove)
         monkeypatch.setattr(gateway_cli, "prompt_yes_no", counting_prompt)
 
-        unit_path = tmp_path / "hermes-gateway.service"
+        unit_path = tmp_path / "qubit-gateway.service"
         monkeypatch.setattr(
             gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path
         )
@@ -2277,13 +2355,13 @@ class TestSystemScopeWizardPreCheck:
         sys_dir.mkdir()
         usr_dir.mkdir()
         if system_present:
-            (sys_dir / "hermes-gateway.service").write_text("[Unit]\n")
+            (sys_dir / "qubit-gateway.service").write_text("[Unit]\n")
         if user_present:
-            (usr_dir / "hermes-gateway.service").write_text("[Unit]\n")
+            (usr_dir / "qubit-gateway.service").write_text("[Unit]\n")
         monkeypatch.setattr(
             gateway_cli,
             "get_systemd_unit_path",
-            lambda system=False: (sys_dir if system else usr_dir) / "hermes-gateway.service",
+            lambda system=False: (sys_dir if system else usr_dir) / "qubit-gateway.service",
         )
 
     def test_non_root_with_only_system_unit_returns_true(self, tmp_path, monkeypatch):
@@ -2312,11 +2390,11 @@ class TestGatewayCommandCatchesSystemScopeError:
         usr_dir = tmp_path / "usr"
         sys_dir.mkdir()
         usr_dir.mkdir()
-        (sys_dir / "hermes-gateway.service").write_text("[Unit]\n")
+        (sys_dir / "qubit-gateway.service").write_text("[Unit]\n")
         monkeypatch.setattr(
             gateway_cli,
             "get_systemd_unit_path",
-            lambda system=False: (sys_dir if system else usr_dir) / "hermes-gateway.service",
+            lambda system=False: (sys_dir if system else usr_dir) / "qubit-gateway.service",
         )
         monkeypatch.setattr(gateway_cli.os, "geteuid", lambda: 1000)
         monkeypatch.setattr(gateway_cli, "supports_systemd_services", lambda: True)
@@ -2341,7 +2419,7 @@ class TestServiceWorkingDirIsStable:
     """
 
     def test_user_unit_workingdirectory_is_qubit_home_not_checkout(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         monkeypatch.setattr(gateway_cli, "get_qubit_home", lambda: home)
         unit = gateway_cli.generate_systemd_unit(system=False)
@@ -2355,7 +2433,7 @@ class TestServiceWorkingDirIsStable:
     def test_launchd_workingdirectory_is_qubit_home(self, tmp_path, monkeypatch):
         import re
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         monkeypatch.setattr(gateway_cli, "get_qubit_home", lambda: home)
         plist = gateway_cli.generate_launchd_plist()
@@ -2380,7 +2458,7 @@ class TestServiceTakeoverGovernance:
     """
 
     def test_launchd_plist_does_not_arm_takeover(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         monkeypatch.setattr(gateway_cli, "get_qubit_home", lambda: home)
         plist = gateway_cli.generate_launchd_plist()
@@ -2401,7 +2479,7 @@ class TestServiceTakeoverGovernance:
         mapping 78→0 is the launchd twin: a clean stop stays down, exit 75 and
         crashes still relaunch.
         """
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         monkeypatch.setattr(gateway_cli, "get_qubit_home", lambda: home)
         parsed = plistlib.loads(gateway_cli.generate_launchd_plist().encode("utf-8"))
@@ -2409,7 +2487,7 @@ class TestServiceTakeoverGovernance:
         assert parsed["RunAtLoad"] is True
 
     def test_systemd_unit_does_not_arm_takeover(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         monkeypatch.setattr(gateway_cli, "get_qubit_home", lambda: home)
         unit = gateway_cli.generate_systemd_unit(system=False)
@@ -2430,9 +2508,9 @@ class TestLaunchctlBootstrapEioRetry:
     version" and needlessly degraded the gateway to a detached process.
     """
 
-    PLIST = "/tmp/ai.hermes.gateway.plist"
+    PLIST = "/tmp/ai.qubit.gateway.plist"
     DOMAIN = "gui/501"
-    LABEL = "ai.hermes.gateway"
+    LABEL = "ai.qubit.gateway"
 
     def test_eio_triggers_bootout_then_retry(self, monkeypatch):
         calls = []
@@ -2498,9 +2576,9 @@ class TestLaunchdUnloadedJobStderrStaysOffTerminal:
         log = tmp_path / "calls.log"
         monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
         monkeypatch.setenv("FAKE_LAUNCHCTL_LOG", str(log))
-        monkeypatch.setattr(gateway_cli, "get_launchd_label", lambda: "ai.hermes.gateway")
+        monkeypatch.setattr(gateway_cli, "get_launchd_label", lambda: "ai.qubit.gateway")
         monkeypatch.setattr(gateway_cli, "_launchd_domain", lambda: "gui/501")
-        monkeypatch.setattr(gateway_cli, "get_launchd_plist_path", lambda: tmp_path / "ai.hermes.gateway.plist")
+        monkeypatch.setattr(gateway_cli, "get_launchd_plist_path", lambda: tmp_path / "ai.qubit.gateway.plist")
         monkeypatch.setattr(gateway_cli, "_clear_launchd_unsupported_marker", lambda: None)
         monkeypatch.setattr(gateway_cli, "_mark_planned_stop", lambda *a, **k: None)
         monkeypatch.setattr(gateway_cli, "_wait_for_gateway_exit", lambda *a, **k: True)
@@ -2545,13 +2623,13 @@ class TestRetryLaunchctlBootstrapUntilRegistered:
     """
 
     DOMAIN = "gui/501"
-    PLIST = "/tmp/ai.hermes.gateway.plist"
-    LABEL = "ai.hermes.gateway"
+    PLIST = "/tmp/ai.qubit.gateway.plist"
+    LABEL = "ai.qubit.gateway"
 
     # `launchctl list <label>` output for a job launchd is actively running.
     # Success requires a PID here, not just exit 0 — exit 0 alone also covers a
     # registered-but-not-running definition (macOS 26+ `state = not running`).
-    RUNNING_LIST_OUTPUT = '{\n\t"PID" = 4242;\n\t"Label" = "ai.hermes.gateway";\n};'
+    RUNNING_LIST_OUTPUT = '{\n\t"PID" = 4242;\n\t"Label" = "ai.qubit.gateway";\n};'
 
     def test_returns_true_once_label_is_registered(self, monkeypatch):
         """Success requires launchctl list to confirm a supervised process, not
@@ -2623,7 +2701,7 @@ class TestRetryLaunchctlBootstrapUntilRegistered:
                 # Registered (exit 0) but no PID line — never running.
                 return SimpleNamespace(
                     returncode=0,
-                    stdout='{\n\t"Label" = "ai.hermes.gateway";\n};',
+                    stdout='{\n\t"Label" = "ai.qubit.gateway";\n};',
                     stderr="",
                 )
             return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -2648,12 +2726,12 @@ class TestTimeoutStopSecCoversCronFloor:
     max(restart_drain, cron_floor) + 30 — not the restart drain alone."""
 
     def _unit_with_config(self, tmp_path, monkeypatch, config_yaml, env=None):
-        hermes = tmp_path / "home" / ".hermes"
-        hermes.mkdir(parents=True)
-        (hermes / "config.yaml").write_text(config_yaml, encoding="utf-8")
-        monkeypatch.setenv("QUBIT_HOME", str(hermes))
-        monkeypatch.delenv("HERMES_RESTART_DRAIN_TIMEOUT", raising=False)
-        monkeypatch.delenv("HERMES_CRON_DRAIN_TIMEOUT", raising=False)
+        qubit = tmp_path / "home" / ".qubit"
+        qubit.mkdir(parents=True)
+        (qubit / "config.yaml").write_text(config_yaml, encoding="utf-8")
+        monkeypatch.setenv("QUBIT_HOME", str(qubit))
+        monkeypatch.delenv("QUBIT_RESTART_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("QUBIT_CRON_DRAIN_TIMEOUT", raising=False)
         monkeypatch.setattr(gateway_cli.shutil, "which", lambda cmd: None)
         monkeypatch.setattr(
             gateway_cli, "_build_user_local_paths", lambda home, existing: []
@@ -2687,13 +2765,13 @@ class TestTimeoutStopSecCoversCronFloor:
             tmp_path,
             monkeypatch,
             "agent:\n  restart_drain_timeout: 0\n",
-            env={"HERMES_CRON_DRAIN_TIMEOUT": "200"},
+            env={"QUBIT_CRON_DRAIN_TIMEOUT": "200"},
         )
         assert f"TimeoutStopSec={resolve_systemd_timeout_stop_sec(0.0, 200.0)}" in unit
 
 
 class TestUnitAnchoredServiceIdentity:
-    """The installed ``hermes-gateway.service`` owns the bare name: under ``sudo`` the naming basis moves
+    """The installed ``qubit-gateway.service`` owns the bare name: under ``sudo`` the naming basis moves
     mid-command when ``_sync_qubit_home_from_systemd_unit()`` adopts the unit's QUBIT_HOME (#108674).
 
     ``platforms("linux")`` because ``_bare_unit_pinned_home()`` is Linux- and root-gated on purpose: a systemd unit
@@ -2703,11 +2781,11 @@ class TestUnitAnchoredServiceIdentity:
 
     @pytest.mark.platforms("linux")
     def test_home_not_pinned_by_unit_keeps_its_suffix(self, tmp_path, monkeypatch):
-        alice_home = tmp_path / "alice" / ".hermes"
+        alice_home = tmp_path / "alice" / ".qubit"
         alice_home.mkdir(parents=True)
-        bob_home = tmp_path / "bob" / ".hermes"
+        bob_home = tmp_path / "bob" / ".qubit"
         bob_home.mkdir(parents=True)
-        root_home = tmp_path / "root" / ".hermes"
+        root_home = tmp_path / "root" / ".qubit"
         root_home.mkdir(parents=True)
         unit_dir = tmp_path / "systemd"
         unit_dir.mkdir()
@@ -2725,7 +2803,7 @@ class TestUnitAnchoredServiceIdentity:
     def test_unprivileged_profile_command_ignores_the_system_unit(self, tmp_path, monkeypatch):
         """A bare system unit pinning ``profiles/<name>`` must not alias that profile onto the user's
         default unit when an unprivileged user-scope command resolves the name."""
-        profile_home = tmp_path / "alice" / ".hermes" / "profiles" / "kimi"
+        profile_home = tmp_path / "alice" / ".qubit" / "profiles" / "kimi"
         profile_home.mkdir(parents=True)
         unit_dir = tmp_path / "systemd"
         unit_dir.mkdir()
@@ -2736,7 +2814,7 @@ class TestUnitAnchoredServiceIdentity:
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "alice")
         monkeypatch.setattr(os, "geteuid", lambda: 1000)
         monkeypatch.setenv("QUBIT_HOME", str(profile_home))
-        assert gateway_cli.get_service_name() == "hermes-gateway-kimi"
+        assert gateway_cli.get_service_name() == "qubit-gateway-kimi"
 
     @pytest.mark.platforms("linux")
     def test_bare_unit_pinning_a_named_profile_home_keeps_the_bare_name(self, tmp_path, monkeypatch):
@@ -2744,9 +2822,9 @@ class TestUnitAnchoredServiceIdentity:
         remapped home, so the BARE unit legitimately carries a ``profiles/<name>`` home. The unit-pinned
         check therefore has to win over the profile branch, which would answer ``-kimi`` for a unit that
         was installed bare."""
-        profile_home = tmp_path / "alice" / ".hermes" / "profiles" / "kimi"
+        profile_home = tmp_path / "alice" / ".qubit" / "profiles" / "kimi"
         profile_home.mkdir(parents=True)
-        root_home = tmp_path / "root" / ".hermes"
+        root_home = tmp_path / "root" / ".qubit"
         root_home.mkdir(parents=True)
         unit_dir = tmp_path / "systemd"
         unit_dir.mkdir()
@@ -2765,9 +2843,9 @@ class TestUnitAnchoredServiceIdentity:
     def test_real_unit_sync_keeps_the_name_it_validated(self, tmp_path, monkeypatch):
         """Drive the production sync instead of simulating the adoption with setenv: the name resolved
         before ``_sync_qubit_home_from_systemd_unit()`` must survive the mutation it performs."""
-        alice_home = tmp_path / "alice" / ".hermes"
+        alice_home = tmp_path / "alice" / ".qubit"
         alice_home.mkdir(parents=True)
-        root_home = tmp_path / "root" / ".hermes"
+        root_home = tmp_path / "root" / ".qubit"
         root_home.mkdir(parents=True)
         unit_dir = tmp_path / "systemd"
         unit_dir.mkdir()

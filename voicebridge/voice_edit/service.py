@@ -249,23 +249,36 @@ _REPEAT_RE = _re_module.compile(
     r"|\bcome\s+again\s*[?]?\s*$",
     _re_module.IGNORECASE)
 
+#: A defect report ("report a bug/issue/problem", "file an error report") is
+#: not a request to summarize a chat session. The verb/noun match below is
+#: adjacency-bounded but "report a bug in the session manager" still puts a
+#: report-ish verb near a session noun, so this frame is excluded explicitly
+#: and before the match — a bug report is routed as a normal ask, never as a
+#: session summary.
+_REPORT_DEFECT_RE = _re_module.compile(
+    r"\breport\b(?:\s+(?:a|an|the))?\s+"
+    r"(bug|issue|problem|error|defect|ticket|complaint|incident)\b"
+    r"|\b(bug|issue|problem|error|defect|ticket|complaint|incident)\s+report\b",
+    _re_module.IGNORECASE)
+
 #: Deterministic chat-session report (report lane, 2026-10-06): "report on my
 #: chat" / "summarize the chat session" / "what did we do in that session"
 #: read the routed/current canonical transcript and speak a SHORT summary
-#: (never the raw transcript). Conservative: a report-ish verb must sit next
-#: to a chat/session/conversation noun, or an explicit "what did we do /
-#: what happened" frame must carry that noun — so ordinary questions ("what
-#: time is it"), a document ask ("summarize this document"), and a YouTube/
-#: email ask never match. The verb/noun match is bounded per sentence so it
-#: cannot bridge two unrelated clauses.
+#: (never the raw transcript). Conservative: a report-ish verb must sit ADJACENT
+#: (within a few words) to a chat/session/conversation noun, or an explicit
+#: "what did we do / what happened" frame must carry that noun — so ordinary
+#: questions ("what time is it"), a document ask ("summarize this document"),
+#: a YouTube/email ask, and a defect report ("report a bug in the session
+#: manager", excluded by :data:`_REPORT_DEFECT_RE`) never match. The bounded
+#: verb/noun gap cannot bridge two unrelated clauses.
 _REPORT_CHAT_RE = _re_module.compile(
-    r"\b(report|recap|summari[sz]e|summary)\b[^.?!]*\b"
+    r"\b(report|recap|summari[sz]e|summary)\b(?:\s+\w+){0,3}\s+"
     r"(chat|session|conversation)\b"
-    r"|\b(chat|session|conversation)\b[^.?!]*\b"
+    r"|\b(chat|session|conversation)\b(?:\s+\w+){0,3}\s+"
     r"(report|recap|summari[sz]e|summary)\b"
-    r"|\bwhat\s+(did\s+)?we\s+(do|talk\s+about|discuss)\b[^.?!]*\b"
+    r"|\bwhat\s+(did\s+)?we\s+(do|talk\s+about|discuss)\b(?:\s+\w+){0,4}\s+"
     r"(chat|session|conversation)\b"
-    r"|\bwhat\s+happened\b[^.?!]*\b(chat|session|conversation)\b",
+    r"|\bwhat\s+happened\b(?:\s+\w+){0,4}\s+(chat|session|conversation)\b",
     _re_module.IGNORECASE)
 
 
@@ -620,11 +633,45 @@ class VoiceEditService:
         with self._lock:
             self._prune()
             self._reqs[rid] = req
+        # Owner directive (wave 5 TASK 2): every PTT / wake / voice interaction
+        # must CREATE the session in ``/qubit-chat``. ``begin`` is the single
+        # seam both the Right-Ctrl path and the wake path call
+        # (``desktop_helper._open_request`` -> ``client.begin``), so ensuring the
+        # canonical dashboard-source session here covers both. Best-effort and
+        # additive — a store fault never blocks the turn (see
+        # ``_ensure_voice_session``).
+        ensured = self._ensure_voice_session(session_id)
         self._audit("voice_edit.begin", {"request_id": rid,
                                          "session_id": session_id or "",
-                                         "target_app": target_app or ""})
+                                         "target_app": target_app or "",
+                                         "ensured_session": ensured.get(
+                                             "session_id", ""),
+                                         "ensured_state": ensured.get(
+                                             "state", ""),
+                                         "ensured_created": bool(
+                                             ensured.get("created"))})
         return {"ok": True, "request_id": rid, "session_id": session_id,
                 "ttl_s": self.ttl()}
+
+    def _ensure_voice_session(self, routed_session_id: str = "") -> Dict[str, Any]:
+        """Ensure the canonical dashboard-source session for this interaction.
+
+        Delegates to :func:`voicebridge.voice_edit.voice_sessions.ensure_voice_session`
+        on the SAME injectable canonical store the turn path writes
+        (``self._canonical_store``), so a Right-Ctrl / wake / voice interaction
+        creates (or reuses) a session ``/qubit-chat`` lists — never a second
+        store, never a second identity. Best-effort: a fault is audited and the
+        turn is unchanged.
+        """
+        try:
+            return voice_sessions.ensure_voice_session(
+                self.cfg, routed_session_id or None,
+                store=self._canonical_store())
+        except Exception as exc:  # noqa: BLE001 - never block a turn
+            self._audit("voice_edit.ensure_session_error",
+                        {"error": str(exc)[:160]})
+            return {"ok": False, "state": "ERROR", "session_id": "",
+                    "created": False}
 
     def _get(self, request_id: str) -> _Request:
         with self._lock:
@@ -1611,11 +1658,16 @@ class VoiceEditService:
         """True when the utterance asks for a report on a chat session.
 
         Conservative by design (see :data:`_REPORT_CHAT_RE`): a report-ish
-        verb next to a chat/session/conversation noun, or an explicit
+        verb adjacent to a chat/session/conversation noun, or an explicit
         "what did we do / what happened" frame carrying that noun. Ordinary
-        questions, a document summarize, and mail/YouTube asks never match.
+        questions, a document summarize, mail/YouTube asks, and defect
+        reports ("report a bug/issue/problem", see :data:`_REPORT_DEFECT_RE`)
+        never match.
         """
-        return bool(_REPORT_CHAT_RE.search(text or ""))
+        raw = text or ""
+        if _REPORT_DEFECT_RE.search(raw):
+            return False
+        return bool(_REPORT_CHAT_RE.search(raw))
 
     def _repeat_last_answer(self) -> "tuple[str, str]":
         """The last spoken answer, verbatim, or ``("", "")`` to fall through.

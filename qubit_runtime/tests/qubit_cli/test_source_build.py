@@ -1,6 +1,6 @@
 """Source orchestration uses real node-deps/npm in an isolated checkout.
 
-Only PM's tool acquisition is substituted with the host's node/npm. Small
+Only PM's tool acquisition (and its installed-node record) is substituted with the host's node/npm. Small
 workspace scripts stand in for the expensive UI compilers; subprocess failures,
 locked dependency selection, environment propagation and publication are real.
 """
@@ -12,11 +12,19 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
 import pm
 from pm.package import Runner
+
+
+def use_host_node_as_pm_node(monkeypatch):
+    """Freshness reads run only under PM's recorded Node; stand the host's node in for it."""
+    node, real = Path(shutil.which("node")), pm.installed_package
+    monkeypatch.setattr(pm, "installed_package", lambda name, **kwargs: (
+        SimpleNamespace(binary=node) if name == "node" else real(name, **kwargs)))
 
 
 def copy_freshness_scripts(root):
@@ -52,8 +60,8 @@ def test_source_build_uses_selected_python_for_isolated_icon_child(tmp_path, mon
     monkeypatch.syspath_prepend(str(selected))
 
     env = source_build_env()
-    assert env["HERMES_PYTHON"] == str(venv_python(venv))
-    subprocess.run([env["HERMES_PYTHON"], "-I", "-c",
+    assert env["QUBIT_PYTHON"] == str(venv_python(venv))
+    subprocess.run([env["QUBIT_PYTHON"], "-I", "-c",
                     "import icon_dependency; assert icon_dependency.ready"], check=True)
 
 
@@ -74,7 +82,7 @@ def test_installed_npm_does_not_authorize_missing_workspace_dependencies(source_
 
     root, _ = source_checkout
     env = source_build_env()
-    monkeypatch.setenv("HERMES_DISABLE_LAZY_INSTALLS", "1")
+    monkeypatch.setenv("QUBIT_DISABLE_LAZY_INSTALLS", "1")
     with pytest.raises(subprocess.CalledProcessError):
         prepare_source_dependencies(root, ("ui-tui", "web"), env=env)
     assert _events(root) == []
@@ -91,11 +99,11 @@ def source_checkout(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "tools"))
-    monkeypatch.setenv("HERMES_DISABLE_LAZY_INSTALLS", "0")
+    monkeypatch.setenv("QUBIT_RUNTIME_DIR", str(tmp_path / "tools"))
+    monkeypatch.setenv("QUBIT_DISABLE_LAZY_INSTALLS", "0")
     monkeypatch.setenv("npm_config_cache", str(tmp_path / "npm-cache"))
     monkeypatch.setenv("ESBUILD_BINARY_PATH", "/wrong/esbuild")
-    monkeypatch.setenv("HERMES_PYTHON", "/wrong/python")
+    monkeypatch.setenv("QUBIT_PYTHON", "/wrong/python")
     (home / "npmrc").write_text("fund=false\n", encoding="utf-8")
     monkeypatch.delenv("NPM_CONFIG_USERCONFIG", raising=False)
     acquired = []
@@ -108,6 +116,7 @@ def source_checkout(tmp_path, monkeypatch):
             [str(Path(npm).parent), str(Path(node).parent), os.environ["PATH"]])})
 
     monkeypatch.setattr(pm, "ensure", acquire)
+    use_host_node_as_pm_node(monkeypatch)
     root = tmp_path / "source with spaces"
     root.mkdir()
     workspaces = ["ui-tui", "web", "apps/desktop", "unrelated"]
@@ -126,7 +135,7 @@ def source_checkout(tmp_path, monkeypatch):
     (root / "log.mjs").write_text(
         "import { appendFileSync } from 'node:fs';\n"
         "appendFileSync('events.jsonl', JSON.stringify({step: process.argv[2], "
-        "python: process.env.HERMES_PYTHON, ci: process.env.CI, "
+        "python: process.env.QUBIT_PYTHON, ci: process.env.CI, "
         "esbuild: process.env.ESBUILD_BINARY_PATH, "
         "npmrc: process.env.NPM_CONFIG_USERCONFIG}) + '\\n');\n",
         encoding="utf-8",
@@ -181,7 +190,7 @@ def source_products(source_checkout):
         "import { build } from '../../product.mjs';\n"
         "const flag = '-c.directories.output=';\n"
         "const staging = process.argv.find(arg => arg.startsWith(flag)).slice(flag.length);\n"
-        "build('desktop', relative('../..', staging) + '/linux-unpacked/hermes');\n",
+        "build('desktop', relative('../..', staging) + '/linux-unpacked/qubit');\n",
         encoding="utf-8",
     )
     (root / "scripts/build/build-desktop.mjs").write_text(
@@ -209,7 +218,7 @@ def test_preparation_reuses_only_the_exact_completed_workspace_union(source_chec
     prepare_source_dependencies(root, ("ui-tui", "web"), env=env)
     first = _events(root)
     assert [event["step"] for event in first] == ["deps"]
-    assert first[0]["python"] == env["HERMES_PYTHON"]
+    assert first[0]["python"] == env["QUBIT_PYTHON"]
     assert first[0]["ci"] == "1"
     assert "esbuild" not in first[0]
     assert first[0]["npmrc"] == str(Path(os.environ["QUBIT_HOME"]) / "npmrc")
@@ -250,7 +259,7 @@ def test_update_builds_selected_products_after_one_union_preparation(source_prod
     from qubit_cli.main_web_build import _web_ui_build_needed
 
     root, acquired = source_products
-    app = root / "apps/desktop/release/linux-unpacked/hermes"
+    app = root / "apps/desktop/release/linux-unpacked/qubit"
     app.parent.mkdir(parents=True)
     app.write_text("previous app")
     build_update_products(root, desktop=desktop)
@@ -267,12 +276,33 @@ def test_update_builds_selected_products_after_one_union_preparation(source_prod
 
 
 @pytest.mark.platforms("linux")
+def test_update_recompiles_only_products_whose_inputs_changed(source_products):
+    from qubit_cli.source_build import build_update_products
+
+    root, _ = source_products
+
+    def products():
+        return [event["step"] for event in _events(root) if event["step"] != "deps"]
+
+    build_update_products(root, desktop=True)
+    (root / "events.jsonl").unlink()
+    build_update_products(root, desktop=True)
+    assert products() == ["desktop"]
+
+    (root / "events.jsonl").unlink()
+    (root / "web/src").mkdir(parents=True, exist_ok=True)
+    (root / "web/src/changed.ts").write_text("export {}\n", encoding="utf-8")
+    build_update_products(root, desktop=False)
+    assert products() == ["web"]
+
+
+@pytest.mark.platforms("linux")
 @pytest.mark.parametrize("step", ["tui", "web", "desktop"])
 def test_update_failure_raises_without_retries_or_replacing_live_app(source_products, step):
     from qubit_cli.source_build import build_update_products
 
     root, acquired = source_products
-    app = root / "apps/desktop/release/linux-unpacked/hermes"
+    app = root / "apps/desktop/release/linux-unpacked/qubit"
     app.parent.mkdir(parents=True)
     app.write_text("previous app")
     (root / f"fail-{step}").touch()
@@ -298,4 +328,40 @@ def test_module_cli_builds_the_requested_products(source_products, desktop, monk
     runpy.run_module("qubit_cli.source_build", run_name="__main__")
     assert acquired == ["npm"]
     assert (root / "qubit_cli/web_dist/index.html").is_file()
-    assert (root / "apps/desktop/release/linux-unpacked/hermes").exists() == desktop
+    assert (root / "apps/desktop/release/linux-unpacked/qubit").exists() == desktop
+
+
+@pytest.mark.platforms("posix")
+def test_packaged_desktop_is_reused_only_while_it_names_head(tmp_path, monkeypatch):
+    """The update skips the desktop build only when the shipped app's baked commit is HEAD
+    and its receipt is current; a moved HEAD or an unreadable stamp means build."""
+    import qubit_cli.main_desktop as main_desktop
+
+    root = tmp_path / "checkout"
+    root.mkdir()
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+    subprocess.run([*git[:3], "init", "-q"], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "one"], check=True)
+    desktop_dir = root / "apps/desktop"
+    exe = desktop_dir / "release/app/Hermes"
+    monkeypatch.setattr(main_desktop, "_desktop_packaged_executable", lambda _d: exe)
+    resources = main_desktop._packaged_resources_dir(desktop_dir)
+    (resources / "app.asar.unpacked/dist").mkdir(parents=True)
+    receipt_current = {"value": True}
+    monkeypatch.setattr(main_desktop, "_desktop_build_needed",
+                        lambda *_a, **_k: not receipt_current["value"])
+
+    def head():
+        return subprocess.run([*git[:3], "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+
+    def reused():
+        return main_desktop._packaged_desktop_current_for_head(desktop_dir, root)
+
+    assert not reused()  # no baked stamp
+    (resources / "install-stamp.json").write_text(json.dumps({"commit": head()}), encoding="utf-8")
+    assert reused()
+    receipt_current["value"] = False
+    assert not reused()
+    receipt_current["value"] = True
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "two"], check=True)
+    assert not reused()

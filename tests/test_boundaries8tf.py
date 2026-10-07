@@ -15,7 +15,7 @@ CONVERTED_TOKENS = ("pairing", "webhook", "peer", "gateway-manage",
                     "gateway", "whatsapp", "whatsapp-cloud", "slack", "send")
 
 ABSENT_COMMANDS = ("login", "logout", "pets", "skin", "serve", "dashboard")
-# Formerly absent surfaces now served by the Qubit-owned fork CLI (not stubs):
+# Formerly absent surfaces now served by the vendored Qubit CLI (not stubs):
 # a real routed command with upstream parser/behaviour, confirm-gated where the
 # operation is mutating.
 ROUTED_FORK_COMMANDS = ("portal", "desktop", "gui")

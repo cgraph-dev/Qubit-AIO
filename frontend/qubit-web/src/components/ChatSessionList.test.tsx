@@ -148,7 +148,9 @@ describe("ChatSessionList", () => {
     await vi.waitFor(() =>
       expect(container.textContent).toContain("First chat"),
     );
-    expect(apiMocks.listChatSessions).toHaveBeenCalledWith(30, 0);
+    // The component now passes the (empty) search query as the third arg; the
+    // contract under test is which STORE is read, not the query default.
+    expect(apiMocks.listChatSessions).toHaveBeenCalledWith(30, 0, "");
     expect(apiMocks.getSessions).not.toHaveBeenCalled();
     expect(container.textContent).toContain("3 msgs");
   });

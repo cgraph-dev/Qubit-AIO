@@ -25,7 +25,7 @@ OMIT_TEMPERATURE = object()
 
 
 def _profile_user_agent() -> str:
-    """Return a ``hermes-cli/<version>`` UA string, with a stable fallback.
+    """Return a ``qubit-cli/<version>`` UA string, with a stable fallback.
 
     Used by ``ProviderProfile.fetch_models`` so the catalog probe is not
     served the default ``Python-urllib/<ver>`` UA — some providers
@@ -33,9 +33,9 @@ def _profile_user_agent() -> str:
     """
     try:
         from qubit_cli.version_info import get_version_info  # lazy: avoid layer cycle at import time
-        return f"hermes-cli/{get_version_info().base_version}"
+        return f"qubit-cli/{get_version_info().base_version}"
     except Exception:
-        return "hermes-cli"
+        return "qubit-cli"
 
 
 @dataclass

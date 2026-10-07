@@ -11,6 +11,10 @@ from qubit_cli.toolset_validation import validate_platform_toolsets
 # A representative set of real toolset names. `hermes` is deliberately absent —
 # that is the corruption #38798 reported (`hermes-cli` rewritten to `hermes`).
 _KNOWN = {
+    "qubit-cli",
+    "qubit-telegram",
+    "qubit-discord",
+    "qubit-whatsapp",
     "hermes-cli",
     "hermes-telegram",
     "hermes-discord",
@@ -28,12 +32,12 @@ def _is_valid(name):
 
 
 def test_38798_corruption_warns_and_suggests_correct_name():
-    # The exact reported shape: cli holds 'hermes' instead of 'hermes-cli'.
+    # The exact reported shape: cli holds 'hermes' instead of 'qubit-cli'.
     warnings = validate_platform_toolsets({"cli": ["hermes"]}, _is_valid)
     unknown = [w for w in warnings if "unknown toolset 'hermes'" in w]
     assert len(unknown) == 1
     # Actionable: points at the valid name the entry should have been.
-    assert "did you mean 'hermes-cli'?" in unknown[0]
+    assert "did you mean 'qubit-cli'?" in unknown[0]
     # And the zero-valid-toolsets safety net fires.
     assert any("zero valid toolsets" in w for w in warnings)
 
@@ -110,7 +114,7 @@ def test_null_platform_warns_even_when_others_are_valid():
     assert any(
         "platform 'cli'" in w
         and "null toolset value" in w
-        and "falling back to 'hermes-cli'" in w
+        and "falling back to 'qubit-cli'" in w
         for w in warnings
     )
     assert not any("zero valid toolsets" in w for w in warnings)
@@ -122,7 +126,7 @@ def test_null_platform_uses_canonical_default_for_alias():
 
     assert any(
         "platform 'whatsapp_cloud'" in w
-        and "falling back to 'hermes-whatsapp'" in w
+        and "falling back to 'qubit-whatsapp'" in w
         for w in warnings
     )
     assert not any("zero valid toolsets" in w for w in warnings)
@@ -135,7 +139,7 @@ def test_scalar_platform_value_warns_but_uses_platform_default():
     assert any(
         "platform 'cli'" in w
         and "invalid toolset value 'bogus'" in w
-        and "falling back to 'hermes-cli'" in w
+        and "falling back to 'qubit-cli'" in w
         for w in warnings
     )
     assert not any("zero valid toolsets" in w for w in warnings)

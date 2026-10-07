@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.live_process_fixtures import SLEEPER_MARKER, sleeper_script_path
+
 pytestmark = pytest.mark.platforms("windows")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -56,12 +58,12 @@ def sleeper():
 
     def _spawn(*tail: str) -> subprocess.Popen:
         p = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(120)", *tail],
+            [sys.executable, sleeper_script_path(), *tail],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         procs.append(p)
-        assert _wait_until(lambda: _argv_visible(p.pid, "time.sleep(120)")), "sleeper argv never visible"
+        assert _wait_until(lambda: _argv_visible(p.pid, SLEEPER_MARKER)), "sleeper argv never visible"
         return p
 
     yield _spawn
@@ -95,12 +97,12 @@ def _entry(proc: subprocess.Popen, purpose: str = "serve") -> dict:
 
 
 def test_live_supervised_serve_suppresses_cold_start(sleeper, monkeypatch, tmp_path):
-    from qubit_cli import gateway as hermes_gateway
+    from qubit_cli import gateway as qubit_gateway
     from qubit_cli import gateway_windows
     from qubit_cli import update_cmd
 
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
-    (tmp_path / ".hermes").mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
+    (tmp_path / ".qubit").mkdir()
 
     serve = sleeper()
     _write_ledger([_entry(serve)])
@@ -109,7 +111,7 @@ def test_live_supervised_serve_suppresses_cold_start(sleeper, monkeypatch, tmp_p
 
     # Autostart artifact present + no gateway running: WITHOUT ownership the
     # pause phase would plan a cold start; WITH it, no plan.
-    monkeypatch.setattr(hermes_gateway, "find_gateway_pids", lambda **_k: [])
+    monkeypatch.setattr(qubit_gateway, "find_gateway_pids", lambda **_k: [])
     monkeypatch.setattr(gateway_windows, "is_installed", lambda: True)
     assert update_cmd._pause_windows_gateways_for_update() is None
 
@@ -124,8 +126,8 @@ def test_live_supervised_serve_suppresses_cold_start(sleeper, monkeypatch, tmp_p
 def test_holder_scan_fallback_respects_token_classifier(sleeper, monkeypatch, tmp_path):
     from qubit_cli import update_cmd
 
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
-    (tmp_path / ".hermes").mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
+    (tmp_path / ".qubit").mkdir()
     _write_ledger([])  # force the fallback rung
 
     # Real process whose argv carries genuine serve shape, visible to psutil.

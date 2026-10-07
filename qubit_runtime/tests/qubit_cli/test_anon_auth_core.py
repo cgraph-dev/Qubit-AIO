@@ -39,12 +39,13 @@ def _shared_store(tmp_path) -> dict:
 
 
 class TestIdentityLifecycle:
-    def test_fresh_install_mints_once_and_is_the_active_provider(self, portal, tmp_path):
+    def test_fresh_install_mints_once_and_resolves_without_claiming_active_provider(self, portal, tmp_path):
         state = anon_auth.ensure_portal_identity(explicit=True)
         assert anon_auth.is_guest_state(state)
         assert "refresh_token" not in state
         store = _load_auth_store()
-        assert store["active_provider"] == "nous"
+        assert "active_provider" not in store
+        assert resolve_provider("auto") == "nous"
         assert anon_auth.is_guest_state(store["providers"]["nous"])
         assert _shared_store(tmp_path).get("anon_token") == state["anon_token"]
         assert portal.minted == 1
@@ -84,18 +85,18 @@ class TestIdentityLifecycle:
             resolve_provider("auto")
 
     def test_launch_gate_off_means_no_free_tier_at_all(self, portal, monkeypatch):
-        """Without ``HERMES_GUEST_ONBOARDING=1`` the free tier does not exist: no mint, no portal
+        """Without ``QUBIT_GUEST_ONBOARDING=1`` the free tier does not exist: no mint, no portal
         traffic, ``nous.guest``'s default is never consulted, and an identity already on disk is
         not treated as enabled. The env var is the only lever; ``0``/``true``/anything but ``1`` is off."""
         monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda: False)
         for raw in ("", "0", "true", "yes", "new"):
-            monkeypatch.setenv("HERMES_GUEST_ONBOARDING", raw)
+            monkeypatch.setenv("QUBIT_GUEST_ONBOARDING", raw)
             assert anon_auth.guest_enabled() is False
             assert anon_auth.ensure_portal_identity(explicit=True) is None
         assert portal.calls == []
         with pytest.raises(anon_auth.AuthError):
             resolve_provider("auto")
-        monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+        monkeypatch.setenv("QUBIT_GUEST_ONBOARDING", "1")
         assert anon_auth.guest_enabled() is True
 
 
@@ -261,7 +262,7 @@ class TestLogout:
         from types import SimpleNamespace
         from qubit_cli.auth import logout_command
         from qubit_cli.auth_nous import persist_nous_credentials
-        persist_nous_credentials({"access_token": _jwt(client_id="hermes-cli", account_tier="free"),
+        persist_nous_credentials({"access_token": _jwt(client_id="qubit-cli", account_tier="free"),
                                   "refresh_token": "rt-1", "expires_at": "2030-01-01T00:00:00+00:00",
                                   "auth_method": "oauth_device_code"})
         assert _shared_store(tmp_path).get("refresh_token") == "rt-1"
@@ -320,7 +321,7 @@ class TestBootstrapIsTheOneCreator:
     def test_bootstrap_mints_once_records_and_a_second_run_is_free(self, portal):
         fb = self._fresh()
         record = fb.run_bootstrap()
-        assert record.free_tier and record.has_identity and record.provider_configured
+        assert record.free_tier_account and record.has_identity and record.provider_configured
         assert record.inference_provider == "nous" and record.other_providers is False
         assert portal.minted == 1
         again = fb.run_bootstrap()
@@ -332,7 +333,7 @@ class TestBootstrapIsTheOneCreator:
         fb = self._fresh()
         record = fb.run_bootstrap()
         assert record.other_providers is True and record.has_identity is True
-        assert record.free_tier is True, "the identity exists for connectors"
+        assert record.free_tier_account is True, "the identity exists for connectors"
         assert record.inference_provider != "nous"
         assert _load_auth_store().get("active_provider") != "nous", "a mint beside an own key must not hijack inference"
         assert portal.minted == 1
@@ -357,7 +358,7 @@ class TestBootstrapIsTheOneCreator:
         portal.gate_closed = True
         fb = self._fresh()
         record = fb.run_bootstrap()
-        assert record.has_identity is False and record.free_tier is False and record.error
+        assert record.has_identity is False and record.free_tier_account is False and record.error
         assert [p for _, p in portal.calls].count("/api/anonymous/create") == 1
         # The explicit retry (desktop free_tier.provision) is also memoised for the process.
         assert anon_auth.ensure_portal_identity(explicit=True) is None
@@ -369,7 +370,7 @@ class TestIdentityOfRecordIsTheSharedStore:
         anon_auth.ensure_portal_identity(explicit=True)
         # A sibling profile signed in: the shared store now holds a real account.
         from qubit_cli.auth_nous import _write_shared_nous_state
-        _write_shared_nous_state({"access_token": _jwt(client_id="hermes-cli", account_tier="free"),
+        _write_shared_nous_state({"access_token": _jwt(client_id="qubit-cli", account_tier="free"),
                                   "refresh_token": "rt-sibling", "expires_at": "2030-01-01T00:00:00+00:00",
                                   "auth_method": "oauth_device_code"})
         state = anon_auth.ensure_portal_identity(explicit=True)
@@ -391,7 +392,7 @@ class TestIdentityOfRecordIsTheSharedStore:
     def test_clearing_a_dead_guest_leaves_a_sibling_identity_alone(self, portal, tmp_path):
         anon_auth.ensure_portal_identity(explicit=True)
         from qubit_cli.auth_nous import _write_shared_nous_state
-        _write_shared_nous_state({"access_token": _jwt(client_id="hermes-cli"), "refresh_token": "rt-sibling",
+        _write_shared_nous_state({"access_token": _jwt(client_id="qubit-cli"), "refresh_token": "rt-sibling",
                                   "expires_at": "2030-01-01T00:00:00+00:00", "auth_method": "oauth_device_code"})
         anon_auth.clear_dead_guest("test")
         assert "nous" not in _load_auth_store().get("providers", {})

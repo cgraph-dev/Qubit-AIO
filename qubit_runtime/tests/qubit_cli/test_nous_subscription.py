@@ -3,10 +3,13 @@
 import shutil
 import sys
 
+import pytest
+
 from qubit_cli.nous_account import NousPortalAccountInfo, NousToolAccessInfo
 from qubit_cli import nous_subscription as ns
 from tools import tool_backend_helpers
 from tools import browser_tool_install as bt_install
+from tools.image_generation_catalog import DEFAULT_MODEL as FAL_DEFAULT_MODEL
 
 
 _POOL_COVERAGE = {
@@ -192,7 +195,7 @@ def test_logged_in_entitled_account_yields_a_state_for_every_feature(monkeypatch
     """The logged-in + entitled branch must produce a state for EVERY feature, including
     those with no config selection field (modal). Regression: the managed-availability
     table indexed the selection map by every feature key and raised KeyError('modal'),
-    crashing `hermes status`, `hermes tools`, and the dashboard toolsets API."""
+    crashing `qubit status`, `qubit tools`, and the dashboard toolsets API."""
     monkeypatch.setattr(ns, "get_nous_portal_account_info", lambda **kw: _pool_account())
     monkeypatch.setattr(ns, "is_managed_tool_gateway_ready", lambda gateway: True)
     monkeypatch.setattr(ns, "get_env_value", lambda name: "")
@@ -204,6 +207,24 @@ def test_logged_in_entitled_account_yields_a_state_for_every_feature(monkeypatch
 
     assert set(result.features) == set(ns._FEATURES)
     assert result.modal.available is True  # entitled + gateway ready → managed modal is offered
+
+
+@pytest.mark.parametrize(
+    "image_cfg, partner",
+    [
+        ({"provider": "nous", "model": "krea-2-medium"}, "Krea"),
+        ({"model": FAL_DEFAULT_MODEL}, "FAL"),
+        ({"provider": "nous", "model": "openai/gpt-image-2"}, "Nous Portal"),
+        ({"model": "openai/gpt-image-2"}, "FAL"),
+        ({"use_gateway": True, "model": "openai/gpt-image-2"}, "FAL"),  # managed-model routing ignores legacy use_gateway
+        ({"provider": "openai", "model": "gpt-image-2"}, None),
+    ],
+)
+def test_managed_image_partner_follows_the_stored_model(image_cfg, partner):
+    """The partner is the gateway the runtime dispatcher routes to (tools.image_generation_managed.
+    managed_route): the stored model decides under the managed pick, Portal ids only with an
+    explicit ``nous``; a direct vendor owns its model id."""
+    assert ns.managed_image_partner({"image_gen": image_cfg}) == partner
 
 
 def test_prompt_enable_tool_gateway_pool_offers_covered_tools_only(monkeypatch):
@@ -228,7 +249,7 @@ def test_get_gateway_eligible_tools_treats_explicit_backend_as_configured(monkey
     """A keyless local backend (e.g. searxng) has no credentials to detect,
     but an explicit non-nous selection must still keep it out of
     'unconfigured' — regression for #92647, where it was pre-checked and a
-    single Enter during `hermes model` overwrote it to `web.backend: nous`.
+    single Enter during `qubit model` overwrote it to `web.backend: nous`.
     """
     monkeypatch.setattr(ns, "get_nous_portal_account_info", lambda **kw: _account(logged_in=True, paid=True))
     monkeypatch.setattr(
@@ -404,7 +425,7 @@ def test_apply_nous_managed_defaults_writes_video_gen_config(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# ensure_nous_portal_access — inline login gate for `hermes tools`
+# ensure_nous_portal_access — inline login gate for `qubit tools`
 # ---------------------------------------------------------------------------
 
 

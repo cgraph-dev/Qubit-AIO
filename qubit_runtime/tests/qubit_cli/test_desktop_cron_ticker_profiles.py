@@ -114,7 +114,13 @@ def test_enumeration_failure_fails_open(monkeypatch, _providers):
 
     ws._start_desktop_cron_ticker(threading.Event(), interval=11)
 
-    assert builtin.start_kwargs == {"interval": 11}
+    from qubit_constants import get_qubit_home
+
+    # This backend's own store only, behind the per-tick gateway gate (see the stand-down tests).
+    assert set(builtin.start_kwargs) == {"interval", "profile_homes", "profile_gate"}
+    assert builtin.start_kwargs["interval"] == 11
+    [(_name, home)] = builtin.start_kwargs["profile_homes"]()
+    assert home == Path(get_qubit_home())
 
 
 def test_external_provider_never_gets_profile_homes(monkeypatch, tmp_path):
@@ -147,7 +153,7 @@ def test_desktop_ticker_serves_every_profile_and_yields_to_owning_gateway(monkey
     import qubit_yaml as yaml
 
     _sp, builtin = _providers
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".qubit"
     for name in ("worker", "guest", "solo"):
         (root / "profiles" / name).mkdir(parents=True)
         (root / "profiles" / name / "config.yaml").write_text("{}\n")  # identity marker: served

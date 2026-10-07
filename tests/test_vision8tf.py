@@ -128,7 +128,7 @@ def _png(tmp_path, name="img.png", payload=PNG_1X1):
 def _no_guard(monkeypatch):
     from voicebridge import vision as VI
 
-    monkeypatch.setattr(VI, "_guard", lambda size_mib: 99999)
+    monkeypatch.setattr(VI, "_guard", lambda size_mib, url="": 99999)
 
 
 # ------------------------------------------------- validation

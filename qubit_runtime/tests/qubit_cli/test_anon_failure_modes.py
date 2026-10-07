@@ -1,5 +1,5 @@
 """Nous free tier: every way the account service or the wire can refuse the free tier, and what
-Qubit does with each (the failure-mode contract behind the desktop's onboarding copy).
+Hermes does with each (the failure-mode contract behind the desktop's onboarding copy).
 
 Driven through a fake NAS whose responses are the ones the real service sends (see the code table
 in ``qubit_cli.anon_auth``), never through mocked-away client code.
@@ -46,7 +46,7 @@ class TestNasRefusalCodes:
         nas.create_response = httpx.Response(404, json={"error": "not_found"})
         err = _mint_error(nas)
         assert err.code == anon_auth.ANON_GATE_CLOSED and err.retryable is False
-        assert "Qubit account" in str(err) and "free" in str(err)
+        assert "Nous account" in str(err) and "free" in str(err)
         # Terminal: no later attempt this process, whatever the clock says.
         assert anon_auth.ensure_portal_identity(explicit=True) is None
         assert nas.creates() == 1
@@ -198,7 +198,7 @@ class TestBootstrapRecord:
         nas.create_response = httpx.Response(
             429, json={"error": "temporarily_unavailable"}, headers={"Retry-After": "30"})
         record = free_tier_bootstrap.run_bootstrap(announce=False)
-        assert record.has_identity is False and record.free_tier is False
+        assert record.has_identity is False and record.free_tier_account is False
         assert record.failure["error_code"] == anon_auth.ANON_RATE_LIMITED
         assert record.failure["retryable"] is True and 28 <= record.failure["retry_after"] <= 30
         assert record.failure_fields() == {
@@ -207,7 +207,7 @@ class TestBootstrapRecord:
 
     def test_a_clean_boot_carries_no_failure_block(self, nas):
         record = free_tier_bootstrap.run_bootstrap(announce=False)
-        assert record.free_tier is True and record.failure_fields() == {}
+        assert record.free_tier_account is True and record.failure_fields() == {}
 
     def test_the_background_loop_retries_a_transient_failure_until_it_settles(self, nas, monkeypatch):
         nas.raise_transport = httpx.ConnectTimeout("no route")
@@ -223,7 +223,7 @@ class TestBootstrapRecord:
         monkeypatch.setattr(free_tier_bootstrap, "_sleep", _sleep)
         free_tier_bootstrap._bootstrap_then_retry()
         record = free_tier_bootstrap.current_record()
-        assert record.has_identity is True and record.free_tier is True
+        assert record.has_identity is True and record.free_tier_account is True
         assert slept == [int(w) for w in anon_auth._MINT_RETRY_LADDER[:2]]
         assert nas.creates() == 3
 
@@ -278,7 +278,7 @@ class TestBootstrapRecord:
         free_tier_bootstrap.run_bootstrap(announce=False)
         nas.raise_transport = None
         record = free_tier_bootstrap.retry_bootstrap_mint(force=True, announce=False)
-        assert record.free_tier is True and record.failure_fields() == {}
+        assert record.free_tier_account is True and record.failure_fields() == {}
         assert free_tier_bootstrap.current_record() is record
 
 
@@ -290,7 +290,7 @@ class TestSignInFailures:
         (anon_auth.ANON_RATE_LIMITED, 45, True, "busy"),
         (anon_auth.ANON_GATE_PAUSED, 0, True, "busy"),
         (anon_auth.ANON_UNREACHABLE, 0, True, "internet connection"),
-        (anon_auth.ANON_GATE_CLOSED, 0, False, "Qubit account"),
+        (anon_auth.ANON_GATE_CLOSED, 0, False, "Nous account"),
         (anon_auth.ANON_POW_REQUIRED, 0, False, "proof of work"),
     ])
     def test_a_service_verdict_keeps_its_code_wait_and_copy(self, code, retry_after, retryable, needle):
@@ -320,11 +320,11 @@ class TestSignInFailures:
 
 
 def test_extra_welcome_hosts_make_a_local_stand_in_the_welcome_host(monkeypatch):
-    """``HERMES_EXTRA_WELCOME_HOSTS`` (env-only) extends the ROUTE predicate so a rehearsal against a
+    """``QUBIT_EXTRA_WELCOME_HOSTS`` (env-only) extends the ROUTE predicate so a rehearsal against a
     local stand-in gets the free tier's rules — including the route-keyed dark-tier 403."""
-    monkeypatch.delenv("HERMES_EXTRA_WELCOME_HOSTS", raising=False)
+    monkeypatch.delenv("QUBIT_EXTRA_WELCOME_HOSTS", raising=False)
     assert anon_auth.route_is_welcome_host("http://127.0.0.1:8765/v1") is False
-    monkeypatch.setenv("HERMES_EXTRA_WELCOME_HOSTS", "127.0.0.1, localhost")
+    monkeypatch.setenv("QUBIT_EXTRA_WELCOME_HOSTS", "127.0.0.1, localhost")
     assert anon_auth.route_is_welcome_host("http://127.0.0.1:8765/v1") is True
     assert anon_auth.route_is_welcome_host("http://localhost:9/v1") is True
     assert anon_auth.welcome_route_refusal(403, "You tried to access something", "http://127.0.0.1:8765/v1") == "tier_disabled"

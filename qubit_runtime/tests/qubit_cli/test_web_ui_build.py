@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from qubit_cli.main_web_build import _build_web_ui, _web_ui_build_needed
-from tests.qubit_cli.test_source_build import stamp_product, copy_freshness_scripts
+from tests.qubit_cli.test_source_build import stamp_product, copy_freshness_scripts, use_host_node_as_pm_node
 from tests.qubit_cli.test_source_build import source_checkout, source_products, _events  # noqa: F401
 
 
@@ -60,7 +60,7 @@ def test_web_failure_is_not_success_even_with_an_old_dist(source_products, fatal
     assert acquired == ["npm"]
     assert [event["step"] for event in _events(root)] == ["deps", "web"]
     assert dist.read_text() == "old product"
-    assert not (root / "qubit_cli/web_dist/hermes-build.json").exists()
+    assert not (root / "qubit_cli/web_dist/qubit-build.json").exists()
 
 
 @pytest.mark.platforms("posix")
@@ -70,7 +70,7 @@ def test_failed_preparation_never_runs_web_compilation(source_products):
     assert not _build_web_ui(root / "web", fatal=True)
     assert acquired == ["npm"]
     assert _events(root) == []
-    assert not (root / "qubit_cli/web_dist/hermes-build.json").exists()
+    assert not (root / "qubit_cli/web_dist/qubit-build.json").exists()
 
 
 @pytest.mark.platforms("linux")
@@ -93,6 +93,7 @@ def test_contended_build_waits_and_rechecks_winner(tmp_path, monkeypatch, existi
     import fcntl
     import threading
 
+    use_host_node_as_pm_node(monkeypatch)
     web, dist = _make_web_dir(tmp_path)
     if existing:
         _touch(dist / 'index.html')

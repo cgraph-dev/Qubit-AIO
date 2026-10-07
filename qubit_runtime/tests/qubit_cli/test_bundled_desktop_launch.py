@@ -1,4 +1,4 @@
-"""``hermes desktop`` from inside a BUNDLED desktop payload.
+"""``qubit desktop`` from inside a BUNDLED desktop payload.
 
 A bundled artifact ships the CLI inside ``<app>/resources/agent-payload``
 and the desktop app is the artifact itself — there is no source tree to
@@ -133,14 +133,14 @@ class TestResolveBundleLayout:
         assert resolve_bundle_layout(repo, platform="win32").launcher is None
 
     def test_a_checkout_is_not_a_bundle(self, tmp_path):
-        checkout = tmp_path / "hermes-agent"
+        checkout = tmp_path / "qubit"
         (checkout / "apps" / "desktop").mkdir(parents=True)
         with pytest.raises(NotBundledApp):
             resolve_bundle_layout(checkout)
 
     def test_a_sealed_tree_with_no_app_is_not_a_bundle(self, tmp_path):
         # docker/nix shape: sealed repo, no agent-payload parent.
-        repo = tmp_path / "opt" / "hermes" / "repo"
+        repo = tmp_path / "opt" / "qubit" / "repo"
         repo.mkdir(parents=True)
         with pytest.raises(NotBundledApp):
             resolve_bundle_layout(repo)
@@ -155,20 +155,20 @@ class TestShapePredicate:
     def test_a_surviving_desktop_package_json_does_not_make_a_bundle(self, tmp_path):
         """repo/apps/desktop survives the payload prune, so a filesystem
         probe cannot be the authority — only the stamp can."""
-        checkout = tmp_path / "hermes-agent"
+        checkout = tmp_path / "qubit"
         (checkout / "apps" / "desktop").mkdir(parents=True)
         (checkout / "apps" / "desktop" / "package.json").write_text("{}\n")
         assert not is_bundled_payload(checkout)
 
     def test_a_bootstrap_artifact_is_not_bundled(self, tmp_path):
-        root = tmp_path / "hermes-agent"
+        root = tmp_path / "qubit"
         root.mkdir()
         stamp = dict(STAMP, payload="bootstrap", tag=None)
         (root / "install-stamp.json").write_text(json.dumps(stamp) + "\n")
         assert not is_bundled_payload(root)
 
     def test_an_unreadable_stamp_is_not_bundled(self, tmp_path):
-        root = tmp_path / "hermes-agent"
+        root = tmp_path / "qubit"
         root.mkdir()
         (root / "install-stamp.json").write_text("{ not json\n")
         assert not is_bundled_payload(root)
@@ -220,7 +220,7 @@ class TestCmdGuiOnABundle:
     def _args(**overrides):
         base = dict(
             source=False, build_only=False, fake_boot=False, ignore_existing=False,
-            hermes_root=None, cwd=None, skip_build=False, force_build=False,
+            qubit_root=None, cwd=None, skip_build=False, force_build=False,
         )
         base.update(overrides)
         return SimpleNamespace(**base)
@@ -269,8 +269,27 @@ class TestCmdGuiOnABundle:
         assert builds == []
         assert launches == [[str(launcher)]]
 
+    def test_explicit_profile_reaches_the_bundled_launcher(self, tmp_path, monkeypatch):
+        """`qubit -p work desktop` on a bundle hands Electron --profile work."""
+        repo, launcher = _host_bundle(tmp_path / "app")
+        # QUBIT_HOME outside the platform home is the root itself on every OS.
+        root = tmp_path / "qubit-root"
+        profile = root / "profiles" / "work"
+        profile.mkdir(parents=True)
+        (profile / "config.yaml").write_text("{}\n", encoding="utf-8")
+        monkeypatch.setenv("QUBIT_HOME", str(root))
+        monkeypatch.setattr(sys, "argv", ["qubit", "-p", "work", "desktop"])
+        monkeypatch.setattr(cli_main, "_explicit_cli_profile", None)
+        cli_main._apply_profile_override()
+
+        code, builds, launches = self._run(monkeypatch, repo, self._args())
+
+        assert code == 0
+        assert builds == []
+        assert launches == [[str(launcher), "--profile", "work"]]
+
     def test_a_checkout_still_takes_the_build_ladder(self, tmp_path, monkeypatch):
-        checkout = tmp_path / "hermes-agent"
+        checkout = tmp_path / "qubit"
         (checkout / "apps" / "desktop").mkdir(parents=True)
         (checkout / "apps" / "desktop" / "package.json").write_text("{}\n")
         code, builds, launches = self._run(monkeypatch, checkout, self._args())

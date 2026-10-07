@@ -12,7 +12,7 @@ from qubit_cli import backup
 
 @pytest.mark.parametrize("automatic", [False, True])
 def test_zip_captures_live_wal_and_cleans_failed_staging(tmp_path, monkeypatch, automatic):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -45,6 +45,12 @@ def test_zip_captures_live_wal_and_cleans_failed_staging(tmp_path, monkeypatch, 
         def refuse_write(self, filename, arcname=None, **kwargs):
             raise OSError("archive device full")
 
+        with zipfile.ZipFile(archive) as zipped:
+            previous = {info.filename: info.CRC for info in zipped.infolist()}
         monkeypatch.setattr(zipfile.ZipFile, "write", refuse_write)
         run()
         assert sorted(output.iterdir()) == [archive], "a failed write must not leak a private database snapshot"
+        if automatic:
+            with zipfile.ZipFile(archive) as zipped:
+                assert {info.filename: info.CRC for info in zipped.infolist()} == previous, \
+                    "an all-failed run must not overwrite the previous good archive"

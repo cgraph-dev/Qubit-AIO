@@ -84,6 +84,18 @@ _CHAIN_CAP = 1000
 class SessionCompressionMixin:
     """Compression lineage, cooldown/streak counters, locks and turn leases."""
 
+    # A turn-lease maintenance write (acquire/refresh/release) is a correctness
+    # boundary, so it must ride out a sibling's legitimate long hold instead of
+    # aborting a healthy turn or leaking the lease row to its TTL. The lease TTL
+    # is 300s (``agent.turn_facade_lease.LEASE_TTL_SECONDS``); waiting up to
+    # 120s before declaring the lease at risk is safe — another writer cannot
+    # reclaim the row before it expires. Deliberately longer than the routine
+    # ``_WRITE_PATIENCE_S`` (20s): the live
+    # "Failed to refresh/release session turn lease" storm came from 20-60s
+    # sibling write locks (multiple long-lived TUI gateways + concurrent
+    # writers) that repeatedly exceeded the routine budget.
+    _TURN_LEASE_WRITE_PATIENCE_S = 120.0
+
     def reopen_if_explicitly_closed(
         self, session_id: str, *, provenance: str, patience_s: Optional[float] = None,
     ) -> Optional[str]:
@@ -579,6 +591,8 @@ class SessionCompressionMixin:
         from qubit_state import _compression_lock_holder_process_is_dead
         if not session_id or not holder:
             return False
+        if patience_s is None:
+            patience_s = self._TURN_LEASE_WRITE_PATIENCE_S
         now = time.time()
         expires_at = now + max(0.1, float(ttl_seconds))
         def _do(conn):
@@ -668,7 +682,8 @@ class SessionCompressionMixin:
                 "UPDATE session_turn_leases SET expires_at = ? "
                 "WHERE conversation_id = ? AND holder = ?", (expires_at, conversation_id, holder),
             ).rowcount > 0
-        return bool(self._execute_write(_do))
+        return bool(self._execute_write(
+            _do, patience_s=self._TURN_LEASE_WRITE_PATIENCE_S))
 
     def release_session_turn_lease(self, session_id: str, holder: str) -> None:
         """Release a turn lease iff ``holder`` still owns it; idempotent."""
@@ -679,7 +694,7 @@ class SessionCompressionMixin:
             conn.execute(
                 "DELETE FROM session_turn_leases WHERE conversation_id = ? AND holder = ?",
                 (conversation_id, holder))
-        self._execute_write(_do)
+        self._execute_write(_do, patience_s=self._TURN_LEASE_WRITE_PATIENCE_S)
 
     def get_compression_lock_holder(self, session_id: str) -> Optional[str]:
         """Current (non-expired) holder for ``session_id``, or None. Diagnostic only."""

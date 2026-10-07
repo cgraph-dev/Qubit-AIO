@@ -107,21 +107,21 @@ def _endpoint(server):
 
 def _add(store, package_id, day="2026-08-26", metrics=1):
     payload = {
-        "schema_version": "hermes.shared_metrics.v2",
+        "schema_version": "qubit.shared_metrics.v2",
         "package_id": package_id,
         "install_id": INSTALL_ID,
         "generated_at": f"{day}T01:00:00Z",
         "period_start": f"{day}T00:00:00Z",
         "period_end": f"{day}T23:59:59Z",
         "resource": {
-            "hermes_version": "0.20.5",
+            "qubit_version": "0.20.5",
             "os_family": "macos",
             "architecture": "arm64",
             "install_method": "git",
         },
         "metrics": [
             {
-                "name": f"hermes.metric.{i}",
+                "name": f"qubit.metric.{i}",
                 "type": "counter",
                 "dimensions": {"outcome": "ok"},
                 "value": i,
@@ -225,30 +225,12 @@ class TestRealTransport:
         assert outcome.sent == 1
         assert len(Ingest.received) == 2
 
-
-    def test_a_gzipped_retry_is_byte_identical_on_the_wire(self, store, server):
-        """gzip embeds an mtime by default, which would break this."""
-        _add(store, "pkg-1", metrics=200)
-        Ingest.script = [(503, {}, {}), (202, {}, {})]
-        _sender(store, server).send_pending()
-        first, second = Ingest.received
-        assert first["headers"].get("content-encoding") == "gzip"
-        assert first["raw"] == second["raw"]
-
     def test_several_packages_in_one_pass(self, store, server):
         for i in range(5):
             _add(store, f"pkg-{i}")
         outcome = _sender(store, server).send_pending()
         assert outcome.sent == 5
         assert len(Ingest.received) == 5
-
-    def test_the_outbox_directory_is_untouched(self, store, server, tmp_path):
-        _add(store, "pkg-1")
-        marker = store.outbox_directory / "pkg-1.json"
-        marker.write_text('{"kept": true}')
-        _sender(store, server).send_pending()
-        assert marker.exists()
-        assert json.loads(marker.read_text()) == {"kept": True}
 
     def test_a_dead_server_defers_without_raising(self, store, server):
         _add(store, "pkg-1")

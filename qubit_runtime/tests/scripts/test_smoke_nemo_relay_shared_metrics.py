@@ -10,8 +10,8 @@ from scripts import smoke_nemo_relay_shared_metrics as smoke
 @pytest.mark.parametrize(
     "relative_path",
     [
-        Path(".venv") / "bin" / "hermes",
-        Path(".venv") / "Scripts" / "hermes.exe",
+        Path(".venv") / "bin" / "qubit",
+        Path(".venv") / "Scripts" / "qubit.exe",
     ],
 )
 def test_resolve_qubit_executable_from_repository_venv(

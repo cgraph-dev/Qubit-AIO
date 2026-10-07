@@ -16,7 +16,7 @@ import qubit_cli.gui_uninstall as gu
 
 def _make_agent(qubit_home: Path) -> Path:
     """Create a fake agent install: source package + venv."""
-    agent_root = qubit_home / "hermes-agent"
+    agent_root = qubit_home / "qubit"
     (agent_root / "qubit_cli").mkdir(parents=True)
     (agent_root / "qubit_cli" / "__init__.py").write_text("")
     (agent_root / "venv" / "bin").mkdir(parents=True)
@@ -24,18 +24,18 @@ def _make_agent(qubit_home: Path) -> Path:
 
 
 def _make_gui_build(qubit_home: Path) -> None:
-    """Create the source-built GUI artifacts a `hermes desktop` run produces."""
-    desktop = qubit_home / "hermes-agent" / "apps" / "desktop"
+    """Create the source-built GUI artifacts a `qubit desktop` run produces."""
+    desktop = qubit_home / "qubit" / "apps" / "desktop"
     (desktop / "dist").mkdir(parents=True)
     (desktop / "dist" / "index.html").write_text("<html>")
     (desktop / "release" / "linux-unpacked").mkdir(parents=True)
     (desktop / "node_modules").mkdir(parents=True)
-    (qubit_home / "hermes-agent" / "node_modules").mkdir(parents=True)
+    (qubit_home / "qubit" / "node_modules").mkdir(parents=True)
     (qubit_home / "desktop-build-stamp.json").write_text("{}")
 
 
 def test_gui_install_summary_shape(tmp_path, monkeypatch):
-    qubit_home = tmp_path / ".hermes"
+    qubit_home = tmp_path / ".qubit"
     _make_agent(qubit_home)
     _make_gui_build(qubit_home)
     monkeypatch.setattr(gu, "packaged_gui_app_paths", lambda: [])
@@ -47,7 +47,7 @@ def test_gui_install_summary_shape(tmp_path, monkeypatch):
     assert summary["gui_installed"] is True
     assert isinstance(summary["source_built_artifacts"], list)
     assert all(isinstance(p, str) for p in summary["source_built_artifacts"])
-    assert summary["hermes_home"] == str(qubit_home)
+    assert summary["qubit_home"] == str(qubit_home)
     assert summary["platform"] == sys.platform
 
 
@@ -60,15 +60,19 @@ def test_uninstall_removes_launcher_entry_and_refreshes_cache(tmp_path, monkeypa
     entry = lde.desktop_entry_path()
     entry.parent.mkdir(parents=True, exist_ok=True)
     entry.write_text("x", encoding="utf-8")
+    # The pre-rename entry lives on as a hidden alias of the app-id entry (#124492);
+    # a GUI uninstall must take it with the real one.
+    legacy_alias = entry.with_name(lde.LEGACY_DESKTOP_ENTRY_NAME)
+    legacy_alias.write_text("x", encoding="utf-8")
 
     refreshed: list[Path] = []
     monkeypatch.setattr(
         lde, "refresh_desktop_databases", lambda d: refreshed.append(d) or ["kbuildsycoca6"]
     )
 
-    qubit_home = tmp_path / ".hermes"
+    qubit_home = tmp_path / ".qubit"
     _make_agent(qubit_home)
-    icon = lde.icon_path(qubit_home / "hermes-agent")
+    icon = lde.icon_path(qubit_home / "qubit")
     icon.parent.mkdir(parents=True, exist_ok=True)
     icon.write_bytes(b"\x89PNG")
     monkeypatch.setattr(gu, "desktop_userdata_dir", lambda: tmp_path / "none")
@@ -76,11 +80,12 @@ def test_uninstall_removes_launcher_entry_and_refreshes_cache(tmp_path, monkeypa
     removed = gu.uninstall_gui(qubit_home)
 
     assert entry in removed and not entry.exists()
+    assert legacy_alias in removed and not legacy_alias.exists()
     assert refreshed == [entry.parent]
     # The icon lives in the checkout. A GUI uninstall must not delete it.
-    assert lde.icon_path(qubit_home / "hermes-agent").exists()
+    assert lde.icon_path(qubit_home / "qubit").exists()
     # The agent itself survives a GUI uninstall.
-    assert (qubit_home / "hermes-agent" / "qubit_cli").is_dir()
+    assert (qubit_home / "qubit" / "qubit_cli").is_dir()
 
 
 @pytest.mark.platforms("posix")  # POSIX symlink semantics

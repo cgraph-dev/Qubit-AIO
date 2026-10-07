@@ -27,7 +27,7 @@ def xdg_home(tmp_path, monkeypatch) -> Path:
 
 
 def _make_project(tmp_path: Path) -> Path:
-    root = tmp_path / "hermes-agent"
+    root = tmp_path / "qubit"
     icon = root / "apps" / "desktop" / "assets" / "icon.png"
     icon.parent.mkdir(parents=True)
     icon.write_bytes(b"\x89PNG fake")
@@ -45,11 +45,11 @@ def _png_ihdr(width: int, height: int) -> bytes:
 
 
 def _stub_install(tmp_path, monkeypatch) -> None:
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir(exist_ok=True)
-    hermes_bin.write_text("", encoding="utf-8")
+    qubit_bin = tmp_path / "bin" / "qubit"
+    qubit_bin.parent.mkdir(exist_ok=True)
+    qubit_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(qubit_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -67,11 +67,11 @@ def test_install_writes_entry_with_absolute_exec_and_icon(
     tmp_path, xdg_home, monkeypatch
 ):
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text("", encoding="utf-8")
+    qubit_bin = tmp_path / "bin" / "qubit"
+    qubit_bin.parent.mkdir()
+    qubit_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(qubit_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
     # Keep the icon install out of the way: this test pins the
@@ -80,12 +80,12 @@ def test_install_writes_entry_with_absolute_exec_and_icon(
 
     entry = lde.install_desktop_entry(root)
 
-    assert entry == xdg_home / "applications" / "hermes.desktop"
+    assert entry == xdg_home / "applications" / lde.DESKTOP_ENTRY_NAME
     values = _parse(entry.read_text(encoding="utf-8"))
 
     # Exec must be the absolute path of the resolved binary. The launcher
     # runs with a minimal PATH, so a bare `qubit` would not resolve.
-    assert values["Exec"] == f"{hermes_bin} desktop"
+    assert values["Exec"] == f"{qubit_bin} desktop"
     assert Path(values["Exec"].split(" ")[0]).is_absolute()
 
     # Icon must be an absolute path to the real icon in the checkout.
@@ -102,23 +102,23 @@ def test_install_prefers_themed_icon_from_hicolor(tmp_path, xdg_home, monkeypatc
     fixed for).
     """
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text("", encoding="utf-8")
+    qubit_bin = tmp_path / "bin" / "qubit"
+    qubit_bin.parent.mkdir()
+    qubit_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(qubit_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
 
     values = _parse(entry.read_text(encoding="utf-8"))
-    assert values["Icon"] == "hermes"
+    assert values["Icon"] == "qubit"
 
     # And the icon really landed in the hicolor tree: the fixture icon is
     # a fake PNG (no valid IHDR), so the size is unknown and the icon
     # lands under 256x256/ (indexed; never scalable, which is SVG-only).
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "qubit.png"
     assert dest.is_file()
     assert dest.read_bytes() == lde.icon_path(root).read_bytes()
 
@@ -128,11 +128,11 @@ def test_install_icon_copy_failure_falls_back_to_absolute(
 ):
     """An impossible icon copy keeps the absolute path (never breaks)."""
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text("", encoding="utf-8")
+    qubit_bin = tmp_path / "bin" / "qubit"
+    qubit_bin.parent.mkdir()
+    qubit_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(qubit_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -148,7 +148,7 @@ def test_install_icon_copy_failure_falls_back_to_absolute(
     assert values["Icon"] == str(lde.icon_path(root))
 
     assert values["Type"] == "Application"
-    assert values["Name"] == "Qubit"
+    assert values["Name"] == "Hermes"
     assert values["Terminal"] == "false"
 
 
@@ -187,14 +187,14 @@ def test_exec_prefixes_interpreter_for_env_shebang_python_script(
     import sys
 
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text(
+    qubit_bin = tmp_path / "bin" / "qubit"
+    qubit_bin.parent.mkdir()
+    qubit_bin.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
-    hermes_bin.chmod(0o755)
+    qubit_bin.chmod(0o755)
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(qubit_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -203,20 +203,20 @@ def test_exec_prefixes_interpreter_for_env_shebang_python_script(
 
     interpreter = os.path.abspath(sys.executable)
     assert exec_line.split(" ")[0].strip('"') == interpreter
-    assert str(hermes_bin) in exec_line
+    assert str(qubit_bin) in exec_line
     assert exec_line.endswith("desktop")
 
 
 def test_exec_leaves_shell_wrapper_launchers_alone(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text(
+    qubit_bin = tmp_path / "bin" / "qubit"
+    qubit_bin.parent.mkdir()
+    qubit_bin.write_text(
         '#!/usr/bin/env bash\nexec /opt/qubit/venv/bin/python "$@"\n', encoding="utf-8"
     )
-    hermes_bin.chmod(0o755)
+    qubit_bin.chmod(0o755)
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(qubit_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -224,20 +224,20 @@ def test_exec_leaves_shell_wrapper_launchers_alone(tmp_path, xdg_home, monkeypat
     exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
 
     # A bash wrapper execs the venv python itself — no interpreter prefix.
-    assert exec_line == f"{hermes_bin} desktop"
+    assert exec_line == f"{qubit_bin} desktop"
 
 
 def test_exec_leaves_venv_shebang_scripts_alone(tmp_path, xdg_home, monkeypatch):
     import sys
 
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
+    qubit_bin = tmp_path / "bin" / "qubit"
+    qubit_bin.parent.mkdir()
     interpreter = os.path.abspath(sys.executable)
-    hermes_bin.write_text(f"#!{interpreter}\nimport qubit_cli\n", encoding="utf-8")
-    hermes_bin.chmod(0o755)
+    qubit_bin.write_text(f"#!{interpreter}\nimport qubit_cli\n", encoding="utf-8")
+    qubit_bin.chmod(0o755)
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(qubit_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -246,7 +246,7 @@ def test_exec_leaves_venv_shebang_scripts_alone(tmp_path, xdg_home, monkeypatch)
 
     # Console-script with the venv's own interpreter in the shebang: correct
     # as-is, prefixing would only add noise.
-    assert exec_line == f"{hermes_bin} desktop"
+    assert exec_line == f"{qubit_bin} desktop"
 
 
 # The persisted entry must be launch-context independent: whatever process
@@ -272,12 +272,12 @@ def test_exec_converges_from_repo_script_argv0_to_installed_wrapper(
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"  # checkout-internal launcher candidate
+    repo_script = root / "qubit"  # checkout-internal launcher candidate
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
-    wrapper = tmp_path / "installed" / "bin" / "hermes"
+    wrapper = tmp_path / "installed" / "bin" / "qubit"
     wrapper.parent.mkdir(parents=True)
     wrapper.write_text(f'#!/usr/bin/env bash\nexec {sys.executable} "$@"\n', encoding="utf-8")
     wrapper.chmod(0o755)
@@ -285,7 +285,7 @@ def test_exec_converges_from_repo_script_argv0_to_installed_wrapper(
     # argv[0] = repo script; PATH lookup finds the installed wrapper.
     _argv0_context(monkeypatch, str(repo_script))
     monkeypatch.setattr(
-        "shutil.which", lambda name: str(wrapper) if name == "hermes" else None
+        "shutil.which", lambda name: str(wrapper) if name == "qubit" else None
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -304,7 +304,7 @@ def test_exec_never_persists_a_bare_interpreter_command(
     `Exec=<python> desktop` — a command line no DE can run."""
 
     root = _make_project(tmp_path)
-    wrapper = tmp_path / "installed" / "bin" / "hermes"
+    wrapper = tmp_path / "installed" / "bin" / "qubit"
     wrapper.parent.mkdir(parents=True)
     wrapper.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     wrapper.chmod(0o755)
@@ -317,7 +317,7 @@ def test_exec_never_persists_a_bare_interpreter_command(
     # argv[0] IS the interpreter (python -m context); PATH has the wrapper.
     _argv0_context(monkeypatch, str(interpreter))
     monkeypatch.setattr(
-        "shutil.which", lambda name: str(wrapper) if name == "hermes" else None
+        "shutil.which", lambda name: str(wrapper) if name == "qubit" else None
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -347,7 +347,7 @@ def test_exec_keeps_resolver_fallback_when_no_wrapper_on_path(
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"
+    repo_script = root / "qubit"
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
@@ -386,7 +386,7 @@ def test_exec_uses_known_wrapper_when_path_lookup_misses(
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"
+    repo_script = root / "qubit"
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
@@ -396,10 +396,10 @@ def test_exec_uses_known_wrapper_when_path_lookup_misses(
     # Realistic installer shim: execs this checkout's venv python on the
     # checkout's qubit script (the aidiyet check requires it to target
     # the writing checkout).
-    known_wrapper = tmp_path / "known-home" / ".local" / "bin" / "hermes"
+    known_wrapper = tmp_path / "known-home" / ".local" / "bin" / "qubit"
     known_wrapper.parent.mkdir(parents=True)
     known_wrapper.write_text(
-        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "qubit"} "$@"\n',
         encoding="utf-8",
     )
     known_wrapper.chmod(0o755)
@@ -432,21 +432,21 @@ def test_exec_never_persists_a_checkout_internal_path_hit(tmp_path, xdg_home, mo
     persisting the venv form; the next DE launch re-resolves to the durable
     wrapper and flips the bytes back. Alternating writers alternate the
     file content (captured: wrapper -> venv -> wrapper inside one update
-    cycle), and every flip rewrites hermes.desktop. A rewrite landing
+    cycle), and every flip rewrites the entry. A rewrite landing
     inside a grid launch's STARTING window is the arm for the gnome-shell
     50.x crash this module already guards against. A PATH hit inside the
     checkout must fall through to the durable probe.
     """
     root = _make_project(tmp_path)
-    venv_script = root / "venv" / "bin" / "hermes"
+    venv_script = root / "venv" / "bin" / "qubit"
     venv_script.parent.mkdir(parents=True)
     venv_script.write_text("#!/usr/bin/env bash\nexec true\n", encoding="utf-8")
     venv_script.chmod(0o755)
 
-    known_wrapper = tmp_path / "path-home" / ".local" / "bin" / "hermes"
+    known_wrapper = tmp_path / "path-home" / ".local" / "bin" / "qubit"
     known_wrapper.parent.mkdir(parents=True)
     known_wrapper.write_text(
-        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "qubit"} "$@"\n',
         encoding="utf-8",
     )
     known_wrapper.chmod(0o755)
@@ -476,6 +476,52 @@ def test_exec_never_persists_a_checkout_internal_path_hit(tmp_path, xdg_home, mo
     assert entry2.read_text(encoding="utf-8") == entry.read_text(encoding="utf-8")
 
 
+def test_exec_skips_managed_environment_cli_without_desktop(
+    tmp_path, xdg_home, monkeypatch
+):
+    """A PM-managed console script is outside the checkout but cannot launch Desktop.
+
+    Its generated workspace has no ``apps/desktop``. Treating it as the durable
+    external primary persists ``Exec=`` at that script, and the grid launcher
+    exits with "Desktop GUI source not found". The entry must keep the
+    checkout's installed wrapper instead.
+    """
+    from pm.environments import install_key
+
+    root = _make_project(tmp_path)
+    installs = tmp_path / "installs"
+    monkeypatch.setattr("pm.environments.installs_root", lambda: installs)
+    generation = installs / install_key(root) / "environments" / "gen"
+    workspace = generation / "workspace"
+    workspace.mkdir(parents=True)
+    managed = generation / "venv" / "bin" / "qubit"
+    managed.parent.mkdir(parents=True)
+    managed.write_text("#!/usr/bin/env bash\nexec true\n", encoding="utf-8")
+    managed.chmod(0o755)
+
+    known_wrapper = tmp_path / ".local" / "bin" / "qubit"
+    known_wrapper.parent.mkdir(parents=True)
+    known_wrapper.write_text(
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "qubit"} "$@"\n',
+        encoding="utf-8",
+    )
+    known_wrapper.chmod(0o755)
+
+    def fake_resolve():
+        return str(managed)
+
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", fake_resolve)
+    _argv0_context(monkeypatch, str(managed))
+    monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
+
+    entry = lde.install_desktop_entry(root)
+    assert entry is not None
+    exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
+
+    assert exec_line == f"{known_wrapper} desktop"
+    assert str(managed) not in exec_line
+
+
 def test_exec_finds_known_wrapper_when_resolver_has_no_candidate(
     tmp_path, xdg_home, monkeypatch
 ):
@@ -486,7 +532,7 @@ def test_exec_finds_known_wrapper_when_resolver_has_no_candidate(
     None outright. The early `return primary` that used to fire here skipped
     the durable-wrapper probe, so the persisted Exec flipped to the bare
     `<python> -m qubit_cli.main desktop` module form. Each flip between the
-    wrapper and module forms rewrites hermes.desktop on the next launch; any
+    wrapper and module forms rewrites the entry on the next launch; any
     rewrite that lands while gnome-shell's ShellApp for the entry is still
     STARTING crashes the shell (shell_app_dispose `state == STOPPED`
     assertion, gnome-shell 50.4). The entry must converge on the durable
@@ -494,10 +540,10 @@ def test_exec_finds_known_wrapper_when_resolver_has_no_candidate(
     """
     root = _make_project(tmp_path)
 
-    known_wrapper = tmp_path / "cold-home" / ".local" / "bin" / "hermes"
+    known_wrapper = tmp_path / "cold-home" / ".local" / "bin" / "qubit"
     known_wrapper.parent.mkdir(parents=True)
     known_wrapper.write_text(
-        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "qubit"} "$@"\n',
         encoding="utf-8",
     )
     known_wrapper.chmod(0o755)
@@ -538,7 +584,7 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"
+    repo_script = root / "qubit"
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
@@ -547,11 +593,11 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
     # A shim belonging to a DIFFERENT checkout.
     other_root = tmp_path / "other-install"
     other_root.mkdir()
-    foreign_wrapper = tmp_path / "known-home" / ".local" / "bin" / "hermes"
+    foreign_wrapper = tmp_path / "known-home" / ".local" / "bin" / "qubit"
     foreign_wrapper.parent.mkdir(parents=True)
     foreign_wrapper.write_text(
         f"#!/usr/bin/env bash\nexec {other_root / 'venv' / 'bin' / 'python'} "
-        f'{other_root / "hermes"} "$@"\n',
+        f'{other_root / "qubit"} "$@"\n',
         encoding="utf-8",
     )
     foreign_wrapper.chmod(0o755)
@@ -639,6 +685,128 @@ def test_known_wrapper_candidates_cover_installer_layouts(
         assert "/usr/local/bin/qubit" not in candidates
 
 
+def test_installed_entry_carries_the_window_app_id(tmp_path, xdg_home, monkeypatch):
+    """The window's app_id is what GNOME matches the entry against — not the old "Hermes"."""
+    _stub_install(tmp_path, monkeypatch)
+    root = _make_project(tmp_path)
+
+    entry = lde.install_desktop_entry(root)
+
+    assert entry is not None
+    assert entry.name == f"{lde.APP_ID}.desktop"
+    values = _parse(entry.read_text(encoding="utf-8"))
+    assert values["StartupWMClass"] == lde.APP_ID
+    assert values["Name"] == "Hermes"  # the menu label is not part of the identity
+
+
+def test_install_keeps_the_legacy_entry_as_a_hidden_alias(tmp_path, xdg_home, monkeypatch):
+    """A pin resolves by the entry file name it was pinned against (#124492).
+
+    Deleting ``qubit.desktop`` silently kills existing taskbar pins (GNOME drops
+    the favourite, Plasma leaves an inert item) and the shell has no mechanism to
+    re-point the association for the user. The pre-rename entry must survive as a
+    ``NoDisplay=true`` alias of the app-id entry: out of the app grid, still
+    launchable, and window-matched through the same ``StartupWMClass`` and
+    ``Exec`` as the app-id entry.
+    """
+    _stub_install(tmp_path, monkeypatch)
+    root = _make_project(tmp_path)
+    legacy = xdg_home / "applications" / lde.LEGACY_DESKTOP_ENTRY_NAME
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text(
+        "[Desktop Entry]\nType=Application\nName=Hermes\nExec=qubit desktop\n",
+        encoding="utf-8",
+    )
+
+    entry = lde.install_desktop_entry(root)
+
+    assert entry is not None and entry.is_file()
+    assert legacy.is_file(), "an existing pin resolves through this file — it must survive"
+    alias = _parse(legacy.read_text(encoding="utf-8"))
+    assert alias["NoDisplay"] == "true"  # no second Hermes in the app grid
+    assert alias["StartupWMClass"] == lde.APP_ID  # still groups with the window
+    entry_values = _parse(entry.read_text(encoding="utf-8"))
+    assert alias["Exec"] == entry_values["Exec"]  # launches the same command
+    assert alias["Icon"] == entry_values["Icon"]
+
+
+def test_unchanged_entry_still_aliases_a_legacy_entry(tmp_path, xdg_home, monkeypatch):
+    """An up-to-date app-id entry must not skip converting a legacy file found beside it."""
+    _stub_install(tmp_path, monkeypatch)
+    root = _make_project(tmp_path)
+    assert lde.install_desktop_entry(root) is not None
+    legacy = xdg_home / "applications" / lde.LEGACY_DESKTOP_ENTRY_NAME
+    legacy.write_text("[Desktop Entry]\nType=Application\nName=Hermes\nExec=qubit desktop\n", encoding="utf-8")
+
+    lde.install_desktop_entry(root)
+
+    assert _parse(legacy.read_text(encoding="utf-8"))["NoDisplay"] == "true"
+
+
+def test_install_keeps_foreign_files_at_the_legacy_path(tmp_path, xdg_home, monkeypatch):
+    """Only our own entry is converted to an alias; another app's file is not ours to rewrite."""
+    _stub_install(tmp_path, monkeypatch)
+    root = _make_project(tmp_path)
+    foreign = xdg_home / "applications" / lde.LEGACY_DESKTOP_ENTRY_NAME
+    foreign.parent.mkdir(parents=True)
+    foreign.write_text(
+        "[Desktop Entry]\nType=Application\nName=Someone else\nExec=other-app\n",
+        encoding="utf-8",
+    )
+
+    lde.install_desktop_entry(root)
+
+    assert foreign.is_file()
+    assert "Name=Someone else" in foreign.read_text(encoding="utf-8")
+
+
+def test_install_opt_out_preserves_the_legacy_entry(tmp_path, xdg_home, monkeypatch):
+    """The opt-out protects user edits, so it also stops the legacy alias conversion.
+
+    The missing-entry path still creates the app-id entry; the rewrite is
+    management too and must not run when the user asked to be left alone.
+    """
+    qubit_home = tmp_path / "qubit-home"
+    qubit_home.mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
+    (qubit_home / "config.yaml").write_text(
+        "desktop:\n  manage_launcher_entry: false\n", encoding="utf-8"
+    )
+    _stub_install(tmp_path, monkeypatch)
+    root = _make_project(tmp_path)
+    legacy = xdg_home / "applications" / lde.LEGACY_DESKTOP_ENTRY_NAME
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text(
+        "[Desktop Entry]\nType=Application\nName=Hermes\nExec=qubit desktop\n",
+        encoding="utf-8",
+    )
+
+    entry = lde.install_desktop_entry(root)
+
+    assert entry == xdg_home / "applications" / lde.DESKTOP_ENTRY_NAME
+    assert legacy.read_text(encoding="utf-8") == (
+        "[Desktop Entry]\nType=Application\nName=Hermes\nExec=qubit desktop\n"
+    ), "the opt-out must leave the legacy entry byte-for-byte untouched"
+
+
+def test_app_id_matches_the_desktop_build_identity():
+    """APP_ID mirrors apps/desktop/product-identity.cjs; the two must not drift apart."""
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not available")
+    repo = Path(__file__).resolve().parents[2]
+    probe = "console.log(require('./apps/desktop/product-identity.cjs').appId)"
+    result = subprocess.run(
+        [node, "-e", probe], cwd=repo, capture_output=True, text=True, timeout=60
+    )
+    if result.returncode != 0:
+        pytest.skip(f"product-identity.cjs did not evaluate: {result.stderr.strip()[:200]}")
+    assert result.stdout.strip() == lde.APP_ID
+
+
 def test_install_is_idempotent_and_skips_cache_refresh(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
     monkeypatch.setattr(
@@ -658,7 +826,7 @@ def test_install_is_idempotent_and_skips_cache_refresh(tmp_path, xdg_home, monke
 
 
 def test_install_without_source_icon_uses_themed_name(tmp_path, xdg_home, monkeypatch):
-    root = tmp_path / "hermes-agent"
+    root = tmp_path / "qubit"
     root.mkdir()
     monkeypatch.setattr(
         "qubit_cli.relaunch.resolve_qubit_bin", lambda: "/usr/bin/qubit"
@@ -668,8 +836,8 @@ def test_install_without_source_icon_uses_themed_name(tmp_path, xdg_home, monkey
     entry = lde.install_desktop_entry(root)
 
     # A broken absolute path renders as no icon. The themed name resolves
-    # when Qubit is installed some other way.
-    assert _parse(entry.read_text(encoding="utf-8"))["Icon"] == "hermes"
+    # when Hermes is installed some other way.
+    assert _parse(entry.read_text(encoding="utf-8"))["Icon"] == "qubit"
 
 
 @pytest.mark.platforms("macos")
@@ -830,7 +998,7 @@ def test_wrapper_ownership_rejects_sibling_extensions(suffix, tmp_path):
     must reject them (stable-but-wrong entry pointing at the renamed
     old install).
     """
-    checkout = tmp_path / "hermes-agent"
+    checkout = tmp_path / "qubit"
     checkout.mkdir()
     evil = tmp_path / "evil-shim"
     evil.write_text(
@@ -856,10 +1024,10 @@ def test_wrapper_ownership_accepts_shim_via_symlinked_home(tmp_path, monkeypatch
     home_real = tmp_path / "home-real"
     home_real.mkdir()
     home_link.symlink_to(home_real)
-    lexical_checkout = home_link / "hermes-agent"
-    (home_real / "hermes-agent").mkdir()
+    lexical_checkout = home_link / "qubit"
+    (home_real / "qubit").mkdir()
 
-    shim = home_link / ".local" / "bin" / "hermes"
+    shim = home_link / ".local" / "bin" / "qubit"
     shim.parent.mkdir(parents=True)
     shim.write_text(
         f"#!/usr/bin/env bash\n"
@@ -875,7 +1043,7 @@ def test_wrapper_ownership_accepts_shim_via_symlinked_home(tmp_path, monkeypatch
     shim.chmod(0o755)
     monkeypatch.setenv("HOME", str(home_link))
     monkeypatch.setattr("shutil.which", lambda name: None)
-    repo_script = lexical_checkout / "hermes"
+    repo_script = lexical_checkout / "qubit"
     repo_script.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
     monkeypatch.setattr(sys, "argv", [str(repo_script), "desktop"])
     assert lde._resolve_qubit_bin_for_desktop_entry(
@@ -897,7 +1065,7 @@ def test_needs_interpreter_case_insensitive_match(tmp_path, monkeypatch):
     interpreter = venv_bin / "python"
     interpreter.write_text("", encoding="utf-8")
 
-    console_script = venv_bin / "hermes"
+    console_script = venv_bin / "qubit"
     console_script.write_text(f"#!{interpreter}\nimport qubit_cli\n", encoding="utf-8")
     monkeypatch.setattr(lde.sys, "executable", str(interpreter))
 
@@ -975,14 +1143,14 @@ def test_probe_skips_wrapper_with_escaping_python_shebang(
     """
 
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"
+    repo_script = root / "qubit"
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
 
     # A wrapper that targets this checkout but cannot run itself.
-    broken_wrapper = xdg_home / ".local" / "bin" / "hermes"
+    broken_wrapper = xdg_home / ".local" / "bin" / "qubit"
     broken_wrapper.parent.mkdir(parents=True)
     broken_wrapper.write_text(
         f"#!/usr/bin/env python3\n# launcher for {root}\nimport qubit_cli\n",
@@ -1009,17 +1177,17 @@ def test_probe_skips_wrapper_with_escaping_python_shebang(
 def test_probe_accepts_shell_launcher_wrapper(tmp_path, xdg_home, monkeypatch):
     """A bash launcher is safe by construction and still wins the probe."""
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"
+    repo_script = root / "qubit"
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
 
-    good_wrapper = xdg_home / ".local" / "bin" / "hermes"
+    good_wrapper = xdg_home / ".local" / "bin" / "qubit"
     good_wrapper.parent.mkdir(parents=True)
     good_wrapper.write_text(
         f"#!/usr/bin/env bash\nexec {root / 'venv' / 'bin' / 'python'} "
-        f'{root / "hermes"} "$@"\n',
+        f'{root / "qubit"} "$@"\n',
         encoding="utf-8",
     )
     good_wrapper.chmod(0o755)
@@ -1047,19 +1215,19 @@ def test_install_icon_handles_truncated_png_header(tmp_path, xdg_home, monkeypat
     icon.write_bytes(
         b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR\x00\x00"  # 22 bytes
     )
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text("", encoding="utf-8")
+    qubit_bin = tmp_path / "bin" / "qubit"
+    qubit_bin.parent.mkdir()
+    qubit_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(qubit_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
 
     values = _parse(entry.read_text(encoding="utf-8"))
-    assert values["Icon"] == "hermes"
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
+    assert values["Icon"] == "qubit"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "qubit.png"
     assert dest.is_file()
 
 
@@ -1086,9 +1254,9 @@ def test_install_places_1024_png_in_256x256_not_scalable(
     entry = lde.install_desktop_entry(root)
     values = _parse(entry.read_text(encoding="utf-8"))
 
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
-    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
-    assert values["Icon"] == "hermes"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "qubit.png"
+    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "qubit.png"
+    assert values["Icon"] == "qubit"
     assert dest.is_file()
     assert dest.read_bytes() == lde.icon_path(root).read_bytes()
     assert not stale.exists()
@@ -1101,13 +1269,13 @@ def test_install_removes_stale_scalable_png(tmp_path, xdg_home, monkeypatch):
     lde.icon_path(root).write_bytes(_png_ihdr(1024, 1024))
     _stub_install(tmp_path, monkeypatch)
 
-    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
+    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "qubit.png"
     stale.parent.mkdir(parents=True)
     stale.write_bytes(b"old scalable png")
 
     lde.install_desktop_entry(root)
 
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "qubit.png"
     assert dest.is_file()
     assert not stale.exists()
 
@@ -1119,10 +1287,10 @@ def test_install_exact_48_png_uses_48x48_dir(tmp_path, xdg_home, monkeypatch):
 
     lde.install_desktop_entry(root)
 
-    dest = xdg_home / "icons" / "hicolor" / "48x48" / "apps" / "hermes.png"
+    dest = xdg_home / "icons" / "hicolor" / "48x48" / "apps" / "qubit.png"
     assert dest.is_file()
     assert not (
-        xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
+        xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "qubit.png"
     ).exists()
 
 
@@ -1144,9 +1312,9 @@ def test_install_resizes_decodable_png_to_panel_sizes(
 
     lde.install_desktop_entry(root)
 
-    dest_24 = xdg_home / "icons" / "hicolor" / "24x24" / "apps" / "hermes.png"
-    dest_256 = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
-    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
+    dest_24 = xdg_home / "icons" / "hicolor" / "24x24" / "apps" / "qubit.png"
+    dest_256 = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "qubit.png"
+    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "qubit.png"
     assert dest_24.is_file()
     assert dest_256.is_file()
     assert not stale.exists()
@@ -1170,3 +1338,182 @@ def test_deferred_install_skips_heal_after_exit_without_reveal():
     deferred.finish()
     assert calls == []
     assert not deferred._thread.is_alive()
+
+
+# --- desktop-capability of the persisted Exec (managed runtime env launchers) ------------------
+
+
+def _write_script(path: Path, text: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    path.chmod(0o755)
+    return path
+
+
+def _env_shaped_tree(tmp_path: Path, name: str = "managed-env") -> Path:
+    """The runtime env layout: a code tree (workspace/qubit_cli) with no desktop app in it."""
+    tree = tmp_path / name
+    (tree / "workspace" / "qubit_cli").mkdir(parents=True)
+    (tree / "workspace" / "qubit_cli" / "main.py").write_text("", encoding="utf-8")
+    _write_script(tree / "venv" / "bin" / "qubit", "#!/bin/sh\nexit 0\n")
+    python_bin = tree / "venv" / "bin" / "python"
+    python_bin.write_bytes(b"\x7fELF fake")  # real interpreters are binaries, never scripts
+    python_bin.chmod(0o755)
+    return tree
+
+
+def _full_tree(tmp_path: Path, name: str = "install") -> Path:
+    """A checkout that carries the desktop app beside qubit_cli."""
+    tree = tmp_path / name
+    (tree / "qubit_cli").mkdir(parents=True)
+    (tree / "apps" / "desktop" / "assets").mkdir(parents=True)
+    (tree / "apps" / "desktop" / "package.json").write_text("{}", encoding="utf-8")
+    _write_script(tree / "venv" / "bin" / "qubit", "#!/bin/sh\nexit 0\n")
+    python_bin = tree / "venv" / "bin" / "python"
+    python_bin.write_bytes(b"\x7fELF fake")  # real interpreters are binaries, never scripts
+    python_bin.chmod(0o755)
+    return tree
+
+
+def test_capability_rejects_env_shaped_launcher_and_accepts_full_tree(tmp_path):
+    env_tree = _env_shaped_tree(tmp_path)
+    full_tree = _full_tree(tmp_path)
+    assert lde._can_serve_desktop(str(env_tree / "venv" / "bin" / "qubit")) is False
+    assert lde._can_serve_desktop(str(full_tree / "venv" / "bin" / "qubit")) is True
+    # Interpreters are not judged: a launcher execing one is followed to its own tree instead.
+    assert lde._can_serve_desktop(str(env_tree / "venv" / "bin" / "python")) is None
+    assert lde._can_serve_desktop(str(full_tree / "venv" / "bin" / "python")) is None
+
+
+def test_capability_unknown_shapes_pass(tmp_path):
+    missing = tmp_path / "nowhere" / "bin" / "qubit"
+    assert lde._can_serve_desktop(str(missing)) is None
+    native = _write_script(tmp_path / "opt" / "bin" / "qubit", "")
+    assert lde._can_serve_desktop(str(native)) is None
+
+
+def test_capability_follows_wrapper_to_its_target(tmp_path):
+    env_tree = _env_shaped_tree(tmp_path)
+    full_tree = _full_tree(tmp_path)
+    bad_wrapper = _write_script(
+        tmp_path / "shims" / "qubit",
+        f'#!/usr/bin/env bash\nexec "{env_tree}/venv/bin/qubit" "$@"\n',
+    )
+    good_wrapper = _write_script(
+        tmp_path / "shims" / "qubit-good",
+        f'#!/usr/bin/env bash\nexec "{full_tree}/venv/bin/qubit" "$@"\n',
+    )
+    assert lde._can_serve_desktop(str(bad_wrapper)) is False
+    assert lde._can_serve_desktop(str(good_wrapper)) is True
+
+
+def test_resolver_skips_incapable_primary_for_wrapper(tmp_path, xdg_home):
+    """A PATH-first launcher from an env-shaped tree must not win over the durable wrapper."""
+    env_tree = _env_shaped_tree(tmp_path)
+    checkout = _full_tree(tmp_path, "checkout")
+    wrapper = _write_script(
+        tmp_path / ".local" / "bin" / "qubit",
+        f'#!/usr/bin/env bash\nexec "{checkout}/venv/bin/qubit" "$@"\n',
+    )
+    resolution = lde._resolve_qubit_bin_for_desktop_entry(
+        resolve_fn=lambda: str(env_tree / "venv" / "bin" / "qubit"),
+        checkout_root=checkout,
+    )
+    assert resolution == str(wrapper)
+
+
+def test_install_skips_write_when_exec_provably_cannot_serve_desktop(tmp_path, xdg_home, monkeypatch):
+    """The fallback must not create a dead entry: no entry on disk stays that way."""
+    root = _make_project(tmp_path)
+    env_tree = _env_shaped_tree(tmp_path)
+    monkeypatch.setattr(lde, "_launcher_entry_management_enabled", lambda: True)
+    monkeypatch.setattr(
+        lde,
+        "resolve_exec_command",
+        lambda project_root=None: f"{env_tree / 'venv' / 'bin' / 'qubit'} desktop",
+    )
+    monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
+
+    assert lde.install_desktop_entry(root) is None
+    assert not lde.desktop_entry_path().exists()
+
+
+def test_install_leaves_existing_entry_untouched_when_exec_incapable(tmp_path, xdg_home, monkeypatch):
+    """A provably dead Exec skips instead of churning an entry that is already on disk."""
+    root = _make_project(tmp_path)
+    env_tree = _env_shaped_tree(tmp_path)
+    entry_path = lde.desktop_entry_path()
+    entry_path.parent.mkdir(parents=True, exist_ok=True)
+    entry_path.write_text("hand-tuned\n", encoding="utf-8")
+    monkeypatch.setattr(lde, "_launcher_entry_management_enabled", lambda: True)
+    monkeypatch.setattr(
+        lde,
+        "resolve_exec_command",
+        lambda project_root=None: f"{env_tree / 'venv' / 'bin' / 'qubit'} desktop",
+    )
+    monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
+
+    assert lde.install_desktop_entry(root) is None
+    assert entry_path.read_text(encoding="utf-8") == "hand-tuned\n"
+
+
+def test_module_form_passes_the_gate(tmp_path):
+    """The module fallback is not second-guessed: only a process that already passed the desktop
+    launch checks (or the bundled payload) ever writes it."""
+    env_tree = _env_shaped_tree(tmp_path)
+    module_form = f'"{env_tree / "venv" / "bin" / "python"}" -m qubit_cli.main desktop'
+    assert lde._persisted_exec_serves_desktop(module_form) is None
+
+
+def test_install_through_wrapper_when_primary_is_incapable(tmp_path, xdg_home, monkeypatch):
+    """End to end: the PATH-first env launcher is skipped and the wrapper's Exec is persisted."""
+    root = _full_tree(tmp_path, "checkout")
+    (root / "apps" / "desktop" / "assets" / "icon.png").write_bytes(b"\x89PNG fake")
+    env_tree = _env_shaped_tree(tmp_path)
+    wrapper = _write_script(
+        tmp_path / ".local" / "bin" / "qubit",
+        f'#!/usr/bin/env bash\nexec "{root}/venv/bin/qubit" "$@"\n',
+    )
+    monkeypatch.setattr(lde, "_launcher_entry_management_enabled", lambda: True)
+    monkeypatch.setattr(
+        "qubit_cli.relaunch.resolve_qubit_bin",
+        lambda: str(env_tree / "venv" / "bin" / "qubit"),
+    )
+    monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
+
+    entry = lde.install_desktop_entry(root)
+    assert entry == lde.desktop_entry_path()
+    assert _parse(entry.read_text(encoding="utf-8"))["Exec"] == f"{wrapper} desktop"
+
+
+# #126009: the persisted launcher is a menu/taskbar click — a launch, not a
+# build request. With a packaged Electron app already present, the Exec line
+# must carry --skip-build (start the packaged app in seconds) instead of the
+# build-then-launch default, whose source-hash freshness check reports
+# "stale" on any locally modified tree and pays a 60s+ rebuild per click.
+def test_exec_appends_skip_build_when_packaged_app_exists(tmp_path, xdg_home, monkeypatch):
+    root = _make_project(tmp_path)
+    unpacked = root / "apps" / "desktop" / "release" / "linux-unpacked"
+    unpacked.mkdir(parents=True)
+    (unpacked / "qubit").write_text("", encoding="utf-8")
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", lambda: None)
+    monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
+
+    entry = lde.install_desktop_entry(root)
+    exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
+
+    assert exec_line.endswith("desktop --skip-build")
+
+
+def test_exec_keeps_build_then_launch_when_no_packaged_app(tmp_path, xdg_home, monkeypatch):
+    # First install (nothing packaged yet): the click must still build and
+    # launch — --skip-build would exit with "no packaged desktop app found".
+    root = _make_project(tmp_path)
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", lambda: None)
+    monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
+
+    entry = lde.install_desktop_entry(root)
+    exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
+
+    assert exec_line.endswith("desktop")
+    assert "--skip-build" not in exec_line

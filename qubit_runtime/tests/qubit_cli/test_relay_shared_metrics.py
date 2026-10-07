@@ -31,6 +31,7 @@ from qubit_cli.observability.shared_metrics_contract import (
     DURATION_BUCKETS,
     EXECUTION_SURFACES,
     LEGACY_MODEL_CALL_METRIC,
+    MODEL_CALL_METRIC,
     MODEL_IDENTIFIER_MAX_LENGTH,
     MODEL_ROUTE_METRIC,
     PROVIDER_IDENTIFIER_MAX_LENGTH,
@@ -58,10 +59,14 @@ from qubit_cli.observability.shared_metrics_contract import (
     skill_counter,
     skill_lifecycle_fields,
     skill_load_fields,
+    task_counter,
+    task_duration_counter,
     task_terminal_fields,
     tool_approval_counter,
     tool_approval_outcome,
     tool_call_dimensions,
+    tool_latency_dimensions,
+    tool_usage_dimensions,
     tool_category,
     tool_latency_bucket,
     tool_outcome,
@@ -74,7 +79,7 @@ SCHEMA_PATH = (
     / "qubit_cli"
     / "observability"
     / "schemas"
-    / "hermes.shared_metrics.v2.schema.json"
+    / "hermes.shared_metrics.v3.schema.json"
 )
 LEGACY_SCHEMA_PATH = SCHEMA_PATH.with_name("hermes.shared_metrics.v1.schema.json")
 
@@ -96,7 +101,9 @@ def _package_dimension_schema() -> dict[str, object]:
 
 def _task_dimension_schema(kind: str) -> dict[str, object]:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    return schema["$defs"][kind]["properties"]["dimensions"]
+    dimensions = schema["$defs"][kind]["properties"]["dimensions"]
+    # The terminal counter lists its current v3 shape first, then the v2 shape it still drains.
+    return dimensions["oneOf"][0] if "oneOf" in dimensions else dimensions
 
 
 def _tool_dimension_schema(kind: str) -> dict[str, object]:
@@ -112,7 +119,7 @@ def _dimensions() -> dict[str, str]:
 
 
 def _resource(
-    hermes_version: str = "test-version",
+    qubit_version: str = "test-version",
     *,
     os_family: str = "linux",
     architecture: str = "x86_64",
@@ -120,7 +127,7 @@ def _resource(
 ) -> dict[str, str]:
     return {
         "architecture": architecture,
-        "hermes_version": hermes_version,
+        "qubit_version": qubit_version,
         "install_method": install_method,
         "os_family": os_family,
     }
@@ -172,7 +179,7 @@ def test_model_call_counter_survives_restart_and_exports_only_new_deltas(tmp_pat
     _schema_validator().validate(first_package)
     uuid.UUID(first_package["package_id"])
     uuid.UUID(first_package["install_id"])
-    assert first_package["schema_version"] == "hermes.shared_metrics.v2"
+    assert first_package["schema_version"] == "qubit.shared_metrics.v3"
     assert first_package["resource"] == _resource()
     assert first_package["metrics"] == [
         {
@@ -217,7 +224,7 @@ def test_v2_package_preserves_pending_v1_model_counters(tmp_path):
             INSERT INTO counter_aggregates(
                 period_start,
                 metric_name,
-                hermes_version,
+                qubit_version,
                 os_family,
                 architecture,
                 install_method,
@@ -250,10 +257,10 @@ def test_v2_package_preserves_pending_v1_model_counters(tmp_path):
     package = json.loads(package_path.read_text(encoding="utf-8"))
     _schema_validator().validate(package)
 
-    assert package["schema_version"] == "hermes.shared_metrics.v2"
+    assert package["schema_version"] == "qubit.shared_metrics.v3"
     assert package["metrics"] == [
         {
-            "name": LEGACY_MODEL_CALL_METRIC,
+            "name": MODEL_CALL_METRIC,
             "type": "counter",
             "dimensions": _legacy_dimensions(),
             "value": 3,
@@ -496,8 +503,10 @@ def test_package_schema_matches_the_model_call_contract():
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     properties = _package_dimension_schema()["properties"]
 
-    assert schema["properties"]["schema_version"]["const"] == "hermes.shared_metrics.v2"
-    assert set(properties) == {"model", "provider"}
+    assert schema["properties"]["schema_version"]["const"] == "qubit.shared_metrics.v3"
+    assert set(properties) == {"call_role", "error_class", "model", "outcome", "provider", "ttft_bucket"}
+    # Rows counted before the v3 upgrade carry only model/provider and must still drain.
+    assert set(_package_dimension_schema()["required"]) == {"model", "provider"}
     assert properties["model"]["maxLength"] == MODEL_IDENTIFIER_MAX_LENGTH
     assert properties["provider"]["maxLength"] == PROVIDER_IDENTIFIER_MAX_LENGTH
     assert "enum" not in properties["model"]
@@ -533,13 +542,13 @@ def test_package_schema_matches_the_client_resource_contract():
     # Every v2 package records the complete bounded client resource.
     assert set(resource["required"]) == {
         "architecture",
-        "hermes_version",
+        "qubit_version",
         "install_method",
         "os_family",
     }
     assert set(resource["properties"]) == {
         "architecture",
-        "hermes_version",
+        "qubit_version",
         "install_method",
         "os_family",
     }
@@ -555,10 +564,10 @@ def test_client_active_mark_accepts_only_an_empty_allowlisted_payload():
         kind="mark",
         category=None,
         category_profile=None,
-        name="hermes.client.active",
+        name="qubit.client.active",
         scope_category=None,
         metadata={
-            "hermes.metrics.schema_version": "hermes.metrics.event.v2",
+            "qubit.metrics.schema_version": "qubit.metrics.event.v3",
         },
         data={},
     )
@@ -570,7 +579,7 @@ def test_client_active_mark_accepts_only_an_empty_allowlisted_payload():
     assert client_active_counter(with_payload) is None
 
     wrong_schema = deepcopy(event)
-    wrong_schema.metadata["hermes.metrics.schema_version"] = "unknown"
+    wrong_schema.metadata["qubit.metrics.schema_version"] = "unknown"
     assert client_active_counter(wrong_schema) is None
 
 
@@ -720,7 +729,7 @@ def test_tool_retry_bucket_requires_an_explicit_non_negative_count(
     assert tool_retry_bucket(retry_count) == expected
 
 
-def test_model_call_fields_report_terminal_model_and_provider_without_a_catalog():
+def test_model_call_fields_report_terminal_model_and_shipped_provider():
     assert model_call_fields({
         "model": "fallback/model",
         "response_model": "NVIDIA/Nemotron-3-Ultra",
@@ -730,12 +739,14 @@ def test_model_call_fields_report_terminal_model_and_provider_without_a_catalog(
         "model": "nvidia/nemotron-3-ultra",
         "provider": "openrouter",
     }
+    # A provider Hermes does not ship is user-named (a custom endpoint key): neither it nor
+    # the model id it serves leaves the machine.
     assert model_call_fields({
         "model": "ZAI/GLM-5.2",
         "provider": "Brev",
     }) == {
-        "model": "zai/glm-5.2",
-        "provider": "brev",
+        "model": "custom",
+        "provider": "custom",
     }
 
 
@@ -754,13 +765,17 @@ def test_auxiliary_logical_scope_projects_one_normalized_terminal_route():
         metadata={
             relay_runtime.RUNTIME_SCHEMA_KEY: relay_runtime.RUNTIME_SCHEMA_VERSION,
             relay_runtime.RUNTIME_INSTANCE_KEY: "runtime-1",
-            "hermes.call_role": "auxiliary:compression",
+            "qubit.call_role": "auxiliary:compression",
         },
     )
 
     assert model_call_dimensions(event) == {
+        "call_role": "auxiliary",
+        "error_class": "none",
         "model": "accepted/model",
+        "outcome": "success",
         "provider": "openrouter",
+        "ttft_bucket": "unknown",
     }
 
     event.data.update({
@@ -768,11 +783,15 @@ def test_auxiliary_logical_scope_projects_one_normalized_terminal_route():
         "response_model": "malformed response model",
     })
     assert model_call_dimensions(event) == {
+        "call_role": "auxiliary",
+        "error_class": "none",
         "model": "configured/model",
+        "outcome": "success",
         "provider": "openrouter",
+        "ttft_bucket": "unknown",
     }
 
-    event.metadata["hermes.call_role"] = "primary"
+    event.metadata["qubit.call_role"] = "primary"
     assert model_call_dimensions(event) is None
 
 
@@ -821,18 +840,32 @@ def test_tool_subscriber_contract_accepts_only_bounded_events():
         kind="scope",
         category="tool",
         category_profile={},
-        name="hermes.tool_call",
+        name="qubit.tool_call",
         scope_category="end",
-        metadata={"hermes.metrics.schema_version": "hermes.metrics.event.v2"},
+        metadata={"qubit.metrics.schema_version": "qubit.metrics.event.v3"},
         data={
             "approval_outcome": "approved",
+            "error_class": "none",
             "latency_bucket": "250ms_to_500ms",
             "outcome": "success",
             "retry_count_bucket": "0",
             "tool_category": "terminal",
+            "tool_name": "terminal",
         },
     )
-    assert tool_call_dimensions(terminal) == terminal.data
+    assert tool_call_dimensions(terminal) == {
+        "approval_outcome": "approved", "outcome": "success", "tool_category": "terminal",
+    }
+    assert tool_latency_dimensions(terminal) == {
+        "latency_bucket": "250ms_to_500ms", "retry_count_bucket": "0", "tool_category": "terminal",
+    }
+    assert tool_usage_dimensions(terminal) == {
+        "error_class": "none", "outcome": "success", "tool_name": "terminal",
+    }
+    terminal.data["tool_name"] = "private-plugin-tool"
+    assert tool_usage_dimensions(terminal) is None
+    assert tool_call_dimensions(terminal) is None
+    terminal.data["tool_name"] = "terminal"
 
     terminal.data["result"] = "must-not-pass"
     assert tool_call_dimensions(terminal) is None
@@ -847,13 +880,13 @@ def test_tool_subscriber_contract_accepts_only_bounded_events():
         kind="mark",
         category=None,
         category_profile=None,
-        name="hermes.tool_approval",
+        name="qubit.tool_approval",
         scope_category=None,
-        metadata={"hermes.metrics.schema_version": "hermes.metrics.event.v2"},
+        metadata={"qubit.metrics.schema_version": "qubit.metrics.event.v3"},
         data={"attribution": "unattributed", "outcome": "denied"},
     )
     assert tool_approval_counter(approval) == (
-        "hermes.tool_approval.count",
+        "qubit.tool_approval.count",
         approval.data,
     )
     approval.data["command"] = "must-not-pass"
@@ -861,36 +894,38 @@ def test_tool_subscriber_contract_accepts_only_bounded_events():
 
 
 def test_skill_subscriber_contract_accepts_only_bounded_marks():
-    metadata = {"hermes.metrics.schema_version": "hermes.metrics.event.v2"}
+    metadata = {"qubit.metrics.schema_version": "qubit.metrics.event.v3"}
     lifecycle = SimpleNamespace(
         kind="mark",
         category=None,
         category_profile=None,
-        name="hermes.skill.lifecycle",
+        name="qubit.skill.lifecycle",
         scope_category=None,
         metadata=metadata,
         data={"action": "patched", "provenance": "agent_created"},
     )
     assert skill_counter(lifecycle) == (
-        "hermes.skill.lifecycle.count",
+        "qubit.skill.lifecycle.count",
         lifecycle.data,
     )
 
     load = SimpleNamespace(**{
         **lifecycle.__dict__,
-        "name": "hermes.skill.load",
+        "name": "qubit.skill.load",
         "data": {
             "post_patch_state": "reused_after_patch",
             "provenance": "agent_created",
             "reuse_state": "reused",
+            "skill_name": "custom",
             "use_count_bucket": "3_to_5",
         },
     })
-    assert skill_counter(load) == ("hermes.skill.load.count", load.data)
+    assert skill_counter(load) == ("qubit.skill.load.count", load.data)
 
+    # Only bundled/optional skill names (public) may appear; a local name is refused.
     load.data["skill_name"] = "privacy-canary"
     assert skill_counter(load) is None
-    load.data.pop("skill_name")
+    load.data["skill_name"] = "custom"
     load.data["provenance"] = "private-repository"
     assert skill_counter(load) is None
     lifecycle.metadata["skill_name"] = "privacy-canary"
@@ -913,16 +948,19 @@ def test_skill_event_fields_are_bounded_and_reject_malformed_usage():
         "post_patch_state": "no_new_patch",
         "provenance": "unknown",
         "reuse_state": "reused",
+        "skill_name": "custom",
         "use_count_bucket": "2",
     }
     assert skill_load_fields({
         "use_count": 1,
         "reused": False,
         "reuse_after_patch": False,
+        "skill_name": "codex",
     }) == {
         "post_patch_state": "not_applicable",
         "provenance": "unknown",
         "reuse_state": "first_use",
+        "skill_name": "codex",
         "use_count_bucket": "1",
     }
     assert (
@@ -970,14 +1008,14 @@ def test_store_migrates_v1_counters_with_unknown_client_dimensions(tmp_path):
             CREATE TABLE counter_aggregates (
                 period_start TEXT NOT NULL,
                 metric_name TEXT NOT NULL,
-                hermes_version TEXT NOT NULL,
+                qubit_version TEXT NOT NULL,
                 dimensions_json TEXT NOT NULL,
                 value INTEGER NOT NULL,
                 packaged_value INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (
                     period_start,
                     metric_name,
-                    hermes_version,
+                    qubit_version,
                     dimensions_json
                 )
             )
@@ -988,7 +1026,7 @@ def test_store_migrates_v1_counters_with_unknown_client_dimensions(tmp_path):
             INSERT INTO counter_aggregates(
                 period_start,
                 metric_name,
-                hermes_version,
+                qubit_version,
                 dimensions_json,
                 value,
                 packaged_value
@@ -1046,7 +1084,7 @@ def test_pending_metrics_keep_the_client_resource_recorded_at_event_time(tmp_pat
 def test_store_exports_task_started_and_terminal_counters(tmp_path):
     store = SharedMetricsStore(tmp_path / "metrics.sqlite3", tmp_path / "outbox")
     store.record_counter(
-        "hermes.task_run.started",
+        "qubit.task_run.started",
         {"entrypoint": "interactive", "execution_surface": "cli"},
         _resource(),
     )
@@ -1061,16 +1099,59 @@ def test_store_exports_task_started_and_terminal_counters(tmp_path):
         tool_call_count=2,
         retry_count=0,
     )
-    store.record_counter("hermes.task_run.finished", terminal, _resource())
+    end = SimpleNamespace(
+        kind="scope", category="function", category_profile=None, name="qubit.task_run",
+        scope_category="end", metadata={"qubit.metrics.schema_version": "qubit.metrics.event.v3"},
+        data=terminal,
+    )
+    for counter in (task_counter(end), task_duration_counter(end)):
+        store.record_counter(*counter, _resource())
 
     [package_path] = store.create_and_export_package()
     package = json.loads(package_path.read_text(encoding="utf-8"))
     _schema_validator().validate(package)
 
     assert {metric["name"] for metric in package["metrics"]} == {
-        "hermes.task_run.finished",
-        "hermes.task_run.started",
+        "qubit.task_run.duration",
+        "qubit.task_run.finished",
+        "qubit.task_run.started",
     }
+
+def test_v2_task_and_tool_rows_recorded_before_an_upgrade_still_package(tmp_path):
+    store = SharedMetricsStore(tmp_path / "metrics.sqlite3", tmp_path / "outbox")
+    store.record_counter("qubit.task_run.finished", {
+        "duration_bucket": "1s_to_5s", "end_reason": "completed", "entrypoint": "interactive",
+        "execution_surface": "cli", "model_call_count_bucket": "1", "outcome": "success",
+        "retry_count_bucket": "0", "termination": "none", "tool_call_count_bucket": "2",
+    }, _resource())
+    store.record_counter("qubit.tool_call.count", {
+        "approval_outcome": "not_required", "latency_bucket": "lt_100ms", "outcome": "success",
+        "retry_count_bucket": "0", "tool_category": "file",
+    }, _resource())
+
+    [package_path] = store.create_and_export_package()
+    package = json.loads(package_path.read_text(encoding="utf-8"))
+    _schema_validator().validate(package)
+    assert {metric["name"] for metric in package["metrics"]} == {
+        "qubit.task_run.finished", "qubit.tool_call.count",
+    }
+
+
+def test_sent_package_keeps_its_file_but_not_a_second_copy_in_the_database(tmp_path):
+    store = SharedMetricsStore(tmp_path / "metrics.sqlite3", tmp_path / "outbox")
+    store.record_model_call(_dimensions(), _resource())
+    [sent_path] = store.create_and_export_package()
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute("UPDATE package_outbox SET send_state = 'sent'")
+    store.record_model_call(_dimensions(), _resource())
+    [pending_path] = store.create_and_export_package()
+
+    with sqlite3.connect(store.database_path) as connection:
+        bodies = dict(connection.execute("SELECT package_id, payload_json FROM package_outbox"))
+    assert bodies[sent_path.stem] == ""
+    assert json.loads(bodies[pending_path.stem]) == json.loads(pending_path.read_text(encoding="utf-8"))
+    _schema_validator().validate(json.loads(sent_path.read_text(encoding="utf-8")))
+
 
 def test_package_schema_rejects_unknown_fields(tmp_path):
     store = SharedMetricsStore(tmp_path / "metrics.sqlite3", tmp_path / "outbox")
@@ -1178,7 +1259,7 @@ def test_retention_prunes_only_expired_exported_history(tmp_path):
             """
             UPDATE counter_aggregates
             SET period_start = '2026-05-01'
-            WHERE hermes_version = 'expired-version'
+            WHERE qubit_version = 'expired-version'
             """
         )
         connection.execute(
@@ -1206,7 +1287,7 @@ def test_retention_prunes_only_expired_exported_history(tmp_path):
         aggregate_versions = {
             row[0]
             for row in connection.execute(
-                "SELECT hermes_version FROM counter_aggregates"
+                "SELECT qubit_version FROM counter_aggregates"
             ).fetchall()
         }
     assert {row[0] for row in outbox_rows} == {
@@ -1416,6 +1497,22 @@ def test_cross_process_model_call_updates_are_transactional(tmp_path):
 
     restarted = SharedMetricsStore(database_path, outbox_directory)
     assert restarted.counter_snapshot()[0]["value"] == 20
+
+
+def test_a_write_the_busy_store_cannot_take_is_deferred_not_lost(tmp_path):
+    """Another writer holding the store past the short busy timeout: the caller returns at once and the
+    increment lands with the next write (or the exit drain), never raised or dropped."""
+    store = SharedMetricsStore(tmp_path / "metrics.sqlite3", tmp_path / "outbox")
+    blocker = sqlite3.connect(tmp_path / "metrics.sqlite3")
+    blocker.execute("BEGIN IMMEDIATE")
+    try:
+        store.record_model_call(_dimensions(), _resource())
+    finally:
+        blocker.rollback()
+        blocker.close()
+    assert store.counter_snapshot() == []
+    store.record_model_call(_dimensions(), _resource())
+    assert store.counter_snapshot()[0]["value"] == 2
 
 
 def test_cross_process_client_active_attempts_record_one_install(tmp_path):

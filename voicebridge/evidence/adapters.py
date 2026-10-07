@@ -19,8 +19,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any, List, Optional
 
-from .models import (EvidenceError, EvidencePartialError, EvidenceRecord,
-                     EvidenceUnavailableError, Scope, Sensitivity, Trust)
+from .models import (EvidenceError, EvidencePartialError, EvidencePermissionError,
+                     EvidenceRecord, EvidenceUnavailableError, Scope, Sensitivity, Trust)
 
 MAX_EXCERPT_CHARS = 2000
 MAX_FETCH_BYTES = 256 * 1024

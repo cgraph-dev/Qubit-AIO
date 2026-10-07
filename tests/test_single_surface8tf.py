@@ -32,7 +32,7 @@ def test_no_second_server_commands():
             names.update(action.choices.keys())
     for absent in ("serve", "dashboard"):
         assert absent not in names, f"no second-server stub: {absent}"
-    # `desktop`/`gui` are Qubit-owned fork CLI families (native desktop app
+    # `desktop`/`gui` are Qubit CLI families (native desktop app
     # build/launch), confirm-gated mutating routes, never a second server.
     from voicebridge import cli_qubit_forward as HF
 

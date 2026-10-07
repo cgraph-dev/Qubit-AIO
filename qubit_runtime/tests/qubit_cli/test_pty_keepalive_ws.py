@@ -24,6 +24,9 @@ class FakeBridge:
     def resize(self, cols, rows):
         pass
 
+    def is_alive(self):
+        return self.alive
+
     def close(self):
         self.alive = False
 
@@ -49,7 +52,7 @@ def pty_keepalive_harness(monkeypatch):
 
     async def fake_argv(**kw):
         resume = "child" if kw.get("resume") == "parent" else kw.get("resume")
-        env = {"HERMES_TUI_RESUME": resume} if resume else {}
+        env = {"QUBIT_TUI_RESUME": resume} if resume else {}
         return (["x", resume or "fresh"], "/tmp", env)
 
     monkeypatch.setattr(_web_server_chat, "_resolve_chat_argv_async", fake_argv)

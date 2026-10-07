@@ -29,7 +29,7 @@ def test_setup_admits_real_provider_union_and_keeps_selection_on_failure(tmp_pat
     for name in ("existing_dep", "provider_dep"):
         _wheel(wheels, name, "1.0")
     (core / "pyproject.toml").write_text(
-        '[project]\nname="core"\nversion="1"\nrequires-python=">=3.11"\n'
+        '[project]\nname="core"\nversion="1"\nrequires-python=">=3.14"\n'
         '[tool.uv]\npackage=false\nno-index=true\n'
         f'find-links=[{json.dumps(wheels.as_posix())}]\n')
     incumbent, candidate = (home / "plugins" / name for name in ("incumbent", "candidate"))
@@ -41,7 +41,7 @@ def test_setup_admits_real_provider_union_and_keeps_selection_on_failure(tmp_pat
         if declaration == "pyproject":
             manifest.write_text('name: candidate\n')
             (candidate / "pyproject.toml").write_text(
-                '[project]\nname="candidate"\nversion="1"\nrequires-python=">=3.11"\n'
+                '[project]\nname="candidate"\nversion="1"\nrequires-python=">=3.14"\n'
                 f'dependencies={json.dumps(requirements)}\n[tool.uv]\npackage=false\n')
         else:
             manifest.write_text(f'name: candidate\n{declaration}: {json.dumps(requirements)}\n')
@@ -51,7 +51,7 @@ def test_setup_admits_real_provider_union_and_keeps_selection_on_failure(tmp_pat
     monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "tools"))
+    monkeypatch.setenv("QUBIT_RUNTIME_DIR", str(tmp_path / "tools"))
     monkeypatch.setattr("pm.paths.repo_root", lambda: core)
     monkeypatch.setattr("pm._uv._toolchain", lambda **kwargs: (Path(uv), Path(sys.executable)))
     monkeypatch.setattr("pm.client.is_runtime", lambda: True)
@@ -138,3 +138,17 @@ def test_malformed_candidate_manifest_is_not_a_successful_noop(tmp_path, monkeyp
     monkeypatch.setattr("plugins.memory.find_provider_dir", lambda name: tmp_path)
     [row] = mp._install_memory_provider_python_dependencies("broken")
     assert row["status"] == "failed"
+
+@pytest.mark.parametrize("manifest_lists", [False, True])
+def test_setup_lists_the_requirements_pm_would_install(tmp_path, monkeypatch, manifest_lists):
+    """An authored pyproject.toml wins over the manifest lists, so it is what the setup UI must show."""
+    (tmp_path / "plugin.yaml").write_text(json.dumps({
+        "name": "provider", **({"pip_dependencies": ["stale-manifest-dep"]} if manifest_lists else {}),
+    }))
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "provider"\nversion = "1"\ndependencies = ["provider_dep>=1,<2", "qubit"]\n')
+    monkeypatch.setattr("plugins.memory.find_provider_dir", lambda name: tmp_path)
+    monkeypatch.setattr("pm.venv_is_current", lambda **inputs: True)
+    from qubit_cli.web_server_memory import _memory_provider_setup_info
+
+    assert _memory_provider_setup_info("provider")["pip_dependencies"] == ["provider_dep>=1,<2"]

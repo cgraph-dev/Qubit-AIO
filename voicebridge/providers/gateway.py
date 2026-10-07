@@ -269,8 +269,25 @@ def _local_chat_raw(messages: Any, cfg: Any, max_tokens: int, *,
                 "num_predict": int(max_tokens)}
         if options:
             opts.update(options)
+        # Thinking models (e.g. qubit-brain4 = Qwen3-abliterated) default to
+        # reasoning ON for a raw /api/chat call. Without an explicit ``think``
+        # flag the whole ``num_predict`` budget is spent on the chain-of-thought
+        # and the response returns content='' with done_reason=length. Mirror
+        # the canonical voice path (``local_llm._chat_payload``): pass the
+        # configured ``intent.local_llm.think`` (default False). A caller that
+        # wants reasoning can override via ``options["think"]``.
+        think = False
+        try:
+            think = bool(cfg.get("intent", "local_llm", "think",
+                                 default=False))
+        except Exception:  # noqa: BLE001 - absent config keeps no-think default
+            think = False
+        if options and "think" in options:
+            think = bool(options["think"])
+        opts.pop("think", None)
         payload: dict = {
             "model": alias, "messages": msgs, "stream": False,
+            "think": think,
             "keep_alive": rc.keep_alive if keep_alive is None else keep_alive,
             "options": opts}
         if structured_schema is not None:
@@ -798,7 +815,11 @@ def run(req: ProviderRequest, cfg: Any,
                                      max_response_chars=policy.max_response_chars)
     gov.acquire()
     try:
-        res = client.complete(req, eg.sanitized, est_cost=est)
+        # ``messages`` carries a pre-built multimodal conversation for the
+        # vision path (OpenAI content-block shape with the image data URL); it
+        # is passed through verbatim so the image is never dropped. Text-only
+        # callers pass ``None`` and the client builds its default body.
+        res = client.complete(req, eg.sanitized, est_cost=est, messages=messages)
     except Exception as exc:
         gov.release(provider, False)
         return ProviderResult(ok=False, code="PROVIDER_OUTAGE",

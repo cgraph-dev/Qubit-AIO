@@ -1,7 +1,7 @@
 """Live plugin-catalog lookups must not multiply per installed plugin.
 
 A slow or unreachable catalog host used to cost one request timeout per plugin row, on the
-dashboard plugins-hub rebuild (inline on the event loop) and on ``hermes plugins list``.
+dashboard plugins-hub rebuild (inline on the event loop) and on ``qubit plugins list``.
 """
 
 from __future__ import annotations
@@ -84,7 +84,7 @@ def test_hub_rebuild_and_plugins_list_resolve_the_kill_list_once(monkeypatch, tm
 
     monkeypatch.setattr(web_server, "_get_dashboard_plugins", lambda force_rescan=False: [])
     monkeypatch.setattr(_web_server_memory, "_discover_memory_provider_statuses", lambda: [])
-    monkeypatch.setattr(_cfg_mod, "get_qubit_home", lambda: Path("/tmp/hermes-home"))
+    monkeypatch.setattr(_cfg_mod, "get_qubit_home", lambda: Path("/tmp/qubit-home"))
     monkeypatch.setattr(_cfg_mod, "load_config", lambda: {"dashboard": {"hidden_plugins": []}})
     monkeypatch.setattr(plugins_cmd, "_discover_all_plugins", lambda: list(_PLUGIN_ROWS))
     monkeypatch.setattr(plugins_cmd, "_get_current_context_engine", lambda: "compressor")
@@ -106,3 +106,46 @@ def test_hub_rebuild_and_plugins_list_resolve_the_kill_list_once(monkeypatch, tm
     rows = {row["name"]: row["removed"] for row in json.loads(capsys.readouterr().out)}
     assert rows == {"demo": "exfiltrated env vars", "second": None, "third": None}
     assert unreachable.attempts == 2  # one more for the whole listing, not one per row
+
+
+def test_dropped_cache_no_longer_outvotes_the_in_tree_catalog(monkeypatch):
+    """The #119340 shape: a snapshot cached before an update answers every lookup while it
+    is fresh, even with the catalog host dead. After the update drops it, the same dead host
+    yields ``None`` — callers fall back to the in-tree catalog the update just installed —
+    instead of resurrecting the pre-update snapshot for the rest of the TTL."""
+    monkeypatch.setattr("httpx.get", _UnreachableCatalog())
+    cache = pc._live_cache_path()
+    cache.parent.mkdir(parents=True)
+    cache.write_text(json.dumps({"entries": [], "removed": []}))
+
+    assert pc.fetch_live_catalog() == {"entries": [], "removed": []}  # the stale snapshot wins
+
+    pc.invalidate_live_cache_for_home(cache.parent.parent)
+
+    assert pc.fetch_live_catalog() is None  # nothing left to serve: in-tree takes over
+
+
+def test_update_invalidates_the_live_catalog_cache_for_every_profile(tmp_path, monkeypatch):
+    """Post-update maintenance drops the cached live catalog under the active home AND every
+    sibling profile's — the checkout is shared, so one profile's update changes every
+    profile's catalog truth at once (#119340)."""
+    from qubit_cli import update_cmd
+    from qubit_cli import update_cmd_maint
+    from qubit_cli import backup as _backup
+
+    root = tmp_path / "home"
+    alpha = root / "profiles" / "alpha"
+    beta = root / "profiles" / "beta"
+    caches = []
+    for home in (root, alpha, beta):
+        cache = home / "cache" / "plugin-catalog.json"
+        cache.parent.mkdir(parents=True)
+        cache.write_text(json.dumps({"entries": [], "removed": []}))
+        caches.append(cache)
+
+    monkeypatch.setattr(update_cmd, "get_qubit_home", lambda: root)
+    monkeypatch.setattr(_backup, "_sibling_profile_homes", lambda _home: [("alpha", alpha), ("beta", beta)])
+
+    update_cmd_maint._invalidate_live_plugin_catalog_caches()
+
+    assert not any(cache.exists() for cache in caches)

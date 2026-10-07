@@ -7,14 +7,15 @@ conversation with correct formatting, truncation, and config behavior.
 
 from io import StringIO
 from unittest.mock import MagicMock, patch
+from agent.i18n import t
 
 
 
 
 def _make_cli(config_overrides=None, env_overrides=None, **kwargs):
-    """Create a HermesCLI instance with minimal mocking."""
+    """Create a QubitCLI instance with minimal mocking."""
     import cli as _cli_mod
-    from cli import HermesCLI
+    from cli import QubitCLI
 
     _clean_config = {
         "model": {
@@ -33,7 +34,7 @@ def _make_cli(config_overrides=None, env_overrides=None, **kwargs):
             else:
                 _clean_config[k] = v
 
-    clean_env = {"LLM_MODEL": "", "HERMES_MAX_ITERATIONS": ""}
+    clean_env = {"LLM_MODEL": "", "QUBIT_MAX_ITERATIONS": ""}
     if env_overrides:
         clean_env.update(env_overrides)
     with (
@@ -41,7 +42,7 @@ def _make_cli(config_overrides=None, env_overrides=None, **kwargs):
         patch.dict("os.environ", clean_env, clear=False),
         patch.dict(_cli_mod.__dict__, {"CLI_CONFIG": _clean_config}),
     ):
-        return HermesCLI(**kwargs)
+        return QubitCLI(**kwargs)
 
 
 # ── Sample conversation histories for tests ──────────────────────────
@@ -128,7 +129,7 @@ class TestDisplayResumedHistory:
         output = self._capture_display(cli)
 
         assert "You:" in output
-        assert "Qubit:" in output
+        assert "Hermes:" in output
         assert "What is Python?" in output
         assert "Python is a high-level programming language." in output
         assert "How do I install it?" in output
@@ -280,7 +281,7 @@ class TestPreloadResumedSession:
 
         assert result is False
         output = buf.getvalue()
-        assert "Session not found" in output
+        assert t("cli.resume.session_not_found", session_id="nonexistent_session") in output
 
 
 

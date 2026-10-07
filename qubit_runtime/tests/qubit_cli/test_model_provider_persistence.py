@@ -1,4 +1,4 @@
-"""Tests that provider selection via `hermes model` always persists correctly.
+"""Tests that provider selection via `qubit model` always persists correctly.
 
 Regression tests for the bug where _save_model_choice could save config.model
 as a plain string, causing subsequent provider writes (which check
@@ -14,7 +14,7 @@ import pytest
 @pytest.fixture
 def config_home(tmp_path, monkeypatch):
     """Isolated QUBIT_HOME with a minimal string-format config."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     config_yaml = home / "config.yaml"
     # Start with model as a plain string — the format that triggered the bug
@@ -23,9 +23,9 @@ def config_home(tmp_path, monkeypatch):
     env_file.write_text("")
     monkeypatch.setenv("QUBIT_HOME", str(home))
     # Clear env vars that could interfere
-    monkeypatch.delenv("HERMES_MODEL", raising=False)
+    monkeypatch.delenv("QUBIT_MODEL", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
-    monkeypatch.delenv("HERMES_INFERENCE_PROVIDER", raising=False)
+    monkeypatch.delenv("QUBIT_INFERENCE_PROVIDER", raising=False)
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("GH_TOKEN", raising=False)
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
@@ -54,7 +54,7 @@ class TestSaveModelChoiceAlwaysDict:
 
 
 class TestProviderPersistsAfterModelSave:
-    def test_update_config_for_provider_uses_atomic_config_write(self, config_home):
+    def test_update_config_for_provider_uses_atomic_config_replace(self, config_home):
         """Provider switches delegate config writes to the comment-preserving config writer."""
         from qubit_cli.auth import _update_config_for_provider
 
@@ -68,7 +68,7 @@ class TestProviderPersistsAfterModelSave:
             assert data["model"]["default"] == "some-old-model"
             raise OSError("simulated atomic write failure")
 
-        with patch("qubit_cli.auth.atomic_config_write", side_effect=_boom) as mock_write:
+        with patch("qubit_cli.auth.atomic_config_replace", side_effect=_boom) as mock_write:
             with pytest.raises(OSError, match="simulated atomic write failure"):
                 _update_config_for_provider(
                     "nous",

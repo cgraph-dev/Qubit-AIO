@@ -5,6 +5,8 @@ from types import SimpleNamespace
 import pytest
 from prompt_toolkit.utils import get_cwidth
 
+from agent.i18n import t
+
 
 @pytest.fixture
 def qubit_home(tmp_path, monkeypatch):
@@ -12,7 +14,7 @@ def qubit_home(tmp_path, monkeypatch):
 
     from qubit_cli import goals
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(home))
@@ -46,7 +48,9 @@ def test_dock_paints_goal_on_top_and_queue_last_and_follows_their_lifecycle(qubi
     assert all(get_cwidth(line) <= 80 for line in lines)
     dock.collapsed = True
     collapsed = dock.dock_text(columns=80, rows=40)
-    assert "\n" not in collapsed and "goal active · 4 queued · Ctrl+R restore · ⊙ Goal" in collapsed
+    counts = f"{t('cli.subagents.goal_active')} · {t('cli.subagents.count_queued', count=4)}"
+    assert "\n" not in collapsed
+    assert f"{t('cli.subagents.heading_session_restore', count=counts)} · ⊙ Goal" in collapsed
     assert "Ctrl+T" not in collapsed  # the monitor only lists subagents/processes
     assert get_cwidth(collapsed) <= 80
 

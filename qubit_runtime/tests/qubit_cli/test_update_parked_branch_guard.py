@@ -1,8 +1,8 @@
-"""Regression tests for the parked-branch guard in ``hermes update``.
+"""Regression tests for the parked-branch guard in ``qubit update``.
 
 Live incident (2026-08-17, Teknium's Linux box): the source checkout was
 parked on a stale feature branch (``claude-code-inspired/local-terminal-
-memory-limit``, days behind main) left there by earlier tooling. ``hermes
+memory-limit``, days behind main) left there by earlier tooling. ``qubit
 update`` autostashed, refreshed lazy backends, synced skills and printed
 "✓ Code updated!" / "✓ Update complete!" — while the checkout stayed on the
 stale branch with none of main's new code. Two sessions burned time on
@@ -25,7 +25,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from qubit_cli import main as hermes_main
+from qubit_cli import main as qubit_main
 import qubit_cli.main_web_build as main_web_build
 import qubit_cli.main_install_repair as main_install_repair
 from qubit_cli import update_cmd
@@ -82,9 +82,9 @@ def repo_pair(tmp_path):
 @pytest.fixture(autouse=True)
 def _no_config(monkeypatch):
     """Isolate the guard from the machine's real config.yaml."""
-    import qubit_cli.config as hermes_config
+    import qubit_cli.config as qubit_config
 
-    monkeypatch.setattr(hermes_config, "load_config", lambda: {})
+    monkeypatch.setattr(qubit_config, "load_config", lambda: {})
 
 
 # ---------------------------------------------------------------------------
@@ -152,10 +152,10 @@ def test_equivalent_cherry_picked_commit_is_still_safe(repo_pair):
 def test_config_opt_out_blocks_auto_switch(repo_pair, monkeypatch):
     """updates.auto_switch_parked_branch: false disables auto-switch even
     when the branch is clean and merged."""
-    import qubit_cli.config as hermes_config
+    import qubit_cli.config as qubit_config
 
     monkeypatch.setattr(
-        hermes_config,
+        qubit_config,
         "load_config",
         lambda: {"updates": {"auto_switch_parked_branch": False}},
     )
@@ -192,7 +192,7 @@ def test_branch_head_suffix_empty_on_non_repo(tmp_path):
 def test_print_update_completion_carries_branch_and_sha(
     repo_pair, monkeypatch, capsys
 ):
-    monkeypatch.setattr(hermes_main, "PROJECT_ROOT", repo_pair)
+    monkeypatch.setattr(qubit_main, "PROJECT_ROOT", repo_pair)
     update_cmd._print_update_completion("✓ Update complete!")
     out = capsys.readouterr().out
     short = _git(repo_pair, "rev-parse", "--short", "HEAD").stdout.strip()
@@ -211,26 +211,85 @@ def _patch_update_flow(monkeypatch, repo, run_real_git=True):
     keeps REAL subprocess.run so the git plumbing runs against the fixture
     repo (the whole point of these regressions).
     """
-    monkeypatch.setattr(hermes_main, "PROJECT_ROOT", repo)
-    monkeypatch.setattr(hermes_main, "_resolve_update_branch", lambda args: "main")
-    monkeypatch.setattr(hermes_main, "_is_windows", lambda: False)
+    monkeypatch.setattr(qubit_main, "PROJECT_ROOT", repo)
+    monkeypatch.setattr(qubit_main, "_resolve_update_branch", lambda args: "main")
+    monkeypatch.setattr(qubit_main, "_is_windows", lambda: False)
     monkeypatch.setattr(main_install_repair, "_is_windows", lambda: False)
     monkeypatch.setattr(
-        hermes_main, "_get_origin_url",
-        lambda *a, **k: "https://github.com/NousResearch/hermes-agent.git",
+        qubit_main, "_get_origin_url",
+        lambda *a, **k: "https://github.com/NousResearch/qubit.git",
     )
     monkeypatch.setattr(update_cmd, "_is_fork", lambda *a, **k: False)
     monkeypatch.setattr(update_cmd, "_discard_lockfile_churn", lambda *a, **k: None)
     monkeypatch.setattr(update_cmd, "_discard_lockfile_churn", lambda *a, **k: None)
     monkeypatch.setattr(update_cmd, "_normalize_managed_eol", lambda *a, **k: None)
-    monkeypatch.setattr(hermes_main, "_clear_bytecode_cache", lambda *a, **k: 0)
-    monkeypatch.setattr(hermes_main, "_record_bytecode_fingerprint", lambda *a, **k: None)
+    monkeypatch.setattr(qubit_main, "_clear_bytecode_cache", lambda *a, **k: 0)
+    monkeypatch.setattr(qubit_main, "_record_bytecode_fingerprint", lambda *a, **k: None)
     monkeypatch.setattr(main_web_build, "_record_bytecode_fingerprint", lambda *a, **k: None)
-    monkeypatch.setattr(hermes_main, "_run_pre_update_backup", lambda *a, **k: None)
-    monkeypatch.setattr(hermes_main, "_pause_windows_gateways_for_update", lambda: None)
+    monkeypatch.setattr(qubit_main, "_run_pre_update_backup", lambda *a, **k: None)
+    monkeypatch.setattr(qubit_main, "_pause_windows_gateways_for_update", lambda: None)
     monkeypatch.setattr(
-        hermes_main, "_resume_windows_gateways_after_update", lambda *a, **k: None
+        qubit_main, "_resume_windows_gateways_after_update", lambda *a, **k: None
     )
+
+
+def test_update_refuses_stopped_rebase_without_moving_head(
+    repo_pair, monkeypatch, capsys
+):
+    """A user-owned rebase controls the checkout; update must not switch branches underneath it."""
+    (repo_pair / "a.txt").write_text("topic\n")
+    _git(repo_pair, "add", "a.txt")
+    _git(repo_pair, "commit", "-qm", "topic")
+    rebase = _git(repo_pair, "rebase", "--merge", "origin/main", check=False)
+    assert rebase.returncode != 0
+    assert (repo_pair / ".git" / "rebase-merge").is_dir()
+    assert _git(repo_pair, "branch", "--show-current").stdout.strip() == ""
+    head_before = _git(repo_pair, "rev-parse", "HEAD").stdout.strip()
+
+    _patch_update_flow(monkeypatch, repo_pair)
+    args = SimpleNamespace(branch=None, yes=True, force=False, force_venv=False)
+
+    with pytest.raises(SystemExit) as exc_info:
+        update_cmd._cmd_update_impl(args, False)
+
+    assert exc_info.value.code == 1
+    assert _git(repo_pair, "rev-parse", "HEAD").stdout.strip() == head_before
+    assert (repo_pair / ".git" / "rebase-merge").is_dir()
+    assert _git(repo_pair, "stash", "list").stdout.strip() == ""
+    out = capsys.readouterr().out
+    assert "Git rebase is in progress" in out
+    assert str(repo_pair) in out
+    assert "git rebase --abort" in out
+
+
+def test_update_reports_git_am_abort_for_apply_state(
+    repo_pair, monkeypatch, capsys
+):
+    """rebase-apply is shared by rebase --apply and git am; recovery advice must match Git's owner."""
+    (repo_pair / "a.txt").write_text("topic\n")
+    _git(repo_pair, "add", "a.txt")
+    _git(repo_pair, "commit", "-qm", "topic")
+    patch = repo_pair.parent / "upstream.patch"
+    patch.write_text(
+        _git(repo_pair, "format-patch", "-1", "origin/main~1", "--stdout").stdout
+    )
+    applied = _git(repo_pair, "am", str(patch), check=False)
+    assert applied.returncode != 0
+    assert (repo_pair / ".git" / "rebase-apply" / "applying").is_file()
+    head_before = _git(repo_pair, "rev-parse", "HEAD").stdout.strip()
+
+    _patch_update_flow(monkeypatch, repo_pair)
+    args = SimpleNamespace(branch=None, yes=True, force=False, force_venv=False)
+
+    with pytest.raises(SystemExit) as exc_info:
+        update_cmd._cmd_update_impl(args, False)
+
+    assert exc_info.value.code == 1
+    assert _git(repo_pair, "rev-parse", "HEAD").stdout.strip() == head_before
+    assert (repo_pair / ".git" / "rebase-apply" / "applying").is_file()
+    out = capsys.readouterr().out
+    assert "Git am is in progress" in out
+    assert "git am --abort" in out
 
 
 def test_update_skips_and_warns_on_dirty_parked_branch(
@@ -244,7 +303,7 @@ def test_update_skips_and_warns_on_dirty_parked_branch(
     args = SimpleNamespace(branch=None, yes=False, force=False, force_venv=False)
 
     with pytest.raises(SystemExit) as exc_info:
-        hermes_main.cmd_update(args)
+        qubit_main.cmd_update(args)
 
     assert exc_info.value.code == 1
     out = capsys.readouterr().out
@@ -284,7 +343,7 @@ def test_update_switches_unmerged_parked_branch_with_kept_notice(
     args = SimpleNamespace(branch=None, yes=False, force=False, force_venv=False)
 
     with pytest.raises(_StopFlow):
-        hermes_main.cmd_update(args)
+        qubit_main.cmd_update(args)
 
     out = capsys.readouterr().out
     assert "CODE UPDATE SKIPPED" not in out
@@ -311,10 +370,10 @@ def test_update_updates_unmerged_branch_in_place_when_configured(
     origin/<target> instead of switched away from. The running code must
     advance (origin/main's files arrive) AND the local commits must survive,
     with the checkout never moving."""
-    import qubit_cli.config as hermes_config
+    import qubit_cli.config as qubit_config
 
     monkeypatch.setattr(
-        hermes_config,
+        qubit_config,
         "load_config",
         lambda: {"updates": {"parked_branch_strategy": "update_in_place"}},
     )
@@ -335,7 +394,7 @@ def test_update_updates_unmerged_branch_in_place_when_configured(
     args = SimpleNamespace(branch=None, yes=False, force=False, force_venv=False)
 
     with pytest.raises(_StopFlow):
-        hermes_main.cmd_update(args)
+        qubit_main.cmd_update(args)
 
     out = capsys.readouterr().out
     assert "CODE UPDATE SKIPPED" not in out
@@ -363,10 +422,10 @@ def test_switch_branch_flag_overrides_in_place_strategy(
     in its history (#89507 review). The branch tip must be byte-identical
     afterwards, while the checkout ends up on the updated target.
     """
-    import qubit_cli.config as hermes_config
+    import qubit_cli.config as qubit_config
 
     monkeypatch.setattr(
-        hermes_config,
+        qubit_config,
         "load_config",
         lambda: {"updates": {"parked_branch_strategy": "update_in_place"}},
     )
@@ -392,7 +451,7 @@ def test_switch_branch_flag_overrides_in_place_strategy(
     )
 
     with pytest.raises(_StopFlow):
-        hermes_main.cmd_update(args)
+        qubit_main.cmd_update(args)
 
     out = capsys.readouterr().out
     assert "CODE UPDATE SKIPPED" not in out
@@ -429,7 +488,7 @@ def test_update_auto_switches_clean_merged_parked_branch(
     args = SimpleNamespace(branch=None, yes=False, force=False, force_venv=False)
 
     with pytest.raises(_StopFlow):
-        hermes_main.cmd_update(args)
+        qubit_main.cmd_update(args)
 
     out = capsys.readouterr().out
     assert "CODE UPDATE SKIPPED" not in out
@@ -478,7 +537,7 @@ def test_update_up_to_date_path_does_not_repark_merged_branch(tmp_path, monkeypa
     args = SimpleNamespace(branch=None, yes=False, force=False, force_venv=False)
 
     with pytest.raises(_StopFlow):
-        hermes_main.cmd_update(args)
+        qubit_main.cmd_update(args)
 
     # The regression: old code ran `git checkout old-feature` here.
     assert (
@@ -503,7 +562,7 @@ def test_update_on_main_fast_path_unchanged(repo_pair, monkeypatch, capsys):
     args = SimpleNamespace(branch=None, yes=False, force=False, force_venv=False)
 
     with pytest.raises(_StopFlow):
-        hermes_main.cmd_update(args)
+        qubit_main.cmd_update(args)
 
     out = capsys.readouterr().out
     assert "parked on" not in out

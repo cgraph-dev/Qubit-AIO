@@ -27,9 +27,9 @@ class TestHolderSubcommand:
             # -c consumes ONE value token; later bare tokens are (harmless,
             # unhinted) subcommand candidates — pin that shape honestly
             (r"python -m qubit_cli.main -c mysession serve", "serve"),
-            (r"C:\bin\hermes.exe dashboard", "dashboard"),
-            (r"/usr/local/bin/hermes serve", "serve"),
-            # no hermes entry at all
+            (r"C:\bin\qubit.exe dashboard", "dashboard"),
+            (r"/usr/local/bin/qubit serve", "serve"),
+            # no qubit entry at all
             (r"python -c import time; time.sleep(3)", None),
             # entry but no subcommand
             (r"python -m qubit_cli.main", None),
@@ -37,3 +37,14 @@ class TestHolderSubcommand:
     )
     def test_parses_subcommand(self, cmdline, expected):
         assert _qubit_holder_subcommand(cmdline) == expected
+
+    def test_shlex_joined_store_launcher_bootstrap_is_inventoried(self):
+        """launchd ProgramArguments arrive ``shlex.join``ed (single-quoted source); the dashboard
+        inventory must still read the subcommand behind the bootstrap."""
+        import shlex
+        from pathlib import Path
+
+        from qubit_cli._launchers import runtime_command
+
+        cmdline = shlex.join(runtime_command(Path("/opt/qubit"), ["dashboard"], python="/opt/store/python"))
+        assert _qubit_holder_subcommand(cmdline) == "dashboard"

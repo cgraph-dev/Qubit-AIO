@@ -223,7 +223,7 @@ def test_resolver_recovers_when_probe_confirms_reset(tmp_path, monkeypatch):
     """The screenshot bug: pool-only cooldown raises `quota exhausted (429);
     retry after Ns` even though the upstream window already reset.  A positive
     probe must clear the cooldown and return the pool credential."""
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     _write_auth_store(qubit_home, _pool_only_rate_limited_store())
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -262,7 +262,7 @@ def test_resolver_selects_entry_with_expired_millisecond_reset(tmp_path, monkeyp
         }
     )
     store["credential_pool"]["openai-codex"].append(reserve)
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     _write_auth_store(qubit_home, store)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     monkeypatch.setattr(auth_mod, "_probe_codex_quota_restored", lambda token, **kw: False)
@@ -291,8 +291,8 @@ def test_pool_probe_not_fired_for_non_quota_exhaustion(tmp_path, monkeypatch):
     entry["last_error_code"] = 401
     entry["last_error_reason"] = "token_expired"
     entry["last_error_message"] = "expired"
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "hermes"))
-    _write_auth_store(tmp_path / "hermes", store)
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qubit"))
+    _write_auth_store(tmp_path / "qubit", store)
 
     from agent.credential_pool import load_pool
 
@@ -356,6 +356,7 @@ def _fake_refresh(monkeypatch, fresh_token, calls):
         return {"access_token": fresh_token, "refresh_token": "rf-new", "last_refresh": "now"}
 
     monkeypatch.setattr(auth_codex, "refresh_codex_oauth_pure", _refresh)
+    monkeypatch.setattr(auth_mod, "refresh_codex_oauth_pure", _refresh)  # the pool's refresh path
 
 
 def test_resolver_refreshes_expired_token_before_probe(tmp_path, monkeypatch):
@@ -363,7 +364,7 @@ def test_resolver_refreshes_expired_token_before_probe(tmp_path, monkeypatch):
     expired by the time the probe runs: /usage answers 401 -> None -> cooldown kept forever,
     even after a top-up / plan upgrade. Refresh (keeping the cooldown) and probe live."""
     now = time.time()
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     _write_auth_store(qubit_home, _expired_jwt_pool_store(now))
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     fresh = _jwt({"exp": now + 3600})
@@ -387,7 +388,7 @@ def test_pool_selection_refreshes_expired_token_before_probe(tmp_path, monkeypat
     on BOTH sides (pool row + ``providers.openai-codex`` singleton) so the next selection's
     auth-store sync cannot re-adopt the consumed pair and lift the cooldown with it."""
     now = time.time()
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     store = _expired_jwt_pool_store(now)
     stale = store["credential_pool"]["openai-codex"][0]
     store["providers"]["openai-codex"] = {
@@ -414,12 +415,39 @@ def test_pool_selection_refreshes_expired_token_before_probe(tmp_path, monkeypat
     assert disk["providers"]["openai-codex"]["tokens"]["refresh_token"] == "rf-new"
 
 
+def test_pool_selection_keeps_probe_rotated_tokens_when_quota_restored(tmp_path, monkeypatch):
+    """The restored twin of the control above: the cooldown clear must build on the row the
+    probe rotated, not on the selection loop's pre-probe copy, or the consumed refresh token
+    goes back into the pool and the same select() replays it (``refresh_token_reused``)."""
+    now = time.time()
+    qubit_home = tmp_path / "qubit"
+    store = _expired_jwt_pool_store(now)
+    store["credential_pool"]["openai-codex"][0]["source"] = "manual:device_code"  # no singleton re-sync
+    _write_auth_store(qubit_home, store)
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
+    fresh = _jwt({"exp": now + 3600})
+    refresh_calls: list = []
+    _fake_refresh(monkeypatch, fresh, refresh_calls)
+    http_calls = _patch_expiry_aware_httpx(monkeypatch, _StubResponse(200, _usage_payload(0.0, 0.0)))
+    from agent.credential_pool import load_pool
+
+    pool = load_pool("openai-codex")
+    selected = pool.select()
+
+    assert refresh_calls == ["rf-old"]
+    assert [c["headers"]["Authorization"] for c in http_calls] == [f"Bearer {fresh}"]
+    assert (selected.access_token, selected.refresh_token, selected.last_status) == (fresh, "rf-new", "ok")
+    assert pool.entries()[0].refresh_token == "rf-new"  # the pool's own row, not just the returned copy
+    disk = json.loads((qubit_home / "auth.json").read_text())
+    assert disk["credential_pool"]["openai-codex"][0]["refresh_token"] == "rf-new"
+
+
 def test_pool_selection_throttles_failing_pre_probe_refresh(tmp_path, monkeypatch):
     """Regression control: a frozen entry whose refresh keeps failing (revoked grant, network
     down) must not POST to the token endpoint on every selection — at most one attempt per
     probe interval, the same budget the probe itself has (<= 1 network call per 5 min)."""
     now = time.time()
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     _write_auth_store(qubit_home, _expired_jwt_pool_store(now))
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     attempts: list = []
@@ -429,6 +457,7 @@ def test_pool_selection_throttles_failing_pre_probe_refresh(tmp_path, monkeypatc
         raise RuntimeError("invalid_grant")
 
     monkeypatch.setattr(auth_codex, "refresh_codex_oauth_pure", _failing_refresh)
+    monkeypatch.setattr(auth_mod, "refresh_codex_oauth_pure", _failing_refresh)
     http_calls = _patch_expiry_aware_httpx(monkeypatch, _StubResponse(200, _usage_payload(0.0, 0.0)))
     from agent.credential_pool import load_pool
 

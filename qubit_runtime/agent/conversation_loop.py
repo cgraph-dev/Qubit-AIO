@@ -424,13 +424,35 @@ def _pressure_with_real_floor(compressor: Any, rough_tokens: int) -> int:
 
 
 def _ollama_context_limit_error(agent: Any, request_tokens: int) -> Optional[str]:
-    """Return a user-facing error when Ollama is loaded with too little context."""
+    """Return a user-facing error when Ollama is loaded with too little context.
+
+    Ollama-only by contract: ``_ollama_num_ctx`` is meaningful only for a server
+    that actually accepts ``num_ctx`` (a local Ollama/llama.cpp endpoint). A hosted
+    provider (opencode-go, OpenRouter, ...) never runs Ollama, so firing this guard
+    there aborts every turn of a perfectly healthy session with advice to raise a
+    value the server does not have. A small ``_ollama_num_ctx`` reached such an agent
+    only by leaking from a local-role resolution; the fix is to refuse to act on a
+    remote endpoint, never to brick the conversation (#local-role-ctx-leak).
+    """
+    from agent.model_metadata import is_local_endpoint
+
     runtime_ctx = getattr(agent, "_ollama_num_ctx", None)
     if (
         not getattr(agent, "tools", None)
         or not isinstance(runtime_ctx, int)
         or not 0 < runtime_ctx < MINIMUM_CONTEXT_LENGTH
     ):
+        return None
+
+    # A hosted base_url can never be "Ollama loaded with too little context": num_ctx
+    # is not a parameter that server honours. Ignore a leaked value there.
+    _base_url = getattr(agent, "base_url", "") or ""
+    if not _base_url or not is_local_endpoint(_base_url):
+        logger.debug(
+            "Ignoring small _ollama_num_ctx=%d on non-local endpoint %s (provider=%s, model=%s)",
+            runtime_ctx, _base_url or "unset", getattr(agent, "provider", "") or "unknown",
+            getattr(agent, "model", "") or "unknown",
+        )
         return None
 
     model = getattr(agent, "model", "") or "the selected model"

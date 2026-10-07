@@ -57,6 +57,23 @@ class TestCuratedModelsForProvider:
         ):
             assert curated_models_for_provider("nous") == [("m-static", "")]
 
+    def test_stepfun_merges_live_and_static(self):
+        """StepFun Step Plan API returns a subset; curated list merges with static."""
+        with patch(
+            "qubit_cli.auth.resolve_api_key_provider_credentials",
+            return_value={"api_key": "***", "base_url": "https://api.stepfun.ai/step_plan/v1"},
+        ), patch(
+            "qubit_cli.models.fetch_api_models",
+            return_value=["step-3.5-flash", "step-3.5-flash-2603"],
+        ):
+            models = curated_models_for_provider("stepfun")
+        model_ids = [m[0] for m in models]
+        # Live models appear first, static-only models appended
+        assert model_ids[0] == "step-3.5-flash"
+        assert "step-3.7-flash" in model_ids
+        # No duplicates
+        assert len(model_ids) == len(set(model_ids))
+
 
 # -- normalize_provider ------------------------------------------------------
 
@@ -648,7 +665,7 @@ class TestValidateRequestedModelNousPortalRecommendations:
     other messaging-platform /model validation, since they all share
     validate_requested_model()) rejected models that are live Nous Portal
     recommendations (/api/nous/recommended-models) but not yet in the
-    hardcoded curated catalog -- even though `hermes chat` already accepts
+    hardcoded curated catalog -- even though `qubit chat` already accepts
     these via union_with_portal_free/paid_recommendations() at model-list
     build time. The per-message validation path now checks the same Portal
     feed as a fallback tier before rejecting, so Telegram/CLI agree.
@@ -692,7 +709,7 @@ class TestValidateRequestedModelNousPortalRecommendations:
         result = self._validate_nous("inclusionai/ling-3.0-flash:free")
         assert result["accepted"] is True
         assert result["persist"] is True
-        assert "Qubit Labs recommendation" in (result["message"] or "")
+        assert "Portal recommendation" in (result["message"] or "")
 
     def test_paid_portal_recommendation_accepted(self):
         result = self._validate_nous("inclusionai/ling-3.0-pro")
@@ -832,6 +849,25 @@ class TestProfileCatalogAuthoritative:
                 "other-vendor/model-a", "relay-owned-catalog", api_key="k")
         assert result["accepted"] is True
         assert result["recognized"] is True
+
+    def test_nebius_relay_base_url_validates_against_relay_listing(self, monkeypatch):
+        """A configured relay base URL must decide Nebius Token Factory validation (#121388)."""
+        relay_base_url = "https://relay.example.invalid/v1"
+        calls = []
+
+        def fetch_relay_models(_api_key, base_url, **_kwargs):
+            calls.append(base_url)
+            return ["relay-only/model"] if base_url == relay_base_url else ["canonical-only/model"]
+
+        monkeypatch.setattr("qubit_cli.models.provider_model_ids", lambda _provider: ["canonical-only/model"])
+        monkeypatch.setattr("qubit_cli.models.fetch_api_models", fetch_relay_models)
+
+        result = validate_requested_model(
+            "relay-only/model", "nebius-token-factory", api_key="k", base_url=relay_base_url)
+
+        assert result["accepted"] is True
+        assert result["recognized"] is True
+        assert calls == [relay_base_url]
 
 
 # -- validate — whitespace in self-hosted / user-configured ids --------------

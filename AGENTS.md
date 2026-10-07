@@ -41,6 +41,13 @@ no API key, $0).
 <!-- graft:end -->
 
 ## Documentation authority (read first)
+- **Identity is canonical in `docs/IDENTITY.md`** (read it before any task that
+  states what Qubit *is*): Qubit is a personal AI agent — an all-in-one assistant
+  (coding agent, caretaker, teacher, personal bot, business organizer) that
+  **absorbs other agents' capabilities into itself and becomes more than any one
+  of them**. Do not describe Qubit as "a fork"; upstream lineage is provenance,
+  named only where load-bearing, per `docs/BRAND.md`. Tagline: *"Nobody knows
+  what it will become."*
 - The **fresh docs set is authoritative and living**: `docs/README.md` (index +
   review checklist), `docs/STATUS.md` (current evidence-backed truth),
   `docs/PARITY.md` (the parity target + method), `docs/MIGRATION.md` (port from

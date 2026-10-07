@@ -17,3 +17,12 @@ export type {
   AdapterFactory,
   TranscriptionControllerOptions,
 } from "./transcription-controller";
+export {
+  ReadAloudController,
+  audioElementPlayer,
+} from "./readAloud";
+export type {
+  ReadAloudDeps,
+  ReadAloudPlayer,
+  ReadAloudSnapshot,
+} from "./readAloud";

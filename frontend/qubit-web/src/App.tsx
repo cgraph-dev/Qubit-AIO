@@ -25,6 +25,7 @@ import {
   BarChart3,
   BookOpen,
   Bot,
+  ChefHat,
   Clock,
   Code,
   Cpu,
@@ -171,6 +172,8 @@ const ComputerWorkspacePage = lazy(
   () => import("@/pages/ComputerWorkspacePage"),
 );
 const AgentCardsPage = lazy(() => import("@/pages/AgentCardsPage"));
+// Kitchen: the intake surface for absorbing other agents/apps into Qubit.
+const KitchenPage = lazy(() => import("@/pages/KitchenPage"));
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useI18n } from "@/i18n";
@@ -299,6 +302,7 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   // and the typed agent card/artifact renderers.
   "/computer": ComputerWorkspacePage,
   "/agent-cards": AgentCardsPage,
+  "/kitchen": KitchenPage,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
@@ -352,6 +356,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/agent-workspace", label: "Agent Workspace", icon: Code },
   { path: "/computer", label: "Computer", icon: Monitor },
   { path: "/agent-cards", label: "Agent Cards", icon: Bot },
+  { path: "/kitchen", label: "Kitchen", icon: ChefHat },
   { path: "/nodes", label: "Nodes", icon: Globe },
   { path: "/devices", label: "Devices", icon: Shield },
   { path: "/session-ops", label: "Session Ops", icon: Activity },
@@ -423,6 +428,7 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   Star,
   Code,
   Eye,
+  ChefHat,
 };
 
 function resolveIcon(name: string): ComponentType<{ className?: string }> {

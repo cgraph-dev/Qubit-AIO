@@ -42,7 +42,7 @@ def _git(*args: str, cwd: str | None = None) -> str:
 
 @pytest.fixture
 def kanban_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -213,7 +213,7 @@ def test_tree_dirtied_between_check_and_removal_preserved(
     # must still refuse the removal.
     from qubit_cli import worktree_ops
 
-    monkeypatch.setattr(worktree_ops, "_worktree_is_dirty", lambda _p: False)
+    monkeypatch.setattr(worktree_ops, "_worktree_is_dirty", lambda _p, *_a, **_k: False)
     kbw._cleanup_worktree_workspace("t_gggg7777", str(wt))
     assert wt.is_dir()
     assert (wt / "late-wip.txt").exists()

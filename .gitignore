@@ -96,3 +96,8 @@ htmlcov/
 
 # Private/operator backup: runtime state + credentials — NEVER commit
 _private_backup/
+
+# Cron/evals runtime artifacts that leak into the vendored tree CWD — never commit
+qubit_runtime/cron-heartbeat
+qubit_runtime/cron-started
+qubit_runtime/evals.desktop_bug_campaign.*

@@ -78,14 +78,13 @@ def test_update_copies_bundled_skill_bytes_to_default_active_and_sibling(tmp_pat
     from pathlib import Path
     from qubit_cli import update_cmd_maint
 
-    home = tmp_path / '.hermes'
+    home = tmp_path / '.qubit'
     homes = [home, home / 'profiles/active', home / 'profiles/sibling'] if named else [home]
     for profile in homes:
         profile.mkdir(parents=True, exist_ok=True)
         (profile / 'config.yaml').write_text('{}\n', encoding='utf-8')
     monkeypatch.setattr(Path, 'home', lambda: tmp_path)
     monkeypatch.setenv('QUBIT_HOME', str(homes[1] if named else home))
-    monkeypatch.setattr('plugins.memory.honcho.cli.sync_honcho_profiles_quiet', lambda: [])
     update_cmd_maint._sync_profiles_after_update()
     bundled = Path(__file__).resolve().parents[2] / 'skills'
     witness = next(bundled.rglob('SKILL.md'))

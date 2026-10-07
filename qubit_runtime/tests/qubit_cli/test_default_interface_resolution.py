@@ -1,19 +1,19 @@
 """Tests for the configurable default interface (cli vs tui).
 
-`hermes` launches the classic prompt_toolkit REPL by default, but users can
+`qubit` launches the classic prompt_toolkit REPL by default, but users can
 flip ``display.interface: tui`` in config.yaml to make the modern Ink TUI the
-default for bare ``hermes`` / ``hermes chat``. Explicit flags always win:
+default for bare ``qubit`` / ``qubit chat``. Explicit flags always win:
 
     --cli                forces the classic REPL (highest precedence)
     --tui                forces the TUI
     (no TTY)             forces the classic REPL — ambient prefs don't apply
-    HERMES_TUI=1         the env default
+    QUBIT_TUI=1         the env default
     display.interface    the configured default
     (unset)              classic REPL
 
 The no-TTY gate exists because ambient TUI preferences must never hijack
 non-interactive invocations: kanban workers / cron / pipelines run
-``hermes … chat -q`` on a pipe, and the TUI's no-TTY bail-out exits 0
+``qubit … chat -q`` on a pipe, and the TUI's no-TTY bail-out exits 0
 without doing the work (a kanban worker then dies with "protocol
 violation" on every attempt).
 
@@ -40,9 +40,9 @@ from qubit_cli import main as m
 @pytest.fixture(autouse=True)
 def _reset_early_cache(monkeypatch):
     # The early resolver memoizes the config read; clear it so each test sees
-    # a fresh value, and make sure no stray HERMES_TUI leaks in.
+    # a fresh value, and make sure no stray QUBIT_TUI leaks in.
     monkeypatch.setattr(m, "_EARLY_INTERFACE_CACHE", None)
-    monkeypatch.delenv("HERMES_TUI", raising=False)
+    monkeypatch.delenv("QUBIT_TUI", raising=False)
     yield
     monkeypatch.setattr(m, "_EARLY_INTERFACE_CACHE", None)
 
@@ -127,7 +127,7 @@ class TestWantsTuiEarly:
     # REGRESSION (#116902): mouse-residue suppression reads the interface
     # before `_apply_profile_override()` sets QUBIT_HOME, so a cache that
     # ignored the home answered every later caller with the DEFAULT home's
-    # interface — `hermes -p <name>` booted the wrong one.
+    # interface — `qubit -p <name>` booted the wrong one.
     def test_reread_after_the_profile_rehomes_the_process(self, tmp_path, monkeypatch):
         default_home = tmp_path / "default"
         profile_home = tmp_path / "profiles" / "coder"
@@ -169,12 +169,24 @@ class TestParserFlags:
         args = self._parser().parse_args(["chat", "--tui"])
         assert args.tui is True
 
+    def test_native_flag_at_both_parser_levels(self):
+        parser = self._parser()
+        assert parser.parse_args(["--native"]).tui_native is True
+        assert parser.parse_args(["chat", "--tui-native"]).tui_native is True
+
     def test_cli_and_tui_are_relaunch_inherited(self):
         from qubit_cli.relaunch import _INHERITED_FLAGS_TABLE
 
         inherited = {flag for flag, _takes_value in _INHERITED_FLAGS_TABLE}
         assert "--cli" in inherited
         assert "--tui" in inherited
+
+    def test_native_flag_is_relaunch_inherited(self):
+        from qubit_cli.relaunch import _INHERITED_FLAGS_TABLE
+
+        inherited = {flag for flag, _takes_value in _INHERITED_FLAGS_TABLE}
+        assert "--native" in inherited
+        assert "--tui-native" in inherited
 
 
 # ---------------------------------------------------------------------------

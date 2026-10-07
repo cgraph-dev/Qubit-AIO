@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from pathlib import Path
 from unittest.mock import patch
@@ -14,7 +15,7 @@ import pytest
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
     """Isolate QUBIT_HOME + reset any module-level catalog cache per test."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(home))
@@ -131,15 +132,17 @@ class TestFetchFailure:
 
 class TestFallbackChain:
     """``_fetch_manifest_with_fallback`` walks ``DEFAULT_CATALOG_FALLBACK_URLS``
-    when the primary URL fails. Regression: the upstream docs host behind Vercel
+    when the primary URL fails. Regression: the Docusaurus site behind Vercel
     occasionally returns HTTP 403 + x-vercel-mitigated: challenge for urllib;
     without a fallback URL the user's disk cache freezes and new model
     releases (opus 4.8, etc.) never reach the picker.
-
-    v0.21.5 rebrand finish (T1): the upstream Hermes docs host is gone; the
-    shipped primary/fallback are the Qubit-owned raw manifest. These tests use
-    explicit sentinel URLs so they exercise the walk without brand literals.
     """
+
+    PRIMARY = "https://qubit.nousresearch.com/docs/api/model-catalog.json"
+    FALLBACK = (
+        "https://raw.githubusercontent.com/NousResearch/qubit"
+        "/main/website/static/api/model-catalog.json"
+    )
 
     def test_uses_primary_when_it_succeeds(self, isolated_home):
         from qubit_cli import model_catalog
@@ -149,48 +152,39 @@ class TestFallbackChain:
             calls.append(url)
             return _valid_manifest()
 
-        primary = model_catalog.DEFAULT_CATALOG_URL
         with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
-            result = model_catalog._fetch_manifest_with_fallback(primary, 5.0)
+            result = model_catalog._fetch_manifest_with_fallback(self.PRIMARY, 5.0)
 
         assert result is not None
-        assert calls == [primary], "fallback URLs must not be touched on primary success"
+        assert calls == [self.PRIMARY], "fallback URLs must not be touched on primary success"
 
-    def test_falls_through_to_fallback_on_primary_failure(self, isolated_home):
+    def test_falls_through_to_raw_github_on_primary_failure(self, isolated_home):
         from qubit_cli import model_catalog
         calls: list[str] = []
-        primary = "https://primary.invalid/model-catalog.json"
 
         def fake_fetch(url, timeout):
             calls.append(url)
-            if url == primary:
-                return None  # simulate the primary endpoint failing
+            if url == self.PRIMARY:
+                return None  # simulate Vercel 403
             return _valid_manifest()
 
         with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
-            result = model_catalog._fetch_manifest_with_fallback(primary, 5.0)
+            result = model_catalog._fetch_manifest_with_fallback(self.PRIMARY, 5.0)
 
         assert result is not None
-        # The shipped fallback is the Qubit-owned raw manifest.
-        assert calls == [primary, model_catalog.DEFAULT_CATALOG_FALLBACK_URLS[0]]
+        assert calls == [self.PRIMARY, self.FALLBACK]
 
-    def test_get_catalog_uses_fallback_chain(self, isolated_home, monkeypatch):
+
+    def test_get_catalog_uses_fallback_chain(self, isolated_home):
         """End-to-end: ``get_catalog`` routes through the fallback helper so
         a primary URL failure transparently produces a working catalog."""
         from qubit_cli import model_catalog
         manifest = _valid_manifest()
         calls: list[str] = []
-        primary = "https://primary.invalid/model-catalog.json"
-
-        monkeypatch.setattr(
-            model_catalog,
-            "_load_catalog_config",
-            lambda: {"enabled": True, "url": primary, "ttl_hours": 0.0, "providers": {}},
-        )
 
         def fake_fetch(url, timeout):
             calls.append(url)
-            if url == primary:
+            if url == self.PRIMARY:
                 return None
             return manifest
 
@@ -198,7 +192,7 @@ class TestFallbackChain:
             result = model_catalog.get_catalog(force_refresh=True)
 
         assert result == manifest
-        assert model_catalog.DEFAULT_CATALOG_FALLBACK_URLS[0] in calls
+        assert self.FALLBACK in calls
 
 
 class TestCuratedAccessors:
@@ -345,7 +339,7 @@ class TestIntegrationWithModelsModule:
 
     def test_picker_nous_row_uses_curated_list(self, tmp_path, monkeypatch):
         """The /model picker surfaces the curated ``_PROVIDER_MODELS["nous"]``
-        list in curated order — matching the ``hermes model`` CLI — not the live
+        list in curated order — matching the ``qubit model`` CLI — not the live
         ``/v1/models`` catalog or the manifest. Portal free/paid recommendations
         are unioned in when reachable; offline (as here, with the Portal calls
         stubbed out) it's exactly the curated list.
@@ -452,8 +446,9 @@ class TestIntegrationWithModelsModule:
         full_row = _nous(full)
         assert full_row is not None and full_row["models"] == expected
 
+        # The Nous row is already curated, so an int cap never trims it (its free tier sits last).
         one_row = _nous(one)
-        assert one_row is not None and one_row["models"] == expected[:1]
+        assert one_row is not None and one_row["models"] == expected
 
         zero_row = _nous(zero)
         # 0 means an empty model list — NOT unlimited. total_models still real.
@@ -472,6 +467,96 @@ class TestIntegrationWithModelsModule:
 # free-tier picker showed "No free models currently available." even though
 # the Portal was serving qwen/qwen3.6-plus as free. CI must catch this.
 # -----------------------------------------------------------------------------
+
+
+class TestSwrRefreshProfileScope:
+    """Two profile homes — A (process default) and B (routed via the QUBIT_HOME ContextVar, as
+    tui_gateway ``_profile_scoped`` does). The off-thread stale-while-revalidate refresh spawned
+    under B must write B's cache file, and A's in-flight refresh must not suppress B's."""
+
+    _CFG = {"enabled": True, "url": "http://master", "ttl_hours": 1.0, "providers": {}}
+
+    @staticmethod
+    def _seed_expired(home: Path, manifest: dict) -> Path:
+        path = home / "cache" / "model_catalog.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        os.utime(path, (1, 1))  # expired → served stale, refreshed off-thread
+        return path
+
+    @staticmethod
+    def _join_swr_threads() -> None:
+        for t in threading.enumerate():
+            if t.name == "model-catalog-swr":
+                t.join(5)
+
+    def test_refresh_under_profile_override_writes_that_profiles_cache(self, isolated_home, tmp_path):
+        from agent.secret_scope import set_multiplex_active
+        from qubit_cli import model_catalog
+        from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+
+        old = _valid_manifest()
+        fresh = {**_valid_manifest(), "updated_at": "2026-05-01T00:00:00Z"}
+        path_a = self._seed_expired(isolated_home, old)
+        path_b = self._seed_expired(tmp_path / "profile-b", old)
+        a_before = path_a.read_bytes()
+        release = threading.Event()
+
+        def fetch(*_args, **_kwargs):
+            assert release.wait(5), "caller did not release the refresh"
+            return fresh
+
+        set_multiplex_active(True)
+        try:
+            with patch.object(model_catalog, "_load_catalog_config", return_value=self._CFG), \
+                 patch.object(model_catalog, "_fetch_manifest_with_fallback", fetch):
+                token = set_qubit_home_override(path_b.parent.parent)
+                try:
+                    assert model_catalog.get_catalog() == old  # stale copy served without blocking
+                finally:
+                    reset_qubit_home_override(token)  # the handler returns before the fetch completes
+                release.set()
+                self._join_swr_threads()
+        finally:
+            set_multiplex_active(False)
+
+        assert json.loads(path_b.read_text(encoding="utf-8")) == fresh
+        assert path_a.read_bytes() == a_before
+
+    def test_inflight_refresh_for_one_profile_does_not_suppress_another(self, isolated_home, tmp_path):
+        from agent.secret_scope import set_multiplex_active
+        from qubit_cli import model_catalog
+        from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+
+        old = _valid_manifest()
+        path_a = self._seed_expired(isolated_home, old)
+        path_b = self._seed_expired(tmp_path / "profile-b", old)
+        release = threading.Event()
+        refreshed_paths: list[str] = []
+        seen = threading.Lock()
+
+        def fetch(*_args, **_kwargs):
+            with seen:
+                refreshed_paths.append(str(model_catalog._cache_path()))
+            release.wait(5)
+            return None
+
+        set_multiplex_active(True)
+        try:
+            with patch.object(model_catalog, "_load_catalog_config", return_value=self._CFG), \
+                 patch.object(model_catalog, "_fetch_manifest_with_fallback", fetch):
+                model_catalog.get_catalog()  # A's refresh is now in flight (blocked on `release`)
+                token = set_qubit_home_override(path_b.parent.parent)
+                try:
+                    model_catalog.get_catalog()  # B must get its own refresh
+                finally:
+                    reset_qubit_home_override(token)
+                release.set()
+                self._join_swr_threads()
+        finally:
+            set_multiplex_active(False)
+
+        assert sorted(refreshed_paths) == sorted([str(path_a), str(path_b)])
 
 
 class TestManifestMatchesInRepoLists:

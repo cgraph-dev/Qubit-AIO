@@ -605,6 +605,13 @@ def _get_platform_tools(config: dict, platform: str, *, include_default_mcp_serv
     # YAML may parse bare numeric names (``12306:``) as int; normalise so sorted() never mixes types.
     toolset_names = [str(ts) for ts in toolset_names]
 
+    # Read-old: a config saved before the platform toolsets were renamed from
+    # ``hermes-<platform>`` to ``qubit-<platform>`` still carries the legacy spelling.
+    # Translate it here — the one resolver every surface reads — so an existing install
+    # keeps its selection; unknown names (plugin/MCP toolsets) pass through unchanged.
+    from toolsets import canonical_toolset_name
+    toolset_names = [canonical_toolset_name(name) for name in toolset_names]
+
     # Expand legacy toolset aliases.  Older Hermes versions and clients used
     # bare ``"qubit"`` as a composite toolset covering both the CLI and the
     # API-server surface.  Modern code expects ``"qubit-cli"`` (and

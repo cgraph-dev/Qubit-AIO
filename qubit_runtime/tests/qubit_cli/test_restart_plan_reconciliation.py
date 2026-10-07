@@ -56,7 +56,7 @@ def test_windows_service_runtime_reconciles_via_service_profiles():
     # must not trip the unaccounted tripwire.
     outcomes = match_runtime_outcomes(
         _plan(_rt("default", 500, supervisor="windows-service")),
-        restarted_services=["hermes-gateway"], relaunched_profiles=["default"],
+        restarted_services=["qubit-gateway"], relaunched_profiles=["default"],
         externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
     )
     assert outcomes == [
@@ -104,7 +104,7 @@ def test_failed_unit_is_failed():
         _plan(_rt("work", 300, supervisor="systemd")),
         restarted_services=[], relaunched_profiles=[],
         externally_supervised_profiles=[], killed_pids=set(),
-        failed_units=["hermes-gateway-work.service"],
+        failed_units=["qubit-gateway-work.service"],
     )
     assert outcomes[0]["outcome"] == "failed"
 
@@ -112,21 +112,21 @@ def test_failed_unit_is_failed():
 def test_restarted_service_unit_matches_profile():
     outcomes = match_runtime_outcomes(
         _plan(_rt("default", 400, supervisor="systemd")),
-        restarted_services=["hermes-gateway.service"], relaunched_profiles=[],
+        restarted_services=["qubit-gateway.service"], relaunched_profiles=[],
         externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
     )
     assert outcomes[0]["outcome"] == "restarted"
 
 
 def test_launchd_default_gateway_restarted_via_ai_qubit_label():
-    """macOS restart bookkeeping records ``ai.hermes.gateway``, which does not
-    contain the substring ``hermes-gateway``. The default-profile gateway must
+    """macOS restart bookkeeping records ``ai.qubit.gateway``, which does not
+    contain the substring ``qubit-gateway``. The default-profile gateway must
     still count as restarted — otherwise every Desktop update on launchd
     exits 1 after a successful kickstart (receipt outcome=partial, tripwire
     'never touched')."""
     outcomes = match_runtime_outcomes(
         _plan(_rt("default", 400, supervisor="launchd")),
-        restarted_services=["ai.hermes.gateway"], relaunched_profiles=[],
+        restarted_services=["ai.qubit.gateway"], relaunched_profiles=[],
         externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
     )
     assert outcomes[0]["outcome"] == "restarted"
@@ -136,7 +136,7 @@ def test_launchd_default_gateway_restarted_via_ai_qubit_label():
 def test_launchd_named_profile_and_failed_label():
     restarted = match_runtime_outcomes(
         _plan(_rt("work", 401, supervisor="launchd")),
-        restarted_services=["ai.hermes.gateway-work"], relaunched_profiles=[],
+        restarted_services=["ai.qubit.gateway-work"], relaunched_profiles=[],
         externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
     )
     assert restarted[0]["outcome"] == "restarted"
@@ -144,7 +144,7 @@ def test_launchd_named_profile_and_failed_label():
         _plan(_rt("default", 402, supervisor="launchd")),
         restarted_services=[], relaunched_profiles=[],
         externally_supervised_profiles=[], killed_pids=set(),
-        failed_units=["ai.hermes.gateway"],
+        failed_units=["ai.qubit.gateway"],
     )
     assert failed[0]["outcome"] == "failed"
 
@@ -153,7 +153,7 @@ def test_untouched_runtime_is_unaccounted_and_escalates(capsys):
     """The tripwire: plan saw it, NO bookkeeping mentions it."""
     outcomes = match_runtime_outcomes(
         _plan(_rt("coder", 500)),
-        restarted_services=["hermes-gateway.service"],
+        restarted_services=["qubit-gateway.service"],
         relaunched_profiles=["default"],
         externally_supervised_profiles=[], killed_pids={123}, failed_units=[],
     )
@@ -188,7 +188,7 @@ def test_unmanaged_serve_runtime_under_default_profile_is_unaccounted():
     )
     outcomes = match_runtime_outcomes(
         _plan(_rt("default", 100, supervisor="systemd"), serve_runtime),
-        restarted_services=["hermes-gateway"], relaunched_profiles=[],
+        restarted_services=["qubit-gateway"], relaunched_profiles=[],
         externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
     )
     by_pid = {o["pid"]: o["outcome"] for o in outcomes}
@@ -204,6 +204,44 @@ def _serve(profile: str, pid: int, kind: str = "serve") -> RuntimeRecord:
         pid=pid,
         supervisor="manual-serve",
         restart_via=_restart_mechanism("manual-serve", profile),
+    )
+
+
+def test_systemd_dashboard_runtime_reconciles_restarted_via_its_unit():
+    """#125297: the fleet unit pass restarts ``qubit-dashboard{,-<profile>}``, so the
+    receipt's runtime_outcomes row must credit it as ``restarted`` — not leave the
+    dashboard ``deferred`` while the update still reports success."""
+    outcomes = match_runtime_outcomes(
+        _plan(_dash_unit_runtime("default", 700), _dash_unit_runtime("work", 701)),
+        restarted_services=["qubit-dashboard", "user/qubit-dashboard-work"],
+        relaunched_profiles=[], externally_supervised_profiles=[],
+        killed_pids=set(), failed_units=[],
+    )
+    by_pid = {o["pid"]: o["outcome"] for o in outcomes}
+    assert by_pid == {700: "restarted", 701: "restarted"}
+    assert report_unaccounted_runtimes(outcomes) is False
+
+
+def test_systemd_dashboard_runtime_without_unit_restart_stays_unaccounted():
+    """The tripwire side: no ``qubit-dashboard*`` restart in the bookkeeping means
+    the row escalates (exit 1), never a silent ``deferred`` on a success receipt."""
+    outcomes = match_runtime_outcomes(
+        _plan(_dash_unit_runtime("default", 700), _rt("default", 100, supervisor="systemd")),
+        restarted_services=["qubit-gateway"], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
+    )
+    by_pid = {o["pid"]: o["outcome"] for o in outcomes}
+    assert by_pid == {100: "restarted", 700: "unaccounted"}
+    assert report_unaccounted_runtimes(outcomes) is True
+
+
+def _dash_unit_runtime(profile: str, pid: int) -> RuntimeRecord:
+    return RuntimeRecord(
+        kind="dashboard",
+        profile=profile,
+        pid=pid,
+        supervisor="systemd",
+        restart_via=_restart_mechanism("systemd", profile),
     )
 
 
@@ -225,11 +263,11 @@ def test_serve_never_borrows_relaunched_or_external_gateway_profile():
 
 
 def test_named_profile_serve_does_not_match_gateway_profile_unit():
-    """``hermes-gateway-work.service`` restarted must not credit the ``work``
+    """``qubit-gateway-work.service`` restarted must not credit the ``work``
     serve — the old substring match (``"work" in unit``) did exactly that."""
     outcomes = match_runtime_outcomes(
         _plan(_rt("work", 101, supervisor="systemd"), _serve("work", 901)),
-        restarted_services=["hermes-gateway-work.service"], relaunched_profiles=[],
+        restarted_services=["qubit-gateway-work.service"], relaunched_profiles=[],
         externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
     )
     by_pid = {o["pid"]: o["outcome"] for o in outcomes}
@@ -237,34 +275,47 @@ def test_named_profile_serve_does_not_match_gateway_profile_unit():
 
 
 def test_serve_reconciles_against_its_own_unit_vocabulary():
-    """A serve IS covered when a ``hermes-serve*`` unit for its profile was
+    """A serve IS covered when a ``qubit-serve*`` unit for its profile was
     restarted (or failed) — scope-qualified identities included."""
     outcomes = match_runtime_outcomes(
         _plan(_serve("default", 900), _serve("work", 901),
               _serve("ops", 902, kind="dashboard"), _serve("qa", 903)),
-        restarted_services=["hermes-gateway", "user/hermes-serve",
-                            "hermes-serve-work.service", "hermes-dashboard-ops"],
+        restarted_services=["qubit-gateway", "user/qubit-serve",
+                            "qubit-serve-work.service", "qubit-dashboard-ops"],
         relaunched_profiles=[], externally_supervised_profiles=[],
-        killed_pids=set(), failed_units=["hermes-serve-qa.service"],
+        killed_pids=set(), failed_units=["qubit-serve-qa.service"],
     )
     by_pid = {o["pid"]: o["outcome"] for o in outcomes}
     assert by_pid == {900: "restarted", 901: "restarted", 902: "restarted", 903: "failed"}
-    # exact names: ``work`` must not claim ``hermes-serve-workbench``
+    # exact names: ``work`` must not claim ``qubit-serve-workbench``
     outcomes = match_runtime_outcomes(
         _plan(_serve("work", 901)),
-        restarted_services=["hermes-serve-workbench.service"], relaunched_profiles=[],
+        restarted_services=["qubit-serve-workbench.service"], relaunched_profiles=[],
         externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
     )
     assert outcomes[0]["outcome"] == "unaccounted"
 
 
+def test_failed_respawn_outranks_incarnation_probe():
+    """A dashboard the cleanup stopped and could not bring back is ``failed``: the probe sees its
+    pre-update pid gone, which is exactly what a failed respawn looks like. See #109290."""
+    plan = _plan(_serve("default", 900), _serve("default", 901, kind="dashboard"))
+    outcomes = match_runtime_outcomes(
+        plan, restarted_services=[], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
+        stale_serve_pids=set(), failed_respawn_pids={901},
+    )
+    by_pid = {o["pid"]: o["outcome"] for o in outcomes}
+    assert by_pid == {900: "restarted", 901: "failed"}
+
+
 def test_serve_outcome_follows_incarnation_probe_when_provided():
     """With the (pid, create_time) survivor probe result, liveness decides:
     a pre-update serve that is gone was replaced (restarted); one still
-    alive is unaccounted — even when a hermes-serve unit was restarted."""
+    alive is unaccounted — even when a qubit-serve unit was restarted."""
     plan = _plan(_serve("default", 900), _serve("default", 901, kind="dashboard"))
     outcomes = match_runtime_outcomes(
-        plan, restarted_services=["hermes-serve.service"], relaunched_profiles=[],
+        plan, restarted_services=["qubit-serve.service"], relaunched_profiles=[],
         externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
         stale_serve_pids={900},
     )
@@ -287,7 +338,7 @@ def test_desktop_serve_deferral_requires_a_verified_alive_incarnation():
     desktop_serve.restart_via = _restart_mechanism("desktop", "default")
 
     unknown = match_runtime_outcomes(
-        _plan(desktop_serve), restarted_services=["hermes-serve.service"],
+        _plan(desktop_serve), restarted_services=["qubit-serve.service"],
         relaunched_profiles=[], externally_supervised_profiles=[], killed_pids=set(),
         failed_units=[], stale_serve_pids=None,
     )
@@ -311,7 +362,7 @@ def test_desktop_serve_deferral_requires_a_verified_alive_incarnation():
 def test_unaccounted_serve_report_names_serve_remedy_not_gateway_restart(capsys):
     outcomes = match_runtime_outcomes(
         _plan(_serve("default", 900)),
-        restarted_services=["hermes-gateway"], relaunched_profiles=[],
+        restarted_services=["qubit-gateway"], relaunched_profiles=[],
         externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
     )
     assert report_unaccounted_runtimes(outcomes) is True
@@ -328,7 +379,7 @@ def test_mixed_fleet_only_the_missed_one_escalates(capsys):
             _rt("work", 701),
             _rt("ghost", 702),
         ),
-        restarted_services=["hermes-gateway.service"],
+        restarted_services=["qubit-gateway.service"],
         relaunched_profiles=["work"],
         externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
     )
@@ -342,3 +393,179 @@ def test_mixed_fleet_only_the_missed_one_escalates(capsys):
     assert "ghost" in missed_block
     assert "[default]" not in missed_block
     assert "[work]" not in missed_block
+
+
+def test_gateway_credited_by_successor_incarnation_not_service_name():
+    """A service can serve a profile its own name does not encode: with a sticky
+    active profile, the root-home ``ai.qubit.gateway`` LaunchAgent supervises the
+    ``coder`` gateway, so the plan row (profile ``coder``) and the restarted label
+    never match by name. The planned PID being gone while a gateway answers for the
+    same profile is the evidence that has to credit it — otherwise every update
+    exits 1 (receipt outcome=partial) after a successful launchd restart."""
+    outcomes = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd")),
+        restarted_services=["ai.qubit.gateway"], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
+        live_gateway_pids={"coder": {76796}},
+    )
+    assert outcomes[0]["outcome"] == "restarted"
+    assert report_unaccounted_runtimes(outcomes) is False
+
+
+def test_gateway_successor_credit_requires_a_live_replacement():
+    """The tripwire keeps its teeth: no successor (the gateway was stopped and
+    nothing replaced it) or the planned PID still answering (never restarted)
+    stays unaccounted and escalates."""
+    no_successor = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd")),
+        restarted_services=["ai.qubit.gateway"], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
+        live_gateway_pids={},
+    )
+    assert no_successor[0]["outcome"] == "unaccounted"
+    assert report_unaccounted_runtimes(no_successor) is True
+
+    never_restarted = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd")),
+        restarted_services=[], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
+        live_gateway_pids={"coder": {76508}},
+    )
+    assert never_restarted[0]["outcome"] == "unaccounted"
+
+    other_profile_only = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd")),
+        restarted_services=[], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
+        live_gateway_pids={"default": {76796}},
+    )
+    assert other_profile_only[0]["outcome"] == "unaccounted"
+
+    empty_evidence = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd")),
+        restarted_services=["ai.qubit.gateway"], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
+        live_gateway_pids={"coder": set()},
+    )
+    assert empty_evidence[0]["outcome"] == "unaccounted"
+
+
+def test_missing_successor_evidence_is_logged(caplog):
+    """A profile the fleet probe has no row for logs why reconciliation stayed on
+    the name-matching path: the tripwire output reads identically whether the
+    evidence was missing or the restart was genuinely missed."""
+    import logging
+
+    with caplog.at_level(logging.DEBUG, logger="qubit_cli.update_inventory"):
+        outcomes = match_runtime_outcomes(
+            _plan(_rt("coder", 76508, supervisor="launchd")),
+            restarted_services=["ai.qubit.gateway"], relaunched_profiles=[],
+            externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
+            live_gateway_pids={},
+        )
+    assert outcomes[0]["outcome"] == "unaccounted"
+    assert "No post-restart gateway evidence for profile 'coder'" in caplog.text
+
+
+def test_successor_evidence_never_outranks_stopped_or_failed():
+    """Bookkeeping verdicts stay authoritative when the incarnation evidence is
+    also passed: the successor branch is reached only after them, so a killed or
+    name-failed gateway cannot be promoted to ``restarted``."""
+    stopped = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd")),
+        restarted_services=[], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids={76508}, failed_units=[],
+        live_gateway_pids={"coder": {76796}},
+    )
+    assert stopped[0]["outcome"] == "stopped"
+
+    failed = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd")),
+        restarted_services=[], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids=set(),
+        failed_units=["ai.qubit.gateway-coder"],
+        live_gateway_pids={"coder": {76796}},
+    )
+    assert failed[0]["outcome"] == "failed"
+
+
+def test_live_gateway_pids_from_fleet_skips_down_and_unusable_rows():
+    """The fleet snapshot is the successor evidence. A ``down`` row carries the
+    PRE-restart PID (nothing replaced it) so it must never count as a successor;
+    rows without a usable profile/PID are skipped; a ``stale`` row is a live
+    successor (the fleet matrix escalates staleness on its own)."""
+    from qubit_cli.update_cmd_fleet import _live_gateway_pids_from_fleet
+
+    rows = [
+        {"profile": "coder", "pid": 76796, "state": "current"},
+        {"profile": "coder", "pid": 76508, "state": "down"},
+        {"profile": "default", "pid": 4242, "state": "stale"},
+        {"profile": "default", "pid": None, "state": "unknown"},
+        {"profile": "", "pid": 7, "state": "current"},
+        {"profile": "researcher", "pid": "not-a-pid", "state": "current"},
+    ]
+    assert _live_gateway_pids_from_fleet(rows) == {"coder": {76796}, "default": {4242}}
+    assert _live_gateway_pids_from_fleet([]) == {}
+
+
+def test_one_successor_cannot_credit_two_planned_runtimes_same_profile():
+    """The fleet probe publishes at most one row per profile, so one successor cannot
+    say which of two planned same-profile gateways it replaced. Neither may be
+    credited — otherwise an untouched sibling disappears behind a replacement that
+    can only have replaced one of them, and the tripwire is suppressed."""
+    outcomes = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd"), _rt("coder", 76795, supervisor="launchd")),
+        restarted_services=[], relaunched_profiles=[], externally_supervised_profiles=[],
+        killed_pids=set(), failed_units=[], live_gateway_pids={"coder": {76796}},
+    )
+    assert [o["outcome"] for o in outcomes] == ["unaccounted", "unaccounted"]
+    assert report_unaccounted_runtimes(outcomes) is True
+
+
+def test_resolved_orphan_sibling_does_not_block_successor_credit():
+    """An orphan row the restart phase already killed has its verdict, so it must not
+    make the surviving same-profile row's successor evidence look ambiguous — both
+    runtimes are accounted for (one stopped, one restarted) and the wire stays quiet."""
+    outcomes = match_runtime_outcomes(
+        _plan(_rt("coder", 100, supervisor="launchd"), _rt("coder", 101, supervisor="launchd")),
+        restarted_services=[], relaunched_profiles=[], externally_supervised_profiles=[],
+        killed_pids={100}, failed_units=[], live_gateway_pids={"coder": {102}},
+    )
+    by_pid = {o["pid"]: o["outcome"] for o in outcomes}
+    assert by_pid == {100: "stopped", 101: "restarted"}
+    assert report_unaccounted_runtimes(outcomes) is False
+
+
+def test_successor_credit_stays_per_profile_with_several_planned_runtimes():
+    """The ambiguity guard is per profile: two profiles with one planned runtime each
+    are both credited from their own successor."""
+    outcomes = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd"), _rt("work", 401, supervisor="launchd")),
+        restarted_services=[], relaunched_profiles=[], externally_supervised_profiles=[],
+        killed_pids=set(), failed_units=[],
+        live_gateway_pids={"coder": {76796}, "work": {402}},
+    )
+    assert [o["outcome"] for o in outcomes] == ["restarted", "restarted"]
+
+
+def test_successor_evidence_is_gateway_only_and_stays_optional():
+    """Serve/dashboard rows reconcile in their own vocabulary, and callers that
+    pass no ``live_gateway_pids`` keep the bookkeeping-only verdict. Two non-gateway
+    rows for the same profile must not make the gateway's evidence look ambiguous:
+    the baseline count is per gateway kind."""
+    outcomes = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd"),
+              _serve("coder", 900), _serve("coder", 901, kind="dashboard")),
+        restarted_services=[], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
+        live_gateway_pids={"coder": {76796}},
+    )
+    by_pid = {o["pid"]: o["outcome"] for o in outcomes}
+    assert by_pid == {76508: "restarted", 900: "unaccounted", 901: "unaccounted"}
+
+    without_probe = match_runtime_outcomes(
+        _plan(_rt("coder", 76508, supervisor="launchd")),
+        restarted_services=["ai.qubit.gateway"], relaunched_profiles=[],
+        externally_supervised_profiles=[], killed_pids=set(), failed_units=[],
+    )
+    assert without_probe[0]["outcome"] == "unaccounted"

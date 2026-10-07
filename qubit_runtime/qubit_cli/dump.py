@@ -289,7 +289,7 @@ def run_dump(args):
         profile = get_active_profile_name() or "(default)"
     except Exception:
         profile = "(default)"
-    toolsets = config.get("toolsets", ["hermes-cli"])
+    toolsets = config.get("toolsets", ["qubit-cli"])
     platforms = [name for name, env in _PLATFORM_ENV_VARS.items() if os.getenv(env)]
     lines = [
         "--- qubit dump ---",

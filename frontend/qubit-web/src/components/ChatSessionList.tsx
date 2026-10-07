@@ -20,7 +20,14 @@
 
 import { Button } from "@nous-research/ui/ui/components/button";
 import { ListItem } from "@nous-research/ui/ui/components/list-item";
-import { AlertCircle, MessageSquarePlus, RefreshCw, Terminal } from "lucide-react";
+import {
+  AlertCircle,
+  MessageSquarePlus,
+  RefreshCw,
+  Search,
+  Terminal,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
@@ -89,6 +96,15 @@ export function ChatSessionList({
   const [error, setError] = useState<string | null>(null);
   // Bumped to force a refetch (after switching, on Refresh, on mount).
   const [reloadNonce, setReloadNonce] = useState(0);
+  // Server-backed thread search: the query the operator typed, and the
+  // debounced value actually sent to the store (so typing does not fire a
+  // request per keystroke).
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  useEffect(() => {
+    const id = window.setTimeout(() => setSearchQuery(searchInput.trim()), 200);
+    return () => window.clearTimeout(id);
+  }, [searchInput]);
 
   // Monotonic request token: only the most recent fetch is allowed to
   // commit state, so a fast refresh (or Refresh spam) can't land a stale
@@ -111,7 +127,7 @@ export function ChatSessionList({
         ? api
             .getSessions(SESSION_LIMIT, 0, scopeKey, "recent")
             .then((res) => ({ sessions: res.sessions }))
-        : api.listChatSessions(SESSION_LIMIT, 0);
+        : api.listChatSessions(SESSION_LIMIT, 0, searchQuery);
     request
       .then((res) => {
         if (reqRef.current !== myReq) return;
@@ -124,7 +140,7 @@ export function ChatSessionList({
       .finally(() => {
         if (reqRef.current === myReq) setLoading(false);
       });
-  }, [scopeKey, source]);
+  }, [scopeKey, source, searchQuery]);
 
   useEffect(() => {
     // Dashboard data surfaces fetch from an effect on mount + scope change;
@@ -235,12 +251,36 @@ export function ChatSessionList({
     if (orderedSessions.length === 0) {
       return (
         <div className="px-2 py-6 text-center text-xs text-text-secondary">
-          {t.sessions.noSessions}
+          {searchQuery ? `No sessions match “${searchQuery}”.` : t.sessions.noSessions}
         </div>
       );
     }
     return (
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-1.5">
+        <div className="relative px-2">
+          <Search
+            className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-tertiary"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder={t.common.search ?? "Search sessions"}
+            aria-label="Search chat sessions"
+            className="w-full rounded border border-midground/20 bg-transparent py-1 pl-7 pr-6 text-xs text-foreground outline-none placeholder:text-text-tertiary focus:border-primary/50"
+          />
+          {searchInput ? (
+            <button
+              type="button"
+              onClick={() => setSearchInput("")}
+              aria-label="Clear session search"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
         {orderedSessions.map((s) => {
           const isActive = s.id === activeSessionId;
           return (

@@ -151,9 +151,9 @@ class TestCredentialPoolEndpoints:
     def test_env_seeded_delete_stays_deleted(self):
         """#55217: DELETE must suppress the source or load_pool() resurrects it.
 
-        load_pool() re-seeds from ~/.hermes/.env on every call, so removing
+        load_pool() re-seeds from ~/.qubit/.env on every call, so removing
         just the pool row silently reverts on the next dashboard refresh.
-        The endpoint must mirror `hermes auth remove`: clean up the backing
+        The endpoint must mirror `qubit auth remove`: clean up the backing
         source and suppress (provider, source).
         """
         from agent.credential_pool import load_pool
@@ -181,7 +181,7 @@ class TestCredentialPoolEndpoints:
     def test_post_readd_lifts_suppression(self):
         """Re-adding via POST is an explicit re-engagement — suppressions lift.
 
-        Mirrors `hermes auth add`, which clears every suppression for the
+        Mirrors `qubit auth add`, which clears every suppression for the
         provider so a user who deleted a credential and re-adds one isn't
         silently blocked from env re-seeding.
         """
@@ -390,6 +390,12 @@ class TestWebhookEndpoints:
         subs = self.client.get("/api/webhooks").json()["subscriptions"]
         assert subs[0]["script"] == "todoist_filter.py"
 
+        # A re-POST is a general update, not an enable: an explicit disable must survive it.
+        assert self.client.put("/api/webhooks/todoist/enabled", json={"enabled": False}).status_code == 200
+        assert self.client.post("/api/webhooks", json={"name": "todoist", "deliver": "log"}).status_code == 200
+        from qubit_cli.webhook import _load_subscriptions
+        assert _load_subscriptions()["todoist"]["enabled"] is False
+
     def test_enable_platform_starts_gateway_restart(self, monkeypatch):
         from qubit_cli.config import load_config
 
@@ -417,7 +423,8 @@ class TestWebhookEndpoints:
             "restart_action": "gateway-restart",
             "restart_pid": 4242,
         }
-        assert restart_calls == [(["gateway", "restart"], "gateway-restart")]
+        # The default home is named explicitly: a bare child would re-read the sticky active_profile.
+        assert restart_calls == [(["-p", "default", "gateway", "restart"], "gateway-restart")]
         assert load_config()["platforms"]["webhook"]["enabled"] is True
         assert self.client.get("/api/webhooks").json()["enabled"] is True
 
@@ -616,12 +623,12 @@ class TestSkillsHubSourcesEndpoint:
                 return self._sid
 
             def search(self, q, limit=10):
-                return [_FakeMeta("hermes-index/featured-skill", "trusted")]
+                return [_FakeMeta("qubit-index/featured-skill", "trusted")]
 
         def _fake_router():
             srcs = [_Src("official"), _Src("github")]
-            # hermes-index source advertises availability + featured search.
-            idx = _Src("hermes-index")
+            # qubit-index source advertises availability + featured search.
+            idx = _Src("qubit-index")
             idx.is_available = True
             srcs.insert(1, idx)
             return srcs
@@ -633,7 +640,7 @@ class TestSkillsHubSourcesEndpoint:
         assert r.status_code == 200
         body = r.json()
         ids = {s["id"] for s in body["sources"]}
-        assert {"official", "github", "hermes-index"} <= ids
+        assert {"official", "github", "qubit-index"} <= ids
         # Every source carries a human label.
         assert all(s.get("label") for s in body["sources"])
         assert body["index_available"] is True
@@ -786,7 +793,7 @@ class TestUpdateCheckEndpoint:
 
     Powers the dashboard's check-before-you-update flow: the System page
     shows the commit-behind count and asks the user to confirm before
-    ``POST /api/qubit/update`` runs ``qubit update --apply``.
+    ``POST /api/qubit/update`` runs ``qubit update``.
     """
 
     @pytest.fixture(autouse=True)
@@ -837,6 +844,14 @@ class TestUpdateCheckEndpoint:
         assert body["update_available"] is False
         assert body["behind"] is None
         assert "managed outside this dashboard" in body["message"]
+        # No runnable command exists; clients render update_command verbatim
+        # as a copyable shell line, so prose here is a fake command.
+        assert body["update_command"] == ""
+
+        refused = self.client.post("/api/qubit/update").json()
+        assert refused["ok"] is False
+        assert refused["error"] == "dashboard_update_managed_externally"
+        assert refused["update_command"] == ""
 
 
 class TestDebugShareEndpoint:
@@ -902,7 +917,7 @@ class TestDebugShareEndpoint:
 
 class TestToolsConfigEndpoints:
     """Provider selection, API-key save, and post-setup spawn for toolsets —
-    the dashboard surface that replicates the `hermes tools` configurator."""
+    the dashboard surface that replicates the `qubit tools` configurator."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_qubit_home):
@@ -949,13 +964,13 @@ class TestToolsConfigEndpoints:
 
 def test_spawn_qubit_action_scrubs_gateway_loop_guard_env(monkeypatch, tmp_path):
     """The dashboard runs inside the gateway, so os.environ has
-    _HERMES_GATEWAY=1. Spawned actions (e.g. `gateway restart`) must NOT inherit
+    _QUBIT_GATEWAY=1. Spawned actions (e.g. `gateway restart`) must NOT inherit
     it, or the in-process restart-loop guard rejects the restart and it silently
     fails (#52470).
     """
     import qubit_cli.web_server as ws
 
-    monkeypatch.setenv("_HERMES_GATEWAY", "1")
+    monkeypatch.setenv("_QUBIT_GATEWAY", "1")
     monkeypatch.setenv("OPENAI_API_KEY", "default-action-provider-key")
     monkeypatch.setattr(_web_server_gateway, "_ACTION_LOG_DIR", tmp_path)
     # Isolate the module-global proc registry: _spawn_qubit_action stores
@@ -976,8 +991,8 @@ def test_spawn_qubit_action_scrubs_gateway_loop_guard_env(monkeypatch, tmp_path)
 
     _web_server_gateway._spawn_qubit_action(["gateway", "restart"], "gateway-restart")
 
-    assert "_HERMES_GATEWAY" not in captured["env"]
-    assert captured["env"]["HERMES_NONINTERACTIVE"] == "1"
+    assert "_QUBIT_GATEWAY" not in captured["env"]
+    assert captured["env"]["QUBIT_NONINTERACTIVE"] == "1"
     # Default-profile actions preserve the historical process environment.
     assert captured["env"]["OPENAI_API_KEY"] == "default-action-provider-key"
 
@@ -994,7 +1009,7 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
     import qubit_cli.web_server as ws
 
     user_home = tmp_path / "user"
-    default_home = user_home / ".hermes"
+    default_home = user_home / ".qubit"
     target_home = default_home / "profiles" / "verifier"
     target_home.mkdir(parents=True)
 
@@ -1033,7 +1048,7 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
         "ZAI_API_KEY": "default-zai",
         "A2A_AUTH_MINI": "default-a2a-auth",
         "EXTERNAL_PROFILE_AUTH": "default-secret-source-auth",
-        "HERMES_ACP_AUTH_METHOD": "default-acp",
+        "QUBIT_ACP_AUTH_METHOD": "default-acp",
         "PROFILE_ENV_TEST_BENIGN": "keep-me",
     }.items():
         monkeypatch.setenv(key, value)
@@ -1065,12 +1080,12 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
     child_env = captured["env"]
     assert captured["cmd"][-4:] == ["-p", "verifier", "gateway", "restart"]
     assert child_env["QUBIT_HOME"] == str(target_home)
-    assert child_env["HERMES_NONINTERACTIVE"] == "1"
+    assert child_env["QUBIT_NONINTERACTIVE"] == "1"
     assert child_env["PROFILE_ENV_TEST_BENIGN"] == "keep-me"
     for leaked_key in (
         "DISCORD_BOT_TOKEN", "API_SERVER_ENABLED", "API_SERVER_KEY", "BLUEBUBBLES_SERVER_URL",
         "BLUEBUBBLES_PASSWORD", "NTFY_TOPIC", "NTFY_TOKEN", "OPENAI_API_KEY", "ZAI_API_KEY",
-        "A2A_AUTH_MINI", "EXTERNAL_PROFILE_AUTH", "HERMES_ACP_AUTH_METHOD",
+        "A2A_AUTH_MINI", "EXTERNAL_PROFILE_AUTH", "QUBIT_ACP_AUTH_METHOD",
     ):
         assert leaked_key not in child_env, leaked_key
 
@@ -1127,8 +1142,8 @@ def test_desktop_lifespan_terminates_managed_gateway_restart(monkeypatch):
         def terminate(self):
             calls.append("terminate")
 
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
-    monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+    monkeypatch.setenv("QUBIT_DESKTOP", "1")
+    monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
     monkeypatch.setattr(ws, "_warm_gateway_module", lambda: None)
     monkeypatch.setattr(ws, "_start_desktop_cron_ticker", lambda *_args: None)
     monkeypatch.setitem(_web_server_gateway._ACTION_PROCS, "gateway-restart", _FakeRunningProc())
@@ -1138,3 +1153,31 @@ def test_desktop_lifespan_terminates_managed_gateway_restart(monkeypatch):
         pass
 
     assert calls == ["terminate"]
+
+
+def test_desktop_lifespan_reaps_orphans_with_a_startup_grace(monkeypatch):
+    """The boot sweep must pass the startup grace, not reap a just-launching gateway (#122533).
+
+    Asserting only "the reaper ran" would not catch a revert to the bare
+    ``_reap_unsupervised_gateway_orphans()`` call, which is exactly the regression.
+    """
+    import qubit_cli.web_server as ws
+    from qubit_cli.dashboard_procs import _REAP_MIN_AGE_SECONDS
+
+    seen = {}
+
+    def _fake_reap(extra_exclude=None, *, min_age_s=0.0):
+        seen["min_age_s"] = min_age_s
+        return False
+
+    monkeypatch.setenv("QUBIT_DESKTOP", "1")
+    monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+    monkeypatch.setattr(ws, "_warm_gateway_module", lambda: None)
+    monkeypatch.setattr(ws, "_start_desktop_cron_ticker", lambda *_args: None)
+    monkeypatch.setattr("qubit_cli.gateway._reap_unsupervised_gateway_orphans", _fake_reap)
+
+    client, _header = _client()
+    with client:
+        pass
+
+    assert seen["min_age_s"] == _REAP_MIN_AGE_SECONDS

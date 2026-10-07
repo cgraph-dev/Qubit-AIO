@@ -68,7 +68,7 @@ def test_historical_payload_maps_to_takeover_request_schema(tmp_path, desktop, r
         "raise SystemExit(code)\n", encoding="utf-8",
     )
     env = {key: value for key, value in os.environ.items()
-           if not key.startswith(('HERMES_', 'PYTHON', 'UV_'))}
+           if not key.startswith(('QUBIT_', 'PYTHON', 'UV_'))}
     env.update(HOME=str(home), QUBIT_HOME=str(home))
     result = subprocess.run([sys.executable, "-B", str(program)], env=env,
                             capture_output=True, text=True, timeout=30)
@@ -80,7 +80,7 @@ def test_historical_payload_maps_to_takeover_request_schema(tmp_path, desktop, r
 
 @pytest.mark.live_system_guard_bypass
 def test_shipped_post_swap_argv_enters_takeover_before_current_cli(tmp_path):
-    """The 2026.9.21 updater starts HEAD as ``hermes update <flags> --post-swap FILE``.
+    """The 2026.9.21 updater starts HEAD as ``qubit update <flags> --post-swap FILE``.
 
     That command must reach the historical takeover before current launch preparation or
     argparse: both belong to the replacement updater and may require dependencies the old
@@ -120,7 +120,7 @@ def test_shipped_post_swap_argv_enters_takeover_before_current_cli(tmp_path):
     }
     handoff.write_text(json.dumps(payload), encoding="utf-8")
     env = {key: value for key, value in os.environ.items()
-           if not key.startswith(("HERMES_", "PYTHON", "UV_"))}
+           if not key.startswith(("QUBIT_", "PYTHON", "UV_"))}
     env.update(HOME=str(home), QUBIT_HOME=str(home))
     result = subprocess.run(
         [sys.executable, "-B", "-m", "qubit_cli.main", "update", "--yes",
@@ -180,14 +180,14 @@ def test_takeover_waits_propagates_status_and_never_reenters_old_code(tmp_path, 
         "raise AssertionError('old updater resumed')\n", encoding="utf-8",
     )
     env = {key: value for key, value in os.environ.items()
-           if not key.startswith(('HERMES_', 'PYTHON', 'UV_'))}
+           if not key.startswith(('QUBIT_', 'PYTHON', 'UV_'))}
     env.update(HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH="/not/the/new/source")
     result = subprocess.run([sys.executable, "-B", str(program)], env=env,
                             capture_output=True, text=True, timeout=30)
     assert result.returncode == status, result.stdout + result.stderr
     assert (home / "runs").read_text() == "child\n"
     assert (home / "cleanup").read_text() == "ran"
-    assert "run `hermes` again" not in result.stderr
+    assert "run `qubit` again" not in result.stderr
 
 
 # Only the copied shim and JSON probe run; this temp checkout has no real updater.
@@ -228,7 +228,7 @@ def test_only_known_early_updater_restarts_with_original_arguments(tmp_path, pos
         "raise AssertionError('old updater resumed')\n", encoding="utf-8",
     )
     env = {key: value for key, value in os.environ.items()
-           if not key.startswith(("HERMES_", "PYTHON", "UV_"))}
+           if not key.startswith(("QUBIT_", "PYTHON", "UV_"))}
     env.update(HOME=str(home), QUBIT_HOME=str(home))
     result = subprocess.run([sys.executable, "-B", *argv], env=env,
                             capture_output=True, text=True, timeout=30)
@@ -281,7 +281,7 @@ def test_atexit_recovers_only_stopped_serves_after_cached_update(tmp_path, ackno
         "raise AssertionError('old updater resumed')\n", encoding="utf-8",
     )
     env = {key: value for key, value in os.environ.items()
-           if not key.startswith(("HERMES_", "PYTHON", "UV_"))}
+           if not key.startswith(("QUBIT_", "PYTHON", "UV_"))}
     env.update(HOME=str(home), QUBIT_HOME=str(home))
     result = subprocess.run([sys.executable, "-B", str(program)], env=env,
                             capture_output=True, text=True, timeout=30)
@@ -308,7 +308,7 @@ def test_serve_resume_child_reuses_respawn_without_updater_or_supervisors(tmp_pa
         entries += [
             dict(entries[0]),
             {"purpose": "serve", "profile": "desktop", "port": 0},
-            {"purpose": "serve", "profile": "foreign", "port": 8121, "hermes_home": str(tmp_path / "foreign")},
+            {"purpose": "serve", "profile": "foreign", "port": 8121, "qubit_home": str(tmp_path / "foreign")},
             {"purpose": "gateway", "profile": "not-serve", "port": 8122},
             {"purpose": "serve", "profile": "boolean-port", "port": True},
             {"purpose": "serve", "profile": "invalid-port", "port": 65536},
@@ -317,14 +317,17 @@ def test_serve_resume_child_reuses_respawn_without_updater_or_supervisors(tmp_pa
                                   "stopped_serves": {"pending": True, "entries": entries}}))
     program = tmp_path / "probe.py"
     program.write_text(
-        "import json, os, runpy, subprocess, sys\nfrom pathlib import Path\n"
+        "import json, os, runpy, subprocess, sys, time\nfrom pathlib import Path\n"
         "calls = []\n"
+        "time.sleep = lambda *_: None\n"
         "def forbidden(*args, **kwargs):\n    raise AssertionError('updater/process control ran')\n"
+        "class _Proc:\n    def poll(self):\n        return None\n"
         "def spawn(command, **kwargs):\n"
         "    assert kwargs['start_new_session'] is True\n"
         "    assert kwargs['stdin'] == subprocess.DEVNULL\n"
         "    calls.append(command)\n"
         f"    if {spawn_fails!r}:\n        raise OSError('probe spawn failed')\n"
+        "    return _Proc()\n"
         "subprocess.Popen = spawn\nsubprocess.run = os.system = os.kill = forbidden\n"
         f"sys.argv = [{str(root / 'qubit_cli/update_serve_resume.py')!r}, {str(context)!r}, {str(result_path)!r}]\n"
         "try:\n    runpy.run_path(sys.argv[0], run_name='__main__')\n"
@@ -334,7 +337,7 @@ def test_serve_resume_child_reuses_respawn_without_updater_or_supervisors(tmp_pa
         encoding="utf-8",
     )
     env = {key: value for key, value in os.environ.items()
-           if not key.startswith(("HERMES_", "PYTHON", "UV_"))}
+           if not key.startswith(("QUBIT_", "PYTHON", "UV_"))}
     env.update(HOME=str(home), QUBIT_HOME=str(home))
     result = subprocess.run([sys.executable, "-I", "-B", "-X", "utf8", str(program)],
                             env=env, capture_output=True, text=True, timeout=30)
@@ -342,8 +345,8 @@ def test_serve_resume_child_reuses_respawn_without_updater_or_supervisors(tmp_pa
     assert json.loads(result_path.read_text()) == {"serves_handled": True}
     commands = json.loads((home / "commands.json").read_text())
     assert commands == [
-        [sys.executable, str(root / "hermes"), "serve", "--host", "127.0.0.1", "--port", "8119"],
-        [sys.executable, str(root / "hermes"), "--profile", "ops team 日本", "dashboard",
+        [sys.executable, str(root / "qubit"), "serve", "--host", "127.0.0.1", "--port", "8119"],
+        [sys.executable, str(root / "qubit"), "--profile", "ops team 日本", "dashboard",
          "--host", "::1", "--port", "8120", "--no-open"],
     ]
     assert ("probe spawn failed" in result.stdout) is spawn_fails
@@ -355,7 +358,7 @@ def test_serve_resume_child_leaves_token_unhandled_when_imports_fail(tmp_path):
     context.write_text(json.dumps({"root": str(tmp_path), "home": str(tmp_path),
                                   "stopped_serves": {"pending": True, "entries": []}}))
     env = {key: value for key, value in os.environ.items()
-           if not key.startswith(("HERMES_", "PYTHON", "UV_"))}
+           if not key.startswith(("QUBIT_", "PYTHON", "UV_"))}
     env.update(HOME=str(tmp_path), QUBIT_HOME=str(tmp_path))
     # -S and an empty checkout make application imports genuinely unavailable;
     # this is not a mocked exception or a path into the real update machinery.

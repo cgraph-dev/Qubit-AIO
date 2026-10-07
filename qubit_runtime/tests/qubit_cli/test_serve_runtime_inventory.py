@@ -1,6 +1,6 @@
 """Serve-kind runtime inventory (#63206, campaign #91277).
 
-A network-bound `hermes serve --host <ip>` powering a remote Desktop used to
+A network-bound `qubit serve --host <ip>` powering a remote Desktop used to
 be invisible to the update pipeline. The spawn ledger's structured launch
 identity (host/port/profile, registered at serve startup) now feeds the
 update inventory and the dashboard process scan.
@@ -9,6 +9,7 @@ update inventory and the dashboard process scan.
 from __future__ import annotations
 
 import sys
+from dataclasses import asdict
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -24,7 +25,7 @@ def _ledger_entry(**over):
         "spawner_pid": None,
         "spawner_create": None,
         "registered_at": 222.0,
-        "argv": "hermes serve --host 100.94.65.93 --port 9119",
+        "argv": "qubit serve --host 100.94.65.93 --port 9119",
         "host": "100.94.65.93",
         "port": 9119,
         "profile": "",
@@ -54,6 +55,16 @@ def test_register_self_records_structured_detail(tmp_path, monkeypatch):
     assert e["host"] == "100.94.65.93"
     assert e["port"] == 9119
     assert e["profile"] == "work"
+
+
+def test_register_self_records_isolated_marker(tmp_path, monkeypatch):
+    from qubit_cli import process_identity as pi
+
+    monkeypatch.setattr(pi, "_ledger_path", lambda: tmp_path / "ledger.json")
+    monkeypatch.setattr(pi, "install_id", lambda *a, **k: "inst")
+    assert pi.register_self("serve", detail={"host": "127.0.0.1", "port": 9119, "isolated": True})
+    assert pi._read_ledger(tmp_path / "ledger.json")[-1]["isolated"] is True
+
 
 def test_register_self_without_detail_stays_backward_compatible(
     tmp_path, monkeypatch
@@ -99,18 +110,72 @@ def test_inventory_classifies_desktop_owned_serve(monkeypatch):
     assert serves and serves[0].supervisor == "desktop"
     assert serves[0].restart_via == "desktop"
 
+
+_SSH_ARGV = ("qubit serve --isolated --host 127.0.0.1 --port 0 "
+             "--ssh-session-token-file /h/.qubit/desktop-ssh/a/b.token --ssh-owner-nonce 0123456789abcdef")
+
+
+def test_inventory_classifies_remote_desktop_ssh_serve_as_its_clients(monkeypatch):
+    """A serve another machine's Desktop spawned over SSH has no local spawner, so the spawner
+    probe alone reads ``manual-serve``: the update then files a manual-restart reminder nobody on
+    this host can discharge, and the recovery pass may try an argv respawn of a process whose
+    token file and owner nonce only its remote client holds. The remote client owns its restart."""
+    from qubit_cli.update_serve_obligations import defer_manual_serve
+
+    entry = _ledger_entry(argv=_SSH_ARGV, host="127.0.0.1", port=57474, isolated=True)
+    fake_pi = SimpleNamespace(ledger_entries=lambda **k: [entry], spawner_is_dead=lambda e: None)
+    monkeypatch.setitem(sys.modules, "qubit_cli.process_identity", fake_pi)
+    plan = update_inventory.collect_runtime_inventory()
+    row = next(r for r in plan.runtimes if r.kind == "serve")
+    assert row.supervisor not in ("manual-serve", "desktop")
+    assert row.restart_via != "respawn-argv"
+    monkeypatch.undo()  # real process_identity: no durable manual-restart reminder may be filed
+    assert defer_manual_serve(asdict(row)) is False
+
+
+def test_hand_started_isolated_serve_stays_manual(monkeypatch):
+    """``--isolated`` alone is an opt-out of the host singleton, not remote ownership: a user's own
+    ``qubit serve --isolated`` keeps its manual-serve relaunch."""
+    entry = _ledger_entry(argv="qubit serve --isolated --host 127.0.0.1 --port 9119", isolated=True)
+    fake_pi = SimpleNamespace(ledger_entries=lambda **k: [entry], spawner_is_dead=lambda e: None)
+    monkeypatch.setitem(sys.modules, "qubit_cli.process_identity", fake_pi)
+    row = next(r for r in update_inventory.collect_runtime_inventory().runtimes if r.kind == "serve")
+    assert row.supervisor == "manual-serve"
+
+
+def test_stale_remote_desktop_ssh_serve_is_deferred_to_its_client_not_unaccounted(monkeypatch):
+    """Still on pre-update code after the update, the SSH serve is its remote client's to recycle:
+    reported as deferred (not an unaccounted failure that fails the update), and never owed by the
+    abort-recovery pass."""
+    from qubit_cli.update_abort_recovery import _owed_stale_serve_rows
+
+    entry = _ledger_entry(argv=_SSH_ARGV, host="127.0.0.1", port=57474, isolated=True)
+    fake_pi = SimpleNamespace(ledger_entries=lambda **k: [entry], spawner_is_dead=lambda e: None)
+    monkeypatch.setitem(sys.modules, "qubit_cli.process_identity", fake_pi)
+    plan = update_inventory.collect_runtime_inventory()
+    outcomes = update_inventory.match_runtime_outcomes(
+        plan, restarted_services=[], relaunched_profiles=[], externally_supervised_profiles=[],
+        killed_pids=set(), failed_units=[], stale_serve_pids={entry["pid"]},
+    )
+    serve = next(o for o in outcomes if o["kind"] == "serve")
+    assert serve["outcome"] == "deferred"
+    assert update_inventory.report_unaccounted_runtimes(outcomes) is False
+    row = next(r for r in plan.runtimes if r.kind == "serve")
+    assert _owed_stale_serve_rows([{"supervisor": row.supervisor}]) == []
+
+
 # ---------------------------------------------------------------------------
 # dashboard_procs: ledger augmentation of the scan (#81564 half)
 # ---------------------------------------------------------------------------
 
 def test_scan_dashboard_processes_includes_ledger_only_serves(monkeypatch):
-    """A profiled serve (`hermes --profile p serve ...`) matches no scan
+    """A profiled serve (`qubit --profile p serve ...`) matches no scan
     pattern; the ledger row must still surface it."""
     import qubit_cli.dashboard_procs as dp
 
     profiled = _ledger_entry(
         pid=8123,
-        argv="hermes --profile work serve --host 100.94.65.93 --port 9119",
+        argv="qubit --profile work serve --host 100.94.65.93 --port 9119",
         profile="work",
     )
     fake_pi = SimpleNamespace(ledger_entries=lambda **k: [profiled])
@@ -167,8 +232,8 @@ def test_inventory_classifies_launchd_job_owned_serve(monkeypatch):
         ledger_entries=lambda **k: [entry],
         spawner_is_dead=lambda e: True,  # bootstrap shell provably gone
     )
-    jobs = [("gui/501", "ai.hermes.dashboard",
-             ["hermes", "serve", "--host", "100.94.65.93", "--port", "9119"], None)]
+    jobs = [("gui/501", "ai.qubit.dashboard",
+             ["qubit", "serve", "--host", "100.94.65.93", "--port", "9119"], None)]
     monkeypatch.setitem(sys.modules, "qubit_cli.process_identity", fake_pi)
     with patch.object(main_dashboard, "_loaded_launchd_backend_jobs", return_value=jobs), \
          patch("qubit_cli.dashboard_procs._process_ancestors", return_value=[]):
@@ -179,4 +244,4 @@ def test_inventory_classifies_launchd_job_owned_serve(monkeypatch):
     assert row.supervisor == "launchd"
     assert row.restart_via == "launchd"
     assert row.detail["launchd_domain"] == "gui/501"
-    assert row.detail["launchd_label"] == "ai.hermes.dashboard"
+    assert row.detail["launchd_label"] == "ai.qubit.dashboard"

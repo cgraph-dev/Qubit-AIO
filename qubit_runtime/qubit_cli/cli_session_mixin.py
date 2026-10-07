@@ -820,6 +820,9 @@ class CLISessionMixin:
         # Editable, not auto-sent (Claude-Code-style).
         if prefill and removed_text:
             self._prefill_input_buffer(removed_text)
+        # The caller records friction only when a turn was actually rewound
+        # (``_cmd_undo``); ``None``/falsy means nothing changed.
+        return turns_undone
 
     @staticmethod
     def _undo_content_to_text(content) -> str:

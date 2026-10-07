@@ -1,4 +1,4 @@
-"""yuanbao_tools.py - 元宝平台工具集 (the "hermes-yuanbao" toolset).
+"""yuanbao_tools.py - 元宝平台工具集 (the "qubit-yuanbao" toolset).
 
 get_group_info / query_group_members / search_sticker / send_sticker / send_dm. Sticker
 flow mirrors chatbot-web's sticker-search/sticker-send: the LLM should search_sticker for
@@ -490,6 +490,6 @@ _TOOLS = (
 
 for _schema, _handler, _emoji in _TOOLS:
     registry.register(
-        name=_schema["name"], toolset="hermes-yuanbao", schema=_schema, handler=_handler,
+        name=_schema["name"], toolset="qubit-yuanbao", schema=_schema, handler=_handler,
         check_fn=_check_yuanbao, is_async=True, emoji=_emoji,
     )

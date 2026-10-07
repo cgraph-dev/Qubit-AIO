@@ -45,7 +45,9 @@ def _render_active_theme_bootstrap_css() -> str:
     """
     from qubit_cli.config import load_config
     try:
-        active = cfg_get(load_config(), "dashboard", "theme", default="default")
+        active = normalize_theme_name(
+            cfg_get(load_config(), "dashboard", "theme", default="default")
+        )
         if not active or not isinstance(active, str):
             return ""
         if any(b["name"] == active for b in _BUILTIN_DASHBOARD_THEMES):
@@ -241,13 +243,32 @@ def mount_spa(application: FastAPI):
 _BUILTIN_DASHBOARD_THEMES = [
     {"name": "default",       "label": "Qubit Teal",         "description": "Classic dark teal — the canonical Qubit look"},
     {"name": "default-large", "label": "Qubit Teal (Large)", "description": "Qubit Teal with bigger fonts and roomier spacing"},
-    {"name": "nous-blue",     "label": "Qubit Blue",           "description": "Light mode — vivid Qubit-blue accents on cream canvas"},
+    {"name": "qubit-blue",    "label": "Qubit Blue",           "description": "Light mode — vivid Qubit-blue accents on cream canvas"},
     {"name": "midnight",      "label": "Midnight",            "description": "Deep blue-violet with cool accents"},
     {"name": "ember",     "label": "Ember",          "description": "Warm crimson and bronze — forge vibes"},
     {"name": "mono",      "label": "Mono",           "description": "Clean grayscale — minimal and focused"},
     {"name": "cyberpunk", "label": "Cyberpunk",      "description": "Neon green on black — matrix terminal"},
     {"name": "rose",      "label": "Rosé",           "description": "Soft pink and warm ivory — easy on the eyes"},
 ]
+
+# Theme ids renamed during the Qubit rebrand. Read-old so a preference
+# persisted under the pre-rebrand name (localStorage or server-side config)
+# still resolves to the canonical Qubit id instead of silently falling back
+# to the default theme. Keep entries until enough release cycles have passed.
+_THEME_NAME_ALIASES: Dict[str, str] = {
+    "nous-blue": "qubit-blue",
+}
+
+
+def normalize_theme_name(name: Any) -> Any:
+    """Map a legacy theme id onto its canonical Qubit id (read-old migration).
+
+    Non-strings and unknown names pass through untouched so callers keep their
+    existing validation semantics (e.g. an unknown name is still rejected).
+    """
+    if isinstance(name, str):
+        return _THEME_NAME_ALIASES.get(name, name)
+    return name
 
 
 def _parse_theme_layer(value: Any, default_hex: str, default_alpha: float = 1.0) -> Optional[Dict[str, Any]]:

@@ -4,8 +4,8 @@ ledger, and the updater's ledger-identified reap rung.
 Layer context (Aug 2026, after the 12-minute Windows update hang): reapers
 previously inferred process lineage from PPIDs and cmdline shape. These
 primitives make identity positive instead: spawners stamp children
-(HERMES_SPAWN), long-lived processes self-register (pid, create_time,
-purpose, spawner) in spawn-ledger.json, and `hermes update` reaps holders the
+(QUBIT_SPAWN), long-lived processes self-register (pid, create_time,
+purpose, spawner) in spawn-ledger.json, and `qubit update` reaps holders the
 ledger PROVES are orphaned backends — in any update context, no hand-off
 contract needed.
 
@@ -17,7 +17,9 @@ from __future__ import annotations
 import json
 import os
 import stat
+import subprocess
 import sys
+import time
 import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -93,8 +95,8 @@ def test_desktop_style_tag_parses():
 
 
 def test_install_id_stable_and_path_scoped():
-    a = pi.install_id(Path("/opt/hermes"))
-    assert a == pi.install_id(Path("/opt/hermes"))
+    a = pi.install_id(Path("/opt/qubit"))
+    assert a == pi.install_id(Path("/opt/qubit"))
     assert a != pi.install_id(Path("/opt/other"))
     assert len(a) == 12
 
@@ -136,7 +138,7 @@ def test_register_self_writes_and_prunes_dead(tmp_path):
 def test_register_self_survives_non_utf8_argv(tmp_path):
     ledger = tmp_path / "spawn-ledger.json"
     fake = _fake_psutil({999: 50.0})
-    bad_argv = ["hermes", "serve", os.fsdecode(b"/tmp/project-\xff")]  # surrogate-escaped path
+    bad_argv = ["qubit", "serve", os.fsdecode(b"/tmp/project-\xff")]  # surrogate-escaped path
     with patch.dict(sys.modules, {"psutil": fake}), \
          patch.object(pi, "_ledger_path", return_value=ledger), \
          patch.object(pi.os, "getpid", return_value=999), \
@@ -177,12 +179,12 @@ def test_register_self_inherits_spawn_tag_lineage(tmp_path):
 
 
 def test_register_self_falls_back_to_desktop_parent_env(tmp_path):
-    # Legacy Desktop: no HERMES_SPAWN, but HERMES_PARENT_PID + winms marker.
+    # Legacy Desktop: no QUBIT_SPAWN, but QUBIT_PARENT_PID + winms marker.
     ledger = tmp_path / "spawn-ledger.json"
     fake = _fake_psutil({999: 50.0})
     env = {
-        "HERMES_PARENT_PID": "888",
-        "HERMES_PARENT_START_MARKER": "winms:1755689000123",
+        "QUBIT_PARENT_PID": "888",
+        "QUBIT_PARENT_START_MARKER": "winms:1755689000123",
     }
     with patch.dict(sys.modules, {"psutil": fake}), \
          patch.dict(pi.os.environ, env, clear=False), \
@@ -228,6 +230,29 @@ def test_ledger_entries_filters_dead_reused_and_foreign(tmp_path):
     assert [e["pid"] for e in live] == [100]
 
 
+@pytest.mark.platforms("posix")
+def test_ledger_entries_excludes_a_killed_but_unreaped_process(tmp_path):
+    """A zombie is dead even though it keeps its create_time until reaped: ``qubit update``
+    books the stopped dashboard gone, then must not find it again as a pre-update survivor."""
+    import psutil
+
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        created = psutil.Process(child.pid).create_time()
+        child.terminate()
+        deadline = time.monotonic() + 10
+        while psutil.Process(child.pid).status() != psutil.STATUS_ZOMBIE:
+            assert time.monotonic() < deadline, "child never became a zombie"
+            time.sleep(0.05)
+        ledger = tmp_path / "spawn-ledger.json"
+        ledger.write_text(json.dumps([_entry(child.pid, created, purpose="dashboard")]), encoding="utf-8")
+        with patch.object(pi, "_ledger_path", return_value=ledger):
+            assert pi.ledger_entries(project_root=Path("/x/install")) == []
+    finally:
+        child.kill()
+        child.wait()
+
+
 def test_spawner_is_dead_tristate():
     fake = _fake_psutil({500: 5.0})
     with patch.dict(sys.modules, {"psutil": fake}):
@@ -271,16 +296,16 @@ def test_updater_ledger_rung_never_raises():
 
 
 def test_desktop_ssh_backend_spawn_shape_is_desktop_owned(monkeypatch):
-    """Desktop's SSH spawn is ``env HERMES_DESKTOP=1 hermes serve --isolated ... --ssh-session-token-file F``
+    """Desktop's SSH spawn is ``env QUBIT_DESKTOP=1 qubit serve --isolated ... --ssh-session-token-file F``
     with NO token env var (its tests assert the var name never appears on the wire). Missing that
     shape made the SSH child claim ROLE_SERVE on the remote host (the #119824 shape there)."""
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
-    monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+    monkeypatch.setenv("QUBIT_DESKTOP", "1")
+    monkeypatch.delenv("QUBIT_DASHBOARD_SESSION_TOKEN", raising=False)
     ssh_argv = ["serve", "--isolated", "--host", "127.0.0.1", "--port", "0",
-                "--ssh-session-token-file", "/home/u/.hermes/desktop-ssh/abc.token"]
+                "--ssh-session-token-file", "/home/u/.qubit/desktop-ssh/abc.token"]
 
     assert pi.is_desktop_owned_backend(ssh_argv) is True
-    monkeypatch.setattr(sys, "argv", ["hermes", *ssh_argv])
+    monkeypatch.setattr(sys, "argv", ["qubit", *ssh_argv])
     assert pi.is_desktop_owned_backend() is True
-    # The bare inherited flag (a Desktop terminal pane running `hermes serve`) is still not ownership.
+    # The bare inherited flag (a Desktop terminal pane running `qubit serve`) is still not ownership.
     assert pi.is_desktop_owned_backend(["serve", "--host", "127.0.0.1", "--port", "0"]) is False

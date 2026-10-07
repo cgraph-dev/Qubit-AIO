@@ -57,7 +57,11 @@ def _ts(description, tools=(), includes=(), **extra):
 
 def _bundle(description, extras=()):
     """A `qubit-*` platform bundle: the shared core tools plus optional platform extras."""
-    return _ts(description, _QUBIT_CORE_TOOLS + list(extras))
+    # posture=True: a bundle that re-lists the core tools without owning them, so
+    # disabling it removes only the platform-specific delta instead of emptying the
+    # list (model_tools._apply_toolset_selection) and the blank-slate minimiser
+    # leaves it out of disabled_toolsets (qubit_cli.setup_quick).
+    return _ts(description, _QUBIT_CORE_TOOLS + list(extras), posture=True)
 
 
 def _core_without(*excluded, kanban=True):
@@ -197,52 +201,55 @@ TOOLSETS = {
     ),
 
     # Full Qubit toolsets (CLI + messaging platforms). All share the core tools;
-    # there is deliberately no agent-callable send_message tool. hermes-acp is the
+    # there is deliberately no agent-callable send_message tool. qubit-acp is the
     # coding posture minus the interactive clarify UI.
-    "hermes-acp": _ts(
+    "qubit-acp": _ts(
         "Editor integration (VS Code, Zed, JetBrains) — coding-focused tools without "
         "messaging, audio, or clarify UI",
         [t for t in _CODING_TOOLS if t != "clarify"],
+        posture=True,
     ),
-    "hermes-api-server": _ts(
+    "qubit-api-server": _ts(
         "OpenAI-compatible API server — full agent tools accessible via HTTP (no "
         "interactive UI tools like clarify or send_message)",
         _core_without("text_to_speech", "clarify", "computer_use", kanban=False),
+        posture=True,
     ),
-    "hermes-cli": _bundle("Full interactive CLI toolset - all default tools plus cronjob management"),
+    "qubit-cli": _bundle("Full interactive CLI toolset - all default tools plus cronjob management"),
 
-    # Mirrors hermes-cli; `qubit tools` platform config filters it down and
+    # Mirrors qubit-cli; `qubit tools` platform config filters it down and
     # _get_platform_tools() drops _DEFAULT_OFF_TOOLSETS unless user-enabled.
-    "hermes-cron": _bundle("Default cron toolset - same core tools as hermes-cli; gated by `qubit tools`"),
-    "hermes-telegram": _bundle("Telegram bot toolset - full access for personal use (terminal has safety checks)"),
-    "hermes-discord": _bundle(
+    "qubit-cron": _bundle("Default cron toolset - same core tools as qubit-cli; gated by `qubit tools`"),
+    "qubit-telegram": _bundle("Telegram bot toolset - full access for personal use (terminal has safety checks)"),
+    "qubit-discord": _bundle(
         "Discord bot toolset - full access (terminal has safety checks via dangerous "
         "command approval)",
         ["discord", "discord_admin"],
     ),
-    "hermes-whatsapp": _bundle("WhatsApp bot toolset - similar to Telegram (personal messaging, more trusted)"),
-    "hermes-slack": _bundle("Slack bot toolset - full access for workspace use (terminal has safety checks)"),
-    "hermes-signal": _bundle("Signal bot toolset - encrypted messaging platform (full access)"),
-    "hermes-bluebubbles": _bundle("BlueBubbles iMessage bot toolset - Apple iMessage via local BlueBubbles server"),
-    "hermes-homeassistant": _bundle("Home Assistant bot toolset - smart home event monitoring and control"),
-    "hermes-email": _bundle("Email bot toolset - interact with Qubit via email (IMAP/SMTP)"),
-    "hermes-mattermost": _bundle("Mattermost bot toolset - self-hosted team messaging (full access)"),
-    "hermes-matrix": _bundle("Matrix bot toolset - decentralized encrypted messaging (full access)"),
-    "hermes-dingtalk": _bundle("DingTalk bot toolset - enterprise messaging platform (full access)"),
-    "hermes-feishu": _bundle("Feishu/Lark bot toolset - enterprise messaging via Feishu/Lark (full access)", _FEISHU_TOOLS),
-    "hermes-weixin": _bundle("Weixin bot toolset - personal WeChat messaging via iLink (full access)"),
-    "hermes-qqbot": _bundle("QQBot toolset - QQ messaging via Official Bot API v2 (full access)"),
-    "hermes-wecom": _bundle("WeCom bot toolset - enterprise WeChat messaging (full access)"),
-    "hermes-wecom-callback": _bundle("WeCom callback toolset - enterprise self-built app messaging (full access)"),
-    "hermes-yuanbao": {
+    "qubit-whatsapp": _bundle("WhatsApp bot toolset - similar to Telegram (personal messaging, more trusted)"),
+    "qubit-slack": _bundle("Slack bot toolset - full access for workspace use (terminal has safety checks)"),
+    "qubit-signal": _bundle("Signal bot toolset - encrypted messaging platform (full access)"),
+    "qubit-bluebubbles": _bundle("BlueBubbles iMessage bot toolset - Apple iMessage via local BlueBubbles server"),
+    "qubit-homeassistant": _bundle("Home Assistant bot toolset - smart home event monitoring and control"),
+    "qubit-email": _bundle("Email bot toolset - interact with Qubit via email (IMAP/SMTP)"),
+    "qubit-mattermost": _bundle("Mattermost bot toolset - self-hosted team messaging (full access)"),
+    "qubit-matrix": _bundle("Matrix bot toolset - decentralized encrypted messaging (full access)"),
+    "qubit-dingtalk": _bundle("DingTalk bot toolset - enterprise messaging platform (full access)"),
+    "qubit-feishu": _bundle("Feishu/Lark bot toolset - enterprise messaging via Feishu/Lark (full access)", _FEISHU_TOOLS),
+    "qubit-weixin": _bundle("Weixin bot toolset - personal WeChat messaging via iLink (full access)"),
+    "qubit-qqbot": _bundle("QQBot toolset - QQ messaging via Official Bot API v2 (full access)"),
+    "qubit-wecom": _bundle("WeCom bot toolset - enterprise WeChat messaging (full access)"),
+    "qubit-wecom-callback": _bundle("WeCom callback toolset - enterprise self-built app messaging (full access)"),
+    "qubit-yuanbao": {
         "description": "Yuanbao Bot 元宝消息平台工具集 - 群信息、成员查询、私聊、贴纸表情",
         "tools": _QUBIT_CORE_TOOLS + _YUANBAO_TOOLS,
         "module": "tools.yuanbao_tools",
         "includes": [],
+        "posture": True,
     },
-    "hermes-sms": _bundle("SMS bot toolset - interact with Qubit via SMS (Twilio)"),
-    "hermes-webhook": _ts("Webhook toolset - receive and process external webhook events", _QUBIT_WEBHOOK_SAFE_TOOLS),
-    "hermes-gateway": _ts(
+    "qubit-sms": _bundle("SMS bot toolset - interact with Qubit via SMS (Twilio)"),
+    "qubit-webhook": _ts("Webhook toolset - receive and process external webhook events", _QUBIT_WEBHOOK_SAFE_TOOLS, posture=True),
+    "qubit-gateway": _ts(
         "Gateway toolset - union of all messaging platform tools",
         [],
         includes=[
@@ -252,6 +259,7 @@ TOOLSETS = {
             "qubit-feishu", "qubit-wecom", "qubit-wecom-callback", "qubit-weixin",
             "qubit-qqbot", "qubit-webhook", "qubit-yuanbao",
         ],
+        posture=True,
     ),
 }
 
@@ -261,41 +269,13 @@ BUILTIN_TOOL_NAMES = frozenset(tool for spec in TOOLSETS.values() for tool in sp
 BUILTIN_TOOLSET_NAMES = frozenset(TOOLSETS)
 
 
-def _register_qubit_platform_aliases() -> None:
-    """Register the Qubit-owned ``qubit-*`` spelling for every upstream
-    ``hermes-*`` platform bundle.
-
-    ``qubit-*`` is the canonical identity for defaults and menus; ``hermes-*``
-    stays a read-old alias (existing configs, the dashboard overlay and the
-    plugin-platform registry name it) and is never deleted. A lookup of either
-    spelling resolves to the same tool list.
-
-    The canonical alias carries the same bundle definition plus ``posture=True``:
-    that is the registry's existing marker for a bundle that re-lists the core
-    tools without owning them, so disabling it removes only the platform-specific
-    delta instead of emptying the list (``model_tools._apply_toolset_selection``)
-    and the blank-slate minimiser leaves it out of ``disabled_toolsets``
-    (``qubit_cli.setup_quick``). Its legacy source already gets that treatment by
-    the ``hermes-`` name prefix.
-    """
-    for legacy_name, legacy_def in list(TOOLSETS.items()):
-        if not legacy_name.startswith("hermes-"):
-            continue
-        canonical = "qubit-" + legacy_name[len("hermes-"):]
-        if canonical in TOOLSETS:
-            continue
-        TOOLSETS[canonical] = {**legacy_def, "posture": True}
-
-
-_register_qubit_platform_aliases()
-
-
-def _canonical_toolset_name(name: str) -> str:
+def canonical_toolset_name(name: str) -> str:
     """Preferred ``TOOLSETS`` key for *name* (read-old resolver).
 
     Exact key wins. Otherwise the name is matched case-insensitively (a careless
-    string rebrand produced ``Qubit-cli``), then ``hermes-*`` is swapped to its
-    canonical ``qubit-*`` spelling. Unknown names are returned unchanged so
+    string rebrand produced ``Qubit-cli``), then a legacy ``hermes-*`` platform
+    bundle is swapped to its canonical ``qubit-*`` spelling so a config saved
+    before the rename keeps resolving. Unknown names are returned unchanged so
     plugin/MCP toolsets and error paths are unaffected.
     """
     if not isinstance(name, str) or name in TOOLSETS:
@@ -346,7 +326,7 @@ def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[st
     ``_get_platform_tools`` uses False so that a tool registered into a toolset but absent from a platform's
     static composite does not drop the whole toolset from inference. See issue #49622.
     """
-    name = _canonical_toolset_name(name)
+    name = canonical_toolset_name(name)
     toolset = TOOLSETS.get(name)
     if not include_registry:
         return {**toolset, "tools": list(toolset.get("tools", [])), "includes": list(toolset.get("includes", []))} if toolset else None
@@ -437,7 +417,7 @@ def resolve_toolset(name: str, visited: Set[str] = None, *, include_registry: bo
     registered into a toolset. Platform reverse-mapping uses False so a registry-added tool cannot drop the
     whole toolset from inference (see #49622 and ``_get_platform_tools``).
     """
-    name = _canonical_toolset_name(name)
+    name = canonical_toolset_name(name)
     external_call = visited is None
     if external_call:
         memo_key = (name, include_registry, *_registry_generation(), _registry_call("current_scope_key", ""))
@@ -526,7 +506,7 @@ def profile_role_toolsets(profile_home: Optional[Path] = None) -> Tuple[Set[str]
 
 
 def validate_toolset(name: str) -> bool:
-    name = _canonical_toolset_name(name)
+    name = canonical_toolset_name(name)
     return (name in {"all", "*"} or name in TOOLSETS
             or name in _get_plugin_toolset_names() or name in _get_registry_toolset_aliases())
 
@@ -538,7 +518,7 @@ def create_custom_toolset(name: str, description: str, tools: List[str] = None, 
 
 def get_toolset_info(name: str) -> Dict[str, Any]:
     """Toolset definition plus its resolved tools, or None if unknown."""
-    name = _canonical_toolset_name(name)
+    name = canonical_toolset_name(name)
     toolset = get_toolset(name)
     if not toolset:
         return None

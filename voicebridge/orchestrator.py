@@ -774,6 +774,18 @@ def launch_task(task_text: str, session: Any = None, *,
     def _cancelled() -> bool:
         return bool(box.get("cancel", False))
 
+    # Work-panel producer for /qubit-chat: build the tool-progress bridge once
+    # per task (None headlessly — no hub attached => the vendored runtime keeps
+    # its no-op default, so the voice/CLI paths are byte-identical). It is
+    # built here because this is the thread the turn actually runs on; the
+    # request thread never enters the vendored agent for a plain text turn.
+    try:
+        from .events.chat_progress import build_progress_sink
+
+        _progress_sink = build_progress_sink(cfg, key)
+    except Exception:  # noqa: BLE001 - panel glue is never fatal
+        _progress_sink = None
+
     def _run() -> None:
         try:
             guard = WorkerGuard(cfg, engine=None)
@@ -783,7 +795,9 @@ def launch_task(task_text: str, session: Any = None, *,
                     cfg, _frame_build_task(text), session=key,
                     execute_tool=backend,
                     cancelled=_cancelled,
-                    estop_engaged=_estop),
+                    estop_engaged=_estop,
+                    progress_sink=_progress_sink,
+                    model=model),
                 source="user", correlation_id=key)
             box["result"] = res if isinstance(res, dict) else {
                 "state": "FAILED", "code": "WORKER_MALFORMED",

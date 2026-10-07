@@ -4,11 +4,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from cli import HermesCLI
+from cli import QubitCLI
+from agent.i18n import t
 
 
 def _make_cli():
-    cli_obj = HermesCLI.__new__(HermesCLI)
+    cli_obj = QubitCLI.__new__(QubitCLI)
     cli_obj.config = {}
     cli_obj.console = MagicMock()
     cli_obj.agent = None
@@ -68,13 +69,13 @@ def test_show_session_status_prints_gateway_style_summary():
         "started_at": 1775791440,
     }
 
-    with patch("qubit_constants.display_qubit_home", return_value="~/.hermes"):
+    with patch("qubit_constants.display_qubit_home", return_value="~/.qubit"):
         cli_obj._show_session_status()
 
     printed = "\n".join(str(call.args[0]) for call in cli_obj.console.print.call_args_list)
-    assert "Qubit CLI Status" in printed
+    assert t("cli.session.status_title") in printed
     assert "Session ID: session-123" in printed
-    assert "Path: ~/.hermes" in printed
+    assert "Path: ~/.qubit" in printed
     assert "Title: My titled session" in printed
     assert "Model: openai/gpt-5.4 (openai)" in printed
     assert "Tokens: 321" in printed
@@ -87,7 +88,7 @@ def test_show_session_status_prints_gateway_style_summary():
 
 
 def test_profile_command_reports_custom_root_profile(monkeypatch, tmp_path, capsys):
-    """Profile detection works for custom-root deployments (not under ~/.hermes)."""
+    """Profile detection works for custom-root deployments (not under ~/.qubit)."""
     cli_obj = _make_cli()
     profile_home = tmp_path / "profiles" / "coder"
 

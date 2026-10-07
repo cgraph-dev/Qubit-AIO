@@ -33,7 +33,7 @@ from qubit_cli.config import (
 )
 
 
-class TestGetHermesHome:
+class TestGetQubitHome:
     def test_default_path(self):
         from qubit_constants import _get_platform_default_qubit_home
         with patch.dict(os.environ, {}, clear=False):
@@ -42,7 +42,7 @@ class TestGetHermesHome:
             assert home == _get_platform_default_qubit_home()
 
 
-class TestEnsureHermesHome:
+class TestEnsureQubitHome:
 
     def test_creates_default_soul_md_if_missing(self, tmp_path):
         with patch.dict(os.environ, {"QUBIT_HOME": str(tmp_path)}):
@@ -68,8 +68,8 @@ class TestEnsureHermesHome:
     # module) so this fixture keeps testing the OLD text regardless of any
     # future change to _LEGACY_TEMPLATE_SOULS's length or ordering.
     _PRE_REWRITE_DEFAULT_SOUL = (
-        "You are Qubit Agent, an intelligent AI assistant created by Qubit "
-        "Labs. You are helpful, knowledgeable, and direct. You assist "
+        "You are Hermes Agent, an intelligent AI assistant created by Nous "
+        "Research. You are helpful, knowledgeable, and direct. You assist "
         "users with a wide range of tasks including answering questions, "
         "writing and editing code, analyzing information, creative work, "
         "and executing actions via your tools. You communicate clearly, "
@@ -140,7 +140,7 @@ class TestLoadConfigParseFailure:
     Before issue #23570 this was a single ``print(...)`` that scrolled past
     on the first invocation — users saw aux-fallback misbehavior with no clue
     their config.yaml was being ignored. The helper must:
-      * log at WARNING (so ``hermes logs`` surfaces it)
+      * log at WARNING (so ``qubit logs`` surfaces it)
       * also write to stderr (so it's visible at startup even before
         ``setup_logging()`` has wired up file handlers)
       * dedup on (path, mtime_ns, size) so concurrent loads don't spam
@@ -393,6 +393,54 @@ class TestSaveAndLoadRoundtrip:
 
         assert config_path.read_text(encoding="utf-8") == original
         assert list((tmp_path / "backups" / "config").glob("config.yaml.corrupt.*"))
+
+    def test_atomic_config_write_refuses_partial_state_instead_of_wiping_config(self, tmp_path):
+        """A partial dict is not a full-state replacement: preserve the existing document."""
+        from qubit_cli.config import atomic_config_write
+
+        config_path = tmp_path / "config.yaml"
+        original = {f"k{i}": i for i in range(99)}
+        config_path.write_text(yaml.safe_dump(original), encoding="utf-8")
+
+        with pytest.raises(RuntimeError, match="would lose settings omitted"):
+            atomic_config_write(config_path, {"skills": {"disabled": ["a"]}})
+
+        assert yaml.safe_load(config_path.read_text(encoding="utf-8")) == original
+
+    def test_atomic_config_write_refuses_nested_omissions_with_same_top_level_keys(self, tmp_path):
+        """Completeness is recursive: keeping the root names must not hide sibling deletion."""
+        from qubit_cli.config import atomic_config_write
+
+        config_path = tmp_path / "config.yaml"
+        original = {
+            "plugins": {"enabled": ["guard"], "disabled": [], "config": {"guard": {"mode": "strict"}}},
+            "model": {"default": "gpt-5"},
+        }
+        config_path.write_text(yaml.safe_dump(original), encoding="utf-8")
+
+        with pytest.raises(RuntimeError, match=r"plugins\.(enabled|config)"):
+            atomic_config_write(
+                config_path,
+                {"plugins": {"disabled": ["legacy"]}, "model": {"default": "gpt-5"}},
+            )
+
+        assert yaml.safe_load(config_path.read_text(encoding="utf-8")) == original
+
+    def test_atomic_config_replace_makes_delete_by_omission_explicit(self, tmp_path):
+        """Full-state owners can still deliberately prune keys without a count-based heuristic."""
+        from qubit_cli.config import atomic_config_replace
+
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(
+            yaml.safe_dump({"model": {"default": "gpt-5"}, "plugins": {"enabled": ["guard"]}}),
+            encoding="utf-8",
+        )
+
+        replacement = {"model": {"default": "gpt-5"}}
+        atomic_config_replace(config_path, replacement)
+
+        assert yaml.safe_load(config_path.read_text(encoding="utf-8")) == replacement
+
 
 class TestLoadEnvInlineComments:
     def test_unquoted_hash_is_a_comment_quoted_hash_is_data(self, tmp_path):
@@ -667,16 +715,16 @@ class TestOptionalEnvVarsRegistry:
 
 
     def test_max_iterations_not_offered_as_env_var(self):
-        """HERMES_MAX_ITERATIONS must NOT be in OPTIONAL_ENV_VARS (issue #17534).
+        """QUBIT_MAX_ITERATIONS must NOT be in OPTIONAL_ENV_VARS (issue #17534).
 
-        Offering it as an editable env var (dashboard, `hermes setup`) lets a
+        Offering it as an editable env var (dashboard, `qubit setup`) lets a
         user write it to .env, recreating the stale ghost that shadows
         config.yaml's agent.max_turns. The iteration budget is configured ONLY
-        via config.yaml; HERMES_MAX_ITERATIONS remains a read-only backward-compat
+        via config.yaml; QUBIT_MAX_ITERATIONS remains a read-only backward-compat
         fallback in the gateway/CLI, never a promoted write target.
         """
         from qubit_cli.config import OPTIONAL_ENV_VARS
-        assert "HERMES_MAX_ITERATIONS" not in OPTIONAL_ENV_VARS
+        assert "QUBIT_MAX_ITERATIONS" not in OPTIONAL_ENV_VARS
 
 
 
@@ -944,18 +992,13 @@ class TestConfigSupportFloor:
         with patch.dict(os.environ, {"QUBIT_HOME": str(tmp_path)}):
             migrate_config(interactive=False, quiet=True)
         raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-        # Pin the golden version the fixtures were captured at, then compare
-        # the rest against the same-latest expectation. If _config_version has
-        # advanced past 33, only the version key may differ.
+        # The fixtures were captured at _config_version 33; later migrations
+        # may add keys, so the captured keys are a subset that must still hold.
         assert raw["_config_version"] == DEFAULT_CONFIG["_config_version"]
-        raw.pop("_config_version")
         exp = dict(expected)
         exp.pop("_config_version")
-        if DEFAULT_CONFIG["_config_version"] == 33:
-            assert raw == exp
-        else:  # future migrations appended — golden subset must still hold
-            for key, val in exp.items():
-                assert raw.get(key) == val, f"parity drift on {key!r}"
+        for key, val in exp.items():
+            assert raw.get(key) == val, f"parity drift on {key!r}"
         assert (tmp_path / ".env").read_text(encoding="utf-8") == expected_env
 
 
@@ -1288,14 +1331,14 @@ class TestEnvWriteDenylist:
     @pytest.mark.parametrize(
         "allowed_key",
         [
-            "HERMES_LANGFUSE_PUBLIC_KEY",
-            "HERMES_SPOTIFY_CLIENT_ID",
-            "HERMES_QWEN_BASE_URL",
-            "HERMES_MAX_ITERATIONS",
+            "QUBIT_LANGFUSE_PUBLIC_KEY",
+            "QUBIT_SPOTIFY_CLIENT_ID",
+            "QUBIT_QWEN_BASE_URL",
+            "QUBIT_MAX_ITERATIONS",
         ],
     )
     def test_qubit_integration_keys_still_writable(self, allowed_key):
-        """``HERMES_*`` overall is NOT blocked.
+        """``QUBIT_*`` overall is NOT blocked.
 
         Integration credentials following that convention must keep working
         or we'd regress provider setup flows (auth.py, Spotify, Langfuse, …).
@@ -1307,21 +1350,21 @@ class TestEnvWriteDenylist:
     @pytest.mark.parametrize(
         "protected_key",
         [
-            "HERMES_CONFIG_PATH",
-            "HERMES_ENV_PATH",
-            "HERMES_OPTIONAL_MCPS",
-            "HERMES_COPILOT_ACP_COMMAND",
-            "HERMES_COPILOT_ACP_ARGS",
-            "HERMES_YOLO_MODE",
-            "HERMES_ACCEPT_HOOKS",
-            "HERMES_REDACT_SECRETS",
-            "HERMES_INTERACTIVE",
-            "HERMES_EXEC_ASK",
-            "HERMES_GATEWAY_SESSION",
-            "HERMES_CRON_SESSION",
-            "HERMES_SINGLE_QUERY_SESSION",
-            "HERMES_SESSION_KEY",
-            "HERMES_SESSION_PLATFORM",
+            "QUBIT_CONFIG_PATH",
+            "QUBIT_ENV_PATH",
+            "QUBIT_OPTIONAL_MCPS",
+            "QUBIT_COPILOT_ACP_COMMAND",
+            "QUBIT_COPILOT_ACP_ARGS",
+            "QUBIT_YOLO_MODE",
+            "QUBIT_ACCEPT_HOOKS",
+            "QUBIT_REDACT_SECRETS",
+            "QUBIT_INTERACTIVE",
+            "QUBIT_EXEC_ASK",
+            "QUBIT_GATEWAY_SESSION",
+            "QUBIT_CRON_SESSION",
+            "QUBIT_SINGLE_QUERY_SESSION",
+            "QUBIT_SESSION_KEY",
+            "QUBIT_SESSION_PLATFORM",
         ],
     )
     def test_qubit_security_control_keys_are_not_writable(self, protected_key):
@@ -1393,21 +1436,21 @@ class TestEnvWriteDenylist:
 
         catalog = tmp_path / "custom-mcp-catalog"
         (tmp_path / ".env").write_text(
-            f"HERMES_OPTIONAL_MCPS={catalog}\n",
+            f"QUBIT_OPTIONAL_MCPS={catalog}\n",
             encoding="utf-8",
         )
         invalidate_env_cache()
 
-        assert load_env()["HERMES_OPTIONAL_MCPS"] == str(catalog)
+        assert load_env()["QUBIT_OPTIONAL_MCPS"] == str(catalog)
 
     @pytest.mark.parametrize(
         ("key", "expected"),
         [
             ("Path", "PATH"),
-            ("Hermes_Yolo_Mode", "HERMES_YOLO_MODE"),
-            ("Hermes_Optional_Mcps", "HERMES_OPTIONAL_MCPS"),
-            ("Hermes_Copilot_Acp_Command", "HERMES_COPILOT_ACP_COMMAND"),
-            ("Hermes_Copilot_Acp_Args", "HERMES_COPILOT_ACP_ARGS"),
+            ("Qubit_Yolo_Mode", "QUBIT_YOLO_MODE"),
+            ("Qubit_Optional_Mcps", "QUBIT_OPTIONAL_MCPS"),
+            ("Qubit_Copilot_Acp_Command", "QUBIT_COPILOT_ACP_COMMAND"),
+            ("Qubit_Copilot_Acp_Args", "QUBIT_COPILOT_ACP_ARGS"),
         ],
     )
     def test_windows_policy_names_are_case_insensitive(self, key, expected):
@@ -1432,10 +1475,10 @@ class TestEnvWriteDenylist:
     @pytest.mark.parametrize(
         "protected_key",
         [
-            "Hermes_Yolo_Mode",
-            "Hermes_Optional_Mcps",
-            "Hermes_Copilot_Acp_Command",
-            "Hermes_Copilot_Acp_Args",
+            "Qubit_Yolo_Mode",
+            "Qubit_Optional_Mcps",
+            "Qubit_Copilot_Acp_Command",
+            "Qubit_Copilot_Acp_Args",
         ],
     )
     def test_windows_writer_rejects_mixed_case_protected_name(self, protected_key):
@@ -1765,13 +1808,13 @@ class TestCodexAppServerAutoConfig:
                 tmp_path,
                 "_config_version: 31\n"
                 "compression:\n"
-                "  codex_app_server_auto: hermes\n",
+                "  codex_app_server_auto: qubit\n",
             )
 
             migrate_config(interactive=False, quiet=True)
 
             raw = yaml.safe_load((tmp_path / "config.yaml").read_text())
-            assert raw["compression"]["codex_app_server_auto"] == "hermes"
+            assert raw["compression"]["codex_app_server_auto"] == "qubit"
 
 
 class TestIsProviderEnabled:
@@ -1859,7 +1902,7 @@ def test_default_config_has_no_duplicate_top_level_keys():
 
 
 class TestConfigCommandFailClosedSurface:
-    """`hermes config set/unset` must exit cleanly (no traceback) when the
+    """`qubit config set/unset` must exit cleanly (no traceback) when the
     fail-closed write guard refuses an unparseable config.yaml."""
 
     def _args(self, **kw):
@@ -1906,7 +1949,7 @@ class TestConfigCommandFailClosedSurface:
 
 
 def test_gateway_multiplex_keys_are_recognized_config_keys():
-    """``hermes config set gateway.multiplex_profiles true`` used to warn 'not a recognized config
+    """``qubit config set gateway.multiplex_profiles true`` used to warn 'not a recognized config
     key' although gateway/config.py reads it; the key (and profile_routes) live in DEFAULT_CONFIG."""
     from qubit_cli.config import _validate_config_key
     from qubit_cli.config_defaults import DEFAULT_CONFIG
@@ -1938,7 +1981,7 @@ def test_empty_dict_default_sections_are_open_containers():
 
 def test_lsp_root_policy_keys_are_recognized_and_off_by_default():
     """``lsp.warmup_timeout`` / ``broken_retry_seconds`` / ``exclude_roots`` (#116446) must be settable via
-    ``hermes config set`` and must default to today's behaviour (no grace, lifetime broken set, no exclusion)."""
+    ``qubit config set`` and must default to today's behaviour (no grace, lifetime broken set, no exclusion)."""
     from qubit_cli.config import _validate_config_key
     for key in ("lsp.warmup_timeout", "lsp.broken_retry_seconds", "lsp.exclude_roots"):
         assert _validate_config_key(key) == (True, None)

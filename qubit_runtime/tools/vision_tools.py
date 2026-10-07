@@ -55,7 +55,48 @@ from tools.vision_tools_image_prep import (
 
 logger = logging.getLogger(__name__)
 
+# Typed vision failure codes. A structurally invalid image (undecodable /
+# unsupported) is a CALLER error the provider answers with HTTP 400; it must be
+# reported as a named code, never as a raw upstream 502. A genuine provider
+# outage keeps ``VISION_UPSTREAM``. These are the codes carried in the tool
+# result JSON (``{"success": false, "code": ...}``).
+VISION_IMAGE_INVALID = "VISION_IMAGE_INVALID"
+VISION_IMAGE_UNSUPPORTED = "VISION_IMAGE_UNSUPPORTED"
+VISION_IMAGE_TOO_LARGE = "VISION_IMAGE_TOO_LARGE"
+VISION_UNSUPPORTED_MODEL = "VISION_UNSUPPORTED_MODEL"
+VISION_UPSTREAM = "VISION_UPSTREAM"
+#: Minimal local fallback hints used only if the shared classifier cannot be
+#: imported (the canonical mapping lives in ``agent.auxiliary_client``).
+_IMAGE_INVALID_HINTS = (
+    "failed to load image", "load image or audio", "invalid image", "bad image",
+    "could not process image", "unable to process image", "could not be fully "
+    "decoded", "invalid_request_error", "image_url", "malformed image",
+)
+
 _debug = DebugSession("vision_tools", env_var="VISION_TOOLS_DEBUG")
+
+
+def _classify_vision_error(exc: BaseException) -> str:
+    """Typed code for a failed vision analysis.
+
+    Prefers a code the exception already carries (``_ImagePrepError``), then the
+    shared ``agent.auxiliary_client.classify_vision_exception`` mapping, then a
+    minimal local hint set. Never raises; an unrecognised failure is a typed
+    ``VISION_UPSTREAM`` rather than an unhandled traceback.
+    """
+    code = getattr(exc, "code", "")
+    if isinstance(code, str) and code:
+        return code
+    try:
+        _load_auxiliary_client()
+        from agent.auxiliary_client import classify_vision_exception
+        return classify_vision_exception(exc)
+    except Exception:  # noqa: BLE001 - classifier import/probe must not raise
+        pass
+    text = str(exc or "").lower()
+    if any(hint in text for hint in _IMAGE_INVALID_HINTS):
+        return VISION_IMAGE_INVALID
+    return VISION_UPSTREAM
 
 
 def _cfg_auxiliary(*keys: str, default=None):
@@ -621,7 +662,15 @@ def _unlink_quietly(path: Optional[Path]) -> None:
 
 
 class _ImagePrepError(ValueError):
-    """Raised by :func:`_prepare_image`; the message is user-facing."""
+    """Raised by :func:`_prepare_image`; the message is user-facing.
+
+    ``code`` is the typed failure code carried into the tool-result JSON so an
+    invalid image is a named error, not a raw upstream 400/502.
+    """
+
+    def __init__(self, message: str, code: str = VISION_IMAGE_INVALID) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class _PreparedImage(NamedTuple):
@@ -643,7 +692,7 @@ async def _prepare_image(
     try:
         resolved = await resolve_image_source(image_url, ResolveContext(task_id=task_id))
     except ImageResolutionError as exc:
-        raise _ImagePrepError(str(exc)) from exc
+        raise _ImagePrepError(str(exc), VISION_IMAGE_INVALID) from exc
     temp_dir = _secure_cache_dir("cache/vision", "temp_vision_images")
     path = temp_dir / f"temp_image_{uuid.uuid4()}.img"
     await asyncio.to_thread(_write_private_bytes, path, resolved.data)
@@ -651,22 +700,28 @@ async def _prepare_image(
     try:
         normalized_path, mime, norm_err = await asyncio.to_thread(_normalize_to_supported_image, path, mime)
         if norm_err or normalized_path is None:
-            raise _ImagePrepError(norm_err or "Image normalization failed.")
+            raise _ImagePrepError(norm_err or "Image normalization failed.",
+                                  VISION_IMAGE_UNSUPPORTED)
         if normalized_path != path:
             _unlink_quietly(path)
             path = normalized_path
             size_bytes = path.stat().st_size
-        if validate_decode:
-            decode_error = await _run_encode_on_cpu_executor(
-                _validate_raster_image_decodable, path,
-                _VISION_MAX_VALIDATED_FRAME_COUNT, _VISION_MAX_VALIDATED_AGGREGATE_PIXELS)
-            if decode_error:
-                raise _ImagePrepError(decode_error)
+        # ALWAYS verify the raster decodes, not only on the native-embed path:
+        # a corrupt/undecodable image (valid magic bytes, broken pixel stream)
+        # otherwise reaches the provider and comes back as an opaque HTTP 400
+        # ("Failed to load image or audio file") that callers surface as a raw
+        # 502. The bound is a full decode of a validated frame/pixel budget.
+        decode_error = await _run_encode_on_cpu_executor(
+            _validate_raster_image_decodable, path,
+            _VISION_MAX_VALIDATED_FRAME_COUNT, _VISION_MAX_VALIDATED_AGGREGATE_PIXELS)
+        if decode_error:
+            raise _ImagePrepError(decode_error, VISION_IMAGE_INVALID)
         if region is not None:
             cropped_path, cropped_mime, crop_err = await asyncio.to_thread(
                 _crop_image_region, path, region, offset_out=crop_offset)
             if crop_err or cropped_path is None:
-                raise _ImagePrepError(crop_err or "Region crop failed.")
+                raise _ImagePrepError(crop_err or "Region crop failed.",
+                                      VISION_IMAGE_INVALID)
             _unlink_quietly(path)
             path, mime, size_bytes = cropped_path, cropped_mime, cropped_path.stat().st_size
     except BaseException:
@@ -713,7 +768,7 @@ async def _vision_analyze_native(
         try:
             prepared = await _prepare_image(image_url, task_id, region, validate_decode=True)
         except _ImagePrepError as exc:
-            return tool_error(str(exc), success=False)
+            return tool_error(str(exc), success=False, code=exc.code)
         image_data_url = await _run_encode_on_cpu_executor(
             _image_to_base64_data_url, prepared.path, mime_type=prepared.mime)
         # Proactive embed cap: this image is re-sent on every later turn, so resize DOWN to the
@@ -741,7 +796,8 @@ async def _vision_analyze_native(
             scale_note=_build_scale_note(_scale_info or None, prepared.crop_offset or None))
     except Exception as exc:
         logger.warning("Native vision fast path failed: %s", exc)
-        return tool_error(f"Native vision failed: {exc}", success=False)
+        return tool_error(f"Native vision failed: {exc}", success=False,
+                          code=_classify_vision_error(exc))
     finally:
         if reserved and not embedded:
             _release_embed(image_url)
@@ -871,7 +927,11 @@ async def _run_analysis(
             f"There was a problem with the request and the {kind} could not be analyzed. Error: {{e}}")
         analysis = template.format(e=e, model=model)
         debug_call_data["error"] = error_msg
-        return finish({"success": False, "error": error_msg, "analysis": analysis})
+        # A named code so a caller can tell an invalid image (a caller error)
+        # from a provider outage without parsing the message. Real upstream
+        # failures keep VISION_UPSTREAM.
+        return finish({"success": False, "code": _classify_vision_error(e),
+                       "error": error_msg, "analysis": analysis})
     finally:
         for path in temp_paths:
             if path and path.exists():

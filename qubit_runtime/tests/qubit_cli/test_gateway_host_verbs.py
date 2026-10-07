@@ -16,6 +16,7 @@ The record is written as raw JSON so the file collects against a tree without th
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -60,13 +61,13 @@ def _write_record(pid: int, home: Path, profiles: tuple[str, ...]) -> None:
 @pytest.fixture
 def host_owner(tmp_path, monkeypatch):
     """A REAL live process published as the host gateway, answering identify for three profiles."""
-    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("QUBIT_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
     home = tmp_path / "root"
     _write_record(child.pid, home, ("default", "ops", "coder"))
     monkeypatch.setattr(
         "gateway.control_socket.identify_gateway",
-        lambda dialled, **kw: {"pid": child.pid, "hermes_home": str(home),
+        lambda dialled, **kw: {"pid": child.pid, "qubit_home": str(home),
                                "served_profiles": ["default", "ops", "coder"]})
     try:
         yield SimpleNamespace(pid=child.pid, home=home, proc=child)
@@ -80,7 +81,10 @@ def test_start_all_never_sweeps_a_live_host_multiplexer(host_owner, monkeypatch,
         raise AssertionError("start --all SIGTERMed the host multiplexer")
 
     monkeypatch.setattr(gw, "kill_gateway_processes", _never)
-    monkeypatch.setattr(gw, "_guard_named_profile_under_multiplexer", lambda **k: None)
+    monkeypatch.setattr(
+        gw, "_guard_named_profile_under_multiplexer",
+        lambda **k: pytest.fail("the generic profile guard pre-empted start --all"),
+    )
     monkeypatch.setattr(gw, "_dispatch_via_service_manager_if_s6", lambda verb: False)
     monkeypatch.setattr(gw, "_service_backend", lambda: None)
     monkeypatch.setattr(gw, "find_gateway_pids", lambda **k: [])
@@ -92,6 +96,126 @@ def test_start_all_never_sweeps_a_live_host_multiplexer(host_owner, monkeypatch,
     # The served set survives the verb: all three profiles are still reported as served.
     for profile in ("default", "ops", "coder"):
         assert profile in out
+
+
+def test_named_profile_start_all_starts_the_default_host_service(monkeypatch, tmp_path):
+    """With no live owner, `-p X gateway start --all` must start the host root, never X's gateway.
+
+    Skipping the generic named-profile guard alone is insufficient on Windows: the Windows backend
+    derives its Scheduled Task name, launcher QUBIT_HOME and detached child from the active home.
+    """
+    import qubit_constants
+
+    root = tmp_path / "qubit"
+    named = root / "profiles" / "leinad"
+    root.mkdir()
+    named.mkdir(parents=True)
+    (root / "config.yaml").write_text("{}\n", encoding="utf-8")
+    (named / "config.yaml").write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setenv("QUBIT_HOME", str(named))
+    qubit_constants._default_qubit_root_memo = None
+    monkeypatch.setattr(
+        gw, "_guard_named_profile_under_multiplexer",
+        lambda **k: pytest.fail("the generic profile guard pre-empted start --all"),
+    )
+    monkeypatch.setattr(gw, "_host_multiplexer_for_all_verb", lambda: None)
+    monkeypatch.setattr(gw, "_service_mgmt_blocked", lambda: False)
+    monkeypatch.setattr(gw, "_service_backend", lambda: "windows")
+
+    calls = []
+
+    def _observe(step):
+        calls.append((
+            step,
+            Path(qubit_constants.get_qubit_home()),
+            os.environ.get("QUBIT_HOME"),
+        ))
+
+    def _kill(**kwargs):
+        assert kwargs == {"all_profiles": True}
+        _observe("kill")
+        return 1
+
+    monkeypatch.setattr(gw, "kill_gateway_processes", _kill)
+    monkeypatch.setattr(gw, "_wait_for_gateway_exit",
+                        lambda **k: _observe("wait") or True)
+    monkeypatch.setattr(gw, "_wait_for_api_server_port_free",
+                        lambda **k: _observe("port") or True)
+
+    def _windows_start():
+        _observe("start")
+
+    # Keep the real _service_call dispatch in the path; only replace the OS-specific leaf.
+    monkeypatch.setattr(gw, "_gw_windows", lambda: SimpleNamespace(start=_windows_start))
+
+    gw._cmd_start(SimpleNamespace(system=False, all=True, force=False))
+
+    assert calls == [
+        ("kill", root, str(root)),
+        ("wait", root, str(root)),
+        ("port", root, str(root)),
+        ("start", root, str(root)),
+    ]
+    # The CLI's named-profile scope is restored after the host-scoped operation.
+    assert qubit_constants.get_qubit_home() == named
+    assert os.environ["QUBIT_HOME"] == str(named)
+
+
+def test_named_profile_restart_all_with_host_down_restarts_the_default_root(monkeypatch, tmp_path):
+    """No live owner: `-p X gateway restart --all` must relaunch the host root, never X's gateway.
+
+    Post-update the host is down, so the ownership refusal cannot fire; the sweep-and-relaunch
+    then ran as X, whose own gateway the run-side named-profile guard refuses (exit 78).
+
+    And it must relaunch the root as a DETACHED child carrying only the root's own secrets: X's
+    CLI already loaded X's ``.env`` into ``os.environ``, and an in-process ``run_gateway`` served the
+    default profile with X's credentials.
+    """
+    import qubit_constants
+
+    root = tmp_path / "qubit"
+    named = root / "profiles" / "leinad"
+    named.mkdir(parents=True)
+    (root / "config.yaml").write_text("{}\n", encoding="utf-8")
+    (named / "config.yaml").write_text("{}\n", encoding="utf-8")
+    (root / ".env").write_text("DISCORD_BOT_TOKEN=root-discord\n", encoding="utf-8")
+    (named / ".env").write_text("TELEGRAM_BOT_TOKEN=leinad-telegram\nOPENAI_API_KEY=leinad-openai\n",
+                                encoding="utf-8")
+    # The CLI startup already loaded leinad's .env into this process.
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "leinad-telegram")
+    monkeypatch.setenv("OPENAI_API_KEY", "leinad-openai")
+
+    monkeypatch.setenv("QUBIT_HOME", str(named))
+    qubit_constants._default_qubit_root_memo = None
+    monkeypatch.setattr(gw, "_host_multiplexer_for_all_verb", lambda: None)
+    monkeypatch.setattr(gw, "_stop_installed_service", lambda system: False)
+    monkeypatch.setattr(gw, "kill_gateway_processes", lambda **k: 0)
+    monkeypatch.setattr(gw, "_wait_for_gateway_exit", lambda **k: True)
+    monkeypatch.setattr(gw, "_wait_for_api_server_port_free", lambda **k: True)
+    monkeypatch.setattr(gw, "_discard_dead_host_record", lambda: False)
+    monkeypatch.setattr(gw, "_installed_service_kind_for", lambda windows: None)
+    monkeypatch.setattr(gw, "run_gateway",
+                        lambda **k: pytest.fail("the root ran IN the named profile's process"))
+    monkeypatch.setattr(gw, "get_python_path", lambda: sys.executable)
+
+    spawned: list[tuple[list[str], dict]] = []
+    monkeypatch.setattr(gw.subprocess, "Popen",
+                        lambda cmd, **kw: spawned.append((cmd, kw)) or SimpleNamespace())
+
+    gw._restart_all(system=False)
+
+    assert len(spawned) == 1
+    cmd, kwargs = spawned[0]
+    assert cmd[-3:] == ["gateway", "run", "--replace"]
+    assert "--profile" not in cmd
+    env = kwargs["env"]
+    assert Path(env["QUBIT_HOME"]) == root
+    assert env.get("DISCORD_BOT_TOKEN") == "root-discord"
+    assert "TELEGRAM_BOT_TOKEN" not in env and "OPENAI_API_KEY" not in env, \
+        "the host child inherited the named profile's credentials"
+    assert qubit_constants.get_qubit_home() == named
+    assert not qubit_constants.process_qubit_home_is_pinned()
 
 
 def test_restart_all_refuses_to_sweep_a_host_multiplexer_owned_by_another_profile(

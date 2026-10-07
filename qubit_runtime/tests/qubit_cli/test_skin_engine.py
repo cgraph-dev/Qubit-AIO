@@ -91,7 +91,7 @@ class TestUserSkins:
 
         assert skin.name == "broken"
         assert skin.get_color("banner_title") == "#FFD700"
-        assert skin.get_branding("agent_name") == "Qubit Agent"
+        assert skin.get_branding("agent_name") == "Hermes Agent"
         assert skin.spinner.get("waiting_faces", []) == []
         assert skin.tool_emojis == {}
         assert skin.tool_prefix == "!"
@@ -112,6 +112,54 @@ class TestUserSkins:
         assert "pirate" in names
         pirate = [s for s in skins if s["name"] == "pirate"][0]
         assert pirate["source"] == "user"
+
+
+class TestCustomCSS:
+    """customCSS passthrough: parsed from user YAML, whitespace-stripped,
+    capped at 32 KiB, empty when the field is absent."""
+
+    def _load(self, tmp_path, monkeypatch, **skin_data):
+        from qubit_cli.skin_engine import load_skin
+
+        skins_dir = tmp_path / "skins"
+        skins_dir.mkdir()
+        import qubit_yaml as yaml
+
+        data = {"name": "styled", "colors": {"background": "#101010"}}
+        data.update(skin_data)
+        (skins_dir / "styled.yaml").write_text(yaml.safe_dump(data))
+        monkeypatch.setattr("qubit_cli.skin_engine._skins_dir", lambda: skins_dir)
+        return load_skin("styled")
+
+    def test_user_skin_custom_css_passthrough(self, tmp_path, monkeypatch):
+        skin = self._load(tmp_path, monkeypatch, customCSS=".chat-input { font-size: 16px; }")
+
+        assert skin.custom_css == ".chat-input { font-size: 16px; }"
+
+    def test_user_skin_custom_css_whitespace_stripped(self, tmp_path, monkeypatch):
+        skin = self._load(tmp_path, monkeypatch, customCSS="\n  .status-bar { background: black; }  \n")
+
+        assert skin.custom_css == ".status-bar { background: black; }"
+
+    def test_user_skin_custom_css_empty_when_missing(self, tmp_path, monkeypatch):
+        skin = self._load(tmp_path, monkeypatch)
+
+        assert skin.custom_css == ""
+
+    def test_user_skin_custom_css_capped_at_32_ki_b(self, tmp_path, monkeypatch):
+        skin = self._load(tmp_path, monkeypatch, customCSS="x" * 40000)
+
+        assert len(skin.custom_css) == 32768
+
+    def test_builtin_skin_has_no_custom_css(self, tmp_path, monkeypatch):
+        from qubit_cli.skin_engine import load_skin
+
+        skins_dir = tmp_path / "skins"
+        skins_dir.mkdir()
+        monkeypatch.setattr("qubit_cli.skin_engine._skins_dir", lambda: skins_dir)
+
+        assert load_skin("default").custom_css == ""
+        assert load_skin("mono").custom_css == ""
 
 
 class TestDisplayIntegration:

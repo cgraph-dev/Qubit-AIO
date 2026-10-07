@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { BUILTIN_THEMES, defaultTheme } from "./presets";
+import { migrateThemeName } from "./themeAliases";
 import {
   FONT_CHOICES,
   THEME_DEFAULT_FONT_ID,
@@ -68,16 +69,7 @@ function readStoredPreference(key: string, legacyKey: string): string | null {
  *  users who saved one of the old names in localStorage (or had it
  *  persisted server-side) would silently fall back to `defaultTheme`
  *  because the lookup in `resolveTheme` no longer finds the stale key.
- *  Keep entries here until enough release cycles have passed that we can
- *  reasonably assume nobody still has the old value persisted. */
-const THEME_NAME_ALIASES: Record<string, string> = {
-  // Renamed during the LENS_5I port + Qubit-blue rebrand.
-  "lens-5i": "nous-blue",
-};
-
-function migrateThemeName(name: string): string {
-  return THEME_NAME_ALIASES[name] ?? name;
-}
+ *  The map + `migrateThemeName` live in `./themeAliases` (pure module). */
 
 /** Tracks fontUrls we've already injected so multiple theme switches don't
  *  pile up <link> tags. Keyed by URL. */

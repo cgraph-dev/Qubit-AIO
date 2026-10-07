@@ -103,7 +103,7 @@ def _register_task_cwd(task_id: str, cwd: str) -> None:
 def _expand_acp_enabled_toolsets(toolsets: List[str] | None = None,
                                  mcp_server_names: List[str] | None = None) -> List[str]:
     """Return ACP toolsets plus explicit MCP server toolsets for this session."""
-    names = [n for n in (["hermes-acp"] if toolsets is None else toolsets) if n]
+    names = [n for n in (["qubit-acp"] if toolsets is None else toolsets) if n]
     names += [f"mcp-{s}" for s in (mcp_server_names or []) if s]
     return list(dict.fromkeys(names))
 

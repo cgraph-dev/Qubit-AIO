@@ -1198,7 +1198,10 @@ QUBIT_WS_GATE_CODES: Dict[str, str] = {
     "/api/pty": "PTY_NO_SHELL",
     "/api/console": "PTY_NO_SHELL",
     "/api/ws": "WS_SINGLE_PATH",
-    "/api/events": "WS_SINGLE_PATH",
+    # ``/api/events`` is NOT gated: it is served as a real WebSocket
+    # (``_maybe_events_upgrade``) because the dashboard sidebar dials it with
+    # unmodified upstream client code. Only the raw tui_gateway RPC dialect
+    # stays refused.
     "/api/pub": "WS_SINGLE_PATH",
     "/api/audio/speak-stream": "WS_SINGLE_PATH",
     "/api/plugins/kanban/events": "WS_SINGLE_PATH",
@@ -1416,11 +1419,20 @@ class WebUIHandler(BaseHTTPRequestHandler):
             while not sub.closed and self.app._server is not None:
                 items = sub.drain(timeout=15.0)
                 out = []
-                if sub.overflow:
-                    sub.overflow = False
-                    out.append(": resync\nevent: resync\ndata: {}\n\n")
+                # Track the last seq actually flushed to THIS client. Overflow
+                # drops the oldest queue entries but the client's cursor still
+                # advances with every delivered frame, so a non-gap overflow is
+                # healed by simply continuing — only a dropped seq ABOVE this
+                # cursor (a genuine gap the client cannot replay from) earns a
+                # resync marker. This is what stops the old resync→reconnect
+                # flap under high-volume feeds (e.g. subagent.text floods).
                 for rec in items:
-                    out.append(hub.wire_frame(rec))
+                    seq = rec.get("seq")
+                    if isinstance(seq, int):
+                        cursor = max(cursor or 0, seq)
+                if sub.take_gap(cursor or 0):
+                    out.append(resync_frame())
+                out.extend(hub.wire_frame(rec) for rec in items)
                 if not out or time.monotonic() >= heartbeat_due:
                     out.append(": ping\n\n")
                     heartbeat_due = time.monotonic() + _SSE_HEARTBEAT_S
@@ -2043,7 +2055,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
     def _qubit_backend_enabled(self) -> bool:
         """Cutover flag: serve safe dashboard reads from the vendored Qubit
-        backend. Stage 2 default is on: the Qubit-owned fork is the runtime
+        backend. Stage 2 default is on: the vendored runtime is the runtime
         authority for safe reads. Set ``webui.qubit_backend: false`` (or
         revert the Stage 2 commit) to fall back to the compatibility layer."""
         try:
@@ -2275,6 +2287,65 @@ class WebUIHandler(BaseHTTPRequestHandler):
             peer_ok=P.peer_allowed(self))
         return True
 
+    def _maybe_events_upgrade(self) -> bool:
+        """Serve the dashboard events WebSocket: ``/agent/api/events``.
+
+        Upstream parity: hermes-agent serves ``/api/events`` as a WebSocket
+        (``hermes_cli/web_routers/chat_ws.py``) and the React sidebar's
+        ``eventsFeedClient.ts`` dials exactly that URL. Refusing it left the
+        sidebar retrying forever (the "events feed disconnected — reconnecting
+        in 30s" loop).
+
+        Auth follows upstream's ``_ws_auth_reason``: a browser cannot set a
+        header on a WS upgrade, so the credential rides the query string. A
+        ``?ticket=`` is consumed when present; otherwise a ``?token=`` is
+        accepted **only** on a loopback peer and only when it matches the
+        listener's session token (constant-time). ``token_ok`` cannot be used
+        here — it rejects every query token by design (Packet 1B, the REST
+        rule), which is exactly why this socket never connected. Overwriting
+        that rule for REST is not in scope; the WS leg gets upstream's own
+        contract. Returns True when handled.
+        """
+        if self.headers.get("Upgrade", "").strip().lower() != "websocket":
+            return False
+        api_path = self.path.split("?")[0]
+        if api_path.startswith("/agent"):
+            api_path = api_path[len("/agent"):]
+        if api_path.rstrip("/") != "/api/events":
+            return False
+        q = query_params(self.path)
+        from . import pty_ws as P
+        peer_ok = P.peer_allowed(self)
+        self.app.events_ws.serve(
+            self, ticket_value=q.get("ticket", ""),
+            origin_ok=P.origin_allowed(self, self.app.allowed_origins),
+            peer_ok=peer_ok,
+            token_ok=self._events_query_token_ok(q, peer_ok=peer_ok))
+        return True
+
+    def _events_query_token_ok(self, q: Dict[str, str], *,
+                               peer_ok: bool) -> bool:
+        """Loopback ``?token=`` acceptance for the events WS (upstream parity).
+
+        Accepted only when the peer is loopback AND the presented token
+        equals the listener's own session token. A listener with no configured
+        token (``api_token`` empty) is the loopback-open case: peer already
+        proves local, so no token is required. Comparison is constant-time.
+        """
+        if not peer_ok:
+            return False
+        configured = str(getattr(self.app, "api_token", "") or "")
+        presented = str(q.get("token", "") or "")
+        if not configured:
+            return True
+        if not presented:
+            return False
+        try:
+            import hmac
+            return hmac.compare_digest(presented, configured)
+        except Exception:  # noqa: BLE001 - fail closed on any comparison error
+            return False
+
     def _maybe_gateway_rpc_upgrade(self) -> bool:
         """Serve the Qubit-dialect RPC WebSocket: ``/agent/api/gateway/ws``.
 
@@ -2350,6 +2421,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if self._maybe_pty_upgrade():
             return
         if self._maybe_stt_upgrade():
+            return
+        if self._maybe_events_upgrade():
             return
         if self._maybe_gateway_rpc_upgrade():
             return
@@ -4155,6 +4228,7 @@ class WebUI:
         # Qubit-dialect RPC WebSocket (/agent/api/gateway/ws): the D2 adapter
         # on the SAME listener, sharing the one ticket authority. Lazy.
         self._rpc_ws: Optional[Any] = None
+        self._events_ws: Optional[Any] = None
         # Streaming-STT WebSocket (/agent/api/audio/stt/ws): live local
         # transcription on the SAME listener + ticket authority. Lazy.
         self._stt_ws: Optional[Any] = None
@@ -4168,10 +4242,21 @@ class WebUI:
         # Additive: the legacy events.jsonl activity journal is untouched.
         self._events_hub: Optional[Any] = None
         try:
-            from .events import EventJournal, EventHub, make_event
+            from .events import EventHub, EventJournal, make_event, resync_frame
             from .events.runs import RunCoordinator, StateTracker
             typed = EventJournal(_sd / "typed-events.jsonl")
             self._events_hub = EventHub(typed)
+            # Hand the hub to the shared ``cfg`` so a ``/qubit-chat`` turn
+            # (chat_transport -> agent.run_agent_turn) can republish the
+            # vendored tool-progress feed as CUSTOM frames without a second
+            # mechanism: the same object reaches dispatch, the turn, and here.
+            # Best-effort — a cfg that forbids attributes just skips the panel.
+            try:
+                if orchestrator is not None:
+                    orchestrator.cfg._qubit_chat_hub = self._events_hub
+                    orchestrator.cfg._qubit_chat_make_event = make_event
+            except Exception:  # noqa: BLE001 - producer wiring is optional
+                log.debug("chat progress sink attach failed", exc_info=True)
             self.runs = RunCoordinator(
                 self._events_hub,
                 abort_hook=self._abort_hook_for_cancel())
@@ -4267,6 +4352,37 @@ class WebUI:
                 tickets=self.pty_ws.tickets)
             self._rpc_ws = srv
         return srv
+
+    @property
+    def events_ws(self) -> Any:
+        """The ``/api/events`` subscriber WebSocket authority for this listener.
+
+        Upstream parity: the dashboard sidebar dials ``/api/events`` as a
+        WebSocket. It fans out the SAME typed event records the SSE feed
+        (``/api/events/stream``) carries, from the one EventHub, so both
+        transports share a single durable order. Shares the listener's one
+        ticket store for the ticket-auth path."""
+        srv = getattr(self, "_events_ws", None)
+        if srv is None:
+            from .events_ws import EventsWsServer
+            srv = EventsWsServer(
+                hub=getattr(self, "_events_hub", None),
+                tickets=self.pty_ws.tickets,
+                estop=self._estop_engaged_probe)
+            self._events_ws = srv
+        return srv
+
+    def _estop_engaged_probe(self) -> bool:
+        """Best-effort e-stop read, matching ``stt_ws``'s authority.
+
+        Fails CLOSED to "not engaged" only when the broker itself is
+        unimportable; a broker that answers is authoritative."""
+        try:
+            from .broker import estop_engaged
+            cfg = self.orch.cfg if self.orch is not None else None
+            return bool(estop_engaged(cfg))
+        except Exception:  # noqa: BLE001 - a missing broker never blocks a socket
+            return False
 
     @property
     def stt_ws(self) -> Any:

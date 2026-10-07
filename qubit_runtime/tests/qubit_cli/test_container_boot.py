@@ -34,7 +34,7 @@ def _hermetic_container_argv(monkeypatch: pytest.MonkeyPatch) -> None:
 
     ``_read_container_argv()`` walks the entire ``/proc`` table looking for
     a process whose argv contains ``main-wrapper.sh`` (the s6-overlay v3
-    fallback). On a host that is *also* running hermes containers, those
+    fallback). On a host that is *also* running qubit containers, those
     containers' ``main-wrapper.sh`` processes are visible in the host's
     ``/proc`` (shared PID view), so the scan would pick up a foreign
     ``gateway run`` argv and make ``_maybe_migrate_legacy_gateway_run_state``
@@ -50,8 +50,8 @@ def _hermetic_container_argv(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda: (),
     )
     # This fixture owns real files, but does not run as the image's service user.
-    monkeypatch.setattr("qubit_cli.service_manager._HERMES_UID", os.getuid())
-    monkeypatch.setattr("qubit_cli.service_manager._HERMES_GID", os.getgid())
+    monkeypatch.setattr("qubit_cli.service_manager._QUBIT_UID", os.getuid())
+    monkeypatch.setattr("qubit_cli.service_manager._QUBIT_GID", os.getgid())
 
 
 def _make_profile(
@@ -68,7 +68,7 @@ def _make_profile(
     p.mkdir(parents=True)
     if config:
         # SOUL.md is what the reconciler keys on — it's always seeded by
-        # `hermes profile create`. See container_boot._render_run_script.
+        # `qubit profile create`. See container_boot._render_run_script.
         (p / "SOUL.md").write_text("# fake profile\n")
     if state is not None or desired_state is not None:
         payload: dict[str, object] = {"timestamp": 1234567890}
@@ -282,7 +282,7 @@ def test_main_skips_reconcile_in_dashboard_container_s6v3(
             "-e",
             "/run/s6/basedir/scripts/rc.init",
             "top",
-            "/opt/hermes/docker/main-wrapper.sh",
+            "/opt/qubit/docker/main-wrapper.sh",
             "dashboard",
             "--host",
             "0.0.0.0",
@@ -306,7 +306,7 @@ def test_main_skips_reconcile_in_dashboard_container_s6v3(
 
 
 def test_a_named_slots_autostart_intent_boots_the_root_slot(tmp_path: Path) -> None:
-    """An image only ever driven as `hermes -p coder gateway start` has no root state at all.
+    """An image only ever driven as `qubit -p coder gateway start` has no root state at all.
     Named slots are now registered DOWN unconditionally (one gateway per container), so without
     the root slot inheriting their intent the container boots with ZERO gateways while every
     action reports "registered" — healthy-looking and completely dark."""
@@ -321,6 +321,26 @@ def test_a_named_slots_autostart_intent_boots_the_root_slot(tmp_path: Path) -> N
     assert by_profile["default"].action == "started", "something must serve this container"
     assert by_profile["default"].folded_into_root is True
     assert by_profile["coder"].action == "registered" and by_profile["coder"].folded_into_root is True
+
+
+def test_a_standalone_profile_boots_its_own_slot_instead_of_folding_into_root(tmp_path: Path) -> None:
+    """The root multiplexer never serves a `gateway.standalone` profile, so folding its intent into
+    the root leaves it dark after every container restart. It boots its own slot; a non-standalone
+    profile's intent still folds into the root."""
+    qubit_home = tmp_path / "data"
+    qubit_home.mkdir()
+    _seed_default_root(qubit_home, state="stopped")
+    solo = _make_profile(qubit_home, "solo", state=None, desired_state="running")
+    (solo / "config.yaml").write_text("gateway:\n  standalone: true\n")
+    _make_profile(qubit_home, "coder", state=None, desired_state="running")
+
+    actions = reconcile_profile_gateways(
+        qubit_home=qubit_home, scandir=tmp_path / "svc", dry_run=True, container_argv=())
+
+    by_profile = {a.profile: a for a in actions}
+    assert by_profile["solo"].action == "started" and by_profile["solo"].folded_into_root is False
+    assert by_profile["coder"].action == "registered" and by_profile["coder"].folded_into_root is True
+    assert by_profile["default"].action == "started"
 
 
 def test_a_stopped_fleet_still_boots_nothing(tmp_path: Path) -> None:

@@ -84,6 +84,17 @@ interface ChatSidebarProps {
    * read from `/api/model/info`.
    */
   terminalModel?: { provider?: string; model: string; contextTokens?: number } | null;
+  /**
+   * The chat session this panel belongs to. When present, a model pick writes
+   * the PER-SESSION model (``PATCH /api/qubit/chat/sessions/:id {model}``) —
+   * the session's own stored model, never the global ``model.default`` — so
+   * two surfaces keep independent models (the owner's requirement). ``/chat``
+   * omits it and keeps its current global ``/api/model/set`` behaviour
+   * unchanged, byte-identically.
+   */
+  sessionId?: string;
+  /** Notified with the session's new model after a per-session pick succeeds. */
+  onSessionModelChange?: (model: string) => void;
   className?: string;
   onDashboardNewSessionRequest?: () => void;
   onSessionTitleChange?: (title: string | null) => void;
@@ -197,6 +208,27 @@ export function ChatSidebar({
     let connectGeneration = 0;
     let attempt = 0;
     let lastSeq: number | null = null;
+
+    // A server resync (genuine journal cursor gap) must not restart the feed
+    // cold. The client already tracks `lastSeq`, so it resumes from the
+    // retained cursor after a short debounce — the journal replay fills the
+    // gap. Debouncing coalesces a burst of resyncs (a flood is exactly when
+    // they appear) into one reconnect instead of a per-frame reconnect storm.
+    const RESYNC_RECONNECT_MS = 1500;
+    let resyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleResyncReconnect = () => {
+      if (unmounting || resyncTimer || reconnectTimer) {
+        return;
+      }
+      // A resync is server-driven recovery, not a hard failure; it must not
+      // count against the failure budget nor surface a "reconnecting" banner.
+      clearConnectTimer();
+      resyncTimer = setTimeout(() => {
+        resyncTimer = null;
+        void connect();
+      }, RESYNC_RECONNECT_MS);
+    };
 
     const clearConnectTimer = () => {
       if (connectTimer) {
@@ -342,15 +374,19 @@ export function ChatSidebar({
           buffer = parsed.rest;
 
           if (parsed.resync) {
-            // Queue overflow server-side: drop the cursor and take a fresh
-            // authoritative replay; abort this connection now.
-            lastSeq = null;
+            // Server-side cursor gap: the journal holds the missed frames. Keep
+            // `lastSeq` (resume from it — do NOT blank the cursor), abort this
+            // now-stale connection, and reconnect once after a debounce. The
+            // old handler dropped the cursor and fell through to a cold
+            // `setState("closed") + scheduleReconnect()` on every resync, which
+            // is what produced the connect→closed→reconnect flap.
             try {
               await reader.cancel();
             } catch {
               /* already released */
             }
             attemptController.abort();
+            scheduleResyncReconnect();
             break;
           }
 
@@ -374,6 +410,11 @@ export function ChatSidebar({
       if (unmounting || generation !== connectGeneration) {
         return;
       }
+      // A resync already scheduled the next attempt — don't also run the cold
+      // failure path, which would flip the badge to "closed" and double-connect.
+      if (resyncTimer) {
+        return;
+      }
       if (!reconnectTimer) {
         setState("closed");
         scheduleReconnect();
@@ -386,6 +427,10 @@ export function ChatSidebar({
       unmounting = true;
       connectGeneration += 1;
       clearConnectTimer();
+      if (resyncTimer) {
+        clearTimeout(resyncTimer);
+        resyncTimer = null;
+      }
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;

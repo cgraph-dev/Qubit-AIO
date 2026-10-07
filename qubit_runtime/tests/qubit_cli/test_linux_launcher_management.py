@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from qubit_cli.linux_desktop_entry import install_desktop_entry
+from qubit_cli.linux_desktop_entry import DESKTOP_ENTRY_NAME, install_desktop_entry
 
 
 @pytest.mark.platforms("linux")
@@ -19,9 +19,9 @@ def test_launcher_optout_preserves_custom_entry_but_creates_missing(tmp_path, mo
     config.write_text("desktop:\n  manage_launcher_entry: false\n", encoding="utf-8")
     root = tmp_path / "checkout"
     root.mkdir()
-    entry = tmp_path / "xdg/applications/hermes.desktop"
+    entry = tmp_path / "xdg" / "applications" / DESKTOP_ENTRY_NAME
     entry.parent.mkdir(parents=True)
-    custom = b"[Desktop Entry]\nType=Application\nName=Custom Qubit\nExec=/opt/custom-qubit desktop\n"
+    custom = b"[Desktop Entry]\nType=Application\nName=Custom Hermes\nExec=/opt/custom-qubit desktop\n"
     for setting in ("false", '"false"'):
         config.write_text(f"desktop:\n  manage_launcher_entry: {setting}\n", encoding="utf-8")
         entry.write_bytes(custom)
@@ -29,7 +29,7 @@ def test_launcher_optout_preserves_custom_entry_but_creates_missing(tmp_path, mo
         assert entry.read_bytes() == custom
     entry.unlink()
     assert install_desktop_entry(root) == entry
-    assert b"Name=Qubit\n" in entry.read_bytes()
+    assert b"Name=Hermes\n" in entry.read_bytes()
     config.write_text("desktop: {}\n", encoding="utf-8")
     entry.write_bytes(custom)
     assert install_desktop_entry(root) == entry

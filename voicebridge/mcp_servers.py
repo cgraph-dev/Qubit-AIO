@@ -367,8 +367,58 @@ def _invocable(rec: Dict[str, Any]) -> bool:
     return MC.is_invocable(rec)
 
 
-def _public(rec: Dict[str, Any]) -> Dict[str, Any]:
+# ---------------------------------------------------------------------------
+# Connectivity evidence — the cached discovery state (read-only, best-effort)
+#
+# ``connected`` is derived from the SAME cross-process record the agent's MCP
+# tool layer consults: the vendored per-server schema cache
+# (``tools/mcp_schema_cache``) is written ONLY after a live ``tools/list``
+# connect (``tools/mcp_tool_registration._write_schema_cache``). Reading it is
+# one small file and opens NO connection, so the dashboard list reflects a real
+# live discovery without spawning a probe per row. The on-demand ``/test`` and
+# ``/resources`` reads remain the live connectivity checks. Every read is
+# strictly fail-soft: an absent/corrupt cache is "nothing recorded", never a
+# raise.
+# ---------------------------------------------------------------------------
+def _discovered_servers() -> Dict[str, Any]:
+    """Best-effort map of servers with a recorded live-discovery manifest.
+
+    Returns ``{server_name: cache_entry}`` for every server whose
+    ``tools/list`` was successfully connected and recorded. Never raises.
+    """
+    try:
+        from . import qubit_runtime as QR
+
+        QR.ensure_path()
+        from tools.mcp_schema_cache import _load_all  # type: ignore
+
+        data = _load_all()
+    except Exception:  # noqa: BLE001 - evidence is best-effort, never a gate
+        return {}
+    out: Dict[str, Any] = {}
+    if isinstance(data, dict):
+        for name, entry in data.items():
+            if isinstance(entry, dict) and entry.get("fingerprint"):
+                out[str(name)] = entry
+    return out
+
+
+def _is_connected(rec: Dict[str, Any],
+                  discovered: Optional[Dict[str, Any]] = None) -> bool:
+    """True when the server has a recorded live-discovery manifest."""
+    name = str(rec.get("name") or "").strip()
+    if not name:
+        return False
+    if discovered is None:
+        discovered = _discovered_servers()
+    return name in discovered
+
+
+def _public(rec: Dict[str, Any],
+            connected: Optional[bool] = None) -> Dict[str, Any]:
     ready = _invocable(rec)
+    if connected is None:
+        connected = _is_connected(rec)
     return {
         "name": rec.get("name"),
         "transport": rec.get("transport", "stdio"),
@@ -379,10 +429,10 @@ def _public(rec: Dict[str, Any]) -> Dict[str, Any]:
         "env": dict(rec.get("env") or {}),
         "capabilities": list(rec.get("capabilities") or []),
         "enabled": bool(rec.get("enabled", False)),
-        "connected": False,
+        "connected": bool(connected),
         "invocable": ready,
         "invocation_code": INVOKE_READY_CODE if ready else INVOKE_OPERATOR_CODE,
-        "status": "configured-not-connected",
+        "status": ("connected" if connected else "configured-not-connected"),
         "source": "qubit-registry",
     }
 
@@ -417,10 +467,14 @@ def list_servers(cfg: Any) -> Dict[str, Any]:
     data = _load(cfg)
     rows: List[Dict[str, Any]] = []
     seen = set()
+    # One read of the cached discovery state for the whole listing (no
+    # connection per row; a server whose live tools/list was recorded reads
+    # connected, everything else stays honestly disconnected).
+    discovered = _discovered_servers()
     for name, rec in sorted(data["servers"].items()):
         if not isinstance(rec, dict):
             continue
-        rows.append(_public(rec))
+        rows.append(_public(rec, connected=name in discovered))
         seen.add(name)
     for name in config_server_names(cfg):
         if name not in seen:
@@ -899,7 +953,7 @@ def invocation_status(cfg: Any, name: str) -> Dict[str, Any]:
             "name": clean,
             "transport": row.get("transport"),
             "enabled": bool(row.get("enabled")),
-            "connected": False,
+            "connected": bool(row.get("connected")),
             "invocable": True,
             "code": INVOKE_READY_CODE,
             "reason": INVOKE_READY_REASON,
@@ -918,7 +972,7 @@ def invocation_status(cfg: Any, name: str) -> Dict[str, Any]:
         "name": clean,
         "transport": row.get("transport"),
         "enabled": bool(row.get("enabled")),
-        "connected": False,
+        "connected": bool(row.get("connected")),
         "invocable": False,
         "code": INVOKE_OPERATOR_CODE,
         "reason": INVOKE_REASON,

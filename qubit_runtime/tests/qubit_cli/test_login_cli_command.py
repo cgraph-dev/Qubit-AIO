@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from rich.console import Console
 
+from agent.i18n import t
 from qubit_cli import anon_auth
 from qubit_cli import cli_commands_mixin as commands
 
@@ -125,8 +126,8 @@ def test_the_handler_never_calls_input_and_uses_the_short_timeout(monkeypatch):
     assert seen == [{"timeout_seconds": 8.0}]
 
 def test_the_command_resolves_through_the_cli_fallback():
-    from cli import HermesCLI
-    assert HermesCLI._slash_handler("login") == ("_handle_login_command", True)
+    from cli import QubitCLI
+    assert QubitCLI._slash_handler("login") == ("_handle_login_command", True)
 
 def test_the_drain_writes_to_the_console_captured_at_start(monkeypatch):
     old_buf, new_buf = StringIO(), StringIO()
@@ -208,5 +209,5 @@ def test_the_live_tui_drain_prints_through_cprint_instead_of_the_captured_consol
     assert not threads[0].is_alive()
     assert old_buf.getvalue() == ""
     assert new_buf.getvalue() == ""
-    assert "  Sign-in" in output
+    assert f"  {t('cli.commands.login.label')}" in output
     assert any("Signed in as person@example.test." in line for line in output)

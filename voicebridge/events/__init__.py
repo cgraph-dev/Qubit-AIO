@@ -9,7 +9,7 @@ from .core import (CONTENT_TYPE, SCHEMA_VERSION, TERMINAL_EVENT_TYPES,
                    decode_sse, encode_sse, from_wire, iter_wire_lines,
                    make_event, now_ms, to_wire)
 from .journal import EventJournal
-from .hub import EventHub
+from .hub import EventHub, resync_frame
 from .runs import RunCoordinator, StateTracker
 from .state import PatchError, PatchUnsupportedError, apply_patch, diff_state
 
@@ -19,5 +19,5 @@ __all__ = [
     "EventType", "PatchError", "PatchUnsupportedError", "RunCoordinator",
     "StateTracker",
     "apply_patch", "decode_sse", "diff_state", "encode_sse", "from_wire",
-    "iter_wire_lines", "make_event", "now_ms", "to_wire",
+    "iter_wire_lines", "make_event", "now_ms", "resync_frame", "to_wire",
 ]

@@ -23,7 +23,7 @@ from qubit_cli import update_cmd, update_cmd_maint
 @pytest.fixture()
 def receipt_home(tmp_path, monkeypatch):
     """Isolated QUBIT_HOME for receipt writes."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
     # ``_receipt_dir`` resolves through ``qubit_constants.get_qubit_home`` (env var), not
     # ``qubit_cli.config`` — patch where production reads.
@@ -43,7 +43,7 @@ class TestReceiptLifecycle:
         ur.record_step("pre_update_backup", True, "snapshot=abc123")
         ur.record_skip("gateway_restart", "no gateways running")
         ur.record_gateway_restart(
-            restarted_services=["hermes-gateway"],
+            restarted_services=["qubit-gateway"],
             relaunched_profiles=["work"],
             killed_pids=[123],
             failed_units=[],
@@ -60,7 +60,7 @@ class TestReceiptLifecycle:
         assert payload["steps"][0]["ok"] is True
         assert payload["skips"][0]["reason"] == "no gateways running"
         gr = payload["gateway_restart"]
-        assert gr["restarted_services"] == ["hermes-gateway"]
+        assert gr["restarted_services"] == ["qubit-gateway"]
         assert gr["relaunched_profiles"] == ["work"]
         assert gr["killed_pids"] == [123]
         assert gr["incomplete"] is False
@@ -150,7 +150,7 @@ class TestCommandBoundaryFinalization:
 
     def test_pending_receipt_persisted_on_exit_2_refusal(self, receipt_home):
         ur.begin_update_receipt()
-        ur.record_step("windows_preflight", False, "another hermes.exe running")
+        ur.record_step("windows_preflight", False, "another qubit.exe running")
         path = ur.finalize_pending_update_receipt(2, "sys.exit(2)")
         assert path is not None and path.is_file()
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -190,25 +190,25 @@ class TestCommandBoundaryFinalization:
         singleton."""
         from types import SimpleNamespace
 
-        from qubit_cli import main as hermes_main
+        from qubit_cli import main as qubit_main
 
         def _fake_impl(args, gateway_mode):
             ur.begin_update_receipt()
-            ur.record_step("windows_preflight", False, "hermes.exe holds venv")
+            ur.record_step("windows_preflight", False, "qubit.exe holds venv")
             sys.exit(2)
 
         monkeypatch.setattr(update_cmd, "_cmd_update_impl", _fake_impl)
         monkeypatch.setattr(
-            hermes_main, "detect_install_method", lambda *a, **k: "git", raising=False
+            qubit_main, "detect_install_method", lambda *a, **k: "git", raising=False
         )
         monkeypatch.setattr(
-            hermes_main,
+            qubit_main,
             "_install_hangup_protection",
             lambda gateway_mode: None,
             raising=False,
         )
         monkeypatch.setattr(
-            hermes_main, "_finalize_update_output", lambda state: None, raising=False
+            qubit_main, "_finalize_update_output", lambda state: None, raising=False
         )
 
         class _FakeLock:
@@ -229,7 +229,7 @@ class TestCommandBoundaryFinalization:
             force=False, force_venv=False,
         )
         with pytest.raises(SystemExit) as exc_info:
-            hermes_main.cmd_update(args)
+            qubit_main.cmd_update(args)
 
         assert exc_info.value.code == 2  # exit code preserved
         latest = ur.read_latest_receipt()
@@ -244,6 +244,61 @@ class TestCommandBoundaryFinalization:
         assert len(list(directory.glob("update_*.json"))) == 1
 
 
+def _desktop_correlated_receipt(home, correlation):
+    """Desktop's managed SSH receipt lookup (managed-ssh-update.ts ``receipt()``)."""
+    directory = home / "logs" / "update_receipts"
+    for path in sorted(directory.glob("update_*.json"), key=lambda p: p.stat().st_mtime_ns, reverse=True):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("correlation_id") != correlation:
+            continue
+        if payload.get("outcome") == "running" or not payload.get("finished_at"):
+            continue
+        return payload
+    return None
+
+
+class TestLauncherCorrelation:
+    """Desktop matches the remote receipt by QUBIT_UPDATE_CORRELATION_ID (#101516)."""
+
+    CORRELATION = "1e7cb007-a6f8-4f6c-badb-d80e204942bf"
+
+    def test_receipt_carries_launcher_correlation(self, receipt_home, monkeypatch):
+        monkeypatch.setenv("QUBIT_UPDATE_CORRELATION_ID", self.CORRELATION)
+        ur.begin_update_receipt()
+        update_id = ur.current_correlation_id()
+        _finalize("success")
+
+        payload = _desktop_correlated_receipt(receipt_home, self.CORRELATION)
+        assert payload is not None
+        assert payload["outcome"] == "success"
+        # update_id stays the CLI's own id (pm sync receipts bind to it).
+        assert payload["update_id"] == update_id != self.CORRELATION
+
+    def test_handoff_receipt_keeps_correlation(self, receipt_home, monkeypatch):
+        monkeypatch.setenv("QUBIT_UPDATE_CORRELATION_ID", self.CORRELATION)
+        ur.begin_update_receipt()
+        pre_swap = dict(ur._current.get().data)
+        with ur.update_receipt_scope():
+            # The post-swap interpreter need not inherit the env var.
+            monkeypatch.delenv("QUBIT_UPDATE_CORRELATION_ID")
+            ur.begin_update_receipt(previous=pre_swap, correlation_id=pre_swap["update_id"])
+            _finalize("success")
+        assert _desktop_correlated_receipt(receipt_home, self.CORRELATION) is not None
+
+    def test_legacy_handoff_receipt_gains_correlation(self, receipt_home, monkeypatch):
+        # A pre-swap receipt from an older updater has no correlation_id field.
+        monkeypatch.setenv("QUBIT_UPDATE_CORRELATION_ID", self.CORRELATION)
+        ur.begin_update_receipt(previous={"update_id": "abc123", "steps": []}, correlation_id="abc123")
+        _finalize("success")
+        assert _desktop_correlated_receipt(receipt_home, self.CORRELATION)["update_id"] == "abc123"
+
+    def test_no_launcher_correlation_is_null(self, receipt_home, monkeypatch):
+        monkeypatch.delenv("QUBIT_UPDATE_CORRELATION_ID", raising=False)
+        ur.begin_update_receipt()
+        _finalize("success")
+        assert ur.read_latest_receipt()["correlation_id"] is None
+
+
 class TestFleetClassification:
     def _fleet_with(self, monkeypatch, tmp_path, record, expected_sha="a" * 40):
         """Run collect_fleet_versions against one fake default profile."""
@@ -251,8 +306,8 @@ class TestFleetClassification:
         home.mkdir()
         gateway_record = {
             "gateway_state": "running",
-            "kind": "hermes-gateway",
-            "argv": ["hermes", "gateway", "run"],
+            "kind": "qubit-gateway",
+            "argv": ["qubit", "gateway", "run"],
             **record,
         }
         (home / "gateway_state.json").write_text(
@@ -380,8 +435,8 @@ class TestFleetClassification:
         record = {
             "pid": 4242,
             "gateway_state": "running",
-            "kind": "hermes-gateway",
-            "argv": ["hermes", "gateway", "run"],
+            "kind": "qubit-gateway",
+            "argv": ["qubit", "gateway", "run"],
             "code_sha": "a" * 40,
             "code_version": "1.0",
         }

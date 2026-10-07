@@ -47,7 +47,7 @@ def catalog_dir(tmp_path, monkeypatch):
 @pytest.fixture(autouse=True)
 def _isolate_qubit_home(tmp_path, monkeypatch):
     """Redirect all config I/O to a temp QUBIT_HOME."""
-    hh = tmp_path / "hermes-home"
+    hh = tmp_path / "qubit-home"
     hh.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(hh))
     monkeypatch.setattr(
@@ -514,6 +514,18 @@ class TestInstall:
         # The rejected entry must not have been persisted.
         assert "evil" not in (load_config().get("mcp_servers") or {})
 
+
+    def test_first_install_records_one_extension_install_and_reinstall_none(self, catalog_dir, monkeypatch):
+        _write_manifest(catalog_dir, "demo", _basic_manifest())
+        import qubit_cli.observability.shared_metrics_events as events
+        from qubit_cli.mcp_catalog import install_entry
+
+        calls = []
+        monkeypatch.setattr(events, "record_extension_install", lambda **kw: calls.append(kw))
+        install_entry(_entry("demo"), enable=True)
+        install_entry(_entry("demo"), enable=True)
+
+        assert calls == [{"kind": "mcp_server", "source": "catalog", "name": "demo", "outcome": "success"}]
 
     def test_install_with_api_key_prompts_and_saves(self, catalog_dir, monkeypatch):
         body = _basic_manifest(

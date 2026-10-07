@@ -3,6 +3,7 @@ Import-light by design: no tool registry, CLI config, or provider resolution."""
 
 import ast
 import hashlib
+import json
 import logging
 import os
 import re

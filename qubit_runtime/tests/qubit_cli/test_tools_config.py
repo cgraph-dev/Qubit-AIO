@@ -29,24 +29,26 @@ from qubit_cli.tools_config import (
 
 def test_all_invalid_platform_toolsets_logs_runtime_warning(caplog):
     """#38798: an explicit platform config whose toolset names are all invalid
-    (e.g. 'hermes' instead of 'hermes-cli') must warn at resolve time so an
-    already-corrupted config is caught at runtime, not just during migration."""
+    (e.g. 'not-a-real-toolset' instead of 'qubit-cli') must warn at resolve
+    time so an already-corrupted config is caught at runtime, not just during
+    migration. (The legacy 'qubit' alias resolves via _LEGACY_TOOLSET_ALIASES
+    since #41579, so it is no longer an invalid name.)"""
     import qubit_cli.tools_config as _tc
     # The runtime warning fires once per platform per process; clear the guard
     # so this test is deterministic regardless of prior resolutions.
     _tc._warned_invalid_platform_toolsets.discard("cli")
-    config = {"platform_toolsets": {"cli": ["hermes"]}}
+    config = {"platform_toolsets": {"cli": ["not-a-real-toolset"]}}
 
     with caplog.at_level(logging.WARNING, logger="qubit_cli.tools_config"):
         _get_platform_tools(config, "cli")
 
     warnings = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
-    assert any("#38798" in m and "hermes" in m for m in warnings), warnings
+    assert any("#38798" in m and "not-a-real-toolset" in m for m in warnings), warnings
 
 
 def test_valid_platform_toolsets_no_runtime_warning(caplog):
     """A correctly-configured platform must not emit the #38798 warning."""
-    config = {"platform_toolsets": {"cli": ["hermes-cli"]}}
+    config = {"platform_toolsets": {"cli": ["qubit-cli"]}}
 
     with caplog.at_level(logging.WARNING, logger="qubit_cli.tools_config"):
         _get_platform_tools(config, "cli")
@@ -58,7 +60,7 @@ def test_partially_valid_platform_toolsets_no_runtime_warning(caplog):
     """When at least one configured toolset is valid, tools still resolve, so
     the runtime zero-tools warning must not fire (the migration-time check still
     flags the individual bad name)."""
-    config = {"platform_toolsets": {"cli": ["hermes-cli", "bogus"]}}
+    config = {"platform_toolsets": {"cli": ["qubit-cli", "bogus"]}}
 
     with caplog.at_level(logging.WARNING, logger="qubit_cli.tools_config"):
         _get_platform_tools(config, "cli")
@@ -164,7 +166,7 @@ def test_get_platform_tools_homeassistant_uses_active_profile_token(monkeypatch)
 
 # ─── #35527: platform-restricted default-off toolsets (discord/discord_admin)
 # are stripped by _DEFAULT_OFF_TOOLSETS even when the user explicitly opts in
-# via the platform's native composite. The composite ``hermes-discord``
+# via the platform's native composite. The composite ``qubit-discord``
 # contains both ``discord`` and ``discord_admin`` tools, so configuring it is
 # an explicit opt-in that should survive the default-off strip. ───────────────
 
@@ -173,7 +175,7 @@ def test_discord_toolsets_do_not_leak_to_other_platforms():
     """Layer 4 (guard): discord/discord_admin are platform-restricted — they
     must never appear on a non-discord platform even when that platform is
     explicitly configured."""
-    config = {"platform_toolsets": {"telegram": ["hermes-telegram", "discord"]}}
+    config = {"platform_toolsets": {"telegram": ["qubit-telegram", "discord"]}}
     enabled = _get_platform_tools(config, "telegram")
     assert "discord" not in enabled
     assert "discord_admin" not in enabled
@@ -183,6 +185,41 @@ def test_discord_toolsets_do_not_leak_to_other_platforms():
 
 
 
+def test_get_platform_tools_legacy_qubit_alias_expands():
+    """Legacy ``"qubit"`` toolset name must expand to ``"qubit-cli"`` and
+    ``"qubit-api-server"`` so that tools are not silently dropped.
+
+    Regression test for issue #41579.
+    """
+    config = {"platform_toolsets": {"cli": ["qubit", "kanban"]}}
+
+    enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
+
+    # Must resolve to the same toolset as a plain "qubit-cli" config.
+    reference = _get_platform_tools(
+        {"platform_toolsets": {"cli": ["qubit-cli", "kanban"]}},
+        "cli",
+        include_default_mcp_servers=False,
+    )
+    assert enabled == reference
+    # Sanity: something was actually enabled. ``kanban`` IS in _DEFAULT_OFF_TOOLSETS
+    # on current main (#3d7f773bb4) but an explicitly listed name is an opt-in that
+    # survives the subtraction, so disjointness no longer holds here.
+    assert enabled
+
+
+def test_get_platform_tools_legacy_qubit_alias_alone():
+    """``"qubit"`` alone (no other toolsets) must still produce tools."""
+    config = {"platform_toolsets": {"cli": ["qubit"]}}
+
+    enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
+    reference = _get_platform_tools(
+        {"platform_toolsets": {"cli": ["qubit-cli", "qubit-api-server"]}},
+        "cli",
+        include_default_mcp_servers=False,
+    )
+    assert enabled == reference
+    assert enabled
 
 
 def test_toolset_has_keys_for_vision_accepts_codex_auth(tmp_path, monkeypatch):
@@ -205,7 +242,7 @@ def test_toolset_has_keys_for_vision_accepts_codex_auth(tmp_path, monkeypatch):
 def test_save_platform_tools_preserves_mcp_server_names():
     """Ensure MCP server names are preserved when saving platform tools.
 
-    Regression test for https://github.com/NousResearch/hermes-agent/issues/1247
+    Regression test for https://github.com/NousResearch/qubit/issues/1247
     """
     config = {
         "platform_toolsets": {
@@ -326,11 +363,11 @@ class TestPlatformToolsetConsistency:
             )
 
     def test_gateway_toolset_includes_all_messaging_platforms(self):
-        """hermes-gateway includes list should cover all messaging platforms."""
+        """qubit-gateway includes list should cover all messaging platforms."""
         from qubit_cli.tools_config import PLATFORMS
         from toolsets import TOOLSETS
 
-        gateway_includes = set(TOOLSETS["hermes-gateway"]["includes"])
+        gateway_includes = set(TOOLSETS["qubit-gateway"]["includes"])
         # Exclude non-messaging platforms from the check
         non_messaging = {"cli", "api_server", "cron"}
         for platform, meta in PLATFORMS.items():
@@ -339,7 +376,7 @@ class TestPlatformToolsetConsistency:
             ts_name = meta["default_toolset"]
             assert ts_name in gateway_includes, (
                 f"Platform {platform!r} toolset {ts_name!r} missing from "
-                f"hermes-gateway includes"
+                f"qubit-gateway includes"
             )
 
     def test_skills_config_covers_tools_config_platforms(self):
@@ -363,7 +400,7 @@ def test_numeric_mcp_server_name_does_not_crash_sorted():
     _get_platform_tools must normalise them to str so that sorted()
     on the returned set never raises TypeError on mixed int/str.
 
-    Regression test for https://github.com/NousResearch/hermes-agent/issues/6901
+    Regression test for https://github.com/NousResearch/qubit/issues/6901
     """
     config = {
         "platform_toolsets": {"cli": ["web", 12306]},
@@ -449,35 +486,18 @@ class TestBrowserUseCliInstalledForAllNonCamofoxBackends:
             _run_post_setup("camofox")
         ensure.assert_not_called()
 
-    def test_ensure_helper_always_delegates_to_install_cli(self):
-        """MANAGED-FIRST: a browser-use on PATH must not short-circuit the
-        helper — install_cli() owns the managed-copy check and provisions
-        $QUBIT_HOME/bin when only side installs exist."""
-        with patch(
-            "qubit_cli.tools_config_post_setup.shutil.which", return_value="/usr/bin/browser-use"
-        ), patch(
-            "tools.browser_use_cli.install_cli",
-            return_value=(True, "browser-use CLI already installed (/managed/bin/browser-use)"),
-        ) as install:
-            from qubit_cli.tools_config import _ensure_browser_use_cli
-
-            _ensure_browser_use_cli()
-        install.assert_called_once()
-
-    def test_ensure_helper_install_failure_is_non_fatal(self):
-        """A failed install must warn and fall back, never raise — the
-        uvx zero-install path and the built-in tools remain available."""
+    def test_ensure_helper_missing_harness_is_non_fatal(self):
+        """A missing harness must warn and point at `qubit update`, never raise — the built-in
+        tools remain available."""
         from qubit_cli.tools_config import _ensure_browser_use_cli
 
-        with patch(
-            "qubit_cli.tools_config_post_setup.shutil.which", return_value=None
-        ), patch(
-            "tools.browser_use_cli.install_cli",
-            return_value=(False, "`uv tool install browser-use` failed:\nboom"),
-        ), patch("qubit_cli.tools_config_post_setup._print_warning") as warn:
+        with patch("tools.browser_use_cli._find_cli", return_value=None), patch(
+            "qubit_cli.tools_config_post_setup._print_warning"
+        ) as warn, patch("qubit_cli.tools_config_post_setup._print_info") as info:
             _ensure_browser_use_cli()  # must not raise
 
-        assert any("failed" in c.args[0] for c in warn.call_args_list)
+        assert any("browser-harness" in c.args[0] for c in warn.call_args_list)
+        assert any("qubit update" in c.args[0] for c in info.call_args_list)
 
 
 class TestImagegenBackendRegistry:
@@ -773,7 +793,7 @@ def test_pool_only_account_is_offered_fal_models_only(monkeypatch):
 # ── Toolsets that shipped after a platform's last `qubit tools` save ────────
 #
 # Saving the picker (or one toggle in the desktop Toolsets UI) replaces a
-# platform's composite (``[hermes-cli]``) with a frozen explicit list, and
+# platform's composite (``[qubit-cli]``) with a frozen explicit list, and
 # nothing ever adds to that list — so a toolset shipped later stays off
 # forever, while everyone still on the composite inherits it on upgrade.
 # ``_RECENTLY_SHIPPED_TOOLSETS`` closes that gap for toolsets new enough that
@@ -814,7 +834,7 @@ def test_saved_list_gains_toolsets_that_shipped_after_it_was_written():
     """The bug: a frozen list never gained a newly shipped toolset, so
     composite users got it on upgrade and picker users silently did not."""
     on_composite = _get_platform_tools(
-        {"platform_toolsets": {"cli": ["hermes-cli"]}},
+        {"platform_toolsets": {"cli": ["qubit-cli"]}},
         "cli",
         include_default_mcp_servers=False,
     )
@@ -829,7 +849,7 @@ def test_saved_list_gains_toolsets_that_shipped_after_it_was_written():
 def test_unchecking_the_new_toolset_sticks():
     """Saving records it as offered, so the next read reads absence as a
     decline instead of turning it back on."""
-    config = {"platform_toolsets": {"cli": ["hermes-cli"]}}
+    config = {"platform_toolsets": {"cli": ["qubit-cli"]}}
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
     with patch("qubit_cli.tools_config.save_config"):
         _save_platform_tools(config, "cli", enabled - _RECENTLY_SHIPPED_TOOLSETS)
@@ -884,7 +904,7 @@ def test_disabled_composite_debugging_prunes_constituent_platform_toolsets():
     """#97015: ``agent.disabled_toolsets: [debugging]`` must hide member
     toolsets on ``qubit tools --summary``, not only strip them at runtime."""
     config = {
-        "platform_toolsets": {"cli": ["hermes-cli"]},
+        "platform_toolsets": {"cli": ["qubit-cli"]},
         "agent": {"disabled_toolsets": ["debugging"]},
     }
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
@@ -901,7 +921,7 @@ def test_disabled_composite_display_matches_runtime_tool_selection():
     from toolsets import resolve_toolset
 
     config = {
-        "platform_toolsets": {"cli": ["hermes-cli"]},
+        "platform_toolsets": {"cli": ["qubit-cli"]},
         "agent": {"disabled_toolsets": ["debugging"]},
     }
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
@@ -914,7 +934,7 @@ def test_disabled_composite_display_matches_runtime_tool_selection():
 @_requires_recently_shipped
 def test_platforms_whose_composite_excludes_it_are_left_narrow():
     """Parity is the justification, so don't widen a deliberately small
-    composite (hermes-acp, hermes-webhook) that never carried the toolset."""
+    composite (qubit-acp, qubit-webhook) that never carried the toolset."""
     from toolsets import TOOLSETS, resolve_toolset
 
     narrow = [
@@ -946,7 +966,7 @@ def test_platforms_whose_composite_excludes_it_are_left_narrow():
 def test_explicit_plugin_toolset_admitted_in_platform_toolsets(monkeypatch):
     """When a plugin toolset key is explicitly listed under
     ``platform_toolsets.<platform>`` (alongside a composite like
-    ``hermes-cli``), it MUST be admitted as a configurable key instead of
+    ``qubit-cli``), it MUST be admitted as a configurable key instead of
     being silently dropped by the has_explicit_config filter.
 
     Reproduces the second half of #81163: even after the eager register_tools
@@ -994,9 +1014,9 @@ def test_explicit_plugin_toolset_admitted_in_platform_toolsets(monkeypatch):
     )
 
     # An explicit platform_toolsets list with a plugin key alongside the
-    # standard composite — exactly the "I want hermes-cli AND a2a in my CLI
+    # standard composite — exactly the "I want qubit-cli AND a2a in my CLI
     # session" config the issue's user was trying to write.
-    config = {"platform_toolsets": {"cli": ["hermes-cli", "dplat_client"]}}
+    config = {"platform_toolsets": {"cli": ["qubit-cli", "dplat_client"]}}
 
     enabled = _get_platform_tools(config, "cli")
 
@@ -1008,7 +1028,7 @@ def test_explicit_plugin_toolset_admitted_in_platform_toolsets(monkeypatch):
 
 def test_explicit_plugin_toolset_admitted_against_real_a2a_plugin(monkeypatch):
     """End-to-end Layer 2 regression: with the bundled a2a plugin enabled and
-    a real config like ``platform_toolsets.cli: [hermes-cli, a2a]``, ``a2a``
+    a real config like ``platform_toolsets.cli: [qubit-cli, a2a]``, ``a2a``
     must appear in the resolved enabled toolset set. Before the fix, the
     filter dropped all non-CONFIGURABLE keys (a2a included)."""
     # Discover real plugins so _get_plugin_toolset_keys() sees the a2a key.
@@ -1020,7 +1040,7 @@ def test_explicit_plugin_toolset_admitted_against_real_a2a_plugin(monkeypatch):
     if "a2a" not in plugin_ts_keys:
         pytest.skip("bundled a2a plugin not discoverable in this worktree")
 
-    config = {"platform_toolsets": {"cli": ["hermes-cli", "a2a"]}}
+    config = {"platform_toolsets": {"cli": ["qubit-cli", "a2a"]}}
     enabled = _get_platform_tools(config, "cli")
     assert "a2a" in enabled, (
         f"plugin-provided 'a2a' toolset dropped by _get_platform_tools "

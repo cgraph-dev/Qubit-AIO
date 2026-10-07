@@ -30,7 +30,7 @@ def _no_aws(monkeypatch):
 
 def _clear_provider_env(monkeypatch):
     for var in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "GLM_API_KEY", "ZAI_API_KEY",
-                "KIMI_API_KEY", "MINIMAX_API_KEY", "HERMES_INFERENCE_PROVIDER"):
+                "KIMI_API_KEY", "MINIMAX_API_KEY", "QUBIT_INFERENCE_PROVIDER"):
         monkeypatch.delenv(var, raising=False)
 
 
@@ -50,7 +50,7 @@ class TestProviderPrecedence:
         _login(monkeypatch, "anthropic")
         _config(monkeypatch, {"default": "some-model"})  # dict, NO provider key
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
-        assert resolve_provider("auto") == "openrouter"
+        assert resolve_provider("auto") == "openai-api"
 
 
     def test_oauth_used_as_last_resort(self, monkeypatch):
@@ -106,7 +106,7 @@ class TestFreeTierBeatsImplicitHostCredentials:
         (True, True, None, None, "nous"),                 # existing identity beats the AWS chain
         (True, False, None, None, "bedrock"),             # no identity yet: Bedrock, nothing minted
         (False, True, None, None, "bedrock"),             # free tier off: Bedrock as before
-        (True, True, "OPENAI_API_KEY", None, "openrouter"),  # env key still wins
+        (True, True, "OPENAI_API_KEY", None, "openai-api"),  # env key still wins
         (True, True, None, "anthropic", "anthropic"),        # a sign-in still wins
     ])
     def test_free_tier_sits_above_the_bedrock_chain(self, monkeypatch, free_tier_on, identity,

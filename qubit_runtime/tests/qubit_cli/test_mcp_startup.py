@@ -105,9 +105,9 @@ def test_prepare_agent_startup_backgrounds_blocking_mcp_for_chat(monkeypatch):
 def test_prepare_agent_startup_skips_discovery_when_chat_resolves_to_tui(
     monkeypatch,
 ):
-    """Bare ``hermes`` / ``hermes chat`` on a TTY with ``display.interface:
+    """Bare ``qubit`` / ``qubit chat`` on a TTY with ``display.interface:
     tui`` resolves to the TUI via ``_resolve_use_tui``, but does NOT pass
-    ``--tui`` or ``HERMES_TUI``. Discovery must be skipped in the wrapper:
+    ``--tui`` or ``QUBIT_TUI``. Discovery must be skipped in the wrapper:
     the TUI gateway owns it, and the wrapper would otherwise hold a dead
     MCP server for the entire session (3 copies per TUI instance).
     """
@@ -465,3 +465,38 @@ def test_lazy_only_discovery_counts_as_usable_at_both_startup_sites(monkeypatch,
     assert calls["mcp"] == (2 if retried else 1)
     assert any("zero connected" in w for w in warnings) is retried
     assert any("retrying discovery thread" in w for w in warnings) is retried
+
+
+def test_server_added_after_discovery_is_connected_by_the_next_agent_build(monkeypatch, tmp_path):
+    """#76954: ``qubit mcp add`` against a running Desktop backend. Discovery already ran and left
+    ``github`` live, so the re-entry every agent build makes returned early and the new server's
+    tools never reached a new session. It must run discovery again, and only while something
+    configured is still unconnected."""
+    from tools import mcp_tool
+    from tools import mcp_tool_config as _config
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text("mcp_servers:\n  github:\n    url: https://mcp.example.test/gh\n")
+    configured = {"github": {"url": "https://mcp.example.test/gh"}}
+    monkeypatch.setattr(_config, "_load_mcp_config", lambda: dict(configured))
+    monkeypatch.setitem(mcp_tool._servers, "github", object())
+    monkeypatch.setitem(mcp_tool._server_scope_keys, "github", None)
+    monkeypatch.setattr(mcp_startup, "_any_mcp_connected", lambda: True)
+    runs: list = []
+    monkeypatch.setattr(mcp_startup, "_discover_mcp_tools_without_interactive_oauth", lambda: runs.append(1))
+    logger = types.SimpleNamespace(debug=lambda *_a, **_k: None, info=lambda *_a, **_k: None,
+                                   warning=lambda *_a, **_k: None)
+
+    def build_agent():
+        mcp_startup.start_background_mcp_discovery(logger=logger, thread_name="t")
+        thread = mcp_startup._current_home_thread()
+        if thread is not None:
+            thread.join(timeout=5.0)
+
+    build_agent()  # backend start
+    build_agent()  # new session, config unchanged: github is live, nothing to do
+    assert len(runs) == 1
+
+    configured["linear"] = {"url": "https://mcp.example.test/linear"}  # qubit mcp add linear
+    build_agent()
+    assert len(runs) == 2

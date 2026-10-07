@@ -2085,7 +2085,22 @@ def _enforce_minimum_context(agent):
         and not isinstance(agent._config_context_length, bool)
         and agent._config_context_length > 0
     )
-    if _ctx and _ctx < MINIMUM_CONTEXT_LENGTH and not _allow_lmstudio_explicit_below_floor:
+    # A local Ollama model carrying an explicit operator-set window is exempt too.
+    # ``model.ollama_num_ctx`` is the operator's deliberate statement of the
+    # window THIS box serves — measured 2026-10-07 on the RTX 3070 Ti: 16K runs
+    # at the same speed as 4K (172 tok/s) while 64K drops to 22 tok/s, so the
+    # floor would force an 8x slowdown for no benefit on a small local voice
+    # model. The floor exists to stop a frontier model being used with too
+    # little working memory; it is not a statement about a 4B local brain.
+    # Mirrors the lmstudio precedent directly above.
+    _allow_local_explicit_below_floor = (
+        bool(getattr(agent, "_ollama_num_ctx", 0))
+        and bool(agent.base_url)
+        and is_local_endpoint(agent.base_url)
+    )
+    if _ctx and _ctx < MINIMUM_CONTEXT_LENGTH and not (
+            _allow_lmstudio_explicit_below_floor
+            or _allow_local_explicit_below_floor):
         floor_k = MINIMUM_CONTEXT_LENGTH // 1000
         if agent.base_url and is_local_endpoint(agent.base_url):
             # Any OpenAI-compatible local server (llama.cpp, vLLM, Ollama, ...) — the window is the
@@ -2232,7 +2247,11 @@ def _clamp_compressor_to_ollama_num_ctx(agent):
     # window to the effective num_ctx so threshold math operates on the context the server actually serves.
     # (Overlaps #60103's silent-clamp dead zone; this is the init-order half.)
     _cc_window = getattr(agent.context_compressor, "context_length", 0) or 0
-    if agent._ollama_num_ctx and agent._ollama_num_ctx > 0 and _cc_window and agent._ollama_num_ctx < _cc_window:
+    if (
+        agent._ollama_num_ctx and agent._ollama_num_ctx > 0 and _cc_window
+        and agent._ollama_num_ctx < _cc_window
+        and is_local_endpoint(getattr(agent, "base_url", "") or "")
+    ):
         _ra().logger.info(
             "Compressor window clamped to Ollama num_ctx: %d -> %d",
             _cc_window, agent._ollama_num_ctx,

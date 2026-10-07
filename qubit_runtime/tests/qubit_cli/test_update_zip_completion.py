@@ -20,13 +20,13 @@ import qubit_yaml
 @pytest.fixture
 def zip_update(tmp_path, monkeypatch, isolated_source_completion):
     home = tmp_path / "home"
-    active = home / ".hermes"
+    active = home / ".qubit"
     sibling = active / "profiles/other"
     sibling.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: home)
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("QUBIT_HOME", str(active))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "store"))
+    monkeypatch.setenv("QUBIT_RUNTIME_DIR", str(tmp_path / "store"))
     for profile in (active, sibling):
         (profile / "config.yaml").write_text(
             f"_config_version: {DEFAULT_CONFIG['_config_version'] - 1}\n"
@@ -48,11 +48,11 @@ def zip_update(tmp_path, monkeypatch, isolated_source_completion):
         path.write_text("retained", encoding="utf-8")
     archive = tmp_path / "source.zip"
     with zipfile.ZipFile(archive, "w") as out:
-        out.writestr("hermes-agent-main/pyproject.toml", '[project]\nversion="2.0"\n')
-        out.writestr("hermes-agent-main/payload.txt", "new")
+        out.writestr("qubit-main/pyproject.toml", '[project]\nversion="2.0"\n')
+        out.writestr("qubit-main/payload.txt", "new")
         for name in ("new-entry/data", "tools/code.py", "apps/desktop/source.js",
                      "venv/keep", "node_modules/keep", ".env"):
-            out.writestr("hermes-agent-main/" + name, "new")
+            out.writestr("qubit-main/" + name, "new")
     # Only redirect transport: extraction, staging, dirty recheck and swap run.
     monkeypatch.setattr("urllib.request.urlretrieve", lambda url, dst: urlretrieve(archive.as_uri(), dst))
     monkeypatch.setattr(main, "PROJECT_ROOT", root)
@@ -82,7 +82,6 @@ def zip_update(tmp_path, monkeypatch, isolated_source_completion):
     monkeypatch.setattr(maint, "_print_post_update_notices_and_self_heals", lambda: None)
     monkeypatch.setattr(maint, "_print_bundled_skills_sync_report", lambda: None)
     monkeypatch.setattr("qubit_cli.profiles.seed_profile_skills", lambda *a, **kw: {})
-    monkeypatch.setattr("plugins.memory.honcho.cli.sync_honcho_profiles_quiet", lambda: [])
     monkeypatch.setattr(update_cmd, "_reload_config_modules", lambda: None)
     monkeypatch.setattr(update_cmd, "_post_update_sqlite_runtime_status", lambda: (True, None))
     monkeypatch.setattr(fleet, "_print_legacy_units_warning", lambda: None)
@@ -152,7 +151,7 @@ def test_zip_command_migrates_profiles_recovers_snapshot_and_verifies_fleet(
     assert receipt["runtime_outcomes"][0]["outcome"] == "restarted"
     assert update_receipt._current.get() is None
     assert state.token["resume_needed"] is False
-    assert not list(state.root.glob("*.hermes-update-*"))
+    assert not list(state.root.glob("*.qubit-update-*"))
 
 
 @pytest.mark.parametrize("verdict", ["healthy", "unsafe-sqlite", "stale-fleet"])
@@ -208,7 +207,7 @@ def test_zip_failure_recovers_pause_without_completion_mutations(zip_update, mon
         rename = os.rename
 
         def fail_second_swap(src, dst):
-            if str(src).endswith(".hermes-update-staging"):
+            if str(src).endswith(".qubit-update-staging"):
                 installed.append(dst)
                 if len(installed) == (5 if failure == "late-swap" else 2):
                     raise OSError("locked replacement")
@@ -221,7 +220,7 @@ def test_zip_failure_recovers_pause_without_completion_mutations(zip_update, mon
         copytree = shutil.copytree
 
         def fail_copy(src, dst, *args, **kwargs):
-            if str(dst).endswith(".hermes-update-staging"):
+            if str(dst).endswith(".qubit-update-staging"):
                 raise OSError("staging disk full")
             return copytree(src, dst, *args, **kwargs)
         monkeypatch.setattr(shutil, "copytree", fail_copy)
@@ -248,7 +247,7 @@ def test_zip_failure_recovers_pause_without_completion_mutations(zip_update, mon
     assert not (state.sibling / ".env").exists()
     assert json.loads(state.jobs.read_text()) == state.original_jobs
     assert not (state.active / "logs/update_receipts/latest.json").exists()
-    assert not list(state.root.glob("*.hermes-update-*"))
+    assert not list(state.root.glob("*.qubit-update-*"))
 
 
 @pytest.mark.parametrize("entry", ["payload.txt", "tools"])
@@ -257,9 +256,9 @@ def test_zip_recovers_crashed_backup_before_failed_copy_and_retry(zip_update, mo
 
     root = zip_update.root
     target = root / entry
-    backup = root / (entry + ".hermes-update-old")
+    backup = root / (entry + ".qubit-update-old")
     target.rename(backup)
-    leftover = root / (entry + ".hermes-update-staging")
+    leftover = root / (entry + ".qubit-update-staging")
     leftover.write_text("interrupted copy", encoding="utf-8")
     function = "copytree" if entry == "tools" else "copy2"
     original = getattr(shutil, function)
@@ -276,10 +275,10 @@ def test_zip_recovers_crashed_backup_before_failed_copy_and_retry(zip_update, mo
         assert error.value.code == 1
     witness = target / "code.py" if entry == "tools" else target
     assert witness.read_text(encoding="utf-8") == ("retained" if entry == "tools" else "old")
-    assert not list(root.glob("*.hermes-update-*"))
+    assert not list(root.glob("*.qubit-update-*"))
     update_cmd_zip._download_and_swap_zip("main", "local fixture")
     assert witness.read_text(encoding="utf-8") == "new"
-    assert not list(root.glob("*.hermes-update-*"))
+    assert not list(root.glob("*.qubit-update-*"))
 
 
 def test_atomic_directory_compat_entrypoint(tmp_path):
@@ -291,7 +290,7 @@ def test_atomic_directory_compat_entrypoint(tmp_path):
     update_cmd_zip._atomic_replace_dir(str(src), str(dst))
     assert {p.name for p in dst.iterdir()} == {"new"}
     assert (dst / "new").read_text(encoding="utf-8") == "new"
-    assert not list(tmp_path.glob("*.hermes-update-*"))
+    assert not list(tmp_path.glob("*.qubit-update-*"))
 
 
 def test_zip_refuses_non_main_before_transport(zip_update, monkeypatch, capsys):
@@ -313,3 +312,28 @@ def test_venv_layout_explicit_and_native(tmp_path, windows, folder, executable):
     assert venv_python(str(tmp_path), windows=windows) == tmp_path / folder / executable
     if windows == (os.name == "nt"):
         assert venv_python(tmp_path) == tmp_path / folder / executable
+
+
+@pytest.mark.platforms("macos")
+@pytest.mark.parametrize(("mechanism", "rebuilt"), [("self", True), ("electron-updater", False)])
+def test_installed_app_without_a_checkout_build_is_still_rebuilt(zip_update, monkeypatch, tmp_path, mechanism, rebuilt):
+    """#52339: an installed Hermes.app only ``qubit update`` refreshes needs a Desktop build even
+    when release/ is gone, or it never gets newer. A self-updating release is not ours to rebuild."""
+    installed = tmp_path / "Applications" / "Hermes.app"
+    (installed / "Contents" / "Resources").mkdir(parents=True)
+    (installed / "Contents" / "Resources" / "install-stamp.json").write_text(
+        json.dumps({"updateMechanism": mechanism}), encoding="utf-8")
+    monkeypatch.setattr("qubit_cli.gui_uninstall.packaged_gui_app_paths", lambda: [installed])
+    # The checkout under the default Hermes home is the one an installed app runs.
+    (tmp_path / "default-home").mkdir()
+    (tmp_path / "default-home" / "qubit").symlink_to(zip_update.root)
+    monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda **kw: tmp_path / "default-home")
+    built = []
+    monkeypatch.setattr("qubit_cli.source_build.build_update_products",
+                        lambda selected, *, desktop: built.append(desktop))
+    monkeypatch.setattr(update_cmd, "_prepare_git_command", lambda: (True, ["git"], False))
+    monkeypatch.setattr(main, "_warn_orphaned_update_autostashes", lambda *args: None)
+
+    update_cmd._cmd_update_impl(SimpleNamespace(branch="main", yes=True), False)
+
+    assert built == [rebuilt]

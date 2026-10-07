@@ -1,4 +1,4 @@
-"""Tests for ``hermes debug`` CLI command and debug utilities."""
+"""Tests for ``qubit debug`` CLI command and debug utilities."""
 
 import os
 from unittest.mock import MagicMock, patch
@@ -12,7 +12,7 @@ import pytest
 @pytest.fixture
 def qubit_home(tmp_path, monkeypatch):
     """Set up an isolated QUBIT_HOME with minimal logs."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
 
@@ -122,7 +122,7 @@ class TestCaptureLogSnapshot:
 class TestMissingLogNote:
     """A missing log explains itself when the writer isn't this backend.
 
-    `hermes debug share` runs on the backend, so a desktop connected to a
+    `qubit debug share` runs on the backend, so a desktop connected to a
     remote/docker/SSH backend can never contribute desktop.log. Reporting a
     bare absence sends triage after a client-side bug it cannot see.
     """
@@ -178,7 +178,7 @@ class TestMissingLogNote:
 
 
 # ---------------------------------------------------------------------------
-# Capture log redaction (force=True applies regardless of HERMES_REDACT_SECRETS)
+# Capture log redaction (force=True applies regardless of QUBIT_REDACT_SECRETS)
 # ---------------------------------------------------------------------------
 
 # A vendor-prefixed token used across redaction tests. Long enough to clear
@@ -190,9 +190,9 @@ class TestCaptureLogSnapshotRedaction:
     """Pin upload-time redaction at the _capture_log_snapshot boundary."""
 
     @pytest.fixture
-    def hermes_home_with_secret(self, tmp_path, monkeypatch):
+    def qubit_home_with_secret(self, tmp_path, monkeypatch):
         """Isolated QUBIT_HOME whose agent.log contains a vendor-prefixed token."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(home))
         # Baseline fixture: no explicit env-var opinion. With the post-#17691
@@ -200,7 +200,7 @@ class TestCaptureLogSnapshotRedaction:
         # secure-default behaviour. The `force=True` regression test
         # setenvs to "false" inline to prove force=True works even when
         # the runtime flag is disabled.
-        monkeypatch.delenv("HERMES_REDACT_SECRETS", raising=False)
+        monkeypatch.delenv("QUBIT_REDACT_SECRETS", raising=False)
 
         logs_dir = home / "logs"
         logs_dir.mkdir()
@@ -211,7 +211,7 @@ class TestCaptureLogSnapshotRedaction:
         (logs_dir / "gateway.log").write_text("")
         return home
 
-    def test_default_redacts_tail_and_full_text(self, hermes_home_with_secret):
+    def test_default_redacts_tail_and_full_text(self, qubit_home_with_secret):
         from qubit_cli.debug import _capture_log_snapshot
 
         snap = _capture_log_snapshot("agent", tail_lines=10)
@@ -221,7 +221,7 @@ class TestCaptureLogSnapshotRedaction:
         assert snap.full_text is not None
         assert _REDACT_FIXTURE_TOKEN not in snap.full_text
 
-    def test_redact_false_passes_through(self, hermes_home_with_secret):
+    def test_redact_false_passes_through(self, qubit_home_with_secret):
         from qubit_cli.debug import _capture_log_snapshot
 
         snap = _capture_log_snapshot("agent", tail_lines=10, redact=False)
@@ -231,24 +231,24 @@ class TestCaptureLogSnapshotRedaction:
         assert _REDACT_FIXTURE_TOKEN in (snap.full_text or "")
 
     def test_force_true_works_when_redaction_disabled(
-        self, hermes_home_with_secret, monkeypatch
+        self, qubit_home_with_secret, monkeypatch
     ):
         """Regression test: redact_sensitive_text short-circuits without force=True.
 
         If a future refactor drops `force=True` from `_redact_log_text`, this
         test fails immediately. Without `force=True`, the redactor returns the
-        input unchanged when HERMES_REDACT_SECRETS=false, and the share-time
+        input unchanged when QUBIT_REDACT_SECRETS=false, and the share-time
         redaction feature ships silently broken for users who opted out of
         runtime redaction (e.g. developers working on the redactor itself).
         """
 
         # Force the runtime flag off so we're exercising the force=True path,
         # not the default-on path.
-        monkeypatch.setenv("HERMES_REDACT_SECRETS", "false")
+        monkeypatch.setenv("QUBIT_REDACT_SECRETS", "false")
 
         from qubit_cli.debug import _capture_log_snapshot
 
-        assert os.environ.get("HERMES_REDACT_SECRETS", "") == "false"
+        assert os.environ.get("QUBIT_REDACT_SECRETS", "") == "false"
 
         snap = _capture_log_snapshot("agent", tail_lines=10)
 
@@ -257,11 +257,11 @@ class TestCaptureLogSnapshotRedaction:
         assert _REDACT_FIXTURE_TOKEN not in snap.full_text
 
     def test_default_redacts_email_addresses_for_public_share(
-        self, hermes_home_with_secret
+        self, qubit_home_with_secret
     ):
         from qubit_cli.debug import _capture_log_snapshot
 
-        log_path = hermes_home_with_secret / "logs" / "agent.log"
+        log_path = qubit_home_with_secret / "logs" / "agent.log"
         log_path.write_text(
             "2026-04-12 17:00:00 INFO gateway.run: "
             "inbound message: platform=bluebubbles "
@@ -277,7 +277,7 @@ class TestCaptureLogSnapshotRedaction:
 
 
     def test_capture_default_log_snapshots_threads_redact(
-        self, hermes_home_with_secret
+        self, qubit_home_with_secret
     ):
         from qubit_cli.debug import _capture_default_log_snapshots
 
@@ -325,7 +325,7 @@ class TestRunDebugShare:
         with patch("qubit_cli.dump.run_dump") as mock_dump, \
              patch("qubit_cli.debug.upload_to_pastebin",
                     side_effect=_mock_upload):
-            mock_dump.side_effect = lambda a: print("--- hermes dump ---\nversion: test\n--- end dump ---")
+            mock_dump.side_effect = lambda a: print("--- qubit dump ---\nversion: test\n--- end dump ---")
             run_debug_share(args)
 
         out = capsys.readouterr().out
@@ -344,16 +344,16 @@ class TestRunDebugShare:
 
         # Each log paste should start with the dump header
         agent_paste = uploaded_content[1]
-        assert "--- hermes dump ---" in agent_paste
+        assert "--- qubit dump ---" in agent_paste
         assert "--- full agent.log ---" in agent_paste
         gateway_paste = uploaded_content[2]
-        assert "--- hermes dump ---" in gateway_paste
+        assert "--- qubit dump ---" in gateway_paste
         assert "--- full gateway.log ---" in gateway_paste
         gui_paste = uploaded_content[3]
-        assert "--- hermes dump ---" in gui_paste
+        assert "--- qubit dump ---" in gui_paste
         assert "--- full gui.log ---" in gui_paste
         desktop_paste = uploaded_content[4]
-        assert "--- hermes dump ---" in desktop_paste
+        assert "--- qubit dump ---" in desktop_paste
         assert "--- full desktop.log ---" in desktop_paste
 
 
@@ -367,12 +367,12 @@ class TestRunDebugShareRedaction:
     """End-to-end: --no-redact flag, banner injection, default behavior."""
 
     @pytest.fixture
-    def hermes_home_with_secret(self, tmp_path, monkeypatch):
+    def qubit_home_with_secret(self, tmp_path, monkeypatch):
         """Isolated QUBIT_HOME whose agent.log contains a vendor-prefixed token."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(home))
-        monkeypatch.delenv("HERMES_REDACT_SECRETS", raising=False)
+        monkeypatch.delenv("QUBIT_REDACT_SECRETS", raising=False)
 
         logs_dir = home / "logs"
         logs_dir.mkdir()
@@ -386,7 +386,7 @@ class TestRunDebugShareRedaction:
         return home
 
     def test_default_share_redacts_uploaded_content(
-        self, hermes_home_with_secret, capsys
+        self, qubit_home_with_secret, capsys
     ):
         """The uploaded report and full-log pastes do not contain the raw token."""
         from qubit_cli.debug import run_debug_share
@@ -416,8 +416,139 @@ class TestRunDebugShareRedaction:
                 "raw token leaked into upload-bound content"
             )
 
+    def test_fallback_provider_key_never_reaches_upload_bound_content(self, qubit_home_with_secret):
+        """``qubit dump`` quotes ``fallback_providers`` from config.yaml; neither the CLI share
+        bundle nor the gateway /debug report may carry a fallback entry's api_key."""
+        from qubit_cli.debug import _capture_dump, collect_debug_report, collect_share_bundle
+
+        fallback_key = "fbk-opaque-0123456789abcdefghij"
+        (qubit_home_with_secret / "config.yaml").write_text(
+            "fallback_providers:\n"
+            "  - provider: custom\n"
+            "    model: backup-model\n"
+            "    base_url: https://backup.example/v1\n"
+            f"    api_key: {fallback_key}\n", encoding="utf-8")
+
+        uploads = [*collect_share_bundle(log_lines=20).values(),
+                   collect_debug_report(log_lines=20, dump_text=_capture_dump())]
+
+        assert any("backup-model" in text for text in uploads)  # the dump really ran
+        assert not [text for text in uploads if fallback_key in text]
+
+    @pytest.mark.parametrize(("yaml_value", "secret"), [
+        ("87419362508741936250", "87419362508741936250"),  # unquoted: YAML int
+        ("'opaque***Fallback0123456789'", "opaque***Fallback0123456789"),  # looks pre-masked
+        ("{value: nestedOpaque0123456789abcdef}", "nestedOpaque0123456789abcdef"),
+    ])
+    def test_fallback_api_key_masked_whatever_its_yaml_shape(self, qubit_home_with_secret, yaml_value, secret):
+        """The runtime ``str()``s any ``api_key`` value (fallback_config.resolve_entry_api_key), so the
+        dump masks the field itself rather than relying on text redaction to recognise the value."""
+        from qubit_cli.debug import _capture_dump, collect_debug_report, collect_share_bundle
+
+        (qubit_home_with_secret / "config.yaml").write_text(
+            "fallback_providers:\n"
+            "  - provider: custom\n"
+            "    model: backup-model\n"
+            f"    api_key: {yaml_value}\n", encoding="utf-8")
+
+        texts = [_capture_dump(redact=False),  # `qubit dump` stdout, as printed
+                 *collect_share_bundle(log_lines=20).values(),
+                 collect_debug_report(log_lines=20, dump_text=_capture_dump())]
+
+        assert "backup-model" in texts[0]
+        assert not [text for text in texts if secret in text]
+
+    @pytest.mark.parametrize(("field", "yaml_value", "secret"), [
+        ("token", "87419362508741936250", "87419362508741936250"),
+        ("auth_token", "'opaque***AuthToken0123456789'", "opaque***AuthToken0123456789"),
+        ("client_secret", "{value: clientSecretOpaque0123456789}", "clientSecretOpaque0123456789"),
+        ("password", "98127364509812736450", "98127364509812736450"),
+        ("clientApiKey", "'opaque***CamelKey0123456789'", "opaque***CamelKey0123456789"),
+    ])
+    def test_fallback_secret_fields_masked_by_repo_policy(self, qubit_home_with_secret, field, yaml_value, secret):
+        """Every field ``agent.redact`` treats as a credential is masked by field, not only ``api_key``;
+        env-var names and token budgets stay readable."""
+        from qubit_cli.debug import _capture_dump, collect_debug_report, run_debug_share
+
+        (qubit_home_with_secret / "config.yaml").write_text(
+            "fallback_providers:\n"
+            "  - provider: custom\n"
+            "    model: backup-model\n"
+            "    key_env: BACKUP_KEY_ENV_NAME\n"
+            "    api_key_env: BACKUP_API_KEY_ENV_NAME\n"
+            "    max_tokens: 4321\n"
+            f"    {field}: {yaml_value}\n", encoding="utf-8")
+
+        uploaded: list[str] = []
+        args = MagicMock(lines=20, expire=1, local=False, nous=False, no_redact=False)
+        with patch("qubit_cli.debug._sweep_expired_pastes", return_value=(0, 0)), \
+             patch("qubit_cli.debug._schedule_auto_delete"), \
+             patch("qubit_cli.debug.upload_to_pastebin",
+                   side_effect=lambda content, expiry_days=1: uploaded.append(content) or "https://paste.rs/x"):
+            run_debug_share(args)  # what actually reaches the paste service
+
+        assert any("backup-model" in text for text in uploaded)  # the dump really reached the sink
+        assert not [text for text in uploaded if secret in text]  # checked first: the sink alone catches a leak
+
+        texts = [_capture_dump(redact=False),  # `qubit dump` stdout, as printed
+                 collect_debug_report(log_lines=20, dump_text=_capture_dump())]
+
+        assert all(s in texts[0] for s in ("backup-model", "BACKUP_KEY_ENV_NAME", "BACKUP_API_KEY_ENV_NAME", "4321"))
+        assert not [text for text in texts if secret in text]
+
+    @pytest.mark.parametrize("base_url", [
+        "https://user:{s}@backup.example/v1",
+        "https://backup.example/v1?key={s}",
+        "https://backup.example/v1?X-Amz-Signature={s}",
+        "https://backup.example/v1?X-Goog-Signature={s}",
+        "https://backup.example/v1?sv=2024-11-04&sig={s}",
+        "https://backup.example/v1#access_token={s}&view=public",
+    ])
+    def test_fallback_base_url_credential_never_reaches_upload_bound_content(self, qubit_home_with_secret, base_url):
+        """A fallback ``base_url`` can carry its credential in the URL (userinfo, query, fragment). The
+        dump is config made to be pasted, so ``qubit dump`` itself and every upload of it get strict
+        URL-credential redaction, not the log policy."""
+        from qubit_cli.debug import _capture_dump, collect_debug_report, collect_share_bundle
+
+        secret = "urlCredOpaque0123456789abcdef"
+        (qubit_home_with_secret / "config.yaml").write_text(
+            "fallback_providers:\n"
+            "  - provider: custom\n"
+            "    model: backup-model\n"
+            f"    base_url: '{base_url.format(s=secret)}'\n", encoding="utf-8")
+
+        texts = [_capture_dump(redact=False),  # `qubit dump` stdout, as printed
+                 *collect_share_bundle(log_lines=20).values(),
+                 collect_debug_report(log_lines=20, dump_text=_capture_dump())]
+
+        assert all("backup-model" in text and "backup.example" in text for text in texts[:2])
+        assert not [text for text in texts if secret in text]
+
+    def test_capture_dump_is_independent_strict_redaction_boundary(self):
+        """A future dump formatting mistake cannot leak through debug upload paths."""
+        from qubit_cli.debug import _capture_dump
+
+        raw_key = "opaqueBoundaryKeyABC123456789"
+        raw_password = "boundaryPasswordABC123456789"
+        raw_signature = "boundarySignatureABC123456789"
+
+        def leaky_dump(_args):
+            print(
+                "{'api_key': '" + raw_key + "', "
+                "'base_url': 'https://user:" + raw_password
+                + "@example.test/v1?X-Amz-Signature=" + raw_signature + "'}"
+            )
+
+        with patch("qubit_cli.dump.run_dump", side_effect=leaky_dump):
+            safe = _capture_dump()
+            raw = _capture_dump(redact=False)
+
+        for secret in (raw_key, raw_password, raw_signature):
+            assert secret not in safe
+            assert secret in raw
+
     def test_default_share_includes_redaction_banner(
-        self, hermes_home_with_secret, capsys
+        self, qubit_home_with_secret, capsys
     ):
         """Each upload-bound paste carries the visible redaction banner."""
         from qubit_cli.debug import run_debug_share
@@ -446,7 +577,7 @@ class TestRunDebugShareRedaction:
             )
 
     def test_no_redact_flag_disables_redaction_and_banner(
-        self, hermes_home_with_secret, capsys
+        self, qubit_home_with_secret, capsys
     ):
         """--no-redact preserves original log content and omits the banner."""
         from qubit_cli.debug import run_debug_share
@@ -530,8 +661,8 @@ class TestScheduleAutoDelete:
     were observed in production.
 
     The new implementation is stateless: it records pending deletions to
-    ``~/.hermes/pastes/pending.json`` and lets ``_sweep_expired_pastes``
-    handle the DELETE requests synchronously on the next ``hermes debug``
+    ``~/.qubit/pastes/pending.json`` and lets ``_sweep_expired_pastes``
+    handle the DELETE requests synchronously on the next ``qubit debug``
     invocation.
     """
 
@@ -664,7 +795,7 @@ class TestSweepExpiredPastes:
 class TestBuildDebugShare:
     """The shared core that returns structured paste URLs (not printed text).
 
-    Backs both ``hermes debug share`` (CLI) and ``POST /api/ops/debug-share``
+    Backs both ``qubit debug share`` (CLI) and ``POST /api/ops/debug-share``
     (dashboard). The dashboard renders ``urls`` as real, copyable links, so the
     contract here is the return value, not stdout.
     """
@@ -739,6 +870,28 @@ class TestCollectShareBundle:
         # With redaction it must be scrubbed everywhere.
         assert secret not in "\n".join(redacted.values())
 
+    def test_redaction_masks_url_credentials(self, qubit_home):
+        """Log-time redaction leaves ``?token=`` and ``user:pass@`` in URLs for tool flows;
+        the upload must not carry them."""
+        from qubit_cli.debug import collect_share_bundle
+
+        query_token = "Q7fK2mZp9RtX4vLb8NcW1yHs"
+        password = "Pw7Kq2Lm9Xs4Vb"
+        (qubit_home / "logs" / "agent.log").write_text(
+            "2026-09-29 01:00:00 INFO plugins.web.firecrawl.provider: Firecrawl scraping: "
+            f"https://files.example.com/export.csv?token={query_token}&page=2\n"
+            f"2026-09-29 01:00:01 INFO agent: using proxy http://alice:{password}@10.0.0.5:3128\n"
+        )
+        with patch("qubit_cli.dump.run_dump"):
+            bundle = "\n".join(collect_share_bundle(log_lines=50, redact=True).values())
+
+        assert query_token not in bundle
+        assert password not in bundle
+        # Query credentials are masked in place; strict URL redaction masks the
+        # complete userinfo field while preserving the host and port.
+        assert "export.csv?token=***&page=2" in bundle
+        assert "***:***@10.0.0.5:3128" in bundle
+
 
 
 
@@ -755,7 +908,7 @@ class TestBuildNousBundle:
         # It's gzip — magic bytes.
         assert blob[:2] == b"\x1f\x8b"
         envelope = _json.loads(gzip.decompress(blob).decode())
-        assert envelope["format"] == "hermes-debug-share/1"
+        assert envelope["format"] == "qubit-debug-share/1"
         assert envelope["redacted"] is True
         assert envelope["files"] == files
         assert "created" in envelope
@@ -834,7 +987,7 @@ class TestDebugSlashCommand:
     """`/debug [nous|local]` parsing in the CLI/TUI handler.
 
     The classic CLI and the TUI slash worker both dispatch through
-    ``HermesCLI.process_command`` → ``_handle_debug_command(cmd_original)``,
+    ``QubitCLI.process_command`` → ``_handle_debug_command(cmd_original)``,
     which parses an optional destination word and builds the args namespace
     handed to ``run_debug_share``.
     """
@@ -859,7 +1012,7 @@ class TestDebugSlashCommand:
 
     def test_bare_debug_defaults_to_paste(self):
         c = self._captured("/debug")
-        assert c["qubit"] is False and c["local"] is False
+        assert c["nous"] is False and c["local"] is False
         # The slash command IS the consent action → skip the [y/N] prompt
         # (input() would hang inside prompt_toolkit's event loop).
         assert c["yes"] is True
@@ -867,13 +1020,13 @@ class TestDebugSlashCommand:
 
     def test_word_parsing_is_case_insensitive(self):
         c = self._captured("/debug NOUS")
-        assert c["qubit"] is True
+        assert c["nous"] is True
 
 
 
 
 class TestShareConsentGate:
-    """`hermes debug share` requires explicit consent before uploading.
+    """`qubit debug share` requires explicit consent before uploading.
 
     Uses SimpleNamespace rather than MagicMock so ``args.yes`` is a real
     ``False`` — a MagicMock auto-provides a truthy ``.yes`` and would silently

@@ -58,7 +58,7 @@ def _advance_backup_clock(seconds: float = 1.1) -> None:
 
 
 def _make_qubit_tree(root: Path) -> None:
-    """Create a realistic ~/.hermes directory structure for testing."""
+    """Create a realistic ~/.qubit directory structure for testing."""
     (root / "config.yaml").write_text("model:\n  provider: openrouter\n")
     (root / ".env").write_text("OPENROUTER_API_KEY=sk-test-123\n")
     for db_name in ("memory_store.db", "qubit_state.db"):
@@ -93,11 +93,11 @@ def _make_qubit_tree(root: Path) -> None:
     (root / "profiles" / "coder" / "config.yaml").write_text("model:\n  provider: anthropic\n")
     (root / "profiles" / "coder" / ".env").write_text("ANTHROPIC_API_KEY=sk-ant-123\n")
 
-    # hermes-agent repo (should be EXCLUDED)
-    (root / "hermes-agent").mkdir(exist_ok=True)
-    (root / "hermes-agent" / "run_agent.py").write_text("# big file\n")
-    (root / "hermes-agent" / ".git").mkdir()
-    (root / "hermes-agent" / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+    # qubit repo (should be EXCLUDED)
+    (root / "qubit").mkdir(exist_ok=True)
+    (root / "qubit" / "run_agent.py").write_text("# big file\n")
+    (root / "qubit" / ".git").mkdir()
+    (root / "qubit" / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
 
     # __pycache__ (should be EXCLUDED)
     (root / "plugins").mkdir(exist_ok=True)
@@ -126,8 +126,8 @@ def _symlink_file_or_skip(link: Path, target: Path) -> None:
 class TestShouldExclude:
     def test_excludes_qubit_agent(self):
         from qubit_cli.backup import _should_exclude
-        assert _should_exclude(Path("hermes-agent/run_agent.py"))
-        assert _should_exclude(Path("hermes-agent/.git/HEAD"))
+        assert _should_exclude(Path("qubit/run_agent.py"))
+        assert _should_exclude(Path("qubit/.git/HEAD"))
 
 
     def test_excludes_backups_dir(self):
@@ -216,19 +216,19 @@ class TestIterBackupFiles:
         """Both backup entry points must select the identical file set.
 
         Before the walks were unified, the automatic pre-update path pruned
-        ``hermes-agent`` at ANY depth, silently dropping nested skill dirs
-        like ``skills/autonomous-ai-agents/hermes-agent/`` that the manual
+        ``qubit`` at ANY depth, silently dropping nested skill dirs
+        like ``skills/autonomous-ai-agents/qubit/`` that the manual
         path preserved. One shared iterator makes that drift impossible;
         this test pins the contract."""
         from qubit_cli.backup import _iter_backup_files
 
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".qubit"
         root.mkdir()
         _make_qubit_tree(root)
 
         # The case the old automatic walk got wrong: a nested dir named
-        # hermes-agent holding real skill content.
-        nested = root / "skills" / "autonomous-ai-agents" / "hermes-agent"
+        # qubit holding real skill content.
+        nested = root / "skills" / "autonomous-ai-agents" / "qubit"
         nested.mkdir(parents=True)
         (nested / "SKILL.md").write_text("# nested skill\n")
 
@@ -239,10 +239,10 @@ class TestIterBackupFiles:
         out_path = tmp_path / "out.zip"
         selected = {str(rel) for _, rel in _iter_backup_files(root, out_path)}
 
-        rel_nested = str(Path("skills/autonomous-ai-agents/hermes-agent/SKILL.md"))
+        rel_nested = str(Path("skills/autonomous-ai-agents/qubit/SKILL.md"))
         assert rel_nested in selected
         assert str(Path("models/big.gguf")) not in selected
-        assert not any(s.startswith("hermes-agent") for s in selected)
+        assert not any(s.startswith("qubit") for s in selected)
 
     def test_prunes_browser_use_cli_profiles_at_home_roots_only(self, tmp_path):
         """The Browser Use CLI backend writes ``QUBIT_HOME/browser_profiles/`` (underscore) — a
@@ -250,7 +250,7 @@ class TestIterBackupFiles:
         at the root or under ``profiles/<name>/``; a skill's same-named dir is user data (#117346)."""
         from qubit_cli.backup import _iter_backup_files
 
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".qubit"
         root.mkdir()
         files = {
             "browser_profiles/browser-use-default/Default/Login Data": False,
@@ -268,7 +268,7 @@ class TestIterBackupFiles:
     def test_prunes_regenerable_caches_but_keeps_durable_and_nested(self, tmp_path):
         from qubit_cli.backup import _iter_backup_files
 
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".qubit"
         root.mkdir()
         files = {
             "cache/model_catalog.json": False,
@@ -277,6 +277,8 @@ class TestIterBackupFiles:
             "cache/images/x.png": True,
             "cache/citations/ledger.json": True,
             "profiles/sage/cache/images/y.png": True,
+            "cache/generated/images/x.png": True,
+            "profiles/sage/cache/generated/videos/v.mp4": True,
             "skills/example/cache/state.db": True,
         }
         for rel in files:
@@ -294,7 +296,7 @@ class TestIterBackupFiles:
     def test_skipped_dirs_collected_for_summary(self, tmp_path):
         from qubit_cli.backup import _iter_backup_files
 
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".qubit"
         root.mkdir()
         _make_qubit_tree(root)
         (root / "models").mkdir()
@@ -303,13 +305,13 @@ class TestIterBackupFiles:
         skipped: set = set()
         list(_iter_backup_files(root, tmp_path / "out.zip", skipped))
         assert "models" in skipped
-        assert "hermes-agent" in skipped
+        assert "qubit" in skipped
 
     @pytest.mark.platforms("linux")
     def test_skips_unix_sockets(self, tmp_path, monkeypatch):
         from qubit_cli.backup import _iter_backup_files
 
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".qubit"
         root.mkdir()
         # AF_UNIX paths are capped at ~108 bytes; pytest's tmp_path overflows that under the
         # test runner's deep temp root, so bind by a relative name from inside ``root``.
@@ -333,7 +335,7 @@ class TestBackup:
         """SQLite staging temp files must be created on the output zip's
         filesystem (dir=out_path.parent), NOT the system /tmp default — a
         small tmpfs there silently drops large DBs from the backup (#35376)."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         _make_qubit_tree(qubit_home)
 
@@ -364,7 +366,7 @@ class TestBackup:
     def test_pre_update_db_snapshots_staged_beside_output_zip(self, tmp_path, monkeypatch):
         """The pre-update/pre-migration zip path (_write_full_zip_backup) must
         also stage SQLite snapshots beside its output zip, not in /tmp."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         _make_qubit_tree(qubit_home)
 
@@ -396,7 +398,7 @@ class TestBackup:
 
     def test_skips_symlinked_files(self, tmp_path, monkeypatch):
         """Backup must not dereference symlinks and leak files outside QUBIT_HOME."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         _make_qubit_tree(qubit_home)
         outside = tmp_path / "outside-secret.txt"
@@ -421,7 +423,7 @@ class TestBackup:
         """A quick snapshot left under state-snapshots/ must not be re-shipped
         by the full backup — each snapshot already holds a copy of state.db, so
         nesting them multiplies the archive by (1 + retained snapshots)."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         _make_qubit_tree(qubit_home)
         with sqlite3.connect(qubit_home / "state.db") as conn:
@@ -458,7 +460,7 @@ class TestValidateBackupZip:
                 zf.writestr(name, "dummy")
 
     def test_state_db_passes(self, tmp_path):
-        """A zip containing state.db is accepted as a valid Qubit backup."""
+        """A zip containing state.db is accepted as a valid Hermes backup."""
         from qubit_cli.backup import _validate_backup_zip
         zip_path = tmp_path / "backup.zip"
         self._make_zip(zip_path, ["state.db", "sessions/abc.json"])
@@ -487,7 +489,7 @@ class TestImport:
         (the install-then-import dead-gateway bug)."""
         import qubit_cli.gateway as gateway_mod
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -511,7 +513,7 @@ class TestImport:
         """A live gateway is left alone — no reinstall churn during import."""
         import qubit_cli.gateway as gateway_mod
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -534,7 +536,7 @@ class TestImport:
     def test_import_survives_service_layer_import_failure(self, tmp_path, monkeypatch, capsys):
         """If the service helpers can't even be reached, import still completes
         and prints the manual fallback."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -582,7 +584,7 @@ class TestImport:
         zip_path.write_bytes(bytes(raw))
 
     def _home_for_corrupt_import(self, tmp_path, monkeypatch) -> Path:
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         (qubit_home / "config.yaml").write_text("model: live\n")
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -691,7 +693,7 @@ class TestImport:
         """A member that could not be written is a partial restore: the CLI must not print
         "restored" or exit 0, or a script and the dashboard's "done" badge carry on over it.
         Runtime files the import deliberately keeps are not failures."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         locked = qubit_home / "skills" / "demo"
         locked.mkdir(parents=True)
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -726,7 +728,7 @@ class TestImport:
         assert cmd_import(args) is None
         out = capsys.readouterr().out
         assert "Preserved 1 runtime state file(s)" in out
-        assert "Done. Your Qubit configuration has been restored." in out
+        assert "Done. Your Hermes configuration has been restored." in out
 
 
 
@@ -738,7 +740,7 @@ class TestImport:
         """The skip is matched by basename, so a named profile's
         gateway_state.json (profiles/<name>/gateway_state.json) is preserved
         the same way the root profile's is."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         (qubit_home / "profiles" / "coder").mkdir(parents=True)
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -768,7 +770,7 @@ class TestImport:
         """gateway.pid / cron.pid / gateway.lock / processes.json from a backup
         reference the source machine's process namespace and must never be
         written over the target's."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -803,7 +805,7 @@ class TestImport:
     @pytest.mark.skipif(os.name != "posix", reason="POSIX file permissions only")
     def test_restores_secret_files_with_0600_perms(self, tmp_path, monkeypatch):
         """Secret files must end up at 0600 after restore (zipfile drops mode bits)."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -835,7 +837,7 @@ class TestRoundTrip:
     def test_backup_then_import(self, tmp_path, monkeypatch):
         """Full round-trip: backup -> import to a new location -> verify."""
         # Source
-        src_home = tmp_path / "source" / ".hermes"
+        src_home = tmp_path / "source" / ".qubit"
         src_home.mkdir(parents=True)
         _make_qubit_tree(src_home)
 
@@ -850,7 +852,7 @@ class TestRoundTrip:
         assert out_zip.exists()
 
         # Import into a different location
-        dst_home = tmp_path / "dest" / ".hermes"
+        dst_home = tmp_path / "dest" / ".qubit"
         dst_home.mkdir(parents=True)
         monkeypatch.setenv("QUBIT_HOME", str(dst_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "dest")
@@ -865,8 +867,8 @@ class TestRoundTrip:
         assert (dst_home / "sessions" / "abc123.json").exists()
         assert (dst_home / "logs" / "agent.log").exists()
 
-        # hermes-agent should NOT be present
-        assert not (dst_home / "hermes-agent").exists()
+        # qubit should NOT be present
+        assert not (dst_home / "qubit").exists()
         # __pycache__ should NOT be present
         assert not (dst_home / "plugins" / "__pycache__").exists()
         # PID files should NOT be present
@@ -903,8 +905,8 @@ class TestValidation:
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as zf:
             # Only directory entries (trailing slash)
-            zf.writestr(".hermes/", "")
-            zf.writestr(".hermes/skills/", "")
+            zf.writestr(".qubit/", "")
+            zf.writestr(".qubit/skills/", "")
         buf.seek(0)
         with zipfile.ZipFile(buf, "r") as zf:
             assert _detect_prefix(zf) == ""
@@ -916,10 +918,31 @@ class TestValidation:
 
 class TestBackupEdgeCases:
 
+    def test_negative_keep_is_rejected_by_backup_parser_and_snapshot_prune(self, capsys):
+        """A negative keep slices away the NEWEST archives/snapshots, so both the
+        ``backup --keep`` parser and ``/snapshot prune N`` refuse it."""
+        import argparse
+        from qubit_cli.cli_commands_mixin import CLICommandsMixin
+        from qubit_cli.subcommands.backup import build_backup_parser
+
+        parser = argparse.ArgumentParser()
+        build_backup_parser(parser.add_subparsers(dest="command"), cmd_backup=lambda args: None)
+        for bad in ("-1", "x"):
+            with pytest.raises(SystemExit) as exc:
+                parser.parse_args(["backup", "--keep", bad])
+            assert exc.value.code == 2
+        assert [parser.parse_args(["backup", *a]).keep for a in (["--keep", "0"], ["-k", "1"], [])] == [0, 1, 3]
+
+        with patch("qubit_cli.backup.prune_quick_snapshots") as prune:
+            CLICommandsMixin._snapshot_prune(object(), ["/snapshot", "prune", "-1"])
+            prune.assert_not_called()
+            CLICommandsMixin._snapshot_prune(object(), ["/snapshot", "prune", "2"])
+            prune.assert_called_once_with(keep=2)
+
     def test_incomplete_archive_is_kept_but_reported_as_failure(self, tmp_path, monkeypatch, capsys):
         """A file that cannot be read is skipped, the zip still lands, and the CLI exits 1: a
         cron/systemd timer must never see a partial archive as success (#101096)."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         _make_qubit_tree(qubit_home)
         unreadable = qubit_home / "skills" / "locked.md"
@@ -949,7 +972,7 @@ class TestBackupEdgeCases:
 
     def test_empty_qubit_home(self, tmp_path, monkeypatch):
         """Backup handles empty qubit home (no files to back up)."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         # Only excluded dirs, no actual files
         (qubit_home / "__pycache__").mkdir()
@@ -969,7 +992,7 @@ class TestBackupEdgeCases:
 
     def test_pre1980_timestamp_skipped(self, tmp_path, monkeypatch):
         """Backup skips files with pre-1980 timestamps (ZIP limitation)."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         (qubit_home / "config.yaml").write_text("model: test\n")
 
@@ -1006,7 +1029,7 @@ class TestImportEdgeCases:
 
     def test_eof_during_confirmation(self, tmp_path, monkeypatch):
         """Import handles EOFError during confirmation prompt."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         (qubit_home / "config.yaml").write_text("existing\n")
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -1084,7 +1107,7 @@ class TestImportAtomicWrites:
 
     def test_failed_member_leaves_existing_file_intact(self, tmp_path, monkeypatch):
         """A dying member must not destroy the file it was replacing."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         original = "model: original\napi_key: keep-me\n"
         (qubit_home / "config.yaml").write_text(original)
@@ -1107,7 +1130,7 @@ class TestImportAtomicWrites:
         """Same invariant on the `_external/` branch, which writes outside QUBIT_HOME."""
         dst_home = tmp_path / "dst"
         dst_home.mkdir()
-        qubit_home = dst_home / ".hermes"
+        qubit_home = dst_home / ".qubit"
         qubit_home.mkdir()
         honcho = dst_home / ".honcho"
         honcho.mkdir()
@@ -1138,7 +1161,7 @@ class TestImportAtomicWrites:
         detach dotfiles-managed deployments (GitHub #16743). ``atomic_replace``
         resolves the link first.
         """
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         store = qubit_home / "store"
         store.mkdir()
@@ -1164,7 +1187,7 @@ class TestImportAtomicWrites:
         """Same guard on the `_external/` branch — the realistic dotfiles case."""
         dst_home = tmp_path / "dst"
         dst_home.mkdir()
-        qubit_home = dst_home / ".hermes"
+        qubit_home = dst_home / ".qubit"
         qubit_home.mkdir()
         dotfiles = dst_home / "dotfiles"
         dotfiles.mkdir()
@@ -1198,7 +1221,7 @@ class TestImportAtomicWrites:
         replaced has to survive the publish, or Docker/NAS installs that rely
         on broader permissions break on restore.
         """
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         target = qubit_home / "config.yaml"
         target.write_text("model: original\n")
@@ -1224,7 +1247,7 @@ class TestImportAtomicWrites:
         QUBIT_HOME would hand every restored file to root. The uid/gid is
         forced so the assertion does not require running as root.
         """
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         target = qubit_home / "config.yaml"
         target.write_text("model: original\n")
@@ -1254,7 +1277,7 @@ class TestImportAtomicWrites:
 
     def test_mode_is_applied_before_the_replace(self, tmp_path, monkeypatch):
         """Publish the correct native permission bits with no permissive window."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         target = qubit_home / "config.yaml"
         target.write_text("model: original\n")
@@ -1303,7 +1326,7 @@ class TestImportAtomicWrites:
         discards exactly the bits at issue, so this failure is invisible to
         them.
         """
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         target = qubit_home / "helper.sh"
         target.write_text("#!/bin/sh\necho original\n")
@@ -1365,7 +1388,7 @@ class TestProfileRestoration:
 
     def test_import_skips_profile_dirs_without_config(self, tmp_path, monkeypatch):
         """Import doesn't create wrappers for profile dirs without config."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -1481,7 +1504,7 @@ class TestQuickSnapshot:
     @pytest.fixture
     def qubit_home(self, tmp_path):
         """Create a fake QUBIT_HOME with critical state files."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         (home / "config.yaml").write_text("model:\n  provider: openrouter\n")
         (home / ".env").write_text("OPENROUTER_API_KEY=test-key-123\n")
@@ -1692,7 +1715,7 @@ class TestQuickSnapshotProjectsKanban:
 
     @pytest.fixture
     def qubit_home(self, tmp_path):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         # Minimal critical file so the snapshot is non-empty.
         (home / "config.yaml").write_text("model:\n  provider: openrouter\n")
@@ -1778,6 +1801,77 @@ class TestQuickSnapshotProjectsKanban:
         assert rows == [("w1", "ship")]
 
 
+def _fail_zip_write_after(monkeypatch, member: str, byte_count: int = 120_000) -> None:
+    """Make ZipFile.write finalize a large partial member, then surface a source-read failure."""
+    real_write = zipfile.ZipFile.write
+
+    def flaky_write(self, filename, arcname=None, compress_type=None, compresslevel=None):
+        if str(arcname) == member:
+            with Path(filename).open("rb") as src, self.open(str(arcname), "w") as dst:
+                dst.write(src.read(byte_count))
+            raise OSError(5, "simulated source read failure")
+        return real_write(self, filename, arcname, compress_type, compresslevel)
+
+    monkeypatch.setattr(zipfile.ZipFile, "write", flaky_write)
+
+
+class TestFailedZipMemberRecovery:
+    def test_automatic_backup_omits_crc_valid_partial_member(self, tmp_path, monkeypatch):
+        qubit_home = tmp_path / ".qubit"
+        qubit_home.mkdir()
+        (qubit_home / "config.yaml").write_text("model: test\n")
+        (qubit_home / "flaky.bin").write_bytes(os.urandom(300_000))
+        archive = tmp_path / "automatic.zip"
+        _fail_zip_write_after(monkeypatch, "flaky.bin")
+
+        from qubit_cli.backup import _write_full_zip_backup
+
+        assert _write_full_zip_backup(archive, qubit_home) is None
+        assert not archive.exists()
+        salvage = tmp_path / "automatic.incomplete.zip"
+        # A streaming reader scans local headers, so the dropped member's bytes must be gone too.
+        assert b"flaky.bin" not in salvage.read_bytes()
+        with zipfile.ZipFile(salvage) as zf:
+            assert "flaky.bin" not in zf.namelist()
+            assert zf.read("config.yaml") == b"model: test\n"
+            assert zf.testzip() is None
+
+    def test_incomplete_pre_update_backup_does_not_rotate_last_complete(self, tmp_path, monkeypatch):
+        qubit_home = tmp_path / ".qubit"
+        qubit_home.mkdir()
+        (qubit_home / "config.yaml").write_text("model: test\n")
+
+        from qubit_cli.backup import create_pre_update_backup
+
+        good = create_pre_update_backup(qubit_home=qubit_home, keep=2)
+        assert good is not None and good.exists()
+
+        real_write = zipfile.ZipFile.write
+        (qubit_home / "flaky.bin").write_bytes(os.urandom(300_000))
+        _fail_zip_write_after(monkeypatch, "flaky.bin")
+        for _ in range(2):
+            _advance_backup_clock()
+            assert create_pre_update_backup(qubit_home=qubit_home, keep=2) is None
+
+        assert good.exists(), "an incomplete generation rotated out the last complete backup"
+        backup_dir = qubit_home / "backups"
+        salvages = list(backup_dir.glob("pre-update-*.incomplete.zip"))
+        assert len(salvages) == 1, "repeated incomplete runs must not pile up"
+        with zipfile.ZipFile(salvages[0]) as zf:
+            assert "flaky.bin" not in zf.namelist()
+            assert zf.read("config.yaml") == b"model: test\n"
+            assert zf.testzip() is None
+
+        # Salvage archives must not count toward retention on the next complete run.
+        monkeypatch.setattr(zipfile.ZipFile, "write", real_write)
+        (qubit_home / "flaky.bin").unlink()
+        _advance_backup_clock()
+        newest = create_pre_update_backup(qubit_home=qubit_home, keep=2)
+        assert newest is not None and newest.exists()
+        assert good.exists(), "a complete run pruned complete backups in favour of salvage"
+        assert len(list(backup_dir.glob("pre-update-*.incomplete.zip"))) == 1
+
+
 class TestPreUpdateBackup:
     """Tests for create_pre_update_backup — the auto-backup ``qubit update``
     runs before touching anything."""
@@ -1785,7 +1879,7 @@ class TestPreUpdateBackup:
 
     @pytest.fixture
     def qubit_home(self, tmp_path):
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".qubit"
         root.mkdir()
         _make_qubit_tree(root)
         return root
@@ -1805,8 +1899,8 @@ class TestPreUpdateBackup:
         assert "sessions/abc123.json" in names
         assert "skills/my-skill/SKILL.md" in names
         assert "profiles/coder/config.yaml" in names
-        # hermes-agent repo excluded
-        assert not any(n.startswith("hermes-agent/") for n in names)
+        # qubit repo excluded
+        assert not any(n.startswith("qubit/") for n in names)
         # __pycache__ excluded
         assert not any("__pycache__" in n for n in names)
         # pid files excluded
@@ -1885,7 +1979,7 @@ class TestRunPreUpdateBackup:
 
     @pytest.fixture
     def qubit_home(self, tmp_path, monkeypatch):
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".qubit"
         root.mkdir()
         _make_qubit_tree(root)
         # Point QUBIT_HOME at the temp dir so config + backup paths resolve here
@@ -1948,18 +2042,18 @@ class TestRunPreUpdateBackup:
 
 class TestPreMigrationBackup:
     """Tests for create_pre_migration_backup — the auto-backup
-    ``qubit claw migrate`` runs before mutating ~/.hermes/."""
+    ``qubit claw migrate`` runs before mutating ~/.qubit/."""
 
     @pytest.fixture
     def qubit_home(self, tmp_path):
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".qubit"
         root.mkdir()
         _make_qubit_tree(root)
         return root
 
 
     def test_restorable_with_qubit_import(self, qubit_home, tmp_path):
-        """The zip produced by pre-migration backup must be a valid Qubit
+        """The zip produced by pre-migration backup must be a valid Hermes
         backup — `qubit import` should accept it."""
         from qubit_cli.backup import create_pre_migration_backup, _validate_backup_zip
         out = create_pre_migration_backup(qubit_home=qubit_home)
@@ -2006,7 +2100,7 @@ class TestRestoreCronJobsIfEmptied:
 
     def test_restores_when_emptied_after_migration(self, tmp_path):
         from qubit_cli.backup import restore_cron_jobs_if_emptied
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         jobs_path = qubit_home / "cron" / "jobs.json"
         # Pre-update: 3 real jobs.
         self._seed_jobs(jobs_path, [{"id": "a"}, {"id": "b"}, {"id": "c"}])
@@ -2031,7 +2125,7 @@ class TestRestoreCronJobsIfEmptied:
         """Desktop scheduler overwrites jobs.json with its own small set,
         losing tool-created crons while keeping desktop-tracked ones."""
         from qubit_cli.backup import restore_cron_jobs_if_emptied
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         jobs_path = qubit_home / "cron" / "jobs.json"
         # Pre-update: 19 jobs (18 tool-created + 1 desktop watchdog).
         self._seed_jobs(
@@ -2052,6 +2146,162 @@ class TestRestoreCronJobsIfEmptied:
         # The live file now has all 19 jobs back.
         restored = json.loads(jobs_path.read_text())
         assert len(restored["jobs"]) == 19
+
+
+# ---------------------------------------------------------------------------
+# Cron agent-job prompt field degradation across update (issue #82990)
+# ---------------------------------------------------------------------------
+
+class TestRestoreCronPromptFieldsIfDegraded:
+    """A writer in the update's mutation window replaced every agent-job prompt
+    with the job's own name while the count stayed identical — the count-based
+    net passed it undetected. `restore_cron_prompt_fields_if_degraded` is the
+    field-level net."""
+
+    @staticmethod
+    def _seed_jobs(path: Path, jobs):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"jobs": jobs}))
+
+    def _make_snapshot(self, qubit_home: Path, label="pre-update"):
+        from qubit_cli.backup import create_quick_snapshot
+        return create_quick_snapshot(label=label, qubit_home=qubit_home, keep=5)
+
+    def test_restores_prompts_when_count_unchanged_but_clobbered(self, tmp_path):
+        """The reported incident: 6 jobs before, 6 after, every prompt == name."""
+        from qubit_cli.backup import restore_cron_prompt_fields_if_degraded
+        qubit_home = tmp_path / ".qubit"
+        jobs_path = qubit_home / "cron" / "jobs.json"
+        self._seed_jobs(jobs_path, [
+            {"id": f"job-{i}", "name": f"Morning brief {i}",
+             "prompt": f"Read the news and write brief {i}."}
+            for i in range(6)
+        ])
+        snap_id = self._make_snapshot(qubit_home)
+        assert snap_id
+
+        # The mutation window clobbers prompts to the name; count unchanged.
+        self._seed_jobs(jobs_path, [
+            {"id": f"job-{i}", "name": f"Morning brief {i}",
+             "prompt": f"Morning brief {i}"}
+            for i in range(6)
+        ])
+
+        result = restore_cron_prompt_fields_if_degraded(snap_id, qubit_home=qubit_home)
+        assert result is not None
+        assert result["restored"] is True
+        assert result["prompts"] == 6
+        assert result["snapshot_id"] == snap_id
+
+        restored = json.loads(jobs_path.read_text())
+        for i, job in enumerate(restored["jobs"]):
+            assert job["prompt"] == f"Read the news and write brief {i}."
+            # Only the prompt was touched — name still the live one.
+            assert job["name"] == f"Morning brief {i}"
+
+    def test_blank_prompt_is_restored_too(self, tmp_path):
+        """Missing/blank prompt on a live agent job is equally unusable."""
+        from qubit_cli.backup import restore_cron_prompt_fields_if_degraded
+        qubit_home = tmp_path / ".qubit"
+        jobs_path = qubit_home / "cron" / "jobs.json"
+        self._seed_jobs(jobs_path, [{"id": "a", "name": "Cleanup", "prompt": "Clean the tmp dir."}])
+        snap_id = self._make_snapshot(qubit_home)
+        assert snap_id
+
+        self._seed_jobs(jobs_path, [{"id": "a", "name": "Cleanup", "prompt": ""}])
+
+        result = restore_cron_prompt_fields_if_degraded(snap_id, qubit_home=qubit_home)
+        assert result is not None
+        assert result["prompts"] == 1
+        assert json.loads(jobs_path.read_text())["jobs"][0]["prompt"] == "Clean the tmp dir."
+
+    def test_no_agent_jobs_are_untouched(self, tmp_path):
+        """Script jobs have no prompt — never restored, never stomped."""
+        from qubit_cli.backup import restore_cron_prompt_fields_if_degraded
+        qubit_home = tmp_path / ".qubit"
+        jobs_path = qubit_home / "cron" / "jobs.json"
+        self._seed_jobs(jobs_path, [
+            {"id": "agent", "name": "Brief", "prompt": "Write the brief."},
+            {"id": "script", "name": "Backup", "no_agent": True, "script": "echo hi", "prompt": "Backup"},
+        ])
+        snap_id = self._make_snapshot(qubit_home)
+        assert snap_id
+
+        self._seed_jobs(jobs_path, [
+            {"id": "agent", "name": "Brief", "prompt": "Brief"},
+            {"id": "script", "name": "Backup", "no_agent": True, "script": "echo hi", "prompt": "Backup"},
+        ])
+
+        result = restore_cron_prompt_fields_if_degraded(snap_id, qubit_home=qubit_home)
+        assert result is not None
+        assert result["prompts"] == 1
+        assert result["job_ids"] == ["agent"]
+        jobs = json.loads(jobs_path.read_text())["jobs"]
+        assert jobs[0]["prompt"] == "Write the brief."
+        assert jobs[1]["prompt"] == "Backup"  # untouched
+
+    def test_a_legitimate_user_edit_is_not_stomped(self, tmp_path):
+        """Only prompt==name or blank restores — a genuinely different prompt
+        is the user's edit during the window, not degradation."""
+        from qubit_cli.backup import restore_cron_prompt_fields_if_degraded
+        qubit_home = tmp_path / ".qubit"
+        jobs_path = qubit_home / "cron" / "jobs.json"
+        self._seed_jobs(jobs_path, [{"id": "a", "name": "Old", "prompt": "Old prompt text."}])
+        snap_id = self._make_snapshot(qubit_home)
+        assert snap_id
+
+        self._seed_jobs(jobs_path, [{"id": "a", "name": "New name", "prompt": "Deliberately rewritten prompt."}])
+
+        result = restore_cron_prompt_fields_if_degraded(snap_id, qubit_home=qubit_home)
+        assert result is None
+        assert json.loads(jobs_path.read_text())["jobs"][0]["prompt"] == "Deliberately rewritten prompt."
+
+    def test_a_legit_prompt_equal_to_name_stays(self, tmp_path):
+        """A user may legitimately set prompt == name; a blank SNAPSHOT prompt
+        means the snapshot has nothing better — restore nothing."""
+        from qubit_cli.backup import restore_cron_prompt_fields_if_degraded
+        qubit_home = tmp_path / ".qubit"
+        jobs_path = qubit_home / "cron" / "jobs.json"
+        # Snapshot job had a blank prompt (hand-edited oddity).
+        self._seed_jobs(jobs_path, [{"id": "a", "name": "Ping", "prompt": ""}])
+        snap_id = self._make_snapshot(qubit_home)
+        assert snap_id
+
+        # Live prompt collapsed to the name — but the snapshot has nothing to give back.
+        self._seed_jobs(jobs_path, [{"id": "a", "name": "Ping", "prompt": "Ping"}])
+
+        result = restore_cron_prompt_fields_if_degraded(snap_id, qubit_home=qubit_home)
+        assert result is None
+
+    def test_unknown_job_ids_are_left_alone(self, tmp_path):
+        """Jobs the snapshot does not know are new since the snapshot — theirs."""
+        from qubit_cli.backup import restore_cron_prompt_fields_if_degraded
+        qubit_home = tmp_path / ".qubit"
+        jobs_path = qubit_home / "cron" / "jobs.json"
+        self._seed_jobs(jobs_path, [{"id": "a", "name": "A", "prompt": "A prompt."}])
+        snap_id = self._make_snapshot(qubit_home)
+        assert snap_id
+
+        self._seed_jobs(jobs_path, [
+            {"id": "a", "name": "A", "prompt": "A prompt."},
+            {"id": "new", "name": "New", "prompt": "New"},  # created during the window
+        ])
+
+        result = restore_cron_prompt_fields_if_degraded(snap_id, qubit_home=qubit_home)
+        assert result is None
+
+    def test_healthy_file_is_untouched(self, tmp_path):
+        from qubit_cli.backup import restore_cron_prompt_fields_if_degraded
+        qubit_home = tmp_path / ".qubit"
+        jobs_path = qubit_home / "cron" / "jobs.json"
+        self._seed_jobs(jobs_path, [{"id": "a", "name": "A", "prompt": "A prompt."}])
+        snap_id = self._make_snapshot(qubit_home)
+        assert snap_id
+        before = jobs_path.read_text()
+
+        result = restore_cron_prompt_fields_if_degraded(snap_id, qubit_home=qubit_home)
+        assert result is None
+        assert jobs_path.read_text() == before
 
 
 # ---------------------------------------------------------------------------
@@ -2094,7 +2344,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         import qubit_yaml as yaml
         from qubit_cli.backup import restore_config_model_settings_if_rewritten
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         cfg = self._seed(qubit_home)
         snap_id = self._make_snapshot(qubit_home)
         assert snap_id
@@ -2128,7 +2378,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
     def test_noop_when_config_untouched(self, tmp_path):
         from qubit_cli.backup import restore_config_model_settings_if_rewritten
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         cfg = self._seed(qubit_home)
         snap_id = self._make_snapshot(qubit_home)
         before = cfg.read_text(encoding="utf-8")
@@ -2145,7 +2395,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         import qubit_yaml as yaml
         from qubit_cli.backup import restore_config_model_settings_if_rewritten
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         cfg = self._seed(qubit_home)
         snap_id = self._make_snapshot(qubit_home)
 
@@ -2170,7 +2420,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         if the update writes those keys fresh — nothing of the user's was lost."""
         from qubit_cli.backup import restore_config_model_settings_if_rewritten
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir(parents=True)
         cfg = qubit_home / "config.yaml"
         cfg.write_text("_config_version: 39\nagent: {}\n", encoding="utf-8")
@@ -2189,7 +2439,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         the safety net leaves it alone (mirrors the cron net's posture)."""
         from qubit_cli.backup import restore_config_model_settings_if_rewritten
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         cfg = self._seed(qubit_home)
         snap_id = self._make_snapshot(qubit_home)
 
@@ -2204,7 +2454,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         from qubit_cli.backup import restore_config_model_settings_if_rewritten
 
         assert restore_config_model_settings_if_rewritten(
-            "", qubit_home=tmp_path / ".hermes"
+            "", qubit_home=tmp_path / ".qubit"
         ) is None
 
 
@@ -2230,7 +2480,7 @@ class TestMemoryProviderExternalPaths:
     def test_backup_skips_external_paths_outside_home(self, tmp_path, monkeypatch):
         """A declared path outside the home dir is not portable and must be
         skipped, never archived."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         self._make_min_tree(qubit_home)
         outside = tmp_path.parent / "outside-home-secret"
         outside.mkdir(exist_ok=True)
@@ -2259,7 +2509,7 @@ class TestMemoryProviderExternalPaths:
         and credential-shaped files get 0600."""
         dst_home = tmp_path / "dst"
         dst_home.mkdir()
-        qubit_home = dst_home / ".hermes"
+        qubit_home = dst_home / ".qubit"
         qubit_home.mkdir()
 
         zip_path = tmp_path / "backup.zip"
@@ -2289,7 +2539,7 @@ class TestMemoryProviderExternalPaths:
 # ---------------------------------------------------------------------------
 
 
-class TestImportHonorsHermesHomeOverride:
+class TestImportHonorsQubitHomeOverride:
     """`qubit import` must restore into the home the command runs under.
 
     Resolving the target through get_default_qubit_root() maps a profile
@@ -2314,7 +2564,7 @@ class TestImportHonorsHermesHomeOverride:
     def test_import_targets_named_profile_home(self, tmp_path, monkeypatch):
         """QUBIT_HOME=<root>/profiles/<name> must restore INTO the profile,
         not into <root> (which would clobber the live root config)."""
-        root = tmp_path / "hermes-root"
+        root = tmp_path / "qubit-root"
         profile = root / "profiles" / "coder"
         profile.mkdir(parents=True)
         # Live root config that must survive untouched.
@@ -2420,7 +2670,7 @@ class TestImportHonorsHermesHomeOverride:
 # ---------------------------------------------------------------------------
 
 def _write_session_db(path: Path, sessions: int, messages_per_session: int) -> None:
-    """Create a minimal Qubit-shaped session database at *path*."""
+    """Create a minimal Hermes-shaped session database at *path*."""
     conn = sqlite3.connect(str(path))
     try:
         conn.execute(
@@ -2447,7 +2697,7 @@ def _write_session_db(path: Path, sessions: int, messages_per_session: int) -> N
 
 
 class TestImportLiveSessionDatabase:
-    """`qubit import` must not swap the inode of a database Qubit holds open.
+    """`qubit import` must not swap the inode of a database Hermes holds open.
 
     Publishing state.db with a rename leaves any live gateway/dashboard/WebUI
     connection reading and writing the unlinked inode, so its sessions vanish
@@ -2459,7 +2709,7 @@ class TestImportLiveSessionDatabase:
             zf.write(db_path, "state.db")
 
     def _prepare(self, tmp_path, monkeypatch, live=(3, 4), backup=(2, 2)):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -2544,7 +2794,7 @@ class TestImportLiveSessionDatabase:
         """A fresh install has no inode to preserve; the member still lands."""
         from qubit_cli.backup import run_import
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -2575,17 +2825,52 @@ def test_run_backup_prunes_older_default_named_zips_but_not_others(tmp_path, mon
     from argparse import Namespace
     from qubit_cli import backup as backup_mod
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
     (home / "config.yaml").write_text("model: x\n")
     monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     for i in range(4):
-        (tmp_path / f"hermes-backup-2026-01-0{i + 1}-000000.zip").write_bytes(b"old")
+        (tmp_path / f"qubit-backup-2026-01-0{i + 1}-000000.zip").write_bytes(b"old")
     (tmp_path / "my-archive.zip").write_bytes(b"mine")
 
     backup_mod.run_backup(Namespace(output=None, keep=2))
 
-    kept = sorted(p.name for p in tmp_path.glob("hermes-backup-*.zip"))
-    assert len(kept) == 2 and kept[0] == "hermes-backup-2026-01-04-000000.zip"
+    kept = sorted(p.name for p in tmp_path.glob("qubit-backup-*.zip"))
+    assert len(kept) == 2 and kept[0] == "qubit-backup-2026-01-04-000000.zip"
     assert (tmp_path / "my-archive.zip").exists()
+
+
+def test_import_restores_the_session_store_with_its_message_uids(tmp_path, monkeypatch):
+    """A backup ships state.db as a SQLite snapshot and an import puts it back byte-for-byte: the durable
+    message ids come back with the rows."""
+    from qubit_state import SessionDB
+
+    qubit_home = tmp_path / ".qubit"
+    qubit_home.mkdir()
+    _make_qubit_tree(qubit_home)
+    db = SessionDB(db_path=qubit_home / "state.db")
+    try:
+        db.create_session("s", "cli", model="m")
+        db.append_message(session_id="s", role="user", content="q")
+        db.append_message(session_id="s", role="assistant", content="a")
+        uids = [m["message_uid"] for m in db.get_messages_as_conversation("s")]
+    finally:
+        db.close()
+    assert len(uids) == 2 and all(len(u) == 32 for u in uids)
+
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    from qubit_cli.backup import run_backup, run_import
+
+    out_zip = tmp_path / "backup.zip"
+    run_backup(Namespace(output=str(out_zip)))
+    for name in ("state.db", "state.db-wal", "state.db-shm"):
+        (qubit_home / name).unlink(missing_ok=True)
+    assert run_import(Namespace(zipfile=str(out_zip), force=True)) is None
+
+    restored = SessionDB(db_path=qubit_home / "state.db")
+    try:
+        assert [m["message_uid"] for m in restored.get_messages_as_conversation("s")] == uids
+    finally:
+        restored.close()

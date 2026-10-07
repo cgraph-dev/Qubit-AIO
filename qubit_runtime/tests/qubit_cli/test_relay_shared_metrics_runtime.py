@@ -215,10 +215,21 @@ class _Relay:
         self.events.append(("subscribers.flush",))
 
 
+_EXPORT_WORKER = "qubit-shared-metrics-flush"
+
+
+def _join_export_workers() -> None:
+    """Task/session exports run on a background worker; wait for it before reading the store."""
+    while workers := [t for t in threading.enumerate() if t.name == _EXPORT_WORKER]:
+        for worker in workers:
+            worker.join(timeout=10)
+            assert not worker.is_alive()
+
+
 @pytest.fixture
 def direct_runtime(tmp_path, monkeypatch):
     fake = _Relay()
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "hermes-home"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qubit-home"))
     monkeypatch.setattr(relay_runtime, "_load_nemo_relay", lambda: fake)
     monkeypatch.setattr(
         "qubit_cli.config.read_raw_config_readonly",
@@ -241,7 +252,7 @@ def real_binding_runtime(tmp_path, monkeypatch):
     relay = pytest.importorskip("nemo_relay")
     if getattr(relay, "_native", None) is None:
         pytest.skip("NeMo Relay native binding is unavailable on this platform")
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "hermes-home"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qubit-home"))
     monkeypatch.setattr(
         "qubit_cli.config.read_raw_config_readonly",
         lambda: {"telemetry": {"shared_metrics": {"enabled": True}}},
@@ -338,6 +349,10 @@ def test_direct_runtime_records_without_enabling_a_plugin(direct_runtime, tmp_pa
         interrupted=False,
         turn_exit_reason="text_response(stop)",
     )
+    # The daily package is cut by the first export that runs. Let the one the task
+    # close scheduled finish before the session closes, so the package holds exactly the
+    # task's metrics instead of racing the session-summary rows.
+    _join_export_workers()
     lifecycle.finalize_session(session_id=base["session_id"])
 
     starts = [event for event in direct_runtime.events if event[0] == "llm.call"]
@@ -351,38 +366,46 @@ def test_direct_runtime_records_without_enabling_a_plugin(direct_runtime, tmp_pa
     ]
     assert len(scope_starts) == 2
     assert scope_starts[0][2] == direct_runtime.ScopeType.Agent
-    assert scope_starts[1][1] == "hermes.task_run"
+    assert scope_starts[1][1] == "qubit.task_run"
     assert scope_starts[1][2] == direct_runtime.ScopeType.Function
     assert scope_starts[1][3]["handle"][1] == relay_runtime.SESSION_SCOPE
     assert scope_starts[1][3]["input"] == {
         "entrypoint": "interactive",
         "execution_surface": "cli",
+        "platform": "none",
     }
     assert len(starts) == 1
     assert len(ends) == 1
     assert len(tool_starts) == 1
     assert len(tool_ends) == 1
-    assert tool_starts[0][1] == "hermes.tool_call"
+    assert tool_starts[0][1] == "qubit.tool_call"
     assert tool_starts[0][2] == {}
     assert tool_ends[0][2] == {
         "approval_outcome": "approved",
+        "error_class": "none",
         "latency_bucket": "250ms_to_500ms",
         "outcome": "success",
         "retry_count_bucket": "0",
         "tool_category": "terminal",
+        "tool_name": "terminal",
     }
     assert starts[0][2] == {}
     assert starts[0][3]["model_name"] == "unknown"
     active_marks = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.event" and event[1] == "hermes.client.active"
+        if event[0] == "scope.event" and event[1] == "qubit.client.active"
     ]
     assert len(active_marks) == 2
     assert all(mark[2]["data"] == {} for mark in active_marks)
     assert ends[0][2] == {
+        "call_role": "primary",
+        # The call recovered from an unclassified provider error before succeeding.
+        "error_class": "unknown",
         "model": "claude-sonnet",
+        "outcome": "success",
         "provider": "anthropic",
+        "ttft_bucket": "unknown",
     }
     serialized_events = json.dumps(direct_runtime.events)
     assert "sensitive-prompt" not in serialized_events
@@ -395,44 +418,60 @@ def test_direct_runtime_records_without_enabling_a_plugin(direct_runtime, tmp_pa
     assert "gpt-sensitive-model-id" not in serialized_events
     assert plugins.get_plugin_manager().list_plugins() == []
 
-    root = tmp_path / "hermes-home" / "telemetry" / "shared_metrics"
+    root = tmp_path / "qubit-home" / "telemetry" / "shared_metrics"
     packages = list((root / "outbox").glob("*.json"))
     assert len(packages) == 1
     package = json.loads(packages[0].read_text(encoding="utf-8"))
     metrics = {metric["name"]: metric for metric in package["metrics"]}
     assert set(metrics) == {
-        "hermes.client.active",
-        "hermes.model_route.count",
-        "hermes.task_run.finished",
-        "hermes.task_run.started",
-        "hermes.tool_approval.count",
-        "hermes.tool_call.count",
+        "qubit.client.active",
+        "qubit.install.milestone",
+        "qubit.install.snapshot",
+        "qubit.model_route.count",
+        "qubit.task_cost.count",
+        "qubit.task_run.duration",
+        "qubit.task_run.finished",
+        "qubit.task_run.started",
+        "qubit.tool.usage.count",
+        "qubit.tool_approval.count",
+        "qubit.tool_call.count",
+        "qubit.tool_call.latency",
     }
-    assert metrics["hermes.client.active"] == {
-        "name": "hermes.client.active",
+    assert metrics["qubit.tool.usage.count"]["dimensions"] == {
+        "error_class": "none", "outcome": "success", "tool_name": "terminal",
+    }
+    assert metrics["qubit.install.snapshot"]["value"] == 1
+    assert metrics["qubit.client.active"] == {
+        "name": "qubit.client.active",
         "type": "counter",
         "dimensions": {},
         "value": 1,
     }
-    assert metrics["hermes.model_route.count"]["dimensions"] == {
+    assert metrics["qubit.model_route.count"]["dimensions"] == {
+        "call_role": "primary",
+        # The call recovered from an unclassified provider error before succeeding.
+        "error_class": "unknown",
         "model": "claude-sonnet",
+        "outcome": "success",
         "provider": "anthropic",
+        "ttft_bucket": "unknown",
     }
-    assert metrics["hermes.model_route.count"]["value"] == 1
-    assert metrics["hermes.tool_call.count"] == {
-        "name": "hermes.tool_call.count",
+    assert metrics["qubit.model_route.count"]["value"] == 1
+    assert metrics["qubit.tool_call.count"] == {
+        "name": "qubit.tool_call.count",
         "type": "counter",
         "dimensions": {
             "approval_outcome": "approved",
-            "latency_bucket": "250ms_to_500ms",
             "outcome": "success",
-            "retry_count_bucket": "0",
             "tool_category": "terminal",
         },
         "value": 1,
     }
-    assert metrics["hermes.tool_approval.count"] == {
-        "name": "hermes.tool_approval.count",
+    assert metrics["qubit.tool_call.latency"]["dimensions"] == {
+        "latency_bucket": "250ms_to_500ms", "retry_count_bucket": "0", "tool_category": "terminal",
+    }
+    assert metrics["qubit.tool_approval.count"] == {
+        "name": "qubit.tool_approval.count",
         "type": "counter",
         "dimensions": {
             "attribution": "tool_call",
@@ -440,17 +479,27 @@ def test_direct_runtime_records_without_enabling_a_plugin(direct_runtime, tmp_pa
         },
         "value": 1,
     }
-    assert metrics["hermes.task_run.started"] == {
-        "name": "hermes.task_run.started",
+    assert metrics["qubit.task_run.started"] == {
+        "name": "qubit.task_run.started",
         "type": "counter",
         "dimensions": {
             "entrypoint": "interactive",
             "execution_surface": "cli",
+            "platform": "none",
         },
         "value": 1,
     }
-    terminal = metrics["hermes.task_run.finished"]["dimensions"]
-    assert terminal["duration_bucket"] in {
+    assert metrics["qubit.task_run.finished"]["dimensions"] == {
+        "end_reason": "completed",
+        "entrypoint": "interactive",
+        "execution_surface": "cli",
+        "failure_class": "none",
+        "outcome": "success",
+        "platform": "none",
+        "termination": "none",
+    }
+    duration = metrics["qubit.task_run.duration"]["dimensions"]
+    assert duration["duration_bucket"] in {
         "lt_1s",
         "1s_to_5s",
         "5s_to_30s",
@@ -458,18 +507,12 @@ def test_direct_runtime_records_without_enabling_a_plugin(direct_runtime, tmp_pa
         "2m_to_10m",
         "gte_10m",
     }
-    assert {
-        key: value for key, value in terminal.items() if key != "duration_bucket"
-    } == {
-        "end_reason": "completed",
-        "entrypoint": "interactive",
-        "execution_surface": "cli",
-        "model_call_count_bucket": "1",
-        "outcome": "success",
-        "retry_count_bucket": "1",
-        "termination": "none",
-        "tool_call_count_bucket": "1",
+    assert {key: value for key, value in duration.items() if key != "duration_bucket"} == {
+        "execution_surface": "cli", "outcome": "success", "retry_count_bucket": "1",
     }
+    # Per-task call counts ride on the task cost row now.
+    assert metrics["qubit.task_cost.count"]["dimensions"]["api_calls_bucket"] == "1"
+    assert metrics["qubit.task_cost.count"]["dimensions"]["tool_calls_bucket"] == "1"
 
 
 def test_real_binding_drives_lifecycle_aggregation_export_and_snapshot(
@@ -548,6 +591,8 @@ def test_real_binding_drives_lifecycle_aggregation_export_and_snapshot(
         turn_exit_reason="text_response(stop)",
     )
     lifecycle.finalize_session(session_id=success["session_id"])
+    # The daily package forms after the first session; later sessions land in the next one.
+    _join_export_workers()
 
     failed = base(2)
     lifecycle.invoke_hook("on_session_start", **failed)
@@ -620,7 +665,8 @@ def test_real_binding_drives_lifecycle_aggregation_export_and_snapshot(
 
     from qubit_cli.observability.shared_metrics import SharedMetricsStore
 
-    root = tmp_path / "hermes-home" / "telemetry" / "shared_metrics"
+    _join_export_workers()
+    root = tmp_path / "qubit-home" / "telemetry" / "shared_metrics"
     store = SharedMetricsStore(root / "metrics.sqlite3", root / "outbox")
     tomorrow = datetime.now(timezone.utc) + timedelta(days=1)
     monkeypatch.setattr(
@@ -633,48 +679,71 @@ def test_real_binding_drives_lifecycle_aggregation_export_and_snapshot(
     for counter in snapshot:
         by_metric.setdefault(counter["metric_name"], []).append(counter)
 
-    assert by_metric["hermes.client.active"][0]["dimensions"] == {}
-    assert by_metric["hermes.client.active"][0]["value"] == 1
-    assert len(by_metric["hermes.task_run.started"]) == 1
-    assert by_metric["hermes.task_run.started"][0]["value"] == 3
-    assert len(by_metric["hermes.model_route.count"]) == 1
-    model_counter = by_metric["hermes.model_route.count"][0]
-    assert model_counter["dimensions"] == {
-        "model": model_canary,
-        "provider": "custom",
+    assert by_metric["qubit.client.active"][0]["dimensions"] == {}
+    assert by_metric["qubit.client.active"][0]["value"] == 1
+    assert len(by_metric["qubit.task_run.started"]) == 1
+    assert by_metric["qubit.task_run.started"][0]["value"] == 3
+    # v3: one route row per terminal outcome; an unclassified failed call reports `unknown`.
+    route_by_outcome = {
+        counter["dimensions"]["outcome"]: counter
+        for counter in by_metric["qubit.model_route.count"]
     }
-    assert model_counter["value"] == 3
+    assert set(route_by_outcome) == {"success", "failed", "cancelled"}
+    for outcome, error_class in (
+        # The success call recovered from an unclassified error; the failed one never did.
+        ("success", "unknown"), ("failed", "unknown"), ("cancelled", "none")
+    ):
+        assert route_by_outcome[outcome]["dimensions"] == {
+            "call_role": "primary",
+            "error_class": error_class,
+            # A custom endpoint's model id is user-named: it never leaves the machine.
+            "model": "custom",
+            "outcome": outcome,
+            "provider": "custom",
+            "ttft_bucket": route_by_outcome[outcome]["dimensions"]["ttft_bucket"],
+        }
+        assert route_by_outcome[outcome]["value"] == 1
+    assert {
+        (c["dimensions"]["tool_name"], c["dimensions"]["outcome"], c["dimensions"]["error_class"])
+        for c in by_metric["qubit.tool.usage.count"]
+    } == {
+        ("terminal", "success", "none"),
+        ("read_file", "failed", "unknown"),
+        ("browser_navigate", "cancelled", "interrupted"),
+    }
     assert {
         counter["dimensions"]["outcome"]
-        for counter in by_metric["hermes.tool_call.count"]
+        for counter in by_metric["qubit.tool_call.count"]
     } == {"success", "failed", "cancelled"}
     tool_by_outcome = {
         counter["dimensions"]["outcome"]: counter["dimensions"]
-        for counter in by_metric["hermes.tool_call.count"]
+        for counter in by_metric["qubit.tool_call.count"]
     }
     assert tool_by_outcome["success"] == {
         "approval_outcome": "approved",
-        "latency_bucket": "100ms_to_250ms",
         "outcome": "success",
-        "retry_count_bucket": "0",
         "tool_category": "terminal",
     }
     assert tool_by_outcome["failed"] == {
         "approval_outcome": "not_required",
-        "latency_bucket": "500ms_to_1s",
         "outcome": "failed",
-        "retry_count_bucket": "unknown",
         "tool_category": "file",
     }
     assert tool_by_outcome["cancelled"] == {
         "approval_outcome": "not_required",
-        "latency_bucket": "gte_30s",
         "outcome": "cancelled",
-        "retry_count_bucket": "unknown",
         "tool_category": "browser",
     }
-    assert len(by_metric["hermes.tool_approval.count"]) == 1
-    approval_counter = by_metric["hermes.tool_approval.count"][0]
+    assert {
+        tuple(counter["dimensions"][f] for f in ("tool_category", "latency_bucket", "retry_count_bucket"))
+        for counter in by_metric["qubit.tool_call.latency"]
+    } == {
+        ("terminal", "100ms_to_250ms", "0"),
+        ("file", "500ms_to_1s", "unknown"),
+        ("browser", "gte_30s", "unknown"),
+    }
+    assert len(by_metric["qubit.tool_approval.count"]) == 1
+    approval_counter = by_metric["qubit.tool_approval.count"][0]
     assert approval_counter["dimensions"] == {
         "attribution": "tool_call",
         "outcome": "approved",
@@ -683,14 +752,20 @@ def test_real_binding_drives_lifecycle_aggregation_export_and_snapshot(
     assert approval_counter["packaged_value"] == 1
     terminal_by_outcome = {
         counter["dimensions"]["outcome"]: counter
-        for counter in by_metric["hermes.task_run.finished"]
+        for counter in by_metric["qubit.task_run.finished"]
     }
     assert set(terminal_by_outcome) == {"success", "failed", "cancelled"}
-    assert terminal_by_outcome["success"]["dimensions"]["retry_count_bucket"] == "1"
-    assert terminal_by_outcome["success"]["dimensions"]["tool_call_count_bucket"] == "1"
+    duration_by_outcome = {
+        counter["dimensions"]["outcome"]: counter["dimensions"]
+        for counter in by_metric["qubit.task_run.duration"]
+    }
+    assert set(duration_by_outcome) == {"success", "failed", "cancelled"}
+    assert duration_by_outcome["success"]["retry_count_bucket"] == "1"
     assert terminal_by_outcome["failed"]["dimensions"]["end_reason"] == (
         "system_aborted"
     )
+    assert terminal_by_outcome["failed"]["dimensions"]["failure_class"] == "other"
+    assert terminal_by_outcome["success"]["dimensions"]["failure_class"] == "none"
     assert terminal_by_outcome["cancelled"]["dimensions"]["termination"] == (
         "user_cancelled"
     )
@@ -710,7 +785,7 @@ def test_real_binding_drives_lifecycle_aggregation_export_and_snapshot(
         json.loads(package.read_text(encoding="utf-8")) for package in packages
     ]
     for package in package_payloads:
-        assert package["schema_version"] == "hermes.shared_metrics.v2"
+        assert package["schema_version"] == "qubit.shared_metrics.v3"
         for metric in package["metrics"]:
             key = (metric["name"], tuple(sorted(metric["dimensions"].items())))
             package_values[key] = package_values.get(key, 0) + metric["value"]
@@ -720,8 +795,8 @@ def test_real_binding_drives_lifecycle_aggregation_export_and_snapshot(
         "snapshot": snapshot,
         "packages": package_payloads,
     })
-    assert model_canary in serialized_analytics
     for canary in (
+        model_canary,
         prompt_canary,
         response_canary,
         tool_canary,
@@ -806,26 +881,28 @@ def test_real_binding_correlates_plugin_approval_denial_to_tool_metric(
     )
     lifecycle.finalize_session(session_id=base["session_id"])
 
-    root = tmp_path / "hermes-home" / "telemetry" / "shared_metrics"
+    _join_export_workers()
+    root = tmp_path / "qubit-home" / "telemetry" / "shared_metrics"
     store = SharedMetricsStore(root / "metrics.sqlite3", root / "outbox")
     snapshot = store.counter_snapshot()
     tool_metrics = [
         counter
         for counter in snapshot
-        if counter["metric_name"] == "hermes.tool_call.count"
+        if counter["metric_name"] == "qubit.tool_call.count"
     ]
     assert len(tool_metrics) == 1
     assert tool_metrics[0]["dimensions"] == {
         "approval_outcome": "denied",
-        "latency_bucket": "lt_100ms",
         "outcome": "blocked",
-        "retry_count_bucket": "unknown",
         "tool_category": "file",
     }
+    assert [
+        counter["dimensions"] for counter in snapshot if counter["metric_name"] == "qubit.tool_call.latency"
+    ] == [{"latency_bucket": "lt_100ms", "retry_count_bucket": "unknown", "tool_category": "file"}]
     approval_metrics = [
         counter
         for counter in snapshot
-        if counter["metric_name"] == "hermes.tool_approval.count"
+        if counter["metric_name"] == "qubit.tool_approval.count"
     ]
     assert len(approval_metrics) == 1
     assert approval_metrics[0]["dimensions"] == {
@@ -884,7 +961,8 @@ def test_real_binding_aggregates_tool_and_approval_timeouts(
     )
     lifecycle.finalize_session(session_id=base["session_id"])
 
-    root = tmp_path / "hermes-home" / "telemetry" / "shared_metrics"
+    _join_export_workers()
+    root = tmp_path / "qubit-home" / "telemetry" / "shared_metrics"
     snapshot = SharedMetricsStore(
         root / "metrics.sqlite3",
         root / "outbox",
@@ -892,19 +970,20 @@ def test_real_binding_aggregates_tool_and_approval_timeouts(
     [tool_metric] = [
         counter
         for counter in snapshot
-        if counter["metric_name"] == "hermes.tool_call.count"
+        if counter["metric_name"] == "qubit.tool_call.count"
     ]
     assert tool_metric["dimensions"] == {
         "approval_outcome": "timed_out",
-        "latency_bucket": "gte_30s",
         "outcome": "timed_out",
-        "retry_count_bucket": "unknown",
         "tool_category": "terminal",
     }
+    assert [
+        counter["dimensions"] for counter in snapshot if counter["metric_name"] == "qubit.tool_call.latency"
+    ] == [{"latency_bucket": "gte_30s", "retry_count_bucket": "unknown", "tool_category": "terminal"}]
     [approval_metric] = [
         counter
         for counter in snapshot
-        if counter["metric_name"] == "hermes.tool_approval.count"
+        if counter["metric_name"] == "qubit.tool_approval.count"
     ]
     assert approval_metric["dimensions"] == {
         "attribution": "tool_call",
@@ -1219,10 +1298,10 @@ def test_disabling_shared_metrics_stops_collection_and_shutdown_export(
             kind="scope",
             category="function",
             category_profile=None,
-            name="hermes.task_run",
+            name="qubit.task_run",
             scope_category="start",
             metadata={
-                "hermes.metrics.schema_version": "hermes.metrics.event.v1",
+                "qubit.metrics.schema_version": "qubit.metrics.event.v1",
                 relay_runtime.RUNTIME_INSTANCE_KEY: runtime.host.runtime_id,
             },
             data={"entrypoint": "interactive", "execution_surface": "cli"},
@@ -1248,8 +1327,10 @@ def test_disabling_shared_metrics_stops_collection_and_shutdown_export(
     root = profile / "telemetry" / "shared_metrics"
     store = SharedMetricsStore(root / "metrics.sqlite3", root / "outbox")
     assert [row["metric_name"] for row in store.counter_snapshot()] == [
-        "hermes.client.active",
-        "hermes.task_run.started"
+        "qubit.client.active",
+        "qubit.install.milestone",
+        "qubit.install.snapshot",
+        "qubit.task_run.started"
     ]
     assert list((root / "outbox").glob("*.json")) == []
     relay_runtime._reset_for_tests()
@@ -1647,6 +1728,7 @@ def test_terminal_model_error_retains_the_failed_route(direct_runtime):
         "api_request_error",
         **base,
         retryable=False,
+        reason="auth",
         error={"message": "sensitive-error"},
     )
     assert not [event for event in direct_runtime.events if event[0] == "llm.call_end"]
@@ -1662,8 +1744,12 @@ def test_terminal_model_error_retains_the_failed_route(direct_runtime):
 
     [end] = [event for event in direct_runtime.events if event[0] == "llm.call_end"]
     assert end[2] == {
+        "call_role": "primary",
+        "error_class": "auth",
         "model": "claude-sonnet",
+        "outcome": "failed",
         "provider": "anthropic",
+        "ttft_bucket": "unknown",
     }
 
 
@@ -1684,6 +1770,7 @@ def test_nonretryable_provider_error_can_recover_within_one_logical_call(
         **base,
         retry_count=0,
         retryable=False,
+        reason="model_not_found",
     )
     fallback = {
         **base,
@@ -1701,9 +1788,14 @@ def test_nonretryable_provider_error_can_recover_within_one_logical_call(
     [end] = [event for event in direct_runtime.events if event[0] == "llm.call_end"]
     [start] = [event for event in direct_runtime.events if event[0] == "llm.call"]
     assert start[3]["model_name"] == "unknown"
+    # The recovered call keeps the error it recovered from.
     assert end[2] == {
+        "call_role": "primary",
+        "error_class": "model_not_found",
         "model": "gpt-5",
+        "outcome": "success",
         "provider": "openai-api",
+        "ttft_bucket": "unknown",
     }
 
 
@@ -1742,7 +1834,7 @@ def test_same_request_id_is_isolated_between_tasks(direct_runtime):
     task_ends = [
         event[2]["output"]
         for event in direct_runtime.events
-        if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"
+        if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"
     ]
     assert len(task_ends) == 2
     assert all(fields["model_call_count_bucket"] == "1" for fields in task_ends)
@@ -1790,7 +1882,7 @@ def test_reused_tool_call_id_is_counted_for_each_provider_request(direct_runtime
     [task_end] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"
+        if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"
     ]
     assert task_end[2]["output"]["tool_call_count_bucket"] == "2"
 
@@ -1830,7 +1922,7 @@ def test_partial_terminal_context_reuses_the_pending_tool_span(direct_runtime):
     [task_end] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"
+        if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"
     ]
     assert task_end[2]["output"]["tool_call_count_bucket"] == "1"
 
@@ -1873,7 +1965,7 @@ def test_partial_terminal_variants_do_not_double_count_a_completed_call(
     [task_end] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"
+        if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"
     ]
     assert task_end[2]["output"]["tool_call_count_bucket"] == "1"
 
@@ -1921,7 +2013,7 @@ def test_ambiguous_partial_terminal_does_not_create_a_phantom_tool_span(
     [task_end] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"
+        if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"
     ]
     assert task_end[2]["output"]["tool_call_count_bucket"] == "2"
 
@@ -1958,12 +2050,12 @@ def test_reused_task_id_starts_a_new_run_for_each_turn(direct_runtime):
     task_starts = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.push" and event[1] == "hermes.task_run"
+        if event[0] == "scope.push" and event[1] == "qubit.task_run"
     ]
     task_ends = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"
+        if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"
     ]
     tool_ends = [
         event for event in direct_runtime.events if event[0] == "tool.call_end"
@@ -2052,7 +2144,7 @@ def test_late_tool_result_does_not_attach_to_reused_task_id(direct_runtime):
     task_ends = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"
+        if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"
     ]
     assert [
         event[2]["output"]["tool_call_count_bucket"] for event in task_ends
@@ -2098,21 +2190,23 @@ def test_pending_tool_is_closed_and_counted_when_task_is_interrupted(direct_runt
     ]
     assert tool_end[2] == {
         "approval_outcome": "not_required",
+        "error_class": "interrupted",
         "latency_bucket": tool_end[2]["latency_bucket"],
         "outcome": "cancelled",
         "retry_count_bucket": "unknown",
         "tool_category": "terminal",
+        "tool_name": "terminal",
     }
     [task_end] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"
+        if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"
     ]
     assert task_end[2]["output"]["tool_call_count_bucket"] == "1"
     task_starts = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.push" and event[1] == "hermes.task_run"
+        if event[0] == "scope.push" and event[1] == "qubit.task_run"
     ]
     assert len(task_starts) == 1
 
@@ -2147,7 +2241,7 @@ def test_pending_tool_uses_the_outer_task_timeout_outcome(direct_runtime):
     [task_end] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"
+        if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"
     ]
     assert task_end[2]["output"]["outcome"] == "timed_out"
     assert task_end[2]["output"]["tool_call_count_bucket"] == "1"
@@ -2217,7 +2311,7 @@ def test_approval_without_tool_context_is_counted_as_unattributed(direct_runtime
     [approval] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.event" and event[1] == "hermes.tool_approval"
+        if event[0] == "scope.event" and event[1] == "qubit.tool_approval"
     ]
     assert approval[2]["data"] == {
         "attribution": "unattributed",
@@ -2254,7 +2348,7 @@ def test_approval_with_unmatched_tool_id_is_counted_as_unattributed(direct_runti
     [approval] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.event" and event[1] == "hermes.tool_approval"
+        if event[0] == "scope.event" and event[1] == "qubit.tool_approval"
     ]
     assert approval[2]["data"] == {
         "attribution": "unattributed",
@@ -2350,14 +2444,15 @@ def test_task_retry_count_survives_provider_fallback_ordinal_reset(direct_runtim
     [model_end] = [
         event for event in direct_runtime.events if event[0] == "llm.call_end"
     ]
-    assert model_end[2] == {
+    assert {k: model_end[2][k] for k in ("model", "outcome", "provider")} == {
         "model": "gpt-5",
+        "outcome": "success",
         "provider": "openai",
     }
     [task_end] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"
+        if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"
     ]
     assert task_end[2]["output"]["retry_count_bucket"] == "2"
 
@@ -2399,10 +2494,11 @@ def test_failed_flush_keeps_daily_export_open_for_later_task(
             interrupted=False,
             turn_exit_reason="text_response(stop)",
         )
+        _join_export_workers()
 
     finish_desktop_task("t1")
 
-    root = tmp_path / "hermes-home" / "telemetry" / "shared_metrics"
+    root = tmp_path / "qubit-home" / "telemetry" / "shared_metrics"
     assert list((root / "outbox").glob("*.json")) == []
     with sqlite3.connect(root / "metrics.sqlite3") as connection:
         [package_count] = connection.execute(
@@ -2415,10 +2511,79 @@ def test_failed_flush_keeps_daily_export_open_for_later_task(
     [package_path] = list((root / "outbox").glob("*.json"))
     package = json.loads(package_path.read_text(encoding="utf-8"))
     metrics = {metric["name"]: metric for metric in package["metrics"]}
-    assert metrics["hermes.task_run.started"]["value"] == 2
-    assert metrics["hermes.task_run.finished"]["value"] == 2
+    assert metrics["qubit.task_run.started"]["value"] == 2
+    assert metrics["qubit.task_run.finished"]["value"] == 2
     assert flush_attempts == 2
     assert "Qubit shared-metrics task flush failed" in caplog.text
+
+
+def _finish_desktop_task(session_id: str, task_id: str) -> None:
+    hook = dict(session_id=session_id, task_id=task_id, platform="desktop")
+    lifecycle.invoke_hook("pre_llm_call", **hook)
+    lifecycle.invoke_hook(
+        "on_session_end", **hook,
+        completed=True, failed=False, interrupted=False,
+        turn_exit_reason="text_response(stop)",
+    )
+
+
+@pytest.fixture
+def parked_flush(direct_runtime, monkeypatch):
+    """A flush that blocks like the real barrier does while another session's tool runs."""
+    monkeypatch.setattr(
+        "qubit_cli.observability.shared_metrics._utc_now",
+        lambda: datetime(2026, 7, 28, 9, tzinfo=timezone.utc),
+    )
+    state = SimpleNamespace(attempts=0, entered=threading.Event(), release=threading.Event())
+
+    def parked() -> None:
+        state.attempts += 1
+        state.entered.set()
+        state.release.wait(3)
+
+    direct_runtime.subscribers.flush = parked
+    yield state
+    state.release.set()
+    _join_export_workers()
+
+
+def test_task_ends_do_not_wait_on_the_process_wide_flush_barrier(parked_flush, tmp_path):
+    _finish_desktop_task("s1", "t1")
+
+    # The turn thread is back while the barrier is still parked, so nothing is exported yet.
+    assert parked_flush.entered.wait(3)
+    outbox = tmp_path / "qubit-home" / "telemetry" / "shared_metrics" / "outbox"
+    assert list(outbox.glob("*.json")) == []
+
+    # Task ends behind the parked barrier coalesce into one more pass, not one each.
+    for task_id in ("t2", "t3", "t4"):
+        _finish_desktop_task("s1", task_id)
+    parked_flush.release.set()
+    _join_export_workers()
+    assert parked_flush.attempts == 2
+    assert len(list(outbox.glob("*.json"))) == 1
+
+
+def test_background_flush_runs_under_the_finishing_turns_profile(
+    direct_runtime, tmp_path, monkeypatch
+):
+    from qubit_constants import get_qubit_home, reset_qubit_home_override, set_qubit_home_override
+
+    seen: list[Any] = []
+    monkeypatch.setattr(
+        relay_shared_metrics._Runtime,
+        "_export",
+        lambda self: seen.append(get_qubit_home()),
+    )
+    profile_home = tmp_path / "other-profile"
+    token = set_qubit_home_override(profile_home)
+    try:
+        _finish_desktop_task("s1", "t1")
+        _join_export_workers()
+    finally:
+        reset_qubit_home_override(token)
+
+    assert seen == [profile_home]
 
 
 def test_skill_lifecycle_flows_through_relay_to_a_privacy_safe_package(
@@ -2454,24 +2619,24 @@ def test_skill_lifecycle_flows_through_relay_to_a_privacy_safe_package(
 
     marks = [event for event in direct_runtime.events if event[0] == "scope.event"]
     assert [event[1] for event in marks] == [
-        "hermes.skill.lifecycle",
-        "hermes.skill.load",
-        "hermes.skill.lifecycle",
-        "hermes.skill.load",
+        "qubit.skill.lifecycle",
+        "qubit.skill.load",
+        "qubit.skill.lifecycle",
+        "qubit.skill.load",
     ]
     assert "private-skill-name" not in json.dumps(marks)
 
-    outbox = tmp_path / "hermes-home" / "telemetry" / "shared_metrics" / "outbox"
+    outbox = tmp_path / "qubit-home" / "telemetry" / "shared_metrics" / "outbox"
     [package_path] = list(outbox.glob("*.json"))
     package = json.loads(package_path.read_text(encoding="utf-8"))
     skill_metrics = [
         metric
         for metric in package["metrics"]
-        if metric["name"].startswith("hermes.skill.")
+        if metric["name"].startswith("qubit.skill.")
     ]
     assert {metric["name"] for metric in skill_metrics} == {
-        "hermes.skill.lifecycle.count",
-        "hermes.skill.load.count",
+        "qubit.skill.lifecycle.count",
+        "qubit.skill.load.count",
     }
     assert "private-skill-name" not in json.dumps(package)
 
@@ -2497,7 +2662,7 @@ def test_skill_lifecycle_with_only_task_id_uses_unique_task_scope(direct_runtime
     [mark] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.event" and event[1] == "hermes.skill.lifecycle"
+        if event[0] == "scope.event" and event[1] == "qubit.skill.lifecycle"
     ]
     assert mark[2]["handle"] == task.handle
 
@@ -2523,7 +2688,7 @@ def test_skill_task_only_correlation_does_not_guess_across_sessions(direct_runti
     [mark] = [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.event" and event[1] == "hermes.skill.lifecycle"
+        if event[0] == "scope.event" and event[1] == "qubit.skill.lifecycle"
     ]
     assert "handle" not in mark[2]
 
@@ -2559,7 +2724,7 @@ def test_late_skill_lifecycle_is_not_reemitted_at_the_root(direct_runtime):
     assert [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.event" and event[1] == "hermes.skill.load"
+        if event[0] == "scope.event" and event[1] == "qubit.skill.load"
     ] == []
 
 
@@ -2586,7 +2751,7 @@ def test_skill_lifecycle_does_not_fallback_across_an_explicit_session(
     assert [
         event
         for event in direct_runtime.events
-        if event[0] == "scope.event" and event[1] == "hermes.skill.lifecycle"
+        if event[0] == "scope.event" and event[1] == "qubit.skill.lifecycle"
     ] == []
 
 
@@ -2621,3 +2786,215 @@ def test_real_binding_concurrent_task_close_skips_pop_under_sibling_scope(
     )
     lifecycle.invoke_hook("on_session_end", **event)
     assert "task close failed" not in caplog.text
+
+
+def _stored_counters(tmp_path) -> dict[str, list[dict[str, Any]]]:
+    from qubit_cli.observability.shared_metrics import SharedMetricsStore
+
+    root = tmp_path / "qubit-home" / "telemetry" / "shared_metrics"
+    by_metric: dict[str, list[dict[str, Any]]] = {}
+    for counter in SharedMetricsStore(root / "metrics.sqlite3", root / "outbox").counter_snapshot():
+        by_metric.setdefault(counter["metric_name"], []).append(counter["dimensions"])
+    return by_metric
+
+
+def test_v3_failure_dimensions_never_export_third_party_identifiers(direct_runtime, tmp_path):
+    """Plugin tool names, exception class names, plugin platforms and raw exit reasons collapse
+    to closed classes, while Hermes's own vocabularies pass through."""
+    base = {
+        "session_id": "s1", "task_id": "t1", "api_request_id": "r1", "platform": "telegram",
+        "provider": "anthropic", "model": "claude-sonnet",
+    }
+    lifecycle.invoke_hook("pre_llm_call", **base)
+    lifecycle.invoke_hook("pre_api_request", **base)
+    lifecycle.invoke_hook("api_request_error", **base, retryable=True, reason="rate_limit")
+    for call_id, tool, error_type in (
+        ("c1", "acme_private_tool", "AcmePrivateError"), ("c2", "terminal", "tool_timeout"),
+    ):
+        lifecycle.invoke_hook("pre_tool_call", **base, tool_call_id=call_id, tool_name=tool)
+        lifecycle.invoke_hook(
+            "post_tool_call", **base, tool_call_id=call_id, tool_name=tool, status="error",
+            error_type=error_type, duration_ms=10,
+        )
+    relay_shared_metrics.finish_task_run(
+        session_id="s1", task_id="t1", platform="telegram",
+        result={"failed": True, "failure_reason": "rate_limit",
+                "turn_exit_reason": "acme private exit reason"},
+    )
+    lifecycle.finalize_session(session_id="s1")
+
+    counters = _stored_counters(tmp_path)
+    assert "acme" not in json.dumps(counters).lower()
+    assert {(d["tool_name"], d["error_class"]) for d in counters["qubit.tool.usage.count"]} == {
+        ("plugin", "exception"), ("terminal", "timeout"),
+    }
+    [route] = counters["qubit.model_route.count"]
+    assert (route["outcome"], route["error_class"]) == ("failed", "rate_limit")
+    [finished] = counters["qubit.task_run.finished"]
+    assert (finished["platform"], finished["failure_class"]) == ("telegram", "rate_limit")
+
+
+def test_install_snapshot_is_daily_and_carries_only_bucketed_counts(
+    direct_runtime, tmp_path, monkeypatch,
+):
+    monkeypatch.setattr(
+        "qubit_cli.config.read_raw_config_readonly",
+        lambda: {
+            "telemetry": {"shared_metrics": {"enabled": True}},
+            "memory": {"provider": "acme-private-memory"},
+            "mcp_servers": {"acme-private-server": {"command": "x"}, "off": {"enabled": False}},
+            "plugins": {"enabled": ["acme-private-plugin", "b", "c"]},
+        },
+    )
+    for task_id in ("t1", "t2"):
+        event = {"session_id": task_id, "task_id": task_id, "platform": "cli"}
+        lifecycle.invoke_hook("pre_llm_call", **event)
+        relay_shared_metrics.finish_task_run(**event, result={"completed": True})
+        lifecycle.finalize_session(session_id=task_id)
+    # A new runtime has no in-process throttle; only the store's 24h latch can hold it back.
+    relay_shared_metrics._reset_for_tests()
+    event = {"session_id": "t3", "task_id": "t3", "platform": "cli"}
+    lifecycle.invoke_hook("pre_llm_call", **event)
+    lifecycle.finalize_session(session_id="t3")
+
+    [snapshot] = _stored_counters(tmp_path)["qubit.install.snapshot"]
+    assert snapshot == {
+        "cron_job_count_bucket": "0", "display_language": "en", "install_age_bucket": snapshot["install_age_bucket"],
+        "main_provider": "none", "mcp_server_count_bucket": "1", "memory_provider": "plugin",
+        "messaging_platform_count_bucket": "0", "plugin_count_bucket": "3_to_5",
+        "profile_count_bucket": snapshot["profile_count_bucket"], "skill_count_bucket": "0",
+        "terminal_backend": "local", "local_model_provider_used": "no",
+        **{k: snapshot[k] for k in ("behind_bucket", "gpu_class", "ram_bucket", "release_channel", "version_age_bucket")},
+    }
+
+
+def _stored_values(tmp_path, metric: str) -> list[tuple[dict[str, Any], int]]:
+    from qubit_cli.observability.shared_metrics import SharedMetricsStore
+
+    root = tmp_path / "qubit-home" / "telemetry" / "shared_metrics"
+    return [
+        (counter["dimensions"], counter["value"])
+        for counter in SharedMetricsStore(root / "metrics.sqlite3", root / "outbox").counter_snapshot()
+        if counter["metric_name"] == metric
+    ]
+
+
+def test_sessions_summarize_on_close_and_milestones_latch_once_per_install(direct_runtime, tmp_path):
+    """Each closed session yields one bucketed summary; delegated children do not; an install
+    milestone is recorded the first time only, however many sessions reach it."""
+    for session_id, turns in (("s1", 3), ("s2", 1)):
+        for turn in range(turns):
+            task = f"{session_id}-t{turn}"
+            lifecycle.invoke_hook("pre_llm_call", session_id=session_id, task_id=task, platform="cli")
+            relay_shared_metrics.finish_task_run(
+                session_id=session_id, task_id=task, platform="cli", result={"completed": True},
+            )
+        lifecycle.finalize_session(session_id=session_id)
+
+    sessions = _stored_values(tmp_path, "qubit.session.count")
+    assert sorted((d["turn_count_bucket"], d["last_outcome"], v) for d, v in sessions) == [
+        ("1", "success", 1), ("3_to_5", "success", 1),
+    ]
+    milestones = {d["milestone"]: v for d, v in _stored_values(tmp_path, "qubit.install.milestone")}
+    assert milestones["first_task_started"] == 1
+    assert milestones["first_task_success"] == 1
+
+
+def test_user_named_providers_and_models_never_reach_counters(direct_runtime, tmp_path):
+    """A custom endpoint's name (``custom:<key>``), its model id and loopback-server models read
+    ``custom``; shipped providers and their public model ids stay readable."""
+    from qubit_cli.observability import shared_metrics_events as events
+    from qubit_cli.observability.shared_metrics import SharedMetricsStore
+
+    events.record_setup_completed(surface="cli", provider="custom:acme-secret-llm")
+    events.record_model_switch(from_provider="custom:acme-secret-llm", to_provider="lmstudio", surface="cli")
+    events.record_fallback(from_provider="acme-unknown", to_provider="openrouter", reason="rate_limit")
+    runtime = relay_shared_metrics._get_runtime(retry_failed=True)
+    for provider, model in (("custom:acme-secret-llm", "acme-internal"), ("lmstudio", "bob-finetune"),
+                            ("openrouter", "c:/users/bob/model.gguf"), ("openrouter", "anthropic/claude-sonnet")):
+        runtime.record_auxiliary_tokens({
+            "usage": {"input_tokens": 5}, "aux_task": "compression", "provider": provider, "model": model,
+        })
+    runtime.relay.subscribers.flush()
+
+    root = tmp_path / "qubit-home" / "telemetry" / "shared_metrics"
+    stored = json.dumps(SharedMetricsStore(root / "metrics.sqlite3", root / "outbox").counter_snapshot())
+    assert not any(leak in stored for leak in ("acme", "bob", "users"))
+    tokens = {(d["provider"], d["model"]) for d, _ in _stored_values(tmp_path, "qubit.model_tokens.sum")}
+    assert tokens == {("custom", "custom"), ("lmstudio", "custom"), ("openrouter", "custom"),
+                      ("openrouter", "anthropic/claude-sonnet")}
+
+
+def test_milestone_install_age_is_the_subscriber_profile_not_the_relay_thread(tmp_path, monkeypatch):
+    """Under multiplex the Relay thread carries no profile binding: a milestone reached in
+    profile B must carry B's install age, not the launch profile's."""
+    import sqlite3 as _sqlite3
+    import time
+
+    from qubit_cli.observability.shared_metrics import SharedMetricsStore
+    from qubit_cli.observability.shared_metrics_subscriber import SharedMetricsSubscriber
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+
+    launch, other = tmp_path / "A", tmp_path / "B"
+    for home in (launch, other):
+        home.mkdir()
+    with _sqlite3.connect(other / "state.db") as con:
+        con.execute("CREATE TABLE sessions (id TEXT, started_at REAL)")
+        con.execute("INSERT INTO sessions VALUES ('s1', ?)", (time.time() - 120 * 86400,))
+    monkeypatch.setenv("QUBIT_HOME", str(launch))
+    token = set_qubit_home_override(str(other))
+    try:
+        subscriber = SharedMetricsSubscriber(SharedMetricsStore(), "1.0")
+    finally:
+        reset_qubit_home_override(token)
+    subscriber._record_milestones("qubit.setup.completed", {"provider": "nous", "surface": "cli"})
+    ages = [c["dimensions"]["install_age_bucket"] for c in subscriber.store.counter_snapshot()
+            if c["metric_name"] == "qubit.install.milestone"]
+    assert ages == ["gte_90d"]
+
+
+def test_token_usage_is_summed_per_model_and_auxiliary_task(direct_runtime, tmp_path):
+    base = {"session_id": "s1", "task_id": "t1", "provider": "anthropic", "model": "claude-sonnet"}
+    for request_id in ("r1", "r2"):
+        lifecycle.invoke_hook("pre_api_request", **base, api_request_id=request_id)
+        lifecycle.invoke_hook(
+            "post_api_request", **base, api_request_id=request_id,
+            usage={"input_tokens": 100, "output_tokens": 10, "cache_read_tokens": 40},
+        )
+    for aux_task in ("compression", "acme-private-task"):
+        lifecycle.invoke_hook(
+            "post_auxiliary_call", aux_task=aux_task, provider="openrouter", model="small/model",
+            usage={"input_tokens": 7, "output_tokens": 3},
+        )
+    relay_shared_metrics.finish_task_run(
+        session_id="s1", task_id="t1", platform="cli", result={"completed": True},
+    )
+    lifecycle.finalize_session(session_id="s1")
+
+    sums = {
+        (d["call_role"], d["aux_task"], d["token_type"]): v
+        for d, v in _stored_values(tmp_path, "qubit.model_tokens.sum")
+    }
+    assert sums == {
+        ("primary", "none", "input"): 200, ("primary", "none", "output"): 20,
+        ("primary", "none", "cache_read"): 80,
+        ("auxiliary", "compression", "input"): 7, ("auxiliary", "compression", "output"): 3,
+        ("auxiliary", "other", "input"): 7, ("auxiliary", "other", "output"): 3,
+    }
+
+
+def test_recovered_rows_report_saved_only_once_the_store_holds_them(real_binding_runtime, monkeypatch):
+    from qubit_cli.observability.shared_metrics import SharedMetricsStore
+
+    row = ("qubit.process.exit", {"crash_class": "none", "exit_kind": "killed", "process_kind": "gateway"})
+    real_store_write = SharedMetricsStore.record_counter
+
+    def locked(*args, **kwargs):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(SharedMetricsStore, "record_counter", locked)
+    assert relay_shared_metrics.record_process_marks_saved([row]) == 0
+    monkeypatch.setattr(SharedMetricsStore, "record_counter", real_store_write)
+    assert relay_shared_metrics.record_process_marks_saved([row]) == 1
+    saved = [(r["metric_name"], r["dimensions"], r["value"]) for r in SharedMetricsStore().counter_snapshot()]
+    assert saved == [("qubit.process.exit", row[1], 1)]

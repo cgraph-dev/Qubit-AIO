@@ -50,6 +50,21 @@ DEFAULT_LOCAL_ID = "qubit-brain4"
 # role never changes the shipped model-profile inventory/count.
 DEFAULT_EMBED_ID = "qubit-embed"
 DEFAULT_EMBED_MODEL = "nomic-embed-text"
+# The ``vision`` role must resolve to a model that can actually read pixels.
+# The shipped chat default (``qubit-brain4``) is text-only, so a plain
+# role-default fallback would report a text model for image analysis. Like the
+# embedding role, the vision default is synthetic (not part of
+# ``default_profiles``) so the shipped model-profile inventory/count is stable.
+VISION = "vision"
+DEFAULT_VISION_ID = "qubit-vision"
+#: Known vision-capable local (Ollama) models, in preference order. A local VLM
+#: that is actually installed is the safest target: no egress, no credential,
+#: and the same runner authority as every other local role.
+VISION_LOCAL_CANDIDATES = ("qwen3-vl:4b", "qwen3-vl:8b")
+VISION_LOCAL_PROVIDERS = ("ollama", "local", "llamacpp", "llama.cpp",
+                          "llama-cpp")
+VISION_EXTERNAL_PROVIDERS = ("openrouter", "nous", "deepinfra", "anthropic",
+                             "openai", "google", "custom")
 # Qubit's Radius provider plugin is an organization-scoped model gateway.
 # It is represented as a ``plugin`` kind record with an ``env:`` credential
 # reference so it is configurable without storing a raw key.
@@ -230,7 +245,21 @@ def default_profiles() -> List[ModelProfile]:
             id=DEFAULT_LOCAL_ID, kind=LOCAL, provider="ollama",
             model=DEFAULT_LOCAL_ID, locality="local", egress_consent="deny",
             context_tokens=4096, supports_streaming=True,
-            roles=[r for r in ROLES if r != EMBEDDING], default=True,
+            # qubit-brain4 is a text-only Qwen3 4B: it must NOT declare the
+            # ``vision`` role (a text model offered for image analysis returns
+            # nothing useful). The vision role resolves through its own local
+            # VLM path (``default_vision_profile``), never this chat default.
+            #
+            # ``chat`` is ALSO excluded: measured 2026-10-07, the installed
+            # ``qubit-brain4`` emits ALL of its output into the ``thinking``
+            # field and returns ``content=''`` with ``done_reason=length`` — it
+            # cannot answer at all (see docs/QUBIT_LOCAL_MODEL_EMPTY_OUTPUT_2026-10-07.md).
+            # Offering it in the MODEL picker would present a model that loads,
+            # runs and returns nothing. Keep the record (it is the shipped
+            # default id / rollback target) but stop advertising it as a chat
+            # choice until its Modelfile renders assistant content.
+            roles=[r for r in ROLES if r not in (EMBEDDING, VISION, DEFAULT_ROLE)],
+            default=True,
             rollback_to=DEFAULT_LOCAL_ID,
             provenance="ollama://qubit-brain4 (shipped default record)",
             license="Apache-2.0 (Qwen3-4B-Instruct-2507-derived)"),
@@ -332,6 +361,90 @@ def load_profiles(cfg: Any) -> List[ModelProfile]:
             continue
         records[p.id] = p
     return list(records.values())
+
+
+# ---------------------------------------------------------------------------
+# Local chat-model registration (owner directive #6)
+# ---------------------------------------------------------------------------
+#: Locally-installed Ollama models that should be selectable in the model
+#: provider panel, declared as data (the same registration shape as every other
+#: ``ModelProfile``) so the picker builder never hardcodes a list. Each entry is
+#: ``(profile_id, ollama_model, roles, supports_vision)``. A profile is only
+#: registered when its ``ollama_model`` is actually installed on the local
+#: runtime — a registered-but-missing model would be a dead picker row.
+LOCAL_MODEL_SEEDS: Tuple[Tuple[str, str, Tuple[str, ...], bool], ...] = (
+    # id                ollama model          roles                    vision
+    ("qubit-brain",      "qubit-brain",       ("chat",),               False),
+    ("qubit-brain-vision", "qubit-brain-vision", (VISION,),            True),
+    ("qwen3-vl:4b",      "qwen3-vl:4b",       (VISION,),               True),
+    ("qubit-cand-q4",    "qubit-cand-q4",     ("chat",),               False),
+    ("qubit-cand-q5",    "qubit-cand-q5",     ("chat",),               False),
+    ("qubit-brain4-pre4b", "qubit-brain4-pre4b", ("chat",),            False),
+)
+
+
+def _installed_local_models(cfg: Any) -> Tuple[str, ...]:
+    """Names installed on the local Ollama runtime (empty when unreachable)."""
+    try:
+        from .. import local_models as _lm
+        url = _lm._local_section(cfg).get("url", "")
+        probe = _lm._probe_local(url)
+    except Exception:  # noqa: BLE001 - a probe failure is not a resolver failure
+        return ()
+    if not probe:
+        return ()
+    names: List[str] = []
+    for item in probe.get("models", []) or []:
+        name = str(item.get("name") or item.get("id") or "").strip()
+        if name:
+            names.append(name)
+    return tuple(names)
+
+
+def ensure_local_model_profiles(cfg: Any) -> Dict[str, Any]:
+    """Register the installed local chat/vision models as real profiles.
+
+    Owner directive #6: every local model must be selectable in the provider
+    panel. The picker row lists *registered* profiles, so an installed-but-
+    unregistered Ollama model (e.g. ``qubit-brain``) was invisible. This
+    registers each curated local model from :data:`LOCAL_MODEL_SEEDS` — but
+    only when it is actually installed on the local runtime — through the
+    canonical :func:`upsert_model_profile` path (never a raw registry write and
+    never a name hardcoded in the picker). Idempotent: an existing profile
+    whose record already matches is left untouched (byte- and mtime-stable).
+    """
+    installed = {n.lower() for n in _installed_local_models(cfg)}
+    if not installed:
+        return {"state": "UNAVAILABLE", "detail": "local runtime unreachable",
+                "registered": [], "count": 0}
+    # Ollama reports ids with an explicit ``:latest`` tag; seed entries name
+    # the logical model. Match either form so ``qubit-brain`` finds
+    # ``qubit-brain:latest``.
+    def _is_installed(model: str) -> bool:
+        name = str(model or "").lower()
+        return name in installed or f"{name}:latest" in installed
+    existing = {p.id: p for p in load_profiles(cfg)}
+    registered: List[str] = []
+    for pid, model, roles, vision in LOCAL_MODEL_SEEDS:
+        if not _is_installed(model):
+            continue
+        prior = existing.get(pid)
+        profile = ModelProfile(
+            id=pid, kind=LOCAL, provider="ollama", model=model,
+            locality="local", egress_consent="deny",
+            context_tokens=(32768 if vision else 4096),
+            supports_streaming=True, supports_vision=bool(vision),
+            roles=list(roles), rollback_to=pid,
+            provenance=f"ollama://{model} (installed local model)",
+            license="see THIRD_PARTY_NOTICES.md")
+        if prior is not None and not prior.default \
+                and prior.to_record() == profile.to_record():
+            continue
+        out = upsert_model_profile(cfg, profile, confirm=True)
+        if out.get("state") == "OK":
+            registered.append(pid)
+    return {"state": "OK", "registered": registered,
+            "count": len(registered), "installed": sorted(installed)}
 
 
 def _save_profiles(cfg: Any, profiles: List[ModelProfile]) -> Path:
@@ -827,6 +940,114 @@ def _profile_for_model(cfg: Any, token: str,
     return None
 
 
+def _vision_configured(cfg: Any) -> Tuple[str, str]:
+    """Operator-configured ``(model, provider)`` for the vision role.
+
+    ``auxiliary.vision.*`` wins (the reference's per-task aux pin), then
+    ``intent.vision.*`` (the Qubit-native vision surface's pin). ``provider`` is
+    empty when unset or ``auto``. Returns ``("", "")`` when neither names a
+    model.
+    """
+    for model_path, provider_path in (
+        (("auxiliary", "vision", "model"), ("auxiliary", "vision", "provider")),
+        (("intent", "vision", "model"), ("intent", "vision", "provider")),
+    ):
+        raw = _get(cfg, *model_path)
+        model = raw.strip() if isinstance(raw, str) else ""
+        if not model:
+            continue
+        raw_provider = _get(cfg, *provider_path)
+        provider = raw_provider.strip() if isinstance(raw_provider, str) else ""
+        if provider.lower() == "auto":
+            provider = ""
+        return model, provider
+    return "", ""
+
+
+def _vision_installed_local(cfg: Any) -> Tuple[str, ...]:
+    """Installed local model names (best-effort, loopback probe only).
+
+    Reads the local runner's ``/api/tags`` through the shared local-models
+    probe: it never egresses and never raises, so a failed probe is an empty
+    tuple and the caller falls through instead of claiming an uninstalled
+    model.
+    """
+    try:
+        from .. import local_models as _lm
+        url = _lm._local_section(cfg).get("url", "")
+        probe = _lm._probe_local(url)
+    except Exception:  # noqa: BLE001 - a probe failure is not a resolver failure
+        return ()
+    if not probe:
+        return ()
+    names: List[str] = []
+    for item in probe.get("models", []) or []:
+        if isinstance(item, dict):
+            name = str(item.get("name") or item.get("id") or "").strip()
+            if name:
+                names.append(name)
+    return tuple(names)
+
+
+def _vision_provider(cfg: Any, model: str, explicit: str) -> str:
+    """Infer the vision model's provider from the config, install list, or id."""
+    if explicit:
+        return explicit
+    lowered = model.lower()
+    if lowered in VISION_LOCAL_CANDIDATES:
+        return "ollama"
+    if lowered in {n.lower() for n in _vision_installed_local(cfg)}:
+        return "ollama"
+    if "/" in model:
+        head = model.split("/", 1)[0].lower()
+        if head in VISION_EXTERNAL_PROVIDERS:
+            return head
+    return "ollama"
+
+
+def _vision_model_profile(cfg: Any, model: str, provider: str) -> ModelProfile:
+    """A vision-capable profile record for ``model``/``provider``."""
+    if provider.lower() in VISION_LOCAL_PROVIDERS:
+        return ModelProfile(
+            id=model, kind=LOCAL, provider=provider or "ollama", model=model,
+            locality="local", egress_consent="deny", context_tokens=32768,
+            supports_streaming=True, supports_vision=True, roles=[VISION],
+            provenance=f"ollama://{model} (vision role)")
+    return ModelProfile(
+        id=model, kind=API, provider=provider, model=model,
+        base_url=str(_get(cfg, "auxiliary", "vision", "base_url",
+                          default="") or ""),
+        locality="external", egress_consent="allow", context_tokens=32768,
+        supports_vision=True, roles=[VISION],
+        provenance=f"{provider}://{model} (vision role)")
+
+
+def default_vision_profile(cfg: Any) -> ModelProfile:
+    """The vision role's effective profile (synthetic; never in the inventory).
+
+    Ladder: the operator's configured ``auxiliary.vision.model``/``provider``;
+    else a registered profile that already declares ``supports_vision``; else a
+    known vision-capable local model that is actually installed; else the
+    shipped known local VLM as a last resort. Always ``supports_vision=True``.
+    """
+    model, provider = _vision_configured(cfg)
+    if model:
+        registered = _profile_for_model(cfg, model, VISION)
+        if (registered is not None and registered.enabled
+                and registered.supports_vision):
+            return registered
+        return _vision_model_profile(
+            cfg, model, _vision_provider(cfg, model, provider))
+    for p in load_profiles(cfg):
+        if p.enabled and p.supports_vision:
+            return p
+    installed = {n.lower() for n in _vision_installed_local(cfg)}
+    for candidate in VISION_LOCAL_CANDIDATES:
+        if candidate.lower() in installed:
+            return _vision_model_profile(cfg, candidate, "ollama")
+    return _vision_model_profile(cfg, VISION_LOCAL_CANDIDATES[0], "ollama")
+
+
 def _effective(cfg: Any, profile: ModelProfile, *, source: str
                ) -> EffectiveProfile:
     policy = _policy(cfg)
@@ -915,6 +1136,10 @@ def _pick(cfg: Any, *, role: str, profile_id: Optional[str],
     # record (keeps the model-profile inventory unchanged).
     if role == EMBEDDING:
         return default_embedding_profile(cfg), "embedding-default"
+    # The vision role must resolve to a model that can actually read pixels;
+    # the shipped chat default is text-only and must never be reported for it.
+    if role == VISION:
+        return default_vision_profile(cfg), "vision-default"
     # Operator-configured default (the reference's resolution): the config's
     # ``model`` default wins over the shipped default, but only when it maps to
     # a registered, role-eligible profile — a configured default can never be

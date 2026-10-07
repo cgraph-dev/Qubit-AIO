@@ -22,9 +22,28 @@ restore + warm probe, always restored via ``finally``):
   is the resident-restore report (automatic) plus no state written.
 
 Model routing stays brokered: the call uses the configured Ollama
-endpoint (same governor path as chat), the model comes from
-``intent.vision.model`` (default ``qwen3-vl:8b`` — also the ``turbo``
-tier), and nothing executes outside the gateway response.
+endpoint (same governor path as chat), and nothing executes outside the
+gateway response.
+
+Model authority (single source). The effective vision model is resolved by
+:func:`voicebridge.providers.resolver.default_vision_profile` — the SAME
+``role="vision"`` ladder the agent tool path uses, so this surface and the
+resolver can never disagree. That ladder, highest precedence first, is:
+
+1. an explicit ``model=`` / ``--model`` argument to :func:`describe`;
+2. ``auxiliary.vision.model`` (the reference per-task aux pin);
+3. ``intent.vision.model`` (the Qubit-native vision surface's own pin);
+4. a registered profile that declares ``supports_vision``;
+5. a known vision-capable local model that is actually installed;
+6. the shipped local VLM (``DEFAULT_VISION_MODEL``).
+
+:func:`find_vision_model` then binds that configured id to the concrete
+installed tag: the configured exact id/tag first, then the same family prefix
+(preferring ``:latest``), then — for a recognised VLM family or an unset id —
+any installed vision-capable model. A configured tag suffix is never silently
+dropped for whichever family sibling ``/api/tags`` happens to list first, and a
+custom-named configured model that is not installed is a typed refusal rather
+than a silent substitution for a different family.
 """
 from __future__ import annotations
 
@@ -32,6 +51,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import time
 import urllib.request
 from pathlib import Path
@@ -51,6 +71,14 @@ NO_BACKEND_CODE = "VISION_NO_BACKEND"
 VRAM_CODE = "VISION_VRAM_SHORT"
 TIMEOUT_CODE = "VISION_TIMEOUT"
 UPSTREAM_CODE = "VISION_UPSTREAM"
+#: A remote (API) vision target needs explicit owner approval before any image
+#: leaves the machine. This is the typed refusal when that approval is absent —
+#: never a silent local substitution and never a silent upload.
+EGRESS_APPROVAL_CODE = "VISION_EGRESS_APPROVAL_REQUIRED"
+#: The resolved remote vision profile is not executable under the frontier
+#: policy (disabled / not allowlisted / egress denied). Reusing the gateway's
+#: own code keeps the refusal consistent with every other frontier surface.
+EGRESS_DENIED_CODE = "EGRESS_DENIED"
 
 # magic-byte prefixes (and RIFF/WEBP special case below).
 MAGIC = {
@@ -77,6 +105,27 @@ def _redact(text: str) -> str:
     return redact_text(text)
 
 
+def _vision_authority_model(cfg: Any) -> str:
+    """Effective vision model id from the one resolver (the authority).
+
+    Reads :func:`voicebridge.providers.resolver.default_vision_profile` so the
+    CLI/dashboard vision surface and the resolver's ``role="vision"`` report the
+    SAME model (precedence documented in the module docstring). Best-effort: a
+    resolution failure yields ``""`` and the caller falls back to
+    ``intent.vision.model`` — this function never raises.
+    """
+    try:
+        from .providers import resolver as _resolver
+
+        profile = _resolver.default_vision_profile(cfg)
+        model = str(getattr(profile, "model", "") or "").strip()
+        if model:
+            return model
+    except Exception:  # noqa: BLE001 - resolution failure falls back below
+        pass
+    return ""
+
+
 def _settings(cfg: Any) -> Dict[str, Any]:
     get = (lambda *p, default=None: cfg.get(*p, default=default)) \
         if hasattr(cfg, "get") else (lambda *p, default=None: default)
@@ -89,9 +138,15 @@ def _settings(cfg: Any) -> Dict[str, Any]:
         max_mb = float(get("intent", "vision", "max_mb", default=DEFAULT_MAX_MB))
     except (TypeError, ValueError):
         max_mb = DEFAULT_MAX_MB
+    # The configured model comes from the ONE resolver vision ladder, so this
+    # surface and ``role="vision"`` agree; ``intent.vision.model`` remains the
+    # fallback when resolution is unavailable.
+    configured = _vision_authority_model(cfg)
+    model = configured or str(get("intent", "vision", "model",
+                                  default=DEFAULT_VISION_MODEL)
+                              or DEFAULT_VISION_MODEL)
     return {
-        "model": str(get("intent", "vision", "model",
-                         default=DEFAULT_VISION_MODEL) or DEFAULT_VISION_MODEL),
+        "model": model,
         "max_mb": max(1.0, min(max_mb, 100.0)),
         "timeout_s": max(MIN_TIMEOUT_S, min(timeout, MAX_TIMEOUT_S)),
     }
@@ -170,21 +225,110 @@ def _tags(url: str, timeout_s: float = 10.0) -> List[Dict[str, Any]]:
     return models if isinstance(models, list) else []
 
 
+#: Family prefixes that mark a locally installed model as vision-capable. The
+#: last-resort rung of :func:`find_vision_model` when the configured family is
+#: not installed at all. Deliberately conservative (a false positive would load
+#: a text model for image analysis); the ``vl``/``vlm``/``vision`` name token
+#: check catches the rest.
+_VISION_FAMILY_HINTS = (
+    "qwen3-vl", "qwen2.5-vl", "qwen2-vl", "qwen2.5vl", "qwen3vl",
+    "llava", "bakllava", "llama3.2-vision", "minicpm-v", "moondream",
+    "cogvlm", "internvl",
+)
+_VISION_NAME_TOKENS = ("vl", "vlm", "vision")
+
+
+def _vision_family(name: str) -> str:
+    """The family prefix before the first ``:`` (lower-cased)."""
+    return str(name or "").split(":", 1)[0].strip().lower()
+
+
+def _is_known_vision_family(name: str) -> bool:
+    """True when the family prefix names a recognised VLM family."""
+    family = _vision_family(name)
+    return bool(family) and any(
+        family == hint or family.startswith(hint) for hint in _VISION_FAMILY_HINTS)
+
+
+def _looks_vision_capable(name: str) -> bool:
+    """True when *name* looks like an installed vision model (family or token)."""
+    if _is_known_vision_family(name):
+        return True
+    tokens = (t for t in re.split(r"[^a-z0-9]+", str(name).lower()) if t)
+    return any(token in _VISION_NAME_TOKENS for token in tokens)
+
+
+def _vision_match_rank(name: str, want: str) -> Optional[int]:
+    """Rank an installed *name* against the configured *want* (lower = better).
+
+    ``0`` — the configured exact id/tag (including the implicit ``:latest``);
+    ``2`` — the same family prefix; ``3`` — any installed vision-capable model,
+    but only when the configured model is itself a recognised VLM family (or
+    unset) so a custom-named configured model is never silently swapped for a
+    different family; ``None`` — no match. This is the precedence contract: the
+    configured tag is honoured before a family sibling, which is honoured
+    before a known-VLM fallback.
+    """
+    nl = str(name or "").strip().lower()
+    if not nl:
+        return None
+    wl = str(want or "").strip().lower()
+    if wl:
+        if nl == wl:
+            return 0
+        if ":" not in wl and nl == f"{wl}:latest":
+            return 0
+        want_family = _vision_family(wl)
+        if want_family and _vision_family(nl) == want_family:
+            return 2
+        # A custom configured family that is not installed is a typed
+        # NO_BACKEND, never a silent substitution for a different model.
+        if not _is_known_vision_family(wl):
+            return None
+    if _looks_vision_capable(nl):
+        return 3
+    return None
+
+
 def find_vision_model(url: str, want: str,
                       timeout_s: float = 10.0) -> Dict[str, Any]:
-    """Locate the vision model in /api/tags (read-only, never loads)."""
-    base = (want or "").strip().split(":")[0].lower()
+    """Locate the best installed match for *want* (read-only, never loads).
+
+    Precedence: the CONFIGURED exact model id/tag first, then the same family
+    prefix (preferring ``:latest``), then — for a recognised VLM family or an
+    unset id — any installed vision-capable model. A configured tag suffix is
+    therefore honoured instead of being dropped for whichever family sibling
+    ``/api/tags`` lists first, and a custom configured model that is not
+    installed is a typed refusal rather than a silent substitution. Raises the
+    typed ``VISION_NO_BACKEND`` only when the endpoint answers but nothing
+    matches, and ``VISION_UPSTREAM`` when the endpoint cannot be reached.
+    """
+    want = (want or "").strip()
+    best_rank: Optional[int] = None
+    best: Optional[Dict[str, Any]] = None
     for entry in _tags(url, timeout_s):
         if not isinstance(entry, dict):
             continue
-        name = str(entry.get("name", ""))
-        if name.split(":")[0].lower() == base and base:
+        name = str(entry.get("name", "") or "").strip()
+        rank = _vision_match_rank(name, want)
+        if rank is None:
+            continue
+        # Lower rank wins; within a rank, prefer the implicit ``:latest`` tag,
+        # then keep the endpoint's own order (stable and deterministic).
+        prefer_latest = name.lower().endswith(":latest")
+        best_latest = bool(best) and str(best["name"]).lower().endswith(":latest")
+        if best is None or rank < best_rank or (
+            rank == best_rank and prefer_latest and not best_latest
+        ):
             try:
                 size_mib = float(entry.get("size", 0) or 0) / (1024 * 1024)
             except (TypeError, ValueError):
                 size_mib = 0.0
-            return {"name": name, "size_mib": size_mib,
+            best = {"name": name, "size_mib": size_mib,
                     "digest": str(entry.get("digest", ""))[:40]}
+            best_rank = rank
+    if best is not None:
+        return best
     raise VisionError(NO_BACKEND_CODE,
                       f"vision model {want!r} not installed; pull it with "
                       f"`ollama pull {want}` on a machine with headroom, or "
@@ -218,26 +362,91 @@ def _extract_reply(body: Any) -> str:
         return ""
 
 
+def vision_target(cfg: Any, model: str = "") -> Dict[str, Any]:
+    """Describe where the effective vision call would run (never sends).
+
+    Resolves the ``role="vision"`` EffectiveProfile through the one resolver
+    and reports whether it is LOCAL (no egress) or REMOTE (API/frontier), plus
+    the frontier-policy gate a remote target must pass. This is what the UI
+    consults to decide whether the approve/decline popup is required BEFORE any
+    image bytes move.
+
+    Never raises: a resolution failure yields ``remote=True`` with
+    ``executable=False`` and a typed reason, so the surface asks for approval
+    and then fails closed rather than silently assuming local.
+    """
+    want = (model or "").strip() or _settings(cfg)["model"]
+    try:
+        from .providers import resolver as _resolver
+
+        eff = _resolver.resolve(cfg, role=_resolver.VISION)
+    except Exception as exc:  # noqa: BLE001 - fail closed to "remote+denied"
+        return {"remote": True, "executable": False, "model": want,
+                "provider": "", "profile_id": "", "kind": "",
+                "locality": "external", "egress_required": True,
+                "egress_allowed": False, "policy_enabled": False,
+                "allowlisted": False, "reason": f"resolver:{type(exc).__name__}"}
+    remote = not eff.is_local
+    return {
+        "remote": remote, "executable": bool(eff.executable),
+        "model": eff.model or want, "provider": eff.provider,
+        "profile_id": eff.profile_id, "kind": eff.kind,
+        "locality": eff.locality, "egress_required": bool(eff.egress_required),
+        "egress_allowed": bool(eff.egress_allowed),
+        "policy_enabled": bool(eff.policy_enabled),
+        "allowlisted": bool(eff.allowlisted),
+        "source": eff.source, "base_url": eff.base_url,
+        "reason": "",
+    }
+
+
 def _analyze(cfg: Any, model: str, image_b64: str, prompt: str,
-             timeout_s: float) -> str:
+             timeout_s: float, *, mime: str = "",
+             approve_remote: bool = False) -> str:
     """Run one image analysis through the canonical provider authority.
 
-    The effective ``vision`` profile is resolved by ``providers.resolver`` and
-    the call executes via ``providers.gateway.run`` on the local route
-    (``keep_alive=0`` so the multi-GB model is never left resident).
+    The effective ``vision`` profile is resolved by ``providers.resolver``:
+
+    * **Local** (Ollama) — the pre-existing path, unchanged: the image is sent
+      as the Ollama ``images: [b64]`` message via ``local_mode="chat_raw"`` and
+      ``keep_alive=0`` so the multi-GB model is never left resident.
+    * **Remote** (API/frontier) — the image is translated to the OpenAI
+      content-block ``image_url`` shape and sent on the frontier route. Egress
+      is gated twice: (1) ``approve_remote`` must be true (the in-UI approval),
+      else a typed ``VISION_EGRESS_APPROVAL_REQUIRED``; (2) the frontier policy
+      (enabled / allowlist / egress) must make the profile executable, else the
+      gateway's typed ``EGRESS_DENIED``. There is never a silent local
+      substitution for a denied remote target.
     """
     from .providers import gateway as _gateway
+    from .providers import vision_payload as _vp
 
-    text = (prompt or "").strip()[:MAX_PROMPT_CHARS] or \
-        "Describe this image factually: main subjects, text visible, setting."
+    text = (prompt or "").strip()[:MAX_PROMPT_CHARS] or _vp.DEFAULT_VISION_PROMPT
+    target = vision_target(cfg, model)
+    remote = bool(target["remote"])
+    if remote:
+        if not approve_remote:
+            raise VisionError(
+                EGRESS_APPROVAL_CODE,
+                f"vision profile {target['profile_id']!r} "
+                f"({target['provider']}/{target['model']}) sends the image "
+                f"off-machine; explicit approval is required before upload")
+        shape = "openai"
+    else:
+        shape = "ollama"
+    messages = _vp.build_vision_messages(shape, text, image_b64, mime)
+    # ``model`` names the resolved profile so run_role executes the SAME
+    # target the resolver reported (local alias or remote model id).
+    kwargs: Dict[str, Any] = {}
+    if not remote:
+        kwargs = {"local_mode": "chat_raw", "keep_alive": 0}
     res = _gateway.run_role(
-        text, cfg, role="vision", model=model, max_tokens=512,
-        timeout_s=timeout_s, local_mode="chat_raw",
-        messages=[{"role": "user", "content": text,
-                   "images": [image_b64]}],
-        keep_alive=0)
+        text, cfg, role="vision", model=target["model"] or model,
+        max_tokens=512, timeout_s=timeout_s, messages=messages, **kwargs)
     if not res.ok:
         msg = str(res.message or "")
+        if res.code == EGRESS_DENIED_CODE:
+            raise VisionError(EGRESS_DENIED_CODE, f"vision egress denied: {msg}")
         if res.code == "TIMEOUT" or "timed out" in msg.lower():
             raise VisionError(TIMEOUT_CODE,
                               f"vision request timed out after {timeout_s:.0f}s")

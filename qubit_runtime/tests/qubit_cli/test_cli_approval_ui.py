@@ -5,7 +5,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import cli as cli_module
-from cli import HermesCLI
+from agent.i18n import t
+from cli import QubitCLI
 
 
 class _FakeBuffer:
@@ -19,7 +20,7 @@ class _FakeBuffer:
 
 
 def _make_cli_stub():
-    cli = HermesCLI.__new__(HermesCLI)
+    cli = QubitCLI.__new__(QubitCLI)
     cli._approval_state = None
     cli._approval_deadline = 0
     cli._approval_lock = threading.Lock()
@@ -206,12 +207,12 @@ class TestCliApprovalUi:
         rendered = "".join(text for _style, text in fragments)
 
         # All four choices visible even with a huge command.
-        for label in ("Allow once", "Allow for this session",
-                      "Add to permanent allowlist", "Deny"):
+        for key in ("approval_once", "approval_session", "approval_always", "approval_deny"):
+            label = t(f"cli.tui.{key}")
             assert label in rendered, f"choice {label!r} missing"
 
         # Command got truncated with a marker.
-        assert "(command truncated" in rendered
+        assert t("cli.tui.approval_command_truncated") in rendered
 
     def test_background_task_registers_thread_local_approval_callbacks(self):
         """Background /btw tasks must use the prompt_toolkit approval UI.
@@ -258,9 +259,9 @@ class TestCliApprovalUi:
                 _thread.join(timeout=10)
 
         assert seen["approval"].__self__ is cli
-        assert seen["approval"].__func__ is HermesCLI._approval_callback
+        assert seen["approval"].__func__ is QubitCLI._approval_callback
         assert seen["sudo"].__self__ is cli
-        assert seen["sudo"].__func__ is HermesCLI._sudo_password_callback
+        assert seen["sudo"].__func__ is QubitCLI._sudo_password_callback
         assert not cli._background_tasks
 
 
@@ -271,7 +272,7 @@ def _make_real_paint_cli_stub():
     _last_invalidate inside the throttle window. A throttled _invalidate() would
     be dropped under these conditions — _paint_now must paint regardless.
     """
-    cli = HermesCLI.__new__(HermesCLI)
+    cli = QubitCLI.__new__(QubitCLI)
     cli._approval_state = None
     cli._approval_deadline = 0
     cli._approval_lock = threading.Lock()
@@ -282,8 +283,8 @@ def _make_real_paint_cli_stub():
     cli._clarify_deadline = 0
     cli._modal_input_snapshot = None
     # Real methods, not mocks.
-    cli._paint_now = HermesCLI._paint_now.__get__(cli, HermesCLI)
-    cli._invalidate = HermesCLI._invalidate.__get__(cli, HermesCLI)
+    cli._paint_now = QubitCLI._paint_now.__get__(cli, QubitCLI)
+    cli._invalidate = QubitCLI._invalidate.__get__(cli, QubitCLI)
     cli._resize_recovery_pending = True       # gate 1: resize in flight
     cli._last_invalidate = time.monotonic()   # gate 2: inside throttle window
     cli._app = SimpleNamespace(invalidate=MagicMock(), current_buffer=_FakeBuffer())
@@ -456,7 +457,9 @@ class TestPersistPromptSummary:
         result = {}
 
         def _run():
-            result["value"] = cli._clarify_callback("Pick a path?", ["A", "B"])
+            result["value"] = cli._clarify_callback([{
+                "qid": "q0", "question": "Pick a path?", "choices": ["A", "B"],
+                "choices_offered": ["A", "B"], "multi_select": False}])
 
         with patch.object(cli_module, "_cprint", printed.append):
             t = threading.Thread(target=_run, daemon=True)
@@ -464,10 +467,10 @@ class TestPersistPromptSummary:
             deadline = time.time() + 2
             while cli._clarify_state is None and time.time() < deadline:
                 time.sleep(0.01)
-            cli._clarify_state["response_queue"].put("B")
+            cli._clarify_batch_lock(cli._clarify_state, "B")
             t.join(timeout=2)
 
-        assert result["value"] == "B"
+        assert result["value"] == {"answers": {"q0": "B"}, "outcome": "submitted"}
         summary = "\n".join(printed)
         assert "Clarify" in summary
         assert "Pick a path?" in summary
@@ -514,7 +517,7 @@ class TestClearOverlaysForInterrupt:
 
         # Each blocked thread would have received a terminal value.
         assert approval_q.get_nowait() == "deny"
-        assert clarify_q.get_nowait()  # cancellation sentinel string
+        assert clarify_q.get_nowait() is None
         assert sudo_q.get_nowait() == ""
         assert secret_q.get_nowait() == ""
 
@@ -536,7 +539,7 @@ class TestClearOverlaysForInterrupt:
 
         assert cli._approval_state is None  # cleared despite dead queue
         assert cli._clarify_state is None
-        assert clarify_q.get_nowait()
+        assert clarify_q.get_nowait() is None
 
     def test_interrupt_unblocks_thread_blocked_on_approval(self):
         """End-to-end: a worker blocked on the approval queue unblocks when the

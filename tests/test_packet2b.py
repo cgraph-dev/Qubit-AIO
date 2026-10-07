@@ -79,7 +79,7 @@ def test_publish_and_subscribe_are_serialized_no_missed_window(tmp_path):
     hub.unsubscribe(sub)
 
 
-def test_slow_subscriber_overflow_signals_resync_without_data_loss(tmp_path):
+def test_slow_subscriber_overflow_signals_gap_without_interrupting_stream(tmp_path):
     hub = EventHub(EventJournal(tmp_path / "t.jsonl", fsync=False),
                    max_queue=3)
     sub = hub.subscribe()
@@ -90,10 +90,22 @@ def test_slow_subscriber_overflow_signals_resync_without_data_loss(tmp_path):
     assert sub.overflow is True                      # oldest dropped
     assert [r["value"]["i"] if isinstance(r["value"], dict) else r["value"]
             for r in drained][-1:] == [5]            # newest survived
+    # No cursor gap: everything dropped (seqs 1..3) is at/below the cursor the
+    # client already holds (seq 5 was delivered), so continuing is enough and
+    # the server must NOT demand a client resync.
+    assert sub.take_gap(5) == 0
+    assert sub.take_gap(5) == 0                       # not demanded twice
+    # A genuine gap: the client cursor sits below dropped frames — that is the
+    # one case that still signals resync (replay from the journal).
+    sub.drain(timeout=0.1)
+    for i in range(6, 12):
+        hub.publish(make_event("CUSTOM", name="n", value=i))
+    sub.drain(timeout=0.5)
+    assert sub.take_gap(7) != 0
     # recovery path: a fresh client (default-capacity hub over the SAME
     # journal) replays everything the slow subscriber dropped
     sub2 = EventHub(EventJournal(tmp_path / "t.jsonl", fsync=False)).subscribe()
-    assert [r["seq"] for r in sub2.drain(timeout=0.1)] == [1, 2, 3, 4, 5, 6]
+    assert [r["seq"] for r in sub2.drain(timeout=0.1)] == list(range(1, 13))
     hub.unsubscribe(sub)
     hub.unsubscribe(sub2)
     assert resync_frame().startswith(": resync")

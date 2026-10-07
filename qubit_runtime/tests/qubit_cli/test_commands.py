@@ -3,7 +3,7 @@
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
-from qubit_cli.commands import COMMAND_REGISTRY, COMMANDS_BY_CATEGORY, CommandDef, GATEWAY_KNOWN_COMMANDS, gateway_help_lines, infer_argument_mode, resolve_command
+from qubit_cli.commands import COMMAND_REGISTRY, COMMANDS_BY_CATEGORY, CommandDef, GATEWAY_KNOWN_COMMANDS, command_desktop_meta, gateway_help_lines, infer_argument_mode, resolve_command
 from qubit_cli.commands_completion import SlashCommandAutoSuggest, SlashCommandCompleter
 from qubit_cli.commands_platforms import _CMD_NAME_LIMIT, _SLACK_RESERVED_COMMANDS, _SLACK_VIA_HERMES_ONLY, _clamp_command_names, _sanitize_telegram_name, slack_app_manifest, slack_native_slashes, slack_subcommand_map, telegram_bot_commands, telegram_menu_commands
 
@@ -41,6 +41,29 @@ class TestCommandRegistry:
                     assert resolve_command(alias).name == cmd.name or alias == cmd.name, \
                         f"Alias '{alias}' of '{cmd.name}' shadows canonical '{target.name}'"
 
+    def test_skills_desktop_meta_limits_exec_to_review_subcommands(self):
+        # #98330: /skills mixes desktop-relevant write-approval review verbs with CLI-hub
+        # mutations; desktop_subcommands exposes only the review slice to the desktop
+        # surface (completion + exec) without widening the whole family.
+        skills = resolve_command("skills")
+        assert skills is not None
+        assert skills.desktop is None
+        assert command_desktop_meta(skills) == {
+            "argument_mode": "options",
+            "desktop": None,
+            "desktop_subcommands": ["pending", "approve", "reject", "diff", "approval"],
+        }
+        assert set(skills.desktop_subcommands or ()) <= set(skills.subcommands)
+
+    def test_empty_desktop_subcommand_scope_serializes_as_deny_all(self):
+        assert command_desktop_meta(
+            CommandDef("demo", "Demo", "Session", desktop_subcommands=())
+        ) == {
+            "argument_mode": None,
+            "desktop": None,
+            "desktop_subcommands": [],
+        }
+
 
     def test_argument_mode_infers_text_from_any_args_hint(self):
         assert infer_argument_mode(CommandDef("demo", "Demo", "Session", args_hint="<prompt>")) == "text"
@@ -51,6 +74,24 @@ class TestCommandRegistry:
 # ---------------------------------------------------------------------------
 # resolve_command tests
 # ---------------------------------------------------------------------------
+
+class TestResolveCommandAliases:
+    """One-letter aliases resolve to their command, never a longer canonical
+    (exact lookup treats the alias as a full name — /s is not a /sessions prefix)."""
+
+    def test_q_resolves_to_queue(self):
+        cmd = resolve_command("q")
+        assert cmd is not None and cmd.name == "queue"
+
+    def test_s_resolves_to_steer(self):
+        cmd = resolve_command("s")
+        assert cmd is not None and cmd.name == "steer"
+
+    def test_exact_names_still_win_over_the_alias(self):
+        cmd = resolve_command("sessions")
+        assert cmd is not None and cmd.name == "sessions"
+        cmd = resolve_command("steer")
+        assert cmd is not None and cmd.name == "steer"
 
 
 
@@ -185,7 +226,7 @@ class TestSlackNativeSlashes:
         slack_norm = {_norm(n) for n in slack_names}
         tg_norm = {_norm(n) for n in tg_names}
         reserved_norm = {_norm(n) for n in _SLACK_RESERVED_COMMANDS}
-        # Commands deliberately routed through /hermes <command> on Slack only
+        # Commands deliberately routed through /qubit <command> on Slack only
         # (Slack's 50-slash cap) are expected to be absent from native slashes.
         via_qubit_norm = {_norm(n) for n in _SLACK_VIA_HERMES_ONLY}
         missing = (tg_norm - slack_norm) - reserved_norm - via_qubit_norm
@@ -195,7 +236,7 @@ class TestSlackNativeSlashes:
 
 
 class TestSlackAppManifest:
-    """Generated Slack app manifest (used by `hermes slack manifest`)."""
+    """Generated Slack app manifest (used by `qubit slack manifest`)."""
 
 
     def test_each_slash_has_required_fields(self):

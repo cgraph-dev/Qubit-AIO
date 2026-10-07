@@ -1,6 +1,6 @@
 """Regression tests for /model support of config.yaml custom_providers.
 
-The terminal `hermes model` flow already exposes `custom_providers`, but the
+The terminal `qubit model` flow already exposes `custom_providers`, but the
 shared slash-command pipeline (`/model` in CLI/gateway/Telegram) historically
 only looked at `providers:`.
 
@@ -288,6 +288,40 @@ def test_providers_singular_model_does_not_suppress_ollama_native_discovery(monk
     assert ollama["models"] == ["qwen3:latest", "llama3.2:latest"]
 
 
+def test_list_splits_comma_chain_custom_provider_model(monkeypatch):
+    """A comma-separated custom-provider ``model:`` chain surfaces as individual entries.
+
+    Regression (fixes #50557): picker rows are fed from ``list_authenticated_providers``
+    and previously rendered the whole fallback chain as one dropdown entry. The raw chain
+    stays first so the server-side fallback behaviour remains the default pick.
+    """
+    monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
+    monkeypatch.setattr(providers_mod, "HERMES_OVERLAYS", {})
+
+    providers = list_authenticated_providers(
+        current_provider="openai-codex",
+        user_providers={},
+        custom_providers=[
+            {
+                "name": "Volcengine Agent Plan",
+                "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+                "model": "deepseek-v4-flash, deepseek-v4-pro, glm-5.2, deepseek-v4-flash",
+            }
+        ],
+        max_models=50,
+    )
+
+    rows = [p for p in providers if p["name"] == "Volcengine Agent Plan"]
+    assert len(rows) == 1
+    assert rows[0]["models"] == [
+        "deepseek-v4-flash, deepseek-v4-pro, glm-5.2, deepseek-v4-flash",
+        "deepseek-v4-flash",
+        "deepseek-v4-pro",
+        "glm-5.2",
+    ]
+    assert rows[0]["total_models"] == 4
+
+
 def test_list_authenticated_providers_can_skip_custom_provider_live_probe(monkeypatch):
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     monkeypatch.setattr(providers_mod, "HERMES_OVERLAYS", {})
@@ -483,7 +517,7 @@ def test_switch_to_bare_custom_from_another_provider_resolves_the_configured_end
     """#73680: the per-turn config sync adopting ``provider: custom`` from an OpenRouter session
     must land on the configured custom endpoint, not pair the new model with OpenRouter's URL
     and key."""
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "qubit-home"
     home.mkdir()
     (home / "config.yaml").write_text(
         "model:\n  default: qwen3:8b\n  provider: custom\n  base_url: http://127.0.0.1:11434/v1\n",
@@ -515,7 +549,7 @@ def test_switch_to_bare_custom_with_no_configured_endpoint_keeps_the_current_one
     """#74143 shape on the switched-provider path: with no ``model.base_url`` the bare-custom
     resolver lands on OpenRouter's default whenever an OpenRouter key exists — a host the user
     never picked. An Anthropic session must stay on its own endpoint instead."""
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "qubit-home"
     home.mkdir()
     (home / "config.yaml").write_text("model:\n  default: m\n  provider: anthropic\n", encoding="utf-8")
     monkeypatch.setenv("QUBIT_HOME", str(home))
@@ -561,7 +595,7 @@ def test_switch_to_bare_custom_ignores_an_openrouter_mirror(monkeypatch, tmp_pat
     ``custom``, the ladder's last rung hands back that mirror — a host the user configured for
     OpenRouter — with the ``no-key-required`` placeholder. It must not replace the session's own
     endpoint and key (the switched arm used to adopt it, dropping a working credential)."""
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "qubit-home"
     home.mkdir()
     (home / "config.yaml").write_text("model:\n  default: m\n  provider: custom\n", encoding="utf-8")
     monkeypatch.setenv("QUBIT_HOME", str(home))
@@ -774,7 +808,7 @@ def test_custom_provider_no_key_singular_model_still_probes_live_models(monkeypa
     """A singular ``model:`` is the active selection, not an explicit catalog.
 
     No-key local OpenAI-compatible endpoints such as llama.cpp should still be
-    probed so /model matches the terminal ``hermes model`` flow. Ollama-native
+    probed so /model matches the terminal ``qubit model`` flow. Ollama-native
     discovery is covered separately with a fake ``/api/tags`` server.
     """
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
@@ -1412,7 +1446,7 @@ def test_lmstudio_bare_providers_block_does_not_hide_live_catalog(monkeypatch):
     row = rows[0]
     assert sorted(row["models"]) == sorted(live_catalog)
     assert row["total_models"] == len(live_catalog)
-    assert row["source"] == "hermes"
+    assert row["source"] == "qubit"
 
 
 def test_lmstudio_providers_block_with_explicit_endpoint_still_uses_section3(monkeypatch):
@@ -1701,14 +1735,14 @@ def test_save_discovered_models_preserves_dict_form(monkeypatch):
 
 
 def test_model_flow_named_custom_persists_discovered_models(monkeypatch):
-    """The ``hermes model`` named-custom-provider flow persists the discovered
+    """The ``qubit model`` named-custom-provider flow persists the discovered
     catalog back to the entry's ``models:`` list.
 
     No-probe surfaces (dashboard, desktop, ACP) call
     ``build_models_payload(..., probe_custom_providers=False)`` and only show
     the configured ``models:`` list. The CLI flow probes and shows the full
     catalog but (before this fix) never saved it, so a provider added via
-    ``hermes model`` collapsed to the single ``model:`` default everywhere but
+    ``qubit model`` collapsed to the single ``model:`` default everywhere but
     the CLI. It must persist discovered models the same way the picker path in
     ``_save_discovered_models_to_config`` does.
     """
@@ -1850,7 +1884,7 @@ def test_excluded_providers_hides_builtin_row(monkeypatch):
 def test_custom_provider_context_length_models_dict_still_probes(monkeypatch):
     """Dict-shaped ``models:`` from ``_save_custom_provider`` is metadata.
 
-    ``hermes model`` writes ``models: {default: {context_length: N}}`` for
+    ``qubit model`` writes ``models: {default: {context_length: N}}`` for
     local Ollama. That must not suppress live /v1/models discovery — otherwise
     Desktop/Telegram only show the saved default and Refresh does nothing.
     """

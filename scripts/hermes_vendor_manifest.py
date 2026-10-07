@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Generate the per-file provenance manifests for the Qubit-owned Hermes fork.
+"""Generate the per-file provenance manifests for the vendored Qubit runtime.
 
-The Qubit product executes a Qubit-owned fork of the pinned Hermes source
+Qubit is a personal AI agent (docs/IDENTITY.md) whose runtime is built on
+vendored upstream source, renamed into the Qubit namespace
 (see docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md). This script
-records, for every file in the local fork, the pinned upstream revision, the
+records, for every file in the vendored tree, the pinned upstream revision, the
 upstream git blob hash, the upstream blob sha256, the local sha256, and a
 six-way classification (UNCHANGED / QUBIT_PATCHED / OPENCLAW_OVERLAY /
 QUBIT_ADDED / MISSING / INTENTIONALLY_OMITTED) plus EOL-normalization notes.
@@ -71,7 +72,7 @@ _CLASSIFICATIONS = (
     MISSING, INTENTIONALLY_OMITTED, EOL_NORMALIZED,
 )
 
-# Documented Qubit patches (or intentional divergence) in the vendored fork.
+# Documented Qubit patches (or intentional divergence) in the vendored runtime.
 #
 # The shipped Qubit runtime is a *maintained source-level rebrand* of the pinned
 # upstream (owner amendment 2026-09-18). Pristine upstream byte identity is
@@ -119,16 +120,16 @@ _QUBIT_PATCH_SPEC: dict[str, dict] = {
 }
 # OpenClaw source is behaviourally adapted, never vendored into qubit_runtime/.
 _OPENCLAW_OVERLAY: set[str] = set()
-# Upstream files deliberately not vendored into the fork (none at present).
+# Upstream files deliberately not vendored into the runtime (none at present).
 _INTENTIONAL_OMISSIONS: dict[str, str] = {}
-# Upstream test trees are reference-only, never shipped product: the fork ships
-# its own test suite (repo ``tests/`` + vendored ``qubit_runtime/tests``).
+# Upstream test trees are reference-only, never shipped product: the vendored
+# runtime ships its own test suite (repo ``tests/`` + vendored ``qubit_runtime/tests``).
 # Recording thousands of upstream pytest files as ``missing_from_local`` hid
 # the real product-code sync gap, so they are classified
 # INTENTIONALLY_OMITTED by this deterministic prefix rule (still listed in the
 # artifact as ``omitted``, never silently dropped).
 _INTENTIONALLY_OMITTED_PREFIXES: tuple[tuple[str, str], ...] = (
-    ("tests/", "upstream test suite is reference-only; the fork ships its own tests"),
+    ("tests/", "upstream test suite is reference-only; the vendored runtime ships its own tests"),
     ("tests-js/", "upstream JS test harness is reference-only"),
 )
 
@@ -144,7 +145,7 @@ def _intentional_omission_reason(rel: str) -> str | None:
     # are reference-only like the tests/ tree.
     if "/__tests__/" in rel or rel.endswith((".test.ts", ".test.tsx",
                                              ".test.js", ".test.jsx")):
-        return "upstream unit test is reference-only; the fork ships its own tests"
+        return "upstream unit test is reference-only; the vendored runtime ships its own tests"
     # Legacy-named skill content whose canonical de-branded Qubit counterpart
     # is already vendored (hermes-agent -> qubit-agent,
     # hermes-agent-skill-authoring -> qubit-agent-skill-authoring,
@@ -165,7 +166,7 @@ def _intentional_omission_reason(rel: str) -> str | None:
 # ---------------------------------------------------------------------------
 # Deep source rebrand path renames (owner amendment 2026-09-19)
 #
-# The shipped fork renamed upstream modules/dirs/files. A renamed file is NOT a
+# The shipped runtime renamed upstream modules/dirs/files. A renamed file is NOT a
 # missing file: this map translates an upstream path to its shipped Qubit path
 # so the comparison is path-aware. Content changes on renamed files are owned by
 # the deep-rebrand patch reason below.

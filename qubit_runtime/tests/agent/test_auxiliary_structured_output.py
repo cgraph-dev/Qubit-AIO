@@ -110,6 +110,24 @@ def test_known_unsupported_route_skips_response_format_before_first_request():
     assert "response_format" not in custom_deepseek.get("extra_body", {})
 
 
+def test_relay_serving_a_profiled_family_inherits_its_unsupported_formats():
+    """An aggregator/relay route (opencode-go) serving a profiled family's model (``deepseek-*``)
+    drops ``json_schema`` up front: the relay's 400 carries no capability marker, so the memo can
+    never learn it, and the family's own profile declares the restriction."""
+    messages = [{"role": "user", "content": "hi"}]
+    relay = _build_call_kwargs(
+        "opencode-go", "deepseek-v4.1-flash", messages,
+        extra_body={"response_format": dict(_JSON_SCHEMA)},
+        base_url="https://opencode.ai/zen/go/v1", task="title_generation")
+    assert "response_format" not in relay.get("extra_body", {})
+
+    # A non-deepseek model on the same relay keeps the field (the restriction is family-scoped).
+    sibling = _build_call_kwargs(
+        "opencode-go", "gpt-5-mini", messages, extra_body={"response_format": dict(_JSON_SCHEMA)},
+        base_url="https://opencode.ai/zen/go/v1")
+    assert sibling["extra_body"]["response_format"] == _JSON_SCHEMA
+
+
 def test_rejection_memo_is_per_model_and_ignores_schema_validation_errors():
     """One model's ``json_schema`` rejection on an aggregator host must not strip the field for every other
     model on that host, and a schema-VALIDATION 400 from a json_schema-capable provider is retried but

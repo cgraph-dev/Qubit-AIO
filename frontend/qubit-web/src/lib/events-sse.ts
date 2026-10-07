@@ -12,9 +12,10 @@
  *   - ``retry: 3000`` on connect;
  *   - ``id: <journal-seq>`` + ``data: <AG-UI json>`` per event;
  *   - ``: ping`` comment heartbeats every ~15s;
- *   - ``: resync`` / ``event: resync`` / ``data: {}`` when a slow client's
- *     queue overflowed — the client drops its cursor and replays from the
- *     durable journal.
+ *   - ``: resync`` / ``event: resync`` / ``data: {}`` only on a *genuine*
+ *     journal cursor gap (a dropped seq above the client's cursor) — the
+ *     client resumes from the retained ``lastSeq`` and the journal replay
+ *     fills the gap; it does NOT restart cold.
  * Replay resumes from ``?last_seq=<id>`` (the client-side equivalent of the
  * ``Last-Event-ID`` request header).
  */

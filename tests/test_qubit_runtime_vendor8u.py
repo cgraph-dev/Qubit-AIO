@@ -1,9 +1,9 @@
-"""Qubit-owned Hermes runtime fork — provenance and behavior proofs.
+"""Vendored Qubit runtime — provenance and behavior proofs.
 
-The product executes a Qubit-owned fork of the pinned Hermes source from this
+The product executes from the vendored runtime built on the pinned upstream source in this
 tree (docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md). These tests
-prove the fork is present, byte-identical to the pin (per the per-file
-manifest), importable, and that the real Hermes CLI runs in-process from the
+prove the vendored runtime is present, byte-identical to the pin (per the per-file
+manifest), importable, and that the real upstream CLI runs in-process from the
 Qubit launcher — not from an external installation.
 """
 from __future__ import annotations

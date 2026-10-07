@@ -3,6 +3,14 @@
 **Status: HISTORICAL EVIDENCE ONLY. Do not treat anything in this directory as
 current project status, current instructions, or a current completion claim.**
 
+> **Identity note (2026-10-07).** Files in this directory frequently describe
+> Qubit as "a fork" (e.g. "the Qubit-owned fork of the pinned Hermes source").
+> That wording is superseded: Qubit is a **personal AI agent** whose runtime is
+> built on vendored upstream source. Upstream lineage is provenance, not
+> identity. The canonical, current statement is `docs/IDENTITY.md`. This note
+> does not rewrite any frozen file — their content stands as written on their own
+> dates.
+
 This directory preserves superseded, contradictory, and superseded-by-newer
 agent reports, wave evidence, and earlier inventories. Files here are kept for
 provenance and audit; they are **not** authoritative context. For current truth

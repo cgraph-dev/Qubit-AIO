@@ -71,7 +71,7 @@ def test_repair_then_prune_leaves_repo_walkable(tmp_path):
     """The production updater sequence: repair runs, then the prune immediately after.
 
     Without the prune's ``--reflog`` fail-safe walk, the prune dropped the boundary
-    repair had just restored, re-breaking the repo on every ``hermes update`` run.
+    repair had just restored, re-breaking the repo on every ``qubit update`` run.
     """
     clone = fixture(tmp_path)
     corrupt_fixture(clone)
@@ -177,6 +177,17 @@ def test_failed_shallow_maintenance_restores_original_bytes(tmp_path, caplog, op
 def test_bom_shallow_prune_rolls_back_without_losing_bytes(tmp_path, caplog, bom):
     clone = fixture(tmp_path)
     shallow = clone / ".git/shallow"
+    # Pin the droppable graft in HEAD's reflog while the file still parses:
+    # user reflogs are never expired (#124645 only expires fetch reflogs), so
+    # the fail-safe must roll back. (Before #124645 the CRLF-only case rolled
+    # back only because the fetch reflog pinned the graft — the very
+    # accumulation that issue fixes.)
+    head_sha = git(clone, "rev-parse", "HEAD").stdout.strip()
+    tip_sha = git(clone, "rev-parse", "origin/main").stdout.strip()
+    middle_sha = next(line for line in shallow.read_text().splitlines()
+                      if line and line not in (head_sha, tip_sha))
+    git(clone, "checkout", "-q", middle_sha)
+    git(clone, "checkout", "-q", "main")
     original = bom + shallow.read_bytes().replace(b"\n", b"\r\n")
     shallow.write_bytes(original)
     with caplog.at_level("DEBUG", logger="qubit_cli.gitlock"):

@@ -62,7 +62,7 @@ def _install_example_plugin(_isolate_qubit_home):
     isolated ``QUBIT_HOME``.
 
     The user-plugin source is preferred over a transient
-    ``HERMES_BUNDLED_PLUGINS`` override because the bundled dir is
+    ``QUBIT_BUNDLED_PLUGINS`` override because the bundled dir is
     resolved per-call (other tests in the suite implicitly rely on the
     real bundled plugins — kanban, qubit-achievements, model providers
     — being available, and globally swapping that root would yank them
@@ -163,7 +163,7 @@ class TestReloadEnv:
 
 
     def test_removes_deleted_known_vars(self, tmp_path):
-        """reload_env() removes known Qubit vars not present in .env."""
+        """reload_env() removes known Hermes vars not present in .env."""
         env_file = tmp_path / ".env"
         env_file.write_text("")  # empty .env
         # Pick a known key from OPTIONAL_ENV_VARS
@@ -192,7 +192,7 @@ class TestRedactKey:
 
 
 class TestSessionTokenInjection:
-    """The desktop shell mints HERMES_DASHBOARD_SESSION_TOKEN and signs its
+    """The desktop shell mints QUBIT_DASHBOARD_SESSION_TOKEN and signs its
     /api + /api/ws calls with it. The backend must adopt that token, else every
     desktop request 401s ("gateway is offline"). A main-merge once silently
     dropped this read — this guards the contract, not a literal value.
@@ -203,7 +203,7 @@ class TestSessionTokenInjection:
 
         original_app = ws.app
         original_token = ws._SESSION_TOKEN
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
+        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
         assert ws._resolve_session_token() == "desktop-seeded-token"
         # No module reload: the loaded app and its adopted token are untouched.
         assert ws.app is original_app
@@ -217,9 +217,9 @@ class TestSessionTokenInjection:
         original_app = ws.app
         original_header_name = ws._SESSION_HEADER_NAME
         original_token = ws._SESSION_TOKEN
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
+        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
         assert ws._resolve_session_token() == "desktop-seeded-token"
-        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.delenv("QUBIT_DASHBOARD_SESSION_TOKEN", raising=False)
         with patch.object(ws.secrets, "token_urlsafe", return_value="generated-token"):
             assert ws._resolve_session_token() == "generated-token"
 
@@ -842,7 +842,7 @@ class FlatProvMemoryProvider(MemoryProvider):
             {"key": "mode", "label": "Mode", "choices": ["cloud", "local_external"], "default": "cloud"},
             {"key": "api_url", "label": "API URL", "default": ""},
             {"key": "api_key", "label": "API key", "secret": True, "env_var": "FLATPROV_API_KEY"},
-            {"key": "bank_id", "label": "Bank", "default": "hermes"},
+            {"key": "bank_id", "label": "Bank", "default": "qubit"},
             {"key": "recall_budget", "label": "Budget", "choices": ["low", "mid", "high"], "default": "mid"},
         ]
 
@@ -931,15 +931,16 @@ CONFIG_SCHEMA = ProviderConfigSchema(
             return real_run(command, **kwargs)
 
         monkeypatch.setattr(web_server.subprocess, "run", guarded_run)
+        self._install_flatprov()
 
-        resp = self.client.post("/api/memory/providers/honcho/setup", json={"values": {}})
+        resp = self.client.post("/api/memory/providers/flatprov/setup", json={"values": {}})
 
         assert resp.status_code == 200
         data = resp.json()
         pip_rows = [row for row in data["results"] if row["kind"] == "pip"]
         assert pip_rows and pip_rows[0]["status"] == "installed"
         assert pip_rows[0]["command"] == "qubit pm install"
-        assert prepared == ["honcho"]
+        assert prepared == ["flatprov"]
 
 
     def test_put_memory_provider_config_writes_config_and_secret(self):
@@ -983,7 +984,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
                     "mode": "cloud",
                     "api_url": "https://api.example.invalid",
                     "api_key": "secret-value",
-                    "bank_id": "hermes",
+                    "bank_id": "qubit",
                     "recall_budget": "mid",
                 }
             },
@@ -999,42 +1000,103 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert "secret-value" not in json.dumps(data)
 
 
-    # ── Memory provider config (Honcho host-block backend) ──────────────
+    # ── Memory provider config (host-block backend) ─────────────────────
+    # ``honcho_host_block`` storage is a host contract a catalog provider opts into. The core
+    # router reaches four names in the provider's own modules; this fixture is that contract.
 
-    @pytest.fixture(autouse=True)
-    def _isolate_honcho_config(self):
-        # Honcho tests write the suite-wide QUBIT_HOME honcho.json; snapshot and
-        # restore it so provider status/config state never leaks across tests.
+    _HOSTPROV_INIT = """
+from agent.memory_provider import MemoryProvider
+
+
+class HostProv(MemoryProvider):
+    name = "hostprov"
+
+    def is_available(self):
+        return True
+
+    def initialize(self, session_id, **kwargs):
+        pass
+
+    def get_tool_schemas(self):
+        return []
+
+
+def register(ctx):
+    ctx.register_memory_provider(HostProv())
+"""
+    _HOSTPROV_CLIENT = """
+from qubit_constants import get_qubit_home
+
+
+def resolve_active_host():
+    return "qubit"
+
+
+def resolve_config_path():
+    return get_qubit_home() / "hostprov.json"
+
+
+def _host_block(cfg, host):
+    return (cfg.get("hosts") or {}).get(host) or {}
+"""
+    _HOSTPROV_OAUTH = """
+import contextlib
+import json
+import threading
+
+ACCESS_TOKEN_PREFIX = "oat_"
+_refresh_lock = threading.Lock()
+
+
+@contextlib.contextmanager
+def _config_refresh_lock(path):
+    yield
+
+
+def _read_config_strict(path):
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+"""
+    _HOSTPROV_SCHEMA = """
+from plugins.memory.config_schema import (
+    KIND_SECRET, KIND_SELECT, KIND_TEXT, STORAGE_HONCHO_HOST_BLOCK, ProviderConfigSchema, ProviderField,
+    ProviderFieldOption,
+)
+
+CONFIG_SCHEMA = ProviderConfigSchema(
+    name="hostprov",
+    label="Host-block Provider",
+    storage=STORAGE_HONCHO_HOST_BLOCK,
+    fields=(
+        ProviderField(key="apiKey", label="API key", kind=KIND_SECRET, description="", env_key="HOSTPROV_API_KEY"),
+        ProviderField(key="baseUrl", label="Base URL", kind=KIND_TEXT, description="", scope="root"),
+        ProviderField(key="environment", label="Environment", kind=KIND_SELECT, description="", default="production",
+                      options=(ProviderFieldOption("production", "Cloud"), ProviderFieldOption("local", "Local"))),
+        ProviderField(key="workspace", label="Workspace", kind=KIND_TEXT, description=""),
+        ProviderField(key="peerName", label="Peer name", kind=KIND_TEXT, description=""),
+        ProviderField(key="aiPeer", label="AI peer", kind=KIND_TEXT, description=""),
+        ProviderField(key="sessionStrategy", label="Session strategy", kind=KIND_TEXT, description=""),
+    ),
+)
+"""
+
+    def _install_hostprov(self):
         from qubit_constants import get_qubit_home
 
-        path = get_qubit_home() / "honcho.json"
-        before = path.read_bytes() if path.exists() else None
-        yield
-        if before is None:
-            path.unlink(missing_ok=True)
-        else:
-            path.write_bytes(before)
+        plugin_dir = get_qubit_home() / "plugins" / "hostprov"
+        plugin_dir.mkdir(parents=True, exist_ok=True)
+        for module, source in (("__init__", self._HOSTPROV_INIT), ("client", self._HOSTPROV_CLIENT),
+                               ("oauth", self._HOSTPROV_OAUTH), ("config_schema", self._HOSTPROV_SCHEMA)):
+            (plugin_dir / f"{module}.py").write_text(source, encoding="utf-8")
+        config_path = get_qubit_home() / "hostprov.json"
+        config_path.write_text("{}", encoding="utf-8")
+        return config_path
 
-    @staticmethod
-    def _seed_local_honcho(cfg=None):
-        from qubit_constants import get_qubit_home
-
-        path = get_qubit_home() / "honcho.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(cfg if cfg is not None else {}), encoding="utf-8")
-        return path
-
-
-    def test_put_honcho_writes_host_block_root_and_secret(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HOME", str(tmp_path))
-        monkeypatch.setenv("HONCHO_API_KEY", "guard")
-        monkeypatch.delenv("HONCHO_API_KEY")
-        self._seed_local_honcho()
-        from qubit_constants import get_qubit_home
+    def test_put_host_block_writes_host_block_root_and_secret(self):
         from qubit_cli.config import load_config, load_env
 
+        config_path = self._install_hostprov()
         resp = self.client.put(
-            "/api/memory/providers/honcho/config?surface=declared",
+            "/api/memory/providers/hostprov/config?surface=declared",
             json={
                 "values": {
                     "apiKey": "hch-test-key",
@@ -1042,7 +1104,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
                     "environment": "local",
                     "workspace": "myws",
                     "peerName": "eri",
-                    "aiPeer": "hermes",
+                    "aiPeer": "qubit",
                     "sessionStrategy": "per-repo",
                 }
             },
@@ -1050,32 +1112,28 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
         assert resp.status_code == 200
         assert resp.json() == {"ok": True}
-        assert load_config()["memory"]["provider"] == "honcho"
-        assert load_env()["HONCHO_API_KEY"] == "hch-test-key"
+        assert load_config()["memory"]["provider"] == "hostprov"
+        assert load_env()["HOSTPROV_API_KEY"] == "hch-test-key"
 
-        cfg = json.loads((get_qubit_home() / "honcho.json").read_text(encoding="utf-8"))
+        cfg = json.loads(config_path.read_text(encoding="utf-8"))
         # baseUrl is root-scoped; the rest live in the active host block.
         assert cfg["baseUrl"] == "https://honcho.example.dev"
-        assert cfg["hosts"]["hermes"]["workspace"] == "myws"
-        assert cfg["hosts"]["hermes"]["peerName"] == "eri"
-        assert cfg["hosts"]["hermes"]["environment"] == "local"
-        assert cfg["hosts"]["hermes"]["sessionStrategy"] == "per-repo"
+        assert cfg["hosts"]["qubit"]["workspace"] == "myws"
+        assert cfg["hosts"]["qubit"]["peerName"] == "eri"
+        assert cfg["hosts"]["qubit"]["environment"] == "local"
+        assert cfg["hosts"]["qubit"]["sessionStrategy"] == "per-repo"
         # The key lands where the client reads first; GET keeps it write-only.
-        assert cfg["hosts"]["hermes"]["apiKey"] == "hch-test-key"
+        assert cfg["hosts"]["qubit"]["apiKey"] == "hch-test-key"
 
 
-    def test_get_honcho_config_does_not_return_secret(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HOME", str(tmp_path))
-        monkeypatch.setenv("HONCHO_API_KEY", "guard")
-        monkeypatch.delenv("HONCHO_API_KEY")
-        self._seed_local_honcho()
-
+    def test_get_host_block_config_does_not_return_secret(self):
+        self._install_hostprov()
         self.client.put(
-            "/api/memory/providers/honcho/config?surface=declared",
+            "/api/memory/providers/hostprov/config?surface=declared",
             json={"values": {"apiKey": "secret-value"}},
         )
 
-        resp = self.client.get("/api/memory/providers/honcho/config?surface=declared")
+        resp = self.client.get("/api/memory/providers/hostprov/config?surface=declared")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -1083,6 +1141,30 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert fields["apiKey"]["is_set"] is True
         assert fields["apiKey"]["value"] == ""
         assert "secret-value" not in json.dumps(data)
+
+
+    @pytest.mark.parametrize("corrupt", [True, False], ids=["unparseable-file-is-left-alone", "parseable-file-is-merged"])
+    def test_put_host_block_never_replaces_an_unparseable_config(self, corrupt):
+        # The router reads the provider's config strictly: a file that exists but does not parse must
+        # not be replaced by this host's block alone (that would wipe every other host's keys).
+        from qubit_cli.config import load_config
+
+        config_path = self._install_hostprov()
+        before = "{not json" if corrupt else json.dumps({"hosts": {"other": {"apiKey": "keep-me"}}})
+        config_path.write_text(before, encoding="utf-8")
+
+        resp = self.client.put("/api/memory/providers/hostprov/config?surface=declared",
+                               json={"values": {"workspace": "myws"}})
+
+        if corrupt:
+            assert resp.status_code == 400
+            assert config_path.read_text(encoding="utf-8") == before
+            assert (load_config().get("memory") or {}).get("provider") != "hostprov"
+            return
+        assert resp.status_code == 200
+        cfg = json.loads(config_path.read_text(encoding="utf-8"))
+        assert cfg["hosts"]["other"]["apiKey"] == "keep-me"
+        assert cfg["hosts"]["qubit"]["workspace"] == "myws"
 
 
     # ── GET /api/media (remote image display) ───────────────────────────
@@ -1097,6 +1179,98 @@ CONFIG_SCHEMA = ProviderConfigSchema(
             headers={_SESSION_HEADER_NAME: "wrong-token"},
         )
         assert resp.status_code == 401
+
+    # ── GET /api/media/proxy (client-blocked CDN fallback, #74564) ──────
+
+
+    def test_media_proxy_requires_auth(self):
+        from qubit_cli.web_server import _SESSION_HEADER_NAME
+
+        resp = self.client.get(
+            "/api/media/proxy",
+            params={"url": "https://v3.fal.media/x.png"},
+            headers={_SESSION_HEADER_NAME: "wrong-token"},
+        )
+        assert resp.status_code == 401
+
+    def test_media_proxy_rejects_disallowed_hosts_and_schemes(self):
+        for bad in (
+            "https://evil.example.com/img.png",
+            "https://sub.fal.media.evil.com/img.png",
+            "file:///etc/passwd",
+            "not a url",
+            "",
+        ):
+            resp = self.client.get("/api/media/proxy", params={"url": bad})
+            assert resp.status_code in (400, 403), (bad, resp.status_code)
+
+    def test_media_proxy_fetches_allowlisted_image_and_returns_data_url(self, monkeypatch):
+        png_bytes = b"\x89PNG\r\n\x1a\n" + b"0" * 8
+
+        class _Resp:
+            status_code = 200
+            headers = {"content-type": "image/png"}
+            content = png_bytes
+
+        class _Client:
+            def __init__(self, *a, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def get(self, url):
+                assert url == "https://v3.fal.media/media/abc123"
+                return _Resp()
+
+        import qubit_cli.web_routers.files as files_router
+
+        monkeypatch.setattr(files_router, "_require_token", lambda request: None, raising=False)
+        # The route imports httpx locally; patch the module it resolves from.
+        import httpx
+
+        monkeypatch.setattr(httpx, "AsyncClient", _Client, raising=False)
+
+        resp = self.client.get(
+            "/api/media/proxy", params={"url": "https://v3.fal.media/media/abc123"}
+        )
+        assert resp.status_code == 200
+        import base64
+
+        assert resp.json()["data_url"] == (
+            "data:image/png;base64," + base64.b64encode(png_bytes).decode("ascii")
+        )
+
+    def test_media_proxy_rejects_non_image_content_type(self, monkeypatch):
+        class _Resp:
+            status_code = 200
+            headers = {"content-type": "text/html"}
+            content = b"<html>nope</html>"
+
+        class _Client:
+            def __init__(self, *a, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def get(self, url):
+                return _Resp()
+
+        import httpx
+
+        monkeypatch.setattr(httpx, "AsyncClient", _Client, raising=False)
+
+        resp = self.client.get(
+            "/api/media/proxy", params={"url": "https://fal.media/media/abc123"}
+        )
+        assert resp.status_code == 415
 
     # ── POST /api/chat/image-upload (browser clipboard/drop images) ─────
 
@@ -1220,20 +1394,20 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         )
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda _root: "docker")
         monkeypatch.setattr(_web_server_gateway, "_spawn_qubit_action", fail_spawn)
-        _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
-        _web_server_gateway._ACTION_RESULTS.pop("hermes-update", None)
+        _web_server_gateway._ACTION_PROCS.pop("qubit-update", None)
+        _web_server_gateway._ACTION_RESULTS.pop("qubit-update", None)
 
         resp = self.client.post("/api/qubit/update")
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["ok"] is False
-        assert data["name"] == "hermes-update"
+        assert data["name"] == "qubit-update"
         assert data["pid"] is None
         assert data["error"] == "docker_update_unsupported"
         assert spawned is False
 
-        status = self.client.get("/api/actions/hermes-update/status")
+        status = self.client.get("/api/actions/qubit-update/status")
         assert status.status_code == 200
         status_data = status.json()
         assert status_data["running"] is False
@@ -1258,8 +1432,8 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         )
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda _root: "apt")
         monkeypatch.setattr(_web_server_gateway, "_spawn_qubit_action", fail_spawn)
-        _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
-        _web_server_gateway._ACTION_RESULTS.pop("hermes-update", None)
+        _web_server_gateway._ACTION_PROCS.pop("qubit-update", None)
+        _web_server_gateway._ACTION_RESULTS.pop("qubit-update", None)
 
         resp = self.client.post("/api/qubit/update")
 
@@ -1281,15 +1455,15 @@ CONFIG_SCHEMA = ProviderConfigSchema(
     def test_update_status_recovers_completed_result_after_dashboard_restart(self, monkeypatch, tmp_path):
 
         action_id = "c" * 32
-        (tmp_path / "hermes-update.log").write_text(
-            "=== hermes-update started 2026-08-17 11:19:34 ===\n"
+        (tmp_path / "qubit-update.log").write_text(
+            "=== qubit-update started 2026-08-17 11:19:34 ===\n"
             "pulling updates...\n",
             encoding="utf-8",
         )
         (tmp_path / "update.log").write_text(
             "=== qubit update started 2026-08-17T11:19:35 ===\n"
             "✓ Update complete!\n"
-            f"=== hermes-update completed {action_id} ===\n",
+            f"=== qubit-update completed {action_id} ===\n",
             encoding="utf-8",
         )
         monkeypatch.setattr(_web_server_gateway, "_ACTION_LOG_DIR", tmp_path)
@@ -1298,14 +1472,14 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         monkeypatch.setattr(_web_server_gateway, "_ACTION_COMMANDS", {})
         monkeypatch.setattr(_web_server_gateway, "_ACTION_IDS", {})
 
-        status = self.client.get("/api/actions/hermes-update/status?lines=2000")
+        status = self.client.get("/api/actions/qubit-update/status?lines=2000")
 
         assert status.status_code == 200
         data = status.json()
         assert data["running"] is False
         assert data["exit_code"] == 0
         assert data["action_id"] == action_id
-        assert f"=== hermes-update completed {action_id} ===" in data["lines"]
+        assert f"=== qubit-update completed {action_id} ===" in data["lines"]
 
     def test_update_qubit_spawns_with_action_id(self, monkeypatch):
         import qubit_cli.web_server as web_server
@@ -1323,8 +1497,8 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda _root: "git")
         monkeypatch.setattr(web_server.secrets, "token_hex", lambda _size: "a" * 32)
         monkeypatch.setattr(_web_server_gateway, "_spawn_qubit_action", fake_spawn)
-        _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
-        _web_server_gateway._ACTION_RESULTS.pop("hermes-update", None)
+        _web_server_gateway._ACTION_PROCS.pop("qubit-update", None)
+        _web_server_gateway._ACTION_RESULTS.pop("qubit-update", None)
 
         resp = self.client.post("/api/qubit/update")
 
@@ -1332,11 +1506,11 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert resp.json() == {
             "ok": True,
             "pid": 12345,
-            "name": "hermes-update",
+            "name": "qubit-update",
             "action_id": "a" * 32,
         }
         assert calls == [
-            (["update"], "hermes-update", {"HERMES_ACTION_ID": "a" * 32})
+            (["update"], "qubit-update", {"QUBIT_ACTION_ID": "a" * 32})
         ]
 
     def test_update_qubit_reuses_running_action(self, monkeypatch):
@@ -1354,20 +1528,20 @@ CONFIG_SCHEMA = ProviderConfigSchema(
             "_spawn_qubit_action",
             lambda *_args, **_kwargs: pytest.fail("must not spawn a duplicate update"),
         )
-        _web_server_gateway._ACTION_PROCS["hermes-update"] = Proc()
-        _web_server_gateway._ACTION_IDS["hermes-update"] = "b" * 32
+        _web_server_gateway._ACTION_PROCS["qubit-update"] = Proc()
+        _web_server_gateway._ACTION_IDS["qubit-update"] = "b" * 32
 
         try:
             resp = self.client.post("/api/qubit/update")
         finally:
-            _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
-            _web_server_gateway._ACTION_IDS.pop("hermes-update", None)
+            _web_server_gateway._ACTION_PROCS.pop("qubit-update", None)
+            _web_server_gateway._ACTION_IDS.pop("qubit-update", None)
 
         assert resp.status_code == 200
         assert resp.json() == {
             "ok": True,
             "pid": 24680,
-            "name": "hermes-update",
+            "name": "qubit-update",
             "already_running": True,
             "action_id": "b" * 32,
         }
@@ -1375,7 +1549,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
     def test_model_set_maps_unknown_vendor_to_aggregator(self, monkeypatch):
         """A bare vendor name from analytics rows (no billing_provider) is not
-        a Qubit provider — keep the user's aggregator instead of writing a
+        a Hermes provider — keep the user's aggregator instead of writing a
         provider that can never resolve credentials."""
         monkeypatch.setattr(
             "qubit_cli.model_cost_guard.expensive_model_warning",
@@ -1414,7 +1588,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         broadcasts = []
         monkeypatch.setattr(fb, "_broadcast", broadcasts.append)
         with fb._lock:
-            fb._record = fb.SetupRecord(provider_configured=False, inference_provider="", free_tier=False,
+            fb._record = fb.SetupRecord(provider_configured=False, inference_provider="", free_tier_account=False,
                                         has_identity=False, other_providers=False)
             fb._started = True
             fb._done.set()
@@ -1532,9 +1706,9 @@ CONFIG_SCHEMA = ProviderConfigSchema(
                 return {
                     "pairing_id": "pair-restart-fails",
                     "poll_token": "poll-secret",
-                    "suggested_username": "hermes_pair_restart_fails_bot",
-                    "deep_link": "https://t.me/newbot/HermesSetupBot/hermes_pair_restart_fails_bot",
-                    "qr_payload": "https://t.me/newbot/HermesSetupBot/hermes_pair_restart_fails_bot",
+                    "suggested_username": "qubit_pair_restart_fails_bot",
+                    "deep_link": "https://t.me/newbot/QubitSetupBot/qubit_pair_restart_fails_bot",
+                    "qr_payload": "https://t.me/newbot/QubitSetupBot/qubit_pair_restart_fails_bot",
                     "expires_at": "2027-05-18T00:00:00.000Z",
                 }
             assert method == "GET"
@@ -1542,7 +1716,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
             assert bearer_token == "poll-secret"
             return {
                 "status": "ready",
-                "bot_username": "hermes_pair_restart_fails_bot",
+                "bot_username": "qubit_pair_restart_fails_bot",
                 "owner_user_id": 123456789,
                 "token": "123456:SECRET",
             }
@@ -1551,7 +1725,8 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         _web_server_gateway._ACTION_PROCS.pop("gateway-restart", None)
 
         def fail_spawn_action(subcommand, name):
-            assert subcommand == ["gateway", "restart"]
+            # The default home is named explicitly: a bare child would re-read the sticky active_profile.
+            assert subcommand == ["-p", "default", "gateway", "restart"]
             assert name == "gateway-restart"
             raise RuntimeError("supervisor unavailable")
 
@@ -2232,6 +2407,46 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         model_cfg = load_config()["model"]
         assert model_cfg["api_key"] == "sk-legacy"
 
+    def test_saving_legacy_custom_provider_keeps_key_env(self):
+        """Save on a legacy row must carry key_env onto providers and drop the list row.
+
+        The panel omits api_key (it only shows ${KEY_ENV}). Resolving only inside
+        providers forked a keyless entry and left the legacy row, so the next
+        request 401s (#126589).
+        """
+        from qubit_cli.config import load_config, save_config, save_env_value
+
+        save_env_value("QUBIT_CUSTOM_127_0_0_1_8001_API_KEY", "secret-value")
+        cfg = load_config()
+        cfg["custom_providers"] = [{
+            "name": "Qwen Local",
+            "base_url": "http://127.0.0.1:8001/v1",
+            "key_env": "QUBIT_CUSTOM_127_0_0_1_8001_API_KEY",
+            "model": "qwen",
+            "api_mode": "chat_completions",
+        }]
+        save_config(cfg)
+
+        listed = {e["id"]: e for e in self.client.get("/api/providers/custom-endpoints").json()["endpoints"]}
+        assert listed["qwen-local"]["source"] == "custom_providers"
+        assert listed["qwen-local"]["has_api_key"] is True
+
+        response = self.client.post("/api/providers/custom-endpoints", json={
+            "id": "qwen-local",
+            "name": "Qwen Local",
+            "base_url": "http://127.0.0.1:8001/v1",
+            "model": "qwen",
+        })
+        assert response.status_code == 200, response.text
+
+        cfg = load_config()
+        assert cfg.get("custom_providers") == []
+        assert cfg["providers"]["qwen-local"]["key_env"] == "QUBIT_CUSTOM_127_0_0_1_8001_API_KEY"
+        rows = {e["id"]: e for e in self.client.get("/api/providers/custom-endpoints").json()["endpoints"]}
+        assert rows["qwen-local"]["source"] == "providers"
+        assert rows["qwen-local"]["has_api_key"] is True
+        assert rows["qwen-local"]["api_key_preview"] == "${QUBIT_CUSTOM_127_0_0_1_8001_API_KEY}"
+
     def test_legacy_custom_providers_entries_get_a_row_and_can_be_deleted(self):
         """A post-migration ``custom_providers:`` list entry is still routed by the
         runtime (``get_compatible_custom_providers``), so Custom Endpoints must show
@@ -2605,7 +2820,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         original_get_messages = SessionDB.get_messages
 
         def tracked_get_messages(self, session_id, *args, **kwargs):
-            calls.append((kwargs.get("limit"), kwargs.get("after_id")))
+            calls.append((kwargs.get("limit"), kwargs.get("after_id"), kwargs.get("include_inactive")))
             return original_get_messages(self, session_id, *args, **kwargs)
 
         monkeypatch.setattr(SessionDB, "get_messages", tracked_get_messages)
@@ -2617,7 +2832,8 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert len(payload["messages"]) == 501
         assert payload["messages"][0]["content"] == "msg 0"
         assert payload["messages"][-1]["content"] == "msg 500"
-        assert calls == [(500, 0), (500, 500)]
+        # Transfer projection: archived rows ride along with their flags (import re-archives them).
+        assert calls == [(500, 0, True), (500, 500, True)]
 
 
 # ---------------------------------------------------------------------------
@@ -2976,7 +3192,7 @@ class TestNewEndpoints:
         import qubit_cli.tools_config as tools_config
         from qubit_cli.nous_account import NousPortalAccountInfo
 
-        # Logged out of Qubit Labs → managed subscription rows need sign-in.
+        # Logged out of Nous Portal → managed subscription rows need sign-in.
         monkeypatch.setattr(
             "qubit_cli.nous_subscription.get_nous_portal_account_info",
             lambda *a, **k: NousPortalAccountInfo(
@@ -3001,7 +3217,7 @@ class TestNewEndpoints:
         # Genuinely-free keyless row stays Ready.
         assert by_name["Microsoft Edge TTS"]["status"] == "ready"
         # Keyless ≠ ready for gated rows:
-        assert by_name["Qubit Subscription"]["status"] == "needs_auth"
+        assert by_name["Nous Subscription"]["status"] == "needs_auth"
         assert by_name["xAI TTS"]["status"] == "needs_auth"
         assert by_name["KittenTTS"]["status"] == "needs_setup"
         assert by_name["Piper"]["status"] == "needs_setup"
@@ -3029,7 +3245,7 @@ class TestNewEndpoints:
 
         resp = self.client.put(
             "/api/tools/toolsets/browser/provider",
-            json={"provider": "Qubit Subscription (Browser Use cloud)"},
+            json={"provider": "Nous Subscription (Browser Use cloud)"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -3100,13 +3316,13 @@ class TestNewEndpoints:
         config = load_config()
         config.setdefault("terminal", {})
         config["terminal"]["ssh_host"] = "devbox.example.com"
-        config["terminal"]["ssh_user"] = "hermes"
+        config["terminal"]["ssh_user"] = "qubit"
         save_config(config)
 
         body = self.client.get("/api/tools/terminal/backends").json()
         ssh = next(r for r in body["backends"] if r["name"] == "ssh")
         assert ssh["status"] == "ready"
-        assert "hermes@devbox.example.com" in ssh["detail"]
+        assert "qubit@devbox.example.com" in ssh["detail"]
 
 
     def test_analytics_usage_includes_skill_breakdown(self):
@@ -3165,6 +3381,56 @@ class TestNewEndpoints:
         assert top_skill["total_count"] == 1
         assert top_skill["last_used_at"] is not None
 
+    def _daily_for_local_starts(self, tz_name, local_starts):
+        """Seed one session per naive local start in ``tz_name``; return the daily buckets."""
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        from qubit_state import SessionDB
+
+        db = SessionDB()
+        try:
+            for i, local in enumerate(local_starts):
+                db.create_session(session_id=f"day-bucket-{i}", source="cli")
+                db._conn.execute("UPDATE sessions SET started_at = ? WHERE id = ?",
+                                 (local.replace(tzinfo=ZoneInfo(tz_name)).timestamp(), f"day-bucket-{i}"))
+            db._conn.commit()
+        finally:
+            db.close()
+        original_tz = os.environ.get("TZ")
+        try:
+            os.environ["TZ"] = tz_name
+            time.tzset()
+            resp = self.client.get("/api/analytics/usage?days=365")
+        finally:
+            if original_tz is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = original_tz
+            time.tzset()
+        assert resp.status_code == 200
+        return {row["day"]: row["sessions"] for row in resp.json()["daily"]}
+
+    @pytest.mark.skipif(not hasattr(time, "tzset"), reason="needs a POSIX process timezone switch")
+    def test_analytics_daily_buckets_use_local_day(self):
+        """A session at 02:00 IST is counted on that local day, as /insights counts it (not the UTC day before)."""
+        from datetime import datetime, timedelta
+
+        yesterday = (datetime.now() - timedelta(days=1)).replace(hour=2, minute=0, second=0, microsecond=0)
+        daily = self._daily_for_local_starts("Asia/Kolkata", [yesterday])
+        assert daily == {yesterday.strftime("%Y-%m-%d"): 1}
+
+    @pytest.mark.skipif(not hasattr(time, "tzset"), reason="needs a POSIX process timezone switch")
+    def test_analytics_daily_buckets_follow_dst_offset_per_session(self):
+        """23:30 local stays on its own day in both EST and EDT; one fixed offset for the range misplaces one."""
+        from datetime import datetime, timedelta
+
+        # The latest past day in January (EST) and in July (EDT), both inside the 365-day window.
+        recent = [(datetime.now() - timedelta(days=n)).replace(hour=23, minute=30, second=0, microsecond=0) for n in range(2, 360)]
+        starts = [next(d for d in recent if d.month == m) for m in (1, 7)]
+        daily = self._daily_for_local_starts("America/New_York", starts)
+        assert daily == {s.strftime("%Y-%m-%d"): 1 for s in starts}
+
 
 # ---------------------------------------------------------------------------
 # Desktop-owned loopback backends are not gated by dashboard.public_url (#96490)
@@ -3177,16 +3443,16 @@ class TestDesktopLoopbackAuthExemption:
     def test_exempt_with_desktop_env_and_session_token_on_loopback(self, monkeypatch):
         import qubit_cli.web_server as web_server
 
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-minted")
+        monkeypatch.setenv("QUBIT_DESKTOP", "1")
+        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-minted")
         assert web_server._desktop_loopback_auth_exempt("127.0.0.1") is True
         assert web_server._desktop_loopback_auth_exempt("::1") is True
 
     def test_exempt_via_ssh_spawn_credentials_without_env_token(self, monkeypatch):
         import qubit_cli.web_server as web_server
 
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.setenv("QUBIT_DESKTOP", "1")
+        monkeypatch.delenv("QUBIT_DASHBOARD_SESSION_TOKEN", raising=False)
         assert web_server._desktop_loopback_auth_exempt(
             "127.0.0.1", ssh_session_token="tok"
         )
@@ -3197,24 +3463,24 @@ class TestDesktopLoopbackAuthExemption:
     def test_not_exempt_without_desktop_env(self, monkeypatch):
         import qubit_cli.web_server as web_server
 
-        monkeypatch.delenv("HERMES_DESKTOP", raising=False)
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "tok")
+        monkeypatch.delenv("QUBIT_DESKTOP", raising=False)
+        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "tok")
         assert web_server._desktop_loopback_auth_exempt("127.0.0.1") is False
 
     def test_not_exempt_without_any_credential(self, monkeypatch):
         import qubit_cli.web_server as web_server
 
-        # HERMES_DESKTOP=1 alone is not enough: a plain serve with the env var
+        # QUBIT_DESKTOP=1 alone is not enough: a plain serve with the env var
         # exported must stay gated.
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.setenv("QUBIT_DESKTOP", "1")
+        monkeypatch.delenv("QUBIT_DASHBOARD_SESSION_TOKEN", raising=False)
         assert web_server._desktop_loopback_auth_exempt("127.0.0.1") is False
 
     def test_not_exempt_on_non_loopback_bind(self, monkeypatch):
         import qubit_cli.web_server as web_server
 
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "tok")
+        monkeypatch.setenv("QUBIT_DESKTOP", "1")
+        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "tok")
         assert web_server._desktop_loopback_auth_exempt("0.0.0.0") is False
         assert web_server._desktop_loopback_auth_exempt("192.168.1.10") is False
 
@@ -3223,7 +3489,7 @@ class TestDesktopLoopbackAuthExemption:
 
         # Sanity: the base behaviour is untouched — a non-Desktop loopback
         # serve with a public_url configured stays ticket-gated.
-        monkeypatch.delenv("HERMES_DESKTOP", raising=False)
+        monkeypatch.delenv("QUBIT_DESKTOP", raising=False)
         assert web_server.should_require_dashboard_auth(
             "127.0.0.1", frozenset({"dash.example.com"})
         ) is True
@@ -3243,9 +3509,9 @@ class TestDesktopHostRendezvousIsolation:
         from qubit_cli.main_dashboard import _host_backend_attachment
         from qubit_cli.plugins_activation import notify_serve_backend
 
-        monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+        monkeypatch.setenv("QUBIT_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+        monkeypatch.setenv("QUBIT_DESKTOP", "1")
+        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
         monkeypatch.setattr(web_server, "_SESSION_TOKEN", "desktop-spawn-token")
         monkeypatch.setattr(hr, "cleanup_on_exit", lambda role: None)
         dialed = []
@@ -3258,7 +3524,7 @@ class TestDesktopHostRendezvousIsolation:
                 return False
 
         def _fake_urlopen(request, timeout=None):
-            dialed.append((request.full_url, request.get_header("X-hermes-session-token")))
+            dialed.append((request.full_url, request.get_header("X-qubit-session-token")))
             return _Reply(b'{"ok": true}')
 
         monkeypatch.setattr(urllib.request, "urlopen", _fake_urlopen)
@@ -3278,12 +3544,12 @@ class TestDesktopHostRendezvousIsolation:
 
     def test_standalone_backend_still_claims_the_host_serve_record(self, monkeypatch):
         """The Desktop exclusion must not alter standalone dashboard discovery — including a
-        supervised service whose shell merely inherited HERMES_DESKTOP=1 without the token."""
+        supervised service whose shell merely inherited QUBIT_DESKTOP=1 without the token."""
         from gateway import host_rendezvous as hr
         import qubit_cli.web_server as web_server
 
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.setenv("QUBIT_DESKTOP", "1")
+        monkeypatch.delenv("QUBIT_DASHBOARD_SESSION_TOKEN", raising=False)
         claimed = []
         published = []
         monkeypatch.setattr(
@@ -3637,7 +3903,7 @@ class TestStatusInstallId:
     """Stable per-install identity on /api/status.
 
     Behaviour contracts: the id is minted once, persisted under the ROOT
-    Qubit home (not the profile home), survives a fresh process-cache read,
+    Hermes home (not the profile home), survives a fresh process-cache read,
     and is byte-identical for every profile served by the same install — the
     desktop uses it to collapse duplicate roster rows when one backend is
     registered under two addresses.
@@ -3694,7 +3960,7 @@ class TestStatusInstallId:
         the same id file — profiles share one physical install identity."""
         import qubit_cli.web_server as ws
 
-        root = tmp_path / "hermes-root"
+        root = tmp_path / "qubit-root"
         profile_home = root / "profiles" / "research"
         profile_home.mkdir(parents=True)
 
@@ -3713,7 +3979,7 @@ class TestStatusInstallId:
     def test_corrupt_id_file_is_replaced_not_propagated(self, monkeypatch, tmp_path):
         import qubit_cli.web_server as ws
 
-        root = tmp_path / "hermes-root"
+        root = tmp_path / "qubit-root"
         root.mkdir()
         (root / "install_id").write_text("not-a-valid-id\n", encoding="utf-8")
         monkeypatch.setenv("QUBIT_HOME", str(root))
@@ -3931,7 +4197,7 @@ class TestNormaliseThemeDefinition:
 
 
 class TestDiscoverUserThemes:
-    """Tests for _discover_user_themes() — scans ~/.hermes/dashboard-themes/."""
+    """Tests for _discover_user_themes() — scans ~/.qubit/dashboard-themes/."""
 
     def test_returns_empty_when_dir_missing(self, tmp_path, monkeypatch):
         monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
@@ -4034,11 +4300,11 @@ class TestThemeBootstrapCSS:
         client = self._mount_spa_client(tmp_path, monkeypatch)
         resp = client.get("/chat")
         assert resp.status_code == 200
-        assert '<style id="hermes-theme-bootstrap">' in resp.text
+        assert '<style id="qubit-theme-bootstrap">' in resp.text
         assert "--background-base:#0a1628;" in resp.text
         # Injected inside <head>, before the closing tag.
         head = resp.text.split("</head>")[0]
-        assert "hermes-theme-bootstrap" in head
+        assert "qubit-theme-bootstrap" in head
 
 
 class TestNormaliseThemeExtensions:
@@ -4122,6 +4388,76 @@ class TestDeleteSessionEndpoint:
         assert resp.status_code == 200
         assert resp.json().get("ok") is True
 
+    def test_delete_existing_session_scrubs_row_and_disk(self):
+        # The CLI delete path threads the sessions dir so transcript
+        # artifacts are removed with the row; the endpoint historically
+        # didn't, leaving secret-bearing session_<id>.json snapshots and
+        # request dumps orphaned on disk after a UI delete.
+        from qubit_constants import get_qubit_home
+        from qubit_state import SessionDB
+
+        db_path = get_qubit_home() / "state.db"
+        db = SessionDB(db_path=db_path)
+        try:
+            db.create_session("disk-scrub", source="cli")
+        finally:
+            db.close()
+
+        sessions_dir = get_qubit_home() / "sessions"
+        sessions_dir.mkdir(parents=True, exist_ok=True)
+        for name, body in (
+            ("session_disk-scrub.json", '{"messages": [{"content": "secret-token"}]}'),
+            ("disk-scrub.jsonl", "{}\n"),
+            ("request_dump_disk-scrub_001.json", "{}"),
+        ):
+            (sessions_dir / name).write_text(body, encoding="utf-8")
+        # Another session's artifacts must survive.
+        (sessions_dir / "session_disk-scrub-neighbour.json").write_text("{}", encoding="utf-8")
+
+        resp = self.auth_client.delete("/api/sessions/disk-scrub")
+
+        assert resp.status_code == 200
+        assert resp.json().get("ok") is True
+        db = SessionDB(db_path=db_path)
+        try:
+            assert db.get_session("disk-scrub") is None
+        finally:
+            db.close()
+        assert not (sessions_dir / "session_disk-scrub.json").exists()
+        assert not (sessions_dir / "disk-scrub.jsonl").exists()
+        assert not (sessions_dir / "request_dump_disk-scrub_001.json").exists()
+        assert (sessions_dir / "session_disk-scrub-neighbour.json").exists()
+
+    def test_delete_named_profile_session_scrubs_profile_disk(self):
+        from qubit_cli import profiles as profiles_mod
+        from qubit_state import SessionDB
+
+        profile_home = profiles_mod.get_profile_dir("worker")
+        profile_home.mkdir(parents=True)
+        (profile_home / "config.yaml").touch()  # identity marker: bare dirs are not profiles
+        sessions_dir = profile_home / "sessions"
+        sessions_dir.mkdir(parents=True, exist_ok=True)
+        db_path = profile_home / "state.db"
+        db = SessionDB(db_path=db_path)
+        try:
+            db.create_session("profile-scrub", source="cli")
+        finally:
+            db.close()
+        (sessions_dir / "session_profile-scrub.json").write_text(
+            '{"messages": [{"content": "secret-token"}]}', encoding="utf-8"
+        )
+
+        resp = self.auth_client.delete("/api/sessions/profile-scrub?profile=worker")
+
+        assert resp.status_code == 200
+        assert resp.json().get("ok") is True
+        db = SessionDB(db_path=db_path)
+        try:
+            assert db.get_session("profile-scrub") is None
+        finally:
+            db.close()
+        assert not (sessions_dir / "session_profile-scrub.json").exists()
+
 
 class TestBulkDeleteSessionsEndpoint:
     """Tests for ``POST /api/sessions/bulk-delete`` — backs the
@@ -4177,7 +4513,7 @@ class TestBulkDeleteSessionsEndpoint:
             "/api/sessions/bulk-delete", json={"ids": ["a", "b"]}
         )
         assert resp.status_code == 200
-        assert resp.json() == {"ok": True, "deleted": 2}
+        assert resp.json() == {"ok": True, "deleted": 2, "skipped_active": []}
 
         db = SessionDB()
         try:
@@ -4292,6 +4628,25 @@ class TestDeleteEmptySessionsEndpoint:
         finally:
             db.close()
 
+    def test_delete_removes_on_disk_files_of_deleted_sessions_only(self):
+        """Deleting an empty session also removes its files in ``sessions/``.
+        A kept session's files stay."""
+        from qubit_constants import get_qubit_home
+
+        self._seed()
+        sessions_dir = get_qubit_home() / "sessions"
+        sessions_dir.mkdir(parents=True, exist_ok=True)
+        deleted_files = [sessions_dir / "session_empty1.json", sessions_dir / "request_dump_empty2_1.json"]
+        kept_file = sessions_dir / "session_hasmsg.json"
+        for path in (*deleted_files, kept_file):
+            path.write_text("{}", encoding="utf-8")
+
+        resp = self.auth_client.delete("/api/sessions/empty")
+
+        assert resp.json() == {"ok": True, "deleted": 2}
+        assert [p for p in deleted_files if p.exists()] == []
+        assert kept_file.exists()
+
 
 class TestPluginAPIAuth:
     """Tests that plugin API routes require the session token (issue #19533)."""
@@ -4372,6 +4727,92 @@ class TestPluginAPIAuth:
         assert resp.status_code == 401
 
 
+class TestPluginAPISecretScopeProductionMount:
+    """#120310: a plugin API handler's ``get_secret()`` must resolve the *requested*
+    profile's credentials under multi-profile hosting, verified through the REAL mount
+    path — discovery → import → ``_mount_plugin_api_routes()`` (which attaches
+    ``_plugin_route_secret_scope``) → a live request against ``app`` — not a hand-built
+    ``include_router``. The dedicated ``test_plugin_api_secret_scope.py`` suite proves the
+    dependency in isolation; this closes the actual reported surface end-to-end and pins
+    that the launch profile and a ``?profile=`` request read distinct secrets, that the
+    request profile does not leak back into the launch profile, and that an unknown
+    profile is rejected in the dependency before the handler runs.
+    """
+
+    _PROBE_KEY = "EXAMPLE_PLUGIN_PROBE_KEY"
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, monkeypatch, _isolate_qubit_home, _install_example_plugin):
+        try:
+            from starlette.testclient import TestClient
+        except ImportError:
+            pytest.skip("fastapi/starlette not installed")
+
+        import qubit_state
+        from qubit_constants import get_qubit_home
+        from qubit_cli import profiles
+        from qubit_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+
+        default_home = get_qubit_home()
+        monkeypatch.setattr(qubit_state, "DEFAULT_DB_PATH", default_home / "state.db")
+
+        # Anchor the named-profiles root to the isolated home so ``?profile=workerb``
+        # resolves inside the test sandbox (mirrors test_web_server_skills_profiles).
+        profiles_root = default_home / "profiles"
+        monkeypatch.setattr(profiles, "_get_default_qubit_home", lambda: default_home)
+        monkeypatch.setattr(profiles, "_get_profiles_root", lambda: profiles_root)
+
+        # Named profile B: a live profile (``.env`` is both an identity marker and the
+        # secret source) with its OWN value for the probe key.
+        worker_home = profiles_root / "workerb"
+        worker_home.mkdir(parents=True, exist_ok=True)
+        (worker_home / ".env").write_text(f"{self._PROBE_KEY}=sk-workerb\n", encoding="utf-8")
+
+        # Launch profile A: an env-only credential (systemd ``Environment=`` style), frozen
+        # into the launch scope when multi-profile hosting activates.
+        monkeypatch.setenv(self._PROBE_KEY, "sk-launch-a")
+
+        import tui_gateway.launch_profile_policy as lpp
+        from agent.secret_scope import is_multiplex_active, set_multiplex_active
+
+        monkeypatch.setattr(lpp, "_snapshot", None)  # freeze the launch env fresh
+        self._previous_multiplex = is_multiplex_active()
+        lpp.activate_multi_profile_hosting()  # freezes os.environ + flips multiplex on
+
+        self.client = TestClient(app)
+        self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
+        try:
+            yield
+        finally:
+            set_multiplex_active(self._previous_multiplex)
+
+    def _probe(self, profile=None):
+        params = {"profile": profile} if profile is not None else None
+        return self.client.get("/api/plugins/example/whoami", params=params)
+
+    def test_launch_and_requested_profile_read_distinct_secrets(self):
+        # No ``?profile=`` → the launch profile's frozen env-only credential.
+        resp = self._probe()
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "key": "sk-launch-a"}
+
+        # ``?profile=workerb`` → that profile's own credential, through the real mount.
+        resp = self._probe("workerb")
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "key": "sk-workerb"}
+
+        # Back to the launch profile: the request scope reset, so B never leaks into A.
+        resp = self._probe()
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "key": "sk-launch-a"}
+
+    def test_unknown_profile_rejected_before_handler(self):
+        # The dependency raises HTTPException(404) before the handler runs, so this is a
+        # 404 — NOT the handler's folded ``{"ok": False}`` no-data contract.
+        resp = self._probe("ghost")
+        assert resp.status_code == 404
+
+
 class TestDashboardPluginManifestExtensions:
     """Tests for the extended plugin manifest fields (tab.override,
     tab.hidden, slots) read by _discover_dashboard_plugins()."""
@@ -4432,7 +4873,7 @@ class TestDashboardPluginManifestExtensions:
         """Regression #87197: a profile-scoped process (``--profile <name>``
         sets QUBIT_HOME=<root>/profiles/<name>) must still discover user
         plugins installed in the qubit root's plugins/ directory."""
-        root = tmp_path / "hermes-root"
+        root = tmp_path / "qubit-root"
         profile_home = root / "profiles" / "presale"
         profile_home.mkdir(parents=True)
         self._write_plugin(root, "meeting-intelligence", {
@@ -4449,7 +4890,7 @@ class TestDashboardPluginManifestExtensions:
     def test_profile_local_plugin_wins_over_root_plugin(self, tmp_path, monkeypatch):
         """A same-named plugin in the profile home takes precedence over the
         root copy (seen_names dedupe, profile scanned first)."""
-        root = tmp_path / "hermes-root"
+        root = tmp_path / "qubit-root"
         profile_home = root / "profiles" / "presale"
         profile_home.mkdir(parents=True)
         self._write_plugin(profile_home, "dupe", {
@@ -4561,7 +5002,7 @@ class TestPtyWebSocket:
     def test_tui_python_command_uses_child_path(self, tmp_path):
         """Bare Python commands are resolved from the TUI child's PATH."""
 
-        command = f"hermes-review-python{Path(sys.executable).suffix}"
+        command = f"qubit-review-python{Path(sys.executable).suffix}"
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
         executable = bin_dir / command
@@ -4569,14 +5010,14 @@ class TestPtyWebSocket:
         # the venv (tmpfs /tmp vs disk home) where hard links raise EXDEV.
         shutil.copy2(sys.executable, executable)
         env = {
-            "HERMES_CWD": str(tmp_path),
-            "HERMES_PYTHON": command,
+            "QUBIT_CWD": str(tmp_path),
+            "QUBIT_PYTHON": command,
             "PATH": str(bin_dir),
         }
 
         main_tui_launch._apply_tui_python_env(env)
 
-        assert env["HERMES_PYTHON"] == command
+        assert env["QUBIT_PYTHON"] == command
 
 
     def test_unavailable_platform_closes_with_message(self, monkeypatch):
@@ -4673,7 +5114,7 @@ def test_resolve_chat_argv_injects_gateway_ws_url(monkeypatch):
     _argv, _cwd, env = _web_server_chat._resolve_chat_argv()
 
     assert env is not None
-    gateway_url = env.get("HERMES_TUI_GATEWAY_URL", "")
+    gateway_url = env.get("QUBIT_TUI_GATEWAY_URL", "")
     assert gateway_url.startswith("ws://127.0.0.1:9119/api/ws?")
     assert "token=" in gateway_url
 
@@ -4965,8 +5406,8 @@ class TestDesktopCronTicker:
 
         called = threading.Event()
         monkeypatch.setattr(sched, "tick", lambda *a, **k: called.set())
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+        monkeypatch.setenv("QUBIT_DESKTOP", "1")
+        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
 
         with self._client():
             assert called.wait(3.0), "expected cron tick under a Desktop-owned backend"
@@ -4991,7 +5432,7 @@ class TestServeIndexMissingIndex:
                 "<html><head></head><body>SPA</body></html>", encoding="utf-8"
             )
         monkeypatch.setattr(ws, "WEB_DIST", dist)
-        monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+        monkeypatch.delenv("QUBIT_SERVE_HEADLESS", raising=False)
         spa_app = FastAPI()
         _web_server_dashboard.mount_spa(spa_app)
         return TestClient(spa_app), dist
@@ -5036,7 +5477,7 @@ class TestServeIndexMissingIndex:
         resp = client.get("/chat")
 
         assert resp.status_code == 200
-        assert 'window.__HERMES_SESSION_TOKEN__="after-mount"' in resp.text
+        assert 'window.__QUBIT_SESSION_TOKEN__="after-mount"' in resp.text
 
 
 class TestHeadlessServeTokenPage:
@@ -5044,7 +5485,7 @@ class TestHeadlessServeTokenPage:
     at `/` when the dashboard auth gate is off (#94227).
 
     The Electron renderer boots by fetching `/` and extracting
-    ``window.__HERMES_SESSION_TOKEN__`` for WebSocket auth. Headless serve
+    ``window.__QUBIT_SESSION_TOKEN__`` for WebSocket auth. Headless serve
     used to 404 every path, so after an update replaced the backend (and
     the spawn-token env pin no longer matched the token the new backend
     generated) the renderer was stuck with a stale token, /api/ws rejected
@@ -5057,7 +5498,7 @@ class TestHeadlessServeTokenPage:
         from starlette.testclient import TestClient
         import qubit_cli.web_server as ws
 
-        monkeypatch.setenv("HERMES_SERVE_HEADLESS", "1")
+        monkeypatch.setenv("QUBIT_SERVE_HEADLESS", "1")
         spa_app = FastAPI()
         spa_app.state.auth_required = gated
         _web_server_dashboard.mount_spa(spa_app)
@@ -5074,14 +5515,14 @@ class TestHeadlessServeTokenPage:
         # Must match the desktop's extraction regex exactly
         # (apps/desktop/electron/dashboard-token.ts).
         match = re.search(
-            r'window\.__HERMES_SESSION_TOKEN__\s*=\s*("(?:\\.|[^"\\])*")',
+            r'window\.__QUBIT_SESSION_TOKEN__\s*=\s*("(?:\\.|[^"\\])*")',
             resp.text,
         )
         assert match, resp.text
         import json as _json
 
         assert _json.loads(match.group(1)) == ws._SESSION_TOKEN
-        assert "window.__HERMES_AUTH_REQUIRED__=false" in resp.text
+        assert "window.__QUBIT_AUTH_REQUIRED__=false" in resp.text
 
     def test_root_uses_ssh_token_applied_after_spa_mount(self, monkeypatch):
         import json
@@ -5095,7 +5536,7 @@ class TestHeadlessServeTokenPage:
         ws._apply_ssh_session_token("after-mount")
         resp = client.get("/")
         match = re.search(
-            r'window\.__HERMES_SESSION_TOKEN__\s*=\s*("(?:\\.|[^"\\])*")',
+            r'window\.__QUBIT_SESSION_TOKEN__\s*=\s*("(?:\\.|[^"\\])*")',
             resp.text,
         )
 
@@ -5143,7 +5584,7 @@ class TestHashedAssetCacheHeaders:
             encoding="utf-8",
         )
         monkeypatch.setattr(ws, "WEB_DIST", dist)
-        monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+        monkeypatch.delenv("QUBIT_SERVE_HEADLESS", raising=False)
         spa_app = FastAPI()
         _web_server_dashboard.mount_spa(spa_app)
         return TestClient(spa_app)

@@ -12,7 +12,7 @@ import json
 import time
 import urllib.error
 import urllib.request
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from ..logging_setup import log_event
 from .contracts import ProviderRequest, ProviderResult, UsageRecord
@@ -199,15 +199,24 @@ class FrontierClient:
         self.max_length_retries = max(0, max_length_retries)
 
     def complete(self, req: ProviderRequest, prompt_text: str,
-                 est_cost: float = 0.0) -> ProviderResult:
+                 est_cost: float = 0.0,
+                 messages: Optional[List[Dict[str, Any]]] = None
+                 ) -> ProviderResult:
         if self.cancel is not None and self.cancel():
             return ProviderResult(ok=False, code="CANCELLED",
                                   message="cancelled before send",
                                   provider=self.provider, model=self.model,
                                   identity=f"{self.provider}/{self.model}")
+        # ``messages`` (when supplied) is a pre-built, already-translated
+        # conversation — the multimodal vision path hands over the OpenAI
+        # content-block shape here. It is passed through verbatim; the default
+        # single-text-message body is used otherwise. NEVER rebuild the caller's
+        # messages: an image carried in a block list would be dropped.
+        convo = messages if messages else [{"role": "user",
+                                            "content": prompt_text}]
         payload: Dict[str, Any] = {
             "model": self.model,
-            "messages": [{"role": "user", "content": prompt_text}],
+            "messages": convo,
             "max_tokens": req.max_tokens,
             "stream": False,
         }

@@ -70,7 +70,7 @@ def test_fresh_param_ignores_channel_active_session_file(pty_client, monkeypatch
     def fake_resolve(resume=None, sidecar_url=None, profile=None, active_session_file=None):
         captured["active_session_file"] = active_session_file
         captured["resume"] = resume
-        return (["fake-hermes-tui"], None, None)
+        return (["fake-qubit-tui"], None, None)
 
     monkeypatch.setattr(_web_server_chat, "_resolve_chat_argv", fake_resolve)
 
@@ -97,7 +97,7 @@ def test_active_session_fallback_sends_resume_control_message(pty_client, monkey
     active_file.write_text(json.dumps({"session_id": "sess-old"}), encoding="utf-8")
 
     monkeypatch.setattr(
-        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-hermes-tui"], None, None)
+        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-qubit-tui"], None, None)
     )
 
     with client.websocket_connect(_url(token, channel=channel)) as conn:
@@ -111,7 +111,7 @@ def test_explicit_resume_sends_no_control_message(pty_client, monkeypatch):
     channel = "explicit-resume-chan"
 
     monkeypatch.setattr(
-        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-hermes-tui"], None, None)
+        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-qubit-tui"], None, None)
     )
 
     with client.websocket_connect(
@@ -142,7 +142,7 @@ def test_child_eof_closes_socket_and_bridge(pty_client, monkeypatch):
 
     monkeypatch.setattr(_web_server_chat.PtyBridge, "spawn", _RecordingBridge.spawn)
     monkeypatch.setattr(
-        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-hermes-tui"], None, None)
+        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-qubit-tui"], None, None)
     )
 
     # The client never sends a disconnect of its own — it only reads the one
@@ -164,3 +164,55 @@ def test_child_eof_closes_socket_and_bridge(pty_client, monkeypatch):
     while not bridges[0].closed and time.monotonic() < deadline:
         time.sleep(0.01)
     assert bridges[0].closed is True
+
+
+def test_profile_switch_closes_previous_profile_keepalive_pty(pty_client, monkeypatch):
+    """One attach token keeps one PTY: moving the tab to another profile closes the old one.
+
+    Regression for #125287: the profile switch spawned a new keep-alive PTY under
+    ``token\\0profile`` and left the previous profile's TUI alive (detached) for the
+    registry TTL, still holding that chat's active-session lease, so returning to the
+    chat was refused with "open in another Hermes window".
+    """
+    import time
+
+    ws, client, token = pty_client
+    bridges = []
+
+    class _IdleBridge(_OneFrameBridge):
+        @classmethod
+        def spawn(cls, *args, **kwargs):
+            b = cls()
+            bridges.append(b)
+            return b
+
+        def read(self, timeout):
+            if self.closed:
+                return None
+            if not self._sent:
+                self._sent = True
+                return b"ready"
+            time.sleep(min(timeout, 0.01))
+            return b""
+
+    monkeypatch.setattr(_web_server_chat.PtyBridge, "spawn", _IdleBridge.spawn)
+    monkeypatch.setattr(
+        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-qubit-tui"], None, None)
+    )
+    attach = "attach-125287"
+    try:
+        with client.websocket_connect(_url(token, channel="chan-a", attach=attach, profile="alpha")) as conn:
+            assert conn.receive_bytes() == b"ready"
+        assert len(bridges) == 1 and bridges[0].closed is False  # keep-alive survives the detach
+
+        with client.websocket_connect(_url(token, channel="chan-b", attach=attach, profile="beta")) as conn:
+            assert conn.receive_bytes() == b"ready"
+            assert len(bridges) == 2
+            deadline = time.monotonic() + 5.0
+            while not bridges[0].closed and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert bridges[0].closed is True
+            assert bridges[1].closed is False
+    finally:
+        for key in [k for k in _web_server_chat.PTY_REGISTRY._sessions if k.startswith(attach)]:
+            _web_server_chat.PTY_REGISTRY._sessions.pop(key).bridge.close()

@@ -21,7 +21,7 @@ from qubit_cli.tools_config_post_setup import _run_post_setup
 ])
 def test_browser_setup_respects_provider_and_native_owner(monkeypatch, capsys, provider, docker, playwright):
     with (
-        patch('tools.browser_use_cli.install_cli', return_value=(True, 'ready')) as install,
+        patch('tools.browser_use_cli._find_cli', return_value=['harness']) as install,
         patch('tools.browser_tool_install._running_in_docker', return_value=docker),
         patch('tools.browser_tool_install._find_agent_browser', return_value='/image/agent-browser'),
         patch('tools.browser_tool_install._chromium_installed', return_value=False) as chromium,
@@ -111,9 +111,9 @@ def test_importable_sdk_does_not_bypass_pm_constraints(monkeypatch, capsys, key,
     if refused:
         assert "outside frozen feature set" in output
         assert "Retry with: qubit tools" in output
-        assert "Restart Qubit" not in output
+        assert "Restart Hermes" not in output
     else:
-        assert "Restart Qubit" in output
+        assert "Restart Hermes" in output
 
 
 @pytest.mark.parametrize("failure", [None, "sdk", "admission"])
@@ -122,7 +122,7 @@ def test_langfuse_setup_uses_plugin_admission_and_preserves_config_on_refusal(
 ):
     from qubit_cli.config import get_qubit_home, read_raw_config
 
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QUBIT_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setitem(sys.modules, "langfuse", ModuleType("langfuse"))
     config_path = get_qubit_home() / "config.yaml"
     config_path.write_text(

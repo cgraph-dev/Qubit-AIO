@@ -1276,7 +1276,7 @@ def _run_foreground(
             break
         except Exception as e:
             # A backend exception (e.g. an SSH connect timeout) never reached an exit status, so it
-            # is not a terminal outcome; Hermes' own deadline arrives as ``hermes_timed_out``.
+            # is not a terminal outcome; Qubit' own deadline arrives as ``qubit_timed_out``.
             if "timeout" in str(e).lower():
                 return _error_json(f"Command timed out after {effective_timeout} seconds", exit_code=124)
             # Retry on transient errors

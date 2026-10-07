@@ -5,7 +5,7 @@ Bug shape (live-reproduced on main @1c5ee5815f): /handoff poll-waited a flat
 60s for a TERMINAL state. The gateway watcher claims within seconds, but the
 dispatch is a FULL synthetic agent turn (whole transcript replay + delivery)
 that routinely exceeds 60s. The CLI then printed "Timed out waiting for the
-gateway. Is `hermes gateway` running?" (false diagnosis), called
+gateway. Is `qubit gateway` running?" (false diagnosis), called
 fail_handoff() on the RUNNING row (stomping the gateway's claim), and claimed
 "Your CLI session is intact" after switch_session had already re-pointed the
 session. The gateway later overwrote failed -> completed: split-brain.
@@ -26,12 +26,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from agent.i18n import t
+
 from qubit_state import SessionDB
 
 
 @pytest.fixture()
 def db(tmp_path, monkeypatch):
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     d = SessionDB(db_path=tmp_path / "state.db")
     yield d
     d.close()
@@ -139,7 +141,7 @@ class TestCLIWaitLoop:
         keep, printed, _ = _run_handoff(db, "cli-sess-a", monkeypatch)
         out = "\n".join(printed)
         assert keep is True
-        assert "Timed out waiting for the gateway" in out
+        assert t("cli.commands.handoff.timed_out") in out
         assert db.get_handoff_state("cli-sess-a")["state"] == "failed"
 
     def test_running_row_is_never_failed_by_cli(self, db, monkeypatch):
@@ -166,8 +168,8 @@ class TestCLIWaitLoop:
         keep, printed, _ = _run_handoff(db_proxy, "cli-sess-b", monkeypatch)
         out = "\n".join(printed)
         assert keep is True
-        assert "Is `hermes gateway` running?" not in out
-        assert "taking unusually long" in out
+        assert t("cli.commands.handoff.timed_out") not in out
+        assert t("cli.commands.handoff.taking_long") in out
         # The row is still owned by the gateway — untouched by the CLI.
         assert db.get_handoff_state("cli-sess-b")["state"] == "running"
         # Late gateway completion wins cleanly (no split-brain).
@@ -201,8 +203,8 @@ class TestCLIWaitLoop:
         keep, printed, host = _run_handoff(db_proxy, "cli-sess-c", monkeypatch)
         out = "\n".join(printed)
         assert keep is False  # completed -> CLI exits like /quit
-        assert "Handoff complete" in out
-        assert "Timed out waiting for the gateway" not in out
+        assert t("cli.commands.handoff.complete", platform="discord") in out
+        assert t("cli.commands.handoff.timed_out") not in out
         assert host._should_exit is True
         assert db.get_handoff_state("cli-sess-c")["state"] == "completed"
 

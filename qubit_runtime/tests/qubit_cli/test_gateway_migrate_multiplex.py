@@ -1,7 +1,7 @@
-"""``hermes gateway migrate``: preflight verdicts, apply/rollback bookkeeping, and the update hook.
+"""``qubit gateway migrate``: preflight verdicts, apply/rollback bookkeeping, and the update hook.
 
 Service layer is faked through the module's ``_installed_services`` / ``_service_op`` seams (the same
-shape ``hermes gateway install`` tests use); the default gateway boot is faked by writing the
+shape ``qubit gateway install`` tests use); the default gateway boot is faked by writing the
 ``served_profiles`` record the real multiplexer writes. Blockers reuse the gateway's own credential
 fingerprint and port-binding predicates, so the tests assert verdict → effect, not internal lists.
 """
@@ -18,11 +18,14 @@ import pytest
 import qubit_constants
 from qubit_cli import gateway_migrate as gm
 
+# Captured before any fixture fakes the seam: the one test that drives the real service leg.
+_REAL_SERVICE_OP = gm._service_op
+
 
 @pytest.fixture
 def fleet(tmp_path, monkeypatch):
     """default + coder + ops; both secondaries run a 'live' standalone gateway with a systemd unit."""
-    root = tmp_path / "hermes"
+    root = tmp_path / "qubit"
     for sub in ("profiles/coder", "profiles/ops"):
         (root / sub).mkdir(parents=True)
     (root / "config.yaml").write_text("model:\n  default: x\n", encoding="utf-8")
@@ -41,13 +44,16 @@ def fleet(tmp_path, monkeypatch):
         pids={"coder": 4101, "ops": 4102},
         ops=[],
         refused_at_start={},
+        # (profile, kind, system) of units whose boot enablement survived; secondaries boot-start,
+        # the pre-existing default unit starts DISABLED unless a test/migration enables it.
+        enabled={("coder", "systemd", False), ("ops", "systemd", False)},
     )
 
     def _service_op(kind, system, verb, home, *, run_as_user=None):
         name = _name(home)
         state.ops.append((name, verb))
         if verb == "start" and name != "default":
-            # What the real `hermes -p <name> gateway run` checks first: is a live multiplexer
+            # What the real `qubit -p <name> gateway run` checks first: is a live multiplexer
             # still recorded as serving me? (exit 78 if so — the unit is then parked for good).
             from qubit_cli.gateway import named_profile_served_by_running_multiplexer
             state.refused_at_start[name] = named_profile_served_by_running_multiplexer(name)
@@ -57,13 +63,17 @@ def fleet(tmp_path, monkeypatch):
                 state.services[name] = remaining
             else:
                 state.services.pop(name, None)
+                state.enabled.discard((name, kind, system))
         elif verb == "install":
             state.services[name] = (kind, system)
+            state.enabled.add((name, kind, system))
+        elif verb == "enable":
+            state.enabled.add((name, kind, system))
         elif verb in ("start", "restart") and name == "default":
-            (root / "gateway.pid").write_text(json.dumps({"pid": os.getpid(), "hermes_home": str(root)}))
+            (root / "gateway.pid").write_text(json.dumps({"pid": os.getpid(), "qubit_home": str(root)}))
             runtime_path = root / "gateway_state.json"
             runtime = json.loads(runtime_path.read_text()) if runtime_path.exists() else {}
-            runtime.update({"pid": os.getpid(), "hermes_home": str(root), "gateway_state": "running"})
+            runtime.update({"pid": os.getpid(), "qubit_home": str(root), "gateway_state": "running"})
             # Multiplex startup records ownership; standalone startup historically preserved the
             # old key, which is the stale-state half of #109473's rollback failure.
             if _config_flag(root):
@@ -72,7 +82,7 @@ def fleet(tmp_path, monkeypatch):
 
     import gateway.status as status
     # The default gateway the fixture "starts" is this process; the served probe verifies identity.
-    monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "hermes gateway run")
+    monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "qubit gateway run")
     monkeypatch.setattr(gm, "_installed_services", lambda home: _units(state.services.get(_name(home))))
     monkeypatch.setattr(gm, "_live_gateway_pid", lambda home: state.pids.get(_name(home)))
     monkeypatch.setattr(gm, "_service_op", _service_op)
@@ -101,7 +111,7 @@ def fleet(tmp_path, monkeypatch):
 
 def _fake_spawn(state, home: Path) -> bool:
     root = state.root
-    (root / "gateway.pid").write_text(json.dumps({"pid": os.getpid(), "hermes_home": str(root)}))
+    (root / "gateway.pid").write_text(json.dumps({"pid": os.getpid(), "qubit_home": str(root)}))
     return True
 
 
@@ -169,6 +179,33 @@ def test_parked_profile_remains_in_migration_inventory(fleet):
     (home / ".env").write_text("TELEGRAM_BOT_TOKEN=111111:default-token\n", encoding="utf-8")
     blocked = gm.build_migration_plan()
     assert any("'coder'" in reason and "credential" in reason for reason in blocked.blockers)
+
+
+def test_preflight_never_imports_a_parked_profiles_plugins(fleet):
+    """A parked profile stays in the inventory and the duplicate-credential guard (above), but
+    loading its gateway config must not run its plugins' ``register()`` in the host process (#123386)."""
+    from qubit_cli.plugins import _reset_plugin_managers_for_tests
+
+    home = fleet.root / "profiles/coder"
+    (home / "gateway.parked").touch()
+    (home / "config.yaml").write_text("plugins:\n  enabled: [p1]\n", encoding="utf-8")
+    marker = fleet.root / "p1-registered"
+    plugin = home / "plugins/p1"
+    plugin.mkdir(parents=True)
+    (plugin / "plugin.yaml").write_text("name: p1\n", encoding="utf-8")
+    (plugin / "__init__.py").write_text(
+        f"from pathlib import Path\n\ndef register(ctx):\n    Path({str(marker)!r}).write_text('imported')\n",
+        encoding="utf-8",
+    )
+    _reset_plugin_managers_for_tests()
+    try:
+        plan = gm.build_migration_plan()
+        assert "coder" in {p.name for p in plan.standalone_secondaries}
+        assert not marker.exists(), "migration preflight imported a parked profile's plugin"
+        gm.duplicate_credential_findings()  # doctor / gateway status read the same homes
+        assert not marker.exists()
+    finally:
+        _reset_plugin_managers_for_tests()
 
 
 def test_migration_removes_parked_footprint_without_waiting_for_it_to_serve(fleet, monkeypatch):
@@ -439,7 +476,7 @@ def test_update_hook_refuses_to_cross_service_user_or_home_boundary(
 
 def test_update_hook_still_migrates_same_user_same_scope_profiles_under_the_default_tree(fleet, capsys, monkeypatch):
     """The guard is a boundary check, not a kill switch: one user, one service domain, everything under
-    profiles/ (the shape `hermes profile create` produces) still auto-migrates."""
+    profiles/ (the shape `qubit profile create` produces) still auto-migrates."""
     fleet.services["default"] = ("systemd", False)
     monkeypatch.setattr(gm, "_gateway_identity", lambda home, pid, service: (1000, home), raising=False)
 
@@ -484,7 +521,7 @@ def test_update_hook_folds_a_unit_less_default_when_every_secondary_shares_one_m
 
 def test_auto_multiplex_migration_false_opts_out_of_the_update_hook_but_not_the_explicit_command(fleet, capsys):
     """``gateway.auto_multiplex_migration: false`` is a durable opt-out: an otherwise-eligible fleet is
-    left alone by ``hermes update`` (no output, no ops, no flag flip), while the operator typing
+    left alone by ``qubit update`` (no output, no ops, no flag flip), while the operator typing
     ``migrate --multiplex`` still migrates. Only the nested key counts."""
     assert gm.build_migration_plan().eligible_for_migration()  # would migrate but for the flag
     (fleet.root / "config.yaml").write_text(
@@ -525,9 +562,9 @@ def test_explicit_migrate_with_no_standalone_secondaries_still_flips_flag_and_re
 
     def _detached(home):  # no service manager anywhere -> detached start writes the served record
         fleet.services["default-detached"] = True
-        (fleet.root / "gateway.pid").write_text(json.dumps({"pid": os.getpid(), "hermes_home": str(fleet.root)}))
+        (fleet.root / "gateway.pid").write_text(json.dumps({"pid": os.getpid(), "qubit_home": str(fleet.root)}))
         (fleet.root / "gateway_state.json").write_text(json.dumps({
-            "pid": os.getpid(), "hermes_home": str(fleet.root), "gateway_state": "running",
+            "pid": os.getpid(), "qubit_home": str(fleet.root), "gateway_state": "running",
             "served_profiles": ["default", "coder", "ops"]}))
         return True
     monkeypatch.setattr(gm, "_spawn_detached_gateway", _detached)
@@ -679,7 +716,7 @@ def test_opt_out_reads_effective_config_managed_false_wins_and_string_false_is_f
     assert auto_migration_opted_out(fleet.root) is False
     managed = tmp_path / "managed"; managed.mkdir()
     (managed / "config.yaml").write_text("gateway:\n  auto_multiplex_migration: false\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+    monkeypatch.setenv("QUBIT_MANAGED_DIR", str(managed))
     managed_scope.invalidate_managed_cache()
     with gm._home_env(fleet.root):
         assert cfg.load_config()["gateway"]["auto_multiplex_migration"] is False
@@ -855,6 +892,50 @@ def test_half_migrated_host_converges_on_a_re_run(fleet, capsys):
     assert gm.build_migration_plan().already_multiplexed
 
 
+def test_migrate_enables_the_survivor_before_it_removes_anything(fleet, capsys):
+    """Systemctl recorder: a pre-existing, DISABLED survivor unit is enabled BEFORE the first
+    secondary uninstall (uninstall = stop + disable + wants-unlink), so an apply interrupted at any
+    later step still leaves a boot-startable gateway. Base restarted the survivor after the removals
+    and never enabled it: N boot-startable gateways became 0 while the migration reported ✓."""
+    fleet.services["default"] = ("systemd", False)  # unit exists; NOT in fleet.enabled
+    assert ("default", "systemd", False) not in fleet.enabled
+
+    with pytest.raises(SystemExit) as exc:
+        gm.cmd_migrate(SimpleNamespace(multiplex=True, dry_run=False, yes=True))
+    assert exc.value.code == 0
+
+    first_removal = min(i for i, op in enumerate(fleet.ops) if op[1] in ("stop", "uninstall"))
+    assert fleet.ops.index(("default", "enable")) < first_removal
+    # A reboot has exactly one gateway: the survivor, and none of the folded secondaries.
+    assert fleet.enabled == {("default", "systemd", False)}
+    assert fleet.ops[-1] == ("default", "restart") and "serves 3 profiles" in capsys.readouterr().out
+
+
+def test_migrate_refuses_when_the_survivor_cannot_be_enabled(fleet, monkeypatch, capsys):
+    """A failed `systemctl enable` is a preflight refusal, not a ⚠ line: continuing removed every
+    boot-startable secondary and reported ✓ Migrated over a host that comes back with no gateway."""
+    from qubit_cli import gateway as gw
+    fleet.services["default"] = ("systemd", False)
+    fake_op = gm._service_op
+    monkeypatch.setattr(gw, "_run_systemctl", lambda args, **kw: SimpleNamespace(returncode=1))
+
+    def _op(kind, system, verb, home, *, run_as_user=None):
+        if verb == "enable":  # the real leg, over a systemctl that fails
+            return _REAL_SERVICE_OP(kind, system, verb, home, run_as_user=run_as_user)
+        fake_op(kind, system, verb, home, run_as_user=run_as_user)
+
+    monkeypatch.setattr(gm, "_service_op", _op)
+
+    with pytest.raises(SystemExit) as exc:
+        gm.cmd_migrate(SimpleNamespace(multiplex=True, dry_run=False, yes=True))
+
+    assert exc.value.code == 1
+    assert not any(op[1] in ("stop", "uninstall") for op in fleet.ops), "refusal must precede every removal"
+    assert fleet.pids == {"coder": 4101, "ops": 4102} and _config_flag(fleet.root) is None
+    assert not gm._manifest_path(fleet.root).exists()
+    assert "refused before changing anything" in capsys.readouterr().out
+
+
 def test_plan_names_every_process_it_will_sigterm_before_it_signals_anything(fleet, capsys):
     """A running gateway is never stopped silently: the dry run names the pids and changes nothing."""
     gm.cmd_migrate(SimpleNamespace(multiplex=True, dry_run=True, yes=True))
@@ -868,7 +949,7 @@ def test_plan_names_every_process_it_will_sigterm_before_it_signals_anything(fle
 
 
 def test_windows_task_detection_reads_both_the_task_and_the_startup_fallback(monkeypatch):
-    """`hermes gateway install` falls back to a Startup-folder entry when it cannot register a
+    """`qubit gateway install` falls back to a Startup-folder entry when it cannot register a
     task; a migration that removed only the task would leave that entry launching a second
     gateway at the next logon."""
     from qubit_cli import gateway_windows as gww

@@ -103,7 +103,7 @@ def _stub_plugin_discovery(monkeypatch):
 
 
 def test_oneshot_wires_session_db_for_recall(monkeypatch):
-    """hermes -z bypasses HermesCLI, but recall still needs SessionDB."""
+    """qubit -z bypasses QubitCLI, but recall still needs SessionDB."""
     from qubit_cli.oneshot import _run_agent
 
     captured = {}
@@ -174,7 +174,7 @@ def test_oneshot_wires_session_db_for_recall(monkeypatch):
 
 
 def test_launch_tui_exports_model_provider_and_toolsets(monkeypatch, main_mod):
-    monkeypatch.setenv("HERMES_PYTHON", sys.executable)
+    monkeypatch.setenv("QUBIT_PYTHON", sys.executable)
     captured = {}
     active_path_during_call = None
 
@@ -185,7 +185,7 @@ def test_launch_tui_exports_model_provider_and_toolsets(monkeypatch, main_mod):
     def fake_call(argv, cwd=None, env=None):
         nonlocal active_path_during_call
         captured.update({"argv": argv, "cwd": cwd, "env": env})
-        active_path_during_call = Path(env["HERMES_TUI_ACTIVE_SESSION_FILE"])
+        active_path_during_call = Path(env["QUBIT_TUI_ACTIVE_SESSION_FILE"])
         assert active_path_during_call.exists()
         return 1
 
@@ -193,18 +193,114 @@ def test_launch_tui_exports_model_provider_and_toolsets(monkeypatch, main_mod):
 
     with pytest.raises(SystemExit):
         main_mod._launch_tui(
-            model="nous/hermes-test", provider="nous", toolsets="web, terminal"
+            model="nous/qubit-test", provider="nous", toolsets="web, terminal"
         )
 
     env = captured["env"]
-    assert env["HERMES_MODEL"] == "nous/hermes-test"
-    assert env["HERMES_INFERENCE_MODEL"] == "nous/hermes-test"
-    assert env["HERMES_TUI_PROVIDER"] == "nous"
-    assert env["HERMES_INFERENCE_PROVIDER"] == "nous"
-    assert env["HERMES_TUI_TOOLSETS"] == "web,terminal"
-    active_path = Path(env["HERMES_TUI_ACTIVE_SESSION_FILE"])
-    assert active_path.name.startswith("hermes-tui-active-session-")
+    assert env["QUBIT_MODEL"] == "nous/qubit-test"
+    assert env["QUBIT_INFERENCE_MODEL"] == "nous/qubit-test"
+    assert env["QUBIT_TUI_PROVIDER"] == "nous"
+    assert env["QUBIT_INFERENCE_PROVIDER"] == "nous"
+    assert env["QUBIT_TUI_TOOLSETS"] == "web,terminal"
+    active_path = Path(env["QUBIT_TUI_ACTIVE_SESSION_FILE"])
+    assert active_path.name.startswith("qubit-tui-active-session-")
     assert active_path.suffix == ".json"
     assert active_path_during_call == active_path
     assert not active_path.exists()
     assert env["NODE_ENV"] == "production"
+
+
+def test_launch_tui_prefers_launch_cwd_over_inherited_qubit_cwd(monkeypatch, main_mod, tmp_path):
+    """The directory `qubit --tui` was run from outranks an inherited QUBIT_CWD.
+
+    A shell export - or an outer `qubit --tui` - leaves QUBIT_CWD naming a real but stale
+    directory, and ui-tui/src/gatewayClient.ts:478 starts the gateway in whatever it names,
+    so the session reads files and completions from the wrong project (#49637).
+    """
+    stale = tmp_path / "stale-project"
+    launch = tmp_path / "launch-project"
+    stale.mkdir()
+    launch.mkdir()
+    monkeypatch.setenv("QUBIT_PYTHON", sys.executable)
+    monkeypatch.setenv("QUBIT_CWD", str(stale))
+    monkeypatch.chdir(launch)
+
+    captured = {}
+    monkeypatch.setattr(main_tui_launch, "_make_tui_argv",
+        lambda tui_dir, tui_dev: (["node", "dist/entry.js"], Path(".")),
+    )
+    monkeypatch.setattr(main_mod.subprocess, "call",
+        lambda argv, cwd=None, env=None: captured.update({"env": env}) or 1,
+    )
+
+    with pytest.raises(SystemExit):
+        main_mod._launch_tui()
+
+    handed_to_tui = Path(captured["env"]["QUBIT_CWD"]).resolve()
+    assert handed_to_tui == launch.resolve(), "the TUI gateway must start where the user launched"
+    assert handed_to_tui != stale.resolve()
+
+
+def test_launch_tui_worktree_still_outranks_the_launch_cwd(monkeypatch, main_mod, tmp_path):
+    """`--worktree` names an explicit destination, so it keeps precedence over the launch cwd."""
+    worktree = tmp_path / "worktree"
+    launch = tmp_path / "launch-project"
+    worktree.mkdir()
+    launch.mkdir()
+    monkeypatch.setenv("QUBIT_PYTHON", sys.executable)
+    monkeypatch.setenv("QUBIT_CWD", str(tmp_path))
+    monkeypatch.chdir(launch)
+
+    captured = {}
+    monkeypatch.setattr(main_tui_launch, "_setup_tui_worktree", lambda: {"path": str(worktree)})
+    monkeypatch.setattr(main_tui_launch, "_make_tui_argv",
+        lambda tui_dir, tui_dev: (["node", "dist/entry.js"], Path(".")),
+    )
+    monkeypatch.setattr(main_mod.subprocess, "call",
+        lambda argv, cwd=None, env=None: captured.update({"env": env}) or 1,
+    )
+
+    with pytest.raises(SystemExit):
+        main_mod._launch_tui(worktree=True)
+
+    assert captured["env"]["QUBIT_CWD"] == str(worktree)
+    assert captured["env"]["TERMINAL_CWD"] == str(worktree)
+    assert Path(captured["env"]["QUBIT_CWD"]).resolve() != launch.resolve()
+
+
+@pytest.mark.parametrize("backend", ["local", "docker"])
+def test_launch_tui_local_session_starts_in_launch_dir_not_terminal_cwd(monkeypatch, main_mod, tmp_path, backend):
+    """A local TUI follows the classic CLI rule: the launch dir beats an absolute terminal.cwd (#84015).
+
+    Remote backends keep terminal.cwd: the launch dir names nothing on the sandbox.
+    """
+    configured = tmp_path / "configured-home"
+    launch = tmp_path / "launch-project"
+    configured.mkdir()
+    launch.mkdir()
+    (Path(os.environ["QUBIT_HOME"]) / "config.yaml").write_text(
+        f"terminal:\n  backend: {backend}\n  cwd: {configured}\n", encoding="utf-8")
+    monkeypatch.delenv("TERMINAL_ENV", raising=False)
+    monkeypatch.delenv("TERMINAL_CWD", raising=False)
+    monkeypatch.setenv("QUBIT_PYTHON", sys.executable)
+    monkeypatch.setenv("QUBIT_TUI_CWD", str(tmp_path))  # stale, from an outer launcher
+    monkeypatch.chdir(launch)
+
+    captured = {}
+    monkeypatch.setattr(main_tui_launch, "_make_tui_argv",
+        lambda tui_dir, tui_dev: (["node", "dist/entry.js"], Path(".")),
+    )
+    monkeypatch.setattr(main_mod.subprocess, "call",
+        lambda argv, cwd=None, env=None: captured.update({"env": env}) or 1,
+    )
+
+    with pytest.raises(SystemExit):
+        main_mod._launch_tui()
+
+    env = captured["env"]
+    if backend == "local":
+        assert Path(env["QUBIT_TUI_CWD"]).resolve() == launch.resolve()
+        assert Path(env["TERMINAL_CWD"]).resolve() == launch.resolve()
+    else:
+        assert "QUBIT_TUI_CWD" not in env
+        assert Path(env["TERMINAL_CWD"]).resolve() == configured.resolve()

@@ -6,10 +6,13 @@ subscribers. Subscribing serializes against publishing under one lock and
 seeds the subscriber from a journal scan past ``last_event_id`` — so a client
 reconnect sees an exact continuation: no gaps, no duplicates.
 
-Overflow policy: a slow subscriber's bounded queue drops its OLDEST entries
-and raises ``overflow``; the SSE writer then tells the client to resync, and
-replay comes back from the journal — nothing is lost because the journal, not
-the queue, is the source of truth.
+Overflow policy: a slow subscriber's bounded queue drops its OLDEST entries so
+the writer can keep streaming the NEWEST ones without interrupting the client.
+``overflow`` is recorded only to power ``Subscriber.had_gap`` — a *genuine*
+cursor gap (the dropped seqs fall below the cursor the client will resume from).
+The client already tracks ``last_seq`` and replays from the journal, so a
+non-gap overflow is healed by continuing the stream; only a real gap needs a
+resync marker. The journal, not the queue, is the source of truth.
 """
 from __future__ import annotations
 
@@ -31,6 +34,10 @@ class Subscriber:
         self.max = max(1, int(max_queue))
         self.q: Deque[Dict[str, Any]] = deque()
         self.overflow = False
+        # Highest seq a stalled read dropped. 0 = none dropped since the last
+        # time the writer asked (``take_gap``), so a non-gap overflow stops
+        # asking for a resync and the client keeps its cursor.
+        self._gap_from: int = 0
         self.closed = False
         self.wake = threading.Event()
 
@@ -39,11 +46,28 @@ class Subscriber:
             return
         if self.run_filter and record.get("run_id") != self.run_filter:
             return
-        if len(self.q) >= self.max:
-            self.q.popleft()
+        while len(self.q) >= self.max:
+            dropped = self.q.popleft()
             self.overflow = True
+            seq = dropped.get("seq")
+            if isinstance(seq, int):
+                self._gap_from = max(self._gap_from, seq)
         self.q.append(record)
         self.wake.set()
+
+    def take_gap(self, cursor: int) -> int:
+        """Return the highest dropped seq at/below ``cursor`` and clear it.
+
+        A client resumes from ``cursor`` (its ``last_seq``); if everything
+        dropped is at or below that, the journal replay bridges the loss with
+        no client action. Only a dropped seq *above* the cursor is a real gap
+        the client cannot heal from its retained cursor — that is the one case
+        that must signal resync. Mutating state lives on the subscriber, so
+        this stays safe under the hub's publish lock.
+        """
+        gap_from = self._gap_from
+        self._gap_from = 0
+        return gap_from if gap_from > cursor else 0
 
     def drain(self, timeout: Optional[float]) -> List[Dict[str, Any]]:
         if timeout is not None and not self.q:
@@ -60,7 +84,7 @@ class Subscriber:
 
 class EventHub:
     def __init__(self, journal: EventJournal,
-                 max_queue: int = 512) -> None:
+                 max_queue: int = 4096) -> None:
         self._journal = journal
         self._max_queue = max_queue
         self._lock = threading.Lock()
@@ -131,5 +155,11 @@ class EventHub:
 
 
 def resync_frame() -> str:
-    """Tell the client its queue overflowed; reconnect replays from journal."""
+    """Tell the client its cursor is unreachable; replays the whole journal.
+
+    Emitted only on a *genuine* cursor gap (the client stalled long enough that
+    the server dropped an event at a seq above the client's own cursor). The
+    client answers by resuming from the retained ``last_seq`` — the journal
+    replay fills the gap — not by reconnecting cold.
+    """
     return ": resync\nevent: resync\ndata: {}\n\n"

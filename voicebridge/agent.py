@@ -357,10 +357,64 @@ def _vendor_tool_names(result: Any) -> "list[str]":
     return out
 
 
+def _local_model_runtime(cfg: Any, model: str) -> "Optional[Dict[str, Any]]":
+    """Runtime kwargs for a LOCAL pinned model, or ``None`` when it is not local.
+
+    A ``/qubit-chat`` session can pin a local model (``qubit-spark17``,
+    ``qubit-brain``, ...). The vendored provider resolver only knows the
+    configured GLOBAL provider, so handing it a bare local model name lands the
+    turn on the global API route under the wrong model. The voicebridge
+    resolver is the one authority that maps a model id onto a local Ollama
+    profile (``kind == "local"``), so it answers "is this local?" and the
+    Ollama OpenAI-compatible endpoint supplies provider/base_url — the SAME
+    runtime the reference local pick uses. Fail-safe: any error yields ``None``
+    so the caller keeps the untouched vendored path.
+    """
+    name = str(model or "").strip()
+    if not name:
+        return None
+    try:
+        from .chat_transport import resolve_route
+
+        routed = resolve_route(cfg, name)
+        if not routed.get("ok") or str(routed.get("kind") or "") != "local":
+            return None
+        provider = str(routed.get("provider") or "ollama").strip() or "ollama"
+        from . import qubit_runtime as _qr  # type: ignore
+
+        _qr.use_qubit_home(cfg)
+        _qr.ensure_path()
+        from qubit_cli.models_local import (  # type: ignore
+            _get_ollama_base_url as _ollama_base)
+    except Exception:  # noqa: BLE001 - not a local pin: keep the vendored path
+        return None
+    try:
+        base = str(_ollama_base() or "").strip().rstrip("/")
+        for suffix in ("/api/tags", "/v1/models", "/api", "/v1"):
+            if base.endswith(suffix):
+                base = base[: -len(suffix)]
+    except Exception:  # noqa: BLE001
+        base = "http://127.0.0.1:11434"
+    if base and "://" not in base:
+        base = "http://" + base
+    if not base:
+        base = "http://127.0.0.1:11434"
+    return {
+        "provider": provider,
+        "base_url": base + "/v1",
+        "api_key": "no-key-required",
+        "api_mode": "chat_completions",
+        "model": str(routed.get("model") or name),
+    }
+
+
 def _run_vendored_session(cfg: Any, text: str, sid: str, *,
                           check: Callable[[], bool], store: Any,
                           reasoning: Optional[str],
-                          persist_user: bool = False
+                          persist_user: bool = False,
+                          event_sink: Optional[Callable[[str, dict], None]] = None,
+                          progress_sink: Optional[Callable[..., None]] = None,
+                          session_model: Optional[str] = None
                           ) -> "Optional[Dict[str, Any]]":
     """Run one tool-capable agent turn through the vendored ``AIAgent``.
 
@@ -368,6 +422,22 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
     same tool set (skills, plugins, MCP), sends the tool schema to the model,
     and executes tool calls. Owner directive docs/DECISIONS.md #26 requires the
     /qubit-chat worker to be this agent, never a tool-less shim.
+
+    ``event_sink`` is the typed-progress bridge: the vendored ``AIAgent``
+    already emits ``(name, payload)`` pairs through its ``event_callback``
+    (``run_agent.py``), and a caller that owns the SSE hub forwards them as
+    ``CUSTOM`` frames so ``/qubit-chat``'s work panel sees real todos and
+    subagent activity. It is optional and purely additive — without it the
+    vendored event hooks fall back to their no-op defaults.
+
+    ``progress_sink`` is the *tool-progress* bridge and the one that actually
+    carries the work-panel events: the vendored runtime fires
+    ``tool_progress_callback`` with the child-agent lifecycle
+    (``subagent.*``, relayed by ``tools/delegate_tool_progress``) and with the
+    ``tool.completed`` result from which the todo snapshot is projected. It is
+    wired into ``AIAgent(tool_progress_callback=...)``; see
+    ``voicebridge/events/chat_progress.py``. Also optional and additive.
+
 
     Returns the ``run_session``-shaped outcome on a real run, or ``None`` when
     the vendored runtime is not importable (hermetic tests, an install that
@@ -398,34 +468,49 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
         raise AgentDenied("EMERGENCY_STOP",
                           "emergency stop latched before the agent turn")
     vcfg = load_config()
-    # Model selection follows the vendored config's ``model`` slot (the /chat
-    # authority), resolved through the same helper the CLI one-shot uses. The
-    # voicebridge ``agent.model`` override wins only when explicitly set —
-    # never the local voice default, which is not a tool-capable remote model.
-    try:
-        choice = _resolve_model_and_provider(
-            vcfg, _explicit_model(cfg) or None, None)
-    except Exception as exc:  # noqa: BLE001 - fail closed to the planner path
-        _audit("session_vendored_runtime_error", session=sid,
-               error=str(exc)[:160])
-        return None
-    model = str(getattr(choice, "model", "") or "")
-    # Fast bail when the vendored config resolves no model at all (an
-    # unconfigured/home-less runtime): there is no tool-capable agent to run,
-    # so return None for the caller's legacy fallback instead of paying the
-    # provider-resolution failure. A configured runtime always names a model.
-    if not str(getattr(choice, "provider", "") or "").strip() \
-            and not model.strip():
-        _audit("session_vendored_unconfigured", session=sid)
-        return None
-    try:
-        runtime, _fallback = resolve_runtime_with_fallback(
-            vcfg, requested=str(getattr(choice, "provider", "") or ""),
-            target_model=model or None)
-    except Exception as exc:  # noqa: BLE001 - fail closed to the planner path
-        _audit("session_vendored_runtime_error", session=sid,
-               error=str(exc)[:160])
-        return None
+    # Model selection: a session PIN (the operator's explicit pick for THIS
+    # conversation) wins over the voicebridge ``agent.model`` override, which in
+    # turn wins over the vendored config's ``model`` slot. Resolution follows
+    # the same helper the CLI one-shot uses so ``/chat`` behaviour is unchanged
+    # when no pin exists.
+    requested = str(session_model or "").strip() or _explicit_model(cfg) or ""
+    runtime: Optional[Dict[str, Any]] = None
+    model = requested
+    if requested:
+        # A LOCAL pin (qubit-spark17, qubit-brain, ...) must run on the local
+        # Ollama endpoint. The vendored provider resolver only knows the
+        # configured GLOBAL provider, so handing it a bare local name routed
+        # the turn to the global API under the wrong model — the exact bug this
+        # fixes. Resolve the pin through the one voicebridge resolver first.
+        runtime = _local_model_runtime(cfg, requested)
+    if runtime is not None:
+        model = str(runtime.get("model") or requested)
+    else:
+        try:
+            choice = _resolve_model_and_provider(
+                vcfg, requested or None, None)
+        except Exception as exc:  # noqa: BLE001 - fail closed to planner path
+            _audit("session_vendored_runtime_error", session=sid,
+                   error=str(exc)[:160])
+            return None
+        model = str(getattr(choice, "model", "") or "")
+        # Fast bail when the vendored config resolves no model at all (an
+        # unconfigured/home-less runtime): there is no tool-capable agent to
+        # run, so return None for the caller's legacy fallback instead of
+        # paying the provider-resolution failure. A configured runtime always
+        # names a model.
+        if not str(getattr(choice, "provider", "") or "").strip() \
+                and not model.strip():
+            _audit("session_vendored_unconfigured", session=sid)
+            return None
+        try:
+            runtime, _fallback = resolve_runtime_with_fallback(
+                vcfg, requested=str(getattr(choice, "provider", "") or ""),
+                target_model=model or None)
+        except Exception as exc:  # noqa: BLE001 - fail closed to planner path
+            _audit("session_vendored_runtime_error", session=sid,
+                   error=str(exc)[:160])
+            return None
     try:
         toolsets = sorted(_get_platform_tools(vcfg, "cli"))
     except Exception:  # noqa: BLE001 - config toolsets are best-effort
@@ -473,6 +558,8 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             credential_pool=runtime.get("credential_pool"),
             reasoning_config=_vendor_reasoning_config(reasoning),
             clarify_callback=_vendor_clarify_callback,
+            event_callback=event_sink,
+            tool_progress_callback=progress_sink,
         )
         result = agent.run_conversation(text) or {}
     except AgentDenied:
@@ -562,7 +649,10 @@ def run_session(cfg: Any, task_text: str, *, session: str,
                 max_steps: int = 4,
                 timeout_s: Optional[float] = None,
                 estop_engaged: Optional[Callable[[], bool]] = None,
-                cancelled: Optional[Callable[[], bool]] = None) -> Dict[str, Any]:
+                cancelled: Optional[Callable[[], bool]] = None,
+                progress_sink: Optional[Callable[..., None]] = None,
+                model: Optional[str] = None
+                ) -> Dict[str, Any]:
     """Run a bounded multi-step worker session natively.
 
     Prefers the vendored tool-capable ``AIAgent`` (the terminal /chat agent:
@@ -626,8 +716,22 @@ def run_session(cfg: Any, task_text: str, *, session: str,
     # planner shim. The vendored AIAgent sends the full tool schema (skills,
     # plugins, MCP) and actually calls tools; the planner below is the
     # fallback for environments without the vendored runtime.
+    # Model selection: the caller may pass the session's pin explicitly
+    # (``launch_task(model=...)``); otherwise read it from the session store so
+    # a voice/orchestrator turn on a pinned ``/qubit-chat`` session runs the
+    # same model the panel shows. A missing/unreadable store leaves it ``None``
+    # and the worker keeps its default resolution.
+    if not (model or "").strip():
+        try:
+            from .chat_transport import _pinned_session_model
+
+            model = _pinned_session_model(cfg, sid)
+        except Exception:  # noqa: BLE001 - a preference, never fatal
+            model = None
     vendored = _run_vendored_session(cfg, clean, sid, check=check,
-                                     store=store, reasoning=reasoning)
+                                     store=store, reasoning=reasoning,
+                                     progress_sink=progress_sink,
+                                     session_model=model)
     if vendored is not None:
         vendored.setdefault("session_id", sid)
         return vendored
@@ -723,7 +827,9 @@ def run_session(cfg: Any, task_text: str, *, session: str,
 
 def run_agent_turn(cfg: Any, text: str, *, session: str,
                    reasoning: Optional[str] = None,
-                   estop_engaged: Optional[Callable[[], bool]] = None
+                   estop_engaged: Optional[Callable[[], bool]] = None,
+                   event_sink: Optional[Callable[[str, dict], None]] = None,
+                   progress_sink: Optional[Callable[..., None]] = None
                    ) -> "Optional[Dict[str, Any]]":
     """Run one general turn through the tool-capable vendored agent.
 
@@ -765,8 +871,21 @@ def run_agent_turn(cfg: Any, text: str, *, session: str,
         except Exception:  # noqa: BLE001 - preference is advisory
             reasoning = None
     store = _canonical_session_store(cfg)
+    # The session's stored model is the operator's explicit pick for THIS
+    # conversation (the ``/qubit-chat`` panel write). Pass it through so the
+    # worker actually runs the pinned model instead of the global default.
+    session_model: Optional[str] = None
+    try:
+        from .chat_transport import _pinned_session_model
+
+        session_model = _pinned_session_model(cfg, sid)
+    except Exception:  # noqa: BLE001 - a preference, never fatal
+        session_model = None
     return _run_vendored_session(cfg, clean, sid, check=check, store=store,
-                                 reasoning=reasoning, persist_user=True)
+                                 reasoning=reasoning, persist_user=True,
+                                 event_sink=event_sink,
+                                 progress_sink=progress_sink,
+                                 session_model=session_model)
 
 
 def refuse_estop() -> Dict[str, Any]:

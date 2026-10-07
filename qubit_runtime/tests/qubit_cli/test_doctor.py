@@ -89,7 +89,7 @@ class TestDoctorPlatformHints:
 
         hint = doctor_platform._sqlite_upgrade_hint()
 
-        assert "docker pull nousresearch/hermes-agent:latest" in hint
+        assert "docker pull nousresearch/qubit:latest" in hint
         assert "qubit update" not in hint
 
 
@@ -100,7 +100,7 @@ class TestDoctorPlatformHints:
         # out-of-place method through the in-place `qubit update` path.
         hint = doctor_platform._sqlite_upgrade_hint("apt")
 
-        assert "run `pkg upgrade hermes-agent`" in hint
+        assert "run `pkg upgrade qubit`" in hint
         assert "qubit update" not in hint
 
     def test_sqlite_upgrade_hint_preserves_nix_guidance_as_prose(self):
@@ -215,7 +215,7 @@ class TestDoctorEnvFileEncoding:
     ):
         import pathlib
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         # Write a UTF-8 .env containing an em dash (U+2014 = e2 80 94). The
         # 0x94 byte is exactly the one the issue reporter hit: it's invalid
@@ -262,7 +262,7 @@ class TestDoctorEnvFileEncoding:
         self, monkeypatch, tmp_path
     ):
         """cp1252/latin-1 .env with ASCII provider hints must not abort doctor."""
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir()
         env_path = qubit_home / ".env"
         # 0xff is invalid UTF-8; latin-1 decodes it. Keep an ASCII provider key
@@ -285,8 +285,7 @@ class TestDoctorToolAvailabilityOverrides:
 
 
     def test_marks_kanban_available_only_when_missing_worker_env_gate(self, monkeypatch):
-        monkeypatch.setattr(doctor_state, "_honcho_is_configured_for_doctor", lambda: False)
-        monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+        monkeypatch.delenv("QUBIT_KANBAN_TASK", raising=False)
 
         available, unavailable = doctor_tools._apply_doctor_tool_availability_overrides(
             [],
@@ -297,7 +296,7 @@ class TestDoctorToolAvailabilityOverrides:
         assert unavailable == []
 
     def test_leaves_kanban_unavailable_when_worker_env_is_set(self, monkeypatch):
-        monkeypatch.setenv("HERMES_KANBAN_TASK", "probe")
+        monkeypatch.setenv("QUBIT_KANBAN_TASK", "probe")
         kanban_entry = {"name": "kanban", "env_vars": [], "tools": ["kanban_show"]}
 
         available, unavailable = doctor_tools._apply_doctor_tool_availability_overrides(
@@ -343,7 +342,7 @@ class TestDoctorMemoryProviderSection:
 
     def _make_qubit_home(self, tmp_path, provider="", memory_config=None):
         """Create a minimal QUBIT_HOME with config.yaml."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir(parents=True, exist_ok=True)
         import qubit_yaml as yaml
         config = dict(memory_config or {})
@@ -450,7 +449,7 @@ class TestDoctorMemoryProviderSection:
 
 
 def test_run_doctor_accepts_named_provider_from_providers_section(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
 
     import qubit_yaml as yaml
@@ -504,7 +503,7 @@ def test_run_doctor_accepts_named_provider_from_providers_section(monkeypatch, t
 def test_run_doctor_accepts_stable_key_when_provider_name_differs(
     monkeypatch, tmp_path
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -550,7 +549,7 @@ def test_run_doctor_accepts_stable_key_when_provider_name_differs(
 
 
 def test_run_doctor_accepts_bare_custom_provider(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -588,7 +587,7 @@ def test_run_doctor_accepts_bare_custom_provider(monkeypatch, tmp_path):
 
 
 def test_run_doctor_flags_missing_credentials_for_active_openrouter_provider(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -642,7 +641,7 @@ def test_run_doctor_flags_missing_credentials_for_active_openrouter_provider(mon
 def test_run_doctor_accepts_qubit_provider_ids_that_catalog_aliases(
     monkeypatch, tmp_path, provider, default_model
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -685,7 +684,7 @@ def test_run_doctor_accepts_qubit_provider_ids_that_catalog_aliases(
 
 
 def test_run_doctor_accepts_vendor_slugs_for_named_custom_provider(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -744,7 +743,7 @@ def test_run_doctor_vendor_slug_policy_for_openai_api_endpoint(
 ):
     """openai-api behind a custom router owns a vendor/model namespace (#69912); the real
     OpenAI endpoint keeps the warning."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -787,7 +786,7 @@ def test_run_doctor_vendor_slug_policy_for_openai_api_endpoint(
 
 
 def test_run_doctor_accepts_kimi_coding_cn_provider(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / ".env").write_text("KIMI_CN_API_KEY=***\n", encoding="utf-8")
     (home / "config.yaml").write_text(
@@ -828,7 +827,7 @@ def test_run_doctor_accepts_kimi_coding_cn_provider(monkeypatch, tmp_path):
 def _doctor_env_for_agent_browser(monkeypatch, tmp_path):
     """Shared fixture setup for the agent-browser npx-resolution
     branch in run_doctor (qubit_cli/doctor.py ~1557-1605)."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
     project = tmp_path / "project"
@@ -917,7 +916,7 @@ def test_doctor_fix_reports_pm_install_failure(monkeypatch, tmp_path):
 
 
 def test_run_doctor_kimi_cn_env_is_detected_and_probe_is_null_safe(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
     (home / ".env").write_text("KIMI_CN_API_KEY=sk-test\n", encoding="utf-8")
@@ -965,7 +964,7 @@ def test_run_doctor_kimi_cn_env_is_detected_and_probe_is_null_safe(monkeypatch, 
 
 
 def test_run_doctor_dashscope_retries_china_endpoint_after_intl_unauthorized(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
     (home / ".env").write_text("DASHSCOPE_API_KEY=sk-test\n", encoding="utf-8")
@@ -1021,7 +1020,7 @@ def test_run_doctor_dashscope_retries_china_endpoint_after_intl_unauthorized(mon
 
 @pytest.mark.parametrize("base_url", [None, "https://opencode.ai/zen/go/v1"])
 def test_run_doctor_opencode_go_skips_invalid_models_probe(monkeypatch, tmp_path, base_url):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
     (home / ".env").write_text("OPENCODE_GO_API_KEY=***\n", encoding="utf-8")
@@ -1108,7 +1107,7 @@ def _run_doctor_with_healthy_oauth_fallback(
     minimax_oauth_status: dict,
     xai_oauth_status: dict | None = None,
 ) -> str:
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -1223,7 +1222,7 @@ class TestDoctorXaiOAuthStatus:
 
     def _run(self, monkeypatch, tmp_path, *, xai_auth_fn) -> str:
         """Run doctor with a controlled xAI auth callable; return stdout."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
         project = tmp_path / "project"
@@ -1265,7 +1264,7 @@ class TestDoctorXaiOAuthStatus:
 
     def test_import_failure_does_not_affect_other_providers(self, monkeypatch, tmp_path):
         """Nous / Codex / Gemini / MiniMax rows must survive an xAI import failure."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".qubit"
         home.mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
         project = tmp_path / "project"
@@ -1291,7 +1290,7 @@ class TestDoctorXaiOAuthStatus:
         with contextlib.redirect_stdout(buf):
             doctor_mod.run_doctor(Namespace(fix=False))
         out = buf.getvalue()
-        assert "Qubit Labs auth" in out
+        assert "Nous Portal auth" in out
         assert "logged in" in out
 
     def test_function_raises_does_not_crash_doctor(self, monkeypatch, tmp_path):
@@ -1311,7 +1310,7 @@ class TestDoctorXaiOAuthStatus:
 
 
 class TestDoctorStaleMaxIterationsDrift:
-    """Regression for #17534: a stale HERMES_MAX_ITERATIONS in .env shadows
+    """Regression for #17534: a stale QUBIT_MAX_ITERATIONS in .env shadows
     agent.max_turns in config.yaml. The repro symptom is config.yaml saying
     400 while the gateway activity line reads N/90. Doctor must detect the
     drift, and `--fix` must remove the .env ghost (config.yaml wins).
@@ -1327,14 +1326,14 @@ class TestDoctorStaleMaxIterationsDrift:
         import io
         from argparse import Namespace
 
-        qubit_home = tmp_path / ".hermes"
+        qubit_home = tmp_path / ".qubit"
         qubit_home.mkdir(parents=True)
         (qubit_home / "config.yaml").write_text(
             f"agent:\n  max_turns: {cfg_turns}\n", encoding="utf-8"
         )
         env_lines = ["OPENAI_API_KEY=sk-test\n"]
         if ghost is not None:
-            env_lines.append(f"HERMES_MAX_ITERATIONS={ghost}\n")
+            env_lines.append(f"QUBIT_MAX_ITERATIONS={ghost}\n")
         (qubit_home / ".env").write_text("".join(env_lines), encoding="utf-8")
 
         monkeypatch.setattr(doctor_mod, "QUBIT_HOME", qubit_home)
@@ -1343,9 +1342,9 @@ class TestDoctorStaleMaxIterationsDrift:
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         if os_environ_value is not None:
             # Simulate the gateway bridge having already overridden os.environ.
-            monkeypatch.setenv("HERMES_MAX_ITERATIONS", str(os_environ_value))
+            monkeypatch.setenv("QUBIT_MAX_ITERATIONS", str(os_environ_value))
         else:
-            monkeypatch.delenv("HERMES_MAX_ITERATIONS", raising=False)
+            monkeypatch.delenv("QUBIT_MAX_ITERATIONS", raising=False)
 
         # Short-circuit at the Tool Availability stage — the drift check runs
         # well before it in the Configuration Files section.
@@ -1365,19 +1364,19 @@ class TestDoctorStaleMaxIterationsDrift:
             monkeypatch, tmp_path, fix=False, ghost=90, cfg_turns=400,
             os_environ_value=400,  # bridge contaminated os.environ
         )
-        assert "HERMES_MAX_ITERATIONS=90" in out
+        assert "QUBIT_MAX_ITERATIONS=90" in out
         assert "shadows" in out
         # Warn-only must NOT mutate .env.
-        assert "HERMES_MAX_ITERATIONS=90" in (qubit_home / ".env").read_text(encoding="utf-8")
+        assert "QUBIT_MAX_ITERATIONS=90" in (qubit_home / ".env").read_text(encoding="utf-8")
 
     def test_fix_removes_ghost(self, monkeypatch, tmp_path):
         out, qubit_home = self._run_config_section(
             monkeypatch, tmp_path, fix=True, ghost=90, cfg_turns=400,
             os_environ_value=400,
         )
-        assert "Removed stale HERMES_MAX_ITERATIONS" in out
+        assert "Removed stale QUBIT_MAX_ITERATIONS" in out
         env_after = (qubit_home / ".env").read_text(encoding="utf-8")
-        assert "HERMES_MAX_ITERATIONS" not in env_after
+        assert "QUBIT_MAX_ITERATIONS" not in env_after
         assert "OPENAI_API_KEY=sk-test" in env_after  # other keys preserved
 
 
@@ -1561,7 +1560,7 @@ class TestMacOSTCCGrants:
     def test_warns_on_cdhash_pinned_dr(self, monkeypatch, capsys, tmp_path):
         self._darwin_bundle(
             monkeypatch, tmp_path,
-            'designated => identifier "com.nousresearch.hermes" and cdhash H"97e692f3890f781fa0ad5ad6cb9d769cfaf42628"',
+            'designated => identifier "com.nousresearch.qubit" and cdhash H"97e692f3890f781fa0ad5ad6cb9d769cfaf42628"',
         )
         doctor_platform.check_macos_tcc_grants()
         out = capsys.readouterr().out
@@ -1570,23 +1569,23 @@ class TestMacOSTCCGrants:
         assert "signing identity is stable" not in out
 
     def test_identifier_dr_is_stable_with_upgrade_hint_and_repair_info(self, monkeypatch, capsys, tmp_path):
-        self._darwin_bundle(monkeypatch, tmp_path, 'designated => identifier "com.nousresearch.hermes"')
+        self._darwin_bundle(monkeypatch, tmp_path, 'designated => identifier "com.nousresearch.qubit"')
         doctor_platform.check_macos_tcc_grants()
         out = capsys.readouterr().out
         assert "TCC signing identity is stable" in out
         assert "--setup-tcc-identity" in out
-        assert "tccutil reset ScreenCapture com.nousresearch.hermes" in out
+        assert "tccutil reset ScreenCapture com.nousresearch.qubit" in out
 
     def test_certificate_anchored_dr_is_stable_without_upgrade_hint(self, monkeypatch, capsys, tmp_path):
         self._darwin_bundle(
             monkeypatch, tmp_path,
-            'designated => identifier "com.nousresearch.hermes" and certificate root = H"aabbcc"',
+            'designated => identifier "com.nousresearch.qubit" and certificate root = H"aabbcc"',
         )
         doctor_platform.check_macos_tcc_grants()
         out = capsys.readouterr().out
         assert "TCC signing identity is stable" in out
         assert "--setup-tcc-identity" not in out
-        assert "tccutil reset ScreenCapture com.nousresearch.hermes" in out
+        assert "tccutil reset ScreenCapture com.nousresearch.qubit" in out
 
     @pytest.mark.parametrize("failure", ["none", "empty", "timeout", "no_codesign"])
     def test_unreadable_dr_warns_and_never_claims_stable(self, monkeypatch, capsys, tmp_path, failure):

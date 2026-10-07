@@ -10,15 +10,7 @@ from qubit_cli.config import DEFAULT_CONFIG
 from qubit_cli.observability.shared_metrics_send_config import (
     DEFAULT_ENDPOINT,
     resolve_send_config,
-    reset_warning_latch_for_tests,
 )
-
-
-@pytest.fixture(autouse=True)
-def _reset_latch():
-    reset_warning_latch_for_tests()
-    yield
-    reset_warning_latch_for_tests()
 
 
 def _config(**shared):
@@ -33,9 +25,7 @@ class TestDefaults:
 
     def test_default_endpoint_is_production(self):
         shared = DEFAULT_CONFIG["telemetry"]["shared_metrics"]
-        # The config default is deliberately blank; the runtime resolves the
-        # production ingest endpoint internally (see resolve_send_config).
-        assert shared["endpoint"] == ""
+        assert shared["endpoint"] == DEFAULT_ENDPOINT
         assert DEFAULT_ENDPOINT.startswith("https://")
 
     def test_empty_config_sends_nothing(self):
@@ -76,12 +66,12 @@ class TestEndpointPrecedence:
     def test_no_environment_variable_can_redirect_telemetry(self, monkeypatch):
         """A consent hazard: an inherited env var must not silently retarget.
 
-        AGENTS.md also reserves HERMES_* for secrets, not behaviour.
+        AGENTS.md also reserves QUBIT_* for secrets, not behaviour.
         """
         for name in (
-            "HERMES_TELEMETRY_ENDPOINT",
+            "QUBIT_TELEMETRY_ENDPOINT",
             "TELEMETRY_ENDPOINT",
-            "HERMES_SHARED_METRICS_ENDPOINT",
+            "QUBIT_SHARED_METRICS_ENDPOINT",
         ):
             monkeypatch.setenv(name, "https://attacker.test/v1")
         resolved = resolve_send_config(_config(enabled=True, send=True))
