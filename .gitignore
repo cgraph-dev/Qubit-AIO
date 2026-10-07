@@ -3,6 +3,11 @@ venv/
 __pycache__/
 *.pyc
 *.pyo
+# deletion-test sandbox (regenerable, never commit)
+/sandbox/
+/home/
+/qhome/
+/qhome2/
 .pytest_cache/
 .pytest-cache/
 .mypy_cache/
