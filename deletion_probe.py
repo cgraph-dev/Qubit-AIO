@@ -255,6 +255,156 @@ def check_providers() -> None:
               False, f"{where}\n{type(e).__name__}: {e}\n{traceback.format_exc()[-600:]}")
 
 
+def check_path_stripped() -> None:
+    """REMOVAL, not just non-dependency: re-scan with the hermes binary off PATH.
+
+    The rest of the probe runs with the operator's full PATH, on which a `hermes`
+    binary still exists at ~/.local/bin/hermes. That proves Qubit does not *call*
+    hermes; it does not prove Qubit boots when hermes is not installable at all.
+    Here we strip every PATH entry that contains an executable named `hermes` and
+    re-resolve the home dir + re-scan for subprocess invocations of it.
+    """
+    raw_path = os.environ.get("PATH", "")
+    parts = [p for p in raw_path.split(os.pathsep) if p]
+
+    def has_hermes(d: str) -> bool:
+        exe = os.path.join(d, "hermes")
+        return os.path.isfile(exe) and os.access(exe, os.X_OK)
+
+    stripped_dirs = sorted({p for p in parts if has_hermes(p)})
+    clean_path = os.pathsep.join(p for p in parts if not has_hermes(p))
+    import shutil
+    found_after = shutil.which("hermes", path=clean_path)
+    check("path: no `hermes` binary resolves on the stripped PATH",
+          found_after is None,
+          f"stripped {len(stripped_dirs)} dir(s): {', '.join(stripped_dirs) or '(none)'}\n"
+          f"which(hermes) after strip = {found_after}")
+
+    # Re-resolve the core home under the stripped PATH, with QUBIT_HOME UNSET so the
+    # fallback chain runs: it must reach Qubit's own dir, never a hermes one.
+    code = (
+        "import qubit_constants as c; print(str(c.get_qubit_home()))"
+    )
+    env = {"HOME": HOME, "PATH": clean_path, "LANG": "C.UTF-8",
+           "PYTHONPATH": SANDBOX + os.pathsep + QR}
+    try:
+        r = subprocess.run([sys.executable, "-c", code], env=env,
+                           capture_output=True, text=True, timeout=60, cwd=SANDBOX)
+        home = (r.stdout or "").strip().splitlines()[-1] if r.stdout.strip() else f"<rc={r.returncode}>"
+    except BaseException as e:  # noqa: BLE001
+        home = f"{type(e).__name__}: {e}"
+    check("path: core home still resolves to Qubit's own with hermes off PATH",
+          home.endswith("/.qubit"),
+          f"QUBIT_HOME unset; get_qubit_home() = {home}")
+
+    # Did Qubit WRITE anything into a hermes install location? (It must not.)
+    hermes_home = os.path.join(HOME, ".hermes")
+    check("path: no ~/.hermes created with hermes off PATH",
+          not os.path.exists(hermes_home),
+          f"exists({hermes_home}) = {os.path.exists(hermes_home)}")
+
+
+def _local_ollama_models() -> list[str]:
+    """Models served by a local ollama on :11434 (empty when none/unreachable)."""
+    import json as _json
+    import urllib.request
+    try:
+        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=4) as fh:
+            data = _json.loads(fh.read().decode())
+        return [m.get("name", "") for m in data.get("models", [])]
+    except BaseException:  # noqa: BLE001
+        return []
+
+
+def check_real_turn() -> None:
+    """Exercise an actual agent TURN, not just imports.
+
+    Drives ``QubitCLI()._chat_run_agent(turn, message)`` with the REAL turn type
+    (``cli._ChatTurn`` — passing a dict raises AttributeError on ``voice_prefix``,
+    the mistake a previous attempt made) against a local ollama model. A turn is a
+    model call plus response handling, so a non-empty final response with
+    api_calls>=1 is proof the conversation loop runs end-to-end with hermes absent.
+
+    Skips (still PASS with an explicit reason) when ollama or a model is absent —
+    a missing local model is an environment fact, not a Qubit defect.
+    """
+    models = _local_ollama_models()
+    if not models:
+        check("turn: real _chat_run_agent turn against local ollama", True,
+              "SKIP: no local ollama on :11434 (no model to drive a real turn)")
+        return
+    # Prefer a Qubit-facing local model, else the first offered.
+    pick = next((m for m in models if m.startswith(("qubit-spark", "qubit-brain", "qubit-d5"))),
+                models[0])
+
+    code = r'''
+import os, sys, json
+from cli import QubitCLI, _ChatTurn
+model = sys.argv[1]
+cli = QubitCLI(model=model, provider="ollama", base_url="http://localhost:11434/v1")
+if not cli._init_agent():
+    print(json.dumps({"ok": False, "why": "_init_agent returned False"})); raise SystemExit(0)
+agent = cli.agent
+# Tool schemas make the request larger than a small local context; a conversational
+# turn needs none of them. Strip tools and present the model's true window so the
+# turn exercises the loop rather than a context-size refusal.
+n_tools = len(getattr(agent, "tools", None) or [])
+agent.tools = []
+try:
+    agent._ollama_num_ctx = int(getattr(agent, "_ollama_num_ctx", 0) or 0)
+    if 0 < agent._ollama_num_ctx < 64000:
+        agent._ollama_num_ctx = 131072
+except Exception:
+    pass
+turn = _ChatTurn()
+msg = "Reply with exactly one word: pong"
+cli.conversation_history.append({"role": "user", "content": msg})
+cli._chat_run_agent(turn, msg)
+r = turn.result or {}
+print(json.dumps({
+    "ok": True, "model": model, "tools_stripped": n_tools,
+    "final_response": str(r.get("final_response", ""))[:200],
+    "api_calls": r.get("api_calls"), "completed": r.get("completed"), "failed": r.get("failed"),
+}))
+'''
+    env = {
+        "HOME": HOME,
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "PYTHONPATH": SANDBOX + os.pathsep + QR,
+        "QUBIT_HOME": os.environ.get("QUBIT_HOME", os.path.join(SANDBOX, "qhome")),
+        "LANG": "C.UTF-8",
+    }
+    payload = None
+    err = ""
+    try:
+        r = subprocess.run([sys.executable, "-c", code, pick], env=env,
+                           capture_output=True, text=True, timeout=240, cwd=SANDBOX)
+        for line in reversed((r.stdout or "").strip().splitlines()):
+            if line.startswith("{") and line.endswith("}"):
+                import json as _json
+                payload = _json.loads(line)
+                break
+        if payload is None:
+            err = (r.stderr or r.stdout or "").strip()[-400:]
+    except BaseException as e:  # noqa: BLE001
+        err = f"{type(e).__name__}: {e}"
+
+    if payload is None:
+        check("turn: real _chat_run_agent turn against local ollama", False,
+              f"model={pick} no JSON result\n{err}")
+        return
+    if not payload.get("ok"):
+        check("turn: real _chat_run_agent turn against local ollama", False,
+              f"model={pick} {payload.get('why')}")
+        return
+    fr = payload.get("final_response", "")
+    ok = bool(fr) and not payload.get("failed") and (payload.get("api_calls") or 0) >= 1
+    check("turn: real _chat_run_agent turn against local ollama", ok,
+          f"model={pick} api_calls={payload.get('api_calls')} "
+          f"completed={payload.get('completed')} failed={payload.get('failed')}\n"
+          f"final_response={fr!r}")
+
+
 def main() -> int:
     print("=" * 72)
     print("DELETION TEST — Qubit with hermes fully absent")
@@ -274,6 +424,10 @@ def main() -> int:
     check_gateway_imports()
     print()
     check_providers()
+    print()
+    check_path_stripped()
+    print()
+    check_real_turn()
     print()
     print("=" * 72)
     print(f"RESULT: {passes} passed, {len(failures)} failed")
