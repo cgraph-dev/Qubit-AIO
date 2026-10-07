@@ -218,7 +218,7 @@ def message_agent_tool(target: str = "", message: str = "", task_id: Optional[st
     except Exception as exc:  # pragma: no cover — defensive
         return _err(f"Bot Mode gate check failed: {exc}")
     from qubit_cli.observability.shared_metrics_signals import record_feature_used
-    record_feature_used("bot_mode", hermes_home=home)
+    record_feature_used("bot_mode", qubit_home=home)
 
     root, me = _qubit_root(Path(home)), _self_profile_name(Path(home))
     roster_homes = dict(_roster(root))

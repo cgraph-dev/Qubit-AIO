@@ -262,6 +262,7 @@ def _redact_log_text(text: str, *, redact_url_credentials: bool = True) -> str:
     if not text:
         return text
     from agent.redact import redact_sensitive_text
+    from qubit_cli.debug_redaction import _EMAIL_ADDRESS_RE
     text = redact_sensitive_text(
         text, force=True, redact_url_credentials=redact_url_credentials
     )
@@ -592,6 +593,7 @@ _NOUS_PRIVACY_NOTICE = """\
 
 def _run_debug_share_nous(args, *, log_lines: int, redact: bool) -> None:
     """``qubit debug share --qubit``: gzip the same bundle into the Qubit envelope → Qubit-S3."""
+    from qubit_cli import install_source
     from qubit_cli.diagnostics_upload import share_to_nous
     print(_NOUS_PRIVACY_NOTICE)
     if not _confirm_upload(args):

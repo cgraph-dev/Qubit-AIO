@@ -114,7 +114,13 @@ def _profile_home(profile: str) -> Optional[str]:
         from qubit_cli.profiles import get_profile_dir
         return str(get_profile_dir(profile))
     if profile and profile != "default":
-        return os.path.expanduser(f"~/.hermes/profiles/{profile}")
+        # Same layout get_profile_dir() uses: <qubit_root>/profiles/<name>. Deriving
+        # from the resolved root keeps this consistent with every other home lookup;
+        # the old literal "~/.hermes/profiles/<p>" produced split-brain homes.
+        with contextlib.suppress(Exception):
+            from qubit_constants import get_default_qubit_root
+            return str(get_default_qubit_root() / "profiles" / profile)
+        return os.path.join(os.path.expanduser("~/.qubit"), "profiles", profile)
     with contextlib.suppress(Exception):
         from qubit_cli.config import get_qubit_home
         return str(get_qubit_home())

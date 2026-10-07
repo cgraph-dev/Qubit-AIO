@@ -100,8 +100,16 @@ class _Ctx:
 
 def patched_stream(self, **kw):
     msgs = kw.get("messages") or []
+    import re as _re
+    first = msgs[0] if msgs else {}
+    sysm = next((m for m in msgs if m.get("role") == "system"), None)
+    nonsys = [m for m in msgs if m.get("role") != "system"]
+    f0 = nonsys[0] if nonsys else {}
+    ftxt = f0.get("content") if isinstance(f0.get("content"), str) else "".join(b.get("text", "") for b in (f0.get("content") or []) if isinstance(b, dict))
+    m = _re.search(r"\[probe-session (\d+)\]", ftxt or "")
+    sha = lambda o: hashlib.sha256(json.dumps(o, sort_keys=True, default=str).encode()).hexdigest()[:10]
     rec = dict(worker=int(m.group(1)) if m else None, call=len(msgs), t_start=time.time(), model=kw.get("model"),
-               n_msgs=len(msgs), system_sha=sys_sha, tools_sha=tools_sha, msg_shas=msg_shas)
+               n_msgs=len(msgs), system_sha=sha(sysm), tools_sha=sha(kw.get("tools")), msg_shas=[sha(x) for x in nonsys])
     if SETTLE_S > 0 and len(msgs) > 1:
         time.sleep(SETTLE_S); rec["settle_s"] = SETTLE_S
     return _Ctx(_orig_stream(self, **kw), rec)
