@@ -38,6 +38,8 @@ from agent.conversation_loop import INTERRUPT_WAITING_FOR_MODEL_PREFIX  # noqa: 
 from tui_gateway import git_probe
 from tui_gateway._env import env_float, env_int
 from tui_gateway.turn_marker import marker_writer_state, clear_turn_marker, read_turn_marker, record_turn_start  # noqa: F401
+from tui_gateway.checkpoints import (_load_checkpoints_enabled, _resolve_checkpoint_hash,
+                                     resolve_checkpoints_enabled as _resolve_checkpoints_enabled)  # noqa: F401
 from tui_gateway.contracts import registry as _contracts
 # User-facing copy shared with the split method modules (they close over this namespace).
 from tui_gateway.user_messages import (  # noqa: F401
@@ -2662,7 +2664,7 @@ def _make_agent(
         # Builds that run before the record exists (branch, eager resume, compute host) pass it explicitly.
         user_id=auth_user_id if auth_user_id is not None else _session_auth_user_id(session),
         session_db=session_db if session_db is not None else _get_db(), ephemeral_system_prompt=system_prompt or None,
-        checkpoints_enabled=is_truthy_value(os.environ.get("HERMES_TUI_CHECKPOINTS")),
+        checkpoints_enabled=_resolve_checkpoints_enabled(cfg),
         pass_session_id=is_truthy_value(os.environ.get("HERMES_TUI_PASS_SESSION_ID")),
         skip_context_files=ignore_rules, skip_memory=ignore_rules, fallback_model=_load_fallback_model(),
         **_agent_cbs(sid))
@@ -2771,17 +2773,6 @@ def _any_live_session_claims_key(target: str) -> bool:
 
 def _with_checkpoints(session, fn):
     return fn(session["agent"]._checkpoint_mgr, _session_cwd(session))
-
-
-def _resolve_checkpoint_hash(mgr, cwd: str, ref: str) -> str:
-    try:
-        checkpoints = mgr.list_checkpoints(cwd)
-        idx = int(ref) - 1
-    except ValueError:
-        return ref
-    if 0 <= idx < len(checkpoints):
-        return checkpoints[idx].get("hash", ref)
-    raise ValueError(f"Invalid checkpoint number. Use 1-{len(checkpoints)}.")
 
 
 # ── Methods: session ─────────────────────────────────────────────────
