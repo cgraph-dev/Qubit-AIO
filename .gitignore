@@ -106,3 +106,8 @@ _private_backup/
 qubit_runtime/cron-heartbeat
 qubit_runtime/cron-started
 qubit_runtime/evals.desktop_bug_campaign.*
+
+# Burndown instrument cache — a measurement, not source. Never commit.
+.frozen_target_progress.cache.json
+audit_frozen.json
+audit_frozen.txt
