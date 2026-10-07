@@ -35,6 +35,185 @@ def _failed_result(request: dict, result_path: Path, code: int) -> int:
     return code
 
 
+
+
+def _write_bootstrap_result(request: dict, result_path: Path, code: int, receipt: dict | None) -> int:
+    """The bootstrap child's answer; windows_resume stays the parent's token (and its atexit net)."""
+    _write_json(result_path, {
+        "schema": 1, "update_id": request["receipt"]["update_id"], "exit_code": code,
+        "receipt": receipt, "windows_resume": None, "pm_receipt": request.get("pm_receipt"),
+    })
+    return code
+
+
+def _bind_and_resume(proc: subprocess.Popen, request: dict, request_path: Path) -> None:
+    """Windows: bind the suspended completion child to the update's job, then resume it.
+
+    Post-commit, refusing the child would fail a committed update, so a child the job refuses
+    still runs, fenced by its own checkout lease instead (R5b: it joins our lock holding a lease
+    byte, which keeps the checkout busy after a killed owner until the child exits). Never
+    silently: the refusal is printed and recorded as a failed ``update_custody`` step in this
+    run's receipt and, before the child runs (it has not read its request yet), in the receipt it
+    resumes, so the terminal receipt carries it."""
+    from qubit_cli import update_receipt
+    from qubit_cli.update_lock import bind_child_to_update_tree, resume_suspended_child
+
+    refusal = bind_child_to_update_tree(proc)
+    if refusal is not None:
+        detail = (f"the update's job would not take the completion child ({refusal}), so it runs "
+                  "outside the job, holding its own checkout lease")
+        print(f"  ⚠ Update completion: {detail}")
+        update_receipt.record_step("update_custody", False, detail)
+        current = update_receipt._current.get()
+        if current is not None and current.data.get("update_id") == request["receipt"]["update_id"]:
+            request["receipt"] = json.loads(json.dumps(current.data))
+            _write_json(request_path, request)
+    resume_suspended_child(proc)
+
+
+def _running_record(request: dict) -> dict | None:
+    from qubit_cli.update_receipt import read_run_record
+
+    found = read_run_record(request["receipt"]["update_id"])
+    if found is None or found[1].get("outcome") != "running":
+        return None
+    found[1].pop("writer_pid", None)
+    return found[1]
+
+
+def _owed_user_action(request: dict) -> str | None:
+    """The unsettled-autostash notice (#122557) when this run parked the user's local changes.
+
+    ``_complete_source_update`` hands it over as the completion message, and a completion message
+    that is not a ``✓`` line is never a success (``_print_verified_update_completion``).
+    """
+    message = request.get("completion_message") or ""
+    return message if message and not message.startswith("✓") else None
+
+
+def _record_owed_user_action(request: dict) -> bool:
+    """Land the parked local changes on the receipt; True when nothing is owed to the user."""
+    from qubit_cli.update_receipt import record_user_action
+
+    notice = _owed_user_action(request)
+    if notice:
+        record_user_action("local_changes", notice)
+    return notice is None
+
+
+def _publish_gateway_success(request: dict) -> None:
+    """The gateway /update watcher's status: the code is committed (same as _complete_selected).
+
+    Guarded like ``update_cmd_fleet._write_gateway_update_exit_code`` (which this stdlib-only
+    process cannot import): an unwritable home must not turn the committed run into an error
+    before its result is written (review P1). The watcher then falls back to its own timeout.
+    """
+    if not request.get("gateway_mode"):
+        return
+    try:
+        (Path(request["home"]) / ".update_exit_code").write_text("0", encoding="utf-8")
+    except OSError as exc:
+        print(f"  ⚠ Could not publish the gateway's update status: {exc}")
+
+
+#: The one whole line the Desktop hand-off scripts match (scripts/desktop-update/posix.sh and
+#: windows.ps1); ``source_build.build_update_products`` prints the same prefix when the build fails.
+DESKTOP_BUILD_OWED = "Desktop app build owed:"
+
+
+def _report_desktop_build_owed(request: dict, record: dict | None, reason: str) -> None:
+    """Name the owed Desktop build when this run never got the build to its own verdict (F6, review P4).
+
+    The builder prints the line only when the build itself fails; a run that never reached it
+    (dependencies owed, the tail refused by the lock, a completion process lost) would otherwise end
+    as a plain "Update complete." in the hand-off. A ``build`` stage on the run's record means the
+    build ran and printed this line itself when the Desktop app failed.
+    """
+    if not request.get("desktop"):
+        return
+    if any(isinstance(mark, dict) and mark.get("name") == "build" for mark in (record or {}).get("stages") or ()):
+        return
+    print(f"  {DESKTOP_BUILD_OWED} {reason}", flush=True)
+
+
+def settle_lost_completion(request: dict, reason: str) -> dict:
+    """The parent's side of C3: the code is committed, but the completion never answered (review P2).
+
+    Reached when spawning or reading the completion failed (an OSError from the temporary
+    directory, the request file or Popen) or the child died without a correlated terminal result
+    (OOM, SIGKILL). The tail is owed, never a failed update: it is armed for the next launch, the
+    run's receipt is a success that names the ``completion`` follow-up, and the exit is 0 -- unless
+    the user's local changes are still parked (#122557: ``partial``, exit 1). Runs in the parent
+    (pre-swap) interpreter: everything it uses is already imported there.
+    """
+    from qubit_cli import update_receipt
+
+    print(f"  ⚠ Source update completion did not finish: {reason}", flush=True)
+    receipt = _read_terminal_receipt(request)  # the child finalized the run, then died
+    if receipt is None:
+        try:
+            from qubit_cli.venv_sync import arm_completion
+
+            arm_completion(Path(request["source"]))
+        except Exception as exc:  # health: allow BLE001 -- post-commit boundary: stale dependencies still make the next launch sync
+            print(f"  ⚠ Could not record the owed source-update tail: {exc}")
+        _report_desktop_build_owed(request, _running_record(request), "the update completion did not finish")
+        update_receipt.resume_run_record()  # the child's persisted stages, never this stale snapshot
+        update_receipt.record_followup("completion", reason, retry="the next launch or `qubit update` finishes it")
+        parked = not _record_owed_user_action(request)
+        if parked:
+            print(_owed_user_action(request))  # the completion child that prints it may never have run
+        update_receipt.finalize_pending_update_receipt(1 if parked else 0, "completion owed after the code was updated")
+        receipt = _read_terminal_receipt(request)
+    outcome = (receipt or {}).get("outcome")
+    code = 130 if outcome == "interrupted" else 1 if outcome == "partial" else 0
+    if code == 0:
+        _publish_gateway_success(request)
+    return {"exit_code": code, "receipt": receipt, "windows_resume": None, "pm_receipt": None}
+
+
+def _settle_after_commit(request: dict, result_path: Path, step: str, reason: str) -> int:
+    """The tree already moved, so a failure here is owed work, never a failed update (C3, A6).
+
+    Runs in the bootstrap interpreter (stdlib + the new tree) when dependency preparation failed or
+    the prepared child died without a result. The tail obligation stays armed, so the next launch
+    syncs the dependencies and finishes the tail; the run's receipt is a success that names the
+    follow-up, so nothing reports "still on the previous version" while the tree is new.
+    """
+    from qubit_cli import update_receipt
+    from qubit_cli.venv_sync import arm_completion
+
+    try:
+        arm_completion(Path(request["source"]))
+    except OSError as exc:  # the next launch still sees stale dependencies and syncs them
+        print(f"  ⚠ Could not record the owed source-update tail: {exc}")
+    receipt = _read_terminal_receipt(request)  # a prepared child that finalized, then died
+    if receipt is None:
+        # A prepared child that died mid-tail persisted stages the parent's snapshot lacks.
+        record = _running_record(request) or request["receipt"]
+        _report_desktop_build_owed(request, record, f"{step} did not finish")
+        _resume_receipt(record)
+        update_receipt.record_stage("deps" if step == "dependencies" else "build", "failed")
+        update_receipt.record_followup(step, reason, retry="dependencies not installed yet — the next launch retries"
+                                       if step == "dependencies" else "the next launch or `qubit update` retries it")
+        if not _record_owed_user_action(request):
+            print(_owed_user_action(request))  # the completion child that would print it never ran
+        update_receipt.finalize_pending_update_receipt(0, f"{step} owed after the code was updated")
+        receipt = _read_terminal_receipt(request)
+    code = 0 if receipt is not None and receipt.get("outcome") == "success" else 1
+    if code == 0:
+        _publish_gateway_success(request)
+    return _write_bootstrap_result(request, result_path, code, receipt)
+
+
+def _report_unbuilt_desktop(request: dict) -> None:
+    """The tail raised out of ``_complete_selected``: before the build stage, the build never ran."""
+    from qubit_cli import update_receipt
+
+    current = update_receipt._current.get()
+    if current is not None:  # a finalized run got past the build (verification finalizes it)
+        _report_desktop_build_owed(request, current.data, "the source-update tail did not finish")
+
 def run_completion(request: dict) -> dict:
     """Wait for new code; zero exit without a correlated terminal result fails closed."""
     root = Path(request["source"])
