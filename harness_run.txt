@@ -1,0 +1,93 @@
+================================================================
+ deletion_test.sh   repo=/tmp/qb-e5
+   HEAD=7e4d180b dirty=1
+================================================================
+[build] creating isolated sandbox at /tmp/qb-e5/sandbox ...
+[build] done.
+[env]   HOME=/tmp/qb-e5/home (empty)   QUBIT_HOME=/tmp/qb-e5/qhome
+[env]   ~/.hermes exists? no
+[env]   hermes binary on PATH? /home/trick/.local/bin/hermes
+[env]   stripped hermes from PATH for PART A (dirs removed: /home/trick/.local/bin )
+
+----------------------------------------------------------------
+ PART A — in-process probe (imports, entry points, providers)
+----------------------------------------------------------------
+========================================================================
+DELETION TEST — Qubit with hermes fully absent
+HOME      = /tmp/qb-e5/home
+SANDBOX   = /tmp/qb-e5/sandbox
+QUBIT_HOME= /tmp/qb-e5/qhome
+========================================================================
+[PASS] env: no ~/.hermes in HOME
+        | HOME=/tmp/qb-e5/home  exists(/tmp/qb-e5/home/.hermes)=False
+[PASS] env: real checkout NOT on sys.path
+        | (sandbox paths)
+
+[PASS] imports: 63/63 first-level modules import clean
+        | all clean
+
+[PASS] cli: `python -m qubit_cli.main --help` exits 0
+        | rc=0
+        | usage: qubit [-h] [--version] [-z PROMPT] [--usage-file PATH] [-m MODEL]
+        |              [--provider PROVIDER] [--reasoning LEVEL] [-t TOOLSETS]
+        |              [--resume SESSION] [--no-restore-cwd] [--in DIR]
+        |              [--continue [SESSION_NAME]] [--worktree] [--accept-hooks]
+        |              [--skills SKILLS] [--yolo] [--pass-session-id]
+        |              [--ignore-user-config] [--ignore-rules] [--safe-mode] [--tui]
+[PASS] cli: `python -m qubit_cli.main --version` exits 0
+        | rc=0 out='Qubit Agent vunknown (2026.9.24)\nInstall directory: /tmp/qb-e5/sandbox/qubit_runtime\nInstall method: unknown\nPython: 3.12.3\nOpenAI SDK: 2.24.0'
+[PASS] cli: subcommands > 70 (found 74)
+        | chat, model, moa, fallback, worktree, browser, secrets, egress, migrate, codex-runtime, gateway, proxy, lsp, setup, whatsapp, whatsapp-cloud, slack, send, login, logout, auth, status, pause, resume, cron ...
+[PASS] cli: construct cli.QubitCLI()
+        | QubitCLI() -> QubitCLI
+
+[PASS] import: tui_gateway.server
+        | ok
+[PASS] import: tui_gateway.entry
+        | ok
+[PASS] import: qubit_cli.gateway
+        | ok
+[PASS] import: plugins.plugin_loader
+        | ok
+
+[PASS] providers: list_authenticated_providers(...) returns providers
+        | qubit_cli.model_switch_providers -> 1 provider(s)
+
+[PASS] path: no `hermes` binary resolves on the stripped PATH
+        | stripped 0 dir(s): (none)
+        | which(hermes) after strip = None
+[PASS] path: core home still resolves to Qubit's own with hermes off PATH
+        | QUBIT_HOME unset; get_qubit_home() = /tmp/qb-e5/home/.qubit
+[PASS] path: no ~/.hermes created with hermes off PATH
+        | exists(/tmp/qb-e5/home/.hermes) = False
+
+[PASS] turn: real _chat_run_agent turn against local ollama
+        | model=qwen3-vl:2b api_calls=1 completed=True failed=False
+        | final_response='pong'
+
+========================================================================
+RESULT: 16 passed, 0 failed
+========================================================================
+probe exit=0
+
+----------------------------------------------------------------
+ PART B — static scan for HARD hermes dependencies (classified)
+----------------------------------------------------------------
+[INFO] imports of hermes_* modules (BLOCKER if real) — 2 hit(s); review classification below
+        | qubit_runtime/tools/cronjob_job_args.py:289:    from HERMES_CRON_AUTO_DELIVER_*, or ``local`` when it has no concrete target; other
+        | qubit_runtime/tools/skills_sync_client.py:224:    from HERMES_SYNC_DEVICE_NAME (first use only, for Qubit Cloud) or a friendly default, then persisted."""
+[PASS] .hermes dir CREATION (BLOCKER) — none
+[INFO] subprocess invokes hermes binary (BLOCKER) — 1 hit(s); review classification below
+        | qubit_runtime/tools/mcp_tool_transport.py:399:        # Subprocess stderr goes to ~/.hermes/logs/mcp-stderr.log so banners can't corrupt the TUI.
+
+[probe] home resolution with QUBIT_HOME unset:
+        | get_qubit_home() = /tmp/qb-e5/home/.qubit
+        | VERDICT: OK — core home is Qubit's own (~/.qubit)
+
+[probe] QUBIT_HOME or ~/.hermes literal fallbacks (COSMETIC unless runtime/core):
+        | count: 63
+        | (core-runtime sites are deliberate read-only COMPAT: _external_default_home)
+
+================================================================
+ OVERALL: PASS — Qubit boots with hermes absent
+================================================================
