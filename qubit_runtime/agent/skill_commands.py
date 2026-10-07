@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 # publication and the freshness lookup so a reader always sees a consistent
 # (key, map) pair. Scanning stays outside the lock (#14536, #74574).
 _skill_commands_by_key: Dict[tuple, Dict[str, Dict[str, Any]]] = {}
+# Keep the last map callers could actually see, even when plugin lifecycle
+# invalidation drops the projection cache before /reload-skills can diff it.
+_last_interactive_skill_commands_by_key: Dict[tuple, Dict[str, Dict[str, Any]]] = {}
 _publish_lock = threading.Lock()
 # ``\w`` keeps Unicode letters (CJK, Cyrillic) so a ``name: 小说拆条`` skill registers ``/小说拆条``
 # instead of slugging to "" and being dropped (#12351); Telegram's ``[a-z0-9_]`` menu limit is
