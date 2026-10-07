@@ -2714,9 +2714,13 @@ def repair_tool_call(agent, tool_name: str) -> str | None:
     return matches[0] if matches else None
 
 
-# Placeholder for an empty non-final message the provider would reject. Kept identical to the stub
-# placeholder in chat_completion_helpers so healed transcripts read consistently.
-_INTERRUPTED_PLACEHOLDER = "[response interrupted]"
+# Placeholder for an empty non-final message the provider would reject. A single source of the
+# wording now lives in ``agent.agent_runtime_helpers_placeholders`` so every healing path (this
+# module, the conversation loop, turn prep, message sanitization) reads consistently, and the
+# wording can be fixed once (#132949) without the readers drifting.
+from agent.agent_runtime_helpers_placeholders import (  # noqa: E402
+    _INTERRUPTED_PLACEHOLDER, _LEGACY_INTERRUPTED_PLACEHOLDER, hidden_interrupt_placeholder_row,
+)
 
 # Escalate repeated heals once per session window, then stay quiet. Default threshold; tunable via
 # ``agent.sanitizer_heal_escalation_threshold`` (<= 0 disables).
