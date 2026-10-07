@@ -5,6 +5,11 @@
 # hermes anywhere on the box? Builds an isolated sandbox (empty HOME, no
 # ~/.hermes, no ~/.hermes/hermes-agent) and exercises real entry points.
 #
+# PART A runs with PATH STRIPPED of every dir holding an executable `hermes`, so
+# it proves REMOVAL (boots with hermes uninstallable), not merely that Qubit never
+# calls it. It also drives a REAL agent turn (cli._ChatTurn + _chat_run_agent)
+# against a local ollama model and asserts a non-empty completion.
+#
 #   usage:  ./deletion_test.sh            # build sandbox (if missing) + run
 #           ./deletion_test.sh --rebuild  # force sandbox rebuild
 #
@@ -68,6 +73,30 @@ echo "[env]   ~/.hermes exists? $([[ -e "$ISO_HOME/.hermes" ]] && echo YES-BAD |
 HERMES_ON_PATH="$(command -v hermes 2>/dev/null || true)"
 echo "[env]   hermes binary on PATH? ${HERMES_ON_PATH:-no}"
 
+# Build a PATH with every dir holding an executable `hermes` removed, so PART A
+# proves REMOVAL (boots with hermes uninstallable), not merely non-dependency.
+CLEAN_PATH="$("$PY" - <<'PYEOF'
+import os, sys
+parts = [p for p in os.environ.get("PATH", "").split(os.pathsep) if p]
+def has(d):
+    e = os.path.join(d, "hermes")
+    return os.path.isfile(e) and os.access(e, os.X_OK)
+print(os.pathsep.join(p for p in parts if not has(p)))
+PYEOF
+)"
+if command -v hermes >/dev/null 2>&1; then
+  if PATH="$CLEAN_PATH" command -v hermes >/dev/null 2>&1; then
+    echo "[env]   WARNING: could not strip hermes from PATH; PART A runs with it present"
+    RUN_PATH="$PATH"
+  else
+    echo "[env]   stripped hermes from PATH for PART A (dirs removed: $(echo "$PATH" | tr ':' '\n' | sort -u | while read d; do [ -x "$d/hermes" ] && echo -n "$d "; done))"
+    RUN_PATH="$CLEAN_PATH"
+  fi
+else
+  echo "[env]   hermes already absent from PATH; PART A runs as-is"
+  RUN_PATH="$PATH"
+fi
+
 # --- 3. run the python probe -----------------------------------------------
 echo
 echo "----------------------------------------------------------------"
@@ -77,7 +106,7 @@ env -i \
   HOME="$ISO_HOME" \
   QUBIT_HOME="$QHOME" \
   PYTHONPATH="$SANDBOX:$SANDBOX/qubit_runtime" \
-  PATH="$PATH" \
+  PATH="$RUN_PATH" \
   LANG=C.UTF-8 \
   DT_SANDBOX="$SANDBOX" \
   "$PY" "$PROBE"
