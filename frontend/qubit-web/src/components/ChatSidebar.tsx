@@ -42,6 +42,7 @@ import {
   isEventsFeedMessage,
 } from "@/lib/events-reconnect";
 import { titleFromSessionInfoPayload } from "@/lib/chat-title";
+import { chatLiveFrame } from "@/lib/chatLiveEvents";
 
 import { cn } from "@/lib/utils";
 import { AlertCircle, ChevronDown, RefreshCw } from "lucide-react";
@@ -119,6 +120,8 @@ export function ChatSidebar({
   channel,
   profile,
   terminalModel,
+  sessionId,
+  onSessionModelChange,
   className,
   onDashboardNewSessionRequest,
   onSessionTitleChange,
@@ -172,6 +175,13 @@ export function ChatSidebar({
         // Best-effort: keep the last known label rather than blanking it.
       });
   }, [profile, terminalModel?.model, terminalModel?.provider]);
+
+  // The SSE effect below is long-lived (it only rebuilds on channel/version),
+  // so it must read the LATEST refresh callback rather than a stale closure
+  // captured at subscribe time. A ref keeps the model card honest after a live
+  // session.updated / model.changed without re-dialing the stream.
+  const refreshEffectiveModelRef = useRef(refreshEffectiveModel);
+  refreshEffectiveModelRef.current = refreshEffectiveModel;
 
   // Profile or chat channel change tears down the stream. Bump `version` (same
   // path as the manual Reconnect button) so the SSE reader resubscribes —
@@ -296,8 +306,40 @@ export function ChatSidebar({
         if (title !== undefined) {
           onSessionTitleChange?.(title);
         }
-      } else if (type === "dashboard.new_session_requested") {
+        return;
+      }
+      if (type === "dashboard.new_session_requested") {
         onDashboardNewSessionRequest?.();
+        return;
+      }
+
+      // Chat-session live-update frames (the server's producer half). A
+      // session create / model pick / rename / delete and a global model
+      // assignment all arrive as a CUSTOM envelope — reading `type` alone is
+      // the literal "CUSTOM", so unwrap `name`/`value` via chatLiveFrame.
+      // Without this the MODEL card kept a stale label until a page reload
+      // (the reported defect).
+      const live = chatLiveFrame(frame as unknown as Record<string, unknown>);
+      if (!live) return;
+      if (live.isModelChange) {
+        refreshEffectiveModelRef.current();
+        return;
+      }
+      if (live.isSession) {
+        // Our own session changed (a per-session model pick writes
+        // session.updated): relay the new model to the host and re-read the
+        // effective model so the card repaints immediately.
+        if (live.sessionId && sessionId && live.sessionId === sessionId) {
+          const m = live.session ? String(live.session.model || "") : "";
+          if (m) onSessionModelChange?.(m);
+        }
+        const title = live.session
+          ? titleFromSessionInfoPayload(live.session)
+          : undefined;
+        if (title !== undefined) {
+          onSessionTitleChange?.(title);
+        }
+        refreshEffectiveModelRef.current();
       }
     };
 
@@ -582,6 +624,32 @@ export function ChatSidebar({
           onApply={async ({ provider, model, confirmExpensiveModel }) => {
             setModelNotice(null);
             setPendingReloadModel(null);
+            // PER-SESSION pick when this panel is bound to a session (the
+            // /qubit-chat sidebar always is). Write THIS session's stored
+            // model through the canonical store — never the global
+            // ``model.default`` — so two surfaces keep independent models and
+            // the pick applies to the conversation actually open, immediately,
+            // with no reload. Falling through to the global branch here is
+            // why a session model could not be switched.
+            if (sessionId) {
+              try {
+                const res = await api.patchChatSession(sessionId, { model });
+                const applied = String(res?.session?.model || model);
+                onSessionModelChange?.(applied);
+                setModelNotice(
+                  `Model set to ${applied.split("/").slice(-1)[0]} for this session.`,
+                );
+                // Re-read the card from the server's authoritative row.
+                refreshEffectiveModel();
+              } catch (e) {
+                setError(
+                  e instanceof Error
+                    ? e.message
+                    : "failed to set this session's model",
+                );
+              }
+              return undefined;
+            }
             const result = await api.setModelAssignment(
               {
                 confirm_expensive_model: confirmExpensiveModel,
