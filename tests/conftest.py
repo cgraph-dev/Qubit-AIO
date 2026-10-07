@@ -61,6 +61,43 @@ def pytest_configure(config):  # noqa: D103
     tempfile.tempdir = str(base)
     config._qubit_tmp_dir = str(base)
 
+    # Register the host-OS gating marker (ported from upstream's tests/conftest.py
+    # alongside tests/_fixtures/platform_gating.py). Without this, a test marked
+    # ``@pytest.mark.platforms("windows")`` raises UnknownMarkWarning, which this
+    # repo's ``filterwarnings = error`` turns into a collection error.
+    config.addinivalue_line(
+        "markers",
+        "platforms(*specs, arch=None, arch_negate=False): run only on hosts "
+        "matching at least one spec — linux/macos/windows/posix/any, "
+        "'not X' negation, optional arch filter (e.g. arch='arm64')",
+    )
+    config.addinivalue_line(
+        "markers",
+        "require_symlinks: skip the test if symbolic links cannot be created in "
+        "the current environment (needs admin/developer mode on Windows).",
+    )
+    config.addinivalue_line(
+        "markers",
+        "live_system_guard_bypass: explicitly bypass the test-only live-system "
+        "guard (a test whose contract races the guard's own subtree walk).",
+    )
+
+
+def pytest_collection_modifyitems(config, items):  # noqa: D103
+    # Host-OS gating: skip items whose ``platforms(...)`` specs exclude this host.
+    # Skips (not run-against-a-patched-host) so a Windows-only test never reports
+    # green on Linux having exercised nothing underneath the branch.
+    from tests._fixtures.platform_gating import (
+        _platforms_gate_reason,
+        _reject_contradictory_platform_marks,
+    )
+
+    _reject_contradictory_platform_marks(items)
+    for item in items:
+        reason = _platforms_gate_reason(item)
+        if reason is not None:
+            item.add_marker(pytest.mark.skip(reason=reason))
+
 
 def pytest_unconfigure(config):  # noqa: D103
     """Remove the per-run basetemp we created; never a user-supplied one."""
