@@ -24,7 +24,7 @@ from tools.binary_extensions import (
 )
 from tools.file_tools_paths import (
     _expand_tilde, _resolve_path_for_task, _ssh_path_escapes_home, _terminal_env_type_for_task)
-from tools.file_tools_read_tracking import _has_full_write_baseline, _read_mtime_drifted
+from tools.file_tools_read_tracking import _has_full_write_baseline, _is_own_blind_patch, _read_mtime_drifted
 
 # Prefixes matched after realpath. macOS: /private/var mirrors /var — block the
 # sensitive subtrees only; a blanket "/private/var/" refuses every temp-file
@@ -578,9 +578,13 @@ def _stale_overwrite_blocker(filepath: str, resolved: str | None, task_id: str) 
         return None
     if not exists:
         return None
+    if _is_own_blind_patch(resolved, task_id):
+        return (
+            "Your patch changed this file without a full view of its current content. Read the current file "
+            "in full before a whole-file overwrite, or continue with targeted patches.")
     return (
         f"{resolved} exists but this task has not seen its full current content "
-        "(never read, only patched, or only a redacted/partial view). Read the "
+        "(never read, patched without a prior full read, or only a redacted/partial view). Read the "
         "file — every page of it, if it needs offset/limit — or use patch for a "
         "targeted edit; a stale conversation copy must not overwrite the current "
         "disk content.")

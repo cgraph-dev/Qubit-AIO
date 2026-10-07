@@ -277,6 +277,11 @@ def route_is_welcome_host(base_url: Any) -> bool:
     return host in welcome_hosts()
 
 
+def on_free_model(agent: Any, base_url: Any) -> bool:
+    """The request went to the free tier's host on a free-tier credential."""
+    return route_is_welcome_host(base_url) and is_anonymous_agent(agent)
+
+
 def anon_secret() -> str:
     return (os.environ.get(ANON_SECRET_ENV) or "").strip()
 

@@ -1493,6 +1493,7 @@ _NATIVE_STT_LABELS = {
     "mistral": "Mistral Voxtral",
     "xai": "xAI Grok STT",
     "elevenlabs": "ElevenLabs Scribe",
+    "deepinfra": "DeepInfra",
 }
 
 
