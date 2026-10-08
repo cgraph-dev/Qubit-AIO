@@ -126,6 +126,8 @@ class ConnectionOperationTarget(Payload):
     kind: ConnectionTargetKind
     action: ConnectionTargetAction
     state: ConnectionTargetState
+    # ``Target.resolved``: the row needs nothing more from the user (a failed catalog row counts).
+    resolved: bool | None = None
     detail: str | None = None
     instructions: str | None = None
     discovery_error: str | None = None

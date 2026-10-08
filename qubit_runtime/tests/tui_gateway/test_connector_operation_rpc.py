@@ -22,20 +22,6 @@ from tools.connectors.operation import ConnectionOperation, Target
 from tui_gateway import server
 from tui_gateway.transport import StdioTransport
 
-# PRODUCT GAP (root-caused, tested): the product's wire contract
-# tui_gateway/contracts/connectors_operation.py:ConnectionOperationTarget is
-# missing the ``resolved: bool | None = None`` field that upstream 38880bd2 has
-# (upstream line 131). Payload sets extra="forbid", so every emitted target that
-# carries ``resolved`` raises
-#   pydantic ValidationError: targets.N.resolved Extra inputs are not permitted
-# inside contracts/registry.py:_report and the RPC collapses to a 5034 connector
-# error. Applied only to the tests that drive a target transition; the two
-# ownership/param tests never emit one. Do NOT fix product here.
-_PRODUCT_GAP_TARGET_RESOLVED = pytest.mark.xfail(
-    reason="PRODUCT GAP: ConnectionOperationTarget lacks the `resolved: bool|None` "
-    "field upstream 38880bd2 has; extra=forbid makes connection.update validation "
-    "fail -> connector RPC 5034.", strict=False)
-
 
 class PipeClient:
     def __init__(self, stack):
@@ -119,7 +105,6 @@ def _open_op():
     return operation
 
 
-@_PRODUCT_GAP_TARGET_RESOLVED
 def test_operation_status_returns_the_live_snapshot_with_the_server_deadline(owned):
     owner, _, _ = owned
     operation = _open_op()
@@ -142,7 +127,6 @@ def test_operation_status_is_owner_only_and_validates_params(owned):
     assert _rpc(owner, "connectors.operation.status", op_id="nope")["error"]["code"] == 4004
 
 
-@_PRODUCT_GAP_TARGET_RESOLVED
 def test_respond_drives_the_live_operation_and_emits_update(owned):
     owner, stranger, _ = owned
     operation = _open_op()
@@ -163,7 +147,6 @@ def test_respond_drives_the_live_operation_and_emits_update(owned):
     assert updates[-1]["payload"]["op_id"] == operation.op_id
 
 
-@_PRODUCT_GAP_TARGET_RESOLVED
 def test_respond_cannot_claim_an_outcome_for_any_target(owned):
     """The card renders the operation; only skip, approve and Continue are its to say. The contract
     refuses any other claim (4002) before it reaches the operation."""
@@ -178,7 +161,6 @@ def test_respond_cannot_claim_an_outcome_for_any_target(owned):
     assert operation.target("notion").state == TargetState.pending
 
 
-@_PRODUCT_GAP_TARGET_RESOLVED
 def test_respond_continue_settles_and_emits_the_settlement_update(owned):
     owner, _, _ = owned
     operation = _open_op()
@@ -198,7 +180,6 @@ def test_pending_connection_on_resume_comes_from_the_live_registry(owned):
     assert server._pending_connection_request_payload(SID) is None
 
 
-@_PRODUCT_GAP_TARGET_RESOLVED
 def test_panel_connect_reissues_only_a_dead_link(owned, monkeypatch):
     """Try again re-mints a failed or expired target; a waiting target keeps the link it was minted
     with (the card reopens it), so the RPC refuses rather than spend a second mint."""
@@ -231,7 +212,6 @@ def test_panel_connect_reissues_only_a_dead_link(owned, monkeypatch):
 
 
 @pytest.mark.parametrize("dead", [TargetState.failed, TargetState.expired])
-@_PRODUCT_GAP_TARGET_RESOLVED
 def test_a_failed_reissue_leaves_the_row_failed_with_no_link(owned, monkeypatch, dead):
     """Try again whose mint fails must not show the row as waiting on the old dead link."""
     owner, _, _ = owned
