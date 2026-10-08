@@ -428,4 +428,56 @@ class TestCLI:
         assert titlesD == []
 
 
+# ---------------------------------------------------------------------------
+# Archived / deleted board resurrection (#43243)
+# ---------------------------------------------------------------------------
 
+class TestBoardResurrection:
+    """Read/watch paths must not resurrect archived or deleted boards.
+
+    Stale dashboard tabs, gateway notifiers and event-stream pollers can hand
+    ``connect(board=<slug>)`` a slug whose board was archived (moved to
+    ``_archived/`` with an ``archived`` tombstone) or hard-deleted
+    (``rmtree``).  ``connect`` must refuse to recreate the directory/DB, and
+    ``list_boards`` must not surface a DB-only stub as an active board.
+    """
+
+    def test_connect_does_not_recreate_archived_board(self, fresh_home):
+        kb.create_board("gone")
+        kb.remove_board("gone", archive=True)
+        tombstone = kb.board_metadata_path("gone")
+        assert tombstone.exists() and kb.read_board_metadata("gone")["archived"] is True
+        with pytest.raises(ValueError, match="archived"):
+            kbc.connect(board="gone")
+        assert not (kb.board_dir("gone") / "kanban.db").exists()
+
+    def test_connect_does_not_recreate_deleted_board(self, fresh_home):
+        kb.create_board("nuked")
+        kb.remove_board("nuked", archive=False)
+        assert not kb.board_dir("nuked").exists()
+        with pytest.raises(ValueError, match="does not exist"):
+            kbc.connect(board="nuked")
+        assert not kb.board_dir("nuked").exists()
+
+    def test_connect_still_opens_live_board(self, fresh_home):
+        kb.create_board("live")
+        with kbc.connect_closing(board="live") as conn:
+            conn.execute("SELECT 1").fetchone()
+        assert kb.board_exists("live")
+
+    def test_list_boards_ignores_db_only_stub(self, fresh_home):
+        # Simulate the historical stub shape: kanban.db with no board.json.
+        stub = kb.board_dir("ghost")
+        stub.mkdir(parents=True)
+        (stub / "kanban.db").touch()
+        assert "ghost" not in [b["slug"] for b in kb.list_boards()]
+        assert "ghost" not in [b["slug"] for b in kb.list_boards(include_archived=True)]
+
+    def test_archive_tombstone_keeps_name(self, fresh_home):
+        kb.create_board("keepname", name="My Board")
+        kb.remove_board("keepname", archive=True)
+        meta = kb.read_board_metadata("keepname")
+        assert meta["archived"] is True
+        assert meta["name"] == "My Board"
+        assert "keepname" in [b["slug"] for b in kb.list_boards(include_archived=True)]
+        assert "keepname" not in [b["slug"] for b in kb.list_boards(include_archived=False)]

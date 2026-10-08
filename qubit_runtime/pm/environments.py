@@ -338,6 +338,36 @@ def project_python(project_root: Path) -> Path:
     return venv_python(selected_venv(project_root))
 
 
+def _payload_store_python(root: Path) -> Path | None:
+    """A sealed payload's own interpreter when a venv must not be entered through its own."""
+    manifest = _payload_manifest(root)
+    if manifest is None or str(manifest.get("target", "")).endswith("-bionic"):
+        return None  # Termux payloads launch through their venv interpreter by design.
+    relative = manifest.get("runtime", {}).get("storePython")
+    if not isinstance(relative, str) or not relative:
+        return None
+    return _payload_path(root, relative, "interpreter")
+
+
+def venv_command(project_root: Path, venv: Path, options: tuple[str, ...] | list[str] = ()) -> list[str]:
+    """The argv prefix that runs Python inside *venv*; append a script, ``-c`` or ``-m``.
+
+    A sealed payload never enters a venv through ``Scripts\\python.exe``. That redirector is
+    an executable outside the package that starts the package's interpreter, which an MSIX
+    refuses (WinError 5) to a process without package identity. Instead the payload's own
+    interpreter attaches the venv's site-packages (``pm/_venv_entry.py``): the same
+    contract as the payload's launchers and its PM worker. Elsewhere the venv's
+    interpreter runs as is. *options* are interpreter flags (``-I``, ``-u``, ``-X …``).
+    """
+    root = Path(project_root).resolve()
+    store_python = _payload_store_python(root)
+    if store_python is None:
+        return [str(venv_python(venv)), *options]
+    entry = Path(__file__).resolve().with_name("_venv_entry.py")
+    flags = [*options, *([] if "-S" in options else ["-S"])]
+    return [str(store_python), *flags, str(entry), str(site_packages(Path(venv)))]
+
+
 def venv_python_version(venv: Path) -> tuple[int, int] | None:
     """The interpreter version a POSIX venv actually holds, or ``None``.
 

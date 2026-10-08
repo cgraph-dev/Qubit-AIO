@@ -91,6 +91,11 @@ _CLONE_ALL_HISTORY_EXCLUDE_ROOT: frozenset[str] = frozenset({
 # seed_profile_skills() callers (fresh-create, `qubit update` all-profile sync, the
 # dashboard) skip bundled-skill seeding. Delete the file to opt back in.
 NO_BUNDLED_SKILLS_MARKER = ".no-bundled-skills"
+# Marker written by `qubit profile create` for the setup profile (``hermes-setup``): its presence
+# at a profile root marks that root as THE setup profile, carrying the onboarding state the app
+# reads. A copy of a profile (clone, clone-all, import, distribution install) must drop it, so a
+# clone never inherits the setup-only toolset grants.
+SETUP_PROFILE_MARKER = ".setup-profile.json"
 
 # ``profile.yaml`` ``role`` values. A role grants backend capabilities (the setup toolset), so
 # only the backend writes one, and a copy of a profile (clone-all, import) never inherits it.
