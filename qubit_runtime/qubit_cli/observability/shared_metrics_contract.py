@@ -259,6 +259,14 @@ MEMORY_OPS = frozenset({"add", "other", "read", "remove", "replace", "search"})
 MEMORY_OP_OUTCOMES = frozenset({"failed", "rejected", "success"})
 # Who asked: the user's turn, or the unattended self-improvement review fork.
 MEMORY_OP_ORIGINS = frozenset({"background_review", "foreground"})
+# Why a memory op was refused or failed. Built-in classes name each refusal/failure return of
+# tools/memory_tool.py and tools/memory_tool_store.py; plugin providers report ``provider_error`` (the
+# tool returned an error) or ``exception`` (it raised). Successes are ``none``.
+MEMORY_OP_FAILURE_CLASSES = frozenset({
+    "ambiguous", "disabled", "drift", "exception", "gate_refused", "invalid_args", "missing_content",
+    "missing_old_text", "no_match", "none", "other", "over_budget", "provider_error", "read_failed",
+    "retry_cap", "scan_blocked", "staged", "stale_entry", "unknown", "would_empty",
+})
 CURATOR_OUTCOMES = frozenset({"failed", "skipped", "success"})
 CURATOR_TRIGGERS = frozenset({"manual", "scheduled"})
 DELEGATION_OUTCOMES = frozenset({"cancelled", "failed", "partial", "success"})
@@ -863,6 +871,14 @@ MEMORY_OPS = frozenset({"add", "other", "read", "remove", "replace", "search"})
 MEMORY_OP_OUTCOMES = frozenset({"failed", "rejected", "success"})
 # Who asked: the user's turn, or the unattended self-improvement review fork.
 MEMORY_OP_ORIGINS = frozenset({"background_review", "foreground"})
+# Why a memory op was refused or failed. Built-in classes name each refusal/failure return of
+# tools/memory_tool.py and tools/memory_tool_store.py; plugin providers report ``provider_error`` (the
+# tool returned an error) or ``exception`` (it raised). Successes are ``none``.
+MEMORY_OP_FAILURE_CLASSES = frozenset({
+    "ambiguous", "disabled", "drift", "exception", "gate_refused", "invalid_args", "missing_content",
+    "missing_old_text", "no_match", "none", "other", "over_budget", "provider_error", "read_failed",
+    "retry_cap", "scan_blocked", "staged", "stale_entry", "unknown", "would_empty",
+})
 CURATOR_OUTCOMES = frozenset({"failed", "skipped", "success"})
 CURATOR_TRIGGERS = frozenset({"manual", "scheduled"})
 DELEGATION_OUTCOMES = frozenset({"cancelled", "failed", "partial", "success"})
