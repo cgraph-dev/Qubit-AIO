@@ -155,6 +155,52 @@ async def get_usage_analytics(
         return await asyncio.to_thread(_get_usage_analytics, days, profile)
 
 
+_USAGE_KEYS = (
+    "input_tokens", "output_tokens", "cache_read_tokens", "reasoning_tokens",
+    "estimated_cost", "actual_cost", "api_calls", "tool_calls",
+)
+
+
+def _has_usage(row: Dict[str, Any]) -> bool:
+    return any((row.get(key) or 0) != 0 for key in _USAGE_KEYS)
+
+
+def _fold_session_only_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Fold model rows that carry no billing_provider and no usage into the single
+    accounted provider row for that model.
+
+    Session rows can be created before the first billable call finishes; if that early row
+    records only the model name while a later row has real accounting, the Models page used
+    to show a duplicate "0 tokens / — API calls" card. Only folds when ownership is
+    unambiguous (exactly one provider row).
+    """
+    rows_by_model: Dict[str, List[Dict[str, Any]]] = {}
+    for row in raw_rows:
+        rows_by_model.setdefault(row.get("model") or "", []).append(row)
+
+    rows: List[Dict[str, Any]] = []
+    for model_rows in rows_by_model.values():
+        provider_rows = [r for r in model_rows if r.get("billing_provider")]
+        if len(provider_rows) != 1:
+            rows.extend(model_rows)
+            continue
+        target = provider_rows[0]
+        for row in model_rows:
+            if row is target or row.get("billing_provider") or _has_usage(row):
+                continue
+            target["sessions"] = (target.get("sessions") or 0) + (row.get("sessions") or 0)
+            target["last_used_at"] = max(target.get("last_used_at") or 0, row.get("last_used_at") or 0)
+            total_tokens = (target.get("input_tokens") or 0) + (target.get("output_tokens") or 0)
+            sessions = target.get("sessions") or 0
+            target["avg_tokens_per_session"] = total_tokens / sessions if sessions else 0
+        rows.append(target)
+        rows.extend(
+            r for r in model_rows
+            if r is not target and (r.get("billing_provider") or _has_usage(r))
+        )
+    return rows
+
+
 def _model_capabilities(provider: str, model_name: str) -> dict:
     """models.dev capability metadata for the card; {} when unknown or lookup fails."""
     try:
@@ -322,7 +368,7 @@ def _get_models_analytics(days: int = 30, profile: Optional[str] = None):
         # row becomes a new row, carrying its own session count.
         _merge_aux_into_rows(raw_rows, _aux_usage_rows(db, cutoff))
 
-        rows = raw_rows
+        rows = _fold_session_only_rows(raw_rows)
         rows.sort(
             key=lambda r: (r.get("input_tokens") or 0) + (r.get("output_tokens") or 0),
             reverse=True,
@@ -339,8 +385,7 @@ def _get_models_analytics(days: int = 30, profile: Optional[str] = None):
         ]
 
         totals = _rows(db, """
-            SELECT COUNT(DISTINCT model) as distinct_models,
-                   SUM(input_tokens) as total_input,
+            SELECT SUM(input_tokens) as total_input,
                    SUM(output_tokens) as total_output,
                    SUM(cache_read_tokens) as total_cache_read,
                    SUM(reasoning_tokens) as total_reasoning,
@@ -350,6 +395,11 @@ def _get_models_analytics(days: int = 30, profile: Optional[str] = None):
                    SUM(COALESCE(api_call_count, 0)) as total_api_calls
             FROM sessions WHERE started_at > ? AND model IS NOT NULL AND model != ''
         """, cutoff)[0]
+
+        # Counted over the same merged row set the cards come from, so a model
+        # reached only through auxiliary usage is in the header as well as on
+        # the page (#89631).
+        totals["distinct_models"] = len({row["model"] for row in rows})
 
         return {"models": models, "totals": totals, "period_days": days}
     finally:
