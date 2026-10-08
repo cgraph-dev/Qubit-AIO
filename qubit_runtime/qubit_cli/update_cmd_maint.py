@@ -972,11 +972,24 @@ def _run_post_update_maintenance(
 ) -> bool:
     """Post-build housekeeping and completion, returning the SQLite runtime verdict.
 
-    Ancillary repairs and notices are best-effort; an unsafe runtime withholds success.
-    ``followups`` (``list[tuple[str, str]] | None``): the caller's owed-tail list; accepted for
-    source_completion parity. This module records its own step failures through ``_best_effort``
-    and the caller's ``step()`` wrapper, so the list needs no appends here.
+    Ancillary repairs and notices are best-effort. The profile sync and the config migration run
+    after a failed build too and never fail the committed update. A config-migration failure is
+    printed as ``⚠``, recorded as a receipt follow-up and appended to ``followups`` so the tail
+    stays owed. Profile sync is best-effort per profile (``_sync_profiles_after_update`` prints
+    that profile's error and carries on); only a sync that escapes the step is owed. An unsafe
+    runtime withholds success (and is reported) but is not tail work.
     """
+    from qubit_cli.update_receipt import record_followup
+
+    def owed_step(name, run):
+        try:
+            run()
+        except (Exception, SystemExit) as exc:  # health: allow BLE001 -- the code is committed; retry later
+            reason = str(exc) or type(exc).__name__
+            record_followup(name, reason)
+            if followups is not None:
+                followups.append((name, reason))
+
     from qubit_cli.update_cmd import _check_and_apply_config_migration, _m
     # macOS TCC: Desktop bundles are re-signed each update, so old grants can go stale
     # (toggle ON, yet macOS re-prompts with no Allow button). Tell users how to re-grant.
@@ -1034,11 +1047,11 @@ def _run_post_update_maintenance(
         print("→ Syncing bundled skills...")
         _print_bundled_skills_sync_report()
 
-    _sync_profiles_after_update()
+    owed_step("profile_sync", _sync_profiles_after_update)
 
-    _check_and_apply_config_migration(
+    owed_step("config_migration", lambda: _check_and_apply_config_migration(
         assume_yes=assume_yes, gateway_mode=gateway_mode, pre_update_snapshot_id=pre_update_snapshot_id,
-    )
+    ))
 
     print()
     update_complete = _print_verified_update_completion(completion_message or _update_complete_message(pre_update_version))
