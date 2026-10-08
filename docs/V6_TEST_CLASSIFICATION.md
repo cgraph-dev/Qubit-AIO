@@ -85,6 +85,8 @@ lines ⇒ faithful) and locating the missing product symbol/signature.
 | test_status_profile_home.py (1) | path uses owning profile home | product status path |
 | test_submit_row_session_target.py (4) | marker lands in stale/expired session | product submit-row session targeting |
 | test_container_backend_workdir.py (1) | container path `/root/.qubit/attachments/...` | product container staging |
+| test_warning_callback_conservation.py (6) | `_agent_cbs.<locals>.<lambda>() missing 1 required positional argument: 'c'`; `[] == [{'q0':'yes'}]` | product clarify callback signature (`_clarify_block` missing `c`) |
+| test_tools_readback_scope.py (1) | toolset section list mismatch | product tools-show sections ignore the session pin |
 
 ## E. STALE PORT (our copy from an older pin) — recorded
 `test_first_contact_onboarding.py`: our copy still calls
