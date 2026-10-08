@@ -158,13 +158,25 @@ def _cua_permission_mode(session_id: str) -> str:
     return configured
 
 def _new_backend(permission_mode: str) -> ComputerUseBackend:
-    backend_name = os.environ.get("HERMES_COMPUTER_USE_BACKEND", "cua").lower()
-    if backend_name in {"cua", "cua-driver", ""}:
-        from tools.computer_use.cua_backend import CuaDriverBackend
-        return CuaDriverBackend(permission_mode=permission_mode)
-    if backend_name != "noop":
+    """Build the backend the plugin registry selects (``computer_use.backend``), like upstream.
+
+    ``HERMES_COMPUTER_USE_BACKEND`` is a legacy Qubit-side override kept for backward compatibility: tests and
+    existing setups feed it ``noop`` (the in-process stub) or a driver alias. When it is set to ``noop`` we return
+    the stub; ``cua``/``cua-driver``/empty fall through to the registry; any other value is treated as a provider
+    name the registry must resolve (an unknown one still fails loudly). Unset or ``cua`` resolves to the built-in
+    ``cua`` provider exactly as upstream does.
+    """
+    backend_name = (os.environ.get("HERMES_COMPUTER_USE_BACKEND") or "").strip().lower()
+    if backend_name == "noop":
+        return _NoopBackend()  # test stub; no registry provider named "noop"
+    from plugins.computer_use import DEFAULT_BACKEND, load_computer_use_provider, get_active_provider
+    if backend_name in {"", DEFAULT_BACKEND, "cua-driver"}:  # only the built-in + its alias: registry decides
+        return get_active_provider().create_backend(permission_mode=permission_mode)
+    # Legacy env override naming a specific installed provider.
+    provider = load_computer_use_provider(backend_name)
+    if provider is None:
         raise RuntimeError(f"Unknown HERMES_COMPUTER_USE_BACKEND={backend_name!r}")
-    return _NoopBackend()  # pragma: no cover
+    return provider.create_backend(permission_mode=permission_mode)
 
 def _install_backend(sid: str, backend: ComputerUseBackend, permission_mode: str) -> ComputerUseBackend:
     """Record a backend in the session caches (the empty session also mirrors it onto the ``_backend`` hook).
@@ -353,9 +365,12 @@ def handle_computer_use(args: Dict[str, Any], **kwargs) -> Any:
     try:
         backend = call.enter_context(_backend_for_call(session_id))
     except Exception as e:
-        return json.dumps({"error": f"computer_use backend unavailable: {e}",
-                           "hint": "If the cua-driver binary is missing, run `qubit computer-use install`. "
-                                   "If a Python dependency is missing, the error above shows the exact install command."})
+        from plugins.computer_use import DEFAULT_BACKEND, configured_backend_name
+        hint = ({"hint": "If the cua-driver binary is missing, run `qubit computer-use install`. "
+                         "If a Python dependency is missing, the error above shows the exact install command."}
+                if (os.environ.get("HERMES_COMPUTER_USE_BACKEND") or "").strip().lower() == "noop"
+                or configured_backend_name() == DEFAULT_BACKEND else {})
+        return json.dumps({"error": f"computer_use backend unavailable: {e}", **hint})
     try:
         with call:
             # Re-check under the dispatch lock: approval, backend start-up and lock waits above can take
@@ -947,11 +962,18 @@ def _route_capture_through_aux_vision(cap: CaptureResult, summary: str, *, visib
 
 # ── Availability check (used by the tool registry check_fn) ─────────────────
 def check_computer_use_requirements() -> bool:
-    """macOS/Windows/Linux + cua-driver binary (or env override). `qubit computer-use doctor` names blocked checks."""
+    """The selected ``computer_use.backend``'s ``is_available()``. An unregistered name stays True so the call
+    surfaces the "not registered (available: ...)" error instead of the tool silently vanishing."""
     if sys.platform not in ("darwin", "win32", "linux"):
         return False
-    from tools.computer_use.cua_backend_driver import cua_driver_binary_available
-    return cua_driver_binary_available()
+    if (os.environ.get("HERMES_COMPUTER_USE_BACKEND") or "").strip().lower() == "noop":
+        from tools.computer_use.cua_backend_driver import cua_driver_binary_available
+        return cua_driver_binary_available()  # legacy env override: keep the driver-only gate
+    from plugins.computer_use import get_active_provider
+    try:
+        return get_active_provider().is_available()
+    except LookupError:
+        return True  # unknown backend: stay visible so the call can explain why
 
 def get_computer_use_schema() -> Dict[str, Any]:
     from tools.computer_use.schema import COMPUTER_USE_SCHEMA
