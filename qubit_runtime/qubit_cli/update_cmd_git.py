@@ -370,9 +370,9 @@ class UpstreamTargetBroken(Exception):
         self.sha, self.path, self.error = sha, path, error
 
 
-def _no_move(_target):
-    """The absent ``checkout_move``: a bare context with nothing to arm (see ``update_cmd_pause_gate``)."""
-    return nullcontext()
+def _no_move(*_targets, **_bound):
+    """The ``checkout_move`` of a run with no paused gateways: the step runs unbound."""
+    return nullcontext({})
 
 
 def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path, *, assume_yes: bool = False, input_fn=None,
