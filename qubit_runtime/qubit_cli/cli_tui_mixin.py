@@ -457,12 +457,11 @@ class CLITuiMixin:
                 # visually move the input area. Input/agent events invalidate explicitly.
                 time.sleep(0.2)
 
-    def _get_clarify_display_fragments(self):
+    def _get_clarify_batch_display_fragments(self, state):
         """Batch (multi-question) clarify panel: "N questions" header, one status line per question
         (✓ answered → answer / ▸ active / · pending), and the active question's numbered choices
         (+ Other) expanded beneath its status line."""
         from cli import _panel_box_width, _wrap_panel_text
-        state = self._clarify_state
         if not state:
             return []
         questions_list = state.get("questions") or []
