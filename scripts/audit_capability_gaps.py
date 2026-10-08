@@ -62,8 +62,34 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-PIN = Path.home() / ".hermes/hermes-agent"
 REPO = Path(__file__).resolve().parent.parent
+
+
+def _upstream_clone() -> Path:
+    """Locate the upstream clone, tolerating the hermes home being retired.
+
+    The clone lived at ~/.hermes/hermes-agent; the hermes home has since been moved aside as part
+    of retirement, so the same tree now sits at ~/.hermes.pre-retirement/hermes-agent. Prefer the
+    live location, fall back to the retired one, and fail LOUDLY rather than silently measuring an
+    empty directory -- a silent miss here would make this audit grade the wrong thing (and, run as
+    gate_all.py's informational check, silently report "None missing symbols across None files",
+    which reads as clean. A measuring stick that lies is worse than one that fails).
+    """
+    for candidate in (
+        Path.home() / "upstream" / "hermes-agent",
+        Path.home() / ".hermes" / "hermes-agent",
+        Path.home() / ".hermes.pre-retirement" / "hermes-agent",
+    ):
+        if (candidate / ".git").exists():
+            return candidate
+    raise SystemExit(
+        "cannot locate the upstream clone (tried ~/upstream/hermes-agent, "
+        "~/.hermes/hermes-agent and ~/.hermes.pre-retirement/hermes-agent); "
+        "every audit would measure nothing"
+    )
+
+
+PIN = _upstream_clone()
 FROM, TO = "69948c0057", "a036b13793"
 
 SKIP_PREFIXES = (".github/", "contributors/", "node_modules/", ".git/")
