@@ -288,7 +288,7 @@ def _seed_branch_row(record: dict, key: str, parent_session_id: str, history: li
             _persist_branch(db, key, parent_session_id, _branch_title(db, parent_session_id), history,
                             source=source, cwd=record["cwd"],
                             profile_name=profile_name_for_home(profile_home) or _current_profile_name(),
-                            model=_session_default_model(record), compensate=True, title_source="derived", user_id=_session_auth_user_id(record))
+                            model=_session_default_route(record)[0], compensate=True, title_source="derived", user_id=_session_auth_user_id(record))
             record["pending_title"] = None
             # The first submit's _persist_branch_seed is the fallback for a failed seed, not a second copy.
             record["_branch_seed_persisted"] = True
@@ -430,8 +430,7 @@ def _create_session(rid, params: dict, *, copy_parent_history: bool = False) -> 
         "session_id": sid, "stored_session_id": key, "message_count": len(messages),
         **({"messages_omitted": True} if copy_parent_history else {"messages": messages}),
         # Reflect the override now so the client doesn't clobber its sticky pick.
-        "info": {"model": override.get("model") if override else _session_default_model(_sessions[sid]),
-                 **({"provider": override["provider"]} if override.get("provider") else {}),
+        "info": {**_lazy_info_route(_sessions[sid], override),
                  "tools": {}, "skills": {}, "cwd": cwd, "branch": git_probe.branch(cwd),
                  "project": _project_info_for_cwd(cwd), "lazy": True, "desktop_contract": DESKTOP_BACKEND_CONTRACT,
                  "profile_name": _response_profile_name(profile)}})
