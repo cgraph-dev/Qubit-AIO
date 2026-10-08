@@ -519,6 +519,7 @@ from cron.jobs import (
     clear_run_claim, get_due_jobs, heartbeat_fire_claim, heartbeat_run_claim, mark_job_run,
     save_job_output, self_removal_delivery_allowed, self_removal_delivery_scope, use_cron_store)
 from cron.execution_identity import enter_cron_execution, exit_cron_execution
+from cron.worker_bootstrap import WORKER_MARKER, finish_worker_boot
 from cron.executions import (
     _TERMINAL_STATES, HANDOFF_ADOPTION_GRACE_SECONDS, create_execution, finish_execution,
     get_execution, mark_execution_handoff_pending, mark_execution_running,
