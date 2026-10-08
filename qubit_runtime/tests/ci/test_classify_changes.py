@@ -180,7 +180,7 @@ CASES = {
     # The Windows desktop-update hand-off is a PowerShell integration surface:
     # its tests spawn the real script and poll its loopback server. They run
     # when the script, the Electron side that launches it, or their own test
-    # files change — not on every qubit_state.py PR.
+    # files change — not on every qubit_state.py PR. The script runs a real
     # `qubit update`, and the Windows crash cells that kill it mid-run live in
     # the install + update journey, so it starts e2e_upgrade as well.
     "windows.ps1 → desktop_updater": (
@@ -339,12 +339,39 @@ CASES = {
         _lanes(python=True, scan=True, e2e_upgrade=True, e2e_desktop_update=True),
     ),
     "PM → e2e_upgrade + docker": (["pm/environments.py"], _lanes(python=True, scan=True, e2e_upgrade=True, docker=True)),
+    # The update pipeline lives beyond the update_* family too: the entry
+    # point, launch-time recovery, the gateway restart/pause surface.
+    # main.py is also `qubit desktop --build-only`, the update's Desktop rebuild.
+    "cmd_update entry → both update suites": (
+        ["qubit_cli/main.py"], _lanes(python=True, scan=True, e2e_upgrade=True, e2e_desktop_update=True),
+    ),
+    "gateway status stamp → e2e_upgrade": (["gateway/status.py"], _lanes(python=True, scan=True, e2e_upgrade=True)),
+    "desktop verify → desktop_updater + both update suites": (
+        ["qubit_cli/desktop_update_verify.py"],
+        _lanes(python=True, scan=True, desktop_updater=True, e2e_upgrade=True, e2e_desktop_update=True),
+    ),
+    "electron main → desktop update": (
+        ["apps/desktop/electron/main.ts"],
+        _lanes(frontend=True, e2e_desktop_update=True),
+    ),
+    "handoff result reader → desktop_updater + desktop update": (
+        ["apps/desktop/electron/handoff-result.ts"],
+        _lanes(frontend=True, desktop_updater=True, e2e_desktop_update=True),
+    ),
     "desktop backend spawn → desktop core": (
         ["apps/desktop/electron/backend-child.ts"],
         _lanes(frontend=True, e2e_desktop_core=True),
     ),
+    "desktop session resume → desktop core": (
+        ["apps/desktop/src/app/session/hooks/use-session-actions/index.ts"],
+        _lanes(frontend=True, e2e_desktop_core=True),
+    ),
     "desktop core spec → desktop core": (
         ["apps/desktop/e2e/core/transcript-integrity.spec.ts"],
+        _lanes(frontend=True, e2e_desktop_core=True),
+    ),
+    "desktop profile rail → desktop core": (
+        ["apps/desktop/src/app/chat/sidebar/profile-switcher.tsx"],
         _lanes(frontend=True, e2e_desktop_core=True),
     ),
     "desktop update spec → desktop update, not core": (
@@ -404,12 +431,77 @@ def test_every_slow_lane_path_matches_a_tracked_file():
     assert dead == set()
 
 
+# Every file the `qubit update` pipeline runs on the update path (the step
+# tables of the updater audit's cli-update and desktop-update code maps). A
+# PR that edits only one of these must start the real-update suite that would
+# catch the regression; before, main.py / _early_recovery.py / relaunch.py /
+# gateway/ / qubit_bootstrap.py skipped both the Linux and Windows journeys.
+_UPDATE_PATH_FILES = (
+    "qubit_cli/main.py",
+    "qubit_cli/main_dashboard.py",
+    "qubit_cli/main_desktop.py",
+    "qubit_cli/_early_recovery.py",
+    "qubit_cli/venv_sync.py",
+    "qubit_cli/update_lock.py",
+    "qubit_cli/update_cmd.py",
+    "qubit_cli/update_completion.py",
+    "qubit_cli/update_cmd_windows.py",
+    "qubit_cli/update_cmd_zip.py",
+    "qubit_cli/_update_takeover.py",
+    "qubit_cli/source_completion.py",
+    "qubit_cli/source_build.py",
+    "qubit_cli/source_releases.py",
+    "qubit_cli/_launchers.py",
+    "qubit_cli/gitlock.py",
+    "qubit_cli/process_identity.py",
+    "qubit_cli/relaunch.py",
+    "qubit_cli/gateway.py",
+    "qubit_cli/gateway_windows.py",
+    "qubit_cli/gateway_migrate.py",
+    "qubit_cli/desktop_update_verify.py",
+    "qubit_bootstrap.py",
+    "qubit_constants.py",
+    "gateway/status.py",
+    "gateway/control_socket.py",
+    "gateway/code_skew.py",
+    "scripts/desktop-update/windows.ps1",
+    "scripts/desktop-update/posix.sh",
+)
+_DESKTOP_UPDATE_PATH_FILES = (
+    "apps/desktop/electron/main.ts",
+    "apps/desktop/electron/update-marker.ts",
+    "apps/desktop/electron/update-gate.ts",
+    "apps/desktop/electron/updater-process.ts",
+    "apps/desktop/electron/updater/checkout.ts",
+    "apps/desktop/electron/handoff-result.ts",
+    "apps/desktop/electron/desktop-installation.ts",
+    "apps/desktop/electron/backend-discovery.ts",
+    "apps/desktop/electron/host-backend-attach.ts",
+    "scripts/desktop-update/windows.ps1",
+    "scripts/desktop-update/posix.sh",
+    "qubit_cli/desktop_update_verify.py",
+    "qubit_cli/main_desktop.py",
+)
+
+
+@pytest.mark.parametrize("path", _UPDATE_PATH_FILES)
+def test_every_update_path_file_starts_the_real_update_suite(path):
+    assert (_REPO / path).is_file(), f"{path} moved: update the classifier and this table"
+    assert classify([path])["e2e_upgrade"], path
+
+
+@pytest.mark.parametrize("path", _DESKTOP_UPDATE_PATH_FILES)
+def test_every_desktop_update_path_file_starts_the_desktop_update_suite(path):
+    assert (_REPO / path).is_file(), f"{path} moved: update the classifier and this table"
+    assert classify([path])["e2e_desktop_update"], path
+
+
 _REPO = Path(__file__).resolve().parents[2]
 
 
 def _yaml(rel: str) -> dict:
     yaml = pytest.importorskip("qubit_yaml")
-    return yaml.safe_load((_REPO / rel).read_text(encoding="utf-8"))
+    return yaml.safe_load((_REPO / rel).read_text(encoding="utf-8-sig"))
 
 
 def test_every_lane_reaches_the_composite_action():
@@ -456,6 +548,60 @@ def _iter_if_expressions(job: object):
     for step in job.get("steps", []) or []:
         if isinstance(step, dict) and isinstance(cond := step.get("if"), str):
             yield cond
+
+
+# (caller workflow, job, called workflow, lane input) for every real-update
+# suite: each runs on a PR exactly when its lane fires and then gates the merge.
+_REAL_UPDATE_LANES = (
+    ("ci.yaml", "tests", "tests.yml", "e2e_upgrade"),
+    ("ci.yaml", "tests-os", "tests-os.yml", "e2e_upgrade"),
+    ("ci.yaml", "e2e-desktop-update", "e2e-desktop-update.yml", "e2e_desktop_update"),
+    ("tests-os.yml", "install-update-e2e", "windows-install-update-e2e.yml", "e2e_upgrade"),
+)
+
+
+@pytest.mark.xfail(
+    reason="CI-WORKFLOW PORT GAP: the frozen target's _REAL_UPDATE_LANES table names CI job "
+    "wiring Qubit's .github/workflows/ does not have yet — tests-os.yml has jobs "
+    "os-tests/e2e-windows (no 'install-update-e2e'), and e2e-desktop-update.yml is absent, so "
+    "the caller_jobs[job] lookups raise KeyError. The merge-gating wiring the test pins is not "
+    "ported. (Not core product code.)",
+    strict=False,
+)
+@pytest.mark.parametrize("caller,job,called,lane", _REAL_UPDATE_LANES)
+def test_real_update_suites_gate_the_merge_when_their_lane_fires(caller, job, called, lane):
+    """A real-update suite that runs but cannot fail the merge is decoration.
+
+    Each one must reach ``all-checks-pass`` (directly, or through the
+    reusable workflow that calls it), be gated on its lane, and never be
+    ``continue-on-error``: a red shard has to block the PR it ran for.
+    """
+    ci = _yaml(".github/workflows/ci.yaml")
+    caller_jobs = _yaml(f".github/workflows/{caller}")["jobs"]
+    assert caller_jobs[job]["uses"] == f"./.github/workflows/{called}"
+    gate = caller_jobs[job].get("if", "") + json.dumps(caller_jobs[job].get("with") or {})
+    assert lane in gate, f"{caller}::{job} is not gated on {lane}"
+    root = job if caller == "ci.yaml" else "tests-os"
+    assert root in ci["jobs"]["all-checks-pass"]["needs"]
+    for name, body in _yaml(f".github/workflows/{called}")["jobs"].items():
+        assert not body.get("continue-on-error"), f"{called}::{name} cannot fail the merge"
+
+
+@pytest.mark.xfail(
+    reason="CI-WORKFLOW STALE ENTRY (real gap the test catches): windows-venv-e2e.yml:70 lists "
+    "the node selector tests/qubit_cli/test_runtime_repair.py::TestWindowsRuntimeSelfLock, but "
+    "neither that file nor that class exists anywhere in qubit_runtime/ — run_tests.sh drops the "
+    "missing path wordlessly, so this shard silently stops running on every wine2e push. Fix "
+    "the workflow (or add the test), not this test.",
+    strict=False,
+)
+def test_windows_venv_e2e_runs_only_test_files_that_exist():
+    """``run_tests.sh`` drops a missing path (or a ``::node`` selector) without
+    a word, so a stale entry silently stops running on every wine2e push."""
+    text = (_REPO / ".github/workflows/windows-venv-e2e.yml").read_text(encoding="utf-8-sig")
+    paths = re.findall(r"(tests/[\w/.:-]+)", text)
+    assert paths
+    assert [p for p in paths if "::" in p or not (_REPO / p).is_file()] == []
 
 
 def _write_event(tmp_path, number: int | None = 88442) -> Path:
@@ -552,7 +698,7 @@ def test_pull_request_labels_prefers_the_live_labels_over_the_replayed_event(tmp
     event = tmp_path / "event.json"
     event.write_text(json.dumps({"pull_request": {"number": 7, "labels": []}}), encoding="utf-8")
     monkeypatch.setenv("EVENT_NAME", "pull_request")
-    monkeypatch.setenv("REPO", "NousResearch/qubit")
+    monkeypatch.setenv("REPO", "NousResearch/hermes-agent")
     monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
 
     live = subprocess.CompletedProcess([], 0, stdout="run-e2e\n", stderr="")
