@@ -8,21 +8,6 @@ import pytest
 
 from agent.skill_preprocessing import preprocess_skill_content
 
-# M6 Wave: frozen ad12263a5ed4 gates inline-shell expansion on hub trust
-# (agent/skill_preprocessing.py:98 ``_is_community_hub_skill`` + the
-# ``and not _is_community_hub_skill(skill_dir)`` guard at :143). This checkout's
-# skill_preprocessing.py:110 calls expand_inline_shell unconditionally when
-# ``inline_shell`` is on — the trust scope is unported. PRODUCT gap: a community-trust
-# hub install auto-executes ``!`cmd`` snippets (#63307). test_community_hub_install_
-# does_not_expand expects the raw DSL ``Dynamic: !`printf SENTINEL``` but gets the
-# executed ``Dynamic: SENTINEL``. xfail (non-strict) keeps the suite green and the
-# gap visible; drop the marker once the trust gate lands.
-pytestmark = pytest.mark.xfail(
-    reason="PRODUCT: agent/skill_preprocessing.py lacks _is_community_hub_skill trust gate "
-    "(frozen ad12263a5ed4 skill_preprocessing.py:98,143); community hub installs auto-execute",
-    strict=False,
-)
-
 CFG = {"inline_shell": True, "inline_shell_timeout": 5}
 SNIPPET = "Dynamic: !`printf SENTINEL`"
 

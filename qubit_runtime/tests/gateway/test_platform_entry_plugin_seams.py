@@ -14,20 +14,6 @@ from gateway.display_config import resolve_display_setting
 from gateway.platform_registry import PlatformEntry, platform_registry
 from gateway.session import SessionSource
 
-# M6 Wave: frozen ad12263a5ed4 consults the registered PlatformEntry seam in
-# gateway/authz_mixin.py:633 ``if source.platform == Platform.WEBHOOK or
-# getattr(_registry_entry(source.platform), "trusted_inbound", False) is True``. This
-# checkout's authz_mixin.py:632 hardcodes ``if source.platform in
-# {Platform.HOMEASSISTANT, Platform.WEBHOOK}`` — a core special case that ignores a
-# plugin platform's ``trusted_inbound=True``. PRODUCT gap: a plugin platform declaring
-# trusted_inbound still fails the allowlist. test_trusted_inbound_platform_bypasses_
-# allowlists expects True but gets False. xfail (non-strict); drop once the seam lands.
-pytestmark = pytest.mark.xfail(
-    reason="PRODUCT: gateway/authz_mixin.py:632 hardcodes {HOMEASSISTANT, WEBHOOK} instead of "
-    "reading PlatformEntry.trusted_inbound (frozen ad12263a5ed4 authz_mixin.py:633)",
-    strict=False,
-)
-
 
 @pytest.fixture
 def plugin_platform():
