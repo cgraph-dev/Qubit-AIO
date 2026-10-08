@@ -25,7 +25,7 @@ HOME = os.environ.get("HOME", "")
 # REAL checkout onto sys.path. Left in place, every "import probe" below would
 # grade the live tree and the deletion test would be a lie. Drop any sys.path
 # entry that resolves outside the sandbox, then pin the sandbox first.
-# Strip ONLY the live checkout's OWN source dirs -- so an import probe cannot grade the
+# Strip ONLY the checkout's OWN source dirs -- so an import probe cannot grade the
 # live tree -- but NEVER the shared .venv. The venv's site-packages lives UNDER the repo
 # path, so the previous filter (the bare "/home/trick/Projects/Repos" prefix) stripped it
 # too, and every probe then failed with ModuleNotFoundError for rich/fire/ruamel even
@@ -40,12 +40,34 @@ _BAD_EXACT = {
 }
 
 
+def _is_checkout_root(p: str) -> bool:
+    """A real checkout's SOURCE root: a dir holding a ``qubit_runtime/`` child.
+
+    The shared .venv's editable-install ``.pth`` injects THE CHECKOUT IT WAS BUILT
+    AGAINST onto sys.path -- which is the inspected repo's main checkout when the
+    harness runs from a git worktree, and is neither under the sandbox nor named by
+    ``_BAD_EXACT`` (that set only knows this process's own ``_LIVE``). Left in, an
+    import probe could resolve product modules from the live tree and the deletion
+    test would be a lie. The venv's site-packages has no ``qubit_runtime/`` child,
+    so this never flags a legitimate dependency path.
+    """
+    return bool(p) and os.path.isdir(os.path.join(p, "qubit_runtime"))
+
+
 def _is_live_checkout_path(p: str) -> bool:
     if not p:
         return False
     if ".venv" in p:            # the shared venv is legitimate: keep it
         return False
-    return os.path.abspath(p) in _BAD_EXACT
+    if os.path.abspath(p) in _BAD_EXACT:
+        return True
+    # Any OTHER real checkout root (e.g. the main checkout the shared .venv's
+    # editable .pth injects when we run from a worktree). Never the sandbox.
+    ap = os.path.abspath(p)
+    sb = os.path.abspath(SANDBOX)
+    if ap == sb or ap.startswith(sb + os.sep):
+        return False
+    return _is_checkout_root(ap)
 
 
 sys.path[:] = [p for p in sys.path if not _is_live_checkout_path(p)]
@@ -92,9 +114,15 @@ def check_environment() -> None:
     # checkout (/home/trick/Projects/Repos/qubit-voicebridge) *and* contains a
     # bare `import _virtualenv` glue line. Both must not resolve product modules,
     # or the "deletion test" silently grades the live tree instead of the sandbox.
+    # Exclude the shared .venv's own site-packages: it is a legitimate dependency
+    # store that merely HAPPENS to live under the repo path, so flagging it would
+    # fail the harness on a correct tree (a false positive -- the check must mean
+    # "the live checkout's SOURCE is not importable", not "no path contains the
+    # repo prefix"). This is the same exclusion the check above applies.
     leaked = [p for p in sys.path
-              if "/home/trick/Projects/Repos" in p
-              or p.rstrip("/") == os.path.expanduser("~/Projects/Repos/qubit-voicebridge")]
+              if "site-packages" not in p and ".venv" not in p
+              and ("/home/trick/Projects/Repos" in p
+                   or p.rstrip("/") == os.path.expanduser("~/Projects/Repos/qubit-voicebridge"))]
     check("env: real checkout NOT on sys.path", not leaked,
           "leaked: " + ", ".join(leaked) if leaked
           else "\n".join(p for p in sys.path if "qb-n5" in p) or "(sandbox paths)")
