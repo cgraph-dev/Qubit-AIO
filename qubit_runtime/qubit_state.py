@@ -78,6 +78,7 @@ from qubit_state_maintenance import SessionMaintenanceMixin
 from qubit_state_gateway import SessionGatewayMixin
 from qubit_state_compression import SessionCompressionMixin
 from qubit_state_search import SessionSearchMixin
+from qubit_state_tool_retries import SessionToolRetriesMixin
 
 try:  # Hard dependency, but tolerate scaffold-phase imports before pip install.
     import psutil
@@ -462,6 +463,7 @@ class SessionDB(
     SessionPortabilityMixin, SessionTelegramTopicsMixin, SessionCompressionMixin,
     SessionGatewayMixin, SessionMaintenanceMixin, SessionUsageMixin, SessionTitlesMixin,
     SessionMessagesMixin, SessionCoverageMixin, SessionRewindMixin, SessionProfileRepairMixin,
+    SessionToolRetriesMixin,
 ):
     """SQLite-backed session storage with FTS5 search; many reader threads, one writer (WAL)."""
 
