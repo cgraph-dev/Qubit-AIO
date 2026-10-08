@@ -2,7 +2,7 @@
 
 Hardware facts come from ``qubit_platform.host``. Account facts (full name, locale) come from OS
 user records, never from environment variables such as HOME or LANG. They describe the machine
-that runs the Hermes backend; when the desktop app drives a remote backend, that is not the
+that runs the Qubit backend; when the desktop app drives a remote backend, that is not the
 user's laptop.
 """
 
