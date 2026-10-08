@@ -863,7 +863,7 @@ from qubit_cli.old_updater_main import (
     _windows_shim_in_process_chain,
     _write_web_ui_build_stamp,
 )
-from qubit_cli.main_install_repair import _cleanup_quarantined_exes
+from qubit_cli.main_install_repair import _cleanup_quarantined_exes, _recover_update_debts_on_startup
 from qubit_cli.main_install_repair import (  # frozen updater surface: update_cmd*.py resolve these via _m()
     _UPDATE_REEXEC_ENV,
     _clear_lazy_refresh_incomplete_marker,
@@ -2429,10 +2429,17 @@ def cmd_update(args):
     from qubit_cli.update_cmd import _cmd_update_impl
     from pm import InstallError
 
+    def _custody_refusal() -> str | None:
+        # m2: readers swallow an OSError, so a refused update child can end the run as a misleading
+        # downstream error; the refusal is what stopped it. Never on POSIX (nothing refuses there).
+        custody = sys.modules.get("qubit_cli.update_custody")
+        return custody.refusal_notice() if custody is not None else None
+
     try:
         _cmd_update_impl(args, gateway_mode=gateway_mode)
     except (InstallError, OSError, subprocess.SubprocessError) as exc:
-        print(f"✗ Update failed: {exc}")
+        refusal = _custody_refusal()
+        print(refusal or f"✗ Update failed: {exc}")
         _finalize_update_receipt(1, f"{type(exc).__name__}: {exc}")
         if gateway_mode:
             from qubit_cli.update_cmd_fleet import _write_gateway_update_exit_code
@@ -2444,6 +2451,8 @@ def cmd_update(args):
         # reach an inner finalize. Persist any still-open receipt with the real
         # exit code (no-op if already finalized), then let the exit proceed.
         _code = _update_exit.code if isinstance(_update_exit.code, int) else 1
+        if _code and (refusal := _custody_refusal()):
+            print(refusal)
         _finalize_update_receipt(_code, f"sys.exit({_code})")
         if gateway_mode and _code:
             from qubit_cli.update_cmd_fleet import _write_gateway_update_exit_code
@@ -3544,15 +3553,7 @@ def main():
     # process resolves fresh source against old bytecode. Never raises.
     _sweep_stale_bytecode_if_checkout_changed()
 
-    # Dependency recovery already ran before imports. Report any fleet restart
-    # still owed by a previous update without restarting services here.
-    if "update" not in sys.argv[1:]:
-        try:
-            from qubit_cli.update_cmd_fleet import _warn_pending_fleet_restart_on_startup
-
-            _warn_pending_fleet_restart_on_startup()
-        except Exception:
-            pass
+    _recover_update_debts_on_startup()  # owed fleet restarts, gateways a killed update paused
 
     if _first_positional_argv() != "update":
         from qubit_cli.boot_bootstrap import maybe_run_boot_bootstrap
