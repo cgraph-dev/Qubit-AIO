@@ -251,7 +251,13 @@ def _early_interface_config_path() -> str:
     home = os.environ.get("QUBIT_HOME")
     if home:
         return os.path.join(home, "config.yaml")
-    return os.path.join(os.path.expanduser("~"), ".hermes", "config.yaml")
+    # The canonical home, not a hardcoded ".hermes": get_qubit_home() applies the same
+    # QUBIT_HOME -> legacy-home -> ~/.qubit precedence the REST of the tree uses, so the
+    # early interface read cannot silently point at a home that does not exist once the
+    # hermes home is retired. 1:1 with upstream, which calls its own resolver here.
+    from qubit_constants import get_qubit_home
+
+    return os.path.join(get_qubit_home(), "config.yaml")
 
 
 def _config_default_interface_early() -> str:
