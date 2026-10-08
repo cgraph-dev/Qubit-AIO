@@ -58,22 +58,28 @@ CASES = {
 def test_repaired_reload_commit_archives_only_held_rows(tmp_path, case):
     from gateway.run import _build_gateway_agent_history
 
-    # PRODUCT GAP (Qubit fork vs pin cbe5e53e): the ``render=True`` case is the
-    # only one whose merged-user rows carry no ``_row_id`` after the
-    # reload-without-ids snapshot + timestamp render. Qubit's
-    # ``coverage_for_commit`` then falls through to the watermark and the commit
-    # archives the UNSEEN rows (``covered=[1,2]`` = the pre-suffix U1/A1) instead
-    # of naming the held merged rows. The helpers
-    # (``held_archive_coverage`` / ``coverage_for_commit`` /
-    # ``repair_message_sequence`` / ``_build_gateway_agent_history`` /
-    # ``archive_and_compact``) are byte-identical to the pin, so the divergence
-    # sits in the reload/render dependency this case is the only one to exercise;
-    # not root-caused within this task's budget. Do NOT fix product here.
+    # ROOT-CAUSED (Qubit fork vs pin 38880bd2): gateway/run.py:_build_replay_entry
+    # drops the merge-withness stamps on the replay entry. Upstream ends the
+    # function with
+    #     for stamp in (MERGED_DURABLE_ROWS, UNNAMED_DURABLE_ROWS, RETIRED_DURABLE_ROWS):
+    #         if msg.get(stamp):
+    #             entry[stamp] = msg[stamp]
+    # and ours omits it. The render=True case is the only one whose merged-user
+    # dict is rebuilt by _build_gateway_agent_history (inject_timestamps=True), so
+    # it is the only case that loses `_merged_durable_rows` here. Without the
+    # stamp, qubit_state_coverage._merged_user_run returns [] (the dict no longer
+    # proves it stands for durable rows), _proved_coverage cannot name the merged
+    # run, coverage_for_commit falls through to the watermark and archives the
+    # UNSEEN rows (covered=[1,2] = pre-suffix U1/A1) instead of naming the held
+    # merged rows [5,6]. Proven: monkey-patching the four upstream lines onto our
+    # _build_replay_entry turns this case green. Do NOT fix product here.
     if case == "timestamp_rendered_merged_user_names_its_run":
         pytest.xfail(
-            "PRODUCT GAP: the timestamp-rendered merged-user reload names the wrong "
-            "rows for commit coverage (archives UNSEEN rows instead of the held "
-            "merged rows); divergence from pin cbe5e53e not yet root-caused."
+            "PRODUCT GAP: product gateway/run.py:_build_replay_entry omits the "
+            "MERGED_DURABLE_ROWS/UNNAMED_DURABLE_ROWS/RETIRED_DURABLE_ROWS stamp "
+            "carry that upstream 38880bd2 has, so the timestamp-rendered merged-user "
+            "reload loses its merge witness and the commit archives UNSEEN rows "
+            "instead of the held merged rows."
         )
 
     unseen, suffix, render, late, expected, tail_count = CASES[case]
