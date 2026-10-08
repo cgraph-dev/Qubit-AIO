@@ -100,18 +100,6 @@ class _ImmediateThread:
 def test_prompt_submit_records_only_untouched_turns(monkeypatch, touch, recorded_turns, records_at_each_complete):
     """Typing into a running turn disqualifies that turn; the queued prompt then runs as its own task.
     Each record is written before its turn's message.complete goes out."""
-    # PRODUCT GAP (Qubit fork vs pin cbe5e53e): ``tui_gateway/prompt_turn.py``
-    # (around line 1219) omits the per-turn cleanup
-    # ``session.pop("_turn_user_input", None)`` that upstream performs inside the
-    # turn's ``finally`` under ``history_lock``. The flag set by a steer/typed
-    # intervention therefore leaks into the NEXT turn: that turn is wrongly
-    # flagged user-touched (so a clean task-done is not recorded) and the key
-    # stays in the session dict. Only the two intervention params exercise this;
-    # "untouched" is unaffected. Do NOT fix product here.
-    if touch is not None:
-        pytest.xfail("PRODUCT GAP: prompt_turn omits the per-turn "
-                     "session.pop('_turn_user_input'); the flag leaks into the next "
-                     "turn (dropped vs pin cbe5e53e).")
     runs: list[str] = []
     recorded: list[int] = []
     monkeypatch.setattr(free_tier_offer, "record_task_done", lambda: recorded.append(len(runs)))
