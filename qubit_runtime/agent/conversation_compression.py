@@ -4068,6 +4068,16 @@ def _route_codex_compaction(
             commit_fence.finish_commit()
 
 
+def _refresh_main_credential(agent: Any) -> None:
+    """Re-resolve a rotating Anthropic OAuth token so the summary call never carries a revoked one."""
+    if getattr(agent, "api_mode", None) != "anthropic_messages":
+        return
+    refresh = getattr(agent, "_try_refresh_anthropic_client_credentials", None)
+    if callable(refresh):
+        with _swallow("pre-compression credential refresh failed: %s"):
+            refresh()
+
+
 def _announce_compression_start(
     agent: Any, *, message_count: int, approx_tokens: Optional[int], focus_topic: Optional[str], force: bool
 ) -> _CompactionLifecycle:
@@ -4154,6 +4164,8 @@ def compress_context(
     lifecycle = _announce_compression_start(
         agent, message_count=_pre_msg_count, approx_tokens=approx_tokens, focus_topic=focus_topic, force=force
     )
+    # After the announce: an expired token's refresh is a blocking network call. Before the probe and summary call.
+    _refresh_main_credential(agent)
     # Lazy feasibility probe (~400ms cold) on first attempt, not __init__; it sets
     # _compression_warning so status replay still surfaces the warning. Marked checked
     # only after the probe completes (transient failures are swallowed inside). A hard
