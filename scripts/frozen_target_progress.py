@@ -61,7 +61,7 @@ if not (REPO / "qubit_runtime").is_dir() or not (REPO / "scripts").is_dir():
     )
 
 # THE FROZEN PIN. Never origin/main. See docs/FROZEN_TARGET.md.
-FROZEN_REV = "cbe5e53e2826b949e4ab33dbd6d045e339fa162b"
+FROZEN_REV = "38880bd2f1e90dbc9a1aeec03af62539ee64719a"
 
 AUDIT = REPO / "scripts" / "audit_sync_completeness.py"
 CACHE = REPO / ".frozen_target_progress.cache.json"
