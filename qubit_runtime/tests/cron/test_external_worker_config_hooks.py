@@ -15,20 +15,6 @@ import json
 
 import pytest
 
-# M6 Wave: frozen ad12263a5ed4's ``_run_external_worker_payload`` (cron/scheduler.py:3867)
-# calls ``qubit_cli.plugins.discover_plugins()`` then
-# ``GatewayStartupMixin._register_config_hooks(...)`` inside the secret scope so the OWNING
-# profile's ``hooks:`` block (shell hooks + outbound webhooks) is registered (#131764). This
-# checkout's qubit_runtime/cron/scheduler.py:3795 omits both calls — it hydrates secret sources
-# and adopts the execution but never registers config hooks, so a config-declared ``hooks:``
-# block silently stops firing the moment fires are handed to an external worker. PRODUCT gap.
-# xfail (non-strict) keeps the suite green and the gap visible; drop once the product block lands.
-pytestmark = pytest.mark.xfail(
-    reason="PRODUCT: cron.scheduler._run_external_worker_payload omits discover_plugins() + "
-    "GatewayStartupMixin._register_config_hooks() (frozen ad12263a5ed4 scheduler.py:3912-3927)",
-    strict=False,
-)
-
 HOOK_CMD = "echo cron-hook-fired"
 OUTBOUND_URL = "https://hooks.example.test/cron"
 

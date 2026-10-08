@@ -371,4 +371,8 @@ def register(ctx) -> None:
         check_fn=check_ha_requirements, validate_config=validate_ha_config, is_connected=_is_connected,
         required_env=["HASS_TOKEN"], install_hint="pip install aiohttp",
         standalone_sender_fn=_standalone_send,  # out-of-process cron delivery via notify.notify
-        max_message_length=HomeAssistantAdapter.MAX_MESSAGE_LENGTH, emoji="🏠", allow_update_command=True)
+        max_message_length=HomeAssistantAdapter.MAX_MESSAGE_LENGTH, emoji="🏠", allow_update_command=True,
+        # HA events are system-generated from the adapter's authenticated WebSocket (HASS_TOKEN);
+        # there is no human sender to allowlist, so the platform bypasses allowlists/pairing
+        # (mirrors the former core {HOMEASSISTANT} branch, now a registry seam).
+        trusted_inbound=True)
