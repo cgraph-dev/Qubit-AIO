@@ -633,7 +633,7 @@ def _npm_lockfile_owners(repo_root: Path) -> set[Path]:
     return owners
 
 
-def _discard_lockfile_churn(git_cmd, repo_root):
+def _discard_lockfile_churn(git_cmd, repo_root, *, checkout_move=None):
     """Restore ``package-lock.json`` files npm rewrote non-deterministically, so the update sees a clean tree
     instead of autostashing every run. A lockfile is kept when a manifest it records is dirty: for the root
     lock that is the root or ANY workspace ``package.json`` (reverting it under a dirty ``apps/desktop``
@@ -659,11 +659,12 @@ def _discard_lockfile_churn(git_cmd, repo_root):
                 dirty.append(path)
         if not dirty:
             return
-        _git_run(git_cmd, ["checkout", "--", *dirty], repo_root)
+        with (checkout_move or _no_move)(paths=dirty):
+            _git_run(git_cmd, ["checkout", "--", *dirty], repo_root)
         print(f"→ Discarded npm lockfile churn ({len(dirty)} file(s))")
 
 
-def _normalize_managed_eol(git_cmd, repo_root):
+def _normalize_managed_eol(git_cmd, repo_root, *, checkout_move=None):
     """Take a managed checkout off ``core.autocrlf=true`` without leaving it dirty.
 
     Git for Windows sets ``autocrlf=true`` system-wide, turning LF files CRLF and breaking ``git checkout``
@@ -678,11 +679,12 @@ def _normalize_managed_eol(git_cmd, repo_root):
     itself, is the only path left that can fix them. See #67730.
     """
     from qubit_cli.update_cmd_git import _git_run
+    from qubit_cli.update_custody import run_git
     # -c, not config: evaluate the tree as it WOULD look pinned, persisting nothing.
     probe = git_cmd + ["-c", "core.autocrlf=false"]
 
     def _probe_run(*args, **kw):
-        return subprocess.run(probe + list(args), cwd=repo_root, **_GIT_TEXT_KW, **kw)
+        return run_git(probe, list(args), cwd=repo_root, **_GIT_TEXT_KW, **kw)
 
     def _eol_only():
         """Dirty paths whose ONLY change is CRLF; None when either probe fails."""
@@ -707,10 +709,11 @@ def _normalize_managed_eol(git_cmd, repo_root):
             return
         if eol_only:
             # Pathspec via stdin: thousands of paths exceed the Windows argv limit.
-            _probe_run("checkout", "--pathspec-from-file=-", "--pathspec-file-nul", "--",
-                       input="\0".join(sorted(eol_only)), check=False)
+            with (checkout_move or _no_move)(paths=sorted(eol_only)):
+                _probe_run("checkout", "--pathspec-from-file=-", "--pathspec-file-nul", "--",
+                           input="\0".join(sorted(eol_only)), check=False)
             if _eol_only():  # still dirty: pinning would only surface churn we failed to clear
                 return
             print(f"→ Normalized line-ending churn ({len(eol_only)} file(s))")
-        subprocess.run(git_cmd + ["config", "core.autocrlf", "false"], cwd=repo_root, capture_output=True, check=False,
-                       creationflags=windows_hide_flags())
+        run_git(git_cmd, ["config", "core.autocrlf", "false"], cwd=repo_root, capture_output=True, check=False,
+                creationflags=windows_hide_flags())
