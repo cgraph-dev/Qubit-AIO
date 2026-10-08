@@ -54,13 +54,6 @@ KILLED_TURN_LEFT = {
 @pytest.mark.parametrize("left", list(KILLED_TURN_LEFT))
 @pytest.mark.parametrize("surface", ["cli", "resume", "gateway"])
 def test_compaction_over_an_unanswered_prompt_keeps_one_copy_of_every_row(session, surface, left):
-    if surface == "gateway" and left in ("prompt", "tool_call"):
-        pytest.xfail(
-            "PRODUCT GAP: product gateway/run.py:_build_replay_entry drops the "
-            "MERGED_DURABLE_ROWS/UNNAMED_DURABLE_ROWS/RETIRED_DURABLE_ROWS stamp "
-            "carry upstream 38880bd2 has; the gateway reload loses the merged row's "
-            "merge witness, so in-place compaction summarizes away a live reply "
-            "(A4) and duplicates the unanswered prompt. cli/resume pass.")
     db, agent = session
     cli = SimpleNamespace(conversation_history=[])
     for n in range(1, 13):
