@@ -1,5 +1,5 @@
 """Tests that ``model_catalog.excluded_providers`` hides providers from the
-interactive ``hermes model`` CLI picker.
+interactive ``qubit model`` CLI picker.
 
 The CLI picker (``qubit_cli.main.select_provider_and_model``) builds its
 provider menu from ``CANONICAL_PROVIDERS`` via ``group_providers`` — a
@@ -62,7 +62,7 @@ def _capture_provider_labels(config_home):
 
 def test_cli_picker_hides_excluded_provider(config_home):
     """``excluded_providers: [openrouter]`` must remove the OpenRouter row
-    from the ``hermes model`` provider menu."""
+    from the ``qubit model`` provider menu."""
     _write_config(config_home, **{"model_catalog": {"excluded_providers": ["openrouter"]}})
 
     labels = _capture_provider_labels(config_home)
@@ -117,3 +117,120 @@ def test_cli_picker_hides_excluded_provider_by_alias(config_home):
     )
 
 
+def test_cli_picker_empty_excluded_is_noop(config_home):
+    """An empty ``excluded_providers`` list must not change the menu."""
+    _write_config(config_home, **{"model_catalog": {"excluded_providers": []}})
+    excluded_labels = _capture_provider_labels(config_home)
+
+    _write_config(config_home)
+    baseline_labels = _capture_provider_labels(config_home)
+
+    assert excluded_labels == baseline_labels
+
+
+# ─── include_unconfigured (in-session TUI ``/model``) path ────────────────────
+# The TUI picker calls ``build_models_payload(include_unconfigured=True)``, which
+# appends ``CANONICAL_PROVIDERS`` skeleton rows via ``_append_unconfigured_rows``.
+# That loop must honor ``excluded_providers`` too, or excluded providers reappear
+# in the TUI ``/model`` picker even though ``qubit model`` hides them (#68816).
+
+
+def _picker_ctx(excluded=None, *, current_provider="", current_model=""):
+    from qubit_cli.inventory import ConfigContext
+
+    return ConfigContext(
+        current_provider=current_provider,
+        current_model=current_model,
+        current_base_url="",
+        user_providers={},
+        custom_providers=[],
+        excluded_providers=excluded,
+    )
+
+
+_EXCLUDED_GAP = pytest.mark.xfail(
+    reason="PRODUCT GAP qubit_runtime/qubit_cli/inventory.py:689 _append_unconfigured_rows "
+    "never consults ctx.excluded_providers; the frozen target builds a names_for alias map "
+    "and skips any slug whose {slug, *aliases} intersects the exclusion set (frozen "
+    "inventory.py:700-714). Excluded providers therefore reappear as skeleton rows in the "
+    "TUI /model picker. #68816.",
+    strict=False,
+)
+
+
+@_EXCLUDED_GAP
+def test_unconfigured_rows_hide_excluded_provider():
+    from qubit_cli.inventory import _append_unconfigured_rows
+
+    baseline = {r["slug"].lower() for r in _append_unconfigured_rows([], _picker_ctx())}
+    assert "openrouter" in baseline, "sanity: openrouter should be a canonical skeleton row"
+
+    slugs = {
+        r["slug"].lower()
+        for r in _append_unconfigured_rows([], _picker_ctx(excluded=["openrouter"]))
+    }
+    assert "openrouter" not in slugs, "excluded provider must not be re-added as a skeleton row"
+    assert slugs == baseline - {"openrouter"}, "only the excluded provider should be removed"
+
+
+@_EXCLUDED_GAP
+def test_unconfigured_rows_exclusion_is_case_insensitive():
+    from qubit_cli.inventory import _append_unconfigured_rows
+
+    slugs = {
+        r["slug"].lower()
+        for r in _append_unconfigured_rows([], _picker_ctx(excluded=["OpenRouter"]))
+    }
+    assert "openrouter" not in slugs
+
+
+@_EXCLUDED_GAP
+def test_unconfigured_rows_hide_excluded_provider_by_alias():
+    """Excluding by an *alias* (not the canonical slug) must also drop the
+    canonical skeleton row, matching ``qubit model`` and
+    ``list_authenticated_providers``. Comparing the raw exclusion strings
+    against ``entry.slug`` alone would leak the canonical row back in."""
+    from qubit_cli.inventory import _append_unconfigured_rows
+    from qubit_cli.models import CANONICAL_PROVIDERS, _PROVIDER_ALIASES
+
+    # Pick an alias whose canonical target is an actual skeleton row.
+    baseline = {r["slug"].lower() for r in _append_unconfigured_rows([], _picker_ctx())}
+    target_slug = None
+    target_alias = None
+    for alias, canon in _PROVIDER_ALIASES.items():
+        if canon and canon.lower() in baseline and any(p.slug == canon for p in CANONICAL_PROVIDERS):
+            target_slug = canon
+            target_alias = alias
+            break
+    if target_slug is None:
+        pytest.skip("no aliased canonical provider present as an unconfigured row")
+
+    slugs = {
+        r["slug"].lower()
+        for r in _append_unconfigured_rows([], _picker_ctx(excluded=[target_alias]))
+    }
+    assert target_slug.lower() not in slugs, (
+        f"excluding alias {target_alias!r} should hide canonical {target_slug!r}; got {slugs}"
+    )
+
+
+@_EXCLUDED_GAP
+def test_unconfigured_rows_exclude_current_provider_matches_cli():
+    """``list_authenticated_providers`` drops an excluded provider even when it is
+    the current one; the skeleton loop must not re-surface it as the
+    ``configured-current`` warning row."""
+    from qubit_cli.inventory import _append_unconfigured_rows
+
+    rows = _append_unconfigured_rows(
+        [], _picker_ctx(excluded=["openrouter"], current_provider="openrouter", current_model="some-model")
+    )
+    assert "openrouter" not in {r["slug"].lower() for r in rows}
+
+
+def test_unconfigured_rows_empty_excluded_is_noop():
+    from qubit_cli.inventory import _append_unconfigured_rows
+
+    base = {r["slug"].lower() for r in _append_unconfigured_rows([], _picker_ctx())}
+    empty = {r["slug"].lower() for r in _append_unconfigured_rows([], _picker_ctx(excluded=[]))}
+    none = {r["slug"].lower() for r in _append_unconfigured_rows([], _picker_ctx(excluded=None))}
+    assert base == empty == none
