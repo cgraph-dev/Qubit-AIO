@@ -25,11 +25,16 @@ try:
 except (ModuleNotFoundError, ImportError):
 
     def get_qubit_home() -> Path:
-        """Return the Qubit home directory (default: ~/.hermes).
+        """Return the Qubit home directory (default: ~/.qubit).
 
-        Mirrors ``qubit_constants.get_qubit_home()``."""
+        Mirrors ``qubit_constants.get_qubit_home()``, whose process-home
+        precedence is exactly ``QUBIT_HOME`` env var -> canonical platform
+        default ``~/.qubit``.  Note the default is ``~/.qubit``, NOT the
+        pre-rebrand ``~/.hermes``: an unconditional legacy fallback would point
+        at a home that does not exist once the hermes home is retired.
+        """
         val = os.environ.get("QUBIT_HOME", "").strip()
-        return Path(val) if val else Path.home() / ".hermes"
+        return Path(val) if val else Path.home() / ".qubit"
 
     def display_qubit_home() -> str:
         """Return a user-friendly ``~/``-shortened display string.
