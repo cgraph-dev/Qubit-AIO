@@ -15,27 +15,6 @@ import tui_gateway.server as server
 from qubit_state import SessionDB
 
 
-# PRODUCT GAP (Qubit fork vs pin cbe5e53e): the fork dropped the ssh
-# launch-dir guards that upstream wires through ``_resumable_stored_cwd`` /
-# ``_is_remote_launch_cwd``:
-#   * ``tui_gateway/server.py:2700 _hydrate_session_cwd`` adopts ``row["cwd"]``
-#     unconditionally (upstream guards it with
-#     ``if row and _resumable_stored_cwd(row.get("cwd"), profile_home)`` and sets
-#     ``explicit_cwd=True`` for a remote workspace);
-#   * ``tui_gateway/methods_session.py:291 _seed_branch_row`` persists
-#     ``cwd=record["cwd"]`` (upstream: ``None if _is_remote_launch_cwd(record)``);
-#   * ``method_session`` never sets ``ctx.profile_resume_cwd`` from
-#     ``_resumable_stored_cwd`` (the helper has ZERO callers in the Qubit tree).
-# Net effect: an ssh session resumes/branches into a persisted HOST launch
-# directory (``/opt/qubit``, ``/opt/data/home``) instead of its remote workspace.
-# Do NOT fix product here — recorded for the sync owner.
-_SSH_RESUME_GAP = pytest.mark.xfail(
-    strict=False,
-    reason="PRODUCT GAP: _resumable_stored_cwd / _is_remote_launch_cwd are defined but "
-    "unwired in Qubit — ssh resume adopts a persisted host launch dir instead of "
-    "the remote workspace.",
-)
-
 class _ImmediateThread:
     def __init__(self, *, target, **_kwargs):
         self._target = target
@@ -160,7 +139,6 @@ def test_named_profile_resume_does_not_adopt_a_root_launch_dir(db):
     assert server._terminal_task_cwd(session) == "~"
 
 
-@_SSH_RESUME_GAP
 def test_resume_leaves_a_set_aside_row_unchanged(backend, db):
     """With ``terminal.cwd`` set the session falls back to it as explicit; the stored row is still not rewritten."""
     stale = _qubit_home_subdir("home")
@@ -170,7 +148,6 @@ def test_resume_leaves_a_set_aside_row_unchanged(backend, db):
     assert db.get_session("aside")["cwd"] == stale
 
 
-@_SSH_RESUME_GAP
 @pytest.mark.parametrize("stored", ["~", "~/proj"])
 def test_resume_keeps_a_remote_tilde_cwd_when_home_is_inside_qubit_home(backend, db, monkeypatch, tmp_path, stored):
     """The Docker image's HOME (``/opt/data/home``) sits inside QUBIT_HOME; ``~`` still names the REMOTE home."""
@@ -182,7 +159,6 @@ def test_resume_keeps_a_remote_tilde_cwd_when_home_is_inside_qubit_home(backend,
     assert session["explicit_cwd"] is True
 
 
-@_SSH_RESUME_GAP
 def test_resume_does_not_adopt_a_stored_qubit_home_cwd(backend, db, tmp_path):
     """The ticket: a row stamped with ``/opt/data/home`` before this rule existed."""
     stale = _qubit_home_subdir("home")
@@ -194,7 +170,6 @@ def test_resume_does_not_adopt_a_stored_qubit_home_cwd(backend, db, tmp_path):
     assert db.get_session("legacy")["cwd"] == stale  # left as-is: every resume heals it again
 
 
-@_SSH_RESUME_GAP
 def test_resume_keeps_a_stored_remote_workspace(backend, db, tmp_path):
     db.create_session("picked", source="tui", model="m", cwd="/home/me/proj")
     session = _hydrate(db, "picked", {"session_key": "picked", "source": "tui", "cwd": str(tmp_path)})
@@ -203,7 +178,6 @@ def test_resume_keeps_a_stored_remote_workspace(backend, db, tmp_path):
     assert session["explicit_cwd"] is True
 
 
-@_SSH_RESUME_GAP
 def test_resume_without_a_stored_cwd_does_not_persist_the_launch_dir(backend, db, tmp_path):
     db.create_session("fresh", source="tui", model="m")
     session = _hydrate(db, "fresh", {"session_key": "fresh", "source": "tui", "cwd": str(tmp_path)})
@@ -231,11 +205,8 @@ def test_host_backends_resume_unchanged(backend, db, tmp_path, name):
 
 @pytest.mark.parametrize(("explicit", "expected"), [(False, None), (True, "/home/me/proj")])
 def test_ssh_branch_seed_skips_the_launch_dir(backend, monkeypatch, explicit, expected):
-    # Only the implicit (explicit=False) param hits the unwired ``_is_remote_launch_cwd``
+    # Only the implicit (explicit=False) param hits the ``_is_remote_launch_cwd``
     # guard in ``_seed_branch_row``; the explicit case carries its own cwd and is unaffected.
-    if not explicit:
-        pytest.xfail("PRODUCT GAP: _seed_branch_row persists the ssh launch dir "
-                     "(_is_remote_launch_cwd guard dropped vs pin cbe5e53e).")
     seen = {}
     monkeypatch.setattr(server, "_session_db", lambda _record: contextlib.nullcontext(object()))
     monkeypatch.setattr(server, "_branch_title", lambda *_a: "t")
@@ -253,7 +224,6 @@ def test_ssh_branch_seed_skips_the_launch_dir(backend, monkeypatch, explicit, ex
 KEY = "20261003_120000_c0ffee"
 
 
-@_SSH_RESUME_GAP
 def test_session_resume_does_not_adopt_a_stored_qubit_home_cwd(backend, resume_db, tmp_path):
     resume_db.create_session(KEY, source="tui", model="test-model", cwd=_qubit_home_subdir("home"))
     live = _resume_live(KEY)

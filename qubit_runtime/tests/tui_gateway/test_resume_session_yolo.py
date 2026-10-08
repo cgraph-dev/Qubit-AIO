@@ -3,26 +3,9 @@ row and re-armed by ``session.resume`` in a process whose in-memory approval set
 
 import types
 
-import pytest
-
 from tui_gateway import server
 
 
-# PRODUCT GAP (Qubit fork vs pin cbe5e53e): ``tui_gateway/methods_config_set.py``
-# ``_set_yolo`` (line 271) dropped the durable-persistence branch. Upstream calls
-# ``toggle_session_yolo(session_key, ..., persist=persist)`` with a ``persist``
-# callback that writes ``db.set_session_yolo(row_id, on)``; the Qubit copy only
-# calls the in-memory ``enable_session_yolo``/``disable_session_yolo``, so a
-# ``/yolo`` toggle is never written to the session row and does not survive a
-# backend restart. (``qubit_state_sessions.set_session_yolo`` and
-# ``tools.approval_yolo.toggle_session_yolo`` both exist — merely unwired.)
-# Do NOT fix product here — recorded for the sync owner.
-@pytest.mark.xfail(
-    strict=False,
-    reason="PRODUCT GAP: _set_yolo does not persist the session yolo flag to the "
-    "session row (persist callback dropped vs pin cbe5e53e); /yolo does not "
-    "survive a backend restart.",
-)
 def test_session_yolo_toggle_survives_a_backend_restart(monkeypatch, tmp_path):
     """A session /yolo (Shift+Tab / the Desktop zap) is persisted on the row and re-armed when a fresh
     backend resumes it, including a toggle made before the row existed; switching it off persists too."""
