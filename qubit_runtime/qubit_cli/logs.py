@@ -28,7 +28,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Sequence
 
-from qubit_constants import get_qubit_home, display_qubit_home
+from qubit_constants import get_qubit_home, display_qubit_home, get_default_qubit_root
 
 # Known log files (name → filename)
 LOG_FILES = {
@@ -62,6 +62,19 @@ _LEVEL_RE = re.compile(r"\s(DEBUG|INFO|WARNING|ERROR|CRITICAL)\s")
 # e.g. "INFO gateway.run:" or "INFO [sess_abc] tools.terminal_tool:".
 _LOGGER_NAME_RE = re.compile(r"\s(?:DEBUG|INFO|WARNING|ERROR|CRITICAL)(?:\s+\[.*?\])?\s+(\S+):")
 _LEVEL_ORDER = {"DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3, "CRITICAL": 4}
+
+# The update/refresh mirrors are written under the ROOT Qubit home, not the active
+# profile home (they describe the checkout, which every profile shares).
+ROOT_HOME_LOGS = frozenset({"update", "handoff"})
+
+
+def log_file_path(log_name: str) -> Optional[Path]:
+    """Where *log_name* lives (doesn't check existence); None for an unknown name."""
+    filename = LOG_FILES.get(log_name)
+    if filename is None:
+        return None
+    home = get_default_qubit_root() if log_name in ROOT_HOME_LOGS else get_qubit_home()
+    return home / "logs" / filename
 
 
 def _parse_since(since_str: str) -> Optional[datetime]:

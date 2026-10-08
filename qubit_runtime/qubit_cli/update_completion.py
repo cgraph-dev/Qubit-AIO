@@ -26,17 +26,6 @@ def _exit_status(code: int) -> int:
     return code if code >= 0 else 128 - code
 
 
-def _failed_result(request: dict, result_path: Path, code: int) -> int:
-    code = _exit_status(code) or 1
-    _write_json(result_path, {
-        "schema": 1, "update_id": request["receipt"]["update_id"], "exit_code": code,
-        "receipt": None, "windows_resume": None, "pm_receipt": request.get("pm_receipt"),
-    })
-    return code
-
-
-
-
 def _write_bootstrap_result(request: dict, result_path: Path, code: int, receipt: dict | None) -> int:
     """The bootstrap child's answer; windows_resume stays the parent's token (and its atexit net)."""
     _write_json(result_path, {
@@ -69,6 +58,123 @@ def _bind_and_resume(proc: subprocess.Popen, request: dict, request_path: Path) 
             request["receipt"] = json.loads(json.dumps(current.data))
             _write_json(request_path, request)
     resume_suspended_child(proc)
+
+
+def run_completion(request: dict) -> dict:
+    """Wait for new code; zero exit without a correlated terminal result fails closed."""
+    root = Path(request["source"])
+    # The child below runs in a new session without a controlling terminal, so
+    # this is the last point where sudo can ask for a password. Run the new
+    # tree's pre-install as its own process (this parent stays stdlib-only); a
+    # tree without it, or any failure, just leaves the in-lock repair to report.
+    if sys.platform.startswith("linux"):
+        subprocess.run([sys.executable, "-I", "-S", "-B", "-c",
+                        "import sys; sys.path.insert(0, sys.argv[1]); "
+                        "from pm.libatomic import install_before_lock; install_before_lock()", str(root)],
+                       cwd=root, stdout=None, stderr=subprocess.DEVNULL, check=False)
+    env = dict(os.environ, QUBIT_HOME=request["home"], PYTHONUNBUFFERED="1")
+    for key in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"):
+        env.pop(key, None)
+    with tempfile.TemporaryDirectory(prefix="qubit-completion-") as directory:
+        request_path = Path(directory) / "request.json"
+        result_path = Path(directory) / "result.json"
+        request = {**request, "stdout_isatty": sys.stdout.isatty()}
+        request["bytecode_cache"] = str(Path(directory) / "bytecode")
+        _write_json(request_path, request)
+        command = [sys.executable, "-I", "-S", "-u", "-X", "utf8", "-X", f"pycache_prefix={request['bytecode_cache']}",
+                   str(root / "qubit_cli/update_completion.py"),
+                   str(request_path), str(result_path)]
+        from qubit_cli.update_lock import CREATE_SUSPENDED, checkout_lock_fds
+
+        # The child joins the update tree's checkout lock: it inherits the locked fd (POSIX)
+        # or dies with us (Windows job: created suspended, bound, then resumed, so nothing it
+        # starts runs outside the job), so the lock is never free while it runs.
+        proc = subprocess.Popen(
+            command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            **({"start_new_session": True, "pass_fds": checkout_lock_fds(root)} if os.name == "posix" else
+               {"creationflags": subprocess.CREATE_NO_WINDOW | CREATE_SUSPENDED}))
+        decoder = codecs.getincrementaldecoder("utf-8")("replace")
+        try:
+            # A failure here unwinds through the cleanup below, never orphans the child.
+            if os.name != "posix":
+                _bind_and_resume(proc, request, request_path)
+            while True:
+                chunk = proc.stdout.read1(8192)
+                sys.stdout.write(decoder.decode(chunk, final=not chunk))
+                sys.stdout.flush()
+                if not chunk:
+                    break
+            code = proc.wait()
+        except BaseException as exc:
+            # This group/retained process handle belongs exclusively to us.
+            # Try to stop descendants before releasing the command's update lock.
+            try:
+                try:
+                    if os.name == "posix":
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)  # windows-footgun: ok — os.name == "posix"; own isolated group
+                        except ProcessLookupError:
+                            pass
+                    else:
+                        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL, timeout=10, check=True,
+                                       creationflags=subprocess.CREATE_NO_WINDOW)
+                finally:
+                    # A failed tree kill must not bypass retained-handle cleanup.
+                    try:
+                        proc.kill()
+                    finally:
+                        proc.wait(timeout=10)
+            except BaseException as cleanup_error:
+                exc.add_note("Completion cleanup failed; child processes may still be running.")
+                raise exc from cleanup_error
+            raise
+        finally:
+            proc.stdout.close()
+        code = _exit_status(code)
+        try:
+            result = json.loads(result_path.read_text(encoding="utf-8-sig"))
+            if result["schema"] != 1 or result["update_id"] != request["receipt"]["update_id"]:
+                raise ValueError("completion response identity mismatch")
+            if result["exit_code"] != code:
+                raise ValueError("completion response disagrees with process exit")
+            receipt = result.get("receipt")
+            if receipt is not None and (
+                receipt.get("update_id") != request["receipt"]["update_id"]
+                or not receipt.get("finished_at")
+                or (code == 0) != (receipt.get("outcome") == "success")
+            ):
+                raise ValueError("completion receipt does not attest this outcome")
+            if code == 0 and receipt is None:
+                raise ValueError("completion did not publish a terminal receipt")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            # No correlated terminal result: the caller settles it (settle_lost_completion).
+            return {"exit_code": code or 1, "receipt": None, "windows_resume": None,
+                    "error": f"{exc} (the completion process exited {code})"}
+        return result
+
+
+def _resume_receipt(data: dict) -> None:
+    from qubit_cli import update_receipt
+
+    # Hydrate the existing run, not a new receipt with a new identity/pre-update probe.
+    receipt = object.__new__(update_receipt.UpdateReceipt)
+    receipt.data = data
+    receipt.correlation_id = data["update_id"]
+    receipt.current_token = update_receipt._current.set(receipt)
+
+
+def _read_terminal_receipt(request: dict) -> dict | None:
+    from qubit_cli import update_receipt
+
+    update_id = request["receipt"]["update_id"]
+    found = update_receipt.read_run_record(update_id)
+    if found is not None and found[1].get("finished_at"):
+        return found[1]
+    # The store refused the terminal write after the commit point (loudly): this process still
+    # holds the correlated terminal record it finalized, so the exit status never turns into 1.
+    return update_receipt.finalized_receipt(update_id)
 
 
 def _running_record(request: dict) -> dict | None:
@@ -206,120 +312,6 @@ def _settle_after_commit(request: dict, result_path: Path, step: str, reason: st
     return _write_bootstrap_result(request, result_path, code, receipt)
 
 
-def _report_unbuilt_desktop(request: dict) -> None:
-    """The tail raised out of ``_complete_selected``: before the build stage, the build never ran."""
-    from qubit_cli import update_receipt
-
-    current = update_receipt._current.get()
-    if current is not None:  # a finalized run got past the build (verification finalizes it)
-        _report_desktop_build_owed(request, current.data, "the source-update tail did not finish")
-
-def run_completion(request: dict) -> dict:
-    """Wait for new code; zero exit without a correlated terminal result fails closed."""
-    root = Path(request["source"])
-    # The child below runs in a new session without a controlling terminal, so
-    # this is the last point where sudo can ask for a password. Run the new
-    # tree's pre-install as its own process (this parent stays stdlib-only); a
-    # tree without it, or any failure, just leaves the in-lock repair to report.
-    if sys.platform.startswith("linux"):
-        subprocess.run([sys.executable, "-I", "-S", "-B", "-c",
-                        "import sys; sys.path.insert(0, sys.argv[1]); "
-                        "from pm.libatomic import install_before_lock; install_before_lock()", str(root)],
-                       cwd=root, stdout=None, stderr=subprocess.DEVNULL, check=False)
-    env = dict(os.environ, QUBIT_HOME=request["home"], PYTHONUNBUFFERED="1")
-    for key in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"):
-        env.pop(key, None)
-    with tempfile.TemporaryDirectory(prefix="hermes-completion-") as directory:
-        request_path = Path(directory) / "request.json"
-        result_path = Path(directory) / "result.json"
-        request = {**request, "stdout_isatty": sys.stdout.isatty()}
-        request["bytecode_cache"] = str(Path(directory) / "bytecode")
-        _write_json(request_path, request)
-        command = [sys.executable, "-I", "-S", "-u", "-X", f"pycache_prefix={request['bytecode_cache']}",
-                   str(root / "qubit_cli/update_completion.py"),
-                   str(request_path), str(result_path)]
-        proc = subprocess.Popen(
-            command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            **({"start_new_session": True} if os.name == "posix" else
-               {"creationflags": subprocess.CREATE_NO_WINDOW}))
-        decoder = codecs.getincrementaldecoder("utf-8")("replace")
-        try:
-            while True:
-                chunk = proc.stdout.read1(8192)
-                sys.stdout.write(decoder.decode(chunk, final=not chunk))
-                sys.stdout.flush()
-                if not chunk:
-                    break
-            code = proc.wait()
-        except BaseException as exc:
-            # This group/retained process handle belongs exclusively to us.
-            # Try to stop descendants before releasing the command's update lock.
-            try:
-                try:
-                    if os.name == "posix":
-                        try:
-                            os.killpg(proc.pid, signal.SIGKILL)  # windows-footgun: ok — os.name == "posix"; own isolated group
-                        except ProcessLookupError:
-                            pass
-                    else:
-                        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
-                                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                       stderr=subprocess.DEVNULL, timeout=10, check=True,
-                                       creationflags=subprocess.CREATE_NO_WINDOW)
-                finally:
-                    # A failed tree kill must not bypass retained-handle cleanup.
-                    try:
-                        proc.kill()
-                    finally:
-                        proc.wait(timeout=10)
-            except BaseException as cleanup_error:
-                exc.add_note("Completion cleanup failed; child processes may still be running.")
-                raise exc from cleanup_error
-            raise
-        finally:
-            proc.stdout.close()
-        code = _exit_status(code)
-        try:
-            result = json.loads(result_path.read_text(encoding="utf-8-sig"))
-            if result["schema"] != 1 or result["update_id"] != request["receipt"]["update_id"]:
-                raise ValueError("completion response identity mismatch")
-            if result["exit_code"] != code:
-                raise ValueError("completion response disagrees with process exit")
-            receipt = result.get("receipt")
-            if receipt is not None and (
-                receipt.get("update_id") != request["receipt"]["update_id"]
-                or not receipt.get("finished_at")
-                or (code == 0) != (receipt.get("outcome") == "success")
-            ):
-                raise ValueError("completion receipt does not attest this outcome")
-            if code == 0 and receipt is None:
-                raise ValueError("completion did not publish a terminal receipt")
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            print(f"✗ Source update completion did not finish: {exc}")
-            return {"exit_code": code or 1, "receipt": None, "windows_resume": None}
-        return result
-
-
-def _resume_receipt(data: dict) -> None:
-    from qubit_cli import update_receipt
-
-    # Hydrate the existing run, not a new receipt with a new identity/pre-update probe.
-    receipt = object.__new__(update_receipt.UpdateReceipt)
-    receipt.data = data
-    receipt.correlation_id = data["update_id"]
-    receipt.current_token = update_receipt._current.set(receipt)
-
-
-def _read_terminal_receipt(request: dict) -> dict | None:
-    directory = Path(request["home"]) / "logs/update_receipts"
-    # Never latest.json: another profile/context may have finalized more recently.
-    for path in directory.glob(f"update_*_{request['receipt']['update_id']}.json"):
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-        if data.get("update_id") == request["receipt"]["update_id"] and data.get("finished_at"):
-            return data
-    return None
-
-
 def _prepare(request: dict, request_path: Path, result_path: Path) -> int:
     import pm
     from pm import receipt
@@ -328,11 +320,22 @@ def _prepare(request: dict, request_path: Path, result_path: Path) -> int:
 
     root = Path(request["source"])
     update_id = request["receipt"]["update_id"]
-    from qubit_cli.venv_sync import (
-        arm_completion, collect_superseded_generations, refuse_foreign_owned_venv,
-    )
+    if sys.platform == "win32":
+        # Windows (review L3): a bootstrap child the update's job refused runs outside the job
+        # and outlives a killed owner, so it joins the checkout lock before anything below
+        # writes the checkout (uv's sync children, the generation collector): the join takes a
+        # lease byte of its own (R5b, as the --prepared child does in complete_source_checkout).
+        # Held until this bootstrap exits, after the --prepared child; the kernel drops it.
+        from qubit_cli.update_lock import _acquire_checkout
 
-    refuse_foreign_owned_venv(root)
+        refused = _acquire_checkout(root)
+        if refused is not None:
+            raise RuntimeError("could not join the update's checkout lock "
+                               f"({refused.reason or f'held by process {refused.pid}'})")
+    from qubit_cli.venv_sync import arm_completion, collect_superseded_generations
+
+    # The foreign-owned-venv refusal runs in the parent BEFORE the swap (update_cmd_commit
+    # .preflight_refusal); the tail was armed there too, so this re-arm is an idempotent backstop.
     arm_completion(root)
     from qubit_cli.gitlock import convert_treeless_checkout_first
     convert_treeless_checkout_first(root)
@@ -347,25 +350,43 @@ def _prepare(request: dict, request_path: Path, result_path: Path) -> int:
         finally:
             request["pm_receipt"] = receipt.last_for_update(update_id)
             _write_json(request_path, request)
+    # -X utf8 like the bootstrap child: -I ignores PYTHONIOENCODING, and this child prints ✓/⚠
+    # (the follow-up protocol) into the parent's pipe, whatever the console code page.
     command = [str(project_python(root)),
-               "-I", "-S", "-u", "-X", f"pycache_prefix={request['bytecode_cache']}",
+               "-I", "-S", "-u", "-X", "utf8", "-X", f"pycache_prefix={request['bytecode_cache']}",
                str(root / "qubit_cli/update_completion.py"),
                str(request_path), str(result_path), "--prepared"]
     # A second interpreter is mandatory: PM may have selected a different Python
     # and dependency graph. No application maintenance runs in this bootstrap.
-    code = _exit_status(subprocess.call(command, cwd=root, env=activation_environment(root)))
+    from qubit_cli.update_lock import checkout_lock_fds
+
+    # health: allow HX006 -- the prepared completion child is the update's build; it runs to the end
+    code = _exit_status(subprocess.call(command, cwd=root, env=activation_environment(root),
+                                        pass_fds=checkout_lock_fds(root)))
     if not result_path.exists():
-        return _failed_result(request, result_path, code)
+        return _settle_after_commit(request, result_path, "completion",
+                                    f"the completion process exited {code} without a result")
     return code
 
 
-def _complete_selected(request: dict) -> None:
+def _complete_selected(request: dict) -> bool:
+    """Everything after the commit point. No step failure fails the update (contract C3).
+
+    Each step is independent; a failed one prints ``⚠``, lands on the receipt as a follow-up
+    and keeps its own obligation armed (``source-completion-pending`` for the tail, the fleet
+    restart obligation for gateways), so the next launch or ``qubit update`` retries it.
+    Returns False only when the user's local changes were left parked in the stash: nothing
+    retries that, so the run is ``partial`` and exits 1 (#122557), never "Update complete".
+    """
     from qubit_cli import main, update_cmd, update_cmd_config
     from qubit_cli.source_completion import complete_source_checkout
     from qubit_cli.update_inventory import RuntimeRecord, UpdatePlan
+    from qubit_cli.update_receipt import (
+        TAIL_FOLLOWUPS, record_build_stage, record_followup, record_skip, record_stage)
 
     root = Path(request["source"])
     main.PROJECT_ROOT = root
+    complete = _record_owed_user_action(request)
     update_cmd_config._LAST_SIBLING_SNAPSHOTS = request["sibling_snapshots"]
     plan_data = request["plan"]
     plan = None if plan_data is None else UpdatePlan(**{
@@ -374,51 +395,58 @@ def _complete_selected(request: dict) -> None:
     # Launchers, products and post-build maintenance live in one place so an
     # install and an update cannot end in different states.
     followups: list[tuple[str, str]] = []
-    complete = complete_source_checkout(
-        root, desktop=request["desktop"], assume_yes=request["assume_yes"],
-        gateway_mode=request["gateway_mode"], pre_update_snapshot_id=request["snapshot_id"],
-        pre_update_version=request["pre_update_version"],
-        completion_message=request.get("completion_message"),
-        announce=None if request.get("completion_message") else "\n✓ Code updated!",
-        followups=followups, before_build=lambda: _resume_paused_before_build(request))
-    from qubit_cli.update_receipt import record_stage
-    record_stage("build", "success" if complete else "failed")
-    if complete:
+    # Exit status and runtime safety are separate facts (R8): an unsafe SQLite runtime keeps the
+    # committed update at exit 0 (reported as the ``sqlite_runtime`` follow-up), but fleet
+    # verification still needs the real verdict so it never auto-migrates the gateway topology
+    # on a runtime that can corrupt sessions. Unknown (the tail raised) is not proven safe.
+    runtime_safe = False
+    try:
+        runtime_safe = complete_source_checkout(
+            root, desktop=request["desktop"], assume_yes=request["assume_yes"],
+            gateway_mode=request["gateway_mode"], pre_update_snapshot_id=request["snapshot_id"],
+            pre_update_version=request["pre_update_version"],
+            completion_message=request.get("completion_message"),
+            announce=None if request.get("completion_message") else "\n✓ Code updated!",
+            followups=followups, before_build=lambda: _resume_paused_before_build(request))
+    except (Exception, SystemExit) as exc:  # health: allow BLE001 -- e.g. the shared update lock refused the tail
+        reason = str(exc) or type(exc).__name__
+        # The tail's steps catch their own failures, so a raise here means the build never ran.
+        _report_desktop_build_owed(request, None, "the source-update tail did not run")
+        record_followup("completion", reason)
+        followups.append(("completion", reason))
+    tail_owed = any(step in TAIL_FOLLOWUPS for step, _ in followups)
+    record_build_stage(followups)
+    if not tail_owed:
         from qubit_cli.venv_sync import clear_completion
         clear_completion(root)
     # systemctl's KillMode=mixed fallback can kill this whole cgroup. Publish the
-    # gateway watcher's status BEFORE that operation, and demote on later failure.
+    # gateway watcher's status BEFORE that operation: the code is committed, so it is 0 unless
+    # the user's own changes are still parked.
     if request["gateway_mode"]:
         update_cmd._write_gateway_update_exit_code(complete)
     if request.get("no_gateway_restart", False):
-        from qubit_cli.update_receipt import record_skip
-
         record_skip("gateway_restart", "--no-gateway-restart: deferred, marker kept")
         record_stage("restart", "skipped")
         print("→ Gateway restart deferred (--no-gateway-restart); restart gateways separately.")
-        if not complete:
-            raise SystemExit(1)
-        return
+        return complete
     skip = update_cmd._fleet_restart_skip_reason(plan)
+    if skip and update_cmd._pending_fleet_restart_needed():
+        # A host already stamped "restarted" for this SHA whose fleet is still off the checkout
+        # (a stale sibling, a failed resume) gets the restart again instead of a dead end.
+        print(f"  → Gateway restart not skipped ({skip}): gateways are still off the checkout code.")
+        skip = None
     if skip:
-        from qubit_cli.update_receipt import record_skip
-
         record_skip("gateway_restart", skip)
         record_stage("restart", "skipped")
         print(f"  ✓ Gateway restart skipped: {skip}.")
-        # Discharges the obligation this run armed when the live fleet vouches for it; a
-        # fleet still owing the restart fails closed exactly like a stale matrix would.
-        if update_cmd._pending_fleet_restart_needed():
-            print("  ⚠ Gateways are still off the checkout code. Recover with: qubit gateway restart")
-            raise SystemExit(1)
-        if not complete:
-            raise SystemExit(1)
-        return
+        return complete
     restart = update_cmd._restart_gateway_fleet_after_update(plan, request["gateway_mode"])
     record_stage("restart", "failed" if getattr(restart, "incomplete", False) else "success")
     update_cmd._resume_windows_gateways_and_merge_outcome(restart, request["windows_resume"], request["gateway_mode"])
     update_cmd._verify_fleet_after_update(
-        restart, _pre_update_plan=plan, _windows_gateway_resume=request["windows_resume"], update_complete=complete)
+        restart, _pre_update_plan=plan, _windows_gateway_resume=request["windows_resume"],
+        update_complete=bool(runtime_safe) and complete)
+    return complete
 
 
 def _resume_paused_before_build(request: dict) -> None:
@@ -451,6 +479,15 @@ class _ForwardedOutput:
         return getattr(self.stream, name)
 
 
+def _report_unbuilt_desktop(request: dict) -> None:
+    """The tail raised out of ``_complete_selected``: before the build stage, the build never ran."""
+    from qubit_cli import update_receipt
+
+    current = update_receipt._current.get()
+    if current is not None:  # a finalized run got past the build (verification finalizes it)
+        _report_desktop_build_owed(request, current.data, "the source-update tail did not finish")
+
+
 def _finish(request: dict, result_path: Path) -> int:
     from qubit_cli import update_receipt
     from pm.receipt import accept_worker_receipt
@@ -460,30 +497,42 @@ def _finish(request: dict, result_path: Path) -> int:
     update_receipt.record_stage("deps", "success")  # only a completed PM preparation reaches --prepared
     code, reason = 0, "source update completion"
     try:
-        _complete_selected(request)
+        if not _complete_selected(request):
+            code, reason = 1, "local changes left in the stash; re-apply them by hand"
+    except KeyboardInterrupt:
+        # An operator interrupt is not a step failure, and the code already moved: the run is
+        # ``interrupted`` (never "failed"), and the armed obligations finish the tail.
+        code, reason = 130, "KeyboardInterrupt: interrupted after the code was updated"
+        update_receipt.finalize_interrupted_update_receipt(reason, exit_code=code)
     except SystemExit as exc:
-        code = _exit_status(exc.code) if isinstance(exc.code, int) else 1
-        reason = f"completion exited {code}"
-    except BaseException as exc:
-        code = _exit_status(exc.returncode) if isinstance(exc, subprocess.CalledProcessError) else 1
-        reason = f"{type(exc).__name__}: {exc}"
-        print(f"✗ Source update completion failed: {reason}")
+        if exc.code not in (0, None):
+            _report_unbuilt_desktop(request)
+            update_receipt.record_followup("completion", f"completion exited {exc.code}")
+    except BaseException as exc:  # noqa: BLE001 — after the commit point nothing fails the update
+        _report_unbuilt_desktop(request)
+        update_receipt.record_followup("completion", f"{type(exc).__name__}: {exc}")
     finally:
-        if code and request["gateway_mode"]:
-            from qubit_cli.update_cmd import _write_gateway_update_exit_code
-            _write_gateway_update_exit_code(False)
+        custody = sys.modules.get("qubit_cli.update_custody")
+        refusal = custody.refusal_notice() if code and custody is not None else None
+        if refusal:  # m2: what stopped it, whatever error the refusal turned into downstream
+            print(refusal)
         # The new interpreter owns recovery too. The original parent's atexit
         # token is updated from the response; it acts only if this process dies.
         try:
             from qubit_cli.update_cmd import _resume_windows_gateways_after_update
             _resume_windows_gateways_after_update(request["windows_resume"])
         except Exception as exc:
-            code, reason = 1, f"Windows gateway recovery failed: {exc}"
-            print(f"✗ {reason}")
+            update_receipt.owe_followup(request["receipt"]["update_id"], "windows_resume",
+                                        f"Windows gateway recovery failed: {exc}")
         update_receipt.finalize_pending_update_receipt(code, reason)
         terminal_receipt = _read_terminal_receipt(request)
+        if terminal_receipt and terminal_receipt.get("outcome") == "success":
+            code = 0  # an interrupt that landed after verification closed the run (review regression 3)
+        if code and request["gateway_mode"]:
+            from qubit_cli.update_cmd import _write_gateway_update_exit_code
+            _write_gateway_update_exit_code(False)
         if not terminal_receipt:
-            code = code or 1
+            code = code or 1  # the parent settles a lost result (settle_lost_completion)
         _write_json(result_path, {
             "schema": 1, "update_id": request["receipt"]["update_id"], "exit_code": code,
             "receipt": terminal_receipt, "windows_resume": request["windows_resume"],
@@ -508,14 +557,23 @@ def main() -> int:
         from pm.environments import activate_dependencies
         activate_dependencies(root)
         return _finish(request, result_path)
+    return _bootstrap(request, request_path, result_path)
+
+
+def _bootstrap(request: dict, request_path: Path, result_path: Path) -> int:
+    """Dependency preparation in the parent's interpreter; its failure is a follow-up (A6)."""
     try:
         return _prepare(request, request_path, result_path)
-    except BaseException as exc:
-        # PM failed before application dependencies were ready. Leave the parent
-        # receipt and paused-gateway obligation intact for boundary recovery.
-        print(f"✗ Source update preparation failed: {exc}")
-        code = exc.returncode if isinstance(exc, subprocess.CalledProcessError) else 1
-        return _failed_result(request, result_path, code)
+    except KeyboardInterrupt:
+        _resume_receipt(request["receipt"])
+        from qubit_cli import update_receipt
+        update_receipt.finalize_interrupted_update_receipt(
+            "KeyboardInterrupt: interrupted while installing dependencies", exit_code=130)
+        return _write_bootstrap_result(request, result_path, 130, _read_terminal_receipt(request))
+    except (Exception, SystemExit) as exc:  # health: allow BLE001 -- after the commit point nothing fails the update
+        # The code is committed but its dependencies are not (A6): an owed follow-up, exit 0.
+        # Paused Windows gateways stay the parent's to resume (it has the dependencies).
+        return _settle_after_commit(request, result_path, "dependencies", str(exc) or type(exc).__name__)
 
 
 if __name__ == "__main__":

@@ -81,6 +81,35 @@ def _print_first_line(text: str) -> None:
         print(f"  {text.strip().splitlines()[0]}")
 
 
+def _push_stash(git_cmd: list[str], cwd: Path, stash_name: str, prev_stash: str) -> str:
+    """``git stash push``; the stash commit. Raises when nothing was saved; resets tracked leftovers
+    when a push saved everything but could not clean up."""
+    from qubit_cli.update_cmd_git import _git_run
+    push = _git_run(git_cmd, ["stash", "push", "--include-untracked", "-m", stash_name], cwd)
+    _print_nonempty(push.stdout)
+    stash_probe = _git_run(git_cmd, ["rev-parse", "--verify", "refs/stash"], cwd)
+    stash_ref = stash_probe.stdout.strip()
+    stash_created = stash_probe.returncode == 0 and bool(stash_ref) and stash_ref != prev_stash
+    if push.returncode != 0:
+        if not stash_created:
+            # No entry created: changes NOT saved — bail before touching HEAD.
+            print("✗ Could not stash local changes — update aborted.")
+            _print_first_line(push.stderr)
+            print("  Commit, stash, or clean up your local changes manually, then re-run `qubit update`.")
+            print("  (An index entry from `git add -N` is the usual cause of this error; `git add` the")
+            print("   paths it names, or `git reset` them, and the update will proceed.)")
+            raise subprocess.CalledProcessError(push.returncode, push.args, output=push.stdout, stderr=push.stderr)
+        # Non-zero but entry created: push saved everything yet couldn't delete some untracked files
+        # (e.g. root-owned dir). Not a failure — continue.
+        _print_nonempty(push.stderr)
+        print("  ⚠ Some untracked files could not be removed from the working tree (permission denied).")
+        print("    They were still saved to the stash and were left in place — the update will continue.")
+        # A partially-failed push also skips cleanup of TRACKED modifications; they'd break the following
+        # pull. Safe to reset: all is in the stash.
+        _reset_hard(git_cmd, cwd)
+    return stash_ref
+
+
 def _stash_local_changes_if_needed(git_cmd: list[str], cwd: Path) -> Optional[str]:
     global _pending_autostash
     from qubit_cli.update_cmd_git import _git_run
@@ -108,28 +137,7 @@ def _stash_local_changes_if_needed(git_cmd: list[str], cwd: Path) -> Optional[st
     stash_name = datetime.now(timezone.utc).strftime(f"{_AUTOSTASH_NAME_PREFIX}%Y%m%d-%H%M%S")
     print("→ Local changes detected — stashing before update...")
     prev_stash = _git_run(git_cmd, ["rev-parse", "--verify", "refs/stash"], cwd).stdout.strip()
-    push = _git_run(git_cmd, ["stash", "push", "--include-untracked", "-m", stash_name], cwd)
-    _print_nonempty(push.stdout)
-    stash_probe = _git_run(git_cmd, ["rev-parse", "--verify", "refs/stash"], cwd)
-    stash_ref = stash_probe.stdout.strip()
-    stash_created = stash_probe.returncode == 0 and bool(stash_ref) and stash_ref != prev_stash
-    if push.returncode != 0:
-        if not stash_created:
-            # No entry created: changes NOT saved — bail before touching HEAD.
-            print("✗ Could not stash local changes — update aborted.")
-            _print_first_line(push.stderr)
-            print("  Commit, stash, or clean up your local changes manually, then re-run `qubit update`.")
-            print("  (An index entry from `git add -N` is the usual cause of this error; `git add` the")
-            print("   paths it names, or `git reset` them, and the update will proceed.)")
-            raise subprocess.CalledProcessError(push.returncode, push.args, output=push.stdout, stderr=push.stderr)
-        # Non-zero but entry created: push saved everything yet couldn't delete some untracked files
-        # (e.g. root-owned dir). Not a failure — continue.
-        _print_nonempty(push.stderr)
-        print("  ⚠ Some untracked files could not be removed from the working tree (permission denied).")
-        print("    They were still saved to the stash and were left in place — the update will continue.")
-        # A partially-failed push also skips cleanup of TRACKED modifications; they'd break the following
-        # pull. Safe to reset: all is in the stash.
-        _reset_hard(git_cmd, cwd)
+    stash_ref = _push_stash(git_cmd, cwd, stash_name, prev_stash)
     _pending_autostash = (
         stash_ref, len([entry for entry in status.stdout.split("\0") if entry]))
     return stash_ref
@@ -428,14 +436,25 @@ def _confirm_restore(stash_ref: str, input_fn) -> bool:
     return False
 
 
-def _apply_stash(git_cmd: list[str], cwd: Path, stash_ref: str) -> list[str] | None:
-    """``git stash apply``; the untracked paths the update replaced (empty on a full restore), or
-    None (tree reset, stash kept) on conflicts or any failure other than the already-exists class."""
+def _apply_stash_step(git_cmd: list[str], cwd: Path, stash_ref: str):
+    """``git stash apply`` and its conflicted paths. Any failure but the already-exists class is
+    reset to the clean tree here, inside the bound step: conflict markers make qubit unrunnable,
+    and the changes stay in the stash."""
     from qubit_cli.update_cmd_git import _git_run
-    print("→ Restoring local changes...")
     restore = _git_run(git_cmd, ["stash", "apply", stash_ref], cwd)
     unmerged = _git_run(git_cmd, ["diff", "--name-only", "--diff-filter=U"], cwd)  # conflicts can exist even on rc 0
     conflicted_files = unmerged.stdout.strip()
+    if conflicted_files or (restore.returncode != 0
+                            and not _stash_apply_failed_only_on_existing_untracked(restore.stderr)):
+        _reset_hard(git_cmd, cwd)
+    return restore, conflicted_files
+
+
+def _apply_stash(git_cmd: list[str], cwd: Path, stash_ref: str) -> list[str] | None:
+    """``git stash apply``; the untracked paths the update replaced (empty on a full restore), or
+    None (tree reset, stash kept) on conflicts or any failure other than the already-exists class."""
+    print("→ Restoring local changes...")
+    restore, conflicted_files = _apply_stash_step(git_cmd, cwd, stash_ref)
     if restore.returncode == 0 and not conflicted_files:
         return []
     if not conflicted_files and _stash_apply_failed_only_on_existing_untracked(restore.stderr):
@@ -455,7 +474,6 @@ def _apply_stash(git_cmd: list[str], cwd: Path, stash_ref: str) -> list[str] | N
             print(f"  • {f}")
     print("\nYour stashed changes are preserved — nothing is lost.")
     print(f"  Stash ref: {stash_ref}")
-    _reset_hard(git_cmd, cwd)  # conflict markers make qubit unrunnable; changes stay in the stash
     print("Working tree reset to clean state.")
     print(f"Restore your changes later with: git stash apply {stash_ref}")
     _record_stash_disposition("parked", stash_ref, "restore hit conflicts")
