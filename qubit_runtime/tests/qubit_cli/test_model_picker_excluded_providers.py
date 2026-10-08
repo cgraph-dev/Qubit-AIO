@@ -148,17 +148,6 @@ def _picker_ctx(excluded=None, *, current_provider="", current_model=""):
     )
 
 
-_EXCLUDED_GAP = pytest.mark.xfail(
-    reason="PRODUCT GAP qubit_runtime/qubit_cli/inventory.py:689 _append_unconfigured_rows "
-    "never consults ctx.excluded_providers; the frozen target builds a names_for alias map "
-    "and skips any slug whose {slug, *aliases} intersects the exclusion set (frozen "
-    "inventory.py:700-714). Excluded providers therefore reappear as skeleton rows in the "
-    "TUI /model picker. #68816.",
-    strict=False,
-)
-
-
-@_EXCLUDED_GAP
 def test_unconfigured_rows_hide_excluded_provider():
     from qubit_cli.inventory import _append_unconfigured_rows
 
@@ -173,7 +162,6 @@ def test_unconfigured_rows_hide_excluded_provider():
     assert slugs == baseline - {"openrouter"}, "only the excluded provider should be removed"
 
 
-@_EXCLUDED_GAP
 def test_unconfigured_rows_exclusion_is_case_insensitive():
     from qubit_cli.inventory import _append_unconfigured_rows
 
@@ -184,7 +172,6 @@ def test_unconfigured_rows_exclusion_is_case_insensitive():
     assert "openrouter" not in slugs
 
 
-@_EXCLUDED_GAP
 def test_unconfigured_rows_hide_excluded_provider_by_alias():
     """Excluding by an *alias* (not the canonical slug) must also drop the
     canonical skeleton row, matching ``qubit model`` and
@@ -214,7 +201,6 @@ def test_unconfigured_rows_hide_excluded_provider_by_alias():
     )
 
 
-@_EXCLUDED_GAP
 def test_unconfigured_rows_exclude_current_provider_matches_cli():
     """``list_authenticated_providers`` drops an excluded provider even when it is
     the current one; the skeleton loop must not re-surface it as the
