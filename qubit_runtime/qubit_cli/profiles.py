@@ -91,6 +91,11 @@ _CLONE_ALL_HISTORY_EXCLUDE_ROOT: frozenset[str] = frozenset({
 # seed_profile_skills() callers (fresh-create, `qubit update` all-profile sync, the
 # dashboard) skip bundled-skill seeding. Delete the file to opt back in.
 NO_BUNDLED_SKILLS_MARKER = ".no-bundled-skills"
+# The setup profile's state file, written at the profile root by ``qubit_cli.setup_profile``.
+# It carries the onboarding state (intro/failed_starts/completed_at) and the setup-only
+# bookkeeping (owner, disabled toolsets) -- and, when present, marks the profile as the
+# setup profile. Kept alongside the ``role`` grant so the file can be read portably.
+SETUP_PROFILE_MARKER = ".setup-profile.json"
 
 # ``profile.yaml`` ``role`` values. A role grants backend capabilities (the setup toolset), so
 # only the backend writes one, and a copy of a profile (clone-all, import) never inherits it.
