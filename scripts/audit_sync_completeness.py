@@ -111,6 +111,14 @@ ROUTES = {
     "hermes_platform": "qubit_platform",
     "hermes_state": "qubit_state",
 }
+# Renamed DIRECTORIES (not the top-level ``hermes_<x>`` module prefixes above, and
+# not the last-segment rule either). Upstream ships `plugins/hermes-achievements/`;
+# we renamed the plugin dir to `qubit-achievements/`. Without this, `route()` never
+# maps it and the entire plugin subtree reads as ABSENT (261 absent files, of which
+# plugin_api.py alone hid 45 top-level defs behind one false "missing file").
+DIR_ROUTES = {
+    "hermes-achievements": "qubit-achievements",
+}
 RUNTIME = REPO / "qubit_runtime"
 
 
@@ -209,7 +217,13 @@ def rebrand(sym: str) -> str:
     # Leading-underscore private helper (`_hermes_repo_root`, `_hermes_home`).
     if sym.startswith("_hermes"):
         return "_qubit" + sym[len("_hermes"):]
-    # Embedded occurrences anywhere in the name.
+    # Embedded occurrences anywhere in the name. UPPERCASE first so an identifier
+    # like `_ZIP_HERMES_ROOT_ARTIFACTS` -> `_ZIP_QUBIT_ROOT_ARTIFACTS` (upstream
+    # ->ours at qubit_cli/update_cmd_zip.py:29/327, IDENTICAL members). The
+    # lowercase pass below would otherwise never fire on the uppercase token, so
+    # the symbol re-reported as missing by the short_port branch every wave.
+    if "HERMES" in sym:
+        return sym.replace("HERMES", "QUBIT")
     if "hermes" in sym:
         return sym.replace("hermes", "qubit")
     if "Hermes" in sym:
@@ -248,7 +262,17 @@ def sh(args: list[str], cwd: Path | None = None) -> str:
 
 
 def route(path: str) -> str:
-    """Upstream path -> our path, applying the rename map under tests/ too."""
+    """Upstream path -> our path, applying the rename map under tests/ too.
+
+    Three transforms, applied to every segment (not just the last):
+      * top-level module prefix   (`hermes_cli/...` -> `qubit_cli/...`)
+      * renamed directory         (`plugins/hermes-achievements/` -> `.../qubit-achievements/`)
+      * a ``hermes``-prefixed segment, e.g. a module: last-segment `_hermes_home.py`
+        -> `_qubit_home.py` (ours ships that exact file under both
+        skills/{research/grounded-citations,productivity/google-workspace}/scripts/).
+        The old rule only fired when the LAST segment *started* with ``hermes``,
+        so a leading underscore or an interior directory escaped it.
+    """
     for prefix in ("tests/", ""):
         if prefix and not path.startswith(prefix):
             continue
@@ -256,8 +280,19 @@ def route(path: str) -> str:
         segs = rest.split("/")
         if segs and segs[0] in ROUTES:
             segs[0] = ROUTES[segs[0]]
-        if segs and segs[-1].startswith("hermes"):
-            segs[-1] = "qubit" + segs[-1][len("hermes"):]
+        for i, seg in enumerate(segs):
+            if seg in DIR_ROUTES:
+                segs[i] = DIR_ROUTES[seg]
+            elif seg.startswith("hermes"):
+                # conservative: only the leading token, so a `hermes_flow.json`
+                # data file (a frozen wire name) is not renamed into a missing path.
+                segs[i] = "qubit" + seg[len("hermes"):]
+            elif seg.lstrip("_").startswith("hermes"):
+                # leading-underscore module: `_hermes_home.py` -> `_qubit_home.py`
+                # (ours ships exactly that under both skills/*/scripts dirs). The
+                # underscores are preserved so the private-module spelling matches.
+                stripped = seg.lstrip("_")
+                segs[i] = seg[:len(seg) - len(stripped)] + "qubit" + stripped[len("hermes"):]
         return prefix + "/".join(segs)
     return path
 
@@ -349,6 +384,11 @@ def main() -> int:
         our_path = route(up_path)
         ours = RUNTIME / our_path
         if not ours.exists():
+            # The routed path is authoritative: a missing routed file means the
+            # work is not here, exactly where it should be. Do NOT fall back to
+            # searching for a same-named file elsewhere -- that would hide a file
+            # left at the wrong path (a real gap) and is the shape of false
+            # negative this audit exists to avoid.
             absent.append(up_path)
             continue
         exists += 1
