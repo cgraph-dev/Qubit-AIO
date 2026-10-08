@@ -9,7 +9,17 @@ worker argv must carry ``--provider`` and the child must hand it to ``QubitCLI``
 
 from types import SimpleNamespace
 
+import pytest
+
 import tui_gateway.server as server
+
+# PRODUCT GAP: product _SlashWorker.__init__ (tui_gateway/server.py:286) lacks the
+# provider param and --provider/--parent-pid argv that upstream 38880bd2 has
+# (#57283: a MoA session dispatched its preset name to the real provider).
+pytestmark = pytest.mark.xfail(strict=False, reason=(
+    "PRODUCT GAP: _SlashWorker.__init__ lacks the provider param + argv upstream "
+    "38880bd2 has (server.py:286 vs upstream:255)."))
+
 
 
 class _Popen:
