@@ -92,7 +92,7 @@ def test_no_answer_survives_the_callers_later_config_save(monkeypatch):
     setup_telemetry(config)
     save_config(config)  # what the wizard and `qubit tools` do afterwards
 
-    assert read_raw_config()["telemetry"]["shared_metrics"] == {"enabled": False, "send": False}
+    assert read_raw_config()["telemetry"]["shared_metrics"] == {"enabled": False, "send": False, "offer_version": 2}
 
 
 def test_chat_offer_asks_an_undecided_profile_once(monkeypatch):
@@ -103,8 +103,8 @@ def test_chat_offer_asks_an_undecided_profile_once(monkeypatch):
     monkeypatch.setattr("qubit_cli.curses_ui.curses_radiolist", lambda *a, **k: asked.append(a) or 1)
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
-    monkeypatch.delenv("QUBIT_DESKTOP", raising=False)
-    monkeypatch.delenv("QUBIT_NONINTERACTIVE", raising=False)
+    monkeypatch.delenv("HERMES_DESKTOP", raising=False)
+    monkeypatch.delenv("HERMES_NONINTERACTIVE", raising=False)
 
     consent.offer_consent_before_chat(argparse.Namespace(query="hi"))  # no person to ask
     assert asked == []
@@ -112,7 +112,7 @@ def test_chat_offer_asks_an_undecided_profile_once(monkeypatch):
     consent.offer_consent_before_chat(argparse.Namespace())
 
     assert len(asked) == 1
-    assert consent.consent_state(read_raw_config()) == {"enabled": True, "send": False, "decided": True}
+    assert consent.consent_state(read_raw_config()) == {"enabled": True, "send": False, "decided": True, "reask": False}
 
 
 def test_offer_drops_keys_typed_before_it_appeared(monkeypatch):

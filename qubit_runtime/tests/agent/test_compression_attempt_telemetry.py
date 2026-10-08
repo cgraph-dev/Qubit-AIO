@@ -218,5 +218,5 @@ def test_automatic_compaction_counts_once_in_shared_metrics(monkeypatch):
         compress_context(agent, _messages(), "system prompt", approx_tokens=80_000)
 
     assert [compression_fields(**kw) for kw in calls] == [
-        {"trigger": "auto", "outcome": "success", "context_fill_bucket": "75_to_90"}
+        {"trigger": "auto", "outcome": "success", "context_fill_bucket": "75_to_90", "failure_class": "none"}
     ]
