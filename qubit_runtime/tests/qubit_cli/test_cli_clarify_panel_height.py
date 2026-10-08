@@ -8,25 +8,7 @@ choice; a tall one must keep the full question text.
 import shutil
 from unittest.mock import patch
 
-import pytest
-
 from cli import QubitCLI
-
-
-# PRODUCT GAP (Qubit fork): ``qubit_cli/cli_tui_mixin.py:569`` dispatches the
-# batch clarify panel to ``self._get_clarify_batch_display_fragments(state)``,
-# but that method is defined nowhere in the tree (upstream pin cbe5e53e keeps
-# the batch logic inline in ``_get_clarify_display_fragments`` —
-# hermes_cli/cli_tui_mixin.py:460). Rendering a multi-question clarify therefore
-# raises ``AttributeError: 'QubitCLI' object has no attribute
-# '_get_clarify_batch_display_fragments'`` — an owner-facing surface.
-# Do NOT fix product here — recorded for the sync owner.
-_BATCH_PANEL_GAP = pytest.mark.xfail(
-    strict=False,
-    reason="PRODUCT GAP: qubit_cli/cli_tui_mixin.py:569 calls the undefined "
-    "_get_clarify_batch_display_fragments; batch clarify panel render raises "
-    "AttributeError (method never ported from upstream).",
-)
 
 
 def _make_cli(questions, answers, choices, active):
@@ -57,7 +39,6 @@ _QUESTION = ("Storage boundary for the signed graph. " * 12).strip()
 
 
 class TestClarifyBatchPanelHeight:
-    @_BATCH_PANEL_GAP
     def test_short_terminal_keeps_active_choices_inside_the_viewport(self):
         cli = _make_cli(
             [_QUESTION, _QUESTION, _QUESTION + " ACTIVE_QUESTION_TAIL"],
@@ -72,7 +53,6 @@ class TestClarifyBatchPanelHeight:
         assert "CHOICE_ALPHA_TOKEN" in rendered
         assert "CHOICE_BETA_TOKEN" in rendered
 
-    @_BATCH_PANEL_GAP
     def test_tall_terminal_keeps_the_full_active_question(self):
         cli = _make_cli(
             [_QUESTION, _QUESTION, _QUESTION + " ACTIVE_QUESTION_TAIL"],
@@ -84,7 +64,6 @@ class TestClarifyBatchPanelHeight:
         assert "ACTIVE_QUESTION_TAIL" in rendered
         assert "CHOICE_ALPHA_TOKEN" in rendered
 
-    @_BATCH_PANEL_GAP
     def test_selected_choice_stays_visible_when_choices_overflow(self):
         cli = _make_cli(
             [_QUESTION, _QUESTION],

@@ -1216,6 +1216,7 @@ def _run_prompt_submit(
             with session["history_lock"]:
                 session["running"] = False
                 session["last_active"] = time.time()
+                session.pop("_turn_user_input", None)  # per turn: never leaks into the next one
                 if not st.error_retained:
                     _clear_inflight_turn(session)
                 _release_hosted_room_turn_slot(session)
