@@ -212,6 +212,22 @@ TTFT_BUCKETS = frozenset({
 })
 COMPRESSION_TRIGGERS = frozenset({"auto", "manual", "other", "overflow"})
 COMPRESSION_OUTCOMES = frozenset({"failed", "skipped", "success"})
+# Why an attempt was skipped or failed: the attempt log's own ``failure_class`` names
+# (agent/conversation_compression*.py, agent/context_compressor.py). Skips are attempts that ended
+# before anything could fail (another path held the lock, nothing summarizable so no model call, the
+# user stopped it, a newer attempt replaced it). ``exception:<Type>`` / ``rollback:<Type>`` keep only
+# their prefix; any other value reads ``other``, a failure with no class ``unknown``.
+COMPRESSION_SKIP_CLASSES = frozenset({
+    "attempt_superseded", "empty_post_handoff_window", "explicit_interrupt", "insufficient_messages",
+    "lock_contended", "no_compressible_window", "snapshot_stale",
+})
+COMPRESSION_FAILURE_CLASSES = COMPRESSION_SKIP_CLASSES | frozenset({
+    "aux_model_fallback", "commit_fence_cancelled", "exception", "feasibility_skip", "no_progress", "none",
+    "other", "pool_saturated", "rollback", "session_split_failed", "stall_deterministic_fallback",
+    "stall_interrupted", "summary_auth_failure", "summary_empty_content_failure", "summary_generation_aborted",
+    "summary_generation_failed", "summary_network_failure", "summary_overload_degraded",
+    "summary_overload_failure", "summary_truncated_failure", "unknown", "would_grow",
+})
 CONTEXT_FILL_BUCKETS = frozenset({"lt_50", "50_to_75", "75_to_90", "90_to_100", "gte_100", "unknown"})
 EXTENSION_KINDS = frozenset({"mcp_server", "plugin", "skill"})
 EXTENSION_SOURCES = frozenset({"bundled", "catalog", "hub", "local", "other", "url"})
@@ -780,6 +796,22 @@ TTFT_BUCKETS = frozenset({
 })
 COMPRESSION_TRIGGERS = frozenset({"auto", "manual", "other", "overflow"})
 COMPRESSION_OUTCOMES = frozenset({"failed", "skipped", "success"})
+# Why an attempt was skipped or failed: the attempt log's own ``failure_class`` names
+# (agent/conversation_compression*.py, agent/context_compressor.py). Skips are attempts that ended
+# before anything could fail (another path held the lock, nothing summarizable so no model call, the
+# user stopped it, a newer attempt replaced it). ``exception:<Type>`` / ``rollback:<Type>`` keep only
+# their prefix; any other value reads ``other``, a failure with no class ``unknown``.
+COMPRESSION_SKIP_CLASSES = frozenset({
+    "attempt_superseded", "empty_post_handoff_window", "explicit_interrupt", "insufficient_messages",
+    "lock_contended", "no_compressible_window", "snapshot_stale",
+})
+COMPRESSION_FAILURE_CLASSES = COMPRESSION_SKIP_CLASSES | frozenset({
+    "aux_model_fallback", "commit_fence_cancelled", "exception", "feasibility_skip", "no_progress", "none",
+    "other", "pool_saturated", "rollback", "session_split_failed", "stall_deterministic_fallback",
+    "stall_interrupted", "summary_auth_failure", "summary_empty_content_failure", "summary_generation_aborted",
+    "summary_generation_failed", "summary_network_failure", "summary_overload_degraded",
+    "summary_overload_failure", "summary_truncated_failure", "unknown", "would_grow",
+})
 CONTEXT_FILL_BUCKETS = frozenset({"lt_50", "50_to_75", "75_to_90", "90_to_100", "gte_100", "unknown"})
 EXTENSION_KINDS = frozenset({"mcp_server", "plugin", "skill"})
 EXTENSION_SOURCES = frozenset({"bundled", "catalog", "hub", "local", "other", "url"})
@@ -1421,8 +1453,8 @@ _COUNTER_DIMENSION_VALUES: dict[str, dict[str, frozenset[str]]] = {
     SETUP_COMPLETED_METRIC: {"surface": SETUP_SURFACES},
     MODEL_TOKENS_METRIC: {"aux_task": AUX_TASKS, "call_role": MODEL_CALL_ROLES, "token_type": TOKEN_TYPES},
     COMPRESSION_METRIC: {
-        "context_fill_bucket": CONTEXT_FILL_BUCKETS, "outcome": COMPRESSION_OUTCOMES,
-        "trigger": COMPRESSION_TRIGGERS,
+        "context_fill_bucket": CONTEXT_FILL_BUCKETS, "failure_class": COMPRESSION_FAILURE_CLASSES,
+        "outcome": COMPRESSION_OUTCOMES, "trigger": COMPRESSION_TRIGGERS,
     },
     MODEL_SWITCH_METRIC: {"execution_surface": EXECUTION_SURFACES},
     FALLBACK_METRIC: {"error_class": MODEL_ERROR_CLASSES},
