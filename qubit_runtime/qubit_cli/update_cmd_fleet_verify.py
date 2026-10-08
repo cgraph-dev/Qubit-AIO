@@ -1,17 +1,14 @@
 """Post-restart fleet verification for ``qubit update`` (``update_cmd_fleet`` sibling).
 
-Split out of ``qubit_cli/update_cmd_fleet.py``: the post-restart verification phase — legacy-unit
-warning, dashboard cleanup, stale-serve probe, fleet version matrix, plan-vs-execution
-reconciliation, receipt finalize. Restart-phase helpers stay in ``update_cmd_fleet`` and are read
-through it (``from qubit_cli import update_cmd_fleet as fleet``) so their patches still apply.
-
-``update_cmd_fleet`` re-imports every name moved here, so existing ``from update_cmd_fleet import
-<name>`` consumers and ``update_cmd_fleet.<name>`` patch seams keep working.
+After the restart phase: compare every live gateway's stamped code against the checkout, reconcile
+the pre-update plan against what the restart did, keep the restart owed (a ``gateway_restart``
+follow-up, never a failed update — contract C3) or clear the obligation, and finalize the receipt.
+Restart-phase helpers stay in ``update_cmd_fleet`` and are read through it so their patches apply.
 """
 
+import json
 import logging
 import subprocess
-import sys
 import time as _time
 from contextlib import suppress
 
@@ -20,9 +17,14 @@ from qubit_cli.update_cmd_common import _best_effort
 # Log-record parity with the origin module.
 logger = logging.getLogger("qubit_cli.update_cmd")
 
+# A supervisor can report a restarted unit active before the gateway finishes its
+# bootstrap and publishes ``gateway_state.json``. Keep the readiness poll bounded,
+# but allow the default systemd startup budget plus status-publication slack.
+_FLEET_PROBE_SETTLE_TIMEOUT_SECONDS = 120.0
+
 
 def _print_legacy_units_warning() -> None:
-    """Legacy hermes.service fights hermes-gateway.service over the bot token; warn on
+    """Legacy qubit.service fights qubit-gateway.service over the bot token; warn on
     every update until migrated."""
     from qubit_cli.gateway import (has_legacy_qubit_units, _find_legacy_qubit_units, supports_systemd_services)
     if not (supports_systemd_services() and has_legacy_qubit_units()):
@@ -33,8 +35,9 @@ def _print_legacy_units_warning() -> None:
         scope = "system" if is_sys else "user"
         print(f"    {path}  ({scope} scope)")
     print()
-    print("  These pre-rename units fight the current gateway service for the")
-    print("  bot token and cause SIGTERM flap loops. Remove them with:")
+    print("  These pre-rename units (qubit.service) fight the current")
+    print("  qubit-gateway.service for the bot token and cause SIGTERM")
+    print("  flap loops. Remove them with:")
     print()
     print("    qubit gateway migrate-legacy")
     print()
@@ -47,20 +50,19 @@ def _collect_fleet_snapshot(restart, rows_expected: bool) -> list:
     Gateways need time to rewrite gateway_state.json; Windows resumes DETACHED (~10s boot),
     so a single 2s sleep reported "no rows" on healthy resumes. A "down" row may be a
     detached replacement still booting: poll until none remain or the deadline passes.
-    Pre-restart PIDs make a gateway stopped WITHOUT verified replacement a DOWN row (exit 1)
+    Pre-restart PIDs make a gateway stopped WITHOUT verified replacement a DOWN row (owed restart)
     instead of no row at all. An ``unknown`` row whose pid is NOT a pre-restart pid is a successor
     that has not published its code identity yet (a relaunched gateway can sit ~10s between process
     start and its first runtime-status write, #112634) — keep polling; at the deadline it is flagged
     ``identity_pending`` so the matrix does not call it a pre-stamping gateway.
     """
-    from qubit_cli import update_cmd_fleet as fleet
     from qubit_cli.update_receipt import collect_fleet_versions
     pending = getattr(restart, "self_restart_pending_pids", None) or None
     if not rows_expected:
         return collect_fleet_versions(
             pre_restart_pids=restart.pre_restart_gateway_pids, self_restart_pending=pending)
     pre_pids = restart.pre_restart_gateway_pids
-    _fleet_deadline = _time.monotonic() + fleet._FLEET_PROBE_SETTLE_TIMEOUT_SECONDS
+    _fleet_deadline = _time.monotonic() + _FLEET_PROBE_SETTLE_TIMEOUT_SECONDS
     while True:
         _time.sleep(2.0)
         snapshot = collect_fleet_versions(pre_restart_pids=pre_pids, self_restart_pending=pending)
@@ -127,13 +129,66 @@ def _live_gateway_pids_from_fleet(fleet_rows: list) -> dict:
     return live
 
 
+def _record_owed_gateway_inventory(plan, stopped_unmapped_pids=()) -> None:
+    """Name the pre-update gateways on the obligation once their restart is owed.
+
+    The pull arms the obligation before the restart phase knows what it owes. An inventory-less
+    record on a host whose gateway then died at boot is settled by the gateway-less discharge
+    (nothing live, nothing named), which would silence the owed-restart warning that replaces a
+    failed update under contract C3. A named inventory keeps it until those gateways run HEAD.
+    A gateway stopped with no known profile is recorded as an unmapped row for the same reason: it
+    has no ``gateway_state.json`` the gateway-less probe could see, so absence would settle it.
+    A readable inventory (a same-SHA catch-up keeps the standing record) only GROWS: rows this run
+    newly owes are appended, so a mapped successor cannot discharge a newly stopped unmapped one.
+    """
+    from qubit_cli import update_cmd_fleet as fleet
+    armed = fleet._fleet_restart_obligation_armed()
+    fields = fleet._obligation_fields() if armed else {}
+    if fields is None:
+        return  # unreadable terms stay fail-closed
+    recorded: list = []
+    if fields.get("inventory") not in (None, "", "null"):
+        try:
+            inventory = json.loads(fields["inventory"])
+            fleet._marker_owed_gateways(inventory)  # validates; malformed/unsupported stays untouched
+        except ValueError:
+            return
+        recorded = inventory["runtimes"]
+    from dataclasses import asdict
+    rows = [
+        asdict(runtime) for runtime in getattr(plan, "runtimes", ()) or ()
+        if getattr(runtime, "kind", None) == "gateway"
+        and isinstance(getattr(runtime, "profile", None), str)
+        and runtime.profile.strip() and runtime.profile != "unknown"
+    ] + [{"kind": "gateway", "profile": None, "pid": pid, "stopped_unmapped": True}
+         for pid in sorted(stopped_unmapped_pids)]
+    rows = [row for row in rows if row not in recorded]
+    if rows:
+        # Not armed any more (a pre-restart probe settled an inventory-less record): re-arm, the
+        # restart is owed. The SHA is the code the fleet must be proven current on.
+        sha = fields.get("expected_sha", "") if armed else (fleet._current_checkout_sha() or "")
+        fleet._write_fleet_restart_pending_marker(expected_sha=sha, runtimes=recorded + rows)
+
+
+def _named_gateways_still_owed() -> bool:
+    """True when the armed obligation NAMES gateways (recorded by an earlier owed restart) and the
+    live fleet still does not prove them current. An inventory-less record keeps its old rules."""
+    from qubit_cli import update_cmd_fleet as fleet
+    if not fleet._fleet_restart_obligation_armed():
+        return False
+    fields = fleet._obligation_fields()
+    if fields is None or fields.get("inventory") in (None, "", "null"):
+        return False
+    return not fleet._marker_only_restart_obsolete()
+
+
 def _verify_fleet_after_update(restart, *, _pre_update_plan, _windows_gateway_resume, update_complete):
     """Post-restart verification: legacy-unit warning, dashboard cleanup, stale serve
     probe, fleet version matrix, plan-vs-execution reconciliation, receipt finalize.
 
-    Exits 1 (leaving ``fleet_restart_pending`` for the next catch-up) when any gateway
-    may still be stale; otherwise clears the marker. A failed SQLite verdict also
-    exits 1, without retaining a fulfilled fleet-restart obligation.
+    Never fails the committed update (contract C3): when any gateway may still be stale it
+    records a ``gateway_restart`` follow-up and leaves ``fleet_restart_pending`` armed for the
+    next catch-up and the startup warning; otherwise clears the marker.
     """
     from qubit_cli import update_cmd_fleet as fleet
     from qubit_cli.update_cmd import (
@@ -141,8 +196,7 @@ def _verify_fleet_after_update(restart, *, _pre_update_plan, _windows_gateway_re
     )
     from qubit_cli.update_cmd_maint import _refresh_dashboard_after_update
     with _best_effort('Legacy unit check during update failed: %s'):
-        # Read through the origin module so its patch seam (``update_cmd_fleet.<name>``) applies.
-        fleet._print_legacy_units_warning()
+        _print_legacy_units_warning()
 
     # Restart a managed dashboard via systemd or stop stale manual ones (raw-killing
     # a systemd-owned PID reads as clean stop and leaves the Cloudflare origin dead).
@@ -155,13 +209,13 @@ def _verify_fleet_after_update(restart, *, _pre_update_plan, _windows_gateway_re
     # Success-path twin of the abort-recovery probe: the restart phase only touches
     # units, so a unit-less `qubit serve` keeps stale sys.modules. Runs AFTER
     # dashboard cleanup so a respawned manual dashboard isn't a survivor. Rows feed
-    # reconciliation (survivor → exit 1); ``None`` = probe failed, stays fail-closed.
+    # reconciliation (survivor → owed restart); ``None`` = probe failed, stays fail-closed.
     # Check if any pre-update serve/dashboard runtimes survived on pre-update code generations (#100479).
     # This is the SUCCESS-path twin of the abort-recovery probe above: the restart phase only restarts
     # units, so an sshd-spawned `serve --isolated` or a manual `qubit serve` (no unit) is left running its
     # pre-update sys.modules graph — and its cron ticker keeps firing agent jobs that ImportError on every
     # symbol added in the pulled range. The rows also feed the plan-vs-execution reconciliation below, so a
-    # survivor is escalated (exit 1) instead of merely printed.
+    # survivor is escalated (an owed gateway_restart follow-up) instead of merely printed.
     _stale_serve_rows: "list | None" = None
     with _best_effort('Failed to check for surviving serve runtimes: %s'):
         _stale_serve_rows = _surviving_pre_update_serve_runtimes(_pre_update_plan)
@@ -184,12 +238,12 @@ def _verify_fleet_after_update(restart, *, _pre_update_plan, _windows_gateway_re
         # See #93406.
         # A gateway stopped WITHOUT a successor ("Restart manually") publishes no row by design,
         # so it must not count as an expected one — otherwise an update whose only live gateways
-        # were unmapped exits 1 with "no rows" after correctly stopping them.
+        # were unmapped reports "no rows" after correctly stopping them.
         _pre_restart, _killed = restart.fleet_probe_signals()
         _fleet_rows_expected = _m()._fleet_probe_expected_runtimes(
             _pre_update_plan, _pre_restart, _windows_gateway_resume, restart.restarted_services, _killed,
         )
-        _fleet_snapshot = fleet._collect_fleet_snapshot(restart, _fleet_rows_expected)
+        _fleet_snapshot = _collect_fleet_snapshot(restart, _fleet_rows_expected)
         if print_fleet_version_matrix(_fleet_snapshot):
             restart.incomplete = True
             # A proven-stale survivor must not keep running (its ticker yields every tick and
@@ -198,14 +252,14 @@ def _verify_fleet_after_update(restart, *, _pre_update_plan, _windows_gateway_re
             signal_stale_fleet_survivors(_fleet_snapshot, restart, fleet._gateway_drain_budget())
         elif not _fleet_snapshot and _fleet_rows_expected:
             # collect_fleet_versions() swallows every failure, so zero rows with
-            # expected runtimes is indistinguishable from health — fail (partial, exit 1).
+            # expected runtimes is indistinguishable from health — keep the restart owed.
             print(
                 # Fleet probe returned zero rows even though at least one gateway runtime was (or may have
                 # been) live pre-update — POSIX restart bookkeeping, the pre-restart PID snapshot, the
                 # pre-update plan inventory, or the Windows pause/resume token all count as that signal.
                 # Every failure path inside collect_fleet_versions() is swallowed via logger.debug(), so an
                 # empty list is indistinguishable from a healthy fleet in the current output. Treat it as
-                # verification failure so the receipt records "partial" and the exit code is 1 (#93406).
+                # verification failure so the receipt carries a gateway_restart follow-up (#93406).
                 "\n⚠ Fleet version check returned no rows even though"
                 " gateway runtimes were expected — verification incomplete."
             )
@@ -259,25 +313,51 @@ def _verify_fleet_after_update(restart, *, _pre_update_plan, _windows_gateway_re
                 if _active is not None:
                     _active.data["runtime_outcomes"] = _runtime_outcomes
 
+    if not restart.incomplete:
+        with _best_effort('Owed-gateway check failed: %s'):
+            if _named_gateways_still_owed():
+                # A gateway a previous run could not restart is still not serving HEAD (nothing
+                # live to restart this time): keep owing it rather than clearing the obligation.
+                print("  ⚠ A gateway owed a restart by a previous update is still not serving this checkout.")
+                restart.incomplete = True
+    if getattr(restart, "stopped_unmapped_pids", None):
+        # A gateway stopped with no successor is owed a restart, not "accounted for": keep the
+        # fleet obligation armed so the startup warning names it until someone restarts it.
+        restart.incomplete = True
+    if restart.incomplete:
+        # Code is committed (contract C3): a gateway that may still run stale modules is a
+        # follow-up, never a failed update. The fleet obligation stays armed, every CLI start
+        # warns about it, and the next `qubit update` retries the restart.
+        from qubit_cli.update_receipt import record_followup
+        stopped = sorted(getattr(restart, "stopped_unmapped_pids", None) or ())
+        record_followup(
+            "gateway_restart",
+            "gateways may still run pre-update code or were stopped without a successor"
+            + (f" (stopped PIDs {', '.join(map(str, stopped))})" if stopped else "")
+            + "; recover with `qubit gateway restart`",
+        )
+        with _best_effort('Fleet restart inventory not recorded: %s'):
+            _record_owed_gateway_inventory(_pre_update_plan, stopped)
     with _best_effort('Update receipt finalize failed: %s'):
         from qubit_cli.update_receipt import finalize_update_receipt
-        _receipt_path = finalize_update_receipt(
-            "partial" if restart.incomplete or not update_complete else "success",
-            fleet=_fleet_snapshot,
-        )
+        # A False ``update_complete`` (unsafe SQLite runtime, owed tail work) never fails the
+        # run: maintenance already reported it as a follow-up. It only vetoes migration below.
+        _receipt_path = finalize_update_receipt("success", fleet=_fleet_snapshot)
         if _receipt_path is not None:
             logger.info("Update receipt written: %s", _receipt_path)
 
     if restart.incomplete:
-        # Code updated but a gateway may still run stale modules: fail so automation
-        # doesn't treat the fleet as healthy; leave the pending marker for catch-up.
-        sys.exit(1)
+        return
     fleet._clear_fleet_restart_pending_marker()
     if not update_complete:
-        # Fleet caught up, but the independently checked SQLite runtime is unsafe.
-        sys.exit(1)
+        # Fleet caught up, but the selected runtime's SQLite is unsafe or the tail is still owed
+        # (both reported by the completion): leave the topology alone until they are repaired.
+        return
     # Fleet is healthy on the new code: fold per-profile gateways into one multiplexer when nothing
     # blocks it (deterministic; never prompts), else print the blockers and the one-liner to run later.
-    with _best_effort('Multiplex auto-migration after update failed: %s'):
+    try:
         from qubit_cli.gateway_migrate import maybe_auto_migrate_after_update
         maybe_auto_migrate_after_update()
+    except (Exception, SystemExit) as exc:  # health: allow BLE001 -- a SystemExit here must not fail a committed update
+        logger.warning('Multiplex auto-migration after update failed: %s', exc)
+        print(f"  ⚠ Gateway multiplex migration did not finish: {exc} (run `qubit gateway migrate` later)")
