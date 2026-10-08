@@ -178,8 +178,9 @@ def kv_dtype_factor(flash_attention: bool) -> float:
 
 
 def ctx_bytes(profile: ModelProfile, window: int, *, flash_attention: bool = True) -> int:
-    """Context memory for one window: full layers linear in T, SWA layers capped at the sliding
-    window, recurrent layers constant. Scaled by profile.kv_scale (MTP draft context)."""
+    """Memory that grows with the window: full layers linear in T, SWA layers capped at the sliding
+    window, recurrent layers constant, KV scaled by profile.kv_scale (MTP draft context), plus the
+    posture's window-scaled compute buffers."""
     factor = kv_dtype_factor(flash_attention)
     total = 0.0
     for kind, per_token_f16 in profile.layers:
@@ -189,7 +190,7 @@ def ctx_bytes(profile: ModelProfile, window: int, *, flash_attention: bool = Tru
             total += per_token_f16 * factor * min(window, profile.swa_window)
         else:
             total += per_token_f16 * factor * window
-    return int(total * profile.kv_scale)
+    return int(total * profile.kv_scale) + profile.window_compute_per_token * window
 
 
 @dataclass
