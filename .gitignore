@@ -111,3 +111,9 @@ qubit_runtime/evals.desktop_bug_campaign.*
 .frozen_target_progress.cache.json
 audit_frozen.json
 audit_frozen.txt
+
+# Runtime state that must never be committed (a salvage committed
+# qubit_runtime/.hermes-update.lock; the lock lives in the home, not the repo)
+.hermes-update.lock
+*.hermes-update.lock
+hermes-update.lock
