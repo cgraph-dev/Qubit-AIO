@@ -25,8 +25,30 @@ HOME = os.environ.get("HOME", "")
 # REAL checkout onto sys.path. Left in place, every "import probe" below would
 # grade the live tree and the deletion test would be a lie. Drop any sys.path
 # entry that resolves outside the sandbox, then pin the sandbox first.
-_BAD = ("/home/trick/Projects/Repos", os.path.expanduser("~/Projects/Repos"))
-sys.path[:] = [p for p in sys.path if not any(b in (p or "") for b in _BAD)]
+# Strip ONLY the live checkout's OWN source dirs -- so an import probe cannot grade the
+# live tree -- but NEVER the shared .venv. The venv's site-packages lives UNDER the repo
+# path, so the previous filter (the bare "/home/trick/Projects/Repos" prefix) stripped it
+# too, and every probe then failed with ModuleNotFoundError for rich/fire/ruamel even
+# though those deps were installed. That produced a false FAIL that reported a broken
+# tree when the tree was fine.
+_LIVE = os.path.dirname(os.path.abspath(__file__))
+_BAD_EXACT = {
+    os.path.abspath(os.path.join(_LIVE, d))
+    for d in ("", "qubit_runtime", "voicebridge", "agent", "tools", "cron", "gateway",
+              "plugins", "pm", "tui_gateway", "scripts", "sandbox",
+              "sandbox/qubit_runtime")
+}
+
+
+def _is_live_checkout_path(p: str) -> bool:
+    if not p:
+        return False
+    if ".venv" in p:            # the shared venv is legitimate: keep it
+        return False
+    return os.path.abspath(p) in _BAD_EXACT
+
+
+sys.path[:] = [p for p in sys.path if not _is_live_checkout_path(p)]
 for _p in (QR, SANDBOX):
     if _p in sys.path:
         sys.path.remove(_p)
@@ -50,6 +72,18 @@ def check(name: str, ok: bool, evidence: str) -> None:
 
 # ---------------------------------------------------------------- environment
 def check_environment() -> None:
+    # The shared .venv legitimately lives under the repo path; it is NOT the live checkout.
+    # Flagging it would fail the harness on a correct tree (the check must mean "we are not
+    # importing the live SOURCE", not "no path contains the repo prefix").
+    leaked = [
+        p for p in sys.path
+        if p and "site-packages" not in p and ".venv" not in p
+        and str(p).startswith(os.path.dirname(os.path.abspath(__file__)))
+        and os.path.abspath(p) != os.path.abspath(SANDBOX)
+        and not os.path.abspath(p).startswith(os.path.abspath(SANDBOX) + os.sep)
+    ]
+    check("env: real checkout NOT on sys.path", not leaked,
+          "sandbox paths only" if not leaked else "\n".join(leaked))
     herm = os.path.join(HOME, ".hermes")
     check("env: no ~/.hermes in HOME", not os.path.exists(herm),
           f"HOME={HOME}  exists({herm})={os.path.exists(herm)}")
