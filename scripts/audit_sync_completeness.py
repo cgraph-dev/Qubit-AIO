@@ -101,7 +101,28 @@ if not (REPO / "qubit_runtime").is_dir() or not (REPO / "scripts").is_dir():
         "`.venv/bin/python scripts/audit_sync_completeness.py` "
         "(do not copy it elsewhere -- it resolves paths from __file__)."
     )
-UP = Path("/home/trick/.hermes/hermes-agent")
+def _upstream_clone() -> Path:
+    """Locate the upstream clone, tolerating the hermes home being retired.
+
+    The clone lived at ~/.hermes/hermes-agent; the hermes home has since been moved aside as part
+    of retirement, so the same tree now sits at ~/.hermes.pre-retirement/hermes-agent. Prefer the
+    live location, fall back to the retired one, and fail LOUDLY rather than silently measuring an
+    empty directory -- a silent miss here would make every audit grade the wrong thing.
+    """
+    for candidate in (
+        Path.home() / "upstream" / "hermes-agent",
+        Path.home() / ".hermes" / "hermes-agent",
+        Path.home() / ".hermes.pre-retirement" / "hermes-agent",
+    ):
+        if (candidate / ".git").exists():
+            return candidate
+    raise SystemExit(
+        "cannot locate the upstream clone (tried ~/.hermes/hermes-agent and "
+        "~/.hermes.pre-retirement/hermes-agent); every audit would measure nothing"
+    )
+
+
+UP = _upstream_clone()
 BASELINE = "a036b13793"
 HEAD = "origin/main"
 

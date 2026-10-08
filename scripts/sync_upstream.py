@@ -31,7 +31,28 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-PIN = Path("/home/trick/.hermes/hermes-agent")
+def _upstream_clone() -> Path:
+    """Locate the upstream clone, tolerating the hermes home being retired.
+
+    The clone lived at ~/.hermes/hermes-agent; the hermes home has since been moved aside as part
+    of retirement, so the same tree now sits at ~/.hermes.pre-retirement/hermes-agent. Prefer the
+    live location, fall back to the retired one, and fail LOUDLY rather than silently measuring an
+    empty directory -- a silent miss here would make every audit grade the wrong thing.
+    """
+    for candidate in (
+        Path.home() / "upstream" / "hermes-agent",
+        Path.home() / ".hermes" / "hermes-agent",
+        Path.home() / ".hermes.pre-retirement" / "hermes-agent",
+    ):
+        if (candidate / ".git").exists():
+            return candidate
+    raise SystemExit(
+        "cannot locate the upstream clone (tried ~/.hermes/hermes-agent and "
+        "~/.hermes.pre-retirement/hermes-agent); every audit would measure nothing"
+    )
+
+
+PIN = _upstream_clone()
 # Derive the repo root from this script's location so the tool works correctly
 # inside a `git worktree` checkout. A hardcoded absolute path made every
 # worktree agent write into the MAIN tree, destroying the isolation that
