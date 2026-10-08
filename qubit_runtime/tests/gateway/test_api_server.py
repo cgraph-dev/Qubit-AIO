@@ -999,6 +999,32 @@ class TestSkillsEndpoint:
                 for entry in data["data"]:
                     assert set(entry.keys()) >= {"name", "description", "category"}
 
+    @pytest.mark.asyncio
+    async def test_skills_endpoint_signature_matches_the_lister(self, adapter):
+        """The endpoint must call ``_find_all_skills`` with only kwargs it declares.
+
+        Regression: the endpoint passed ``include_editorial=True`` — a kwarg
+        ``_find_all_skills`` never had — so ``GET /v1/skills`` raised a TypeError
+        the broad ``except Exception`` turned into an opaque 500. The sibling
+        test above could not catch it because it patched the lister with a Mock
+        that accepts any kwarg; this one patches only the DATA SOURCE so the
+        real function's signature is exercised end-to-end.
+        """
+        fake_catalog = [
+            {"load_name": "github", "description": "GitHub workflow skill", "category": "github"},
+            {"load_name": "ascii-art", "description": "ASCII art generation", "category": "creative"},
+        ]
+        with patch(
+            "tools.skills_tool._skill_catalog",
+            return_value=list(fake_catalog),
+        ):
+            app = _create_app(adapter)
+            async with TestClient(TestServer(app)) as cli:
+                resp = await cli.get("/v1/skills")
+                assert resp.status == 200
+                data = await resp.json()
+                assert sorted(s["name"] for s in data["data"]) == ["ascii-art", "github"]
+
 
 class TestToolsetsEndpoint:
     @pytest.mark.asyncio
