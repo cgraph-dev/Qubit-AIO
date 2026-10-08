@@ -52,7 +52,10 @@ def pty_keepalive_harness(monkeypatch):
 
     async def fake_argv(**kw):
         resume = "child" if kw.get("resume") == "parent" else kw.get("resume")
-        env = {"QUBIT_TUI_RESUME": resume} if resume else {}
+        # The runtime hand-off key the PTY child actually reads is HERMES_TUI_RESUME
+        # (a frozen wire name — see web_server_chat._resolve_chat_argv); the mock must
+        # emit that exact key or the handler never sees the canonical resume target.
+        env = {"HERMES_TUI_RESUME": resume} if resume else {}
         return (["x", resume or "fresh"], "/tmp", env)
 
     monkeypatch.setattr(_web_server_chat, "_resolve_chat_argv_async", fake_argv)

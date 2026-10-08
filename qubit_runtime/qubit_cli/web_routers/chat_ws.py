@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 
 from agent.interrupt_scope import InterruptScope, bind_interrupt_scope
+from qubit_cli.active_sessions import ActiveSessionRegistryError, active_session_registry_snapshot
 from qubit_cli.pty_session import RegistryFull
 from qubit_cli.web_deps import LateState, late
 from qubit_cli.web_routers.chat_ws_errors import chat_start_failure_message
@@ -51,6 +52,28 @@ def _get_event_state(app: "FastAPI"):
 
 
 _VALID_CHANNEL_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+
+
+def _unlink_active_session_file(path: Optional[Path]) -> None:
+    if path is None:
+        return
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _discard_active_session_file(app: "FastAPI", channel: Optional[str], path: Optional[Path]) -> None:
+    _unlink_active_session_file(path)
+    if not channel or path is None:
+        return
+    try:
+        from qubit_cli.web_server import _get_pty_active_session_files
+        files = _get_pty_active_session_files(app)
+        if files.get(channel) == path:
+            files.pop(channel, None)
+    except Exception:  # health: allow BLE001 S110 -- marker cleanup must never mask the PTY teardown path it runs inside
+        pass
 
 
 def _ws_auth_mode() -> str:
@@ -435,9 +458,103 @@ async def _pty_fail(ws: WebSocket, exc: BaseException) -> None:
     await ws.close(code=1011)
 
 
+def _lease_holder_pid(session_id: Optional[str], *, registry_home: Optional[str] = None) -> Optional[int]:
+    """The live process holding ``session_id``'s single-writer lease, if any.
+
+    A keep-alive PTY whose chat was never resumed from carries no resume target
+    in its registry key, so the lease holder is what identifies the terminal
+    that has to give the session back. Leases live under the HOME the chat runs
+    in — a profile-scoped chat's child claims its lease in the profile's home,
+    not the dashboard's launch home — so ``registry_home`` is the child's. A
+    registry that cannot be read is not a reason to refuse the attach: the
+    caller simply finds no holder.
+    """
+    if not session_id:
+        return None
+    try:
+        for entry in active_session_registry_snapshot(registry_home=registry_home):
+            if entry.get("session_id") == session_id and isinstance(entry.get("pid"), int):
+                return entry["pid"]
+    except (ActiveSessionRegistryError, OSError, ValueError):
+        return None
+    return None
+
+
+def _attach_accepts_active_session_file(registry: Any) -> bool:
+    """Whether this registry's ``attach_or_spawn`` takes ``active_session_file``.
+
+    The lease-aware registry threads the marker through to the PtySession so a
+    keep-alive PTY owns it for its lifetime; an older registry has no such
+    parameter, so passing it would raise TypeError mid-handler. Detect once, at
+    the call site, and fall back to the plain signature.
+    """
+    try:
+        import inspect
+
+        return "active_session_file" in inspect.signature(registry.attach_or_spawn).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+async def _pump_keepalive_input(ws: "WebSocket", session: Any) -> None:
+    """Writer loop for a keep-alive /api/pty socket: forward client input to the
+    session's bridge, consuming resize escapes locally. On child EOF the drain
+    task closes the attached socket with 4410, which unparks ws.receive()."""
+    from qubit_cli.web_server_chat import _RESIZE_RE
+    while True:
+        try:
+            msg = await ws.receive()
+        except RuntimeError:  # receive() after the drain task already closed us
+            break
+        if msg.get("type") == "websocket.disconnect":
+            break
+        raw = msg.get("bytes")
+        if raw is None:
+            text = msg.get("text")
+            raw = text.encode("utf-8") if isinstance(text, str) else b""
+        if not raw:
+            continue
+        # Resize escape is consumed locally, never written to the PTY.
+        match = _RESIZE_RE.match(raw)
+        if match and match.end() == len(raw):
+            session.bridge.resize(cols=int(match.group(1)), rows=int(match.group(2)))
+            continue
+        if not await session.write(ws, raw):
+            await _close_stalled_pty_input(ws, path="keepalive")
+            break
+
+
+async def _pty_channel_marker_state(
+    ws: WebSocket, resume: Optional[str], force_fresh: bool,
+) -> tuple[Optional[Path], bool, Optional[str]]:
+    """(active_session_file, marker_preexisting, resume) for the /api/pty handler.
+
+    A channel's marker may already belong to a live keep-alive PTY on that
+    channel — only a marker this handler allocates is its own to drop on
+    failure (#63553)."""
+    channel = _channel_or_close_code(ws)
+    if not channel:
+        return None, False, resume
+    from qubit_cli.web_server import _get_pty_active_session_files
+    marker_files = _get_pty_active_session_files(ws.app)
+    marker_preexisting = channel in marker_files
+
+    active_session_file = _active_session_file_for_channel(ws.app, channel)
+    if force_fresh:
+        resume = None
+        try:
+            active_session_file.unlink(missing_ok=True)
+        except OSError:
+            pass
+        marker_preexisting = False
+    elif not resume:
+        resume = _read_active_session_file(active_session_file)
+    return active_session_file, marker_preexisting, resume
+
+
 @router.websocket("/api/pty")
 async def pty_ws(ws: WebSocket) -> None:
-    from qubit_cli.web_server_chat import PTY_REGISTRY, PtyBridge, PtyUnavailableError, _PTY_BRIDGE_AVAILABLE, _RESIZE_RE
+    from qubit_cli.web_server_chat import PTY_REGISTRY, PtyBridge, PtyUnavailableError, _PTY_BRIDGE_AVAILABLE
     from pm.package import InstallError
     gate = await _ws_gate(ws, "pty")
     if gate is None:
@@ -463,24 +580,14 @@ async def pty_ws(ws: WebSocket) -> None:
     channel = _channel_or_close_code(ws)
     sidecar_url = _build_sidecar_url(channel) if channel else None
     force_fresh = (ws.query_params.get("fresh") or "").strip().lower() in {"1", "true", "yes", "on"}
-    active_session_file: Optional[Path] = None
+    active_session_file, marker_preexisting, resume = await _pty_channel_marker_state(ws, resume, force_fresh)
 
-    if channel:
-        active_session_file = _active_session_file_for_channel(ws.app, channel)
-        if force_fresh:
-            resume = None
-            try:
-                active_session_file.unlink(missing_ok=True)
-            except OSError:
-                pass
-        elif not resume:
-            resume = _read_active_session_file(active_session_file)
-            if resume:
-                # The client only pins the viewport to the bottom when it asked
-                # for `?resume=`; announce the implicit active-session replay so
-                # it gets the same follow-scroll treatment.
-                # See #93518.
-                await ws.send_json({"type": "resume", "id": resume})
+    if channel and not force_fresh and resume and resume != raw_resume:
+        # The client only pins the viewport to the bottom when it asked
+        # for `?resume=`; announce the implicit active-session replay so
+        # it gets the same follow-scroll treatment.
+        # See #93518.
+        await ws.send_json({"type": "resume", "id": resume})
 
     resolve_kwargs = {"resume": resume, "sidecar_url": sidecar_url, "profile": profile}
     if active_session_file is not None:
@@ -499,9 +606,13 @@ async def pty_ws(ws: WebSocket) -> None:
     try:
         argv, cwd, env = await _resolve_chat_argv_async(**resolve_kwargs)
     except HTTPException as exc:  # unknown/invalid profile
+        if not marker_preexisting:
+            _discard_active_session_file(ws.app, channel, active_session_file)
         await _pty_fail(ws, exc)
         return
     except SystemExit as exc:  # _make_tui_argv sys.exit(1)s when node/npm is missing
+        if not marker_preexisting:
+            _discard_active_session_file(ws.app, channel, active_session_file)
         await _pty_fail(ws, exc)
         return
     except InstallError as exc:  # PM could not provide node; its remedy names the fix
@@ -528,16 +639,40 @@ async def pty_ws(ws: WebSocket) -> None:
             await _pty_fail(ws, exc)
             return
         except (FileNotFoundError, OSError) as exc:
+            if not marker_preexisting:
+                _discard_active_session_file(ws.app, channel, active_session_file)
             await _pty_fail(ws, exc)
             return
-        await _legacy_pump(ws, bridge)
+        try:
+            await _legacy_pump(ws, bridge)
+        finally:
+            # The 1:1 PTY died with this socket; nothing survives to keep the
+            # breadcrumb, so drop the marker instead of leaking the entry (#63553).
+            # A preexisting marker belongs to a live keep-alive PTY on this channel
+            # — only the marker this handler allocated is ours to drop. In a
+            # finally: a handler cancelled mid-teardown (client gone, server
+            # shutdown) must still drop it.
+            if not marker_preexisting:
+                _discard_active_session_file(ws.app, channel, active_session_file)
         return
 
     # Keep-alive path: the PTY outlives this socket; reattach by token.
     try:
         await PTY_REGISTRY.close_other_sessions(raw_attach_token, keep_key=attach_token)
-        session, _created = await PTY_REGISTRY.attach_or_spawn(attach_token, spawn=_spawn)
+        holder_pid = _lease_holder_pid(registry_resume, registry_home=(env or {}).get("HERMES_HOME"))
+        close_orphaned = getattr(PTY_REGISTRY, "close_orphaned_sessions", None)
+        if callable(close_orphaned):
+            # Close a keep-alive PTY stranded under a superseded attach token; the
+            # lease holder identifies a never-resumed terminal. No-op on a registry
+            # without the lease-aware method (older PtySessionRegistry).
+            await close_orphaned(registry_resume, keep_key=attach_token, holder_pid=holder_pid)
+        attach_kwargs = {"spawn": _spawn}
+        if _attach_accepts_active_session_file(PTY_REGISTRY):
+            attach_kwargs["active_session_file"] = active_session_file
+        session, _created = await PTY_REGISTRY.attach_or_spawn(attach_token, **attach_kwargs)
     except (PtyUnavailableError, FileNotFoundError, OSError, RegistryFull) as exc:
+        if not marker_preexisting:
+            _discard_active_session_file(ws.app, channel, active_session_file)
         await _pty_fail(ws, exc)
         return
 
@@ -547,6 +682,18 @@ async def pty_ws(ws: WebSocket) -> None:
     cancel_pending = getattr(PTY_REGISTRY, "attach_or_spawn_cancel_pending", None)
     if callable(cancel_pending):
         cancel_pending(attach_token)
+
+    if _created:
+        # This PTY now owns this marker for its entire keep-alive lifetime.
+        if channel and active_session_file is not None:
+            session.active_session_cleanup = (
+                lambda app=ws.app, ch=channel, path=active_session_file:
+                _discard_active_session_file(app, ch, path)
+            )
+    elif not marker_preexisting:
+        # A different channel attached to an already-existing PTY. The marker
+        # just allocated for this channel is not owned by that PTY.
+        _discard_active_session_file(ws.app, channel, active_session_file)
 
     # A fresh xterm can't rebuild the TUI from an arbitrary tail of alternate-
     # screen differential output; reused PTYs emit a full frame after replay.
@@ -564,27 +711,7 @@ async def pty_ws(ws: WebSocket) -> None:
     # it while detached. On child EOF it closes the attached socket with 4410,
     # which unparks ws.receive() — same half-open protection as the legacy pump.
     try:
-        while True:
-            try:
-                msg = await ws.receive()
-            except RuntimeError:  # receive() after the drain task already closed us
-                break
-            if msg.get("type") == "websocket.disconnect":
-                break
-            raw = msg.get("bytes")
-            if raw is None:
-                text = msg.get("text")
-                raw = text.encode("utf-8") if isinstance(text, str) else b""
-            if not raw:
-                continue
-            # Resize escape is consumed locally, never written to the PTY.
-            match = _RESIZE_RE.match(raw)
-            if match and match.end() == len(raw):
-                session.bridge.resize(cols=int(match.group(1)), rows=int(match.group(2)))
-                continue
-            if not await session.write(ws, raw):
-                await _close_stalled_pty_input(ws, path="keepalive")
-                break
+        await _pump_keepalive_input(ws, session)
     except WebSocketDisconnect:
         pass
     finally:
