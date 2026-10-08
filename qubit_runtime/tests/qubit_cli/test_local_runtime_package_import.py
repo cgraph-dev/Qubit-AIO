@@ -10,7 +10,6 @@ already-loaded module since the release crashes ``qubit update``.
 import subprocess
 import sys
 
-import pytest
 
 _PROBE = (
     "import sys\n"
@@ -20,24 +19,11 @@ _PROBE = (
 )
 
 
-# PRODUCT GAP (Qubit fork): ``qubit_cli/local_runtime/__init__.py`` replaced
-# upstream's lazy PEP-562 re-export (``hermes_cli/local_runtime/__init__.py`` in
-# pin cbe5e53e defines ``_EXPORTS`` + ``__getattr__`` and imports nothing up
-# front) with EAGER ``from …local_runtime.<mod> import …`` lines. Importing
-# ``qubit_cli.local_runtime.processes`` now drags in every sibling submodule,
-# which is exactly the failure the lazy design exists to prevent: a shipped
-# updater imports ``…processes`` from the NEW checkout while its process still
-# holds stale first-party modules, so ``qubit update`` can crash on any name
-# added since the release. Do NOT fix product here.
-_LAZY_IMPORT_GAP = pytest.mark.xfail(
-    strict=False,
-    reason="PRODUCT GAP: qubit_cli/local_runtime/__init__.py eagerly imports every "
-    "submodule where upstream pin cbe5e53e uses a lazy __getattr__ re-export; "
-    "importing …processes runs the whole package (breaks qubit update).",
-)
-
-
-@_LAZY_IMPORT_GAP
+# The lazy PEP-562 re-export (``_EXPORTS`` + ``__getattr__``, importing nothing
+# up front) is now in place: importing ``qubit_cli.local_runtime.processes`` no
+# longer drags in every sibling submodule, so a shipped updater that imports it
+# from the NEW checkout while its process still holds stale first-party modules
+# no longer crashes ``qubit update`` on any name added since the release.
 def test_processes_import_runs_no_other_local_runtime_module():
     out = subprocess.run([sys.executable, "-c", _PROBE], capture_output=True, text=True, check=True).stdout
     assert out.split() == ["qubit_cli.local_runtime.processes"]
