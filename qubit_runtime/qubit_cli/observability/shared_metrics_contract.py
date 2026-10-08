@@ -425,6 +425,26 @@ UPDATE_STOP_CLASSES = frozenset({
 })
 UPDATE_FAILURE_CLASSES |= UPDATE_STOP_CLASSES
 # ---- end iuf c1 ----
+# ---- iuf c2 ----
+# One fresh-install run of scripts/install.sh / install.ps1, from the local receipt the installer
+# leaves (the installer itself never sends); counted by a later Qubit start while collection is on.
+INSTALL_RUN_MARK = INSTALL_RUN_METRIC = "qubit.install.run"
+INSTALL_RUN_INSTALLERS = frozenset({"install_ps1", "install_sh", "other"})
+INSTALL_RUN_OUTCOMES = frozenset({"failed", "success"})
+# The installers' stage_names / $Stages ladder (hyphens as underscores).
+INSTALL_RUN_STAGES = frozenset({
+    "complete", "config", "gateway", "prerequisites", "products", "python_deps", "repository", "setup", "venv",
+})
+INSTALL_RUN_FAILED_STAGES = INSTALL_RUN_STAGES | {"none", "other"}
+# The code each installer fail()/Fail call site passes; `none` on success.
+INSTALL_RUN_FAILURE_CLASSES = frozenset({
+    "commit_not_on_branch", "curl_missing", "deps_install_failed", "dir_not_checkout", "download_digest_mismatch",
+    "download_failed", "filesystem_error", "gateway_failed", "git_checkout_failed", "git_clone_failed",
+    "git_extract_failed", "git_fetch_failed", "git_missing", "git_reset_failed", "interrupted",
+    "libstdcxx_missing", "local_changes_blocked", "none", "other", "products_build_failed",
+    "python_install_failed", "setup_failed", "unsupported_platform", "uv_unusable",
+})
+# ---- end iuf c2 ----
 _UPDATE_DURATION_THRESHOLDS = (
     (30_000, "lt_30s"), (120_000, "30s_to_2m"), (300_000, "2m_to_5m"), (900_000, "5m_to_15m"),
 )
@@ -1009,6 +1029,26 @@ UPDATE_STOP_CLASSES = frozenset({
 })
 UPDATE_FAILURE_CLASSES |= UPDATE_STOP_CLASSES
 # ---- end iuf c1 ----
+# ---- iuf c2 ----
+# One fresh-install run of scripts/install.sh / install.ps1, from the local receipt the installer
+# leaves (the installer itself never sends); counted by a later Qubit start while collection is on.
+INSTALL_RUN_MARK = INSTALL_RUN_METRIC = "qubit.install.run"
+INSTALL_RUN_INSTALLERS = frozenset({"install_ps1", "install_sh", "other"})
+INSTALL_RUN_OUTCOMES = frozenset({"failed", "success"})
+# The installers' stage_names / $Stages ladder (hyphens as underscores).
+INSTALL_RUN_STAGES = frozenset({
+    "complete", "config", "gateway", "prerequisites", "products", "python_deps", "repository", "setup", "venv",
+})
+INSTALL_RUN_FAILED_STAGES = INSTALL_RUN_STAGES | {"none", "other"}
+# The code each installer fail()/Fail call site passes; `none` on success.
+INSTALL_RUN_FAILURE_CLASSES = frozenset({
+    "commit_not_on_branch", "curl_missing", "deps_install_failed", "dir_not_checkout", "download_digest_mismatch",
+    "download_failed", "filesystem_error", "gateway_failed", "git_checkout_failed", "git_clone_failed",
+    "git_extract_failed", "git_fetch_failed", "git_missing", "git_reset_failed", "interrupted",
+    "libstdcxx_missing", "local_changes_blocked", "none", "other", "products_build_failed",
+    "python_install_failed", "setup_failed", "unsupported_platform", "uv_unusable",
+})
+# ---- end iuf c2 ----
 _UPDATE_DURATION_THRESHOLDS = (
     (30_000, "lt_30s"), (120_000, "30s_to_2m"), (300_000, "2m_to_5m"), (900_000, "5m_to_15m"),
 )
@@ -1444,6 +1484,13 @@ _COUNTER_DIMENSION_VALUES: dict[str, dict[str, frozenset[str]]] = {
         "skill_count_bucket": SIZE_BUCKETS, "terminal_backend": TERMINAL_BACKENDS,
         **_INSTALL_V4_SNAPSHOT_DIMENSIONS,
     },
+    # ---- iuf c2 ----
+    INSTALL_RUN_METRIC: {
+        "duration_bucket": UPDATE_DURATION_BUCKETS, "failed_stage": INSTALL_RUN_FAILED_STAGES,
+        "failure_class": INSTALL_RUN_FAILURE_CLASSES, "installer": INSTALL_RUN_INSTALLERS,
+        "outcome": INSTALL_RUN_OUTCOMES,
+    },
+    # ---- end iuf c2 ----
     SESSION_METRIC: {
         "active_duration_bucket": SESSION_DURATION_BUCKETS, "entrypoint": TASK_ENTRYPOINTS,
         "execution_surface": EXECUTION_SURFACES, "failed_turn_count_bucket": COUNT_BUCKETS,
@@ -1745,6 +1792,9 @@ _DECISION_MARK_METRICS = {
     TOOL_UNAVAILABLE_MARK: TOOL_UNAVAILABLE_METRIC, PROVIDER_SETUP_MARK: PROVIDER_SETUP_METRIC,
     FEATURE_DISABLED_MARK: FEATURE_DISABLED_METRIC,
     # ---- end v5 signals ----
+    # ---- iuf c2 ----
+    INSTALL_RUN_MARK: INSTALL_RUN_METRIC,
+    # ---- end iuf c2 ----
 }
 
 
