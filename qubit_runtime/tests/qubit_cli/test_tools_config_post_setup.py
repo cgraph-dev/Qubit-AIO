@@ -111,9 +111,9 @@ def test_importable_sdk_does_not_bypass_pm_constraints(monkeypatch, capsys, key,
     if refused:
         assert "outside frozen feature set" in output
         assert "Retry with: qubit tools" in output
-        assert "Restart Hermes" not in output
+        assert "Restart Qubit" not in output
     else:
-        assert "Restart Hermes" in output
+        assert "Restart Qubit" in output
 
 
 @pytest.mark.parametrize("failure", [None, "sdk", "admission"])
