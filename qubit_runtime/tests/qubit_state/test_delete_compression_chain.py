@@ -20,24 +20,7 @@ of them, but not all"). Invariants this module locks in:
    every other lineage and standalone row survives untouched.
 """
 
-import pytest
-
 from qubit_state import SessionDB
-
-# M6 Wave: frozen ad12263a5ed4's ``SessionDB.delete_sessions`` accepts
-# ``include_compression_chain`` (hermes_state_sessions.py:1784-1787) and expands each
-# selected id via ``_expand_compression_lineage``. Neither the kwarg nor the helper
-# exists in this checkout (qubit_state_sessions.py:1699 signature has only
-# session_ids/sessions_dir/exclude_active_write_guards/skipped_ids). PRODUCT gap:
-# the chain-aware dashboard delete (#57543) is unported, so every test here hits
-# ``TypeError: delete_sessions() got an unexpected keyword argument
-# 'include_compression_chain'``. Marked xfail (non-strict) to keep the suite green
-# and the gap visible; remove this marker once the product feature lands.
-pytestmark = pytest.mark.xfail(
-    reason="PRODUCT: qubit_state_sessions.delete_sessions lacks include_compression_chain "
-    "+ _expand_compression_lineage (frozen ad12263a5ed4 hermes_state_sessions.py:1784)",
-    strict=False,
-)
 
 
 def _make_chain(db, root="root", mid="mid", tip="tip"):
