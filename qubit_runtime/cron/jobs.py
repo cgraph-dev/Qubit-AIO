@@ -1662,6 +1662,17 @@ def _normalize_str_list(items: Any) -> Optional[List[str]]:
     return [str(j).strip() for j in items if str(j).strip()] or None
 
 
+def _normalize_enabled_toolsets(value: Any) -> Optional[List[str]]:
+    """Per-job toolset allowlist. An explicitly-set EMPTY list means 'nothing allowed' and must
+    persist as [] — normalizing it to None would read back as 'no restriction' (#82010). Absent
+    or None stays None (the unrestricted default); a non-list raises before anything is stored."""
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError("enabled_toolsets must be a list of toolset names (or [] for none).")
+    return [str(j).strip() for j in value if str(j).strip()]
+
+
 def _normalize_context_from(value: Any) -> Optional[List[str]]:
     """Accept a job id or a list of ids; anything else is None."""
     if isinstance(value, str):
@@ -1708,16 +1719,20 @@ _CREATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "script": _normalize_job_optional_text,
     "monitor_script": _normalize_job_optional_text,
     "monitor_url": _normalize_job_optional_text,
-    "enabled_toolsets": lambda v: _normalize_str_list(v) if v else None,
+    "enabled_toolsets": _normalize_enabled_toolsets,
     "workdir": _normalize_workdir,
     "no_agent": bool,
     "context_from": _normalize_context_from,
     "failure_deliver": _normalize_failure_deliver,
+    "interpreter": _normalize_job_optional_text,
 }
 _UPDATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
+    # [] is an explicit zero-tool allowlist and must survive the update path as [] too (#82010).
+    "enabled_toolsets": _normalize_enabled_toolsets,
     "workdir": lambda v: None if v in {None, "", False} else _normalize_workdir(v),
     "monitor_script": _normalize_job_optional_text,
     "monitor_url": _normalize_job_optional_text,
+    "interpreter": _normalize_job_optional_text,
     "reasoning_effort": _normalize_reasoning_effort,
 }
 
@@ -1789,6 +1804,7 @@ def create_job(
     paused: bool = False,
     paused_reason: Optional[str] = None,
     pinned: bool = False,
+    interpreter: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create a new cron job and return the stored record.
 
@@ -1797,7 +1813,9 @@ def create_job(
     delivered verbatim, requires ``script``). context_from: job id(s) whose latest output is
     injected. workdir: absolute cwd for tools/scripts. monitor_script/monitor_url: cheap monitor
     source run FIRST each tick; unchanged output suppresses the agent run (mutually exclusive,
-    incompatible with ``no_agent``). reasoning_effort: per-job pin; capability NOT validated."""
+    incompatible with ``no_agent``). reasoning_effort: per-job pin; capability NOT validated.
+    interpreter: absolute/``~`` Python for ``.py`` script/monitor_script, validated at run time
+    (a venv can be rebuilt or moved after creation)."""
     if not isinstance(paused, bool):
         raise ValueError("paused must be a boolean.")
     if paused_reason is not None and not isinstance(paused_reason, str):
@@ -1882,7 +1900,7 @@ def create_job(
     # jobs.
     for key, value in (
         ("attach_to_session", normalized_attach), ("reasoning_effort", normalized_reasoning_effort),
-        ("failure_deliver", f["failure_deliver"]),
+        ("failure_deliver", f["failure_deliver"]), ("interpreter", f["interpreter"]),
     ):
         if value is not None:
             job[key] = value

@@ -9,16 +9,12 @@ from __future__ import annotations
 
 import pytest
 
-# PRODUCT GAP (recorded, not fixed here): cron/jobs.py is a short-port of the frozen
-# revision. Its `_normalize` map (qubit_runtime/cron/jobs.py:1711) uses
-# `lambda v: _normalize_str_list(v) if v else None`, which collapses an explicit
-# `enabled_toolsets=[]` to None -- the exact #82010 widening bug. Frozen upstream
-# defines `_normalize_enabled_toolsets` (cron/jobs.py:1701) that preserves `[]`.
-# Same file also lacks the `interpreter` kwarg that tools/cronjob_tools.py:696 passes.
-# The three xfailed tests below expose it; drop the marks when cron/jobs.py is re-ported.
-_prod_gap = pytest.mark.xfail(
-    reason="cron/jobs.py short-port of ad12263a5ed4 (#82010 []->None normalizer; "
-           "missing interpreter kwarg)", strict=False)
+# The three tests below exposed three recorded product gaps against the frozen revision:
+# cron/jobs.py:1711 collapsed an explicit `enabled_toolsets=[]` to None (#82010); the same file
+# lacked the `interpreter` kwarg that tools/cronjob_tools.py:696 passes; and
+# cron/scheduler.py:475 `if per_job:` treated a stored `[]` as absent and re-widened the job to
+# the platform default. All three are now fixed (ported 1:1 from ad12263a5ed4), so the marks are
+# dropped and these run as ordinary green assertions.
 
 
 @pytest.fixture
@@ -42,7 +38,6 @@ def qubit_env(tmp_path, monkeypatch):
     return home
 
 
-@_prod_gap
 def test_create_persists_explicit_empty_allowlist_and_survives_reload(qubit_env):
     import importlib
 
@@ -69,7 +64,6 @@ def test_update_path_preserves_explicit_empty_allowlist(qubit_env):
     assert updated is not None and updated["enabled_toolsets"] == []
 
 
-@_prod_gap
 def test_scheduler_resolves_explicit_empty_as_zero_toolsets(qubit_env):
     from cron.scheduler import _resolve_cron_enabled_toolsets
 
@@ -79,7 +73,6 @@ def test_scheduler_resolves_explicit_empty_as_zero_toolsets(qubit_env):
     assert _resolve_cron_enabled_toolsets({}, {})
 
 
-@_prod_gap
 def test_cronjob_tool_roundtrip_preserves_explicit_empty(qubit_env):
     """The reporter's exact path: cronjob create with enabled_toolsets=[] from a session."""
     import json
