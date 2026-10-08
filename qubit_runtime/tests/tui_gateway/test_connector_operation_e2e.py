@@ -123,7 +123,7 @@ class FakeConnectorClient:
 
 @pytest.fixture
 def owned_session(monkeypatch, tmp_path):
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "qubit-home"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
     reset_session_vars()

@@ -41,8 +41,8 @@ NEW_URL = "https://new-endpoint.invalid/v1"
 @pytest.fixture()
 def live_home(monkeypatch):
     """A REAL isolated QUBIT_HOME with a config.yaml + state.db on disk."""
-    tmp = Path(tempfile.mkdtemp(prefix="hermes-live-staleprov-"))
-    home = tmp / ".hermes"
+    tmp = Path(tempfile.mkdtemp(prefix="qubit-live-staleprov-"))
+    home = tmp / ".qubit"
     home.mkdir(parents=True)
     config = {
         "model": {"default": "test-model-live", "provider": "custom:newone"},
