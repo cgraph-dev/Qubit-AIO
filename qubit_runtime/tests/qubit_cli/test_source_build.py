@@ -60,8 +60,8 @@ def test_source_build_uses_selected_python_for_isolated_icon_child(tmp_path, mon
     monkeypatch.syspath_prepend(str(selected))
 
     env = source_build_env()
-    assert env["QUBIT_PYTHON"] == str(venv_python(venv))
-    subprocess.run([env["QUBIT_PYTHON"], "-I", "-c",
+    assert env["HERMES_PYTHON"] == str(venv_python(venv))
+    subprocess.run([env["HERMES_PYTHON"], "-I", "-c",
                     "import icon_dependency; assert icon_dependency.ready"], check=True)
 
 
@@ -82,7 +82,7 @@ def test_installed_npm_does_not_authorize_missing_workspace_dependencies(source_
 
     root, _ = source_checkout
     env = source_build_env()
-    monkeypatch.setenv("QUBIT_DISABLE_LAZY_INSTALLS", "1")
+    monkeypatch.setenv("HERMES_DISABLE_LAZY_INSTALLS", "1")
     with pytest.raises(subprocess.CalledProcessError):
         prepare_source_dependencies(root, ("ui-tui", "web"), env=env)
     assert _events(root) == []
@@ -99,11 +99,11 @@ def source_checkout(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setenv("QUBIT_RUNTIME_DIR", str(tmp_path / "tools"))
-    monkeypatch.setenv("QUBIT_DISABLE_LAZY_INSTALLS", "0")
+    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "tools"))
+    monkeypatch.setenv("HERMES_DISABLE_LAZY_INSTALLS", "0")
     monkeypatch.setenv("npm_config_cache", str(tmp_path / "npm-cache"))
     monkeypatch.setenv("ESBUILD_BINARY_PATH", "/wrong/esbuild")
-    monkeypatch.setenv("QUBIT_PYTHON", "/wrong/python")
+    monkeypatch.setenv("HERMES_PYTHON", "/wrong/python")
     (home / "npmrc").write_text("fund=false\n", encoding="utf-8")
     monkeypatch.delenv("NPM_CONFIG_USERCONFIG", raising=False)
     acquired = []
@@ -135,7 +135,7 @@ def source_checkout(tmp_path, monkeypatch):
     (root / "log.mjs").write_text(
         "import { appendFileSync } from 'node:fs';\n"
         "appendFileSync('events.jsonl', JSON.stringify({step: process.argv[2], "
-        "python: process.env.QUBIT_PYTHON, ci: process.env.CI, "
+        "python: process.env.HERMES_PYTHON, ci: process.env.CI, "
         "esbuild: process.env.ESBUILD_BINARY_PATH, "
         "npmrc: process.env.NPM_CONFIG_USERCONFIG}) + '\\n');\n",
         encoding="utf-8",
@@ -190,7 +190,7 @@ def source_products(source_checkout):
         "import { build } from '../../product.mjs';\n"
         "const flag = '-c.directories.output=';\n"
         "const staging = process.argv.find(arg => arg.startsWith(flag)).slice(flag.length);\n"
-        "build('desktop', relative('../..', staging) + '/linux-unpacked/qubit');\n",
+        "build('desktop', relative('../..', staging) + '/linux-unpacked/hermes');\n",
         encoding="utf-8",
     )
     (root / "scripts/build/build-desktop.mjs").write_text(
@@ -218,7 +218,7 @@ def test_preparation_reuses_only_the_exact_completed_workspace_union(source_chec
     prepare_source_dependencies(root, ("ui-tui", "web"), env=env)
     first = _events(root)
     assert [event["step"] for event in first] == ["deps"]
-    assert first[0]["python"] == env["QUBIT_PYTHON"]
+    assert first[0]["python"] == env["HERMES_PYTHON"]
     assert first[0]["ci"] == "1"
     assert "esbuild" not in first[0]
     assert first[0]["npmrc"] == str(Path(os.environ["QUBIT_HOME"]) / "npmrc")
@@ -259,7 +259,7 @@ def test_update_builds_selected_products_after_one_union_preparation(source_prod
     from qubit_cli.main_web_build import _web_ui_build_needed
 
     root, acquired = source_products
-    app = root / "apps/desktop/release/linux-unpacked/qubit"
+    app = root / "apps/desktop/release/linux-unpacked/hermes"
     app.parent.mkdir(parents=True)
     app.write_text("previous app")
     build_update_products(root, desktop=desktop)
@@ -299,21 +299,55 @@ def test_update_recompiles_only_products_whose_inputs_changed(source_products):
 @pytest.mark.platforms("linux")
 @pytest.mark.parametrize("step", ["tui", "web", "desktop"])
 def test_update_failure_raises_without_retries_or_replacing_live_app(source_products, step):
-    from qubit_cli.source_build import build_update_products
+    from qubit_cli.source_build import ProductBuildError, build_update_products
 
     root, acquired = source_products
-    app = root / "apps/desktop/release/linux-unpacked/qubit"
+    app = root / "apps/desktop/release/linux-unpacked/hermes"
     app.parent.mkdir(parents=True)
     app.write_text("previous app")
     (root / f"fail-{step}").touch()
-    with pytest.raises(subprocess.CalledProcessError):
+    with pytest.raises(ProductBuildError) as failure:
         build_update_products(root, desktop=True)
-    assert app.read_text() == "previous app"
-    assert not list((root / "apps/desktop").glob(".staging-*"))
-    order = ["deps", "tui", "web", "desktop"]
-    assert [event["step"] for event in _events(root)] == order[:order.index(step) + 1]
+    # The failure is still raised, naming the one product that failed (no retries) ...
+    assert len(failure.value.failures) == 1
+    assert isinstance(failure.value.failures[0][1], subprocess.CalledProcessError)
+    # ... but it no longer skips the independent products after it (was order[:index + 1]).
+    assert [event["step"] for event in _events(root)] == ["deps", "tui", "web", "desktop"]
     assert acquired == ["npm"]
-    assert not (Path(os.environ["QUBIT_HOME"]) / "desktop-build-stamp.json").exists()
+    assert not list((root / "apps/desktop").glob(".staging-*"))
+    if step == "desktop":
+        # A failed desktop build never replaces the live app nor stamps it.
+        assert app.read_text() == "previous app"
+        assert not (Path(os.environ["QUBIT_HOME"]) / "desktop-build-stamp.json").exists()
+
+
+@pytest.mark.platforms("linux")
+@pytest.mark.parametrize("failure", ["npm-unavailable", "desktop-after-long-feature-failure"])
+def test_unbuilt_desktop_is_named_on_one_whole_line(source_products, monkeypatch, capsys, failure):
+    # The Desktop hand-off keys on this line: the receipt follow-up is truncated and leads with
+    # whichever product failed first, and an npm acquisition failure used to escape un-named.
+    import qubit_cli.main_install_repair as install_repair
+    from qubit_cli.source_build import ProductBuildError, build_update_products
+
+    root, _ = source_products
+
+    def fail(error):
+        def raiser(*_args, **_kwargs):
+            raise error
+        return raiser
+
+    if failure == "npm-unavailable":
+        monkeypatch.setattr(pm, "ensure", fail(pm.InstallError("npm", "unavailable")))
+        expected = "Desktop app build owed: Node dependencies failed"
+    else:
+        monkeypatch.setattr(install_repair, "_install_configured_features_missing_deps",
+                            fail(RuntimeError("pip install failed: " + "x" * 600)))
+        (root / "fail-desktop").touch()
+        expected = "Desktop app build owed: desktop app build failed"
+    with pytest.raises(ProductBuildError):
+        build_update_products(root, desktop=True)
+    lines = [line.strip() for line in capsys.readouterr().out.splitlines()]
+    assert [line for line in lines if line.startswith("Desktop app build owed:")] == [expected]
 
 
 @pytest.mark.platforms("linux")
@@ -328,7 +362,7 @@ def test_module_cli_builds_the_requested_products(source_products, desktop, monk
     runpy.run_module("qubit_cli.source_build", run_name="__main__")
     assert acquired == ["npm"]
     assert (root / "qubit_cli/web_dist/index.html").is_file()
-    assert (root / "apps/desktop/release/linux-unpacked/qubit").exists() == desktop
+    assert (root / "apps/desktop/release/linux-unpacked/hermes").exists() == desktop
 
 
 @pytest.mark.platforms("posix")

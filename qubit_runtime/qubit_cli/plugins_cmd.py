@@ -822,6 +822,19 @@ def _default_on(dir_path, source: str) -> bool:
     return kind == "model-provider" or (source == "bundled" and kind in _BUNDLED_DEFAULT_ON_KINDS)
 
 
+def _bundled_default_on(dir_path) -> bool:
+    """True when a bundled plugin is active without a ``plugins.enabled`` entry (portable
+    ``plugin.json`` packages have no kind, so never)."""
+    manifest_file = _native_manifest_file(Path(dir_path))
+    if manifest_file is None:
+        return False
+    try:
+        kind = str(_load_yaml_manifest(manifest_file).get("kind", "standalone")).strip().lower()
+        return kind in _BUNDLED_DEFAULT_ON_KINDS
+    except Exception:
+        return False
+
+
 def _scan_level(base: Path, source: str, skip_names: set, prefix: str, depth: int, seen: dict) -> None:
     """Recursive directory scan matching PluginManager._scan_directory_level."""
     if not base.is_dir():
