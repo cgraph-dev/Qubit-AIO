@@ -25,26 +25,6 @@ def db(tmp_path):
     d.close()
 
 
-
-
-
-# PRODUCT GAP (Qubit fork): ``qubit_state_portability.py``
-# ``_normalize_import_session`` (line 465) dropped upstream pin cbe5e53e's value
-# validation (upstream lines 581-595 + helpers ``_import_non_finite_path`` and
-# the ``_SQLITE_INT_MIN/MAX`` range guard): it no longer rejects non-finite
-# floats in the session/``model_config``/reasoning-JSON fields, integers outside
-# SQLite's signed-64-bit range, or oversized scalar/token_count payloads.
-# ``import_sessions`` therefore ACCEPTS the bad payload and either persists
-# ``inf``/NaN or raises ``OverflowError`` at sqlite3 bind. Do NOT fix product
-# here — recorded for the sync owner.
-_IMPORT_VALIDATION_GAP = pytest.mark.xfail(
-    strict=False,
-    reason="PRODUCT GAP (#63954): qubit_state_portability._normalize_import_session "
-    "omits upstream's non-finite / SQLite-range / oversize import validation; "
-    "unsafe payloads are accepted.",
-)
-
-
 def _payload(session_id: str, **overrides) -> dict:
     session = {"id": session_id, "messages": [{"role": "user", "content": "hello"}]}
     session.update(overrides)
@@ -62,7 +42,6 @@ def _rejected(db: SessionDB, session: dict) -> str:
     return error
 
 
-@_IMPORT_VALIDATION_GAP
 def test_import_rejects_non_finite_session_floats(db):
     for field in ("started_at", "ended_at", "estimated_cost_usd", "actual_cost_usd"):
         # 1e309 decodes to float('inf'); NaN arrives the same way (json NaN syntax).
@@ -71,7 +50,6 @@ def test_import_rejects_non_finite_session_floats(db):
             assert "non-finite" in error or "timestamp" in error, (field, error)
 
 
-@_IMPORT_VALIDATION_GAP
 def test_import_rejects_non_finite_nested_model_config(db):
     error = _rejected(db, _payload("nested", model_config='{"temperature": 1e309}'))
     assert "non-finite number at session.model_config" in error
@@ -80,7 +58,6 @@ def test_import_rejects_non_finite_nested_model_config(db):
     assert "non-finite" in error
 
 
-@_IMPORT_VALIDATION_GAP
 def test_import_rejects_non_finite_reasoning_json(db):
     session = _payload(
         "reasoning",
@@ -91,7 +68,6 @@ def test_import_rejects_non_finite_reasoning_json(db):
     assert "non-finite number at session.messages[0].reasoning_details" in error
 
 
-@_IMPORT_VALIDATION_GAP
 def test_import_rejects_int_columns_outside_sqlite_range(db):
     huge = 1 << 63
     for field in ("input_tokens", "output_tokens", "api_call_count", "cache_read_tokens",
@@ -99,7 +75,6 @@ def test_import_rejects_int_columns_outside_sqlite_range(db):
         assert "outside SQLite's integer range" in _rejected(db, _payload(f"huge-{field}", **{field: huge})), field
 
 
-@_IMPORT_VALIDATION_GAP
 def test_import_rejects_oversized_scalar_message_content(db):
     error = _rejected(db, _payload("huge-content", messages=[
         {"role": "user", "content": 1 << 63}]))
@@ -109,7 +84,6 @@ def test_import_rejects_oversized_scalar_message_content(db):
     assert "non-finite number at session.messages[0].content" in error
 
 
-@_IMPORT_VALIDATION_GAP
 def test_import_rejects_oversized_token_count_and_bad_message_timestamp(db):
     assert "token_count" in _rejected(db, _payload("huge-tokens", messages=[
         {"role": "user", "content": "hi", "token_count": 1 << 63}]))
