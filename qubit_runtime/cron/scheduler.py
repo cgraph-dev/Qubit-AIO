@@ -3833,8 +3833,23 @@ def _run_external_worker_payload(payload_path: Path, ack_path: Path) -> bool:
         home_token = set_qubit_home_override(profile_home)
         multiplex_active = bool(payload.get("multiplex_active", False))
         set_multiplex_active(multiplex_active)
+        # Plugin secret sources (``ctx.register_secret_source()``) only exist after plugin
+        # discovery; this process starts with the builtin registry alone, so hydrating without it
+        # silently dropped every plugin-sourced credential (#121929). Runs under the home override
+        # so a multiplexed worker loads the OWNING profile's plugins, not the launch profile's.
+        from qubit_cli.plugins import discover_plugins
+
+        discover_plugins()
         hydrate_profile_secret_sources(profile_home)
         secret_token = set_secret_scope(build_profile_secret_scope(profile_home), profile_home=str(profile_home))
+        # This process never ran gateway startup, so the OWNING profile's ``hooks:`` block (shell
+        # hooks + ``hooks.outbound``) was never registered and cron sessions silently lost it
+        # (#131764). Same helper the gateway uses per profile; it must run inside the secret scope
+        # because ``secret_env`` targets resolve through ``get_secret`` (raises unscoped under multiplex).
+        from gateway.run_startup import GatewayStartupMixin
+
+        GatewayStartupMixin._register_config_hooks(
+            "Cron external worker: config hook registration failed", level=logging.WARNING)
         with use_cron_store(profile_home):
             if adopt_claimed_execution(execution_id) is None:
                 logger.error(
