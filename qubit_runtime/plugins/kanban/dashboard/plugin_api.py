@@ -69,8 +69,14 @@ def _resolve_board(board: Optional[str]) -> Optional[str]:
     if board is None or board == "":
         return None
     normed = _normalize_slug_or_400(board)
-    if normed and normed != kanban_db.DEFAULT_BOARD and not kanban_db.board_exists(normed):
-        raise HTTPException(status_code=404, detail=f"board {normed!r} does not exist")
+    if normed and normed != kanban_db.DEFAULT_BOARD:
+        if not kanban_db.board_exists(normed):
+            raise HTTPException(status_code=404, detail=f"board {normed!r} does not exist")
+        # An archived board has a tombstone board.json; it must not be openable
+        # (connect() would refuse anyway) — a stale dashboard tab gets a clean
+        # 404 instead of a resurrection or a 500 (#43243).
+        if kanban_db.read_board_metadata(normed).get("archived"):
+            raise HTTPException(status_code=404, detail=f"board {normed!r} is archived")
     return normed
 
 
@@ -335,8 +341,13 @@ def get_board(
 
         # Queue columns keep list_tasks' dispatch order (priority DESC, created_at ASC).
         tenants = [r["tenant"] for r in conn.execute("SELECT DISTINCT tenant FROM tasks WHERE tenant IS NOT NULL ORDER BY tenant")]
-        assignees = [r["assignee"] for r in conn.execute(
-            "SELECT DISTINCT assignee FROM tasks WHERE assignee IS NOT NULL AND status != 'archived' ORDER BY assignee")]
+        # List of known assignees for the lane-by-profile sub-grouping.
+        # Uses kanban_db.known_assignees so the lane set unions profiles
+        # currently holding non-archived tasks with profiles configured on
+        # disk — a freshly-added profile shows up as a (possibly empty)
+        # lane immediately, matching the assignee picker at /assignees
+        # which already uses this helper.
+        assignees = [entry["name"] for entry in kanban_db.known_assignees(conn)]
         return {
             "columns": [{"name": name, "tasks": columns[name]} for name in columns], "tenants": tenants,
             "assignees": assignees, "latest_event_id": int(latest_event_id), "now": int(time.time())}
@@ -1713,6 +1724,19 @@ def _ws_board(raw: Optional[str]) -> Optional[str]:
         return None
 
 
+def _ws_board_live(normed: Optional[str]) -> Optional[str]:
+    """Require an already-normalised slug to name a *live* board.
+
+    A stale dashboard tab can keep its old board slug around after the board
+    was archived or deleted; the event stream must reject it instead of handing
+    it to ``connect(board=slug)``, which would resurrect an empty board (#43243).
+    Returns ``None`` when the board is unknown/archived.
+    """
+    if not normed or normed == kanban_db.DEFAULT_BOARD:
+        return normed
+    return normed if kanban_db.board_exists(normed) else None
+
+
 class _EventTail:
     """Per-socket ``task_events`` tailer. One SQLite connection, used/closed only on a
     dedicated single-thread executor (connections are thread-affine); reusing it avoids
@@ -1783,7 +1807,14 @@ async def stream_events(ws: WebSocket):
     await ws.accept()
     # Board is pinned at the handshake; the UI opens a new WS on board change
     # rather than reconciling two cursors mid-stream.
-    tail = _EventTail(_ws_board(ws.query_params.get("board")))
+    raw_board = _ws_board(ws.query_params.get("board"))
+    board = _ws_board_live(raw_board)
+    if raw_board is not None and board is None:
+        # Stale tab: the slug names an archived or deleted board. Close the
+        # stream instead of connecting, which would resurrect the board (#43243).
+        await ws.close(code=http_status.WS_1008_POLICY_VIOLATION)
+        return
+    tail = _EventTail(board)
     since = _since_param(ws)
     try:
         # Capture the tail at accept, before the first wait, so an event that
