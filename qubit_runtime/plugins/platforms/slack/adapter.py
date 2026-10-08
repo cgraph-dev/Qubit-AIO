@@ -1675,8 +1675,13 @@ class SlackAdapter(BasePlatformAdapter):
 
         @self._app.command(_slash_pattern)
         async def handle_qubit_command(ack, command):
-            slash = (command.get("command") or "").lstrip("/")
-            await ack(response_type="ephemeral", text=t("platform.slack.slash.running", command=slash))
+            # Bolt listener for every native slash: ack within 3s, then run. A gated channel gets a
+            # bare ack, never a "Running /x" promise the gate in _handle_slash_command will break.
+            if self._slash_channel_gated(command.get("channel_id", "")):
+                await ack()
+            else:
+                slash = (command.get("command") or "").lstrip("/")
+                await ack(response_type="ephemeral", text=t("platform.slack.slash.running", command=slash))
             await self._handle_slash_command(command)
 
         # Approval buttons, slash-confirm buttons (tools/slash_confirm.py), feedback.
@@ -6042,6 +6047,15 @@ class SlackAdapter(BasePlatformAdapter):
             logger.debug("[Slack] Thread-root image recovery failed: %s", exc)
         return media_urls, media_types
 
+    def _slash_channel_gated(self, channel_id: str) -> bool:
+        """The message path's channel gates (_prefilter_inbound, _channel_gate_allows) for a slash
+        command: ignored channels are never touched, and outside allowed_channels only a 1:1 DM is
+        answered. By id alone, so no lookup can drop a control command."""
+        if self._is_ignored_channel(channel_id):
+            return True
+        allowed_channels = self._slack_allowed_channels()
+        return bool(allowed_channels) and not str(channel_id).startswith("D") and channel_id not in allowed_channels
+
     async def _handle_slash_command(self, command: dict) -> None:
         """Slash commands: native ``/<command> [args]`` for every COMMAND_REGISTRY entry, or
         ``/qubit <subcommand> [args]``; other text after ``/qubit`` is a regular message."""
@@ -6052,6 +6066,9 @@ class SlackAdapter(BasePlatformAdapter):
             self._remember_channel_team(channel_id, team_id)
         text = self._slash_command_text(command)
         thread_id = self._slash_thread_id(command)
+        if self._slash_channel_gated(channel_id):
+            logger.debug("[Slack] Ignoring slash command in ignored/non-allowed channel: %s", channel_id)
+            return
         is_dm = str(channel_id).startswith("D")
         if is_dm and self._slack_disable_dms():
             logger.info(
