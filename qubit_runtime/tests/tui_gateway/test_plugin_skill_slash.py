@@ -7,11 +7,7 @@ profile scope must bind the real ``qubit_constants`` home override for A->B->A t
 import tui_gateway.server as server
 import pytest
 
-_prod_gap_ps = pytest.mark.xfail(reason="commands.catalog returns empty skills {} -- plugin skills do not reach the TUI slash menu", strict=False)
 
-
-
-@_prod_gap_ps
 def test_plugin_skills_reach_tui_slash_menu_and_stack_per_profile(tmp_path, monkeypatch):
     """``ctx.register_skill`` skills are offered and dispatched as ``/plugin:skill`` in the
     TUI/Desktop slash menu, scoped to the session's profile, and a stacked

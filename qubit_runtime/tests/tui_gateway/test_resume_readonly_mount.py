@@ -14,9 +14,6 @@ import pytest
 from qubit_state import SessionDB
 from tui_gateway import server
 
-_prod_gap_rr = pytest.mark.xfail(reason="mounting a finalized session reopens its row (ended_at=None) -- #85303", strict=False)
-
-
 
 def _frames(out: io.StringIO) -> list[dict]:
     return [json.loads(line) for line in out.getvalue().splitlines() if line.strip()]
@@ -60,7 +57,6 @@ def _mount(monkeypatch, db, home, tmp_path, *, defer_history=False):
 
 
 @pytest.mark.parametrize("defer_history", [False, True])
-@_prod_gap_rr
 def test_resume_mount_keeps_finalized_row_ended(tmp_path, monkeypatch, defer_history):
     db, home = _finalized_db(tmp_path)
     events, built = _mount(monkeypatch, db, home, tmp_path)
@@ -85,7 +81,6 @@ def test_resume_mount_keeps_finalized_row_ended(tmp_path, monkeypatch, defer_his
         db.close()
 
 
-@_prod_gap_rr
 def test_lazy_watch_mount_keeps_finalized_row_ended(tmp_path, monkeypatch):
     db, home = _finalized_db(tmp_path)
     events, built = _mount(monkeypatch, db, home, tmp_path)
@@ -135,7 +130,6 @@ def test_reopen_if_finalized_leaves_live_rows_untouched(tmp_path):
     db.close()
 
 
-@_prod_gap_rr
 def test_isolated_dispatch_reopens_a_finalized_row(tmp_path, monkeypatch):
     """The compute-host seam: prompt.submit returns BEFORE its persist on an isolated turn
     (the child process runs the turn), so the reopen must live on the dispatch path every
@@ -176,7 +170,6 @@ def test_isolated_dispatch_reopens_a_finalized_row(tmp_path, monkeypatch):
         db.close()
 
 
-@_prod_gap_rr
 def test_compute_host_child_turn_reopens_a_finalized_row(tmp_path, monkeypatch):
     """The child-process half: the compute host builds its own session record and runs
     ``_run_prompt_submit`` directly, so the reopen at the dispatch seam fires there too —

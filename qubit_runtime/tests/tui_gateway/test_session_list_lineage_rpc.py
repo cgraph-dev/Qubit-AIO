@@ -16,8 +16,6 @@ import tui_gateway.server as srv
 import tui_gateway.methods_session  # noqa: F401  (registers the RPC methods)
 from qubit_state import SessionDB
 
-_prod_gap_sl = pytest.mark.xfail(reason="RPC session.list rows omit _lineage_root_id (methods_session.py) -- #66663", strict=False)
-
 
 
 @pytest.fixture
@@ -50,7 +48,6 @@ def _seed_compressed_conversation(db) -> None:
     db._conn.commit()
 
 
-@_prod_gap_sl
 def test_session_list_projects_lineage_root_id(db):
     """The RPC row summary must forward the projected tip's lineage root, like REST."""
     _seed_compressed_conversation(db)
