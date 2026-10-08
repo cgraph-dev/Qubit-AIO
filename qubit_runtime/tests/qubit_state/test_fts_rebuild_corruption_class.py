@@ -15,23 +15,6 @@ import pytest
 from qubit_state import SessionDB
 
 
-# PRODUCT GAP (Qubit fork): ``qubit_state_search.py`` ``rebuild_fts`` (line
-# 1324) and ``optimize_fts`` (line 1289) catch only ``sqlite3.OperationalError``.
-# SQLITE_CORRUPT — ``sqlite3.DatabaseError("database disk image is malformed")``
-# — is a SIBLING of OperationalError, not a subclass, so the corruption the
-# recovery path exists to handle escapes the per-index loop and propagates.
-# Upstream pin cbe5e53e catches ``sqlite3.DatabaseError`` and uses
-# ``is_malformed_db_error(exc)`` (hermes_state_search.py lines 1291, 1330) — the
-# helper ``qubit_state_errors.is_malformed_db_error`` exists in Qubit but is
-# never called here. Do NOT fix product here — recorded for the sync owner.
-pytestmark = pytest.mark.xfail(
-    strict=False,
-    reason="PRODUCT GAP (#133375): qubit_state_search.rebuild_fts/optimize_fts catch only "
-    "OperationalError, so the SQLITE_CORRUPT DatabaseError class they exist to "
-    "recover from escapes and propagates.",
-)
-
-
 @pytest.fixture
 def db(tmp_path):
     d = SessionDB(db_path=tmp_path / "state.db")
