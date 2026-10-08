@@ -23,12 +23,15 @@ import os
 import sys
 import threading
 import time
+from typing import TYPE_CHECKING
 
 import cli as cli_mod
-from cli import QubitCLI as HermesCLI
 from tui_gateway._env import env_float
 from tui_gateway._stdin_recovery import handle_spurious_eof
 from rich.console import Console
+
+if TYPE_CHECKING:
+    from cli import QubitCLI as HermesCLI
 
 # Env-overridable so the integration test can drive sub-second timing.
 _WATCHDOG_POLL_S = max(0.05, env_float("HERMES_SLASH_WATCHDOG_POLL_S", 2.0))
@@ -112,7 +115,7 @@ def _refuse_skill_slash(command: str) -> None:
         raise SkillSlashRefused(base)
 
 
-def _run(cli: HermesCLI, command: str) -> str:
+def _run(cli: "HermesCLI", command: str) -> str:
     cmd = (command or "").strip()
     if not cmd:
         return ""
@@ -149,6 +152,7 @@ def main():
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument("--session-key", required=True)
     p.add_argument("--model", default="")
+    p.add_argument("--provider", default="")
     p.add_argument("--parent-pid", type=int, default=0)
     args = p.parse_args()
     os.environ["HERMES_SESSION_KEY"] = args.session_key
@@ -156,9 +160,18 @@ def main():
     # Start before the (hundreds-of-ms) HermesCLI build — that window is itself an orphan risk if the
     # gateway dies mid-spawn.
     _start_parent_death_watchdog(_watchdog_parent(args.parent_pid, is_windows=sys.platform == "win32"))
+    # Keep the heavyweight CLI import behind the watchdog (importing it at module
+    # load left a reparenting window before main() could snapshot PPID), but ahead
+    # of MCP discovery: importing cli loads ~/.hermes/.env and sets HERMES_QUIET,
+    # which MCP ``${VAR}`` interpolation in the runtime prep depends on.
+    from cli import QubitCLI as HermesCLI
     _prepare_slash_worker_runtime()
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-        cli = HermesCLI(model=args.model or None, compact=True, resume=args.session_key, verbose=False)
+        # --provider pins the CLI to the parent agent's resolved provider (a MoA session's virtual
+        # "moa" provider included). Without it HermesCLI re-resolves from config and dispatches the
+        # MoA preset NAME to the configured real provider (#57283).
+        cli = HermesCLI(model=args.model or None, provider=args.provider or None,
+                        compact=True, resume=args.session_key, verbose=False)
     # Spurious stdin-EOF recovery (same shared-file-description O_NONBLOCK issue as the gateway entry
     # point — any child inheriting fd 0 can flip the flag).
     _sw_recovery_times: list[float] = []
