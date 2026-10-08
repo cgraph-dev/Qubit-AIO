@@ -1015,6 +1015,42 @@
       }
     },
     {
+      "name": "free_tier.challenge_result",
+      "summary": "Report a browser window outcome for the matching pending attempt; mint remains authoritative.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/FreeTierChallengeResultParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/FreeTierChallengeResult"
+        }
+      }
+    },
+    {
+      "name": "free_tier.claim_nudge",
+      "summary": "Claim the due sign-in offer; true for exactly one caller each time an offer comes due.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ProfileParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/FreeTierClaimNudgeResult"
+        }
+      }
+    },
+    {
       "name": "free_tier.provision",
       "summary": "Explicit retry of the free-tier identity mint when the boot bootstrap could not create it.",
       "params": [
@@ -1969,6 +2005,60 @@
       }
     },
     {
+      "name": "onboarding.ensure_setup_session",
+      "summary": "",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OnboardingEnsureSetupSessionParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OnboardingEnsureSetupSessionResult"
+        }
+      }
+    },
+    {
+      "name": "onboarding.mark_seen",
+      "summary": "",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/Params"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OnboardingStateResult"
+        }
+      }
+    },
+    {
+      "name": "onboarding.record_failed_start",
+      "summary": "",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/Params"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OnboardingStateResult"
+        }
+      }
+    },
+    {
       "name": "onboarding.reset_setup_profile",
       "summary": "Restore the setup profile to its created state in place (soul, memories, skills, sessions).",
       "params": [
@@ -1983,6 +2073,24 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/OnboardingResetSetupProfileResult"
+        }
+      }
+    },
+    {
+      "name": "onboarding.state",
+      "summary": "",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/Params"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OnboardingStateResult"
         }
       }
     },
@@ -3477,6 +3585,24 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/SessionSetHiddenResult"
+        }
+      }
+    },
+    {
+      "name": "session.start_chat",
+      "summary": "Run a start_chat request again from the session that made it (the handoff card's Retry).",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SessionStartChatParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SessionStartChatResult"
         }
       }
     },
@@ -9520,6 +9646,17 @@
             ],
             "default": null,
             "title": "Skill"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstallPhase"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -13941,6 +14078,120 @@
         "title": "FreeTierAckNoticeResult",
         "type": "object"
       },
+      "FreeTierChallengePayload": {
+        "additionalProperties": true,
+        "description": "``qubit_cli/anon_challenge.py::BrowserChallenge.as_payload``: the ``free_tier.challenge``\nevent, and ``free_tier.status``'s ``challenge`` field for a client that connected after it.",
+        "properties": {
+          "type": {
+            "const": "browser",
+            "title": "Type",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "attempt": {
+            "default": 0,
+            "title": "Attempt",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "url",
+          "required",
+          "expires_in",
+          "message"
+        ],
+        "title": "FreeTierChallengePayload",
+        "type": "object"
+      },
+      "FreeTierChallengeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accepted"
+        ],
+        "title": "FreeTierChallengeResult",
+        "type": "object"
+      },
+      "FreeTierChallengeResultParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "attempt": {
+            "default": 0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "outcome": {
+            "enum": [
+              "done",
+              "failed",
+              "closed",
+              "timeout",
+              "refused",
+              "error",
+              "unsupported"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "outcome"
+        ],
+        "title": "FreeTierChallengeResultParams",
+        "type": "object"
+      },
+      "FreeTierClaimNudgeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "claimed": {
+            "title": "Claimed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "claimed"
+        ],
+        "title": "FreeTierClaimNudgeResult",
+        "type": "object"
+      },
       "FreeTierProvisionResult": {
         "additionalProperties": false,
         "properties": {
@@ -14083,6 +14334,29 @@
             ],
             "default": null,
             "title": "Retry After"
+          },
+          "challenge": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FreeTierChallengePayload"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "nudge_due_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Nudge Due In"
           }
         },
         "required": [
@@ -16546,6 +16820,16 @@
         "title": "InsightsGetResult",
         "type": "object"
       },
+      "InstallPhase": {
+        "description": "The slow steps of an install, as ids; the desktop catalog card words them in its own language.",
+        "enum": [
+          "downloading",
+          "python_packages",
+          "loading_tools"
+        ],
+        "title": "InstallPhase",
+        "type": "string"
+      },
       "InterruptStatus": {
         "enum": [
           "interrupted",
@@ -18443,6 +18727,18 @@
             "default": null,
             "title": "Response Previewed"
           },
+          "response_reused": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Response Reused"
+          },
           "response_transformed": {
             "anyOf": [
               {
@@ -18880,6 +19176,11 @@
             "title": "Fast",
             "type": "boolean"
           },
+          "ultrafast": {
+            "default": false,
+            "title": "Ultrafast",
+            "type": "boolean"
+          },
           "reasoning": {
             "title": "Reasoning",
             "type": "boolean"
@@ -19203,6 +19504,28 @@
             ],
             "default": null,
             "title": "Unavailable Models"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderLimit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -19694,6 +20017,61 @@
         "title": "OnboardingEnsureSetupProfileResult",
         "type": "object"
       },
+      "OnboardingEnsureSetupSessionParams": {
+        "additionalProperties": false,
+        "properties": {
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Messages"
+          }
+        },
+        "title": "OnboardingEnsureSetupSessionParams",
+        "type": "object"
+      },
+      "OnboardingEnsureSetupSessionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "empty": {
+            "title": "Empty",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile",
+          "session_id",
+          "empty"
+        ],
+        "title": "OnboardingEnsureSetupSessionResult",
+        "type": "object"
+      },
+      "OnboardingIntro": {
+        "enum": [
+          "unseen",
+          "seen"
+        ],
+        "title": "OnboardingIntro",
+        "type": "string"
+      },
       "OnboardingResetSetupProfileResult": {
         "additionalProperties": false,
         "properties": {
@@ -19716,6 +20094,53 @@
           "path"
         ],
         "title": "OnboardingResetSetupProfileResult",
+        "type": "object"
+      },
+      "OnboardingStateResult": {
+        "additionalProperties": false,
+        "properties": {
+          "eligible": {
+            "title": "Eligible",
+            "type": "boolean"
+          },
+          "intro": {
+            "$ref": "#/components/schemas/OnboardingIntro"
+          },
+          "failed_starts": {
+            "title": "Failed Starts",
+            "type": "integer"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "required": [
+          "eligible",
+          "intro",
+          "failed_starts"
+        ],
+        "title": "OnboardingStateResult",
         "type": "object"
       },
       "OpenRequestEntry": {
@@ -26245,6 +26670,18 @@
             "default": null,
             "title": "Voice Context"
           },
+          "voice_turn": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Voice Turn"
+          },
           "title_preview": {
             "anyOf": [
               {
@@ -26447,6 +26884,173 @@
         ],
         "title": "PromptSubmitStatus",
         "type": "string"
+      },
+      "ProviderLimit": {
+        "additionalProperties": false,
+        "description": "``qubit_cli/inventory.py::_apply_limits`` \u2014 ``account``: the whole login is rate-limited until\n``resets_at`` (ISO, absent when unknown); ``models``: only these models are, each until its time.",
+        "properties": {
+          "scope": {
+            "enum": [
+              "account",
+              "models"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Resets At"
+          },
+          "models": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Models"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ProviderLimit",
+        "type": "object"
+      },
+      "ProviderUsage": {
+        "additionalProperties": false,
+        "description": "``qubit_cli/inventory.py::_apply_usage`` \u2014 the provider's subscription usage, from cache.\n\nMulti-entry credential pools carry ``accounts`` (one row per account; the legacy ``windows``\nstays EMPTY there \u2014 a provider-wide percentage across different logins would be fabricated).\nSingle-account providers keep the legacy ``windows`` gauge.",
+        "properties": {
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderUsageWindow"
+            },
+            "title": "Windows",
+            "type": "array"
+          },
+          "accounts": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ProviderUsageAccount"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Accounts"
+          }
+        },
+        "title": "ProviderUsage",
+        "type": "object"
+      },
+      "ProviderUsageAccount": {
+        "additionalProperties": false,
+        "description": "One account of a provider's credential pool (``qubit_cli/inventory.py::_pool_usage_accounts``).\n``id`` is a stable non-secret account identity (never a key or URL); ``label`` may be empty (UI\nfalls back to a localized \"Account N\"). ``windows`` is empty while the account's usage is not\nyet known \u2014 state carries the meaning, never a fabricated gauge.\n\n``state``: ``ready`` \u2014 live quota below the cap (numeric windows present); ``limited`` \u2014 a live\ncredential-wide cooldown or exhausted account-scoped quota windows; ``unknown`` \u2014 no live\nnumeric windows (failed/empty fetch, stale snapshot, provider without a usage API);\n``unavailable`` \u2014 DEAD auth row (kept visible, never a quota row).\n\n``resets_at``: for a limited account, the LATEST of its exhausted account-scoped windows (or a\nlive cooldown when later); ``None`` when unknown (the frontend renders its own advisory, e.g.\nthe earliest limited sibling).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderUsageWindow"
+            },
+            "title": "Windows",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "limited",
+              "unknown",
+              "unavailable"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Resets At"
+          }
+        },
+        "required": [
+          "id",
+          "state"
+        ],
+        "title": "ProviderUsageAccount",
+        "type": "object"
+      },
+      "ProviderUsageWindow": {
+        "additionalProperties": false,
+        "description": "One subscription usage window (``agent/account_usage.py::AccountUsageWindow``): e.g. the 5-hour\nsession or the weekly cap, with how much of it is spent and when it rolls over (ISO).\n\n``scope``: ``account`` \u2014 exhausting the window exhausts the whole login (Codex session/weekly,\nso a limited account's resets_at must wait for it); ``model`` \u2014 the window caps only one model\nfamily (Anthropic Opus/Sonnet weekly) and can never imply the account itself is out of quota.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "used_percent": {
+            "title": "Used Percent",
+            "type": "number"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Resets At"
+          },
+          "scope": {
+            "default": "account",
+            "enum": [
+              "account",
+              "model"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "used_percent"
+        ],
+        "title": "ProviderUsageWindow",
+        "type": "object"
       },
       "QueuedPrompt": {
         "additionalProperties": false,
@@ -29766,6 +30370,18 @@
             "default": null,
             "title": "Fast"
           },
+          "service_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Service Tier"
+          },
           "close_on_disconnect": {
             "default": false,
             "title": "Close On Disconnect",
@@ -30728,6 +31344,18 @@
             "default": "",
             "title": "Source",
             "type": "string"
+          },
+          "_lineage_root_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Lineage Root Id"
           }
         },
         "required": [
@@ -31565,6 +32193,128 @@
         "title": "SessionSetHiddenResult",
         "type": "object"
       },
+      "SessionStartChatParams": {
+        "additionalProperties": false,
+        "description": "``tool_call_id`` names the rejected call; its saved tool row records a started retry (display-only).",
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "tool_call_id": {
+            "title": "Tool Call Id",
+            "type": "string"
+          },
+          "args": {
+            "$ref": "#/components/schemas/StartChatArgs"
+          }
+        },
+        "required": [
+          "session_id",
+          "tool_call_id",
+          "args"
+        ],
+        "title": "SessionStartChatParams",
+        "type": "object"
+      },
+      "SessionStartChatResult": {
+        "additionalProperties": false,
+        "description": "``tui_gateway/start_chat.py``: ``started`` carries the new chat, ``rejected`` a reason and whether the same\narguments may succeed on another try (``retryable``). A call already retried returns that retry's result.",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/StartChatStatus"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Id"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "retryable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Retryable"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "SessionStartChatResult",
+        "type": "object"
+      },
       "SessionStatusParams": {
         "additionalProperties": false,
         "properties": {
@@ -32103,6 +32853,165 @@
         "title": "SessionWorkspaceMoveResult",
         "type": "object"
       },
+      "SetupChooseKind": {
+        "enum": [
+          "question",
+          "accent",
+          "theme",
+          "layout",
+          "connectors",
+          "plugins",
+          "tour",
+          "fork",
+          "machine_use"
+        ],
+        "title": "SetupChooseKind",
+        "type": "string"
+      },
+      "SetupChooseOption": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "SetupChooseOption",
+        "type": "object"
+      },
+      "SetupChooseRequestParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SetupChooseKind"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SetupChooseOption"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Options"
+          },
+          "multi_select": {
+            "default": false,
+            "title": "Multi Select",
+            "type": "boolean"
+          },
+          "preselected": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Preselected"
+          }
+        },
+        "required": [
+          "session_id",
+          "kind",
+          "question"
+        ],
+        "title": "SetupChooseRequestParams",
+        "type": "object"
+      },
+      "SetupChooseResult": {
+        "additionalProperties": false,
+        "properties": {
+          "picked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Picked"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "said": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Said"
+          }
+        },
+        "title": "SetupChooseResult",
+        "type": "object"
+      },
       "SetupReadyPayload": {
         "additionalProperties": true,
         "description": "``qubit_cli/free_tier_bootstrap.py::SetupRecord.as_payload``.",
@@ -32461,7 +33370,7 @@
       },
       "SharedMetricsConsentResult": {
         "additionalProperties": false,
-        "description": "The focused profile's ``telemetry.shared_metrics`` opt-ins. ``send`` is never true while\n``enabled`` is false; ``decided`` = either key is written in config.yaml (the shipped defaults\nare not an answer).",
+        "description": "The focused profile's ``telemetry.shared_metrics`` opt-ins. ``send`` is never true while\n``enabled`` is false; ``decided`` = either key is written in config.yaml (the shipped defaults\nare not an answer) and it is not a ``reask``: an \"off\" from before the type-ahead fix, offered\nonce more with the reason.",
         "properties": {
           "enabled": {
             "title": "Enabled",
@@ -32473,6 +33382,11 @@
           },
           "decided": {
             "title": "Decided",
+            "type": "boolean"
+          },
+          "reask": {
+            "default": false,
+            "title": "Reask",
             "type": "boolean"
           }
         },
@@ -32829,7 +33743,7 @@
       },
       "SharedMetricsStartupLatencyParams": {
         "additionalProperties": false,
-        "description": "``elapsed_ms`` = the client's own launch (TUI process start / Desktop app start) to ready\n(TUI gateway ready / Desktop backend attached), measured once per launch by the client. The\nclient names its surface because a Desktop may attach to a URL/cloud backend where\n``QUBIT_DESKTOP`` is unset; without it the backend falls back to its own client detection.\n``launch_id`` is an opaque per-launch token the backend latches on (never recorded), so a\nreconnect re-sending the same launch counts once while a new launch counts again.",
+        "description": "``elapsed_ms`` = the client's own launch (TUI process start / Desktop app start) to ready\n(TUI gateway ready / Desktop backend attached), measured once per launch by the client. The\nclient names its surface because a Desktop may attach to a URL/cloud backend where\n``HERMES_DESKTOP`` is unset; without it the backend falls back to its own client detection.\n``launch_id`` is an opaque per-launch token the backend latches on (never recorded), so a\nreconnect re-sending the same launch counts once while a new launch counts again.",
         "properties": {
           "profile": {
             "anyOf": [
@@ -34094,6 +35008,53 @@
         ],
         "title": "SpawnTreeSaveResult",
         "type": "object"
+      },
+      "StartChatArgs": {
+        "additionalProperties": false,
+        "description": "The ``start_chat`` tool's arguments (``tools/start_chat_tool.py``).",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "StartChatArgs",
+        "type": "object"
+      },
+      "StartChatStatus": {
+        "enum": [
+          "started",
+          "rejected"
+        ],
+        "title": "StartChatStatus",
+        "type": "string"
       },
       "StatusUpdatePayload": {
         "additionalProperties": false,
@@ -36400,6 +37361,15 @@
         "title": "ToolsetsListResult",
         "type": "object"
       },
+      "TourPreset": {
+        "description": "Which built-in tour ``start`` without steps runs.",
+        "enum": [
+          "quick",
+          "full"
+        ],
+        "title": "TourPreset",
+        "type": "string"
+      },
       "TourRequestParams": {
         "additionalProperties": false,
         "description": "``tools/tour_tool.py`` field set.",
@@ -36498,6 +37468,17 @@
             ],
             "default": null,
             "title": "Step Index"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TourPreset"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -38022,6 +39003,21 @@
         "title": "VerificationStatusResult",
         "type": "object"
       },
+      "VoicePartialPayload": {
+        "additionalProperties": false,
+        "description": "``methods_voice`` voice.record ``on_partial`` \u2014 live STT text so far (``stt.streaming``).",
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "VoicePartialPayload",
+        "type": "object"
+      },
       "VoiceRecordAction": {
         "enum": [
           "start",
@@ -39215,6 +40211,24 @@
       }
     },
     {
+      "name": "setup_choose",
+      "summary": "",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SetupChooseRequestParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SetupChooseResult"
+        }
+      }
+    },
+    {
       "name": "sudo",
       "summary": "Masked sudo password for the terminal tool.",
       "params": [
@@ -39542,6 +40556,18 @@
           "name": "payload",
           "schema": {
             "$ref": "#/components/schemas/ErrorPayload"
+          }
+        }
+      ]
+    },
+    {
+      "name": "free_tier.challenge",
+      "summary": "The account service wants a browser challenge cleared before the free-tier token exchange (broadcast); the desktop loads ``url`` in a hidden window.",
+      "params": [
+        {
+          "name": "payload",
+          "schema": {
+            "$ref": "#/components/schemas/FreeTierChallengePayload"
           }
         }
       ]
@@ -40204,6 +41230,18 @@
           "schema": {
             "type": "object",
             "additionalProperties": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "voice.partial",
+      "summary": "Live STT text so far while the user is still speaking.",
+      "params": [
+        {
+          "name": "payload",
+          "schema": {
+            "$ref": "#/components/schemas/VoicePartialPayload"
           }
         }
       ]
