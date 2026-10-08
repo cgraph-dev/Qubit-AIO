@@ -94,7 +94,7 @@ lines ⇒ faithful) and locating the missing product symbol/signature.
 `test_the_task_chat_setup_hands_off_to_gets_no_note`. The pin's function takes a 4th
 `message` arg. Re-port from the pin, not a product change.
 
-## Absent test files ported this wave (29 → 15 remaining, 11 ported successfully)
+## Absent test files ported this wave (29 → 9 remaining, 20 ported successfully)
 | ported | result |
 |---|---|
 | tests/agent/test_in_place_merged_user_rows.py | 10 pass, 2 xfail (product gap, see below) |
@@ -120,7 +120,7 @@ lines ⇒ faithful) and locating the missing product symbol/signature.
 
 Remaining absent (not ported, environment-blocked): the 3 `tests/ci/*` CI-replay files
 (need `.github` scaffolding), 4 `tests/e2e/core/windows_update/*` (windows-only),
-`tests/e2e/core/platforms/__init__.py`.
+1 `tests/ci/test_windows_update_crash_oracles.py` (windows + `.github`).
 
 ## New PRODUCT GAPS found (recorded for siblings)
 1. `gateway/run.py:_build_replay_entry` omits the 4-line merge-witness stamp carry
