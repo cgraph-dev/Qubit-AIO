@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from qubit_cli.update_cmd_common import _best_effort
+from qubit_cli.update_host_obligation import PROFILE_MARKER_NAME
 from qubit_cli.update_inventory import _gateway_service_matches_profile
 from qubit_cli.update_cmd_fleet_verify import (  # noqa: F401  moved to the topical sibling; re-imported so existing `from update_cmd_fleet import <name>` consumers and `update_cmd_fleet.<name>` patch seams keep working
     _collect_fleet_snapshot, _fleet_row_identity_pending, _live_gateway_pids_from_fleet,
@@ -29,14 +30,9 @@ logger = logging.getLogger("qubit_cli.update_cmd")
 # after a pull advanced HEAD; cleared only when the restart completes or nothing ran.
 # The existing ``.update-incomplete`` / ``.lazy-refresh-incomplete`` markers gate dependency/venv repair;
 # this one is the fleet-restart obligation after a git pull that advanced HEAD (#95294).
-_FLEET_RESTART_PENDING_NAME = "fleet_restart_pending"
+_FLEET_RESTART_PENDING_NAME = PROFILE_MARKER_NAME
 
 _FRESH_RESTART_SUPERVISORS = frozenset({"systemd", "launchd", "service", "s6"})
-
-# A supervisor can report a restarted unit active before the gateway finishes its
-# bootstrap and publishes ``gateway_state.json``. Keep the readiness poll bounded,
-# but allow the default systemd startup budget plus status-publication slack.
-_FLEET_PROBE_SETTLE_TIMEOUT_SECONDS = 120.0
 
 _SYSTEMD_SCOPES = (("user", ["systemctl", "--user"]), ("system", ["systemctl"]))
 _LIST_GATEWAY_UNITS = [
@@ -47,6 +43,11 @@ _LIST_GATEWAY_UNITS = [
 
 def _write_gateway_update_exit_code(ok: bool) -> None:
     from qubit_cli.update_cmd import get_qubit_home
+    from qubit_cli.update_receipt import committed_success
+
+    # A run whose receipt already closed as a success is never reported failed (C3, review
+    # regression 3): the command boundary's catch-alls call this with False.
+    ok = ok or committed_success()
     path = get_qubit_home() / ".update_exit_code"
     with suppress(OSError):
         path.write_text("0" if ok else "1", encoding="utf-8")
@@ -230,6 +231,7 @@ def _receipt_owed_gateways(receipt: dict, pending_manual: list[dict]) -> set[tup
     plan = receipt.get("plan") or {}
     entries: list[tuple[object, str | None]] = [(entry, None) for entry in plan.get("runtimes") or []]
     entries.extend((entry, None) for entry in receipt.get("pending_manual_serves") or [])
+    entries.extend((entry, None) for entry in receipt.get("carried_manual_serves") or [])
     entries.extend((entry, "gateway") for entry in receipt.get("fleet") or [])
     owed: set[tuple[str, str]] = set()
     unverified = False
@@ -295,6 +297,11 @@ def _live_fleet_covers_receipt(expected_sha: str | None, receipt: dict, owed: se
         return False
 
 
+# A gateway the restart phase stopped without knowing its profile: no live row can be matched to it,
+# so only a live, current gateway of this checkout settles it, never an empty host (""=no profile).
+_UNMAPPED_GATEWAY = ("gateway", "")
+
+
 def _marker_owed_gateways(inventory: object) -> set[tuple[str, str]] | None:
     """The ``("gateway", profile)`` set a marker's inventory owes; None when it recorded none.
 
@@ -314,6 +321,9 @@ def _marker_owed_gateways(inventory: object) -> set[tuple[str, str]] | None:
         if not isinstance(runtime, dict):
             raise ValueError("fleet-restart inventory row is not an object")
         if runtime_outside_gateway_evidence(runtime):
+            continue
+        if runtime.get("kind") == "gateway" and runtime.get("stopped_unmapped"):
+            owed.add(_UNMAPPED_GATEWAY)
             continue
         profile = runtime.get("profile")
         if runtime.get("kind") != "gateway" or not isinstance(profile, str) or not profile.strip() or profile == "unknown":
@@ -367,7 +377,7 @@ def _marker_only_restart_obsolete() -> bool:
     undischargeable on every host that runs a dashboard. A manual-serve row still needs its
     durable handoff (``defer_manual_serve``), and an unclassified backend stays fail-closed.
     Discharging here strands nobody: the same row is still accounted at update time by
-    ``update_inventory.report_unaccounted_runtimes``, which prints it and exits 1 when the restart
+    ``update_inventory.report_unaccounted_runtimes``, which prints it and records an owed restart when the restart
     phase never touched it — this marker only stops re-warning about it on every later startup.
     """
     from qubit_cli.update_cmd_fleet_checkout import checkout_contains
@@ -417,8 +427,13 @@ def _marker_only_restart_obsolete() -> bool:
             continue
         if row.get("state") != "current" or str(row.get("code_sha")) != target_sha:
             return False  # stale / down / unknown-identity row still owes the restart
-    if owed is not None and not owed <= covered:
+    if owed is not None and not owed - {_UNMAPPED_GATEWAY} <= covered:
         return False  # A gateway this marker owns is absent (down) or unidentifiable.
+    if owed and _UNMAPPED_GATEWAY in owed and not (_fleet_covered_gateways(
+            [row for row in fleet if not row_is_external(row)]) or set()) - owed:
+        # An unmapped stopped gateway has no identity to match, so only a local gateway that no
+        # mapped owed one explains can be its successor; another checkout's gateway never is.
+        return False
     _clear_fleet_restart_pending_marker()
     logger.debug(
         "Fleet-restart-pending marker discharged: %d gateway(s) already serve %s",
@@ -683,23 +698,13 @@ def _systemctl(cmd: list, *, timeout: float):
     return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
 
-# poll() takes signed 32-bit milliseconds; keep headroom for rounding in communicate().
-_SYSTEMCTL_RESTART_TIMEOUT_MAX = (2**31 - 1) // 1000 - 1
-
-
-def _systemd_restart_timeout(scope_cmd: list, svc_name: str, *, start_only: bool = False) -> float:
-    """Moved to the topical sibling (``update_cmd_fleet_unit_budget``); re-exported here so existing
-    importers (``qubit_cli/update_cmd.py``) are unaffected."""
-    from qubit_cli.update_cmd_fleet_unit_budget import systemd_restart_timeout
-    return systemd_restart_timeout(scope_cmd, svc_name, start_only=start_only)
-
-
 def _systemctl_reset_and_restart(manage_cmd: list, svc_name: str, *, scope_cmd: list | None = None):
     """``reset-failed`` then ``restart``: a unit parked in failed state by systemd's own
     auto-restart can wedge a plain ``restart`` against RestartSec backoff and stay dead."""
     # Property reads need no manage-units privileges: narrow sudoers may permit
     # restart/reset-failed but deny show. Keep the same user/system manager scope.
-    timeout = _systemd_restart_timeout(scope_cmd if scope_cmd is not None else manage_cmd, svc_name)
+    from qubit_cli.update_cmd_fleet_unit_budget import systemd_restart_timeout
+    timeout = systemd_restart_timeout(scope_cmd if scope_cmd is not None else manage_cmd, svc_name)
     _systemctl(manage_cmd + ["reset-failed", svc_name], timeout=10)
     return _systemctl(manage_cmd + ["restart", svc_name], timeout=timeout)
 
@@ -927,7 +932,6 @@ def _restart_macos_launchd_gateways(
         supervision_verify=True, self_restart_pending=self_restart_pending)
     restarted_services.extend(_restarted)
     failed_or_stale_units.extend(_failed)
-    current_label = get_launchd_label()
 
     derived_labels = launchd_gateway_labels_for_install()
     # Units labelled before the profile-name suffix scheme (ai.hermes.gateway-<hash>) are invisible
@@ -939,7 +943,7 @@ def _restart_macos_launchd_gateways(
         print(f"  ↻ legacy-labelled units of this install join the restart: {', '.join(legacy_labels)}")
     from qubit_cli.update_fleet_scope import describe_skipped_runtime, launchd_label_foreign_home
     for label in derived_labels + legacy_labels:
-        if label == current_label:
+        if label == current_label or label in resumed:
             continue
         # Labels are account-global: root B's default profile derives the same bare label root A
         # installed. A plist pinning a foreign QUBIT_HOME is another install's job (#93349).
@@ -1258,6 +1262,7 @@ def _restart_one_systemd_gateway_unit(
         _main_pid, drain_budget, svc_name, self_restart_pending=self_restart_pending)
 
     if _graceful_ok:
+        from qubit_cli.update_cmd_fleet_unit_budget import service_restart_sec, systemd_restart_timeout
         # ``Restart=always`` respawns only after RestartSec (60s in our unit; dead time for a
         # voluntary restart). ``reset-failed`` + ``start`` skips it (~1-3s); if RestartSec already
         # elapsed, ``start`` is a no-op and we fall through to the poll. Needs manage-units
@@ -1266,14 +1271,14 @@ def _restart_one_systemd_gateway_unit(
             _systemctl(_manage_cmd + ["reset-failed", svc_name], timeout=10)
             _systemctl(
                 _manage_cmd + ["start", svc_name],
-                timeout=_systemd_restart_timeout(scope_cmd, svc_name, start_only=True),
+                timeout=systemd_restart_timeout(scope_cmd, svc_name, start_only=True),
             )
             if _wait_for_service_active(scope_cmd, svc_name, timeout=10.0):
                 restarted_services.append(svc_name)
                 return
         # Passive poll: auto-restart fires after RestartSec regardless of
         # privileges — primary when _manage_cmd is None, fallback otherwise.
-        _restart_sec = _service_restart_sec(scope_cmd, svc_name, default=0.0)
+        _restart_sec = service_restart_sec(scope_cmd, svc_name, default=0.0)
         if _manage_cmd is None and _restart_sec > 5.0:
             print(
                 f"  → {svc_name}: waiting for systemd "
@@ -1595,7 +1600,7 @@ def _recover_after_restart_phase_abort(
     from qubit_cli.update_abort_recovery import _owed_stale_serve_rows
     from qubit_cli.update_cmd import (
         _abort_recovery_is_complete, _recover_gateway_restart_after_abort, _surviving_pre_update_serve_runtimes,
-        _warn_stale_serve_runtimes, _write_gateway_update_exit_code,
+        _warn_stale_serve_runtimes,
     )
     logger.debug("Gateway restart during update failed: %s", e)
     out.phase_errors.append(str(e))
@@ -1655,11 +1660,10 @@ def _recover_after_restart_phase_abort(
         or _owed_stale_serve_rows(_stale_runtime_rows)
         or _serve_units_failed
     ):
+        # Owed restart (C3): verification records the follow-up; the /update marker stays committed.
         out.incomplete = True
         _warn_gateway_restart_phase_aborted(e, _surviving)
         _warn_stale_serve_runtimes(_stale_runtime_rows)
-        if gateway_mode:
-            _write_gateway_update_exit_code(False)
     out.record_receipt(phase_error=str(e), fresh_recovery=_recovery_result)
 
 
@@ -1678,7 +1682,7 @@ def _restart_gateway_fleet_after_update(_pre_update_plan, gateway_mode: bool):
     Never raises: a phase abort runs fresh-child recovery and fails closed unless
     every planned gateway is verifiably covered.
     """
-    from qubit_cli.update_cmd import _m, _write_gateway_update_exit_code
+    from qubit_cli.update_cmd import _m
     # All bookkeeping is declared before the try so abort recovery and fleet reconciliation
     # can read it even if the phase raises early. ``pre_restart_gateway_pids`` stays empty
     # until we are about to stop/drain, so an early exception has nothing to fail closed on,
@@ -1738,9 +1742,8 @@ def _restart_gateway_fleet_after_update(_pre_update_plan, gateway_mode: bool):
         _restart_manual_gateways(out, _drain_budget)
 
         if out.failed_or_stale_units:
+            # Owed restart (C3): verification records the follow-up; the /update marker stays committed.
             out.incomplete = True
-            if gateway_mode:
-                _write_gateway_update_exit_code(False)
         _warn_incomplete_gateway_fleet_restart(out.failed_or_stale_units)
         out.record_receipt()
         _force_kill_stuck_gateways(out.killed_pids)
@@ -1825,13 +1828,3 @@ def _wait_for_service_active(scope_cmd_: list, svc_name_: str, timeout: float = 
         if _time.monotonic() >= deadline:
             return False
         _time.sleep(0.5)
-
-
-_RESTART_SEC_UNITS = (("ms", 0.001), ("us", 0.000001), ("min", 60.0), ("s", 1.0))
-
-
-def _service_restart_sec(scope_cmd_: list, svc_name_: str, default: float = 0.0) -> float:
-    """Moved to the topical sibling (``update_cmd_fleet_unit_budget``); re-exported here so existing
-    importers (``qubit_cli/update_cmd.py``) are unaffected."""
-    from qubit_cli.update_cmd_fleet_unit_budget import service_restart_sec
-    return service_restart_sec(scope_cmd_, svc_name_, default)
