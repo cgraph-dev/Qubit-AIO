@@ -223,7 +223,12 @@ export function useChatActivity(session: string, enabled = true): AgentActivity 
           buffer += decoder.decode(value, { stream: true });
           const { frames, rest, resync } = parseSseChunk(buffer);
           buffer = rest;
-          if (resync) lastSeq = null;
+          // Server resync = genuine cursor gap: the journal is the source of
+          // truth and replay resumes from the RETAINED cursor (the resync frame
+          // carries no id, so the loop below never advances or blanks it).
+          // Blanking `lastSeq` here would force a cold whole-journal replay,
+          // contradicting the server's resync contract (see ChatSidebar).
+          void resync;
           for (const frame of frames) handleFrame(frame);
         }
       } catch {

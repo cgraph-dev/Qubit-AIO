@@ -86,9 +86,12 @@ export function useChatLiveEvents(
             const parsed = parseSseChunk(buffer);
             buffer = parsed.rest;
             if (parsed.resync) {
-              // Server-side cursor gap: keep the cursor (the journal replay
-              // fills the gap), drop this now-stale connection, reconnect once.
-              lastSeq = null;
+              // Server-side cursor gap: the journal, not the queue, is the
+              // source of truth — the server's resync contract is to resume
+              // from the RETAINED cursor so the journal replay fills the gap.
+              // Blanking `lastSeq` here forced a cold whole-journal replay (the
+              // "reconnect storm" the sibling ChatSidebar reader fixed); keep
+              // the cursor, drop this now-stale connection, reconnect once.
               try {
                 await reader.cancel();
               } catch {
