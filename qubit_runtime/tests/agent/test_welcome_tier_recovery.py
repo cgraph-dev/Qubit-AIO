@@ -229,7 +229,7 @@ class TestTerminalResultsCarryTheFreeTierBlock:
         err = _refusal("at_capacity", retry_after=30)
         classified = _classify(err)
         result = max_retries_exhausted_result(
-            self._terminal_agent(), err, classified, max_retries=3, is_rate_limited=True, error_msg="429",
+            self._terminal_agent(), err, classified, attempts=3, is_rate_limited=True, error_msg="429",
             api_kwargs=None, api_messages=[], messages=[], conversation_history=[], api_call_count=3,
             approx_tokens=10, provider="nous", base_url=WELCOME, model="nous/welcome")
         assert result["free_tier"]["kind"] == "at_capacity"
@@ -241,7 +241,7 @@ class TestTerminalResultsCarryTheFreeTierBlock:
         err = _gateway_error(503, {"status": 503, "message": "The requested model is currently unavailable."})
         classified = _classify(err)
         result = max_retries_exhausted_result(
-            self._terminal_agent(), err, classified, max_retries=3, is_rate_limited=False, error_msg="503",
+            self._terminal_agent(), err, classified, attempts=3, is_rate_limited=False, error_msg="503",
             api_kwargs=None, api_messages=[], messages=[], conversation_history=[], api_call_count=3,
             approx_tokens=10, provider="nous", base_url=WELCOME, model="nous/welcome")
         assert result["free_tier"]["kind"] == "outage"
@@ -250,7 +250,7 @@ class TestTerminalResultsCarryTheFreeTierBlock:
         from agent.turn_recovery import max_retries_exhausted_result
         err = _gateway_error(503, {"status": 503, "message": "The requested model is currently unavailable."})
         result = max_retries_exhausted_result(
-            self._terminal_agent(), err, _classify(err, base_url=PAID), max_retries=3, is_rate_limited=False,
+            self._terminal_agent(), err, _classify(err, base_url=PAID), attempts=3, is_rate_limited=False,
             error_msg="503", api_kwargs=None, api_messages=[], messages=[], conversation_history=[],
             api_call_count=3, approx_tokens=10, provider="nous", base_url=PAID, model="hermes-4")
         assert "free_tier" not in result
