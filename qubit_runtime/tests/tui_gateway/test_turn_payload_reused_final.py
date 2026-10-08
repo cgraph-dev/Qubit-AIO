@@ -13,9 +13,6 @@ from types import SimpleNamespace
 
 import tui_gateway.server as srv
 
-_prod_gap_tp = pytest.mark.xfail(reason="turn payload omits response_reused (prompt_turn.py/contracts/events.py) ", strict=False)
-
-
 
 def _payload(monkeypatch, result):
     monkeypatch.setattr(srv, "_get_usage", lambda _agent: {})
@@ -31,7 +28,6 @@ def _payload(monkeypatch, result):
     return payload
 
 
-@_prod_gap_tp
 def test_reused_final_is_named_on_the_wire(monkeypatch):
     payload = _payload(monkeypatch, {"final_response": "Here is the answer.", "response_previewed": True,
                                      "response_reused": True})
