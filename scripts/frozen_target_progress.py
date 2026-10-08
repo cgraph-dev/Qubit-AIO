@@ -92,6 +92,7 @@ def run_audit() -> dict:
         sys.executable,
         str(AUDIT),
         "--rev", FROZEN_REV,          # ALWAYS the frozen pin, never origin/main
+        "--show-symbols",             # needed to split behind_head by path
         "--json", out_path,
     ]
     print(f"# running audit --rev {FROZEN_REV} (this takes a few minutes)...",
@@ -132,6 +133,20 @@ def split(data: dict) -> dict:
     sp_test_share = sum(w["missing"] for w in sp_test)
     sp_prod_share = sp_symbols - sp_test_share if sp else sp_symbols
 
+    # behind_head IS NOT production-only. The `symbols` dict enumerates every
+    # behind_head file with its missing names; split it by path. (Reading the
+    # combined summary field as production over-charged the gap by ~250 symbols
+    # for several waves, because ~80% of behind-head files are TESTS.)
+    syms = data.get("symbols") or {}
+    bh_prod = [k for k, v in syms.items()
+               if isinstance(v, dict) and v.get("branch") == "behind_head"
+               and not is_test_path(k)]
+    bh_test = [k for k, v in syms.items()
+               if isinstance(v, dict) and v.get("branch") == "behind_head"
+               and is_test_path(k)]
+    bh_prod_syms = sum(len(syms[k]["missing"]) for k in bh_prod)
+    bh_test_syms = sum(len(syms[k]["missing"]) for k in bh_test)
+
     return {
         "absent_prod": len(absent_prod),
         "absent_test": len(absent_test),
@@ -139,6 +154,10 @@ def split(data: dict) -> dict:
         "sp_files_test": len(sp_test),
         "sp_symbols_prod": sp_prod_share,
         "sp_symbols_test": sp_test_share,
+        "bh_files_prod": len(bh_prod),
+        "bh_files_test": len(bh_test),
+        "bh_symbols_prod": bh_prod_syms,
+        "bh_symbols_test": bh_test_syms,
     }
 
 
@@ -174,8 +193,10 @@ def main() -> int:
     # production files. Tests never block retiring hermes.
     prod_missing = (s["absent_prod"]
                     + s["sp_symbols_prod"]
-                    + tot_bh_syms)          # behind-head is production-only by nature
-    test_missing = s["absent_test"] + s["sp_symbols_test"]
+                    + s["bh_symbols_prod"])   # split by path -- NOT the combined total
+    test_missing = (s["absent_test"]
+                    + s["sp_symbols_test"]
+                    + s["bh_symbols_test"])
 
     print("=" * 68)
     print(f"FROZEN TARGET PROGRESS  --  rev {FROZEN_REV}")
@@ -201,8 +222,8 @@ def main() -> int:
     print(f"    absent:      prod {s['absent_prod']:>4}   tests {s['absent_test']:>4}")
     print(f"    short_port:  prod {s['sp_symbols_prod']:>4} sym / {s['sp_files_prod']} files"
           f"   tests {s['sp_symbols_test']:>4} sym / {s['sp_files_test']} files")
-    print(f"    behind_head: prod {tot_bh_syms:>4} sym / {tot_bh_files} files"
-          f"   (upstream moved on -- production)")
+    print(f"    behind_head: prod {s['bh_symbols_prod']:>4} sym / {s['bh_files_prod']} files"
+          f"   tests {s['bh_symbols_test']:>4} sym / {s['bh_files_test']} files")
     print()
 
     drift = total_missing - BASE["total_missing"]
