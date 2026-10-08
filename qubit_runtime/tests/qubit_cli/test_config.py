@@ -715,16 +715,16 @@ class TestOptionalEnvVarsRegistry:
 
 
     def test_max_iterations_not_offered_as_env_var(self):
-        """QUBIT_MAX_ITERATIONS must NOT be in OPTIONAL_ENV_VARS (issue #17534).
+        """HERMES_MAX_ITERATIONS must NOT be in OPTIONAL_ENV_VARS (issue #17534).
 
         Offering it as an editable env var (dashboard, `qubit setup`) lets a
         user write it to .env, recreating the stale ghost that shadows
         config.yaml's agent.max_turns. The iteration budget is configured ONLY
-        via config.yaml; QUBIT_MAX_ITERATIONS remains a read-only backward-compat
+        via config.yaml; HERMES_MAX_ITERATIONS remains a read-only backward-compat
         fallback in the gateway/CLI, never a promoted write target.
         """
         from qubit_cli.config import OPTIONAL_ENV_VARS
-        assert "QUBIT_MAX_ITERATIONS" not in OPTIONAL_ENV_VARS
+        assert "HERMES_MAX_ITERATIONS" not in OPTIONAL_ENV_VARS
 
 
 
@@ -1331,10 +1331,10 @@ class TestEnvWriteDenylist:
     @pytest.mark.parametrize(
         "allowed_key",
         [
-            "QUBIT_LANGFUSE_PUBLIC_KEY",
-            "QUBIT_SPOTIFY_CLIENT_ID",
-            "QUBIT_QWEN_BASE_URL",
-            "QUBIT_MAX_ITERATIONS",
+            "HERMES_LANGFUSE_PUBLIC_KEY",
+            "HERMES_SPOTIFY_CLIENT_ID",
+            "HERMES_QWEN_BASE_URL",
+            "HERMES_MAX_ITERATIONS",
         ],
     )
     def test_qubit_integration_keys_still_writable(self, allowed_key):
@@ -1350,21 +1350,21 @@ class TestEnvWriteDenylist:
     @pytest.mark.parametrize(
         "protected_key",
         [
-            "QUBIT_CONFIG_PATH",
-            "QUBIT_ENV_PATH",
-            "QUBIT_OPTIONAL_MCPS",
-            "QUBIT_COPILOT_ACP_COMMAND",
-            "QUBIT_COPILOT_ACP_ARGS",
-            "QUBIT_YOLO_MODE",
-            "QUBIT_ACCEPT_HOOKS",
-            "QUBIT_REDACT_SECRETS",
-            "QUBIT_INTERACTIVE",
-            "QUBIT_EXEC_ASK",
-            "QUBIT_GATEWAY_SESSION",
-            "QUBIT_CRON_SESSION",
-            "QUBIT_SINGLE_QUERY_SESSION",
-            "QUBIT_SESSION_KEY",
-            "QUBIT_SESSION_PLATFORM",
+            "HERMES_CONFIG_PATH",
+            "HERMES_ENV_PATH",
+            "HERMES_OPTIONAL_MCPS",
+            "HERMES_COPILOT_ACP_COMMAND",
+            "HERMES_COPILOT_ACP_ARGS",
+            "HERMES_YOLO_MODE",
+            "HERMES_ACCEPT_HOOKS",
+            "HERMES_REDACT_SECRETS",
+            "HERMES_INTERACTIVE",
+            "HERMES_EXEC_ASK",
+            "HERMES_GATEWAY_SESSION",
+            "HERMES_CRON_SESSION",
+            "HERMES_SINGLE_QUERY_SESSION",
+            "HERMES_SESSION_KEY",
+            "HERMES_SESSION_PLATFORM",
         ],
     )
     def test_qubit_security_control_keys_are_not_writable(self, protected_key):
@@ -1436,21 +1436,21 @@ class TestEnvWriteDenylist:
 
         catalog = tmp_path / "custom-mcp-catalog"
         (tmp_path / ".env").write_text(
-            f"QUBIT_OPTIONAL_MCPS={catalog}\n",
+            f"HERMES_OPTIONAL_MCPS={catalog}\n",
             encoding="utf-8",
         )
         invalidate_env_cache()
 
-        assert load_env()["QUBIT_OPTIONAL_MCPS"] == str(catalog)
+        assert load_env()["HERMES_OPTIONAL_MCPS"] == str(catalog)
 
     @pytest.mark.parametrize(
         ("key", "expected"),
         [
             ("Path", "PATH"),
-            ("Qubit_Yolo_Mode", "QUBIT_YOLO_MODE"),
-            ("Qubit_Optional_Mcps", "QUBIT_OPTIONAL_MCPS"),
-            ("Qubit_Copilot_Acp_Command", "QUBIT_COPILOT_ACP_COMMAND"),
-            ("Qubit_Copilot_Acp_Args", "QUBIT_COPILOT_ACP_ARGS"),
+            ("Qubit_Yolo_Mode", "HERMES_YOLO_MODE"),
+            ("Qubit_Optional_Mcps", "HERMES_OPTIONAL_MCPS"),
+            ("Qubit_Copilot_Acp_Command", "HERMES_COPILOT_ACP_COMMAND"),
+            ("Qubit_Copilot_Acp_Args", "HERMES_COPILOT_ACP_ARGS"),
         ],
     )
     def test_windows_policy_names_are_case_insensitive(self, key, expected):
