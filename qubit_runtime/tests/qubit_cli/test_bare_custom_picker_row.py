@@ -13,20 +13,6 @@ import qubit_cli.providers as providers_mod
 from qubit_cli.model_switch import list_authenticated_providers
 
 
-# PRODUCT GAP (Qubit fork): ``qubit_cli/model_switch_providers.py``
-# ``_lap_bare_custom_row`` dropped the static-config fallback branch that
-# upstream ``hermes_cli/model_switch_providers.py`` (pin cbe5e53e, lines
-# 1058-1073) has: when the session's current provider is NOT ``custom`` it
-# recovers ``base_url``/``default`` from ``load_config().get("model")`` so the
-# row survives switching away (#59702). The Qubit copy only serves the row
-# while ``current_provider_norm == "custom"``; the config block is never read.
-# Do NOT fix product here — recorded for the sync owner.
-@pytest.mark.xfail(
-    strict=False,
-    reason="PRODUCT GAP (#59702): qubit_cli/model_switch_providers._lap_bare_custom_row "
-    "omits upstream's static config.yaml `model:` fallback; the bare custom row "
-    "vanishes when a different provider is current.",
-)
 def test_bare_custom_row_survives_switching_away_from_it(monkeypatch):
     """Regression for #59702: the bare ``model.provider: custom`` row must not
     vanish from the picker when the session's current provider is a different
