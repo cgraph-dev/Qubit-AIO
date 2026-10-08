@@ -210,6 +210,9 @@ class FreeTierStatusResult(Result):
     retry_after: int | None = None
     # A browser challenge the account service is waiting on (``qubit_cli/anon_challenge.py``).
     challenge: FreeTierChallengePayload | None = None
+    # Seconds until the sign-in offer after a finished task is due (0 = due now); absent when none is
+    # pending (no finished task since the last offer, or not on the free tier).
+    nudge_due_in: int | None = None
 
 
 method("free_tier.status", params=ProfileParams, result=FreeTierStatusResult,
@@ -251,17 +254,27 @@ method("free_tier.ack_notice", params=ProfileParams, result=FreeTierAckNoticeRes
        doc="Mark the one-time availability notice as shown on the free-tier identity.")
 
 
+class FreeTierClaimNudgeResult(Result):
+    claimed: bool
+
+
+method("free_tier.claim_nudge", params=ProfileParams, result=FreeTierClaimNudgeResult,
+       doc="Claim the due sign-in offer; true for exactly one caller each time an offer comes due.")
+
+
 # ── shared metrics consent ────────────────────────────────────────────────────────────────────
 
 
 class SharedMetricsConsentResult(Result):
     """The focused profile's ``telemetry.shared_metrics`` opt-ins. ``send`` is never true while
     ``enabled`` is false; ``decided`` = either key is written in config.yaml (the shipped defaults
-    are not an answer)."""
+    are not an answer) and it is not a ``reask``: an "off" from before the type-ahead fix, offered
+    once more with the reason."""
 
     enabled: bool
     send: bool
     decided: bool
+    reask: bool = False
 
 
 method("shared_metrics.status", params=ProfileParams, result=SharedMetricsConsentResult,
@@ -545,6 +558,8 @@ class ModelOptionProvider(OpenModel):
     free_tier_pending: bool | None = None
     free_tier_row: bool | None = None
     unavailable_models: list[str] | None = None
+    limit: ProviderLimit | None = None
+    usage: ProviderUsage | None = None
 
 
 class ModelOptionsResult(Result):
