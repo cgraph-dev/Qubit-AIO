@@ -11,21 +11,6 @@ import pytest
 from tests.agent.test_run_agent import _mock_response
 from tools.registry import registry
 
-# PRODUCT GAP (root-caused): the product never reports ``user_intervened`` on a
-# turn result. Upstream 38880bd2 sets ``agent._turn_user_intervened = False`` at
-# turn start and ``result["user_intervened"] = bool(getattr(agent,
-# "_turn_user_intervened", False))`` at turn end (agent/conversation_loop.py:1738
-# and :1764), and sets the flag True from steer/redirect/interrupt
-# (agent/interrupt_control.py:161,277,297,331). Neither the attribute nor the
-# result key exists anywhere in this tree (only free_tier_task_done.py:23 reads
-# ``result.get("user_intervened")``). Product short-port; do NOT fix here.
-pytestmark = pytest.mark.xfail(
-    reason="PRODUCT GAP: run_conversation never sets result['user_intervened'] "
-    "nor agent._turn_user_intervened (upstream 38880bd2 sets both in "
-    "agent/conversation_loop.py:1738/1764 and interrupt_control.py).",
-    strict=False,
-)
-
 _PROBE = "intervention_probe"
 _DURING_TOOL: list = []  # callables run inside the tool, i.e. while the turn is executing tools
 
