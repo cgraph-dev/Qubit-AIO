@@ -84,7 +84,12 @@ def _lanes(python=False, frontend=False, site=False, scan=False, deps=False, uv_
 
 
 CASES = {
-    "shared JS builder → frontend": (["scripts/build/web.mjs"], _lanes(python=True, frontend=True)),
+    # source_build runs it on every source update, and the Desktop build steps
+    # through the same compilers (tests/ci/test_update_ci_routing.py).
+    "shared JS builder → frontend + both update suites": (
+        ["scripts/build/web.mjs"],
+        _lanes(python=True, frontend=True, e2e_upgrade=True, e2e_desktop_update=True),
+    ),
     "root JS tests → frontend": (["tests-js/product-builders.test.mjs"], _lanes(python=True, frontend=True)),
     "docs-only → nothing heavy": (["README.md", "docs/guide.md"], _lanes()),
     "python source → python": (["run_agent.py"], _lanes(python=True, scan=True)),
@@ -176,15 +181,17 @@ CASES = {
     # its tests spawn the real script and poll its loopback server. They run
     # when the script, the Electron side that launches it, or their own test
     # files change — not on every qubit_state.py PR.
+    # `qubit update`, and the Windows crash cells that kill it mid-run live in
+    # the install + update journey, so it starts e2e_upgrade as well.
     "windows.ps1 → desktop_updater": (
         ["scripts/desktop-update/windows.ps1"],
-        _lanes(python=True, desktop_updater=True, e2e_desktop_update=True),
+        _lanes(python=True, desktop_updater=True, e2e_upgrade=True, e2e_desktop_update=True),
     ),
     # The shipped updater page is exercised by the desktop Electron suite;
     # a page-only change must run that suite as well as the server tests.
     "updater ui.html → frontend + desktop_updater": (
         ["scripts/desktop-update/ui.html"],
-        _lanes(python=True, frontend=True, desktop_updater=True, e2e_desktop_update=True),
+        _lanes(python=True, frontend=True, desktop_updater=True, e2e_upgrade=True, e2e_desktop_update=True),
     ),
     "desktop-update test → desktop_updater": (
         ["tests/scripts/desktop_update/test_desktop_update_windows_progress.py"],
