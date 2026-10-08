@@ -24,22 +24,6 @@ UNIFIED_128 = HardwareBudget(usable_vram_bytes=int(128 * GIB * 0.8), total_devic
                              ram_available_bytes=0, uma=True)
 
 
-# PRODUCT GAP (Qubit fork): ``qubit_cli/web_routers/local_models.py`` diverged
-# from upstream pin cbe5e53e in two ways that together break MTP-head download:
-#   1. ``_download_plan`` (line 418) omits ``entry.mtp_head`` from the asset
-#      tuple — upstream includes ``(entry.mmproj, entry.draft, entry.mtp_head)``.
-#   2. ``_hf_url`` (line 399) hardcodes ``/resolve/main/`` and drops the
-#      per-asset ``repo``/``revision`` that ``AssetFile`` still carries
-#      (catalog.py lines 42-43) — upstream is ``_hf_url(a.repo or entry.repo,
-#      a.path, a.revision)``.
-# The head therefore never enters the download plan. Do NOT fix product here.
-_MTP_HEAD_GAP = pytest.mark.xfail(
-    strict=False,
-    reason="PRODUCT GAP: qubit_cli/web_routers/local_models._download_plan omits "
-    "entry.mtp_head and _hf_url drops AssetFile.repo/revision (upstream pin "
-    "cbe5e53e includes both); the MTP head never enters the download plan.",
-)
-
 BUILD = QuantVariant(quant="UD-IQ4_XS", files=(AssetFile("m/Head-Model-00001-of-00002.gguf", 10 << 20),
                                                AssetFile("m/Head-Model-00002-of-00002.gguf", 40 * GIB)))
 ENTRY = CatalogEntry(
@@ -49,7 +33,6 @@ ENTRY = CatalogEntry(
     mtp_head=AssetFile("mtp-Head-Model-Q8_0.gguf", 4 * GIB, repo="other/Head-Model-GGUF", revision="0123abc"))
 
 
-@_MTP_HEAD_GAP
 def test_the_head_downloads_with_the_model_from_its_own_repo_and_is_priced_before_download():
     without_head = replace(ENTRY, mtp_head=None)
 
