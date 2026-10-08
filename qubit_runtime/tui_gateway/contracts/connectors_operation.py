@@ -102,6 +102,22 @@ class CatalogScan(Payload):
     summary: str
 
 
+class CatalogApproved(Payload):
+    """The non-secret Advanced choices the user approved on a catalog row; a Try again after the
+    operation settled repeats them."""
+
+    force: bool
+    enable: bool
+    ref: str | None = None
+
+
+class CatalogServerError(Payload):
+    """An MCP server an installed plugin brought that did not connect, with the raw reason."""
+
+    name: str
+    error: str
+
+
 class ConnectionOperationTarget(Payload):
     """``Target.snapshot``: the link minted up front rides here, never in the model result. ``extra``
     keys a leg records (``tools``, ``hint``) are typed here as they appear."""
