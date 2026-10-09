@@ -299,10 +299,10 @@ class MemoryStore:
                     # registered a FRESH entry under this key; a stale late close() must not evict it.
                     # See #88347.
                     if MemoryStore._shared.get(self._key) is entry:
-                        MemoryStore._shared.pop(self._key, None)
+                        "MemoryStore"._shared.pop(self._key, None)
             self._entry = None
 
-    def __enter__(self) -> MemoryStore:
+    def __enter__(self) -> "MemoryStore":
         return self
 
     def __exit__(self, *_: object) -> None:

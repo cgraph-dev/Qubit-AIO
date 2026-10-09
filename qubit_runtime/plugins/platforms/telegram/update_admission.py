@@ -167,7 +167,7 @@ class PerChatUpdateProcessor(SimpleUpdateProcessor):
                 prev.add_done_callback(release)
 
 
-def build_update_processor(extra, name: str) -> PerChatUpdateProcessor:
+def build_update_processor(extra, name: str) -> "PerChatUpdateProcessor":
     """``platforms.telegram.extra.max_concurrent_updates`` (default 32); bad values warn and fall back."""
     raw = extra.get("max_concurrent_updates", DEFAULT_MAX_CONCURRENT_UPDATES)
     limit = coerce_port(raw, 0)
