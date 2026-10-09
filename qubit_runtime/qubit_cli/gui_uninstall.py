@@ -93,7 +93,7 @@ def gui_is_installed(qubit_home: Path) -> bool:
     ))
 
 
-def gui_install_summary(qubit_home: "Path | None" = None) -> dict:
+def gui_install_summary(qubit_home: Path | None = None) -> dict:
     """JSON-serializable snapshot of what's installed, for the desktop UI to render via IPC."""
     home: Path = qubit_home if qubit_home is not None else get_qubit_home()
     userdata = desktop_userdata_dir()
@@ -133,7 +133,7 @@ def _remove_path(path: Path) -> bool:
         return False
 
 
-def uninstall_gui(qubit_home: "Path | None" = None, *, remove_userdata: bool = True) -> "list[Path]":
+def uninstall_gui(qubit_home: Path | None = None, *, remove_userdata: bool = True) -> list[Path]:
     """Remove the desktop GUI's artifacts, leaving the agent + user data intact."""
     home: Path = qubit_home if qubit_home is not None else get_qubit_home()
     removed: list[Path] = []
