@@ -306,7 +306,7 @@ def _parse_env_value(raw_value: str) -> str:
 # EACCES must not become "this profile has no secrets"), and the descriptor pins one inode so a
 # symlink repointed mid-read can't file one file's contents under another's identity.
 # ``invalidate_env_file_cache()`` is the explicit knob; ``qubit_cli.config.invalidate_env_cache()``
-# calls it for Hermes's own .env writers.
+# calls it for Qubit's own .env writers.
 _ENV_FILE_CACHE: OrderedDict[str, Tuple[tuple, Dict[str, str]]] = OrderedDict()
 _ENV_FILE_CACHE_LOCK = threading.Lock()
 _ENV_FILE_CACHE_MAX = 64  # one entry per profile home in practice
