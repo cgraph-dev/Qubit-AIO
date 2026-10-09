@@ -73,7 +73,7 @@ def _write_home(home, monkeypatch, *, nous_state=None, config=None):
 
     home.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setenv("QUBIT_GUEST_ONBOARDING", "1")
+    monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
     monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
     monkeypatch.delenv("TOOL_GATEWAY_USER_TOKEN", raising=False)
     atomic_config_write(home / "config.yaml", {"web": {"keyless_rescue": False}, **(config or {})})
