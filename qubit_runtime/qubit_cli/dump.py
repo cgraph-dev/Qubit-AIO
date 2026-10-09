@@ -11,6 +11,7 @@ from qubit_cli.config import get_qubit_home, get_env_path, get_project_root, loa
 from qubit_cli.env_loader import load_qubit_dotenv
 from qubit_constants import display_qubit_home
 from agent.skill_utils import is_excluded_skill_path
+from datetime import UTC
 
 
 def _dotenv_key_names() -> set[str]:
@@ -87,7 +88,7 @@ def _get_git_commit_date(project_root: Path) -> str:
 
         from qubit_cli.version_info import get_version_info  # deferred: keeps dump cheap on non-dump paths
         commit_date = get_version_info().commit_date
-        return datetime.fromtimestamp(commit_date, tz=timezone.utc).strftime("%Y-%m-%d") if commit_date else ""
+        return datetime.fromtimestamp(commit_date, tz=UTC).strftime("%Y-%m-%d") if commit_date else ""
     except Exception:
         return ""
 

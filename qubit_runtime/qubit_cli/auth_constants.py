@@ -163,10 +163,10 @@ def _provider_error_factory(provider: str) -> Callable[..., AuthError]:
 _nous_err = _provider_error_factory("nous")
 _xai_err = _provider_error_factory("xai-oauth")
 _codex_err = _provider_error_factory("openai-codex")
-_spotify_err = _provider_error_factory("spotify")
 _qwen_err = _provider_error_factory("qwen-oauth")
 _minimax_err = _provider_error_factory("minimax-oauth")
 _openrouter_err = _provider_error_factory("openrouter")
+_spotify_err = _provider_error_factory("spotify")
 
 
 def _decode_jwt_claims(token: Any) -> Dict[str, Any]:

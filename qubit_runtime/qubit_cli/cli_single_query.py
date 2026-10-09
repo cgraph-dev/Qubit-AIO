@@ -94,7 +94,7 @@ def _run_kanban_goal_loop_q(cli: "HermesCLI", first_response: str, run_turn=None
             "failure_reason": result.get("failure_reason") if isinstance(result, dict) else None,
         }
 
-    def _task_status() -> "str | None":
+    def _task_status() -> str | None:
         with _kbc.connect_closing() as c:
             return _kb.goal_run_status(c, task_id, worker_run_id)
 

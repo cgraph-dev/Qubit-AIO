@@ -41,7 +41,7 @@ _ENTRY_POINTS_GROUP = "qubit_agent.plugins"
 class RemoteRegistration:
     """Child-side twin of ``PluginRegistration``: ``dispose()`` releases the Hermes-side entry."""
 
-    def __init__(self, runtime: "HostRuntime", handle_id: int, kind: str, key: str):
+    def __init__(self, runtime: HostRuntime, handle_id: int, kind: str, key: str):
         self._runtime, self._id, self.kind, self.key = runtime, handle_id, kind, key
         self._disposed = False
 
@@ -59,7 +59,7 @@ class RemoteRegistration:
 class RemoteFacade:
     """``ctx.state`` / ``ctx.llm`` / ...: every method call runs on the Hermes-side facade."""
 
-    def __init__(self, runtime: "HostRuntime", plugin_key: str, name: str):
+    def __init__(self, runtime: HostRuntime, plugin_key: str, name: str):
         self._runtime, self._plugin_key, self._name = runtime, plugin_key, name
         self._methods: Dict[str, bool] = {}  # method name -> is a coroutine function in Hermes
 

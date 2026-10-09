@@ -65,7 +65,7 @@ except Exception:  # noqa: BLE001 - never block the dashboard on an optional shi
     _log.debug("pty lease shim unavailable; PTY leases release on the normal paths", exc_info=True)
 
 
-async def _close_stalled_pty_input(ws: "WebSocket", *, path: str) -> None:
+async def _close_stalled_pty_input(ws: WebSocket, *, path: str) -> None:
     """Close only the terminal socket when its child stops accepting input."""
     _log.warning("pty input stalled path=%s; recycling terminal session", path)
     try:
@@ -74,7 +74,7 @@ async def _close_stalled_pty_input(ws: "WebSocket", *, path: str) -> None:
         pass
 
 
-async def _legacy_pump(ws: "WebSocket", bridge) -> None:
+async def _legacy_pump(ws: WebSocket, bridge) -> None:
     """Original 1:1 socket<->PTY pump: stream until disconnect, then close the
     bridge. Used when no ``?attach=`` token is supplied (keep-alive opt-in).
 
@@ -150,7 +150,7 @@ async def _legacy_pump(ws: "WebSocket", bridge) -> None:
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "testclient"})
 
 
-def _ws_client_reason(ws: "WebSocket") -> Optional[str]:
+def _ws_client_reason(ws: WebSocket) -> Optional[str]:
     """Return a rejection reason token for the peer IP, or None when allowed.
 
     Loopback bind: only loopback peers (the legacy ``?token=`` is the only auth,
@@ -173,12 +173,12 @@ def _ws_client_reason(ws: "WebSocket") -> Optional[str]:
     return f"peer_not_loopback peer={client_host} bound={bound_host or '?'}"
 
 
-def _ws_client_is_allowed(ws: "WebSocket") -> bool:
+def _ws_client_is_allowed(ws: WebSocket) -> bool:
     """True when the peer IP passes :func:`_ws_client_reason`."""
     return _ws_client_reason(ws) is None
 
 
-def _ws_host_origin_reason(ws: "WebSocket") -> Optional[str]:
+def _ws_host_origin_reason(ws: WebSocket) -> Optional[str]:
     """Return ``host_mismatch …`` / ``origin_mismatch …``, or None when allowed.
 
     HTTP middleware does not run for WebSocket routes, so the DNS-rebinding
@@ -208,12 +208,12 @@ def _ws_host_origin_reason(ws: "WebSocket") -> Optional[str]:
     return None
 
 
-def _ws_host_origin_is_allowed(ws: "WebSocket") -> bool:
+def _ws_host_origin_is_allowed(ws: WebSocket) -> bool:
     """True when the upgrade passes the dashboard Host/Origin guard."""
     return _ws_host_origin_reason(ws) is None
 
 
-def _ws_request_is_allowed(ws: "WebSocket") -> bool:
+def _ws_request_is_allowed(ws: WebSocket) -> bool:
     """Return True when the WebSocket upgrade matches dashboard boundaries."""
     return _ws_host_origin_is_allowed(ws) and _ws_client_is_allowed(ws)
 
@@ -222,7 +222,7 @@ _GATEWAY_WS_PROTOCOL = "hermes-gateway-v1"
 _GATEWAY_WS_TICKET_PROTOCOL_PREFIX = "hermes-gateway-ticket."
 
 
-def _gateway_ws_ticket_from_subprotocol(ws: "WebSocket") -> tuple[str, str]:
+def _gateway_ws_ticket_from_subprotocol(ws: WebSocket) -> tuple[str, str]:
     """Return ``(ticket, reason)`` from an unambiguous gateway protocol set."""
     raw = str(ws.headers.get("sec-websocket-protocol", "") or "")
     protocols = [value.strip() for value in raw.split(",") if value.strip()]
@@ -236,7 +236,7 @@ def _gateway_ws_ticket_from_subprotocol(ws: "WebSocket") -> tuple[str, str]:
     return (ticket, "ok") if ticket else ("", "invalid")
 
 
-def _ws_request_view(ws: "WebSocket") -> "Request":
+def _ws_request_view(ws: WebSocket) -> Request:
     """A ``Request`` facade over a ``WebSocket`` for the auth helpers.
 
     ``_verify_access_token`` only touches ``request.headers`` (X-Forwarded-For
@@ -261,7 +261,7 @@ def _ws_request_view(ws: "WebSocket") -> "Request":
     })
 
 
-def _ws_auth_reason(ws: "WebSocket") -> tuple[Optional[str], str]:
+def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
     """Validate WS-upgrade auth; return ``(reason, credential)``.
 
     ``reason`` is None when accepted, else a short token (``no_credential``,
@@ -388,7 +388,7 @@ def _ws_auth_reason(ws: "WebSocket") -> tuple[Optional[str], str]:
     return "token_mismatch", "token"
 
 
-def _ws_auth_ok(ws: "WebSocket") -> bool:
+def _ws_auth_ok(ws: WebSocket) -> bool:
     """True when the WS-upgrade credential is accepted. See _ws_auth_reason."""
     return _ws_auth_reason(ws)[0] is None
 
@@ -569,16 +569,8 @@ async def _resolve_chat_argv_async(
         return await asyncio.to_thread(_resolve_chat_argv, **kwargs)
 
 
-def _active_session_file_for_channel(app: "FastAPI", channel: str) -> Path:
-    """Return the per-channel file where a dashboard TUI writes its active sid.
-
-    The path is DETERMINISTIC per channel, not a fresh ``mkstemp`` per process.
-    The dashboard's own mapping lives in ``app.state`` and dies with the
-    process, so a random temp path made every reconnect after a restart read an
-    empty file, find no resume id, and spawn a brand-new session — the point at
-    which an interrupted turn could no longer be recovered. A stable path lets
-    the id written before the restart be read after it.
-    """
+def _active_session_file_for_channel(app: FastAPI, channel: str) -> Path:
+    """Return the per-channel file where a dashboard TUI writes its active sid."""
     from qubit_cli.web_server import _get_pty_active_session_files
     import hashlib
     files = _get_pty_active_session_files(app)

@@ -319,10 +319,10 @@ _POST_SETUP_HOOKS: dict = {
     "browser_use_cli": lambda: _ensure_browser_use_cli(verbose_hints=True),
     "camofox": _post_setup_camofox,
     "cua_driver": lambda: install_cua_driver(upgrade=False),
-    "spotify": _post_setup_spotify,
     "langfuse": _post_setup_langfuse,
     "xai_grok": _post_setup_xai_grok,
     "openai_codex": _post_setup_openai_codex,
+    "spotify": _post_setup_spotify,
     **{key: (lambda spec=spec: _post_setup_python(spec)) for key, spec in _PYTHON_POST_SETUP_HOOKS.items()},
 }
 
