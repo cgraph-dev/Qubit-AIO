@@ -132,6 +132,30 @@ def test_check_subprocess_never_starts_the_loop(tmp_path):
     assert not (home / "gateway.sock").exists()
 
 
+# ----------------------------------------------------------- dead-write guard
+
+def test_gateway_daemon_does_not_set_a_dead_marker():
+    """Wave f5 #4: ``voicebridge.gateway_daemon`` used to set
+    ``QUBIT_GATEWAY_DAEMON=1`` immediately before handing off to the vendored
+    gateway loop. Nothing ever read that name — it was a signal with no consumer
+    ("am I the daemon?" intent). The real, widely-read gateway marker is
+    ``_HERMES_GATEWAY``, set once in the vendored loop
+    (``qubit_runtime/gateway/run.py``) and read by 11 call sites.
+
+    Guard against the dead write being reintroduced: this file must not mention
+    the name, and the vendored loop must still set the real marker.
+    """
+    src = (REPO_ROOT / "voicebridge" / "gateway_daemon.py").read_text()
+    assert "QUBIT_GATEWAY_DAEMON" not in src, (
+        "the dead QUBIT_GATEWAY_DAEMON write must not be reintroduced — "
+        "nothing reads it; _HERMES_GATEWAY is the daemon marker"
+    )
+    run_src = (REPO_ROOT / "qubit_runtime" / "gateway" / "run.py").read_text()
+    assert 'os.environ["_HERMES_GATEWAY"] = "1"' in run_src, (
+        "gateway/run.py must still set the real _HERMES_GATEWAY daemon marker"
+    )
+
+
 # ----------------------------------------------------------- daemon-unit selector
 
 def test_daemon_service_unit_default_and_overrides(tmp_path):

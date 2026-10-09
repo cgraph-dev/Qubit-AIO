@@ -137,7 +137,6 @@ def main(argv: Optional[list] = None) -> int:
         return 0 if report["state"] == "OK" else 2
     # Everything after the Qubit-dedicated flags is the vendored gateway's own
     # argv (--config/-c, --verbose/-v); we never re-parse those here.
-    os.environ.setdefault("QUBIT_GATEWAY_DAEMON", "1")
     return run_gateway(rest)
 
 
