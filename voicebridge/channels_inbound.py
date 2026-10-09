@@ -288,6 +288,78 @@ def _store_path(cfg: Any) -> Path:
     return Path(cfg.state_dir()) / STORE_NAME
 
 
+def _safe_int(value: Any) -> Optional[int]:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+# The authority for "is this channel connected" is the LIVE gateway's own
+# status, not the inbound credential-reference registry. Two stores, two
+# different questions (see DASHBOARD_CONFIG_WIRING): this registry holds
+# Qubit's inbound framework *intent*; the running gateway's
+# ``gateway_state.json`` holds its own transport connection state. The
+# user-facing surface must read the authority, or report both honestly --
+# never show ``0`` while the gateway is demonstrably connected.
+_GATEWAY_AUTHORITY = "gateway_state.json"
+
+
+def _default_gateway_reader() -> Optional[Dict[str, Any]]:
+    """The live gateway's own status, or ``None`` when unreadable.
+
+    Delegates to :func:`voicebridge.gateway_supervisor.daemon_runtime_status`
+    (the same first-party read the ``qubit gateway status`` surface uses) so
+    there is exactly one authority, never a third store. Best-effort: any
+    failure resolves to ``None`` -- never a fabricated record.
+    """
+    try:
+        from . import gateway_supervisor as GS
+
+        return GS.daemon_runtime_status()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _gateway_view(reader: Optional[Any] = None) -> Dict[str, Any]:
+    """Normalize the live gateway's own platform-connection view.
+
+    Returns a labelled, read-only summary of the AUTHORITATIVE source:
+    ``readable`` (was the gateway state file present), ``state`` (the
+    gateway's own ``gateway_state``), ``platforms`` (platform -> state) and
+    ``connected_platforms`` (the connected set, sorted). When the gateway is
+    absent this is honestly empty -- never a fabricated ``connected``.
+    """
+    read = reader or _default_gateway_reader
+    rec: Optional[Dict[str, Any]] = None
+    try:
+        rec = read()
+    except Exception:  # noqa: BLE001
+        rec = None
+    platforms: Dict[str, str] = {}
+    if isinstance(rec, dict):
+        raw = rec.get("platforms_map")
+        if isinstance(raw, dict):
+            for name, info in raw.items():
+                state = ""
+                if isinstance(info, dict):
+                    state = str(info.get("state") or info.get("status") or "")
+                else:
+                    state = str(info or "")
+                platforms[str(name)] = state.lower()
+    connected = sorted(
+        name for name, state in platforms.items()
+        if state in ("connected", "running", "ok"))
+    return {
+        "authoritative_source": _GATEWAY_AUTHORITY,
+        "readable": isinstance(rec, dict),
+        "state": (rec.get("gateway_state") if isinstance(rec, dict) else None),
+        "platforms": platforms,
+        "connected": len(connected),
+        "connected_platforms": connected,
+    }
+
+
 def _nonce_path(cfg: Any) -> Path:
     return Path(cfg.state_dir()) / NONCE_NAME
 
@@ -401,7 +473,8 @@ def _get(cfg: Any, channel: str) -> Dict[str, Any]:
     return rec
 
 
-def _public(rec: Dict[str, Any]) -> Dict[str, Any]:
+def _public(rec: Dict[str, Any],
+            gateway: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     caps = CHANNEL_CAPS.get(rec["channel"], {})
     from .providers.credentials import resolve_key
 
@@ -412,11 +485,19 @@ def _public(rec: Dict[str, Any]) -> Dict[str, Any]:
         state, state_code = "NO_CREDENTIAL", NO_CREDENTIAL_CODE
     else:
         state, state_code = "UNAVAILABLE", UNAVAILABLE_CODE
+    # The live gateway's own view of THIS channel (authoritative for
+    # ``connected``); a registry credential reference can never set it.
+    gw_state = ""
+    if isinstance(gateway, dict):
+        gw_state = str((gateway.get("platforms") or {}).get(rec["channel"])
+                       or "")
     return {"channel": rec["channel"], "label": caps.get("label", ""),
             "events": list(rec.get("events", [])),
             "credential": _redact_secret_kind(_resolve_ref(rec)),
             "transport": caps.get("transport", "none"),
             "available": False, "state": state, "code": state_code,
+            "gateway_state": gw_state,
+            "connected": gw_state in ("connected", "running", "ok"),
             "configured_at": rec.get("configured_at"),
             "updated_by": rec.get("updated_by", "")}
 
@@ -485,23 +566,34 @@ def unconfigure(cfg: Any, channel: str, *, confirmed: bool = False,
     return {"state": "OK", "removed": clean}
 
 
-def accounts(cfg: Any) -> Dict[str, Any]:
+def accounts(cfg: Any, *, gateway_reader: Optional[Any] = None
+             ) -> Dict[str, Any]:
     """Configured inbound channels (redacted, honest derived state)."""
     state = _load(cfg)
-    rows = [_public(r) for r in
+    gateway = _gateway_view(gateway_reader)
+    rows = [_public(r, gateway) for r in
             sorted(state["channels"].values(),
                    key=lambda r: r.get("channel", ""))]
     return {"state": "OK", "schema": SCHEMA, "accounts": rows,
-            "connected": []}
+            "connected": [],
+            "gateway": gateway}
 
 
-def catalog(cfg: Any) -> Dict[str, Any]:
-    """Every known channel with a credential-reference-derived typed state."""
+def catalog(cfg: Any, *, gateway_reader: Optional[Any] = None
+            ) -> Dict[str, Any]:
+    """Every known channel with a credential-reference-derived typed state.
+
+    ``connected`` lists the platforms the LIVE gateway reports connected
+    (read from the authoritative ``gateway_state.json``), not the registry.
+    """
     configured = _load(cfg).get("channels", {})
+    gateway = _gateway_view(gateway_reader)
+    gw_platforms = gateway.get("platforms") or {}
     rows: List[Dict[str, Any]] = []
     for cid, caps in CHANNEL_CAPS.items():
+        gw_state = str(gw_platforms.get(cid) or "")
         if cid in configured:
-            rows.append(_public(configured[cid]))
+            rows.append(_public(configured[cid], gateway))
         else:
             rows.append({
                 "channel": cid, "label": caps.get("label", cid),
@@ -509,31 +601,48 @@ def catalog(cfg: Any) -> Dict[str, Any]:
                 "transport": caps.get("transport", "none"),
                 "available": False, "state": "UNCONFIGURED",
                 "code": NO_CREDENTIAL_CODE, "configured_at": None,
+                "gateway_state": gw_state,
+                "connected": gw_state in ("connected", "running", "ok"),
                 "updated_by": "", "detail": caps.get("detail", "")})
     return {"state": "OK", "schema": SCHEMA, "channels": rows,
             "available": [r["channel"] for r in rows
                           if r["state"] == "AVAILABLE"],
-            "connected": [],
+            "connected": list(gateway.get("connected_platforms") or []),
+            "gateway": gateway,
             "listener": dict(LISTENER)}
 
 
-def status(cfg: Any) -> Dict[str, Any]:
-    """Typed inbound framework state: listener NONE, connected never faked."""
+def status(cfg: Any, *, gateway_reader: Optional[Any] = None
+           ) -> Dict[str, Any]:
+    """Typed inbound framework state + the LIVE gateway's connection view.
+
+    ``connected`` is the gateway's own connected-platform count (the
+    authority); the framework registry is reported alongside, clearly
+    labelled, so the surface never shows ``0`` while the gateway is
+    demonstrably connected. ``configured`` is still the credential-reference
+    count -- a reference is not a transport.
+    """
     latched = estop_engaged(cfg)
     try:
         configured = len(_load(cfg).get("channels", {}))
     except ChannelError:
         configured = -1
+    gateway = _gateway_view(gateway_reader)
     return {"state": "ESTOP" if latched else "OK",
             "code": ESTOP_CODE if latched else "",
             "schema": SCHEMA, "channels": len(CHANNELS),
-            "configured": configured, "connected": 0,
+            "configured": configured,
+            "connected": int(gateway.get("connected") or 0),
+            "connected_platforms": list(
+                gateway.get("connected_platforms") or []),
+            "gateway": gateway,
             "listener": LISTENER["state"],
             "listener_detail": LISTENER["detail"],
             "dashboard_config_wiring": dict(DASHBOARD_CONFIG_WIRING),
             "estop": latched,
-            "detail": "real registry/contract with typed CHANNEL_UNAVAILABLE "
-                      "until a listener transport is configured"}
+            "detail": "registry credential references are separate from the "
+                      "live gateway's transport connections; ``connected`` "
+                      "reflects the gateway's own platform state"}
 
 
 def _nonce_seen(cfg: Any, nonce: str) -> bool:
