@@ -98,20 +98,19 @@ def homeassistant_in_use(home: Path, *, process_env: bool = False) -> bool:
     return _toolset_listed(_read_config(home), frozenset({"homeassistant", "qubit-homeassistant", "hermes-homeassistant"}))
 
 
-def spotify_in_use(home: Path, *, process_env: bool = False) -> bool:
-    """What made core's Spotify tools usable for *home*: a login stored in its ``auth.json``
-    (``providers.spotify``, written by ``qubit auth spotify``) or the ``spotify`` toolset selected
-    for a platform. The tools were opt-in and login-gated, so a client id alone is not use."""
-    import json
-    try:
-        store = json.loads((home / "auth.json").read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):  # missing/unreadable/invalid JSON: no login we can see
-        store = {}
-    providers = store.get("providers") if isinstance(store, dict) else None
-    state = providers.get("spotify") if isinstance(providers, dict) else None
-    if isinstance(state, dict) and (state.get("access_token") or state.get("refresh_token")):
-        return True
-    return _toolset_listed(_read_config(home), frozenset({"spotify"}))
+# NOTE (spotify deliberately absent from LEFT_CORE): upstream moved Spotify out of core into the
+# standalone ``spotify`` catalog plugin (upstream 71704ffb498, "move Spotify out of core into the
+# spotify catalog plugin"), which is why upstream added ``spotify_in_use`` and the LEFT_CORE row
+# alongside it. Qubit does NOT ship that move: the loopback-PKCE login (``qubit_cli.auth_spotify``),
+# the ``spotify`` toolset in ``qubit_cli.tools_config`` / ``auth_constants`` (SERVICE_PROVIDER_NAMES)
+# and the bundled backend plugin (``plugins/spotify``, ``name: spotify``, 7 tools) are all still in
+# our tree, and there is NO catalog entry named ``spotify`` to migrate a home TO (the catalog only
+# carries ``spotify-desktop``, an unrelated community Desktop player with no agent tools). A
+# LEFT_CORE row installs the catalog plugin for homes that used a core feature, so a row here would
+# name a plugin that does not exist: the feature never left core, nothing needs migrating, and the
+# ``spotify_in_use`` predicate has no caller. It is therefore deleted rather than left defined-but-
+# unreferenced. Restore this row only in the same change that removes spotify from core and adds the
+# ``spotify`` catalog entry (mirroring upstream 71704ffb498).
 
 
 @dataclass(frozen=True)
