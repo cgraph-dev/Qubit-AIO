@@ -212,7 +212,7 @@ class CLISessionMixin:
         """Show compact startup status line."""
         from cli import get_tool_definitions
         # Avoid pulling the full tool registry into the bare Termux prompt path.
-        if os.environ.get("QUBIT_DEFER_AGENT_STARTUP") == "1":
+        if os.environ.get("HERMES_DEFER_AGENT_STARTUP") == "1":
             tool_status = t("cli.session.status_tools_deferred")
         else:
             tools = get_tool_definitions(enabled_toolsets=self.enabled_toolsets,
