@@ -1,6 +1,7 @@
 """Delivery routing for cron job outputs and agent responses, by target: explicit ("telegram:123456789"),
 platform home channel ("telegram"), origin (back to where the job was created), or local (files)."""
 
+from __future__ import annotations
 import logging
 import re
 from pathlib import Path
@@ -121,7 +122,7 @@ class DeliveryTarget:
     unknown_platform: Optional[str] = None
 
     @classmethod
-    def parse(cls, target: str, origin: Optional[SessionSource] = None) -> "DeliveryTarget":
+    def parse(cls, target: str, origin: Optional[SessionSource] = None) -> DeliveryTarget:
         """Parse "origin" | "local" | "<platform>" | "<platform>:<chat_id>[:<thread_id>]"."""
         target = target.strip()
         if target.lower() == "origin":
