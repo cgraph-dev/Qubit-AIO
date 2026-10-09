@@ -59,9 +59,9 @@ def _loaded_status(content: str, rendered_len: int, max_chars: int, user_authore
 
 def list_context_file_sources(
     cwd: Optional[str] = None, context_length: Optional[int] = None, allow_install_tree_fallback: bool = False,
-    home_override: "Path | None" = None, skip_soul: bool = False,
+    home_override: Path | None = None, skip_soul: bool = False,
 ) -> List[Dict[str, Any]]:
-    """One dict per context file Qubit considered, in the builder's priority order.
+    """One dict per context file Hermes considered, in the builder's priority order.
 
     Same signature semantics as ``build_context_files_prompt`` (``cwd=None`` → launch dir, install-tree guard
     unless *allow_install_tree_fallback*). Keys: ``label``, ``path``, ``chars``, ``est_tokens``, ``loaded``
