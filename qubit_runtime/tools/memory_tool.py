@@ -44,7 +44,7 @@ from tools.memory_tool_store import (  # noqa: E402,F401  (re-exports)
     ENTRY_DELIMITER, MEMORY_BLOCK_HEADERS, MemoryStore, _scan_memory_content)
 
 
-def load_on_disk_store() -> "MemoryStore":
+def load_on_disk_store() -> MemoryStore:
     """Fresh on-disk MemoryStore with configured limits/flags for contexts with no live
     agent (gateway, Desktop, ``/memory``) so approvals enforce the SAME caps as
     ``agent_init``. Falls back to defaults if config can't load; never raises."""
