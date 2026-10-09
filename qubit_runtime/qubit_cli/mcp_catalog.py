@@ -370,8 +370,7 @@ def catalog_diagnostics() -> List[tuple]:
 
 def get_entry(name: str) -> Optional[CatalogEntry]:
     """Look up a single entry by name. ``official/<name>`` prefix accepted."""
-    if name.startswith("official/"):
-        name = name[len("official/"):]
+    name = name.removeprefix("official/")
     return next((e for e in list_catalog() if e.name == name), None)
 
 
