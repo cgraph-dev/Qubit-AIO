@@ -336,7 +336,7 @@ cua-driver team ships and maintains for every other agent harness.
 cua-driver skills install
 ```
 
-links the pack into `~/.hermes/skills/cua-driver` (Qubit is a detected
+links the pack into `~/.qubit/skills/cua-driver` (Qubit is a detected
 agent; `cua-driver skills status` shows the link state). You'll then have:
 
 - `SKILL.md` — the cross-platform core (snapshot invariant, no-
