@@ -154,12 +154,6 @@ LEFT_CORE: tuple[LeftCoreFeature, ...] = (
         toolsets=("homeassistant",), off_platforms=("acp", "webhook"), platform="homeassistant",
         enable_env=("HASS_TOKEN",), channel_env_prefixes=("HASS_",),
     ),
-    LeftCoreFeature(
-        plugin="spotify", label="Spotify", in_use=spotify_in_use,
-        unchanged="your Spotify login, the spotify toolset and the spotify_* tools are unchanged; "
-                  "`qubit auth spotify` is now `qubit spotify login`",
-        cli="spotify",
-    ),
 )
 
 def platform_install_hint(platform: str) -> str:
