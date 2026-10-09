@@ -125,11 +125,40 @@ def _collect_defs(tree: ast.AST, file: str, module: str) -> list[FuncDef]:
             self.stack: list[str] = []
 
         def visit_ClassDef(self, node: ast.ClassDef):
+            # Index the CLASS only when it has an EXPLICIT __init__ and is not a
+            # @dataclass/@attrs/NamedTuple (those synthesize __init__ from fields,
+            # which pure AST cannot see -- indexing them would flag every legal
+            # `Cls(field=...)` call). No explicit __init__ -> not indexed at all,
+            # so a same-named def elsewhere can never be wrongly matched to it.
+            decs = " ".join(ast.unparse(d) for d in node.decorator_list)
+            if any(t in decs for t in ("dataclass", "attrs", "attr.s", "define", "NamedTuple", "dataclasses")):
+                self.stack.append(node.name)
+                self.generic_visit(node)
+                self.stack.pop()
+                return
+            init = next((b for b in node.body
+                         if isinstance(b, (ast.FunctionDef, ast.AsyncFunctionDef))
+                         and b.name == "__init__"), None)
+            if init is not None:
+                dotted_cls = ".".join(self.stack + [node.name]) if self.stack else node.name
+                qual_cls = (module + "." + dotted_cls) if module else dotted_cls
+                out.append(FuncDef(
+                    qualname=qual_cls, short=node.name, dotted=dotted_cls,
+                    shape=_shape(init.args), file=file, lineno=node.lineno,
+                ))
             self.stack.append(node.name)
             self.generic_visit(node)
             self.stack.pop()
 
         def _fn(self, node):
+            # A pytest fixture's NAME is bound, at call time, to whatever the
+            # fixture RETURNS (usually a factory closure), not to the fixture
+            # function. So `fixture_name(factory_kwarg=...)` is not a call of the
+            # fixture def, and comparing it against the fixture's own parameters
+            # produces a systematic false positive (167 of 180 findings before
+            # this gate). Never index a fixture-decorated def for drift checking.
+            if any("fixture" in ast.unparse(d) for d in node.decorator_list):
+                return
             short = node.name
             dotted = ".".join(self.stack + [short]) if self.stack else short
             qual = (module + "." + dotted) if module else dotted
@@ -148,6 +177,41 @@ def _collect_defs(tree: ast.AST, file: str, module: str) -> list[FuncDef]:
     return out
 
 
+def _assigned_or_nested_names(tree: ast.AST) -> set[str]:
+    """Names a file can bind to something OTHER than a top-level def: an
+    assignment target (`self._runner = runner`, `x = ...`) or a NESTED def/class.
+    A bare call to such a name is scope-dependent -- pure AST cannot decide
+    whether it means the top-level def or the local binding, so the caller skips
+    it (never guesses)."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                names |= _target_id_names(t)
+        elif isinstance(node, ast.AnnAssign):
+            names |= _target_id_names(node.target)
+    # nested def/class names (their bodies are their own scope; a bare call to
+    # such a name may bind the local closure, not the top-level def)
+    for node in ast.walk(tree):
+        if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                and node not in getattr(tree, "body", [])):
+            names.add(node.name)
+    return names
+
+
+def _target_id_names(t: ast.AST) -> set[str]:
+    if isinstance(t, ast.Name):
+        return {t.id}
+    if isinstance(t, ast.Attribute):
+        return {t.attr}      # self.x = ... -> x
+    if isinstance(t, (ast.Tuple, ast.List)):
+        out: set[str] = set()
+        for e in t.elts:
+            out |= _target_id_names(e)
+        return out
+    return set()
+
+
 def _resolve_receivers(tree: ast.AST, module: str, local_prefixes: frozenset[str]) -> tuple[set[str], dict[str, str]]:
     """Names that can be attributed to a LOCAL module.
 
@@ -160,6 +224,7 @@ def _resolve_receivers(tree: ast.AST, module: str, local_prefixes: frozenset[str
     package names our roots define."""
     imported_modules: set[str] = set()
     local_from_names: dict[str, str] = {}
+    conflicts: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for a in node.names:
@@ -172,7 +237,20 @@ def _resolve_receivers(tree: ast.AST, module: str, local_prefixes: frozenset[str
             if src_top in local_prefixes:
                 for a in node.names:
                     if a.name != "*":
-                        local_from_names[a.asname or a.name] = f"{src}.{a.name}" if src else a.name
+                        local = a.asname or a.name
+                        target = f"{src}.{a.name}" if src else a.name
+                        prev = local_from_names.get(local)
+                        # The same local alias bound to DIFFERENT sources at
+                        # different points (e.g. `from pm.install import ensure
+                        # as direct` then `... import sync_venv as direct`) is
+                        # scope-dependent and unresolvable by a flat AST scan.
+                        # Never guess a winner -- drop it so the call stays
+                        # UNRESOLVED instead of being compared to the wrong def.
+                        if prev is not None and prev != target:
+                            conflicts.add(local)
+                        local_from_names[local] = target
+    for local in conflicts:
+        local_from_names.pop(local, None)
     return imported_modules, local_from_names
 
 
@@ -252,6 +330,7 @@ def scan(root: Path) -> tuple[list[FuncDef], list[dict], list[dict], int]:
             continue
         this_module = _module_name(path.resolve(), root.resolve())
         imported_modules, from_modules = _resolve_receivers(tree, this_module, local_prefixes)
+        shadowed_names = _assigned_or_nested_names(tree)
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
@@ -274,6 +353,13 @@ def scan(root: Path) -> tuple[list[FuncDef], list[dict], list[dict], int]:
             if not cands:
                 unresolved += 1
                 continue
+            # A bare or self-qualified call to a name the file ALSO binds locally
+            # (nested closure, or `self.x = ...` instance attribute) is
+            # scope-dependent: pure AST cannot tell which binding the call means,
+            # so never compare it against a same-named def in another scope/file.
+            if kind in ("name", "self") and name in shadowed_names:
+                unresolved += 1
+                continue
             if kind == "self":
                 # self.X / cls.X can only be a method (dotted name has a class segment)
                 cands = [c for c in cands if "." in c.dotted]
@@ -293,10 +379,23 @@ def scan(root: Path) -> tuple[list[FuncDef], list[dict], list[dict], int]:
                             cands = by_tail[key]
                             break
             elif kind == "module":
-                # alias.X(...) where alias is a local module import
+                # alias.X(...) where alias is a local module import. The def must
+                # be a top-level symbol (no class segment) of the aliased module;
+                # if the short name maps to defs in MANY files, a flat short-name
+                # match cannot tell which -- skip rather than compare blindly.
+                if len({c.file for c in cands}) > 1:
+                    unresolved += 1
+                    continue
                 cands = [c for c in cands if c.dotted == name]
             else:
-                # bare `X()` -> a def in THIS module
+                # bare `X()` -> a def in THIS module. But if the same name is
+                # also ASSIGNED in this file (`self._runner = runner`, `x = None`)
+                # or defined as a NESTED closure, the call's target is
+                # scope-dependent and pure AST cannot pick the right one --
+                # skip rather than compare against a same-named def elsewhere.
+                if name in shadowed_names:
+                    unresolved += 1
+                    continue
                 cands = [c for c in cands if "." not in c.dotted and c.file == str(path)]
             if not cands:
                 unresolved += 1
