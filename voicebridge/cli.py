@@ -6950,7 +6950,10 @@ def _channels_doctor(cfg):
     acct = CI.accounts(cfg)
     return {"state": "OK", "schema": CI.SCHEMA, "store_ok": True,
             "channels": st.get("channels", 0),
-            "configured": st.get("configured", 0), "connected": 0,
+            "configured": st.get("configured", 0),
+            "connected": st.get("connected", 0),
+            "connected_platforms": st.get("connected_platforms", []),
+            "gateway": st.get("gateway"),
             "listener": st.get("listener", "NONE"),
             "accounts": len(acct.get("accounts", [])),
             "available": cat.get("available", []),
