@@ -1775,8 +1775,16 @@ export default function SessionsPage() {
   const platformEntries = status
     ? Object.entries(status.gateway_platforms ?? {})
     : [];
-  const recentSessions = overviewSessions
-    .filter((s) => !s.is_active)
+  // Live sessions FIRST, then the most recent closed ones, capped at 5. The
+  // previous ``.filter((s) => !s.is_active)`` dropped every session the user was
+  // actively talking to, so Overview's "Recent sessions" never showed the
+  // conversation on screen (the reported defect). ``is_active`` is computed by
+  // the store from the row (ended_at NULL + activity inside the 5-min window),
+  // never synthesized, so a stale-but-open row stays out and the card is
+  // honest. Sorting is stable on ``last_active`` (already recency-ordered by
+  // the poll), so the live rows keep their own newest-first order.
+  const recentSessions = [...overviewSessions]
+    .sort((a, b) => Number(b.is_active) - Number(a.is_active))
     .slice(0, 5);
 
   const isSearching = Boolean(search.trim());
