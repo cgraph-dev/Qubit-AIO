@@ -662,7 +662,7 @@ class _ProfileRoutingFileHandler(logging.Handler):
         self.release_profile(home)
         return True
 
-    def _handler_for_home(self, home: Path) -> _ManagedRotatingFileHandler:
+    def _handler_for_home(self, home: Path) -> "_ManagedRotatingFileHandler":
         with self._profile_handlers_lock:
             if home not in self._profile_handlers:
                 handler = _new_file_handler(
@@ -722,7 +722,7 @@ class _ProfileRoutingFileHandler(logging.Handler):
 # drops WebSocket clients. Every file handler is therefore driven by a single
 # QueueListener thread; loggers only do a non-blocking enqueue.
 
-_log_queue: "Optional[queue.SimpleQueue]" = None
+_log_queue: Optional[queue.SimpleQueue] = None
 _queue_listener: Optional[QueueListener] = None
 _queued_file_handlers: list = []
 _queue_atexit_registered = False
