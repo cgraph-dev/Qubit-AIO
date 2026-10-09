@@ -2049,6 +2049,97 @@ def _run_agent_with_watchdog(
     return result
 
 
+# ---------------------------------------------------------------------------
+# Acted-work acceptance for a completed agent turn (fails CLOSED)
+# ---------------------------------------------------------------------------
+# An agent turn that reports ``completed=True`` is NOT proof the job did anything.
+# The phantom-done shape ("I will build the weekly report now…", zero tool calls,
+# zero files) completes its turn normally, so the cron run was marked
+# ``last_status='ok'`` and delivered the promise as if it were the result. The
+# chat lane already rejects this shape (``chat_transport._worker_acted`` /
+# ``TASK_NO_BUILD``); the cron lane bypassed it entirely. These two sets are the
+# cron-side port of that guard: a turn whose only evidence is a future-tense
+# promise or progress chatter, with no tool activity behind it, is a failure.
+
+#: Future-tense promise phrasing with no acted work behind it.
+_CRON_PROMISE_RES = (
+    re.compile(r"\bi\s+will\b", re.IGNORECASE),
+    re.compile(r"\bi['\u2019]ll\b", re.IGNORECASE),
+    re.compile(r"\bi['\u2019]m\s+going\s+to\b", re.IGNORECASE),
+    re.compile(r"\blet\s+me\b", re.IGNORECASE),
+    re.compile(r"\bi\s+can\s+(make|create|build|help|do)\b", re.IGNORECASE),
+)
+
+#: Progress chatter with no acted work behind it.
+_CRON_PROGRESS_RES = (
+    re.compile(r"\bworking on\b", re.IGNORECASE),
+    re.compile(r"\blooking into\b", re.IGNORECASE),
+    re.compile(r"\bchecking( on| into)?\b", re.IGNORECASE),
+    re.compile(r"\bgetting started\b", re.IGNORECASE),
+    re.compile(r"\bstarting (on|with|to)\b", re.IGNORECASE),
+)
+
+#: Concrete completion evidence: a past-tense acted verb. Present alongside a
+#: promise/progress phrase, the reply is a report, not a phantom.
+_CRON_PAST_ACTED_RE = re.compile(
+    r"\b(built|created|wrote|written|saved|added|finished|completed|"
+    r"updated|generated|streamed|delivered|attached|done)\b",
+    re.IGNORECASE,
+)
+
+
+def _cron_turn_had_tool_activity(messages: object) -> bool:
+    """Whether a run's message history shows any executed tool call.
+
+    Tool receipts win outright: an assistant row carrying ``tool_calls`` or any
+    ``role='tool'`` result row proves the agent acted (a tool actually ran).
+    Accepts the OpenAI-style dict history ``run_conversation`` returns.
+    """
+    if not isinstance(messages, list):
+        return False
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("role") == "tool":
+            return True
+        if msg.get("tool_calls"):
+            return True
+    return False
+
+
+def _cron_phantom_done(final_response: str, result: dict) -> Optional[str]:
+    """Failure evidence when a COMPLETED turn shows no acted work, else None.
+
+    Mirrors the chat lane's verdict: a reply whose only push is a future-tense
+    promise (:data:`_CRON_PROMISE_RES`) or bare progress chatter
+    (:data:`_CRON_PROGRESS_RES`), with NO tool activity in the run's message
+    history, is a phantom-done — it must fail closed, never report ``ok``. A
+    past-tense acted verb in the text excuses it (that is a report). This is
+    deliberately conservative: it fires ONLY on the explicit promise/chatter
+    shape with zero tool receipts, so ordinary answers (a briefing, a summary,
+    a one-line "upstream has not moved") are untouched.
+    """
+    if _cron_turn_had_tool_activity(result.get("messages")):
+        return None
+    text = str(final_response or "")
+    if not text.strip():
+        return None
+    promise = any(rx.search(text) for rx in _CRON_PROMISE_RES)
+    chatter = any(rx.search(text) for rx in _CRON_PROGRESS_RES) \
+        and not _CRON_PAST_ACTED_RE.search(text)
+    if not (promise or chatter):
+        return None
+    if _CRON_PAST_ACTED_RE.search(text):
+        # A past-tense acted verb means the reply reports real work.
+        return None
+    kind = "promised work but produced no acted result" if promise \
+        else "reported progress but produced no acted result"
+    return (
+        f"Agent turn completed with no tool activity — the reply {kind} "
+        f"(no tool call ran, no file was created): {text.strip()[:160]}"
+    )
+
+
 def _final_response_from_result(result: dict, job_id: str, job_name: str, AIAgent) -> str:
     """Deliverable final response from a ``run_conversation`` result. Raises RuntimeError on
     `failed=True`/`completed=False`: the error text may sit in `final_response` and would otherwise
@@ -2597,6 +2688,15 @@ def run_job(
         # Keep final_response clean for delivery logic (empty = no delivery).
         logged_response = final_response if final_response else "(No response generated)"
         output = _run_doc_header(job, job_name, job_id, prompt) + f"## Response\n\n{logged_response}\n"
+        # Acted-work acceptance (fails CLOSED): a turn that "completed" but shows
+        # only a future-tense promise or progress chatter with NO tool receipts is
+        # the phantom-done shape — record it as a failure, never `ok`. The chat
+        # lane already enforces this (TASK_NO_BUILD); cron bypassed it.
+        phantom_error = _cron_phantom_done(final_response, result)
+        if phantom_error is not None:
+            logger.error("Job '%s': %s", job_name, phantom_error)
+            _audit.write(dict(result, response_silent=False), phantom_error)
+            return False, output, "", phantom_error
         logger.info("Job '%s' completed successfully", job_name)
         _audit.write(dict(result, response_silent=_is_cron_silence_response(final_response or "")), None)
         return True, output, final_response, None
