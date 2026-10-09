@@ -114,22 +114,63 @@ exact file:line. **Prefer it over grep.** `graft build` is free and needs no API
 
 ## 6. MISTAKES MADE THIS SESSION (so they are not repeated)
 
-**Four times a raw count was quoted before checking what it contained.** Each alarm was mine:
+**SIX times a raw count was quoted before checking what it (or the query) contained.** Every alarm
+was mine, never the repo's:
 
-| Claim | Truth |
-|---|---|
-| "1101 production files changed upstream" | one automated linter commit (whitespace) |
-| "94 test files broken by docs deletion" | **1 file** (measured against pre-deletion commit) |
-| "tools 2.6× upstream" | `__pycache__` — real `.py` counts: 355 vs 354 |
-| "281 upstream tool dirs vs our 7" | upstream `tools/` is a **flat file list**; miscounted |
-| "all trees shared=0, 100% qubit-only" | **broken script** — compared relative vs full paths |
-| "you under-ported the frontend" | overlay simply does not use those 2 files |
+| Claim | Truth | What went wrong |
+|---|---|---|
+| "1101 production files changed upstream" | one automated linter commit (whitespace) | counted a linter pass as semantic work |
+| "94 test files broken by docs deletion" | **1 file** (measured vs pre-deletion commit) | inferred from a grep of *mentions*, not a measurement |
+| "tools 2.6× upstream" | real `.py`: 355 ours vs 354 upstream | counted `__pycache__` |
+| "281 upstream tool dirs vs our 7" | upstream `tools/` is a **flat file list** | miscounted files as directories |
+| "all trees shared=0, 100% qubit-only" | broken script | compared relative vs full paths |
+| "17,236 tracked .pyc" | **0 tracked** | `git ls-files X -- '*.pyc'` is a UNION of two pathspecs, not a filter — it listed the whole tree |
 
-**RULE: verify the comparison itself before reporting its output.**
+### RULES that follow
+
+1. **Verify the comparison before reporting its output.** A result that is impossible (every tree
+   `shared=0`) is a broken query, not a finding. **Check the impossible-looking result first.**
+2. **Exclude build artifacts from every count.** Use `-name '*.py'` or `-not -path '*__pycache__*'`.
+   There are **14,647 `.pyc` in 366 `__pycache__` dirs = 302.7 MB untracked**; `.gitignore` handles
+   them correctly (nothing to fix) but they poison `find`-based counts.
+3. **`git ls-files -- 'PATTERN'`** to filter by pattern. **Anything before `--` is a path, anything
+   after is a pathspec, and multiple entries are ORed.** `git ls-files . -- '*.pyc'` lists the whole
+   repo, not the `.pyc`.
+4. **A count is not a finding.** "2.6× more files" is a question, not an answer — check composition
+   (`.py` vs `.pyc` vs `.md`) before drawing any conclusion.
+5. **Use `graft` first.** `graft ask "<query>"` returns ranked nodes + exact file:line in ~800 chars
+   and self-refreshes. The env-var grep I ran **three times** was **17,518 chars per run**. That is
+   ~50,000 chars re-fetched for data I did not need in full. Graft is installed, in `.mcp.json`, and
+   was unused all session.
 
 **Other:** deleted `~/.local/bin/hermes*` calling them "dead debris" — they were the owner's working
 launchers (the real cause was `qubit` scripts never linked into `~/.local/bin`). Replaced with
 `qubit`/`qubit-acp`/`qubit-agent`/`qubit-dev` symlinks.
+
+**Removed:** `~/.config/systemd/user/hermes-dashboard.service` — disabled, inactive, and its
+`ExecStart` pointed at a binary that no longer existed. All live units are now `qubit-*`.
+
+---
+
+## 6b. ASSET COVERAGE — VERIFIED BY FLAT-BASENAME COMPARISON
+
+Method: distinct **basenames** (not paths — see mistake #5 above) compared against upstream at the pin.
+
+| Tree | upstream | ours | shared | MISSING | extra (real, excl. `.pyc`) |
+|---|---|---|---|---|---|
+| `tools/` | 343 | 910 | **343** | **0** | Qubit additions |
+| `optional-skills/` | 552 | 657 | **552** | **0** | Qubit additions |
+| `optional-mcps/` | 1 | 1 | **1** | **0** | — |
+| `skills/` | 252 | 304 | 251 | 1 | Qubit additions |
+| `plugins/` | 96 | 225 | 95 | 1 | Qubit additions |
+
+**The two "MISSING=1" entries are THE SAME file: `hermes-kanban-dispatcher.service`** — a
+`hermes-`named systemd unit shipped inside upstream's plugins tree. **Correctly not ported.**
+
+**Plugin dirs:** every upstream dir is present; `hermes-achievements` → `qubit-achievements` is the
+correct rename. Genuinely Qubit-only plugin dirs: `web`, `spotify`, `teams_pipeline`, `video_gen`.
+
+**CONCLUSION: nothing is missing.** The asset trees are complete.
 
 ---
 
