@@ -5,7 +5,7 @@ command-palette commands, keybinds, routes, and themes. A plugin is a single
 plain-JavaScript ESM file the app loads at runtime — no build step, no repo
 changes. A plugin can also talk to its own Python backend namespace
 (`ctx.rest`/`ctx.socket` → `/api/plugins/<id>`); the general Python plugin
-system (`~/.hermes/plugins/`) is otherwise documented separately.
+system (`~/.qubit/plugins/`) is otherwise documented separately.
 
 There are TWO on-disk doors, same contract and hot reload:
 
@@ -36,13 +36,13 @@ Full human reference (every export, area payloads, backend, security):
 
 - The Qubit desktop app (it loads plugins; the CLI/gateway alone does not).
 - Write access to `$QUBIT_HOME/desktop-plugins/` (usually
-  `~/.hermes/desktop-plugins/`).
+  `~/.qubit/desktop-plugins/`).
 
 ## How to Run
 
 1. Create `$QUBIT_HOME/desktop-plugins/<name>/plugin.js` from
    `templates/plugin.js` (in this skill directory) — that's
-   `~/.hermes/...` by default, or `~/.hermes/profiles/<profile>/...` under a
+   `~/.qubit/...` by default, or `~/.qubit/profiles/<profile>/...` under a
    named profile. Keep `<name>` equal to the plugin `id`.
 2. The desktop app watches that directory: the plugin loads within a few
    seconds of the file landing, and every later save hot-reloads it in
@@ -137,7 +137,7 @@ The ONLY import surface is `@hermes/plugin-sdk` (plus `react` /
   React Query client — cache, dedupe, `refetchInterval`, invalidate like core;
   never hand-roll a poll loop), plus `atom`/`computed` for plugin-local state.
 - Backend: if the plugin ships a Python `plugin_api.py` (under
-  `~/.hermes/plugins/<id>/dashboard/`, manifest `"api": "plugin_api.py"`), reach
+  `~/.qubit/plugins/<id>/dashboard/`, manifest `"api": "plugin_api.py"`), reach
   it with `ctx.rest('/path', { method?, body?, timeoutMs? })` and its live twin
   `ctx.socket('/events', onMessage)` — both scoped to `/api/plugins/<id>` by
   construction (traversal rejected). `ctx.socket` is a **no-op on OAuth
