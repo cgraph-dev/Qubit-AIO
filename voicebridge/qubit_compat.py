@@ -11893,6 +11893,12 @@ def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         when = str(b["repeat"].get("expr", "") or "")
     when = _normalize_schedule_expr(when)
     deliver = str(b.get("deliver", b.get("deliver_to", "")) or "")
+    # Finite repeat count (runs N times then completes). The SPA sends a scalar
+    # int/str; a ``{times: N}`` dict is also accepted. Forwarded verbatim to the
+    # store's normalize_repeat_value chokepoint (invalid values raise there).
+    repeat = b.get("repeat")
+    if isinstance(repeat, dict):
+        repeat = repeat.get("times")
     skills = b.get("skills")
     if isinstance(skills, str):
         skills = [s.strip() for s in skills.split(",") if s.strip()]
@@ -11906,6 +11912,7 @@ def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     try:
         job = CB.create(
             cfg, name=name, prompt=task_text, schedule=when, deliver=deliver,
+            repeat=repeat,
             skills=skills if isinstance(skills, list) else None,
             provider=b.get("provider"), model=b.get("model"),
             base_url=b.get("base_url"), script=b.get("script"),

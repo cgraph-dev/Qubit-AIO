@@ -148,13 +148,22 @@ def create(cfg: Any, *, name: str = "", prompt: str = "", schedule: str = "",
            base_url: Optional[str] = None, script: Optional[str] = None,
            no_agent: bool = False, context_from: Any = None,
            enabled_toolsets: Optional[List[str]] = None,
-           workdir: Optional[str] = None) -> Dict[str, Any]:
-    """Create a job in the real store and return the stored record."""
+           workdir: Optional[str] = None,
+           repeat: Any = None) -> Dict[str, Any]:
+    """Create a job in the real store and return the stored record.
+
+    ``repeat`` is the finite run count (``None`` = forever). It is forwarded
+    verbatim to ``cron.jobs.create_job``, which normalizes it through the shared
+    ``normalize_repeat_value`` chokepoint (the same coercion the CLI and the
+    vendored create path use). Omitting it here silently dropped the field the
+    SPA form sends, so a "run 3 times" job became unlimited.
+    """
     J = _store(cfg)
     job = J.create_job(
         prompt=prompt or None,
         schedule=schedule,
         name=name or None,
+        repeat=repeat,
         deliver=deliver or None,
         skills=skills or None,
         model=model or None,
@@ -187,7 +196,7 @@ def update(cfg: Any, job_id: str, mutation: Dict[str, Any]) -> Dict[str, Any]:
     updates: Dict[str, Any] = {}
     for key in ("name", "prompt", "deliver", "provider", "model", "base_url",
                 "script", "no_agent", "context_from", "enabled_toolsets",
-                "workdir", "skills"):
+                "workdir", "skills", "repeat"):
         if key in mutation:
             updates[key] = mutation[key]
     when = mutation.get("when") or mutation.get("schedule")
