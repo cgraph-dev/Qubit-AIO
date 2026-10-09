@@ -12,11 +12,11 @@ two genuine RuntimeError-grade breaks (``qubit_constants.PROJECT_ROOT`` and
 because their imports live inside function bodies.
 
 A single number from a single tool is a measurement, not a verdict. This script
-runs all four and prints ONE verdict line, so no caller can mistake a partial
+runs all five and prints ONE verdict line, so no caller can mistake a partial
 green for completion.
 
-THE FOUR CHECKS (each catches a class the others miss)
------------------------------------------------------
+THE FIVE CHECKS (each catches a class the others miss)
+------------------------------------------------------
   1. import gate          -- do the ~29 curated modules import at all?
                              Catches top-level breakage in the hot path.
   2. entry-point sweep    -- does every ``from X import Y`` / ``X.Y`` in the
@@ -26,18 +26,27 @@ THE FOUR CHECKS (each catches a class the others miss)
                              class the static sweep structurally cannot: an
                              import inside a function body only fails at call
                              time, so it never shows in an import gate.
-  4. capability audit     -- how many upstream symbols are still missing, by
+  4. shadowed-def check   -- does any file bind the SAME name twice (the later
+                             silently wins)? Catches the class every name-
+                             existence sweep is blind to: the name IS bound, so
+                             nothing "missing" is reported. Runs a baseline
+                             ratchet, so a KNOWN duplicate does not red the gate
+                             but a NEW one does -- the class cannot be
+                             REINTRODUCED without this firing. Its own
+                             ``--self-test`` must report OK or the check is
+                             treated as failed (a blind gate is worse than none).
+  5. capability audit     -- how many upstream symbols are still missing, by
                              subsystem? Not pass/fail -- a BURNDOWN number, so
                              progress toward parity is visible and cannot be
                              confused with correctness.
 
 BLOCKING vs INFORMATIONAL
 -------------------------
-  1, 2, 3 are BLOCKING: a failure means the tree is broken, not incomplete.
-  4 is INFORMATIONAL: a gap count is expected during a sync and never blocks.
+  1, 2, 3, 4 are BLOCKING: a failure means the tree is broken, not incomplete.
+  5 is INFORMATIONAL: a gap count is expected during a sync and never blocks.
 
 Usage:
-    python3 scripts/gate_all.py            # all four, one verdict
+    python3 scripts/gate_all.py            # all five, one verdict
     python3 scripts/gate_all.py --fast     # skip the capability audit (slow)
     python3 scripts/gate_all.py --json out.json
 """
@@ -124,6 +133,38 @@ def check_capability() -> dict:
             "detail": f"{missing} missing symbols across {files} files"}
 
 
+def check_shadowed_defs() -> dict:
+    """Class-4 half-rebrand: a definition shadowed by a later one of the same
+    name. Every name-existence sweep sees the name BOUND (both defs exist), so
+    none of the other checks can catch it -- the defect lives in the RELATIONSHIP
+    between two defs (a name loaded on a branch whose body the later def
+    replaced), not in either def. This runs the duplicate-def AST pass against a
+    baseline of KNOWN duplicates: an existing one is reported but does not red
+    the gate, a NEW one does. The ratchet is what makes the class impossible to
+    REINTRODUCE without the gate catching it.
+    """
+    self_test = _run([PY, "scripts/check_duplicate_defs.py", "--self-test"], timeout=120)
+    baseline = REPO / "scripts" / "duplicate_defs_baseline.json"
+    cmd = [PY, "scripts/check_duplicate_defs.py", "--tree", "qubit_runtime"]
+    if baseline.exists():
+        cmd += ["--baseline", str(baseline)]
+    code, out = _run(cmd, timeout=600)
+    known = _find(r"^# ratchet: (\d+) known", out)
+    new = _find(r"^# ratchet: \d+ known \(baselined\), (\d+) NEW", out)
+    real = _find(r"^# duplicate-def check: (\d+) real duplicate", out)
+    total = _find(r"^=== (\d+) REAL duplicate", out)
+    fired = "SELF-TEST OK" in self_test[1]
+    return {"name": "shadowed defs", "blocking": True,
+            "exit": code if fired else 126,
+            "self_test": fired,
+            "known": int(known) if known is not None else None,
+            "new": int(new) if new is not None else None,
+            "real": int(total) if total is not None else None,
+            "detail": (f"self-test {'FIRES' if fired else 'BLIND'}; "
+                       f"{(total or real or '?')} real dup(s), "
+                       f"{known or 0} known / {new or 0} new")}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -132,7 +173,8 @@ def main() -> int:
     ap.add_argument("--json", help="write results here")
     args = ap.parse_args()
 
-    checks = [check_import_gate, check_entry_point, check_lazy_imports]
+    checks = [check_import_gate, check_entry_point, check_lazy_imports,
+              check_shadowed_defs]
     if not args.fast:
         checks.append(check_capability)
 
