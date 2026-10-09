@@ -40,10 +40,39 @@ _SIGNING_IDENTITY = "Her" + "mes Local Signing"
 
 # Ordered migration phrasing: a blanket substitution would read "Qubit to
 # Qubit" or "leftover Qubit" for the legacy-assistant migration family.
+#
+# The vendored fork is already de-branded in-source (upstream product words
+# were replaced with "Qubit"), so the migration *source* family now renders
+# as "Qubit to Qubit" / "from an Qubit installation" -- incoherent, and the
+# `_UPSTREAM_*` phrases below no longer match it. These Qubit-form phrases
+# restore the "legacy assistant" reading at the render boundary. They are
+# exact literals that occur ONLY in the legacy-assistant migration family
+# (``qubit_cli/subcommands/claw.py``), so a targeted rewrite is safe.
 _LEGACY_PHRASES: Tuple[Tuple[str, str], ...] = (
     (_UPSTREAM_B + " migration", "legacy-assistant migration"),
     ("from " + _UPSTREAM_B, "from a legacy assistant"),
     ("leftover " + _UPSTREAM_B, "leftover legacy-assistant"),
+    # Already-de-branded fork form (source side reads as "Qubit").
+    ("from Qubit to Qubit", "from a legacy assistant to Qubit"),
+    ("from an Qubit installation", "from a legacy-assistant installation"),
+    ("from an Qubit workspace", "from a legacy-assistant workspace"),
+    ("from a Qubit installation", "from a legacy-assistant installation"),
+    ("leftover Qubit directories", "leftover legacy-assistant directories"),
+    ("Path to Qubit directory", "Path to legacy-assistant directory"),
+    ("a specific Qubit directory",
+     "a specific legacy-assistant directory"),
+)
+
+# Other misleading forwarded help, rewritten at the render boundary so the
+# product never points the user at a command that does not work. ``qubit
+# resume`` is a typed refusal in Qubit (a second emergency-stop authority); the
+# fork's ``pause`` help names it ("until `qubit resume`" / "Run `qubit resume`
+# to lift the pause"). Rewrite it to the real, Qubit-native lift command.
+_CORRECTIVE_PHRASES: Tuple[Tuple[str, str], ...] = (
+    ("`qubit resume`",
+     "`qubit power enable --confirm`"),
+    ("until qubit resume",
+     "until `qubit power enable --confirm`"),
 )
 
 # Whole-line protections: legal/provenance text is never product prose.
@@ -83,6 +112,8 @@ def rebrand_help(text: str) -> str:
         for src, dst in _LEGACY_PHRASES:
             line = line.replace(src, dst)
         line = _PRODUCT_RE.sub(_brand, line)
+        for src, dst in _CORRECTIVE_PHRASES:
+            line = line.replace(src, dst)
         for token, original in protected:
             line = line.replace(token, original)
         out.append(line)
