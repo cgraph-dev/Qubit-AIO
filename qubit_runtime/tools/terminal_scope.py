@@ -204,7 +204,7 @@ def install_profile_terminal_scope(
 
 
 @contextmanager
-def install_and_reset_profile_terminal_scope(qubit_home: Any) -> Iterator[None]:
+def install_and_reset_profile_terminal_scope(qubit_home: "Any") -> Iterator[None]:
     """Install the profile's terminal policy for a bounded turn/fire. Never raises."""
     token = install_profile_terminal_scope(qubit_home)
     try:

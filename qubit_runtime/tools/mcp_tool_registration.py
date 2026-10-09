@@ -367,7 +367,7 @@ def _register_candidates(name: str, candidates: List[_Candidate], *, check_fn: C
     return registered
 
 
-def _write_schema_cache(name: str, server: MCPServerTask, config: dict, should_register) -> None:
+def _write_schema_cache(name: str, server: "MCPServerTask", config: dict, should_register) -> None:
     """Write-through: persist the manifest so the next startup registers this server lazily (no spawn). Never raises."""
     try:
         # Write-through (#56832): refresh the on-disk schema cache after a live connect so the next startup
