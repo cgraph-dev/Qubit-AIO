@@ -42,7 +42,7 @@ against. There is no shared cookie or session that browser-Portal-login
 extends to other apps on the same machine.
 
 What Qubit Agent has that *feels* like OAuth — `qubit login --provider qubit`
-opening a browser, user signs in, token lands in `~/.hermes/auth.json` — is a
+opening a browser, user signs in, token lands in `~/.qubit/auth.json` — is a
 **Qubit-specific browser flow**. Under the hood it produces a credential
 Qubit uses as a bearer. It is not a public OAuth provider that Karakeep et al.
 can implement a client for, because it isn't an OAuth provider at all from the
@@ -55,7 +55,7 @@ outside.
 Yes. The pattern is a **local credential-broker proxy**. Even without a public
 OAuth flow, an app on the user's machine can:
 
-1. Read Qubit's existing Portal credential out of `~/.hermes/auth.json`.
+1. Read Qubit's existing Portal credential out of `~/.qubit/auth.json`.
 2. Expose a local OpenAI-compatible endpoint at `http://localhost:NNNN/v1`.
 3. Forward incoming requests to `inference-api.nousresearch.com/v1` with that
    bearer attached.
