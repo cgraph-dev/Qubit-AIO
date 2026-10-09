@@ -1,0 +1,54 @@
+# Qubit adapter registry.
+#
+# An ADAPTER is a pluggable discovery seam through which Qubit gains a capability
+# it does not implement natively. This file records, for each kind, the REAL
+# discovery entry point in the current tree. Nothing here owns runtime code:
+# existing modules have NOT moved (see README.md).
+#
+# Fields:
+#   name    -- adapter identifier (builtin today; hermes/openclaw/picoclaw later)
+#   kind    -- skills | plugins | mcps | channels | tools
+#   status  -- shipped (code exists now) | planned (declared seam, no code yet)
+#   source  -- where the kind's definitions come from
+#   seam    -- <repo-relative path>:<line>  (the discovery entry point)
+#   symbol  -- the function/method at that seam
+#
+# Schema validated by adapters/registry.py; seam files asserted by
+# adapters/test_registry.py.
+version: 1
+
+adapters:
+  - name: builtin
+    kind: skills
+    status: shipped
+    source: builtin
+    seam: qubit_runtime/tools/skills_tool.py:248
+    symbol: skills_list
+
+  - name: builtin
+    kind: plugins
+    status: shipped
+    source: bundled + user + entry-point
+    seam: qubit_runtime/qubit_cli/plugins.py:1770
+    symbol: discover_plugins
+
+  - name: builtin
+    kind: mcps
+    status: shipped
+    source: config
+    seam: qubit_runtime/tools/mcp_tool_discovery.py:595
+    symbol: discover_mcp_tools
+
+  - name: builtin
+    kind: channels
+    status: shipped
+    source: bundled + plugin
+    seam: qubit_runtime/gateway/platform_registry.py:414
+    symbol: PlatformRegistry.create_adapter
+
+  - name: builtin
+    kind: tools
+    status: shipped
+    source: builtin
+    seam: qubit_runtime/tools/registry.py:96
+    symbol: discover_builtin_tools
