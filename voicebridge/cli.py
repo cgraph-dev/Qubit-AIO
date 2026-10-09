@@ -4350,18 +4350,28 @@ def _cmd_completion(shell: str, cmd: str) -> int:
 
 
 def _cmd_capability(action: str, name: str, state: str | None) -> int:
-    """Capability catalog lookup (read-only, typed result)."""
-    from .capability_catalog import check, list_names, summary
+    """Capability catalog lookup (read-only, typed result).
 
-    if action == "check":
-        print(json.dumps(check(name or ""), indent=2))
+    A missing catalog source (build input absent from the checkout/package) is
+    a typed refusal, never a bare traceback: the read-only surface reports
+    ``CAPABILITY_CATALOG_SOURCE_MISSING`` naming the file and the remedy.
+    """
+    from .capability_catalog import (CatalogSourceMissing, check, list_names,
+                                     summary)
+
+    try:
+        if action == "check":
+            print(json.dumps(check(name or ""), indent=2))
+            return 0
+        if action == "list":
+            for item in list_names(state):
+                print(item)
+            return 0
+        print(json.dumps(summary(), indent=2))
         return 0
-    if action == "list":
-        for item in list_names(state):
-            print(item)
-        return 0
-    print(json.dumps(summary(), indent=2))
-    return 0
+    except CatalogSourceMissing as exc:
+        print(json.dumps(exc.as_dict(), indent=2))
+        return 2
 
 
 def _cmd_auth_status(cfg) -> int:
@@ -9920,21 +9930,27 @@ def _cmd_doctor(cfg, args) -> int:
                 print(f"[{c['state']:>13}] {c['name']:<12} {c['detail']}")
             print(D.doctor_summary(checks))
         return 0 if all(c["state"] == "OK" for c in checks) else 1
-    if cmd == "check":
-        out = CC.check(args.name)
-        print(_json.dumps(out, indent=2, sort_keys=True))
-        return 0 if out.get("state") in ("IMPLEMENTED", "NOT_UPSTREAM") else 2
-    if cmd == "list":
-        names = CC.list_names(getattr(args, "state", None))
-        if as_json:
-            print(_json.dumps(names, indent=2, sort_keys=True))
-        else:
-            for name in names:
-                print(name)
-        return 0
-    if cmd == "summary":
-        print(_json.dumps(CC.summary(), indent=2, sort_keys=True))
-        return 0
+    # check/list/summary read the capability catalog: a missing catalog source
+    # is a typed refusal, never a bare traceback.
+    try:
+        if cmd == "check":
+            out = CC.check(args.name)
+            print(_json.dumps(out, indent=2, sort_keys=True))
+            return 0 if out.get("state") in ("IMPLEMENTED", "NOT_UPSTREAM") else 2
+        if cmd == "list":
+            names = CC.list_names(getattr(args, "state", None))
+            if as_json:
+                print(_json.dumps(names, indent=2, sort_keys=True))
+            else:
+                for name in names:
+                    print(name)
+            return 0
+        if cmd == "summary":
+            print(_json.dumps(CC.summary(), indent=2, sort_keys=True))
+            return 0
+    except CC.CatalogSourceMissing as exc:
+        print(_json.dumps(exc.as_dict(), indent=2, sort_keys=True))
+        return 2
     print(f"ERROR: unknown doctor command {cmd!r}")
     return 2
 
