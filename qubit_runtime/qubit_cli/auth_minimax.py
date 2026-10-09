@@ -12,7 +12,7 @@ import hashlib
 import json
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 from qubit_cli.auth_constants import (
     AuthError, MINIMAX_OAUTH_GRANT_TYPE, MINIMAX_OAUTH_REFRESH_SKEW_SECONDS, MINIMAX_OAUTH_SCOPE,
@@ -105,11 +105,11 @@ def _minimax_resolve_token_expiry_unix(expired_in: int, *, now: datetime) -> flo
 
 def _minimax_expiry_fields(expired_in: Any) -> Dict[str, Any]:
     """``obtained_at`` / ``expires_at`` / ``expires_in`` derived from a MiniMax ``expired_in``."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at_unix = _minimax_resolve_token_expiry_unix(int(expired_in), now=now)
     return {
         "obtained_at": now.isoformat(),
-        "expires_at": datetime.fromtimestamp(expires_at_unix, tz=timezone.utc).isoformat(),
+        "expires_at": datetime.fromtimestamp(expires_at_unix, tz=UTC).isoformat(),
         "expires_in": max(0, int(expires_at_unix - now.timestamp())),
     }
 
