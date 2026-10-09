@@ -36,7 +36,16 @@ FORWARD_TABLE = {
     ("sessions", "pinned"): ("sessions", "pinned"),
     ("mcp", "list"): ("mcp", "list"),
     ("plugins", "capabilities"): ("plugins", "capabilities"),
-    ("plugins", "compat"): ("plugins", "compat"),
+    # NOTE: the former ``("plugins", "compat")`` row was removed. It mapped
+    # ``qubit plugins compat`` onto a vendored ``plugins compat`` subcommand
+    # that never existed: the upstream pin (bd0affe5) deleted the ``compat``
+    # subcommand AND its ``cmd_compat`` handler together (upstream dropped the
+    # PLUGIN-COMPAT layer), and no reachable commit of this fork ever
+    # registered a ``compat`` parser (verified across 65eeb897, 6e6fddae,
+    # 42d64b84). The row was a phantom target: forwarding it reached argparse
+    # ``invalid choice`` in the fork. ``plugin_compat.py`` survives only as the
+    # library shim the PLUGIN-COMPAT blocks import (``warn_once``); it declares
+    # no CLI surface, and the compat layer is itself scheduled for removal.
     ("skills", "audit"): ("skills", "audit"),
     ("skills", "list-modified"): ("skills", "list-modified"),
     ("flags", "path"): ("config", "path"),
