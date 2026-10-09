@@ -232,6 +232,31 @@ describe("SessionsPage overview recent-session cards", () => {
     expect(apiMocks.getSessionMessages).toHaveBeenCalledWith("sid-recent", null);
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
   });
+
+  // The overview used to drop every live session (`.filter((s) => !s.is_active)`),
+  // so the conversation the operator was actually in never appeared in "Recent
+  // sessions" — the reported defect. A live row must render, and it must lead
+  // the card even when a more recently-touched closed row is present.
+  it("shows an active session, sorted ahead of closed rows", async () => {
+    const live = {
+      id: "sid-live", profile: null, source: "tui", model: "prov/model",
+      title: "Live one", started_at: 5, ended_at: null, last_active: 5,
+      is_active: true, message_count: 9, tool_call_count: 0,
+      input_tokens: 0, output_tokens: 0, preview: "live",
+    };
+    const closed = {
+      id: "sid-closed", profile: null, source: "cli", model: null,
+      title: "Closed one", started_at: 9, ended_at: 9, last_active: 9,
+      is_active: false, message_count: 3, tool_call_count: 0,
+      input_tokens: 0, output_tokens: 0, preview: "closed",
+    };
+    await renderSessionsPage([], [closed, live]);
+    const cards = Array.from(
+      document.querySelectorAll('[data-testid^="recent-session-"]'),
+    ).map((n) => n.getAttribute("data-testid"));
+    expect(cards).toContain("recent-session-sid-live");
+    expect(cards[0]).toBe("recent-session-sid-live");
+  });
 });
 describe("SessionsPage tab families + source popover dismissal", () => {
   const oneRow = () => [
