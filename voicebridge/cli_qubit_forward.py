@@ -59,6 +59,18 @@ FORWARD_TABLE = {
     ("mcp", "catalog"): ("mcp", "catalog"),
     # Wave 4: remaining fork reads for the still-open cli families.
     ("plugins", "info"): ("plugins", "info"),
+    # The native `qubit plugins` family is a narrower registry surface
+    # (status/list/show/register/invoke/unregister/doctor/catalog/install/
+    # remote) that shares the family name with the fork's richer catalog tree.
+    # A subcommand the native parser does not declare would otherwise fail with
+    # `invalid choice` instead of reaching the fork verb it names. These are the
+    # fork's read-only catalog subs, forwarded verbatim; the mutating siblings
+    # stay in CONFIRM_TABLE (never an unrestricted bypass).
+    ("plugins", "browse"): ("plugins", "browse"),
+    ("plugins", "validate"): ("plugins", "validate"),
+    ("plugins", "check-updates"): ("plugins", "check-updates"),
+    ("plugins", "check"): ("plugins", "check"),
+    ("plugins", "ls"): ("plugins", "ls"),
     ("frontier", "ls"): ("fallback", "ls"),
     # Wave 1 Qubit CLI parity: read-only fork subcommands whose Qubit family
     # does not expose a native subcommand.
@@ -346,6 +358,17 @@ CONFIRM_TABLE = {
     ("pairing", "clear-pending"): ("pairing", "clear-pending"),
     ("plugins", "disable"): ("plugins", "disable"),
     ("plugins", "pack"): ("plugins", "pack"),
+    # Fork-only mutating catalog subs (the native parser declares none of
+    # these, so a bare call would be `invalid choice`): updating pulls an
+    # installed plugin to its pinned/new revision, adopt writes a provenance
+    # row, trust-update-url moves a saved update_url tag, and rm/uninstall
+    # remove an installed plugin. All require Qubit's `--confirm` + the shared
+    # dispatch guard, exactly like their `remove` sibling above.
+    ("plugins", "update"): ("plugins", "update"),
+    ("plugins", "adopt"): ("plugins", "adopt"),
+    ("plugins", "trust-update-url"): ("plugins", "trust-update-url"),
+    ("plugins", "rm"): ("plugins", "rm"),
+    ("plugins", "uninstall"): ("plugins", "uninstall"),
     ("profile", "create"): ("profile", "create"),
     ("profile", "delete"): ("profile", "delete"),
     ("profile", "export"): ("profile", "export"),
