@@ -181,7 +181,7 @@ class RepairPlan:
         return [f for f in self.findings if f.repairable]
 
     # -- scan --
-    def scan(self, session: _Session) -> "RepairPlan":
+    def scan(self, session: _Session) -> RepairPlan:
         for store in self.stores:
             self._scan_sessions(session, store)
             self._scan_topics(session, store)
@@ -252,7 +252,7 @@ class RepairPlan:
                 reason="either a standalone gateway's own history (--legacy-main rekey) or a default "
                        "chat that leaked in (--legacy-main move); the row cannot say which"))
 
-    def _move_batch(self, src: Store, dst: Store) -> "_MoveBatch":
+    def _move_batch(self, src: Store, dst: Store) -> _MoveBatch:
         return self._moves.setdefault((src.db_path, dst.db_path), _MoveBatch(src, dst))
 
     def _scan_topics(self, session: _Session, store: Store) -> None:
