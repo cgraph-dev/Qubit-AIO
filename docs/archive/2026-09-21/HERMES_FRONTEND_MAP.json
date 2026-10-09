@@ -1,0 +1,2625 @@
+{
+ "source": {
+  "repo": "https://github.com/NousResearch/hermes-agent",
+  "revision": "2237be355906fbe6065ce1815711eee52b2d646e",
+  "tag": "v2026.9.7",
+  "license": "MIT (Nous Research)",
+  "oracle": "/tmp/pinned-upstream/hermes-agent/web/src",
+  "verified_rev": "2237be355906fbe6065ce1815711eee52b2d646e"
+ },
+ "adaptation_rule": "Per the owner amendment 2026-09-11 and docs/QUBIT_DASHBOARD_REBUILD_PLAN.md, the pinned Hermes React/Vite/Node frontend is vendored into frontend/qubit-web (from hermes-agent/web) and frontend/qubit-shared (from hermes-agent/qubit-shared) and is built with Vite; React/TS is a supported Qubit dashboard runtime and the former static-only runtime constraint no longer applies. Every upstream file maps to a byte-identical vendored file or a documented Qubit patch/rebrand carrying upstream+Qubit hashes, a reason, and an affected regression test in docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints additionally map to shared Qubit backend operations, tested policy refusals, or documented omissions.",
+ "routes": {
+  "/chat": {
+   "qubit": "/chat",
+   "disposition": "adapted",
+   "note": "Qubit-safe native chat: POST /api/qubit/chat (voicebridge.agent.turn, the same module as CLI text and voice PTT) with typed loading/empty/error/retry states, browser speech input, per-session transcript persistence, and the sessions switcher. /api/pty is refused (PTY_NO_SHELL); the page no longer opens or retries it."
+  },
+  "/sessions": {
+   "qubit": "/sessions",
+   "disposition": "adapted",
+   "note": "sessions op (receipt sessions) + actions receipts; Hermes rename/export/import/prune/search/stats map to memory + task stores per PARITY_HERMES sessions row."
+  },
+  "/files": {
+   "qubit": "/projects",
+   "disposition": "adapted",
+   "note": "files_inspect/list/read (project-root confined); Hermes mkdir/upload-stream refused (write policy, no bypass)."
+  },
+  "/analytics": {
+   "qubit": "/activity+/reports+/memory",
+   "disposition": "partial",
+   "note": "insights/activity/reports/logs journal-derived views; token-billing charts omitted (local runner has no token economy; owner: local-runner)."
+  },
+  "/models": {
+   "qubit": "/models",
+   "disposition": "adapted",
+   "note": "frontier/config_profiles/reasoning/prompt_budget + capability/mcp/proxy groups."
+  },
+  "/logs": {
+   "qubit": "/system+/activity",
+   "disposition": "adapted",
+   "note": "logs op + live event feed."
+  },
+  "/cron": {
+   "qubit": "/tasks",
+   "disposition": "adapted",
+   "note": "schedules_* ops + opencode/task_run; blueprints map to task-templates + schedules_create."
+  },
+  "/skills": {
+   "qubit": "/skills",
+   "disposition": "adapted",
+   "note": "skills_*/verified/curator/plugins_install/hooks; hub fetch refused (reviewed-only, tested)."
+  },
+  "/plugins": {
+   "qubit": "/skills",
+   "disposition": "adapted",
+   "note": "reviewed-install flow."
+  },
+  "/mcp": {
+   "qubit": "/models",
+   "disposition": "adapted",
+   "note": "mcp inventory; server mount/execution refused (direct-MCP bypass policy)."
+  },
+  "/channels": {
+   "qubit": "/messages",
+   "disposition": "adapted",
+   "note": "msg_* inbox/draft/send/approve."
+  },
+  "/webhooks": {
+   "qubit": "/messages",
+   "disposition": "adapted",
+   "note": "webhook list/show/add/remove/test + verify extra."
+  },
+  "/pairing": {
+   "qubit": "/messages+/token-setup",
+   "disposition": "adapted",
+   "note": "pairing list/create/approve/revoke + device ceremony."
+  },
+  "/profiles": {
+   "qubit": "/memory",
+   "disposition": "adapted",
+   "note": "brain_* profiles/ Vaults."
+  },
+  "/profiles/new": {
+   "qubit": "/memory",
+   "disposition": "adapted",
+   "note": "brain_onboard_plan + onboard_apply form."
+  },
+  "/config": {
+   "qubit": "/settings",
+   "disposition": "adapted",
+   "note": "profiles/models/audio/permissions/power/export/rollback; raw-config dump refused (secret policy)."
+  },
+  "/env": {
+   "qubit": "/security",
+   "disposition": "adapted",
+   "note": "key-reference status only; value reveal refused (secret policy)."
+  },
+  "/system": {
+   "qubit": "/system",
+   "disposition": "adapted",
+   "note": "runtime/doctor/product/package/verify/backup/sync/etc.; gateway process control refused (single event path)."
+  },
+  "/docs": {
+   "qubit": "/docs",
+   "disposition": "adapted",
+   "note": "Qubit docs index + safe render."
+  }
+ },
+ "endpoints": {
+  "/api/actions/": {
+   "qubit": "actions",
+   "disposition": "adapted"
+  },
+  "/api/analytics": {
+   "qubit": "insights/activity/reports",
+   "disposition": "partial:no-token-charts"
+  },
+  "/api/auth/me": {
+   "qubit": "auth_status",
+   "disposition": "adapted"
+  },
+  "/api/auth/providers": {
+   "qubit": "auth_login",
+   "disposition": "adapted:key-refs"
+  },
+  "/api/auth/ws-ticket": {
+   "qubit": "pairing",
+   "disposition": "adapted:ticket-model"
+  },
+  "/api/chat/image-upload": {
+   "qubit": "vision_describe",
+   "disposition": "adapted:bounded"
+  },
+  "/api/config": {
+   "qubit": "settings/product",
+   "disposition": "adapted"
+  },
+  "/api/config/raw": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:CONFIG_RAW (secret policy)"
+  },
+  "/api/config/schema": {
+   "qubit": "settings",
+   "disposition": "adapted:forms"
+  },
+  "/api/config/defaults": {
+   "qubit": "setup_check/product",
+   "disposition": "adapted"
+  },
+  "/api/console": {
+   "qubit": "\u2014",
+   "disposition": "OMITTED:PTY (browser PTY spawn refused; transcript+TUI equivalent)"
+  },
+  "/api/credentials/pool": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:CREDENTIAL_POOL (credential export forbidden)"
+  },
+  "/api/cron/blueprints": {
+   "qubit": "schedules+task-templates",
+   "disposition": "adapted"
+  },
+  "/api/cron/delivery-targets": {
+   "qubit": "monitor",
+   "disposition": "adapted:quiet-hours"
+  },
+  "/api/cron/jobs": {
+   "qubit": "schedules",
+   "disposition": "adapted"
+  },
+  "/api/curator": {
+   "qubit": "curator/verified",
+   "disposition": "adapted"
+  },
+  "/api/dashboard/agent": {
+   "qubit": "worker/agent",
+   "disposition": "adapted"
+  },
+  "/api/dashboard/font": {
+   "qubit": "themes",
+   "disposition": "adapted"
+  },
+  "/api/dashboard/theme": {
+   "qubit": "themes",
+   "disposition": "adapted"
+  },
+  "/api/dashboard/plugin": {
+   "qubit": "plugins_install/skills",
+   "disposition": "adapted:reviewed"
+  },
+  "/api/dashboard/plugins": {
+   "qubit": "skills/verified",
+   "disposition": "adapted:list"
+  },
+  "/api/dashboard/plugins/hub": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:REMOTE_PLUGIN (reviewed-only, tested)"
+  },
+  "/api/dashboard/agent-plugins/install": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:REMOTE_PLUGIN (reviewed-only, tested)"
+  },
+  "/api/dashboard/plugin-providers": {
+   "qubit": "plugins_install",
+   "disposition": "adapted:reviewed"
+  },
+  "/api/env": {
+   "qubit": "secrets/auth_status",
+   "disposition": "adapted:key-refs"
+  },
+  "/api/env/reveal": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:ENV_REVEAL (secret policy)"
+  },
+  "/api/events": {
+   "qubit": "events/stream",
+   "disposition": "adapted:SSE journal"
+  },
+  "/api/ws": {
+   "qubit": "events/stream",
+   "disposition": "adapted:single authority"
+  },
+  "/api/pub": {
+   "qubit": "events/stream",
+   "disposition": "adapted:single authority"
+  },
+  "/api/files": {
+   "qubit": "files",
+   "disposition": "adapted:read-only"
+  },
+  "/api/files/mkdir": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:FILE_WRITE (write policy)"
+  },
+  "/api/files/upload-stream": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:FILE_WRITE (write policy)"
+  },
+  "/api/gateway": {
+   "qubit": "gateway",
+   "disposition": "adapted:records"
+  },
+  "/api/gateway/start": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:GATEWAY_SUPERVISION (single event path, tested)"
+  },
+  "/api/gateway/stop": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:GATEWAY_SUPERVISION (single event path, tested)"
+  },
+  "/api/gateway/restart": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:GATEWAY_SUPERVISION (single event path, tested)"
+  },
+  "/api/hermes/update": {
+   "qubit": "product/update_status",
+   "disposition": "adapted"
+  },
+  "/api/logs": {
+   "qubit": "logs",
+   "disposition": "adapted"
+  },
+  "/api/mcp": {
+   "qubit": "mcp",
+   "disposition": "adapted:inventory"
+  },
+  "/api/mcp/catalog/install": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:REMOTE_MCP (never mounts/fetches)"
+  },
+  "/api/mcp/oauth/flows": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:REMOTE_MCP (never mounts/fetches)"
+  },
+  "/api/mcp/servers": {
+   "qubit": "mcp",
+   "disposition": "adapted:inventory"
+  },
+  "/api/memory": {
+   "qubit": "memory/brain",
+   "disposition": "adapted"
+  },
+  "/api/memory/reset": {
+   "qubit": "memory_forget/brain_profile_sweep",
+   "disposition": "adapted:scoped"
+  },
+  "/api/messaging/platforms": {
+   "qubit": "msg",
+   "disposition": "adapted"
+  },
+  "/api/messaging/telegram/onboarding": {
+   "qubit": "pairing/device",
+   "disposition": "adapted:refs"
+  },
+  "/api/messaging/whatsapp/onboarding": {
+   "qubit": "pairing/device",
+   "disposition": "adapted:refs"
+  },
+  "/api/model/": {
+   "qubit": "config_profiles/frontier",
+   "disposition": "adapted"
+  },
+  "/api/ops/backup": {
+   "qubit": "backup/export_state",
+   "disposition": "adapted:form-passphrase"
+  },
+  "/api/ops/checkpoints": {
+   "qubit": "checkpoints",
+   "disposition": "adapted"
+  },
+  "/api/ops/config-migrate": {
+   "qubit": "product_migrate",
+   "disposition": "adapted"
+  },
+  "/api/ops/debug-share": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:DEBUG_SHARE (exfiltration policy)"
+  },
+  "/api/ops/doctor": {
+   "qubit": "doctor",
+   "disposition": "adapted"
+  },
+  "/api/ops/dump": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:STATE_DUMP (secret policy)"
+  },
+  "/api/ops/hooks": {
+   "qubit": "hooks",
+   "disposition": "adapted"
+  },
+  "/api/ops/import": {
+   "qubit": "import_state",
+   "disposition": "adapted:form-passphrase"
+  },
+  "/api/ops/import-upload": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:FILE_WRITE (server-side bundles only)"
+  },
+  "/api/ops/prompt-size": {
+   "qubit": "prompt_budget",
+   "disposition": "adapted"
+  },
+  "/api/ops/security-audit": {
+   "qubit": "security/verify_release",
+   "disposition": "adapted"
+  },
+  "/api/pairing": {
+   "qubit": "pairing",
+   "disposition": "adapted"
+  },
+  "/api/plugins/kanban/events": {
+   "qubit": "qubit-boards (ops) + /api/events SSE",
+   "disposition": "partial: plugin WS upgrade refused by the single event path; board reads stay live via /api/plugins/kanban/board and all mutations run through /api/ops/* + /api/ops/confirm"
+  },
+  "/api/portal": {
+   "qubit": "\u2014",
+   "disposition": "OMITTED:EXTERNAL_PORTAL (external account console; guidance only)"
+  },
+  "/api/profiles": {
+   "qubit": "brain/config_profiles",
+   "disposition": "adapted"
+  },
+  "/api/providers/oauth": {
+   "qubit": "auth_login",
+   "disposition": "adapted:key-refs,live-dance-provider-side"
+  },
+  "/api/pty": {
+   "qubit": "POST /api/qubit/chat",
+   "disposition": "REFUSED:PTY_NO_SHELL (Qubit-safe equivalent = native chat turn; frontend no longer connects the raw WS)"
+  },
+  "/api/sessions": {
+   "qubit": "sessions/memory",
+   "disposition": "adapted:receipts+stores"
+  },
+  "/api/skills": {
+   "qubit": "skills",
+   "disposition": "adapted"
+  },
+  "/api/skills/hub": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:REMOTE_PLUGIN (reviewed-only, tested)"
+  },
+  "/api/skills/toggle": {
+   "qubit": "skills_enable/disable",
+   "disposition": "adapted"
+  },
+  "/api/status": {
+   "qubit": "status",
+   "disposition": "adapted"
+  },
+  "/api/system/stats": {
+   "qubit": "runtime/status",
+   "disposition": "adapted"
+  },
+  "/api/tools/toolsets": {
+   "qubit": "permissions/capability",
+   "disposition": "adapted:grants"
+  },
+  "/api/webhooks": {
+   "qubit": "webhook",
+   "disposition": "adapted"
+  }
+ },
+ "files": [
+  {
+   "path": "web/src/App.tsx",
+   "bytes": 44130,
+   "sha256": "5f72d97b2f3c952118df3920fa6075e9c349dc58d16f9cc00df0dbc9839d3b0e",
+   "kind": "shell",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/AuthWidget.tsx",
+   "bytes": 5258,
+   "sha256": "4d0ad8e7ca4caf9d98b8a258a11018d6a16303c58bcb775b2c6cf6fc248073fa",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/AutoField.tsx",
+   "bytes": 6348,
+   "sha256": "3c84d78ef3cc352b05fad806b4eaa1a06f1006760541ad45aa2e90d16926a992",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/AutomationBlueprints.tsx",
+   "bytes": 7232,
+   "sha256": "adaabe68e88020e918b804067b3fda155d95c74ab8a3362f3c662580c959df18",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ChatSessionList.tsx",
+   "bytes": 9285,
+   "sha256": "5c37d2bbdc97abc2a3e2f0cb145ff6216575fc67a1d5e214617ac50f3af2b9d6",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ChatSidebar.test.tsx",
+   "bytes": 14342,
+   "sha256": "0db3644058d7c75d5632efd849f348f825e2046441f7241ade8677e3c5d467ab",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/components/ChatSidebar.tsx",
+   "bytes": 20448,
+   "sha256": "a4c2f511b68a89e17950719fd6ecdab0d660764aac9e1b071cc9ad9f64809b8a",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ConfirmDialog.tsx",
+   "bytes": 3326,
+   "sha256": "13cf8290e4d0f49db0aabcee6ad56e966ef600022674a0c47a6e7a0e5ab89382",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/DeleteConfirmDialog.tsx",
+   "bytes": 841,
+   "sha256": "88892093ef3ec42f905ce359665c0482aef85eb220f2210a7c1255ca190ae593",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/HermesConsoleModal.tsx",
+   "bytes": 15975,
+   "sha256": "776f58d89d2e2bbd50f2dc950f61dffc416b5e1f4be25f30871102f1bdb8cb81",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/LanguageSwitcher.tsx",
+   "bytes": 6323,
+   "sha256": "8078c4987adc2e83f2a3462901f9942fa3ba6f9e5bc710d863b2b56e077e5127",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/Markdown.tsx",
+   "bytes": 10850,
+   "sha256": "09e4546ae2bfaadd3c9cbfcb2c74b207f5e50e3b6d768bbe7d8cbb13383ee20c",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/MemoryPressureBanner.test.tsx",
+   "bytes": 14372,
+   "sha256": "276f1ff539f68e4ab16c3dd3e5dc56431f2de70b45a72710176242976faaa4be",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/components/MemoryPressureBanner.tsx",
+   "bytes": 7836,
+   "sha256": "f16829fc87ce8d2600c8c33386edfafe69c6e84e03657196cd742f7f01657983",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ModelInfoCard.tsx",
+   "bytes": 4169,
+   "sha256": "ae26834005695bfa0064ef46d549ec15856c0e774388dcf146d2fd6a338f9f39",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ModelPickerDialog.tsx",
+   "bytes": 21780,
+   "sha256": "0166cf84e6d22b1d809dbe358b9eed5753e7d03feb7c1eebbc40dc8ea4870f09",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ModelReloadConfirm.tsx",
+   "bytes": 1403,
+   "sha256": "ad10b9f064ff04b801fa4f9eef1ce58a8dbb4d7100ce387b0b4dd165ebdf92a1",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/OAuthLoginModal.test.tsx",
+   "bytes": 6181,
+   "sha256": "03b64175602b9a8a9079c21068ee92ba892de5230f19e4943be1a74f7160a199",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/components/OAuthLoginModal.tsx",
+   "bytes": 15586,
+   "sha256": "306b925b08b69550b67c09c5fe9701aa4fa54f40ea3c2013aa50fb251c013358",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/OAuthProvidersCard.tsx",
+   "bytes": 10560,
+   "sha256": "cc1b40d5a5d4aeb3a089c77e742783a6839eb8ee462a3eb2161b6b062ed2d6b6",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/PlatformsCard.tsx",
+   "bytes": 3858,
+   "sha256": "5913da0dceab75fd817b85f840dc3ed1ad70a5f00a14ef3beef6e54214e264e4",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ProfileScopeBanner.tsx",
+   "bytes": 985,
+   "sha256": "59318cf3a7797436cdd3d17fa65996041db8fae4856ac0346c7d6542a6458af2",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ProfileSwitcher.tsx",
+   "bytes": 2689,
+   "sha256": "41e7041948abaeb7ab726a2e10519a16fb1840995eb98394f3cf63dbfc890319",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ReasoningPicker.tsx",
+   "bytes": 4514,
+   "sha256": "3b25e94a09b4e6196f959366cb2c0b3af6dc52c65d8d4b04a8c9f2a82e116b17",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ScheduleBuilder.tsx",
+   "bytes": 9535,
+   "sha256": "958fb7cf80fa30099284bfeffba263bc85e4373e5034ceaae5a559a1c0d6ba10",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/SidebarFooter.tsx",
+   "bytes": 1195,
+   "sha256": "c070c3c534b7b51bef52b1de94cdeca1d6a2e1e8b357016af8115993e29ad306",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/SidebarStatusStrip.tsx",
+   "bytes": 2405,
+   "sha256": "0dd142f12b5b9d4d7d5339a6be46cb52825e2be02f81ecc718493393ebd5522d",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/SkillEditorDialog.tsx",
+   "bytes": 7085,
+   "sha256": "fe6084909ab16cb8e7e143a1af41ab111e83438287eaa5da5e4ecab5fbd54e0e",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/SlashPopover.tsx",
+   "bytes": 5014,
+   "sha256": "1ed4751afe109dd7faea36f4d418f1cc74766b3b913a9333aa39a65fbe6dd885",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ThemeSwitcher.tsx",
+   "bytes": 12013,
+   "sha256": "4c5181bb0a89bbf0336ecb9dff4d96736f273607a966ea78eb8704327a939d9e",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/components/ToolsetConfigDrawer.tsx",
+   "bytes": 18067,
+   "sha256": "6abf43e63eca2dc183cded7eb1f09afb63769311f5912be52d1c71c3294b1db6",
+   "kind": "component",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/contexts/PageHeaderProvider.tsx",
+   "bytes": 4659,
+   "sha256": "8a1809e7c89fd12a50b6af8869b8cc8e0f5ae72a8501cae4425091d4ca5863c2",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/contexts/ProfileProvider.tsx",
+   "bytes": 5058,
+   "sha256": "86e0d90ebea43deec5c803d3ca78cd082a02249d99bca756af41c23409f197a8",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/contexts/SystemActions.tsx",
+   "bytes": 3837,
+   "sha256": "9a40a898f6545d9db58ce7e3fee089023ea29c6a671065a39421046d2e46f52f",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/contexts/page-header-context.ts",
+   "bytes": 340,
+   "sha256": "dbac74bed0434ffc7a14d058d2e471b4e5d1402c7041ddf781a6c22261c8e165",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/contexts/profile-context.ts",
+   "bytes": 560,
+   "sha256": "c9a616ee41e6207c9a6b1aea298de87ee98c953a6b74b5f554a8fb2d69157692",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/contexts/system-actions-context.ts",
+   "bytes": 516,
+   "sha256": "9005331d44083da62e71942d9576688b5f99b161ab912820ea518bc324f0875e",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/contexts/usePageHeader.ts",
+   "bytes": 341,
+   "sha256": "4cd26c2b220ddd7dd23c853c75a321dfb770f9d025829a53a43b190c5be3d8f7",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/contexts/useProfileScope.ts",
+   "bytes": 173,
+   "sha256": "0ad44c462a91713f02b758e06325ab2c476a626ffead05272b513017493e5d00",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/contexts/useSystemActions.ts",
+   "bytes": 369,
+   "sha256": "66c7293e7d27c474fb9ffe094983e09b513d0f7696c87ec1c89c1434055c5cd5",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/hooks/useModalBehavior.ts",
+   "bytes": 1100,
+   "sha256": "bb018af8fb2f8f7e25a967d062e79647ba3e77d906afc09b60f97d73305d74f4",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/hooks/useSidebarStatus.ts",
+   "bytes": 674,
+   "sha256": "dfc8c6bcff796cc06a22877a46de30bd73ff7f5638717632665eca16949f2fa7",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/i18n/af.ts",
+   "bytes": 30133,
+   "sha256": "acfb4ae554327d35010e8d255209c151f4e3efef1e27eb2187fb6e62e21e6397",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/ar.ts",
+   "bytes": 33287,
+   "sha256": "7c88de5e5cb35fc661cd2e609e1ae9786a111cd321d20e19fa512af5b3a3b282",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/context.tsx",
+   "bytes": 3572,
+   "sha256": "cef177add9ca0f567e2ff0639c97a640b0b2ea2524623e941c2b0f501aab6228",
+   "kind": "i18n",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/i18n/de.ts",
+   "bytes": 32037,
+   "sha256": "2ab2afe3270eb92ed7b7c5eb0886f92ef7406489d345991659895032a4c8b22b",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/define-locale.ts",
+   "bytes": 1519,
+   "sha256": "27e06404fd0b4eaf7d9f35b79db17af62be428c5e94ae7efb4c7fd5e87682fc1",
+   "kind": "i18n",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/i18n/en.ts",
+   "bytes": 33275,
+   "sha256": "82ffe1cfe23cfdaf1b15fb6e043090ce4f30e24e71115b7a9c2066d0c49a5f40",
+   "kind": "i18n",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/i18n/es.ts",
+   "bytes": 31696,
+   "sha256": "afcfec650bfa5f45ef3b483a3d895af335f340b348c7004febbc0547a9fd8bba",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/fr.ts",
+   "bytes": 32583,
+   "sha256": "178d4909dd59cffb9fb0ef73358201eebbeb4e4a8bb6c70e18eceae8c07bf9fe",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/ga.ts",
+   "bytes": 32466,
+   "sha256": "40c417b8f5f2501a7ea3327c64947cfecbcd1559477b9b90353b3ad3cf618cb3",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/hu.ts",
+   "bytes": 32922,
+   "sha256": "3555b41649df15ab0adc4ca8454193046b2e575d9a5a88f420b82207fc038eeb",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/index.ts",
+   "bytes": 117,
+   "sha256": "bc8a217831c6f66d36a8925ea612414f9d5f4c882c64287e5e604041b5dbfd6b",
+   "kind": "i18n",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/i18n/it.ts",
+   "bytes": 31449,
+   "sha256": "276e9fb741a3bf79ab5545d73afd584024d3e855f2c745baee87b719866d64ac",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/ja.ts",
+   "bytes": 36538,
+   "sha256": "6bc01e590b1af4ce2fe268c0085decbd9aa2b06b6e698bd43359faeaf869d023",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/ko.ts",
+   "bytes": 32725,
+   "sha256": "3fd8cf1fef086a4bab972b407d0b96628aba5eb2cf55ed7b28c1dd21dcdca75f",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/pt.ts",
+   "bytes": 31639,
+   "sha256": "c009197a4a88dc77b19286a6751790378ab5b8f50f3e55cd88748358b416ee74",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/ru.ts",
+   "bytes": 43258,
+   "sha256": "3dc86a29bdfd77c8aae1119db5187007333ecb946a14cfbf1a64d39fb4e391a0",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/tr.ts",
+   "bytes": 31294,
+   "sha256": "a63db5030b48b2b5c9fa6cf951f2de83a0d3ec66b2cd83d9585f7dbcdff39796",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/types.ts",
+   "bytes": 21250,
+   "sha256": "734affe3b52308bc89b970d4597ca4d3d74e598def99db9e6a64e359e97914c2",
+   "kind": "i18n",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/i18n/uk.ts",
+   "bytes": 42614,
+   "sha256": "a22136f03d37eac4499df724e5acada2f242ffc5ee79b48a000eebf3a94e3813",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/zh-hant.ts",
+   "bytes": 29023,
+   "sha256": "78506a0d97eaf1e2af618a04bac6f81f0492a25c06b4813c62382a3f73377f5e",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/zh.ts",
+   "bytes": 28480,
+   "sha256": "bf11533fcbf17f460cc72906ce477a9300f82eb32ad4cf910ff29a532c86a80c",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/index.css",
+   "bytes": 9234,
+   "sha256": "0f65b06e327494f599d59d57cd0633387a0f0bef11be2917a70cc2ffde60690b",
+   "kind": "shell",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/api.test.ts",
+   "bytes": 6570,
+   "sha256": "a5c23be1b619241f30448590e5f951f385b0c22413d5b46829e6099e8f31935d",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/api.ts",
+   "bytes": 86394,
+   "sha256": "59bb6ab61d5fee205f3c0b3a410383d621f6e76cbfa9a6db24ce55014118f9b9",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/chat-activation.test.ts",
+   "bytes": 1042,
+   "sha256": "2abd0118e6079e82b2b2377e94abb657f5a72d28de610f0d4f75e2fde30c4717",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/chat-activation.ts",
+   "bytes": 866,
+   "sha256": "92235b55a0de50d48dbfdff03d8d7ba59a0cf889cfa6e0aea7b5ecf7335f8c8d",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/chat-sidebar-session-params.test.ts",
+   "bytes": 1124,
+   "sha256": "02862cc8de208acf92f648941f4b647479cd87e374be9e1a61440e645d049e31",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/chat-title.test.ts",
+   "bytes": 1232,
+   "sha256": "68c309502ef38cdaf016be57ae924b6c2048892870b8d09cae1a2e79ce532100",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/chat-title.ts",
+   "bytes": 446,
+   "sha256": "a2538a723f717f8ce5d1e08baf4b66a4b3ca5aed74f03f476b569cb9ac490f81",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/chatImagePaste.test.ts",
+   "bytes": 2962,
+   "sha256": "8f4f31ec0c05d86c6527eaf996b49a577cdf24d380b2a0b1e7e279f98c9e8464",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/chatImagePaste.ts",
+   "bytes": 4878,
+   "sha256": "03b78a59532685dbada06068b4dd034429749a843923276f5398a922e6812db3",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/clipboard-usage.test.ts",
+   "bytes": 2249,
+   "sha256": "256b643b3f9af72c494057e1d5db6603ebdd65a2ac480646b547e4f14724d5a4",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/clipboard.test.ts",
+   "bytes": 3557,
+   "sha256": "c4941304ff7feba393bf6b07b194f422bce916c7ef97f42ad196a363a1063212",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/clipboard.ts",
+   "bytes": 1452,
+   "sha256": "c765130d3494db25abed0bd4ee032715a4abb68490970f821e92f1158c9e49f8",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/cron-job.test.ts",
+   "bytes": 5621,
+   "sha256": "b53fb3a3bb2bfecceffcc89804e025416104cdb28fa4d9efa502d0f10571c882",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/cron-job.ts",
+   "bytes": 5428,
+   "sha256": "ed77676ba7daeec01572f682cbfd9bc529bc7b86dfb186ed30f09cb8b3fd2d0e",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/cron-trigger-controller.test.ts",
+   "bytes": 4192,
+   "sha256": "9b1c5e94ec180a31b3b356d04ee99f7682b70f77914e2b4a47acf1607363022e",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/dashboard-auth-reload.test.ts",
+   "bytes": 2003,
+   "sha256": "16b26d81e0bd5e26ea57e0706f202a32ce11a2db6e7e4bbace32540940aa3574",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/dashboard-auth-reload.ts",
+   "bytes": 1737,
+   "sha256": "39a2ec1d34f416f75a4dcb853d6e7ba1fd97aa688482d5a2ba0585351cce9944",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/dashboard-flags.ts",
+   "bytes": 906,
+   "sha256": "3ea7399273b663afd94419ada45f97749d203327c8b31362148211427457b2b4",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/dashboard-modal-shell.test.ts",
+   "bytes": 852,
+   "sha256": "d7f5167ee02b76ee5ed7f5fcc8926489d02c4a933113f9ae4bb9b517673a7d42",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/dashboard-modal-shell.ts",
+   "bytes": 1116,
+   "sha256": "1eb68b3363a51259feec112ae9234ac756862460b2e481af5e2751d6b0682221",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/env-state.test.ts",
+   "bytes": 1208,
+   "sha256": "544eb9eb366f08e7a35726f17ee8cd66c96ac69c5829a8a7112681a3ef295def",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/env-state.ts",
+   "bytes": 526,
+   "sha256": "4fce475d7b06bbc3fde2f154d82e09f8cb08e4c327d25a826019e0015de28ba8",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/events-reconnect.test.ts",
+   "bytes": 4181,
+   "sha256": "a1746fe74dadd858d24322b80b7fe12b8af71cd052258bbdae623f8e6891508c",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/events-reconnect.ts",
+   "bytes": 3149,
+   "sha256": "86023749ab37d5bb1dcee8fb06fa0e649814f5e8a435229631b33bdf271be16b",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/format.ts",
+   "bytes": 373,
+   "sha256": "440ef0c314785cefb39f89e5b010788bad3c7bf7e69708c70b5b82979e4cd4be",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/fuzzy.ts",
+   "bytes": 5364,
+   "sha256": "e6a34adc8257000698874dc2cd81f359003d692efb99680d7f7beb92ae35b8e3",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/gatewayClient.test.ts",
+   "bytes": 2415,
+   "sha256": "b86db1264ee80f746dff70c709b24e7bc41ba3823b0f1774c6a8a5c3c5755bcc",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/gatewayClient.ts",
+   "bytes": 2127,
+   "sha256": "0117fbccf3e4955ae918782cfc11bf4b5320690f50985c0abc1d3fcd63326b64",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/keyboard-inset.test.ts",
+   "bytes": 2739,
+   "sha256": "820f31641a14b02ad234a693554074d01fd4ee8ed802d3210e245c1f0b8ff808",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/keyboard-inset.ts",
+   "bytes": 3012,
+   "sha256": "d8242d3a6e28a5748a0311841f3df5350ec92050cdbbff42e2e7fa399ff9e6e0",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/log-classify.test.ts",
+   "bytes": 2000,
+   "sha256": "e45af1654d91fbff9e034fb54565a527148e0cd08a2d436a26f51d0fc69d6fe6",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/log-classify.ts",
+   "bytes": 1346,
+   "sha256": "f6c2e04410e4c9f375707f6e86b5f24835d757dc5e97f4ae03469015df5dffdf",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/mcp-dashboard-oauth.test.ts",
+   "bytes": 4642,
+   "sha256": "151c342dbc15495d3b9e34511cb614c0bbc3afbf895cc101b987b180277c4828",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/mcp-dashboard-oauth.ts",
+   "bytes": 2076,
+   "sha256": "79d87c35c6ef4badca9d3073ab61daf2a83a43cd3187f3420e2018f3d73201f8",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/mcp-server-create.test.ts",
+   "bytes": 2565,
+   "sha256": "4bac9494334195623a7da91523ef54676824b6c541c4b693bd8587dec0fb732c",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/mcp-server-create.ts",
+   "bytes": 2042,
+   "sha256": "8f63a659ab8db648abad7accee1131351b66ec5b1afa3226ab8ef4973486b1a0",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/model-picker-filter.test.ts",
+   "bytes": 1626,
+   "sha256": "6d8e8cc0f7620f53925b1221a91a2da6323f9d965994666dbc63ab5733b6b0ec",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/model-picker-filter.ts",
+   "bytes": 872,
+   "sha256": "bb9ffa1035c352a296b364b3f3d10f87978622d11c79c8b847fc2cceacbd5d97",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/model-search-text.ts",
+   "bytes": 1027,
+   "sha256": "9c3061f0087a94a4606c17eb11eee958e63220281c9fed03830b89c142af25fd",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/nested.ts",
+   "bytes": 802,
+   "sha256": "6c26becede8a2db3e9ef8ac7200a755ba72f714f04619954dc7b1f65693c7216",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/pty-composition.test.ts",
+   "bytes": 3953,
+   "sha256": "f0f27bb6bfb87fb97775f5404fc4d4598ad80a357fa60dec288baf2bcb54ffa2",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-composition.ts",
+   "bytes": 1780,
+   "sha256": "e8a2a54df7694a845218ef05d2b1f379c9b2ec1bc2cdfbef255335ee3e3d864c",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/pty-focus.test.ts",
+   "bytes": 1123,
+   "sha256": "5e2b281615db561747ccae7f3eb0c5697f31432e6081105a192eab78755d99b9",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-focus.ts",
+   "bytes": 743,
+   "sha256": "d9149140160ae6ab8723992129e2d4e959ce36874cbb30ead8bd11cbf90be66c",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/pty-keyboard-shortcuts.test.ts",
+   "bytes": 2383,
+   "sha256": "62e6b560d466aae8bb0a921e1f692931774503954e508cae38dc7a3ae8346da4",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-keyboard-shortcuts.ts",
+   "bytes": 1468,
+   "sha256": "55bfd9f0496f2655d1cc04c7baa529a0e5d26973450ca416d327ed6337318821",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/pty-mobile-input.test.ts",
+   "bytes": 4026,
+   "sha256": "54a9dded9e6306ee2191e4da2f44feda3bd55026ff50c77e2a4da7ee736d3d27",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-mobile-input.ts",
+   "bytes": 4267,
+   "sha256": "d996c7fc7aabaae0c805c18e843d1c5e4bc56d107d786609343ac3349f2c2474",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/pty-reconnect.test.ts",
+   "bytes": 3539,
+   "sha256": "d249a2f8dd06bdce795553868907acf5b301a4898bf3b4af91953c75215f73f2",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-reconnect.ts",
+   "bytes": 3336,
+   "sha256": "702f496572898b144cebb80dacfff707f898b2086f063ba825d53f2dbe020c4c",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/pty-resume-loading.test.ts",
+   "bytes": 3300,
+   "sha256": "f857ffddc0e81fb48e015d9f7f42d766811c2fdbdf9db6fd3fa11f0d700f938f",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-resume-loading.ts",
+   "bytes": 1319,
+   "sha256": "73fb2a6e31987a163ec2341a19a050df89a32198639d53e7c8b0df48f1cf5e9b",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/pty-resume-sanitizer.test.ts",
+   "bytes": 7863,
+   "sha256": "f7d2950781e3837d52abc47c47027500931ff3a9a0e3f99311f344b591635028",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-resume-sanitizer.ts",
+   "bytes": 5587,
+   "sha256": "095e10f5419efec3fefca62ec71d2c4e933e3edc80af4edc5b095ba5db94b10b",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/pty-scroll.test.ts",
+   "bytes": 3100,
+   "sha256": "7de43e47c742fb5a17eac7dbaadb18cc3492e6245954676d39ce400aabb9bad7",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-scroll.ts",
+   "bytes": 3028,
+   "sha256": "64d4c0c4f8891895592f86ec186969d8eaf419446bb38ffca0c1d5fee04ae319",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/reasoning-effort.test.ts",
+   "bytes": 1583,
+   "sha256": "591f94e6158c3561bba79a55fdec2c7198c1351e3800570fe492e44a17b5a6e8",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/reasoning-effort.ts",
+   "bytes": 1277,
+   "sha256": "84e5b38ef9138daea0653a61430da414641521fcf1f90c4cb144f77e677bb96f",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/resolve-page-title.test.ts",
+   "bytes": 1882,
+   "sha256": "e470f55523267a4e2f3e62f97d7b4c1bb8855b69b6457412c582c407b3f05799",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/resolve-page-title.ts",
+   "bytes": 1552,
+   "sha256": "10b554fdb60ecd52605a7b078851fcf28e86c518b7fc6c275f1deaff1507d7a7",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/schedule.test.ts",
+   "bytes": 3634,
+   "sha256": "89cc819b9e665177a70d71aca204ddb607918cb76278c1fefb6c12204ccebf06",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/schedule.ts",
+   "bytes": 15932,
+   "sha256": "f7f3a6365eedff722d79cf4333a475f4a11ca376a758858e52bb7c6abb1f51ae",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/session-import.test.ts",
+   "bytes": 1468,
+   "sha256": "43021212e55974cda0b591d8850f757772ec67b7964ec2b25088ca1e9e0945d7",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/session-import.ts",
+   "bytes": 1505,
+   "sha256": "d2d7f23d04e19ed2fb11f122a76dc9ebdcd56a7bac2b4186698dbd74f68d6b7e",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/session-prune.test.ts",
+   "bytes": 578,
+   "sha256": "135a6096d80c2b9f5efa8553aec20d660d5571aea58cb01e4e51a2ceb3c0fa3e",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/session-prune.ts",
+   "bytes": 429,
+   "sha256": "3ceb7d173b0152fa0594d302366589d3cdada9602b02c78b1061c4e621ef75f4",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/session-refresh.test.ts",
+   "bytes": 762,
+   "sha256": "55ec2beba15e6169749e363d4e03b3a34780cffe93e009ad809c3266f646b359",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/session-refresh.ts",
+   "bytes": 1001,
+   "sha256": "b691fa246edbb01a2b0785c891c33a5ea6961d88065ad357aad74b021e28c050",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/slashExec.ts",
+   "bytes": 4616,
+   "sha256": "5f47aded05a6faed9a03e3a9d805cde13f41b5c7017c722aaa5da2e3a8cbebca",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/lib/utils.ts",
+   "bytes": 1466,
+   "sha256": "4e13dd449bd4aa30829e93d9f44b9dcc4b64cf31f836efc9756132c58d70b4e7",
+   "kind": "lib",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/main.tsx",
+   "bytes": 825,
+   "sha256": "4a4ca8d3ec4506e169f9c7991876ee68d5036a741ba5a7f31eab86f1067c50a1",
+   "kind": "shell",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/AnalyticsPage.tsx",
+   "bytes": 22052,
+   "sha256": "b52abfe58b7b58556f837c0f3ecedf6f327160c8a9e76cae2de1a60e3b073b64",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/ChannelsPage.tsx",
+   "bytes": 53007,
+   "sha256": "d51af1ff281eb69b053b4ab2901c6b6f923f2265214d1f241038096351a85bb1",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/ChatPage.test.tsx",
+   "bytes": 12675,
+   "sha256": "d62ce3b214ac2eaaf7f66a92f97aafe4c5f5b5bb019d1a3b1171f9587ead51a3",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/pages/ChatPage.tsx",
+   "bytes": 81074,
+   "sha256": "e0195bc46b650594803fefe896fa8fffa64c44848db4a1c074ffd72125113fea",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/ConfigPage.tsx",
+   "bytes": 22702,
+   "sha256": "aa61c2de5e9b903b97718a111c53286832439606df628d12329da6fe841ac367",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/CronPage.tsx",
+   "bytes": 41557,
+   "sha256": "dfdc719993f3d823908c66739f6fa9f83fd307b50d90013b941ee9d0d2972dab",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/DocsPage.tsx",
+   "bytes": 2307,
+   "sha256": "99a72b939db339c0749678cf3ef2262d2fbd634ee162314a663cc05e7b77a13e",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/EnvPage.tsx",
+   "bytes": 35102,
+   "sha256": "b8aad15b638c009486b20a398f71dcadb7cf42e7b3b2143538c19b5cdda8bf97",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/FilesPage.tsx",
+   "bytes": 18005,
+   "sha256": "1b844d04eae25194514889a4fd53b7b6dda0b56fda551b0c374d1f040c6b6d15",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/LogsPage.tsx",
+   "bytes": 7943,
+   "sha256": "3cc1186530f6bf9eba8b0c3c074f59e3b5570d14b12ad14b8e08bc6a86ea28bd",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/McpPage.tsx",
+   "bytes": 32736,
+   "sha256": "c21108ca49ba80024a8714e25a91f00ebb97e3342dfa457d5f15d9040b3a2b1a",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/ModelsPage.tsx",
+   "bytes": 49365,
+   "sha256": "78733577fe04e4608872b7e2061b5332b35062a1709624763a9c1b32c7a52ad2",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/PairingPage.tsx",
+   "bytes": 8893,
+   "sha256": "57ffb2aa70884bb7a036dce8b4c6e857a77493cc863b5c5dc591eb016a1408a3",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/PluginsPage.tsx",
+   "bytes": 40421,
+   "sha256": "72c8f2448648cda43313329039070a4778edc4b929ae5b64767b67cbcf75c894",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/ProfileBuilderPage.tsx",
+   "bytes": 32421,
+   "sha256": "821fb1c3b60c5df9d8c00d3f82fdc8546ca19df8d88cbb80ef4d811849319b7f",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/ProfilesPage.tsx",
+   "bytes": 49473,
+   "sha256": "a3fc373b77d6b247d85e72bfb7e91b8807cfd176f5fa1588ab25741d3707735e",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/SessionsPage.test.tsx",
+   "bytes": 6504,
+   "sha256": "af94f9a48da896869a39c3ed926be6bd6cf73cb74e4f8b85d1507248f3ed6212",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/pages/SessionsPage.tsx",
+   "bytes": 76060,
+   "sha256": "a919556cc0848f0fe7ca14ab33d253071615753c6711a74b06bf0bdab10105ff",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/SkillsPage.tsx",
+   "bytes": 56308,
+   "sha256": "0dea99c29201b20c3d9eaf53bff90a3d3f41f34bab98e41adf8369bc1989a102",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/SystemPage.tsx",
+   "bytes": 60992,
+   "sha256": "01b9bdc6adecf2406e5156c17da4f132e7b4c70133f00a9fa2c968b8e36a630b",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/pages/WebhooksPage.tsx",
+   "bytes": 21701,
+   "sha256": "5375f8eeb05de315c6f0d41572c57e14ff680fb87605fc3d644ad5ba3ebca2a6",
+   "kind": "page",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/plugins/PluginPage.tsx",
+   "bytes": 1756,
+   "sha256": "e6cd2271067a519a3ab6b2715254d48b9ac8da078035d01b6f66ab18389df7c1",
+   "kind": "other",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/plugins/index.ts",
+   "bytes": 430,
+   "sha256": "f393530f9a2f7113f80d802b0ff0e71d46935d527108cd7550b6983bf16bf10d",
+   "kind": "other",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/plugins/registry.test.ts",
+   "bytes": 2185,
+   "sha256": "072251420857f7bf0b2e5e6696f99cc2993db64d7c8d84698ea97c906bbc811c",
+   "kind": "other",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/plugins/registry.ts",
+   "bytes": 6502,
+   "sha256": "f37ca0ab497efe1c8588f32afe677865b999c19393d71002ecfc004d30a7f990",
+   "kind": "other",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/plugins/sdk.d.ts",
+   "bytes": 8085,
+   "sha256": "092b483dc1000d2de504b46d93faba88b2ea45d87a75a74265b41846a99c7417",
+   "kind": "other",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/plugins/slots.ts",
+   "bytes": 7046,
+   "sha256": "c65b4d964f69271bb4b4c728c9fc115411e3071d1dee19e7bfa4569b51f6d92b",
+   "kind": "other",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/plugins/types.ts",
+   "bytes": 1141,
+   "sha256": "be44d4d046e335ee34a696cc13177a78807cf25f67f2347c7fcaab9085640942",
+   "kind": "other",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/plugins/usePlugins.test.ts",
+   "bytes": 4087,
+   "sha256": "453b4631586c474a5598706eb7d5f6fa4c029bd5239bd1838d8c04217ac01950",
+   "kind": "other",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/plugins/usePlugins.ts",
+   "bytes": 7119,
+   "sha256": "9e5eb67012f67a2e21b5684160c86c504dbbf91c90753b0aff2611420c0f0f52",
+   "kind": "other",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/themes/context.tsx",
+   "bytes": 22204,
+   "sha256": "b545d59691a0dce5e507cb8b62dec2c90bc60a47332c797f89fb76e456defe3f",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/themes/fonts.ts",
+   "bytes": 5957,
+   "sha256": "c1a0358c6049e9881087d9f1c58d122cb238a0cf7c3c5332969bec595f81cb26",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/themes/index.ts",
+   "bytes": 379,
+   "sha256": "6410c711e788cc6958571619673d5d46012e95fbefd90a4256478a4f6ca78b9f",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/themes/presets.ts",
+   "bytes": 7215,
+   "sha256": "9fe5354d4f0c72bc462e61767fc1c757e1a55caea95301dedd43b7dc904f2231",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  },
+  {
+   "path": "web/src/themes/types.ts",
+   "bytes": 8274,
+   "sha256": "f67972703821f875c5338f219614d1bfb9770d2244595ebc2f6e3ce8037c348c",
+   "kind": "context",
+   "disposition": "vendored Hermes React/Vite source (byte-identical or documented Qubit patch; see docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints below)"
+  }
+ ],
+ "vendoring": {
+  "dashboard_baseline": "frontend/qubit-web <- hermes-agent/web",
+  "shared_library": "frontend/qubit-shared <- hermes-agent/qubit-shared",
+  "runtime": "React + Vite + Node build toolchain (owner amendment 2026-09-11 item 2)",
+  "provenance_manifest": "docs/HERMES_SOURCE_COMPARISON.json",
+  "per_file_fields": [
+   "upstream",
+   "upstream_blob_sha256",
+   "qubit",
+   "qubit_sha256",
+   "patch",
+   "reason",
+   "affected_regression_test"
+  ],
+  "pinned_revision": "2237be355906fbe6065ce1815711eee52b2d646e"
+ },
+ "inventory": {
+  "generated": "2026-09-13",
+  "source_pin": "2237be355906fbe6065ce1815711eee52b2d646e",
+  "counts": {
+   "upstream_web_src_files": 170,
+   "overlay_web_src_files": 171,
+   "baseline_pages": 19,
+   "baseline_routes": 19,
+   "nav_items": 20,
+   "dialogs": 8,
+   "forms": 2,
+   "i18n_locales": 19,
+   "pinned_dashboard_plugins": 2,
+   "overlay_plugins": 10,
+   "achievements_catalog": 60,
+   "achievements_api_routes": 6,
+   "static_qubit_pages": 19,
+   "tables": 7,
+   "workflows": 5,
+   "routes": 19,
+   "endpoints": 73
+  },
+  "pages": [
+   {
+    "upstream": "web/src/pages/AnalyticsPage.tsx",
+    "upstream_sha256": "b52abfe58b7b58556f837c0f3ecedf6f327160c8a9e76cae2de1a60e3b073b64",
+    "qubit_route": "/analytics",
+    "qubit_file": "frontend/qubit-web/src/pages/AnalyticsPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/AnalyticsPage.tsx",
+    "backend_route": "/api/analytics",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/AnalyticsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ChannelsPage.tsx",
+    "upstream_sha256": "d51af1ff281eb69b053b4ab2901c6b6f923f2265214d1f241038096351a85bb1",
+    "qubit_route": "/channels",
+    "qubit_file": "frontend/qubit-web/src/pages/ChannelsPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/ChannelsPage.tsx",
+    "backend_route": "/api/messaging/platforms",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/ChannelsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ChatPage.tsx",
+    "upstream_sha256": "e0195bc46b650594803fefe896fa8fffa64c44848db4a1c074ffd72125113fea",
+    "qubit_route": "/chat",
+    "qubit_file": "frontend/qubit-web/src/pages/ChatPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/ChatPage.tsx",
+    "backend_route": "/api/status",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/ChatPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ConfigPage.tsx",
+    "upstream_sha256": "aa61c2de5e9b903b97718a111c53286832439606df628d12329da6fe841ac367",
+    "qubit_route": "/config",
+    "qubit_file": "frontend/qubit-web/src/pages/ConfigPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/ConfigPage.tsx",
+    "backend_route": "/api/config",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/ConfigPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/CronPage.tsx",
+    "upstream_sha256": "dfdc719993f3d823908c66739f6fa9f83fd307b50d90013b941ee9d0d2972dab",
+    "qubit_route": "/cron",
+    "qubit_file": "frontend/qubit-web/src/pages/CronPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/CronPage.tsx",
+    "backend_route": "/api/cron/jobs",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/CronPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/DocsPage.tsx",
+    "upstream_sha256": "99a72b939db339c0749678cf3ef2262d2fbd634ee162314a663cc05e7b77a13e",
+    "qubit_route": "/docs",
+    "qubit_file": "frontend/qubit-web/src/pages/DocsPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/DocsPage.tsx",
+    "backend_route": "(served SPA shell)",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/DocsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/EnvPage.tsx",
+    "upstream_sha256": "b8aad15b638c009486b20a398f71dcadb7cf42e7b3b2143538c19b5cdda8bf97",
+    "qubit_route": "/env",
+    "qubit_file": "frontend/qubit-web/src/pages/EnvPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/EnvPage.tsx",
+    "backend_route": "/api/env",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/EnvPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/FilesPage.tsx",
+    "upstream_sha256": "1b844d04eae25194514889a4fd53b7b6dda0b56fda551b0c374d1f040c6b6d15",
+    "qubit_route": "/files",
+    "qubit_file": "frontend/qubit-web/src/pages/FilesPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/FilesPage.tsx",
+    "backend_route": "/api/files",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/FilesPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/LogsPage.tsx",
+    "upstream_sha256": "3cc1186530f6bf9eba8b0c3c074f59e3b5570d14b12ad14b8e08bc6a86ea28bd",
+    "qubit_route": "/logs",
+    "qubit_file": "frontend/qubit-web/src/pages/LogsPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/LogsPage.tsx",
+    "backend_route": "/api/logs",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/LogsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/McpPage.tsx",
+    "upstream_sha256": "c21108ca49ba80024a8714e25a91f00ebb97e3342dfa457d5f15d9040b3a2b1a",
+    "qubit_route": "/mcp",
+    "qubit_file": "frontend/qubit-web/src/pages/McpPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/McpPage.tsx",
+    "backend_route": "/api/mcp",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/McpPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ModelsPage.tsx",
+    "upstream_sha256": "78733577fe04e4608872b7e2061b5332b35062a1709624763a9c1b32c7a52ad2",
+    "qubit_route": "/models",
+    "qubit_file": "frontend/qubit-web/src/pages/ModelsPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/ModelsPage.tsx",
+    "backend_route": "/api/model/info",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/ModelsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/PairingPage.tsx",
+    "upstream_sha256": "57ffb2aa70884bb7a036dce8b4c6e857a77493cc863b5c5dc591eb016a1408a3",
+    "qubit_route": "/pairing",
+    "qubit_file": "frontend/qubit-web/src/pages/PairingPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/PairingPage.tsx",
+    "backend_route": "/api/pairing",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/PairingPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/PluginsPage.tsx",
+    "upstream_sha256": "72c8f2448648cda43313329039070a4778edc4b929ae5b64767b67cbcf75c894",
+    "qubit_route": "/plugins",
+    "qubit_file": "frontend/qubit-web/src/pages/PluginsPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/PluginsPage.tsx",
+    "backend_route": "/api/dashboard/plugins",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/PluginsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ProfilesPage.tsx",
+    "upstream_sha256": "a3fc373b77d6b247d85e72bfb7e91b8807cfd176f5fa1588ab25741d3707735e",
+    "qubit_route": "/profiles",
+    "qubit_file": "frontend/qubit-web/src/pages/ProfilesPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/ProfilesPage.tsx",
+    "backend_route": "/api/profiles",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/ProfilesPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ProfileBuilderPage.tsx",
+    "upstream_sha256": "821fb1c3b60c5df9d8c00d3f82fdc8546ca19df8d88cbb80ef4d811849319b7f",
+    "qubit_route": "/profiles/new",
+    "qubit_file": "frontend/qubit-web/src/pages/ProfileBuilderPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/ProfileBuilderPage.tsx",
+    "backend_route": "/api/profiles",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/ProfileBuilderPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/SessionsPage.tsx",
+    "upstream_sha256": "a919556cc0848f0fe7ca14ab33d253071615753c6711a74b06bf0bdab10105ff",
+    "qubit_route": "/sessions",
+    "qubit_file": "frontend/qubit-web/src/pages/SessionsPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/SessionsPage.tsx",
+    "backend_route": "/api/sessions",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/SessionsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/SkillsPage.tsx",
+    "upstream_sha256": "0dea99c29201b20c3d9eaf53bff90a3d3f41f34bab98e41adf8369bc1989a102",
+    "qubit_route": "/skills",
+    "qubit_file": "frontend/qubit-web/src/pages/SkillsPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/SkillsPage.tsx",
+    "backend_route": "/api/skills",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/SkillsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/SystemPage.tsx",
+    "upstream_sha256": "01b9bdc6adecf2406e5156c17da4f132e7b4c70133f00a9fa2c968b8e36a630b",
+    "qubit_route": "/system",
+    "qubit_file": "frontend/qubit-web/src/pages/SystemPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/SystemPage.tsx",
+    "backend_route": "/api/system/stats",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/SystemPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/WebhooksPage.tsx",
+    "upstream_sha256": "5375f8eeb05de315c6f0d41572c57e14ff680fb87605fc3d644ad5ba3ebca2a6",
+    "qubit_route": "/webhooks",
+    "qubit_file": "frontend/qubit-web/src/pages/WebhooksPage.tsx",
+    "vendored_file": "qubit_runtime/web/src/pages/WebhooksPage.tsx",
+    "backend_route": "/api/webhooks",
+    "status": "adapted",
+    "evidence": "frontend/qubit-web/src/pages/WebhooksPage.tsx:1"
+   }
+  ],
+  "navigation": [
+   {
+    "path": "/chat",
+    "label": "Chat",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/sessions",
+    "label": "Sessions",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/files",
+    "label": "Files",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/analytics",
+    "label": "Analytics",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/models",
+    "label": "Models",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/logs",
+    "label": "Logs",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/cron",
+    "label": "Cron",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/skills",
+    "label": "Skills",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/plugins",
+    "label": "Plugins",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/mcp",
+    "label": "MCP",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/channels",
+    "label": "Channels",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/webhooks",
+    "label": "Webhooks",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/pairing",
+    "label": "Pairing",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/profiles",
+    "label": "Profiles",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/config",
+    "label": "Config",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/env",
+    "label": "Keys",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/system",
+    "label": "System",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/docs",
+    "label": "Documentation",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/achievements",
+    "label": "Achievements",
+    "plugin_owned": true,
+    "source": "frontend/qubit-web/public/plugins/fleet.json"
+   },
+   {
+    "path": "/kanban",
+    "label": "Kanban",
+    "plugin_owned": true,
+    "source": "frontend/qubit-web/public/plugins/fleet.json"
+   }
+  ],
+  "dialogs": [
+   {
+    "upstream": "web/src/components/ConfirmDialog.tsx",
+    "qubit_file": "frontend/qubit-web/src/components/ConfirmDialog.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/qubit-web/src/components/ConfirmDialog.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/DeleteConfirmDialog.tsx",
+    "qubit_file": "frontend/qubit-web/src/components/DeleteConfirmDialog.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/qubit-web/src/components/DeleteConfirmDialog.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/HermesConsoleModal.tsx",
+    "qubit_file": "frontend/qubit-web/src/components/QubitConsoleModal.tsx",
+    "status": "adapted",
+    "kind": "console",
+    "evidence": "frontend/qubit-web/src/components/QubitConsoleModal.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/ModelPickerDialog.tsx",
+    "qubit_file": "frontend/qubit-web/src/components/ModelPickerDialog.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/qubit-web/src/components/ModelPickerDialog.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/ModelReloadConfirm.tsx",
+    "qubit_file": "frontend/qubit-web/src/components/ModelReloadConfirm.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/qubit-web/src/components/ModelReloadConfirm.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/OAuthLoginModal.tsx",
+    "qubit_file": "frontend/qubit-web/src/components/OAuthLoginModal.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/qubit-web/src/components/OAuthLoginModal.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/SkillEditorDialog.tsx",
+    "qubit_file": "frontend/qubit-web/src/components/SkillEditorDialog.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/qubit-web/src/components/SkillEditorDialog.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/ToolsetConfigDrawer.tsx",
+    "qubit_file": "frontend/qubit-web/src/components/ToolsetConfigDrawer.tsx",
+    "status": "adapted",
+    "kind": "drawer",
+    "evidence": "frontend/qubit-web/src/components/ToolsetConfigDrawer.tsx:1"
+   }
+  ],
+  "forms": [
+   {
+    "upstream": "web/src/components/AutoField.tsx",
+    "qubit_file": "frontend/qubit-web/src/components/AutoField.tsx",
+    "status": "adapted"
+   },
+   {
+    "upstream": "web/src/components/ScheduleBuilder.tsx",
+    "qubit_file": "frontend/qubit-web/src/components/ScheduleBuilder.tsx",
+    "status": "adapted"
+   }
+  ],
+  "tables": [
+   {
+    "page": "/sessions",
+    "widget": "session table + search/stats",
+    "qubit_file": "frontend/qubit-web/src/pages/SessionsPage.tsx",
+    "backend_route": "/api/sessions",
+    "status": "adapted"
+   },
+   {
+    "page": "/files",
+    "widget": "file tree + preview",
+    "qubit_file": "frontend/qubit-web/src/pages/FilesPage.tsx",
+    "backend_route": "/api/files",
+    "status": "adapted"
+   },
+   {
+    "page": "/cron",
+    "widget": "job/run table",
+    "qubit_file": "frontend/qubit-web/src/pages/CronPage.tsx",
+    "backend_route": "/api/cron/jobs",
+    "status": "adapted"
+   },
+   {
+    "page": "/logs",
+    "widget": "log stream table",
+    "qubit_file": "frontend/qubit-web/src/pages/LogsPage.tsx",
+    "backend_route": "/api/logs",
+    "status": "adapted"
+   },
+   {
+    "page": "/models",
+    "widget": "model/provider inventory",
+    "qubit_file": "frontend/qubit-web/src/pages/ModelsPage.tsx",
+    "backend_route": "/api/model/info",
+    "status": "adapted"
+   },
+   {
+    "page": "/achievements",
+    "widget": "catalog grid + per-category filters + scan status",
+    "qubit_file": "frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js",
+    "backend_route": "/api/plugins/hermes-achievements/achievements",
+    "status": "adapted"
+   },
+   {
+    "page": "/qubit-boards",
+    "widget": "board/tab/card/widget tables with confirm-gated mutations",
+    "qubit_file": "frontend/qubit-app/plugins/qubit-boards/qubit-boards.js",
+    "backend_route": "/api/ops/kanban + /api/ops/boards + /api/ops/run",
+    "status": "adapted"
+   }
+  ],
+  "plugins": {
+   "pinned": [
+    {
+     "name": "hermes-achievements",
+     "label": "Achievements",
+     "tab": {
+      "path": "/achievements",
+      "position": "after:analytics"
+     },
+     "entry": "dist/index.js",
+     "css": "dist/style.css",
+     "api": "plugin_api.py",
+     "manifest": "qubit_runtime/plugins/hermes-achievements/dashboard/manifest.json",
+     "bundle_served": "frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js"
+    },
+    {
+     "name": "kanban",
+     "label": "Kanban",
+     "tab": {
+      "path": "/kanban",
+      "position": "after:skills"
+     },
+     "entry": "dist/index.js",
+     "css": "dist/style.css",
+     "api": "plugin_api.py",
+     "manifest": "qubit_runtime/plugins/kanban/dashboard/manifest.json",
+     "bundle_served": "frontend/qubit-web/public/plugins/kanban/dist/index.js"
+    }
+   ],
+   "overlay": [
+    {
+     "name": "qubit-approvals",
+     "label": "Qubit Approvals",
+     "tab": {
+      "path": "/qubit-approvals",
+      "hidden": true
+     },
+     "entry": "qubit-approvals.js",
+     "manifest": "frontend/qubit-app/plugins/qubit-approvals/manifest.json",
+     "js": "frontend/qubit-app/plugins/qubit-approvals/qubit-approvals.js"
+    },
+    {
+     "name": "qubit-boards",
+     "label": "Boards",
+     "tab": {
+      "path": "/qubit-boards",
+      "position": "after:cron"
+     },
+     "entry": "qubit-boards.js",
+     "manifest": "frontend/qubit-app/plugins/qubit-boards/manifest.json",
+     "js": "frontend/qubit-app/plugins/qubit-boards/qubit-boards.js"
+    },
+    {
+     "name": "qubit-brand",
+     "label": "Qubit Brand",
+     "tab": {
+      "path": "/qubit-brand",
+      "hidden": true
+     },
+     "entry": "qubit-brand.js",
+     "manifest": "frontend/qubit-app/plugins/qubit-brand/manifest.json",
+     "js": "frontend/qubit-app/plugins/qubit-brand/qubit-brand.js"
+    },
+    {
+     "name": "qubit-devices",
+     "label": "Devices",
+     "tab": {
+      "path": "/devices",
+      "position": "after:qubit-runtime"
+     },
+     "entry": "qubit-devices.js",
+     "manifest": "frontend/qubit-app/plugins/qubit-devices/manifest.json",
+     "js": "frontend/qubit-app/plugins/qubit-devices/qubit-devices.js"
+    },
+    {
+     "name": "qubit-gateway",
+     "label": "Gateway",
+     "tab": {
+      "path": "/qubit-gateway",
+      "position": "after:mcp"
+     },
+     "entry": "qubit-gateway.js",
+     "manifest": "frontend/qubit-app/plugins/qubit-gateway/manifest.json",
+     "js": "frontend/qubit-app/plugins/qubit-gateway/qubit-gateway.js"
+    },
+    {
+     "name": "qubit-memory",
+     "label": "Memory",
+     "tab": {
+      "path": "/memory",
+      "position": "after:profiles"
+     },
+     "entry": "qubit-memory.js",
+     "manifest": "frontend/qubit-app/plugins/qubit-memory/manifest.json",
+     "js": "frontend/qubit-app/plugins/qubit-memory/qubit-memory.js"
+    },
+    {
+     "name": "qubit-models",
+     "label": "Models & Providers",
+     "tab": {
+      "path": "/qubit-models",
+      "position": "after:models"
+     },
+     "entry": "qubit-models.js",
+     "manifest": "frontend/qubit-app/plugins/qubit-models/manifest.json",
+     "js": "frontend/qubit-app/plugins/qubit-models/qubit-models.js"
+    },
+    {
+     "name": "qubit-ops",
+     "label": "Operations",
+     "tab": {
+      "path": "/operations",
+      "position": "after:system"
+     },
+     "entry": "qubit-ops.js",
+     "manifest": "frontend/qubit-app/plugins/qubit-ops/manifest.json",
+     "js": "frontend/qubit-app/plugins/qubit-ops/qubit-ops.js"
+    },
+    {
+     "name": "qubit-reports",
+     "label": "Reports",
+     "tab": {
+      "path": "/reports",
+      "position": "after:analytics"
+     },
+     "entry": "qubit-reports.js",
+     "manifest": "frontend/qubit-app/plugins/qubit-reports/manifest.json",
+     "js": "frontend/qubit-app/plugins/qubit-reports/qubit-reports.js"
+    },
+    {
+     "name": "qubit-runtime",
+     "label": "Runtime",
+     "tab": {
+      "path": "/qubit-runtime",
+      "position": "after:system"
+     },
+     "entry": "qubit-runtime.js",
+     "manifest": "frontend/qubit-app/plugins/qubit-runtime/manifest.json",
+     "js": "frontend/qubit-app/plugins/qubit-runtime/qubit-runtime.js"
+    }
+   ],
+   "fleet": [
+    "hermes-achievements",
+    "kanban"
+   ]
+  },
+  "plugin_apis": [
+   {
+    "plugin": "hermes-achievements",
+    "backend": "voicebridge.qubit_plugins.h_plugin_achievements",
+    "routes": [
+     "GET /achievements",
+     "GET /scan-status",
+     "GET /recent-unlocks",
+     "GET /sessions/{session_id}/badges",
+     "POST /rescan",
+     "POST /reset-state"
+    ],
+    "proof": "tests/test_qubit_plugins.py::test_achievements_wire_shape_states_and_tier_progression"
+   },
+   {
+    "plugin": "kanban",
+    "backend": "voicebridge.qubit_plugins.h_plugin_kanban_board",
+    "routes": [
+     "GET /board",
+     "GET /tasks/{task_id}",
+     "GET /stats",
+     "GET /assignees",
+     "GET /boards",
+     "GET /config",
+     "GET /projects",
+     "GET /workers/active",
+     "GET /diagnostics",
+     "GET /model-options",
+     "GET /home-channels",
+     "GET /tasks/{task_id}/log",
+     "GET /tasks/{task_id}/attachments",
+     "GET /runs/{run_id}",
+     "GET /runs/{run_id}/inspect",
+     "GET /profiles",
+     "GET /orchestration",
+     "POST/PATCH/DELETE/PUT -> KANBAN_WRITE_BROKERED gate (Qubit-safe: /api/ops/run + /api/ops/confirm)"
+    ],
+    "proof": "tests/test_qubit_plugins.py::test_kanban_read_routes_serve_real_board + tests/test_qbpv2_frontend_boards.py (ops lifecycle + persistence)"
+   }
+  ],
+  "assets": [
+   {
+    "path": "frontend/qubit-web/public/favicon.ico",
+    "kind": "icon",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/qubit-web/public/fonts",
+    "kind": "display fonts",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/qubit-web/public/fonts-terminal",
+    "kind": "mono fonts",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js",
+    "kind": "plugin bundle",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/qubit-web/public/plugins/hermes-achievements/dist/style.css",
+    "kind": "plugin css",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/qubit-web/public/plugins/kanban/dist/index.js",
+    "kind": "plugin bundle",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/qubit-web/public/plugins/kanban/dist/style.css",
+    "kind": "plugin css",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/qubit-app/qubit-theme.json",
+    "kind": "theme",
+    "status": "adapted"
+   }
+  ],
+  "state_files": [
+   {
+    "name": "state.json",
+    "owner": "hermes-achievements",
+    "backend": "qubit_runtime/plugins/hermes-achievements/dashboard/plugin_api.py",
+    "status": "real"
+   },
+   {
+    "name": "scan_snapshot.json",
+    "owner": "hermes-achievements",
+    "backend": "qubit_runtime/plugins/hermes-achievements/dashboard/plugin_api.py",
+    "status": "real"
+   },
+   {
+    "name": "scan_checkpoint.json",
+    "owner": "hermes-achievements",
+    "backend": "qubit_runtime/plugins/hermes-achievements/dashboard/plugin_api.py",
+    "status": "real"
+   }
+  ],
+  "i18n": {
+   "host_namespaces": [
+    "common",
+    "app",
+    "status",
+    "sessions",
+    "analytics",
+    "models",
+    "logs",
+    "cron",
+    "profiles",
+    "pluginsPage",
+    "skills",
+    "config",
+    "env",
+    "oauth",
+    "language",
+    "theme",
+    "achievements",
+    "kanban"
+   ],
+   "locales": 19,
+   "achievements_namespace": "frontend/qubit-web/src/i18n/en.ts:576",
+   "kanban_namespace": "frontend/qubit-web/src/i18n/en.ts:660",
+   "non_english_omitted": "OMITTED:I18N (owner decision; English-first UI)",
+   "en_total_string_keys": 714,
+   "achievements_namespace_keys": 67,
+   "kanban_namespace_keys": 168
+  },
+  "workflows": [
+   {
+    "workflow": "chat/streaming",
+    "route": "/chat",
+    "backend": "POST /api/qubit/chat (voicebridge.agent.turn) + GET /api/model/info",
+    "states": "empty,loading,ready,error+retry,voice unsupported/denied/no-speech/timeout,persisted-per-session",
+    "status": "adapted"
+   },
+   {
+    "workflow": "session lifecycle",
+    "route": "/sessions",
+    "backend": "/api/sessions",
+    "states": "list,search,show,confirmation-gated write verbs",
+    "status": "adapted"
+   },
+   {
+    "workflow": "achievements scan",
+    "route": "/achievements",
+    "backend": "/api/plugins/hermes-achievements/*",
+    "states": "pending/scanning/ready/stale/error/secret/unlocked/discovered",
+    "status": "adapted"
+   },
+   {
+    "workflow": "kanban board",
+    "route": "/qubit-boards (+ /kanban)",
+    "backend": "/api/plugins/kanban/* reads (single source) + /api/ops/run (kanban_boards_create, kanban_create, kanban_move, kanban_complete, kanban_assign, kanban_block, kanban_unblock, kanban_edit, kanban_archive) resolved through /api/ops/confirm",
+    "states": "empty,loading,ready,staged-confirmation,executed,error (archive-restore has no backend op -> reported cross-boundary)",
+    "status": "adapted"
+   },
+   {
+    "workflow": "approvals",
+    "route": "/qubit-approvals (hidden banner)",
+    "backend": "/api/ops/approvals + /api/ops/confirm|cancel",
+    "states": "pending/confirm/cancel/estop",
+    "status": "adapted"
+   }
+  ]
+ },
+ "achievements_audit": {
+  "plugin": "qubit_runtime/plugins/hermes-achievements",
+  "backend_present": true,
+  "api_present": true,
+  "persistence_present": true,
+  "catalog_count": 60,
+  "catalog_min_required": 60,
+  "categories": [
+   "Agent Autonomy",
+   "Debugging Chaos",
+   "Qubit Native",
+   "Lifestyle",
+   "Model Lore",
+   "Research/Web",
+   "Tool Mastery",
+   "Vibe Coding"
+  ],
+  "dashboard_page_present": true,
+  "dashboard_page_file": "frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js",
+  "dashboard_page_served": true,
+  "assets_present": [
+   "dashboard/dist/index.js",
+   "dashboard/dist/style.css",
+   "docs/assets/achievements-dashboard-hd.png",
+   "docs/assets/achievements-tier-showcase-hd.png"
+  ],
+  "states": [
+   "idle",
+   "pending",
+   "running",
+   "in_progress",
+   "failed",
+   "stale",
+   "secret",
+   "discovered",
+   "unlocked"
+  ],
+  "localization": {
+   "namespace": "achievements",
+   "host_locales": "en only namespace; other locales fall back to English"
+  },
+  "tests": [
+   "qubit_runtime/plugins/hermes-achievements/tests/test_achievement_engine.py",
+   "tests/test_qubit_plugins.py::test_achievements_wire_shape_states_and_tier_progression",
+   "tests/test_dashboard_plugin_fleet.py"
+  ],
+  "real": [
+   "61-badge tiered/multi-condition catalog",
+   "6 REST routes",
+   "durable state/snapshot/checkpoint (0600)",
+   "real session-history scan",
+   "726-line dashboard page with cards/share/scan states",
+   "tier + secret/discovered state machine"
+  ],
+  "missing": [
+   "resolved by the deep rebrand: backend catalog strings and the category label are \"Qubit Native\" (0 remaining \"Hermes\" strings in plugin_api.py)",
+   "resolved by the deep rebrand: pinned manifest description reads \"agentic Qubit workflows\"",
+   "vendored source dist copy qubit_runtime/plugins/hermes-achievements/dashboard/dist/index.js is upstream-branded (served SPA copy is Qubit-patched)"
+  ],
+  "live_verified": true,
+  "live_payload_routes": {
+   "GET /api/plugins/hermes-achievements/achievements": 200,
+   "GET /api/plugins/hermes-achievements/scan-status": 200,
+   "GET /api/plugins/hermes-achievements/recent-unlocks": 200,
+   "POST /api/plugins/hermes-achievements/rescan": 200,
+   "POST /api/plugins/hermes-achievements/reset-state": "409 CONFIRM_REQUIRED without confirm=true"
+  },
+  "live_render_states": "empty, loading, ready (catalog), scanning, stale, error, secret/discovered/unlocked",
+  "render_boundary_normalizer": "frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js api() applies rebrandPayload (Hermes|OpenClaw -> Qubit) to every payload"
+ },
+ "missing_paths": [
+  {
+   "kind": "branding-leak",
+   "path": "qubit_runtime/plugins/hermes-achievements/dashboard/plugin_api.py",
+   "symbol": "ACHIEVEMENTS / _ach descriptions / criteria_for / display_achievement / METRIC_LABELS",
+   "lines": "57-136, 440-502, 509-521, 524-529",
+   "detail": "Resolved in the deep rebrand: the vendored engine catalog, category labels (\"Qubit Native\"), metric labels, and criteria text now carry Qubit identity (0 remaining \"Hermes\" strings in qubit_runtime/plugins/hermes-achievements/dashboard/plugin_api.py).",
+   "required_change": "none (rebranded in the vendored engine this wave)",
+   "frontend_mitigation": "Render boundary normalizer retained as a defense-in-depth ratchet (frontend/qubit-web/src/lib/rebrand.ts + the Achievements bundle rebrandPayload).",
+   "cross_boundary_owner": "orchestrator/Agent 2 (voicebridge/**, qubit_runtime/**)",
+   "status": "resolved-by-deep-rebrand"
+  },
+  {
+   "kind": "branding-leak",
+   "path": "qubit_runtime/plugins/hermes-achievements/dashboard/dist/index.js",
+   "symbol": "bundle",
+   "lines": "338,446-447,478,669-670,681,690",
+   "detail": "Vendored source dist still renders \"Hermes Achievements\"/\"run Hermes more\"; the SPA-shipped copy frontend/qubit-web/public/... is Qubit-patched.",
+   "required_change": "Ship the Qubit patch in the vendored dist (or keep divergence documented in HERMES_SOURCE_COMPARISON.json).",
+   "cross_boundary_owner": "orchestrator/Agent 1",
+   "status": "open",
+   "frontend_mitigation": "SPA render boundary rebrands free-text payloads via frontend/qubit-web/src/lib/rebrand.ts (MCP/Channels/Config) and the Achievements bundle rebrandPayload; live crawl shows 0 visible upstream product names. Backend payloads still author the upstream names."
+  },
+  {
+   "kind": "branding-leak",
+   "path": "qubit_runtime/plugins/kanban/dashboard/dist/index.js",
+   "symbol": "bundle",
+   "lines": "multiple",
+   "detail": "Vendored source kanban dist renders \"Hermes profile/Hermes Kanban\"; the SPA-shipped copy is Qubit-patched.",
+   "required_change": "Same as achievements: rebrand vendored dist or document the divergence.",
+   "cross_boundary_owner": "orchestrator/Agent 1",
+   "status": "open",
+   "frontend_mitigation": "SPA render boundary rebrands free-text payloads via frontend/qubit-web/src/lib/rebrand.ts (MCP/Channels/Config) and the Achievements bundle rebrandPayload; live crawl shows 0 visible upstream product names. Backend payloads still author the upstream names."
+  },
+  {
+   "kind": "branding-leak",
+   "path": "qubit_runtime/plugins/hermes-achievements/dashboard/manifest.json",
+   "symbol": "description",
+   "lines": "4",
+   "detail": "Resolved: the pinned manifest description now reads \"Steam-style achievements for vibe coding and agentic Qubit workflows.\" It is returned by GET /api/dashboard/plugins/fleet (h_plugin_fleet).",
+   "required_change": "none (rebranded this wave)",
+   "cross_boundary_owner": "orchestrator/Agent 2",
+   "status": "resolved-by-deep-rebrand",
+   "frontend_mitigation": "SPA render boundary rebrands free-text payloads via frontend/qubit-web/src/lib/rebrand.ts (MCP/Channels/Config) and the Achievements bundle rebrandPayload; live crawl shows 0 visible upstream product names. Backend payloads still author the upstream names."
+  },
+  {
+   "kind": "provenance-refresh",
+   "path": "docs/HERMES_SOURCE_COMPARISON.json",
+   "symbol": "rows[qubit=frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js].qubit_sha256",
+   "lines": "-",
+   "detail": "Frontend repairs changed three hashed overlay artifacts. Agent 1 regenerated docs/HERMES_SOURCE_COMPARISON.json and docs/QUBIT_HERMES_VENDOR_MANIFEST.json in the shared tree; the achievements-bundle row and the wave3.added fleet.ts row now match the on-disk hashes (281d55d2...c888a1 and 0c3d42bf...024eb).",
+   "required_change": "none (verified in sync at handoff)",
+   "cross_boundary_owner": "Agent 1",
+   "status": "resolved-by-agent1"
+  },
+  {
+   "kind": "i18n-gap",
+   "path": "frontend/qubit-web/src/i18n/*.ts",
+   "symbol": "achievements/kanban namespaces",
+   "lines": "en.ts:576,660",
+   "detail": "The achievements and kanban namespaces exist only in en.ts; the other 19 locales fall back to English.",
+   "required_change": "Provision translated namespaces or record the English-first owner decision.",
+   "cross_boundary_owner": "orchestrator (owner decision)",
+   "status": "open"
+  },
+  {
+   "kind": "reports-raw-json",
+   "path": "frontend/qubit-app/plugins/qubit-reports/qubit-reports.js",
+   "symbol": "Generated reports / Insights <pre>",
+   "detail": "/reports renders the raw backend envelope for generated reports and insights instead of a formatted table; functional but low-polish.",
+   "required_change": "render reports/insights as structured rows (owner: W3 frontend).",
+   "cross_boundary_owner": "W3",
+   "status": "open"
+  },
+  {
+   "kind": "kanban-events-ws",
+   "path": "frontend/qubit-web/public/plugins/kanban/dist/index.js",
+   "symbol": "WebSocket subscription to /api/plugins/kanban/events",
+   "detail": "Qubit serves no plugin WebSocket (single SSE path), so the pinned Kanban plugin's live-update feed fails auth/handshake; board reads and broker mutations still work.",
+   "required_change": "either expose a Qubit-safe SSE feed the plugin consumes, or patch the SPA bundle to poll /api/plugins/kanban/events.",
+   "cross_boundary_owner": "orchestrator/W2",
+   "status": "open"
+  }
+ ],
+ "frontend_repairs": [
+  {
+   "file": "frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js",
+   "what": "Normalize every achievements API payload (Hermes|OpenClaw -> Qubit) in the single api() seam so the rendered catalog/category/criteria never expose the upstream product name.",
+   "proof": "tests/test_qubit_frontend_inventory8u.py::test_shipped_normalizer_rebrands_the_real_backend_payload (executes the shipped function with node against the real /api/plugins/hermes-achievements/achievements payload)"
+  },
+  {
+   "file": "frontend/qubit-web/src/plugins/fleet.ts",
+   "what": "Resolve QUBIT_BASE_PATH lazily in fleetManifestPath() instead of at module load; the eager const made any test that partially mocks @/lib/api fail on transitive import (SessionsPage.test.tsx).",
+   "proof": "frontend/qubit-web: npm run typecheck + npm run test (40 files / 295 tests pass)"
+  },
+  {
+   "file": "frontend/qubit-web/src/plugins/index.ts",
+   "what": "Export the new fleetManifestPath() in place of the removed top-level FLEET_MANIFEST_PATH constant.",
+   "proof": "frontend/qubit-web: npm run typecheck + npm run test"
+  },
+  {
+   "file": "frontend/qubit-web/src/pages/ChatPage.tsx",
+   "what": "Replaced the raw /api/pty xterm transport with the Qubit-safe native chat (POST /api/qubit/chat): typed loading/empty/error/retry, browser voice input with typed VOICE_* states, per-session transcript persistence, and the sessions switcher. Removes the 1006 reconnect loop.",
+   "proof": "frontend/qubit-web: npm run typecheck + npm run test; live Playwright /hermes/chat"
+  },
+  {
+   "file": "frontend/qubit-app/plugins/qubit-boards/qubit-boards.js",
+   "what": "Exposed the full card lifecycle through the Qubit ops broker: assign, block, unblock, edit, archive (confirmed), alongside create/move/complete; state persists in the canonical kanban store.",
+   "proof": "tests/test_qbpv2_frontend_boards.py"
+  },
+  {
+   "file": "frontend/qubit-web/src/lib/rebrand.ts",
+   "what": "Single render-boundary normalizer (Hermes|OpenClaw -> Qubit) applied to free-text backend payloads on the MCP catalog (description/post_install/diagnostics), messaging platform descriptions and env-field help (Channels), and config schema help (AutoField). Live crawl of all 32 routes reports 0 visible upstream product names.",
+   "proof": "tests/test_qbpv2_frontend_identity.py + live Chromium crawl over frontend/qubit-dist"
+  },
+  {
+   "file": "frontend/qubit-app/plugins/qubit-boards/qubit-boards.js",
+   "what": "Added the archived visibility filter and a confirmed Restore action (kanban_restore), completing the archive -> restore lifecycle on the Qubit Boards page.",
+   "proof": "tests/test_qbpv2_frontend_boards.py::test_card_lifecycle_persists_through_the_broker"
+  }
+ ],
+ "kanban_audit": {
+  "dashboard_vendored_plugin": "frontend/qubit-web/public/plugins/kanban/dist/index.js (Kanban tab)",
+  "qubit_native_page": "frontend/qubit-app/plugins/qubit-boards/qubit-boards.js (Boards tab)",
+  "store": "voicebridge/kanban.py -> <state_dir>/kanban.db (single canonical Qubit store)",
+  "read_api": {
+   "GET /api/plugins/kanban/board": 200,
+   "GET /api/plugins/kanban/boards": 200,
+   "GET /api/plugins/kanban/stats": 200,
+   "GET /api/plugins/kanban/assignees": 200,
+   "GET /api/plugins/kanban/config": 200,
+   "GET /api/plugins/kanban/projects": 200,
+   "GET /api/plugins/kanban/workers/active": 200,
+   "GET /api/plugins/kanban/diagnostics": 200,
+   "GET /api/plugins/kanban/model-options": 200
+  },
+  "write_api": {
+   "POST/PATCH/DELETE/PUT /api/plugins/kanban/*": "KANBAN_WRITE_BROKERED (typed refusal; no direct dashboard write)",
+   "POST /api/ops/run {id: kanban_boards_create|kanban_create|kanban_move|kanban_complete|kanban_assign|kanban_block|kanban_unblock|kanban_edit|kanban_archive}": "409 NEEDS_CONFIRMATION -> POST /api/ops/confirm -> 200 executed",
+   "POST /api/ops/run {id: ...|kanban_restore}": "409 NEEDS_CONFIRMATION -> POST /api/ops/confirm -> 200 executed"
+  },
+  "live_verified_lifecycle": [
+   "create board -> /api/ops/boards lists it",
+   "create card -> /api/ops/kanban?board=<slug> lists it",
+   "move (status) -> persisted",
+   "complete -> persisted",
+   "assign -> persisted (assignee set)",
+   "block -> persisted (status blocked)",
+   "unblock -> persisted (status open)",
+   "edit -> persisted (title changed)",
+   "archive -> persisted (removed from default list)",
+   "restore -> persisted (archived card returns to its prior column)"
+  ],
+  "persistence": "all states survive a fresh dispatch/get_board read from the same DB",
+  "gaps": {
+   "plugin_live_events": "pinned kanban plugin subscribes to ws://.../api/plugins/kanban/events; the backend serves no plugin WS (single SSE event path), so live updates are degraded while reads/mutations work."
+  }
+ },
+ "live_verification": {
+  "date": "2026-09-13",
+  "method": "headless Chromium over the real WebUI serving frontend/qubit-dist (python playwright); plus voicebridge.qubit_compat.dispatch for every page backend route",
+  "routes_rendered": 32,
+  "fatal_console_errors": 0,
+  "allowed_by_design_noise": [
+   "ws:// /api/ws, /api/events, /api/pty upgrades refused (single event path)",
+   "ws:// /api/plugins/kanban/events upgrade refused (plugin WS not served)",
+   "403 policy gates (credentials pool, portal, remote update check)"
+  ],
+  "chat": "/hermes/chat sends POST /api/qubit/chat and renders a real reply; 0 /api/pty requests; no 1006 reconnect banner (tests/test_qbpv2_frontend_chat_live.py)",
+  "achievements": "GET /api/plugins/hermes-achievements/achievements 200 with the real 60+ catalog; renders 9.5k chars in /achievements",
+  "boards": "/api/ops/run + /api/ops/confirm create/move/complete/assign/block/unblock/edit/archive all persist in <state_dir>/kanban.db",
+  "served_bundle_parity": "served /hermes/dashboard-plugins/* and /hermes/plugins/* sha256 == on-disk source"
+ }
+}
