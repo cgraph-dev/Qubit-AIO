@@ -14,10 +14,10 @@ if command -v gh &>/dev/null && gh auth status &>/dev/null; then
 else
   AUTH="git"
   if [ -z "$GITHUB_TOKEN" ]; then
-    if _qubit_env="${QUBIT_HOME:-$HOME/.hermes}/.env"; [ -f "$_qubit_env" ] && grep -q "^GITHUB_TOKEN=" "$_qubit_env"; then
+    if _qubit_env="${QUBIT_HOME:-$HOME/.qubit}/.env"; [ -f "$_qubit_env" ] && grep -q "^GITHUB_TOKEN=" "$_qubit_env"; then
       GITHUB_TOKEN=$(grep "^GITHUB_TOKEN=" "$_qubit_env" | head -1 | cut -d= -f2 | tr -d '\n\r')
     elif grep -q "github.com" ~/.git-credentials 2>/dev/null; then
-      GITHUB_TOKEN=$(uv run python "${QUBIT_HOME:-$HOME/.hermes}/skills/github/github-auth/scripts/git-credential-token.py")
+      GITHUB_TOKEN=$(uv run python "${QUBIT_HOME:-$HOME/.qubit}/skills/github/github-auth/scripts/git-credential-token.py")
     fi
   fi
 fi
@@ -432,8 +432,8 @@ RUN_ID=<run_id>
 curl -s -L \
   -H "Authorization: token $GITHUB_TOKEN" \
   https://api.github.com/repos/$OWNER/$REPO/actions/runs/$RUN_ID/logs \
-  -o ~/.hermes/cache/scratch/ci-logs.zip
-cd ~/.hermes/cache/scratch && unzip -o ci-logs.zip -d ci-logs
+  -o ~/.qubit/cache/scratch/ci-logs.zip
+cd ~/.qubit/cache/scratch && unzip -o ci-logs.zip -d ci-logs
 
 # Re-run a failed workflow
 curl -s -X POST \
