@@ -863,19 +863,6 @@ def bounded_probe_run(
     return subprocess.CompletedProcess(list(argv), proc.returncode, stdout, stderr)
 
 
-def kill_and_drain(proc: subprocess.Popen, seconds: float) -> tuple | None:
-    """Tree-kill *proc* (:func:`kill_process_tree`), then read what its pipes still hold for at
-    most *seconds*: ``(stdout, stderr)``, or ``None`` when a descendant the kill missed still
-    holds them. Those pipes are left to ``communicate()``'s reader threads, never closed
-    (closing a pipe a thread is reading blocks; a ``with Popen`` exit would close them)."""
-    kill_process_tree(proc)
-    try:
-        return proc.communicate(timeout=seconds)
-    except (OSError, ValueError, subprocess.SubprocessError):
-        proc.stdin = proc.stdout = proc.stderr = None
-        return None
-
-
 def _close_job(job) -> None:
     if job is None:
         return
