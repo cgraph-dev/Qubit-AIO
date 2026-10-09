@@ -158,6 +158,30 @@ def _post_setup_python(spec: dict) -> None:
     _info_lines(*spec["on_install"], *spec["always"])
 
 
+def _post_setup_spotify() -> None:
+    # Full `qubit auth spotify` flow: no client_id yet → interactive wizard (persists to ~/.hermes/.env)
+    # then PKCE; existing app → OAuth only.
+    from types import SimpleNamespace
+    try:
+        from qubit_cli.auth import login_spotify_command
+    except Exception as exc:
+        _print_warning(f"    Could not load Spotify auth: {exc}")
+        _info_lines("Run manually: qubit auth spotify")
+        return
+    _print_info("    Starting Spotify login...")
+    try:
+        login_spotify_command(SimpleNamespace(
+            client_id=None, redirect_uri=None, scope=None, no_browser=False, timeout=None))
+        _print_success("    Spotify authenticated")
+    except SystemExit as exc:
+        # User aborted the wizard or OAuth failed — don't fail the toolset enable.
+        _print_warning(f"    Spotify login did not complete: {exc}")
+        _info_lines("Run later: qubit auth spotify")
+    except Exception as exc:
+        _print_warning(f"    Spotify login failed: {exc}")
+        _info_lines("Run manually: qubit auth spotify")
+
+
 def _post_setup_langfuse() -> None:
     import pm
 
@@ -298,6 +322,7 @@ _POST_SETUP_HOOKS: dict = {
     "langfuse": _post_setup_langfuse,
     "xai_grok": _post_setup_xai_grok,
     "openai_codex": _post_setup_openai_codex,
+    "spotify": _post_setup_spotify,
     **{key: (lambda spec=spec: _post_setup_python(spec)) for key, spec in _PYTHON_POST_SETUP_HOOKS.items()},
 }
 
