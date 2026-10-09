@@ -69,7 +69,7 @@ class _Generation:
 
     __slots__ = ("path", "db", "refcount", "identity", "retired")
 
-    def __init__(self, path: Path, db: "SessionDB", identity: Optional[Tuple[int, int]]) -> None:
+    def __init__(self, path: Path, db: SessionDB, identity: Optional[tuple[int, int]]) -> None:
         self.path = path
         self.db = db
         self.refcount = 1
@@ -400,7 +400,7 @@ def close_all_under(directory: str | Path) -> int:
 
 def other_generations_for_path(
     db_path: Path, *, exclude: Optional["SessionDB"] = None
-) -> List[str]:
+) -> list[str]:
     """Describe every other LIVE SessionDB generation THIS process holds for *db_path*.
 
     The registry is path-keyed, so it can answer the in-process half of "is this store quiet?"
@@ -430,7 +430,7 @@ def other_generations_for_path(
         ]
 
 
-def live_shared_session_dbs() -> List["SessionDB"]:
+def live_shared_session_dbs() -> list[SessionDB]:
     """Snapshot of every live (non-retired) shared SessionDB (refcounts untouched), for
     in-process maintenance. A concurrent final release may close an instance, in which
     case the callee sees ``_conn is None``."""
@@ -439,7 +439,7 @@ def live_shared_session_dbs() -> List["SessionDB"]:
 
 
 @contextlib.contextmanager
-def borrow_live_shared_session_dbs() -> Iterator[List["SessionDB"]]:
+def borrow_live_shared_session_dbs() -> Iterator[list[SessionDB]]:
     """Borrow live handles with registry references pinned for the whole block.
 
     Maintenance must not operate on the unowned snapshot returned by

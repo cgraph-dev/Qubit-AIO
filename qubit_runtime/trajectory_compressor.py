@@ -600,7 +600,7 @@ Write only the summary, starting with "[CONTEXT SUMMARY]:" prefix."""
                     run.skipped += bool(metrics.skipped_under_target)
                     run.finish()
                 return processed_entry, metrics
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self.logger.warning("Timeout processing entry from %s:%s (>%ss)", file_path, entry_idx, self.config.per_trajectory_timeout)
                 async with run.lock:
                     self.aggregate_metrics.trajectories_failed += 1
@@ -741,7 +741,7 @@ Write only the summary, starting with "[CONTEXT SUMMARY]:" prefix."""
 # CLI
 # ---------------------------------------------------------------------------
 
-def _load_cli_config(config: str, target_max_tokens: Optional[int], tokenizer: Optional[str]) -> CompressionConfig:
+def _load_cli_config(config: str, target_max_tokens: Optional[int], tokenizer: Optional[str]) -> "CompressionConfig":
     """Load the YAML config (defaults if missing) and apply CLI overrides."""
     if Path(config).exists():
         print(f"📋 Loading config from {config}")
@@ -830,8 +830,8 @@ def _run_dir_mode(input_path: Path, output: Optional[str], compression_config: C
     print("\n✅ Compression complete!")
 
 
-def main(input: str, output: str = None, config: str = "configs/trajectory_compression.yaml", target_max_tokens: int = None,
-         tokenizer: str = None, sample_percent: float = None, seed: int = 42, dry_run: bool = False):
+def main(input: str, output: str | None = None, config: str = "configs/trajectory_compression.yaml", target_max_tokens: int | None = None,
+         tokenizer: str | None = None, sample_percent: float | None = None, seed: int = 42, dry_run: bool = False):
     """
     Compress agent trajectories to fit within a target token budget.
     
