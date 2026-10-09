@@ -661,6 +661,12 @@ def _schedule_check_fn_probe(fn) -> Optional[threading.Thread]:
     return thread
 
 
+def _plugin_login_command(name: str) -> str:
+    """A plugin that left core with its own login command (``qubit spotify login``), else ``qubit auth <name>``."""
+    from qubit_cli.left_core_migration import LEFT_CORE
+    return next((f"hermes {f.cli} login" for f in LEFT_CORE if f.plugin == name and f.cli), f"qubit auth {name}")
+
+
 def _plugin_auth_hint(name: str, provides_tools: list) -> tuple:
     """``(auth_required, auth_command)`` from last-known cached tool availability only.
 
@@ -677,7 +683,7 @@ def _plugin_auth_hint(name: str, provides_tools: list) -> tuple:
             if cached_result is None:
                 _schedule_check_fn_probe(entry.check_fn)
             elif cached_result is False:
-                return True, f"qubit auth {name}"
+                return True, _plugin_login_command(name)
     except Exception:
         pass
     return False, ""
