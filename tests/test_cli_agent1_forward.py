@@ -12,6 +12,7 @@ leak into the pytest process.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -268,3 +269,42 @@ def test_forwarded_wave2_parser_error_is_preserved(tmp_path):
     r = _run_cli(tmp_path, ["lessons", "ledger", "--definitely-not-a-flag"])
     assert r.returncode == 2
     assert "unrecognized arguments" in r.stderr or "invalid" in r.stderr
+
+
+# ---------------------------------------------------------------------------
+# `qubit plugins <sub>` — the native plugins family is a narrower registry
+# surface than the fork's catalog tree; a fork-only subcommand must reach the
+# fork verb it names, not die on the native parser's `invalid choice`.
+# ---------------------------------------------------------------------------
+# Fork-only plugins subcommands the native parser does not declare; each must
+# route to the fork (read-only forwards verbatim, mutating needs --confirm).
+PLUGINS_FORK_ONLY_READONLY = ("browse", "validate", "check-updates", "check", "ls")
+PLUGINS_FORK_ONLY_CONFIRM = ("update", "adopt", "trust-update-url", "rm", "uninstall")
+
+
+@pytest.mark.parametrize("sub", PLUGINS_FORK_ONLY_READONLY)
+def test_plugins_readonly_sub_reaches_fork_help(tmp_path, sub):
+    """The fork answers with its own (branded) help, not the native parser's
+    `invalid choice`. Alias spellings (``ls``→list, ``check``→check-updates)
+    print the canonical verb's usage line, so assert the fork surface, not the
+    literal spelling."""
+    r = _run_cli(tmp_path, ["plugins", sub, "--help"])
+    assert r.returncode == 0, (sub, r.stderr[-500:])
+    assert "invalid choice" not in (r.stdout + r.stderr), (sub, r.stdout[:300])
+    assert r.stdout.lstrip().startswith("usage: qubit plugins "), (sub, r.stdout[:300])
+
+
+@pytest.mark.parametrize("sub", PLUGINS_FORK_ONLY_CONFIRM)
+def test_plugins_confirm_sub_without_confirm_is_gated(tmp_path, sub):
+    r = _run_cli(tmp_path, ["plugins", sub])
+    assert r.returncode == 3, (sub, r.returncode, r.stdout[:200])
+    assert json.loads(r.stdout)["code"] == "CONFIRM_REQUIRED", sub
+
+
+def test_plugins_catalog_search_is_not_a_fork_verb():
+    """The task's literal `plugins catalog search` names no real verb on either
+    side: the native `catalog` is a leaf and the fork's search verb is bare
+    `plugins search`. Assert the real verb reaches the fork instead."""
+    from voicebridge.cli_qubit_forward import translate
+    assert translate(["plugins", "search", "hermes"]) == ["plugins", "search", "hermes"]
+    assert translate(["plugins", "catalog", "search", "hermes"]) is None
