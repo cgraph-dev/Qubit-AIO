@@ -44,14 +44,6 @@ def source_built_gui_artifacts(qubit_home: Path) -> "list[Path]":
             qubit_home / "desktop-build-stamp.json"]
 
 
-def desktop_install_record() -> Path:
-    """Where ``qubit update`` records the installed ``Hermes.app`` copies it keeps current. The apps
-    are machine-wide, so the record sits under the default root whichever profile runs; deleting it
-    is what stops an uninstalled app from being put back by the next update."""
-    from qubit_constants import get_default_qubit_root  # noqa: PLC0415
-    return get_default_qubit_root() / "desktop-installed-apps.json"
-
-
 def packaged_gui_app_paths() -> "list[Path]":
     """Standard install locations of the packaged desktop distributable for the current OS. Every candidate
     is returned; the caller filters to those that exist. Never globs system-wide — only the well-known
