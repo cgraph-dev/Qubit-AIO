@@ -2614,7 +2614,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # Packet 2B: typed event stream over the EXISTING server. Replay
             # from the durable journal via Last-Event-ID header or ?last_seq=
             # (id is not a secret; query-string TOKENS stay forbidden).
-            if not self._api_token_ok():
+            # This is an SPA route: the dashboard SPA authenticates with its
+            # canonical ``X-Qubit-Session-Token`` header (see
+            # frontend/qubit-web/src/lib/events-sse.ts), the same identity
+            # every ``/agent/api/*`` route accepts. Gate with ``_qubit_token_ok``
+            # (SPA header, legacy ``X-Hermes-Session-Token``, and the raw
+            # ``X-Api-Token`` fallback for CLI/voice) — gating on
+            # ``_api_token_ok`` alone rejected the SPA's own header with 401,
+            # which surfaced as "events feed disconnected — reconnecting…".
+            if not self._qubit_token_ok():
                 self._send(401, b"unauthorized")
                 return
             self._events_stream()
