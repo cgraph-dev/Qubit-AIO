@@ -154,23 +154,23 @@ class TestExecuteCodeRemoteTempDir(unittest.TestCase):
         # (no PID from nohup), so search for the per-call sandbox commands
         # rather than pinning positions.
         mkdir_cmd = next(cmd for cmd, _, _ in env.commands
-                         if "mkdir -p" in cmd and "qubit_exec_" in cmd)
+                         if "mkdir -p" in cmd and "hermes_exec_" in cmd)
         run_cmd = next(cmd for cmd, _, _ in env.commands if "python3 script.py" in cmd)
         cleanup_cmd = next(cmd for cmd, _, _ in env.commands
-                           if "rm -rf" in cmd and "qubit_exec_" in cmd)
-        self.assertIn("mkdir -p /data/data/com.termux/files/usr/tmp/qubit_exec_", mkdir_cmd)
-        self.assertIn("rm -rf /data/data/com.termux/files/usr/tmp/qubit_exec_", cleanup_cmd)
-        self.assertNotIn("mkdir -p /tmp/qubit_exec_", mkdir_cmd)
+                           if "rm -rf" in cmd and "hermes_exec_" in cmd)
+        self.assertIn("mkdir -p /data/data/com.termux/files/usr/tmp/hermes_exec_", mkdir_cmd)
+        self.assertIn("rm -rf /data/data/com.termux/files/usr/tmp/hermes_exec_", cleanup_cmd)
+        self.assertNotIn("mkdir -p /tmp/hermes_exec_", mkdir_cmd)
         # Env vars travel in the shipped sandbox.env (sourced by the remote
         # shell), not on the command line.
         self.assertIn(". ./sandbox.env", run_cmd)
         env_ship = next(c for c in ship_mock.call_args_list
                         if c.args[1].endswith("sandbox.env"))
-        self.assertIn("QUBIT_RPC_DIR=/data/data/com.termux/files/usr/tmp/qubit_exec_",
+        self.assertIn("HERMES_RPC_DIR=/data/data/com.termux/files/usr/tmp/hermes_exec_",
                       env_ship.args[2])
 
     def test_timezone_shell_quoted_in_remote_execution(self):
-        """QUBIT_TIMEZONE must be shell-quoted in the sourced sandbox.env file
+        """HERMES_TIMEZONE must be shell-quoted in the sourced sandbox.env file
         to prevent injection at source time."""
         class FakeEnv:
             def __init__(self):
@@ -199,7 +199,7 @@ class TestExecuteCodeRemoteTempDir(unittest.TestCase):
              patch("tools.code_execution_tool._ship_file_to_remote") as ship_mock, \
              patch("tools.code_execution_tool.threading.Thread",
                    return_value=fake_thread), \
-             patch.dict(os.environ, {"QUBIT_TIMEZONE": malicious_tz}):
+             patch.dict(os.environ, {"HERMES_TIMEZONE": malicious_tz}):
             result = json.loads(_execute_remote("print('hello')", "task-1", ["terminal"]))
 
         self.assertEqual(result["status"], "success")
@@ -276,7 +276,7 @@ class TestRemoteSharedHostLockdown(unittest.TestCase):
         import subprocess
         import tempfile
         mkdir_cmd = next(c for c in commands
-                         if "mkdir -p" in c and "qubit_exec_" in c)
+                         if "mkdir -p" in c and "hermes_exec_" in c)
         env_ship, token = ships["sandbox.env"], tokens["sandbox.env"]
         sandbox = env_ship.args[1].rsplit("/", 1)[0]
         root = tempfile.mkdtemp()
@@ -648,7 +648,7 @@ class TestEnvVarFiltering(unittest.TestCase):
     def test_timezone_injected_when_set(self):
         env_backup = os.environ.copy()
         try:
-            os.environ["QUBIT_TIMEZONE"] = "America/New_York"
+            os.environ["HERMES_TIMEZONE"] = "America/New_York"
             child_env = self._get_child_env()
             if sys.platform == "win32":
                 # The MSVC runtime only parses POSIX-form TZ; an IANA name yields a wrong
