@@ -107,7 +107,7 @@ class _SyncSentencePipeline:
 
     def __init__(self, stop_event: threading.Event, *, lookahead: int = 2):
         self._stop = stop_event
-        self._queue: "queue.Queue[Optional[tuple[str, Future]]]" = queue.Queue(maxsize=max(1, lookahead))
+        self._queue: queue.Queue[Optional[tuple[str, Future]]] = queue.Queue(maxsize=max(1, lookahead))
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tts-sync-synth")
         self._player = threading.Thread(target=self._drain, name="tts-sync-play", daemon=True)
         self._player.start()
@@ -230,13 +230,13 @@ class _StreamerPlayback:
             logger.warning("Streaming TTS synthesis failed: %s", exc)
             return
         self._prefetch_sem.acquire()
-        chunk_queue: "queue.Queue[Optional[bytes]]" = queue.Queue(maxsize=self._CHUNK_QUEUE_MAX)
+        chunk_queue: queue.Queue[Optional[bytes]] = queue.Queue(maxsize=self._CHUNK_QUEUE_MAX)
         self._audio_queue.put(chunk_queue)
         self._prefetch_threads.append(threading.Thread(
             target=self._consume_to_queue, args=(audio_iter, chunk_queue), daemon=True))
         self._prefetch_threads[-1].start()
 
-    def _consume_to_queue(self, audio_iter: Iterator[bytes], chunk_queue: "queue.Queue[Optional[bytes]]") -> None:
+    def _consume_to_queue(self, audio_iter: Iterator[bytes], chunk_queue: queue.Queue[Optional[bytes]]) -> None:
         try:
             for chunk in audio_iter:
                 if self.stop_event.is_set():
