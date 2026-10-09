@@ -4306,6 +4306,10 @@ export interface CronJobMutation {
   context_from?: string[] | null;
   enabled_toolsets?: string[] | null;
   workdir?: string | null;
+  /** Finite repeat count (runs N times then completes; null = unlimited).
+   *  Accepted as a scalar int or the user-facing strings the CLI takes
+   *  ('forever'/'once'/'3'); normalized server-side in cron.jobs. */
+  repeat?: number | string | null;
 }
 
 export interface CronJob {
