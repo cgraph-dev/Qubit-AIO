@@ -718,44 +718,6 @@ def is_partial_clone_pack_objects_crash(stderr: str) -> bool:
     return any(terminator in text for terminator in _PACK_OBJECTS_CRASH_TERMINATORS)
 
 
-def fetch_with_partial_clone_recovery(runner: Callable[..., subprocess.CompletedProcess],
-                                      git_cmd: List[str], fetch_args: List[str],
-                                      repo_root: Path) -> subprocess.CompletedProcess:
-    """Run a fetch; on the pack-objects BUG, mark the unmarked packs and retry it once.
-
-    ``runner(git_cmd, args) -> CompletedProcess`` and ``git_cmd + fetch_args`` is the plain
-    fetch argv. On the crash, ``repo_root``'s unmarked packs get a ``.promisor`` file and the
-    identical fetch runs once more. The retry's result is returned whatever its exit code, so the caller keeps its
-    normal failure handling. (A ``-c remote.origin.promisor=`` override does not help: git
-    registers promisor remotes additively, so the repo's own ``true`` still wins.)
-    """
-    shallow_path = _shallow_file_path(repo_root)
-    shallow = shallow_path is not None
-    # Callers already inject creationflags via _no_prompt_git_kwargs(); OR the
-    # hide flag into the shared kwargs instead of passing the keyword twice
-    # (TypeError: got multiple values) — the config probes below inherit it.
-    run_kwargs["creationflags"] = run_kwargs.get("creationflags", 0) | windows_hide_flags()
-    fetch_filter = _partial_clone_filter(repo_root, **run_kwargs)
-    converts = fetch_filter is None and shallow and bool(_batch_missing_parents(
-        repo_root, shallow_path.read_text(encoding="utf-8-sig").split()))
-    if converts:
-        fetch_filter = "tree:0"
-    try:
-        subprocess.run(
-            ["git", "fetch", "--quiet", *(["--unshallow"] if shallow else []),
-             *([f"--filter={fetch_filter}"] if fetch_filter else []),
-             "--no-tags", "origin", "refs/tags/v*:refs/tags/v*", *extra_refspecs],
-            cwd=str(repo_root), check=True, capture_output=True, text=True,
-            encoding="utf-8", errors="replace", timeout=900, **run_kwargs,
-        )
-    finally:
-        # git writes the partial-clone config before it fetches, so a failed fetch converts too.
-        if converts:
-            mark_unmarked_packs_promisor(repo_root)
-            disable_tree0_auto_maintenance(repo_root)
-    return shallow
-
-
 # git 2.53+ promisor fetches run index-pack --promisor, whose repack_local_links() BUG()s in
 # pack-objects (should_include_obj) when an object outside the promisor packs leads to a
 # promisor-missing one (#124272). The unmarked packs stay, so fetches keep dying until they are
