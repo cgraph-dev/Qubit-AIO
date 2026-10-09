@@ -6,11 +6,53 @@ Real config/.env files under a temp home; the catalog lookup and the network ins
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import pytest
 
 import qubit_cli.left_core_migration as lcm
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def test_left_core_has_no_orphaned_predicate_and_spotify_is_deliberately_absent():
+    """LOCK the (ii) decision: spotify is deliberately NOT a LEFT_CORE feature in Qubit.
+
+    Upstream moved Spotify out of core into the ``spotify`` catalog plugin (71704ffb498) and added
+    both the ``spotify_in_use`` predicate and the LEFT_CORE row. Qubit never took that move: it still
+    ships spotify in core (auth_spotify, the bundled ``plugins/spotify`` toolset) and there is NO
+    catalog entry named ``spotify`` to migrate a home to, so a LEFT_CORE row would point at a plugin
+    that does not exist. The predicate is therefore DELETED, not left defined-but-unreferenced.
+
+    This test fails if either half of that decision regresses:
+      * ``spotify_in_use`` reappears (defined-but-orphaned, or re-added to a row without a catalog
+        target ever existing), or
+      * a ``spotify`` LEFT_CORE row reappears while our tree still bundles spotify (nothing to
+        migrate to).
+    A stray mention in the explanatory comment is not a call; the caller check is static.
+    """
+    source = (_REPO_ROOT / "qubit_runtime" / "qubit_cli" / "left_core_migration.py").read_text(
+        encoding="utf-8")
+    tree = ast.parse(source)
+    defined = {n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    assert "spotify_in_use" not in defined, (
+        "spotify_in_use is defined again -- it must stay deleted while Qubit bundles spotify in core")
+    # No module-level function named *_in_use may be defined without being referenced. (Guards the
+    # orphaned-helper class, not just spotify.)
+    referenced = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    referenced |= {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    for name in sorted(n for n in defined if n.endswith("_in_use")):
+        assert name in referenced, f"{name} is defined but referenced nowhere (orphaned predicate)"
+
+    # The LEFT_CORE table must not name 'spotify' as a plugin while our tree still ships it in core.
+    assert "spotify" not in {f.plugin for f in lcm.LEFT_CORE}, (
+        "a 'spotify' LEFT_CORE row reappeared, but Qubit still bundles spotify in core and ships no "
+        "'spotify' catalog entry for the row to install")
+    assert "spotify-desktop" in {p.stem for p in
+                                 (_REPO_ROOT / "qubit_runtime" / "plugin-catalog").glob("*.yaml")}, \
+        "expected the catalog to still carry spotify-desktop (evidence the catalog has no plain 'spotify')"
 
 
 @pytest.fixture(autouse=True)
