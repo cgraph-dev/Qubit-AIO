@@ -1,7 +1,7 @@
 /**
  * Qubit desktop plugin template. Save as:
  *   <qubit home>/desktop-plugins/<id>/plugin.js   (folder name == id)
- * where <qubit home> is ~/.hermes by default, or ~/.hermes/profiles/<name>
+ * where <qubit home> is ~/.qubit by default, or ~/.qubit/profiles/<name>
  * when running a named profile (`qubit -p <name>`). Run `qubit doctor` (or
  * check the app's Settings → Plugins folder path) if unsure which is active.
  * Then run "Reload desktop plugins" from ⌘K in the desktop app.
