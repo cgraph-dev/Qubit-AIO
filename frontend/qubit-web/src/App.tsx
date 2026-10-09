@@ -445,6 +445,13 @@ function buildNavItems(
     if (manifest.tab.override) continue;
     if (manifest.tab.hidden) continue;
 
+    // A plugin tab whose path is already a built-in route is a duplicate: the
+    // built-in nav item already renders that entry and owns the route. Pushing
+    // it again puts two items with the same `path` into the sidebar list, which
+    // React keys collide on (`key={item.path}`) and the menu shows the entry
+    // twice. Skip it — the built-in entry wins.
+    if (items.some((i) => i.path === manifest.tab.path)) continue;
+
     const pluginItem: NavItem = {
       path: manifest.tab.path,
       label: ROUTE_TITLES[manifest.tab.path] ?? manifest.label,
