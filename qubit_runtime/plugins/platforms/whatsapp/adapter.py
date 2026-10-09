@@ -172,12 +172,14 @@ def _kill_stale_bridge_by_pidfile(session_path: Path) -> None:
     _unlink_quietly(pid_file)
 
 
-def _write_bridge_pidfile(session_path: Path, pid: int) -> None:
-    """Write the bridge PID plus its kernel start time (line 2) for identity-checked cleanup."""
+def _write_bridge_pidfile(session_path: Path, pid: int, port: Optional[int] = None) -> None:
+    """Write the bridge PID plus its kernel start time (line 2) for identity-checked cleanup, and the
+    port it listens on (line 3) so a secondary adopts only the endpoint that process actually serves."""
     with suppress(OSError):
         from gateway.status import get_process_start_time
         start = get_process_start_time(pid)
-        (session_path / "bridge.pid").write_text(str(pid) if start is None else f"{pid}\n{start}", encoding="utf-8")
+        text = str(pid) if start is None else f"{pid}\n{start}" + ("" if port is None else f"\n{port}")
+        (session_path / "bridge.pid").write_text(text, encoding="utf-8")
 
 
 def _terminate_bridge_process(proc, *, force: bool = False) -> None:
@@ -605,7 +607,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             self._bridge_process = subprocess.Popen(
                 [node, str(bridge_path), "--port", str(self._bridge_port), "--session", str(self._session_path),
                  "--mode", _wenv("WHATSAPP_MODE", "self-chat")], stdout=bridge_log_fh, stderr=bridge_log_fh, env=self._bridge_env(), **windows_detach_popen_kwargs())
-            _write_bridge_pidfile(self._session_path, self._bridge_process.pid)
+            _write_bridge_pidfile(self._session_path, self._bridge_process.pid, self._bridge_port)
             if not await self._wait_for_bridge():
                 return False
             self._attach_to_bridge(self._bridge_process)
