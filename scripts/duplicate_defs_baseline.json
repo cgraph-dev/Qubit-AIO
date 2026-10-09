@@ -1,0 +1,27 @@
+{
+  "keys": [
+    "qubit_runtime/agent/conversation_compression.py::<module>::_emit_compression_attempt_telemetry::SIG-DIFFER",
+    "qubit_runtime/agent/secret_sources/base.py::<module>::_SOURCE_ENVIRONMENT::SIG-DIFFER",
+    "qubit_runtime/evals/memory/honcho_current_query.py::<module>::args::BODY-DIFFER",
+    "qubit_runtime/evals/memory/honcho_current_query.py::<module>::delay::BODY-DIFFER",
+    "qubit_runtime/evals/memory/honcho_current_query.py::<module>::delay::BODY-DIFFER",
+    "qubit_runtime/evals/memory/honcho_current_query.py::<module>::empty_all::BODY-DIFFER",
+    "qubit_runtime/evals/memory/honcho_current_query.py::<module>::empty_all::BODY-DIFFER",
+    "qubit_runtime/evals/memory/honcho_current_query.py::<module>::invalidate::BODY-DIFFER",
+    "qubit_runtime/evals/output_caps_local_capture.py::<module>::kwargs::BODY-DIFFER",
+    "qubit_runtime/evals/postmortem/live_ab/cache_concurrency_probe.py::<module>::rows::BODY-DIFFER",
+    "qubit_runtime/evals/postmortem/review_probes/deadline_probe.py::<module>::b::BODY-DIFFER",
+    "qubit_runtime/evals/postmortem/review_probes/deadline_probe.py::<module>::b::BODY-DIFFER",
+    "qubit_runtime/evals/postmortem/review_probes/scanner_bypass_probe.py::<module>::cmd::BODY-DIFFER",
+    "qubit_runtime/evals/postmortem/review_probes/scanner_bypass_probe.py::<module>::p::BODY-DIFFER",
+    "qubit_runtime/gateway/session_db_recovery.py::<module>::_health_states::SIG-DIFFER",
+    "qubit_runtime/qubit_cli/cli_config_load.py::<module>::_TERMINAL_ENV_MAPPINGS::BODY-DIFFER",
+    "qubit_runtime/qubit_cli/dashboard_auth/login_page.py::<module>::_EMPTY_HTML::BODY-DIFFER",
+    "qubit_runtime/qubit_cli/gitlock.py::<module>::fetch_with_partial_clone_recovery::BODY-DIFFER",
+    "qubit_runtime/qubit_cli/gui_uninstall.py::<module>::desktop_install_record::BODY-DIFFER",
+    "qubit_runtime/qubit_cli/profile_distribution.py::<module>::_merges_per_root::BODY-DIFFER",
+    "qubit_runtime/qubit_constants.py::<module>::normalize_scope::BODY-DIFFER",
+    "qubit_runtime/tests/conftest.py::<module>::_REAL_HERMES_ROOT_CANDIDATES::SIG-DIFFER",
+    "qubit_runtime/tools/browser_vault_tool.py::<module>::_check_vault_available::SIG-DIFFER"
+  ]
+}
