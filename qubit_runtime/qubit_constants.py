@@ -275,7 +275,7 @@ LOCAL_RUNTIME_ROOT_DIRS: frozenset[str] = frozenset({"models", "runtimes", "node
 
 # get_default_qubit_root() memo keyed on (native home, expanded QUBIT_HOME) so it stays
 # fresh when a test or plugin mutates either input; saves ~80us/call at 31+ sites.
-_default_qubit_root_memo: "tuple[str, str, Path] | None" = None
+_default_qubit_root_memo: tuple[str, str, Path] | None = None
 
 
 def get_default_qubit_root(*, home: str | Path | None = None) -> Path:
