@@ -147,5 +147,5 @@ Plugin- and provider-supplied subcommands (e.g. `qubit photon setup`) only appea
 | Skills catalog | `qubit skills browse` · [Skills catalog](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/reference/skills-catalog) |
 | Provider setup | `qubit model` · [Providers guide](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/integrations/providers) |
 | Env variables | `qubit config env-path` · [Env vars reference](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/reference/environment-variables) |
-| Gateway logs | `~/.hermes/logs/gateway.log` (or `qubit logs`) |
+| Gateway logs | `~/.qubit/logs/gateway.log` (or `qubit logs`) |
 | Sessions | `qubit sessions browse` (reads state.db) |

@@ -68,21 +68,21 @@ qubit proxy                   # OpenAI-compatible local proxy backed by your OAu
 ## Key Paths
 
 ```
-~/.hermes/config.yaml       Main configuration (settings — never secrets)
-~/.hermes/.env              API keys and secrets ONLY (under $QUBIT_HOME if set)
+~/.qubit/config.yaml       Main configuration (settings — never secrets)
+~/.qubit/.env              API keys and secrets ONLY (under $QUBIT_HOME if set)
 $QUBIT_HOME/skills/        Installed skills
-~/.hermes/skins/            Custom themes (see references/themes.md)
-~/.hermes/desktop-plugins/  Desktop app UI plugins (see references/desktop-plugins.md)
-~/.hermes/tui-widgets/      TUI widget apps (see references/tui-widgets.md)
-~/.hermes/pets/             Installed pet mascots (see references/petdex.md)
-~/.hermes/state.db          Canonical session store (SQLite + FTS5)
-~/.hermes/sessions/         Gateway routing index, request dumps, *.jsonl transcripts
-~/.hermes/logs/             Gateway and error logs
-~/.hermes/auth.json         OAuth tokens and credential pools
-~/.hermes/hermes-agent/     Source code (if git-installed)
+~/.qubit/skins/            Custom themes (see references/themes.md)
+~/.qubit/desktop-plugins/  Desktop app UI plugins (see references/desktop-plugins.md)
+~/.qubit/tui-widgets/      TUI widget apps (see references/tui-widgets.md)
+~/.qubit/pets/             Installed pet mascots (see references/petdex.md)
+~/.qubit/state.db          Canonical session store (SQLite + FTS5)
+~/.qubit/sessions/         Gateway routing index, request dumps, *.jsonl transcripts
+~/.qubit/logs/             Gateway and error logs
+~/.qubit/auth.json         OAuth tokens and credential pools
+~/.qubit/hermes-agent/     Source code (if git-installed)
 ```
 
-Profiles use `~/.hermes/profiles/<name>/` with the same layout. When a profile is active, resolve the real home from `$QUBIT_HOME` — never hardcode `~/.hermes`.
+Profiles use `~/.qubit/profiles/<name>/` with the same layout. When a profile is active, resolve the real home from `$QUBIT_HOME` — never hardcode `~/.qubit`.
 
 ## Routing Table — load the reference for the task
 
@@ -94,7 +94,7 @@ Profiles use `~/.hermes/profiles/<name>/` with the same layout. When a profile i
 | In-session slash commands | `references/slash-commands.md` |
 | Provider setup, API keys, OAuth | `references/providers-and-models.md` |
 | config.yaml sections, toolsets, voice/STT/TTS | `references/configuration.md` |
-| AGENTS.md / .hermes.md / CLAUDE.md project rules | `references/project-context-files.md` |
+| AGENTS.md / .qubit.md / CLAUDE.md project rules | `references/project-context-files.md` |
 | Secret redaction, PII, approval modes, "reset permissions" | `references/security-privacy.md` |
 | Delegation, cron, curator, kanban | `references/background-systems.md` |
 | MCP servers (add, catalog, `qubit mcp`) | `references/native-mcp.md` |

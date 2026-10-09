@@ -25,7 +25,7 @@ hermes-agent/
 └── website/              # Docusaurus docs site
 ```
 
-Config: `~/.hermes/config.yaml` (settings), `~/.hermes/.env` (API keys) — both under `$QUBIT_HOME` when it is set.
+Config: `~/.qubit/config.yaml` (settings), `~/.qubit/.env` (API keys) — both under `$QUBIT_HOME` when it is set.
 
 ### Adding a Tool
 
@@ -59,8 +59,8 @@ registry.register(
 `_QUBIT_CORE_TOOLS` (every platform) or to a specific toolset.
 
 All handlers must return JSON strings. Use `get_qubit_home()` for paths,
-never hardcode `~/.hermes`. For custom/local-only tools, write a plugin in
-`~/.hermes/plugins/` instead of editing core — see the developer docs.
+never hardcode `~/.qubit`. For custom/local-only tools, write a plugin in
+`~/.qubit/plugins/` instead of editing core — see the developer docs.
 
 ### Adding a Slash Command
 
@@ -95,7 +95,7 @@ scripts/run_tests.sh tests/tools/test_x.py    # one file
 scripts/run_tests.sh -v --tb=long             # pass-through pytest flags
 ```
 
-- Tests auto-redirect `QUBIT_HOME` to temp dirs — never touch real `~/.hermes/`.
+- Tests auto-redirect `QUBIT_HOME` to temp dirs — never touch real `~/.qubit/`.
 - Prepare Python through the PM developer workflow before building a test environment.
 - Run `python -m pm.build_env --source . --out .venv --group dev --group test`.
   The output must not exist. Stop its processes and intentionally remove only

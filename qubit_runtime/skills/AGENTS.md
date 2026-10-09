@@ -16,10 +16,11 @@ Reviewing a skill PR: check the target directory — heavy-dep or niche skills g
 ## SKILL.md frontmatter
 
 `name`, `description`, `version`, `author`, `license`, `platforms` (OS gate: `[macos]`,
-`[linux, macos]`, ...), `metadata.hermes.tags`, `metadata.hermes.category`,
-`metadata.hermes.related_skills`, `metadata.hermes.config` (config.yaml settings the skill needs —
+`[linux, macos]`, ...), `metadata.qubit.tags`, `metadata.qubit.category`,
+`metadata.qubit.related_skills`, `metadata.qubit.config` (config.yaml settings the skill needs —
 stored under `skills.config.<key>`, prompted during setup, injected at load). Top-level `tags:` /
-`category:` are accepted and mirrored from `metadata.hermes.*` by the loader.
+`category:` are accepted and mirrored from `metadata.qubit.*` by the loader. (Read-old
+`metadata.hermes.*` is still accepted.)
 
 ## Authoring standards (HARDLINE — enforced by `tests/skills/test_authoring_standards.py`)
 
@@ -62,10 +63,10 @@ in the `hermes-agent-dev` skill.
 ## Curator (skill lifecycle)
 
 Background maintenance that tracks usage on agent-created skills and auto-archives stale ones;
-archives go to `~/.hermes/skills/.archive/` and are restorable. Core `agent/curator.py` (review
+archives go to `~/.qubit/skills/.archive/` and are restorable. Core `agent/curator.py` (review
 loop, auto-transitions, LLM review prompt) + `agent/curator_backup.py` (pre-run tar.gz snapshots);
 CLI `qubit_cli/curator.py` → `qubit curator status|run|pause|resume|pin|unpin|archive|restore|
-prune|backup|rollback`; telemetry `tools/skill_usage.py` owns `~/.hermes/skills/.usage.json`
+prune|backup|rollback`; telemetry `tools/skill_usage.py` owns `~/.qubit/skills/.usage.json`
 (`use_count`, `view_count`, `patch_count`, `last_activity_at`, `state` active/stale/archived,
 `pinned`). Config `curator:` — `enabled, interval_hours, min_idle_hours, stale_after_days,
 archive_after_days, backup.*`; its LLM calls route through `auxiliary` (`agent/AGENTS.md`).

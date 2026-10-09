@@ -3,7 +3,7 @@
 Author a Qubit **skin** — one YAML file that themes the CLI, the TUI, and the
 desktop GUI at once. The skin engine (`qubit_cli/skin_engine.py`) resolves the
 active skin and the gateway pushes it to every surface, so a file dropped in
-`~/.hermes/skins/` is the theme analogue of a plugin: no code, all surfaces. This
+`~/.qubit/skins/` is the theme analogue of a plugin: no code, all surfaces. This
 skill covers writing a good skin and activating it; it does not build GUI theme
 editors or ship built-in presets.
 
@@ -17,7 +17,7 @@ editors or ship built-in presets.
 
 ## Prerequisites
 
-- Write access to the Qubit home dir — `~/.hermes` by default, or `$QUBIT_HOME`
+- Write access to the Qubit home dir — `~/.qubit` by default, or `$QUBIT_HOME`
   / the active profile's dir. Skins live in `<hermes-home>/skins/`.
 - Native tools: `write_file` (create the YAML), `read_file` / `search_files`
   (inspect existing skins), `terminal` (activate via `qubit config set`).
@@ -99,8 +99,8 @@ enumerate.
 
 ## Pitfalls
 
-- **Don't hardcode `~/.hermes`** when a profile is active — resolve the real home
-  from `$QUBIT_HOME` first, falling back to `~/.hermes`.
+- **Don't hardcode `~/.qubit`** when a profile is active — resolve the real home
+  from `$QUBIT_HOME` first, falling back to `~/.qubit`.
 - **Keep `#rrggbb` hex.** Shorthand `#rgb`, `rgb()`, and named colors are not
   guaranteed to parse on every surface.
 - **Set `background`.** Without it the GUI has to guess a base surface from text

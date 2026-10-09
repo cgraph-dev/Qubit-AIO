@@ -27,7 +27,7 @@ python -c "import pm; pm.sync_venv(['mcp'], explicit=True)"
 
 ## Quick Start
 
-Add MCP servers to `~/.hermes/config.yaml` under the `mcp_servers` key:
+Add MCP servers to `~/.qubit/config.yaml` under the `mcp_servers` key:
 
 ```yaml
 mcp_servers:
@@ -93,7 +93,7 @@ Note: A server config must have either `command` (stdio) or `url` (HTTP), not bo
 
 When Qubit Agent starts, `discover_mcp_tools()` is called during tool initialization:
 
-1. Reads `mcp_servers` from `~/.hermes/config.yaml`
+1. Reads `mcp_servers` from `~/.qubit/config.yaml`
 2. For each server, spawns a connection in a dedicated background event loop
 3. Initializes the MCP session and calls `list_tools()` to discover available tools
 4. Registers each tool in the Qubit tool registry
@@ -199,7 +199,7 @@ python -c "import pm; pm.sync_venv(['mcp'], explicit=True)"
 
 ### "No MCP servers configured"
 
-No `mcp_servers` key in `~/.hermes/config.yaml`, or it's empty. Add at least one server.
+No `mcp_servers` key in `~/.qubit/config.yaml`, or it's empty. Add at least one server.
 
 ### "Failed to connect to MCP server 'X'"
 
