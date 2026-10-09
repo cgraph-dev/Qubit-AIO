@@ -76,12 +76,31 @@ def main() -> int:
     args = ap.parse_args()
 
     clone = upstream_clone()
+    fetched = False
     if args.fetch:
-        subprocess.run(["git", "-C", str(clone), "fetch", "--quiet", "origin"],
-                       capture_output=True, text=True)
+        # CHECK THE RESULT. A failed fetch and a successful one must not look alike: if the
+        # fetch fails we fall back to the last-known ref, and then a frozen mirror reports
+        # "0 commits behind" forever -- a monitor that cannot fail loudly is worse than none.
+        res = subprocess.run(["git", "-C", str(clone), "fetch", "--quiet", "origin", "main"],
+                             capture_output=True, text=True, errors="replace")
+        if res.returncode != 0:
+            msg = (res.stderr or res.stdout or "").strip()
+            print(f"FETCH FAILED (rc={res.returncode}) -- measuring the LAST-KNOWN ref, "
+                  f"which may be stale: {msg[:300]}")
+        else:
+            fetched = True
 
     pin = pinned_rev()
     head = git(clone, "rev-parse", "origin/main")
+
+    # A pin the mirror has never seen means the mirror predates the pin entirely; every number
+    # below would be meaningless. Refuse rather than print a confident lie.
+    if subprocess.run(["git", "-C", str(clone), "cat-file", "-e", pin],
+                      capture_output=True).returncode != 0:
+        raise SystemExit(f"upstream mirror does not contain the pinned rev {pin[:12]}. "
+                         "The clone is stale or the pin is wrong -- refusing to report drift "
+                         "numbers that cannot be true.")
+
     pin_short, head_short = pin[:12], head[:12]
 
     behind = int(git(clone, "rev-list", "--count", f"{pin}..{head}"))
