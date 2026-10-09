@@ -446,7 +446,7 @@ class XAIStreamer(StreamingTTSProvider):
         import threading
         from contextvars import copy_context
 
-        q: "queue.Queue[object]" = queue.Queue(maxsize=_XAI_QUEUE_MAX)
+        q: queue.Queue[object] = queue.Queue(maxsize=_XAI_QUEUE_MAX)
         done = object()
         stop = threading.Event()
 
@@ -512,7 +512,7 @@ class XAIStreamer(StreamingTTSProvider):
                     message = await asyncio.wait_for(
                         ws.recv(), timeout=self._RECV_TIMEOUT_S
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     raise RuntimeError(f"xAI streaming TTS: no audio for {self._RECV_TIMEOUT_S}s")
                 except websockets.exceptions.ConnectionClosedOK:
                     return  # clean close, with or without audio.done
