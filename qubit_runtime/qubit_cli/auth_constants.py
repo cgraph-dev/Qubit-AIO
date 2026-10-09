@@ -116,14 +116,7 @@ OPENROUTER_AUTH_URL = "https://openrouter.ai/auth"
 OPENROUTER_AUTH_KEYS_URL = "https://openrouter.ai/api/v1/auth/keys"
 OPENROUTER_OAUTH_DOCS_URL = "https://openrouter.ai/docs/guides/overview/auth/oauth"
 
-OAUTH_OVER_SSH_DOCS_URL = install_source.docs_url("guides/oauth-over-ssh")
-DEFAULT_SPOTIFY_SCOPE = " ".join((
-    "user-modify-playback-state", "user-read-playback-state", "user-read-currently-playing",
-    "user-read-recently-played", "playlist-read-private", "playlist-read-collaborative",
-    "playlist-modify-public", "playlist-modify-private", "user-library-read", "user-library-modify",
-))
-SERVICE_PROVIDER_NAMES: Dict[str, str] = {"spotify": "Spotify"}
-
+OAUTH_OVER_SSH_DOCS_URL = "https://hermes-agent.nousresearch.com/docs/guides/oauth-over-ssh"
 # LM Studio's default no-auth mode still needs *some* non-empty bearer for the API-key code paths to
 # treat the provider as configured. Sent only to LM Studio, never to a remote service.
 LMSTUDIO_NOAUTH_PLACEHOLDER = "dummy-lm-api-key"
@@ -163,7 +156,6 @@ def _provider_error_factory(provider: str) -> Callable[..., AuthError]:
 _nous_err = _provider_error_factory("nous")
 _xai_err = _provider_error_factory("xai-oauth")
 _codex_err = _provider_error_factory("openai-codex")
-_spotify_err = _provider_error_factory("spotify")
 _qwen_err = _provider_error_factory("qwen-oauth")
 _minimax_err = _provider_error_factory("minimax-oauth")
 _openrouter_err = _provider_error_factory("openrouter")
