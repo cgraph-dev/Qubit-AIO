@@ -17,6 +17,7 @@ function form(overrides: Partial<CronJobFormState> = {}): CronJobFormState {
     prompt: "prompt",
     schedule: "every 1h",
     deliver: "local",
+    repeat: "",
     skills: [],
     provider: "",
     model: "",
@@ -88,6 +89,23 @@ describe("buildCronJobPayload", () => {
       enabled_toolsets: null,
       workdir: null,
     });
+  });
+
+  it("sends a numeric repeat as a number", () => {
+    const payload = buildCronJobPayload(form({ repeat: "3" }));
+    expect(payload.repeat).toBe(3);
+  });
+
+  it("sends an empty repeat as null, never a bogus 0", () => {
+    // An untouched/cleared input means "repeat forever"; sending 0 would make
+    // the store create a job that runs zero times.
+    expect(buildCronJobPayload(form({ repeat: "" })).repeat).toBeNull();
+    expect(buildCronJobPayload(form({ repeat: "   " })).repeat).toBeNull();
+  });
+
+  it("passes a non-numeric repeat string through for server-side coercion", () => {
+    // The store's normalize_repeat_value accepts 'forever'/'once' too.
+    expect(buildCronJobPayload(form({ repeat: "once" })).repeat).toBe("once");
   });
 });
 
