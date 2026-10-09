@@ -331,7 +331,7 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
     # not the claim lock or either expiry, so an unreaped expired-lease row still
     # reports "running" and a continue verdict would re-enter the model under an
     # authority this process can no longer prove (round-3 finding).
-    if os.environ.get("QUBIT_KANBAN_GOAL_MODE") == "1" and _exit_code == 0:
+    if os.environ.get("HERMES_KANBAN_GOAL_MODE") == "1" and _exit_code == 0:
         try:
             _run_kanban_goal_loop_q(cli, response)
         except Exception as _goal_exc:
@@ -513,7 +513,7 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
     # full timeout. See #86878.
     os.environ["HERMES_SINGLE_QUERY_SESSION"] = "1"
     from qubit_cli.quiet_single_query import exit_single_query
-    if os.environ.get("QUBIT_KANBAN_TASK"):
+    if os.environ.get("HERMES_KANBAN_TASK"):
         from tools.kanban_tools import register_current_worker_from_env
         if not register_current_worker_from_env():
             # No exit trailer: the task log now belongs to the run that replaced this one.
@@ -591,7 +591,7 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
         # interrupt, terminal settlement) — must reach the shared exit path below with zero
         # further model entry, because goal_run_status() checks run identity only and would
         # otherwise continue under an authority this process can no longer prove.
-        if os.environ.get("QUBIT_KANBAN_GOAL_MODE") == "1" and _single_query_exit_code(cli._last_turn_result) == 0:
+        if os.environ.get("HERMES_KANBAN_GOAL_MODE") == "1" and _single_query_exit_code(cli._last_turn_result) == 0:
             try:
                 _run_kanban_goal_loop_chat(cli, response or "")
             except Exception as _goal_exc:
