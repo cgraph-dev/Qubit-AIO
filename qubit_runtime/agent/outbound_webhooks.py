@@ -46,7 +46,7 @@ QUEUE_MAX_SIZE = 256
 _registered: Set[Tuple[str, str, str]] = set()
 _registered_lock = threading.Lock()
 
-_delivery_queue: "queue.Queue[Optional[Dict[str, Any]]]" = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+_delivery_queue: queue.Queue[Optional[Dict[str, Any]]] = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 _worker_lock = threading.Lock()
 _worker: Optional[threading.Thread] = None
 
