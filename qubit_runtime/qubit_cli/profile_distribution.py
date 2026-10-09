@@ -511,15 +511,6 @@ def _merges_per_root(src: Path, rel_parts: Tuple[str, ...]) -> bool:
                              or profile_path_contains_private_store(rel_parts))
 
 
-def _merges_per_root(src: Path, rel_parts: Tuple[str, ...]) -> bool:
-    """An owned top-level dir, or an owned container (``skills/research/``, see
-    ``_is_container``), is merged per authored root instead of replaced whole, so skills the installer
-    added to it (``qubit skills install`` and agent-created skills land in
-    ``skills/<category>/``) survive. The pre-write symlink guard and the copy loop both
-    use this, so the guard covers exactly what the copy merges."""
-    return src.is_dir() and (len(rel_parts) == 1 or _is_container(src, rel_parts))
-
-
 def _refuse_symlinked_targets(target: Path, entries) -> None:
     """Refuse before the first write. The per-entry check in ``_real_dir`` fires mid-loop,
     after earlier entries were already replaced and before the manifest is rewritten,
