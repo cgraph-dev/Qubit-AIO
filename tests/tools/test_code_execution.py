@@ -154,23 +154,23 @@ class TestExecuteCodeRemoteTempDir(unittest.TestCase):
         # (no PID from nohup), so search for the per-call sandbox commands
         # rather than pinning positions.
         mkdir_cmd = next(cmd for cmd, _, _ in env.commands
-                         if "mkdir -p" in cmd and "qubit_exec_" in cmd)
+                         if "mkdir -p" in cmd and "hermes_exec_" in cmd)
         run_cmd = next(cmd for cmd, _, _ in env.commands if "python3 script.py" in cmd)
         cleanup_cmd = next(cmd for cmd, _, _ in env.commands
-                           if "rm -rf" in cmd and "qubit_exec_" in cmd)
-        self.assertIn("mkdir -p /data/data/com.termux/files/usr/tmp/qubit_exec_", mkdir_cmd)
-        self.assertIn("rm -rf /data/data/com.termux/files/usr/tmp/qubit_exec_", cleanup_cmd)
-        self.assertNotIn("mkdir -p /tmp/qubit_exec_", mkdir_cmd)
+                           if "rm -rf" in cmd and "hermes_exec_" in cmd)
+        self.assertIn("mkdir -p /data/data/com.termux/files/usr/tmp/hermes_exec_", mkdir_cmd)
+        self.assertIn("rm -rf /data/data/com.termux/files/usr/tmp/hermes_exec_", cleanup_cmd)
+        self.assertNotIn("mkdir -p /tmp/hermes_exec_", mkdir_cmd)
         # Env vars travel in the shipped sandbox.env (sourced by the remote
         # shell), not on the command line.
         self.assertIn(". ./sandbox.env", run_cmd)
         env_ship = next(c for c in ship_mock.call_args_list
                         if c.args[1].endswith("sandbox.env"))
-        self.assertIn("QUBIT_RPC_DIR=/data/data/com.termux/files/usr/tmp/qubit_exec_",
+        self.assertIn("HERMES_RPC_DIR=/data/data/com.termux/files/usr/tmp/hermes_exec_",
                       env_ship.args[2])
 
     def test_timezone_shell_quoted_in_remote_execution(self):
-        """QUBIT_TIMEZONE must be shell-quoted in the sourced sandbox.env file
+        """HERMES_TIMEZONE must be shell-quoted in the sourced sandbox.env file
         to prevent injection at source time."""
         class FakeEnv:
             def __init__(self):
@@ -199,7 +199,7 @@ class TestExecuteCodeRemoteTempDir(unittest.TestCase):
              patch("tools.code_execution_tool._ship_file_to_remote") as ship_mock, \
              patch("tools.code_execution_tool.threading.Thread",
                    return_value=fake_thread), \
-             patch.dict(os.environ, {"QUBIT_TIMEZONE": malicious_tz}):
+             patch.dict(os.environ, {"HERMES_TIMEZONE": malicious_tz}):
             result = json.loads(_execute_remote("print('hello')", "task-1", ["terminal"]))
 
         self.assertEqual(result["status"], "success")
@@ -260,14 +260,14 @@ class TestRemoteSharedHostLockdown(unittest.TestCase):
                              if c.args[1].endswith(env_name)), None)
             self.assertIsNotNone(env_ship, f"{env_name} was not shipped")
             token_line = next(l for l in env_ship.args[2].splitlines()
-                              if l.startswith("QUBIT_RPC_TOKEN="))
+                              if l.startswith("HERMES_RPC_TOKEN="))
             token = token_line.split("=", 1)[1].strip("'\"")
             self.assertTrue(token)
             self.assertFalse(any(token in c for c in commands),
                              f"{env_name} token appeared in a remote command line")
             ships[env_name], tokens[env_name] = env_ship, token
         run_cmd = next(c for c in commands if "python3 script.py" in c)
-        self.assertNotIn("QUBIT_RPC_TOKEN=", run_cmd)
+        self.assertNotIn("HERMES_RPC_TOKEN=", run_cmd)
         if sys.platform == "win32":
             return
         # Behaviour, not command text: replay the recorded setup + launch
@@ -276,7 +276,7 @@ class TestRemoteSharedHostLockdown(unittest.TestCase):
         import subprocess
         import tempfile
         mkdir_cmd = next(c for c in commands
-                         if "mkdir -p" in c and "qubit_exec_" in c)
+                         if "mkdir -p" in c and "hermes_exec_" in c)
         env_ship, token = ships["sandbox.env"], tokens["sandbox.env"]
         sandbox = env_ship.args[1].rsplit("/", 1)[0]
         root = tempfile.mkdtemp()
@@ -290,11 +290,11 @@ class TestRemoteSharedHostLockdown(unittest.TestCase):
         with open(f"{local}/sandbox.env", "w") as fh:
             fh.write(env_ship.args[2])
         with open(f"{local}/script.py", "w") as fh:
-            fh.write("import os, sys\nprint(os.environ['QUBIT_RPC_TOKEN'])\nsys.exit(7)\n")
+            fh.write("import os, sys\nprint(os.environ['HERMES_RPC_TOKEN'])\nsys.exit(7)\n")
         # The env reaches the child, its exit code is the command's, and the
         # token never leaks into the outer shell (the backend's session
         # snapshot dump; issue #71296 class).
-        run = sh(run_cmd + ' ; echo "[${QUBIT_RPC_TOKEN:-}]"')
+        run = sh(run_cmd + ' ; echo "[${HERMES_RPC_TOKEN:-}]"')
         self.assertEqual(run.stdout.splitlines(), [token, "[]"], run.stderr)
         self.assertEqual(sh(run_cmd).returncode, 7)
 
@@ -648,7 +648,7 @@ class TestEnvVarFiltering(unittest.TestCase):
     def test_timezone_injected_when_set(self):
         env_backup = os.environ.copy()
         try:
-            os.environ["QUBIT_TIMEZONE"] = "America/New_York"
+            os.environ["HERMES_TIMEZONE"] = "America/New_York"
             child_env = self._get_child_env()
             if sys.platform == "win32":
                 # The MSVC runtime only parses POSIX-form TZ; an IANA name yields a wrong
@@ -873,7 +873,7 @@ class TestRpcTokenAuthorization(unittest.TestCase):
     """The per-session RPC token must gate socket dispatch (fail-closed).
 
     Regression coverage for the execute_code tool-socket hardening: a
-    request without the matching QUBIT_RPC_TOKEN must be rejected before
+    request without the matching HERMES_RPC_TOKEN must be rejected before
     the tool is dispatched, while a request carrying the correct token
     round-trips normally.
     """
