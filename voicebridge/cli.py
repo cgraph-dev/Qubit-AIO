@@ -3269,7 +3269,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="OpenTelemetry-style telemetry gate status (read-only)")
 
     add("receipts",
-        help="Verify the local execution-receipt chain (read-only)")
+        help="Show and verify the local execution-receipt chain in one "
+             "shot (read-only; no subcommands)")
 
     lb = add("logbook", help="Append-only work journal (entries/summary/note)")
     lb.add_argument("--limit", type=int, default=100)
