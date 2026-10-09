@@ -177,7 +177,7 @@ _DESKTOP_MCP_DISCOVERY_DELAY_S = 1.0
 
 
 @asynccontextmanager
-async def _lifespan(app: FastAPI):
+async def _lifespan(app: "FastAPI"):
     app.state.event_channels = {}  # dict[str, set]
     app.state.event_lock = asyncio.Lock()
     app.state.pty_active_session_files = {}  # dict[str, Path]
@@ -331,7 +331,7 @@ async def _lifespan(app: FastAPI):
         eager_reconcile_thread.join()
 
 
-def _app_state_default(app: FastAPI, name: str, factory):
+def _app_state_default(app: "FastAPI", name: str, factory):
     """Return ``app.state.<name>``, lazily creating it for non-``with`` TestClient usages.
 
     The lifespan normally initialises these on the running event loop (an
@@ -345,11 +345,11 @@ def _app_state_default(app: FastAPI, name: str, factory):
         return value
 
 
-def _get_chat_argv_lock(app: FastAPI) -> asyncio.Lock:
+def _get_chat_argv_lock(app: "FastAPI") -> asyncio.Lock:
     return _app_state_default(app, "chat_argv_lock", asyncio.Lock)
 
 
-def _get_pty_active_session_files(app: FastAPI) -> dict[str, Path]:
+def _get_pty_active_session_files(app: "FastAPI") -> dict[str, Path]:
     return _app_state_default(app, "pty_active_session_files", dict)
 
 
