@@ -3,6 +3,8 @@
 Protocol: reads JSON lines from stdin {id, command}, writes {id, ok, output|error} to stdout.
 """
 
+from __future__ import annotations
+
 # Stop a ``utils/`` (or ``proxy/``, ``ui/``) package in the launch directory from shadowing Qubit's own
 # top-level modules: this worker is spawned as ``-m tui_gateway.slash_worker`` with the user's CWD, so
 # ``import cli`` would otherwise resolve ``utils`` to a colliding local package and crash the child in a
@@ -84,8 +86,7 @@ def _start_parent_death_watchdog(original_ppid) -> None:
 
 def _slash_base(command: str) -> str:
     cmd = (command or "").strip()
-    if cmd.startswith("/"):
-        cmd = cmd[1:]
+    cmd = cmd.removeprefix("/")
     return (cmd.split(maxsplit=1)[0] if cmd else "").lower()
 
 
@@ -115,7 +116,18 @@ def _refuse_skill_slash(command: str) -> None:
         raise SkillSlashRefused(base)
 
 
-def _run(cli: "HermesCLI", command: str) -> str:
+def _run(cli: QubitCLI, command: str) -> str:
+    """Run one command; return its captured, ANSI-stripped output.
+
+    A command like /prompt or /blueprint parks the composed text on the one-shot
+    ``_pending_agent_seed`` for the interactive REPL loop (cli.py) — but this
+    worker has no REPL, so the seed is harvested here onto ``cli._harvested_seed``
+    and routed back to the gateway, which sends it as the next turn (#107800).
+    """
+    import cli as cli_mod
+    from rich.console import Console
+
+    cli._harvested_seed = ""  # one-shot: a fresh run never re-sends a stale seed
     cmd = (command or "").strip()
     if not cmd:
         return ""
