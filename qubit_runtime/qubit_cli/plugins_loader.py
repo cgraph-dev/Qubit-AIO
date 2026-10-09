@@ -101,7 +101,7 @@ def _reserve_abandoned_loader_slot() -> None:
     )
 
 
-def run_with_load_deadline(plugin_key: str, ctx: PluginContext, fn: Callable[[], Any]) -> Any:
+def run_with_load_deadline(plugin_key: str, ctx: "PluginContext", fn: Callable[[], Any]) -> Any:
     """Run ``fn`` (a plugin's import + ``register()``) under the per-plugin deadline.
 
     The worker inherits the caller's context (the Qubit-home override is a ContextVar). On timeout the
