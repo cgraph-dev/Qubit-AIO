@@ -36,6 +36,12 @@ const apiMocks = vi.hoisted(() => ({
     messages: [],
     total: 0,
   })),
+  getChatSession: vi.fn(async () => ({
+    session: { id: "dashboard-chat" },
+    messages: [],
+    message_count: 0,
+    meta: {},
+  })),
   getConfig: vi.fn(async () => ({ voice: { input_engine: "auto" } })),
   sttWsUrl: vi.fn(async () => "ws://127.0.0.1/agent/api/audio/stt/ws?ticket=t"),
   saveConfig: vi.fn(async () => ({ ok: true })),
@@ -56,6 +62,7 @@ vi.mock("@/lib/api", () => ({
     getModelInfo: apiMocks.getModelInfo,
     listChatSessions: apiMocks.listChatSessions,
     getChatSessionMessages: apiMocks.getChatSessionMessages,
+    getChatSession: apiMocks.getChatSession,
     getConfig: apiMocks.getConfig,
     sttWsUrl: apiMocks.sttWsUrl,
     saveConfig: apiMocks.saveConfig,
@@ -70,6 +77,9 @@ vi.mock("@/lib/api", () => ({
   },
   authedFetch: vi.fn(),
   streamChatTurn,
+  // Transcript reads go through the backoff wrapper; mocked transports never
+  // transiently fail, so a first-attempt passthrough matches real behavior.
+  withBackoff: (fn: () => Promise<unknown>) => fn(),
   CHAT_REASONING_LEVELS: [
     { id: "none", budget: 64 },
     { id: "minimal", budget: 128 },
