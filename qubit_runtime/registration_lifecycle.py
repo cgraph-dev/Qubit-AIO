@@ -30,7 +30,7 @@ class ReplacementLease:
     previous: Any
     restore: Callable[[Any], bool]
     finalize: Callable[[], None] | None = None
-    predecessor: "ReplacementLease | None" = None
+    predecessor: ReplacementLease | None = None
     active: bool = field(default=True, init=False)
 
     def dispose(self) -> None:
