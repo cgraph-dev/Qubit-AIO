@@ -22,7 +22,7 @@ outgrows the source it came from.
 
 The relationship to upstream is therefore stated once, as engineering fact
 (which install is the behavioral reference, which files were vendored), and
-nowhere else. See [BRAND.md](BRAND.md) §"Internal engineering docs".
+nowhere else.
 
 ## Absorbs, then exceeds
 
@@ -43,30 +43,14 @@ through the one authority path (broker · policy · audit · confirmation ·
 e-stop), reachable by both text and voice. A wrapper that only forwards to
 another agent, or a typed refusal dressed as a feature, is **not** absorption —
 it is an unwired route. Absorption must be *verified by behavior*, not declared.
-This is the same rule as [ARCHITECTURE.md](ARCHITECTURE.md) "Parity is behavior"
-and it does not relax for identity claims.
 
-## One agent, one authority
+## One agent, many roles
 
-Identity does not split the product. Everything Qubit absorbs, whatever surface
-invoked it, runs through the same single backend and the same authority chain,
-under one home (`QUBIT_HOME`, one `state.db`). Multiple roles, one agent. See
-[ARCHITECTURE.md](ARCHITECTURE.md).
+Every role runs through a single backend and the same authority chain, under one
+home (`QUBIT_HOME`, one `state.db`). Multiple roles, one agent.
 
 ## The roles are open-ended
 
 "Your imagination is the limit" is how this reads from the outside — but it is
 a *reading*, not a promise. Qubit claims no capability it has not built. The
-only commitments that bind are the ones verified in
-[STATUS.md](STATUS.md), [PARITY.md](PARITY.md), and
-[CHECKLIST.md](CHECKLIST.md). What is unbounded is the *ambition*, not the
-current capability list.
-
-## Related
-
-- [ARCHITECTURE.md](ARCHITECTURE.md) — the layers, the authority path, the
-  provenance/overlay split.
-- [BRAND.md](BRAND.md) — zero legacy brand on product surfaces; legal
-  attribution the one required exception.
-- [PARITY.md](PARITY.md) — the behavioral target and how parity is judged.
-- [STATUS.md](STATUS.md) — the evidence-backed truth of what works today.
+only commitments that bind are the ones verified in the status ledger.
