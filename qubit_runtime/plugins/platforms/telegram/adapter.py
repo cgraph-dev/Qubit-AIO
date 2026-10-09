@@ -11,7 +11,7 @@ import html as _html
 import re
 import time
 from contextvars import ContextVar
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from typing import Any, Awaitable, Callable, Dict, Iterator, List, Optional, Set
 from qubit_cli import setup_platforms
 
@@ -69,11 +69,11 @@ async def _await_with_thread_deadline(
     result = await run_bounded_async(
         awaitable, timeout, label=label, on_abandon=on_abandon, dump_on_blocked_loop=dump_on_blocked_loop)
     if result.timed_out:
-        raise asyncio.TimeoutError(f"timed out after {timeout:.0f}s ({label})")
+        raise TimeoutError(f"timed out after {timeout:.0f}s ({label})")
     return result.value
 
 
-def _iter_exception_graph(error: BaseException) -> "Iterator[BaseException]":
+def _iter_exception_graph(error: BaseException) -> Iterator[BaseException]:
     """Yield ``error`` and every ``__cause__``/``__context__`` ancestor (DFS, cycle-safe) —
     PTB wraps httpx errors, so classifiers must inspect the whole graph."""
     seen: set[int] = set()
@@ -201,7 +201,7 @@ _FLOOD_INLINE_WAIT_CAP_SECS = 5.0
 _TELEGRAM_CHAT_OUTBOUND_BUDGET_SECS = 1.0
 
 
-def _flood_cap_result(wait: float) -> "SendResult":
+def _flood_cap_result(wait: float) -> SendResult:
     """The shared fail-closed SendResult for an over-cap flood wait."""
     return SendResult(success=False, error=f"flood_control:{wait}", retry_after=float(wait))
 
@@ -213,7 +213,7 @@ _TELEGRAM_IMAGE_EXT_TO_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg
 def _coerce_duration_seconds(value: Any) -> Optional[int]:
     """Round a raw length to whole positive seconds, or None if unusable."""
     try:
-        secs = int(round(float(value)))
+        secs = round(float(value))
     except (TypeError, ValueError):
         return None
     return secs if secs > 0 else None
@@ -747,7 +747,7 @@ class TelegramAdapter(BasePlatformAdapter):
             return False
         return not bool(getattr(self, "_fatal_error_retryable", True))
 
-    def _replacement_telegram_adapter(self) -> Optional["TelegramAdapter"]:
+    def _replacement_telegram_adapter(self) -> Optional[TelegramAdapter]:
         """Live adapter if the reconnect watcher replaced us in ``runner.adapters`` (an in-flight
         ``send()`` still holds the old instance whose ``_bot`` stays None)."""
         runner = getattr(self, "gateway_runner", None)
@@ -2008,7 +2008,7 @@ class TelegramAdapter(BasePlatformAdapter):
             # Losers are NOT cancelled here; the finally below does it.
             await _await_with_thread_deadline(
                 asyncio.wait({progress_wait, error_wait}, return_when=asyncio.FIRST_COMPLETED), timeout=_INITIAL_POLLING_PROGRESS_TIMEOUT)
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             raise OSError(
                 "Telegram getUpdates made no progress within "
                 f"{_INITIAL_POLLING_PROGRESS_TIMEOUT:.0f}s during initial "
@@ -2060,7 +2060,7 @@ class TelegramAdapter(BasePlatformAdapter):
             # the except below classifies it as a network error → background recovery.
             # Same watchdog bound as the reconnect ladders: a wedged httpx connection pool can hang
             # start_polling() forever at bootstrap too (#59614).
-            generation, progress = await self._start_polling_once(
+            _generation, progress = await self._start_polling_once(
                 self._app, drop_pending_updates=drop_pending_updates, error_callback=effective_callback,
                 abandon_app_on_timeout=require_progress,
                 # The strict gate IS the cold-start verifier; a background one would race it.
@@ -2104,7 +2104,7 @@ class TelegramAdapter(BasePlatformAdapter):
             if app and app.updater and app.updater.running:
                 try:
                     await _await_with_thread_deadline(app.updater.stop(), timeout=_UPDATER_STOP_TIMEOUT)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     message = (
                         f"Telegram updater.stop() did not finish before the {what} deadline; "
                         "rebuilding the adapter instead of reusing an Updater whose lifecycle lock may still be held.")
@@ -2132,8 +2132,8 @@ class TelegramAdapter(BasePlatformAdapter):
             # Not a retry: no counter bump, no backoff, no in-place stop/drain. The supervisor's rebuild
             # runs disconnect(), which performs the same bounded updater.stop() and app.shutdown().
             message = (
-                "Telegram polling stall confirmed (getUpdates made no progress); "
-                "rebuilding the adapter instead of reusing an Updater whose long-poll action did not quiesce."
+                f"Telegram polling stall confirmed ({_redact_telegram_error_text(error)}); rebuilding the adapter instead of reusing "
+                "a wedged Updater/dispatcher in place."
             )
             await self._go_fatal_network(message, "[%s] %s (rebuilding adapter via supervisor)", self.name, message)
             return
@@ -2145,8 +2145,7 @@ class TelegramAdapter(BasePlatformAdapter):
         attempt = self._polling_network_error_count
         if attempt > MAX_NETWORK_RETRIES:
             message = (
-                "Telegram polling could not reconnect after %d network error retries. "
-                "Escalating to gateway recovery." % MAX_NETWORK_RETRIES)
+                f'Telegram polling could not reconnect after {MAX_NETWORK_RETRIES:d} network error retries. Escalating to gateway recovery.')
             await self._go_fatal_network(message, "[%s] %s Last error: %s", self.name, message, _redact_telegram_error_text(error))
             return
         delay = min(BASE_DELAY * (2 ** (attempt - 1)), MAX_DELAY)
@@ -2235,7 +2234,7 @@ class TelegramAdapter(BasePlatformAdapter):
                             recovery_task.cancel()
                         self._set_fatal_error(
                             "telegram_network_error",
-                            "Telegram reconnect task wedged for %.0fs; forcing gateway reconnect." % stuck_for,
+                            f"Telegram reconnect task wedged for {stuck_for:.0f}s; forcing gateway reconnect.",
                             retryable=True)
                         await self._handoff_polling_fatal_error()
                         return
@@ -2268,7 +2267,7 @@ class TelegramAdapter(BasePlatformAdapter):
                 self._check_ingress_dispatch_stall()
             except asyncio.CancelledError:
                 return
-            except (asyncio.TimeoutError, OSError) as probe_err:
+            except (TimeoutError, OSError) as probe_err:
                 self._schedule_polling_recovery(probe_err, reason="heartbeat probe")
             except Exception as probe_err:
                 # Non-connectivity errors (e.g. TelegramError 401) aren't CLOSE-WAIT symptoms.
@@ -2325,7 +2324,7 @@ class TelegramAdapter(BasePlatformAdapter):
             return
         try:
             info = await asyncio.wait_for(get_webhook_info(), probe_timeout)  # type: ignore[arg-type]
-        except (asyncio.TimeoutError, OSError):
+        except (TimeoutError, OSError):
             return  # connectivity symptom for the get_me() path, not a stuck-queue signal
         pending = int(getattr(info, "pending_update_count", 0) or 0)
         if pending <= 0:
@@ -2370,12 +2369,14 @@ class TelegramAdapter(BasePlatformAdapter):
         self._ingress_stalled_heartbeats = stalled + 1
         if stalled + 1 < _INGRESS_DISPATCH_STALL_HEARTBEATS:
             return
-        logger.warning(
-            "[%s] Telegram ingress is healthy but deaf: %d update(s) fetched by getUpdates have not been "
-            "dispatched to any handler across %d heartbeats (%d received, %d dispatched, generation %d). "
-            "Polling is fine; PTB's dispatcher is not draining its queue.",
-            self.name, received - dispatched, _INGRESS_DISPATCH_STALL_HEARTBEATS, received, dispatched,
-            getattr(self, "_polling_generation", 0))
+        # No pre-log: the handoff warning and ``_go_fatal_network`` carry this text (see _check_polling_stall).
+        generation = getattr(self, "_polling_generation", 0)
+        self._schedule_polling_recovery(
+            _PollingStallError(
+                f"ingress healthy but deaf: PTB dispatcher made no progress for {_INGRESS_DISPATCH_STALL_HEARTBEATS} "
+                f"heartbeats with {received - dispatched} update(s) fetched but not dispatched "
+                f"({received} received, {dispatched} dispatched, generation {generation})"),
+            reason="ingress dispatch stall watchdog")
 
     async def _check_polling_stall(self) -> None:
         """Watchdog the last successful getUpdates round-trip: a long-poll can wedge without raising
@@ -2403,8 +2404,7 @@ class TelegramAdapter(BasePlatformAdapter):
         # error-level line, so a stall does not announce itself twice.
         self._schedule_polling_recovery(
             _PollingStallError(
-                "getUpdates made no progress for %.0fs (generation %d; polling stall watchdog)"
-                % (stalled_for, getattr(self, "_polling_generation", 0))),
+                f"getUpdates made no progress for {stalled_for:.0f}s (generation {getattr(self, '_polling_generation', 0)}; polling stall watchdog)"),
             reason="polling stall watchdog")
 
     def _verifier_stale(self, generation: int, progress: asyncio.Event) -> bool:
@@ -2548,11 +2548,11 @@ class TelegramAdapter(BasePlatformAdapter):
             return
         # Retries exhausted — fatal so the runner surfaces it and the user knows to act.
         message = (
-            "Telegram polling could not recover after %d retries (%ds total wait). "
+            f"Telegram polling could not recover after {MAX_CONFLICT_RETRIES} retries "
+            f"({sum(10 + i * 10 for i in range(1, MAX_CONFLICT_RETRIES + 1))}s total wait). "
             "The previous gateway session is still held open on Telegram's servers, "
-            "or another process is using the same bot token. To recover: ensure no other Qubit or Qubit instance is running "
-            "with this token, then restart the gateway with 'qubit gateway restart'."
-            % (MAX_CONFLICT_RETRIES, sum(10 + i * 10 for i in range(1, MAX_CONFLICT_RETRIES + 1))))
+            "or another process is using the same bot token. To recover: ensure no other Hermes or OpenClaw instance is running "
+            "with this token, then restart the gateway with 'hermes gateway restart'.")
         logger.error("[%s] %s Original error: %s", self.name, message, _redact_telegram_error_text(error))
         # Snapshot whether WE transition to fatal: a concurrent retry task suspended past the entry
         # guard reaches this branch too. Only the first transition notifies.
@@ -2561,7 +2561,7 @@ class TelegramAdapter(BasePlatformAdapter):
         try:
             if self._app and self._app.updater:
                 await _await_with_thread_deadline(self._app.updater.stop(), timeout=_UPDATER_STOP_TIMEOUT)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("[%s] updater.stop() timed out after exhausting conflict retries (likely CLOSE-WAIT socket); proceeding to fatal notify", self.name)
         except Exception as stop_error:
             logger.warning(
@@ -3135,7 +3135,7 @@ class TelegramAdapter(BasePlatformAdapter):
                     self._app.initialize(), timeout=_init_timeout, on_abandon=lambda app=self._app: _shutdown_abandoned_app(app),
                     label="telegram-init")
                 break
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 rebuild_app = True
                 if _attempt >= _max_connect - 1:
                     raise OSError(
@@ -4468,7 +4468,7 @@ class TelegramAdapter(BasePlatformAdapter):
     _MODEL_PAGE_SIZE = 8
 
     @staticmethod
-    def _provider_button(p: dict) -> "InlineKeyboardButton":
+    def _provider_button(p: dict) -> InlineKeyboardButton:
         count = p.get("total_models", len(p.get("models", [])))
         label = f"{p['name']} ({count})"
         if p.get("is_current"):
@@ -4712,7 +4712,7 @@ class TelegramAdapter(BasePlatformAdapter):
         with contextlib.suppress(Exception):
             await query.edit_message_text(text=self.format_message(text_md), parse_mode=ParseMode.MARKDOWN_V2, reply_markup=None)
 
-    async def _handle_inline_query(self, update: "Update", context: "ContextTypes.DEFAULT_TYPE") -> None:
+    async def _handle_inline_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Answer ``@botname <query>`` with a searchable command/skill picker (the ``/`` menu is capped at
         60 slots). Results are computed per keystroke, 50 per page; tapping sends ``/cmd`` text as the
         user, so dispatch flows through the normal command path. Inline queries arrive from ANY chat, so
@@ -4777,7 +4777,7 @@ class TelegramAdapter(BasePlatformAdapter):
         await query.answer(text=denial_text)
         return False
 
-    async def _handle_callback_query(self, update: "Update", context: "ContextTypes.DEFAULT_TYPE") -> None:
+    async def _handle_callback_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Dispatch inline keyboard button clicks on the callback_data prefix."""
         query = update.callback_query
         if not query or not query.data:
@@ -5042,7 +5042,7 @@ class TelegramAdapter(BasePlatformAdapter):
                 label = t("platform.telegram.gmail_triage.failed", verb=verb, detail=last_line[:80])
                 logger.error(
                     "[%s] gmail-triage callback failed: verb=%s arg=%s rc=%s stderr=%s", self.name, verb, arg, proc.returncode, stderr_text)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             label = t("platform.telegram.gmail_triage.timed_out", verb=verb)
             logger.error("[%s] gmail-triage callback timed out: verb=%s arg=%s", self.name, verb, arg)
         except Exception as exc:
@@ -6440,7 +6440,7 @@ class TelegramAdapter(BasePlatformAdapter):
             session_entry = store.get_or_create_session(self._telegram_group_observe_shared_source(event.source))
             entry = {
                 "role": "user", "content": self._telegram_group_observe_attributed_text(event),
-                "timestamp": datetime.now(tz=timezone.utc).isoformat(), "observed": True}
+                "timestamp": datetime.now(tz=UTC).isoformat(), "observed": True}
             if event.message_id:
                 entry["message_id"] = str(event.message_id)
             self._accept_update()
@@ -6948,7 +6948,7 @@ class TelegramAdapter(BasePlatformAdapter):
         await self._flush_buffered(
             self._media_group_events, self._media_group_tasks, media_group_id, self.MEDIA_GROUP_WAIT_SECONDS, "media-group")
 
-    async def _handle_sticker(self, msg: Message, event: "MessageEvent") -> None:
+    async def _handle_sticker(self, msg: Message, event: MessageEvent) -> None:
         """Describe a sticker via vision, cached by file_unique_id; animated/video stickers get an emoji placeholder."""
         from gateway.sticker_cache import (
             get_cached_description, cache_sticker_description_async, build_sticker_injection,
