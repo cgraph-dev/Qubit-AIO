@@ -1,9 +1,11 @@
 """Cron pause/resume/trigger settle through the pending-approvals banner.
 
 The row actions stage via ``_cron_mutate`` (``payload={"id": job_id}``), and the
-banner's id-only ``POST /api/ops/confirm`` must execute the real ``schedules``
-backend exactly once — not fail ``CONFIRM_UNSUPPORTED``. Proved live in the
-browser (/cron create→pause→resume→delete, 2026-09-24); this pins the runner.
+banner's id-only ``POST /api/ops/confirm`` must execute the real cron store
+backend exactly once — not fail ``CONFIRM_UNSUPPORTED``. The dashboard cron
+surface is backed by ``voicebridge.cron_bridge`` (the vendored ``cron.jobs``
+JSON store the live scheduler fires from), not the legacy
+``voicebridge.schedules`` SQLite store.
 
 Hermetic: temp XDG/QUBIT_HOME only; no live service, network, or hardware.
 """
@@ -47,21 +49,16 @@ def _make_job(cfg):
                                 "when": "every 60 minutes",
                                 "confirm": True}, {})
     assert code == 200, out
-    jobs = out.get("jobs") or out.get("job") or {}
-    job = jobs[0] if isinstance(jobs, list) else jobs
-    job_id = job.get("id") or out.get("id")
+    job_id = out.get("id")
     assert job_id, out
     return job_id
 
 
 def _paused(cfg, job_id) -> bool:
-    from voicebridge import schedules as S
+    from voicebridge import cron_bridge as CB
 
-    envelope = S.get_job(cfg, job_id)
-    job = envelope.get("job", envelope) if isinstance(envelope, dict) else {}
-    if "paused" in job:
-        return bool(job["paused"])
-    return not bool(job.get("enabled", True))
+    job = CB.get_job(cfg, job_id)
+    return bool(job) and not bool(job.get("enabled", True))
 
 
 def test_staged_cron_pause_settles_through_banner(tmp_path, monkeypatch):
@@ -93,12 +90,12 @@ def test_staged_cron_pause_settles_through_banner(tmp_path, monkeypatch):
 
 def test_staged_cron_resume_settles_through_banner(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
+    from voicebridge import cron_bridge as CB
     from voicebridge import dashboard_ops as OPS
     from voicebridge import qubit_compat as HC
-    from voicebridge import schedules as S
 
     job_id = _make_job(cfg)
-    S.set_paused(cfg, job_id, True, requested_by="test", confirmed=True)
+    CB.pause(cfg, job_id)
     assert _paused(cfg, job_id) is True
 
     code, staged = HC._cron_mutate("resume", cfg, {}, {}, {"id": str(job_id)})

@@ -3030,130 +3030,104 @@ def _cron_shape(j: Dict[str, Any], *, cfg: Any = None,
 
 def h_cron_jobs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Any]:
-    from . import schedules as S
+    """GET /api/cron/jobs -> the REAL cron store's jobs.
+
+    Backed by ``voicebridge.cron_bridge`` (the vendored ``cron.jobs`` JSON store
+    the live scheduler fires from), NOT the legacy ``voicebridge.schedules``
+    SQLite store. Serving this read from ``schedules.db`` split the dashboard
+    from the scheduler: the jobs that actually fire and deliver (Telegram /
+    WhatsApp) never appeared on /cron, while stale schedules rows did.
+    """
+    from . import cron_bridge as CB
     try:
-        res = S.list_jobs(cfg)
+        jobs = CB.list_jobs(cfg)
     except Exception as exc:
         return _fail(exc)
-    jobs = res.get("jobs", res) if isinstance(res, dict) else res
-    tz_name = str(res.get("timezone", "") or "") if isinstance(res, dict) else ""
-    return 200, [_cron_shape(j, cfg=cfg, tz_name=tz_name)
-                 for j in (jobs or [])]
+    return 200, jobs
 
 
 def h_cron_job_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import schedules as S
-    reader = getattr(S, "get_job", None) or getattr(S, "show", None)
+    """GET /api/cron/jobs/{id} -> one job from the REAL cron store."""
+    from . import cron_bridge as CB
+    raw = str(p.get("id", "") or "")
     try:
-        res = reader(cfg, int(p.get("id", "0")))
+        job = CB.get_job(cfg, raw)
     except Exception as exc:
-        code = getattr(exc, "code", None) or type(exc).__name__
-        http = 404 if "NOT_FOUND" in str(code).upper() else 400
-        return http, {"ok": False, "code": code,
-                      "detail": _redact(str(exc))[:200]}
-    if isinstance(res, dict) and res.get("ok") is False:
-        return 404, {"ok": False, "code": res.get("code", "NOT_FOUND"),
-                     "detail": _redact(res.get("error", ""))[:200]}
-    job = res.get("job", res) if isinstance(res, dict) else {}
-    return 200, _cron_shape(job if isinstance(job, dict) else {},
-                            cfg=cfg, tz_name=_cron_timezone(cfg))
+        return _fail(exc)
+    if job is None:
+        return 404, {"ok": False, "code": "CRON_NOT_FOUND",
+                     "detail": f"cron job {raw!r} not found"}
+    return 200, job
 
 
 def h_cron_job_runs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """Run history for one schedule ({"runs": CronRun[], "limit": int}).
+    """Run history for one job ({"runs": CronRun[], "limit": int}).
 
-    Backed by ``voicebridge.schedules.history`` (the same SQLite run log
-    ``qubit schedules history`` reads). Schedule ids are numeric; a non-numeric
-    upstream job id honestly reports no runs instead of scanning every job.
+    Backed by ``cron.executions`` — the same ledger the scheduler writes and
+    ``qubit cron`` reads. Job ids are the store's hex ids (a name also
+    resolves); an unknown id honestly reports no runs.
     """
-    from . import schedules as S
+    from . import cron_bridge as CB
     raw = str(p.get("id", "") or "")
     try:
         limit = max(1, min(int(q.get("limit", "20") or "20"), 100))
     except ValueError:
         limit = 20
     try:
-        job_id = int(raw)
-    except ValueError:
-        job_id = 0
-    if not job_id:
-        return _ok(runs=[], limit=limit, count=0,
-                   detail=f"schedule {raw!r} has no numeric id; no runs")
-    try:
-        res = S.history(cfg, job_id, limit)
+        shaped = CB.runs(cfg, raw, limit)
     except Exception as exc:
         return _fail(exc)
-    runs = res.get("runs", []) if isinstance(res, dict) else []
-    now = time.time()
-    shaped = []
-    for r in runs if isinstance(runs, list) else []:
-        started = r.get("started_at") or 0
-        finished = r.get("finished_at") or 0
-        shaped.append({
-            "id": r.get("id"), "job_id": r.get("job_id"),
-            "started_at": started, "ended_at": finished or None,
-            "finished_at": finished, "state": str(r.get("state", "") or ""),
-            "code": str(r.get("code", "") or ""),
-            "detail": str(r.get("detail", "") or ""),
-            "is_active": not finished and (now - started) < 300,
-            "archived": False,
-        })
-    return _ok(runs=shaped, limit=limit, count=len(shaped),
-               state=str(res.get("state", "OK") if isinstance(res, dict)
-                         else "OK"))
+    return _ok(runs=shaped, limit=limit, count=len(shaped), state="OK")
 
 
 def _cron_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
                  b: Dict[str, Any], p: Dict[str, str]
                  ) -> Tuple[int, Dict[str, Any]]:
-    """POST /api/cron/jobs/{id}/pause|resume|trigger.
+    """POST /api/cron/jobs/{id}/pause|resume|trigger on the REAL cron store.
 
     Pause/resume are schedule mutations and share the same confirmation
     contract as create/update/delete: ``_compat_confirm`` checks the shared
     e-stop latch, consumes a pending approval exactly once, and otherwise
     stages a typed 409 with a real ``confirmation_id``. The canonical
-    ``schedules.set_paused`` (the CLI/voice store) performs the transition and
-    audits it. A trigger addresses the exact job in the path -- never a
-    blanket ``run_due`` over every due job.
+    ``cron.jobs.pause_job`` / ``resume_job`` (the same store the CLI, the
+    ``cronjob`` tool, and the scheduler use) performs the transition. A trigger
+    addresses the exact job in the path — ``cron.jobs.trigger_job`` schedules
+    it for the next ticker pass, never a blanket ``run_due`` over every job.
     """
-    from . import schedules as S
-    try:
-        job_id = int(p.get("id", "0") or "0")
-    except (TypeError, ValueError):
+    from . import cron_bridge as CB
+    job_id = str(p.get("id", "") or "")
+    if not job_id:
         return 400, {"ok": False, "code": "MALFORMED",
-                     "detail": "schedule id must be numeric"}
+                     "detail": "cron job id required"}
     try:
         if fn_name in ("pause", "resume"):
-            paused = fn_name == "pause"
             guard = _compat_confirm(
                 cfg, f"cron.{fn_name}",
-                f"schedule {fn_name} requires explicit confirmation: "
+                f"cron job {fn_name} requires explicit confirmation: "
                 "re-POST with {\"confirm\": true}", q, b,
                 payload={"id": job_id})
             if guard is not None:
                 return guard
-            res = S.set_paused(cfg, job_id, paused,
-                               requested_by="dashboard:user", confirmed=True)
-            ok = not (isinstance(res, dict) and res.get("ok") is False)
-            return (200 if ok else 400), {"ok": ok, "result": res,
-                                          "enabled": not paused,
-                                          "qubit_counterpart":
-                                          "CLI `qubit schedules pause|resume`"}
-        if fn_name == "run_due":
-            # A path id targets exactly that job (forced); the legacy global
-            # ``run_due`` behavior is preserved only when no id was supplied.
-            if job_id:
-                res = S.trigger(cfg, job_id, requested_by="dashboard:user")
-            else:
-                res = S.run_due(cfg, requested_by="dashboard:user")
-            return 200, {"ok": True, "result": res}
-        res = getattr(S, fn_name)(cfg, job_id, requested_by="dashboard:user")
+            res = (CB.pause(cfg, job_id) if fn_name == "pause"
+                   else CB.resume(cfg, job_id))
+            if res is None:
+                return 404, {"ok": False, "code": "CRON_NOT_FOUND",
+                             "detail": f"cron job {job_id!r} not found"}
+            return _ok(ok=True, result=CB.shape_job(res),
+                       enabled=(fn_name == "resume"),
+                       qubit_counterpart="CLI `qubit cron pause|resume`")
+        res = CB.trigger(cfg, job_id)
     except Exception as exc:
-        return _fail(exc)
-    ok = not (isinstance(res, dict) and res.get("ok") is False)
-    return (200 if ok else 400), {"ok": ok, "result": res}
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    if res is None:
+        return 404, {"ok": False, "code": "CRON_NOT_FOUND",
+                     "detail": f"cron job {job_id!r} not found"}
+    return _ok(ok=True, result=CB.shape_job(res),
+               qubit_counterpart="CLI `qubit cron run`")
 
 
 def h_logs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -11894,7 +11868,19 @@ def _normalize_schedule_expr(when: str) -> str:
 
 def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import schedules as S
+    """POST /api/cron/jobs -> create a job in the REAL cron store.
+
+    Reads the SPA editor payload (``name``/``prompt``/``when`` or
+    ``schedule``/``deliver``/...) and creates through ``voicebridge.cron_bridge``
+    — the same ``cron.jobs`` store the CLI, the ``cronjob`` tool, and the
+    scheduler share, so a job created here actually fires and delivers. The
+    write is confirm-gated on the shared journal (``_compat_confirm``: staged
+    409 with a real id, or settle via ``confirm: true``). The response carries
+    ``ok: True``: the pending-approvals banner settles cron.create via
+    ``dashboard_ops.confirm_compat_op``, which requires ``body["ok"]`` — without
+    it the job WAS created but the banner reported BACKEND_REFUSED.
+    """
+    from . import cron_bridge as CB
     name = str(b.get("name", "") or "")
     task_text = str(b.get("prompt", b.get("task_text", "")) or "")
     when = str(b.get("when", "") or "")
@@ -11907,6 +11893,9 @@ def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         when = str(b["repeat"].get("expr", "") or "")
     when = _normalize_schedule_expr(when)
     deliver = str(b.get("deliver", b.get("deliver_to", "")) or "")
+    skills = b.get("skills")
+    if isinstance(skills, str):
+        skills = [s.strip() for s in skills.split(",") if s.strip()]
     detail = ("schedule create (unattended work) requires explicit "
               "confirmation: re-POST with {\"confirm\": true}")
     guard = _compat_confirm(cfg, "cron.create", detail, q, b,
@@ -11915,57 +11904,46 @@ def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if guard is not None:
         return guard
     try:
-        res = S.create(cfg, name, task_text, when,
-                       deliver_to=deliver,
-                       requested_by="dashboard:user", confirmed=True)
+        job = CB.create(
+            cfg, name=name, prompt=task_text, schedule=when, deliver=deliver,
+            skills=skills if isinstance(skills, list) else None,
+            provider=b.get("provider"), model=b.get("model"),
+            base_url=b.get("base_url"), script=b.get("script"),
+            no_agent=bool(b.get("no_agent")),
+            context_from=b.get("context_from"),
+            enabled_toolsets=b.get("enabled_toolsets"),
+            workdir=b.get("workdir"))
     except Exception as exc:
         code = getattr(exc, "code", None) or type(exc).__name__
         return 400, {"ok": False, "code": code,
                      "detail": _redact(str(exc))[:300]}
-    job = res.get("job", {}) if isinstance(res, dict) else {}
-    if isinstance(job, dict) and job.get("id") and "next_run_at" not in job:
-        # ``create_job`` returns the raw row; re-read through the store view so
-        # the returned projection honors the configured timezone/retry posture.
-        try:
-            viewed = S.get_job(cfg, int(job["id"]))
-            if isinstance(viewed, dict) and isinstance(viewed.get("job"), dict):
-                job = viewed["job"]
-        except Exception:  # noqa: BLE001 — a read must never break the create
-            pass
-    # Carry ``ok:True``: the pending-approvals banner settles cron.create via
-    # ``dashboard_ops.confirm_compat_op``, which requires ``body["ok"]``. Without
-    # it the job WAS created but the banner reported BACKEND_REFUSED (a false
-    # failure receipt). The direct POST response also gains the standard ok.
-    shape = _cron_shape(job if isinstance(job, dict) else {},
-                        cfg=cfg, tz_name=_cron_timezone(cfg))
-    return _ok(**shape)
+    return _ok(**CB.shape_job(job))
 
 
 def cron_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """PUT /api/cron/jobs/{job_id} -> real in-place schedule edit.
+    """PUT /api/cron/jobs/{job_id} -> real in-place edit on the REAL store.
 
     The edit modal posts the full mutation (name/prompt/schedule/deliver/
     skills/...) plus the current ``enabled`` flag. Without ``confirm`` the
-    write stages a typed 409 on the shared journal; with it the same
-    ``schedules`` store the CLI/voice use applies the editable fields in place
-    (``set_paused`` delegates body-carrying edits to ``schedules.update_job``)
-    and records an audit receipt.
+    write stages a typed 409 on the shared journal; with it ``cron.jobs``
+    (the store the CLI/tool/scheduler share) applies the editable fields in
+    place, and an ``enabled`` flip routes through ``pause_job``/``resume_job``
+    so the store's own resume semantics are preserved.
     """
-    from . import schedules as S
-    try:
-        job_id = int(p.get("id", "0"))
-    except (TypeError, ValueError):
+    from . import cron_bridge as CB
+    job_id = str(p.get("id", "") or "")
+    if not job_id:
         return 400, {"ok": False, "code": "MALFORMED",
-                     "detail": "schedule id must be numeric"}
+                     "detail": "cron job id required"}
     enabled = b.get("enabled")
     if enabled is None:
         return _gate("CRON_UPDATE_IMMUTABLE",
-                     "schedule update requires the current enabled flag; "
+                     "cron job update requires the current enabled flag; "
                      "re-POST the full mutation including enabled.",
-                     "CLI `qubit schedules` (same schedules store)")
+                     "CLI `qubit cron` (same cron store)")
     enabled = bool(enabled)
-    detail = (f"schedule {'resume' if enabled else 'pause'} requires explicit "
+    detail = (f"cron job {'resume' if enabled else 'pause'} requires explicit "
               "confirmation: re-POST with {\"confirm\": true}")
     guard = _compat_confirm(
         cfg, "cron.update", detail, q, b,
@@ -11976,45 +11954,43 @@ def cron_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if guard is not None:
         return guard
     try:
-        # Pause == not enabled. The confirm was already settled above, so pass
-        # it through to the single-store setter (avoids a second confirm).
-        res = S.set_paused(cfg, job_id, not enabled,
-                           requested_by="dashboard:user",
-                           confirmed=True, body=b, query=q)
+        job = CB.update(cfg, job_id, b)
+    except KeyError:
+        return 404, {"ok": False, "code": "CRON_NOT_FOUND",
+                     "detail": f"cron job {job_id!r} not found"}
     except Exception as exc:
         code = getattr(exc, "code", None) or type(exc).__name__
         return 400, {"ok": False, "code": code,
                      "detail": _redact(str(exc))[:300]}
-    ok = not (isinstance(res, dict) and res.get("ok") is False)
-    return (200 if ok else 400), {"ok": ok, "result": res,
-                                  "enabled": enabled,
-                                  "qubit_counterpart":
-                                  "CLI `qubit schedules pause|resume`"}
+    return _ok(**CB.shape_job(job))
 
 
 def cron_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import schedules as S
-    detail = ("schedule delete requires explicit confirmation: re-POST with "
+    """DELETE /api/cron/jobs/{id} -> remove the job from the REAL cron store.
+
+    Confirm-gated on the shared journal. The confirm/id are read from BOTH the
+    parsed body and the query string, so ``DELETE .../id?confirm=true`` and
+    ``DELETE .../id {"confirm": true}`` both settle. An unknown id is a typed
+    404, never a fabricated success.
+    """
+    from . import cron_bridge as CB
+    detail = ("cron job delete requires explicit confirmation: re-POST with "
               "{\"confirm\": true}")
-    # Read the confirm/id from BOTH the parsed body and the query string, so
-    # ``DELETE .../1?confirm=true`` and ``DELETE .../1 {"confirm": true}`` both
-    # settle (previously only a body was read and it was never parsed).
-    try:
-        _job_id = int(p.get("id", "0"))
-    except (TypeError, ValueError):
-        _job_id = 0
+    job_id = str(p.get("id", "") or "")
     guard = _compat_confirm(cfg, "cron.delete", detail, q, b,
-                            payload={"id": _job_id})
+                            payload={"id": job_id})
     if guard is not None:
         return guard
     try:
-        S.delete(cfg, int(p.get("id", "0")), requested_by="dashboard:user",
-                 confirmed=True)
+        removed = CB.delete(cfg, job_id)
     except Exception as exc:
         code = getattr(exc, "code", None) or type(exc).__name__
         return 400, {"ok": False, "code": code,
                      "detail": _redact(str(exc))[:300]}
+    if not removed:
+        return 404, {"ok": False, "code": "CRON_NOT_FOUND",
+                     "detail": f"cron job {job_id!r} not found"}
     return _ok(ok=True)
 
 

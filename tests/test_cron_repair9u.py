@@ -5,8 +5,9 @@ Defects fixed here (audit ``qa-cron-mem-boards``):
   * Daily/Weekly/Monthly/Once cron + ISO schedule strings were rejected by
     ``schedules.parse_when`` (only natural-language forms were accepted).
   * The edit modal's "Save changes" was dead: the PUT handler only accepted an
-    ``enabled`` transition. ``schedules.set_paused`` now delegates a body that
-    carries editable fields to ``schedules.update_job``.
+    ``enabled`` transition. The dashboard cron surface is now backed by
+    ``voicebridge.cron_bridge`` (the real ``cron.jobs`` store the scheduler
+    fires from), so the edit modal's editable fields apply in place.
   * The dashboard ``deliver`` choice was silently dropped; the store now keeps
     the display preference while never fabricating a transport target.
 
@@ -162,8 +163,8 @@ def test_deliver_preference_persisted_without_fabricated_transport(tmp_path,
 def test_banner_runner_executes_cron_create_from_staged_payload(tmp_path,
                                                                 monkeypatch):
     """The pending-approvals banner can settle a staged cron create."""
+    from voicebridge import cron_bridge as CB
     from voicebridge import dashboard_ops as OPS
-    from voicebridge import schedules as SC
 
     cfg = _cfg(tmp_path, monkeypatch)
     for action in ("cron.create", "cron.update", "cron.delete"):
@@ -173,9 +174,9 @@ def test_banner_runner_executes_cron_create_from_staged_payload(tmp_path,
     code, out = runner(cfg, {"name": "banner-created", "task_text": "t",
                              "when": "0 9 * * *", "deliver": "local"})
     assert code == 200, out
-    name = out.get("name") or out.get("job", {}).get("name")
-    assert name == "banner-created", out
-    assert SC.list_jobs(cfg)["jobs"], "job not persisted by banner runner"
+    assert out.get("name") == "banner-created", out
+    assert any(j["name"] == "banner-created" for j in CB.list_jobs(cfg)), \
+        "job not persisted by banner runner"
 
 
 def test_blueprint_schedule_template_is_accepted_by_store():
