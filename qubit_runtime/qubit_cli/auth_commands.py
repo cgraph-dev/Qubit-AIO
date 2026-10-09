@@ -710,6 +710,17 @@ def auth_logout_command(args) -> None:
     auth_mod.logout_command(SimpleNamespace(provider=raw_provider))
 
 
+def auth_spotify_command(args) -> None:
+    action = str(getattr(args, "spotify_action", "") or "login").strip().lower()
+    if action in {"", "login"}:
+        auth_mod.login_spotify_command(args)
+        return
+    handler = {"status": auth_status_command, "logout": auth_logout_command}.get(action)
+    if handler is None:
+        raise SystemExit(f"Unknown Spotify auth action: {action}")
+    handler(SimpleNamespace(provider="spotify"))
+
+
 def _print_bedrock_status() -> None:
     """Show AWS Bedrock credential status (not in the pool — uses boto3 chain)."""
     try:
@@ -904,7 +915,8 @@ def auth_upgrade_command(args) -> None:
 _AUTH_ACTIONS = {
     "add": auth_add_command, "list": auth_list_command, "remove": auth_remove_command,
     "reset": auth_reset_command, "priority": auth_priority_command, "refresh": auth_refresh_command, "status": auth_status_command,
-    "logout": auth_logout_command, "upgrade": auth_upgrade_command}
+    "logout": auth_logout_command, "upgrade": auth_upgrade_command,
+    "spotify": auth_spotify_command}
 
 
 def auth_command(args) -> None:
