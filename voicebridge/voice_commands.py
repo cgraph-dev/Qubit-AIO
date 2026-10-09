@@ -9816,6 +9816,9 @@ CLI_COVERAGE = {
         "gateway_supervision_revert",
         "gateway_discovery",
     ),
+    # `qubit restart` is the host-service fleet fan-out (same lifecycle class as
+    # `gateway restart`): CLI/dashboard only, never spoken.
+    "restart": (),
     "peer": ("peer_list", "peer_dm", "peer_run"),
     "tui": ("tui_help",),
     "vision": ("vision_status", "vision_describe"),
@@ -10055,6 +10058,8 @@ VOICE_IMPOSSIBLE = {
     # passphrases must never be spoken (transcripts/journal/audio history)
     "export-state.voice": "passphrase-sealed bundles: use the dashboard form or "
                           "`qubit export-state` in a terminal",
+    "restart.voice": "host service fleet restart; use `qubit restart --confirm` "
+                     "in a terminal or the dashboard Gateway page",
     "import-state.voice": "passphrase-sealed bundles: use the dashboard form or "
                           "`qubit import-state <bundle> [--apply]` in a terminal",
     # nested JSON envelopes cannot be spoken reliably (dashboard/CLI only)

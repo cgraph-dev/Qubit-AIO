@@ -137,6 +137,21 @@ Auto-start (optional):
 systemctl --user status qubit-voicebridge
 ```
 
+Restarting (after a config edit, or to recover a wedged unit):
+
+```bash
+qubit restart                           # PREVIEW: names the units, touches nothing
+qubit restart --confirm                 # restart the whole fleet
+qubit restart --only voicebridge --confirm   # just the push-to-talk bridge
+```
+
+`qubit restart` is a convenience fan-out over the same systemd units
+(`qubit-voicebridge`, `qubit-gateway`, `qubit-voice-orb`, `qubit-voice-agent`).
+It goes through the same authority path as `qubit gateway restart` (e-stop gate,
+confirmation, audit) and is a preview unless `--confirm` — a restart replaces
+the serving process and drops LIVE voice/terminal sessions. The raw equivalent
+is `systemctl --user restart qubit-voicebridge.service`.
+
 Headless / SSH (no X11): `qubit run --no-hotkey` and press Enter to
 start/stop capture, or `qubit once` for a single utterance.
 

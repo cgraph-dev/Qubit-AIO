@@ -381,7 +381,8 @@ def query_daemon_control(home: Optional[Any] = None, verb: str = "status"
 def status(cfg: Any, *, runner: Optional[Runner] = None,
            probe: Optional[Callable[[str, int], bool]] = None,
            daemon_reader: Optional[Callable[[], Optional[Dict[str, Any]]]] = None,
-           control_query: Optional[Callable[[], Optional[Dict[str, Any]]]] = None
+           control_query: Optional[Callable[[], Optional[Dict[str, Any]]]] = None,
+           unit_override: str = ""
            ) -> Dict[str, Any]:
     """Read-only gateway/service status. Never raises.
 
@@ -395,8 +396,11 @@ def status(cfg: Any, *, runner: Optional[Runner] = None,
     fabricated): ``daemon`` is the vendored ``gateway_state.json`` snapshot, and
     ``control`` is the live ``gateway.sock`` answer (liveness). Both are
     best-effort; absence is reported as absent.
+
+    ``unit_override`` names the unit explicitly (the fleet fan-out reads each
+    member); empty means resolve from config as before.
     """
-    unit = daemon_service_unit(cfg)
+    unit = str(unit_override or "").strip() or daemon_service_unit(cfg)
     host, port = _host_port(cfg)
     run = runner or _default_runner
     check_port = probe or _port_in_use
@@ -776,7 +780,8 @@ def control(cfg: Any, action: str, *, confirmed: bool = False,
             confirmation_id: str = "", source: str = "user",
             actor: str = "dashboard:user", runner: Optional[Runner] = None,
             spawner: Optional[Spawner] = None,
-            probe: Optional[Callable[[str, int], bool]] = None
+            probe: Optional[Callable[[str, int], bool]] = None,
+            unit_override: str = ""
             ) -> Dict[str, Any]:
     """Perform an authorized gateway lifecycle transition and record its outcome.
 
@@ -785,11 +790,14 @@ def control(cfg: Any, action: str, *, confirmed: bool = False,
     dashboard's action-status poll reports the truth after the restart replaces
     the serving process. The authorization and execution semantics are
     unchanged.
+
+    ``unit_override`` names the systemd unit explicitly (the fleet fan-out uses
+    it to restart each member); empty means resolve from config as before.
     """
     out = _control_impl(cfg, action, confirmed=confirmed,
                         confirmation_id=confirmation_id, source=source,
                         actor=actor, runner=runner, spawner=spawner,
-                        probe=probe)
+                        probe=probe, unit_override=unit_override)
     _record_control_status(cfg, action, out)
     return out
 
@@ -798,7 +806,8 @@ def _control_impl(cfg: Any, action: str, *, confirmed: bool = False,
                   confirmation_id: str = "", source: str = "user",
                   actor: str = "dashboard:user", runner: Optional[Runner] = None,
                   spawner: Optional[Spawner] = None,
-                  probe: Optional[Callable[[str, int], bool]] = None
+                  probe: Optional[Callable[[str, int], bool]] = None,
+                  unit_override: str = ""
                   ) -> Dict[str, Any]:
     """Perform an authorized gateway lifecycle transition.
 
@@ -821,7 +830,7 @@ def _control_impl(cfg: Any, action: str, *, confirmed: bool = False,
                 "code": ESTOP_CODE})
         return {"ok": False, "code": ESTOP_CODE, "state": "UNAVAILABLE",
                 "detail": "emergency stop is latched; gateway control refused"}
-    unit = daemon_service_unit(cfg)
+    unit = str(unit_override or "").strip() or daemon_service_unit(cfg)
     refusal, receipt = _authorize_control(
         cfg, unit, clean, actor, confirmed=confirmed,
         confirmation_id=str(confirmation_id or ""), source=source)
@@ -842,7 +851,7 @@ def _control_impl(cfg: Any, action: str, *, confirmed: bool = False,
                            "environment (test guard); no service was touched")}
     run = runner or _default_runner
     spawn = spawner or _default_spawner
-    before = status(cfg, runner=run, probe=probe)
+    before = status(cfg, runner=run, probe=probe, unit_override=unit)
     unit = before["service_unit"]
     if not before["available"]:
         return {"ok": False, "code": UNAVAILABLE_CODE, "state": "UNAVAILABLE",
@@ -983,6 +992,110 @@ def _recover_impl(cfg: Any, *, confirmed: bool = False, confirmation_id: str = "
             "detail": detail, "status": after, "receipt": receipt}
 
 
+# --------------------------------------------------------------------------
+# Fleet restart (`qubit restart`)
+# --------------------------------------------------------------------------
+# The Qubit fleet is a set of systemd user units, not one. A bare
+# ``systemctl --user restart qubit-voicebridge.service`` only bounces the
+# push-to-talk bridge; the messaging gateway, the voice orb, and the voice
+# typing helper are separate units. This is a *convenience fan-out* over the
+# SAME authority path :func:`control` already uses — it adds no new authority,
+# introduces no second supervisor, and (like every other control verb) is
+# confirm-gated and refuses under the e-stop latch. A restart drops live
+# voice/terminal sessions, so a bare invocation is a preview, never a surprise
+# bounce.
+
+#: The fleet units, in restart order: the bridge owns the mic/PTT loop, the
+#: gateway owns the messaging backend, the orb/agent are voice surfaces.
+FLEET_UNITS = {
+    "voicebridge": "qubit-voicebridge.service",
+    "gateway": DEFAULT_DAEMON_UNIT,
+    "orb": "qubit-voice-orb.service",
+    "agent": "qubit-voice-agent.service",
+}
+#: Ordered selection for ``--only all`` (alias: the whole fleet).
+FLEET_ORDER = ("voicebridge", "gateway", "orb", "agent")
+
+
+def _fleet_selection(only: str) -> Tuple[Optional[List[str]], Optional[str]]:
+    """Resolve ``--only`` to an ordered unit-name list, or a typed error.
+
+    Returns ``(names, None)`` on success, ``(None, code)`` on a bad selector.
+    """
+    key = str(only or "all").strip().lower()
+    if key in ("", "all"):
+        return [FLEET_UNITS[k] for k in FLEET_ORDER], None
+    if key not in FLEET_UNITS:
+        return None, BAD_INPUT_CODE
+    return [FLEET_UNITS[key]], None
+
+
+def restart_fleet(cfg: Any, *, only: str = "all", confirmed: bool = False,
+                  confirmation_id: str = "", source: str = "user",
+                  actor: str = "cli:user", runner: Optional[Runner] = None,
+                  spawner: Optional[Spawner] = None,
+                  probe: Optional[Callable[[str, int], bool]] = None
+                  ) -> Dict[str, Any]:
+    """Restart the selected Qubit service units through :func:`control`.
+
+    Convenience fan-out, NOT a new authority path: every unit is restarted
+    through :func:`control`, so the e-stop latch, the single-use target-bound
+    confirmation, the policy Decision, and the audit receipt are unchanged and
+    shared. ``only`` selects ``voicebridge`` | ``gateway`` | ``orb`` | ``agent``
+    | ``all`` (default: all — the whole fleet, since that is what an operator
+    typing ``qubit restart`` means).
+
+    Confirmation is per-unit and target-bound, so the fleet call issues its own
+    confirmation for each unit it is about to transition; without it, every
+    unit returns its typed ``CONFIRM_REQUIRED`` refusal and nothing is touched
+    (the caller renders that as the preview). The aggregate is ``ok`` only when
+    every unit transitioned (or was an idempotent no-op).
+    """
+    names, err = _fleet_selection(only)
+    if names is None:
+        return {"ok": False, "code": err or BAD_INPUT_CODE, "state": "FAILED",
+                "action": "restart", "detail":
+                f"--only must be one of {FLEET_ORDER} or 'all'"}
+    results: List[Dict[str, Any]] = []
+    for unit in names:
+        # This goes through the SAME authority path as a single-unit control —
+        # `unit_override` names the fleet member explicitly, so the e-stop
+        # latch, the target-bound confirmation, the policy Decision, and the
+        # audit receipt are unchanged and shared.
+        out = control(cfg, "restart", confirmed=confirmed,
+                      confirmation_id=confirmation_id, source=source,
+                      actor=actor, runner=runner, spawner=spawner, probe=probe,
+                      unit_override=unit)
+        results.append({"unit": unit, **out})
+    ok = all(bool(r.get("ok")) for r in results) and bool(results)
+    touched = [r["unit"] for r in results if r.get("ok")]
+    preview = [r["unit"] for r in results
+               if str(r.get("code") or "") == CONFIRM_CODE]
+    # Aggregate code: prefer a specific per-unit refusal (confirmation, e-stop,
+    # supervision unavailable) over the generic control-failed, so the CLI exit
+    # code is the honest one (3 = needs confirmation/e-stop, 2 = unavailable).
+    specific = ""
+    for code in (CONFIRM_CODE, ESTOP_CODE, UNAVAILABLE_CODE):
+        if any(str(r.get("code") or "") == code for r in results):
+            specific = code
+            break
+    code = "" if ok else (specific or FAILED_CODE)
+    state = ("RESTARTING" if ok else
+             "CONFIRM_REQUIRED" if preview and not touched else
+             "UNAVAILABLE" if specific == UNAVAILABLE_CODE else "FAILED")
+    detail = ("service restart dispatched; it completes in ~"
+              f"{int(DETACH_DELAY_S)}s" if ok else
+              f"confirmation required before restarting "
+              f"{len(preview)} unit(s); nothing was touched"
+              if preview and not touched else
+              "one or more units failed to restart; see results")
+    _audit("restart_fleet", actor,
+           {"units": names, "confirmed": bool(confirmed), "ok": ok})
+    return {"ok": ok, "state": state, "action": "restart", "only": only,
+            "units": names, "results": results,
+            "detached": bool(ok), "code": code, "detail": detail}
+
+
 def install_unit_plan(cfg: Any, *, repo_root: Optional[Any] = None,
                       unit_dir: Optional[Any] = None, force: bool = False
                       ) -> Dict[str, Any]:
@@ -1068,4 +1181,5 @@ __all__ = ["DEFAULT_UNIT", "DEFAULT_DAEMON_UNIT", "DEFAULT_PORT",
            "ACTIONS", "GATEWAY_CONTROL_CAPABILITY", "service_unit",
            "daemon_service_unit", "daemon_runtime_status", "query_daemon_control",
            "install_unit_plan", "install_unit",
-           "system_scope", "status", "failure", "control", "recover"]
+           "system_scope", "status", "failure", "control", "recover",
+           "FLEET_UNITS", "FLEET_ORDER", "restart_fleet"]

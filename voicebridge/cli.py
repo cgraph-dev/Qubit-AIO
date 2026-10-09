@@ -414,6 +414,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     add("run", help="interactive push-to-talk loop (default)")
     add("once", help="record one utterance, process it, exit")
+    _restart_p = add(
+        "restart",
+        help="restart the Qubit service fleet (preview unless --confirm)")
+    _restart_p.add_argument(
+        "--only", default="all",
+        choices=["all", "voicebridge", "gateway", "orb", "agent"],
+        help="which unit(s) to restart (default: all — the whole fleet)")
+    _restart_p.add_argument(
+        "--confirm", action="store_true",
+        help="actually dispatch the restart (a restart drops live "
+             "voice/terminal sessions); without it this is a preview")
     add("mic-test", help="record 5s and report levels (diagnostic)")
     task = add("task", help="send a typed task through the pipeline (no mic)")
     task.add_argument("text", nargs="*", help="task text, e.g. 'inspect the Stripe webhook flow'")
@@ -4132,6 +4143,8 @@ def main(argv=None) -> int:
         return _cmd_msg(cfg, args)
     if command == "gateway":
         return _cmd_gateway(cfg, args)
+    if command == "restart":
+        return _cmd_restart(cfg, args)
     if command == "peer":
         return _cmd_peer(cfg, args)
     if command == "voice":
@@ -7729,6 +7742,57 @@ def _cmd_gateway(cfg, args) -> int:
                            "rollback": "registries untouched; nothing delivered"},
                           indent=2))
         return rc
+
+
+def _cmd_restart(cfg, args) -> int:
+    """``voicebridge restart [--only …] [--confirm]`` — restart the fleet.
+
+    A convenience verb over the ONE authority path: every unit is restarted
+    through ``gateway_supervisor.control`` (e-stop latch → single-use
+    target-bound confirmation → policy Decision → audit), so this adds no new
+    authority. Without ``--confirm`` it is a PREVIEW that prints exactly which
+    units WOULD be bounced and exits non-zero; nothing is touched. A restart
+    replaces the serving process and drops live voice/terminal sessions, so it
+    is never silent.
+
+    Exit codes: 0 dispatched (or already-active no-op), 3 confirmation
+    required (the preview), 2 supervision unavailable, 1 a unit failed.
+    """
+    import json as _json
+    from . import gateway_supervisor as GS
+
+    only = str(getattr(args, "only", "all") or "all")
+    confirm = bool(getattr(args, "confirm", False))
+    names, err = GS._fleet_selection(only)
+    if names is None:
+        print(_json.dumps(
+            {"ok": False, "code": err or GS.BAD_INPUT_CODE, "state": "FAILED",
+             "action": "restart",
+             "detail": f"--only must be one of {GS.FLEET_ORDER} or 'all'"},
+            indent=2, sort_keys=True))
+        return 1
+    if not confirm:
+        # Preview: name the exact units, say what it costs, touch nothing.
+        preview = {
+            "ok": False, "code": GS.CONFIRM_CODE, "state": "CONFIRM_REQUIRED",
+            "action": "restart", "only": only, "units": names,
+            "scope": GS.system_scope(cfg),
+            "detail": ("this restarts the following Qubit units: "
+                       f"{', '.join(names)}. A restart replaces the serving "
+                       "process and drops LIVE voice/terminal sessions. "
+                       "Re-issue with --confirm to proceed; nothing was "
+                       "touched."),
+            "command": f"voicebridge restart --only {only} --confirm",
+        }
+        print(_json.dumps(preview, indent=2, sort_keys=True))
+        return 3
+    out = GS.restart_fleet(cfg, only=only, confirmed=True, actor="cli:user")
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    if out.get("ok"):
+        return 0
+    code = str(out.get("code") or "")
+    return {GS.CONFIRM_CODE: 3, GS.ESTOP_CODE: 3,
+            GS.UNAVAILABLE_CODE: 2}.get(code, 1)
 
 
 def _cmd_peer(cfg, args) -> int:
