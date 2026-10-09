@@ -40,7 +40,7 @@ export const zhHantDiagnostics = {
       elevenLabsRejectedKey: 'ElevenLabs 拒絕了該 API 金鑰 (401)。',
       diskFull: '磁碟已滿 — 請騰出一些空間後再試。',
       gatewayAuthFailed: '閘道認證失敗 — 請檢查你的 API_SERVER_KEY。',
-      methodNotAllowed: '桌面後端拒絕了該請求 (405 Method Not Allowed)。請嘗試重新啟動 Hermes Desktop。',
+      methodNotAllowed: '桌面後端拒絕了該請求 (405 Method Not Allowed)。請嘗試重新啟動 Qubit Desktop。',
       microphonePermission: '麥克風權限已被拒絕。',
       openaiRejectedApiKey: 'OpenAI 拒絕了該 API 金鑰。',
       openaiTtsNeedsKey: 'OpenAI TTS 需要 VOICE_TOOLS_OPENAI_KEY 或 OPENAI_API_KEY。',
@@ -101,7 +101,7 @@ export const zhHantDiagnostics = {
     handoffLead: '在以下位置繼續討論:',
     links: {
       github: 'GitHub Issues',
-      portal: 'Nous Portal 支援',
+      portal: 'Qubit Support',
       discord: 'Discord'
     }
   },

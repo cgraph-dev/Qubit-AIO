@@ -230,7 +230,7 @@ export const arSettings = {
       advanced: 'متقدم'
     },
     searchPlaceholder: {
-      about: 'حول Hermes Desktop',
+      about: 'حول Qubit Desktop',
       config: 'ابحث في الإعدادات...',
       gateway: 'اتصال البوابة...',
       keys: 'ابحث في مفاتيح API...',
@@ -256,7 +256,7 @@ export const arSettings = {
       chatTextScaleDesc:
         'يضبط حجم نص المحادثة ومحرر الرسائل نسبةً إلى مقياس الواجهة. يبقى حجم الأشرطة الجانبية وعناصر التحكم كما هو.',
       title: 'المظهر',
-      intro: 'خصص مظهر Hermes Desktop.',
+      intro: 'خصص مظهر Qubit Desktop.',
       colorMode: 'نمط الألوان',
       colorModeDesc: 'اختر الوضع الفاتح أو الداكن أو اتبع النظام.',
       toolViewTitle: 'عرض الأدوات',
@@ -600,7 +600,7 @@ export const arSettings = {
       title: 'اتصال البوابة',
       envOverride: 'تجاوز من البيئة',
       intro:
-        'يشغّل Hermes Desktop بوابة محلية خاصة افتراضياً. استخدم بوابة بعيدة عندما تريد أن يتحكم هذا التطبيق بخلفية Hermes تعمل مسبقاً على جهاز آخر أو خلف وكيل موثوق. اتصالات البوابة إعداد على مستوى الجهاز؛ ويتم اكتشاف الملفات الشخصية من البوابات المتصلة.',
+        'يشغّل Qubit Desktop بوابة محلية خاصة افتراضياً. استخدم بوابة بعيدة عندما تريد أن يتحكم هذا التطبيق بخلفية Qubit تعمل مسبقاً على جهاز آخر أو خلف وكيل موثوق. اتصالات البوابة إعداد على مستوى الجهاز؛ ويتم اكتشاف الملفات الشخصية من البوابات المتصلة.',
       envOverrideTitle: 'متغيرات البيئة تتحكم في جلسة سطح المكتب هذه.',
       envOverrideDesc: 'أزل QUBIT_DESKTOP_REMOTE_URL و QUBIT_DESKTOP_REMOTE_TOKEN لاستخدام الإعداد المحفوظ أدناه.',
       localTitle: 'بوابة محلية',
@@ -644,7 +644,7 @@ export const arSettings = {
       enterUrlFirst: 'أدخل رابط البوابة البعيدة أولاً.',
       restartingTitle: 'جار إعادة تشغيل اتصال البوابة',
       savedTitle: 'تم حفظ إعدادات البوابة',
-      restartingMessage: 'سيعيد Hermes Desktop الاتصال باستخدام الإعدادات المحفوظة.',
+      restartingMessage: 'سيعيد Qubit Desktop الاتصال باستخدام الإعدادات المحفوظة.',
       savedMessage: 'تم الحفظ للتشغيل القادم.',
       connectedTo: (baseUrl, version) => `متصل بـ ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
       reachableTitle: 'البوابة البعيدة قابلة للوصول',
@@ -860,7 +860,7 @@ export const arSettings = {
       noProviderOptions: 'لا تحتوي مجموعة الأدوات هذه على خيارات مزوّد — فعّلها لتعمل مع إعدادك الحالي.',
       noProviders: 'لا يوجد مزوّدون متاحون لمجموعة الأدوات هذه الآن.',
       ready: 'جاهز',
-      nousIncluded: 'مُضمّن مع اشتراك Nous — سجّل الدخول إلى Nous Portal للتفعيل.',
+      nousIncluded: 'مُضمّن مع اشتراك Qubit — سجّل الدخول إلى Qubit للتفعيل.',
       noApiKeyRequired: 'لا يلزم مفتاح API.',
       postSetupHint: step =>
         `تحتاج هذه الخلفية إلى تثبيت لمرة واحدة (${step}). يعمل على هذا الجهاز — قد يستغرق بضع دقائق.`,

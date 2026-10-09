@@ -2,7 +2,7 @@ import type { TranslationOverrides } from './define-locale'
 
 export const arBoot = {
   boot: {
-    ready: 'Hermes Desktop جاهز',
+    ready: 'Qubit Desktop جاهز',
     desktopBootFailedWithMessage: message => `فشل تشغيل سطح المكتب: ${message}`,
     steps: {
       connectingGateway: 'جار الاتصال ببوابة سطح المكتب',
@@ -10,7 +10,7 @@ export const arBoot = {
       loadingSessions: 'جار تحميل الجلسات الأخيرة',
       retryingRemoteBackend: 'جارٍ إعادة الاتصال بخادم Hermes البعيد…',
       startingDesktopConnection: 'جار بدء اتصال سطح المكتب',
-      startingQubitDesktop: 'جار تشغيل Hermes Desktop...'
+      startingQubitDesktop: 'جار تشغيل Qubit Desktop...'
     },
     errors: {
       backgroundExited: 'خرجت عملية Hermes الخلفية.',
@@ -31,7 +31,7 @@ export const arBoot = {
       retry: 'إعادة المحاولة',
       repairInstall: 'إصلاح التثبيت',
       useLocalGateway: 'استخدام البوابة المحلية',
-      cloudDownTitle: 'عامل Nous Cloud معطّل',
+      cloudDownTitle: 'عامل Qubit Cloud معطّل',
       cloudDownDescription:
         'يعيد عامل السحابة المُدار من Nous الذي يتصل به هذا البوابة خطأً من الخادم. لا يمكن إعادة تشغيله من هنا — تحقق من حالته، أو بدّل إلى البوابة المحلية، أو احصل على الدعم.',
       cloudDownHint: 'تفتح الأزرار أدناه بوابة Nous (حالة المثيل وعناصر التحكم) أو Discord للحصول على الدعم.',
@@ -84,7 +84,7 @@ export const arBoot = {
     tryAgain: 'إعادة المحاولة',
     notAvailableTitle: 'التحديث غير متاح',
     unsupportedMessage: 'لا يمكن لهذا الإصدار من Hermes تحديث نفسه من داخل التطبيق.',
-    appName: 'Hermes Desktop',
+    appName: 'Qubit',
     version: value => `الإصدار ${value}`,
     versionUnavailable: 'الإصدار غير متاح',
     bundleOutOfSync: 'إصدار التطبيق قديم',
@@ -242,7 +242,7 @@ export const arBoot = {
     reloadRetry: 'إعادة التحميل وإعادة المحاولة'
   },
   onboarding: {
-    headerTitle: 'لنُعِدّ لك Hermes Agent',
+    headerTitle: 'لنُعِدّ لك Qubit Agent',
     headerDesc: 'اربط مزوّد نماذج لبدء المحادثة. معظم الخيارات تتطلب نقرة واحدة.',
     preparingInstall: 'يُكمل Hermes التثبيت. عادة ما يستغرق ذلك أقل من دقيقة في أول تشغيل.',
     starting: 'جار بدء Hermes...',
