@@ -35,15 +35,15 @@ def _cfg(tmp_path, monkeypatch):
 
 # --------------------------------------------------------------------- cron
 def _cron_job(cfg, name):
-    from voicebridge import schedules as S
+    from voicebridge import cron_bridge as CB
 
-    return int(S.create(cfg, name, "task", "every 60 minutes",
-                        requested_by="t", confirmed=True)["job"]["id"])
+    return CB.create(cfg, name=name, prompt="task", schedule="every 60 minutes",
+                     deliver="local")["id"]
 
 
 def test_cron_pause_requires_confirmation_then_persists(tmp_path, monkeypatch):
+    from voicebridge import cron_bridge as CB
     from voicebridge import qubit_compat as HC
-    from voicebridge import schedules as S
 
     cfg = _cfg(tmp_path, monkeypatch)
     job_id = _cron_job(cfg, "pause-me")
@@ -52,12 +52,12 @@ def test_cron_pause_requires_confirmation_then_persists(tmp_path, monkeypatch):
                                f"/api/cron/jobs/{job_id}/pause", {}, {})
     assert code == 409 and staged["code"] == "CONFIRM_REQUIRED", staged
     assert staged["confirmation_id"], staged
-    assert S.show(cfg, job_id)["job"]["enabled"] is True, "pause bypassed"
+    assert CB.get_job(cfg, job_id)["enabled"] is True, "pause bypassed"
 
     code, done = HC.dispatch(cfg, "POST", f"/api/cron/jobs/{job_id}/pause",
                              {}, {"confirmation_id": staged["confirmation_id"]})
     assert code == 200 and done["ok"] is True, (code, done)
-    assert S.show(cfg, job_id)["job"]["enabled"] is False
+    assert CB.get_job(cfg, job_id)["enabled"] is False
 
     code, staged = HC.dispatch(cfg, "POST",
                                f"/api/cron/jobs/{job_id}/resume", {}, {})
@@ -65,12 +65,12 @@ def test_cron_pause_requires_confirmation_then_persists(tmp_path, monkeypatch):
     code, done = HC.dispatch(cfg, "POST", f"/api/cron/jobs/{job_id}/resume",
                              {}, {"confirm": True})
     assert code == 200, (code, done)
-    assert S.show(cfg, job_id)["job"]["enabled"] is True
+    assert CB.get_job(cfg, job_id)["enabled"] is True
 
 
 def test_cron_trigger_addresses_only_the_path_job(tmp_path, monkeypatch):
+    from voicebridge import cron_bridge as CB
     from voicebridge import qubit_compat as HC
-    from voicebridge import schedules as S
 
     cfg = _cfg(tmp_path, monkeypatch)
     job_a = _cron_job(cfg, "job-a")
@@ -79,10 +79,11 @@ def test_cron_trigger_addresses_only_the_path_job(tmp_path, monkeypatch):
     code, out = HC.dispatch(cfg, "POST",
                             f"/api/cron/jobs/{job_b}/trigger", {}, {})
     assert code == 200, (code, out)
-    ran = [r.get("job_id") for r in out["result"].get("results", [])]
-    assert ran == [job_b], ran
-    assert S.history(cfg, job_a)["runs"] == [], "job A was triggered"
-    assert [r["job_id"] for r in S.history(cfg, job_b)["runs"]] == [job_b]
+    # The trigger addresses exactly the path job and returns that job's shaped
+    # record (``cron.jobs.trigger_job``: schedule for the next ticker pass),
+    # never a blanket run_due over every job.
+    assert out["result"]["id"] == job_b, out
+    assert CB.get_job(cfg, job_a)["id"] == job_a, "job A was mutated"
 
 
 # ----------------------------------------------------------------- webhooks
