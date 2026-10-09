@@ -18,10 +18,33 @@ sys.path.insert(0, str(REPO_ROOT))
 
 
 @pytest.fixture(autouse=True)
-def _estop_clear(monkeypatch):
+def _estop_clear(monkeypatch, tmp_path):
     from voicebridge import gateway_supervisor as GS
 
     monkeypatch.setattr(GS, "_estop", lambda _cfg: False)
+    # Isolate QUBIT_HOME so `_daemon_home()` returns early instead of touching
+    # the operator's real home.
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qhome"))
+    # The vendored runtime is imported lazily by the control path; a bare
+    # `from . import qubit_runtime` leaves `agent` (a top-level package rooted
+    # at `qubit_runtime/`) half-registered, which breaks a later
+    # `qubit_runtime.run()` help dispatch in the SAME pytest process
+    # (test-ordering pollution, not product behavior). Snapshot sys.path and
+    # drop any vendored top-level modules we caused so the next test starts
+    # clean.
+    import sys as _sys
+
+    before_path = list(_sys.path)
+    before_mods = set(_sys.modules)
+    yield
+    _sys.path[:] = before_path
+    for name in set(_sys.modules) - before_mods:
+        mod = _sys.modules.get(name)
+        if mod is None:
+            continue
+        root = getattr(mod, "__file__", "") or ""
+        if "qubit_runtime" in root or name in ("agent", "tools", "qubit_cli"):
+            _sys.modules.pop(name, None)
 
 
 class _Cfg:
