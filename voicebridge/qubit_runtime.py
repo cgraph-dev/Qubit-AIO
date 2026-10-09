@@ -42,6 +42,25 @@ _UPSTREAM_PRODUCT_WORD = "hermes"
 _BRAND_MARKER = "_qubit_branded"
 _BRAND_PROG = _QUBIT_PROG
 
+# Fork families whose *parser* is registered under a primary name with
+# ``add_parser(aliases=...)`` aliases (``journey`` = ``learning``/
+# ``memory-graph``; ``desktop`` = ``gui``; ``cleanup`` = ``clean``). argparse
+# renders ``prog``/usage as the primary name even when the alias was invoked,
+# so ``qubit memory-graph --help`` printed ``usage: qubit journey`` and
+# ``qubit gui --help`` printed ``usage: qubit desktop`` -- the product looked
+# broken. This maps an invoked ALIAS token to its PRIMARY parser name so the
+# subparser's rendered prog can use the name the user actually typed.
+_ALIAS_TO_PRIMARY: dict = {
+    "memory-graph": "journey",
+    "learning": "journey",
+    "gui": "desktop",
+    "clean": "cleanup",
+}
+
+# The invoked top-level family token for this ``run`` call (set before the
+# vendored parser is built). ``None``/a non-alias token means "no remap".
+_INVOKED_FAMILY: Optional[str] = None
+
 
 def _launcher_prog() -> str:
     """User-facing launcher name for the branded fork help.
@@ -101,13 +120,20 @@ def _rebrand_parser(parser, prog: str) -> None:
             continue
         # Future ``add_parser()`` calls on this action inherit the new prefix.
         action._prog_prefix = prog
-        for choice in list(getattr(action, "_choices_actions", ()) or ()):
+        for choice in list(getattr(action, "_choices_actions", ()) or ()): 
             name = getattr(choice, "dest", None)
             if not name:
                 continue
             sub = action.choices.get(name)
             if sub is not None:
-                _rebrand_parser(sub, f"{prog} {name}")
+                # When the family was invoked through an argparse *alias*
+                # (e.g. ``memory-graph`` -> primary ``journey``), render the
+                # prog the user actually typed instead of the primary name.
+                child = name
+                if prog == _BRAND_PROG \
+                        and _ALIAS_TO_PRIMARY.get(_INVOKED_FAMILY) == name:
+                    child = _INVOKED_FAMILY
+                _rebrand_parser(sub, f"{prog} {child}")
 
 
 def _guard_parser(parser) -> None:
@@ -130,7 +156,8 @@ def _guard_parser(parser) -> None:
     parser._qubit_brand_guard = True
 
 
-def _install_qubit_branding(prog: str) -> None:
+def _install_qubit_branding(prog: str, invoked_family: Optional[str] = None
+                            ) -> None:
     """Wrap the fork's top-level parser builder so help reads as Qubit.
 
     Idempotent: installed once per process; repeated :func:`run` calls only
@@ -138,8 +165,9 @@ def _install_qubit_branding(prog: str) -> None:
     and ``qubit_cli.main._build_cli_parser`` imports it inside the function,
     so the wrapper is seen without editing the pinned tree.
     """
-    global _BRAND_PROG
+    global _BRAND_PROG, _INVOKED_FAMILY
     _BRAND_PROG = prog or _QUBIT_PROG
+    _INVOKED_FAMILY = (invoked_family or "").strip() or None
     from qubit_cli import _parser as _hp
 
     existing = _hp.build_top_level_parser
@@ -572,6 +600,9 @@ def run(argv: Optional[list] = None) -> int:
     args = list(argv or [])
     # Read the launcher name before sys.argv is replaced with the fork's own.
     prog = _launcher_prog()
+    # The invoked top-level family token (for alias-prog rendering); skip a
+    # leading flag so ``qubit --help`` never looks like a family.
+    invoked = next((tok for tok in args if not tok.startswith("-")), "")
     saved_path = list(sys.path)
     saved_env = dict(os.environ)
     saved = sys.argv
@@ -579,7 +610,7 @@ def run(argv: Optional[list] = None) -> int:
     try:
         use_qubit_home()
         ensure_path()
-        _install_qubit_branding(prog)
+        _install_qubit_branding(prog, invoked)
         from qubit_cli.main import main as _qubit_main
         result = _qubit_main()
     finally:
