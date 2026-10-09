@@ -149,6 +149,7 @@ function emptyCronJobForm(): CronJobEditorState {
     prompt: "",
     schedule: "",
     deliver: "local",
+    repeat: "",
     skills: [],
     provider: "",
     model: "",
@@ -459,6 +460,19 @@ function CronJobFormFields({
               "No messaging platforms configured. Set one up under Channels to deliver reports."}
           </p>
         )}
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor={`${idPrefix}-repeat`}>{t.cron.repeat}</Label>
+        <Input
+          id={`${idPrefix}-repeat`}
+          type="number"
+          min={1}
+          placeholder={t.cron.repeatPlaceholder}
+          value={form.repeat}
+          onChange={(e) => update("repeat", e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">{t.cron.repeatHint}</p>
       </div>
 
       <div className="grid gap-2">

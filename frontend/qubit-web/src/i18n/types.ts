@@ -318,6 +318,9 @@ export interface Translations {
       onceAt: string;
     };
     deliverTo: string;
+    repeat: string;
+    repeatHint: string;
+    repeatPlaceholder: string;
     scheduledJobs: string;
     noJobs: string;
     last: string;

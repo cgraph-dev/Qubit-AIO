@@ -5,6 +5,10 @@ export interface CronJobFormState {
   prompt: string;
   schedule: string;
   deliver: string;
+  /** Finite run count as typed ("" = forever). Scalar int/str is forwarded to
+   *  the store's normalize_repeat_value chokepoint, which coerces it; an empty
+   *  value must become null (never a bogus 0). */
+  repeat: string;
   skills: string[];
   provider: string;
   model: string;
@@ -39,6 +43,17 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+/** Coerce the repeat input into the wire value: blank -> null ("forever"),
+ * a numeric string -> number, otherwise the raw string (the store's
+ * `normalize_repeat_value` chokepoint accepts `'forever'`/`'once'` and raises on
+ * junk). Never emits 0 — an empty field means "no finite repeat", so sending it
+ * must not create a "run zero times" job. */
+function optionalRepeat(value: string): number | string | null {
+  const text = value.trim();
+  if (!text) return null;
+  return /^\d+$/.test(text) ? Number(text) : text;
+}
+
 /** Build the create/update payload. Optional fields collapse to null so an
  * update explicitly clears them rather than leaving stale values. */
 export function buildCronJobPayload(form: CronJobFormState): CronJobMutation {
@@ -55,6 +70,7 @@ export function buildCronJobPayload(form: CronJobFormState): CronJobMutation {
     prompt: form.prompt.trim(),
     schedule: form.schedule.trim(),
     deliver: form.deliver.trim() || "local",
+    repeat: optionalRepeat(form.repeat),
     skills: form.skills.filter(Boolean),
     provider: optionalText(form.provider),
     model: optionalText(form.model),
@@ -74,6 +90,16 @@ export function cronJobHasExecutionContent(
   return Boolean(asString(job.prompt).trim() || asString(job.script).trim() || skills.length);
 }
 
+/** Read a stored job's finite repeat count into the form's text input. The
+ * store shape is `{times, completed}` with times null = forever, so a null (or
+ * absent) times collapses to "" — the same "no repeat" state the input starts
+ * in, and one the save path turns back into null rather than a bogus 0. */
+function repeatFromJob(job: CronJob): string {
+  const times = job.repeat?.times;
+  if (times === null || times === undefined) return "";
+  return String(times);
+}
+
 export function cronJobFormFromJob(job: CronJob): CronJobFormState {
   const storedRefs = splitCronList(job.context_from);
   // Raw store records carry the reserved "self" entry inside context_from;
@@ -90,6 +116,7 @@ export function cronJobFormFromJob(job: CronJob): CronJobFormState {
       asString(job.schedule?.run_at) ||
       asString(job.schedule_display),
     deliver: asString(job.deliver) || "local",
+    repeat: repeatFromJob(job),
     skills: Array.isArray(job.skills) ? job.skills.filter(Boolean) : [],
     provider: asString(job.provider),
     model: asString(job.model),
