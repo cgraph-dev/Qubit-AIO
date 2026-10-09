@@ -18,7 +18,12 @@ export function Markdown({
   highlightTerms?: string[];
   streaming?: boolean;
 }) {
-  const blocks = useMemo(() => parseBlocks(content), [content]);
+  // Coerce to a string before parsing. A transcript row can carry a non-string
+  // `content` (a malformed persisted reply, or a live frame whose `summary`/
+  // `reply` is not text); `content.split` would then throw inside render and
+  // blank the whole route (the "black screen" defect). Never trust the shape.
+  const text = typeof content === "string" ? content : content == null ? "" : String(content);
+  const blocks = useMemo(() => parseBlocks(text), [text]);
   const caret = streaming ? <StreamingCaret /> : null;
 
   return (

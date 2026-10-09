@@ -237,6 +237,13 @@ beforeEach(() => {
     messages: [],
     total: 0,
   });
+  apiMocks.getChatSession.mockReset();
+  apiMocks.getChatSession.mockResolvedValue({
+    session: { id: "dashboard-chat" },
+    messages: [],
+    message_count: 0,
+    meta: {},
+  } as never);
   apiMocks.getStatus.mockReset();
   apiMocks.getStatus.mockResolvedValue({ gateway_state: "stopped" });
   apiMocks.getLogs.mockReset();
@@ -320,14 +327,16 @@ describe("Qubit ChatPage", () => {
   });
 
   it("does not request a transcript for a not-yet-created session", async () => {
-    // The unsaved default session has no server record yet: the page must not
-    // issue a messages request (which would 404 in the console).
+    // The unsaved default session has no server record yet: the page probes
+    // the canonical session, gets a 404, and must NOT issue a messages request
+    // (which would 404 in the console). The empty composer renders instead.
     apiMocks.listChatSessions.mockResolvedValueOnce({
       sessions: [],
       total: 0,
       limit: 100,
       offset: 0,
     });
+    apiMocks.getChatSession.mockRejectedValueOnce(new Error("404: missing"));
     await renderChat();
     await vi.waitFor(() =>
       expect(container.textContent).toContain("Start a new run."),
@@ -632,5 +641,119 @@ describe("Qubit ChatPage", () => {
     expect(apiMocks.getRuntime).toHaveBeenCalled();
     expect(container.textContent).toContain('"agent":"ready"');
     expect(container.textContent).toContain('"provider":"qubit-brain4"');
+  });
+
+  // ── Regression: reload must restore the session without a right-rail click ──
+  it("loads the transcript even when the session LIST read fails", async () => {
+    // The reported defect: on reload the transcript load was gated behind
+    // `listChatSessions`; a slow/failing list (backend restarting) left the
+    // page blank until a session row was clicked. The list is now auxiliary,
+    // so a rejected list must not stop the transcript from painting.
+    apiMocks.listChatSessions.mockRejectedValueOnce(new Error("502: backend restarting"));
+    apiMocks.getChatSessionMessages.mockResolvedValueOnce({
+      session_id: "dashboard-chat",
+      messages: [
+        { role: "user", content: "reload question" },
+        { role: "assistant", content: "reload answer" },
+      ],
+      total: 2,
+    });
+    await renderChatAt("/chat?resume=dashboard-chat");
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("reload answer"),
+    );
+    // Not degraded to the page error banner — the transcript is authoritative.
+    expect(container.querySelector('[role="alert"][data-state="degraded"]')).toBeNull();
+  });
+
+  it("does not duplicate a build-task report into the streaming bubble", async () => {
+    // A build turn streams `progress` frames, then the full report as one
+    // delta, and writes the same report back on `done` as reportText. Without
+    // the guard the report painted twice (streaming bubble + message) and the
+    // swap at done flickered. It must appear exactly once, as the message.
+    await renderChat();
+    await vi.waitFor(() =>
+      expect(container.querySelector('#qubit-chat-input')).not.toBeNull(),
+    );
+    streamChatTurn.mockImplementationOnce(
+      async (
+        _body: unknown,
+        handlers: {
+          onProgress?: (e: unknown) => void;
+          onDelta?: (t: string, e: unknown) => void;
+          onDone?: (e: unknown) => void;
+        },
+      ) => {
+        handlers.onProgress?.({
+          event: "progress",
+          task: "task-1",
+          status: "working",
+          detail: "worker started",
+        });
+        handlers.onDelta?.("FULL_REPORT_BODY", { event: "delta" });
+        handlers.onDone?.({
+          event: "done",
+          reply: "FULL_REPORT_BODY",
+          summary: "SHORT_SUMMARY",
+          route: "task",
+          task: "task-1",
+          receipt: { route: "task", task: "task-1" },
+        });
+      },
+    );
+    await typeAndSend("build me something");
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("SHORT_SUMMARY"),
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    // No live streaming bubble survived the done frame (the flicker source).
+    expect(container.querySelector('[data-state="streaming"]')).toBeNull();
+    // The full report lives in the message disclosure exactly once — it is NOT
+    // also painted into the assistant message body (that would show the whole
+    // report twice, once as `text`, once as `reportText`).
+    const disclosure = container.querySelector(
+      '[data-testid="message-report-full"]',
+    );
+    expect(disclosure).not.toBeNull();
+    expect(
+      (disclosure?.textContent?.match(/FULL_REPORT_BODY/g) ?? []).length,
+    ).toBe(1);
+    // The assistant message body carries the SHORT summary, not the report.
+    const messageBody = container.querySelector(
+      '[data-message-index] .whitespace-pre-wrap',
+    );
+    expect(messageBody?.textContent).not.toContain("FULL_REPORT_BODY");
+  });
+
+  it("renders a non-string reply without crashing the page", async () => {
+    // <Markdown> parses via `content.split`; a frame whose reply is not text
+    // used to throw inside render and blank the route (the black screen).
+    await renderChat();
+    await vi.waitFor(() =>
+      expect(container.querySelector('#qubit-chat-input')).not.toBeNull(),
+    );
+    streamChatTurn.mockImplementationOnce(
+      async (
+        _body: unknown,
+        handlers: {
+          onDelta?: (t: string, e: unknown) => void;
+          onDone?: (e: unknown) => void;
+        },
+      ) => {
+        handlers.onDelta?.("partial", { event: "delta" });
+        handlers.onDone?.({
+          event: "done",
+          reply: { not: "text" },
+          receipt: { model: "qubit-brain4" },
+        });
+      },
+    );
+    await typeAndSend("hello");
+    // The page is still mounted and interactive (no uncaught render throw).
+    await vi.waitFor(() =>
+      expect(container.querySelector("#qubit-chat-input")).not.toBeNull(),
+    );
   });
 });

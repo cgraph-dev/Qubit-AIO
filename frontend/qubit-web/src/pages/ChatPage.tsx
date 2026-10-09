@@ -622,6 +622,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // Late-bound sender: the load effect that detects an interrupted turn runs
   // before `send` is defined, so it reaches it through this ref.
   const sendRef = useRef<((raw: string, activity?: "thinking" | "summarizing") => void) | null>(null);
+  // True while the in-flight turn is a build/task worker turn (its `progress`
+  // frames set it). The report delta must not also accumulate into the
+  // streaming bubble — it is written back once as the message's reportText.
+  const taskTurnRef = useRef(false);
 
   // Keep the session pointer stable in storage so a reload lands back on the
   // same conversation even without a ?resume= param.
@@ -648,11 +652,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   }, [resumeParam, session, setSearchParams]);
 
   // Load the selected session's persisted transcript from the Qubit chat
-  // store (`GET /api/qubit/chat/sessions/<id>/messages`). Resolve the session
-  // against `listChatSessions()` first so a not-yet-created session (e.g. the
-  // unsaved default `dashboard-chat`) never issues a transcript request — the
-  // empty state renders instead of a typed 404 in the console. Server state is
-  // authoritative; nothing is invented.
+  // store (`GET /api/qubit/chat/sessions/<id>/messages`). The server store is
+  // authoritative; the session list is an AUXILIARY read (newest live voice
+  // session, foreign-id detection) so a slow or failing list request can never
+  // strand the transcript — the reported "reload shows a blank chat until I
+  // click a session in the right rail" defect, which was the transcript load
+  // being gated behind the list fetch.
   useEffect(() => {
     const myReq = ++loadReqRef.current;
     // Instant paint from the cache; the server load below replaces it.
@@ -667,31 +672,22 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     // the settled server row count once the transcript load completes.
     voiceSyncedRef.current = 0;
     transcriptReadyRef.current = false;
-    api
-      .listChatSessions(100, 0)
-      .then((list) => {
-        if (loadReqRef.current !== myReq) return null;
-        // Offer a one-click jump to the newest live voice session when the
-        // store exposes one (read-only; the affordance just switches resume).
-        setNewestVoiceSession(pickNewestVoiceSession(list.sessions));
-        const exists = (list.sessions ?? []).some((s) => s.id === session);
-        if (!exists) {
-          // No server record yet. If the id is the unsaved default, this is
-          // simply a fresh Qubit chat. If it is some OTHER id (a canonical
-          // /chat worker id), do NOT hijack this page: flag it as foreign so
-          // the UI offers to open it in /chat and keeps this page usable.
-          setForeignSession(session === DEFAULT_SESSION ? null : session);
-          // No persisted preference to load.
-          setReasoning(null);
-          setTranscriptState("ready");
-          voiceSyncedRef.current = 0;
-          transcriptReadyRef.current = true;
-          return null;
-        }
-        setForeignSession(null);
-        // Retry the transcript read through a backend bounce (`voicebridge run`
-        // restarting) instead of freezing on one failed fetch: the page should
-        // recover on its own when the service comes back.
+
+    // Authoritative transcript read: probe the canonical session first so a
+    // not-yet-created id (the unsaved default, a fresh id) never issues a
+    // transcript request (which would 404 in the console) and an id that
+    // belongs to the /chat terminal is flagged foreign. The probe is
+    // independent of the LIST read, so a slow or failing list can no longer
+    // strand the transcript — the reported "reload shows a blank chat until I
+    // click a session in the right rail" defect.
+    const loadMessages = withBackoff(() => api.getChatSession(session), {
+      shouldStop: () => loadReqRef.current !== myReq,
+    })
+      .then((info) => {
+        if (loadReqRef.current !== myReq) return;
+        setReasoning(normalizeReasoning(info.meta?.reasoning));
+        setSessionModel(String(info.session?.model || ""));
+        setPendingConfirm(extractPendingConfirm(info));
         return withBackoff(() => api.getChatSessionMessages(session), {
           shouldStop: () => loadReqRef.current !== myReq,
         }).then((res) => {
@@ -704,39 +700,58 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           // The loaded rows are what a live-voice poll diffs against.
           voiceSyncedRef.current = loaded.length;
           transcriptReadyRef.current = true;
-          // Session-persisted reasoning preference (server is authoritative;
-          // a session without one keeps the model default).
-          withBackoff(() => api.getChatSession(session), {
-            shouldStop: () => loadReqRef.current !== myReq,
-          })
-            .then((info) => {
-              if (loadReqRef.current !== myReq) return;
-              setReasoning(normalizeReasoning(info.meta?.reasoning));
-              // This session's OWN stored model — the value the side panel
-              // shows as its per-session model (mirrors /chat's PTY grant).
-              setSessionModel(String(info.session?.model || ""));
-              // Best-effort restore of a live staged confirmation so a reload
-              // keeps the yes/no banner rather than hiding a pending action.
-              setPendingConfirm(extractPendingConfirm(info));
-              // A turn cut short by a backend restart: re-issue it so the
-              // operator does not have to retype `continue`. Guarded to once per
-              // session per page load, so a crash loop cannot spin here.
-              const interrupted = info.interrupted_turn;
-              if (interrupted?.prompt && !resumedRef.current.has(session)) {
-                resumedRef.current.add(session);
-                sendRef.current?.(interrupted.prompt, "thinking");
-              }
-            })
-            .catch(() => {
-              /* keep the default; the turn path still validates */
-            });
+          // A turn cut short by a backend restart: re-issue it so the
+          // operator does not have to retype `continue`. Guarded to once per
+          // session per page load, so a crash loop cannot spin here.
+          const interrupted = info.interrupted_turn;
+          if (interrupted?.prompt && !resumedRef.current.has(session)) {
+            resumedRef.current.add(session);
+            sendRef.current?.(interrupted.prompt, "thinking");
+          }
         });
       })
       .catch((err: unknown) => {
+        // The probe 404s for an id with no server record. The unsaved default
+        // is simply a fresh Qubit chat (empty composer); any OTHER id is a
+        // /chat worker id — flag it foreign so the UI offers to open it there
+        // and keeps this page usable.
         if (loadReqRef.current !== myReq) return;
-        setTranscriptState("error");
-        setError(err instanceof Error ? err.message : String(err ?? "load failed"));
+        const message = err instanceof Error ? err.message : String(err ?? "");
+        if (/\b404\b/.test(message)) {
+          setForeignSession(session === DEFAULT_SESSION ? null : session);
+          setReasoning(null);
+          setMessages([]);
+          setTranscriptState("ready");
+          voiceSyncedRef.current = 0;
+          transcriptReadyRef.current = true;
+          return;
+        }
+        throw err;
       });
+
+    // Auxiliary list read (never gates the transcript): the newest live voice
+    // session for the one-click jump. Foreign-id detection is owned by the
+    // probe above, so this read never sets it (two writers would race).
+    const loadList = api
+      .listChatSessions(100, 0)
+      .then((list) => {
+        if (loadReqRef.current !== myReq) return;
+        setNewestVoiceSession(pickNewestVoiceSession(list.sessions));
+      })
+      .catch(() => {
+        /* best-effort: the transcript load above already decided the state */
+      });
+
+    Promise.allSettled([loadMessages, loadList]).then(([messagesResult]) => {
+      if (loadReqRef.current !== myReq) return;
+      // Only a failed TRANSCRIPT read degrades the page; a failed list read
+      // does not. A not-yet-created id resolves via the probe's 404 branch
+      // (empty state), so anything that rejects here is a real load failure.
+      if (messagesResult.status !== "rejected") return;
+      const reason = messagesResult.reason;
+      setTranscriptState("error");
+      setError(reason instanceof Error ? reason.message : String(reason ?? "load failed"));
+    });
   }, [session]);
 
   // Live voice follow: while the open session is a `voice-*` session (and
@@ -943,6 +958,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       setAssistantActivity(activity);
       setStreamingText("");
       setTaskProgress(null);
+      taskTurnRef.current = false;
       setMessages((prev) => prev.concat([{ role: "user", text }]));
       // A locally-driven turn in a followed voice session appends rows the
       // server will persist too; advance the merge counter so the next poll
@@ -964,12 +980,25 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         {
           onDelta: (delta, event) => {
             if (controller.signal.aborted) return;
-            setStreamingText((prev) => prev + delta);
+            // A build/task turn streams progress frames and THEN the whole
+            // worker report as one delta; that same report is written back on
+            // `done` as `reportText` (rendered in the "Full /chat report"
+            // disclosure). Accumulating it into `streamingText` as well paints
+            // the report twice — once in the streaming bubble, once in the
+            // appended message — and the swap at `done` is the flicker. The
+            // `progress` frame for this turn sets `taskTurnRef` before the
+            // report delta arrives, so gate on it: a task turn's progress card
+            // already shows liveness, and its report lands once, in the card.
+            if (event?.route === "task" || taskTurnRef.current) return;
+            setStreamingText((prev) =>
+              prev + (typeof delta === "string" ? delta : ""),
+            );
             const pending = extractPendingConfirm(event);
             if (pending) setPendingConfirm(pending);
           },
           onProgress: (event) => {
             if (controller.signal.aborted) return;
+            taskTurnRef.current = true;
             const pending = extractPendingConfirm(event);
             if (pending) setPendingConfirm(pending);
             const key = event.task ?? "";
@@ -1001,16 +1030,23 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   role: "assistant",
                   // Build turns: write back the CONCISE summary (what the
                   // voice layer speaks) and keep the full report behind a
-                  // "Full /chat report" disclosure.
+                  // "Full /chat report" disclosure. Coerce every field to a
+                  // string — a frame whose summary/reply is not text would
+                  // otherwise reach <Markdown> and blank the page.
                   text:
                     route === "task" && event.summary
-                      ? event.summary
-                      : event.reply ?? "",
+                      ? String(event.summary)
+                      : typeof event.reply === "string"
+                        ? event.reply
+                        : "",
                   meta: streamMeta(event),
                   report: route === "task" && Boolean(taskKey),
                   reportText:
-                    route === "task" && event.summary && event.summary !== event.reply
-                      ? event.reply
+                    route === "task" && event.summary &&
+                    String(event.summary) !== String(event.reply ?? "")
+                      ? typeof event.reply === "string"
+                        ? event.reply
+                        : undefined
                       : undefined,
                   taskKey: taskKey,
                   sources:
