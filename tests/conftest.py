@@ -165,6 +165,15 @@ def _isolate_qubit_runtime(tmp_path, monkeypatch):  # noqa: D103
     # (or, worse, resolving the operator store) in a later test.
     monkeypatch.delenv("OPENCLAW_HOME", raising=False)
     monkeypatch.delenv("OPENCLAW_STATE_DIR", raising=False)
+    # Clear VOICE_BRIDGE_CONFIG: it is an explicit, highest-precedence pointer
+    # to a config file that ``resolve_config_path`` honors ABOVE HOME and every
+    # XDG var. A gateway-launched test process inherits it from the live
+    # service (pointing at the operator's real ``~/.config/.../voice.yaml``),
+    # so any test asserting config resolution -- e.g. the service-equivalent
+    # environment check that sets HOME and unsets XDG -- silently read the
+    # operator's real config instead of its isolated one. Same fail-closed
+    # intent as the QUBIT_HOME/HERMES_HOME/OPENCLAW_* clears above.
+    monkeypatch.delenv("VOICE_BRIDGE_CONFIG", raising=False)
     yield
 
 

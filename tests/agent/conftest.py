@@ -20,6 +20,17 @@ monkeypatch ``run_agent.time.sleep`` locally (see
 
 from __future__ import annotations
 
+# Make the vendored runtime's top-level packages importable at collection time.
+# The ported tests in this directory import the fork's modules by bare name
+# (``run_agent``, ``qubit_state``, ``agent.*``, ``tools.*`` …), which live under
+# ``qubit_runtime/`` — not the repo root. ``ensure_path()`` is the one sanctioned
+# way to put that root on ``sys.path`` (see tests/providers/conftest.py and
+# ``voicebridge.qubit_runtime``); without it every ported file here fails
+# collection with ``ModuleNotFoundError``. Idempotent and cheap.
+from voicebridge import qubit_runtime as _qubit_runtime  # noqa: E402
+
+_qubit_runtime.ensure_path()
+
 import pytest
 
 
