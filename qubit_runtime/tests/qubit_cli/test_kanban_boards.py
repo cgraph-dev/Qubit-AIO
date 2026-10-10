@@ -491,27 +491,42 @@ class TestBoardResurrection:
 
 
 def test_workspaces_root_reader_honours_producer_hermes_spelling(fresh_home, tmp_path, monkeypatch):
-    """``workspaces_root()`` (kanban_db.py:591) reads
+    """``_managed_scratch_path_info()`` (kanban_db_workspace.py:294) reads
     ``HERMES_KANBAN_WORKSPACES_ROOT`` — the exact var the dispatcher injects
-    (kanban_db_dispatch.py:2927). Setting it must pin the root; the stale
-    ``QUBIT_KANBAN_WORKSPACES_ROOT`` spelling must be inert."""
-    pinned = tmp_path / "producer-workspaces"
-    monkeypatch.setenv("HERMES_KANBAN_WORKSPACES_ROOT", str(pinned))
-    assert kb.workspaces_root() == pinned.resolve()
-    # Fenced worker: an explicit board must still resolve through the pin.
-    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_reader_regression")
-    assert kb.workspaces_root(board="other-board") == pinned.resolve()
+    (kanban_db_dispatch.py:2927) — to decide whether a path is managed scratch
+    storage (the gate ``_cleanup_workspace`` consults before ``rmtree``).
+    Setting the producer's spelling must mark the override root managed; the
+    stale ``QUBIT_KANBAN_WORKSPACES_ROOT`` spelling must be inert."""
+    from qubit_cli import kanban_db_workspace as ws
+
+    override = tmp_path / "custom-workspaces"
+    candidate = override / "t_abc123" / "work"
+    monkeypatch.setenv("HERMES_KANBAN_WORKSPACES_ROOT", str(override))
+
+    is_managed, board = ws._managed_scratch_path_info(candidate)
+    assert is_managed is True, (
+        "a scratch path under the producer's HERMES_KANBAN_WORKSPACES_ROOT "
+        f"override must be managed scratch storage; got {is_managed!r}"
+    )
+    assert ws._is_managed_scratch_path(candidate) is True
 
 
 def test_workspaces_root_reader_ignores_stale_qubit_spelling(fresh_home, tmp_path, monkeypatch):
-    """The legacy ``QUBIT_KANBAN_WORKSPACES_ROOT`` spelling must NOT pin the
-    root: the producer never writes it, so honouring it would be a no-op in
-    production and only ever misleads. The default root must win."""
-    stale = tmp_path / "stale-qubit-workspaces"
-    monkeypatch.setenv("QUBIT_KANBAN_WORKSPACES_ROOT", str(stale))
-    resolved = kb.workspaces_root()
-    assert "stale-qubit-workspaces" not in str(resolved)
-    assert resolved == fresh_home / "kanban" / "workspaces"
+    """The legacy ``QUBIT_KANBAN_WORKSPACES_ROOT`` spelling must NOT mark a
+    path managed: the producer never writes it, so honouring it would only
+    mislabel an arbitrary directory as safe to ``rmtree``. The override root
+    is not under the real kanban home, so the candidate must stay unmanaged."""
+    from qubit_cli import kanban_db_workspace as ws
+
+    stale_root = tmp_path / "stale-qubit-workspaces"
+    candidate = stale_root / "t_abc123" / "work"
+    monkeypatch.setenv("QUBIT_KANBAN_WORKSPACES_ROOT", str(stale_root))
+
+    is_managed, _board = ws._managed_scratch_path_info(candidate)
+    assert is_managed is False, (
+        "the stale QUBIT_ spelling must be inert: a path under it is not a "
+        f"kanban-managed root; got {is_managed!r}"
+    )
 
 
 def test_record_cli_one_shot_ready_reads_producer_hermes_task(monkeypatch):
