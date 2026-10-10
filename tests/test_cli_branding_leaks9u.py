@@ -44,17 +44,23 @@ def _load_debrand():
 
 # --------------------------------------------------------------------- tips
 def test_tips_fixed_entries_have_no_upstream_branding():
-    from qubit_cli.tips import TIPS
+    # Repin fe33b10f replaced the module's hardcoded ``TIPS`` list with the
+    # i18n-catalog API (``tip_keys()`` + ``t()``) -- a real upstream change, so
+    # the stale ``from qubit_cli.tips import TIPS`` is replaced by the live
+    # surface. The tips themselves live in ``locales/en.yaml``.
+    from qubit_cli import tips
+    from agent.i18n import t
 
-    joined = "\n".join(TIPS)
+    joined = "\n".join(t(key) for key in tips.tip_keys())
     for leak in ("NousResearch", "HERMES_DEV=1", "~/.hermes/.env",
                  "The skills quarantine at ~/.hermes"):
         assert leak not in joined, leak
     # repaired entries remain present and Qubit-branded
-    assert any("~/.config/qubit-voicebridge/.env" in t for t in TIPS)
-    assert any("trusted organizations" in t for t in TIPS)
-    assert any("developer-mode environment flag" in t for t in TIPS)
-    assert any("skills quarantine under the Qubit home" in t for t in TIPS)
+    texts = [t(key) for key in tips.tip_keys()]
+    assert any("~/.config/qubit-voicebridge/.env" in tip for tip in texts)
+    assert any("trusted organizations" in tip for tip in texts)
+    assert any("developer-mode environment flag" in tip for tip in texts)
+    assert any("skills quarantine under the Qubit home" in tip for tip in texts)
 
 
 # ------------------------------------------------------------ console engine
@@ -97,8 +103,11 @@ def test_acp_launcher_is_qubit_branded(tmp_path, monkeypatch, capsys):
     from qubit_cli import update_cmd_maint as m
     from qubit_cli.update_cmd import _m
 
-    # A source checkout has no recorded pm store interpreter.
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda root: None)
+    # A source checkout has no recorded pm store interpreter. Mirror the real
+    # signature -- resolve_store_python(repo_root, *, publication=False) -- and
+    # expose_cli() calls it with publication=True (see _launchers.py:856).
+    monkeypatch.setattr(_launchers, "resolve_store_python",
+                        lambda root, *, publication=False: None)
 
     before = sorted(p.name for p in bin_dir.iterdir())
     assert m._ensure_acp_launcher() is None

@@ -12,14 +12,14 @@ metadata:
     related_skills: [claude-design, popular-web-designs]
     upstream:
       repo: pbakaus/impeccable
-      path: .hermes/skills/impeccable
+      path: .qubit/skills/impeccable
 ---
 
 # Impeccable (upstream-maintained)
 
 > **Catalog stub.** This entry is maintained upstream at
 > [pbakaus/impeccable](https://github.com/pbakaus/impeccable): the project
-> ships and verifies a Qubit-native skill bundle under `.hermes/skills/`.
+> ships and verifies a Qubit-native skill bundle under `.qubit/skills/`.
 > `qubit skills install impeccable` pulls the current bundle live from that
 > repo (quarantined and scanned like any hub install) — this directory holds
 > only the catalog metadata, so the vendored copy can never go stale.

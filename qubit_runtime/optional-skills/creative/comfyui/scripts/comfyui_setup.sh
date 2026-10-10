@@ -30,7 +30,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HARDWARE_CHECK="$SCRIPT_DIR/hardware_check.py"
-LOG_DIR="${TMPDIR:-${QUBIT_HOME:-$HOME/.hermes}/cache/scratch}"
+LOG_DIR="${TMPDIR:-${QUBIT_HOME:-$HOME/.qubit}/cache/scratch}"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/comfyui_setup.$$.log"
 PORT=8188

@@ -238,7 +238,7 @@ python $QUBIT_HOME/skills/migration/qubit-migration/scripts/openclaw_to_hermes.p
 When using the terminal tool, prefer an absolute invocation pattern such as:
 
 ```json
-{"command":"python /home/USER/.hermes/skills/migration/qubit-migration/scripts/openclaw_to_hermes.py","workdir":"/home/USER"}
+{"command":"python /home/USER/.qubit/skills/migration/qubit-migration/scripts/openclaw_to_hermes.py","workdir":"/home/USER"}
 ```
 
 Dry run with the user-data preset:

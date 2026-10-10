@@ -37,7 +37,15 @@ def _cfg(tmp_path, monkeypatch):
 
 
 def _seed_legacy_store(cfg, session_id="legacy-chat"):
-    """Write a legacy chat session + transcript into the canonical store."""
+    """Write a legacy chat session + transcript into the canonical store.
+
+    The transcript carries a THIRD message on purpose: ``/api/qubit/chat/
+    sessions`` (the picker) legitimately hides a ``<=2``-message
+    ``dashboard``-sourced row as probe noise (``_is_chat_picker_noise``,
+    signal 2). A real conversation exceeds that floor, so the fixture is a
+    real conversation — this test asserts the serve-boundary rebrand of the
+    list payload, not the picker's noise curation.
+    """
     from voicebridge import chat_transport as CT
 
     store = CT.store(cfg)
@@ -45,6 +53,7 @@ def _seed_legacy_store(cfg, session_id="legacy-chat"):
     store.append(session_id, "user", "Who made this?")
     store.append(session_id, "assistant", LEGACY_TEXT,
                  meta={"model": "OpenClaw-local"})
+    store.append(session_id, "user", "Thanks, noted.")
     return store
 
 

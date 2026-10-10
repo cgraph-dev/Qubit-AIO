@@ -9,7 +9,7 @@ Usage (via cron with --no-agent):
       --script-args "--name hermes-issues --repo cgraph-dev/Qubit-AIO --scope issues"
 
 Set GITHUB_TOKEN (or GH_TOKEN) in the Qubit .env file
-(``${QUBIT_HOME:-~/.hermes}/.env``) to avoid the 60 req/hr
+(``${QUBIT_HOME:-~/.qubit}/.env``) to avoid the 60 req/hr
 anonymous rate limit.
 
 Scopes: issues | pulls | releases | commits.  Or pass --search QUERY to

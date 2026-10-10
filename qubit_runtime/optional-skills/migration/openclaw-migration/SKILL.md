@@ -39,9 +39,9 @@ It uses `scripts/openclaw_to_hermes.py` to:
 - transform Qubit `MEMORY.md` and `USER.md` into Qubit memory entries
 - merge Qubit command approval patterns into Qubit `command_allowlist`
 - migrate Qubit-compatible messaging settings such as `TELEGRAM_ALLOWED_USERS`, and map Qubit workspace settings to Qubit working-directory configuration
-- copy Qubit skills into `~/.hermes/skills/openclaw-imports/`
+- copy Qubit skills into `~/.qubit/skills/openclaw-imports/`
 - optionally copy the Qubit workspace instructions file into a chosen Qubit workspace
-- mirror compatible workspace assets such as `workspace/tts/` into `~/.hermes/tts/`
+- mirror compatible workspace assets such as `workspace/tts/` into `~/.qubit/tts/`
 - archive non-secret docs that do not have a direct Qubit destination
 - produce a structured report listing migrated items, conflicts, skipped items, and reasons
 
@@ -53,13 +53,13 @@ The helper script lives in this skill directory at:
 
 When this skill is installed from the Skills Hub, the normal location is:
 
-- `~/.hermes/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py`
+- `~/.qubit/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py`
 
-Do not guess a shorter path like `~/.hermes/skills/openclaw-migration/...`.
+Do not guess a shorter path like `~/.qubit/skills/openclaw-migration/...`.
 
 Before running the helper:
 
-1. Prefer the installed path under `~/.hermes/skills/migration/openclaw-migration/`.
+1. Prefer the installed path under `~/.qubit/skills/migration/openclaw-migration/`.
 2. If that path fails, inspect the installed skill directory and resolve the script relative to the installed `SKILL.md`.
 3. Only use `find` as a fallback if the installed location is missing or the skill was moved manually.
 4. When calling the terminal tool, do not pass `workdir: "~"`. Use an absolute directory such as the user's home directory, or omit `workdir` entirely.
@@ -232,37 +232,37 @@ For a standalone Python environment, install `ruamel.yaml==0.18.17` first.
 Dry run with full discovery:
 
 ```bash
-python ~/.hermes/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py
+python ~/.qubit/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py
 ```
 
 When using the terminal tool, prefer an absolute invocation pattern such as:
 
 ```json
-{"command":"python /home/USER/.hermes/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py","workdir":"/home/USER"}
+{"command":"python /home/USER/.qubit/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py","workdir":"/home/USER"}
 ```
 
 Dry run with the user-data preset:
 
 ```bash
-python ~/.hermes/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py --preset user-data
+python ~/.qubit/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py --preset user-data
 ```
 
 Execute a user-data migration:
 
 ```bash
-python ~/.hermes/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py --execute --preset user-data --skill-conflict skip
+python ~/.qubit/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py --execute --preset user-data --skill-conflict skip
 ```
 
 Execute a full compatible migration:
 
 ```bash
-python ~/.hermes/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py --execute --preset full --migrate-secrets --skill-conflict skip
+python ~/.qubit/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py --execute --preset full --migrate-secrets --skill-conflict skip
 ```
 
 Execute with workspace instructions included:
 
 ```bash
-python ~/.hermes/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py --execute --preset user-data --skill-conflict rename --workspace-target "/absolute/workspace/path"
+python ~/.qubit/skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py --execute --preset user-data --skill-conflict rename --workspace-target "/absolute/workspace/path"
 ```
 
 Do not use `$PWD` or the home directory as the workspace target by default. Ask for an explicit workspace path first.
@@ -297,5 +297,5 @@ After a successful run, the user should have:
 
 - Qubit persona state imported
 - Qubit memory files populated with converted Qubit knowledge
-- Qubit skills available under `~/.hermes/skills/openclaw-imports/`
+- Qubit skills available under `~/.qubit/skills/openclaw-imports/`
 - a migration report showing any conflicts, omissions, or unsupported data

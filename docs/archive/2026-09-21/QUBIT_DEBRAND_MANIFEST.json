@@ -1,0 +1,63 @@
+{
+ "amendment": "docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-19_DEEP_REBRAND.md",
+ "class_counts": {
+  "phrase": 23,
+  "prose-word": 415
+ },
+ "files_changed": 424,
+ "phrase_map": {
+  "NOUS PORTAL": "QUBIT LABS",
+  "NOUS RESEARCH": "QUBIT LABS",
+  "Nous Portal": "Qubit Labs",
+  "Nous Research": "Qubit Labs",
+  "nous portal": "qubit labs",
+  "nous research": "qubit labs"
+ },
+ "preserve_strings": [
+  "__HERMES_BASE_PATH__",
+  "__HERMES_SESSION_TOKEN__",
+  "__HERMES_AUTH_REQUIRED__",
+  "__HERMES_PLUGINS__",
+  "__HERMES_PLUGIN_SDK__",
+  "X-Hermes-Session-Token",
+  "hermes_flow",
+  "hermes.tokenReloadAttempted",
+  "hermes-kanban",
+  "hermes-flow",
+  "hermes_achievements",
+  "hermes-achievements",
+  "HERMES_QWEN_",
+  "qubit-hermes"
+ ],
+ "prose_words": {
+  "hermes": "qubit",
+  "nous": "qubit",
+  "openclaw": "qubit"
+ },
+ "protected_parts": [
+  "LICENSE",
+  "THIRD_PARTY_NOTICES",
+  "docs/archive/2026-09-21/LICENSING",
+  "docs/archive/2026-09-21/UPSTREAM_REUSE",
+  "voicebridge/upstream",
+  "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST",
+  "docs/archive/2026-09-21/HERMES_SOURCE_COMPARISON",
+  "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY",
+  "docs/archive/2026-09-21/INVENTORY_",
+  "docs/archive/2026-09-21/QUBIT_GAP_LEDGER",
+  "docs/archive/2026-09-21/AGENT_PROMPT_PACK",
+  "scripts/qubit_rebrand.py",
+  "scripts/qubit_debrand.py",
+  "docs/archive/2026-09-21/QUBIT_REBRAND_MANIFEST",
+  "docs/archive/2026-09-21/QUBIT_DEBRAND_MANIFEST",
+  "qubit_runtime/tests",
+  "qubit_runtime/apps",
+  "qubit_runtime/website",
+  "qubit_runtime/contributors",
+  "qubit_runtime/evals",
+  "qubit_runtime/docs",
+  "qubit_runtime/optional-mcps",
+  "qubit_runtime/native/docs"
+ ],
+ "schema": "qubit-debrand/1"
+}

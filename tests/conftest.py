@@ -148,6 +148,23 @@ def _isolate_qubit_runtime(tmp_path, monkeypatch):  # noqa: D103
     # sets it after this fixture (monkeypatch restores the original at teardown,
     # including a value assigned directly by runtime code during the test).
     monkeypatch.delenv("QUBIT_HOME", raising=False)
+    # Also clear HERMES_HOME, the foreign alias of QUBIT_HOME declared in
+    # agent_compat's env_aliases. EnvAliaser mirrors an unset QUBIT_HOME from a
+    # set HERMES_HOME (framework.py `EnvAliaser.apply`), so a process launched by
+    # the live gateway — which exports BOTH to the operator's real runtime home —
+    # would otherwise re-import the operator home through the alias even after
+    # QUBIT_HOME is deleted, tripping qubit_runtime.assert_safe_test_home.
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    # Also clear the OPENCLAW_* home aliases. The OpenClaw adapter declares
+    # ``env_aliases={"OPENCLAW_HOME": "QUBIT_HOME", "OPENCLAW_STATE_DIR":
+    # "QUBIT_HOME"}`` and ``EnvAliaser.apply`` mirrors a set foreign name back
+    # onto an unset QUBIT_HOME. A gateway-launched test process exports BOTH
+    # OPENCLAW_HOME and OPENCLAW_STATE_DIR at the operator's real runtime home,
+    # so after the delenv above a mid-test alias apply would re-inject
+    # QUBIT_HOME=<operator home>, tripping qubit_runtime.assert_safe_test_home
+    # (or, worse, resolving the operator store) in a later test.
+    monkeypatch.delenv("OPENCLAW_HOME", raising=False)
+    monkeypatch.delenv("OPENCLAW_STATE_DIR", raising=False)
     yield
 
 

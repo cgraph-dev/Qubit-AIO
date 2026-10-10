@@ -266,7 +266,7 @@ skills:
 ## API key requirements
 
 Track these in the project setup. The setup script should verify each required
-key is present in `${QUBIT_HOME:-~/.hermes}/.env` (or macOS Keychain) before firing the kanban.
+key is present in `${QUBIT_HOME:-~/.qubit}/.env` (or macOS Keychain) before firing the kanban.
 
 | Service | Env var | Used by |
 |---------|---------|---------|
@@ -283,7 +283,7 @@ key is present in `${QUBIT_HOME:-~/.hermes}/.env` (or macOS Keychain) before fir
 | Anthropic | `ANTHROPIC_API_KEY` | every Qubit profile (Claude) |
 
 If a key is missing, prompt the user to add it. Storage methods, in order of
-preference: macOS Keychain → `${QUBIT_HOME:-~/.hermes}/.env` → environment variable.
+preference: macOS Keychain → `${QUBIT_HOME:-~/.qubit}/.env` → environment variable.
 
 ## Skill version pinning
 

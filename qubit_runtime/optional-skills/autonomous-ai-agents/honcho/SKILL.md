@@ -389,7 +389,7 @@ This fix addresses edge cases where raw user conclusions containing markup or sp
 ## Troubleshooting
 
 ### "Honcho not configured"
-Run `qubit honcho setup`. Ensure `memory.provider: honcho` is in `~/.hermes/config.yaml`.
+Run `qubit honcho setup`. Ensure `memory.provider: honcho` is in `~/.qubit/config.yaml`.
 
 ### Memory not persisting across sessions
 Check `qubit honcho status` -- verify `saveMessages: true` and `writeFrequency` isn't `session` (which only writes on exit).
