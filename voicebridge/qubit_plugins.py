@@ -381,21 +381,91 @@ def _need_confirm(detail: str) -> Tuple[int, Dict[str, Any]]:
 # Vendored engine loading
 # ---------------------------------------------------------------------------
 
+def _plugin_dirs() -> List[Path]:
+    """Every root a dashboard plugin may live in, bundled first.
+
+    ``runtime_root()/plugins`` is the repo (bundled) tree. Robots installed
+    through the catalog land in the RUNTIME HOME (``<home>/plugins/<name>/``),
+    which the repo tree never contains -- so resolving only the bundled root
+    made an installed plugin permanently invisible to this loader
+    (``dashboard_surface()`` returned ``None`` and ``_plugin_api_path()``
+    pointed at a file that does not exist). Both roots are real plugin homes
+    per ``plugins/AGENTS.md`` (``$QUBIT_HOME/plugins/`` is a documented
+    location).
+    """
+    roots: List[Path] = []
+    try:
+        roots.append(qubit_runtime.runtime_root() / "plugins")
+    except Exception:
+        pass
+    try:
+        home = qubit_runtime.default_home() / "plugins"
+        if home not in roots:
+            roots.append(home)
+    except Exception:
+        pass
+    return roots
+
+
+def _plugin_dir(name: str) -> Optional[Path]:
+    """The plugin's directory under whichever root actually has it."""
+    for root in _plugin_dirs():
+        candidate = root / name
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
+def _plugin_entry_file(name: str) -> Optional[str]:
+    """The backend module filename, as the plugin's own manifest declares it.
+
+    ``manifest.json`` carries the real name (``obsidian-memory`` ships
+    ``"api": "api.py"``; the bundled tree uses ``plugin_api.py``). Reading it
+    keeps both layouts working instead of hardcoding one, and a plugin that
+    renames its module stays loadable without a code change here.
+    """
+    directory = _plugin_dir(name)
+    if directory is None:
+        return None
+    manifest = directory / "dashboard" / "manifest.json"
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    api = str((data or {}).get("api") or "").strip()
+    return api or None
+
+
 def _plugin_api_path(name: str) -> Path:
+    """Absolute path to the plugin's backend module.
+
+    Prefers the manifest-declared ``api`` filename, then the bundled
+    convention. Returns the conventional path when neither resolves so the
+    caller's error stays the honest "not found" for that plugin.
+    """
+    directory = _plugin_dir(name)
+    declared = _plugin_entry_file(name)
+    if directory is not None:
+        if declared:
+            return directory / "dashboard" / declared
+        return directory / "dashboard" / "plugin_api.py"
     return qubit_runtime.runtime_root() / "plugins" / name / "dashboard" / \
         "plugin_api.py"
 
 
 def dashboard_surface(name: str) -> Optional[Path]:
-    """The vendored plugin's dashboard manifest, or ``None`` when it has none.
+    """The plugin's dashboard manifest, or ``None`` when it has none.
 
-    A plugin "has a dashboard surface" only when the pinned tree ships
-    ``plugins/<name>/dashboard/manifest.json`` (the fleet audit uses this, and so
+    A plugin "has a dashboard surface" only when its tree ships
+    ``dashboard/manifest.json`` (the fleet audit uses this, and so
     does the ledger generator, so the two cannot disagree about which plugins
-    are dashboard plugins).
+    are dashboard plugins). Searches every plugin root, not just the bundled
+    one, so an installed plugin's surface is visible.
     """
-    manifest = qubit_runtime.runtime_root() / "plugins" / name / "dashboard" / \
-        "manifest.json"
+    directory = _plugin_dir(name)
+    if directory is None:
+        return None
+    manifest = directory / "dashboard" / "manifest.json"
     return manifest if manifest.is_file() else None
 
 
