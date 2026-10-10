@@ -242,6 +242,27 @@ def test_env_alias_mirrors_but_never_clobbers(monkeypatch):
     assert os.environ["QUBIT_HOME"] == "/tmp/explicit-profile"
 
 
+def test_env_alias_backfills_the_foreign_name_when_only_real_is_set(monkeypatch):
+    """A foreign plugin reading its OWN var resolves when only QUBIT_HOME is set.
+
+    Hermes Herald's ``_resolve_hermes_home()`` reads ``HERMES_HOME``. Before this, the
+    mirror ran foreign->real only, so with only ``QUBIT_HOME`` set (the systemd unit's
+    export) ``HERMES_HOME`` stayed unset and the plugin fell back to ``~/.hermes`` and
+    missed the live config. The reverse fill fixes that without clobbering an explicit
+    foreign value.
+    """
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    monkeypatch.setenv("QUBIT_HOME", "/tmp/qubit-runtime")
+    applied = fw.EnvAliaser([hermes.ADAPTER]).apply()
+    assert os.environ["HERMES_HOME"] == "/tmp/qubit-runtime"
+    assert "QUBIT_HOME->HERMES_HOME" in applied
+
+    # An explicit foreign value still wins — the fill never overwrites it.
+    monkeypatch.setenv("HERMES_HOME", "/tmp/foreign-explicit")
+    fw.EnvAliaser([hermes.ADAPTER]).apply()
+    assert os.environ["HERMES_HOME"] == "/tmp/foreign-explicit"
+
+
 def test_unresolvable_alias_fails_loudly():
     """An alias to a nonexistent target must raise a NAMED error, never return a stub."""
     bad = fw.ForeignAdapter(name="broken", module_aliases={"broken_cli": "no_such_module_xyz"})

@@ -136,8 +136,16 @@ class VendoredPluginProvider:
         return "agent_compat"
 
     def activate(self) -> list:
-        """Install the import aliaser (idempotent) and report active adapter names."""
-        install()
+        """Install the import aliaser + env mirrors (idempotent); report adapter names.
+
+        ``env=True`` is required: without it the foreign env mirror never runs, so a foreign
+        plugin that reads its OWN variable (``HERMES_HOME``) instead of the renamed one
+        (``QUBIT_HOME``) falls back to a stale default path and misses the live config —
+        Hermes Herald's ``_resolve_hermes_home()`` is exactly this case. The mirror is
+        non-destructive in both directions (see :class:`EnvAliaser`), so enabling it cannot
+        retarget a profile.
+        """
+        install(env=True)
         return [a.name for a in active_adapters()]
 
     def entry_point_groups(self) -> tuple:
@@ -148,9 +156,21 @@ class VendoredPluginProvider:
 def register_with_vendored_runtime() -> bool:
     """Push this framework into the vendored runtime's foreign-content registry.
 
+    Also installs the mechanism (import aliaser + non-destructive env mirrors)
+    immediately, because registration alone is not enough: the vendored tree only
+    calls ``activate()`` later, at the plugin-discovery funnel, and some foreign
+    plugins read their OWN env names during an EARLIER pass (a ``config.yaml`` read
+    at plugin-load time). Installing here — at the runtime boundary, before any
+    plugin import — makes the mirror live for that first read too. ``install()`` is
+    idempotent.
+
     Idempotent and safe to call repeatedly. Returns False (never raises) when
     the vendored tree is not importable — this package is usable standalone
     (its own tests do exactly that) and must not hard-require the tree.
+
+    NOTE the caller must have the vendored tree importable already: importing
+    ``qubit_cli`` here fails closed (returns False) otherwise, silently disabling
+    foreign support. Call this AFTER ``ensure_path()``.
     """
     try:
         from qubit_cli.plugins_discovery import register_foreign_provider
@@ -158,6 +178,9 @@ def register_with_vendored_runtime() -> bool:
         return False
     try:
         register_foreign_provider(_PROVIDER)
+        # Install the mechanism now (idempotent) so the env mirror is live before
+        # the first foreign plugin import, not only after activate().
+        install(env=True)
     except Exception:  # noqa: BLE001 - never break a caller's startup
         return False
     return True

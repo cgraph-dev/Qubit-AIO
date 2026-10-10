@@ -286,10 +286,18 @@ def _prefix_family(real_prefix: str, foreign_prefix: str) -> List[Tuple[str, str
 # ------------------------------------------------------------------- env / symbol aliasing
 
 class EnvAliaser:
-    """Mirror foreign env vars onto the real names Qubit reads.
+    """Mirror foreign env vars onto the real names Qubit reads, and back.
 
-    Direction is one-way (foreign -> real) and never destructive: an explicitly-set real
-    variable wins, so a profile can never be silently retargeted by a foreign plugin.
+    Direction is non-destructive in BOTH directions: an explicitly-set variable always wins,
+    and the other side is filled only when unset. This makes a foreign plugin that reads its
+    OWN name (e.g. ``HERMES_HOME``) resolve correctly when only Qubit's name is set — and a
+    foreign plugin that sets its own name cannot silently retarget a Qubit profile.
+
+    Why both directions: ``env_aliases`` declares that two names denote the SAME variable
+    (``HERMES_HOME`` ≡ ``QUBIT_HOME``). A one-way mirror only serves foreign code that reads
+    the REAL name; foreign code that reads its own name — which is the common case for a
+    plugin written before the rename, e.g. Hermes Herald's ``_resolve_hermes_home()`` — would
+    otherwise fall back to a stale default path and miss the live config.
     """
 
     def __init__(self, adapters: Sequence[ForeignAdapter]) -> None:
@@ -300,13 +308,20 @@ class EnvAliaser:
                     self._pairs.append((old, new))
 
     def apply(self) -> List[str]:
-        """Apply the mirrors. Returns the pairs actually written."""
+        """Apply the mirrors (both directions). Returns the pairs actually written."""
         applied: List[str] = []
         for old, new in self._pairs:
+            # foreign -> real (unchanged contract: a set real var is never overwritten)
             value = os.environ.get(old)
             if value and not os.environ.get(new):
                 os.environ[new] = value
                 applied.append(f"{old}->{new}")
+            # real -> foreign: fill the foreign name when IT is unset, so foreign code that
+            # reads its own variable resolves. An explicit foreign value still wins.
+            value = os.environ.get(new)
+            if value and not os.environ.get(old):
+                os.environ[old] = value
+                applied.append(f"{new}->{old}")
         return applied
 
     def pairs(self) -> List[Tuple[str, str]]:
@@ -721,7 +736,12 @@ def install(*, env: bool = False, adapters: Optional[Sequence[ForeignAdapter]] =
         # Pre-seed so neither import order can produce a duplicate module.
         _finder.preload()
         SymbolAliaser(chosen).apply()
-        if env and not _env_applied:
+        # Apply the env mirror on EVERY call (idempotent, non-destructive — it only fills a
+        # side that is unset). A one-shot latch is wrong here: an early install() can run
+        # before QUBIT_HOME is visible (or before any pair has a source value), set the
+        # latch, and then every later call is a silent no-op — which is exactly how a
+        # foreign plugin's HERMES_HOME stayed unset while the process had QUBIT_HOME.
+        if env:
             EnvAliaser(chosen).apply()
             _env_applied = True
     return _finder

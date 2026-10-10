@@ -256,6 +256,30 @@ def _publish_qubit_home(home: Path) -> None:
     _PINNED_QUBIT_HOME = str(_resolved(home))
 
 
+def _register_foreign_adapters() -> None:
+    """Hand our foreign-agent adapters to the vendored runtime's neutral registry.
+
+    The tree must not import this package (a clean rename would then rot), so the
+    dependency is inverted: it exposes ``register_foreign_provider()`` and we push in.
+
+    Called from BOTH home boundaries — :func:`pin_qubit_home` (the daemon's pre-fork
+    guard) and :func:`use_qubit_home` (the canonical runtime path). Registering only in
+    ``use_qubit_home`` left it dead in the gateway daemon, which calls
+    ``pin_qubit_home`` and never routes through ``use_qubit_home`` before plugin
+    discovery: ``install_foreign_adapters()`` then saw zero providers, so the whole
+    compat layer (module/env aliases, skills, MCP, plugin discovery) was inert and a
+    foreign plugin reading its own ``HERMES_HOME`` fell back to a missing ``~/.hermes``.
+
+    Best-effort and idempotent — a failure degrades to "no foreign content", never a
+    broken home resolution.
+    """
+    try:
+        from . import agent_compat
+        agent_compat.register_with_vendored_runtime()
+    except Exception:  # noqa: BLE001 - foreign support is optional capability
+        pass
+
+
 def pin_qubit_home() -> Path:
     """Publish a Qubit-owned ``QUBIT_HOME`` before the vendored fork loads.
 
@@ -265,6 +289,12 @@ def pin_qubit_home() -> Path:
     is replaced with :func:`default_home`. This is the fail-closed guard against
     the fork adopting the operator's ``~/.hermes`` by import-time side effect.
     """
+    # Register foreign adapters here too: this is the daemon's earliest, most
+    # reliable pre-fork boundary, and the gateway calls it without ever reaching
+    # ``use_qubit_home`` before plugin discovery. Idempotent, so co-registering in
+    # both boundaries is safe. NOTE: this only succeeds once the vendored tree is
+    # importable; run_gateway additionally re-registers after ensure_path().
+    _register_foreign_adapters()
     current = os.environ.get("QUBIT_HOME", "").strip()
     if current:
         try:
@@ -461,15 +491,8 @@ def use_qubit_home(cfg: Any = None) -> Path:
     from . import qubit_legacy
     qubit_legacy.install()
     # Hand our foreign-agent adapters to the vendored runtime's neutral registry.
-    # The tree must not import this package (a clean rename would then rot), so
-    # the dependency is inverted: it exposes register_foreign_provider() and we
-    # push in. Best-effort — a failure here degrades to "no foreign content",
-    # never a broken home resolution.
-    try:
-        from . import agent_compat
-        agent_compat.register_with_vendored_runtime()
-    except Exception:  # noqa: BLE001 - foreign support is optional capability
-        pass
+    # Shared with pin_qubit_home so whichever boundary runs first registers them.
+    _register_foreign_adapters()
     home = runtime_home_for_cfg(cfg)
     assert_safe_test_home(home)
     current = os.environ.get("QUBIT_HOME", "").strip()
@@ -585,6 +608,14 @@ def ensure_path() -> Path:
     else:
         sys.path.insert(0, s)
     _cache_repo_tests_namespace()
+    # Register our foreign-agent compat adapters NOW that the vendored tree is on
+    # sys.path and importable. Doing it inside pin_qubit_home() (called just above)
+    # fails closed — `import qubit_cli` raises ModuleNotFoundError before sys.path
+    # is set, so register_with_vendored_runtime() silently returns False and the
+    # whole compat layer (module/env aliases, skills, MCP) stays inert. That is
+    # why a foreign plugin reading its own HERMES_HOME missed the config while the
+    # process had QUBIT_HOME. Idempotent, so use_qubit_home() re-registering is safe.
+    _register_foreign_adapters()
     return root
 
 
