@@ -23,10 +23,6 @@ def fresh_home(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
     for var in (
-        "QUBIT_KANBAN_DB",
-        "QUBIT_KANBAN_WORKSPACES_ROOT",
-        "QUBIT_KANBAN_HOME",
-        "QUBIT_KANBAN_BOARD",
         "HERMES_KANBAN_DB",
         "HERMES_KANBAN_WORKSPACES_ROOT",
         "HERMES_KANBAN_HOME",
