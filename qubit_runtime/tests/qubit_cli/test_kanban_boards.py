@@ -6,11 +6,11 @@ Covers the pieces added when boards became a first-class concept:
 * Path resolution for ``default`` (legacy ``<root>/kanban.db``) vs
   named boards (``<root>/kanban/boards/<slug>/kanban.db``).
 * Current-board persistence via ``<root>/kanban/current`` and
-  ``QUBIT_KANBAN_BOARD`` env var.
+  ``HERMES_KANBAN_BOARD`` env var.
 * ``connect(board=)`` isolation — writes on one board don't leak.
 * ``create_board`` / ``list_boards`` / ``remove_board`` round trip.
 * CLI surface: ``qubit kanban boards list/create/switch/rm``.
-* ``_default_spawn`` injects ``QUBIT_KANBAN_BOARD`` into worker env.
+* ``_default_spawn`` injects ``HERMES_KANBAN_BOARD`` into worker env.
 """
 
 from __future__ import annotations
@@ -49,10 +49,10 @@ def fresh_home(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
     for var in (
-        "QUBIT_KANBAN_DB",
-        "QUBIT_KANBAN_WORKSPACES_ROOT",
-        "QUBIT_KANBAN_HOME",
-        "QUBIT_KANBAN_BOARD",
+        "HERMES_KANBAN_DB",
+        "HERMES_KANBAN_WORKSPACES_ROOT",
+        "HERMES_KANBAN_HOME",
+        "HERMES_KANBAN_BOARD",
     ):
         monkeypatch.delenv(var, raising=False)
     # Also reset qubit_constants cache so get_default_qubit_root() re-reads.
@@ -101,20 +101,20 @@ class TestPathResolution:
 
 
     def test_env_var_db_override_still_wins(self, fresh_home, tmp_path, monkeypatch):
-        """``QUBIT_KANBAN_DB`` pins the file regardless of ``board=`` arg for every
+        """``HERMES_KANBAN_DB`` pins the file regardless of ``board=`` arg for every
         execution the dispatcher fences (the 5ec6baa multi-boards isolation: workers
-        physically cannot see other boards): its dispatched workers (``QUBIT_KANBAN_TASK``)
-        and delegated children / descendants (``QUBIT_DELEGATED_CHILD_CONTEXT``). An
+        physically cannot see other boards): its dispatched workers (``HERMES_KANBAN_TASK``)
+        and delegated children / descendants (``HERMES_DELEGATED_CHILD_CONTEXT``). An
         explicit board that outranked the pin would also escape
         ``kanban_path_is_fenced``, which checks the pinned path / fenced root. Outside
         those fences an explicit board is the caller's own intent and wins (see
         ``test_explicit_board_trumps_env_var_db_override`` below)."""
         forced = tmp_path / "custom.db"
-        monkeypatch.setenv("QUBIT_KANBAN_DB", str(forced))
+        monkeypatch.setenv("HERMES_KANBAN_DB", str(forced))
         assert kb.kanban_db_path() == forced
         assert kb.kanban_db_path(board=None) == forced
         # Dispatched worker identity: the pin still fences explicit board intent.
-        monkeypatch.setenv("QUBIT_KANBAN_TASK", "t_fence_probe")
+        monkeypatch.setenv("HERMES_KANBAN_TASK", "t_fence_probe")
         assert kb.kanban_db_path(board="ignored") == forced
         # Delegated children / spawned descendants are fenced the same way.
         from agent.delegation_context import DELEGATED_CHILD_ENV_MARKER
@@ -122,24 +122,24 @@ class TestPathResolution:
         assert kb.kanban_db_path(board="ignored") == forced
 
     def test_env_var_db_override_wins_when_board_not_passed(self, fresh_home, tmp_path, monkeypatch):
-        """``QUBIT_KANBAN_DB`` pins the file when no explicit ``board=`` is given
+        """``HERMES_KANBAN_DB`` pins the file when no explicit ``board=`` is given
         (back-compat for dispatcher-spawned workers with no board override)."""
         forced = tmp_path / "custom.db"
-        monkeypatch.setenv("QUBIT_KANBAN_DB", str(forced))
+        monkeypatch.setenv("HERMES_KANBAN_DB", str(forced))
         assert kb.kanban_db_path() == forced
         assert kb.kanban_db_path(board=None) == forced
 
     def test_explicit_board_trumps_env_var_db_override(self, fresh_home, tmp_path, monkeypatch):
         """Documented priority (module docstring, predates this test): explicit
-        ``board=`` arg > ``QUBIT_KANBAN_BOARD`` > ``QUBIT_KANBAN_DB`` > current >
+        ``board=`` arg > ``HERMES_KANBAN_BOARD`` > ``HERMES_KANBAN_DB`` > current >
         default — for UNFENCED callers. An explicit ``board=`` must resolve to that
-        board's own path even when ``QUBIT_KANBAN_DB`` pins a different file: this is
+        board's own path even when ``HERMES_KANBAN_DB`` pins a different file: this is
         what makes cross-board ``kanban_create(board=...)`` / ``kanban_show(board=...)``
         work from a user-facing session instead of silently landing on the pinned board
         (t_3f1c63a5). Fenced callers (dispatched workers, delegated children) keep the
         pinned path — see ``test_env_var_db_override_still_wins`` above."""
         forced = tmp_path / "custom.db"
-        monkeypatch.setenv("QUBIT_KANBAN_DB", str(forced))
+        monkeypatch.setenv("HERMES_KANBAN_DB", str(forced))
         p = kb.kanban_db_path(board="atm10-server")
         assert p == fresh_home / "kanban" / "boards" / "atm10-server" / "kanban.db"
         assert p != forced
@@ -316,7 +316,7 @@ class TestConnectionIsolation:
         kb.create_board("persist")
         kb.create_board("envwin")
         kb.set_current_board("persist")
-        monkeypatch.setenv("QUBIT_KANBAN_BOARD", "envwin")
+        monkeypatch.setenv("HERMES_KANBAN_BOARD", "envwin")
         with kbc.connect() as conn:
             kb.create_task(conn, title="via-env", assignee="x")
         with kbc.connect(board="envwin") as conn:
@@ -330,7 +330,7 @@ class TestConnectionIsolation:
 # ---------------------------------------------------------------------------
 
 class TestWorkerSpawnEnv:
-    """Ensure the dispatcher pins ``QUBIT_KANBAN_BOARD`` / DB / workspaces on spawn.
+    """Ensure the dispatcher pins ``HERMES_KANBAN_BOARD`` / DB / workspaces on spawn.
 
     We monkey-patch ``subprocess.Popen`` to capture the child env without
     actually spawning anything.
@@ -371,13 +371,13 @@ class TestWorkerSpawnEnv:
         kbd._default_spawn(task, str(fresh_home / "ws"), board="spawntest")
 
         env = captured["env"]
-        assert env["QUBIT_KANBAN_BOARD"] == "spawntest"
-        assert env["QUBIT_KANBAN_TASK"] == "t_abc"
+        assert env["HERMES_KANBAN_BOARD"] == "spawntest"
+        assert env["HERMES_KANBAN_TASK"] == "t_abc"
         # DB path should match the per-board DB, not the legacy default.
         expected_db = fresh_home / "kanban" / "boards" / "spawntest" / "kanban.db"
-        assert env["QUBIT_KANBAN_DB"] == str(expected_db)
+        assert env["HERMES_KANBAN_DB"] == str(expected_db)
         expected_ws = fresh_home / "kanban" / "boards" / "spawntest" / "workspaces"
-        assert env["QUBIT_KANBAN_WORKSPACES_ROOT"] == str(expected_ws)
+        assert env["HERMES_KANBAN_WORKSPACES_ROOT"] == str(expected_ws)
 
 
 # ---------------------------------------------------------------------------
@@ -481,3 +481,82 @@ class TestBoardResurrection:
         assert meta["name"] == "My Board"
         assert "keepname" in [b["slug"] for b in kb.list_boards(include_archived=True)]
         assert "keepname" not in [b["slug"] for b in kb.list_boards(include_archived=False)]
+
+# ---------------------------------------------------------------------------
+# Reader regression: the producer writes the HERMES_ spelling, so the READERS
+# must honour HERMES_ and ignore the stale QUBIT_ spelling. These tests fail if
+# a reader regresses to the QUBIT_ spelling (the bug these tests were meant to
+# catch). They exercise the actual readers, not a proxy env dict.
+# ---------------------------------------------------------------------------
+
+
+def test_workspaces_root_reader_honours_producer_hermes_spelling(fresh_home, tmp_path, monkeypatch):
+    """``_managed_scratch_path_info()`` (kanban_db_workspace.py:294) reads
+    ``HERMES_KANBAN_WORKSPACES_ROOT`` — the exact var the dispatcher injects
+    (kanban_db_dispatch.py:2927) — to decide whether a path is managed scratch
+    storage (the gate ``_cleanup_workspace`` consults before ``rmtree``).
+    Setting the producer's spelling must mark the override root managed; the
+    stale ``QUBIT_KANBAN_WORKSPACES_ROOT`` spelling must be inert."""
+    from qubit_cli import kanban_db_workspace as ws
+
+    override = tmp_path / "custom-workspaces"
+    candidate = override / "t_abc123" / "work"
+    monkeypatch.setenv("HERMES_KANBAN_WORKSPACES_ROOT", str(override))
+
+    is_managed, board = ws._managed_scratch_path_info(candidate)
+    assert is_managed is True, (
+        "a scratch path under the producer's HERMES_KANBAN_WORKSPACES_ROOT "
+        f"override must be managed scratch storage; got {is_managed!r}"
+    )
+    assert ws._is_managed_scratch_path(candidate) is True
+
+
+def test_workspaces_root_reader_ignores_stale_qubit_spelling(fresh_home, tmp_path, monkeypatch):
+    """The legacy ``QUBIT_KANBAN_WORKSPACES_ROOT`` spelling must NOT mark a
+    path managed: the producer never writes it, so honouring it would only
+    mislabel an arbitrary directory as safe to ``rmtree``. The override root
+    is not under the real kanban home, so the candidate must stay unmanaged."""
+    from qubit_cli import kanban_db_workspace as ws
+
+    stale_root = tmp_path / "stale-qubit-workspaces"
+    candidate = stale_root / "t_abc123" / "work"
+    monkeypatch.setenv("QUBIT_KANBAN_WORKSPACES_ROOT", str(stale_root))
+
+    is_managed, _board = ws._managed_scratch_path_info(candidate)
+    assert is_managed is False, (
+        "the stale QUBIT_ spelling must be inert: a path under it is not a "
+        f"kanban-managed root; got {is_managed!r}"
+    )
+
+
+def test_record_cli_one_shot_ready_reads_producer_hermes_task(monkeypatch):
+    """``shared_metrics_startup.record_cli_one_shot_ready()`` must read
+    ``HERMES_KANBAN_TASK`` (the var the dispatcher injects,
+    kanban_db_dispatch.py:2890) so a real kanban worker is excluded from the
+    CLI startup distribution; the stale ``QUBIT_KANBAN_TASK`` must be inert."""
+    from qubit_cli.observability import shared_metrics_startup as sms
+
+    recorded: list[str] = []
+    monkeypatch.setattr(sms, "record_process_ready", lambda surface, **kw: recorded.append(surface))
+
+    # Producer's spelling: a kanban worker must NOT record a CLI startup.
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_reader_regression")
+    sms.record_cli_one_shot_ready()
+    assert recorded == []
+
+    # A plain -q run (no kanban task) DOES record.
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    sms.record_cli_one_shot_ready()
+    assert recorded == ["cli"]
+
+
+def test_record_cli_one_shot_ready_ignores_stale_qubit_task(monkeypatch):
+    """The legacy ``QUBIT_KANBAN_TASK`` spelling must NOT suppress the CLI
+    startup record: the producer never writes it."""
+    from qubit_cli.observability import shared_metrics_startup as sms
+
+    recorded: list[str] = []
+    monkeypatch.setattr(sms, "record_process_ready", lambda surface, **kw: recorded.append(surface))
+    monkeypatch.setenv("QUBIT_KANBAN_TASK", "stale")
+    sms.record_cli_one_shot_ready()
+    assert recorded == ["cli"]

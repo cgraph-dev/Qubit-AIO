@@ -132,7 +132,7 @@ def cli_prompt_ready_handler():
 def record_cli_one_shot_ready() -> None:
     """A ``-q`` run is ready to dispatch its query. Kanban workers are dispatched processes, not a
     user waiting on a prompt, so they stay out of the CLI startup distribution."""
-    if not os.environ.get("QUBIT_KANBAN_TASK"):
+    if not os.environ.get("HERMES_KANBAN_TASK"):
         record_process_ready("cli")
 
 
