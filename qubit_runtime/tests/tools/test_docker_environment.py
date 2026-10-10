@@ -1101,15 +1101,21 @@ class _FakeThread:
     target() synchronously when .start() runs, so cleanup behavior is
     observable without actually backgrounding subprocess calls."""
 
-    def __init__(self, target=None, daemon=None, name=None):
+    def __init__(self, target=None, args=None, kwargs=None, daemon=None, name=None):
         self._target = target
+        # A faithful stand-in must accept the same kwargs as threading.Thread:
+        # production constructs Thread(target=f, args=(...), daemon=True) (e.g.
+        # environments/base_output.py:477), so a double without ``args`` fails
+        # with TypeError instead of exercising the cleanup path.
+        self._args = args or ()
+        self._kwargs = kwargs or {}
         self.daemon = daemon
         self.name = name
         self._done = False
 
     def start(self):
         if self._target is not None:
-            self._target()
+            self._target(*self._args, **self._kwargs)
         self._done = True
 
     def is_alive(self):

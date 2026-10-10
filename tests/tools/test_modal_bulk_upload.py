@@ -172,3 +172,6 @@ class TestModalCommandStdin:
         assert len(exec_calls) == 1
         assert payload not in " ".join(str(part) for part in exec_calls[0])
         stdin_mock.write_eof.assert_called_once()
+        # The handle owns a pipe read end; the production drainer closes it, but
+        # this test reads stdin_mock instead, so close it here or the GC leaks the fd.
+        handle.stdout.close()

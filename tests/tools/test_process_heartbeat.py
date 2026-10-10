@@ -114,7 +114,7 @@ def test_schema_minimum_heartbeat_is_disabled_for_foreground(monkeypatch):
     assert captured["notify_on_complete"] is False
 
 
-def test_terminal_dispatch_heartbeat_implies_notify_and_refuses_foreground(monkeypatch):
+def test_terminal_dispatch_heartbeat_implies_notify_and_drops_foreground(monkeypatch):
     from tools import terminal_tool as tt
 
     captured = {}
@@ -125,8 +125,13 @@ def test_terminal_dispatch_heartbeat_implies_notify_and_refuses_foreground(monke
 
     monkeypatch.setattr(tt, "terminal_tool", fake_terminal_tool)
     dispatch = tt._handle_terminal
+    # Foreground heartbeat carries no execution meaning, so it is normalized away
+    # rather than refused (refusing produced identical-call retry loops); the
+    # command still runs.
     fg = json.loads(dispatch({"command": "sleep 1", "heartbeat": 120}))
-    assert fg.get("error") and "background" in fg["error"]
+    assert not fg.get("error")
+    assert captured["heartbeat"] == 0
+    assert captured["notify_on_complete"] is False
 
     bg = json.loads(dispatch({"command": "sleep 1", "background": True, "heartbeat": 120}))
     assert "error" not in bg or not bg["error"]

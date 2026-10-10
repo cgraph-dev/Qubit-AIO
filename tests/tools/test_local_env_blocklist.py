@@ -93,7 +93,14 @@ def test_terminal_child_observes_declared_policy(child_env, monkeypatch):
 
 @pytest.mark.parametrize("builder", ["foreground", "background", "factory", "nonterminal"])
 def test_builders_strip_runtime_markers_and_owned_paths(child_env, monkeypatch, builder):
-    repo, site = Path(__file__).resolve().parents[2], _running_site()
+    # The stripped root is the RUNTIME root, and production derives it from its
+    # own file location (tools/environments/local.py: `Path(__file__).parents[2]`
+    # -> qubit_runtime/). A ported copy of this test computed it from
+    # `tests/tools/`, where parents[2] is the REPO root instead -- a different
+    # tree, so the assertion fed a path production correctly does not own. Ask
+    # production for the value rather than duplicating the expression.
+    from tools.environments import local as _local_env
+    repo, site = _local_env._qubit_repo_root, _running_site()
     user_path = str(child_env / "user-lib")
     for k, v in {"VIRTUAL_ENV": "/unrelated/venv", "CONDA_PREFIX": "/unrelated/conda",
                  "PYTHONHOME": "/nonexistent/python-home",
@@ -241,14 +248,21 @@ def test_profile_passthrough_in_terminal_child(child_env, monkeypatch, scoped, e
     (None, None),
 ])
 def test_pythonpath_literal_policy(entries, expected):
-    locations = {"REPO": str(Path(__file__).resolve().parents[2]), "SITE": str(_running_site())}
+    # REPO here means the root production owns/strips -- the RUNTIME root
+    # (tools/environments/local.py), not this test file's parents[2].
+    from tools.environments import local as _local_env
+    locations = {"REPO": str(_local_env._qubit_repo_root), "SITE": str(_running_site())}
     env = {} if entries is None else {"PYTHONPATH": os.pathsep.join(locations.get(p, p) for p in entries)}
     pp._strip_qubit_owned_pythonpath(env)
     assert env.get("PYTHONPATH") == (os.pathsep.join(expected) if expected is not None else None)
 
 
 def test_pythonpath_descendants_are_not_owned():
-    repo, site = Path(__file__).resolve().parents[2], _running_site()
+    # Same port defect as above: production's owned root is the runtime root
+    # (tools/environments/local.py), not the repo root this file's parents[2]
+    # happens to name from tests/tools/.
+    from tools.environments import local as _local_env
+    repo, site = _local_env._qubit_repo_root, _running_site()
     entries = [str(site / "user-path"), str(repo / "tools"), str(repo / "tools/environments"),
                "/opt/other-venv/lib/python3.99/site-packages"]
     env = {"PYTHONPATH": os.pathsep.join(entries)}

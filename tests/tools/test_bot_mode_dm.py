@@ -488,8 +488,8 @@ def test_delivery_pins_the_qubit_entrypoint_beside_this_interpreter(tmp_path, mo
     Both transports must invoke the entrypoint beside this interpreter instead."""
     venv_bin = tmp_path / "venv" / ("Scripts" if sys.platform == "win32" else "bin")
     venv_bin.mkdir(parents=True)
-    hermes_entry = venv_bin / ("hermes.exe" if sys.platform == "win32" else "hermes")
-    hermes_entry.write_text("#!/bin/sh\n", encoding="utf-8")
+    qubit_entry = venv_bin / ("qubit.exe" if sys.platform == "win32" else "qubit")
+    qubit_entry.write_text("#!/bin/sh\n", encoding="utf-8")
     monkeypatch.setattr(sys, "executable", str(venv_bin / "python3"))
 
     calls = _capture_spawn(monkeypatch)
@@ -502,7 +502,7 @@ def test_delivery_pins_the_qubit_entrypoint_beside_this_interpreter(tmp_path, mo
     assert result["status"] == "queued"
     mode, _dm_file, transport_argv = _runner_parts(calls[0]["command"])
     assert mode == "query-file"
-    assert transport_argv[0] == str(hermes_entry)
+    assert transport_argv[0] == str(qubit_entry)
     assert transport_argv[1:] == ["-p", "researcher", "chat", "--in", "~", "-c", "Bot Chat",
                                   "--create-if-missing", "-Q"]
 
@@ -512,7 +512,7 @@ def test_delivery_pins_the_qubit_entrypoint_beside_this_interpreter(tmp_path, mo
     assert result2["status"] == "queued"
     mode, _dm_file, transport_argv = _runner_parts(calls[1]["command"])
     assert mode == "stdin"
-    assert transport_argv == [str(hermes_entry), "-p", "default", "peer", "dm", "spark"]
+    assert transport_argv == [str(qubit_entry), "-p", "default", "peer", "dm", "spark"]
 
 
 def test_peer_delivery_author_carries_the_sender_hostname_and_local_stays_bare(tmp_path, monkeypatch):

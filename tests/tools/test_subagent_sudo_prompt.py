@@ -124,7 +124,7 @@ class TestDelegatedChildFailureMessaging:
             out = tts._handle_sudo_failure(
                 "sudo: a password is required", env_type="local"
             )
-        assert "Subagents cannot prompt" in out
+        assert "cannot prompt for a sudo password" in out
         assert "SUDO_PASSWORD" in out
 
     def test_parent_output_unchanged(self, monkeypatch):
