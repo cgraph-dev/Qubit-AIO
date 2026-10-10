@@ -65,6 +65,17 @@ config/task-templates.yaml
 frontend/qubit-web/node_modules/
 frontend/qubit-dist/
 
+# Generated parity/vendor reports (regenerable; never hand-edited). Both are
+# produced by their own scripts and one is ~15 MB, so committing it would add a
+# large regenerable blob to history for no benefit:
+#   scripts/parity_inventory.py      -> docs/generated/parity_inventory.json
+#   scripts/hermes_vendor_manifest.py -> docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json
+# scripts/route_e2e_audit.py CONSUMES parity_inventory.json and requires it to
+# exist, so regenerate before running it (see
+# docs/generated/ parity notes in AGENTS.md / the skill):
+#   QUBIT_PARITY_REF_HOME=/home/trick/upstream .venv/bin/python scripts/parity_inventory.py
+docs/generated/
+
 # Runtime state artifacts that must never be committed (created under CWD by
 # some tests when no state dir is injected).
 session_activity.json

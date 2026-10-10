@@ -54,3 +54,24 @@ home (`QUBIT_HOME`, one `state.db`). Multiple roles, one agent.
 "Your imagination is the limit" is how this reads from the outside — but it is
 a *reading*, not a promise. Qubit claims no capability it has not built. The
 only commitments that bind are the ones verified in the status ledger.
+
+## Language policy (owner ruling, 2026-10-10)
+
+**English is the authoring language, for docs and for the whole product.**
+
+- **Pre-existing translations are KEPT.** Runtime locale packs that shipped
+  before this ruling (the 17 languages under `qubit_runtime/locales/`) stay as
+  they are. They are restored, not retired — a purge commit (`eafb54e2`,
+  "delete all non-English content; keep English only") removed 35 files from
+  that directory as collateral while its stated scope was documentation; this
+  ruling restores them.
+- **New implementations are English-only.** No new language packs are authored.
+  A new user-facing string ships in `en.yaml` and is not translated.
+
+Rationale: the earlier purge was aimed at *docs and the website translation
+tree*, and its message described "engineering docs … reference material for the
+port". The runtime locale catalog is a **product surface** (`agent/i18n.py`
+loads it for `display.language`), not reference material — deleting it silently
+broke 16 languages for users. Retirement of existing packs is therefore treated
+as out of scope; authoring new ones is explicitly out of scope.
+
