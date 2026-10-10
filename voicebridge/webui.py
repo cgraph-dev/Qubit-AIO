@@ -4464,6 +4464,33 @@ class WebUI:
                           code=str(result.get("code") or ""))
             except Exception:
                 log.exception("stt prewarm failed (non-fatal)")
+            # A native abort inside sherpa-onnx/ONNX Runtime is NOT a Python
+            # exception, so the handler above cannot catch it: the call has been
+            # observed to kill the whole process ("Fatal Python error: Aborted"
+            # inside OnlineRecognizer.from_transducer) when the load runs under
+            # heavy load. Running it on a bare thread means ANY process that
+            # constructs WebUI -- including a pytest run -- is abortable by a
+            # background warm-up. Threads do not contain a hard abort, so the
+            # only durable containment is to not start the warm-up where it is
+            # not wanted.
+            except BaseException as exc:  # noqa: BLE001 - widen beyond Exception
+                log.warning("stt prewarm aborted: %s", exc)
+
+        try:
+            from . import qubit_runtime as _HR
+            _under_test = _HR.under_test()
+        except Exception:
+            _under_test = False
+        if _under_test:
+            # Tests assert behaviour; a background model load adds nothing and
+            # can abort the interpreter (native crash), taking the whole suite
+            # with it. Opt in with QUBIT_STT_PREWARM_TEST=1 when deliberately
+            # exercising the real engine.
+            import os as _os
+            if _os.environ.get("QUBIT_STT_PREWARM_TEST") != "1":
+                log_event("stt.prewarm", ok=True, engine="skipped",
+                          code="UNDER_TEST")
+                return
 
         threading.Thread(target=_run, daemon=True, name="stt-prewarm").start()
 
