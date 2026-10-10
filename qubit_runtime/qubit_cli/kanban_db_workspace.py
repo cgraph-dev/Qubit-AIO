@@ -291,7 +291,7 @@ def _managed_scratch_path_info(p: Path) -> tuple[bool, Optional[str]]:
                 board,
             ))
 
-    override = os.environ.get("QUBIT_KANBAN_WORKSPACES_ROOT", "").strip()
+    override = os.environ.get("HERMES_KANBAN_WORKSPACES_ROOT", "").strip()
     if override:
         override_root = Path(override).expanduser()
         with contextlib.suppress(OSError):
