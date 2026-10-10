@@ -347,6 +347,16 @@ class SessionKernel:
         if self.alive():
             from tools.code_execution_tool import _kill_process_group
             _kill_process_group(self.proc, escalate=True)
+        # Close the child's pipes: reaching EOF (after the kill) does not release the
+        # TextIOWrapper/BufferedReader objects, so leaving them open leaks 3 fds per kernel
+        # until GC. Readers have exited on EOF or tolerate the closed stream.
+        if self.proc is not None:
+            for stream in (self.proc.stdout, self.proc.stderr, self.proc.stdin):
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except Exception:
+                        pass
         sock, self.server_sock = self.server_sock, None
         try:
             if sock is not None:
@@ -508,7 +518,12 @@ def _stdout_reader(kernel: SessionKernel) -> None:
     while True:
         # read1 returns as soon as any bytes arrive; a plain read(n) on a BufferedReader
         # blocks until n bytes or EOF and would sit on a complete small frame forever.
-        chunk = stream.read1(4096)
+        try:
+            chunk = stream.read1(4096)
+        except (ValueError, OSError):
+            # teardown closed the pipe under us; treat like EOF.
+            kernel.response_q.put({"status": "kernel-eof"})
+            return
         if not chunk:
             if buf:
                 raw(buf)
@@ -555,8 +570,12 @@ def _stdout_reader(kernel: SessionKernel) -> None:
 def _stderr_reader(kernel: SessionKernel) -> None:
     from tools.code_execution_tool import MAX_STDERR_BYTES
     assert kernel.proc is not None and kernel.proc.stderr is not None
-    while chunk := kernel.proc.stderr.read1(4096):
-        kernel.stderr.append(chunk, MAX_STDERR_BYTES)
+    try:
+        while chunk := kernel.proc.stderr.read1(4096):
+            kernel.stderr.append(chunk, MAX_STDERR_BYTES)
+    except (ValueError, OSError):
+        # teardown closed the pipe under us; nothing more to read.
+        return
 
 
 def _bind_rpc_socket(kernel: SessionKernel) -> str:

@@ -229,6 +229,18 @@ def run_command_provider(
             name, chunk = output_queue.get_nowait()
             if chunk:
                 chunks[name].append(chunk)
+    else:
+        for reader in readers:
+            reader.join(timeout=0.5)
+    # Close the Popen pipes on every exit path (success, timeout, error): neither
+    # reaching EOF nor proc.wait() releases the TextIOWrapper, so leaving them open
+    # leaks fds until GC. Readers have drained by here.
+    for stream in (proc.stdout, proc.stderr):
+        if stream is not None:
+            try:
+                stream.close()
+            except Exception:
+                pass
     stdout, stderr = "".join(chunks["stdout"]), "".join(chunks["stderr"])
     if timed_out:
         raise subprocess.TimeoutExpired(command, timeout, output=stdout, stderr=stderr) from (

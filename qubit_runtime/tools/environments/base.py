@@ -483,6 +483,14 @@ class BaseEnvironment(ABC):
         def _kill_and_join():
             self._kill_process(proc)
             drain_thread.join(timeout=2)
+            # The natural-exit path closes stdout below; the kill paths must too, or a
+            # timed-out/interrupted command leaks the Popen pipe fd until GC.
+            stdout = proc.stdout
+            if stdout is not None:
+                try:
+                    stdout.close()
+                except Exception:
+                    pass
 
         try:
             # Adaptive poll: start at 5ms so fast commands return in ~6ms, back
