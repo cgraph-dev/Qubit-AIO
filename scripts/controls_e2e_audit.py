@@ -212,8 +212,8 @@ class Harness:
         async ([method, path, body]) => {
             const init = {method, headers: {"Content-Type": "application/json"}};
             if (body !== null) init.body = JSON.stringify(body);
-            const token = (window.__HERMES_SESSION_TOKEN__) || "";
-            init.headers["X-Hermes-Session-Token"] = token;
+            const token = (window.__QUBIT_SESSION_TOKEN__) || "";
+            init.headers["X-Qubit-Session-Token"] = token;
             const r = await fetch("/agent" + path, init);
             let parsed = null;
             try { parsed = await r.json(); } catch (e) { parsed = null; }

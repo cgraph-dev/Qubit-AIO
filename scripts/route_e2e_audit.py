@@ -255,7 +255,7 @@ def scrape_token(base: str, timeout: float = 10.0) -> str:
             html = resp.read().decode("utf-8", "replace")
     except Exception:  # noqa: BLE001
         pass
-    match = re.search(r'window\.__HERMES_SESSION_TOKEN__="([^"]+)"', html)
+    match = re.search(r'window\.__QUBIT_SESSION_TOKEN__="([^"]+)"', html)
     if not match:
         raise RuntimeError(
             f"no session token in {base}/chat (is the dashboard running?)")
