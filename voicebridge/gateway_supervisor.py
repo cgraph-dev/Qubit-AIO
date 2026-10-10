@@ -894,13 +894,22 @@ def _control_impl(cfg: Any, action: str, *, confirmed: bool = False,
 
     # restart / stop replace (or end) this process: dispatch detached so the
     # HTTP response is sent first, and report the transition as in-progress.
+    # A ``restart`` first runs ``reset-failed`` so a unit parked in the systemd
+    # "failed" state (e.g. after a restart-burst / StartLimitBurst trip) is
+    # cleared before the restart — otherwise ``systemctl restart`` on a
+    # rate-limited unit is a no-op and "qubit restart" leaves the fleet down
+    # instead of bringing it back. This mirrors the proven ``recover`` path
+    # (reset-failed + start) at the fleet level. ``stop`` keeps its single verb.
     # The unit name is config-controlled and this argv is executed by ``sh -c``
     # (the sleep must precede the transition so the response is flushed first),
     # so it is shell-quoted — never interpolated raw.
-    detached = ["sh", "-c",
-                f"sleep {DETACH_DELAY_S}; systemctl"
-                + (" --user" if system_scope(cfg) == "user" else "")
-                + f" {clean} {shlex.quote(unit)}"]
+    verb = (f"systemctl{' --user' if system_scope(cfg) == 'user' else ''} "
+            f"reset-failed {shlex.quote(unit)}; systemctl"
+            f"{' --user' if system_scope(cfg) == 'user' else ''} restart "
+            f"{shlex.quote(unit)}") if clean == "restart" else (
+            f"systemctl{' --user' if system_scope(cfg) == 'user' else ''} "
+            f"{clean} {shlex.quote(unit)}")
+    detached = ["sh", "-c", f"sleep {DETACH_DELAY_S}; {verb}"]
     try:
         spawn(detached)
     except Exception as exc:  # noqa: BLE001
@@ -1006,15 +1015,20 @@ def _recover_impl(cfg: Any, *, confirmed: bool = False, confirmation_id: str = "
 # bounce.
 
 #: The fleet units, in restart order: the bridge owns the mic/PTT loop, the
-#: gateway owns the messaging backend, the orb/agent are voice surfaces.
+#: gateway owns the messaging backend, the orb is the X11 voice surface.
+#: ``qubit-voice-agent.service`` is NOT a fleet member: it is the 7D
+#: intermediate LEGACY name for the bridge (see voicebridge/profiles.py and
+#: systemd/qubit-voice-agent.service, kept as a "LEGACY REFERENCE ONLY — DO
+#: NOT INSTALL" diagnostic). Listing it here made ``--only all`` name a unit
+#: that does not exist on a migrated host, so the fleet reported an
+#: unavailable member on every restart.
 FLEET_UNITS = {
     "voicebridge": "qubit-voicebridge.service",
     "gateway": DEFAULT_DAEMON_UNIT,
     "orb": "qubit-voice-orb.service",
-    "agent": "qubit-voice-agent.service",
 }
 #: Ordered selection for ``--only all`` (alias: the whole fleet).
-FLEET_ORDER = ("voicebridge", "gateway", "orb", "agent")
+FLEET_ORDER = ("voicebridge", "gateway", "orb")
 
 
 def _fleet_selection(only: str) -> Tuple[Optional[List[str]], Optional[str]]:
