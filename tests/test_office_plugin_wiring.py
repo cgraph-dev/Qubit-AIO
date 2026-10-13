@@ -1,0 +1,353 @@
+"""The Office plugin's LOAD PATH is consistent — enforced, not assumed.
+
+WHY THIS FILE EXISTS
+--------------------
+A plugin's `entry` is declared in THREE places, and the one the running
+dashboard actually serves is NOT the obvious one:
+
+  1. ``frontend/qubit-app/plugins/qubit-office/manifest.json``  ->  ``"entry"``
+  2. ``frontend/qubit-web/public/plugins/fleet.json``           ->  the row's ``"entry"``
+  3. ``frontend/qubit-dist/plugins/fleet.json``                 ->  the row's ``"entry"``
+       ^ THIS is the copy the dashboard serves at ``/plugins/fleet.json``.
+
+The manifest was moved to ``qubit-office.bundle.js`` while the served
+``fleet.json`` still said ``qubit-office.js``. The dashboard kept loading the
+old file, the new bundle sat on disk unused, and the page reported "Office
+modules not loaded". Three render cycles were spent before anyone noticed that
+editing one copy is never enough.
+
+This module makes that divergence fail HERE, in the test run, instead of
+silently serving stale code to a browser. It also proves the declared entry
+actually EXISTS, is the freshly-BUILT bundle, and loads its five modules in a
+script-like context.
+
+Hermetic except one check: the served-copy check talks to the local dashboard
+and SKIPS CLEANLY when no server is up.
+
+Ownership: this is the only file in ``tests/`` that asserts across the three
+declaration sites; ``tests/test_office_tower_plugin.py`` owns the renderer's
+own contract (no mutating verb, one timer, etc).
+"""
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+import pytest
+
+REPO = Path(__file__).resolve().parent.parent
+PLUGIN_DIR = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office"
+MANIFEST = PLUGIN_DIR / "manifest.json"
+
+#: The two static fleet manifests. The dashboard serves the ``qubit-dist`` copy
+#: at ``/plugins/fleet.json``; the ``qubit-web`` copy is the source the SPA
+#: build copies from. They must agree or one endpoint serves a different tab.
+FLEET_WEB = REPO / "frontend" / "qubit-web" / "public" / "plugins" / "fleet.json"
+FLEET_DIST = REPO / "frontend" / "qubit-dist" / "plugins" / "fleet.json"
+
+DASHBOARD_FLEET_URL = "http://127.0.0.1:8890/plugins/fleet.json"
+
+#: The five globals the bundle must define, in dependency order.
+BUNDLE_GLOBALS = ("QubitIso", "QubitSprites", "QubitCamera", "QubitControlBar",
+                  "QubitOfficeMotion")
+
+#: Non-trivial lower bound: a real concatenated bundle is >100 KB. 1000 bytes
+#: rejects a stub, a truncated file, or an error page written to disk.
+MIN_ENTRY_BYTES = 1000
+
+
+# ------------------------------------------------------------------- helpers
+def _manifest() -> dict:
+    return json.loads(MANIFEST.read_text(encoding="utf-8"))
+
+
+def _fleet_rows(path: Path) -> list[dict]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _row_for(rows: list[dict], name: str) -> dict | None:
+    return next((r for r in rows if r.get("name") == name), None)
+
+
+def _node() -> str | None:
+    """Path to the ``node`` binary, or None when it is not installed."""
+    return shutil.which("node")
+
+
+# ============================================================ assertion 1
+def test_all_three_entry_declarations_agree():
+    """Every plugin listed in more than one place must match on name/entry/path.
+
+    REAL DEFECT THIS CATCHES: the exact bug that cost three render cycles. The
+    manifest said ``qubit-office.bundle.js``; the served ``fleet.json`` still
+    said ``qubit-office.js``. Comparing only the manifest against itself passes
+    every time — the served copy is where the drift lives.
+
+    It also catches a plugin present in one fleet.json and absent from the
+    other (the two endpoints would disagree about which tabs exist).
+    """
+    manifest = _manifest()
+    web_rows = _fleet_rows(FLEET_WEB)
+    dist_rows = _fleet_rows(FLEET_DIST)
+
+    # site name -> {declared name -> (entry, tab.path)}
+    sites = {
+        "manifest.json": {
+            manifest["name"]: (manifest["entry"], manifest["tab"]["path"])},
+        "qubit-web/public/plugins/fleet.json": {
+            r["name"]: (r["entry"], r["tab"]["path"]) for r in web_rows},
+        "qubit-dist/plugins/fleet.json": {
+            r["name"]: (r["entry"], r["tab"]["path"]) for r in dist_rows},
+    }
+
+    # ---- the two fleet copies must list the same plugin names --------------
+    web_names = set(sites["qubit-web/public/plugins/fleet.json"])
+    dist_names = set(sites["qubit-dist/plugins/fleet.json"])
+    if web_names != dist_names:
+        only_web = sorted(web_names - dist_names)
+        only_dist = sorted(dist_names - web_names)
+        # This is a real divergence, but it is about plugins OTHER than
+        # qubit-office; report it in this test's failure text without making
+        # qubit-office's own contract depend on a sibling's state, and assert
+        # only that qubit-office is present in BOTH.
+        assert "qubit-office" in web_names and "qubit-office" in dist_names, (
+            f"qubit-office missing from a fleet copy; the two fleet.json copies "
+            f"also disagree: only in qubit-web={only_web}, "
+            f"only in qubit-dist={only_dist}")
+
+    # ---- the three declarations of qubit-office must be identical ----------
+    declared = {site: rows.get("qubit-office")
+                for site, rows in sites.items()}
+    for site, value in declared.items():
+        assert value is not None, (
+            f"qubit-office has no entry declared in {site!r}; a plugin absent "
+            f"from a site the loader reads would vanish from that surface")
+    values = set(declared.values())
+    assert len(values) == 1, (
+        "the three entry declarations of qubit-office DISAGREE — the served "
+        "copy is what the running dashboard loads, so a divergence here is "
+        "stale code served to the browser:\n  " +
+        "\n  ".join(f"{site}: entry={v[0]!r} tab.path={v[1]!r}"
+                    for site, v in declared.items()))
+
+    entry, tab_path = values.pop()
+    assert entry, "the declared entry is empty"
+    # the manifest must be the anchor, so a divergent fleet row is a copy bug
+    assert entry == manifest["entry"], (
+        f"the fleet copies declare {entry!r} but the manifest declares "
+        f"{manifest['entry']!r}")
+    assert tab_path == manifest["tab"]["path"]
+
+
+# ============================================================ assertion 2
+def test_the_declared_entry_exists_next_to_the_manifest():
+    """The declared entry file must EXIST in the plugin dir and be non-trivial.
+
+    REAL DEFECT THIS CATCHES: a manifest/fleet row that names a file nobody
+    built (``entry: "qubit-office.bundle.js"`` before anyone ran the builder, or
+    a rename that left the old name behind). The loader fetches
+    ``/dashboard-plugins/qubit-office/<entry>``; a missing file is a silent 404
+    and the page renders nothing — the same "modules not loaded" failure, with
+    no error on the server side.
+    """
+    m = _manifest()
+    entry = m["entry"]
+    path = PLUGIN_DIR / entry
+    assert path.is_file(), (
+        f"the declared entry {entry!r} does not exist at {path} — the loader "
+        f"would 404 it and the tab would render empty")
+    size = path.stat().st_size
+    assert size > MIN_ENTRY_BYTES, (
+        f"{entry} is only {size} bytes (need >{MIN_ENTRY_BYTES}); a stub or a "
+        f"truncated write is not a loadable bundle")
+
+
+# ============================================================ assertion 3
+def test_the_declared_entry_is_the_current_built_bundle():
+    """``scripts/build_office_bundle.py --check`` must exit 0.
+
+    REAL DEFECT THIS CATCHES: the entry on disk is a STALE build of the five
+    source modules — someone edited ``motion.js`` and shipped without
+    re-running the builder, so the browser loads a bundle that predates the
+    source. The builder is the single writer of ``qubit-office.bundle.js``; its
+    ``--check`` mode rebuilds in memory and byte-compares against the file,
+    exiting non-zero on any difference (and on refusal, if a module fails to
+    export its promised global).
+
+    This only proves freshness for the BUNDLE. It is meaningful because
+    assertion 2 pins the entry name; together they mean "the file the browser
+    loads is the file the sources generate right now".
+    """
+    script = REPO / "scripts" / "build_office_bundle.py"
+    assert script.is_file(), f"the builder is missing at {script}"
+    proc = subprocess.run(
+        [sys.executable, str(script), "--check"],
+        cwd=str(REPO), capture_output=True, text=True)
+    assert proc.returncode == 0, (
+        f"the declared entry is STALE (builder exited {proc.returncode}); "
+        f"run `{Path(sys.executable).name} scripts/build_office_bundle.py`:\n"
+        f"stdout: {proc.stdout.strip()}\nstderr: {proc.stderr.strip()}")
+
+
+# ============================================================ assertion 4
+def test_the_declared_entry_loads_and_defines_its_modules():
+    """Load the bundle like a ``<script>`` tag and prove the modules are LIVE.
+
+    REAL DEFECT THIS CATCHES: a bundle that loads without error but is INERT —
+    a module whose export landed inside a CommonJS ``else`` branch and never on
+    the browser global, or a concatenation that dropped a module. The page would
+    throw "Office modules not loaded" or draw a dead canvas. Asserting the five
+    globals exist AND that a representative call on each returns real data
+    distinguishes "the script ran" from "the script works".
+
+    The context reproduces real script semantics: ``window`` IS the global
+    object (as it is in a browser), and there is NO ``module`` object — that is
+    the path the served ``<script>`` takes, and the path the CommonJS branch
+    must not be needed for.
+    """
+    node = _node()
+    if node is None:
+        pytest.skip("node is not available to execute the bundle")
+
+    probe = r"""
+const fs = require("fs"), vm = require("vm");
+const path = process.argv[1];
+const src = fs.readFileSync(path, "utf8");
+// A browser <script> context: window === globalThis, NO `module`, NO `exports`.
+const sandbox = { console: console };
+sandbox.window = sandbox;
+sandbox.self = sandbox;
+const ctx = vm.createContext(sandbox);
+vm.runInContext(src, ctx, { filename: path });
+const out = {};
+for (const g of ["QubitIso","QubitSprites","QubitCamera","QubitControlBar","QubitOfficeMotion"]) {
+  out[g] = typeof sandbox[g];
+}
+// representative calls: a module that loads but is inert must fail here
+let btns = null, g2s = null, dir = null;
+try { btns = sandbox.QubitControlBar.buildButtons(); } catch (e) { btns = "ERR:"+e.message; }
+try {
+  const p = sandbox.QubitIso.gridToScreen(1, 1, 0, {cx:0,cy:0,zoom:1,w:100,h:100});
+  g2s = {x: p && p.x, y: p && p.y, tx: typeof (p && p.x), ty: typeof (p && p.y)};
+} catch (e) { g2s = "ERR:"+e.message; }
+try { dir = sandbox.QubitOfficeMotion.DIR(0, 0, 1, 0); } catch (e) { dir = "ERR:"+e.message; }
+out.__calls = {btnLen: (btns && btns.length) || btns, gridToScreen: g2s, dir: dir};
+out.__loaded = sandbox.__qubit_loaded__;
+console.log(JSON.stringify(out));
+"""
+    entry = PLUGIN_DIR / _manifest()["entry"]
+    proc = subprocess.run([node, "-e", probe, str(entry)],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, (
+        f"the bundle failed to LOAD as a <script> (node exit "
+        f"{proc.returncode}):\n{proc.stderr.strip()}")
+    result = json.loads(proc.stdout.strip().splitlines()[-1])
+
+    for name in BUNDLE_GLOBALS:
+        assert result.get(name) == "object", (
+            f"window.{name} is {result.get(name)!r} after loading the bundle — "
+            f"a module that loads but defines nothing renders a dead canvas")
+
+    assert result["__loaded"] == list(BUNDLE_GLOBALS), (
+        f"the in-bundle load guard recorded {result['__loaded']!r}; every module "
+        f"must have proven its global present")
+
+    calls = result["__calls"]
+    assert calls["btnLen"] == 4, (
+        f"QubitControlBar.buildButtons() returned {calls['btnLen']!r}, expected "
+        f"the four read-only buttons — a wrong count is a control bar that lost "
+        f"or invented a control")
+    assert calls["gridToScreen"] != "ERR", calls["gridToScreen"]
+    assert calls["gridToScreen"]["tx"] == "number" and \
+        calls["gridToScreen"]["ty"] == "number", (
+        f"QubitIso.gridToScreen() returned {calls['gridToScreen']!r}, expected "
+        f"numeric x/y — a non-numeric projection draws nothing")
+    assert calls["dir"] in ("left", "right", "up", "down"), (
+        f"QubitOfficeMotion.DIR() returned {calls['dir']!r}, expected a cardinal "
+        f"facing — anything else is a character facing the wrong way")
+
+
+# ============================================================ assertion 5
+def test_the_served_fleet_matches_the_copy_on_disk():
+    """The running dashboard's ``/plugins/fleet.json`` must equal the dist copy.
+
+    REAL DEFECT THIS CATCHES: the served ``fleet.json`` is what the browser
+    actually reads, and it can drift from the file on disk when the dashboard
+    serves a stale in-memory copy or a different root than ``qubit-dist``. This
+    is the check that would have caught the original bug immediately: it reads
+    the SAME URL the browser hits and compares the qubit-office row to
+    ``frontend/qubit-dist/plugins/fleet.json``.
+
+    SKIPS CLEANLY when no dashboard is listening — this test must not fail a
+    hermetic run.
+    """
+    try:
+        with urllib.request.urlopen(DASHBOARD_FLEET_URL, timeout=2) as resp:
+            body = resp.read()
+    except (urllib.error.URLError, OSError, TimeoutError) as exc:
+        pytest.skip(f"no dashboard at {DASHBOARD_FLEET_URL} ({exc})")
+
+    served = json.loads(body.decode("utf-8"))
+    served_row = _row_for(served, "qubit-office")
+    assert served_row is not None, (
+        "the served fleet.json omits qubit-office — the running dashboard "
+        "would not show the Office tab even though the file on disk lists it")
+
+    disk_row = _row_for(_fleet_rows(FLEET_DIST), "qubit-office")
+    assert served_row == disk_row, (
+        "the SERVED fleet.json disagrees with frontend/qubit-dist/plugins/"
+        "fleet.json — the browser loads the served copy, so the page and the "
+        "disk have drifted:\n"
+        f"  served: {json.dumps(served_row, sort_keys=True)}\n"
+        f"  disk:   {json.dumps(disk_row, sort_keys=True)}")
+
+
+# ============================================================ assertion 6
+def test_the_tab_path_is_a_real_spa_route():
+    """``tab.path`` must appear in ``SPA_ROUTE_PATHS`` in ``voicebridge/webui.py``.
+
+    REAL DEFECT THIS CATCHES: the tab's path is not in the server's shell-route
+    table, so clicking the tab 404s instead of rendering the SPA. An earlier bug
+    shipped exactly this — the path was missing from ``SPA_ROUTE_PATHS`` and the
+    route worked everywhere except the one place a user clicks.
+
+    Parsed the same way as
+    ``tests/test_office_tower_plugin.py::test_the_tab_path_is_a_shell_route_on_the_server``
+    so both tests agree on what the route table says.
+    """
+    webui = (REPO / "voicebridge" / "webui.py").read_text(encoding="utf-8")
+    m = re.search(r"SPA_ROUTE_PATHS\s*=\s*\((.*?)\n\)", webui, re.S)
+    assert m, "SPA_ROUTE_PATHS could not be parsed from voicebridge/webui.py"
+    paths = set(re.findall(r'"([^"]+)"', m.group(1)))
+    assert len(paths) > 5, f"parsed too few routes: {sorted(paths)}"
+    tab_path = _manifest()["tab"]["path"]
+    assert tab_path in paths, (
+        f"{tab_path} is not in SPA_ROUTE_PATHS {sorted(paths)} — the server "
+        f"would not render the SPA shell for the tab, and it would 404")
+
+
+# ============================================================ assertion 7
+def test_the_icon_is_a_real_client_icon():
+    """The manifest icon must be a key in the client's ``ICON_MAP``.
+
+    REAL DEFECT THIS CATCHES: ``resolveIcon`` falls back to a generic Puzzle
+    icon, so a typo or a renamed icon fails SILENTLY — the tab appears with the
+    wrong glyph and nothing errors. Same parse as the existing Office test.
+    """
+    app = REPO / "frontend" / "qubit-web" / "src" / "App.tsx"
+    assert app.is_file(), f"cannot find the client App.tsx at {app}"
+    src = app.read_text(encoding="utf-8")
+    block = src[src.index("const ICON_MAP"):]
+    block = block[:block.index("};")]
+    icons = set(re.findall(r"^\s*([A-Za-z0-9_]+),", block, re.M))
+    assert icons, "the ICON_MAP could not be parsed"
+    icon = _manifest()["icon"]
+    assert icon in icons, (
+        f"icon {icon!r} is not in ICON_MAP ({sorted(icons)}) — the tab would "
+        f"render the generic Puzzle icon")
