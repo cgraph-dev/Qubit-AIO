@@ -124,6 +124,52 @@ def test_select_model_requires_a_real_endpoint(tmp_path):
     assert R.get_active_profile(cfg)["state"] == "UNSET"
 
 
+def test_provider_key_ref_uses_upstream_authority_over_slug_guess(tmp_path, monkeypatch):
+    """A provider whose slug does not follow ``<SLUG>_API_KEY`` must still
+    resolve its credential: ``openai-api`` reads ``OPENAI_API_KEY`` (from the
+    vendored ``get_provider`` chain — models.dev ``env``, the SAME authority
+    upstream ``hermes_cli/auth.py`` iterates), NOT the slug guess
+    ``OPENAI_API_API_KEY`` — that mismatch made every ``openai-api`` pick
+    refuse with ``MODEL_CREDENTIAL_REQUIRED`` even with the key present.
+    """
+    cfg = _cfg(tmp_path)
+    # The store sees ONLY the canonical var; the slug-derived guess is absent.
+    monkeypatch.setattr(ES, "present_names", lambda _cfg: {"OPENAI_API_KEY"})
+    assert EP._provider_key_ref(cfg, "openai-api") == "env:OPENAI_API_KEY"
+
+    # And a provider with no candidate present stays honest (no fabricated ref).
+    monkeypatch.setattr(ES, "present_names", lambda _cfg: set())
+    assert EP._provider_key_ref(cfg, "openai-api") == ""
+
+
+def test_provider_env_vars_match_upstream_get_provider():
+    """``_provider_env_vars`` must equal the vendored ``get_provider`` chain's
+    ``api_key_env_vars`` — the authority upstream resolves credentials from.
+    Guards against re-introducing a slug guess or reading the drifted
+    ``qubit_cli/auth.py::PROVIDER_REGISTRY`` table (it still lists
+    ``OPENCODE_GO_API_KEY`` where models.dev says ``OPENCODE_API_KEY``).
+    """
+    from voicebridge import qubit_runtime as _qr
+
+    _qr.ensure_path()
+    from qubit_cli import providers as _P  # type: ignore
+
+    for name in ("openai-api", "opencode-go", "openrouter", "gemini", "lmstudio"):
+        pdef = _P.get_provider(name)
+        assert pdef is not None, name
+        assert EP._provider_env_vars(name) == tuple(pdef.api_key_env_vars), name
+
+
+def test_select_model_openai_api_resolves_when_key_present(tmp_path, monkeypatch):
+    """End-to-end: an ``openai-api`` pick with the key present must not refuse
+    on credentials (it proceeds to endpoint activation)."""
+    cfg = _cfg(tmp_path)
+    monkeypatch.setattr(ES, "present_names", lambda _cfg: {"OPENAI_API_KEY"})
+    out = EP.select_model(cfg, "openai-api", "gpt-4o-mini", confirm=False)
+    assert out.get("dry_run") is True, out
+
+
+
 # ---------------------------------------------------------------------------
 # Defect 3 — is_set truth + name validation live in env_store
 # ---------------------------------------------------------------------------

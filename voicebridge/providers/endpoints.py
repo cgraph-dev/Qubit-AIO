@@ -722,12 +722,47 @@ def _provider_overlay(provider: str) -> Any:
         return None
 
 
+def _provider_def(provider: str) -> Any:
+    """The vendored ``ProviderDef`` for *provider*, or None.
+
+    1:1 with the upstream ``hermes_cli/providers.py::get_provider`` chain:
+    models.dev ``env`` (canonical key env vars) merged with the Hermes overlay's
+    ``extra_env_vars``, then plugin provider profiles. This — not the older
+    ``qubit_cli/auth.py::PROVIDER_REGISTRY`` table, which has drifted (it still
+    lists ``OPENCODE_GO_API_KEY`` where models.dev says ``OPENCODE_API_KEY``) —
+    is the authority the runtime itself resolves credentials from.
+    """
+    try:
+        from .. import qubit_runtime as _qr
+        _qr.ensure_path()
+        from qubit_cli import providers as _P  # type: ignore
+        return _P.get_provider(str(provider or "").strip())
+    except Exception:  # noqa: BLE001 - fork unavailable -> caller falls back
+        return None
+
+
+def _provider_env_vars(provider: str) -> tuple:
+    """A provider's canonical API-key env var NAME(s), via the vendored
+    ``get_provider`` chain (models.dev ``env`` + overlay extras).
+
+    Empty when the fork is unavailable or the provider is unknown; the caller
+    then falls back to the overlay / slug convention. Mirrors upstream
+    ``hermes_cli/auth.py`` which iterates ``pconfig.api_key_env_vars``.
+    """
+    pdef = _provider_def(provider)
+    if pdef is None:
+        return ()
+    names = getattr(pdef, "api_key_env_vars", ()) or ()
+    return tuple(str(n).strip() for n in names if str(n).strip())
+
+
 def _provider_base_url(cfg: Any, provider: str) -> str:
     """Resolve a known provider's endpoint exactly as the vendored runtime does.
 
     ``HERMES_OVERLAYS[provider].base_url_env_var`` (e.g. ``OPENCODE_GO_BASE_URL``)
-    first, then a non-virtual ``base_url_override``, then the generic
-    ``<SLUG>_BASE_URL`` convention. Empty when nothing resolves.
+    first, then a non-virtual ``base_url_override``, then the vendored
+    ``get_provider`` row's endpoint, then the generic ``<SLUG>_BASE_URL``
+    convention. Empty when nothing resolves.
     """
     ov = _provider_overlay(provider)
     if ov is not None:
@@ -740,6 +775,17 @@ def _provider_base_url(cfg: Any, provider: str) -> str:
         if override and "://" in override and not override.startswith(
                 ("moa://", "acp://")):
             return override
+    pdef = _provider_def(provider)
+    if pdef is not None:
+        env_name = str(getattr(pdef, "base_url_env_var", "") or "")
+        if env_name:
+            v = _runtime_env_value(cfg, env_name)
+            if v:
+                return v
+        base_url = str(getattr(pdef, "base_url", "") or "")
+        if base_url and "://" in base_url and not base_url.startswith(
+                ("moa://", "acp://")):
+            return base_url
     slug_env = str(provider or "").strip().upper().replace("-", "_") + "_BASE_URL"
     return _runtime_env_value(cfg, slug_env)
 
@@ -748,13 +794,16 @@ def _provider_key_ref(cfg: Any, provider: str) -> str:
     """Resolve a provider's credential reference from its env var NAME(s).
 
     Returns ``env:<NAME>`` when a candidate key var is set (name-only check;
-    the secret VALUE is never read), else ``""``. Candidates are the overlay's
-    ``extra_env_vars`` plus the ``<SLUG>_API_KEY`` convention.
+    the secret VALUE is never read), else an empty string. Candidates, in
+    order: the vendored registry row's ``api_key_env_vars`` (canonical — this
+    is what the runtime itself reads for the provider), the overlay's
+    ``extra_env_vars``, then the generic ``<SLUG>_API_KEY`` convention as a
+    last resort.
     """
     ov = _provider_overlay(provider)
     extra = tuple(getattr(ov, "extra_env_vars", ()) or ()) if ov is not None else ()
     slug = str(provider or "").strip().upper().replace("-", "_")
-    candidates = list(extra) + [f"{slug}_API_KEY"]
+    candidates = list(_provider_env_vars(provider)) + list(extra) + [f"{slug}_API_KEY"]
     try:
         from .. import env_store
         present = env_store.present_names(cfg)

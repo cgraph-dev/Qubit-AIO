@@ -495,10 +495,34 @@ def _write_terminal_profile_config(qubit_home: Any,
 
 
 def _provider_key_env_vars(provider: str) -> Tuple[str, ...]:
-    """Env var(s) the vendored provider layer reads for *provider*'s API key."""
+    """Env var(s) the vendored provider layer reads for *provider*'s API key.
+
+    Resolution order mirrors upstream ``hermes_cli/providers.py::get_provider``:
+    the models.dev ``env`` merged with the overlay's ``extra_env_vars`` comes
+    FIRST (this is what ``hermes_cli/auth.py`` iterates as
+    ``pconfig.api_key_env_vars``), and the plugin provider profile is only a
+    fallback for providers models.dev does not catalog. Getting the order wrong
+    returns a stale/wrong var — the plugin profile still lists
+    ``OPENCODE_GO_API_KEY`` where models.dev says ``OPENCODE_API_KEY``, and
+    includes URL vars as if they were keys. The ``<SLUG>_API_KEY`` convention is
+    the last resort, and is wrong for slugs that do not follow it
+    (``openai-api`` -> ``OPENAI_API_KEY``, not ``OPENAI_API_API_KEY``).
+    """
     name = str(provider or "").strip()
     if not name:
         return ()
+    try:
+        from . import qubit_runtime
+        qubit_runtime.ensure_path()
+        from qubit_cli import providers as _P  # type: ignore
+
+        pdef = _P.get_provider(name)
+        if pdef is not None:
+            names = tuple(str(v) for v in (getattr(pdef, "api_key_env_vars", ()) or ()) if v)
+            if names:
+                return names
+    except Exception:
+        pass
     try:
         from . import qubit_runtime
         qubit_runtime.ensure_path()
