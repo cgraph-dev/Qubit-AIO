@@ -53,9 +53,10 @@ FLEET_DIST = REPO / "frontend" / "qubit-dist" / "plugins" / "fleet.json"
 
 DASHBOARD_FLEET_URL = "http://127.0.0.1:8890/plugins/fleet.json"
 
-#: The five globals the bundle must define, in dependency order.
-BUNDLE_GLOBALS = ("QubitIso", "QubitSprites", "QubitCamera", "QubitControlBar",
-                  "QubitOfficeMotion")
+#: The six globals the bundle must define, in dependency order.
+#: `QubitAtlas` precedes `QubitSprites` because sprites.js reads it at load time.
+BUNDLE_GLOBALS = ("QubitIso", "QubitAtlas", "QubitSprites", "QubitCamera",
+                  "QubitControlBar", "QubitOfficeMotion")
 
 #: Non-trivial lower bound: a real concatenated bundle is >100 KB. 1000 bytes
 #: rejects a stub, a truncated file, or an error page written to disk.
@@ -226,7 +227,7 @@ sandbox.self = sandbox;
 const ctx = vm.createContext(sandbox);
 vm.runInContext(src, ctx, { filename: path });
 const out = {};
-for (const g of ["QubitIso","QubitSprites","QubitCamera","QubitControlBar","QubitOfficeMotion"]) {
+for (const g of __GLOBALS__) {
   out[g] = typeof sandbox[g];
 }
 // representative calls: a module that loads but is inert must fail here
@@ -241,6 +242,7 @@ out.__calls = {btnLen: (btns && btns.length) || btns, gridToScreen: g2s, dir: di
 out.__loaded = sandbox.__qubit_loaded__;
 console.log(JSON.stringify(out));
 """
+    probe = probe.replace("__GLOBALS__", json.dumps(list(BUNDLE_GLOBALS)))
     entry = PLUGIN_DIR / _manifest()["entry"]
     proc = subprocess.run([node, "-e", probe, str(entry)],
                           capture_output=True, text=True)

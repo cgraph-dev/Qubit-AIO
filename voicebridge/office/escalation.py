@@ -106,9 +106,9 @@ def raise_to_supervisor(cfg: Any, *, agent_id: int, kind: str, summary: str,
     finally:
         conn.close()
 
-    store.audit("escalation.raise", requested_by,
-                {"id": eid, "agent_id": agent_id, "kind": kind,
-                 "confirmation_id": approval.id})
+    _announce_raised(cfg, requested_by,
+                     {"id": eid, "agent_id": agent_id, "kind": kind,
+                      "confirmation_id": approval.id}, eid, kind)
     return {"state": "OK", "id": eid, "agent_id": int(agent_id),
             "supervisor_id": int(supervisor), "kind": kind,
             "confirmation_id": approval.id, "summary": text,
@@ -388,3 +388,33 @@ def sync(cfg: Any) -> Dict[str, Any]:
                            "decision": item.decision})
     return {"state": "OK", "synced": len(synced), "checked": len(open_rows),
             "closed": synced}
+
+
+def _announce_raised(cfg: Any, requested_by: str, detail: Dict[str, Any],
+                     eid: int, kind: str) -> None:
+    """Audit a raise, and emit the ``escalation`` event it caused (A5, C7).
+
+    A real escalation was raised: the tower draws that as the walk to the
+    manager's desk. So the row is emitted by the code that raised it — never by
+    the renderer guessing — beside the journal row ``raise_to_supervisor``
+    already writes. One journal, no second queue (``90-AGENT-CONTRACT`` §2.5).
+
+    Defined at the end of the module on purpose: this is a call-site-only
+    addition, and keeping it out of the function bodies above preserves the
+    exact 1-based line numbers other modules cite (``escalation.py:321`` is the
+    level rule in :func:`resolve`).
+    """
+    store.audit("escalation.raise", requested_by, detail)
+    try:
+        from . import agent_memory as _mem
+
+        agent_id = detail.get("agent_id")
+        _mem.emit_event(cfg, "escalation",
+                        agent_id=(int(agent_id)
+                                  if agent_id is not None else None),
+                        payload={"escalation_id": int(eid),
+                                 "kind": str(kind),
+                                 "confirmation_id": detail.get("confirmation_id")},
+                        visible="bubble")
+    except Exception:                                   # noqa: BLE001
+        pass

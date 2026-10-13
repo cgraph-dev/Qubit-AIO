@@ -40,9 +40,9 @@ REPO = Path(__file__).resolve().parents[1]
 PLUGIN_DIR = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office"
 BUNDLE = PLUGIN_DIR / "qubit-office.bundle.js"
 BUILDER = REPO / "scripts" / "build_office_bundle.py"
-MODULES = ["iso-engine.js", "sprites.js", "camera.js", "control-bar.js",
+MODULES = ["iso-engine.js", "atlas.js", "sprites.js", "camera.js", "control-bar.js",
            "motion.js"]
-GLOBALS = ["QubitIso", "QubitSprites", "QubitCamera", "QubitControlBar",
+GLOBALS = ["QubitIso", "QubitAtlas", "QubitSprites", "QubitCamera", "QubitControlBar",
            "QubitOfficeMotion"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None,

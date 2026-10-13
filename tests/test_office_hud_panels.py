@@ -250,7 +250,13 @@ def test_the_org_small_and_conditional_misses_are_proven_not_assumed(
 # now fixed — it is verified present-and-correct by assertion 5, not here.
 GAP_FIELDS = {
     "N1": ["display_name", "person_name", "employee_name"],
-    "N2": ["memory", "memories", "relationship", "relationships", "goal",
+    # N2 — PARTIALLY FILLED (A5, L2). `memory`/`memories` are now REAL payload
+    # fields (tower.state()'s per-character `memory` block + `dossier`), so they
+    # are removed from the absent list and asserted PRESENT below. The rest of
+    # N2 stays absent on purpose: there is still no authored `personality`,
+    # `secret`, `goal` or `relationship` field — the dossier is derived, and a
+    # derived belief is not a stored trait.
+    "N2": ["relationship", "relationships", "goal",
            "goals", "personality", "secret", "secrets"],
     "N3": ["task", "task_id", "current_task", "task_title", "feature"],
     "N4": ["spend", "spend_cents", "balance", "agent_spend", "seat_spend"],
@@ -311,6 +317,12 @@ def test_no_documented_gap_field_is_present_in_the_payload(
     assert "supervisor_id" in keys, (
         "N6 says supervisor_id is present (as a number) — it is gone")
     assert "supervisor_name" not in keys and "supervisor_slug" not in keys
+
+    # N2's now-filled half (A5, L2): the per-character memory/personality block
+    # EXISTS. This is the positive half of the gap — the spec said "no memory
+    # field"; it now does. Asserted PRESENT so a future removal fails loudly.
+    assert "memory" in keys and "dossier" in keys, (
+        "A5 landed the per-seat memory + dossier fields; they are gone")
 
 
 # ===================================================================== #

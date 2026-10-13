@@ -567,7 +567,13 @@ def preview_state(cfg: Any) -> Dict[str, Any]:
                          "x": int(room["x"]) + 1 + (i % 3) * 2,
                          "y": int(room["y"]) + 1, "slot": i},
             "animation": "idle", "last_event": None, "stalled": False,
-            "facing": "down", "walking": False, "at": "desk"})
+            "facing": "down", "walking": False, "at": "desk",
+            # A5 — the same additive fields a live character carries, so the
+            # renderer reads one shape. A preview seat has no memory and no
+            # evidence, and says so rather than borrowing a real seat's.
+            "memory": {"count": 0, "known": False},
+            "dossier": {"known": False, "beliefs": [], "dimensions": []},
+        })
     plan = {"schema": FLOORPLAN_SCHEMA,
             "grid": {"cols": ROOM_COLS * (ROOM_W + 1),
                      "rows": ROOM_ROWS * (ROOM_H + 1), "tile": 1},
@@ -623,6 +629,13 @@ def state(cfg: Any, *, now: Optional[float] = None,
         conn.close()
 
     characters = []
+    # A5 — the per-seat memory/personality projection, computed once for the
+    # whole org (one read, not one per character). It is ADDITIVE: an org with
+    # no memories emits `known: False` blocks, so the renderer has a field to
+    # read and a fact to draw, never a missing key.
+    from . import agent_memory as _mem
+
+    dossiers = _mem.dossiers(cfg, [int(s["id"]) for s in seats])
     for seat in seats:
         aid = int(seat["id"])
         pos = placed.get(aid)
@@ -667,6 +680,12 @@ def state(cfg: Any, *, now: Optional[float] = None,
             "last_event": ({"kind": act["kind"], "age_s": act["age_s"]}
                            if act else None),
             "stalled": bool((act or {}).get("stalled")),
+            # A5 — additive: the seat's memory depth and its derived personality
+            # block. Absent memories => `known: False`, never a fabricated one.
+            "memory": {"count": int(dossiers.get(aid, {}).get("memory_count", 0)),
+                       "known": bool(dossiers.get(aid, {}).get("known"))},
+            "dossier": dossiers.get(aid, {"known": False, "beliefs": [],
+                                          "dimensions": []}),
         })
 
     empty = (not seats and not plan["floors"] and ledger_rows == 0)

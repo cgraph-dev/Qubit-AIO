@@ -51,6 +51,10 @@ PLUGIN_DIR = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office"
 #: (filename, the global it must define). Order is load order.
 ORDER = [
     ("iso-engine.js", "window.QubitIso"),
+    # The atlas loader must define its global BEFORE sprites.js reads it:
+    # `sprites.js` does `var ATLAS = (root && root.QubitAtlas) || null` at load
+    # time, so atlas.js has to be concatenated first. A2 owns both files.
+    ("atlas.js", "window.QubitAtlas"),
     ("sprites.js", "window.QubitSprites"),
     ("camera.js", "window.QubitCamera"),
     ("control-bar.js", "window.QubitControlBar"),

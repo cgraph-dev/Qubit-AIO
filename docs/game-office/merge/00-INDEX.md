@@ -16,9 +16,11 @@ Decisions recorded: `2a 3d` (`docs/game-office/merge/10-DECISIONS.md`) plus **dr
 | `30-SOURCE-INVENTORY.md` | Per repo: exact paths, file counts, what is taken, what is rejected |
 | `40-ASSET-PIPELINE.md` | How art gets from `/refs` into the served plugin bundle |
 | `50-ARCHITECTURE.md` | Where each borrowed system lives in the tower, and the seams |
+| `55-VERIFICATION.md` | Per-milestone proofs, regression gates, and how to prove no regression against the two anchors |
 | `60-WIRING-TRAPS.md` | The serving/allowlist/build facts that will bite implementation |
 | `70-MILESTONES.md` | M0–M6 with one behavioral proof each |
 | `80-RISKS.md` | R1–R9, the thin defence, and what is deliberately not done |
+| `90-AGENT-CONTRACT.md` | The 7-builder + verifier partition: file ownership, interfaces, merge order, and the hard "never touch" list |
 
 ---
 

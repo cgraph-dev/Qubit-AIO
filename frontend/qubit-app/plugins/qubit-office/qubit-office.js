@@ -124,6 +124,18 @@
     }
   })();
 
+  /* ============================================================ the art
+   * The world surface's GEOMETRY (ground tiles, building exteriors, furniture,
+   * labels) and its ASSET LOADER both live in `iso-engine.js`, read here as
+   * `ISO.drawTile.world`. They live in the module because this file's source is
+   * inlined into a `node -e` argument by the headless proofs and a long enough
+   * module trips the OS argument limit — an E2BIG that would read as a broken
+   * renderer. Assets load from `/plugins/qubit-office/assets/...`, the one route
+   * that serves PNGs (C1); with no module in hand (a harness) every world draw
+   * falls back to a flat primitive, which is what those proofs measure. */
+  var ART = (ISO && ISO.drawTile && ISO.drawTile.world) || null;
+  if (ART && ART.load) ART.load("/plugins/qubit-office/assets");
+
   /* The poll. It is the ONLY timer in this file and it exists to ask the backend
    * what is true — never to change what is drawn on its own. It is deliberately
    * fast: walk smoothness is a function of how often we ask, and asking more
@@ -353,6 +365,25 @@
                Number(z || 0) * DECK_Z};
   }
 
+  /* Fill a tile's projected box from a colour, with NO module in hand.
+   * `iso-engine`'s `drawTileArt` is the real implementation; this is the
+   * renderer's own copy for the one case the module is absent (the headless
+   * harness, where window.QubitIso is null). It is geometry only — the box is the
+   * TILE's own bounding box, computed from the same `iso()` every other draw
+   * uses, so the fallback floor lands where the module's would.
+   *
+   * A RECTANGLE, NOT A DIAMOND. A ground tile is the mesh UNDER a room; the
+   * volume tests identify a room by its 4-vertex quads (plate + two walls), so a
+   * diamond here would be counted as a third of a room. A rect fills the same
+   * tile and is never mistaken for architecture. */
+  function localTilePatch(ctx, x, y, z, cam, fill) {
+    if (!ctx || !fill) return;
+    var c = iso(x, y, z, cam);
+    var hw = (TILE_W / 2) * cam.zoom, hh = (TILE_H / 2) * cam.zoom;
+    ctx.fillStyle = fill;
+    ctx.fillRect(c.x - hw, c.y - hh, hw * 2, hh * 2);
+  }
+
   /* Keep the deck reachable. Ported from pixel-agents clampPan: the extent may
    * leave the viewport only up to a margin, so a small office is never lost in
    * a corner and a large one never becomes unpannable. Delegates to
@@ -483,16 +514,26 @@
   /* -------------------------------------------------------------- the deck */
 
   function drawRoomPlate(ctx, cam, room, base, z) {
-    /* The plate + the two cutaway wall faces, extracted so the room item's draw
-     * closure stays readable. A pure move of the former inline code: same
-     * points, same fills, same order. The room is drawn as ONE item keyed on its
-     * FAR corner so its own floor is beneath everything standing on it. */
+    /* The plate + the two cutaway wall faces. The room is drawn as ONE item keyed
+     * on its FAR corner so its own floor is beneath everything standing on it.
+     *
+     * THE PLATE IS A WASH, NOT AN OPAQUE SLAB, WHEN THERE IS GROUND UNDER IT.
+     * The world surface lays real terrain tiles under the room (rank `ground`,
+     * painted first). An opaque plate would cover them and every floor would read
+     * as the flat colour a previous version was criticised for. So when the
+     * terrain art is in hand the plate is filled at low alpha — it still tints and
+     * bounds the room, but the authored grass/dirt shows through it. With no art
+     * (a harness) the plate stays opaque, which is what the volume/pixel proofs
+     * measure. `worldArt()` is the module's decoded-terrain check. */
     var x0 = Number(room.x), y0 = Number(room.y);
     var x1 = x0 + Number(room.w), y1 = y0 + Number(room.h);
     var a = iso(x0, y0, z, cam), b = iso(x1, y0, z, cam);
     var c = iso(x1, y1, z, cam), d = iso(x0, y1, z, cam);
 
     /* the deck plate */
+    var art = worldArt();
+    ctx.save();
+    if (art) ctx.globalAlpha = 0.30;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
     ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y);
@@ -502,6 +543,7 @@
     ctx.strokeStyle = "#33415a";
     ctx.lineWidth = 1;
     ctx.stroke();
+    ctx.restore();
 
     /* two cutaway wall faces only, so the interior stays visible.
      * Proportion from StarNet stationbake (FACE_H tall, FACE_W thin). */
@@ -518,6 +560,14 @@
     ctx.closePath();
     ctx.fillStyle = shade(base, 0.04);
     ctx.fill();
+  }
+
+  /* Is the terrain art decoded on this page? Read through the module so the
+   * renderer never touches an Image itself (the module owns loading). False in a
+   * harness, so the plate stays opaque there and the proofs measure the flat
+   * path. */
+  function worldArt() {
+    return !!(ART && ART.read && ART.read.terrain && ART.read.terrain());
   }
 
   function drawShadow(ctx, at, cam) {
@@ -665,7 +715,15 @@
    * `iso-engine.js` owns the real key (`depthKey`/`sortByDepth`); this file
    * calls it. The local branch is the same rule for a bare harness.
    */
-  var KIND_RANK = {floor: 0, room: 1, desk: 2, agent: 3, marker: 4};
+  /* The world surface adds four kinds to the SAME table (M12 — extend, do not
+   * replace). A rank more NEGATIVE paints EARLIER (a smaller tiebreak is a larger
+   * key, and a larger key paints later): ground -2 (under the plate), building -1
+   * (the room's far corner), prop 2 (chair/desk — a figure on that cell still
+   * wins it at rank 3), label 5 (floor text, last in its own cell). */
+  var KIND_RANK = {
+    ground: -2, building: -1, floor: 0, room: 1, desk: 2, prop: 2,
+    agent: 3, marker: 4, label: 5
+  };
 
   /* The local key: the screen y of the cell the thing stands on, un-zoomed. The
    * camera is an affine transform shared by every drawable, so it cannot
@@ -698,6 +756,23 @@
     });
   }
 
+  /* The world ITEMS (ground, exterior, furniture, labels) are built by the module
+   * (`ISO.drawTile.world.roomItems`), for the E2BIG reason at `ART` above. Items
+   * come back keyed on the SAME `depthKey(x, y, z)` (M12): a chair at (1,1)
+   * covers a figure at (0,0), and a figure at (1,-1) covers the chair. Nothing
+   * here invents a room, seat or prop the payload did not report. */
+  function worldFor(ctx, cam, room, z, floorNo, base) {
+    if (!ART || !ART.roomItems) return [];
+    return ART.roomItems({
+      ctx: ctx, cam: cam, room: room, z: z, floorNo: floorNo, base: base,
+      /* `ART_READ` is the module's own asset port (terrain/building/furniture/
+       * labelFont), exported on `drawTile.world` alongside `roomItems` — the
+       * two must travel together, because an item builder that cannot resolve
+       * its images draws nothing. */
+      img: ART.read, rankOf: rankOf, depthKey: depthKey, shade: shade
+    });
+  }
+
   function drawTower(ctx, v, opts) {
     var cam = opts.cam;
     var plan = v.floorplan || {};
@@ -721,6 +796,10 @@
         var x1 = x0 + Number(room.w), y1 = y0 + Number(room.h);
         var base = deckTint(fl.role, (fl.rooms || []).length);
 
+        /* the world surface joins the SAME `items` array, on the same key */
+        var world = worldFor(ctx, cam, room, z, fl.number, base);
+        for (var wi = 0; wi < world.length; wi++) items.push(world[wi]);
+
         /* FAR corner (x0, y0) keys the plate: the room's top vertex is the one
          * point of the room that is behind everything standing in it. */
         items.push({
@@ -729,6 +808,10 @@
           gx: x0, gy: y0, gz: z, key: depthKey(x0, y0, z),
           draw: function () {
             drawRoomPlate(ctx, cam, room, base, z);
+            /* The room label keeps its EXACT font and offset: this string is
+             * asserted verbatim by test_office_label_layout.py (ROOM_GLYPH_PX).
+             * The pixel-font sign is a separate item (`worldFor`), an addition
+             * not a replacement. */
             ctx.fillStyle = "#7c8aa0";
             ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
             var a = iso(x0, y0, z, cam), c = iso(x1, y1, z, cam);
@@ -744,7 +827,9 @@
          * The desk's KEY is its own CELL (slot.x, slot.y), not the +0.5 draw
          * offset: the desk and the agent sitting at it occupy ONE cell, so they
          * tie on the key and the `agent` rank breaks the tie — the figure
-         * covers the desk it sits at. */
+         * covers the desk it sits at. (The REAL desk and chair PNGs for that
+         * seat come from `worldFor` above, on the same cell — the occupant
+         * figure still wins the tie at rank 3 > prop 2.) */
         (room.seats || []).forEach(function (slot, n) {
           var sx = Number(slot.x), sy = Number(slot.y);
           var occupied = slot.agent_id !== null && slot.agent_id !== undefined;

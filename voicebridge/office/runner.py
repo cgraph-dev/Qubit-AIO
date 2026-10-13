@@ -105,10 +105,28 @@ def attribute_artifact(cfg: Any, run_id: str, *, agent_id: Optional[int],
             (run_id, agent_id, department_id, kind, ref.strip(), sha256,
              size, store.now()))
         conn.commit()
-        return {"state": "OK", "id": int(cur.lastrowid or 0),
-                "run_id": run_id, "ref": ref.strip()}
+        artifact_id = int(cur.lastrowid or 0)
     finally:
         conn.close()
+    # A REAL note/artifact reached the shelf: that is the `note_written`
+    # (`carrying`) event, emitted by the code that actually wrote the thing —
+    # never by the renderer guessing (C7). A5 owns the memory/linkage seam. The
+    # payload names the artifact row (which is itself run-scoped, C6) rather
+    # than repeating `run_id`, so `runner.trace`'s run-scoped event view is not
+    # silently widened by a value the artifact row already holds.
+    try:
+        from . import agent_memory as _mem
+
+        _mem.emit_event(cfg, "note_written", agent_id=agent_id,
+                        department_id=department_id,
+                        payload={"ref": ref.strip(),
+                                 "artifact_id": artifact_id,
+                                 "kind": kind, "sha256": sha256 or ""},
+                        visible="badge")
+    except Exception:                                   # noqa: BLE001
+        pass
+    return {"state": "OK", "id": artifact_id,
+            "run_id": run_id, "ref": ref.strip()}
 
 
 def contract_check_attribution(cfg: Any) -> Dict[str, Any]:
@@ -235,6 +253,25 @@ def run_turn(cfg: Any, agent_id: int, task_text: str, *,
 
     usage = ((result.get("receipt") or {}).get("usage"))
     state = str(result.get("state") or "").upper()
+
+    # THE CAPABILITY EVENTS (A5). The turn receipt reports the tools that really
+    # ran (`receipt["tools"]`), and two of the tower's walk-driving kinds are a
+    # direct function of that list: a `mcp__<server>__<tool>` name IS an MCP
+    # call (`comms` station) and a skill tool name IS a skill use (`workbench`).
+    # They are emitted here, after the turn returned and only for names that
+    # actually appear, so the animation cannot fire without the action behind it
+    # (C7). `agent_memory.classify_tool` owns the vocabulary; this is the one
+    # honest call site — a plain file/shell tool classifies to "" and is not
+    # promoted into a walk it did not earn.
+    try:
+        from . import agent_memory as _mem
+
+        _mem.tool_events(cfg, agent_id,
+                         tools=((result.get("receipt") or {}).get("tools")
+                                or []),
+                         meta={})
+    except Exception:                                   # noqa: BLE001
+        pass
 
     # --- a subscription-backed turn has no dollar cost to be unknown (D16) ---
     # `unmetered` means the provider is flat-rate: the turn happened and is

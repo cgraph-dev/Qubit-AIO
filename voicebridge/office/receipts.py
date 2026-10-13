@@ -129,6 +129,28 @@ def finish_run(cfg: Any, run_id: str, *, settled_cents: int,
         tokens_out=tokens_out, provider_cost_micros=provider_cost_micros,
         source=source, external_ref=external_ref)
 
+    # A row reached the ledger: that IS a `ledger_write` (the tower's `vault`
+    # walk / `settling` pose). Emitted here, by the code that actually booked
+    # the money, so the vault animation can only fire when money really moved
+    # (C7). A5 owns the emission; the payload carries the row id and cents so
+    # the event is the same evidence the ledger row is. It deliberately does
+    # NOT carry `run_id`: the ledger row itself is run-scoped, and `runner.trace`
+    # joins a run's events by `payload LIKE '"run_id": …'` — adding the key here
+    # would silently widen that pinned surface for a value the ledger row already
+    # holds.
+    try:
+        from . import agent_memory as _mem
+
+        _mem.emit_event(cfg, "ledger_write", agent_id=rid_agent,
+                        department_id=department_id,
+                        payload={"ledger_id": entry.get("id"),
+                                 "cents": int(settled_cents),
+                                 "kind": "inference",
+                                 "unmetered": bool(unmetered)},
+                        visible="badge")
+    except Exception:                                   # noqa: BLE001
+        pass
+
     conn = store.connect(cfg)
     try:
         store.migrate(conn)

@@ -55,22 +55,57 @@
  *      - `webview-ui/src/office/colorize.ts` — recolour a sprite by shifting
  *        HSL while PRESERVING per-pixel alpha. Ported in `tint()`.
  *
- * Deliberately NOT used: any asset pipeline (`new Image()`, manifest fetching,
- * `drawImage` of a PNG) — our figures are procedural, so only the technique of
- * those files is adopted. `rsanandres/aphae` ships no licence file (all rights
- * reserved) and none of its code is referenced here.
+ * Deliberately NOT used in the PROCEDURAL path: any asset pipeline — the
+ * procedural figure is the FALLBACK. `rsanandres/aphae` ships no licence file
+ * (all rights reserved) and none of its code is referenced here.
+ *
+ * ---------------------------------------------------------------------------
+ * THE ATLAS PATH (M6) — added on top of the technique above
+ *
+ * The procedural figure is a rectangle stack: at the tower's own scale it reads
+ * as a smear. So when `window.QubitAtlas` is present AND ready *and* the pose
+ * the payload's animation state names has decoded, `drawAgentSprite` draws the
+ * VENDORED PNG instead — anchored by the same measured feet line, over the
+ * same contact shadow, with the same walk bob. The procedural path stays as the
+ * fallback so a missing atlas, a missing pose or an undecoded image still draws
+ * a figure rather than a blank desk, and the gap is named via
+ * `atlasGap()`/`MODULE_GAPS` rather than hidden.
+ *
+ * WHAT DOES NOT CHANGE (M12 — the reason this is safe):
+ *   `drawAgentSprite` still returns the SAME feet-anchored geometry, so the
+ *   caller's `depthKey(x, y, z)` -> `sortByDepth()` -> `paintOrder()` chain
+ *   sorts the figure exactly where the vector figure sorted. The atlas changes
+ *   HOW a figure is DRAWN; it never changes WHERE it sorts.
  * ---------------------------------------------------------------------------
  */
 (function (root, factory) {
-  var api = factory();
+  var api = factory(root);
   if (typeof module === "object" && module && module.exports) {
     module.exports = api;                 /* `node -e` smoke test path */
   }
   if (root) {
     root.QubitSprites = api;              /* browser <script> path */
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (root) {
   "use strict";
+
+  /* The atlas loader, if the bundle loaded it before this file (the bundle
+   * `ORDER` places `atlas.js` ahead of `sprites.js`; see 90-AGENT-CONTRACT
+   * §2.6). In a bare `node` harness it is absent and the procedural figure
+   * below is used — a missing module must draw the office, not blank it. */
+  var ATLAS = (root && root.QubitAtlas) || null;
+
+  /* Lazy one-shot init. The renderer (A3's file) MIGHT call `QubitAtlas.init()`
+   * itself, but this module must not depend on that: the moment the atlas is
+   * present, the first sprite draw that carries a state asks it to load its
+   * manifest. `init()` is idempotent and never throws. This keeps the seam one
+   * way — A2 → A3 — while letting the atlas switch itself on. */
+  var atlasInitTried = false;
+  function atlasEnsure() {
+    if (!ATLAS || atlasInitTried) return;
+    atlasInitTried = true;
+    try { if (typeof ATLAS.init === "function") ATLAS.init(); } catch (err) { /* named gap, not a crash */ }
+  }
 
   /* ======================================================================
    * THE FIGURE, IN SPRITE UNITS
@@ -175,6 +210,28 @@
       out += (byte < 16 ? "0" : "") + byte.toString(16);
     }
     return out;
+  }
+
+  /* HSL -> [r, g, b] as 0..255 integers. The same conversion as `hslToHex`,
+   * stopping one step earlier: an ImageData write needs channel bytes, not a
+   * string, and re-parsing a hex string per pixel to get them back is both
+   * slower and easy to get subtly wrong. */
+  function hslToRgb(h, s, l) {
+    h = ((h % 360) + 360) % 360;
+    s = Math.max(0, Math.min(1, s));
+    l = Math.max(0, Math.min(1, l));
+    var c = (1 - Math.abs(2 * l - 1)) * s;
+    var hp = h / 60, x = c * (1 - Math.abs((hp % 2) - 1));
+    var r1 = 0, g1 = 0, b1 = 0;
+    if (hp < 1) { r1 = c; g1 = x; }
+    else if (hp < 2) { r1 = x; g1 = c; }
+    else if (hp < 3) { g1 = c; b1 = x; }
+    else if (hp < 4) { g1 = x; b1 = c; }
+    else if (hp < 5) { r1 = x; b1 = c; }
+    else { r1 = c; b1 = x; }
+    var m = l - c / 2;
+    function ch(v) { return Math.max(0, Math.min(255, Math.round(v * 255))); }
+    return [ch(r1 + m), ch(g1 + m), ch(b1 + m)];
   }
 
   /* f < 0 darkens, f > 0 lightens. Lightening desaturates LESS than a plain
@@ -653,6 +710,194 @@
     }
   }
 
+  /* ======================================================================
+   * THE ATLAS PATH — a real PNG pose, drawn by its measured feet line
+   *
+   * Everything here is OPTIONAL and additive. When the atlas is absent,
+   * unready, or a pose has not decoded, `atlasDraw` returns false and the
+   * caller falls through to the procedural figure it already had. The atlas
+   * never changes the returned geometry — only whether a canvas is blitted
+   * (which the caller already blits for the procedural bake too).
+   * ====================================================================== */
+
+  /* Is the atlas loader present and holding a manifest? Ensures a manifest
+   * load has been attempted once (lazy init). */
+  function atlasReady() {
+    atlasEnsure();
+    return !!(ATLAS && typeof ATLAS.ready === "function" && ATLAS.ready());
+  }
+
+  /* ----------------------------------------------------------------------
+   * THE PER-SEAT RECOLOUR — a cached tinted copy of a vendored pose.
+   *
+   * The vendored families ship a single flat tone, so the atlas path alone
+   * makes every agent identical AND discards `seatColour`, which the procedural
+   * figure honoured and which is what tells two seats apart on the tower.
+   *
+   * The fix mirrors the bake's own `tinted` cache: build the recoloured canvas
+   * ONCE per (set, pose, colour) and reuse it every frame. The recolour itself
+   * is `tint()` — the same alpha-preserving HSL mix the procedural path uses,
+   * so a sprite and a fallback figure for the same seat agree on colour.
+   *
+   * Returns null when the pose cannot be recoloured yet (not decoded, or no
+   * target hue) — the caller then draws the original image, which is the
+   * correct fallback: untinted art beats a missing figure.
+   * -------------------------------------------------------------------- */
+  var atlasTintCache = {};   /* "set/pose|colour" -> canvas */
+
+  function atlasTinted(pose, colour) {
+    if (!pose || !pose.img || !pose.set || !pose.name) return null;
+    var key = pose.set + "/" + pose.name + "|" + String(colour);
+    var hit = atlasTintCache[key];
+    if (hit) return hit;
+
+    var img = pose.img;
+    if (!(img.complete !== false) || !(img.naturalWidth || img.width)) return null;
+
+    /* The art's own tone, so an untargeted hue is a no-op rather than a
+     * pointless full-canvas recolour that would shift the shading. */
+    try {
+      var cv = document.createElement("canvas");
+      cv.width = img.naturalWidth || img.width;
+      cv.height = img.naturalHeight || img.height;
+      var c2 = cv.getContext("2d");
+      if (!c2) return null;
+      c2.drawImage(img, 0, 0);
+      var data = c2.getImageData(0, 0, cv.width, cv.height);
+      var px = data.data;
+      /* The seat hue we tint toward. `tint()` mixes the seat's own hue toward
+       * itself at full weight = the seat hue, so this is just the seat colour
+       * resolved to one opaque hex — matching what the procedural bake uses. */
+      var seatHex = solidHex(colour);
+      var t = parseColour(seatHex);
+      for (var i = 0; i < px.length; i += 4) {
+        if (px[i + 3] === 0) continue;             /* transparent: leave it */
+        /* Recolour the pixel's hue toward the seat hue, keeping its ALPHA and
+         * its relative luminance, so the art's shading survives the tint.
+         * `parseColour` reads HEX and returns HSL (NOT rgb), so the target is
+         * built as HSL and converted straight back to 0..255 channels via the
+         * module's own hslToRgb — the previous version read `m.r`, which does
+         * not exist on the parsed object, so every channel wrote NaN -> 0 and
+         * the figure came out black. */
+        var pxHex = "#" + hex2(px[i] / 255) + hex2(px[i + 1] / 255) + hex2(px[i + 2] / 255);
+        var pc = parseColour(pxHex);
+        var d = ((t.h - pc.h + 540) % 360) - 180;
+        var rgb = hslToRgb(pc.h + d * 0.85, Math.min(1, t.s), pc.l);
+        px[i] = rgb[0]; px[i + 1] = rgb[1]; px[i + 2] = rgb[2];
+        /* alpha byte (px[i+3]) is deliberately untouched */
+      }
+      c2.putImageData(data, 0, 0);
+      atlasTintCache[key] = cv;
+      return cv;
+    } catch (e) {
+      /* A tainted/undecodable image must never break the frame. */
+      return null;
+    }
+  }
+
+  /* The named gaps the atlas has collected, so the renderer can surface them
+   * in the page rather than silently degrading (50-ARCHITECTURE §5.4). */
+  function atlasGap() {
+    if (!ATLAS || typeof ATLAS.gapText !== "function") return "";
+    try { return ATLAS.gapText() || ""; } catch (err) { return ""; }
+  }
+
+  /* The atlas set for a figure. `set` is the payload's per-seat art field
+   * (additive, default-safe — 50-ARCHITECTURE §5.2 seam 1). A1 vendors the
+   * neutral families only (owner ruling O1); a seat with no `sprite_set` uses
+   * the recolourable blank base so every figure still draws. */
+  var DEFAULT_SET = "approved_blank_amber";
+  function atlasSetFor(set) {
+    return set ? String(set) : DEFAULT_SET;
+  }
+
+  /* Resolve the pose for one (state, facing, walk-frame). `walkSeed` is the
+   * frame index inside a walk cycle; for the non-walking states it is 1 and
+   * the family ignores it (rot/sit have a single frame). */
+  function atlasPose(set, state, face, walking, progress) {
+    if (!atlasReady()) return null;
+    var seed = walking ? (1 + walkFrame(progress)) : 1;
+    try {
+      return ATLAS.pose(set, state || "idle", face, seed);
+    } catch (err) {
+      return null;   /* the atlas must never throw into the render loop */
+    }
+  }
+
+  /* Draw the PNG pose so its FEET land on (fx, fy + bob), exactly where the
+   * procedural bake's feet land. Returns the drawn geometry on success,
+   * false on any reason to fall back.
+   *
+   * The pose is 144x144 with transparent margin below the boots, so the
+   * image bottom is NOT the floor. `pad` (measured by the atlas's
+   * measureFootPad) is how many transparent rows sit under the feet; the
+   * visible figure therefore spans image rows [top .. h-1-pad], and its feet
+   * line sits `pad` px above the image bottom. Anchoring:
+   *     bottomOfImage = fy + bob + pad * drawScale
+   *     drawY         = bottomOfImage - drawnH
+   * — i.e. the feet line lands on fy + bob and the transparent rows hang
+   * BELOW the floor (invisible), which is what keeps a big sprite from
+   * floating above its own shadow. */
+  function atlasDraw(ctx, pose, fx, fy, sc, face, bob, colour) {
+    if (!pose || !pose.img || !pose.w || !pose.h) return false;
+    var img = pose.img;
+    /* An image that has not finished decoding yet has no drawable size. */
+    if (!(img.complete !== false)) return false;
+    if (!(img.naturalWidth || img.width)) return false;
+
+    /* PER-SEAT COLOUR. The vendored families are a single flat tone, so drawn
+     * as-is every agent is the same gold and `seatColour` — which distinguishes
+     * one seat from another on the tower — has no effect. We tint a CACHED copy
+     * of the pose toward the seat hue, preserving per-pixel alpha (the same
+     * `tint()` the procedural figure uses), and cache it per (pose, colour) so
+     * the recolour is paid once, not every frame. `colour` absent or equal to
+     * the art's own tone leaves the original image untouched — no cache entry,
+     * no copy. */
+    if (colour) {
+      var tinted = atlasTinted(pose, colour);
+      if (tinted) img = tinted;
+    }
+
+    /* The drawn height: the visible figure, not the padded image.
+     *
+     * THE FIGURE SCALE. The renderer passes `sc` = max(cam.zoom, 1.9) screen px
+     * per sprite unit, sized for the ~18-unit procedural figure. The vendored
+     * art is a real human silhouette, which is THINNER than the procedural
+     * rectangle stack — at the same nominal height it covers fewer pixels and
+     * reads smaller. So the atlas figure is drawn at its own height in sprite
+     * units, larger than the procedural body, which is exactly the M6
+     * legibility goal (the renderer's own comment calls the equal-size figure
+     * "a speck"). `POSE_BODY_UNITS` is the atlas figure's height on the same
+     * grid; the procedural body stays 18. */
+    var POSE_BODY_UNITS = 22;      /* ~1.22x the procedural body: legible, not cartoonish */
+    var visible = pose.h - (pose.pad || 0);
+    if (visible <= 0) return false;
+    var drawScale = (POSE_BODY_UNITS * sc) / visible;
+    var drawnW = pose.w * drawScale;
+    var drawnH = pose.h * drawScale;
+    var padPx = (pose.pad || 0) * drawScale;
+
+    /* Facing nudge: a diagonal pose already faces its way, so only the four
+     * cardinals carry the small turn the procedural figure used. Kept tiny so
+     * the feet never leave the shadow. */
+    var dx = face === "left" ? -0.8 * sc : (face === "right" ? 0.8 * sc : 0);
+
+    var drawX = fx + dx - drawnW / 2;
+    /* bottom of the IMAGE = feet line + the transparent pad below the boots */
+    var drawY = fy + bob + padPx - drawnH;
+
+    var prev = ctx.imageSmoothingEnabled;
+    if ("imageSmoothingEnabled" in ctx) ctx.imageSmoothingEnabled = drawScale < 1;
+    try {
+      ctx.drawImage(img, Math.round(drawX), Math.round(drawY),
+                    Math.round(drawnW), Math.round(drawnH));
+    } finally {
+      if ("imageSmoothingEnabled" in ctx) ctx.imageSmoothingEnabled = prev;
+    }
+    return {w: drawnW, h: drawnH, drawY: drawY, drawX: drawX,
+            feetY: visible * drawScale / sc};
+  }
+
   /* Draw one agent, anchored by its FEET at (x, y).
    *   cache    the object returned by bakeAgent (or null, and it is resolved)
    *   colour   the seat colour; only used to resolve the cache
@@ -660,11 +905,18 @@
    *   facing   left | right | down | up  (defaults to down)
    *   walking  boolean — the payload's `walking`
    *   progress 0..1 — the payload's `progress`; the ONLY source of motion
+   *   opts     OPTIONAL (10th arg): {state, set}. `state` is the payload's own
+   *            animation state, which selects the atlas pose; `set` is the
+   *            per-seat art family. Both are additive — omitting `opts` keeps
+   *            the pre-atlas behaviour byte for byte, which is why every
+   *            existing caller and test still holds.
    * Returns the drawn geometry and the feet anchor, so a caller can lay a
-   * name label or a marker on top without asking again. */
-  function drawAgentSprite(ctx, cacheOrAgent, colour, x, y, scale, facing, walking, progress) {
-    var figure = cacheOrAgent && cacheOrAgent.canvas !== undefined
-      ? cacheOrAgent : bakeAgent(colour, {scale: scale});
+   * name label or a marker on top without asking again.
+   *
+   * M12: the RETURNED GRAPHICS may come from the atlas, but the returned
+   * geometry — `feetY`, `drawY`, the feet on (x, y) — is the SAME as the
+   * procedural path's, so the caller's depth sort does not move. */
+  function drawAgentSprite(ctx, cacheOrAgent, colour, x, y, scale, facing, walking, progress, opts) {
     var sc = Number(scale);
     if (!isFinite(sc) || sc <= 0) sc = 1;
     var fx = Number(x), fy = Number(y);
@@ -672,10 +924,43 @@
     if (!isFinite(fy)) fy = 0;
     var face = ["left", "right", "up", "down"].indexOf(facing) >= 0 ? facing : "down";
     var moving = !!walking;
+    var o = opts || {};
 
     /* The contact shadow stays on the floor even when the body lifts: only the
-     * sprite rises through a bob, never its pool. */
+     * sprite rises through a bob, never its pool. Drawn for BOTH paths. */
     drawShadow(ctx, fx, fy, sc);
+
+    /* THE ATLAS PATH (M6). A real vendored PNG, when the loader is ready and
+     * the state's pose has decoded. It is drawn over the same shadow, at the
+     * same feet point, with the same bob — so the only thing that changes is
+     * the pixels. Anything missing falls through to the procedural figure.
+     *
+     * THE STATE. A3's renderer passes the payload's own `state` as `opts.state`.
+     * Until it does, we derive the state from the payload signal this call
+     * ALREADY carries — `walking` — which yields exactly two reachable states
+     * (`walking` / `idle`). That is not inventing a state: both are payload
+     * facts, and the weathering rule (§5.3) is satisfied because the atlas only
+     * ever draws a pose a payload-backed state asked for. A3 passing `state`
+     * simply widens the set to the other 10. */
+    var geomState = (o.state !== undefined && o.state !== null)
+      ? o.state : (moving ? "walking" : "idle");
+    var bobAtlas = moving ? bobFor(progress, sc) : 0;
+    if (ctx && typeof ctx.drawImage === "function" && atlasReady()) {
+      var pose = atlasPose(atlasSetFor(o.set), geomState, face, moving, progress);
+      if (pose) {
+        var hit = atlasDraw(ctx, pose, fx, fy, sc, face, bobAtlas, colour);
+        if (hit) {
+          return {feetY: hit.feetY, height: hit.feetY, x: fx, y: fy,
+                  w: hit.w, h: hit.h, drawY: hit.drawY, bob: bobAtlas,
+                  facing: face, walk: 0, key: "atlas:" + atlasSetFor(o.set) + "/" + pose.name,
+                  source: "atlas", pose: pose.name,
+                  top: hit.drawY, midX: fx};
+        }
+      }
+    }
+
+    var figure = cacheOrAgent && cacheOrAgent.canvas !== undefined
+      ? cacheOrAgent : bakeAgent(colour, {scale: scale});
 
     var walk = moving ? walkFrom(progress) : 0;
     var drawn = figure;
@@ -766,6 +1051,9 @@
     walkFrame: walkFrame, bobFor: bobFor, bodyScale: bodyScale,
     /* draw */
     drawAgentSprite: drawAgentSprite, drawShadow: drawShadow,
+    /* atlas (M6) — optional; absent when the loader is not bundled */
+    atlasReady: atlasReady, atlasGap: atlasGap, atlasSetFor: atlasSetFor,
+    ATLAS: ATLAS, DEFAULT_SET: DEFAULT_SET,
     /* test-only: the pose geometry, so a headless test can assert the
      * silhouette without a canvas at all */
     _figureRects: figureRects, _walkFrom: walkFrom, _parseColour: parseColour
