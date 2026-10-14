@@ -1,0 +1,86 @@
+{
+  "url": "http://127.0.0.1:8890/qubit-office",
+  "errors": [],
+  "failed_requests": [],
+  "modules": [
+    "QubitIso",
+    "QubitAtlas",
+    "QubitSprites",
+    "QubitCamera",
+    "QubitControlBar",
+    "QubitOfficeMotion"
+  ],
+  "canvas_event_listeners": [],
+  "wheel_changed_pixels": false,
+  "drag_changed_pixels": false,
+  "floor_button_changed_pixels": true,
+  "pnl_button_opens_chart": true,
+  "buttons": [
+    "Reset",
+    "Fit",
+    "Zoom",
+    "P&L",
+    "all",
+    "F1 \u00b7 executive",
+    "F2 \u00b7 operations",
+    "F3 \u00b7 intelligence",
+    "P&L"
+  ],
+  "atlas": {
+    "ready": true,
+    "gaps": []
+  },
+  "tower_keys": [
+    "ok",
+    "schema",
+    "now",
+    "active_window_s",
+    "walk_s",
+    "empty",
+    "empty_reason",
+    "hud",
+    "floorplan",
+    "characters",
+    "activity",
+    "history",
+    "history_totals",
+    "grid",
+    "motion_rule",
+    "read_only",
+    "preview"
+  ],
+  "character_keys": [
+    "agent_id",
+    "slug",
+    "seat_type",
+    "department_id",
+    "supervisor_id",
+    "seated",
+    "position",
+    "facing",
+    "walking",
+    "at",
+    "animation",
+    "last_event",
+    "stalled",
+    "memory",
+    "dossier"
+  ],
+  "floors": 3,
+  "characters": 10,
+  "initial_viewport": {
+    "width": 1600,
+    "height": 1000
+  },
+  "canvas_box": {
+    "x": 278.5,
+    "y": 280.4375,
+    "width": 883,
+    "height": 502
+  },
+  "mobile_overflow": {
+    "viewport": 390,
+    "body": 390,
+    "doc": 390
+  }
+}

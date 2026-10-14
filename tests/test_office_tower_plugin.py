@@ -240,6 +240,35 @@ def test_every_fetch_call_is_the_read_route():
             assert "/api/office/tower" in line, line.strip()
 
 
+def test_no_file_in_the_plugin_dir_issues_a_mutating_request():
+    """C4, over the WHOLE plugin directory — not just the entry file.
+
+    `95-CONTRACT.md` C4's proof greps `plugins/qubit-office/*.js`, and the
+    frontend rebuild adds modules beside the entry (a `game/` tree, an adapter,
+    command helpers). A C4 check that reads one hand-named file is one new
+    module away from proving nothing, so this walks every JS file in the
+    directory and in every subdirectory.
+
+    See `docs/game-office/05-AMENDMENT-LOG.md` § Frontend amendment item 1 and
+    its test-change list row T2.
+    """
+    files = sorted(PLUGIN_DIR.rglob("*.js"))
+    assert files, "no JS files found in the plugin dir"
+    # the generated bundle is a concatenation of the same modules; checking it
+    # too costs nothing and catches a stale generated file that disagrees
+    for path in files:
+        raw = path.read_text()
+        src = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
+        src = re.sub(r"//[^\n]*", "", src)
+        for verb in ("POST", "PUT", "PATCH", "DELETE"):
+            assert f'"{verb}"' not in src, (
+                f"{path.name} contains {verb}: C4 forbids the view issuing any "
+                f"mutating request")
+            assert f"'{verb}'" not in src, (
+                f"{path.name} contains '{verb}': C4 forbids the view issuing "
+                f"any mutating request")
+
+
 # ------------------------------------------------------------------- C7
 def test_the_only_timer_is_the_poll():
     """No timer may imply work. Exactly one interval, and it only re-reads."""

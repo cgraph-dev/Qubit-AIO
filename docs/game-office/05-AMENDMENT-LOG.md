@@ -458,6 +458,121 @@ renderer interpolating motion the events did not justify.
 
 ---
 
+## Frontend amendment — 2026-10-14 (the game frontend programme)
+
+The owner's verdict on the current office page is **not working as the requested product** (see
+`frontend-game/README.md` § Recommendation). This amendment is required before any builder runs a
+packet: it distinguishes the rules the rebuild must still honour from the interpretations that were
+only ever true of the single-tower page. **No C-rule is edited in place**; C4 and C7 are *reaffirmed*
+and their renderer-side readings clarified exactly as `frontend-game/10-DECISIONS.md` § Amendment
+required prescribes. `95-CONTRACT.md`, `docs/differential/INTERFACE.md` and every frozen contract
+remain authoritative and unmodified.
+
+### 1. C4 reaffirmed — no direct org writes
+
+C4 is unchanged. **No direct org writes.** Every mutation is a staged op through the existing
+operation/confirmation authority. The frontend may *initiate* staged ops; it may never POST to a
+store route, show optimistic state, or resolve its own confirmation.
+
+What changes is only the proof's scope: the `grep` in `95-CONTRACT.md` C4 inspects
+`plugins/qubit-office/*.js`. The rebuild compiles to one registered entry and adds
+`game/{adapter,commands}.ts` plus UI components, so C4's proof must cover the **whole plugin
+directory** — not one hand-written file list. The behavioural test is the binding one (below).
+
+### 2. C7 clarified — no fabricated work; presentation is not work
+
+C7's rule is unchanged and its core prohibition stands: **no fabricated work, unverified success,
+fake progress, fake money, or fake agent location.**
+
+What was never C7's meaning, and is now explicitly excluded:
+
+- **Render-clock interpolation may depict a bounded authoritative route/event.** If the backend says
+  an agent moved from A to B, smooth motion between A and B is honest. Motion that implies a
+  relocation, state change or spend the events do not carry is still forbidden.
+- **Cosmetic scenery, ambient idle motion, camera travel and view transitions are presentation, not
+  domain state.** They may never carry work meaning. A visitor's viewpoint moving is not an agent
+  working.
+- **A request-loading indicator is permitted while a real request is genuinely pending**, labelled
+  "waiting for response" — never "task progress", never a percentage of work that does not exist.
+
+The binding half of C7 survives intact: `test_office_tower_no_phantom_motion.py` and
+`test_office_walk_visible.py` — freeze the event stream, advance the clock, and every character goes
+`idle` and stops. That test is the rule. A source-string ban is not.
+
+### 3. Local viewpoint vs. real agent relocation
+
+Separated explicitly (see `frontend-game/10-DECISIONS.md` P06). **Visitor viewpoint movement is
+local presentation state.** **Real agent relocation requires an accepted action or an updated
+snapshot** and may never be synthesised client-side. Any UI that shows an agent in a room must be
+able to answer "which event or snapshot revision put them there".
+
+### 4. Blanket source-string and timer bans are superseded by behavioural tests
+
+The following existing assertions ban source *vocabulary* rather than behaviour, and they are
+superseded for the frontend programme. They must be **replaced by behavioural tests proving the same
+boundary — not deleted outright**:
+
+| Existing assertion | File | Disposition |
+|---|---|---|
+| `setInterval`/`setTimeout`/`requestAnimationFrame`/`setImmediate`/`queueMicrotask` absent from the control bar | `tests/test_office_control_bar.py:149-151` | **Keep for the control bar** (it genuinely owns no timer). **Do not generalise** to the engine. |
+| `daemon=`, `setInterval`, `requestAnimationFrame` absent from `autowork.py` and every `voicebridge/office/*.py` | `tests/test_office_autonomous_driver.py:387-395` | **Keep unchanged.** Backend cron shape is a real property; the engine is frontend. |
+| No `@keyframes`, `animate(`, `document.`, `innerHTML` in the control bar | `tests/test_office_control_bar.py:157-159` | **Keep for the control bar.** A game engine legitimately uses `document.*`; this ban must never be lifted onto the renderer by extension. |
+
+The replacement contract is behavioural and applies to the new engine:
+
+1. With no new `office_event` rows, no character's animation state changes and no position advances
+   (C7's core claim — same as the existing phantom-motion suite).
+2. No mutation request originates from the renderer; every mutation goes through the staged
+   operation path (C4).
+3. A camera gesture issues no snapshot fetch and starts no agent run.
+
+### 5. Tests may not be deleted to pass
+
+Restating `frontend-game/10-DECISIONS.md`: this amendment does **not** authorise a builder to bypass
+a test by deleting it. Superseding an assertion means writing the behavioural test that proves the
+same boundary first, then removing the string check and recording the swap in this log.
+
+### 6. Execution partition superseded for THIS programme
+
+The seven-agent merge partition (see the wave-1 merge commit) is **superseded for the frontend
+programme only**: one sequential worker, no delegated agents, and no inherited autonomous
+run/spend permission. Backend, service and inference permissions are unchanged by this amendment —
+the frontend programme neither needs nor receives them.
+
+### Test-change list (F00 deliverable)
+
+| # | Change | File | Type |
+|---|---|---|---|
+| T1 | Add behavioural phantom-motion check for the new engine, assert engine-level no-fake-work | new engine test | add |
+| T2 | Add C4 check over the whole plugin dir (`game/` included), not a fixed `.js` list | `tests/test_office_tower_plugin.py` (or successor) | extend |
+| T3 | Add camera-gesture-issues-no-request check | new engine test | add |
+| T4 | Keep control-bar bans as-is (T4 = no change, recorded so nobody "tidies" them) | `tests/test_office_control_bar.py` | keep |
+| T5 | Keep `autowork.py` / `voicebridge/office/*.py` cron-shape bans as-is | `tests/test_office_autonomous_driver.py` | keep |
+| T6 | Record each supersede-and-replace swap here at the moment it happens | this file | process |
+
+**Status: amendment applied 2026-10-14. Owner directive: "apply and start".** The table above is the
+contract/test-change list F00 requires; T1–T3 are implementation work owned by F04–F07, T4–T6 are
+recorded constraints, not tasks.
+
+### Test-change log (T6 — one row per swap, appended as it happens)
+
+| Date | Swap | Files | Evidence |
+|---|---|---|---|
+| 2026-10-14 | T2 landed: added `test_no_file_in_the_plugin_dir_issues_a_mutating_request`, C4 over `PLUGIN_DIR.rglob("*.js")` including subdirs. The pre-existing single-file C4 check was **not** removed — the new test widens the proof rather than replacing it, because both read the same entry and neither is a string-ban on behaviour. | `tests/test_office_tower_plugin.py` | test added; falsified by planting `game/__probe.js` with a `POST` and observing the failure, then removing the probe |
+| 2026-10-14 | T3 landed: `test_a_camera_gesture_issues_no_request`, `test_a_camera_gesture_starts_no_agent_run`, `test_the_input_effect_owns_no_timer` — all scoped to the input effect, not the whole file, so they cannot be tripped by unrelated code. | `tests/test_office_interaction_lifecycle.py` | 18 passed |
+| 2026-10-14 | **No ban was deleted.** T4 (control-bar timer/`document.` bans) and T5 (`autowork.py` / `voicebridge/office/*.py` cron-shape bans) remain exactly as they were; nothing in this amendment required removing either. | — | `test_office_control_bar.py`, `test_office_autonomous_driver.py` both still pass unchanged |
+
+### Harness adaptation recorded (not a test weakening)
+
+`tests/test_office_inspector.py` extracts the renderer's literal `click()` and evaluates it in a
+harness that recreates its closure by hand. F02 changed `click()` to (a) consult `suppressClick` and
+(b) store an agent **ID** rather than the payload object. The harness was updated to declare
+`suppressClick = false` (a bare click with no preceding drag — the truthful value, not a stub) and to
+resolve the stored ID against the payload being drawn, mirroring the renderer's own derivation.
+Both MUTATION tests in that file still pass, which is the check that the harness still has teeth.
+
+---
+
 ## Known open items (correctly unresolved, not contradictions)
 
 | Item | Status |

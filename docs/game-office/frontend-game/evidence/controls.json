@@ -1,0 +1,24 @@
+{
+  "zoom_button_changes_pixels": true,
+  "fit_restores_initial_pixels": false,
+  "fit_changes_zoomed_pixels": false,
+  "reset_restores_initial_pixels": false,
+  "dpr_geometry": {
+    "dpr": 2,
+    "backingWidth": 881,
+    "cssWidth": 883,
+    "backingHeight": 500,
+    "cssHeight": 502
+  },
+  "mobile_canvas": {
+    "x": 27.25,
+    "y": 540.5625,
+    "width": 327,
+    "height": 502
+  },
+  "mobile_scroll_height": 844,
+  "minimap_pixels": {
+    "nonBackground": 78442,
+    "total": 166400
+  }
+}

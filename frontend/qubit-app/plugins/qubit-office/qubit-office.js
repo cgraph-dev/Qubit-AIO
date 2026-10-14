@@ -629,8 +629,14 @@
        * clearance, so it cannot reach the deck above. */
       var FIGURE_SCALE_FLOOR = 1.9;
       var sc = Math.max(Number(cam.zoom) || 1, FIGURE_SCALE_FLOOR);
+      /* `opts.state` is the payload's OWN animation field, threaded through so
+       * the atlas can resolve all twelve poses rather than the two that
+       * `walking` alone can express. Without it the loader falls back to
+       * `moving ? "walking" : "idle"` and every working/meeting/blocked agent
+       * in the org renders as a person standing still — the state reached the
+       * renderer and was dropped one call short of the sprite. */
       SPRITES.drawAgentSprite(ctx, null, colour, x, y, sc, facing,
-                              !!walking, progress);
+                              !!walking, progress, {state: state});
       /* the state band: the payload's own signal, kept because at this scale a
        * colour alone is not readable. Drawn against the SAME `sc` as the figure
        * so it stays on the body rather than floating below an oversized sprite */
@@ -1227,11 +1233,15 @@
       if (camRef.current._frameKey !== key) {
         camRef.current._frameKey = key;
         fitToBuilding(cam, shown);
+        /* The CANONICAL framing is only ever the fit — never the current
+         * camera. Saving `cam` here (as this file used to) made Reset restore
+         * whatever the user had just panned/zoomed to, turning Fit/Reset into
+         * no-ops that could never return to the canonical view. */
+        fitRef.current = {cx: cam.cx, cy: cam.cy, zoom: cam.zoom};
       } else if (camRef.current._autoZoom) {
         fitToBuilding(cam, shown);
+        fitRef.current = {cx: cam.cx, cy: cam.cy, zoom: cam.zoom};
       }
-      /* remember the framed view for the control bar's `reset` */
-      fitRef.current = {cx: cam.cx, cy: cam.cy, zoom: cam.zoom};
       /* The module's clamp is a WORLD-extent constraint; apply it where the
        * extent is known. Falls back to the local cols/rows guard. */
       var ex = extent(shown);
@@ -1278,7 +1288,11 @@
       camRef.current.cy = next.cam.cy;
       camRef.current.zoom = next.cam.zoom;
       if (id === "fit" || id === "reset") {
-        camRef.current._auto = true;      /* re-frame is a pass, not a choice */
+        /* `_autoZoom` — the flag `redraw()` actually reads. This wrote `_auto`
+         * (a name nothing read), so Fit/Reset set a phantom flag and left
+         * `_autoZoom` at whatever the user's last wheel had made it, which is
+         * why Fit never re-framed after Zoom. */
+        camRef.current._autoZoom = true;
       } else if (id === "zoom") {
         camRef.current._autoZoom = false;
       }
@@ -1290,31 +1304,83 @@
 
     /* Pan, zoom and pick. Plain DOM listeners attached ONCE — no timer, no
      * animation frame: a drag moves the camera and the next draw reflects it,
-     * so nothing here can produce motion the payload did not report. */
+     * so nothing here can produce motion the payload did not report.
+     *
+     * BOUND TO THE BRANCH, NOT TO MOUNT. The canvas exists only in the ready
+     * branch below, so a mount-only effect read `canvasRef.current === null`,
+     * returned at the guard, and never ran again — the page rendered a canvas
+     * with zero listeners (no pan, no zoom, no pick). The dependency is the
+     * branch selector itself, so the effect re-runs when the canvas actually
+     * appears (loading -> ready) and re-binds after any remount. On every
+     * branch that renders no canvas there is no element to bind and the guard
+     * still returns, which is why `view.loading`/`view.error`/`v.empty` are the
+     * correct keys: they are exactly the conditions under which the canvas is
+     * absent from the tree. */
+    var canvasPresent = !view.loading && !view.error && !(v.empty && !v.preview);
     hooks.useEffect(function () {
       var cv = canvasRef.current;
       if (!cv) return;
       var drag = null;
+      /* A DRAG THRESHOLD, because a click and a drag are the same gesture until
+       * the pointer travels: without it, a 2px slip during a click pans the
+       * camera and then the click lands on a different tile than the user
+       * aimed at. `DRAG_SLOP` is in CSS px, not world units — the user's hand
+       * does not know about zoom. */
+      var DRAG_SLOP = 4;
+      /* set when a drag actually moved, so the `click` that follows a pan is
+       * swallowed exactly once */
+      var suppressClick = false;
       function down(ev) {
         drag = {x: ev.clientX, y: ev.clientY,
-                cx: camRef.current.cx, cy: camRef.current.cy};
+                cx: camRef.current.cx, cy: camRef.current.cy,
+                moved: false, id: ev.pointerId};
+        /* POINTER CAPTURE: without it a fast drag that leaves the canvas ends
+         * the gesture early and the camera sticks mid-pan. Guarded because
+         * synthetic events in the headless probe have no pointerId. */
+        if (ev.pointerId !== undefined && cv.setPointerCapture) {
+          try { cv.setPointerCapture(ev.pointerId); } catch (err) { /* named gap */ }
+        }
         cv.style.cursor = "grabbing";
       }
+      /* `pointercancel` (an OS gesture, a lost capture) must end the drag the
+       * same way `pointerup` does, or the camera stays stuck to a pointer that
+       * no longer exists. */
+      function cancel() { up(); }
       function move(ev) {
         if (!drag) return;
-        camRef.current.cx = drag.cx -
-          (ev.clientX - drag.x) / camRef.current.zoom;
-        camRef.current.cy = drag.cy -
-          (ev.clientY - drag.y) / camRef.current.zoom;
+        var dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+        if (!drag.moved && Math.abs(dx) + Math.abs(dy) < DRAG_SLOP) return;
+        drag.moved = true;
+        camRef.current.cx = drag.cx - dx / camRef.current.zoom;
+        camRef.current.cy = drag.cy - dy / camRef.current.zoom;
+        /* the user took the camera: stop the passive re-frame from yanking it */
+        camRef.current._autoZoom = false;
         redraw();
       }
-      function up() { drag = null; cv.style.cursor = "grab"; }
+      function up() {
+        if (drag && drag.moved) suppressClick = true;
+        drag = null;
+        cv.style.cursor = "grab";
+      }
       function wheel(ev) {
         ev.preventDefault();
         var f = ev.deltaY > 0 ? 0.9 : 1.1;
-        camRef.current.zoom = Math.max(CHAR_FLOOR_ZOOM,
-          Math.min(MAX_ZOOM, camRef.current.zoom * f));
-        camRef.current._autoZoom = false;   /* the user chose; stop re-framing */
+        /* CURSOR-ANCHORED ZOOM. Zooming about the canvas centre means the point
+         * under the pointer slides away — the user has to re-aim after every
+         * step. Solve for the world point under the cursor, scale, then solve
+         * for the camera that puts that same world point back under it. */
+        var cam = camRef.current;
+        var before = cam.zoom;
+        var after = Math.max(CHAR_FLOOR_ZOOM, Math.min(MAX_ZOOM, before * f));
+        if (after !== before) {
+          var r = cv.getBoundingClientRect();
+          var px = ev.clientX - r.left - cam.w / 2;
+          var py = ev.clientY - r.top - cam.h / 2;
+          cam.cx += px / before - px / after;
+          cam.cy += py / before - py / after;
+          cam.zoom = after;
+        }
+        cam._autoZoom = false;   /* the user chose; stop re-framing */
         redraw();
       }
       /* Click-to-select, resolved by the MODULE's inverse transform rather than
@@ -1324,6 +1390,10 @@
        * Without the module the probe still carries each figure's grid cell, so
        * the fallback is the same rule on cell distance, not on screen pixels. */
       function click(ev) {
+        /* A DRAG IS NOT A CLICK. Without this, releasing a pan fires `click`
+         * on the canvas and the selection jumps to whatever tile the drag
+         * happened to end on. */
+        if (suppressClick) { suppressClick = false; return; }
         var r = cv.getBoundingClientRect();
         var mx = ev.clientX - r.left, my = ev.clientY - r.top;
         var cam = camRef.current;
@@ -1394,23 +1464,25 @@
           if (pick) best = pick;
           else best = null;
         }
-        setPick(best);
+        /* store the ID, not the object: the inspector derives from the latest
+         * snapshot (see `picked` below). */
+        setPick(best && best.agent_id !== undefined ? best.agent_id : null);
       }
       cv.addEventListener("pointerdown", down);
       cv.addEventListener("pointermove", move);
       cv.addEventListener("pointerup", up);
-      cv.addEventListener("pointerleave", up);
+      cv.addEventListener("pointercancel", cancel);
       cv.addEventListener("wheel", wheel, {passive: false});
       cv.addEventListener("click", click);
       return function () {
         cv.removeEventListener("pointerdown", down);
         cv.removeEventListener("pointermove", move);
         cv.removeEventListener("pointerup", up);
-        cv.removeEventListener("pointerleave", up);
+        cv.removeEventListener("pointercancel", cancel);
         cv.removeEventListener("wheel", wheel);
         cv.removeEventListener("click", click);
       };
-    }, []);
+    }, [canvasPresent]);
 
     /* Redraw whenever the truth changes: a poll, a floor focus, the chart
      * toggle, a control-bar verb. This is the only thing that moves pixels. */
@@ -1452,6 +1524,19 @@
       return !c.seated;
     });
     var barButtons = BAR ? BAR.buildButtons() : [];
+    /* THE INSPECTOR IS DERIVED, NOT STORED. `pick` holds an agent ID (or null);
+     * the panel below resolves it against `v.characters` from the CURRENT
+     * snapshot. Storing the character object itself (as this file used to)
+     * pinned the inspector to the revision it was clicked in: every later poll
+     * updated the tower and left the panel showing a stale state, walking flag
+     * and last-event age. An ID cannot go stale — a deleted or renamed agent
+     * simply resolves to nothing and the panel says so. */
+    var picked = null;
+    if (pick !== null && pick !== undefined) {
+      (v.characters || []).forEach(function (c) {
+        if (c.agent_id === pick) picked = c;
+      });
+    }
 
     return e("div", {style: styles.page, "data-state": "ready"},
       /* --- the preview banner. A drawing nobody can identify as a drawing is
@@ -1521,32 +1606,34 @@
           e("div", {style: {marginTop: 6, fontSize: 11, opacity: 0.55}},
             "Drag to pan \u00b7 scroll to zoom \u00b7 click a character")),
         e("div", {style: styles.side},
-          pick
+          picked
             ? e("div", {style: styles.panel},
-                e("div", {style: {fontWeight: 600, fontSize: 14}}, pick.slug),
+                e("div", {style: {fontWeight: 600, fontSize: 14}}, picked.slug),
                 e("div", {style: {fontSize: 12, opacity: 0.7}},
-                  pick.seat_type + (pick.department_id
-                    ? " \u00b7 dept " + pick.department_id : "")),
+                  picked.seat_type + (picked.department_id
+                    ? " \u00b7 dept " + picked.department_id : "")),
                 e("div", {style: {fontSize: 12, marginTop: 4}},
-                  "state: " + pick.animation +
-                  (pick.walking ? " (walking)" : "") +
-                  (pick.at ? " \u00b7 at " + pick.at : "")),
-                pick.stalled
+                  "state: " + picked.animation +
+                  (picked.walking ? " (walking)" : "") +
+                  (picked.at ? " \u00b7 at " + picked.at : "")),
+                picked.stalled
                   ? e("div", {style: {fontSize: 12, color: "#e0554a",
                                       fontWeight: 600, marginTop: 2}},
                       "STALLED \u2014 no event within " +
                       Math.round(Number(v.active_window_s) || 0) +
                       "s, so nothing is happening here")
                   : null,
-                pick.last_event
+                picked.last_event
                   ? e("div", {style: {fontSize: 12, opacity: 0.7}},
-                      "last event: " + pick.last_event.kind + " \u00b7 " +
-                      Math.round(pick.last_event.age_s) + "s ago")
+                      "last event: " + picked.last_event.kind + " \u00b7 " +
+                      Math.round(picked.last_event.age_s) + "s ago")
                   : e("div", {style: {fontSize: 12, opacity: 0.5}},
                       "no event on record"))
             : e("div", {style: styles.panel},
                 e("div", {style: {fontSize: 12, opacity: 0.6}},
-                  "Click a character for its state.")),
+                  pick !== null && pick !== undefined
+                    ? "That agent is no longer in the tower."
+                    : "Click a character for its state.")),
           e("div", {style: styles.panel},
             e("div", {style: {fontSize: 12, fontWeight: 600,
                               marginBottom: 4}},

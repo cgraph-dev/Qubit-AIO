@@ -1,0 +1,27 @@
+{
+  "url": "http://127.0.0.1:8890/qubit-office",
+  "errors": [],
+  "failed_requests": [],
+  "canvas_event_listeners": [
+    "pointerdown",
+    "pointermove",
+    "pointerup",
+    "pointercancel",
+    "wheel",
+    "click"
+  ],
+  "wheel_changed_pixels": true,
+  "drag_changed_pixels": true,
+  "zoom_then_fit_changed": true,
+  "fit_then_reset_changed": false,
+  "reset_returns_to_fit": true,
+  "fit_is_idempotent": true,
+  "click_changed_panel": false,
+  "tower_payloads_captured": 11,
+  "canvas_box": {
+    "x": 278.5,
+    "y": 280.4375,
+    "width": 883,
+    "height": 502
+  }
+}

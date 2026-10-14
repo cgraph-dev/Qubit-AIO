@@ -320,6 +320,10 @@ var viewRef = {current: {floor: null}};
 var __selected = [];
 var setPick = function (p) { __selected.push(p); };
 var cv = {getBoundingClientRect: function () { return {left: 0, top: 0}; }};
+/* `click` consults `suppressClick` — set by a completed drag so the click that
+ * follows a pan is swallowed. Every click this harness drives is a bare click
+ * with no preceding drag, so `false` is the faithful value, not a stub. */
+var suppressClick = false;
 %(click)s
 
 var payload = %(payload)s;
@@ -353,10 +357,21 @@ var results = clicks.map(function (cl) {
   __selected = [];
   click({clientX: cl.mx, clientY: cl.my});
   var got = __selected.length ? __selected[__selected.length - 1] : null;
+  /* The renderer stores an agent ID and DERIVES the character from the current
+   * snapshot (so the inspector cannot go stale). This resolves it the same
+   * way, against the payload being drawn — reading `got.slug` here would only
+   * work for the old store-the-object behaviour. */
+  var pickedSlug = null;
+  if (got !== null && got !== undefined) {
+    (payload.characters || []).forEach(function (c) {
+      if (c.agent_id === got) pickedSlug = c.slug;
+    });
+  }
   return {mx: cl.mx, my: cl.my, agents_floor: cl.agents_floor,
           z: z,
           drawn: agents.map(function (a) { return a.cs.slug; }),
-          picked: got ? got.slug : null,
+          picked: pickedSlug,
+          picked_id: got,
           cell: globalThis.QubitIso.screenToGrid(cl.mx, cl.my,
                                                  camRef.current, z)};
 });

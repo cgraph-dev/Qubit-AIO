@@ -1,0 +1,65 @@
+{
+  "timestamp": "2026-10-14T11:09:17.452410+03:00",
+  "status": "planning-doc-coherence-pass",
+  "product_implementation": "not performed",
+  "independent_review": "not performed",
+  "documents": [
+    {
+      "file": "00-AUDIT.md",
+      "lines": 100,
+      "sha256": "b672bd0233fa0ed40c9719654a51e34174c59aa69c877f5857068f2ba1c02237"
+    },
+    {
+      "file": "10-DECISIONS.md",
+      "lines": 62,
+      "sha256": "96cb4fde1697a058ce61f07144ce45fbbbe6ee131139f9441bffbccf54c11812"
+    },
+    {
+      "file": "20-GAME-DESIGN.md",
+      "lines": 119,
+      "sha256": "a51219669568f9b20d95bfa212d96ba8dd99de3fa6c33a076348fe19256f7afb"
+    },
+    {
+      "file": "30-ARCHITECTURE.md",
+      "lines": 103,
+      "sha256": "4eff0a8d21c2861b6d2b0101254d2cb9d4cae30fbd31965b9d4b9eb05a3bc115"
+    },
+    {
+      "file": "40-ART-AND-ASSETS.md",
+      "lines": 101,
+      "sha256": "3ab67506a6d075831ee0edd49e196541bed964c15879654bf19c52e240e5854b"
+    },
+    {
+      "file": "50-BACKEND-CONTRACT.md",
+      "lines": 90,
+      "sha256": "a7b8efc25a5bd5840356603c386b38cfda5e1cb011823f87937b6debf5587aaa"
+    },
+    {
+      "file": "60-IMPLEMENTATION-PLAN.md",
+      "lines": 174,
+      "sha256": "f2a72889431547e6364c4797c2dc6e268e4e388cd431b6cf20993c06e14bd5ee"
+    },
+    {
+      "file": "70-ACCEPTANCE-AND-HANDOFF.md",
+      "lines": 107,
+      "sha256": "5aafd31d17b415b1ae145640fd9eb214782b29cfb02972486b62894415024f8b"
+    },
+    {
+      "file": "README.md",
+      "lines": 63,
+      "sha256": "4800a45e2fbe244a8a625f0ab8d13d73cdbfebf483bb66e6b1fe23f8af551aeb"
+    }
+  ],
+  "functional_source_gap_risk_findings": 24,
+  "documentation_findings": 16,
+  "total_findings": 40,
+  "sequential_packets": 17,
+  "future_acceptance_gates": 18,
+  "broken_local_links": [],
+  "baseline_probes": [
+    "probe.json",
+    "controls.json"
+  ],
+  "baseline_owner_acceptance": "failed; rebuild required",
+  "verification_scope": "document IDs/links/requirements and actual recorded baseline probes; no broad suites or live redesigned-game claim"
+}

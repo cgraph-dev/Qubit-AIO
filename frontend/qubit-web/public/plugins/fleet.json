@@ -5,7 +5,10 @@
     "description": "Steam-style achievements for vibe coding and agentic Qubit workflows.",
     "icon": "Star",
     "version": "0.4.0",
-    "tab": { "path": "/achievements", "position": "after:analytics" },
+    "tab": {
+      "path": "/achievements",
+      "position": "after:analytics"
+    },
     "entry": "dist/index.js",
     "css": "dist/style.css",
     "has_api": true,
@@ -18,11 +21,29 @@
     "description": "Multi-agent collaboration board — drag-drop cards across columns, read comment threads, see which profile is running what",
     "icon": "Package",
     "version": "1.0.0",
-    "tab": { "path": "/kanban", "position": "after:skills" },
+    "tab": {
+      "path": "/kanban",
+      "position": "after:skills"
+    },
     "entry": "dist/index.js",
     "css": "dist/style.css",
     "has_api": true,
     "source": "bundled",
     "assetBase": "/plugins/kanban"
+  },
+  {
+    "name": "qubit-office",
+    "label": "Office",
+    "description": "Qubit Office — the agent corporation as a building: floors, rooms, seats, and characters that animate only from office_event rows.",
+    "icon": "Users",
+    "version": "1.0.0",
+    "tab": {
+      "path": "/qubit-office",
+      "position": "end"
+    },
+    "entry": "qubit-office.game.js",
+    "css": null,
+    "has_api": true,
+    "source": "qubit-overlay"
   }
 ]

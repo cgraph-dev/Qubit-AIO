@@ -8,7 +8,7 @@
     "path": "/qubit-office",
     "position": "end"
   },
-  "entry": "qubit-office.bundle.js",
+  "entry": "qubit-office.game.js",
   "css": null,
   "has_api": true,
   "source": "qubit-overlay"

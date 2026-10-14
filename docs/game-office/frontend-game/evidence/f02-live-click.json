@@ -1,0 +1,9 @@
+{
+  "selected": true,
+  "fx": 0.25,
+  "fy": 0.7,
+  "text": "Headcount\n10\nRevenue\n$10.00\nCost\n$0.20\nNet\n$9.80\nBurn\n$0.01/day\nRunway\n686 d\nfloor 7 d\nView\nReset\nFit\nZoom\nP&L\nFloor\nall\nF1 \u00b7 executive\nF2 \u00b7 operations\nF3 \u00b7 intelligence\nP&L\nDrag to pan \u00b7 scroll to zoom \u00b7 click a character\nceo\nceo \u00b7 dept 1\nstate: idle \u00b7 at desk\nlast event: run_unpriced \u00b7 165547s ago\nBuilding \u2014 3 floors, 10 seats\nActivity\n6:26:26 AM wren used a tool\n7:20:39 PM lead-content claimed ",
+  "panel_updated_or_stable": true,
+  "panel_after_poll_sample": "Headcount\n10\nRevenue\n$10.00\nCost\n$0.20\nNet\n$9.80\nBurn\n$0.01/day\nRunway\n686 d\nfloor 7 d\nView\nReset\nFit\nZoom\nP&L\nFloor\nall\nF1 \u00b7 executive\nF2 \u00b7 operations\nF3 \u00b7 intelligence\nP&L\nDrag to pan \u00b7 scroll to zoom \u00b7 click a character\nceo\nceo \u00b7 dept 1\nstate: idle \u00b7 at desk\nlast event: run_unpriced \u00b7 165548s ago\nBuilding \u2014 3 floors, 10 seats\nActivity\n6:26:26 AM wren used a tool\n7:20:39 PM lead-content claimed ",
+  "panel_same_text": false
+}

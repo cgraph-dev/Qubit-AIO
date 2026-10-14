@@ -1,0 +1,15 @@
+{
+  "name": "qubit-office",
+  "label": "Office",
+  "description": "Qubit Office — the agent corporation as a building: floors, rooms, seats, and characters that animate only from office_event rows (C7). Reads /api/office/tower, the same store `qubit office` writes.",
+  "icon": "Users",
+  "version": "1.0.0",
+  "tab": {
+    "path": "/qubit-office",
+    "position": "end"
+  },
+  "entry": "qubit-office.bundle.js",
+  "css": null,
+  "has_api": true,
+  "source": "qubit-overlay"
+}
