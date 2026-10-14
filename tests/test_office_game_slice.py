@@ -23,7 +23,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 WEB = REPO / "frontend" / "qubit-web"
@@ -39,6 +41,11 @@ TSC = tsc_path()
 
 MODULES = ["types.ts", "WorldAssembler.ts", "navigation.ts", "input.ts",
            "SceneHost.ts", "scenes.ts", "InteractionController.ts"]
+#: `scenes.ts` imports these, so they must sit beside it when it is compiled.
+#: Listed separately from the entry points above because they are compiled as
+#: DEPENDENCIES, not driven directly.
+ART_MODULES = ["art/colour.ts", "art/surfaces.ts", "art/iso.ts", "art/room.ts",
+               "art/scene-adapter.ts", "art/fittings.ts"]
 
 
 def _toolchain() -> bool:
@@ -54,9 +61,15 @@ def _run(tmp_path: Path, js: str) -> object:
     staged.mkdir(exist_ok=True)
     for name in MODULES:
         shutil.copy(GAME_DIR / name, staged / name)
+    # `art/` keeps its directory so the relative `./art/colour` imports in
+    # scenes.ts resolve exactly as they do in the bundle.
+    (staged / "art").mkdir(exist_ok=True)
+    for name in ART_MODULES:
+        shutil.copy(GAME_DIR / name, staged / name)
     subprocess.run(
         [NODE, str(TSC), "--module", "commonjs", "--target", "es2020",
-         "--moduleResolution", "node", "--outDir", str(tmp_path / "js"),
+         "--moduleResolution", "node",
+         "--ignoreDeprecations", "6.0", "--outDir", str(tmp_path / "js"),
          "--skipLibCheck", "--noEmitOnError", "false",
          "--lib", "es2020,dom", str(staged / "InteractionController.ts"),
          str(staged / "input.ts"), str(staged / "scenes.ts")],
@@ -82,7 +95,7 @@ def _run(tmp_path: Path, js: str) -> object:
          json.dumps(str(tmp_path / "js" / "input.js")),
          json.dumps(str(tmp_path / "js" / "scenes.js")),
          json.dumps(str(FIXTURE)), js)
-    proc = subprocess.run([NODE, "-e", program], capture_output=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True,
                           text=True, timeout=120)
     assert proc.returncode == 0, (
         f"node exited {proc.returncode}\nstdout: {proc.stdout}\n"

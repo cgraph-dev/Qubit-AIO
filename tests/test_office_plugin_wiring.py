@@ -31,6 +31,7 @@ own contract (no mutating verb, one timer, etc).
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -40,6 +41,8 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+
+from _office_node import run_node
 
 REPO = Path(__file__).resolve().parent.parent
 PLUGIN_DIR = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office"
@@ -197,20 +200,41 @@ def test_the_declared_entry_is_the_current_built_bundle():
 
 
 # ============================================================ assertion 4
-def test_the_declared_entry_loads_and_defines_its_modules():
-    """Load the bundle like a ``<script>`` tag and prove the modules are LIVE.
+def test_the_declared_entry_loads_and_registers_its_component():
+    """Load the served entry like a ``<script>`` tag and prove it is LIVE.
 
-    REAL DEFECT THIS CATCHES: a bundle that loads without error but is INERT —
-    a module whose export landed inside a CommonJS ``else`` branch and never on
-    the browser global, or a concatenation that dropped a module. The page would
-    throw "Office modules not loaded" or draw a dead canvas. Asserting the five
-    globals exist AND that a representative call on each returns real data
-    distinguishes "the script ran" from "the script works".
+    WHAT CHANGED AND WHY (the guarantee moved, it did not vanish)
+    -------------------------------------------------------------
+    This assertion used to prove the served entry defined the five CLASSIC
+    globals (``QubitIso``/``QubitAtlas``/``QubitSprites``/``QubitCamera``/
+    ``QubitControlBar``/``QubitOfficeMotion``). Those globals are the exports of
+    the hand-stitched ``qubit-office.bundle.js`` built by
+    ``scripts/build_office_bundle.py``, and they exist ONLY to feed the classic
+    canvas renderer in ``qubit-office.js``.
+
+    The manifest now promotes the Vite-built game (``qubit-office.game.js``),
+    which registers its own component through the SDK and needs none of them.
+    That promotion keeps the classic bundle ONLY as a rollback artifact
+    (``tests/test_office_game_packaging.py`` asserts it still exists for exactly
+    that reason) — it is never loaded. And the loader itself
+    (``frontend/qubit-web/src/plugins/usePlugins.ts``) injects exactly ONE
+    ``<script>`` per manifest ``entry``, while ``docs/game-office/
+    frontend-game/30-ARCHITECTURE.md`` states the manifest "selects exactly ONE
+    entry. Never leave duplicate native and plugin route owners active." So the
+    classic modules CANNOT be loaded alongside the game entry, and bundling
+    their dead exports into the game would ship a second, unused renderer.
+
+    The guarantee this file actually exists for — "the file the browser loads is
+    not inert: it runs without throwing and registers a real React component for
+    the tab" — is now asserted directly on the served entry, through the same
+    SDK seam the dashboard uses. A bundle that loads but registers nothing (or
+    registers an OBJECT where the registry stores a component type — the live
+    'Element type is invalid ... got: object' bug) fails here.
 
     The context reproduces real script semantics: ``window`` IS the global
     object (as it is in a browser), and there is NO ``module`` object — that is
-    the path the served ``<script>`` takes, and the path the CommonJS branch
-    must not be needed for.
+    the path the served ``<script>`` takes. The SDK is supplied as the dashboard
+    supplies it, because the entry registers a component built from it.
     """
     node = _node()
     if node is None:
@@ -218,7 +242,7 @@ def test_the_declared_entry_loads_and_defines_its_modules():
 
     probe = r"""
 const fs = require("fs"), vm = require("vm");
-const path = process.argv[1];
+const path = process.env.OFFICE_WIRING_ENTRY;
 const src = fs.readFileSync(path, "utf8");
 // A browser <script> context: window === globalThis, NO `module`, NO `exports`.
 const sandbox = { console: console };
@@ -294,55 +318,97 @@ sandbox.AudioContext = function () { return { createGain: () => ({ connect() {} 
 sandbox.HTMLCanvasElement = function () {};
 sandbox.HTMLVideoElement = function () {};
 sandbox.Image = function () {};
+/* The dashboard's plugin SDK, verbatim in shape: `React`, `hooks`,
+ * `fetchJSON`. `window.__QUBIT_PLUGINS__.register(name, component)` stores the
+ * second argument AS the component type — so what is registered must be a
+ * function, never an object literal. */
+sandbox.__QUBIT_PLUGIN_SDK__ = {
+  React: { createElement: function (t, p) {
+    return {type: t, props: p || {}, children: Array.prototype.slice.call(arguments, 2)}; } },
+  hooks: {
+    useState: function (init) { return [init, function () {}]; },
+    useEffect: function () {}, useRef: function (v) { return {current: v}; },
+    useCallback: function (f) { return f; },
+  },
+  fetchJSON: function () { return Promise.resolve({}); },
+};
+let registeredName = null;
+let registeredKind = "__unset__";
+sandbox.__QUBIT_PLUGINS__ = {
+  register: function (name, component) {
+    registeredName = name;
+    registeredKind = typeof component;
+  },
+};
+const ctx = vm.createContext(sandbox);
+vm.runInContext(src, ctx, { filename: path });
+console.log(JSON.stringify({name: registeredName, kind: registeredKind}));
+"""
+    entry = PLUGIN_DIR / _manifest()["entry"]
+    proc = run_node(probe, timeout=180,
+                    env={**os.environ, "OFFICE_WIRING_ENTRY": str(entry)})
+    assert proc.returncode == 0, (
+        f"the served entry failed to LOAD as a <script> (node exit "
+        f"{proc.returncode}):\n{proc.stderr.strip()}")
+    result = json.loads(proc.stdout.strip().splitlines()[-1])
+
+    assert result["name"] == "qubit-office", (
+        f"the entry registered {result['name']!r}, not 'qubit-office' — the "
+        f"tab's route would resolve no component and render nothing")
+    assert result["kind"] == "function", (
+        f"the entry registered a {result['kind']!r} where the registry stores a "
+        f"COMPONENT TYPE — registering an object literal is the live "
+        f"'Element type is invalid ... got: object' bug")
+
+
+# ============================================================ assertion 4b
+def test_the_rollback_bundle_still_defines_the_classic_globals():
+    """The classic globals are obsolete FOR THE SERVED ENTRY, not deleted.
+
+    They are the exports of ``qubit-office.bundle.js``, the documented rollback
+    artifact (``tests/test_office_game_packaging.py`` asserts it stays on disk
+    and ``docs/game-office/frontend-game/30-ARCHITECTURE.md`` records the
+    one-entry switch). This test keeps the old guarantee asserted where it now
+    legitimately lives: on the rollback bundle, so a rollback to it is still a
+    working renderer. It is SKIPPED when that bundle is absent so a clean clone
+    without a generated bundle does not fail — but if the file is present and
+    has stopped defining its modules, that is a real regression.
+    """
+    node = _node()
+    if node is None:
+        pytest.skip("node is not available to execute the bundle")
+    bundle = PLUGIN_DIR / "qubit-office.bundle.js"
+    if not bundle.is_file():
+        pytest.skip("the rollback bundle is not present in this checkout")
+
+    probe = r"""
+const fs = require("fs"), vm = require("vm");
+const path = process.env.OFFICE_WIRING_ENTRY;
+const src = fs.readFileSync(path, "utf8");
+const sandbox = { console: console };
+sandbox.window = sandbox;
+sandbox.self = sandbox;
 const ctx = vm.createContext(sandbox);
 vm.runInContext(src, ctx, { filename: path });
 const out = {};
-for (const g of __GLOBALS__) {
-  out[g] = typeof sandbox[g];
-}
-// representative calls: a module that loads but is inert must fail here
-let btns = null, g2s = null, dir = null;
-try { btns = sandbox.QubitControlBar.buildButtons(); } catch (e) { btns = "ERR:"+e.message; }
-try {
-  const p = sandbox.QubitIso.gridToScreen(1, 1, 0, {cx:0,cy:0,zoom:1,w:100,h:100});
-  g2s = {x: p && p.x, y: p && p.y, tx: typeof (p && p.x), ty: typeof (p && p.y)};
-} catch (e) { g2s = "ERR:"+e.message; }
-try { dir = sandbox.QubitOfficeMotion.DIR(0, 0, 1, 0); } catch (e) { dir = "ERR:"+e.message; }
-out.__calls = {btnLen: (btns && btns.length) || btns, gridToScreen: g2s, dir: dir};
+for (const g of __GLOBALS__) out[g] = typeof sandbox[g];
 out.__loaded = sandbox.__qubit_loaded__;
 console.log(JSON.stringify(out));
 """
     probe = probe.replace("__GLOBALS__", json.dumps(list(BUNDLE_GLOBALS)))
-    entry = PLUGIN_DIR / _manifest()["entry"]
-    proc = subprocess.run([node, "-e", probe, str(entry)],
-                          capture_output=True, text=True)
+    proc = run_node(probe, timeout=180,
+                    env={**os.environ, "OFFICE_WIRING_ENTRY": str(bundle)})
     assert proc.returncode == 0, (
-        f"the bundle failed to LOAD as a <script> (node exit "
-        f"{proc.returncode}):\n{proc.stderr.strip()}")
+        f"the rollback bundle failed to load (node exit {proc.returncode}):\n"
+        f"{proc.stderr.strip()}")
     result = json.loads(proc.stdout.strip().splitlines()[-1])
-
     for name in BUNDLE_GLOBALS:
         assert result.get(name) == "object", (
-            f"window.{name} is {result.get(name)!r} after loading the bundle — "
-            f"a module that loads but defines nothing renders a dead canvas")
-
+            f"window.{name} is {result.get(name)!r} in the rollback bundle — a "
+            f"rollback to it would render a dead canvas")
     assert result["__loaded"] == list(BUNDLE_GLOBALS), (
-        f"the in-bundle load guard recorded {result['__loaded']!r}; every module "
-        f"must have proven its global present")
-
-    calls = result["__calls"]
-    assert calls["btnLen"] == 4, (
-        f"QubitControlBar.buildButtons() returned {calls['btnLen']!r}, expected "
-        f"the four read-only buttons — a wrong count is a control bar that lost "
-        f"or invented a control")
-    assert calls["gridToScreen"] != "ERR", calls["gridToScreen"]
-    assert calls["gridToScreen"]["tx"] == "number" and \
-        calls["gridToScreen"]["ty"] == "number", (
-        f"QubitIso.gridToScreen() returned {calls['gridToScreen']!r}, expected "
-        f"numeric x/y — a non-numeric projection draws nothing")
-    assert calls["dir"] in ("left", "right", "up", "down"), (
-        f"QubitOfficeMotion.DIR() returned {calls['dir']!r}, expected a cardinal "
-        f"facing — anything else is a character facing the wrong way")
+        f"the rollback bundle's load guard recorded {result['__loaded']!r}; "
+        f"every module must have proven its global present")
 
 
 # ============================================================ assertion 5

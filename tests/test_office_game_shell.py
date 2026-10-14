@@ -25,7 +25,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 WEB = REPO / "frontend" / "qubit-web"
@@ -57,7 +59,8 @@ def _run(tmp_path: Path, js: str) -> object:
         shutil.copy(UI_DIR / name, staged / name)
     subprocess.run(
         [NODE, str(TSC), "--module", "commonjs", "--target", "es2020",
-         "--moduleResolution", "node", "--outDir", str(tmp_path / "js"),
+         "--moduleResolution", "node",
+         "--ignoreDeprecations", "6.0", "--outDir", str(tmp_path / "js"),
          "--skipLibCheck", "--noEmitOnError", "false",
          "--lib", "es2020,dom", str(staged / "settings.ts"),
          str(staged / "PanelHost.ts")],
@@ -75,7 +78,7 @@ def _run(tmp_path: Path, js: str) -> object:
         '})().catch(e => { console.error(String(e && e.stack || e));'
         ' process.exit(1); });\n'
     ) % (json.dumps(str(st)), json.dumps(str(ph)), js)
-    proc = subprocess.run([NODE, "-e", program], capture_output=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True,
                           text=True, timeout=90)
     assert proc.returncode == 0, (
         f"node exited {proc.returncode}\nstdout: {proc.stdout}\n"
@@ -407,7 +410,8 @@ def test_a_panel_above_the_world_swallows_movement_through_the_real_router(
     shutil.copy(GAME_DIR / "input.ts", staged / "input.ts")
     subprocess.run(
         [NODE, str(TSC), "--module", "commonjs", "--target", "es2020",
-         "--moduleResolution", "node", "--outDir", str(tmp_path / "js"),
+         "--moduleResolution", "node",
+         "--ignoreDeprecations", "6.0", "--outDir", str(tmp_path / "js"),
          "--skipLibCheck", "--noEmitOnError", "false",
          "--lib", "es2020,dom", str(staged / "input.ts"),
          str(staged / "PanelHost.ts")],
@@ -429,7 +433,7 @@ def test_a_panel_above_the_world_swallows_movement_through_the_real_router(
         '  panelHandled: r.handledBy, typingNav: typing.nav,\n'
         '  typingPass: typing.passThrough}));\n'
     ) % (json.dumps(str(ph)), json.dumps(str(inp)))
-    proc = subprocess.run([NODE, "-e", program], capture_output=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True,
                           text=True, timeout=60)
     assert proc.returncode == 0, proc.stderr[:600]
     got = json.loads(proc.stdout)

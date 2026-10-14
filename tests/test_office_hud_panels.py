@@ -488,10 +488,17 @@ def test_p5_inspector_renders_from_the_selected_character():
     The inspector is fed two different `pick` characters and must draw their
     fields: slug, seat_type, animation (+ walking suffix), the stalled line and
     the last-event line. A constant inspector fails the difference check.
+
+    The renderer's selection contract is an **agent id**, not the character
+    object: `qubit-office.js` documents it (`pick` holds an id) so the inspector
+    derives from the CURRENT snapshot — a stored object pinned the panel to the
+    revision it was clicked in. The harness therefore has to do what a real
+    click does: put the character in `view.data.characters` and pass its
+    `agent_id` as `pick`. Passing the object itself (the pre-`0c26cb2c6`
+    contract) renders "That agent is no longer in the tower." and asserts
+    against the empty-selection branch, not the inspector.
     """
     src = ENTRY.read_text()
-    view = {"loading": False, "error": None,
-            "data": _payload(chars=[])}
 
     one = {"agent_id": 1, "slug": "wk-0", "seat_type": "worker",
            "department_id": None, "animation": "working", "walking": False,
@@ -506,8 +513,12 @@ def test_p5_inspector_renders_from_the_selected_character():
                         "x": 3, "y": 4},
            "last_event": {"kind": "run_started", "age_s": 130.0}}
 
-    l1 = _render(src, view, pick=one)["leaves"]
-    l2 = _render(src, view, pick=two)["leaves"]
+    view_one = {"loading": False, "error": None,
+                "data": _payload(chars=[one])}
+    view_two = {"loading": False, "error": None,
+                "data": _payload(chars=[two])}
+    l1 = _render(src, view_one, pick=one["agent_id"])["leaves"]
+    l2 = _render(src, view_two, pick=two["agent_id"])["leaves"]
 
     assert "wk-0" in l1 and "mgr" in l2, (
         "P5 inspector did not follow the selected slug: %r vs %r" % (l1, l2))
@@ -547,12 +558,18 @@ def test_p4_meter_inputs_are_payload_fields_and_no_bar_is_faked():
 
     If a future renderer adds real meter bars, the last two rows flip and this
     test must be updated with the spec — which is the point of pinning it.
+
+    Like P5, the harness selects by **agent id** (the renderer's contract since
+    the selection moved to an id resolved against the live snapshot): the drawn
+    character is in `view.data.characters` and `pick` is its `agent_id`.
     """
     src = ENTRY.read_text()
-    view = {"loading": False, "error": None, "data": _payload()}
 
     def leaves_for(ch):
-        return " ".join(str(x) for x in _render(src, view, pick=ch)["leaves"])
+        """Leaves for the inspector with `ch` selected the way a click does."""
+        view = {"loading": False, "error": None, "data": _payload(chars=[ch])}
+        return " ".join(str(x) for x in
+                        _render(src, view, pick=ch["agent_id"])["leaves"])
 
     base = {"agent_id": 1, "slug": "wk-0", "seat_type": "worker",
             "department_id": None, "animation": "working", "walking": False,

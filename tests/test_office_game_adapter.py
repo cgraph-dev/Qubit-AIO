@@ -24,7 +24,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 WEB = REPO / "frontend" / "qubit-web"
@@ -55,7 +57,8 @@ def _compile(tmp_path: Path) -> Path:
         shutil.copy(GAME_DIR / name, staged / name)
     subprocess.run(
         [NODE, str(TSC), "--module", "commonjs", "--target", "es2020",
-         "--moduleResolution", "node", "--outDir", str(tmp_path / "js"),
+         "--moduleResolution", "node",
+         "--ignoreDeprecations", "6.0", "--outDir", str(tmp_path / "js"),
          "--skipLibCheck", "--noEmitOnError", "false",
          "--lib", "es2020,dom", str(staged / "adapter.ts")],
         capture_output=True, text=True, timeout=180, cwd=str(staged))
@@ -79,7 +82,7 @@ def _run(tmp_path: Path, js: str) -> object:
         '})().catch(e => { console.error(String(e && e.stack || e)); '
         'process.exit(1); });\n'
     ) % (json.dumps(str(compiled)), json.dumps(str(FIXTURE)), js)
-    proc = subprocess.run([NODE, "-e", program], capture_output=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True,
                           text=True, timeout=90)
     assert proc.returncode == 0, (
         f"node exited {proc.returncode}\nstdout: {proc.stdout}\n"

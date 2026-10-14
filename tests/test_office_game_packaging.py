@@ -38,7 +38,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 from _office_toolchain import node_path  # noqa: E402
 
@@ -512,7 +514,8 @@ def test_the_scene_host_lifecycle_is_clean(tmp_path):
         shutil.copy(GAME_DIR / name, staged / name)
     proc = subprocess.run(
         [NODE, str(tsc), "--module", "commonjs", "--target", "es2020",
-         "--moduleResolution", "node", "--outDir", str(tmp_path / "js"),
+         "--moduleResolution", "node",
+         "--ignoreDeprecations", "6.0", "--outDir", str(tmp_path / "js"),
          "--skipLibCheck", "--noEmitOnError", "false",
          str(staged / "CanvasSceneHost.ts")],
         capture_output=True, text=True, timeout=180, cwd=str(staged))
@@ -524,7 +527,7 @@ def test_the_scene_host_lifecycle_is_clean(tmp_path):
     program = (
         'const {createCanvasHost} = require(%s);\n%s'
         % (json.dumps(str(compiled)), _DRIVER))
-    run = subprocess.run([NODE, "-e", program], capture_output=True, text=True,
+    run = subprocess.run([NODE], input=program, capture_output=True, text=True,
                          timeout=60)
     assert run.returncode == 0, (
         f"the lifecycle driver failed\nstdout: {run.stdout}\n"
@@ -568,7 +571,8 @@ def test_a_mount_after_destroy_rebinds_from_scratch(tmp_path):
         shutil.copy(GAME_DIR / name, staged / name)
     subprocess.run(
         [NODE, str(tsc), "--module", "commonjs", "--target", "es2020",
-         "--moduleResolution", "node", "--outDir", str(tmp_path / "js"),
+         "--moduleResolution", "node",
+         "--ignoreDeprecations", "6.0", "--outDir", str(tmp_path / "js"),
          "--skipLibCheck", "--noEmitOnError", "false",
          str(staged / "CanvasSceneHost.ts")],
         capture_output=True, text=True, timeout=180, cwd=str(staged))
@@ -576,9 +580,9 @@ def test_a_mount_after_destroy_rebinds_from_scratch(tmp_path):
     if not compiled.is_file():
         pytest.skip("tsc could not compile the host for the node driver")
     run = subprocess.run(
-        [NODE, "-e",
-         'const {createCanvasHost} = require(%s);\n%s'
-         % (json.dumps(str(compiled)), driver)],
+        [NODE],
+        input=('const {createCanvasHost} = require(%s);\n%s'
+               % (json.dumps(str(compiled)), driver)),
         capture_output=True, text=True, timeout=60)
     assert run.returncode == 0, run.stderr[:600]
     got = json.loads(run.stdout)

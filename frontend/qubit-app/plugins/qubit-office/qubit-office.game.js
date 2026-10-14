@@ -190016,70 +190016,561 @@ create: function(game) {
 		};
 	}
 	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/scenes.ts
-	/** The Japanese-anime-office direction from 40-ART-AND-ASSETS.md, as tokens. */
-	var PALETTE = {
-		void: "#0b0f16",
-		ground: "#1b2230",
-		plate: "#2a3342",
-		wall: "#39445a",
-		wallTop: "#4b5876",
-		accent: "#e08fb0",
-		ink: "#e8edf6",
-		muted: "#8b97ad",
-		doorway: "#6fd3a6"
-	};
-	function text(ctx, s, x, y, size, colour, align = "left", weight = "400") {
-		ctx.save();
-		ctx.font = `${weight} ${size}px ui-sans-serif, system-ui, sans-serif`;
-		ctx.fillStyle = colour;
-		ctx.textAlign = align;
-		ctx.textBaseline = "middle";
-		ctx.fillText(s, x, y);
-		ctx.restore();
+	//#region ../qubit-app/plugins/qubit-office/game/art/colour.ts
+	/** '#rgb', '#rrggbb', '#rrggbbaa'. Unknown or non-hex input returns magenta.
+	*
+	* Magenta-on-failure is deliberate: a typo'd colour must be LOUD. Returning
+	* black or transparent would hide the mistake inside a dark scene, which is
+	* precisely how a bad colour survives to production.
+	*
+	* The `isFinite` guard is not defensive padding: `parseInt("zz", 16)` returns
+	* NaN, so `#zzz` is well-formed LENGTH but not well-formed HEX. Without the
+	* guard that colour becomes `#NaNNaNNaN` and paints as nothing at all. */
+	function parse(colour) {
+		const s = colour.trim().toLowerCase();
+		if (s.startsWith("#")) {
+			const hex = s.slice(1);
+			if (hex.length === 3 || hex.length === 4) {
+				const n = [...hex].map((ch) => parseInt(ch + ch, 16));
+				if (n.every((v) => Number.isFinite(v))) return [
+					n[0],
+					n[1],
+					n[2],
+					hex.length === 4 ? n[3] : 255
+				];
+			}
+			if (hex.length === 6 || hex.length === 8) {
+				const n = (i) => parseInt(hex.slice(i, i + 2), 16);
+				const v = [
+					n(0),
+					n(2),
+					n(4),
+					hex.length === 8 ? n(6) : 255
+				];
+				if (v.every((x) => Number.isFinite(x))) return [
+					v[0],
+					v[1],
+					v[2],
+					v[3]
+				];
+			}
+		}
+		return [
+			255,
+			0,
+			255,
+			255
+		];
 	}
-	function plate(ctx, x, y, w, h, fill, stroke) {
-		ctx.save();
-		ctx.fillStyle = fill;
+	function toHex(r, g, b) {
+		const h = (n) => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, "0");
+		return `#${h(r)}${h(g)}${h(b)}`;
+	}
+	/** As `toHex`, but appends the alpha byte when it is not fully opaque. */
+	function alphaHex(hex, a) {
+		return a >= 255 ? hex : `${hex}${Math.round(Math.max(0, Math.min(255, a))).toString(16).padStart(2, "0")}`;
+	}
+	function rgbToHsl(r, g, b) {
+		const rn = r / 255;
+		const gn = g / 255;
+		const bn = b / 255;
+		const max = Math.max(rn, gn, bn);
+		const min = Math.min(rn, gn, bn);
+		const l = (max + min) / 2;
+		if (max === min) return [
+			0,
+			0,
+			l
+		];
+		const d = max - min;
+		const s = l > .5 ? d / (2 - max - min) : d / (max + min);
+		let h;
+		if (max === rn) h = (gn - bn) / d + (gn < bn ? 6 : 0);
+		else if (max === gn) h = (bn - rn) / d + 2;
+		else h = (rn - gn) / d + 4;
+		return [
+			h * 60,
+			s,
+			l
+		];
+	}
+	function hslToRgb(h, s, l) {
+		const hh = (h % 360 + 360) % 360 / 360;
+		if (s === 0) {
+			const v = Math.round(l * 255);
+			return [
+				v,
+				v,
+				v
+			];
+		}
+		const q = l < .5 ? l * (1 + s) : l + s - l * s;
+		const p = 2 * l - q;
+		const ch = (t) => {
+			let x = t;
+			if (x < 0) x += 1;
+			if (x > 1) x -= 1;
+			if (x < 1 / 6) return p + (q - p) * 6 * x;
+			if (x < 1 / 2) return q;
+			if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
+			return p;
+		};
+		return [
+			Math.round(ch(hh + 1 / 3) * 255),
+			Math.round(ch(hh) * 255),
+			Math.round(ch(hh - 1 / 3) * 255)
+		];
+	}
+	/** Move hue `h` toward `target`, by at most `deg`. Shortest way round. */
+	function towardHue(h, target, deg) {
+		let d = (target - h + 540) % 360 - 180;
+		if (Math.abs(d) < deg) return target;
+		d = Math.sign(d) * deg;
+		return (h + d + 360) % 360;
+	}
+	var clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
+	/**
+	* Lighten (k > 0) or darken (k < 0) by `k` of HSL lightness, WITH the hue shift.
+	*
+	* THE SATURATION IS THE POINT. A pure grey has saturation 0 and no hue, so a
+	* shift scaled purely by saturation leaves it grey — which is exactly what made
+	* the first version of this function useless here: the wall and carpet themes
+	* are muted, and a muted material shaded to grey reads as a wireframe.
+	*
+	* Two things make the tint survive 8-bit rounding, and both are load-bearing:
+	*
+	*  1. A `+ 0.35` FLOOR on the shift gain, so a neutral colour still moves.
+	*  2. A real saturation FLOOR on the result (`max(s, amt * 0.45)` for a shadow,
+	*     `max(s, amt * 0.2)` for a light). Without it the hue is technically
+	*     correct but the pixel rounds back to grey: saturation 0.027 in an 8-bit
+	*     channel is under one unit of colour, so the tint is computed and then
+	*     thrown away. A shadow that is *supposed* to be blue-grey must actually
+	*     contain blue.
+	*/
+	function shade(colour, k) {
+		if (k === 0) return colour;
+		const [r, g, b, a] = parse(colour);
+		let [h, s, l] = rgbToHsl(r, g, b);
+		const amt = Math.abs(k);
+		const gain = Math.min(1, s * 1.6 + .35);
+		if (k < 0) {
+			h = towardHue(h, 235, amt * 55 * gain);
+			s = clamp01(Math.max(s + amt * .12, amt * .45));
+		} else {
+			h = towardHue(h, 48, amt * 35 * gain);
+			s = clamp01(Math.max(s - amt * .05, amt * .2));
+		}
+		l = clamp01(l + k);
+		const [nr, ng, nb] = hslToRgb(h, s, l);
+		return alphaHex(toHex(nr, ng, nb), a);
+	}
+	/** Linear blend: t = 0 → a, t = 1 → b. */
+	function mix(a, b, t) {
+		const ca = parse(a);
+		const cb = parse(b);
+		const u = clamp01(t);
+		return toHex(ca[0] + (cb[0] - ca[0]) * u, ca[1] + (cb[1] - ca[1]) * u, ca[2] + (cb[2] - ca[2]) * u);
+	}
+	var rampCache = /* @__PURE__ */ new Map();
+	function ramp(base, step = .08) {
+		const key = `${base}|${step}`;
+		let r = rampCache.get(key);
+		if (!r) {
+			r = {
+				hi: shade(base, step * 2),
+				lt: shade(base, step),
+				base,
+				dk: shade(base, -step),
+				dd: shade(base, -step * 2)
+			};
+			rampCache.set(key, r);
+		}
+		return r;
+	}
+	/**
+	* The outline colour for a pixel of colour `c`: a dark version of `c` pulled
+	* most of the way to a slate, NEVER pure black.
+	*
+	* Pure black outlines are the classic amateur tell — they flatten the image and
+	* read as a drawing on paper rather than a lit object. Mixing toward a slate
+	* keeps the outline related to the material it surrounds.
+	*/
+	var OUTLINE_SLATE = "#272b3b";
+	function outlineFor(colour) {
+		return mix(shade(colour, -.45), OUTLINE_SLATE, .7);
+	}
+	/** A deterministic 0–1 generator. Same seed, same art, every run. */
+	function seeded(seed) {
+		let s = (Math.floor(seed) || 1) >>> 0;
+		return () => {
+			s ^= s << 13;
+			s >>>= 0;
+			s ^= s >> 17;
+			s ^= s << 5;
+			s >>>= 0;
+			return s / 4294967296;
+		};
+	}
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/art/surfaces.ts
+	var THEMES$1 = [
+		{
+			carpet: "#6b7688",
+			wall: "#c3ccd8",
+			trim: "#8d99ab",
+			accent: "#3f7fd8"
+		},
+		{
+			carpet: "#8a7a5f",
+			wall: "#e2d6c0",
+			trim: "#b0996f",
+			accent: "#ec8a3c"
+		},
+		{
+			carpet: "#5f7a63",
+			wall: "#d3ddcb",
+			trim: "#8aa07c",
+			accent: "#4cae6a"
+		},
+		{
+			carpet: "#6f6889",
+			wall: "#d5d0e2",
+			trim: "#9b92b8",
+			accent: "#8d66cf"
+		},
+		{
+			carpet: "#8a6558",
+			wall: "#e6cec2",
+			trim: "#b98d7c",
+			accent: "#e2604f"
+		},
+		{
+			carpet: "#4e7d78",
+			wall: "#c8dedb",
+			trim: "#79a9a2",
+			accent: "#36b0b0"
+		},
+		{
+			carpet: "#5a626f",
+			wall: "#c9cdd4",
+			trim: "#7d8794",
+			accent: "#f2c14e"
+		},
+		{
+			carpet: "#8a6377",
+			wall: "#e4ccd6",
+			trim: "#b98ca1",
+			accent: "#e47aa8"
+		},
+		{
+			carpet: "#5c6f8d",
+			wall: "#ccd8e6",
+			trim: "#89a0be",
+			accent: "#5b8fe0"
+		},
+		{
+			carpet: "#7d7166",
+			wall: "#ddd3c6",
+			trim: "#a4977f",
+			accent: "#c9713f"
+		}
+	];
+	/** A theme for a room, stable for a given seed. Negative seeds are fine. */
+	function roomTheme(seed) {
+		const n = THEMES$1.length;
+		return THEMES$1[(Math.floor(seed) % n + n) % n];
+	}
+	THEMES$1.length;
+	/**
+	* Paint a wall FACE into a rect.
+	*
+	* The face darkens toward its bottom edge, which is what tells the eye the wall
+	* is a vertical surface lit from above rather than a flat rectangle of colour.
+	*/
+	function drawWallFace(ctx, x, y, w, h, theme, opts = {}) {
+		const base = theme.wall;
+		const r = climb(base);
+		const capH = Math.min(5, h);
+		const baseH = Math.min(4, Math.max(0, h - capH));
+		const faceY = y + capH;
+		const faceH = Math.max(0, h - capH - baseH);
+		const rand = seeded(opts.seed ?? 1);
+		for (let i = 0; i < faceH; i++) {
+			ctx.fillStyle = shade(base, .03 - i / Math.max(1, faceH) * .055);
+			ctx.fillRect(x, faceY + i, w, 1);
+		}
+		const pattern = opts.pattern ?? "plain";
+		if (pattern === "stripes") {
+			ctx.fillStyle = shade(base, -.035);
+			for (let sx = x; sx < x + w; sx += 8) ctx.fillRect(sx, faceY, 3, faceH);
+			ctx.fillStyle = shade(base, -.015);
+			for (let sx = x + 4; sx < x + w; sx += 8) ctx.fillRect(sx, faceY, 1, faceH);
+		} else if (pattern === "panelled") {
+			const top = faceY + Math.floor(faceH * .42);
+			ctx.fillStyle = mix("#b98a5e", base, .2);
+			ctx.fillRect(x, top, w, faceY + faceH - top);
+			for (let sx = x; sx < x + w; sx += 7) {
+				ctx.fillStyle = r.dd;
+				ctx.fillRect(sx, top, 1, faceY + faceH - top);
+				ctx.fillStyle = r.lt;
+				ctx.fillRect(sx + 1, top + 1, 1, faceY + faceH - top - 1);
+			}
+			ctx.fillStyle = r.hi;
+			ctx.fillRect(x, top - 2, w, 1);
+			ctx.fillStyle = r.lt;
+			ctx.fillRect(x, top - 1, w, 1);
+			ctx.fillStyle = r.dk;
+			ctx.fillRect(x, top, w, 1);
+		}
+		ctx.fillStyle = shade(base, -.075);
+		ctx.fillRect(x, faceY, w, 1);
+		const cap = mix("#3d4356", base, .12);
+		ctx.fillStyle = cap;
+		ctx.fillRect(x, y, w, capH);
+		ctx.fillStyle = shade(cap, .09);
+		ctx.fillRect(x, y, w, 1);
+		ctx.fillStyle = shade(cap, -.07);
+		ctx.fillRect(x, y + capH - 1, w, 1);
+		const trim = theme.trim;
+		ctx.fillStyle = trim;
+		ctx.fillRect(x, y + h - baseH, w, baseH);
+		ctx.fillStyle = shade(trim, .09);
+		ctx.fillRect(x, y + h - baseH, w, 1);
+		ctx.fillStyle = shade(trim, -.09);
+		ctx.fillRect(x, y + h - 1, w, 1);
+		if ((opts.seed ?? 0) % 3 === 0) for (let i = 0; i < Math.floor(w / 6); i++) {
+			const px = x + Math.floor(rand() * w);
+			const py = faceY + Math.floor(rand() * Math.max(1, faceH));
+			ctx.fillStyle = rand() < .5 ? shade(base, -.03) : shade(base, .03);
+			ctx.fillRect(px, py, 1, 1);
+		}
+	}
+	/**
+	* Paint a FLOOR in isometric tiles.
+	*
+	* Each tile gets its own 2% lightness jitter. That is barely visible tile by
+	* tile and is the entire reason a large floor does not read as a single sheet
+	* of colour — a perfectly uniform plane looks like a placeholder.
+	*/
+	function drawFloor$1(ctx, x, y, w, h, theme, opts = {}) {
+		const tile = opts.tile ?? 26;
+		const base = theme.carpet;
+		const rand = seeded(opts.seed ?? 7);
+		ctx.fillStyle = shade(base, -.04);
 		ctx.fillRect(x, y, w, h);
-		if (stroke) {
-			ctx.strokeStyle = stroke;
+		const cols = Math.ceil(w / tile) + 2;
+		const rows = Math.ceil(h / tile) + 2;
+		for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+			const offX = row % 2 * (tile / 2);
+			const tx = x - tile + col * tile + offX;
+			const ty = y - tile + row * (tile / 2);
+			ctx.fillStyle = shade(base, (rand() - .5) * .04);
+			ctx.beginPath();
+			ctx.moveTo(tx + tile / 2, ty);
+			ctx.lineTo(tx + tile, ty + tile / 2);
+			ctx.lineTo(tx + tile / 2, ty + tile);
+			ctx.lineTo(tx, ty + tile / 2);
+			ctx.closePath();
+			ctx.fill();
+			ctx.strokeStyle = shade(base, -.055);
 			ctx.lineWidth = 1;
-			ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
+			ctx.beginPath();
+			ctx.moveTo(tx, ty + tile / 2);
+			ctx.lineTo(tx + tile / 2, ty + tile);
+			ctx.lineTo(tx + tile, ty + tile / 2);
+			ctx.stroke();
 		}
-		ctx.restore();
 	}
-	/** A figure. Feet-anchored, tinted by state, with the state band the tower uses. */
-	function figure(ctx, c, x, y, scale, selected) {
-		const w = 12 * scale, h = 17 * scale;
-		const top = y - h;
-		const colour = ANIM_COLOUR[c.animation] ?? PALETTE.muted;
+	/**
+	* A contact shadow under a figure or object.
+	*
+	* Composited as a soft ellipse at low alpha and DARKENED toward a blue-grey
+	* rather than toward black. This is the cheapest single trick for making a flat
+	* sprite look like it is standing ON something instead of pasted over it.
+	*/
+	function drawContactShadow(ctx, cx, cy, rx, ry, strength = .26) {
+		const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
+		g.addColorStop(0, `rgba(28,32,52,${strength})`);
+		g.addColorStop(.6, `rgba(28,32,52,${strength * .5})`);
+		g.addColorStop(1, "rgba(28,32,52,0)");
 		ctx.save();
-		if (selected) {
-			ctx.strokeStyle = PALETTE.accent;
-			ctx.lineWidth = 2;
-			ctx.strokeRect(x - w * .8, top - 4 * scale, w * 1.6, h + 8 * scale);
-		}
-		ctx.fillStyle = "rgba(0,0,0,0.28)";
+		ctx.translate(cx, cy);
+		ctx.scale(1, ry / Math.max(1, rx));
+		ctx.fillStyle = g;
 		ctx.beginPath();
-		ctx.ellipse(x, y + 1, w * .7, w * .28, 0, 0, Math.PI * 2);
+		ctx.arc(0, 0, Math.max(rx, ry), 0, Math.PI * 2);
 		ctx.fill();
-		ctx.fillStyle = colour;
-		ctx.fillRect(x - w / 2, top + h * .26, w, h * .46);
-		ctx.fillStyle = PALETTE.ink;
-		ctx.beginPath();
-		ctx.arc(x, top + h * .14, w * .3, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.fillStyle = "rgba(0,0,0,0.35)";
-		ctx.fillRect(x - w * .42, top + h * .72, w * .3, h * .28);
-		ctx.fillRect(x + w * .12, top + h * .72, w * .3, h * .28);
-		ctx.fillStyle = colour;
-		ctx.fillRect(x - w * .62, top - 3 * scale, w * 1.24, Math.max(1, 2 * scale));
 		ctx.restore();
-		if (c.stalled) text(ctx, "!", x, top - 12 * scale, 12 * scale, "#e0554a", "center", "700");
 	}
-	var ANIM_COLOUR = {
-		idle: "#8a8f98",
+	/**
+	* A 1px outline around a rect, in the outline slate rather than black.
+	*
+	* Used for furniture and lifted elements. `outlineFor` pulls the outline toward
+	* the material's own dark, so a wooden desk gets a woody outline and a steel
+	* one gets a steely outline instead of both getting the same black border.
+	*/
+	function outlineRect(ctx, x, y, w, h, colour) {
+		ctx.strokeStyle = outlineFor(colour);
+		ctx.lineWidth = 1;
+		ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
+	}
+	/** Local alias so the import list stays short at the call sites. */
+	function climb(base) {
+		return ramp(base);
+	}
+	/** Grid -> screen. Origin (0,0,0) maps to (0,0); callers translate. */
+	function toScreen(p) {
+		const z = p.z ?? 0;
+		return {
+			x: (p.gx - p.gy) * 16,
+			y: (p.gx + p.gy) * 8 - z * 16
+		};
+	}
+	/**
+	* The painter's-algorithm sort key.
+	*
+	* Depth is `gx + gy` ASCENDING: a tile with a larger sum is nearer the viewer
+	* and must be drawn later. `z` is subtracted so a high object (a wall) is drawn
+	* before the floor in front of it. Two objects on the same key are on the same
+	* diagonal and their order does not matter.
+	*/
+	function depth(p) {
+		return p.gx + p.gy - (p.z ?? 0) * 2;
+	}
+	/** The four corners of a tile's floor diamond, in screen space. */
+	function tileDiamond(gx, gy, ox = 0, oy = 0) {
+		const cx = (gx - gy) * 16 + ox;
+		const cy = (gx + gy) * 8 + oy;
+		return [
+			{
+				x: cx,
+				y: cy - 8
+			},
+			{
+				x: cx + 16,
+				y: cy
+			},
+			{
+				x: cx,
+				y: cy + 8
+			},
+			{
+				x: cx - 16,
+				y: cy
+			}
+		];
+	}
+	/**
+	* The visible faces of a wall block, as screen-space polygons.
+	*
+	* A wall occupies grid cell (gx, gy) and rises `h` tiles. In isometric only two
+	* of its four vertical faces are ever visible: the SOUTH-west face (facing the
+	* viewer's lower-left) and the SOUTH-east face. The north faces are always
+	* occluded, so drawing them would be wasted work and — worse — would z-fight.
+	*
+	* This is what gives a wall its apparent solidity: two faces at different
+	* angles, each lit differently, meeting at a vertical edge.
+	*/
+	function wallFaces(gx, gy, h, ox = 0, oy = 0) {
+		const hpx = h * 16;
+		const base = tileDiamond(gx, gy, ox, oy);
+		const north = base[0], east = base[1], south = base[2], west = base[3];
+		const lift = (p) => ({
+			x: p.x,
+			y: p.y - hpx
+		});
+		return {
+			west: [
+				west,
+				south,
+				lift(south),
+				lift(west)
+			],
+			east: [
+				south,
+				east,
+				lift(east),
+				lift(south)
+			],
+			top: [
+				lift(north),
+				lift(east),
+				lift(south),
+				lift(west)
+			]
+		};
+	}
+	/**
+	* A whole room's worth of geometry, in tiles.
+	*
+	* The proportions are the reference's: a room is two tiles of visible north
+	* wall face, nine tiles of floor, and one tile of south wall. Those numbers are
+	* not arbitrary — 9 tiles of floor at a 2:1 diamond is 144px wide and 72 deep,
+	* which is what makes a room read as a ROOM rather than a corridor.
+	*/
+	var ROOM = {
+		/** Tiles of north wall face standing at the back of a room. */
+		wallFaceTiles: 2,
+		/** Floor depth in tiles (north-to-south). */
+		floorTiles: 9,
+		/** South wall stub, so the room is enclosed. */
+		southTiles: 1,
+		/** Room width in tiles. */
+		widthTiles: 16
+	};
+	ROOM.wallFaceTiles + ROOM.floorTiles + ROOM.southTiles;
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/art/room.ts
+	var THEMES = [
+		{
+			carpet: "#7d8ba3",
+			wall: "#c9d3e0",
+			trim: "#93a0b5",
+			accent: "#3f7fd8"
+		},
+		{
+			carpet: "#a8906a",
+			wall: "#e6dac4",
+			trim: "#bda57c",
+			accent: "#ec8a3c"
+		},
+		{
+			carpet: "#7a9b7f",
+			wall: "#d6e0cf",
+			trim: "#9bb48d",
+			accent: "#4cae6a"
+		},
+		{
+			carpet: "#8b83a8",
+			wall: "#dbd6e8",
+			trim: "#a89fc4",
+			accent: "#8d66cf"
+		},
+		{
+			carpet: "#a87d6d",
+			wall: "#e9d4c9",
+			trim: "#c49886",
+			accent: "#e2604f"
+		},
+		{
+			carpet: "#6a9b95",
+			wall: "#cfe3df",
+			trim: "#8db3ac",
+			accent: "#36b0b0"
+		},
+		{
+			carpet: "#77808f",
+			wall: "#d0d4db",
+			trim: "#8b95a2",
+			accent: "#f2c14e"
+		}
+	];
+	function themeFor(seed) {
+		const n = THEMES.length;
+		return THEMES[(Math.floor(seed) % n + n) % n];
+	}
+	var ANIM = {
+		idle: "#9aa0b0",
 		working: "#f0c05a",
 		walking: "#6fd3a6",
 		meeting: "#8fb0e0",
@@ -190088,151 +190579,893 @@ create: function(game) {
 		glow: "#ffd98a",
 		settling: "#9ad0c0",
 		walking_to_manager: "#e08fb0",
-		seated: "#8a8f98"
+		seated: "#9aa0b0"
+	};
+	/**
+	* Fit a floor into the viewport and return the camera.
+	*
+	* Centres the floor's bounding diamond. Without this a floor drifts off-screen
+	* as it grows, and "the room is empty" gets reported when the room is merely
+	* somewhere else.
+	*/
+	function cameraFor(floor, width, height) {
+		let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+		for (const r of floor.rooms) for (const [gx, gy] of [
+			[r.x, r.y],
+			[r.x + r.w, r.y],
+			[r.x, r.y + r.h],
+			[r.x + r.w, r.y + r.h]
+		]) {
+			const p = toScreen({
+				gx,
+				gy
+			});
+			minX = Math.min(minX, p.x - 16);
+			maxX = Math.max(maxX, p.x + 16);
+			minY = Math.min(minY, p.y - 8 - 32);
+			maxY = Math.max(maxY, p.y + 8 + 32);
+		}
+		if (!Number.isFinite(minX)) return {
+			ox: width / 2,
+			oy: height / 2,
+			zoom: 1
+		};
+		const spanX = Math.max(1, maxX - minX);
+		const spanY = Math.max(1, maxY - minY);
+		const zoom = Math.min(Math.max(.35, width * .92 / spanX), Math.max(.35, height * .9 / spanY), 3.2);
+		return {
+			ox: width / 2 - (minX + maxX) / 2 * zoom,
+			oy: height / 2 - (minY + maxY) / 2 * zoom,
+			zoom
+		};
+	}
+	function poly$1(p, pts) {
+		const { ctx, cam } = p;
+		ctx.beginPath();
+		pts.forEach((pt, i) => {
+			const x = pt.x * cam.zoom + cam.ox;
+			const y = pt.y * cam.zoom + cam.oy;
+			if (i === 0) ctx.moveTo(x, y);
+			else ctx.lineTo(x, y);
+		});
+		ctx.closePath();
+	}
+	function fillPoly(p, pts, colour) {
+		poly$1(p, pts);
+		p.ctx.fillStyle = colour;
+		p.ctx.fill();
+	}
+	/** The floor plane: every tile of every room, back to front. */
+	function paintFloorPlane(p, floor) {
+		const { ctx, cam } = p;
+		for (const room of floor.rooms) {
+			const theme = themeFor(room.id + floor.number * 3);
+			const rand = seeded(room.id * 977 + floor.number);
+			for (let gy = room.y; gy < room.y + room.h; gy++) for (let gx = room.x; gx < room.x + room.w; gx++) {
+				const d = tileDiamond(gx, gy);
+				ctx.save();
+				ctx.translate(cam.ox, cam.oy);
+				ctx.scale(cam.zoom, cam.zoom);
+				fillPoly(p, d, shade(theme.carpet, (rand() - .5) * .055));
+				ctx.strokeStyle = shade(theme.carpet, -.075);
+				ctx.lineWidth = 1 / cam.zoom;
+				ctx.beginPath();
+				ctx.moveTo(d[0].x, d[0].y);
+				ctx.lineTo(d[3].x, d[3].y);
+				ctx.lineTo(d[2].x, d[2].y);
+				ctx.stroke();
+				ctx.restore();
+			}
+		}
+	}
+	/**
+	* Wall blocks around each room, sorted so nearer walls overdraw farther ones.
+	*
+	* The two visible faces are shaded differently — the east face is the dark one
+	* — which is what makes the corner between them read as an edge rather than a
+	* colour change.
+	*/
+	function paintWalls(p, floor) {
+		const blocks = [];
+		for (const room of floor.rooms) {
+			const theme = themeFor(room.id + floor.number * 3);
+			for (let gx = room.x; gx < room.x + room.w; gx++) {
+				const gy = room.y;
+				blocks.push({
+					gx,
+					gy,
+					theme,
+					key: depth({
+						gx,
+						gy
+					})
+				});
+			}
+			for (let gy = room.y; gy < room.y + room.h + ROOM.southTiles; gy++) {
+				blocks.push({
+					gx: room.x,
+					gy,
+					theme,
+					key: depth({
+						gx: room.x,
+						gy
+					})
+				});
+				blocks.push({
+					gx: room.x + room.w - 1,
+					gy,
+					theme,
+					key: depth({
+						gx: room.x + room.w - 1,
+						gy
+					})
+				});
+			}
+		}
+		blocks.sort((a, b) => a.key - b.key);
+		const { ctx, cam } = p;
+		for (const b of blocks) {
+			const faces = wallFaces(b.gx, b.gy, 2);
+			const r = ramp(b.theme.wall, .08);
+			ctx.save();
+			ctx.translate(cam.ox, cam.oy);
+			ctx.scale(cam.zoom, cam.zoom);
+			fillPoly(p, faces.west, r.base);
+			fillPoly(p, faces.east, r.dk);
+			fillPoly(p, faces.top, mix(r.hi, "#ffffff", .06));
+			const bs = b.theme.trim;
+			const wf = faces.west;
+			const t = 3 / cam.zoom;
+			fillPoly(p, [
+				wf[0],
+				wf[1],
+				{
+					x: wf[1].x,
+					y: wf[1].y - t
+				},
+				{
+					x: wf[0].x,
+					y: wf[0].y - t
+				}
+			], bs);
+			ctx.restore();
+		}
+	}
+	/** A desk: an isometric box with a lit top and a drawn shadow. */
+	function paintDesk(p, gx, gy, colour = "#a07f5c") {
+		const { ctx, cam } = p;
+		const r = ramp(colour, .09);
+		const faces = wallFaces(gx, gy, .55);
+		ctx.save();
+		ctx.translate(cam.ox, cam.oy);
+		ctx.scale(cam.zoom, cam.zoom);
+		fillPoly(p, faces.west, r.dk);
+		fillPoly(p, faces.east, r.dd);
+		fillPoly(p, faces.top, r.lt);
+		const mon = ramp("#39445a", .1);
+		const mp = wallFaces(gx, gy, 1.15);
+		fillPoly(p, [
+			mp.west[2],
+			mp.west[3],
+			mp.west[2],
+			mp.west[2]
+		], mon.base);
+		const screen = ramp("#5fd0c0", .1);
+		fillPoly(p, [
+			{
+				x: mp.top[0].x,
+				y: mp.top[0].y
+			},
+			{
+				x: mp.top[0].x + 16,
+				y: mp.top[0].y + 8
+			},
+			{
+				x: mp.top[0].x + 16,
+				y: mp.top[0].y + 8 - 10
+			},
+			{
+				x: mp.top[0].x,
+				y: mp.top[0].y - 10
+			}
+		], screen.base);
+		ctx.restore();
+	}
+	/** A potted plant: the cheapest way to make an office look inhabited. */
+	function paintPlant(p, gx, gy) {
+		const { ctx, cam } = p;
+		ctx.save();
+		ctx.translate(cam.ox, cam.oy);
+		ctx.scale(cam.zoom, cam.zoom);
+		const centre = toScreen({
+			gx,
+			gy
+		});
+		const pot = ramp("#8a6a4e", .1);
+		fillPoly(p, [
+			{
+				x: centre.x - 5,
+				y: centre.y - 7
+			},
+			{
+				x: centre.x + 5,
+				y: centre.y - 7
+			},
+			{
+				x: centre.x + 4,
+				y: centre.y + 1
+			},
+			{
+				x: centre.x - 4,
+				y: centre.y + 1
+			}
+		], pot.base);
+		const leaf = ramp("#4cae6a", .1);
+		for (let i = 0; i < 5; i++) {
+			ctx.fillStyle = i % 2 ? leaf.base : leaf.dk;
+			const a = i / 5 * Math.PI * 2;
+			ctx.beginPath();
+			ctx.ellipse(centre.x + Math.cos(a) * 4, centre.y - 12 + Math.sin(a) * 4, 3, 6, a, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		ctx.restore();
+	}
+	/**
+	* A figure, in isometric.
+	*
+	* Feet-anchored at the character's tile so it stands ON the floor rather than
+	* floating, with a contact shadow sized to the same anchor. The body is three
+	* tones of one state colour, which is what makes a 20px shape read as a person.
+	*/
+	function paintFigure(p, gx, gy, colour, stalled, selected) {
+		const { ctx, cam } = p;
+		const c = toScreen({
+			gx,
+			gy
+		});
+		const r = ramp(colour, .1);
+		ctx.save();
+		ctx.translate(cam.ox, cam.oy);
+		ctx.scale(cam.zoom, cam.zoom);
+		drawContactShadow(ctx, c.x, c.y, 7, 3.4, .36);
+		if (selected) {
+			ctx.strokeStyle = "#e08fb0";
+			ctx.lineWidth = 1.5 / cam.zoom;
+			ctx.beginPath();
+			ctx.ellipse(c.x, c.y, 9, 5, 0, 0, Math.PI * 2);
+			ctx.stroke();
+		}
+		const top = c.y - 20;
+		ctx.fillStyle = r.dd;
+		ctx.fillRect(c.x - 4, top + 15, 3, 6);
+		ctx.fillRect(c.x + 1, top + 15, 3, 6);
+		ctx.fillStyle = r.dk;
+		ctx.fillRect(c.x - 6, top + 8, 12, 9);
+		ctx.fillStyle = r.base;
+		ctx.fillRect(c.x - 6, top + 9, 12, 6);
+		ctx.fillStyle = r.lt;
+		ctx.fillRect(c.x - 6, top + 8, 12, 2);
+		ctx.fillStyle = r.dk;
+		ctx.fillRect(c.x - 8, top + 9, 2, 7);
+		ctx.fillRect(c.x + 6, top + 9, 2, 7);
+		ctx.fillStyle = "#f0d0ae";
+		ctx.beginPath();
+		ctx.arc(c.x, top + 4, 4.2, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.fillStyle = shade("#f0d0ae", -.22);
+		ctx.beginPath();
+		ctx.arc(c.x, top + 3, 4.2, Math.PI, Math.PI * 2);
+		ctx.fill();
+		if (stalled) {
+			ctx.fillStyle = "#ff7a6a";
+			ctx.fillRect(c.x - 1, top - 12, 2, 7);
+			ctx.fillRect(c.x - 1, top - 3, 2, 2);
+		}
+		ctx.restore();
+	}
+	/**
+	* Paint a floor of the office.
+	*
+	* Order: floor plane, then walls, then everything that stands on the floor
+	* sorted by depth. That last sort is what puts a figure behind the desk it is
+	* sitting at and in front of the wall behind it.
+	*/
+	function paintFloor(ctx, floor, width, height, selectedAgent = null) {
+		const p = {
+			ctx,
+			cam: cameraFor(floor, width, height)
+		};
+		ctx.fillStyle = "#141221";
+		ctx.fillRect(0, 0, width, height);
+		paintFloorPlane(p, floor);
+		paintWalls(p, floor);
+		const standees = [];
+		for (const room of floor.rooms) {
+			themeFor(room.id + floor.number * 3);
+			const seats = room.occupants.length;
+			for (let i = 0; i < seats; i++) {
+				const gx = room.x + 2 + i % 4 * 3;
+				const gy = room.y + 3 + Math.floor(i / 4) * 3;
+				if (gx > room.x + room.w - 2 || gy > room.y + room.h - 1) continue;
+				standees.push({
+					gx,
+					gy,
+					key: depth({
+						gx,
+						gy
+					}),
+					draw: () => paintDesk(p, gx, gy)
+				});
+				const occ = room.occupants[i];
+				standees.push({
+					gx,
+					gy: gy + 1,
+					key: depth({
+						gx,
+						gy: gy + 1
+					}) + .4,
+					draw: () => paintFigure(p, gx, gy + 1, ANIM[occ.animation] ?? "#9aa0b0", occ.stalled, occ.agentId === selectedAgent)
+				});
+			}
+			if (room.w > 4 && room.h > 4) {
+				const px2 = room.x + 1, py2 = room.y + room.h - 2;
+				standees.push({
+					gx: px2,
+					gy: py2,
+					key: depth({
+						gx: px2,
+						gy: py2
+					}),
+					draw: () => paintPlant(p, px2, py2)
+				});
+			}
+		}
+		standees.sort((a, b) => a.key - b.key);
+		for (const s of standees) s.draw();
+	}
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/art/scene-adapter.ts
+	function occupantsOf(room) {
+		return room.occupants.map((c) => ({
+			agentId: c.agent_id,
+			slug: c.slug,
+			animation: String(c.animation),
+			stalled: Boolean(c.stalled)
+		}));
+	}
+	/**
+	* One floor of the building, ready to paint.
+	*
+	* Rooms with no occupants still come through: an empty room is a real state
+	* and drawing it empty is the honest rendering. Dropping it would make a floor
+	* look smaller than the payload says it is.
+	*/
+	function toIsoFloor(floor) {
+		const rooms = floor.rooms.map((r) => ({
+			id: r.id,
+			slug: r.slug,
+			kind: r.kind,
+			x: r.x,
+			y: r.y,
+			w: Math.max(1, r.w),
+			h: Math.max(1, r.h),
+			occupants: occupantsOf(r)
+		}));
+		return {
+			number: floor.number,
+			name: floor.name,
+			role: floor.role,
+			rooms
+		};
+	}
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/art/fittings.ts
+	function poly(f, pts) {
+		const { ctx, cam } = f;
+		ctx.beginPath();
+		pts.forEach((p, i) => {
+			const x = p.x * cam.zoom + cam.ox;
+			const y = p.y * cam.zoom + cam.oy;
+			if (i === 0) ctx.moveTo(x, y);
+			else ctx.lineTo(x, y);
+		});
+		ctx.closePath();
+	}
+	function fill(f, pts, colour) {
+		poly(f, pts);
+		f.ctx.fillStyle = colour;
+		f.ctx.fill();
+	}
+	function withCam(f, fn) {
+		f.ctx.save();
+		f.ctx.translate(f.cam.ox, f.cam.oy);
+		f.ctx.scale(f.cam.zoom, f.cam.zoom);
+		fn();
+		f.ctx.restore();
+	}
+	/** A box standing on the floor: height in tiles, footprint one tile. */
+	function box(f, gx, gy, height, base, opts = {}) {
+		const r = ramp(base, .09);
+		const faces = wallFaces(gx, gy, height);
+		const ctx = f.ctx;
+		if (opts.alpha !== void 0) ctx.globalAlpha = opts.alpha;
+		fill(f, faces.west, r.base);
+		fill(f, faces.east, shade(r.base, -.14));
+		fill(f, faces.top, opts.topColour ?? mix(r.hi, "#ffffff", .05));
+		if (opts.alpha !== void 0) ctx.globalAlpha = 1;
+	}
+	/** A wide bench (desk, counter): a box spanning several tiles on X. */
+	function bench(f, gx, gy, tilesX, height, base) {
+		for (let i = 0; i < tilesX; i++) box(f, gx + i, gy, height, base);
+	}
+	/**
+	* The reception counter: a bench with a lip, a monitor and a chair.
+	*
+	* The lip is a second, slightly larger top box — that overhang is what makes a
+	* counter read as furniture rather than as a wall stub.
+	*/
+	function receptionDesk(f, gx, gy) {
+		const base = "#9a7c58";
+		withCam(f, () => {
+			const c = toScreen({
+				gx: gx + 1,
+				gy
+			});
+			drawContactShadow(f.ctx, c.x, c.y + 8, 34, 12, .32);
+			bench(f, gx, gy, 3, .75, base);
+			bench(f, gx, gy, 3, .9, mix(base, "#ffffff", .12));
+			const mon = toScreen({
+				gx: gx + 1,
+				gy
+			});
+			f.ctx.fillStyle = "#2f3b52";
+			f.ctx.fillRect(mon.x - 9, mon.y - 40, 18, 14);
+			f.ctx.fillStyle = mix("#5fd0c0", "#ffffff", .18);
+			f.ctx.fillRect(mon.x - 7, mon.y - 38, 14, 10);
+			f.ctx.fillStyle = "#20222c";
+			f.ctx.fillRect(mon.x - 3, mon.y - 26, 6, 3);
+		});
+	}
+	/**
+	* The lift: a recessed frame with two doors and a floor indicator above.
+	*
+	* The doors are drawn as two vertical gradients meeting at a hairline, which in
+	* isometric reads as a metal door pair. The green indicator is the one bright
+	* accent that says "this is active".
+	*/
+	function elevator(f, gx, gy, height = 2.4) {
+		const ctx = f.ctx;
+		withCam(f, () => {
+			const r = ramp("#6a7284", .09);
+			box(f, gx, gy, height, shade(r.base, -.28));
+			const wf = wallFaces(gx, gy, height).west;
+			const left = wf[0], right = wf[1];
+			const halfN = 3;
+			for (let i = 0; i < halfN; i++) {
+				const t0 = i / halfN, t1 = (i + 1) / halfN;
+				const x0 = left.x + (right.x - left.x) * t0;
+				const x1 = left.x + (right.x - left.x) * t1;
+				const y0 = left.y + (right.y - left.y) * t0;
+				const y1 = left.y + (right.y - left.y) * t1;
+				const top0 = y0 - height * 16, top1 = y1 - height * 16;
+				const g = ctx.createLinearGradient(x0, 0, x1, 0);
+				g.addColorStop(0, shade(r.lt, -i * .02));
+				g.addColorStop(1, shade(r.base, -i * .02));
+				ctx.fillStyle = g;
+				poly(f, [
+					{
+						x: x0,
+						y: y0
+					},
+					{
+						x: x1,
+						y: y1
+					},
+					{
+						x: x1,
+						y: top1
+					},
+					{
+						x: x0,
+						y: top0
+					}
+				]);
+				ctx.fill();
+			}
+			const midX = (left.x + right.x) / 2, midY = (left.y + right.y) / 2;
+			ctx.strokeStyle = shade(r.dd, -.1);
+			ctx.lineWidth = 1 / f.cam.zoom;
+			ctx.beginPath();
+			ctx.moveTo(midX, midY);
+			ctx.lineTo(midX, midY - height * 16);
+			ctx.stroke();
+			const cap = wallFaces(gx, gy, height).top;
+			const ix = (cap[0].x + cap[2].x) / 2;
+			const iy = (cap[0].y + cap[2].y) / 2;
+			ctx.fillStyle = "#1c1f28";
+			ctx.fillRect(ix - 8, iy - 7, 16, 6);
+			ctx.fillStyle = "#6fd3a6";
+			ctx.fillRect(ix - 6, iy - 6, 12, 3);
+		});
+	}
+	/** A run of stairs, each step a box, ascending away from the viewer. */
+	function stairs(f, gx, gy, steps = 6) {
+		const base = "#5f5a72";
+		withCam(f, () => {
+			for (let i = 0; i < steps; i++) box(f, gx, gy - i, .35 + i * .32, shade(base, -i * .012));
+		});
+	}
+	/** A chair: a low box with a back. */
+	function chair(f, gx, gy, base = "#4a6ea8") {
+		withCam(f, () => {
+			box(f, gx, gy, .42, base);
+			box(f, gx, gy - .001 + 0, .72, shade(base, -.1));
+		});
+	}
+	/** A plant in a pot: two boxes and a few leaves. */
+	function plant(f, gx, gy) {
+		const ctx = f.ctx;
+		withCam(f, () => {
+			const c = toScreen({
+				gx,
+				gy
+			});
+			drawContactShadow(ctx, c.x, c.y + 3, 8, 4, .34);
+			box(f, gx, gy, .4, "#8a6a4e");
+			const leaf = ramp("#4cae6a", .11);
+			for (let i = 0; i < 6; i++) {
+				const a = i / 6 * Math.PI * 2;
+				ctx.fillStyle = i % 2 ? leaf.base : leaf.dk;
+				ctx.beginPath();
+				ctx.ellipse(c.x + Math.cos(a) * 4, c.y - 12 + Math.sin(a) * 4, 3, 6, a, 0, Math.PI * 2);
+				ctx.fill();
+			}
+			ctx.fillStyle = leaf.lt;
+			ctx.beginPath();
+			ctx.ellipse(c.x, c.y - 16, 3, 5, 0, 0, Math.PI * 2);
+			ctx.fill();
+		});
+	}
+	/** A rug: a flat diamond on the floor, a few tones off the carpet. */
+	function rug(f, gx, gy, tiles, base) {
+		f.ctx;
+		withCam(f, () => {
+			const r = ramp(base, .1);
+			for (let i = 0; i < tiles; i++) for (let j = 0; j < tiles; j++) fill(f, tileDiamond(gx + i, gy + j), i === 0 || j === 0 || i === tiles - 1 || j === tiles - 1 ? r.dk : (i + j) % 3 === 0 ? r.lt : r.base);
+			for (let i = 0; i < tiles; i++) fill(f, tileDiamond(gx + i, gy + Math.floor(tiles / 2)), mix(r.hi, "#ffffff", .1));
+		});
+	}
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/scenes.ts
+	/** Qubit Office's palette. Base colours only — the ramps are derived. */
+	var PALETTE = {
+		void: "#161320",
+		ground: "#2b2740",
+		plate: "#332e49",
+		wall: "#4a4463",
+		wallTop: "#635b80",
+		accent: "#e08fb0",
+		ink: "#f4f1f8",
+		muted: "#a6a0bb",
+		doorway: "#6fd3a6"
+	};
+	/** The building's own material. One base, ramped at every use. */
+	var HQ = {
+		carpet: "#3b3556",
+		wall: "#635b80",
+		trim: "#453f5e",
+		accent: "#e08fb0"
+	};
+	function text(ctx, s, x, y, size, colour, align = "left", weight = "400") {
+		ctx.save();
+		ctx.font = `${weight} ${size}px ui-sans-serif, system-ui, sans-serif`;
+		ctx.textAlign = align;
+		ctx.textBaseline = "middle";
+		ctx.fillStyle = "rgba(12,10,20,0.55)";
+		ctx.fillText(s, x, y + 1);
+		ctx.fillStyle = colour;
+		ctx.fillText(s, x, y);
+		ctx.restore();
+	}
+	/**
+	* A figure: feet-anchored, shaded from a ramp, with a contact shadow.
+	*
+	* The body is three tones of the SAME state colour (shoulder lit, torso mid,
+	* hip dark) rather than one rectangle. That is what makes a 17px-tall shape
+	* read as a person instead of a chip.
+	*/
+	function figure(ctx, c, x, y, scale, selected) {
+		const w = 12 * scale, h = 17 * scale;
+		const top = y - h;
+		const r = ramp(ANIM_COLOUR[c.animation] ?? PALETTE.muted, .09);
+		drawContactShadow(ctx, x, y + 1, w * .62, w * .24, .34);
+		ctx.save();
+		if (selected) {
+			ctx.strokeStyle = PALETTE.accent;
+			ctx.lineWidth = 2;
+			ctx.strokeRect(x - w * .8, top - 4 * scale, w * 1.6, h + 8 * scale);
+		}
+		ctx.fillStyle = r.dd;
+		ctx.fillRect(x - w * .38, top + h * .7, w * .3, h * .3);
+		ctx.fillRect(x + w * .08, top + h * .7, w * .3, h * .3);
+		ctx.fillStyle = r.dk;
+		ctx.fillRect(x - w / 2, top + h * .26, w, h * .46);
+		ctx.fillStyle = r.base;
+		ctx.fillRect(x - w / 2, top + h * .3, w, h * .3);
+		ctx.fillStyle = r.lt;
+		ctx.fillRect(x - w / 2, top + h * .28, w, 2 * scale);
+		ctx.fillStyle = r.dk;
+		ctx.fillRect(x - w * .62, top + h * .3, w * .14, h * .34);
+		ctx.fillRect(x + w * .48, top + h * .3, w * .14, h * .34);
+		ctx.fillStyle = "#e8c9a8";
+		ctx.beginPath();
+		ctx.arc(x, top + h * .14, w * .31, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.fillStyle = shade("#e8c9a8", -.12);
+		ctx.beginPath();
+		ctx.arc(x, top + h * .13, w * .31, Math.PI * 1.05, Math.PI * 1.95);
+		ctx.fill();
+		ctx.restore();
+		if (c.stalled) text(ctx, "!", x, top - 12 * scale, 12 * scale, "#ff7a6a", "center", "700");
+	}
+	/** The payload's own animation vocabulary, as base colours. */
+	var ANIM_COLOUR = {
+		idle: "#9aa0b0",
+		working: "#f0c05a",
+		walking: "#6fd3a6",
+		meeting: "#8fb0e0",
+		blocked: "#e0554a",
+		carrying: "#c99ae0",
+		glow: "#ffd98a",
+		settling: "#9ad0c0",
+		walking_to_manager: "#e08fb0",
+		seated: "#9aa0b0"
 	};
 	function drawExterior(a) {
 		const { ctx, width, height, world } = a;
-		plate(ctx, 0, 0, width, height, PALETTE.void);
-		plate(ctx, 0, height * .62, width, height * .38, PALETTE.ground);
-		ctx.save();
-		ctx.fillStyle = "rgba(255,255,255,0.05)";
-		ctx.fillRect(0, height * .8, width, 2);
-		ctx.restore();
-		const bw = Math.min(360, width * .46);
-		const bh = height * .56;
+		const sky = ctx.createLinearGradient(0, 0, 0, height * .62);
+		sky.addColorStop(0, "#0d0a16");
+		sky.addColorStop(1, "#241f38");
+		ctx.fillStyle = sky;
+		ctx.fillRect(0, 0, width, height * .62);
+		const rnd = ramp("#1d1930", .06);
+		for (let i = 0; i < 9; i++) {
+			const bw = 40 + i % 3 * 24;
+			const bh = 30 + i * 37 % 70;
+			const bx = i * 137 % Math.max(1, width - bw);
+			ctx.fillStyle = i % 2 ? rnd.dk : rnd.base;
+			ctx.fillRect(bx, height * .62 - bh, bw, bh);
+		}
+		const ground = ramp("#2b2740", .07);
+		ctx.fillStyle = ground.base;
+		ctx.fillRect(0, height * .62, width, height * .38);
+		for (let i = 0; i < 6; i++) {
+			ctx.fillStyle = i % 2 ? ground.dk : ground.dd;
+			ctx.fillRect(0, height * .62 + i * (height * .38 / 6), width, 1);
+		}
+		const bw = Math.min(380, width * .48);
+		const bh = height * .58;
 		const bx = width / 2 - bw / 2;
 		const by = height * .62 - bh;
-		plate(ctx, bx, by, bw, bh, PALETTE.wall, PALETTE.wallTop);
 		const floors = Math.max(1, world.building.floors.length);
-		for (let i = 1; i < floors; i++) {
-			const y = by + bh / floors * i;
-			ctx.save();
-			ctx.fillStyle = "rgba(255,255,255,0.07)";
-			ctx.fillRect(bx, y, bw, 1);
-			ctx.restore();
+		const wallR = ramp(HQ.wall, .07);
+		for (let i = 0; i < bh; i++) {
+			ctx.fillStyle = shade(HQ.wall, .05 - i / bh * .12);
+			ctx.fillRect(bx, by + i, bw, 1);
 		}
+		ctx.fillStyle = mix(wallR.lt, "#ffffff", .12);
+		ctx.fillRect(bx, by, 2, bh);
+		ctx.fillStyle = wallR.dd;
+		ctx.fillRect(bx + bw - 2, by, 2, bh);
+		const rowH = bh / floors;
 		for (let i = 0; i < floors; i++) {
-			const y = by + bh / floors * i + bh / floors * .34;
-			for (let k = 0; k < 4; k++) plate(ctx, bx + 24 + k * ((bw - 48) / 4), y, 18, 14, i === 0 ? PALETTE.accent : "rgba(255,255,255,0.16)");
+			const y = by + rowH * i;
+			ctx.fillStyle = shade(HQ.wall, -.14);
+			ctx.fillRect(bx, y, bw, 2);
+			ctx.fillStyle = shade(HQ.wall, .04);
+			ctx.fillRect(bx, y + 2, bw, 1);
+			const cols = Math.max(2, Math.floor(bw / 54));
+			for (let k = 0; k < cols; k++) {
+				const wx = bx + 20 + k * ((bw - 40) / cols);
+				const wy = y + rowH * .34;
+				const ww = Math.min(26, (bw - 40) / cols - 10);
+				const wh = Math.max(10, rowH * .32);
+				ctx.fillStyle = shade(HQ.wall, -.2);
+				ctx.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
+				const lit = i === 0 ? "#ffd98a" : "#cbb894";
+				const pane = ctx.createLinearGradient(wx, wy, wx, wy + wh);
+				pane.addColorStop(0, mix(lit, "#ffffff", .15));
+				pane.addColorStop(1, shade(lit, -.12));
+				ctx.fillStyle = pane;
+				ctx.fillRect(wx, wy, ww, wh);
+				ctx.fillStyle = shade(HQ.wall, .08);
+				ctx.fillRect(wx - 2, wy + wh + 1, ww + 4, 2);
+				ctx.fillStyle = "rgba(0,0,0,0.25)";
+				ctx.fillRect(wx - 2, wy + wh + 3, ww + 4, 1);
+			}
 		}
-		const dw = 44, dh = 46;
-		const dx = width / 2 - dw / 2, dy = height * .62 - dh;
-		plate(ctx, dx, dy, dw, dh, PALETTE.doorway, "rgba(255,255,255,0.25)");
-		ctx.save();
-		const g = ctx.createRadialGradient(width / 2, dy + dh, 4, width / 2, dy + dh, 90);
-		g.addColorStop(0, "rgba(111,211,166,0.30)");
-		g.addColorStop(1, "rgba(111,211,166,0)");
-		ctx.fillStyle = g;
-		ctx.fillRect(width / 2 - 100, dy - 20, 200, 106);
-		ctx.restore();
-		text(ctx, world.building.name, width / 2, by - 22, 16, PALETTE.ink, "center", "600");
+		const dw = 52, dh = 54;
+		const dx = width / 2 - dw / 2;
+		const dy = height * .62 - dh;
+		ctx.fillStyle = shade(HQ.wall, -.24);
+		ctx.fillRect(dx - 5, dy - 5, 62, 59);
+		const doorR = ramp(PALETTE.doorway, .1);
+		const dg = ctx.createLinearGradient(dx, dy, dx, dy + dh);
+		dg.addColorStop(0, doorR.hi);
+		dg.addColorStop(1, doorR.dk);
+		ctx.fillStyle = dg;
+		ctx.fillRect(dx, dy, dw, dh);
+		ctx.strokeStyle = doorR.dd;
+		ctx.lineWidth = 1;
+		ctx.strokeRect(dx + .5, dy + .5, 51, 53);
+		const spill = ctx.createRadialGradient(width / 2, dy + dh, 4, width / 2, dy + dh, 130);
+		spill.addColorStop(0, "rgba(111,211,166,0.34)");
+		spill.addColorStop(.5, "rgba(111,211,166,0.12)");
+		spill.addColorStop(1, "rgba(111,211,166,0)");
+		ctx.fillStyle = spill;
+		ctx.fillRect(width / 2 - 140, dy - 30, 280, 174);
+		text(ctx, world.building.name, width / 2, by - 24, 17, PALETTE.ink, "center", "600");
 		text(ctx, world.building.floors.length + " floors", width / 2, by - 6, 11, PALETTE.muted, "center");
-		text(ctx, "Enter", width / 2, dy + dh + 16, 12, PALETTE.doorway, "center", "600");
+		text(ctx, "Enter", width / 2, dy + dh + 20, 12, PALETTE.doorway, "center", "600");
 	}
 	function drawEntranceHall(a) {
 		const { ctx, width, height, world } = a;
-		plate(ctx, 0, 0, width, height, PALETTE.void);
-		const fh = height * .72;
-		const fy = height * .14;
-		plate(ctx, width * .05, fy, width * .9, fh, PALETTE.plate, PALETTE.wallTop);
-		plate(ctx, width * .05, fy + fh - 28, width * .9, 28, PALETTE.ground);
-		const dw = 58, dh = 96;
+		ctx.fillStyle = PALETTE.void;
+		ctx.fillRect(0, 0, width, height);
+		const fh = height * .76;
+		const fy = height * .12;
+		drawWallFace(ctx, width * .04, fy, width * .92, fh * .52, HQ, {
+			seed: 2,
+			pattern: "panelled"
+		});
+		drawFloor$1(ctx, width * .04, fy + fh * .52, width * .92, fh * .48, HQ, { seed: 11 });
+		const dw = 62, dh = 104;
 		const dx = width * .5 - dw / 2;
-		const dy = fy + fh - 28 - dh;
-		plate(ctx, dx, dy, dw, dh, PALETTE.doorway, "rgba(255,255,255,0.3)");
-		ctx.save();
-		const g = ctx.createRadialGradient(width * .5, dy + dh, 6, width * .5, dy + dh, 150);
-		g.addColorStop(0, "rgba(111,211,166,0.22)");
-		g.addColorStop(1, "rgba(111,211,166,0)");
-		ctx.fillStyle = g;
-		ctx.fillRect(width * .5 - 160, dy - 40, 320, 186);
-		ctx.restore();
-		text(ctx, world.building.name, width * .05 + 14, fy + 20, 15, PALETTE.ink, "left", "600");
-		text(ctx, "You are inside.", width * .05 + 14, fy + 40, 12, PALETTE.muted);
-		text(ctx, "To reception →", width * .95 - 14, fy + 20, 12, PALETTE.accent, "right", "600");
-		text(ctx, "Back outside", width * .5, dy + dh + 18, 11, PALETTE.doorway, "center");
-		text(ctx, world.building.floors.length + " floors above", width / 2, fy + fh - 12, 11, PALETTE.muted, "center");
+		const dy = fy + fh * .52 - dh;
+		const doorR = ramp(PALETTE.doorway, .1);
+		const dg = ctx.createLinearGradient(dx, dy, dx, dy + dh);
+		dg.addColorStop(0, mix(doorR.hi, "#ffffff", .2));
+		dg.addColorStop(1, doorR.base);
+		ctx.fillStyle = dg;
+		ctx.fillRect(dx, dy, dw, dh);
+		ctx.strokeStyle = doorR.dd;
+		ctx.lineWidth = 2;
+		ctx.strokeRect(dx + 1, dy + 1, 60, 102);
+		const pool = ctx.createRadialGradient(width * .5, fy + fh * .52 + 10, 6, width * .5, fy + fh * .52 + 10, 200);
+		pool.addColorStop(0, "rgba(111,211,166,0.30)");
+		pool.addColorStop(.55, "rgba(111,211,166,0.10)");
+		pool.addColorStop(1, "rgba(111,211,166,0)");
+		ctx.fillStyle = pool;
+		ctx.fillRect(width * .5 - 220, fy + fh * .52 - 20, 440, fh * .48 + 20);
+		for (const px of [width * .1, width * .9]) {
+			const potR = ramp("#7a5a44", .08);
+			drawContactShadow(ctx, px, fy + fh * .52 + 4, 12, 5, .35);
+			ctx.fillStyle = potR.base;
+			ctx.fillRect(px - 9, fy + fh * .52 - 18, 18, 18);
+			ctx.fillStyle = potR.lt;
+			ctx.fillRect(px - 9, fy + fh * .52 - 18, 18, 2);
+			const leafR = ramp("#4cae6a", .09);
+			for (let i = 0; i < 5; i++) {
+				ctx.fillStyle = i % 2 ? leafR.base : leafR.dk;
+				ctx.beginPath();
+				ctx.ellipse(px - 8 + i * 4, fy + fh * .52 - 26 - i % 3 * 5, 5, 9, (i - 2) * .3, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+		text(ctx, world.building.name, width * .04 + 18, fy + 22, 16, PALETTE.ink, "left", "600");
+		text(ctx, "You are inside.", width * .04 + 18, fy + 44, 12, PALETTE.muted);
+		text(ctx, "To reception →", width * .96 - 18, fy + 22, 12, PALETTE.accent, "right", "600");
+		text(ctx, "Back outside", width * .5, dy + dh + 20, 11, PALETTE.doorway, "center");
+		text(ctx, world.building.floors.length + " floors above", width / 2, fy + fh - 14, 11, PALETTE.muted, "center");
 	}
 	function drawLobby(a) {
 		const { ctx, width, height, world } = a;
-		plate(ctx, 0, 0, width, height, PALETTE.void);
-		const fh = height * .66;
-		const fy = height * .2;
-		plate(ctx, width * .06, fy, width * .88, fh, PALETTE.plate, PALETTE.wallTop);
-		plate(ctx, width * .06, fy + fh - 24, width * .88, 24, PALETTE.ground);
-		plate(ctx, width * .12, fy + fh - 96, 130, 40, PALETTE.wall, "rgba(255,255,255,0.18)");
-		text(ctx, "Reception", width * .12 + 12, fy + fh - 74, 11, PALETTE.muted);
-		const ex = width * .62, ew = 66, eh = 96;
-		const ey = fy + fh - 24 - eh;
-		plate(ctx, ex, ey, ew, eh, PALETTE.wall, PALETTE.accent);
-		text(ctx, "▲▼", ex + ew / 2, ey + eh * .5, 20, PALETTE.accent, "center");
-		text(ctx, "Elevator", ex + ew / 2, ey + eh + 14, 11, PALETTE.muted, "center");
-		const sx = width * .8;
-		for (let i = 0; i < 5; i++) plate(ctx, sx + i * 9, ey + eh - i * 12 - 10, 9, 10 + i * 12, i % 2 ? PALETTE.wallTop : PALETTE.wall);
-		text(ctx, "Stairs", sx + 22, ey + eh + 14, 11, PALETTE.muted, "center");
-		const lowest = Math.min(...world.building.floors.map((f) => f.number));
-		world.building.characters.filter((c) => c.roomId !== null && world.building.floors.find((f) => f.number === lowest)?.rooms.some((r) => r.id === c.roomId)).forEach((c, i) => {
-			figure(ctx, c, width * .2 + i * 34, fy + fh - 34, 1.5, false);
-		});
-		text(ctx, "Reception", width * .06 + 10, fy + 16, 13, PALETTE.ink, "left", "600");
-		text(ctx, world.building.name, width * .06 + 10, fy + 34, 11, PALETTE.muted);
+		ctx.fillStyle = PALETTE.void;
+		ctx.fillRect(0, 0, width, height);
+		const lobby = {
+			number: 0,
+			name: world.building.name,
+			role: "reception",
+			rooms: [{
+				id: 0,
+				slug: "reception",
+				kind: "lobby",
+				x: 0,
+				y: 0,
+				w: 14,
+				h: 10,
+				occupants: lobbyOccupants(world)
+			}]
+		};
+		paintFloor(ctx, lobby, width, height, null);
+		const f = {
+			ctx,
+			cam: cameraFor(lobby, width, height)
+		};
+		receptionDesk(f, 3, 4);
+		elevator(f, 10, 2);
+		stairs(f, 12, 7);
+		plant(f, 1, 8);
+		plant(f, 13, 1);
+		rug(f, 5, 6, 3, "#7c5f86");
+		chair(f, 5, 8);
+		text(ctx, "Reception", 18, 24, 14, PALETTE.ink, "left", "600");
+		text(ctx, world.building.name + "  ·  " + world.building.floors.length + " floors", 18, 44, 11, PALETTE.muted);
+	}
+	/** Who the payload seats on the ground floor — the lobby's own crowd. */
+	function lobbyOccupants(world) {
+		const lowest = Math.min(...world.building.floors.map((x) => x.number));
+		const floor = world.building.floors.find((x) => x.number === lowest);
+		if (!floor) return [];
+		const ids = new Set(floor.rooms.flatMap((r) => r.occupants.map((c) => c.agent_id)));
+		return world.building.characters.filter((c) => ids.has(c.agentId)).map((c) => ({
+			agentId: c.agentId,
+			slug: c.slug,
+			animation: String(c.animation),
+			stalled: c.stalled
+		}));
 	}
 	function drawFloor(a, floor) {
 		const { ctx, width, height, world } = a;
-		plate(ctx, 0, 0, width, height, PALETTE.void);
-		const fh = height * .68;
-		const fy = height * .16;
-		plate(ctx, width * .04, fy, width * .92, fh, PALETTE.plate, PALETTE.wallTop);
-		plate(ctx, width * .04, fy + fh - 26, width * .92, 26, PALETTE.ground);
-		plate(ctx, width * .08, fy + fh - 130, 54, 104, PALETTE.wall, PALETTE.accent);
-		text(ctx, "▲▼", width * .08 + 27, fy + fh - 78, 16, PALETTE.accent, "center");
-		const rooms = floor.rooms;
-		const rw = Math.min(150, width * .72 / Math.max(1, rooms.length) - 16);
-		rooms.forEach((r, i) => {
-			const rx = width * .2 + i * (rw + 16);
-			const ry = fy + 30;
-			const rh = fh - 90;
-			plate(ctx, rx, ry, rw, rh, PALETTE.wall, "rgba(255,255,255,0.16)");
-			plate(ctx, rx + rw / 2 - 16, ry + rh - 34, 32, 34, PALETTE.doorway);
-			text(ctx, r.slug, rx + rw / 2, ry + 16, 11, PALETTE.ink, "center", "600");
-			text(ctx, r.kind, rx + rw / 2, ry + 32, 10, PALETTE.muted, "center");
-			r.occupants.slice(0, 4).forEach((c, k) => {
-				const occupant = world.building.characters.find((wc) => wc.agentId === c.agent_id);
-				if (occupant) figure(ctx, occupant, rx + 22 + k * 30, ry + rh - 46, 1.3, false);
-			});
-			text(ctx, r.occupants.length + " in room", rx + rw / 2, ry + rh - 12, 10, PALETTE.muted, "center");
-		});
-		if (rooms.length === 0) text(ctx, "No rooms on this floor", width / 2, fy + fh / 2, 13, PALETTE.muted, "center");
-		text(ctx, floor.name + "  ·  floor " + floor.number, width * .04 + 10, fy + 16, 13, PALETTE.ink, "left", "600");
-		text(ctx, floor.role, width * .04 + 10, fy + 34, 11, PALETTE.muted);
+		paintFloor(ctx, toIsoFloor(floor), width, height, null);
+		for (const room of floor.rooms) {
+			room.occupants.length;
+			text(ctx, room.slug, width / 2, height - 46 + 0, 0, PALETTE.ink);
+			break;
+		}
+		const here = floor.rooms.reduce((n, r) => n + r.occupants.length, 0);
+		text(ctx, floor.name + "  ·  floor " + floor.number, 18, 24, 14, PALETTE.ink, "left", "600");
+		text(ctx, floor.role + "  ·  " + floor.rooms.length + " rooms  ·  " + here + " seated", 18, 44, 11, PALETTE.muted);
+		if (floor.rooms.length === 0) text(ctx, "No rooms on this floor", width / 2, height / 2, 13, PALETTE.muted, "center");
 	}
 	function drawRoom(a, floor) {
 		const { ctx, width, height, world } = a;
 		const room = floor.rooms.find((r) => r.id === a.place.room);
-		plate(ctx, 0, 0, width, height, PALETTE.void);
-		const fh = height * .7;
-		const fy = height * .15;
-		plate(ctx, width * .06, fy, width * .88, fh, PALETTE.plate, PALETTE.wallTop);
-		plate(ctx, width * .06, fy + fh - 30, width * .88, 30, PALETTE.ground);
+		ctx.fillStyle = PALETTE.void;
+		ctx.fillRect(0, 0, width, height);
+		const fh = height * .74;
+		const fy = height * .13;
 		if (!room) {
 			text(ctx, "This room is not in the tower report", width / 2, fy + fh / 2, 13, PALETTE.muted, "center");
 			return;
 		}
+		const theme = roomTheme(room.id + floor.number * 3);
+		drawWallFace(ctx, width * .05, fy, width * .9, fh * .5, theme, {
+			seed: room.id * 3,
+			pattern: room.kind === "exec" ? "panelled" : "plain"
+		});
+		drawFloor$1(ctx, width * .05, fy + fh * .5, width * .9, fh * .5, theme, { seed: room.id * 5 });
+		const floorY = fy + fh * .5;
 		const occ = room.occupants;
 		const cols = Math.max(1, Math.min(3, occ.length));
 		occ.forEach((c, i) => {
 			const worldChar = world.building.characters.find((wc) => wc.agentId === c.agent_id);
 			const col = i % cols, row = Math.floor(i / cols);
-			const dx = width * .16 + col * 150;
-			const dy = fy + 70 + row * 96;
-			plate(ctx, dx, dy + 22, 92, 26, PALETTE.wall, "rgba(255,255,255,0.14)");
-			if (worldChar) figure(ctx, worldChar, dx + 46, dy + 22, 1.7, false);
-			text(ctx, c.slug, dx + 46, dy + 60, 11, PALETTE.ink, "center", "600");
-			text(ctx, c.animation + (c.stalled ? " · stalled" : ""), dx + 46, dy + 74, 10, c.stalled ? "#e0554a" : PALETTE.muted, "center");
+			const dx = width * .14 + col * 158;
+			const dy = floorY + 44 + row * 104;
+			const deskR = ramp("#8a6f52", .08);
+			const dwid = 96, dhei = 30;
+			drawContactShadow(ctx, dx + dwid / 2, dy + dhei + 16, dwid * .5, 8, .3);
+			ctx.fillStyle = deskR.dk;
+			ctx.fillRect(dx, dy, dwid, dhei);
+			ctx.fillStyle = deskR.base;
+			ctx.fillRect(dx, dy, dwid, 22);
+			ctx.fillStyle = deskR.hi;
+			ctx.fillRect(dx, dy, dwid, 3);
+			outlineRect(ctx, dx, dy, dwid, dhei, deskR.base);
+			const monR = ramp("#2f3b52", .09);
+			ctx.fillStyle = monR.base;
+			ctx.fillRect(dx + dwid / 2 - 16, dy - 24, 32, 24);
+			const anim = ANIM_COLOUR[c.animation] ?? PALETTE.muted;
+			ctx.fillStyle = mix(anim, "#ffffff", .15);
+			ctx.fillRect(dx + dwid / 2 - 14, dy - 22, 28, 18);
+			if (worldChar) figure(ctx, worldChar, dx + dwid / 2, dy + 24, 1.7, false);
+			text(ctx, c.slug, dx + dwid / 2, dy + dhei + 34, 11, PALETTE.ink, "center", "600");
+			text(ctx, c.animation + (c.stalled ? " · stalled" : ""), dx + dwid / 2, dy + dhei + 48, 10, c.stalled ? "#ff7a6a" : PALETTE.muted, "center");
 		});
-		if (occ.length === 0) text(ctx, "Nobody is seated here", width / 2, fy + fh / 2, 13, PALETTE.muted, "center");
-		text(ctx, room.slug, width * .06 + 10, fy + 16, 13, PALETTE.ink, "left", "600");
-		text(ctx, room.kind + "  ·  " + occ.length + " seated", width * .06 + 10, fy + 34, 11, PALETTE.muted);
+		if (occ.length === 0) text(ctx, "Nobody is seated here", width / 2, floorY + 40, 13, PALETTE.muted, "center");
+		text(ctx, room.slug, width * .05 + 18, fy + 22, 14, PALETTE.ink, "left", "600");
+		text(ctx, room.kind + "  ·  " + occ.length + " seated", width * .05 + 18, fy + 42, 11, PALETTE.muted);
 	}
 	/** Paint the current place. The one entry point the hosts call. */
 	function drawPlace(a) {
@@ -190253,7 +191486,8 @@ create: function(game) {
 			case "floor": {
 				const f = world.building.floors.find((x) => x.number === place.floor);
 				if (!f) {
-					plate(a.ctx, 0, 0, a.width, a.height, PALETTE.void);
+					a.ctx.fillStyle = PALETTE.void;
+					a.ctx.fillRect(0, 0, a.width, a.height);
 					text(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 					return;
 				}
@@ -190262,14 +191496,16 @@ create: function(game) {
 			case "room": {
 				const f = world.building.floors.find((x) => x.number === place.floor);
 				if (!f) {
-					plate(a.ctx, 0, 0, a.width, a.height, PALETTE.void);
+					a.ctx.fillStyle = PALETTE.void;
+					a.ctx.fillRect(0, 0, a.width, a.height);
 					text(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 					return;
 				}
 				return drawRoom(a, f);
 			}
 			default:
-				plate(a.ctx, 0, 0, a.width, a.height, PALETTE.void);
+				a.ctx.fillStyle = PALETTE.void;
+				a.ctx.fillRect(0, 0, a.width, a.height);
 				text(a.ctx, "Unknown place", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 		}
 	}
