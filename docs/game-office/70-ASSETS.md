@@ -1,8 +1,14 @@
 # 70 — Visuals and Assets
 
-**Revised by D11.** The tower is **2D isometric Phaser**. Agents are **procedurally drawn** today.
-Tripo GLB characters are a **phase-2 upgrade** — so the first half of this file is an *upgrade
-spec*, not a phase-1 dependency.
+**Revised by D11.** The tower is **2D isometric — drawn on a plain `<canvas>`, not Phaser.**
+*(Corrected 2026-10-14: this line said "2D isometric Phaser", but `qubit-office.js` and
+`iso-engine.js` contain **zero** Phaser references and use `getContext("2d")` directly. Phaser
+was the reference implementation's engine, studied for its iso model; it was never adopted. A
+renderer with no engine dependency stays a single `<script>` with no bundler, which is what the
+loader supports.)* Agents are **drawn from a vendored PNG atlas** today (448 poses, 7 families);
+the procedural rectangle figure remains only as the fallback when the atlas is absent or a pose
+has not decoded. Tripo GLB characters are a **phase-2 upgrade** — so the first half of this file
+is an *upgrade spec*, not a phase-1 dependency.
 
 **Nothing in this file blocks M4.** Phase-1 agents are drawn in code; the Tripo assets are an
 upgrade that lands whenever the owner gets around to exporting them (M6).

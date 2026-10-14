@@ -1,0 +1,395 @@
+{
+  "source": "https://github.com/marmottajr/habblaud",
+  "commit": "4ccce2537472fe5a8d432f06974494d2e778ff15",
+  "licence": "MIT",
+  "note": "Vendored build output of the Habblaud client. Client-side only: the server, the Claude Code mod, and the Docker setup are NOT vendored. Served from /plugin-apps/qubit-office/habblaud/.",
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "5de137c2c07bd58a24cfaa423221fee7ef4a5955b140f4858c8e8169ae1dee9a",
+      "bytes": 1071
+    },
+    {
+      "path": "assets/art/framed/painting-abstract.png",
+      "sha256": "6cdd1058dff101dd25d8e84576a9b1f9136910093d726aaea041a1fbbdada09e",
+      "bytes": 339
+    },
+    {
+      "path": "assets/art/framed/painting-beach.png",
+      "sha256": "8e3c7e4651c0e364ee158d3a71fdae9da102717606b449dcea35fdf5b3edad81",
+      "bytes": 465
+    },
+    {
+      "path": "assets/art/framed/painting-cat.png",
+      "sha256": "d3f2c34df218514d452f58431468d677832e9110b92202ef42bfd6b6491b5210",
+      "bytes": 563
+    },
+    {
+      "path": "assets/art/framed/painting-city-night.png",
+      "sha256": "246b3e210f0e7cef511790b0fce3e8345b0902de78c29b4299d94662ffcbf6e1",
+      "bytes": 627
+    },
+    {
+      "path": "assets/art/framed/painting-mountains.png",
+      "sha256": "06718279927fc091008040e4c96eec1ca6845e5759d8f8cee28b4ed851e7c5ca",
+      "bytes": 576
+    },
+    {
+      "path": "assets/art/framed/painting-rio.png",
+      "sha256": "9831c0421b28bbbbb346ae49acccc55b38ee21cf65df0dc2888045dc1ceb41f9",
+      "bytes": 522
+    },
+    {
+      "path": "assets/art/framed/painting-sunflowers.png",
+      "sha256": "4aabf5f8630b364c3173c5788d5b74f9c3d01200f821d5f3ce6673ab91f50587",
+      "bytes": 577
+    },
+    {
+      "path": "assets/art/framed/painting-wave.png",
+      "sha256": "1e1cfcf00ec26f69fec450bd798f574a768de07806bfcc7058c35020031d8172",
+      "bytes": 774
+    },
+    {
+      "path": "assets/art/framed/painting-wide-aurora.png",
+      "sha256": "91a0713c5def2fbd0a69c53c448e8c34b4c2769702a3c52a14dc4d31c47d7874",
+      "bytes": 1274
+    },
+    {
+      "path": "assets/art/framed/painting-wide-color-fields.png",
+      "sha256": "d52d97934c4a767f3a1d2afc9ac5fc33c4bdff1787047ae6bbef2d3d6fab7d4d",
+      "bytes": 892
+    },
+    {
+      "path": "assets/art/framed/painting-wide-forest-lake.png",
+      "sha256": "f814b14440685ab6002a65297b94eba510030933bef71873d832763742956984",
+      "bytes": 1208
+    },
+    {
+      "path": "assets/art/painting-abstract.png",
+      "sha256": "a64b3ec112ad52d6c54ab8cd28a1ece2db4a9753e6366c2ee007209bfd2d4581",
+      "bytes": 276
+    },
+    {
+      "path": "assets/art/painting-beach.png",
+      "sha256": "1a8bdfb290ce56b6c106a0f1a58af84d3dc0d7898e81cb40f19dc52bf9c13076",
+      "bytes": 365
+    },
+    {
+      "path": "assets/art/painting-cat.png",
+      "sha256": "3e784bb880da0d137395ee04e7c2e96d7d9951a70d467a8a6d0554794efc075b",
+      "bytes": 493
+    },
+    {
+      "path": "assets/art/painting-city-night.png",
+      "sha256": "102377d4d3213d9d1c98f7c267410d757b0ac056be40d53225976ee35f7c4b39",
+      "bytes": 499
+    },
+    {
+      "path": "assets/art/painting-mountains.png",
+      "sha256": "ae890a113be3d910665a944560a16d9fca0262777725a8ee1165529c4c721acf",
+      "bytes": 430
+    },
+    {
+      "path": "assets/art/painting-rio.png",
+      "sha256": "788f6463ec77ee82a787ff6737c79401d1665d4c2e97fb7440bace5630dc927c",
+      "bytes": 411
+    },
+    {
+      "path": "assets/art/painting-sunflowers.png",
+      "sha256": "1d4dd4530137c15d2af16db60a1ffc5db58ff01c667351c43a08912445996558",
+      "bytes": 480
+    },
+    {
+      "path": "assets/art/painting-wave.png",
+      "sha256": "4a52d2b1e9bbca55e3247e82e1d88a91b932a7b98ae4ad0453e5e97768708939",
+      "bytes": 646
+    },
+    {
+      "path": "assets/art/painting-wide-aurora.png",
+      "sha256": "7395486ea17a36597beffc21441f265eec8b8d23a2b5302315204f471ccb1666",
+      "bytes": 1110
+    },
+    {
+      "path": "assets/art/painting-wide-color-fields.png",
+      "sha256": "0564524adcd6cea69ceca3d49a94b8d882fa45fddad983bdb5048809c4340212",
+      "bytes": 769
+    },
+    {
+      "path": "assets/art/painting-wide-forest-lake.png",
+      "sha256": "351969c6a9f5a6241b27ccf35465a67bae0dd79c08008f225ae5077a9f35d666",
+      "bytes": 1055
+    },
+    {
+      "path": "assets/art/poster-bug.png",
+      "sha256": "9e275ff405f90f4b74bbec1cd784ac088823b3db9acb8d015dda181e11d06149",
+      "bytes": 332
+    },
+    {
+      "path": "assets/art/poster-cat.png",
+      "sha256": "4d6d8d1dd1767c3bc7fd02580a7b0f29f334afb10bcb5ff0b7ce718e778840c2",
+      "bytes": 235
+    },
+    {
+      "path": "assets/art/poster-code.png",
+      "sha256": "374fc09809b9f11f45db2c83d1c3ca8e91ab6d5b2ab2ceaeac9144615adb5d61",
+      "bytes": 288
+    },
+    {
+      "path": "assets/art/poster-coffee.png",
+      "sha256": "731b3220fae6b5b68d49fda8c9c0d2f0953dc9ffe11da1b69bb07da868499d5f",
+      "bytes": 233
+    },
+    {
+      "path": "assets/art/poster-rocket.png",
+      "sha256": "3595e357962fa48ed3c40fc05d7c55f228f94bf73d4b0564e5bedf744a4cff5e",
+      "bytes": 272
+    },
+    {
+      "path": "assets/art/poster-ship-it.png",
+      "sha256": "aad5de690975174140a27d39a00c2edcc03b05597f3bb0513d09dd327bd29df3",
+      "bytes": 312
+    },
+    {
+      "path": "assets/brand/apple-touch-icon.png",
+      "sha256": "b142d7ac61378194152df4ef16cae547c999da55bd0b60d15fe7864c6023909d",
+      "bytes": 1503
+    },
+    {
+      "path": "assets/brand/favicon-16.png",
+      "sha256": "3674cec879ae4b63abd3fc998e9d924860d303281898ac39f7d42c87a14a0153",
+      "bytes": 398
+    },
+    {
+      "path": "assets/brand/favicon-32.png",
+      "sha256": "8e59ba72625928486424ec367ebfe3297f582f618e48e0a61d1835febec42b2f",
+      "bytes": 590
+    },
+    {
+      "path": "assets/brand/icon-192.png",
+      "sha256": "64fdd88b509bd5306905ca25728cdb68c5cab97be4deb8b8369758a1e893bef3",
+      "bytes": 1578
+    },
+    {
+      "path": "assets/brand/icon-512.png",
+      "sha256": "30e71f5b25f475fc886674b0cfda3e307ef4f1ecff97ea68f5f2e983a1669af3",
+      "bytes": 4651
+    },
+    {
+      "path": "assets/brand/logo-detailed.png",
+      "sha256": "32e31da00ea396b186d2fa04abd20a1ea095cdfd5f90af235d62e7dd02bc2bf4",
+      "bytes": 1412
+    },
+    {
+      "path": "assets/brand/logo-mark.png",
+      "sha256": "8e59ba72625928486424ec367ebfe3297f582f618e48e0a61d1835febec42b2f",
+      "bytes": 590
+    },
+    {
+      "path": "assets/brand/logo-mark@4x.png",
+      "sha256": "4d34d9be1f72c96c83e3e7711f4f84c343d22da40de185a7996b11fb34dc6c67",
+      "bytes": 1035
+    },
+    {
+      "path": "assets/brand/signage.png",
+      "sha256": "ac5ed77cd068397804f504ed4197fb008e30839c8deaf834395fbf1cfce931a5",
+      "bytes": 404
+    },
+    {
+      "path": "assets/brand/signage@4x.png",
+      "sha256": "ea75be25cecb6f5364b578c1e399d5c3987c5f8c6a2c6aac9d946980838078f4",
+      "bytes": 693
+    },
+    {
+      "path": "assets/illustrations/empty-office.png",
+      "sha256": "298c0066b8d93e629a010ba4a7a13e9e8ca12a9354a89c8be3a270a1bc9fee98",
+      "bytes": 83603
+    },
+    {
+      "path": "assets/manifest.json",
+      "sha256": "64d391c2bbe0e16af691492842e682d7f79682df080c2675dc4dbfa21bde0078",
+      "bytes": 5515
+    },
+    {
+      "path": "assets/og-image.png",
+      "sha256": "642541e2780002f2fb6ff37412afb6f31b63c7d2054c85128dbc3e63469f2080",
+      "bytes": 76799
+    },
+    {
+      "path": "bundle/app-BW61bUik.css",
+      "sha256": "2be3803177e97e74f62009495ad23c5f49d10ad3e544ed0987552fd90b2731f3",
+      "bytes": 128520
+    },
+    {
+      "path": "bundle/app-U4Pwh2XA.js",
+      "sha256": "5a7ec651af12609f7f73af2120f2f40d66a71853922e3f047f49fc9c5e5f9b86",
+      "bytes": 698086
+    },
+    {
+      "path": "bundle/daystats-CUw1NUBG.js",
+      "sha256": "2c528ab63470a371474bdc47f683ab397ca903f1f05d0dbee6d6c45dd14cf941",
+      "bytes": 36986
+    },
+    {
+      "path": "bundle/en-2E7tqGEw.js",
+      "sha256": "6d0419548808112f99f9a1fba53d14426db9d00b45a759e5bdbbf200a5180636",
+      "bytes": 186018
+    },
+    {
+      "path": "bundle/es-BlnHV64J.js",
+      "sha256": "3b9f4dbca402902483427178a01d8a785c7b5d76fc7f99ef47b74cd650d4dfb0",
+      "bytes": 195336
+    },
+    {
+      "path": "bundle/fr-Bhd3CCOg.js",
+      "sha256": "501a69481f65df707d92bf6ec99c6dbb55eac7cbe6109c72995d174fe627f9ba",
+      "bytes": 203518
+    },
+    {
+      "path": "bundle/main-DND_b4_E.js",
+      "sha256": "286f362fc50cd4261f715445d71ecd0ab8ce7e87c8f746a6d0b30579e118120e",
+      "bytes": 3921
+    },
+    {
+      "path": "bundle/pixelify-sans-cyrillic-400-normal-Ckz2YJkH.woff2",
+      "sha256": "5dd043d408d06c9da363b90cadd07ec8ce9c248b6c1e61e200d050e760c0dc92",
+      "bytes": 3176
+    },
+    {
+      "path": "bundle/pixelify-sans-cyrillic-400-normal-DfOZNMlW.woff",
+      "sha256": "4c0e92c10863c2e6a0143593fb0172fc013681d403c8114567610ee775a4e0ff",
+      "bytes": 4412
+    },
+    {
+      "path": "bundle/pixelify-sans-cyrillic-500-normal--wrb4dVK.woff2",
+      "sha256": "e02ce66255727d50290f5ff32b0153a7bb6e24abd6d7e065947c801af0124afb",
+      "bytes": 3240
+    },
+    {
+      "path": "bundle/pixelify-sans-cyrillic-500-normal-CR9SIKMr.woff",
+      "sha256": "78fac78497b591306e93c362303dd1f24bda7ceb18133e9da9f8e35cabf9bb36",
+      "bytes": 4452
+    },
+    {
+      "path": "bundle/pixelify-sans-cyrillic-600-normal-B3EuUOZG.woff",
+      "sha256": "e6600ca590ebd840fbd545944c01dac92f3274e407cbcccf69f607dfbed415ff",
+      "bytes": 4472
+    },
+    {
+      "path": "bundle/pixelify-sans-cyrillic-600-normal-BhqNJYOZ.woff2",
+      "sha256": "ad03b65e2a004344495877d46fc6e2ea3d0171e856b5af38a00d8f09b70aad5c",
+      "bytes": 3264
+    },
+    {
+      "path": "bundle/pixelify-sans-cyrillic-700-normal-BrZTw8tu.woff",
+      "sha256": "8f47fda8dfab332618f23eb042e4fbd4d4f1974ad29e888468b7def6c3898766",
+      "bytes": 4408
+    },
+    {
+      "path": "bundle/pixelify-sans-cyrillic-700-normal-CYtG5Rfp.woff2",
+      "sha256": "44953058b3d676a92c8a9ede7c6e56813a297ba52ab230bb5d61db4b8bfc246f",
+      "bytes": 3168
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-400-normal-DLrIX9QE.woff2",
+      "sha256": "d830612ac9131788ebae754b9268f83f7c1d3ffa9bc0f9a5514207a8283fe71e",
+      "bytes": 7692
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-400-normal-JapMNN6Z.woff",
+      "sha256": "60603c6e85cc8ba29a235657dfc0ff9012bae9adcdbc40cd9056a8cb68a9864c",
+      "bytes": 10264
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-500-normal-Bq6pAlou.woff",
+      "sha256": "5128555306c5da6b53be1501e2bcc357b6323ca79f89433e3e0f5405a7bbf247",
+      "bytes": 10684
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-500-normal-DC052d-m.woff2",
+      "sha256": "d17198a8057c1d0354ca39fffd54533734c1c8a6f47a9bde29ee1fb4cdfa06f0",
+      "bytes": 8096
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-600-normal-BNlgYbDL.woff",
+      "sha256": "08677e7720bdf6488cefe2a8d967fbec9d1b6d804a070c3923547de5a7c174e6",
+      "bytes": 10772
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-600-normal-Dd_Dy7u5.woff2",
+      "sha256": "9ee47c039a991caea6072eecfe03cf36debf4f70bb2566bd602b9eada1ab1112",
+      "bytes": 8216
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-700-normal-BctWAS0u.woff",
+      "sha256": "c6b477efe0057f791df7cd78a38d554c93b131d053b75c58ad32e16d6e879f56",
+      "bytes": 10492
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-700-normal-D3Xxx3QE.woff2",
+      "sha256": "c836cfa5c0e9d62ea9b890e0418d52a6004149090a521cd198a8c09f5d5ab893",
+      "bytes": 7904
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-ext-400-normal-BkfTUL4s.woff",
+      "sha256": "595844088d5a5f11cb3921926289f5430b08602057695f73d704bc971a5378cb",
+      "bytes": 7440
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-ext-400-normal-DdH6zlBQ.woff2",
+      "sha256": "b3adb19d68a00dba6caa8b5cbc5a973f1a0a8ae010c576042b3f5e2915499250",
+      "bytes": 5360
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-ext-500-normal-BHT4w5qI.woff2",
+      "sha256": "3a41a1f55e96df095f46bfb34961ad2121f077d3ccf7ea39009f3606f9ed4ef6",
+      "bytes": 5496
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-ext-500-normal-Bkr-oq6R.woff",
+      "sha256": "ed0d185787370ed748ce126ab6f96133c4c64ad8dd102f5f73c5f67dbb4e28c9",
+      "bytes": 7608
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-ext-600-normal-CDaIumwU.woff",
+      "sha256": "2b4e93f155f4bcb264fdb8842beca1281eeb00ecd74d585f228912c975074d38",
+      "bytes": 7656
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-ext-600-normal-Dha6RiOG.woff2",
+      "sha256": "a6e624967a4a319e4a062b0f8953e5db1bb7abf8f9e8f4b8164b59b93a864b35",
+      "bytes": 5568
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-ext-700-normal-BadXkHzZ.woff",
+      "sha256": "160e0add253cc0bb4e1ff2009b532f2841877fe1881565c83cb1b3f25d66033c",
+      "bytes": 7468
+    },
+    {
+      "path": "bundle/pixelify-sans-latin-ext-700-normal-ClyJstAh.woff2",
+      "sha256": "ff161050f286bc34badde88366fc2e0312c7739f1b8a20eb5957e90cf90adb8f",
+      "bytes": 5416
+    },
+    {
+      "path": "bundle/ptypane-BrP-ENHg.css",
+      "sha256": "0e5386f16cb4be78a2fe911e014a810da76ea2db47d8c8b2a966516b2fd5270b",
+      "bytes": 3939
+    },
+    {
+      "path": "bundle/ptypane-DxPqTDKo.js",
+      "sha256": "60fa0392fda300bf4c8e8426c5e78540547d4e55c5452ad35b5ddcb9e36e6054",
+      "bytes": 334656
+    },
+    {
+      "path": "index.html",
+      "sha256": "1cbabe9decd229ff5d0a3718f66db3acfaa92fb477e84e3adfc7535f3c571734",
+      "bytes": 2832
+    },
+    {
+      "path": "manifest.webmanifest",
+      "sha256": "0bc6bbdee8141fe7c4f47317c68a750d45786d39ef60ee3363627b23d2f50893",
+      "bytes": 656
+    }
+  ],
+  "total_bytes": 2147057,
+  "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
+}

@@ -24,6 +24,35 @@ rewritten to `/api/<x>`). `webui.py:1069` registers `/api/office/tower` in
 `/agent` prefix will 404 and be misread as "the endpoint is broken." The browser is fine
 because the SPA bundle knows the prefix (`__QUBIT_API_PREFIX__="/agent"`).
 
+### Known false positive — do not re-report this
+
+**Two independent review passes have now reported "the running dashboard can't fetch office
+data: `GET /api/office/tower` returns 404" as their headline finding.** Both were testing the
+wrong URL. The route is served, and the page renders.
+
+Verified 2026-10-14 from the live daemon:
+
+```
+$ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8890/agent/api/office/tower
+401                                   # route EXISTS (auth required, as designed)
+$ .venv/bin/python scripts/render_office_screenshot.py --json
+data-state=ready, canvas_count=2, non_background_pct=37.4, console_errors=[]
+```
+
+The page itself fetches `fetchJSON("/api/office/tower")` (`qubit-office.js:1177`) and the
+**plugin SDK prepends the served prefix** — `window.__QUBIT_API_PREFIX__ = "/agent"` is
+declared in the page the server sends. So the browser requests
+`/agent/api/office/tower` and gets 200 with the session token.
+
+**Rule for reviewers:** if you find a 404 at `/api/...`, curl the `/agent/api/...` twin before
+writing it up. A 401 on the prefixed path means the route is fine and you simply had no token.
+A reviewer with no browser cannot distinguish "the route is missing" from "I asked the wrong
+host path" — so state which URL you tested and its exact status.
+
+The stale-daemon suspicion ("the Python process started 12 October, so its route table is
+older than the source") is also wrong for this route: the office route has been registered
+since before that process started, and the page demonstrably reaches `ready`.
+
 ---
 
 ## Trap 2 — `.wav` is not servable (M9)

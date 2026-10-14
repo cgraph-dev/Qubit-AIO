@@ -192387,6 +192387,178 @@ create: function(game) {
 		return a.kind === b.kind && a.building === b.building && a.floor === b.floor && a.room === b.room;
 	}
 	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/app/office-app.ts
+	/** The plugin's served directory, relative to the dashboard base path. */
+	var OFFICE_APP_PATH = "/plugin-apps/qubit-office/habblaud/";
+	/**
+	* Build the URL the iframe should load.
+	*
+	* `base` is the dashboard's own base path (empty at the root). The trailing
+	* slash is enforced so a relative `bundle/...` inside the app resolves against
+	* the app directory rather than its parent.
+	*/
+	function officeAppUrl(base = "") {
+		return `${base.endsWith("/") ? base.slice(0, -1) : base}${OFFICE_APP_PATH}`;
+	}
+	function officeAppSrc(opts = {}) {
+		const url = officeAppUrl(opts.base ?? "");
+		return opts.mock ? `${url}?mock=1` : url;
+	}
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/app/office-api.ts
+	var ROUTES = [
+		{
+			client: "access",
+			qubit: null,
+			readOnly: true,
+			note: "No access/permission model is served. The client uses this to decide whether answering from the office is allowed; with no answer it falls back to view-only, which is the safe default."
+		},
+		{
+			client: "stream",
+			qubit: null,
+			readOnly: true,
+			note: "THE BLOCKING ONE. Qubit serves a snapshot, not a stream, so the office cannot update live. Polling /agent/api/office/tower is a stand-in that is honest about being a poll."
+		},
+		{
+			client: "agents/:id",
+			qubit: null,
+			readOnly: true,
+			note: "Per-agent conversation transcripts are not exposed over HTTP."
+		},
+		{
+			client: "permissions/:id",
+			qubit: null,
+			readOnly: false,
+			note: "Answering a permission is an org mutation and must go through the confirmation authority (C4). It must NOT be wired as a bare POST."
+		},
+		{
+			client: "messages/:id",
+			qubit: null,
+			readOnly: false,
+			note: "Sending a message to an agent is an org mutation. Same rule as above."
+		}
+	];
+	/** The one route that IS bound. */
+	var SNAPSHOT_ROUTE = "/agent/api/office/tower";
+	/** How often the stand-in poll runs. Slower than a real stream would be. */
+	var POLL_INTERVAL_MS = 2e3;
+	function bindingVerdict() {
+		const bound = [];
+		const missing = [];
+		const gated = [];
+		for (const r of ROUTES) if (r.readOnly === false) gated.push(r.client);
+		else if (r.qubit) bound.push(r.client);
+		else missing.push(r.client);
+		return {
+			bound,
+			missing,
+			gated,
+			canRender: true,
+			viewOnly: gated.length > 0
+		};
+	}
+	/** One line for a person. Deliberately does not say "working". */
+	function bindingSummary() {
+		const v = bindingVerdict();
+		return `${v.bound.length} of ${ROUTES.length} routes bound · ${v.missing.length} missing · ${v.gated.length} gated by the confirmation authority`;
+	}
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
+	/**
+	* Build the component. React and hooks arrive as arguments, exactly as the rest
+	* of the plugin does it.
+	*/
+	function createOfficeApp(R, hooks) {
+		const { useState, useEffect, useRef } = hooks;
+		return function OfficeApp(props = {}) {
+			const [loaded, setLoaded] = useState(false);
+			const [failed, setFailed] = useState(null);
+			const frameRef = useRef(null);
+			useEffect(() => {
+				const frame = frameRef.current;
+				if (!frame) return;
+				frame.src = officeAppSrc({
+					base: props.base,
+					mock: props.mock
+				});
+				const onLoad = () => {
+					setLoaded(true);
+					setFailed(null);
+					props.onReady?.();
+				};
+				const onError = () => setFailed("The office app failed to load.");
+				frame.addEventListener("load", onLoad);
+				frame.addEventListener("error", onError);
+				return () => {
+					frame.removeEventListener("load", onLoad);
+					frame.removeEventListener("error", onError);
+				};
+			}, [props.base, props.mock]);
+			const children = [R.createElement("iframe", {
+				key: "frame",
+				ref: frameRef,
+				title: "Qubit Office",
+				"data-testid": "office-app-frame",
+				className: "office-game__frame",
+				allow: "clipboard-read; clipboard-write",
+				style: {
+					border: "0",
+					width: "100%",
+					height: "100%",
+					display: "block"
+				}
+			})];
+			if (!loaded && !failed) children.push(R.createElement("div", {
+				key: "loading",
+				className: "office-game__panel",
+				"data-testid": "office-app-loading",
+				style: {
+					position: "absolute",
+					inset: "50% 0 auto 0",
+					textAlign: "center"
+				}
+			}, "Loading the office…"));
+			if (failed) children.push(R.createElement("div", {
+				key: "failed",
+				className: "office-game__refusal",
+				"data-testid": "office-app-failed",
+				role: "alert",
+				style: {
+					position: "absolute",
+					left: 12,
+					top: 12
+				}
+			}, [R.createElement("div", { key: "m" }, failed), R.createElement("div", {
+				key: "p",
+				style: { fontSize: "var(--office-fs-xs)" }
+			}, OFFICE_APP_PATH)]));
+			children.push(R.createElement("div", {
+				key: "status",
+				className: "office-game__bar",
+				"data-testid": "office-app-status",
+				role: "status",
+				style: {
+					position: "absolute",
+					left: 0,
+					right: 0,
+					bottom: 0
+				}
+			}, [R.createElement("span", { key: "s" }, bindingSummary()), R.createElement("span", {
+				key: "r",
+				style: { opacity: .7 }
+			}, `poll ${POLL_INTERVAL_MS / 1e3}s \u2192 ${SNAPSHOT_ROUTE}`)]));
+			return R.createElement("div", {
+				"data-testid": "office-app",
+				className: "office-game",
+				style: {
+					position: "relative",
+					width: "100%",
+					height: "100%"
+				}
+			}, children);
+		};
+	}
+	//#endregion
 	//#region ../qubit-app/plugins/qubit-office/game/types.ts
 	/** The schema this adapter is written against. A mismatch is refused, not coerced. */
 	var EXPECTED_SCHEMA = "qubit-office-tower/1";
@@ -192548,7 +192720,10 @@ create: function(game) {
 	var SDK = window.__QUBIT_PLUGIN_SDK__;
 	if (!SDK || !SDK.React || !SDK.hooks) console.warn("[qubit-office] plugin SDK missing (React/hooks); the game entry cannot register. The Office tab will show no office.");
 	else {
-		const Office = createOfficeComponent(SDK.React, SDK.hooks, liveData);
+		const wantApp = new URLSearchParams(window.location.search).has("app");
+		const R = SDK.React;
+		const H = SDK.hooks;
+		const Office = wantApp ? createOfficeApp(R, H) : createOfficeComponent(R, H, liveData);
 		window.__QUBIT_PLUGINS__?.register("qubit-office", Office);
 	}
 	/**

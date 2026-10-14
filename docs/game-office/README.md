@@ -102,6 +102,15 @@ The tower is a **page in the dashboard sidebar** — the "Qubit Office" tab — 
 need its own auth, store, event stream, and confirmation path, which is this repo's most expensive
 recurring bug class.
 
+## Full-game frontend audit and proposed redesign
+
+Read [`frontend-game/README.md`](frontend-game/README.md) for the current live
+frontend audit and the sequential Japanese/anime ARPG-style game plan: building
+entry/exit, lobby/elevator/stair travel, floors/rooms, character conversations,
+settings, panels and the backend handoff. This is **audit and planning only**;
+no game redesign has been implemented. The milestone claims below are historical
+snapshots, not the new audit's current capability verdict.
+
 ## Status
 
 **M0–M4 are built and proven** (2026-10-12). The append-only ledger, the two money folds, the

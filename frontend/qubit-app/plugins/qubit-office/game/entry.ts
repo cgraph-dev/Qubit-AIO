@@ -27,6 +27,7 @@
  */
 
 import { createOfficeComponent, type OfficeGameShellProps } from "./OfficeGameShell";
+import { createOfficeApp } from "./app/OfficeAppShell";
 // F08's styles. Imported here so the bundler emits them with the entry; the
 // rules are all scoped to `.office-game`, so the dashboard is untouched.
 import "./styles/tokens.css";
@@ -51,10 +52,24 @@ if (!SDK || !SDK.React || !SDK.hooks) {
     "[qubit-office] plugin SDK missing (React/hooks); the game entry cannot " +
     "register. The Office tab will show no office.");
 } else {
-  // The registry wants a COMPONENT, built against the host's React and hooks.
-  // The live data wiring is injected as `load`, so the shell stays a pure
-  // renderer of (world, viewpoint) — the shape the F07 tests drive.
-  const Office = createOfficeComponent(SDK.React, SDK.hooks, liveData);
+  /* WHICH RENDERER MOUNTS, AND HOW TO GET BACK
+   *
+   * `?app=1` mounts the VENDORED office client (the full pixel-art app, served
+   * from /dashboard-plugins/qubit-office/habblaud/). Without it, the previous
+   * hand-built shell mounts.
+   *
+   * A URL SWITCH RATHER THAN A CODE CHANGE because the vendored app's
+   * interactive half is not bound to Qubit yet (no /api/stream, and writes must
+   * go through the confirmation authority — see app/office-api.ts). Both
+   * renderers have to stay reachable while that is settled, and a query param
+   * means nobody has to edit and rebuild to compare them.
+   */
+  const wantApp = new URLSearchParams(window.location.search).has("app");
+  const R = SDK.React as OfficeGameShellProps["React"];
+  const H = SDK.hooks as OfficeGameShellProps["hooks"];
+  const Office = wantApp
+    ? createOfficeApp(R, H)
+    : createOfficeComponent(R, H, liveData);
   window.__QUBIT_PLUGINS__?.register("qubit-office", Office);
 }
 

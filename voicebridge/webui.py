@@ -53,6 +53,12 @@ PCM_WIDTH = 2  # Int16
 # idle-looking event-stream socket.
 _SSE_HEARTBEAT_S = 15.0
 
+#: Where a plugin's bundled HTML application is served from. Kept as one
+#: constant because the route, the auth predicate that trusts a Referer from it,
+#: and the vendoring script's rewrite target must agree — three copies of this
+#: string is three chances to drift.
+OFFICE_APP_PREFIX = "/plugin-apps/"
+
 # --------------------------------------------------------------------------
 # Transport-boundary redaction (Wave 5, G2).
 #
@@ -881,7 +887,7 @@ SPA_ROUTE_PATHS = (
     # Qubit overlay plugin tabs (real client routes)
     "/reports", "/operations", "/devices", "/memory", "/qubit-approvals",
     "/qubit-boards", "/qubit-brand", "/qubit-chat", "/qubit-gateway",
-    "/qubit-models", "/qubit-runtime",
+    "/qubit-models", "/qubit-office", "/qubit-runtime",
 )
 SPA_ROUTE_SET = frozenset(SPA_ROUTE_PATHS)
 # First path segment of every shell route, for SPA deep links such as
@@ -1064,6 +1070,9 @@ QUBIT_READ_AUTHORITY: tuple = (
     # reset on reload while run correctly refused CURATOR_PAUSED. Serve GET from
     # the same Qubit handler (``h_curator``) the write uses.
     "/api/curator",
+    # M4: the office tower read. Served from the Qubit boundary so the page
+    # reads the SAME store the `qubit office` CLI writes (no split-brain).
+    "/api/office/tower",
     # Host version read (UI audit 2026-09-29): the fork-proxied
     # ``/api/system/stats`` emitted only ``hermes_version`` (a legacy label),
     # so ``SystemPage``'s ``v{stats.qubit_version}`` row rendered blank and a
@@ -1517,6 +1526,46 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return True
         return self._api_token_ok()
 
+    def _office_app_caller_ok(self) -> bool:
+        """Auth for the vendored office app's stream.
+
+        WHY THIS IS NOT ``_qubit_token_ok``
+        -----------------------------------
+        That check requires a header the caller cannot send: the app opens the
+        stream with ``new EventSource('/api/stream')``, and EventSource has no
+        API for headers. A token in the query string is rejected by
+        ``token_ok(..., qp=True)`` on purpose, because a query token leaks into
+        logs and Referer. So the app could never connect, and it rendered its
+        "server isn't responding" state over a working renderer — which is what
+        a black office screen actually was.
+
+        The predicate is deliberately TIGHT rather than a token bypass:
+
+          1. LOOPBACK ONLY. A non-local peer is refused outright, so this can
+             never widen the network exposure of the office.
+          2. SAME-ORIGIN ONLY. Host must be this server's own address, so a page
+             on another origin cannot ride the exemption.
+          3. THE CALLER MUST BE OUR OWN APP. Referer must point at the vendored
+             app's directory, so an arbitrary script on the local machine
+             cannot read the office store through this route.
+
+        A header token still works and is still checked first — this only ADDs
+        the path the browser's EventSource can actually take.
+        """
+        if self._qubit_token_ok():
+            return True
+
+        peer = self.client_address[0] if self.client_address else ""
+        if peer not in ("127.0.0.1", "::1", "localhost"):
+            return False
+
+        host = (self.headers.get("Host", "") or "").split(":")[0]
+        if host not in ("127.0.0.1", "localhost", "::1"):
+            return False
+
+        referer = self.headers.get("Referer", "") or ""
+        return (OFFICE_APP_PREFIX in referer)
+
     def _qubit_dist(self) -> "Path":
         # Resolve the built Qubit dashboard from package data first (a clean
         # wheel install ships frontend/qubit-dist under voicebridge/_data/),
@@ -1603,6 +1652,158 @@ class WebUIHandler(BaseHTTPRequestHandler):
         elif low.endswith(".map"): ctype = "application/json"
         else: ctype = "application/octet-stream"
         self._file(fp, ctype)
+
+    def _serve_office_stream(self) -> None:
+        """GET /api/stream — the office client's live feed.
+
+        WHY THIS ROUTE EXISTS
+        ---------------------
+        The vendored office client (the full pixel-art app under
+        `/plugin-apps/qubit-office/habblaud/`) was written against a server that
+        streams SSE from `/api/stream`. Qubit serves one office route — a
+        read-only tower snapshot — so without this the client renders its
+        "server isn't responding" state over a perfectly good renderer.
+
+        It is a TRANSLATION, not a second source of truth: each snapshot is a
+        fresh read of the same tower report `GET /api/office/tower` returns, so
+        the page, that route, and the C7 test cannot disagree about the office.
+
+        NOT BOUND HERE, deliberately: `/api/agents/:id`, `/api/permissions/:id`
+        and `/api/messages/:id`. Those are org MUTATIONS; contract C4 requires
+        them to go through the confirmation authority rather than a POST from a
+        view. The client reports them missing, which is the truth.
+
+        Auth matches every other office read: the same session token, accepted
+        as a query param because EventSource cannot set headers.
+        """
+        from . import office_stream as OS
+        from .office import tower as TWR
+
+        if not self._office_app_caller_ok():
+            self._send(401, b"unauthorized")
+            return
+        # The config lives on the orchestrator, exactly as every other compat
+        # handler reads it (`self.app.orch.cfg`).
+        cfg = self.app.orch.cfg
+
+        # Same HTTP/1.1 one-response-per-connection shape as the events feed:
+        # BaseHTTPRequestHandler defaults to 1.0, which has no keep-alive, so a
+        # length-less SSE body is terminated by connection close.
+        self.protocol_version = "HTTP/1.1"
+        self.close_connection = True
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+        if getattr(self, "_head_only", False):
+            return
+
+        start = time.time()
+        revision = 0
+        deadline = time.monotonic() + OS.STREAM_MAX_SECONDS
+        try:
+            while time.monotonic() < deadline and self.app._server is not None:
+                try:
+                    tower = TWR.state(cfg)
+                except Exception as exc:  # noqa: BLE001 - a read must not 500
+                    # Report the failure AS A NOTICE rather than closing: the
+                    # client keeps its last good snapshot and shows the reason,
+                    # instead of blanking the office on a transient store error.
+                    self.wfile.write(OS.sse("notice", {
+                        "kind": "error",
+                        "text": f"the office store could not be read: "
+                                f"{str(exc)[:200]}",
+                    }))
+                    self.wfile.flush()
+                    time.sleep(OS.SNAPSHOT_INTERVAL_SECONDS)
+                    continue
+
+                revision += 1
+                for frame in OS.stream_frames(tower, revision, start):
+                    self.wfile.write(frame)
+                self.wfile.flush()
+                # The client applies a snapshot WHOLESALE, so a fresh snapshot
+                # per interval is the simplest correct update: it carries the
+                # current positions, and the feed carries the new events. There
+                # is no delta protocol to get wrong.
+                time.sleep(OS.SNAPSHOT_INTERVAL_SECONDS)
+        except (BrokenPipeError, ConnectionResetError):
+            # The client navigated away or reconnected. Not an error.
+            pass
+
+    def _serve_plugin_app(self, sub: str) -> None:
+        """Serve a plugin's bundled HTML application.
+
+        WHY THIS IS A SEPARATE ROUTE FROM ``/dashboard-plugins/``
+        ---------------------------------------------------------
+        That route serves a single SCRIPT ASSET: it caps the path at three
+        segments and allows only .js/.json/.css. A whole application needs
+        ``<name>/<app>/index.html``, ``.../bundle/<hash>.js`` and
+        ``.../assets/<icon>.png`` — deeper, and with file types the asset route
+        refuses by design. Widening the asset route would have loosened a
+        narrow, security-relevant allowlist to fit a different job; a second
+        route keeps each one's rule intact.
+
+        CONFINEMENT: the path must resolve INSIDE the plugin directory the first
+        segment names. ``..`` is rejected outright, and the resolved real path
+        is re-checked against the plugin root so a symlink cannot escape either.
+        """
+        from . import resources as _resources
+
+        rel = sub.lstrip("/").split("?")[0]
+        parts = [p for p in rel.split("/") if p not in ("", ".")]
+        if not parts or ".." in parts:
+            self._send(404, b"not found")
+            return
+        # Default document for a directory request.
+        if parts[-1] == "" or "." not in parts[-1]:
+            parts = parts + ["index.html"]
+
+        root = _resources.resource_path("frontend/qubit-app/plugins")
+        plugin_dir = root.joinpath(parts[0])
+        try:
+            resolved_root = plugin_dir.resolve()
+            if plugin_dir.resolve().parent != root.resolve() and not str(
+                    plugin_dir.resolve()).startswith(str(root.resolve())):
+                self._send(404, b"not found")
+                return
+        except OSError:
+            self._send(404, b"not found")
+            return
+        target = plugin_dir.joinpath(*parts[1:]).resolve()
+        if not str(target).startswith(str(resolved_root) + "/") or not target.is_file():
+            self._send(404, b"not found")
+            return
+
+        suffix = target.suffix.lower()
+        ctype = {
+            ".html": "text/html; charset=utf-8",
+            ".js": "application/javascript",
+            ".mjs": "application/javascript",
+            ".css": "text/css",
+            ".json": "application/json",
+            ".webmanifest": "application/manifest+json",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".svg": "image/svg+xml",
+            ".ico": "image/x-icon",
+            ".woff": "font/woff",
+            ".woff2": "font/woff2",
+            ".ttf": "font/ttf",
+            ".wasm": "application/wasm",
+            ".map": "application/json",
+        }.get(suffix)
+        if ctype is None:
+            # An allowlist, not a denylist: an unexpected type is refused rather
+            # than guessed at, so nothing new becomes servable by accident.
+            self._send(404, b"not found")
+            return
+        self._file(target, ctype)
 
     def _serve_qubit_plugin(self, sub: str) -> None:
         from . import resources as _resources
@@ -1761,6 +1962,39 @@ class WebUIHandler(BaseHTTPRequestHandler):
                             "detail": "POST only"}, 405)
                 return
             self._device_enroll_impl(body)
+            return
+        # Embedded OpenViking Studio (the /open-viking page's iframe): its two
+        # backend reads live beside the voice-edit and device families. The
+        # health route probes OpenViking SERVER-SIDE (browser CORS/reachability
+        # are not the truth) and the wiring route reads memory.provider from the
+        # effective user config. Same ``(status, payload)`` module-handler shape
+        # as voice_edit/routes.py; no new listener, no second authority.
+        if api_path.rstrip("/") in ("/api/qubit/viking/studio-health",
+                                    "/api/qubit/viking/studio-wiring"):
+            from . import viking_studio as _VS
+            routed = _VS.handle(self.app.orch.cfg, method, api_path, body)
+            if routed is not None:
+                status, payload = routed
+                self._json(payload, status)
+                return
+        # Kitchen: decompose a staged source and map its capabilities (stages
+        # 1-2 of the four-stage pipeline the page states). The analysis engine
+        # is REA, used ONLY here. Clones go to a confined runtime dir and are
+        # removed in a finally block; stages 3-4 are reported unimplemented
+        # rather than implied.
+        if api_path.rstrip("/") == "/api/qubit/kitchen/analyze":
+            if method != "POST":
+                self._json({"ok": False, "code": "METHOD_NOT_ALLOWED",
+                            "detail": "POST only"}, 405)
+                return
+            from . import kitchen as _K
+            try:
+                status, payload = _K.handle(self.app.orch.cfg, query, body, {})
+            except Exception as exc:
+                self._json({"ok": False, "code": "KITCHEN_ERROR",
+                            "detail": redact_obj(str(exc))[:200]}, 500)
+                return
+            self._json(payload, status)
             return
         # Raw-YAML config save (audit 2026-09-23 D-6). The generic secret gate
         # answers a *save* with ``SECRET_NEVER_SERVED`` and a credential-status
@@ -2458,6 +2692,21 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/dashboard-plugins/"):
             self._serve_qubit_plugin(path[len("/dashboard-plugins/"):])
+            return
+        # A plugin's own bundled APPLICATION (an HTML page plus its chunks and
+        # assets), as opposed to a single script asset. `/dashboard-plugins/`
+        # cannot serve one: it caps at 3 path segments and allows only
+        # .js/.json/.css, so an app with `bundle/*.js`, `assets/*.png` and an
+        # index.html has no way through it.
+        if path.startswith("/plugin-apps/"):
+            self._serve_plugin_app(path[len("/plugin-apps/"):])
+            return
+        # The office client's live feed. `/api/stream` is what the vendored app
+        # asks for; Qubit's own API lives under `/agent/api/`, so this one path
+        # is served directly rather than through the compat dispatch (which
+        # returns JSON bodies, not a stream).
+        if path.split("?")[0] in ("/api/stream", "/api/snapshot"):
+            self._serve_office_stream()
             return
         if path == "/favicon.ico":
             self._serve_qubit_static("/favicon.ico")

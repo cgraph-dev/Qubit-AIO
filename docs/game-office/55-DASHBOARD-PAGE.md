@@ -21,11 +21,21 @@
 >    only one of the two lists is one cache away from being invisible — which is
 >    exactly how this tab first shipped. The two copies are asserted identical.
 >
-> **Not built, and stated rather than implied:** no isometric projection, no
-> camera rig, no sprite art (phase 1 is a flat plan view with code-drawn
-> agents — nothing in M4's proof depends on the projection), and no WebSocket
-> (the page polls a read route; a second transport before the first is needed
-> is how C3's "no second loop" gets eroded).
+> **Superseded — this paragraph described the M4 state and was stale by days.**
+> It read: *"Not built… no isometric projection, no camera rig, no sprite art
+> (phase 1 is a flat plan view with code-drawn agents)."* **All of that is now
+> built.** The live page has an isometric camera with fit/pan/zoom, a minimap,
+> sprite art (an atlas of 448 poses), ground tiles, furniture, building
+> exteriors and in-canvas labels. Verified 2026-10-14: `data-state=ready`,
+> 2 canvases, 37.4% non-background pixels, 0 office console errors
+> (`scripts/render_office_screenshot.py --json`). The paragraph is kept behind
+> this note because the *shape* of the claim — "state what is not built" — is
+> still the rule; only its content expired.
+>
+> **Still not built:** no WebSocket (the page polls a read route; a second
+> transport before the first is needed is how C3's "no second loop" gets
+> eroded), and no lift / animated floor transitions (floor selection reframes
+> the canvas; it is not a ride between floors).
 
 The tower is a **page in the Qubit dashboard sidebar**, not a standalone app. Directory and this
 doc use "Qubit Office" (working name; rename freely).
