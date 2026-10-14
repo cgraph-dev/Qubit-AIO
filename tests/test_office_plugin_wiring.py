@@ -224,6 +224,76 @@ const src = fs.readFileSync(path, "utf8");
 const sandbox = { console: console };
 sandbox.window = sandbox;
 sandbox.self = sandbox;
+/* THE ENGINE PROBES THE BROWSER AT MODULE INIT.
+ * Phaser 4 reads `navigator.userAgent` while its module body evaluates, so a
+ * bare Node context throws `ReferenceError: navigator is not defined` before a
+ * single line of plugin code runs. That is worth knowing beyond this test: the
+ * bundle cannot be evaluated in a DOM-less environment at all (SSR, prerender,
+ * a plain Node import), and the failure surfaces as "the bundle is broken"
+ * rather than "there is no DOM". The shim below is the minimum Phaser needs to
+ * reach its own registration; it does NOT fake rendering. */
+sandbox.navigator = {
+  userAgent: "Mozilla/5.0 (X11; Linux x86_64) Node/office-test",
+  platform: "Linux x86_64",
+  language: "en-GB",
+  languages: ["en-GB"],
+  hardwareConcurrency: 4,
+  maxTouchPoints: 0,
+  vendor: "",
+};
+/* A 2D context Phaser's init-time capability probe can write to. Phaser calls
+ * `checkInverseAlpha` on a 1x1 canvas and sets `fillStyle`/`fillRect`; a null
+ * context throws before the plugin body runs. This is a WRITE-THROUGH STUB, not
+ * a renderer — nothing here draws, it only has to be assignable. */
+function fakeCtx() {
+  const c = {};
+  for (const m of ["save","restore","fillRect","clearRect","drawImage","beginPath",
+                   "closePath","moveTo","lineTo","arc","fill","stroke","strokeRect",
+                   "rect","roundRect","setTransform","translate","scale","rotate",
+                   "measureText","createImageData","getImageData","putImageData",
+                   "createLinearGradient","createRadialGradient","clip","setLineDash"]) {
+    c[m] = () => (m === "measureText" ? {width: 0}
+                : m.startsWith("create") ? {addColorStop() {}}
+                : m.startsWith("get") ? {data: [0, 0, 0, 255]}
+                : undefined);
+  }
+  return c;
+}
+const mkCanvas = () => ({
+  style: {}, width: 1, height: 1,
+  getContext: () => fakeCtx(),
+  addEventListener() {}, removeEventListener() {},
+  setAttribute() {}, appendChild() {}, remove() {},
+  getBoundingClientRect: () => ({left:0,top:0,width:1,height:1}),
+  toDataURL: () => "data:,",
+});
+sandbox.document = {
+  createElement: (tag) => (tag === "canvas" ? mkCanvas() : {
+    style: {}, getContext: () => fakeCtx(), addEventListener() {}, removeEventListener() {},
+    setAttribute() {}, appendChild() {}, remove() {},
+    getBoundingClientRect: () => ({left:0,top:0,width:0,height:0}),
+  }),
+  getElementById: () => null,
+  querySelector: () => null,
+  querySelectorAll: () => [],
+  addEventListener() {}, removeEventListener() {},
+  documentElement: { style: {}, addEventListener() {}, removeEventListener() {} },
+  body: { appendChild() {}, style: {}, addEventListener() {} },
+  head: { appendChild() {} },
+  readyState: "complete",
+  createTextNode: () => ({}),
+};
+sandbox.location = { href: "http://localhost/qubit-office", protocol: "http:", search: "", hash: "" };
+sandbox.screen = { width: 1280, height: 720, orientation: { type: "landscape-primary" } };
+sandbox.devicePixelRatio = 1;
+sandbox.requestAnimationFrame = (fn) => setTimeout(() => fn(Date.now()), 16);
+sandbox.cancelAnimationFrame = (id) => clearTimeout(id);
+sandbox.addEventListener = () => {};
+sandbox.removeEventListener = () => {};
+sandbox.AudioContext = function () { return { createGain: () => ({ connect() {} }), destination: {} }; };
+sandbox.HTMLCanvasElement = function () {};
+sandbox.HTMLVideoElement = function () {};
+sandbox.Image = function () {};
 const ctx = vm.createContext(sandbox);
 vm.runInContext(src, ctx, { filename: path });
 const out = {};

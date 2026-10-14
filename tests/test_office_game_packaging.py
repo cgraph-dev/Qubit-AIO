@@ -40,13 +40,15 @@ from pathlib import Path
 
 import pytest
 
+from _office_toolchain import node_path  # noqa: E402
+
 REPO = Path(__file__).resolve().parent.parent
 WEB = REPO / "frontend" / "qubit-web"
 PLUGIN_DIR = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office"
 GAME_DIR = PLUGIN_DIR / "game"
 CONFIG = WEB / "vite.office-game.config.ts"
 
-NODE = shutil.which("node")
+NODE = node_path()
 VITE = WEB / "node_modules" / "vite" / "bin" / "vite.js"
 
 

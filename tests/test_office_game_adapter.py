@@ -32,16 +32,19 @@ GAME_DIR = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office" / "game"
 FIXTURE = (REPO / "frontend" / "qubit-web" / "src" / "lib" / "office-game"
            / "fixtures" / "tower-recording.json")
 
-NODE = shutil.which("node")
-TSC = WEB / "node_modules" / "typescript" / "bin" / "tsc"
+from _office_toolchain import (  # noqa: E402
+    SKIP_REASON, has_tsc, node_path, tsc_path)
+
+NODE = node_path()
+TSC = tsc_path()
 
 
 def _toolchain() -> bool:
-    return bool(NODE) and TSC.is_file()
+    return has_tsc()
 
 
 pytestmark = pytest.mark.skipif(
-    not _toolchain(), reason="node + the web node_modules (typescript) required")
+    not _toolchain(), reason=SKIP_REASON)
 
 
 def _compile(tmp_path: Path) -> Path:

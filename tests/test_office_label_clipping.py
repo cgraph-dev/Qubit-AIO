@@ -60,7 +60,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 # --------------------------------------------------------------- the harness
 # Reuse the fake-canvas harness from the visual test verbatim: it evaluates the
@@ -94,7 +96,7 @@ FLOOR_DESCENT = 1.0
 
 # ------------------------------------------------------------------- modules
 def _node_json(program: str) -> dict:
-    proc = subprocess.run([NODE, "-e", program], capture_output=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True,
                           text=True, timeout=60)
     assert proc.returncode == 0, "node failed:\n%s\n%s" % (proc.stdout, proc.stderr)
     return json.loads(proc.stdout.strip())

@@ -41,7 +41,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 PLUGIN_DIR = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office"
@@ -120,7 +122,7 @@ def _run(script: str, *, with_canvas: bool) -> dict:
         + "function out(o){ console.log('__RESULT__' + JSON.stringify(o)); }\n"
         + script
     )
-    proc = subprocess.run([NODE, "-e", program], cwd=str(REPO), timeout=60,
+    proc = subprocess.run([NODE], input=program, cwd=str(REPO), timeout=60,
                           capture_output=True, text=True)
     assert proc.returncode == 0, (
         f"node exited {proc.returncode}\nstderr:\n{proc.stderr}\nstdout:\n{proc.stdout}")

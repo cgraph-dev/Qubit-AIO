@@ -1,0 +1,262 @@
+/* F08 — the game's design tokens.
+ *
+ * Separated from the scene palette on purpose. The PALETTE in `scenes.ts` is
+ * what a painting uses; these are what the SHELL uses (panels, buttons, focus
+ * rings, text). Keeping them apart means re-skinning the office does not
+ * silently restyle the panels, and vice versa — the "asset collage" failure the
+ * design doc warns about starts exactly here.
+ *
+ * Every value is a token, not a literal, so F08's later settings (text zoom,
+ * reduced motion, contrast) can change the shell without touching component
+ * code.
+ */
+
+:root {
+  /* surfaces, darkest to lightest */
+  --office-void: #0b0f16;
+  --office-ground: #1b2230;
+  --office-plate: #2a3342;
+  --office-wall: #39445a;
+
+  /* ink */
+  --office-ink: #e8edf6;
+  --office-muted: #8b97ad;
+  --office-dim: rgba(232, 237, 246, 0.55);
+
+  /* accent + semantic state (mirrors the scene animation colours) */
+  --office-accent: #e08fb0;
+  --office-ok: #6fd3a6;
+  --office-warn: #f0c05a;
+  --office-bad: #e0554a;
+
+  /* the frame */
+  --office-radius: 6px;
+  --office-border: 1px solid rgba(255, 255, 255, 0.12);
+  --office-border-strong: 1px solid rgba(255, 255, 255, 0.24);
+  --office-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+
+  /* spacing scale: 4px base. Every gap in the shell is one of these. */
+  --office-s1: 4px;
+  --office-s2: 8px;
+  --office-s3: 12px;
+  --office-s4: 16px;
+  --office-s5: 24px;
+  --office-s6: 32px;
+
+  /* text. `--office-scale` is the ONE knob text zoom turns; nothing else
+     hardcodes a font size. */
+  --office-scale: 1;
+  --office-fs-xs: calc(10px * var(--office-scale));
+  --office-fs-sm: calc(12px * var(--office-scale));
+  --office-fs-md: calc(14px * var(--office-scale));
+  --office-fs-lg: calc(18px * var(--office-scale));
+  --office-fs-xl: calc(24px * var(--office-scale));
+
+  /* motion. Zeroed by the reduced-motion setting, so every transition obeys
+     one switch instead of each component checking a media query. */
+  --office-dur-fast: 120ms;
+  --office-dur-med: 220ms;
+  --office-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* The player's explicit preference. Set on the shell root by the settings
+   store; `prefers-reduced-motion` is honoured separately in game.css so a
+   system setting cannot be overridden by a saved game preference. */
+[data-office-reduced-motion="1"] {
+  --office-dur-fast: 0ms;
+  --office-dur-med: 0ms;
+}
+
+/* High contrast is a token swap, not a filter: a filter would wash out the
+   scene's own state colours and make a `blocked` agent look `idle`. */
+[data-office-contrast="high"] {
+  --office-ink: #ffffff;
+  --office-muted: #cfd6e4;
+  --office-border: 1px solid rgba(255, 255, 255, 0.4);
+  --office-plate: #222b3a;
+}
+/* F08 — the game shell's layout.
+ *
+ * The layout chain matters more than it looks. `App.tsx` wraps every route in a
+ * plain block div, and a block grows to its content — so a game asking for
+ * `height: 100%` resolves against an auto-height ancestor and expands instead
+ * of being bounded. That is the documented 104,305px-in-a-950px-viewport bug
+ * which is why `/qubit-office` is now in FULL_HEIGHT_ROUTE_PATHS.
+ *
+ * So this file assumes a BOUNDED ancestor and states its own bounds explicitly.
+ */
+
+.office-game {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* NOT `height: 100%`. The route wrapper chain contains a `display: contents`
+     div, which does not carry a height — so a percentage resolves against an
+     auto-height ancestor and the shell grows to its content instead of being
+     bounded (measured: a 390px phone got a 574px shell and a 500px stage, i.e.
+     the world overflowed the viewport). `flex: 1 1 auto` + `min-height: 0`
+     sizes the shell from whatever flex parent it lands in, and `100%` is kept
+     only as the fallback for a block parent. */
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;          /* the flexbox scroll trap: without it a child cannot
+                             shrink below its content and the stage pushes the
+                             HUD off-screen */
+  background: var(--office-void);
+  color: var(--office-ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* The measuring canvas must not contribute to layout height: an inline canvas
+   reserves its attribute height (500px), which alone can pin the shell taller
+   than the viewport on a short window. */
+.office-game > canvas {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* --- the world: the only element allowed to grow ------------------------ */
+.office-game__world {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.office-game__stage {
+  width: 100%;
+  height: 100%;
+}
+
+/* The measuring canvas is never shown; the ENGINE's canvas is the surface. */
+.office-game__measure {
+  display: none;
+}
+
+/* --- bars -------------------------------------------------------------- */
+.office-game__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--office-s3);
+  padding: var(--office-s2) var(--office-s3);
+  border-bottom: var(--office-border);
+  background: rgba(11, 15, 22, 0.72);
+  font-size: var(--office-fs-sm);
+}
+
+.office-game__stat {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.office-game__stat-label {
+  font-size: var(--office-fs-xs);
+  color: var(--office-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.office-game__stat-value {
+  font-size: var(--office-fs-md);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- controls ---------------------------------------------------------- */
+.office-game__btn {
+  appearance: none;
+  border: var(--office-border);
+  background: var(--office-plate);
+  color: var(--office-ink);
+  border-radius: var(--office-radius);
+  padding: var(--office-s1) var(--office-s3);
+  font-size: var(--office-fs-sm);
+  cursor: pointer;
+  transition: background var(--office-dur-fast) var(--office-ease),
+              border-color var(--office-dur-fast) var(--office-ease);
+}
+
+.office-game__btn:hover {
+  border-color: var(--office-accent);
+}
+
+.office-game__btn[aria-pressed="true"] {
+  border-color: var(--office-accent);
+  background: rgba(224, 143, 176, 0.18);
+}
+
+/* FOCUS IS NEVER REMOVED. A keyboard-driven game with no visible focus ring is
+   unplayable without a mouse — the accessibility failure this file exists to
+   avoid. */
+.office-game__btn:focus-visible,
+.office-game__world:focus-visible {
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
+}
+
+/* --- panels: one primary, one drawer ----------------------------------- */
+.office-game__panel {
+  border: var(--office-border);
+  background: var(--office-plate);
+  border-radius: var(--office-radius);
+  padding: var(--office-s3);
+  box-shadow: var(--office-shadow);
+}
+
+/* The exclusive modal: dims the world and traps focus inside (the trap itself
+   is in PanelHost, because a CSS-only trap is not a trap). */
+.office-game__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 10, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.office-game__modal {
+  max-width: min(560px, 92vw);
+  max-height: 84%;
+  overflow: auto;
+  border: var(--office-border-strong);
+  background: var(--office-plate);
+  border-radius: var(--office-radius);
+  padding: var(--office-s4);
+  box-shadow: var(--office-shadow);
+}
+
+/* --- the travel refusal ------------------------------------------------- */
+.office-game__refusal {
+  color: var(--office-warn);
+  font-size: var(--office-fs-sm);
+}
+
+/* --- small screens ------------------------------------------------------ */
+/* 390px is the narrowest width the design targets (a modern phone). The world
+   gives up height before the controls give up reachability. */
+@media (max-width: 520px) {
+  .office-game__bar {
+    gap: var(--office-s2);
+    padding: var(--office-s1) var(--office-s2);
+  }
+  .office-game__stat:nth-child(n + 4) {
+    display: none;              /* the HUD degrades; the controls never do */
+  }
+}
+
+/* The system preference is honoured separately from the in-game setting, so a
+   player cannot save a preference that overrides their OS. */
+@media (prefers-reduced-motion: reduce) {
+  .office-game,
+  .office-game * {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}
+/*$vite$:1*/

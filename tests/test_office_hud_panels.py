@@ -49,7 +49,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 SPEC = REPO / "docs" / "game-office" / "hud-panels.json"
@@ -384,7 +386,7 @@ def _render(src_text, view, pick=None, floor=None):
         "src": json.dumps(src_text),
         "use": json.dumps([view, floor, pick, False, 0]),
     }
-    proc = subprocess.run([NODE, "-e", program], capture_output=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True,
                           text=True, timeout=60)
     if proc.returncode != 0:
         raise AssertionError("node failed:\nSTDOUT:\n%s\nSTDERR:\n%s"

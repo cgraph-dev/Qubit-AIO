@@ -18,7 +18,7 @@
   {
     "name": "kanban",
     "label": "Kanban",
-    "description": "Multi-agent collaboration board — drag-drop cards across columns, read comment threads, see which profile is running what",
+    "description": "Multi-agent collaboration board \u2014 drag-drop cards across columns, read comment threads, see which profile is running what",
     "icon": "Package",
     "version": "1.0.0",
     "tab": {
@@ -34,7 +34,7 @@
   {
     "name": "qubit-office",
     "label": "Office",
-    "description": "Qubit Office — the agent corporation as a building: floors, rooms, seats, and characters that animate only from office_event rows.",
+    "description": "Qubit Office \u2014 the agent corporation as a building: floors, rooms, seats, and characters that animate only from office_event rows.",
     "icon": "Users",
     "version": "1.0.0",
     "tab": {
@@ -42,7 +42,7 @@
       "position": "end"
     },
     "entry": "qubit-office.game.js",
-    "css": null,
+    "css": "qubit-office.game.css",
     "has_api": true,
     "source": "qubit-overlay"
   }

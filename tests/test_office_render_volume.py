@@ -58,7 +58,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 ENTRY = (REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office"
@@ -316,7 +318,7 @@ def _run(program: str, face_h: int | None = None):
             + program
             + "\nif (typeof __RESULT !== 'undefined') "
               "{ process.stdout.write(JSON.stringify(__RESULT)); }\n")
-    proc = subprocess.run([NODE, "-e", full], capture_output=True, text=True,
+    proc = subprocess.run([NODE], input=full, capture_output=True, text=True,
                           timeout=60)
     if proc.returncode != 0:
         raise AssertionError("node failed:\nSTDOUT:\n%s\nSTDERR:\n%s"

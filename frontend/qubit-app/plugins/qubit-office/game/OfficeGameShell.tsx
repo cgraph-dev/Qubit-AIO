@@ -25,6 +25,10 @@ import { assembleWorld, type OfficeWorld } from "./WorldAssembler";
 import type { OfficeTowerPayload } from "./types";
 import { drawPlace } from "./scenes";
 import { hotspotsFor, hitTest, applyIntent, type Intent } from "./InteractionController";
+import {
+  SETTINGS, applySetting, defaultValues, shellAttributes,
+  type SettingSpec, type SettingValues,
+} from "./ui/settings";
 
 /**
  * REACT COMES FROM THE HOST, NOT FROM AN IMPORT.
@@ -119,6 +123,27 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
   // this module, so the dashboard's single React is the only one in play.
   const { useState, useEffect, useRef } = props.hooks;
 
+  // ---- F08 state: settings + the panel policy -------------------------
+  // Settings are LOCAL unless a spec says otherwise; `applySetting` is the only
+  // way in, so a backend-scoped setting can never land here.
+  const [settings, setSettings] = useState(defaultValues());
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [settingsDrawer, setSettingsDrawer] = useState(false);
+  const [settingsModal, setSettingsModal] = useState(false);
+
+  /** Apply a setting edit, surfacing a refusal instead of swallowing it. */
+  const onSettingChange = (key: string, value: unknown) => {
+    const res = applySetting(settings, key as never, value as never);
+    if (res.ok) {
+      setSettings(res.values);
+      setRefusal(null);
+    } else {
+      // A REFUSED setting must be visible. Silently ignoring it would look
+      // like a broken checkbox rather than a rule.
+      setRefusal(res.reason);
+    }
+  };
+
   /**
    * The render model handed to the engine. A pure function of the world and
    * the viewpoint — the engine rasterises it and decides nothing.
@@ -170,6 +195,12 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
   });
   const portalsRef = useRef<Portal[]>(portals);
   portalsRef.current = portals;
+  /**
+   * A RENDER-VISIBLE mirror of `navRef`. The ref stays the reducer's source of
+   * truth (it must not re-render per keystroke), but the HUD must display the
+   * CURRENT place — read at render time, after every `force()` a `step()` does.
+   */
+  const navState: NavState = navRef.current;
   const propsRef = useRef({ onPlaceChange, onWorldCommand });
   propsRef.current = { onPlaceChange, onWorldCommand };
 
@@ -324,7 +355,13 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
                               world, selectedRef.current);
       navRef.current = res.nav;
       if (res.selected !== undefined) selectedRef.current = res.selected;
-      if (res.refused) return;   // a refusal changes nothing on screen
+      if (res.refused) {
+        // A refusal is INFORMATION, not silence. Swallowing it is how "the
+        // click did nothing" gets reported as a bug when the rule worked.
+        setRefusal(String(res.refused));
+        return;
+      }
+      setRefusal(null);
       propsRef.current.onPlaceChange?.(res.nav.viewpoint);
       const scene = sceneRef.current;
       if (scene) scene.step(currentModel(), scene.camera());
@@ -363,29 +400,190 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
   // up with two canvases: React's (unused) plus the engine's. The measuring
   // canvas below is hidden and only tells the host how big to make its surface;
   // the engine mounts into the empty `stageRef` div beside it.
+  // The HUD: the one bar the shell owns. It carries the settings affordance —
+  // without a visible control, a setting nobody can reach is a setting nobody
+  // has. `s` opens it from the keyboard too (routed through the panel context).
+  const hud = R.createElement("div", {
+    className: "office-game__bar",
+    "data-testid": "office-game-hud",
+    role: "toolbar",
+    "aria-label": "Office controls",
+  }, [
+    R.createElement("div", {
+      key: "place", className: "office-game__stat",
+    }, [
+      R.createElement("span", {
+        key: "l", className: "office-game__stat-label",
+      }, "Place"),
+      R.createElement("span", {
+        key: "v", className: "office-game__stat-value",
+        "data-testid": "office-game-place",
+      }, placeLabel(navState.viewpoint)),
+    ]),
+    R.createElement("div", { key: "spacer", style: { flex: "1 1 auto" } }),
+    R.createElement("button", {
+      key: "text", type: "button", className: "office-game__btn",
+      "data-testid": "office-game-text-bigger",
+      "aria-label": "Larger text",
+      onClick: () => onSettingChange("textScale",
+        nextScaleValue(settings.textScale)),
+    }, "A+"),
+    R.createElement("button", {
+      key: "motion", type: "button", className: "office-game__btn",
+      "aria-pressed": settings.reducedMotion,
+      "data-testid": "office-game-reduce-motion",
+      onClick: () => onSettingChange("reducedMotion", !settings.reducedMotion),
+    }, "Motion"),
+    R.createElement("button", {
+      key: "settings", type: "button", className: "office-game__btn",
+      "aria-expanded": settingsDrawer || settingsModal,
+      "data-testid": "office-game-settings-btn",
+      onClick: () => {
+        if (settingsModal) setSettingsModal(false);
+        else setSettingsDrawer(!settingsDrawer);
+      },
+    }, "Settings"),
+  ]);
+
+  const attrs = shellAttributes(settings);
+  const scenes: Array<unknown> = [];
+  scenes.push(R.createElement("div", {
+    key: "world", className: "office-game__world",
+    "data-testid": "office-game-stage",
+    style: { position: "relative" },
+  }, [
+    R.createElement("div", {
+      key: "host", ref: stageRef, className: "office-game__stage",
+      "data-testid": "office-game-stage-inner",
+    }),
+    refusal
+      ? R.createElement("div", {
+          key: "refusal", className: "office-game__refusal",
+          role: "status", "data-testid": "office-game-refusal",
+          style: { position: "absolute", left: 12, bottom: 12,
+                   background: "rgba(11,15,22,0.85)", padding: "4px 8px",
+                   borderRadius: "var(--office-radius)" },
+        }, refusal)
+      : null,
+    R.createElement("div", {
+      key: "drawer", className: "office-game__panel",
+      "data-testid": "office-game-drawer",
+      hidden: settingsDrawer,
+      style: { position: "absolute", right: 12, top: 12, width: 260 },
+    }, settingsDrawer ? settingsBody(R, settings, onSettingChange) : null),
+  ]));
+
+  if (settingsModal) {
+    scenes.push(R.createElement("div", {
+      key: "scrim", className: "office-game__scrim",
+      "data-testid": "office-game-scrim", role: "presentation",
+    }, R.createElement("div", {
+      className: "office-game__modal", role: "dialog", "aria-modal": "true",
+      "aria-label": "Settings", "data-testid": "office-game-modal",
+    }, settingsBody(R, settings, onSettingChange))));
+  }
+
   return R.createElement(
     "div",
-    {
+    Object.assign({
       "data-state": "ready",
       "data-testid": "office-game-shell",
+      className: "office-game",
       tabIndex: 0,
-      style: { display: "block", width: "100%", height: "100%",
-               position: "relative" },
-    },
+    }, attrs),
+    // Hidden measuring surface: tells the host how big the engine's surface
+    // must be. React's OWN canvas is never shown — the engine mounts into the
+    // empty stage div, because a second visible canvas is the two-canvas bug.
     R.createElement("canvas", {
       ref: canvasRef,
       width: 880,
       height: 500,
+      className: "office-game__measure",
       "data-testid": "office-game-canvas",
       "aria-hidden": "true",
-      style: { display: "none" },
     }),
-    R.createElement("div", {
-      ref: stageRef,
-      "data-testid": "office-game-stage",
-      style: { width: "100%", height: "100%" },
-    }),
+    hud,
+    scenes,
   );
+}
+
+/** The place for the HUD. Plain language, because a place id is not a name. */
+function placeLabel(place: Place): string {
+  switch (place.kind) {
+    case "exterior": return "Outside the building";
+    case "building": return "Entrance hall";
+    case "lobby": return "Reception";
+    case "floor": return `Floor ${place.floor}`;
+    case "room": return place.room ? `Room ${place.room}` : "A room";
+    default: return "Unknown";
+  }
+}
+
+/** The next text scale in the declared ladder, wrapping at the top. */
+function nextScaleValue(current: number): number {
+  const ladder = (SETTINGS.textScale.options ?? []).map((o) => o.value);
+  const i = ladder.indexOf(current);
+  return ladder[(i + 1 + ladder.length) % ladder.length] ?? current;
+}
+
+/**
+ * The settings body, rendered from the SPECS rather than hand-written per
+ * control. A hand-written form drifts from the specs the moment one is added —
+ * and the drifted one is the setting nobody notices is missing.
+ *
+ * A `backend`-scoped control is rendered DISABLED with its real explanation,
+ * not hidden. Hiding it would make the rule invisible; the point is that the
+ * player can see the change exists and why it is not theirs to make.
+ */
+function settingsBody(
+  R: OfficeGameShellProps["React"],
+  values: SettingValues,
+  onChange: (key: string, value: unknown) => void,
+): unknown {
+  const rows = Object.entries(SETTINGS).map(([key, raw]) => {
+    const spec = raw as SettingSpec<unknown>;
+    const current = values[key as keyof SettingValues];
+    const scoped = spec.scope === "backend";
+    return R.createElement("div", {
+      key, style: { marginBottom: "var(--office-s3)" },
+      "data-testid": `setting-${key}`,
+      "data-scope": spec.scope,
+    }, [
+      R.createElement("div", {
+        key: "label", style: { fontSize: "var(--office-fs-sm)" },
+      }, spec.label),
+      R.createElement("div", {
+        key: "help",
+        style: { fontSize: "var(--office-fs-xs)",
+                 color: "var(--office-muted)", marginBottom: "var(--office-s1)" },
+      }, spec.help),
+      R.createElement("div", { key: "ctl", style: { display: "flex", gap: "var(--office-s1)", flexWrap: "wrap" } },
+        (spec.options ?? []).map((o) => R.createElement("button", {
+          key: String(o.value),
+          type: "button",
+          className: "office-game__btn",
+          disabled: scoped,
+          "aria-pressed": current === o.value,
+          "data-testid": `setting-${key}-${String(o.value)}`,
+          onClick: () => onChange(key, o.value),
+        }, o.label))),
+      scoped
+        ? R.createElement("div", {
+            key: "scoped",
+            style: { fontSize: "var(--office-fs-xs)", color: "var(--office-warn)",
+                     marginTop: "var(--office-s1)" },
+            "data-testid": `setting-${key}-note`,
+          }, `Needs the confirmed action ${spec.backendAction}.`)
+        : null,
+    ]);
+  });
+  return R.createElement("div", { "data-testid": "office-game-settings" }, [
+    R.createElement("div", {
+      key: "title",
+      style: { fontSize: "var(--office-fs-lg)", marginBottom: "var(--office-s3)" },
+    }, "Settings"),
+    ...rows,
+  ]);
 }
 
 /** Enter/exit/up/down resolved to a concrete place, then travelled. */

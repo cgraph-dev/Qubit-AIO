@@ -30,6 +30,7 @@ import pytest
 
 PLUGIN_DIR = (Path(__file__).resolve().parent.parent
               / "frontend" / "qubit-app" / "plugins" / "qubit-office")
+REPO = Path(__file__).resolve().parent.parent
 MANIFEST = PLUGIN_DIR / "manifest.json"
 #: What the manifest declares and the browser loads: the generated bundle.
 #: Read FROM the manifest rather than hardcoded — a hardcoded filename here is
@@ -101,16 +102,34 @@ def test_the_manifest_matches_the_overlay_shape():
 
 
 def test_the_manifest_does_not_reference_a_file_that_does_not_exist():
-    """A `css` entry pointing at a missing file is a broken tab, not a style."""
+    """A `css` entry pointing at a missing file is a broken tab, not a style.
+
+    The check runs both ways. An entry that is declared must exist; and — since
+    F08 ships real styles — the entry must be DECLARED, because a stylesheet
+    that is built but never referenced is loaded by nothing. That was the actual
+    state before this test changed: `qubit-office.game.css` was emitted and
+    served, `manifest.css` was null, and the HUD therefore rendered unstyled.
+    """
     m = json.loads(MANIFEST.read_text())
     css = m.get("css")
-    if css:
-        assert (PLUGIN_DIR / css).is_file(), f"{css} is referenced but missing"
-    # documented deviation from 55-DASHBOARD-PAGE.md's illustrative example,
-    # which shows a css file: the tower styles in JS and needs no build step.
-    assert css in (None, ""), (
-        "if a css file is added, keep this assertion honest by pointing it at "
-        "a file that exists — and update 55-DASHBOARD-PAGE.md")
+    assert css, (
+        "no css is declared, but F08 ships stylesheets — an undeclared file is "
+        "emitted and never loaded, so the game renders unstyled")
+    assert (PLUGIN_DIR / css).is_file(), f"{css} is referenced but missing"
+    # and the same entry must be declared to the SPA, which resolves it from
+    # the fleet manifest rather than from this directory.
+    for fleet in (REPO / "frontend" / "qubit-web" / "public" / "plugins"
+                  / "fleet.json",
+                  REPO / "frontend" / "qubit-dist" / "plugins" / "fleet.json"):
+        if not fleet.is_file():
+            continue
+        entries = json.loads(fleet.read_text())
+        office = [p for p in entries if p.get("name") == "qubit-office"]
+        assert office, f"{fleet} has no qubit-office entry"
+        assert office[0].get("css") == css, (
+            f"{fleet} declares css={office[0].get('css')!r} but the plugin "
+            f"manifest declares {css!r}; the SPA would load the wrong file "
+            f"or none")
 
 
 # ------------------------------------------------- the tab actually appears

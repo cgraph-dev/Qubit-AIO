@@ -48,7 +48,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 PLUGIN_DIR = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office"
@@ -89,7 +91,7 @@ def _node(body: str) -> dict:
         "var ISO=require(%s);var CAM=require(%s);\n" % (
             json.dumps(str(ISO_JS)), json.dumps(str(CAMERA_JS)))
     ) + body
-    proc = subprocess.run([NODE, "-e", program], capture_output=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True,
                           text=True, timeout=60)
     assert proc.returncode == 0, (
         f"node exited {proc.returncode}\nSTDOUT:\n{proc.stdout}\n"

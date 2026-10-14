@@ -1,0 +1,77 @@
+/* F08 — the game's design tokens.
+ *
+ * Separated from the scene palette on purpose. The PALETTE in `scenes.ts` is
+ * what a painting uses; these are what the SHELL uses (panels, buttons, focus
+ * rings, text). Keeping them apart means re-skinning the office does not
+ * silently restyle the panels, and vice versa — the "asset collage" failure the
+ * design doc warns about starts exactly here.
+ *
+ * Every value is a token, not a literal, so F08's later settings (text zoom,
+ * reduced motion, contrast) can change the shell without touching component
+ * code.
+ */
+
+:root {
+  /* surfaces, darkest to lightest */
+  --office-void: #0b0f16;
+  --office-ground: #1b2230;
+  --office-plate: #2a3342;
+  --office-wall: #39445a;
+
+  /* ink */
+  --office-ink: #e8edf6;
+  --office-muted: #8b97ad;
+  --office-dim: rgba(232, 237, 246, 0.55);
+
+  /* accent + semantic state (mirrors the scene animation colours) */
+  --office-accent: #e08fb0;
+  --office-ok: #6fd3a6;
+  --office-warn: #f0c05a;
+  --office-bad: #e0554a;
+
+  /* the frame */
+  --office-radius: 6px;
+  --office-border: 1px solid rgba(255, 255, 255, 0.12);
+  --office-border-strong: 1px solid rgba(255, 255, 255, 0.24);
+  --office-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+
+  /* spacing scale: 4px base. Every gap in the shell is one of these. */
+  --office-s1: 4px;
+  --office-s2: 8px;
+  --office-s3: 12px;
+  --office-s4: 16px;
+  --office-s5: 24px;
+  --office-s6: 32px;
+
+  /* text. `--office-scale` is the ONE knob text zoom turns; nothing else
+     hardcodes a font size. */
+  --office-scale: 1;
+  --office-fs-xs: calc(10px * var(--office-scale));
+  --office-fs-sm: calc(12px * var(--office-scale));
+  --office-fs-md: calc(14px * var(--office-scale));
+  --office-fs-lg: calc(18px * var(--office-scale));
+  --office-fs-xl: calc(24px * var(--office-scale));
+
+  /* motion. Zeroed by the reduced-motion setting, so every transition obeys
+     one switch instead of each component checking a media query. */
+  --office-dur-fast: 120ms;
+  --office-dur-med: 220ms;
+  --office-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* The player's explicit preference. Set on the shell root by the settings
+   store; `prefers-reduced-motion` is honoured separately in game.css so a
+   system setting cannot be overridden by a saved game preference. */
+[data-office-reduced-motion="1"] {
+  --office-dur-fast: 0ms;
+  --office-dur-med: 0ms;
+}
+
+/* High contrast is a token swap, not a filter: a filter would wash out the
+   scene's own state colours and make a `blocked` agent look `idle`. */
+[data-office-contrast="high"] {
+  --office-ink: #ffffff;
+  --office-muted: #cfd6e4;
+  --office-border: 1px solid rgba(255, 255, 255, 0.4);
+  --office-plate: #222b3a;
+}

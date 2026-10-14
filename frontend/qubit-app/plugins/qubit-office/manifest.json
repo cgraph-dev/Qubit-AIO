@@ -9,7 +9,7 @@
     "position": "end"
   },
   "entry": "qubit-office.game.js",
-  "css": null,
+  "css": "qubit-office.game.css",
   "has_api": true,
   "source": "qubit-overlay"
 }

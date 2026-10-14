@@ -54,6 +54,11 @@ export const FULL_HEIGHT_ROUTE_PATHS = [
   ...CHAT_ROUTE_PATHS,
   "/webchat",
   "/qubit-bot",
+  // The Office game owns the whole viewport: a world you can walk needs actual
+  // height, and its HUD bars sit above and below a stage that must be bounded
+  // rather than growing to its content. Added deliberately and NOT to
+  // CHAT_ROUTE_PATHS — the two predicates answer different questions.
+  "/qubit-office",
 ] as const;
 
 export function isFullHeightPath(pathname: string): boolean {

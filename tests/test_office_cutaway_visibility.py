@@ -133,7 +133,12 @@ def _run(program, face_h=None):
             + program
             + "\nif (typeof __RESULT !== 'undefined') "
               "{ process.stdout.write(JSON.stringify(__RESULT)); }\n")
-    proc = subprocess.run([NODE, "-e", full], capture_output=True, text=True,
+    # STDIN, NOT ARGV. The source under test is a 7 MB bundle, and `node -e
+    # <7 MB>` exceeds ARG_MAX (`OSError: [Errno 7] Argument list too long`). It
+    # worked only while the bundle was a few KB, so the harness silently had a
+    # size limit nobody declared. `node` with no `-e` reads a program from
+    # stdin, which has no such limit.
+    proc = subprocess.run([NODE], input=full, capture_output=True, text=True,
                           timeout=60)
     if proc.returncode != 0:
         raise AssertionError("node failed:\nSTDOUT:\n%s\nSTDERR:\n%s"

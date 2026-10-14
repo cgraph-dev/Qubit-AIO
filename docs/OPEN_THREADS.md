@@ -187,14 +187,11 @@ Owner directive: *"apply and start"*, then *"verify and fix and continue"*.
 | 4.9 | **The office API is `/agent/api/office/tower`, not `/api/office/tower`** | A bare `curl /api/office/tower` returns 404 and looks like a missing route; the SPA rewrites the `/agent` prefix (`webui.py:2484-2488`). With the session token from `window.__QUBIT_SESSION_TOKEN__`, `/agent/api/office/tower` returns **200** with real data | `webui.py:2484`; live 200 | Worth knowing before anyone debugs a "missing" route again | ✅ |
 | 4.10 | **All work UNCOMMITTED** | This session: modified `05-AMENDMENT-LOG.md`, `frontend-game/README.md`, `60-IMPLEMENTATION-PLAN.md`, `OPEN_THREADS.md`, `qubit-office.js`, `qubit-office.bundle.js`, `tests/test_office_{inspector,tower_plugin}.py`; new `docs/game-office/frontend-game/` (+evidence, +fixture provenance), `plugins/qubit-office/game/` (7 files), `frontend/qubit-web/vite.office-game.config.ts`, `tests/test_office_game_{packaging,adapter,navigation}.py`, `tests/test_office_interaction_lifecycle.py` | `git status --short` | Owner: the pre-existing 43-file dirty tree plus these. Not committed — the owner's call (see § 0, still the top of this file) | 🔴 |
 
-**Next in the plan:** **F07 (first playable vertical slice) is BLOCKED on the F04 engine decision** —
-it builds `scenes/{BootScene,DistrictScene,LobbyScene,FloorScene}.ts`, which is where an engine (or the
-Canvas host) actually gets used. Two of its prerequisites are now done and tested: the F05 adapter and
-the F06 navigation reducer, both on the engine-agnostic `SceneHost` seam.
-
-**The owner must rule on the engine before F07 can start:** Phaser 3.90.0 (P02 as written) vs Phaser
-4.2.1 (now GA) vs PixiJS. Everything else in the critical path (F08 UI shell, F09 conversation panel,
-F12 operational panels) is unblocked and does not need an engine.
+**Next in the plan:** **F08 (responsive shell, panels, settings) is PARTIAL** — see its STATUS block in
+`60-IMPLEMENTATION-PLAN.md` for what landed and the four items still open (the world not growing to fill
+the shell was the largest; it is now fixed and verified live). **F07 is done** (playable slice, 17 tests,
+committed `186abf7d4`); **F09 (character roster, profile, dialogue shell)** and **F12 (operational
+panels)** are unblocked and need no new engine work.
 
 ---
 

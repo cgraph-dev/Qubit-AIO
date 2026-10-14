@@ -100,7 +100,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 PLUGIN = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office"
@@ -124,7 +126,7 @@ console.log(JSON.stringify({{
 
 
 def _iso_constants() -> dict:
-    proc = subprocess.run([NODE, "-e", _ENGINE_CONSTANTS],
+    proc = subprocess.run([NODE], input=_ENGINE_CONSTANTS,
                           capture_output=True, text=True, timeout=60)
     assert proc.returncode == 0, proc.stderr
     return json.loads(proc.stdout.strip())

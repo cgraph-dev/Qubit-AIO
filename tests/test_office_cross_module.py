@@ -51,7 +51,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -129,7 +131,7 @@ def _run_node(body: str, modules: dict) -> dict:
         "var %s=require(%s)" % (name, json.dumps(str(path)))
         for name, path in modules.items()
     ) + ";\n" + body
-    proc = subprocess.run([NODE, "-e", program], capture_output=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True,
                           text=True, timeout=60)
     assert proc.returncode == 0, (
         f"node exited {proc.returncode}\nSTDOUT:\n{proc.stdout}\n"

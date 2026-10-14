@@ -190545,6 +190545,139 @@ create: function(game) {
 		};
 	}
 	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/ui/settings.ts
+	/** The settings the shell owns. Ids are stable — they are storage keys. */
+	var SETTINGS = {
+		/** Text zoom. LOCAL: it scales the UI, nothing else. */
+		textScale: {
+			id: "office.textScale",
+			label: "Text size",
+			help: "Scales the interface text only. The world is unaffected.",
+			scope: "local",
+			default: 1,
+			options: [
+				{
+					value: .9,
+					label: "Small"
+				},
+				{
+					value: 1,
+					label: "Normal"
+				},
+				{
+					value: 1.15,
+					label: "Large"
+				},
+				{
+					value: 1.3,
+					label: "Larger"
+				}
+			]
+		},
+		/** Reduced motion. LOCAL: zeroes the shell's transitions. */
+		reducedMotion: {
+			id: "office.reducedMotion",
+			label: "Reduce motion",
+			help: "Removes interface transitions. Your system setting is always honoured too.",
+			scope: "local",
+			default: false,
+			options: [{
+				value: false,
+				label: "Off"
+			}, {
+				value: true,
+				label: "On"
+			}]
+		},
+		/** High contrast. LOCAL: swaps tokens, never filters the scene. */
+		highContrast: {
+			id: "office.highContrast",
+			label: "High contrast",
+			help: "Stronger text and borders.",
+			scope: "local",
+			default: false,
+			options: [{
+				value: false,
+				label: "Off"
+			}, {
+				value: true,
+				label: "On"
+			}]
+		},
+		/** What the world draws. VIEW: presentation, no org mutation. */
+		showLabels: {
+			id: "office.showLabels",
+			label: "Character labels",
+			help: "Draw names over the figures. Presentation only.",
+			scope: "view",
+			default: true,
+			options: [{
+				value: true,
+				label: "Shown"
+			}, {
+				value: false,
+				label: "Hidden"
+			}]
+		},
+		/**
+		* !! THE DANGEROUS ONE, AND DELIBERATELY PRESENT !!
+		*
+		* "Floor layout" reads like a view preference and is NOT: a room's objects
+		* grant its occupants' tools (C12), so rearranging a floor changes
+		* capabilities. It is `backend` scope, and the local store refuses it. It is
+		* here so the refusal is exercised by a real setting rather than asserted in
+		* the abstract.
+		*/
+		floorLayout: {
+			id: "office.floorLayout",
+			label: "Floor layout",
+			help: "Rearranging a room changes which tools its occupants may use, so this is an organisation change, not a display preference.",
+			scope: "backend",
+			backendAction: "office.floor.update",
+			default: "unchanged",
+			options: [{
+				value: "unchanged",
+				label: "Leave as reported"
+			}]
+		}
+	};
+	function defaultValues() {
+		const out = {};
+		for (const [key, spec] of Object.entries(SETTINGS)) out[key] = spec.default;
+		return out;
+	}
+	/** Apply an edit. Returns the next values and REFUSES a backend-scoped one. */
+	function applySetting(values, key, value) {
+		const spec = SETTINGS[key];
+		if (!spec) return {
+			ok: false,
+			reason: `${String(key)} is not a setting`
+		};
+		if (spec.scope === "backend") return {
+			ok: false,
+			reason: `"${spec.label}" changes organisation state, not this view. It needs the confirmed action ${spec.backendAction ?? "(unnamed)"}; a display preference cannot apply it.`
+		};
+		if (spec.options && !spec.options.some((o) => o.value === value)) return {
+			ok: false,
+			reason: `${String(value)} is not an allowed value for ${spec.label}`
+		};
+		return {
+			ok: true,
+			values: {
+				...values,
+				[key]: value
+			}
+		};
+	}
+	/** The DOM attributes the shell root carries, derived from the values. */
+	function shellAttributes(values) {
+		return {
+			"data-office-reduced-motion": values.reducedMotion ? "1" : "0",
+			"data-office-contrast": values.highContrast ? "high" : "normal",
+			"data-office-scale": String(values.textScale)
+		};
+	}
+	//#endregion
 	//#region ../qubit-app/plugins/qubit-office/game/OfficeGameShell.tsx
 	/**
 	* Build the component the plugin registry wants, bound to the host's React.
@@ -190574,6 +190707,18 @@ create: function(game) {
 			zoom: 1
 		}, createScene = createPhaserHost, payload = null, world: worldProp = null, revision = 0, portals = [], initialPlace, onPlaceChange, onWorldCommand } = props;
 		const { useState, useEffect, useRef } = props.hooks;
+		const [settings, setSettings] = useState(defaultValues());
+		const [refusal, setRefusal] = useState(null);
+		const [settingsDrawer, setSettingsDrawer] = useState(false);
+		const [settingsModal, setSettingsModal] = useState(false);
+		/** Apply a setting edit, surfacing a refusal instead of swallowing it. */
+		const onSettingChange = (key, value) => {
+			const res = applySetting(settings, key, value);
+			if (res.ok) {
+				setSettings(res.values);
+				setRefusal(null);
+			} else setRefusal(res.reason);
+		};
 		/**
 		* The render model handed to the engine. A pure function of the world and
 		* the viewpoint — the engine rasterises it and decides nothing.
@@ -190625,6 +190770,12 @@ create: function(game) {
 		});
 		const portalsRef = useRef(portals);
 		portalsRef.current = portals;
+		/**
+		* A RENDER-VISIBLE mirror of `navRef`. The ref stays the reducer's source of
+		* truth (it must not re-render per keystroke), but the HUD must display the
+		* CURRENT place — read at render time, after every `force()` a `step()` does.
+		*/
+		const navState = navRef.current;
 		const propsRef = useRef({
 			onPlaceChange,
 			onWorldCommand
@@ -190742,7 +190893,11 @@ create: function(game) {
 				const res = applyIntent(navRef.current, hit.intent, portalsRef.current, world, selectedRef.current);
 				navRef.current = res.nav;
 				if (res.selected !== void 0) selectedRef.current = res.selected;
-				if (res.refused) return;
+				if (res.refused) {
+					setRefusal(String(res.refused));
+					return;
+				}
+				setRefusal(null);
 				propsRef.current.onPlaceChange?.(res.nav.viewpoint);
 				const scene = sceneRef.current;
 				if (scene) scene.step(currentModel(), scene.camera());
@@ -190771,31 +190926,204 @@ create: function(game) {
 			ro.observe(stage);
 			return () => ro.disconnect();
 		}, [createScene, mounted]);
-		return R.createElement("div", {
+		const hud = R.createElement("div", {
+			className: "office-game__bar",
+			"data-testid": "office-game-hud",
+			role: "toolbar",
+			"aria-label": "Office controls"
+		}, [
+			R.createElement("div", {
+				key: "place",
+				className: "office-game__stat"
+			}, [R.createElement("span", {
+				key: "l",
+				className: "office-game__stat-label"
+			}, "Place"), R.createElement("span", {
+				key: "v",
+				className: "office-game__stat-value",
+				"data-testid": "office-game-place"
+			}, placeLabel(navState.viewpoint))]),
+			R.createElement("div", {
+				key: "spacer",
+				style: { flex: "1 1 auto" }
+			}),
+			R.createElement("button", {
+				key: "text",
+				type: "button",
+				className: "office-game__btn",
+				"data-testid": "office-game-text-bigger",
+				"aria-label": "Larger text",
+				onClick: () => onSettingChange("textScale", nextScaleValue(settings.textScale))
+			}, "A+"),
+			R.createElement("button", {
+				key: "motion",
+				type: "button",
+				className: "office-game__btn",
+				"aria-pressed": settings.reducedMotion,
+				"data-testid": "office-game-reduce-motion",
+				onClick: () => onSettingChange("reducedMotion", !settings.reducedMotion)
+			}, "Motion"),
+			R.createElement("button", {
+				key: "settings",
+				type: "button",
+				className: "office-game__btn",
+				"aria-expanded": settingsDrawer || settingsModal,
+				"data-testid": "office-game-settings-btn",
+				onClick: () => {
+					if (settingsModal) setSettingsModal(false);
+					else setSettingsDrawer(!settingsDrawer);
+				}
+			}, "Settings")
+		]);
+		const attrs = shellAttributes(settings);
+		const scenes = [];
+		scenes.push(R.createElement("div", {
+			key: "world",
+			className: "office-game__world",
+			"data-testid": "office-game-stage",
+			style: { position: "relative" }
+		}, [
+			R.createElement("div", {
+				key: "host",
+				ref: stageRef,
+				className: "office-game__stage",
+				"data-testid": "office-game-stage-inner"
+			}),
+			refusal ? R.createElement("div", {
+				key: "refusal",
+				className: "office-game__refusal",
+				role: "status",
+				"data-testid": "office-game-refusal",
+				style: {
+					position: "absolute",
+					left: 12,
+					bottom: 12,
+					background: "rgba(11,15,22,0.85)",
+					padding: "4px 8px",
+					borderRadius: "var(--office-radius)"
+				}
+			}, refusal) : null,
+			R.createElement("div", {
+				key: "drawer",
+				className: "office-game__panel",
+				"data-testid": "office-game-drawer",
+				hidden: settingsDrawer,
+				style: {
+					position: "absolute",
+					right: 12,
+					top: 12,
+					width: 260
+				}
+			}, settingsDrawer ? settingsBody(R, settings, onSettingChange) : null)
+		]));
+		if (settingsModal) scenes.push(R.createElement("div", {
+			key: "scrim",
+			className: "office-game__scrim",
+			"data-testid": "office-game-scrim",
+			role: "presentation"
+		}, R.createElement("div", {
+			className: "office-game__modal",
+			role: "dialog",
+			"aria-modal": "true",
+			"aria-label": "Settings",
+			"data-testid": "office-game-modal"
+		}, settingsBody(R, settings, onSettingChange))));
+		return R.createElement("div", Object.assign({
 			"data-state": "ready",
 			"data-testid": "office-game-shell",
-			tabIndex: 0,
-			style: {
-				display: "block",
-				width: "100%",
-				height: "100%",
-				position: "relative"
-			}
-		}, R.createElement("canvas", {
+			className: "office-game",
+			tabIndex: 0
+		}, attrs), R.createElement("canvas", {
 			ref: canvasRef,
 			width: 880,
 			height: 500,
+			className: "office-game__measure",
 			"data-testid": "office-game-canvas",
-			"aria-hidden": "true",
-			style: { display: "none" }
-		}), R.createElement("div", {
-			ref: stageRef,
-			"data-testid": "office-game-stage",
+			"aria-hidden": "true"
+		}), hud, scenes);
+	}
+	/** The place for the HUD. Plain language, because a place id is not a name. */
+	function placeLabel(place) {
+		switch (place.kind) {
+			case "exterior": return "Outside the building";
+			case "building": return "Entrance hall";
+			case "lobby": return "Reception";
+			case "floor": return `Floor ${place.floor}`;
+			case "room": return place.room ? `Room ${place.room}` : "A room";
+			default: return "Unknown";
+		}
+	}
+	/** The next text scale in the declared ladder, wrapping at the top. */
+	function nextScaleValue(current) {
+		const ladder = (SETTINGS.textScale.options ?? []).map((o) => o.value);
+		return ladder[(ladder.indexOf(current) + 1 + ladder.length) % ladder.length] ?? current;
+	}
+	/**
+	* The settings body, rendered from the SPECS rather than hand-written per
+	* control. A hand-written form drifts from the specs the moment one is added —
+	* and the drifted one is the setting nobody notices is missing.
+	*
+	* A `backend`-scoped control is rendered DISABLED with its real explanation,
+	* not hidden. Hiding it would make the rule invisible; the point is that the
+	* player can see the change exists and why it is not theirs to make.
+	*/
+	function settingsBody(R, values, onChange) {
+		const rows = Object.entries(SETTINGS).map(([key, raw]) => {
+			const spec = raw;
+			const current = values[key];
+			const scoped = spec.scope === "backend";
+			return R.createElement("div", {
+				key,
+				style: { marginBottom: "var(--office-s3)" },
+				"data-testid": `setting-${key}`,
+				"data-scope": spec.scope
+			}, [
+				R.createElement("div", {
+					key: "label",
+					style: { fontSize: "var(--office-fs-sm)" }
+				}, spec.label),
+				R.createElement("div", {
+					key: "help",
+					style: {
+						fontSize: "var(--office-fs-xs)",
+						color: "var(--office-muted)",
+						marginBottom: "var(--office-s1)"
+					}
+				}, spec.help),
+				R.createElement("div", {
+					key: "ctl",
+					style: {
+						display: "flex",
+						gap: "var(--office-s1)",
+						flexWrap: "wrap"
+					}
+				}, (spec.options ?? []).map((o) => R.createElement("button", {
+					key: String(o.value),
+					type: "button",
+					className: "office-game__btn",
+					disabled: scoped,
+					"aria-pressed": current === o.value,
+					"data-testid": `setting-${key}-${String(o.value)}`,
+					onClick: () => onChange(key, o.value)
+				}, o.label))),
+				scoped ? R.createElement("div", {
+					key: "scoped",
+					style: {
+						fontSize: "var(--office-fs-xs)",
+						color: "var(--office-warn)",
+						marginTop: "var(--office-s1)"
+					},
+					"data-testid": `setting-${key}-note`
+				}, `Needs the confirmed action ${spec.backendAction}.`) : null
+			]);
+		});
+		return R.createElement("div", { "data-testid": "office-game-settings" }, [R.createElement("div", {
+			key: "title",
 			style: {
-				width: "100%",
-				height: "100%"
+				fontSize: "var(--office-fs-lg)",
+				marginBottom: "var(--office-s3)"
 			}
-		}));
+		}, "Settings"), ...rows]);
 	}
 	/** Enter/exit/up/down resolved to a concrete place, then travelled. */
 	function travelTo(state, direction, portals) {

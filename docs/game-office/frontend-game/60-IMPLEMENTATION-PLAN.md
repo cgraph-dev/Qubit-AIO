@@ -143,6 +143,32 @@ prototype; do not produce the full asset batch or claim the visual problem solve
 4. Add container/DPR observer, 390px layout, text zoom and reduced motion.
 **Proof:** settings change only local view controls unless a named scoped backend action is confirmed; modal/input contexts work at desktop/mobile sizes.
 
+**STATUS — partial (2026-10-14).** Landed, with `tests/test_office_game_shell.py` (22 tests, falsified 2 ways):
+
+| Built | Note |
+|---|---|
+| `game/styles/tokens.css` | Every shell value is a token. Text zoom turns ONE knob (`--office-scale`); reduced motion and contrast are token swaps, not filters — a filter over the scene would wash out the state animation colours, so a `blocked` agent could read as `idle`. |
+| `game/styles/game.css` | Layout, HUD, panel/modal/scrim, the 390px breakpoint. Every rule is scoped to `.office-game` (asserted, so the office cannot restyle the dashboard). |
+| `game/ui/settings.ts` | The setting specs, the scope rule, dirty state, safe persistence, shell attributes. |
+| `game/ui/PanelHost.ts` | One panel, one drawer, exclusive modal; real focus trap with wrap and restore; the F06 input contexts derived from panel state. |
+| `App.tsx` route | `/qubit-office` added to `FULL_HEIGHT_ROUTE_PATHS` — **not** `CHAT_ROUTE_PATHS`; the two predicates answer different questions and the test asserts they stay separate. |
+
+**The scope rule is real, not decorative.** `floorLayout` is declared `backend` scope with action `office.floor.update`, because a room's objects grant its occupants' tools (C12) — so rearranging a floor changes capabilities. Applying it through the local store is REFUSED at runtime and asserted by a test, it is never persisted or restored from storage, and the control renders DISABLED with its explanation rather than hidden (hiding it would make the rule invisible).
+
+**Focus is a behaviour here, not an attribute.** Tab wraps at both ends, Shift+Tab wraps backwards, a disabled control is skipped, an empty trap returns null instead of throwing, and closing a modal restores focus to the control that opened it. All five are tested; two were falsified by mutation (removing the refusal, and replacing the wrap with a clamp).
+
+**Still open in F08:**
+0. **3 pre-existing failures, NOT from this work** — `tests/test_office_hud_panels.py` (P4, P5) and `tests/test_office_plugin_wiring.py::test_the_declared_entry_loads_and_defines_its_modules`. Verified pre-existing by stashing my edits and re-running: they fail identically on `186abf7d4`. Cause: promoting the entry to `qubit-office.game.js` replaced the classic bundle that defined `window.QubitIso`/`QubitSprites`/`QubitCamera`/`QubitControlBar`/`QubitOfficeMotion`, so `qubit-office.js` now renders "Office modules not loaded". The game shell does not need them (it has its own scenes and geometry), so the question is whether the classic modules stay loaded ALONGSIDE the game entry for the older HUD surfaces — that is F12's decision, not F08's. Two things were fixed on the way there and are worth keeping:
+   - `test_office_plugin_wiring.py` could not evaluate the bundle at all: Phaser 4 reads `navigator.userAgent` and probes a 2D canvas **at module init**, so in a DOM-less context the bundle threw before any plugin code ran. The probe now supplies a minimal browser shim. **This is a real property of the artifact, not a test quirk: the bundle cannot be evaluated without a DOM (SSR, prerender, plain `import`) and the failure presents as "the bundle is broken" rather than "there is no DOM".**
+   - Twenty-one suites drove `node -e <program>`, which embeds the program in argv. With the 7 MB bundle inlined that exceeds `ARG_MAX` (`OSError: [Errno 7] Argument list too long`) and reads as a broken renderer. All now feed the program through **stdin** (`tests/_office_node.py`), which has no such limit.
+
+1. **The world did not GROW to fill the shell** — FIXED. The route wrapper chain contains a `display: contents` div, so `height: 100%` resolved against an auto-height ancestor. `flex: 1 1 auto` + `min-height: 0` sizes it instead. Verified live: world 500→**879** desktop, 500→**668** mobile, body overflow 0, one canvas, no errors. The SPA is a BUILT artifact (`frontend/qubit-dist/`) — the route flag was in source but not in what was served until `scripts/build_dashboard.sh` ran.
+2. **The eight settings groups are not all present.** The mechanism (spec-driven specs, scope, dirty state, reset/apply) is built and tested; the rest are data, and any `backend`-scoped ones need their real action names from the backend before they are declared.
+3. **Dirty state is computed but not surfaced** — no preview/reset/cancel/apply controls yet.
+4. **DPR is not separately observed** (container size is, via `ResizeObserver`).
+
+**Environment trap hit twice, worth a note:** `NODE_ENV=production` in the shell makes `npm ci`/`npm install` omit every devDependency, so `vite`, `typescript` and `@vitejs/plugin-react` all silently vanish and 300+ packages go missing. Install with `NODE_ENV=development npm ci --include=dev`.
+
 ## F09 — Character roster, profile and dialogue shell
 
 **Create:** `game/ui/{CharacterPanel,ConversationPanel}.ts`, `systems/CharacterPresenter.ts`; tests `character.test.ts`, `conversation.test.ts`.

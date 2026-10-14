@@ -33,7 +33,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 PLUGIN_DIR = (Path(__file__).resolve().parent.parent
               / "frontend" / "qubit-app" / "plugins" / "qubit-office")
@@ -77,7 +79,7 @@ def _run(js: str) -> object:
         'const out = (() => { %s })();\n'
         'process.stdout.write(JSON.stringify(out));\n'
     ) % (json.dumps(str(MODULE)), js)
-    proc = subprocess.run([NODE, "-e", program], capture_output=True, text=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True, text=True,
                           timeout=30)
     assert proc.returncode == 0, (
         f"node exited {proc.returncode}\nstdout: {proc.stdout}\n"
