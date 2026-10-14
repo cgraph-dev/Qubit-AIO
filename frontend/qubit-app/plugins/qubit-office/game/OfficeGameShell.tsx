@@ -21,6 +21,10 @@ import { createPhaserHost } from "./PhaserSceneHost";
 import type { Camera, RenderModel, SceneHost, SceneFactory } from "./SceneHost";
 import { detectContext, routeInput, pushContext, type InputState } from "./input";
 import { back, travel, type NavState, type Place, type Portal } from "./navigation";
+import { assembleWorld, type OfficeWorld } from "./WorldAssembler";
+import type { OfficeTowerPayload } from "./types";
+import { drawPlace } from "./scenes";
+import { hotspotsFor, hitTest, applyIntent, type Intent } from "./InteractionController";
 
 /**
  * REACT COMES FROM THE HOST, NOT FROM AN IMPORT.
@@ -47,8 +51,12 @@ export interface OfficeGameShellProps {
   hooks: HooksLike;
   /** The engine. Defaults to PHASER, with the Canvas host as the fallback. */
   createScene?: SceneFactory;
-  /** Authoritative payload -> drawing input. Supplied by the F05 adapter. */
-  model?: RenderModel | null;
+  /** The world to render. A `payload` prop is assembled here; a prebuilt world
+   *  is accepted directly so tests and the F05 adapter can drive it. */
+  payload?: OfficeTowerPayload | null;
+  world?: OfficeWorld | null;
+  /** Bumped by the caller on every accepted payload; drives world re-assembly. */
+  revision?: number;
   /** Initial camera. Fit/reset target; the host never overwrites it on redraw. */
   initialCamera?: Camera;
   /** The building's portal graph (F06). Absent means navigation is inert. */
@@ -73,18 +81,35 @@ export interface OfficeGameShellProps {
 export function createOfficeComponent(
   ReactLike: OfficeGameShellProps["React"],
   hooks: OfficeGameShellProps["hooks"],
+  load?: (hooks: OfficeGameShellProps["hooks"]) => {
+    payload?: OfficeTowerPayload | null;
+    revision?: number;
+    portals?: Portal[];
+    initialPlace?: Place;
+  },
 ) {
   return function Office() {
-    return OfficeGameShell({ React: ReactLike, hooks });
+    // The live data is loaded through the HOST's hooks, inside the render, so
+    // the shell receives it as plain props and stays a pure renderer.
+    const data = load ? load(hooks) : {};
+    return OfficeGameShell({
+      React: ReactLike, hooks,
+      payload: data.payload ?? null,
+      revision: data.revision ?? 0,
+      portals: data.portals ?? [],
+      initialPlace: data.initialPlace,
+    });
   };
 }
 
 export function OfficeGameShell(props: OfficeGameShellProps) {
   const {
     React: R,
-    model = null,
     initialCamera = { cx: 0, cy: 0, zoom: 1 },
     createScene = createPhaserHost,
+    payload = null,
+    world: worldProp = null,
+    revision = 0,
     portals = [],
     initialPlace,
     onPlaceChange,
@@ -93,6 +118,38 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
   // The hooks come from the HOST. See the header: no `react` import exists in
   // this module, so the dashboard's single React is the only one in play.
   const { useState, useEffect, useRef } = props.hooks;
+
+  /**
+   * The render model handed to the engine. A pure function of the world and
+   * the viewpoint — the engine rasterises it and decides nothing.
+   */
+  function currentModel(): RenderModel {
+    const w = worldRef.current;
+    const { w: width, h: height } = sizeRef.current;
+    return {
+      revision: w ? w.revision : 0,
+      draw: (ctx) => {
+        if (!w) {
+          // No world yet: say so rather than paint an invented office.
+          ctx.save();
+          ctx.fillStyle = "#0b0f16";
+          ctx.fillRect(0, 0, width, height);
+          ctx.fillStyle = "#8b97ad";
+          ctx.font = "13px ui-sans-serif, system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("Reading the office\u2026", width / 2, height / 2);
+          ctx.restore();
+          return;
+        }
+        drawPlace({
+          ctx, world: w, width, height,
+          place: navRef.current.viewpoint,
+          travel: 0,
+        });
+      },
+    };
+  }
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   /** The empty container the ENGINE mounts into (Phaser creates its own canvas). */
@@ -117,6 +174,19 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
   propsRef.current = { onPlaceChange, onWorldCommand };
 
   /**
+   * THE WORLD + THE DRAWING. The engine is handed a `RenderModel` whose `draw`
+   * paints the CURRENT place from the CURRENT world — so the engine never
+   * decides what is on screen, it only rasterises a pure function of
+   * (payload revision, viewpoint). That is what keeps one renderer valid for
+   * both engines and keeps C7 intact: no clock, no invented state.
+   */
+  const worldRef = useRef<OfficeWorld | null>(null);
+  const selectedRef = useRef<number | null>(null);
+  const sizeRef = useRef({ w: 880, h: 500 });
+  /** Flips true once the stage element exists, so effects that need it re-run. */
+  const [mounted, setMounted] = useState(0);
+
+  /**
    * ONE mount per canvas presence. The dependency is the canvas element's
    * identity, not `[]` — that is the whole fix class.
    */
@@ -130,7 +200,13 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
     // canvas is how a page ends up with two.
     scene.mount(stage, cv);
     sceneRef.current = scene;
+    // Paint the first frame if a payload already arrived.
+    scene.step(currentModel(), scene.camera());
     force((n) => n + 1);
+    // Announce that the stage exists. Effects that bind INPUT depend on this,
+    // not on `[]`: a mount-only binding reads `stageRef.current === null` and
+    // returns forever — the exact F02 bug, reproduced here in the shell.
+    setMounted((n) => n + 1);
     return () => {
       scene.destroy();
       sceneRef.current = null;
@@ -141,6 +217,9 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
     // `model` deliberately NOT a dependency: a new payload is a `step()`, not a
     // remount. Remounting on every poll would be the 400 ms snapshot bug in a
     // new costume.
+    //
+    // `mounted` is deliberately NOT a dependency either: this effect is what
+    // SETS it, and depending on it would remount the engine in a loop.
   }, [createScene]);
 
   /**
@@ -202,14 +281,77 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
 
     container.addEventListener("keydown", onKeyDown);
     return () => container.removeEventListener("keydown", onKeyDown);
-  }, [createScene]);
+  }, [createScene, mounted]);
 
-  // Data change is a step, never a rebuild.
+  // DATA CHANGE IS A STEP, NEVER A REBUILD. A new payload re-assembles the
+  // world and repaints; it does not remount the engine (remounting on every
+  // poll would be the 400 ms snapshot bug in a new costume).
   useEffect(() => {
+    worldRef.current = worldProp ?? assembleWorld(payload, revision);
     const scene = sceneRef.current;
-    if (!scene || !model) return;
-    scene.step(model, scene.camera());
-  }, [model]);
+    if (scene) scene.step(currentModel(), scene.camera());
+  }, [payload, worldProp, revision]);
+
+  /**
+   * THE MOUSE. A click resolves through the SAME hotspots the scenes draw and
+   * the SAME reducer the keyboard uses, so a door you can see is a door you can
+   * click and a door you can press.
+   */
+  useEffect(() => {
+    const cv = canvasRef.current;
+    // The stage div is the outer click surface; fall back to the shell so a
+    // ref-timing difference can never leave the mouse completely unbound (the
+    // F02 bug class, which this file has already been bitten by once).
+    const stage = (stageRef.current ?? (cv && cv.parentElement)) as HTMLElement | null;
+    if (!cv || !stage) return;
+    const onPointerUp = (ev: PointerEvent) => {
+      const target = (stage.querySelector("canvas") ?? cv) as HTMLElement;
+      const r = target.getBoundingClientRect();
+      const { w: width, h: height } = sizeRef.current;
+      // Scene coordinates. The scenes draw in `sizeRef`'s space, and the canvas
+      // is displayed at its natural size, so the map is a straight ratio — but
+      // guarded, because a zero-size rect would divide by zero and silently
+      // drop every click.
+      if (r.width <= 0 || r.height <= 0) return;
+      const x = (ev.clientX - r.left) / r.width * width;
+      const y = (ev.clientY - r.top) / r.height * height;
+      const world = worldRef.current;
+      if (!world) return;
+      const spots = hotspotsFor(navRef.current.viewpoint, world, width, height);
+      const hit = hitTest(spots, x, y);
+      if (!hit) return;
+      const res = applyIntent(navRef.current, hit.intent, portalsRef.current,
+                              world, selectedRef.current);
+      navRef.current = res.nav;
+      if (res.selected !== undefined) selectedRef.current = res.selected;
+      if (res.refused) return;   // a refusal changes nothing on screen
+      propsRef.current.onPlaceChange?.(res.nav.viewpoint);
+      const scene = sceneRef.current;
+      if (scene) scene.step(currentModel(), scene.camera());
+    };
+    stage.addEventListener("pointerup", onPointerUp);
+    return () => stage.removeEventListener("pointerup", onPointerUp);
+  }, [createScene, mounted]);
+
+  // A resize changes the drawing surface. Observed, not polled.
+  useEffect(() => {
+    const cv = canvasRef.current;
+    const stage = stageRef.current;
+    if (!cv || !stage || typeof ResizeObserver === "undefined") return;
+    const sync = () => {
+      const box = stage.getBoundingClientRect();
+      const w = Math.max(240, Math.floor(box.width) || 880);
+      const h = Math.max(160, Math.floor(box.height) || 500);
+      if (w === sizeRef.current.w && h === sizeRef.current.h) return;
+      sizeRef.current = { w, h };
+      const scene = sceneRef.current;
+      if (scene) scene.step(currentModel(), scene.camera());
+    };
+    sync();   // first measurement, before any resize event fires
+    const ro = new ResizeObserver(sync);
+    ro.observe(stage);
+    return () => ro.disconnect();
+  }, [createScene, mounted]);
 
   // NO JSX. JSX would compile to a `react/jsx-runtime` import, which the build
   // externalizes into a global the dashboard does not define — that is the

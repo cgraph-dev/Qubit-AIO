@@ -189473,8 +189473,9 @@ create: function(game) {
 		}
 		mount(container, canvas) {
 			this.container = container;
-			this.surfaceWidth = Math.max(240, canvas.width || 880);
-			this.surfaceHeight = Math.max(160, canvas.height || 500);
+			const box = container.getBoundingClientRect();
+			this.surfaceWidth = Math.max(240, Math.floor(box.width) || canvas.width || 880);
+			this.surfaceHeight = Math.max(160, Math.floor(box.height) || canvas.height || 500);
 			if (canvas.style.display !== "none") canvas.style.display = "none";
 			this.game = new __webpack_exports__default.Game({
 				type: __webpack_exports__default.CANVAS,
@@ -189763,6 +189764,8 @@ create: function(game) {
 	}
 	//#endregion
 	//#region ../qubit-app/plugins/qubit-office/game/navigation.ts
+	/** The exterior district: the root of the graph. */
+	var EXTERIOR = { kind: "exterior" };
 	function same(a, b) {
 		return a.kind === b.kind && a.building === b.building && a.floor === b.floor && a.room === b.room;
 	}
@@ -189824,6 +189827,723 @@ create: function(game) {
 			refused: null
 		};
 	}
+	/**
+	* The portal graph for a single headquarters, DERIVED from real floor data so
+	* it cannot drift from the building it describes. Multi-building (F11) extends
+	* this by passing more than one building.
+	*/
+	function buildHeadquartersPortals(building, floors) {
+		const portals = [];
+		const sorted = [...floors].sort((a, b) => a.number - b.number);
+		const lowest = sorted[0]?.number ?? 1;
+		portals.push({
+			from: EXTERIOR,
+			to: {
+				kind: "building",
+				building
+			},
+			via: "entrance"
+		});
+		portals.push({
+			from: {
+				kind: "building",
+				building
+			},
+			to: EXTERIOR,
+			via: "exit"
+		});
+		portals.push({
+			from: {
+				kind: "building",
+				building
+			},
+			to: {
+				kind: "lobby",
+				building
+			},
+			via: "entrance"
+		});
+		portals.push({
+			from: {
+				kind: "lobby",
+				building
+			},
+			to: {
+				kind: "building",
+				building
+			},
+			via: "exit"
+		});
+		for (const f of sorted) {
+			const floorPlace = {
+				kind: "floor",
+				building,
+				floor: f.number
+			};
+			portals.push({
+				from: {
+					kind: "lobby",
+					building
+				},
+				to: floorPlace,
+				via: f.number === lowest ? "door" : "elevator",
+				...f.number === lowest ? {} : { span: f.number - lowest }
+			});
+			portals.push({
+				from: floorPlace,
+				to: {
+					kind: "lobby",
+					building
+				},
+				via: f.number === lowest ? "door" : "elevator",
+				...f.number === lowest ? {} : { span: f.number - lowest }
+			});
+			for (const r of f.rooms) {
+				const roomPlace = {
+					kind: "room",
+					building,
+					floor: f.number,
+					room: r.id
+				};
+				portals.push({
+					from: floorPlace,
+					to: roomPlace,
+					via: "door"
+				});
+				portals.push({
+					from: roomPlace,
+					to: floorPlace,
+					via: "door"
+				});
+				if (f.number === lowest) {
+					portals.push({
+						from: {
+							kind: "lobby",
+							building
+						},
+						to: roomPlace,
+						via: "door"
+					});
+					portals.push({
+						from: roomPlace,
+						to: {
+							kind: "lobby",
+							building
+						},
+						via: "door"
+					});
+				}
+			}
+		}
+		return portals;
+	}
+	/**
+	* Build the world. Pure: same payload in, same world out, no clock, no random.
+	*/
+	function assembleWorld(payload, revision) {
+		if (!payload) return {
+			revision,
+			building: {
+				slug: "hq",
+				name: "Headquarters",
+				floors: [],
+				characters: [],
+				placeholder: true
+			},
+			motionRule: "",
+			empty: false,
+			emptyReason: "",
+			preview: false,
+			grid: {
+				cols: 39,
+				rows: 16,
+				tile: 1
+			}
+		};
+		const floors = (payload.floorplan?.floors ?? []).map((f) => {
+			const rooms = (f.rooms ?? []).map((r) => ({
+				id: r.id,
+				slug: r.slug,
+				kind: r.kind,
+				x: r.x,
+				y: r.y,
+				w: r.w,
+				h: r.h,
+				occupants: (payload.characters ?? []).filter((c) => c.position?.room_id === r.id),
+				placeholder: false
+			}));
+			return {
+				number: f.number,
+				name: f.name,
+				role: f.role,
+				z: Number(f.z || 0),
+				rooms
+			};
+		});
+		return {
+			revision,
+			building: {
+				slug: "hq",
+				name: "Headquarters",
+				floors,
+				characters: (payload.characters ?? []).map((c) => {
+					const seated = c.seated !== false && c.position?.room_id !== void 0 && c.position?.room_id !== null;
+					return {
+						agentId: c.agent_id,
+						slug: c.slug,
+						seatType: c.seat_type,
+						animation: c.animation,
+						walking: !!c.walking,
+						facing: c.facing,
+						stalled: !!c.stalled,
+						roomId: seated ? Number(c.position.room_id) : null,
+						x: Number(c.position?.x ?? 0),
+						y: Number(c.position?.y ?? 0),
+						unseated: !seated
+					};
+				}),
+				placeholder: floors.length === 0
+			},
+			motionRule: String(payload.motion_rule ?? ""),
+			empty: !!payload.empty,
+			emptyReason: String(payload.empty_reason ?? ""),
+			preview: !!payload.preview,
+			grid: payload.floorplan?.grid ?? {
+				cols: 39,
+				rows: 16,
+				tile: 1
+			}
+		};
+	}
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/scenes.ts
+	/** The Japanese-anime-office direction from 40-ART-AND-ASSETS.md, as tokens. */
+	var PALETTE = {
+		void: "#0b0f16",
+		ground: "#1b2230",
+		plate: "#2a3342",
+		wall: "#39445a",
+		wallTop: "#4b5876",
+		accent: "#e08fb0",
+		ink: "#e8edf6",
+		muted: "#8b97ad",
+		doorway: "#6fd3a6"
+	};
+	function text(ctx, s, x, y, size, colour, align = "left", weight = "400") {
+		ctx.save();
+		ctx.font = `${weight} ${size}px ui-sans-serif, system-ui, sans-serif`;
+		ctx.fillStyle = colour;
+		ctx.textAlign = align;
+		ctx.textBaseline = "middle";
+		ctx.fillText(s, x, y);
+		ctx.restore();
+	}
+	function plate(ctx, x, y, w, h, fill, stroke) {
+		ctx.save();
+		ctx.fillStyle = fill;
+		ctx.fillRect(x, y, w, h);
+		if (stroke) {
+			ctx.strokeStyle = stroke;
+			ctx.lineWidth = 1;
+			ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
+		}
+		ctx.restore();
+	}
+	/** A figure. Feet-anchored, tinted by state, with the state band the tower uses. */
+	function figure(ctx, c, x, y, scale, selected) {
+		const w = 12 * scale, h = 17 * scale;
+		const top = y - h;
+		const colour = ANIM_COLOUR[c.animation] ?? PALETTE.muted;
+		ctx.save();
+		if (selected) {
+			ctx.strokeStyle = PALETTE.accent;
+			ctx.lineWidth = 2;
+			ctx.strokeRect(x - w * .8, top - 4 * scale, w * 1.6, h + 8 * scale);
+		}
+		ctx.fillStyle = "rgba(0,0,0,0.28)";
+		ctx.beginPath();
+		ctx.ellipse(x, y + 1, w * .7, w * .28, 0, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.fillStyle = colour;
+		ctx.fillRect(x - w / 2, top + h * .26, w, h * .46);
+		ctx.fillStyle = PALETTE.ink;
+		ctx.beginPath();
+		ctx.arc(x, top + h * .14, w * .3, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.fillStyle = "rgba(0,0,0,0.35)";
+		ctx.fillRect(x - w * .42, top + h * .72, w * .3, h * .28);
+		ctx.fillRect(x + w * .12, top + h * .72, w * .3, h * .28);
+		ctx.fillStyle = colour;
+		ctx.fillRect(x - w * .62, top - 3 * scale, w * 1.24, Math.max(1, 2 * scale));
+		ctx.restore();
+		if (c.stalled) text(ctx, "!", x, top - 12 * scale, 12 * scale, "#e0554a", "center", "700");
+	}
+	var ANIM_COLOUR = {
+		idle: "#8a8f98",
+		working: "#f0c05a",
+		walking: "#6fd3a6",
+		meeting: "#8fb0e0",
+		blocked: "#e0554a",
+		carrying: "#c99ae0",
+		glow: "#ffd98a",
+		settling: "#9ad0c0",
+		walking_to_manager: "#e08fb0",
+		seated: "#8a8f98"
+	};
+	function drawExterior(a) {
+		const { ctx, width, height, world } = a;
+		plate(ctx, 0, 0, width, height, PALETTE.void);
+		plate(ctx, 0, height * .62, width, height * .38, PALETTE.ground);
+		ctx.save();
+		ctx.fillStyle = "rgba(255,255,255,0.05)";
+		ctx.fillRect(0, height * .8, width, 2);
+		ctx.restore();
+		const bw = Math.min(360, width * .46);
+		const bh = height * .56;
+		const bx = width / 2 - bw / 2;
+		const by = height * .62 - bh;
+		plate(ctx, bx, by, bw, bh, PALETTE.wall, PALETTE.wallTop);
+		const floors = Math.max(1, world.building.floors.length);
+		for (let i = 1; i < floors; i++) {
+			const y = by + bh / floors * i;
+			ctx.save();
+			ctx.fillStyle = "rgba(255,255,255,0.07)";
+			ctx.fillRect(bx, y, bw, 1);
+			ctx.restore();
+		}
+		for (let i = 0; i < floors; i++) {
+			const y = by + bh / floors * i + bh / floors * .34;
+			for (let k = 0; k < 4; k++) plate(ctx, bx + 24 + k * ((bw - 48) / 4), y, 18, 14, i === 0 ? PALETTE.accent : "rgba(255,255,255,0.16)");
+		}
+		const dw = 44, dh = 46;
+		const dx = width / 2 - dw / 2, dy = height * .62 - dh;
+		plate(ctx, dx, dy, dw, dh, PALETTE.doorway, "rgba(255,255,255,0.25)");
+		ctx.save();
+		const g = ctx.createRadialGradient(width / 2, dy + dh, 4, width / 2, dy + dh, 90);
+		g.addColorStop(0, "rgba(111,211,166,0.30)");
+		g.addColorStop(1, "rgba(111,211,166,0)");
+		ctx.fillStyle = g;
+		ctx.fillRect(width / 2 - 100, dy - 20, 200, 106);
+		ctx.restore();
+		text(ctx, world.building.name, width / 2, by - 22, 16, PALETTE.ink, "center", "600");
+		text(ctx, world.building.floors.length + " floors", width / 2, by - 6, 11, PALETTE.muted, "center");
+		text(ctx, "Enter", width / 2, dy + dh + 16, 12, PALETTE.doorway, "center", "600");
+	}
+	function drawEntranceHall(a) {
+		const { ctx, width, height, world } = a;
+		plate(ctx, 0, 0, width, height, PALETTE.void);
+		const fh = height * .72;
+		const fy = height * .14;
+		plate(ctx, width * .05, fy, width * .9, fh, PALETTE.plate, PALETTE.wallTop);
+		plate(ctx, width * .05, fy + fh - 28, width * .9, 28, PALETTE.ground);
+		const dw = 58, dh = 96;
+		const dx = width * .5 - dw / 2;
+		const dy = fy + fh - 28 - dh;
+		plate(ctx, dx, dy, dw, dh, PALETTE.doorway, "rgba(255,255,255,0.3)");
+		ctx.save();
+		const g = ctx.createRadialGradient(width * .5, dy + dh, 6, width * .5, dy + dh, 150);
+		g.addColorStop(0, "rgba(111,211,166,0.22)");
+		g.addColorStop(1, "rgba(111,211,166,0)");
+		ctx.fillStyle = g;
+		ctx.fillRect(width * .5 - 160, dy - 40, 320, 186);
+		ctx.restore();
+		text(ctx, world.building.name, width * .05 + 14, fy + 20, 15, PALETTE.ink, "left", "600");
+		text(ctx, "You are inside.", width * .05 + 14, fy + 40, 12, PALETTE.muted);
+		text(ctx, "To reception →", width * .95 - 14, fy + 20, 12, PALETTE.accent, "right", "600");
+		text(ctx, "Back outside", width * .5, dy + dh + 18, 11, PALETTE.doorway, "center");
+		text(ctx, world.building.floors.length + " floors above", width / 2, fy + fh - 12, 11, PALETTE.muted, "center");
+	}
+	function drawLobby(a) {
+		const { ctx, width, height, world } = a;
+		plate(ctx, 0, 0, width, height, PALETTE.void);
+		const fh = height * .66;
+		const fy = height * .2;
+		plate(ctx, width * .06, fy, width * .88, fh, PALETTE.plate, PALETTE.wallTop);
+		plate(ctx, width * .06, fy + fh - 24, width * .88, 24, PALETTE.ground);
+		plate(ctx, width * .12, fy + fh - 96, 130, 40, PALETTE.wall, "rgba(255,255,255,0.18)");
+		text(ctx, "Reception", width * .12 + 12, fy + fh - 74, 11, PALETTE.muted);
+		const ex = width * .62, ew = 66, eh = 96;
+		const ey = fy + fh - 24 - eh;
+		plate(ctx, ex, ey, ew, eh, PALETTE.wall, PALETTE.accent);
+		text(ctx, "▲▼", ex + ew / 2, ey + eh * .5, 20, PALETTE.accent, "center");
+		text(ctx, "Elevator", ex + ew / 2, ey + eh + 14, 11, PALETTE.muted, "center");
+		const sx = width * .8;
+		for (let i = 0; i < 5; i++) plate(ctx, sx + i * 9, ey + eh - i * 12 - 10, 9, 10 + i * 12, i % 2 ? PALETTE.wallTop : PALETTE.wall);
+		text(ctx, "Stairs", sx + 22, ey + eh + 14, 11, PALETTE.muted, "center");
+		const lowest = Math.min(...world.building.floors.map((f) => f.number));
+		world.building.characters.filter((c) => c.roomId !== null && world.building.floors.find((f) => f.number === lowest)?.rooms.some((r) => r.id === c.roomId)).forEach((c, i) => {
+			figure(ctx, c, width * .2 + i * 34, fy + fh - 34, 1.5, false);
+		});
+		text(ctx, "Reception", width * .06 + 10, fy + 16, 13, PALETTE.ink, "left", "600");
+		text(ctx, world.building.name, width * .06 + 10, fy + 34, 11, PALETTE.muted);
+	}
+	function drawFloor(a, floor) {
+		const { ctx, width, height, world } = a;
+		plate(ctx, 0, 0, width, height, PALETTE.void);
+		const fh = height * .68;
+		const fy = height * .16;
+		plate(ctx, width * .04, fy, width * .92, fh, PALETTE.plate, PALETTE.wallTop);
+		plate(ctx, width * .04, fy + fh - 26, width * .92, 26, PALETTE.ground);
+		plate(ctx, width * .08, fy + fh - 130, 54, 104, PALETTE.wall, PALETTE.accent);
+		text(ctx, "▲▼", width * .08 + 27, fy + fh - 78, 16, PALETTE.accent, "center");
+		const rooms = floor.rooms;
+		const rw = Math.min(150, width * .72 / Math.max(1, rooms.length) - 16);
+		rooms.forEach((r, i) => {
+			const rx = width * .2 + i * (rw + 16);
+			const ry = fy + 30;
+			const rh = fh - 90;
+			plate(ctx, rx, ry, rw, rh, PALETTE.wall, "rgba(255,255,255,0.16)");
+			plate(ctx, rx + rw / 2 - 16, ry + rh - 34, 32, 34, PALETTE.doorway);
+			text(ctx, r.slug, rx + rw / 2, ry + 16, 11, PALETTE.ink, "center", "600");
+			text(ctx, r.kind, rx + rw / 2, ry + 32, 10, PALETTE.muted, "center");
+			r.occupants.slice(0, 4).forEach((c, k) => {
+				const occupant = world.building.characters.find((wc) => wc.agentId === c.agent_id);
+				if (occupant) figure(ctx, occupant, rx + 22 + k * 30, ry + rh - 46, 1.3, false);
+			});
+			text(ctx, r.occupants.length + " in room", rx + rw / 2, ry + rh - 12, 10, PALETTE.muted, "center");
+		});
+		if (rooms.length === 0) text(ctx, "No rooms on this floor", width / 2, fy + fh / 2, 13, PALETTE.muted, "center");
+		text(ctx, floor.name + "  ·  floor " + floor.number, width * .04 + 10, fy + 16, 13, PALETTE.ink, "left", "600");
+		text(ctx, floor.role, width * .04 + 10, fy + 34, 11, PALETTE.muted);
+	}
+	function drawRoom(a, floor) {
+		const { ctx, width, height, world } = a;
+		const room = floor.rooms.find((r) => r.id === a.place.room);
+		plate(ctx, 0, 0, width, height, PALETTE.void);
+		const fh = height * .7;
+		const fy = height * .15;
+		plate(ctx, width * .06, fy, width * .88, fh, PALETTE.plate, PALETTE.wallTop);
+		plate(ctx, width * .06, fy + fh - 30, width * .88, 30, PALETTE.ground);
+		if (!room) {
+			text(ctx, "This room is not in the tower report", width / 2, fy + fh / 2, 13, PALETTE.muted, "center");
+			return;
+		}
+		const occ = room.occupants;
+		const cols = Math.max(1, Math.min(3, occ.length));
+		occ.forEach((c, i) => {
+			const worldChar = world.building.characters.find((wc) => wc.agentId === c.agent_id);
+			const col = i % cols, row = Math.floor(i / cols);
+			const dx = width * .16 + col * 150;
+			const dy = fy + 70 + row * 96;
+			plate(ctx, dx, dy + 22, 92, 26, PALETTE.wall, "rgba(255,255,255,0.14)");
+			if (worldChar) figure(ctx, worldChar, dx + 46, dy + 22, 1.7, false);
+			text(ctx, c.slug, dx + 46, dy + 60, 11, PALETTE.ink, "center", "600");
+			text(ctx, c.animation + (c.stalled ? " · stalled" : ""), dx + 46, dy + 74, 10, c.stalled ? "#e0554a" : PALETTE.muted, "center");
+		});
+		if (occ.length === 0) text(ctx, "Nobody is seated here", width / 2, fy + fh / 2, 13, PALETTE.muted, "center");
+		text(ctx, room.slug, width * .06 + 10, fy + 16, 13, PALETTE.ink, "left", "600");
+		text(ctx, room.kind + "  ·  " + occ.length + " seated", width * .06 + 10, fy + 34, 11, PALETTE.muted);
+	}
+	/** Paint the current place. The one entry point the hosts call. */
+	function drawPlace(a) {
+		const { place, world } = a;
+		switch (place.kind) {
+			case "exterior": return drawExterior(a);
+			case "building": return drawEntranceHall(a);
+			case "lobby": {
+				const lowest = world.building.floors.reduce((best, f) => !best || f.number < best.number ? f : best, null);
+				return drawLobby({
+					...a,
+					place: {
+						kind: "floor",
+						floor: lowest?.number
+					}
+				});
+			}
+			case "floor": {
+				const f = world.building.floors.find((x) => x.number === place.floor);
+				if (!f) {
+					plate(a.ctx, 0, 0, a.width, a.height, PALETTE.void);
+					text(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
+					return;
+				}
+				return drawFloor(a, f);
+			}
+			case "room": {
+				const f = world.building.floors.find((x) => x.number === place.floor);
+				if (!f) {
+					plate(a.ctx, 0, 0, a.width, a.height, PALETTE.void);
+					text(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
+					return;
+				}
+				return drawRoom(a, f);
+			}
+			default:
+				plate(a.ctx, 0, 0, a.width, a.height, PALETTE.void);
+				text(a.ctx, "Unknown place", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
+		}
+	}
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/InteractionController.ts
+	/**
+	* The hotspots for a place. DERIVED from the same geometry the scene painter
+	* uses, so a click always lands on a door that is actually drawn — the classic
+	* mismatch is a hitbox that drifts from its sprite.
+	*/
+	function hotspotsFor(place, world, width, height) {
+		const out = [];
+		const slug = world.building.slug;
+		if (place.kind === "exterior") {
+			out.push({
+				x: width / 2,
+				y: height * .62 - 23,
+				r: 46,
+				intent: { kind: "enter" },
+				label: "the front door"
+			});
+			return out;
+		}
+		if (place.kind === "building") {
+			out.push({
+				x: width * .95 - 14,
+				y: height * .14 + 20,
+				r: 60,
+				intent: { kind: "enter" },
+				label: "the way to reception"
+			});
+			out.push({
+				x: width * .5,
+				y: height * .14 + height * .72 - 28 - 96 + 96,
+				r: 52,
+				intent: { kind: "exit" },
+				label: "the way back outside"
+			});
+			return out;
+		}
+		if (place.kind === "lobby") {
+			out.push({
+				x: width * .62 + 33,
+				y: height * .2 + height * .66 - 24 - 48,
+				r: 52,
+				intent: { kind: "up" },
+				label: "the elevator"
+			});
+			out.push({
+				x: 40,
+				y: height - 40,
+				r: 34,
+				intent: { kind: "exit" },
+				label: "the way out"
+			});
+			const lowest = lowestFloor(world);
+			if (lowest) lowest.rooms.forEach((r, i) => {
+				out.push({
+					x: width * .2 + i * 166 + 60,
+					y: height * .2 + 60,
+					r: 44,
+					intent: {
+						kind: "goto",
+						to: {
+							kind: "room",
+							building: slug,
+							floor: lowest.number,
+							room: r.id
+						}
+					},
+					label: "the door to " + r.slug
+				});
+			});
+			return out;
+		}
+		if (place.kind === "floor") {
+			const f = world.building.floors.find((x) => x.number === place.floor);
+			if (!f) return out;
+			f.rooms.forEach((r, i) => {
+				out.push({
+					x: width * .2 + i * (Math.min(150, width * .72 / Math.max(1, f.rooms.length) - 16) + 16) + 60,
+					y: height * .16 + 100,
+					r: 44,
+					intent: {
+						kind: "goto",
+						to: {
+							kind: "room",
+							building: slug,
+							floor: f.number,
+							room: r.id
+						}
+					},
+					label: "the door to " + r.slug
+				});
+			});
+			out.push({
+				x: width * .08 + 27,
+				y: height * .16 + height * .68 - 78,
+				r: 48,
+				intent: { kind: "back" },
+				label: "the elevator back down"
+			});
+			f.rooms.forEach((r) => {
+				r.occupants.forEach((c) => {
+					out.push({
+						x: 0,
+						y: 0,
+						r: 14,
+						intent: {
+							kind: "select",
+							target: c.agent_id
+						},
+						label: "agent " + c.slug
+					});
+				});
+			});
+			return out;
+		}
+		if (place.kind === "room") {
+			const room = world.building.floors.find((x) => x.number === place.floor)?.rooms.find((r) => r.id === place.room);
+			room?.occupants.forEach((c, i) => {
+				const col = i % Math.max(1, Math.min(3, room.occupants.length));
+				out.push({
+					x: width * .16 + col * 150 + 46,
+					y: height * .15 + 70 + Math.floor(i / Math.max(1, Math.min(3, room.occupants.length))) * 96,
+					r: 26,
+					intent: {
+						kind: "select",
+						target: c.agent_id
+					},
+					label: "agent " + c.slug
+				});
+			});
+			out.push({
+				x: 40,
+				y: height - 40,
+				r: 34,
+				intent: { kind: "back" },
+				label: "the door back to the floor"
+			});
+			return out;
+		}
+		return out;
+	}
+	/** The lowest floor the payload reports, or null for a building with none. */
+	function lowestFloor(world) {
+		let best = null;
+		for (const f of world.building.floors) if (best === null || f.number < best.number) best = f;
+		return best;
+	}
+	/** The nearest hotspot within its radius, or null. */
+	function hitTest(spots, x, y) {
+		let best = null;
+		let bestD = Infinity;
+		for (const s of spots) {
+			const d = Math.hypot(s.x - x, s.y - y);
+			if (d <= s.r && d < bestD) {
+				bestD = d;
+				best = s;
+			}
+		}
+		return best;
+	}
+	/**
+	* THE ONE REDUCER. Both mouse and keyboard arrive here as intents.
+	*/
+	function applyIntent(state, intent, portals, world, selected) {
+		const slug = world.building.slug;
+		switch (intent.kind) {
+			case "back": return {
+				nav: back(state),
+				refused: false
+			};
+			case "select": return {
+				nav: state,
+				selected: intent.target,
+				refused: false
+			};
+			case "goto": return step(state, intent.to, portals);
+			case "enter": {
+				const to = state.viewpoint.kind === "exterior" || state.viewpoint.kind === void 0 ? {
+					kind: "building",
+					building: slug
+				} : state.viewpoint.kind === "building" ? {
+					kind: "lobby",
+					building: slug
+				} : state.viewpoint;
+				if (to === state.viewpoint) return {
+					nav: {
+						...state,
+						refused: {
+							reason: "there is nothing to enter from here",
+							from: state.viewpoint,
+							to: state.viewpoint
+						}
+					},
+					refused: true
+				};
+				return step(state, to, portals);
+			}
+			case "exit": {
+				const here = state.viewpoint;
+				let to;
+				if (here.kind === "room") to = {
+					kind: "floor",
+					building: here.building,
+					floor: here.floor
+				};
+				else if (here.kind === "floor") to = {
+					kind: "lobby",
+					building: here.building
+				};
+				else if (here.kind === "lobby") to = {
+					kind: "building",
+					building: here.building
+				};
+				else if (here.kind === "building") to = EXTERIOR;
+				else return {
+					nav: {
+						...state,
+						refused: {
+							reason: "there is nothing to exit from here",
+							from: here,
+							to: here
+						}
+					},
+					refused: true
+				};
+				return step(state, to, portals);
+			}
+			case "up":
+			case "down": return floorStep(state, intent.kind === "up" ? 1 : -1, portals);
+		}
+	}
+	function step(state, to, portals) {
+		const next = travel(state, to, portals);
+		return {
+			nav: next,
+			refused: next.refused !== null
+		};
+	}
+	/** Ride the elevator one floor. Refuses at the ends rather than wrapping. */
+	function floorStep(state, delta, portals) {
+		const here = state.viewpoint;
+		const candidates = portals.filter((p) => p.via === "elevator" || p.via === "stairs");
+		if (here.kind === "lobby" || here.kind === "building") {
+			const pick = candidates.filter((p) => p.from.kind === "lobby").sort((a, b) => (b.to.floor ?? 0) - (a.to.floor ?? 0))[0];
+			if (!pick) return {
+				nav: state,
+				refused: true
+			};
+			return step(state, pick.to, portals);
+		}
+		if (here.kind === "floor") {
+			const from = here.floor ?? 0;
+			const direct = candidates.filter((p) => p.from.kind === "floor" && p.from.floor === from).map((p) => p.to).filter((t) => typeof t.floor === "number").filter((t) => delta > 0 ? t.floor > from : t.floor < from).sort((a, b) => delta > 0 ? a.floor - b.floor : b.floor - a.floor)[0];
+			if (direct) return step(state, direct, portals);
+			return {
+				nav: {
+					...state,
+					refused: {
+						reason: delta > 0 ? "this is the top floor" : "this is the ground floor",
+						from: here,
+						to: here
+					}
+				},
+				refused: true
+			};
+		}
+		return {
+			nav: state,
+			refused: true
+		};
+	}
 	//#endregion
 	//#region ../qubit-app/plugins/qubit-office/game/OfficeGameShell.tsx
 	/**
@@ -189834,21 +190554,59 @@ create: function(game) {
 	* pre-built element. React and hooks are captured here, which is what keeps the
 	* dashboard's single React in play.
 	*/
-	function createOfficeComponent(ReactLike, hooks) {
+	function createOfficeComponent(ReactLike, hooks, load) {
 		return function Office() {
+			const data = load ? load(hooks) : {};
 			return OfficeGameShell({
 				React: ReactLike,
-				hooks
+				hooks,
+				payload: data.payload ?? null,
+				revision: data.revision ?? 0,
+				portals: data.portals ?? [],
+				initialPlace: data.initialPlace
 			});
 		};
 	}
 	function OfficeGameShell(props) {
-		const { React: R, model = null, initialCamera = {
+		const { React: R, initialCamera = {
 			cx: 0,
 			cy: 0,
 			zoom: 1
-		}, createScene = createPhaserHost, portals = [], initialPlace, onPlaceChange, onWorldCommand } = props;
+		}, createScene = createPhaserHost, payload = null, world: worldProp = null, revision = 0, portals = [], initialPlace, onPlaceChange, onWorldCommand } = props;
 		const { useState, useEffect, useRef } = props.hooks;
+		/**
+		* The render model handed to the engine. A pure function of the world and
+		* the viewpoint — the engine rasterises it and decides nothing.
+		*/
+		function currentModel() {
+			const w = worldRef.current;
+			const { w: width, h: height } = sizeRef.current;
+			return {
+				revision: w ? w.revision : 0,
+				draw: (ctx) => {
+					if (!w) {
+						ctx.save();
+						ctx.fillStyle = "#0b0f16";
+						ctx.fillRect(0, 0, width, height);
+						ctx.fillStyle = "#8b97ad";
+						ctx.font = "13px ui-sans-serif, system-ui, sans-serif";
+						ctx.textAlign = "center";
+						ctx.textBaseline = "middle";
+						ctx.fillText("Reading the office…", width / 2, height / 2);
+						ctx.restore();
+						return;
+					}
+					drawPlace({
+						ctx,
+						world: w,
+						width,
+						height,
+						place: navRef.current.viewpoint,
+						travel: 0
+					});
+				}
+			};
+		}
 		const canvasRef = useRef(null);
 		/** The empty container the ENGINE mounts into (Phaser creates its own canvas). */
 		const stageRef = useRef(null);
@@ -189876,6 +190634,21 @@ create: function(game) {
 			onWorldCommand
 		};
 		/**
+		* THE WORLD + THE DRAWING. The engine is handed a `RenderModel` whose `draw`
+		* paints the CURRENT place from the CURRENT world — so the engine never
+		* decides what is on screen, it only rasterises a pure function of
+		* (payload revision, viewpoint). That is what keeps one renderer valid for
+		* both engines and keeps C7 intact: no clock, no invented state.
+		*/
+		const worldRef = useRef(null);
+		const selectedRef = useRef(null);
+		const sizeRef = useRef({
+			w: 880,
+			h: 500
+		});
+		/** Flips true once the stage element exists, so effects that need it re-run. */
+		const [mounted, setMounted] = useState(0);
+		/**
 		* ONE mount per canvas presence. The dependency is the canvas element's
 		* identity, not `[]` — that is the whole fix class.
 		*/
@@ -189886,7 +190659,9 @@ create: function(game) {
 			const scene = createScene();
 			scene.mount(stage, cv);
 			sceneRef.current = scene;
+			scene.step(currentModel(), scene.camera());
 			force((n) => n + 1);
+			setMounted((n) => n + 1);
 			return () => {
 				scene.destroy();
 				sceneRef.current = null;
@@ -189935,12 +190710,67 @@ create: function(game) {
 			};
 			container.addEventListener("keydown", onKeyDown);
 			return () => container.removeEventListener("keydown", onKeyDown);
-		}, [createScene]);
+		}, [createScene, mounted]);
 		useEffect(() => {
+			worldRef.current = worldProp ?? assembleWorld(payload, revision);
 			const scene = sceneRef.current;
-			if (!scene || !model) return;
-			scene.step(model, scene.camera());
-		}, [model]);
+			if (scene) scene.step(currentModel(), scene.camera());
+		}, [
+			payload,
+			worldProp,
+			revision
+		]);
+		/**
+		* THE MOUSE. A click resolves through the SAME hotspots the scenes draw and
+		* the SAME reducer the keyboard uses, so a door you can see is a door you can
+		* click and a door you can press.
+		*/
+		useEffect(() => {
+			const cv = canvasRef.current;
+			const stage = stageRef.current ?? (cv && cv.parentElement);
+			if (!cv || !stage) return;
+			const onPointerUp = (ev) => {
+				const r = (stage.querySelector("canvas") ?? cv).getBoundingClientRect();
+				const { w: width, h: height } = sizeRef.current;
+				if (r.width <= 0 || r.height <= 0) return;
+				const x = (ev.clientX - r.left) / r.width * width;
+				const y = (ev.clientY - r.top) / r.height * height;
+				const world = worldRef.current;
+				if (!world) return;
+				const hit = hitTest(hotspotsFor(navRef.current.viewpoint, world, width, height), x, y);
+				if (!hit) return;
+				const res = applyIntent(navRef.current, hit.intent, portalsRef.current, world, selectedRef.current);
+				navRef.current = res.nav;
+				if (res.selected !== void 0) selectedRef.current = res.selected;
+				if (res.refused) return;
+				propsRef.current.onPlaceChange?.(res.nav.viewpoint);
+				const scene = sceneRef.current;
+				if (scene) scene.step(currentModel(), scene.camera());
+			};
+			stage.addEventListener("pointerup", onPointerUp);
+			return () => stage.removeEventListener("pointerup", onPointerUp);
+		}, [createScene, mounted]);
+		useEffect(() => {
+			const cv = canvasRef.current;
+			const stage = stageRef.current;
+			if (!cv || !stage || typeof ResizeObserver === "undefined") return;
+			const sync = () => {
+				const box = stage.getBoundingClientRect();
+				const w = Math.max(240, Math.floor(box.width) || 880);
+				const h = Math.max(160, Math.floor(box.height) || 500);
+				if (w === sizeRef.current.w && h === sizeRef.current.h) return;
+				sizeRef.current = {
+					w,
+					h
+				};
+				const scene = sceneRef.current;
+				if (scene) scene.step(currentModel(), scene.camera());
+			};
+			sync();
+			const ro = new ResizeObserver(sync);
+			ro.observe(stage);
+			return () => ro.disconnect();
+		}, [createScene, mounted]);
 		return R.createElement("div", {
 			"data-state": "ready",
 			"data-testid": "office-game-shell",
@@ -189986,12 +190816,198 @@ create: function(game) {
 		return a.kind === b.kind && a.building === b.building && a.floor === b.floor && a.room === b.room;
 	}
 	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/types.ts
+	/** The schema this adapter is written against. A mismatch is refused, not coerced. */
+	var EXPECTED_SCHEMA = "qubit-office-tower/1";
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/adapter.ts
+	var DEFAULT_INTERVAL_MS = 400;
+	var OfficeAdapter = class {
+		revision = 0;
+		payload = null;
+		error = null;
+		loading = false;
+		provenance = "none";
+		inflight = null;
+		timer = null;
+		disposed = false;
+		opts;
+		constructor(opts) {
+			this.opts = {
+				baseUrl: "/agent",
+				intervalMs: DEFAULT_INTERVAL_MS,
+				...opts
+			};
+		}
+		/** The current snapshot. A pure read — never triggers a load. */
+		snapshot() {
+			return {
+				revision: this.revision,
+				payload: this.payload,
+				error: this.error,
+				loading: this.loading,
+				stale: this.error !== null && this.payload !== null,
+				provenance: this.provenance
+			};
+		}
+		/**
+		* One serialized load. A call while one is in flight ABORTS the earlier one
+		* and supersedes it, so two responses can never race.
+		*/
+		async load() {
+			if (this.disposed) return;
+			this.inflight?.abort();
+			const ctl = new AbortController();
+			this.inflight = ctl;
+			const requestedAt = this.revision;
+			this.loading = true;
+			this.emit();
+			const f = this.opts.fetchImpl ?? fetch;
+			const token = this.opts.token ?? readSessionToken();
+			try {
+				const res = await f(`${this.opts.baseUrl}/api/office/tower`, {
+					signal: ctl.signal,
+					headers: token ? { "X-Api-Token": token } : void 0
+				});
+				if (ctl.signal.aborted) return;
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				const body = await res.json();
+				if (ctl.signal.aborted) return;
+				this.accept(body, requestedAt);
+			} catch (err) {
+				if (ctl.signal.aborted || this.disposed) return;
+				this.error = err instanceof Error ? err.message : String(err);
+				this.loading = false;
+				this.emit();
+			} finally {
+				if (this.inflight === ctl) this.inflight = null;
+			}
+		}
+		/** Validate + apply one payload. Exposed so tests can drive it directly. */
+		accept(body, requestedAt) {
+			const check = parseTower(body);
+			if (!check.ok) {
+				this.error = check.error;
+				this.loading = false;
+				this.emit();
+				return;
+			}
+			if (requestedAt < this.revision) {
+				this.loading = false;
+				return;
+			}
+			this.payload = check.payload;
+			this.revision = requestedAt + 1;
+			this.error = null;
+			this.loading = false;
+			this.provenance = check.payload.preview ? "recording" : "live";
+			this.emit();
+		}
+		/** Start polling. Pauses while the document is hidden. */
+		start() {
+			if (this.timer !== null || this.disposed) return;
+			this.load();
+			this.timer = setInterval(() => {
+				if (isHidden()) return;
+				this.load();
+			}, this.opts.intervalMs);
+		}
+		stop() {
+			if (this.timer !== null) {
+				clearInterval(this.timer);
+				this.timer = null;
+			}
+		}
+		/** Release everything. Idempotent — safe in a React cleanup. */
+		dispose() {
+			if (this.disposed) return;
+			this.disposed = true;
+			this.stop();
+			this.inflight?.abort();
+			this.inflight = null;
+			this.loading = false;
+		}
+		emit() {
+			if (this.disposed) return;
+			this.opts.onSnapshot(this.snapshot());
+		}
+	};
+	function isHidden() {
+		return typeof document !== "undefined" && document.visibilityState === "hidden";
+	}
+	/**
+	* The session token the server injects into the SPA shell
+	* (`webui.py:1563` `window.__QUBIT_SESSION_TOKEN__`). Never a query param —
+	* `token_ok` rejects query tokens outright.
+	*/
+	function readSessionToken() {
+		const w = globalThis;
+		return typeof w.__QUBIT_SESSION_TOKEN__ === "string" ? w.__QUBIT_SESSION_TOKEN__ : "";
+	}
+	/** Structural validation. Returns a typed refusal, never a coerced payload. */
+	function parseTower(body) {
+		if (body === null || typeof body !== "object") return {
+			ok: false,
+			error: "the response was not an object"
+		};
+		const b = body;
+		if (b.schema !== "qubit-office-tower/1") return {
+			ok: false,
+			error: `unexpected schema ${JSON.stringify(b.schema)}; this build reads ${EXPECTED_SCHEMA}`
+		};
+		if (b.ok !== true) return {
+			ok: false,
+			error: typeof b.detail === "string" ? b.detail : "the tower report answered not-ok"
+		};
+		if (typeof b.hud !== "object" || b.hud === null) return {
+			ok: false,
+			error: "the payload carries no hud"
+		};
+		if (!Array.isArray(b.characters)) return {
+			ok: false,
+			error: "the payload carries no characters array"
+		};
+		return {
+			ok: true,
+			payload: body
+		};
+	}
+	//#endregion
 	//#region ../qubit-app/plugins/qubit-office/game/entry.ts
 	var SDK = window.__QUBIT_PLUGIN_SDK__;
 	if (!SDK || !SDK.React || !SDK.hooks) console.warn("[qubit-office] plugin SDK missing (React/hooks); the game entry cannot register. The Office tab will show no office.");
 	else {
-		const Office = createOfficeComponent(SDK.React, SDK.hooks);
+		const Office = createOfficeComponent(SDK.React, SDK.hooks, liveData);
 		window.__QUBIT_PLUGINS__?.register("qubit-office", Office);
+	}
+	/**
+	* Poll the tower and hand the shell a payload + the portals derived from it.
+	*
+	* The portal graph is built from the payload's OWN floorplan, so the building a
+	* player walks through is the building the backend reported — a floor appears in
+	* the game because it exists in the store, not because the renderer assumed it.
+	*/
+	function liveData(hooks) {
+		const [payload, setPayload] = hooks.useState(null);
+		const [revision, setRevision] = hooks.useState(0);
+		hooks.useEffect(() => {
+			const adapter = new OfficeAdapter({ onSnapshot: (s) => {
+				if (s.payload) {
+					setPayload(s.payload);
+					setRevision((n) => n + 1);
+				}
+			} });
+			adapter.start();
+			return () => adapter.dispose();
+		}, []);
+		return {
+			payload,
+			revision,
+			portals: buildHeadquartersPortals("hq", (payload?.floorplan?.floors ?? []).map((f) => ({
+				number: f.number,
+				rooms: f.rooms.map((r) => ({ id: r.id }))
+			})))
+		};
 	}
 	//#endregion
 })();

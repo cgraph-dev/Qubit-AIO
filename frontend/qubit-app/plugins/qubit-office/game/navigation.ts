@@ -188,10 +188,16 @@ export function buildHeadquartersPortals(
 
   portals.push({ from: EXTERIOR, to: { kind: "building", building },
                  via: "entrance" });
+  portals.push({ from: { kind: "building", building }, to: EXTERIOR,
+                 via: "exit" });
   portals.push({ from: { kind: "building", building },
                  to: { kind: "lobby", building }, via: "entrance" });
-  portals.push({ from: { kind: "lobby", building }, to: EXTERIOR,
-                 via: "exit" });
+  /* EVERY STEP IS REVERSIBLE. The lobby must have a way back out to the
+   * building, exactly as the building has a way in. Without this pair the
+   * second half of F07's walk (…→back→exit) is impossible: you can get in and
+   * never out, which is the classic one-way-door bug. */
+  portals.push({ from: { kind: "lobby", building },
+                 to: { kind: "building", building }, via: "exit" });
 
   for (const f of sorted) {
     const floorPlace: Place = { kind: "floor", building, floor: f.number };
@@ -211,6 +217,17 @@ export function buildHeadquartersPortals(
                                  room: r.id };
       portals.push({ from: floorPlace, to: roomPlace, via: "door" });
       portals.push({ from: roomPlace, to: floorPlace, via: "door" });
+      /* THE LOBBY'S OWN FLOOR IS ENTERABLE DIRECTLY. Reception is on the
+       * lowest floor, so a person standing at reception walks straight into
+       * that floor's rooms without riding the elevator to the floor they are
+       * already on. Without this, the lobby drew doors it could not open — the
+       * dead affordance the hotspot test caught. */
+      if (f.number === lowest) {
+        portals.push({ from: { kind: "lobby", building }, to: roomPlace,
+                       via: "door" });
+        portals.push({ from: roomPlace, to: { kind: "lobby", building },
+                       via: "door" });
+      }
     }
   }
   return portals;

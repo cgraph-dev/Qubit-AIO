@@ -290,6 +290,22 @@ def test_the_phaser_host_implements_the_same_contract_as_the_canvas_host():
         "the Phaser host does not declare the SceneHost contract")
 
 
+def test_the_shell_mounts_the_engine_exactly_once():
+    """TWO mount effects stack two engines — the live page showed two canvases
+    in the stage, from a duplicated `useEffect` that called `createScene()`
+    twice. One engine per shell, asserted structurally."""
+    raw = (GAME_DIR / "OfficeGameShell.tsx").read_text()
+    src = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
+    src = re.sub(r"//[^\n]*", "", src)
+    calls = len(re.findall(r"createScene\(\)", src))
+    assert calls == 1, (
+        f"the shell calls createScene() {calls} times; each call mounts another "
+        f"engine and the page ends up with extra canvases")
+    mounts = len(re.findall(r"\.mount\(", src))
+    assert mounts == 1, (
+        f"the shell calls mount() {mounts} times — duplicate engines")
+
+
 def test_the_shell_gives_the_engine_an_empty_stage():
     """ONE visible canvas, not two.
 
@@ -318,14 +334,22 @@ def test_the_shell_gives_the_engine_an_empty_stage():
 def test_the_plugin_registers_a_component_not_an_object():
     """`registry.ts::registerPlugin(name, component)` stores the SECOND argument
     as the component type. Registering `{Office, React, hooks}` produced
-    'Element type is invalid ... got: object' in the live page."""
+    'Element type is invalid ... got: object' in the live page.
+
+    Checked at the CALL SITE, not over the whole file: the entry imports and
+    defines helper functions, and a whole-file window would flag those.
+    """
     src = (GAME_DIR / "entry.ts").read_text()
     assert "createOfficeComponent" in src, (
         "the entry does not build a component from the host React")
-    call = src[src.find("register("):]
-    call = call[:call.find(");") + 2] if ");" in call else call[:300]
-    assert "{ Office" not in call and "Office:" not in call, (
-        "the entry registers an OBJECT where the registry expects a component")
+    m = re.search(r"__QUBIT_PLUGINS__[^;]*\.register\(([^;]*)\)\s*;", src, re.S)
+    assert m, "the plugin registration call could not be found"
+    args = m.group(1)
+    assert "{" not in args, (
+        f"the entry registers an OBJECT literal where the registry expects a "
+        f"component: register({args.strip()})")
+    assert "Office" in args, (
+        f"the registration does not pass the Office component: {args.strip()}")
 
 
 def test_the_shell_takes_react_from_the_host_never_an_import():

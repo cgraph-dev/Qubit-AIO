@@ -26,7 +26,11 @@
  * ROLLBACK:  qubit-office.bundle.js (the previous hand-stitched renderer)
  */
 
-import { createOfficeComponent } from "./OfficeGameShell";
+import { createOfficeComponent, type OfficeGameShellProps } from "./OfficeGameShell";
+import { OfficeAdapter } from "./adapter";
+import { buildHeadquartersPortals } from "./navigation";
+import { HQ_SLUG } from "./WorldAssembler";
+import type { OfficeTowerPayload } from "./types";
 
 declare global {
   interface Window {
@@ -44,6 +48,45 @@ if (!SDK || !SDK.React || !SDK.hooks) {
     "register. The Office tab will show no office.");
 } else {
   // The registry wants a COMPONENT, built against the host's React and hooks.
-  const Office = createOfficeComponent(SDK.React, SDK.hooks);
+  // The live data wiring is injected as `load`, so the shell stays a pure
+  // renderer of (world, viewpoint) — the shape the F07 tests drive.
+  const Office = createOfficeComponent(SDK.React, SDK.hooks, liveData);
   window.__QUBIT_PLUGINS__?.register("qubit-office", Office);
+}
+
+/**
+ * Poll the tower and hand the shell a payload + the portals derived from it.
+ *
+ * The portal graph is built from the payload's OWN floorplan, so the building a
+ * player walks through is the building the backend reported — a floor appears in
+ * the game because it exists in the store, not because the renderer assumed it.
+ */
+function liveData(hooks: OfficeGameShellProps["hooks"]) {
+  const [payload, setPayload] = hooks.useState<OfficeTowerPayload | null>(null);
+  const [revision, setRevision] = hooks.useState(0);
+
+  hooks.useEffect(() => {
+    const adapter = new OfficeAdapter({
+      onSnapshot: (s) => {
+        // The adapter already drops stale revisions and RETAINS the last good
+        // payload on a failed read, so this only advances on a real success.
+        if (s.payload) {
+          setPayload(s.payload);
+          setRevision((n) => n + 1);
+        }
+      },
+    });
+    adapter.start();
+    return () => adapter.dispose();
+  }, []);
+
+  const floors = (payload?.floorplan?.floors ?? []).map((f) => ({
+    number: f.number,
+    rooms: f.rooms.map((r) => ({ id: r.id })),
+  }));
+  return {
+    payload,
+    revision,
+    portals: buildHeadquartersPortals(HQ_SLUG, floors),
+  };
 }

@@ -99,8 +99,13 @@ export class PhaserOfficeHost implements SceneHost {
 
   mount(container: HTMLElement, canvas: HTMLCanvasElement): void {
     this.container = container;
-    this.surfaceWidth = Math.max(240, canvas.width || 880);
-    this.surfaceHeight = Math.max(160, canvas.height || 500);
+    // SIZE FROM THE STAGE, NOT THE HIDDEN MEASURING CANVAS. The measuring
+    // canvas is a fixed 880x500 while the stage is fluid, so reading the canvas
+    // produced a surface narrower than its container and a click-coordinate map
+    // that was wrong by the ratio. The stage is what the user actually sees.
+    const box = container.getBoundingClientRect();
+    this.surfaceWidth = Math.max(240, Math.floor(box.width) || canvas.width || 880);
+    this.surfaceHeight = Math.max(160, Math.floor(box.height) || canvas.height || 500);
 
     // Phaser creates and owns its own canvas inside `container`. The canvas
     // React rendered is only the MEASURING STICK for the surface size — the

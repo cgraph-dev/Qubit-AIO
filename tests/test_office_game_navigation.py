@@ -161,22 +161,35 @@ def test_every_floor_and_room_is_reachable_and_returns(tmp_path):
 
 
 def test_leaving_the_building_returns_to_the_exterior(tmp_path):
+    """Every step out is one hop, and each is the reverse of the step in.
+
+    The route out is now lobby -> building -> exterior, NOT a lobby -> exterior
+    shortcut: a one-way door is the bug this shape removes, and an earlier
+    version of this test encoded exactly that shortcut.
+    """
     got = _run(tmp_path, _GRAPH + """
+      const hops = [];
       let s = N.initialNav();
-      s = N.travel(s, {kind:'building', building:'hq'}, portals);
-      s = N.travel(s, {kind:'lobby', building:'hq'}, portals);
-      const inLobby = JSON.stringify(s.viewpoint);
-      s = N.travel(s, N.EXTERIOR, portals);
-      const outKind = s.viewpoint.kind;
-      // and back() from the lobby also reaches the building
+      for (const to of [{kind:'building', building:'hq'},
+                        {kind:'lobby', building:'hq'},
+                        {kind:'building', building:'hq'},
+                        N.EXTERIOR]) {
+        s = N.travel(s, to, portals);
+        hops.push({to: N.encodePlace(to), at: N.encodePlace(s.viewpoint),
+                   refused: s.refused !== null});
+      }
+      // back() from the lobby also reaches the building
       let t = N.initialNav();
       t = N.travel(t, {kind:'building', building:'hq'}, portals);
       t = N.travel(t, {kind:'lobby', building:'hq'}, portals);
       t = N.back(t);
-      return {inLobby, outKind, backTo: t.viewpoint.kind,
-              refusals: s.refused === null};
+      return {hops, final: N.encodePlace(s.viewpoint),
+              backTo: t.viewpoint.kind};
     """)
-    assert got["outKind"] == "exterior", "there is no way out of the building"
+    refusals = [h for h in got["hops"] if h["refused"]]
+    assert not refusals, f"a hop out of the building was refused: {refusals}"
+    assert got["final"] == "exterior", (
+        f"there is no way out of the building: ended at {got['final']}")
     assert got["backTo"] == "building"
 
 
