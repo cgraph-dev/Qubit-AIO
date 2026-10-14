@@ -329,6 +329,81 @@ def test_the_contact_shadow_is_soft_and_not_black(tmp_path):
         f"the shadow is not the blue-grey contact tone: {got['first']}")
 
 
+def test_the_wall_tones_contrast_against_the_floor(tmp_path):
+    """A WALL YOU CANNOT DISTINGUISH FROM THE FLOOR IS NOT A WALL.
+
+    Every earlier geometry test passed while the room read as a flat bright
+    diamond: the wall's three tones and the carpet all sat within ~15% of each
+    other, so "the walls render" was true and useless. This asserts the thing
+    that actually matters — the wall's darkest visible plane is CLEARLY darker
+    than the floor it stands on, which is what makes a vertical surface read as
+    vertical.
+    """
+    got = _run_scene(tmp_path, """
+      const t = ROOM.themeFor(0);
+      const r = C.ramp(t.wall, 0.08);
+      const west = C.shade(r.base, -0.06);
+      const east = C.shade(r.dk, -0.17);
+      const cap  = C.mix(r.hi, '#ffffff', 0.10);
+      const floor = t.carpet;
+      const lum = (c) => C.luminance(c);
+      return {
+        west, east, cap, floor,
+        lumWest: lum(west), lumEast: lum(east), lumCap: lum(cap),
+        lumFloor: lum(floor),
+        eastVsFloor: +(lum(floor) - lum(east)).toFixed(3),
+        capVsEast: +(lum(cap) - lum(east)).toFixed(3),
+      };
+    """)
+    # the darkest wall plane must be clearly darker than the floor
+    assert got["eastVsFloor"] > 0.18, (
+        f"the wall's dark face is only {got['eastVsFloor']} luminance below the "
+        f"floor — a vertical surface that does not contrast reads as more floor, "
+        f"which is exactly how a room renders as a flat diamond "
+        f"(wall {got['east']} vs floor {got['floor']})")
+    # and the cap must be clearly lighter than the dark face, so the top edge of
+    # the wall is legible
+    assert got["capVsEast"] > 0.3, (
+        f"the wall cap is only {got['capVsEast']} above its dark face, so the "
+        f"wall has no visible top edge: cap {got['cap']} vs east {got['east']}")
+    # the three faces must be three DIFFERENT tones, or the wall is a flat block
+    assert len({got["west"], got["east"], got["cap"]}) == 3, (
+        f"the wall's faces are not distinct tones: {got}")
+
+
+def test_the_wall_paints_pixels_above_the_floor(tmp_path):
+    """The geometric complement: a wall must occupy screen rows ABOVE the
+    floor's topmost row, or it has no visible height no matter its colour."""
+    got = _run_scene(tmp_path, """
+      const floor = {number:0, name:'HQ', role:'r', rooms:[
+        {id:0, slug:'a', kind:'lobby', x:0, y:0, w:10, h:8, occupants:[]}]};
+      const cam = ROOM.cameraFor(floor, 1305, 879);
+      const sx = (p) => p.x * cam.zoom + cam.ox;
+      const sy = (p) => p.y * cam.zoom + cam.oy;
+      // the floor's topmost screen row
+      let floorTop = 1e9, wallTop = 1e9, wallBottom = -1e9;
+      for (let gy=0; gy<8; gy++) for (let gx=0; gx<10; gx++)
+        for (const p of ISO.tileDiamond(gx,gy)) floorTop = Math.min(floorTop, sy(p));
+      // the north wall run (one tile off the room's own row)
+      for (let gx=-1; gx<=10; gx++) {
+        const f = ISO.wallFaces(gx, -1, 2);
+        for (const poly of [f.top, f.west, f.east])
+          for (const p of poly) {
+            wallTop = Math.min(wallTop, sy(p));
+            wallBottom = Math.max(wallBottom, sy(p));
+          }
+      }
+      return {floorTop: Math.round(floorTop), wallTop: Math.round(wallTop),
+              wallBottom: Math.round(wallBottom), camZoom: +cam.zoom.toFixed(2)};
+    """)
+    assert got["wallTop"] < got["floorTop"], (
+        f"the wall's highest pixel ({got['wallTop']}) is not above the floor's "
+        f"top row ({got['floorTop']}) — the wall has no visible height")
+    assert got["floorTop"] - got["wallTop"] > 60, (
+        f"the wall rises only {got['floorTop'] - got['wallTop']}px above the "
+        f"floor; at zoom {got['camZoom']} a 2-tile wall should be far taller")
+
+
 # ======================================================================
 # 4 — the scenes actually USE the shading model
 # ======================================================================
@@ -437,14 +512,34 @@ def _run_scene(tmp_path: Path, js: str) -> object:
     assert wa.is_file(), (
         f"tsc emitted scenes.js but not WorldAssembler.js: "
         f"{sorted(p.name for p in js_dir.iterdir())}")
+
+    def find(name: str) -> Path:
+        """Locate an emitted module.
+
+        tsc's emit layout depends on how it infers rootDir, so a module can land
+        at `js/room.js` or `js/art/room.js` depending on the entry it was given.
+        Searching only one of them is how this helper silently drove nothing.
+        """
+        for cand in (js_dir / name, js_dir / "art" / name,
+                     tmp_path / "js" / name, tmp_path / "js" / "art" / name):
+            if cand.is_file():
+                return cand
+        raise AssertionError(
+            f"could not find emitted {name}; layout is "
+            f"{sorted(str(p.relative_to(tmp_path)) for p in (tmp_path / 'js').rglob('*.js'))}")
     fixture = (REPO / "frontend" / "qubit-web" / "src" / "lib" / "office-game"
                / "fixtures" / "tower-recording.json")
     program = ("const SC = require(%s);\nconst WA = require(%s);\n"
+               "const ROOM = require(%s);\nconst ISO = require(%s);\n"
+               "const C = require(%s);\n"
                "const TOWER = JSON.parse(require('fs').readFileSync(%s,'utf8'));\n"
                "const world = WA.assembleWorld(TOWER, 1);\n"
                "%s\n"
                "process.stdout.write(JSON.stringify((() => { %s })()));\n"
                % (json.dumps(str(scenes)), json.dumps(str(wa)),
+                  json.dumps(str(find("room.js"))),
+                  json.dumps(str(find("iso.js"))),
+                  json.dumps(str(find("colour.js"))),
                   json.dumps(str(fixture)), _CTOR, js))
     proc = subprocess.run([NODE], input=program, capture_output=True,
                           text=True, timeout=120)

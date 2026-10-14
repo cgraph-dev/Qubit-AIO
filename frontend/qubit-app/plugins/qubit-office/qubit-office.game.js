@@ -190523,45 +190523,45 @@ create: function(game) {
 	//#region ../qubit-app/plugins/qubit-office/game/art/room.ts
 	var THEMES = [
 		{
-			carpet: "#7d8ba3",
-			wall: "#c9d3e0",
-			trim: "#93a0b5",
+			carpet: "#8fa0b8",
+			wall: "#4b5875",
+			trim: "#333d55",
 			accent: "#3f7fd8"
 		},
 		{
-			carpet: "#a8906a",
-			wall: "#e6dac4",
-			trim: "#bda57c",
+			carpet: "#c4a97e",
+			wall: "#6d5a42",
+			trim: "#4a3c2b",
 			accent: "#ec8a3c"
 		},
 		{
-			carpet: "#7a9b7f",
-			wall: "#d6e0cf",
-			trim: "#9bb48d",
+			carpet: "#8fb894",
+			wall: "#4a6b52",
+			trim: "#334b39",
 			accent: "#4cae6a"
 		},
 		{
-			carpet: "#8b83a8",
-			wall: "#dbd6e8",
-			trim: "#a89fc4",
+			carpet: "#b0a5cc",
+			wall: "#5c5278",
+			trim: "#403856",
 			accent: "#8d66cf"
 		},
 		{
-			carpet: "#a87d6d",
-			wall: "#e9d4c9",
-			trim: "#c49886",
+			carpet: "#cb9c88",
+			wall: "#7a5245",
+			trim: "#553a30",
 			accent: "#e2604f"
 		},
 		{
-			carpet: "#6a9b95",
-			wall: "#cfe3df",
-			trim: "#8db3ac",
+			carpet: "#84bcb4",
+			wall: "#3f6f68",
+			trim: "#2c4f4a",
 			accent: "#36b0b0"
 		},
 		{
-			carpet: "#77808f",
-			wall: "#d0d4db",
-			trim: "#8b95a2",
+			carpet: "#a8b0bd",
+			wall: "#535b6b",
+			trim: "#3a404d",
 			accent: "#f2c14e"
 		}
 	];
@@ -190591,10 +190591,10 @@ create: function(game) {
 	function cameraFor(floor, width, height) {
 		let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 		for (const r of floor.rooms) for (const [gx, gy] of [
-			[r.x, r.y],
-			[r.x + r.w, r.y],
-			[r.x, r.y + r.h],
-			[r.x + r.w, r.y + r.h]
+			[r.x - 1, r.y - 1],
+			[r.x + r.w + 1, r.y - 1],
+			[r.x - 1, r.y + r.h + 1],
+			[r.x + r.w + 1, r.y + r.h + 1]
 		]) {
 			const p = toScreen({
 				gx,
@@ -190664,13 +190664,21 @@ create: function(game) {
 	* The two visible faces are shaded differently — the east face is the dark one
 	* — which is what makes the corner between them read as an edge rather than a
 	* colour change.
+	*
+	* THE NORTH RUN IS INSET BY ONE TILE. A wall drawn on the room's own north row
+	* puts its base exactly where the floor's first row is, so from this camera
+	* angle the floor in front hides most of the wall's lower face and the room
+	* reads as a bare diamond. Standing the wall one tile further back — outside
+	* the walkable floor, which is where a wall actually is — leaves the whole face
+	* visible above the floor line.
 	*/
 	function paintWalls(p, floor) {
 		const blocks = [];
 		for (const room of floor.rooms) {
 			const theme = themeFor(room.id + floor.number * 3);
-			for (let gx = room.x; gx < room.x + room.w; gx++) {
-				const gy = room.y;
+			const northY = room.y - 1;
+			for (let gx = room.x - 1; gx <= room.x + room.w; gx++) {
+				const gy = northY;
 				blocks.push({
 					gx,
 					gy,
@@ -190681,22 +190689,22 @@ create: function(game) {
 					})
 				});
 			}
-			for (let gy = room.y; gy < room.y + room.h + ROOM.southTiles; gy++) {
+			for (let gy = northY; gy < room.y + room.h + 1; gy++) {
 				blocks.push({
-					gx: room.x,
+					gx: room.x - 1,
 					gy,
 					theme,
 					key: depth({
-						gx: room.x,
+						gx: room.x - 1,
 						gy
 					})
 				});
 				blocks.push({
-					gx: room.x + room.w - 1,
+					gx: room.x + room.w,
 					gy,
 					theme,
 					key: depth({
-						gx: room.x + room.w - 1,
+						gx: room.x + room.w,
 						gy
 					})
 				});
@@ -190710,10 +190718,9 @@ create: function(game) {
 			ctx.save();
 			ctx.translate(cam.ox, cam.oy);
 			ctx.scale(cam.zoom, cam.zoom);
-			fillPoly(p, faces.west, r.base);
-			fillPoly(p, faces.east, r.dk);
-			fillPoly(p, faces.top, mix(r.hi, "#ffffff", .06));
-			const bs = b.theme.trim;
+			fillPoly(p, faces.west, shade(r.base, -.06));
+			fillPoly(p, faces.east, shade(r.dk, -.17));
+			fillPoly(p, faces.top, mix(r.hi, "#ffffff", .1));
 			const wf = faces.west;
 			const t = 3 / cam.zoom;
 			fillPoly(p, [
@@ -190727,7 +190734,7 @@ create: function(game) {
 					x: wf[0].x,
 					y: wf[0].y - t
 				}
-			], bs);
+			], shade(b.theme.trim, -.3));
 			ctx.restore();
 		}
 	}
