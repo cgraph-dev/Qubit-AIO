@@ -184,13 +184,21 @@ def test_bridge_preserves_a_token_already_on_the_url(tmp_path):
 # --------------------------------------------------------------------------
 # 2. The app document is served WITH the token (server side)
 # --------------------------------------------------------------------------
-def _app_handler(*, token="secret", peer="127.0.0.1"):
-    """A handler whose ``_send`` is captured, serving a real HTML file."""
+def _app_handler(*, token="secret", peer="127.0.0.1", host="127.0.0.1"):
+    """A handler whose ``_send`` is captured, serving a real HTML file.
+
+    ``host`` is set because a REAL HTTP/1.1 request always carries a ``Host``
+    header, and the token injector now requires BOTH the peer address and the
+    Host to be loopback (a request arriving on the LAN address with a
+    ``localhost`` Host still came from off-box). An empty header dict therefore
+    models a caller the injector must refuse — see
+    ``test_a_non_loopback_app_html_caller_gets_the_shell_without_the_token``.
+    """
     from voicebridge import resources
 
     h = object.__new__(W.WebUIHandler)
     h.path = "/plugin-apps/qubit-office/habblaud/index.html"
-    h.headers = {}
+    h.headers = {"Host": host} if host is not None else {}
     h.client_address = (peer, 51234)
     h._head_only = False
 
@@ -253,6 +261,43 @@ def test_app_html_injection_is_html_only_not_every_asset(plugin_root):
     assert "__QUBIT_SESSION_TOKEN__" not in body, (
         "the token was injected into a non-HTML asset — it belongs only in the "
         "document's own <head>")
+
+
+def test_a_non_loopback_app_html_caller_gets_the_shell_without_the_token(
+        plugin_root):
+    """A peer off this machine must NOT be handed the live session token.
+
+    Measured leak this pins: `curl http://<lan-ip>:8890/plugin-apps/qubit-office/
+    habblaud/` returned 200 with the token in the body, and that token then
+    authenticated `/agent/api/office/tower` from the LAN. The document itself is
+    a static asset and is still served — only the credential is withheld, so the
+    app renders its unauthenticated state instead of being handed API access.
+    """
+    for peer, host in (("192.168.1.135", "192.168.1.135"),
+                       ("10.0.0.5", "127.0.0.1"),      # LAN peer, spoofed Host
+                       ("127.0.0.1", "192.168.1.135")):  # loopback, LAN Host
+        h, _ = _app_handler(token="tok-123", peer=peer, host=host)
+        h._serve_plugin_app("qubit-office/habblaud/index.html")
+        assert h._captured["code"] == 200, (peer, host, h._captured)
+        body = h._captured["body"].decode("utf-8")
+        assert "tok-123" not in body, (
+            f"the session token was handed to a non-loopback caller "
+            f"(peer={peer}, host={host}) — off-box and Host-spoofing callers "
+            f"must both be refused the credential")
+
+
+def test_app_html_injection_requires_both_peer_and_host_to_be_loopback():
+    """The two halves of the check are independent; neither alone is sufficient.
+
+    A missing Host is not a loopback request — a real HTTP/1.1 request always
+    carries one, so an empty header dict models a caller we cannot vouch for.
+    """
+    h, _ = _app_handler(token="tok-123", host=None)
+    h._serve_plugin_app("qubit-office/habblaud/index.html")
+    body = h._captured["body"].decode("utf-8")
+    assert "tok-123" not in body, (
+        "a request with no Host header was treated as loopback and handed the "
+        "session token")
 
 
 # --------------------------------------------------------------------------
