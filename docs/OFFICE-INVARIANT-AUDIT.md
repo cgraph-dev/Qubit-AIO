@@ -24,7 +24,7 @@ permanent test guard.
 
 | # | Invariant (as claimed) | Where | Verdict | Reachable? |
 |---|---|---|---|---|
-| 1 | "Above the envelope, it is refused unless raised." | `envelope.py:12-20`, `spend()` | **BROKE** | latent — no CLI/turn path calls `spend()` yet |
+| 1 | "Above the envelope, it is refused unless raised." | `envelope.py:12-20`, `spend()` | **FIXED** | latent — no CLI/turn path calls `spend()` yet |
 | 2 | Unmetered rows never enter any metered fold; agent balances exclude them (D16). | `ledger.py:44-47`, `reverse()` | **BROKE** | **live** — `reverse()` is a public API |
 | 3 | "The reviewer is exactly one level above the assignee." | `work.py:9-11`, `review()` | **BROKE** | **live** — `task-review` CLI `--by` defaults to `None` |
 | 4 | "Assign a task to a seat, enforcing the chain." | `work.py:114`, `claim()` | **BROKE** | **live** — `task-claim` re-claims a running task |
@@ -36,7 +36,13 @@ do **not** catch.
 
 ---
 
-## FINDING #1 — an approved raise of N cents unlocks unlimited spend
+## FINDING #1 — a small approved raise unlocks unlimited spend [RESOLVED]
+
+**STATUS: RESOLVED.** Fixed in `envelope.py`: `_has_approved_raise` (existence
+only) is replaced by `_approval_covers` + `_approved_raise_headroom`, which
+require the approved raise to COVER the spend in THIS period. Verified by
+`tests/test_office_invariants_audit.py` FINDING #1 guards and by mutating a
+scratch copy back to the old predicate (both behaviour guards go RED).
 
 **Invariant claimed.** `envelope.py:12-20`:
 
@@ -44,54 +50,75 @@ do **not** catch.
 > * **Above the envelope, it is refused unless raised** — and a raise must name
 >   the four things the contract requires.
 
-**Where.** `envelope.spend()` (`envelope.py:354`) calls `_has_approved_raise`
-(`envelope.py:398`) when the spend is above the envelope. That predicate is:
+**Where (before the fix).** `envelope.spend()` (`envelope.py:354`) called
+`_has_approved_raise` (`envelope.py:398`) when the spend was above the envelope.
+That predicate was:
 
 ```sql
 SELECT 1 FROM office_request WHERE agent_id=? AND status='approved' LIMIT 1
 ```
 
-It takes **no amount and no period**. Its answer cannot depend on either. So
-*any* approved request — for a single cent, for a past period — satisfies a
+It took **no amount and no period**. Its answer could not depend on either. So
+*any* approved request — for a single cent, for a past period — satisfied a
 spend of *any* size.
 
-**Reproduction** (`test_finding1_tiny_approved_raise_unlocks_unlimited_spend`):
+**Reproduction** (`test_finding1_tiny_approved_raise_does_not_unlock_unlimited_spend`):
 
 ```
 org envelope              = 100 cents;  seat funded with a large balance
 spend   100               -> OK, headroom now 0
 spend    50               -> refused OFFICE_ENVELOPE_EXCEEDED   (correct)
 raise     1 cent, approve -> the envelope is NOT topped up
-spend 50000               -> ALLOWED   {'booked': True, 'within_envelope': False, 'raised': True}
+spend 50000               -> REFUSED OFFICE_ENVELOPE_EXCEEDED  (after the fix)
 ```
 
-A **$0.01** raise, approved once on a **$1.00** envelope, licensed **$500.00**
-of spend — 500× the raise, 500× the envelope. The seat's metered cost ends at
-`50_100` cents.
+Before the fix that last line returned
+`{'booked': True, 'within_envelope': False, 'raised': True}`: a **$0.01** raise,
+approved once on a **$1.00** envelope, licensed **$500.00** of spend — 500× the
+raise, 500× the envelope, with the seat's metered cost ending at `50_100` cents.
 
 **Root cause, isolated**
 (`test_has_approved_raise_ignores_amount_and_period`): a raise approved for
-period `2000-01` satisfies `_has_approved_raise` in any later period, because
-the predicate has no period argument at all.
+period `2000-01` satisfied `_has_approved_raise` in any later period, because
+the predicate had no period argument at all.
 
 **Reachability (honest).** `grep` shows **no caller** of `envelope.spend`
 anywhere in `voicebridge/` — not the CLI, not `runner.run_turn`, not
 `dispatch`, not `autowork`. The live turn path gates on `receipts.admit`
 (dollar caps + balance), and `autowork`/`envelope.headroom_for` only *read*
-`check_spend`. So this is a **latent defect in the enforcing wrapper**, not a
+`check_spend`. So this was a **latent defect in the enforcing wrapper**, not a
 live exploit today. It matters because `spend()` is the documented enforcing
 path and the next caller inherits the hole. It also means the envelope is not
 actually enforced on a real turn — a separate gap worth a decision.
 
-**Minimal fix (description only — not applied).** `_has_approved_raise` should
-match an approved request whose `amount_cents` covers the *remaining* overspend
-and whose `period` equals the current period — or `spend()` should require the
-raise to be consumed (a matching ledger debit) rather than a bare status. Do
-not apply blind; the amount/period semantics are a contract decision.
+**The contract implemented (one sentence).** *A spend above the envelope is
+permitted only when the seat holds an approved raise — for this period, and
+covering the overage above the remaining envelope headroom — that has not
+already been drawn on; an insufficient, stale, or already-consumed approval is
+treated as no approval.*
+
+`_approved_raise_headroom` sums the seat's `approved` `office_request.amount_cents`
+for the current `period`, minus the overage already drawn this period (so one
+approval cannot authorise two spends). `_approval_covers` permits the spend iff
+`max(0, cents - max(0, headroom)) <= approved_cents`. A negative headroom (the
+seat is already above the envelope) makes every new cent overage. A denied or
+other-period approval contributes zero. The refusal stays the typed
+`OFFICE_ENVELOPE_EXCEEDED` and its detail names the approved cents held.
+
+**Falsification.** Mutating a scratch copy of `envelope.py` back to the
+existence-only predicate turns both behaviour guards
+(`test_finding1_...` and `test_a_sufficient_approved_raise_covers_the_spend`)
+RED; the repo copy was never mutated.
+
 
 ---
 
 ## FINDING #2 — reversing an unmetered row manufactures metered money
+
+**STATUS: RESOLVED.** Fixed in `ledger.reverse()` by threading
+`unmetered=bool(original["unmetered"])` into the compensating `record()` call.
+The BROKE tests below were flipped to assert the FIXED behaviour; the
+reversal is now the exact inverse of what the original did to the metered fold.
 
 **Invariant claimed.** `ledger.py:44-47`:
 
@@ -135,20 +162,22 @@ The reconciliation the docs lean on is blind to this path by construction.
 (`ledger-reverse`), and `settle()` / any correction flow can reach it. This is
 **live**.
 
-**Minimal fix (description only).** Thread the original row's `unmetered`
-through the compensating call:
+**Minimal fix (applied).** Thread the original row's `unmetered` through the
+compensating call:
 
 ```python
 out = record(cfg, "transfer", delta, ...,
              unmetered=bool(original["unmetered"]), ...)
 ```
 
-so a reversal of a phantom stays a phantom. `test_mutation_unmetered_propagation_would_fix_finding2`
-records the exact source shape this must land on and fails loudly if the code
-changes underneath it. A second, independent guard worth having: a `transfer`
-whose `offsets_id` names an `unmetered=1` row must itself be `unmetered=1`
-(an entity-integrity check at write time), so no caller can reintroduce the
-mix-up.
+so a reversal of a phantom stays a phantom. `test_mutation_unmetered_propagation_is_what_fixes_finding2`
+guards that exact source shape: it asserts the keyword is present at
+`reverse()`'s compensating call site, then strips it into a scratch copy to
+prove the omission is exactly what the finding was — so a later edit that drops
+the keyword fails the guard instead of silently re-opening the bug. A second,
+independent guard worth having: a `transfer` whose `offsets_id` names an
+`unmetered=1` row must itself be `unmetered=1` (an entity-integrity check at
+write time), so no caller can reintroduce the mix-up.
 
 ---
 

@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -51,6 +53,8 @@ ENTRY = PLUGIN_DIR / "qubit-office.js"
 #: The file the manifest actually names, resolved next to the manifest.
 SERVED_ENTRY = PLUGIN_DIR / MANIFEST_ENTRY if MANIFEST_ENTRY else ENTRY
 
+NODE = shutil.which("node")
+
 
 def _src() -> str:
     """The whole file, comments included. Use for 'does it say what it is'."""
@@ -69,6 +73,65 @@ def _code() -> str:
     src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
     src = re.sub(r"//[^\n]*", "", src)
     return src
+
+
+#: The IIFE tail rewritten to expose `drawMinimap` (and the small helpers it
+#: reads) so the real function can be driven from `node`. Same transform the
+#: scene/hud harnesses use; kept literal so a renamed registration fails loudly
+#: instead of silently skipping.
+_MINIMAP_REGISTER = 'window.__QUBIT_PLUGINS__.register("qubit-office", Office);'
+_MINIMAP_EXPOSED = ["drawMinimap", "iso", "isoWorld", "ANIM_COLOR", "MOTION",
+                    "PALETTE", "Office"]
+
+_MINIMAP_PROGRAM = r"""
+globalThis.window = {
+  __QUBIT_PLUGIN_SDK__: {
+    React: {createElement: function () { return {type: arguments[0]}; }},
+    hooks: {useState: function (v) { return [v, function () {}]; },
+            useEffect: function () {}, useRef: function (v) { return {current: v}; },
+            useCallback: function (f) { return f; }},
+    fetchJSON: function () { return Promise.resolve({}); }
+  },
+  __QUBIT_PLUGINS__: {register: function (n, f) { globalThis.__OFF = f; }},
+  location: {search: ""}
+};
+function FakeCtx() { this.ops = []; this.fillStyle = "#000000"; }
+FakeCtx.prototype.clearRect = function (x, y, w, h) {
+  this.ops.push({op: "clearRect"}); };
+FakeCtx.prototype.fillRect = function (x, y, w, h) {
+  this.ops.push({op: "fillRect", x: x, y: y, w: w, h: h, fillStyle: this.fillStyle}); };
+FakeCtx.prototype.beginPath = function () {};
+FakeCtx.prototype.moveTo = function () {}; FakeCtx.prototype.lineTo = function () {};
+FakeCtx.prototype.stroke = function () {}; FakeCtx.prototype.fill = function () {};
+FakeCtx.prototype.arc = function () {}; FakeCtx.prototype.rect = function () {};
+FakeCtx.prototype.fillText = function () {};
+FakeCtx.prototype.save = function () {}; FakeCtx.prototype.restore = function () {};
+var __SRC = %(src)s;
+(0, eval)(__SRC);
+var v = %(payload)s;
+var cv = {width: 640, height: 260, getContext: function () { return cv._c; }};
+cv._c = new FakeCtx();
+__X.drawMinimap(cv, v, null);
+var colours = cv._c.ops.filter(function (o) { return o.op === "fillRect"; })
+                       .map(function (o) { return o.fillStyle; });
+process.stdout.write(JSON.stringify({colours: colours}));
+"""
+
+
+def _source_with_exposed_internals() -> str:
+    """The renderer with its register line swapped for an export of internals.
+
+    No drawing function is touched; the only change is the IIFE tail, exactly
+    as `test_office_visual_scenes.py` does. Kept local so the two suites stay
+    independent.
+    """
+    src = _src()
+    assert _MINIMAP_REGISTER in src, (
+        "the minimap harness rewrites %r; it is gone from %s. Update "
+        "_MINIMAP_REGISTER." % (_MINIMAP_REGISTER, ENTRY.name))
+    export = "globalThis.__X = {" + ", ".join(
+        "%s: %s" % (n, n) for n in _MINIMAP_EXPOSED) + "};"
+    return src.replace(_MINIMAP_REGISTER, export)
 
 
 # --------------------------------------------------------------- existence
@@ -410,9 +473,68 @@ def test_no_html_injection_primitive_is_used():
 
 
 def test_the_stalled_state_is_surfaced_not_hidden():
-    """A dead turn is visible as a fact rather than drawn as work."""
-    src = _code()
-    assert "stalled" in src and "STALLED" in src
+    """A dead turn is drawn as a FACT, not as work.
+
+    The sibling suites already prove the two headline surfaces: Scene 7
+    (`test_office_visual_scenes.py`) pins the `!` marker over the head, and P5
+    (`test_office_hud_panels.py`) pins the inspector's STALLED line. Asserting
+    either again here would be a second copy of one claim.
+
+    What no sibling covered is the MINIMAP dot: `drawMinimap` colours a seat's
+    dot `#e0554a` when `cs.stalled` and its animation colour otherwise. That is
+    the same promise — a stalled seat must not be drawn in the colour that means
+    "working" — on a surface the marker/inspector tests never touch. So this
+    drives the REAL `drawMinimap` over two payloads that differ ONLY in
+    `stalled` and asserts the drawn dot colour flips. `stalled` is read from the
+    payload (the backend reports it as a state, tower.py:266); the renderer may
+    not ignore it, and may not paint a dead seat as an active one.
+
+    The assertion mutates with the code: break `cs.stalled ? "#e0554a" : ...`
+    and the two colours stop differing and this fails.
+    """
+    assert NODE is not None, "node is required for the minimap assertion"
+
+    def _minimap_dot_colours(stalled: bool) -> list[str]:
+        payload = {
+            "floorplan": {"grid": {"cols": 21, "rows": 10, "tile": 1},
+                          "floors": [{"number": 1, "z": 3, "rooms": [
+                              {"id": 1, "slug": "open", "kind": "open",
+                               "x": 0, "y": 0, "w": 6, "h": 4, "seats": []}]}]},
+            "characters": [{"agent_id": 1, "slug": "a", "seat_type": "worker",
+                            "animation": "idle", "walking": False,
+                            "stalled": stalled,
+                            "position": {"floor": 1, "room": "open",
+                                         "room_id": 1, "slot": 0, "x": 1, "y": 2}}],
+            "empty": False,
+        }
+        program = _MINIMAP_PROGRAM % {
+            "src": json.dumps(_source_with_exposed_internals()),
+            "payload": json.dumps(payload),
+        }
+        proc = subprocess.run([NODE], input=program, capture_output=True,
+                              text=True, timeout=60)
+        if proc.returncode != 0:
+            raise AssertionError("node failed:\nSTDOUT:\n%s\nSTDERR:\n%s"
+                                 % (proc.stdout, proc.stderr))
+        out = proc.stdout.strip()
+        assert out, ("node produced no result; the program did not reach the "
+                     "write. STDOUT=%r STDERR=%r" % (proc.stdout, proc.stderr))
+        return json.loads(out)["colours"]
+
+    stalled = _minimap_dot_colours(True)
+    running = _minimap_dot_colours(False)
+
+    # The last fillRect is the seat dot (drawMinimap paints background +
+    # deck rects first, then one dot per seated character).
+    assert stalled[-1] == "#e0554a", (
+        "a stalled seat's minimap dot is not the dead colour: %r" % stalled)
+    assert running[-1] != stalled[-1], (
+        "a stalled seat and a running one drew the SAME dot colour (%r vs "
+        "%r) — the minimap cannot tell a dead turn from work" % (
+            stalled[-1], running[-1]))
+    # and the running dot is the idle animation colour, i.e. not colour-free
+    assert running[-1] == "#3a4657", (
+        "a running seat's dot is not its animation colour: %r" % running)
 
 
 @pytest.mark.parametrize("field", ["headcount", "revenue_cents", "cost_cents",

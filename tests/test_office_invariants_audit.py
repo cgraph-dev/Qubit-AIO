@@ -65,26 +65,36 @@ def _org(tmp_path, monkeypatch, name="audit"):
 
 
 # =========================================================================
-# FINDING #1 — BUDGET: an approved raise of N cents unlocks UNLIMITED spend.
+# FINDING #1 — BUDGET: a small approved raise must not unlock unlimited spend.
 # =========================================================================
-# Envelope rule (envelope.py:12-20): "Above the envelope, it is refused unless
-# raised." `spend()` enforces that via `_has_approved_raise` (envelope.py:398),
-# which returns True if the seat has ANY request row with status='approved' —
-# it never reads the approved amount, the period, or whether the envelope was
-# actually topped up. So a $0.01 raise that the level above approved on an
-# empty envelope licenses spending of any size.
-def test_finding1_tiny_approved_raise_unlocks_unlimited_spend(tmp_path, monkeypatch):
-    """FINDING #1 (BROKE): a 1-cent raise authorises 50000 cents of spend.
+# RESOLVED (was BROKE). Envelope rule (envelope.py:12-20): "Above the envelope,
+# it is refused unless raised." `spend()` enforced that via `_has_approved_raise`
+# (formerly envelope.py:398), which returned True if the seat had ANY request
+# row with status='approved' — it never read the approved amount or the period,
+# so a $0.01 raise that the level above approved on an empty envelope licensed
+# spending of any size.
+#
+# The fix replaces the existence check with an approval-must-cover-the-spend
+# check: `_approved_raise_headroom` sums the seat's `approved` requests for THIS
+# period (minus overage already drawn), and `_approval_covers` requires that the
+# spend's overage above the envelope not exceed those approved cents. A stale
+# (other-period) approval, a denied one, or an approval smaller than the overage
+# all now contribute nothing. The tests below guard the FIXED behaviour;
+# `docs/OFFICE-INVARIANT-AUDIT.md` FINDING #1 is marked RESOLVED.
+def test_finding1_tiny_approved_raise_does_not_unlock_unlimited_spend(
+        tmp_path, monkeypatch):
+    """FINDING #1 (FIXED): a 1-cent raise cannot authorise 50000 cents.
 
     Reproduction:
       1. org envelope = 100 cents; seat holds a large balance.
       2. spend 100  -> allowed (inside the envelope), headroom now 0.
       3. spend 50   -> refused OFFICE_ENVELOPE_EXCEEDED (correct).
       4. raise 1 cent, supervisor approves; the envelope is NOT topped up.
-      5. spend 50000 -> ALLOWED. 500x the tiny raise, 500x the envelope.
+      5. spend 50000 -> REFUSED OFFICE_ENVELOPE_EXCEEDED. Only the 1 approved
+         cent above the envelope is covered, so 1 cent is permitted and a
+         second is not; nothing beyond that is booked.
 
-    The docstring promises (2) above is refused unless raised — but the raise
-    that was approved was for 1 cent, and `_has_approved_raise` cannot tell.
+    Before the fix step (5) booked 50000 cents against a 1-cent approval.
     """
     from voicebridge.office import envelope as E
     from voicebridge.office import ledger as L
@@ -112,67 +122,124 @@ def test_finding1_tiny_approved_raise_unlocks_unlimited_spend(tmp_path, monkeypa
     assert req["amount_cents"] == 1
     E.decide_request(cfg, req["id"], "approve", by_agent=ceo, confirmed=True)
 
-    # 5. spend 50000 cents against a 1-cent raise on a 100-cent envelope.
-    out = E.spend(cfg, agent_id=mgr, cents=50_000)
-    assert out["booked"] is True
-    assert out["within_envelope"] is False
-    # The seat's metered cost now dwarfs both the envelope and the raise.
-    assert L.sum_metered(cfg, scope="agent", id=mgr) == 50_100
+    # 5a. one cent above the envelope is covered by the one approved cent.
+    one = E.spend(cfg, agent_id=mgr, cents=1)
+    assert one["booked"] is True and one["raised"] is True
+    # 5b. a second cent is NOT — the approval is now fully drawn.
+    with pytest.raises(OfficeError) as exc:
+        E.spend(cfg, agent_id=mgr, cents=1)
+    assert exc.value.code == "OFFICE_ENVELOPE_EXCEEDED", exc.value.code
+    # 5c. and a 50000-cent spend is refused outright, with nothing booked.
+    with pytest.raises(OfficeError) as exc:
+        E.spend(cfg, agent_id=mgr, cents=50_000)
+    assert exc.value.code == "OFFICE_ENVELOPE_EXCEEDED", exc.value.code
+    # The seat's metered cost is 100 (envelope) + 1 (approved overage) only —
+    # never the 50000 the broken predicate used to let through.
+    assert L.sum_metered(cfg, scope="agent", id=mgr) == 101
 
 
-def test_has_approved_raise_ignores_amount_and_period(tmp_path, monkeypatch):
-    """FINDING #1 root cause, isolated: the predicate reads only the status.
+def test_a_sufficient_approved_raise_covers_the_spend(tmp_path, monkeypatch):
+    """FINDING #1 (FIXED): an approval that covers the overage still works.
 
-    ``_has_approved_raise`` selects ``SELECT 1 ... WHERE agent_id=? AND
-    status='approved' LIMIT 1`` (envelope.py:402-404). It takes neither the
-    amount nor a period, so its answer cannot depend on either. Two approvals
-    for different periods both satisfy it in any period.
+    The fix must not break the fast-track case it exists for: approve a raise
+    large enough for the spend, and the spend above the envelope books.
     """
     from voicebridge.office import envelope as E
+    from voicebridge.office import ledger as L
+
+    cfg, ids = _org(tmp_path, monkeypatch, name="raise_covered")
+    mgr, ceo = ids["manager"], ids["ceo"]
+    E.allocate(cfg, scope="org", scope_id=None, cents=100, by_agent=None,
+               confirmed=True)
+    L.record(cfg, "adjustment", 100_000, agent_id=mgr, note="capital")
+    E.spend(cfg, agent_id=mgr, cents=100)         # headroom now 0
+
+    req = E.raise_above(cfg, agent_id=mgr, amount_cents=50_500, thesis="t",
+                        expected_return="r", displaces="d", confirmed=True)
+    E.decide_request(cfg, req["id"], "approve", by_agent=ceo, confirmed=True)
+
+    out = E.spend(cfg, agent_id=mgr, cents=50_000)
+    assert out["booked"] is True and out["within_envelope"] is False
+    assert out["raised"] is True
+    # 500 cents of the approval remain (50,500 - 50,000); draw them, then the
+    # approval is exhausted.
+    assert E.spend(cfg, agent_id=mgr, cents=500)["booked"] is True
+    with pytest.raises(Exception) as exc:
+        E.spend(cfg, agent_id=mgr, cents=1)
+    assert getattr(exc.value, "code", None) == "OFFICE_ENVELOPE_EXCEEDED"
+
+
+def test_has_approved_raise_requires_amount_and_period(tmp_path, monkeypatch):
+    """FINDING #1 root cause, isolated: the predicate must read amount + period.
+
+    The old ``_has_approved_raise`` selected ``SELECT 1 ... WHERE agent_id=? AND
+    status='approved' LIMIT 1`` — it took neither the amount nor a period, so
+    its answer could not depend on either. The replacement sums the approved
+    amount for THIS period and subtracts overage already drawn.
+    """
+    from voicebridge.office import envelope as E
+    from voicebridge.office import ledger as L
 
     cfg, ids = _org(tmp_path, monkeypatch, name="raise_root")
     mgr, ceo = ids["manager"], ids["ceo"]
+    E.allocate(cfg, scope="org", scope_id=None, cents=100, by_agent=None,
+               confirmed=True)
+    L.record(cfg, "adjustment", 10_000, agent_id=mgr, note="capital")
+    E.spend(cfg, agent_id=mgr, cents=100)         # headroom now 0
 
-    # A raise approved for a PAST period.
-    req = E.raise_above(cfg, agent_id=mgr, amount_cents=1, thesis="t",
+    # A raise approved for a PAST period contributes nothing this period.
+    req = E.raise_above(cfg, agent_id=mgr, amount_cents=1_000, thesis="t",
                         expected_return="r", displaces="d", period="2000-01",
                         confirmed=True)
     E.decide_request(cfg, req["id"], "approve", by_agent=ceo, confirmed=True)
+    assert E._approved_raise_headroom(cfg, agent_id=mgr,
+                                      check=E.check_spend(cfg, agent_id=mgr,
+                                                          cents=1)) == 0
 
-    # The predicate has no period argument at all — so today is covered by a
-    # raise approved for the year 2000.
-    assert E._has_approved_raise(cfg, agent_id=mgr) is True
-
-    # And a DENIED request is correctly not counted (the guard is discriminating,
-    # just not specific enough).
-    req2 = E.raise_above(cfg, agent_id=mgr, amount_cents=1, thesis="t",
+    # A DENIED request contributes nothing either.
+    req2 = E.raise_above(cfg, agent_id=mgr, amount_cents=1_000, thesis="t",
                          expected_return="r", displaces="d", confirmed=True)
     E.decide_request(cfg, req2["id"], "deny", by_agent=ceo, confirmed=True)
-    assert E._has_approved_raise(cfg, agent_id=mgr) is True  # req1 still open
+    assert E._approved_raise_headroom(cfg, agent_id=mgr,
+                                      check=E.check_spend(cfg, agent_id=mgr,
+                                                          cents=1)) == 0
+
+    # An approved raise for THIS period contributes exactly its amount.
+    req3 = E.raise_above(cfg, agent_id=mgr, amount_cents=1_000, thesis="t",
+                         expected_return="r", displaces="d", confirmed=True)
+    E.decide_request(cfg, req3["id"], "approve", by_agent=ceo, confirmed=True)
+    assert E._approved_raise_headroom(cfg, agent_id=mgr,
+                                      check=E.check_spend(cfg, agent_id=mgr,
+                                                          cents=1)) == 1_000
 
 
 # =========================================================================
 # FINDING #2 — MONEY: reversing an unmetered row manufactures metered money.
 # =========================================================================
-# ledger.record documents (ledger.py:44-47) that an `unmetered=True` row is
-# "recorded, but no metered aggregate will ever see it. Agent balances ...
-# exclude it." `reverse()` (ledger.py:152) writes a `transfer` whose
-# compensating amount is derived from the original — but it does NOT propagate
-# the original's `unmetered` flag, and a `transfer` is metered by definition.
-# The compensating row therefore enters the metered fold the original was
-# excluded from: undoing a phantom creates real money.
-def test_finding2_reversing_unmetered_row_creates_metered_money(
+# RESOLVED (was BROKE). `ledger.record` documents (ledger.py:44-47) that an
+# `unmetered=True` row is "recorded, but no metered aggregate will ever see it."
+# `reverse()` (ledger.py:152) used to write a metered `transfer` whose amount was
+# derived from the original but which did NOT propagate the original's
+# `unmetered` flag — so the compensating row entered the metered fold the
+# original was excluded from, and undoing a phantom minted real money.
+#
+# The fix threads `unmetered=bool(original["unmetered"])` into `reverse()`'s
+# compensating `record()` call, so a reversal is the exact inverse of what the
+# original did to the metered fold. The tests below now guard the FIXED
+# behaviour; `docs/OFFICE-INVARIANT-AUDIT.md` FINDING #2 is marked RESOLVED.
+def test_finding2_reversing_unmetered_row_creates_no_metered_money(
         tmp_path, monkeypatch):
-    """FINDING #2 (BROKE): assert_balances says HELD while the balance is fake.
+    """FINDING #2 (FIXED): a phantom turn, undone, stays worthless.
 
     Reproduction:
       1. seat balance = 0.
       2. record inference 777 unmetered=True (a subscription-backed turn).
          balance stays 0 — correct (D16).
-      3. reverse that row -> balance becomes +777 METERED cents.
-         $7.77 of real, spendable balance conjured from a phantom row.
+      3. reverse that row -> balance MUST stay 0. Before the fix it became +777
+         metered cents: $7.77 of real, spendable balance conjured from a
+         phantom row.
 
-    Reversing unmetered *revenue* destroys real money in the other direction.
+    Reversing unmetered *revenue* must likewise not destroy real money.
     """
     from voicebridge.office import ledger as L
 
@@ -186,20 +253,24 @@ def test_finding2_reversing_unmetered_row_creates_metered_money(
     # D16: the unmetered row must not move the balance.
     assert L.balance(cfg, seat)["balance_cents"] == 0, "D16 already broken"
 
-    L.reverse(cfg, row["id"])
-    # The compensating row is a metered transfer -> real balance appears.
-    assert L.balance(cfg, seat)["balance_cents"] == 777
-    assert L.sum_metered(cfg) == 0      # the transfer nets out of *cost* ...
-    # ... but the seat now holds 777 metered cents of headroom it never earned.
+    rev = L.reverse(cfg, row["id"])
+    # The compensating row inherits the flag, so no metered money appears.
+    assert rev["unmetered"] is True
+    assert L.balance(cfg, seat)["balance_cents"] == 0
+    assert L.sum_metered(cfg) == 0
+    # It still names and offsets the row it corrects (C1).
+    rows = {r["id"]: r for r in L.rows(cfg)["rows"]}
+    assert rows[rev["id"]]["offsets_id"] == row["id"]
+    assert rows[rev["id"]]["unmetered"] == 1
 
 
-def test_finding2_reversing_unmetered_revenue_destroys_metered_money(
+def test_finding2_reversing_unmetered_revenue_destroys_no_metered_money(
         tmp_path, monkeypatch):
-    """FINDING #2, the destructive direction (BROKE).
+    """FINDING #2, the destructive direction (FIXED).
 
     A seat with balance 0 records unmetered revenue 5000 (balance stays 0),
-    then reverses it. The compensating transfer is -5000 METERED, so the seat's
-    balance drifts to -5000 for money that was never in the metered book.
+    then reverses it. Before the fix the compensating transfer was -5000
+    METERED, drifting the balance to -5000 for money never in the metered book.
     """
     from voicebridge.office import ledger as L
 
@@ -210,18 +281,20 @@ def test_finding2_reversing_unmetered_revenue_destroys_metered_money(
                    note="unmetered revenue")
     assert L.balance(cfg, seat)["balance_cents"] == 0
 
-    L.reverse(cfg, row["id"])
-    assert L.balance(cfg, seat)["balance_cents"] == -5000
+    rev = L.reverse(cfg, row["id"])
+    assert rev["unmetered"] is True
+    assert L.balance(cfg, seat)["balance_cents"] == 0
 
 
-def test_finding2_balance_sheet_reports_balanced_through_the_break(
+def test_finding2_balance_sheet_reports_balanced_and_nothing_was_minted(
         tmp_path, monkeypatch):
-    """FINDING #2 is invisible to the reconciliation gate (BROKE).
+    """FINDING #2 (FIXED): the gate is green AND no balance was conjured.
 
-    ``assert_balances`` recomputes from the same rows the reversal wrote, so it
-    sees a self-consistent book and reports ``ok: True``. The money was created
-    by an ordinary API call and the auditor's control does not see it — which is
-    the worse half of the finding: the control the docs lean on cannot catch it.
+    Before the fix ``assert_balances`` reported ``ok: True, residual: 0``
+    through the break — the worse half of the finding, because the control the
+    docs lean on recomputed from the same rows the reversal wrote and so could
+    not see the corruption. The sequence is now genuinely neutral: the gate is
+    green *and* the seat's metered balance is unchanged.
     """
     from voicebridge.office import balance_sheet as BS
     from voicebridge.office import ledger as L
@@ -231,32 +304,44 @@ def test_finding2_balance_sheet_reports_balanced_through_the_break(
 
     row = L.record(cfg, "inference", 777, agent_id=seat, unmetered=True)
     assert BS.assert_balances(cfg)["ok"] is True     # clean before
+    assert L.balance(cfg, seat)["balance_cents"] == 0
 
     L.reverse(cfg, row["id"])
     gate = BS.assert_balances(cfg)
-    assert gate["ok"] is True                        # still "balanced"
+    assert gate["ok"] is True                        # still balanced
     assert gate["residual"] == 0
-    assert L.balance(cfg, seat)["balance_cents"] == 777   # but 777 was minted
+    # …and this time the balance really is 0, not a minted 777.
+    assert L.balance(cfg, seat)["balance_cents"] == 0
 
 
 # =========================================================================
-# FINDING #3 — CONSENT/SoD: task-review with no reviewer identity accepts work.
+# HELD — CONSENT/SoD: task-review with no reviewer identity IS level-checked.
 # =========================================================================
 # work.py:9-11 promises: "The reviewer is exactly one level above the assignee
-# (C31). A worker does not accept its own work." The check at work.py:197 is
-# guarded by `by_agent is not None`, and the CLI's --by defaults to None
-# (cli.py:1796). So `office task-review <id> --accept --confirm` skips the
-# separation-of-duties gate entirely.
-def test_finding3_review_with_no_identity_accepts_any_task(tmp_path, monkeypatch):
-    """FINDING #3 (BROKE): a task is accepted with no reviewer check.
+# (C31). A worker does not accept its own work." FINDING #3 was that the gate
+# read `by_agent is not None`, so an omitted `--by` (the CLI default,
+# cli.py:1796) skipped it and accepted any task.
+#
+# FIXED. The required approver is now derived from the ASSIGNEE's supervisor —
+# the same way `task_proposal.approve` derives it from the proposer's
+# (task_proposal.py:316-339) — and `by_agent=None` means THE OWNER, not
+# "anyone". The owner is not a seat (D2) and sits above the top seat, so an
+# omitted identity approves exactly one case: work whose assignee has no
+# supervisor. Everywhere else both the owner and a non-supervisor seat are
+# refused. These guards are permanent.
+def test_held_review_without_an_identity_is_still_level_checked(
+        tmp_path, monkeypatch):
+    """HELD: no identity means the owner, and the owner is level-checked.
 
-    Reproduction:
+    Reproduction (the FINDING #3 sequence, now refusing):
       1. worker claims a task, completes it -> status 'review', reviewer=mgr.
-      2. W.review(..., verdict='accept', by_agent=w1) -> refused WRONG_LEVEL
-         (the SoD rule works when an identity is supplied).
-      3. W.review(..., verdict='accept', by_agent=None) -> ACCEPTED.
-         The CLI's `--by` defaults to None, so this is reachable as
-         `qubit office task-review <id> --accept --confirm`.
+      2. W.review(..., verdict='accept', by_agent=w1)   -> WRONG_LEVEL
+         (the assignee may not accept its own work).
+      3. W.review(..., verdict='accept', by_agent=None) -> WRONG_LEVEL
+         (the owner is above the CEO, NOT above w1's manager). The task stays
+         in 'review'; nothing was accepted.
+      4. W.review(..., verdict='accept', by_agent=mgr)  -> accepted (the level
+         immediately above the assignee still works).
     """
     from voicebridge.office import work as W
     from voicebridge.office.errors import OfficeError
@@ -270,35 +355,148 @@ def test_finding3_review_with_no_identity_accepts_any_task(tmp_path, monkeypatch
     W.record_turn(cfg, t, outcome="satisfied")
     assert W.tasks(cfg)["tasks"][0]["status"] == "review"
 
-    # 2. an identity that is NOT the reviewer is refused (the rule works here)
+    # 2. the ASSIGNEE itself is refused (self-approval, C31).
     with pytest.raises(OfficeError) as exc:
         W.review(cfg, t, verdict="accept", by_agent=w1, confirmed=True)
     assert exc.value.code == "OFFICE_REVIEW_WRONG_LEVEL"
 
-    # 3. NO identity at all: the guard is skipped and the task is accepted.
+    # 3. NO identity at all is the OWNER — still refused, still typed.
+    with pytest.raises(OfficeError) as exc:
+        W.review(cfg, t, verdict="accept", by_agent=None, confirmed=True)
+    assert exc.value.code == "OFFICE_REVIEW_WRONG_LEVEL", exc.value.code
+    assert W.tasks(cfg)["tasks"][0]["status"] == "review"   # untouched
+
+    # 4. the level above the assignee still accepts — the rule is not "nobody".
+    out = W.review(cfg, t, verdict="accept", by_agent=mgr, confirmed=True)
+    assert out["status"] == "accepted"
+    assert W.tasks(cfg)["tasks"][0]["status"] == "accepted"
+
+
+def test_held_owner_may_judge_the_top_seats_work(tmp_path, monkeypatch):
+    """HELD: an omitted identity DOES work when the assignee is the top seat.
+
+    The owner is not a seat (D2), so work done by the top seat has the owner as
+    its only possible approver — `by_agent=None` must accept it, or the top
+    seat's work could never be accepted at all. The other half of the contract:
+    `None` is an identity, not a wildcard and not a blanket refusal.
+    """
+    from voicebridge.office import store as S
+    from voicebridge.office import work as W
+
+    cfg, ids = _org(tmp_path, monkeypatch, name="owner")
+    ceo = ids["ceo"]
+
+    # `claim` refuses a seat with no supervisor (C30), so the row is written the
+    # way the top seat's task actually looks: the assignee is the top seat.
+    t = W.create(cfg, "board work", exit_check="true", confirmed=True)["id"]
+    conn = S.connect(cfg)
+    try:
+        S.migrate(conn)
+        conn.execute("UPDATE office_task SET assignee_id=?, status='running'"
+                     " WHERE id=?", (int(ceo), int(t)))
+        conn.commit()
+    finally:
+        conn.close()
+    W.record_turn(cfg, t, outcome="satisfied")
+    assert W.tasks(cfg)["tasks"][0]["status"] == "review"
+
     out = W.review(cfg, t, verdict="accept", by_agent=None, confirmed=True)
     assert out["status"] == "accepted"
     assert W.tasks(cfg)["tasks"][0]["status"] == "accepted"
 
 
+def test_held_a_seat_cannot_accept_the_top_seats_work(
+        tmp_path, monkeypatch):
+    """HELD: the owner-only case refuses a seat, in both directions.
+
+    A task whose assignee has no supervisor may only be accepted by the owner
+    (no `--by`). A seat supplying `--by` must be refused — and a `reviewer_id`
+    left NULL by an earlier state must never be readable as "anyone may",
+    because the level is derived from the assignee, not from that column.
+    """
+    from voicebridge.office import store as S
+    from voicebridge.office import work as W
+    from voicebridge.office.errors import OfficeError
+
+    cfg, ids = _org(tmp_path, monkeypatch, name="nullrev")
+    t = W.create(cfg, "t", exit_check="true", confirmed=True)["id"]
+    conn = S.connect(cfg)
+    try:
+        S.migrate(conn)
+        conn.execute("UPDATE office_task SET assignee_id=?, reviewer_id=NULL,"
+                     " status='running' WHERE id=?", (int(ids["ceo"]), int(t)))
+        conn.commit()
+    finally:
+        conn.close()
+    W.record_turn(cfg, t, outcome="satisfied")
+
+    with pytest.raises(OfficeError) as exc:
+        W.review(cfg, t, verdict="accept", by_agent=ids["manager"],
+                 confirmed=True)
+    assert exc.value.code == "OFFICE_REVIEW_WRONG_LEVEL"
+    assert W.tasks(cfg)["tasks"][0]["status"] == "review"
+
+
+def test_held_owner_cannot_accept_a_mid_chain_tasks_work(
+        tmp_path, monkeypatch):
+    """HELD: an omitted `--by` on a seat's work is refused, not a shortcut.
+
+    The owner is above the CEO, so the owner is NOT the level above a worker's
+    manager. Reaching for the owner instead of the assigned supervisor must be
+    refused with the same code — otherwise `--by` omitted becomes a way to
+    accept anything by claiming to be the owner.
+    """
+    from voicebridge.office import work as W
+    from voicebridge.office.errors import OfficeError
+
+    cfg, ids = _org(tmp_path, monkeypatch, name="midchain")
+    t = W.create(cfg, "t", exit_check="true", confirmed=True)["id"]
+    W.claim(cfg, t, agent_id=ids["w2"], confirmed=True)
+    W.record_turn(cfg, t, outcome="satisfied")
+    assert W.tasks(cfg)["tasks"][0]["status"] == "review"
+
+    with pytest.raises(OfficeError) as exc:
+        W.review(cfg, t, verdict="accept", by_agent=None, confirmed=True)
+    assert exc.value.code == "OFFICE_REVIEW_WRONG_LEVEL", exc.value.code
+    # the CEO supplying --by is wrong too: the level is the manager, not the top
+    with pytest.raises(OfficeError) as exc:
+        W.review(cfg, t, verdict="accept", by_agent=ids["ceo"], confirmed=True)
+    assert exc.value.code == "OFFICE_REVIEW_WRONG_LEVEL"
+    assert W.tasks(cfg)["tasks"][0]["status"] == "review"
+
+
 # =========================================================================
-# FINDING #4 — DISPATCH: a running task can be silently re-claimed by a peer.
+# FINDING #4 — DISPATCH: a peer silently re-claimed a `running` task. FIXED:
+# in-progress work may only change hands as a RECORDED handoff.
 # =========================================================================
 # work.claim's docstring says "Assign a task to a seat, enforcing the chain"
-# and the module promises a reviewer exactly one level above the assignee. But
-# claim accepts `running` as a claimable state (work.py:124) with no check that
-# the caller is the current assignee, so a second seat overwrites the in-flight
-# claim and the reviewer escalates to the new (peer) seat's supervisor — while
-# the first seat's turn is still mid-flight and untracked.
-def test_finding4_running_task_is_silently_reclaimed(tmp_path, monkeypatch):
-    """FINDING #4 (BROKE): w2 steals w1's in-progress task with no trail.
+# and the module promises a reviewer exactly one level above the assignee.
+# claim accepts `running` as a claimable state (work.py) — and it is DELIBERATE:
+# a task whose turn was refused or whose check failed stays in progress and
+# must be picked up again (27-WORK-LOOP.md). The defect was never that a peer
+# could pick it up; it was that a DIFFERENT seat could take it with no
+# ownership check and no handoff record, so a second seat overwrote the
+# in-flight claim (the reviewer silently escalates to the peer's supervisor)
+# while the first seat's turn stayed mid-flight and untracked. Two clean
+# `claimed` events with no handoff is unfalsifiable — a reader cannot tell the
+# previous owner's work was discarded.
+#
+# The fix preserves recoverability and adds the missing record: a task that
+# already has an assignee in progress may be re-claimed by (a) the current
+# assignee — the ordinary recovery, silent because nothing changed hands — or
+# (b) another seat ONLY with `handoff=True` and a reason, which updates the
+# assignee and appends a `reassigned` trail event naming BOTH seats. A
+# cross-seat take without the handoff flag is a typed refusal.
+def test_finding4_running_task_cannot_be_silently_reclaimed(tmp_path, monkeypatch):
+    """FINDING #4 (FIXED): w2 cannot steal w1's in-progress task silently.
 
     Reproduction:
       1. claim task t by w1  -> assignee=w1, status=running.
-      2. claim the same t by w2 -> succeeds, assignee=w2, status=running.
-         No error, no 'requeued' event: w1's turn is now untracked work.
+      2. claim the same t by w2, no handoff -> REFUSED (OFFICE_TASK_NOT_YOURS),
+         assignee stays w1, and w1's turn is still w1's.
     """
     from voicebridge.office import work as W
+    from voicebridge.office.errors import OfficeError
 
     cfg, ids = _org(tmp_path, monkeypatch, name="steal")
     w1, w2 = ids["w1"], ids["w2"]
@@ -306,18 +504,109 @@ def test_finding4_running_task_is_silently_reclaimed(tmp_path, monkeypatch):
     t = W.create(cfg, "t", exit_check="true", confirmed=True)["id"]
     first = W.claim(cfg, t, agent_id=w1, confirmed=True)
     assert first["assignee_id"] == w1
+    assert first["handoff"] is False
 
-    second = W.claim(cfg, t, agent_id=w2, confirmed=True)
-    assert second["assignee_id"] == w2                    # stolen
+    with pytest.raises(OfficeError) as exc:
+        W.claim(cfg, t, agent_id=w2, confirmed=True)
+    assert exc.value.code == "OFFICE_TASK_NOT_YOURS"
+
     task = W.tasks(cfg)["tasks"][0]
-    assert task["assignee_id"] == w2
+    assert task["assignee_id"] == w1                        # NOT stolen
     assert task["status"] == "running"
 
-    # The trail records two clean claims and no handoff — a reader cannot tell
-    # that w1's work was discarded.
+    # The trail shows the refusal's absence of a second clean claim: the only
+    # `claimed` row is w1's, so w1's work is still attributable.
     kinds = [e["kind"] for e in W.trail(cfg, t)["events"]]
-    assert kinds.count("claimed") == 2
-    assert "requeued" not in kinds
+    assert kinds.count("claimed") == 1
+    assert "reassigned" not in kinds
+
+
+def test_finding4_handoff_is_recorded_and_names_both_seats(tmp_path, monkeypatch):
+    """FINDING #4 (FIXED): the ONLY way work changes hands is a recorded one.
+
+    The legitimate cross-seat path: `handoff=True` + a reason updates the
+    assignee (and recomputes the reviewer from the new assignee's supervisor,
+    C31) and appends a `reassigned` event naming both seats — so a reader can
+    always tell whose work was taken and why.
+    """
+    from voicebridge.office import work as W
+    from voicebridge.office.errors import OfficeError
+
+    cfg, ids = _org(tmp_path, monkeypatch, name="handoff")
+    w1, w2, mgr = ids["w1"], ids["w2"], ids["manager"]
+
+    t = W.create(cfg, "t", exit_check="true", confirmed=True)["id"]
+    W.claim(cfg, t, agent_id=w1, confirmed=True)
+    W.record_turn(cfg, t, outcome="refused:OFFICE_RUN_REFUSED")
+
+    # a handoff with no reason is refused — a handoff without a reason is just
+    # a silent claim wearing a hat
+    with pytest.raises(OfficeError) as exc:
+        W.claim(cfg, t, agent_id=w2, confirmed=True, handoff=True, reason="")
+    assert exc.value.code == "OFFICE_BAD_INPUT"
+    assert W.tasks(cfg)["tasks"][0]["assignee_id"] == w1
+
+    out = W.claim(cfg, t, agent_id=w2, confirmed=True, handoff=True,
+                  reason="w1 is blocked on provider auth")
+    assert out["assignee_id"] == w2
+    assert out["handoff"] is True
+    assert out["previous_assignee_id"] == w1
+    assert out["reviewer_id"] == mgr            # recomputed from w2's supervisor
+
+    events = W.trail(cfg, t)["events"]
+    handed = [e for e in events if e["kind"] == "reassigned"]
+    assert len(handed) == 1
+    assert f"seat:{w1}" in handed[0]["body"] and f"seat:{w2}" in handed[0]["body"]
+    assert handed[0]["payload"]["from_agent_id"] == w1
+    assert handed[0]["payload"]["to_agent_id"] == w2
+
+
+def test_finding4_same_assignee_can_still_recover_its_task(tmp_path, monkeypatch):
+    """FINDING #4 (FIXED): the deliberate re-claim is intact for its owner.
+
+    `running` staying claimable is on purpose (27-WORK-LOOP.md): after a
+    refused or failed turn the owner must be able to pick the task back up,
+    with no handoff ceremony required because nothing changed hands.
+    """
+    from voicebridge.office import work as W
+
+    cfg, ids = _org(tmp_path, monkeypatch, name="recover")
+    w1 = ids["w1"]
+
+    t = W.create(cfg, "t", exit_check="true", confirmed=True)["id"]
+    W.claim(cfg, t, agent_id=w1, confirmed=True)
+    W.record_turn(cfg, t, outcome="refused:OFFICE_RUN_REFUSED")
+
+    again = W.claim(cfg, t, agent_id=w1, confirmed=True)
+    assert again["assignee_id"] == w1
+    assert again["handoff"] is False
+    kinds = [e["kind"] for e in W.trail(cfg, t)["events"]]
+    assert "reassigned" not in kinds            # nothing changed hands
+
+
+def test_finding4_open_and_released_tasks_are_still_claimable_by_anyone(
+        tmp_path, monkeypatch):
+    """FINDING #4 (FIXED): the ownership guard only bites on LIVE ownership.
+
+    An `open` task has no assignee, and `requeue` clears the assignee — so the
+    dispatcher's normal path (claim open work for the least-loaded seat) is
+    unaffected. Only a task that is genuinely owned in progress is protected.
+    """
+    from voicebridge.office import work as W
+
+    cfg, ids = _org(tmp_path, monkeypatch, name="open")
+    w1, w2 = ids["w1"], ids["w2"]
+
+    t = W.create(cfg, "open task", exit_check="true", confirmed=True)["id"]
+    assert W.claim(cfg, t, agent_id=w1, confirmed=True)["handoff"] is False
+
+    t2 = W.create(cfg, "released", exit_check="true", confirmed=True)["id"]
+    W.claim(cfg, t2, agent_id=w1, confirmed=True)
+    W.requeue(cfg, t2, reason="the turn never happened")
+    # requeue clears the owner, so a fresh seat may take the recovered work
+    out = W.claim(cfg, t2, agent_id=w2, confirmed=True)
+    assert out["assignee_id"] == w2
+    assert out["handoff"] is False
 
 
 # =========================================================================
@@ -713,29 +1002,35 @@ def test_mutation_append_only_trigger_removal_is_caught(tmp_path):
     conn.close()
 
 
-def test_mutation_unmetered_propagation_would_fix_finding2(tmp_path):
-    """Proof FINDING #2 is exactly the missing unmetered propagation.
+def test_mutation_unmetered_propagation_is_what_fixes_finding2(tmp_path):
+    """Proof FINDING #2 is exactly the unmetered propagation (now applied).
 
-    A scratch copy of ledger.py whose ``reverse`` passes ``unmetered=`` through
-    to the compensating ``transfer`` is parsed from source; the change is proven
-    real by the presence of the propagated keyword. This documents the minimal
-    fix shape without applying it (evidence first).
+    This guard asserts the exact source shape of FINDING #2's fix site: that
+    ``reverse()``'s compensating ``record`` call propagates the original row's
+    ``unmetered`` flag. If a later edit drops the keyword the finding silently
+    re-opens, so this test goes red rather than letting the bug drift back in.
+
+    The load-bearing property is proven by mutation: stripping the propagated
+    keyword out of a SCRATCH copy of ``ledger.py`` reproduces the original
+    omission at the exact call site. Repo files are never written.
     """
     src = ROOT / "voicebridge" / "office" / "ledger.py"
     text = src.read_text()
-    assert "unmetered=unmetered" not in text.split("def record", 1)[0], (
-        "reverse() apparently already propagates unmetered; re-audit FINDING #2")
 
-    # The compensating call in reverse() currently omits unmetered entirely.
+    # The fix must be present at the compensating call site in reverse().
     rev_src = text.split("def reverse", 1)[1].split("def rows", 1)[0]
-    assert "out = record(cfg, \"transfer\", delta," in rev_src
-    assert "unmetered" not in rev_src.split("out = record", 1)[1], (
-        "reverse() now passes unmetered; FINDING #2 may be fixed — re-check")
+    assert 'out = record(cfg, "transfer", delta,' in rev_src
+    call_src = rev_src.split('out = record', 1)[1]
+    assert 'unmetered=bool(original["unmetered"])' in call_src, (
+        "reverse() no longer propagates unmetered; FINDING #2 has re-opened")
 
-    # The minimal fix: thread `unmetered=bool(original[\"unmetered\"])` into that
-    # call, so a reversal of a phantom stays a phantom. Simulated here textually.
-    fixed = text.replace(
-        'out = record(cfg, "transfer", delta,',
-        'out = record(cfg, "transfer", delta,\n'
-        '                 unmetered=bool(original["unmetered"]),', 1)
-    assert fixed != text
+    # Mutation: strip the propagation and confirm the omission is reproducible
+    # at that call site — i.e. the keyword really is what fixes the finding.
+    mutated = text.replace(
+        '                 unmetered=bool(original["unmetered"]))',
+        '                 )', 1)
+    assert mutated != text, "the propagation keyword was not found to mutate"
+    mutated_rev = mutated.split("def reverse", 1)[1].split("def rows", 1)[0]
+    mutated_call = mutated_rev.split("out = record", 1)[1]
+    assert "unmetered" not in mutated_call, (
+        "the mutation did not reproduce the original omission")

@@ -375,12 +375,21 @@ def spend(cfg: Any, *, agent_id: int, cents: int, kind: str = "inference",
     # The two refusals are distinct and the codes must not be confused: a
     # solvency problem is not fixable by a raise, and a policy problem is not
     # fixable by funding.
-    if check.get("needs_raise") and not _has_approved_raise(cfg,
-                                                            agent_id=agent_id):
+    #
+    # The approval must COVER this spend (FINDING #1). `_approved_raise_headroom`
+    # returns the cents of *approved* raise the seat holds for this period that
+    # it has not already drawn on; a 1-cent approval therefore clears exactly one
+    # cent above the envelope, not any amount. A stale approval (a different
+    # period) or a denied one contributes nothing.
+    approved = _approved_raise_headroom(cfg, agent_id=agent_id, check=check)
+    if check.get("needs_raise") and not _approval_covers(
+            check, cents=int(cents), approved_cents=approved):
         raise OfficeError(
             "OFFICE_ENVELOPE_EXCEEDED",
             f"refused: {check['reason']}. A raise must name the amount, the "
-            f"thesis, the expected return, and what it displaces (D37/C31).")
+            f"thesis, the expected return, and what it displaces (D37/C31); "
+            f"an approved raise must cover THIS spend, and the seat holds "
+            f"{approved} approved cent(s) above the envelope this period.")
     if check.get("needs_funds"):
         raise OfficeError(
             "OFFICE_INSUFFICIENT_BALANCE",
@@ -395,13 +404,53 @@ def spend(cfg: Any, *, agent_id: int, cents: int, kind: str = "inference",
             "raised": True}
 
 
-def _has_approved_raise(cfg: Any, *, agent_id: int) -> bool:
+def _approval_covers(check: Dict[str, Any], *, cents: int,
+                     approved_cents: int) -> bool:
+    """Does the approved raise cover the part of this spend above the envelope?
+
+    The envelope has already paid for whatever headroom remains; an approval only
+    ever authorises the *overage*. A negative headroom means the seat is already
+    above the envelope, so every new cent is overage. The approval covers the
+    spend iff the overage is not more than the approved cents available.
+    """
+    if check.get("envelope") is None:
+        return True                       # no envelope → nothing to cover
+    head = max(0, int(check.get("headroom_cents") or 0))
+    overage = max(0, int(cents) - head)
+    return overage <= int(approved_cents)
+
+
+def _approved_raise_headroom(cfg: Any, *, agent_id: int,
+                             check: Dict[str, Any]) -> int:
+    """Approved raise cents this seat holds for THIS period and has not drawn.
+
+    The amount and period are the whole point (FINDING #1): an approval is only
+    an authorisation for the amount the level above actually approved, in the
+    period it approved it for. Sum every `approved` request in the period, then
+    subtract the overage the seat has already drawn this period (read from the
+    caller's own `check`, so no nested connection) — so two spends cannot both
+    draw the same approval, and a stale approval from another period contributes
+    nothing.
+    """
+    pk = check.get("period") or period_key()
     conn = store.connect(cfg)
     try:
         store.migrate(conn)
-        return conn.execute(
-            "SELECT 1 FROM office_request WHERE agent_id=? AND status='approved'"
-            " LIMIT 1", (agent_id,)).fetchone() is not None
+        row = conn.execute(
+            "SELECT COALESCE(SUM(amount_cents),0) c FROM office_request"
+            " WHERE agent_id=? AND status='approved' AND period=?",
+            (agent_id, pk)).fetchone()
+        approved = int(row["c"])
+        if approved <= 0:
+            return 0
+        if check.get("envelope") is None:
+            return approved
+        head = int(check.get("headroom_cents") or 0)
+        if head >= 0:
+            return approved              # nothing above the envelope yet
+        # head<0 means the seat has already drawn |head| above the envelope;
+        # that portion of the approval is spent and cannot be drawn again.
+        return max(0, approved + head)
     finally:
         conn.close()
 

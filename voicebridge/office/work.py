@@ -110,8 +110,39 @@ def create(cfg: Any, title: str, *, brief: str = "", exit_check: str = "",
 
 
 def claim(cfg: Any, task_id: int, *, agent_id: int, confirmed: bool = False,
+          handoff: bool = False, reason: str = "",
           requested_by: str = "office:dispatch") -> Dict[str, Any]:
-    """Assign a task to a seat, enforcing the chain."""
+    """Assign a task to a seat, enforcing the chain.
+
+    **No work changes hands without a record.** `running` is claimable on
+    purpose: a task whose turn was refused or whose check failed stays in
+    progress and must be picked up again (27-WORK-LOOP.md). But "picked up
+    again" is a *recovery by the seat that already owns it*, not a licence for
+    a peer to take it. `pick_worker` returns the current `assignee_id` for a
+    `running`/`fixing` task for exactly this reason (dispatch.py).
+
+    Before the ownership check existed, a second seat could claim a peer's
+    in-flight task outright: the trail recorded two clean `claimed` events and
+    no handoff, the assignee flipped silently, and the first seat's turn became
+    untracked work -- the trail could no longer tell a reader that the first
+    seat's work had been discarded. A double-`claimed` is unfalsifiable, so the
+    fix is to make the transfer *say so*.
+
+    So a task that already has an assignee in progress (`running`/`fixing`) may
+    be re-claimed by:
+
+    * **the current assignee** -- the ordinary recovery path, allowed silently
+      (nothing changed hands); or
+    * **any other seat, only as an explicit handoff** -- pass ``handoff=True``
+      and a ``reason``. The transfer updates the assignee and appends a
+      ``reassigned`` trail event naming BOTH seats, so the previous owner's
+      work is on the record rather than erased. A cross-seat claim without
+      ``handoff`` is a typed refusal (``OFFICE_TASK_NOT_YOURS``).
+
+    An `open` task has no owner, so anyone entitled to it still claims it
+    normally. The reviewer is always recomputed from the (new) assignee's
+    supervisor, so a handoff cannot leave a stale reviewer one level up (C31).
+    """
     if not confirmed:
         raise OfficeError(store.CONFIRM_CODE, "office task-claim requires --confirm")
     conn = store.connect(cfg)
@@ -129,6 +160,29 @@ def claim(cfg: Any, task_id: int, *, agent_id: int, confirmed: bool = False,
         if seat["status"] == "terminated":
             raise OfficeError(BAD_STATE_CODE,
                               f"seat {seat['slug']!r} is terminated")
+
+        # --- ownership: in-progress work does not change hands unrecorded ---
+        prev_assignee = task["assignee_id"]
+        needs_handoff = (prev_assignee is not None
+                         and int(prev_assignee) != int(agent_id))
+        if needs_handoff:
+            prev = _seat(conn, prev_assignee)["slug"]
+            if not handoff:
+                raise OfficeError(
+                    "OFFICE_TASK_NOT_YOURS",
+                    f"refused: task #{task_id} is {task['status']} and already "
+                    f"assigned to {prev!r} (#{prev_assignee}). Re-claiming "
+                    f"another seat's in-progress work is a handoff, not a "
+                    f"claim -- pass handoff with a reason so the transfer "
+                    f"names both seats, or have the current assignee release "
+                    f"it. A silent take would leave {prev!r}'s turn untracked.")
+            if not str(reason or "").strip():
+                raise OfficeError(
+                    BAD_INPUT_CODE,
+                    f"a handoff must say why task #{task_id} is moving from "
+                    f"{prev!r} to {seat['slug']!r}; a handoff without a reason "
+                    f"is just a silent claim")
+
         # the reviewer must be exactly one level above the assignee (C31)
         reviewer = seat["supervisor_id"]
         if reviewer is None:
@@ -140,12 +194,24 @@ def claim(cfg: Any, task_id: int, *, agent_id: int, confirmed: bool = False,
             "UPDATE office_task SET assignee_id=?, reviewer_id=?, status='running'"
             " WHERE id=?", (int(agent_id), int(reviewer), int(task_id)))
         conn.commit()
+        prev_slug = (_seat(conn, prev_assignee)["slug"]
+                     if prev_assignee is not None else None)
     finally:
         conn.close()
+    if needs_handoff:
+        _trail(cfg, task_id, actor=f"seat:{agent_id}", kind="reassigned",
+               body=(f"handed off from seat:{prev_assignee} ({prev_slug}) to "
+                     f"seat:{agent_id} ({seat['slug']}): {str(reason).strip()}"),
+               payload={"from_agent_id": int(prev_assignee),
+                        "to_agent_id": int(agent_id),
+                        "reason": str(reason).strip(),
+                        "reviewer_id": int(reviewer)})
     _trail(cfg, task_id, actor=f"seat:{agent_id}", kind="claimed",
            body=f"assigned to {seat['slug']}; reviewer {reviewer}")
     return {"state": "OK", "id": int(task_id), "assignee_id": int(agent_id),
-            "reviewer_id": int(reviewer), "status": "running"}
+            "reviewer_id": int(reviewer), "status": "running",
+            "handoff": bool(needs_handoff),
+            "previous_assignee_id": int(prev_assignee) if needs_handoff else None}
 
 
 def record_turn(cfg: Any, task_id: int, *, run_id: str = "", artifact: str = "",
@@ -181,6 +247,16 @@ def review(cfg: Any, task_id: int, *, verdict: str, note: str = "",
     A rejection is not a restart: the task returns to its assignee with the note
     attached and one attempt spent. The note is the instruction — "fix X" — and
     it is what the assignee reads next round.
+
+    ``by_agent=None`` means **the owner**, never "anyone". The owner is not a
+    seat (D2) and sits above the top seat, so an omitted identity accepts
+    exactly one thing: work whose assignee has no supervisor. Everywhere else
+    the owner is refused, and so is any seat that is not the assignee's
+    immediate supervisor — including the assignee itself. An approver flag that
+    defaults to ``None`` reads as "anyone may" unless the callee interprets it,
+    and that is how a worker ends up accepting its own work (C31). Mirrors
+    :func:`voicebridge.office.task_proposal.approve`, which derives the required
+    approver from the proposer's supervisor.
     """
     if not confirmed:
         raise OfficeError(store.CONFIRM_CODE, "office task-review requires --confirm")
@@ -194,13 +270,54 @@ def review(cfg: Any, task_id: int, *, verdict: str, note: str = "",
                 BAD_STATE_CODE,
                 f"task #{task_id} is {task['status']}; only a task in `review` "
                 f"can be judged")
-        if by_agent is not None and task["reviewer_id"] is not None \
-                and int(by_agent) != int(task["reviewer_id"]):
+        # ---- C31: exactly one level above, and only that level -------------
+        # The required approver is derived from the ASSIGNEE's supervisor, the
+        # same way `task_proposal.approve` derives it from the proposer's
+        # (task_proposal.py:316-339) — `reviewer_id` is a convenience copy of
+        # that, not the authority.
+        #
+        # `by_agent=None` means THE OWNER, never "anyone". The owner is not a
+        # seat (D2) and sits above the CEO, so an omitted identity approves
+        # exactly one case: work whose assignee has no supervisor (the top
+        # seat). Everywhere else it is refused, and so is the owner "helpfully"
+        # reached for a task that a seat should have judged. An approver flag
+        # that defaults to None reads as "anyone may" unless the callee
+        # interprets it, and that is precisely how a worker ends up accepting
+        # its own work.
+        assignee = _seat(conn, int(task["assignee_id"])) \
+            if task["assignee_id"] is not None else None
+        supervisor = assignee["supervisor_id"] if assignee is not None else None
+        assignee_slug = assignee["slug"] if assignee is not None else None
+        if by_agent is not None and assignee is not None \
+                and int(by_agent) == int(assignee["id"]):
             raise OfficeError(
                 "OFFICE_REVIEW_WRONG_LEVEL",
-                f"refused: task #{task_id} was assigned reviewer "
-                f"#{task['reviewer_id']} and this seat is #{by_agent}. Only the "
-                f"level above may accept the work (C31).")
+                f"refused: seat {assignee_slug!r} did task #{task_id} and may "
+                f"not accept it. A seat that signs off its own work has no "
+                f"chain above it (C31).")
+        if supervisor is None:
+            # the top seat: the owner is the only approver, and is not a seat
+            if by_agent is not None:
+                raise OfficeError(
+                    "OFFICE_REVIEW_WRONG_LEVEL",
+                    f"refused: task #{task_id} was done by "
+                    f"{assignee_slug or 'an unassigned seat'}, the top seat. "
+                    f"The approver above it is the owner, who is not an agent "
+                    f"(D2); no seat may accept this work — omit --by.")
+        elif by_agent is None:
+            raise OfficeError(
+                "OFFICE_REVIEW_WRONG_LEVEL",
+                f"refused: task #{task_id} was done by {assignee_slug!r} and "
+                f"must be accepted by its level above, seat #{supervisor} "
+                f"(C31) — not by the owner directly. Omitting --by means the "
+                f"owner, not anyone.")
+        elif int(by_agent) != int(supervisor):
+            raise OfficeError(
+                "OFFICE_REVIEW_WRONG_LEVEL",
+                f"refused: task #{task_id} was done by {assignee_slug!r}, "
+                f"whose level above is seat #{supervisor}; this approver is "
+                f"seat #{by_agent}. Only the level immediately above may "
+                f"accept the work (C31).")
         if verdict == "reject" and not str(note or "").strip():
             raise OfficeError(
                 BAD_INPUT_CODE,

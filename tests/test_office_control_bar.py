@@ -162,13 +162,69 @@ def test_no_css_animation_or_dom_is_touched():
 
 
 def test_the_rule_and_the_refusals_are_stated_for_the_next_reader():
-    """The source says what it is, so a future editor cannot call the six
-    refusals an oversight."""
-    src = _src()
-    assert "C4" in src and "C7" in src
-    assert "28-HUD-PANELS.md" in src
-    for refused in ("publish", "edit", "delete", "hire", "approve", "speed"):
-        assert refused in src, f"the refusal of {refused!r} is not written down"
+    """Every DECLARED refusal is a REAL guard — the declaration cannot drift.
+
+    The old version asserted the six words appear somewhere in the file, which a
+    comment satisfies; it stayed GREEN even when the module could publish. The
+    property worth holding is the one that makes the declaration load-bearing:
+    the module's OWN list (`CB.REFUSED_IDS`) must equal the set of ids it
+    actually refuses, enforced through the same three exported surfaces a caller
+    uses. A refusal that is written down but not enforced — or enforced but never
+    declared — is exactly the "oversight" the written-down list exists to
+    prevent, and this fails on it.
+
+    The sibling `test_the_module_never_fetches_anything` proves the bar issues
+    no request at all; this test proves the refusals it names are the ones its
+    code holds, driven through the real module rather than a second copy of the
+    list in the test.
+    """
+    got = _run("""
+      var declared = CB.REFUSED_IDS.slice();
+      var enforced = declared.map(function (id) {
+        var throws = false;
+        try { CB.apply(id, {cam: {cx: 0, cy: 0, zoom: 1}}); }
+        catch (e) { throws = /refus/i.test(e.message) && e.message.indexOf(id) >= 0; }
+        var reason = CB.refusalReason(id);
+        return {
+          id: id,
+          readOnly: CB.isReadOnly(id),
+          throws: throws,
+          namesIt: typeof reason === "string" && reason.length > 30
+        };
+      });
+      /* an id that is NOT declared must not be silently refused-by-name either:
+       * the generic unknown path names no rule. */
+      var undeclared = {reason: CB.refusalReason("publish2"), ro: CB.isReadOnly("publish2")};
+      return {declared: declared, enforced: enforced, undeclared: undeclared,
+              readOnlyIds: CB.READ_ONLY_IDS};
+    """)
+
+    # 1. The declaration exists and is non-trivial (a truncated list fails).
+    assert len(got["declared"]) == 6, got
+    assert got["declared"] == REFUSED, (
+        "the module's declared refusals drifted from the six §4 / 28-HUD-PANELS"
+        ".md names: %r" % got["declared"])
+
+    # 2. EVERY declared refusal is enforced on all three surfaces.
+    for row in got["enforced"]:
+        assert row["readOnly"] is False, (
+            "%r is declared refused but isReadOnly says it is permitted: %r"
+            % (row["id"], row))
+        assert row["throws"] is True, (
+            "%r is declared refused but apply() did not refuse it by name — the "
+            "declaration is not backed by a guard: %r" % (row["id"], row))
+        assert row["namesIt"] is True, (
+            "%r is declared refused but refusalReason() names no rule: %r"
+            % (row["id"], row))
+
+    # 3. An id that is NOT declared gets no refusal sentence — so the declared
+    #    list is the actual contract, not a subset of a wider blanket.
+    assert got["undeclared"]["reason"] is None, (
+        "an undeclared id carries a refusal sentence: %r" % got["undeclared"])
+    assert got["undeclared"]["ro"] is False
+
+    # 4. The declared refusals and the read-only ids partition cleanly.
+    assert not set(got["declared"]) & set(got["readOnlyIds"]), got
 
 
 # -------------------------------------------------------------- the four

@@ -1781,6 +1781,14 @@ def build_parser() -> argparse.ArgumentParser:
              "(needs --confirm)")
     of_tcl.add_argument("task_id", type=int)
     of_tcl.add_argument("--agent", type=int, required=True, dest="agent_id")
+    of_tcl.add_argument(
+        "--handoff", action="store_true",
+        help="take a task another seat already has in progress. Refused "
+             "without it: a cross-seat take is a handoff, and it is recorded "
+             "(needs --reason)")
+    of_tcl.add_argument("--reason", default="",
+                        help="why the work is changing hands (required with "
+                             "--handoff)")
     of_tcl.add_argument("--confirm", action="store_true")
     of_tt = of_sub.add_parser("task-trail", parents=[common],
                               help="the append-only trail for one task")
@@ -1793,7 +1801,13 @@ def build_parser() -> argparse.ArgumentParser:
     of_trv.add_argument("--accept", action="store_true")
     of_trv.add_argument("--reject", action="store_true")
     of_trv.add_argument("--note", default="")
-    of_trv.add_argument("--by", type=int, default=None, dest="by_agent")
+    of_trv.add_argument(
+        "--by", type=int, default=None, dest="by_agent",
+        help="the seat id of the approver. It must be the assignee's "
+             "immediate supervisor (C31); the assignee itself is refused. "
+             "Omit it to act AS THE OWNER — not a wildcard: the owner is "
+             "above the top seat, so an omitted --by accepts only work done "
+             "by the seat that has no supervisor, and is refused otherwise")
     of_trv.add_argument("--confirm", action="store_true")
     of_dsp = of_sub.add_parser(
         "dispatch", parents=[common],
@@ -7202,6 +7216,8 @@ def _cmd_office(cfg, args) -> int:
                           assignee_id=args.assignee_id, limit=args.limit)
         elif cmd == "task-claim":
             out = W.claim(cfg, args.task_id, agent_id=args.agent_id,
+                          handoff=bool(getattr(args, "handoff", False)),
+                          reason=getattr(args, "reason", "") or "",
                           confirmed=confirm, requested_by="cli:owner")
         elif cmd == "task-trail":
             out = W.trail(cfg, args.task_id, limit=args.limit)

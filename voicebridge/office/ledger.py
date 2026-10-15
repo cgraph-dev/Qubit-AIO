@@ -163,6 +163,13 @@ def reverse(cfg: Any, entry_id: int, *, note: str = "",
       (the cost is given back; gross revenue and gross cost stay as recorded,
       which is what a credit note looks like on a real ledger)
     * ``transfer``/``adjustment`` are already signed → negate them
+
+    The compensating row inherits the original's ``unmetered`` flag (D16): a
+    reversal must be the *exact inverse of what the original did to the metered
+    fold*. An ``unmetered=1`` row is invisible to every metered aggregate, so
+    its reversal must be invisible too — otherwise undoing a phantom mints (or
+    destroys) real, spendable balance, and ``assert_balances`` cannot see it
+    because it recomputes from the same rows the reversal just wrote.
     """
     conn = store.connect(cfg)
     try:
@@ -192,7 +199,8 @@ def reverse(cfg: Any, entry_id: int, *, note: str = "",
                  department_id=original["department_id"],
                  note=(note or f"reversal of #{entry_id}"),
                  recorded_by=recorded_by,
-                 offsets_id=entry_id)
+                 offsets_id=entry_id,
+                 unmetered=bool(original["unmetered"]))
     out["reversed"] = entry_id
     out["reversed_kind"] = original["kind"]
     return out
