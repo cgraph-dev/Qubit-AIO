@@ -200,16 +200,16 @@ the evidence; "NOT VERIFIED" means it is claimed or plausible but was not exerci
 
 | # | Claim | State | Exact evidence |
 |---|-------|-------|----------------|
-| 4.14a | **The REAL third-party office app is vendored** — `github.com/marmottajr/habblaud`, MIT, commit `4ccce2537472`, client build output only (server / Claude Code mod / Docker NOT vendored) | **VERIFIED** | `.venv/bin/python scripts/vendor_habblaud.py --src /tmp/habblaud-full --check` → `ok: 77 files, 2147125 bytes, commit 4ccce2537472` (exit 0). `PYTHON=/dev/null PROVENANCE.json` records source URL, commit, MIT licence and per-file sha256. Lives at `frontend/qubit-app/plugins/qubit-office/habblaud/`. |
+| 4.14a | **The REAL third-party office app is vendored** — `github.com/marmottajr/habblaud`, MIT, commit `4ccce2537472`, client build output only (server / Claude Code mod / Docker NOT vendored) | **VERIFIED** | `.venv/bin/python scripts/vendor_habblaud.py --check` → `ok: 77 files, **2147631** bytes, commit 4ccce2537472` (exit 0). `PROVENANCE.json` records source URL, commit, MIT licence and per-file sha256. Lives at `frontend/qubit-app/plugins/qubit-office/habblaud/`. **CORRECTED 2026-10-15:** this row previously read `--src /tmp/habblaud-full --check` and `2147125 bytes`; `--check` needs no `--src`, no checkout exists at that path, and the byte total had drifted (the tree is also now English-pinned, hence 2147631 not 2147637). |
 | 4.14b | **The vendored app is served and renders** | **VERIFIED (served AND renders)** | `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8890/plugin-apps/qubit-office/habblaud/` → **200**. The body is the real Habblaud `index.html` (pt-BR, `<canvas id="world">`, module `bundle/main-DND_b4_E.js`). Bundle + an asset also return 200. **Pixel-verified** by headless-chrome probe: default `/qubit-office` frame reports `Habblaud Connected 4 rooms 10 agents` with **0 page errors**; an earlier probe of the same page counted **22,776 non-background canvas pixels across 162 tones** (a black/empty canvas would be one tone). |
 | 4.14c | **Which implementation is the default on `/qubit-office`** | **VERIFIED — the VENDORED APP** | `game/entry.ts` mounts the vendored app by default; the hand-built shell is opt-in via `?shell=1`. Live probe (headless chrome): plain `/qubit-office` → **1 iframe**, src `/plugin-apps/qubit-office/habblaud/`, frame text `Habblaud Connected 4 rooms 10 agents`; `?shell=1` → **0 iframes, 2 canvases** (the old shell). NOTE: `manifest.json` line 11 still declares `"entry": "qubit-office.game.js"` — that is the plugin entry, and the *entry itself* chooses the app. Both statements are true at different layers; do not read the manifest as "which renderer you get". An earlier revision of this row claimed the hand-built renderer was the default — **that was measured before the inversion landed and is corrected here.** |
-| 4.14d | **The default/fallback switch** | **VERIFIED — `?shell=1` opts back into the hand-built shell** | `game/entry.ts`: `const wantShell = params.has("shell")`. The earlier `?app=1` form is gone: with the app now the default, an opt-*in* to the app is meaningless and the inverse param carries the fallback. An earlier revision of this row claimed no switch existed and that no `app=`/`shell=` param was present — **that was stale** (the grep ran before the inversion landed). |
+| 4.14d | **The default/fallback switch** | **VERIFIED — `?shell=1` opts back into the hand-built shell; `?app=1` is a compat alias that also wins** | `game/entry.ts:81`: `const wantShell = params.has("shell") && !params.has("app")`. **CORRECTED 2026-10-15:** this row previously claimed "the earlier `?app=1` form is gone". It is NOT gone — it is a deliberate backward-compatibility alias for bookmarks from the first Habblaud preview, and it *overrides* `shell` (`?shell=1&app=1` mounts the app). The vendored app is still the unconditional default. `tests/test_office_game_shell.py::test_the_default_renderer_is_the_app_and_the_shell_is_opt_in` now evaluates the real expression under node for all four param cases. |
 | 4.14e | **F09 (character roster, profile, dialogue shell) is DONE** | **VERIFIED (tests pass)** | `tests/test_office_game_character.py` — real count in § 4.14g (run together with F12). |
 | 4.14f | **F12 (operational panels, boardroom) is DONE** | **VERIFIED (tests pass)** | `tests/test_office_game_operational.py` — real count in § 4.14g. |
-| 4.14g | **The office game suite passes** | **VERIFIED** | `.venv/bin/python -m pytest tests/test_office_game_*.py -q` → **`211 passed in 70.98s`**, exit 0, **0 skipped**, even with `NODE_ENV=production` set. (Earlier this session the same command reported `204 passed / 2 skipped` — the 2 skips were the toolchain gap below, not real coverage.) F09+F12 alone: `pytest tests/test_office_game_character.py tests/test_office_game_operational.py -q` → **`66 passed in 15.07s`**. |
-| 4.14h | **The vendored-app route is a PARALLEL track to the F00–F17 packet plan** | **STATED, not a status claim** | The packets describe a **hand-built** renderer (`frontend-game/60-IMPLEMENTATION-PLAN.md`; F01–F16). The vendored habblaud app is a **different implementation of the same goal** (an office you watch agents work in), shipped as a separate served route. The packets are still the plan of record for the Office tab; the vendored route does not advance or replace them. There is no reconciliation document yet — that is an open item. |
-| 4.14i | **`docs/STATUS.md` still does not exist** | **VERIFIED absent (unchanged from § 4.2)** | `ls docs/STATUS.md` → `No such file or directory`. Not invented; recorded as a labelled unknown, as before. |
-| 4.14j | **Work is UNCOMMITTED** | **VERIFIED** | `git status --short \| wc -l` → **49** dirty entries. `git log --oneline -3` top = `3d7989e36 fix(qubit-office): make the walls actually read as walls`. |
+| 4.14g | **The office game suite passes** | **VERIFIED 2026-10-15** | `.venv/bin/python -m pytest tests/test_office_game_*.py -q` → **`212 passed in 110.04s`**, exit 0, **0 skipped**. **CORRECTED 2026-10-15:** this row previously read `211 passed`, and at an earlier point `3 failed, 209 passed` — the three failures were stale tests pinning the pre-rewrite contract of `entry.ts`/`office-api.ts` and were reconciled in `d50a56945`. F09+F12 alone: `pytest tests/test_office_game_character.py tests/test_office_game_operational.py -q` → `66 passed`. |
+| 4.14h | **The vendored app is the DEFAULT renderer of the Office tab; the F00–F17 packets describe the fallback** | **VERIFIED 2026-10-15** | **CORRECTED:** this row previously called the vendored route a "PARALLEL track" with "no reconciliation document yet". Both parts were stale. The vendored app is the default at `/qubit-office` (see § 4.14c) and the hand-built packet renderer is the opt-in fallback (`?shell=1`). Reconciliation now exists: `docs/OFFICE-DOC-RECONCILIATION.md`, plus `docs/OFFICE-LIVE-VERIFICATION.md`, `docs/BROWSER-PARITY-FINDINGS.md`, `docs/FIREFOX-PARITY-FINDINGS.md`, `docs/OFFICE-ACCEPTANCE-AND-RISK.md`, `docs/VENDOR-REPRODUCIBILITY.md`, `docs/VENDOR-ATOMIC-PUBLISH-FIX.md`. The packets remain the plan of record for the hand-built renderer they describe. |
+| 4.14i | **`docs/STATUS.md` exists** | **VERIFIED present 2026-10-15** | `ls -la docs/STATUS.md` → `6172` bytes. **CORRECTED:** this row previously stated the file did not exist and recorded its absence as a labelled unknown. It exists now (as of 2026-10-15 17:18). |
+| 4.14j | **Work is COMMITTED; the tree is clean** | **VERIFIED 2026-10-15** | `git status --short \| wc -l` → **0**. **CORRECTED:** this row previously read **49** dirty entries with HEAD at `3d7989e36`. HEAD is now `fba27ca06` (through `c3b005f18` checkpoint → `ead2053b5` clarify/vendor/office rescue → `80f232080` A8 token fix → `baf6093f5` clarify tests → `fba27ca06` vendor preload assertions). |
 
 ### 4.15 — Office test toolchain: the `NODE_ENV=production` trap (2026-10-14)
 
@@ -232,15 +232,24 @@ cannot delete it) and the suites **RUN**. With `QUBIT_TSC_SELF_HEAL=0` and no co
 suite **ERRORS at collection** naming the exact install command — never a skip. Falsified both ways
 2026-10-14 (hide `tsc` + `SELF_HEAL=0` → collection error; hide `tsc` + self-heal → `18 passed`).
 
-**Intermittent test failure — recorded, not laundered.** Running
+**Intermittent test failure — ROOT-CAUSED AND FIXED 2026-10-15.** Running
 `pytest tests/test_office_vendor_habblaud.py tests/test_office_assets_vendored.py tests/test_office_plugin_app.py -q`
-produced **`5 failed, 81 passed`** on the first run this session (five `test_office_vendor_habblaud.py`
-assertions: recorded-file hashes, MIT licence shipped, licence in the record, index absolute-ref rewrite,
-plugin-prefix rewrite). The **same command re-run four times** produced `86 passed` every time; each file
-alone and each pair alone also pass. So the failure is **order-/state-dependent and intermittent, NOT a
-reproducible defect** — but it is NOT resolved: no root cause was found. Treat the vendored-app hash
-assertions as **flaky until a root cause is identified**. Do not read the four green re-runs as proof the
-first failure was spurious.
+once produced **`5 failed, 81 passed`**; four re-runs produced `86 passed` every time; no root cause was found
+at the time. The root cause is now identified and repaired:
+
+`scripts/vendor_habblaud.py::vendor()` **deleted the destination tree and wrote `PROVENANCE.json`
+mid-assembly**, so any concurrent reader — including these tests, which hash the tree against that
+record — could observe a half-generated directory. **Measured on the old algorithm: 0 of 90,818
+concurrent reads were consistent; 19 were inconsistent.** The intermittent first-run failure was a
+**correct detection of an inconsistent tree**, not a broken test.
+
+The fix (commit `ca03150e8`) makes publish order the consistency barrier: the record is unlinked
+first, every file is written, and the record is written **last** via temp-file + `os.replace`; `LICENSE`
+is copied the same way. Full write-up: `docs/VENDOR-ATOMIC-PUBLISH-FIX.md`, including one residual
+hole that is **deliberately not closed** (~1 in 600k reads can still catch an in-place file overwrite,
+because `copytree` writes non-atomically). Treat the vendored-app hash assertions as **reliable but
+still fenced against concurrent re-vendors** — and assert **exit code + file count, never the byte
+total**, which drifts legitimately across rebuilds.
 
 ---
 

@@ -119,8 +119,13 @@ top-down envelopes with raises, escalation on the **shared** confirmation journa
 daily tick, one-level reviews, the business lifecycle with its gates, idempotent revenue ingestion,
 the audit layer (reconciliation, findings, separation of duties, spot audit, penalty ladder, auditor
 seat), and **the Office page** — a tower whose characters animate only from `office_event`.
-**16 modules / 5,288 lines**, `qubit office` with **65 subcommands**, **221 tests passing**
+**28 modules / 11,743 lines**, `qubit office` with **81 subcommands**, **84 `test_office_*.py` files**
 (`90-MILESTONES.md` § M0–M4 status carry the commands and the per-proof tables).
+**CORRECTED 2026-10-15:** this line previously read "16 modules / 5,288 lines … 65 subcommands …
+221 tests passing" — every figure was stale and low. Re-counted from the tree:
+`ls voicebridge/office/*.py | wc -l` → 28; `wc -l voicebridge/office/*.py | tail -1` → 11,743;
+`voicebridge.cli office --help` subparser list → 81; `ls tests/test_office_*.py | wc -l` → 84.
+The old "221 tests" is not comparable (it counted test functions in one family, not the suite).
 
 **The Office tab** (`frontend/qubit-app/plugins/qubit-office/`, tab `/qubit-office`) reads
 `GET /api/office/tower` and nothing else — no mutation, no optimistic state (C4). Its animation
