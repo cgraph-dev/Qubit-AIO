@@ -48,7 +48,10 @@ import {
 } from "react";
 import { useSearchParams } from "react-router";
 
-import { ChatSessionList } from "@/components/ChatSessionList";
+import {
+  ChatSessionList,
+  FRESH_CHAT_SESSION_ID,
+} from "@/components/ChatSessionList";
 import { ChatSessionArtifacts } from "@/components/ChatSessionArtifacts";
 import { ChatToolsSummary } from "@/components/ChatToolsSummary";
 import { Markdown } from "@/components/Markdown";
@@ -574,6 +577,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // surfacing the freshly created session immediately (its internal fetch only
   // runs on mount / manual Refresh).
   const [sessionListNonce, setSessionListNonce] = useState(0);
+  // True while the surface sits on a DELIBERATE fresh chat (New chat pressed,
+  // nothing resumed yet). Drives the session panel's `activeSessionId` so it
+  // renders no highlight while the mint round-trips, instead of falling back to
+  // the server's `is_active` row (several sessions are legitimately live at
+  // once). Cleared once a real session id resolves.
+  const [freshChat, setFreshChat] = useState(false);
   const [terminalNoticeOpen, setTerminalNoticeOpen] = useState(false);
   // A31: the side panel is one `role="complementary"` "Model & tools" wrapper
   // (the pinned Qubit structure) mounting the model box and session switcher.
@@ -612,6 +621,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const lastCommittedRef = useRef("");
   const browserSentRef = useRef("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const followTranscriptRef = useRef(true);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -631,6 +641,14 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // same conversation even without a ?resume= param.
   useEffect(() => {
     if (resumeParam) storageSet(SESSION_KEY, resumeParam);
+  }, [resumeParam]);
+
+  // A real resolved session id means we are no longer on a deliberate fresh
+  // chat, so the panel may highlight it again. Keyed on `resumeParam` (not the
+  // `session` memo, which already falls back to a stored/default id) so only an
+  // actual URL resume clears the flag.
+  useEffect(() => {
+    if (resumeParam) setFreshChat(false);
   }, [resumeParam]);
 
   // Mirror the resolved session into the URL (like /chat?resume=<id>) so the
@@ -931,11 +949,25 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     };
   }, []);
 
-  // Follow the newest message.
+  // Follow new output only while the operator is already at the bottom.
+  // Otherwise a small upward scroll is immediately undone on every stream
+  // delta, making the scroll-up affordance appear to jump away.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && followTranscriptRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, busy, error]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const updateFollow = () => {
+      followTranscriptRef.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    };
+    el.addEventListener("scroll", updateFollow, { passive: true });
+    updateFollow();
+    return () => el.removeEventListener("scroll", updateFollow);
+  }, [transcriptSession]);
 
   useEffect(() => {
     return () => {
@@ -998,6 +1030,18 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           },
           onProgress: (event) => {
             if (controller.signal.aborted) return;
+            // The FIRST progress frame of this turn also settles the fact that
+            // the server persisted an extra assistant row the client never
+            // renders: `_stream_task` writes "Working on it in /chat (task …)"
+            // (voicebridge/chat_transport.py) before the report row. A live
+            // voice session's poll diffs the persisted rows against
+            // `voiceSyncedRef` (index-based), so without counting that row the
+            // completed report is re-appended as "new" and renders twice. Only
+            // the first frame counts — later keepalive `progress` frames (one
+            // every ~5s while the worker runs) describe the SAME persisted row.
+            if (!taskTurnRef.current && followLiveVoice) {
+              voiceSyncedRef.current += 1;
+            }
             taskTurnRef.current = true;
             const pending = extractPendingConfirm(event);
             if (pending) setPendingConfirm(pending);
@@ -1281,11 +1325,21 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     setMessages([]);
     setError(null);
     setRetryText(null);
+    // Enter the deliberate-fresh state immediately, before the async mint and
+    // its `?resume=` write land. Without this the panel keeps reading the old
+    // `session` (or `DEFAULT_SESSION` -> null) and falls back to the server's
+    // `is_active` row for the whole round-trip, so the previous conversation
+    // stays highlighted right after pressing New chat.
+    setFreshChat(true);
     api
       .createChatSession()
       .then((res) => {
         const newId = res?.session?.id;
-        if (!newId) return;
+        if (!newId) {
+          // No id to point at: stay fresh rather than snapping the highlight
+          // back to an unrelated live session.
+          return;
+        }
         // Persist first so a reload lands on the fresh session even before the
         // URL effect runs; the `?resume=` param then drives the session memo.
         storageSet(SESSION_KEY, newId);
@@ -2284,6 +2338,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
 
           <div
             ref={scrollRef}
+            onScroll={(event) => {
+              const el = event.currentTarget;
+              followTranscriptRef.current =
+                el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+            }}
             role="log"
             aria-live="polite"
             aria-relevant="additions text"
@@ -2940,7 +2999,13 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             <div className="qchat__sessions min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
-                activeSessionId={session}
+                activeSessionId={
+                  freshChat
+                    ? FRESH_CHAT_SESSION_ID
+                    : session === DEFAULT_SESSION
+                      ? null
+                      : session
+                }
                 profile={scopedProfile}
                 onNewChat={startFresh}
               />

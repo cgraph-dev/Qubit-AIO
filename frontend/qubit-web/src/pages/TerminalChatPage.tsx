@@ -25,7 +25,10 @@ import { WsTicketError } from "@/lib/api";
 import { terminalRefusalCopy } from "@/lib/terminal-errors";
 import { useProfileScope } from "@/contexts/useProfileScope";
 import { useI18n } from "@/i18n";
-import { ChatSessionList } from "@/components/ChatSessionList";
+import {
+  ChatSessionList,
+  FRESH_CHAT_SESSION_ID,
+} from "@/components/ChatSessionList";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { createPtyCompositionForwarder } from "@/lib/pty-composition";
 import { shouldRestoreTerminalFocus } from "@/lib/pty-focus";
@@ -62,6 +65,14 @@ import {
   shouldFollowPtyOutput,
 } from "@/lib/pty-scroll";
 import { PTY_RECONNECTING_BANNER } from "@/lib/pty-close-copy";
+import {
+  RESUME_MISSING_TITLE,
+  isResumeProbeMissing,
+  resumeMissingMessage,
+  resumeProbeState,
+  shouldDialTerminalForResume,
+  shouldShowResumeChecking,
+} from "@/lib/chat-resume-guard";
 import {
   TERMINAL_FONT_FAMILY,
   refitWhenTerminalFontLoads,
@@ -236,7 +247,27 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // server's one-off JSON control frame (the implicit active-session fallback).
   const effectiveResumeRef = useRef<string | null>(null);
   const [resumeTarget, setResumeTarget] = useState<string | null>(null);
+  // True while the surface sits on a DELIBERATE fresh chat (New chat pressed,
+  // nothing resumed). Drives the session panel's `activeSessionId` so it renders
+  // no highlight instead of falling back to an unrelated `is_active` row. Reset
+  // the moment a real session id is resolved (a row pick, a URL resume, or the
+  // server's active-session control frame).
+  const [freshChat, setFreshChat] = useState(false);
   const [hydrating, setHydrating] = useState(false);
+  // `/chat?resume=<id>` existence guard. The server's resume path ENSURES an
+  // explicit id (creating a phantom session for a bogus one) and the terminal
+  // then paints an empty canvas. Verify the id against the read-only session
+  // probe first: `verifiedId` = the id we proved exists, `missingId` = the id
+  // we proved does NOT. The page must not dial the PTY for a missing id.
+  const [resumeVerifiedId, setResumeVerifiedId] = useState<string | null>(null);
+  const [resumeMissingId, setResumeMissingId] = useState<string | null>(null);
+  // Mirror of the resume probe for `connect()` (a stable callback that must not
+  // re-create on every probe transition). `connect` refuses to dial while a
+  // resume id is still being verified or is known-missing.
+  const resumeDialAllowedRef = useRef(true);
+  // Previous render's dial-gate value, so the effect below can detect a
+  // blocked→allowed transition and make the one deferred connect attempt.
+  const prevDialAllowedRef = useRef(true);
   // Mobile IME tracking (`pty-mobile-input`) + composition fallback.
   const ptyInputLineRef = useRef("");
   const mobileReplacementUntilRef = useRef(0);
@@ -340,6 +371,13 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   const handleNewChat = useCallback(() => {
     setNotice(null);
     resumeRef.current = "";
+    // Mark the surface as a DELIBERATE fresh chat so the session panel stops
+    // highlighting the previously-resumed row. Clearing `?resume=` alone made
+    // `activeSessionId` null, which the panel reads as "no selection known yet"
+    // and answers with the server's `is_active` fallback — lighting an
+    // unrelated live session (subagents and the PTY are often all `is_active`),
+    // so "New chat" looked like it kept the old session selected.
+    setFreshChat(true);
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -403,6 +441,11 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   const connect = useCallback((profileId?: string, forceFresh = false) => {
     const term = termRef.current;
     if (!term || disposedRef.current) return;
+    // Do not dial while a `?resume=<id>` is unverified or known-missing: the
+    // server would ENS(`ensure`) a bogus id into a phantom session and paint an
+    // empty canvas. An explicit New chat (`forceFresh`) is never gated — it
+    // clears the resume and legitimately starts fresh.
+    if (!forceFresh && !resumeDialAllowedRef.current) return;
     // Tear down any previous terminal BEFORE opening a new one. Without this
     // a Reconnect / profile switch / New chat opened a SECOND PTY while the
     // first stayed alive: the server caps concurrent PTYs and enforces one
@@ -563,6 +606,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             if (resumeId) {
               effectiveResumeRef.current = resumeId;
               setResumeTarget(resumeId);
+              // The server told us which session this connection is on: we are
+              // no longer on a fresh chat, so let the panel highlight it.
+              setFreshChat(false);
               const active = sanitizerRef.current;
               if (active) beginResumeReplay(active);
               return;
@@ -693,12 +739,82 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     connectRef.current = (profileId, forceFresh) => connect(profileId, forceFresh);
   }, [connect]);
 
+  // Verify a `?resume=<id>` against the read-only session probe BEFORE the
+  // terminal dials. Without this the server's `canonical_terminal_session`
+  // ENSURES any explicit id — creating a phantom session and painting an empty
+  // canvas for a bogus/deleted/foreign id — which is the reported "blank /chat
+  // until I click a session" symptom. A 404 marks the id missing so
+  // `shouldDialTerminalForResume` blocks the PTY and the not-found state shows;
+  // any other failure is a real load error and leaves the id unverified (we do
+  // NOT invent a "missing" verdict from a network fault).
+  useEffect(() => {
+    const id = resumeParam.trim();
+    if (!id) {
+      setResumeVerifiedId(null);
+      setResumeMissingId(null);
+      return;
+    }
+    if (resumeVerifiedId === id || resumeMissingId === id) return;
+    let cancelled = false;
+    withBackoff(() => api.getSessionDetail(id), {
+      shouldStop: () => cancelled || disposedRef.current,
+    })
+      .then(() => {
+        if (cancelled || disposedRef.current) return;
+        setResumeVerifiedId(id);
+        setResumeMissingId(null);
+      })
+      .catch((err: unknown) => {
+        if (cancelled || disposedRef.current) return;
+        if (isResumeProbeMissing(err)) {
+          setResumeMissingId(id);
+          setResumeVerifiedId(null);
+        } else {
+          // A real probe failure: do not block the terminal on it. Leave the
+          // id unverified-but-dialable so a flaky backend still reaches the
+          // PTY's own error surface rather than a false "not found".
+          setResumeVerifiedId(id);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeParam, resumeVerifiedId, resumeMissingId]);
+
+  const resumeProbe = resumeProbeState({
+    resumeId: resumeParam,
+    verifiedId: resumeVerifiedId,
+    missingId: resumeMissingId,
+  });
+  // Update the dial gate DURING RENDER, not in an effect: the xterm mount
+  // effect (declared later) calls `connect()` before any gate-sync effect would
+  // have run, so an effect-set ref would be stale (still `true`) on first mount
+  // and the terminal would dial an unverified/missing id.
+  resumeDialAllowedRef.current = shouldDialTerminalForResume(resumeProbe);
+
+  // Keep `connect`'s gate in sync, and dial the terminal as soon as a pending
+  // resume id is verified. The mount-time connect (inside the xterm effect)
+  // fires before the probe resolves, so it is refused by the gate and this
+  // effect makes the one real attempt once the id is proven to exist.
+  useEffect(() => {
+    const allowed = shouldDialTerminalForResume(resumeProbe);
+    const wasBlocked = !prevDialAllowedRef.current;
+    prevDialAllowedRef.current = allowed;
+    if (allowed && wasBlocked) {
+      connectRef.current();
+    }
+  }, [resumeProbe]);
+
   // Reconnect when the resume target changes (a session row was picked, or
   // "New chat" cleared it). The first render is a no-op: the ref was seeded
   // with the same value the mount-time connect already used.
   useEffect(() => {
     if (resumeRef.current === resumeParam) return;
     resumeRef.current = resumeParam;
+    // A real `?resume=` id means we are on a stored session again, not a fresh
+    // one; clearing it via the URL (back button) leaves the deliberate-fresh
+    // flag untouched so New chat's intent survives a client-side nav.
+    if (resumeParam) setFreshChat(false);
     connectRef.current();
   }, [resumeParam]);
 
@@ -1161,9 +1277,44 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
               {PTY_RESUME_LOADING_MESSAGE}
             </div>
           ) : null}
+          {shouldShowResumeChecking(resumeProbe) ? (
+            <div
+              role="status"
+              data-state="checking-resume"
+              className="shrink-0 rounded-md border border-current/15 bg-background-base/60 px-3 py-2 text-xs opacity-80"
+            >
+              Checking that this session exists…
+            </div>
+          ) : null}
+          {resumeProbe === "missing" ? (
+            <div
+              role="alert"
+              data-state="resume-missing"
+              className="flex min-h-0 flex-1 flex-col items-start justify-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-6"
+            >
+              <h2 className="text-sm font-medium text-destructive">
+                {RESUME_MISSING_TITLE}
+              </h2>
+              <p className="max-w-prose text-xs text-text-secondary">
+                {resumeMissingMessage(resumeParam)}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" onClick={handleNewChat}>
+                  New chat
+                </Button>
+                <a
+                  href="/sessions"
+                  className="inline-flex items-center rounded-md px-2 py-1 text-xs text-midground hover:bg-midground/10"
+                >
+                  Browse sessions
+                </a>
+              </div>
+            </div>
+          ) : null}
           <div
             ref={hostRef}
             aria-label="Qubit terminal"
+            hidden={resumeProbe === "missing"}
             className="min-h-0 flex-1 overflow-hidden rounded-lg border border-current/15 bg-background-base/60 p-2 [&_.xterm]:h-full [&_.xterm-viewport]:!bg-transparent"
           />
         </section>
@@ -1210,7 +1361,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
-                activeSessionId={resumeTarget}
+                activeSessionId={
+                  freshChat ? FRESH_CHAT_SESSION_ID : resumeTarget
+                }
                 profile={scopedProfile}
                 onNewChat={handleNewChat}
                 workspaceCwd={workspaceCwd}

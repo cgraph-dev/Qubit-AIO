@@ -12,6 +12,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FRESH_CHAT_SESSION_ID } from "./ChatSessionList";
+
 const apiMocks = vi.hoisted(() => ({
   listChatSessions: vi.fn(),
   getSessions: vi.fn(),
@@ -115,6 +117,35 @@ async function renderList(activeSessionId: string | null = null) {
       </MemoryRouter>,
     ),
   );
+}
+
+/** Render the `/chat` variant: the canonical receipts store, which is the
+ * store the PTY resumes and the one that pages + carries `is_active`. */
+async function renderCanonicalList(activeSessionId: string | null = null) {
+  const { ChatSessionList } = await import("./ChatSessionList");
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={["/chat"]}>
+        <LocationProbe />
+        <ChatSessionList activeSessionId={activeSessionId} source="canonical" />
+      </MemoryRouter>,
+    ),
+  );
+}
+
+function canonicalSession(id: string, over: Record<string, unknown> = {}) {
+  return {
+    id,
+    title: `Session ${id}`,
+    name: null,
+    source: "tui",
+    message_count: 2,
+    last_active: Date.now() / 1000 - 60,
+    ...over,
+  };
 }
 
 beforeEach(() => {
@@ -306,5 +337,212 @@ describe("ChatSessionList", () => {
     root = undefined as unknown as Root;
     expect(clearSpy).toHaveBeenCalled();
     clearSpy.mockRestore();
+  });
+
+  // ── /chat (canonical store) ──────────────────────────────────────────
+  // The right-side panel on `/chat` reads the canonical receipts store,
+  // which is the store the PTY resumes and the only one that pages.
+
+  it("canonical: reads the receipts store, not the chat store", async () => {
+    apiMocks.getSessions.mockResolvedValue({
+      sessions: [canonicalSession("s-1")],
+      total: 1,
+      limit: 30,
+      offset: 0,
+    });
+    await renderCanonicalList();
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Session s-1"),
+    );
+    expect(apiMocks.getSessions).toHaveBeenCalledWith(30, 0, "", "recent");
+    expect(apiMocks.listChatSessions).not.toHaveBeenCalled();
+  });
+
+  it("canonical: highlights only the selected session, not every live one", async () => {
+    // `is_active` marks live sessions server-side — a background voice/WhatsApp
+    // session stays true while you read an old thread. Lighting every one of
+    // them reads as multiple active rows, so selection must win.
+    apiMocks.getSessions.mockResolvedValue({
+      sessions: [
+        canonicalSession("s-live", { is_active: true }),
+        canonicalSession("s-old", { is_active: false }),
+      ],
+      total: 2,
+      limit: 30,
+      offset: 0,
+    });
+    await renderCanonicalList("s-old");
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Session s-old"),
+    );
+
+    const rows = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-testid="session-row"]'),
+    );
+    const activeRows = rows.filter((r) =>
+      r.className.includes("qchat__session-row--active"),
+    );
+    expect(activeRows.length).toBe(1);
+
+    const old = rows.find((r) => r.textContent?.includes("Session s-old"))!;
+    expect(old.className).toContain("qchat__session-row--active");
+    expect(old.getAttribute("aria-current")).toBe("true");
+
+    const live = rows.find((r) => r.textContent?.includes("Session s-live"))!;
+    expect(live.className).not.toContain("qchat__session-row--active");
+    expect(live.getAttribute("aria-current")).toBeNull();
+  });
+
+  it("canonical: falls back to the server's live session when nothing is selected", async () => {
+    // With no resume id (fresh load / after restart) `is_active` is the only
+    // signal for which session the server considers current, so it takes the
+    // single highlight rather than leaving the panel unmarked.
+    apiMocks.getSessions.mockResolvedValue({
+      sessions: [
+        canonicalSession("s-live", { is_active: true }),
+        canonicalSession("s-old", { is_active: false }),
+      ],
+      total: 2,
+      limit: 30,
+      offset: 0,
+    });
+    await renderCanonicalList(null);
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Session s-live"),
+    );
+
+    const rows = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-testid="session-row"]'),
+    );
+    const activeRows = rows.filter((r) =>
+      r.className.includes("qchat__session-row--active"),
+    );
+    expect(activeRows.length).toBe(1);
+    expect(activeRows[0].textContent).toContain("Session s-live");
+  });
+
+  it("canonical: pages older sessions in with See more instead of dropping them", async () => {
+    // 512 sessions on the live server vs a 30-row window: without paging the
+    // older ones are unreachable.
+    apiMocks.getSessions.mockResolvedValueOnce({
+      sessions: [canonicalSession("s-1")],
+      total: 2,
+      limit: 30,
+      offset: 0,
+    });
+    await renderCanonicalList();
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Session s-1"),
+    );
+
+    const seeMore = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("See more"),
+    )!;
+    expect(seeMore).toBeTruthy();
+
+    apiMocks.getSessions.mockResolvedValueOnce({
+      sessions: [canonicalSession("s-2")],
+      total: 2,
+      limit: 30,
+      offset: 1,
+    });
+    await act(async () => {
+      seeMore.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Session s-2"),
+    );
+    // Appended, not replaced — the first page is still there.
+    expect(container.textContent).toContain("Session s-1");
+    expect(apiMocks.getSessions).toHaveBeenLastCalledWith(30, 1, "", "recent");
+    // Nothing left to page, so the affordance goes away.
+    expect(
+      Array.from(container.querySelectorAll("button")).some((b) =>
+        b.textContent?.includes("See more"),
+      ),
+    ).toBe(false);
+  });
+
+  it("canonical: hides See more when the first page covers the whole store", async () => {
+    apiMocks.getSessions.mockResolvedValue({
+      sessions: [canonicalSession("s-only")],
+      total: 1,
+      limit: 30,
+      offset: 0,
+    });
+    await renderCanonicalList();
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Session s-only"),
+    );
+    expect(
+      Array.from(container.querySelectorAll("button")).some((b) =>
+        b.textContent?.includes("See more"),
+      ),
+    ).toBe(false);
+  });
+
+  it("canonical: highlights NOTHING on a deliberate fresh chat (New chat)", async () => {
+    // Regression: pressing "New chat" clears `?resume=`, which used to arrive
+    // here as `null` — indistinguishable from "no selection known yet" — so the
+    // panel fell through to the `is_active` fallback and lit an unrelated live
+    // session (subagents and the PTY are often all `is_active` at once). The
+    // operator saw the OLD conversation still highlighted after New chat.
+    // `FRESH_CHAT_SESSION_ID` is the explicit "nothing is selected" signal and
+    // must suppress the fallback entirely.
+    apiMocks.getSessions.mockResolvedValue({
+      sessions: [
+        canonicalSession("s-live", { is_active: true }),
+        canonicalSession("s-old", { is_active: false }),
+      ],
+      total: 2,
+      limit: 30,
+      offset: 0,
+    });
+    await renderCanonicalList(FRESH_CHAT_SESSION_ID);
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Session s-live"),
+    );
+
+    const rows = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-testid="session-row"]'),
+    );
+    expect(rows.length).toBe(2);
+    const activeRows = rows.filter((r) =>
+      r.className.includes("qchat__session-row--active"),
+    );
+    expect(activeRows).toEqual([]);
+    expect(
+      rows.map((r) => r.getAttribute("aria-current")).filter(Boolean),
+    ).toEqual([]);
+    // The sentinel is not a session id: it must never be rendered as a row.
+    expect(container.textContent).not.toContain(FRESH_CHAT_SESSION_ID);
+  });
+
+  it("canonical: a real selection still wins over a live sibling", async () => {
+    // Guards the fix's boundary: suppressing the fallback for the fresh-chat
+    // sentinel must not weaken selection for an actual id.
+    apiMocks.getSessions.mockResolvedValue({
+      sessions: [
+        canonicalSession("s-live", { is_active: true }),
+        canonicalSession("s-old", { is_active: false }),
+      ],
+      total: 2,
+      limit: 30,
+      offset: 0,
+    });
+    await renderCanonicalList("s-old");
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Session s-old"),
+    );
+
+    const rows = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-testid="session-row"]'),
+    );
+    const activeRows = rows.filter((r) =>
+      r.className.includes("qchat__session-row--active"),
+    );
+    expect(activeRows.length).toBe(1);
+    expect(activeRows[0].textContent).toContain("Session s-old");
   });
 });

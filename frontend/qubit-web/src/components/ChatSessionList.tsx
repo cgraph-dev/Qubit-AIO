@@ -33,10 +33,13 @@ import { useSearchParams } from "react-router";
 
 import { useI18n } from "@/i18n";
 import { ChatWorkspacePicker } from "@/components/ChatWorkspacePicker";
-import { mergeActiveFirst } from "@/components/chatSessionOrder";
+import { mergeActiveFirst, type SessionLike } from "@/components/chatSessionOrder";
 import { api, type ChatStoreSession } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 
+/** Rows fetched per request. The list pages (See more) rather than raising
+ * this, because the effect below re-runs on every `activeSessionId` change and
+ * a larger window only pushes older sessions out of reach on each pick. */
 const SESSION_LIMIT = 30;
 /** Best-effort live refresh cadence for the switcher while the tab is open. */
 const SESSION_REFRESH_MS = 15_000;
@@ -45,8 +48,26 @@ const SESSION_REFRESH_MS = 15_000;
  * `canonical` reads the canonical receipts store (`GET /api/sessions`,
  * profile-scoped, the store the `/chat` PTY resumes). */
 export type ChatSessionListSource = "chat" | "canonical";
+
+/**
+ * `activeSessionId` value meaning "the host is deliberately on a FRESH chat
+ * with nothing resumed". Distinct from `null`, which means "no selection
+ * known yet" and still falls back to the server's `is_active` row.
+ *
+ * WHY a sentinel and not one nullable value: `null` was carrying both
+ * meanings, so pressing "New chat" (which clears `?resume=`) made the panel
+ * fall through to the `is_active` fallback and light up an unrelated live
+ * session — reading as "New chat still highlights the old session". The two
+ * states need different rendering, so they need different values.
+ */
+export const FRESH_CHAT_SESSION_ID = "__fresh__";
+
 interface ChatSessionListProps {
-  /** Active resume target (the session currently shown in the transcript). */
+  /**
+   * Active resume target (the session currently shown in the transcript), or
+   * {@link FRESH_CHAT_SESSION_ID} when the host is on a deliberate fresh chat.
+   * `null` = not yet known, which permits the `is_active` fallback.
+   */
   activeSessionId: string | null;
   /** Management profile from the dashboard switcher (chat store is single-
    * principal; retained for interface compatibility with the host). */
@@ -94,6 +115,11 @@ export function ChatSessionList({
   const [sessions, setSessions] = useState<ChatStoreSession[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Server total (canonical store pages; the chat store omits it). Drives the
+  // "See more" affordance so older sessions past the first window are reachable
+  // instead of silently aging out of the list.
+  const [total, setTotal] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   // Bumped to force a refetch (after switching, on Refresh, on mount).
   const [reloadNonce, setReloadNonce] = useState(0);
   // Server-backed thread search: the query the operator typed, and the
@@ -126,12 +152,13 @@ export function ChatSessionList({
       source === "canonical"
         ? api
             .getSessions(SESSION_LIMIT, 0, scopeKey, "recent")
-            .then((res) => ({ sessions: res.sessions }))
+            .then((res) => ({ sessions: res.sessions, total: res.total }))
         : api.listChatSessions(SESSION_LIMIT, 0, searchQuery);
     request
       .then((res) => {
         if (reqRef.current !== myReq) return;
         setSessions(res.sessions);
+        setTotal("total" in res && typeof res.total === "number" ? res.total : null);
       })
       .catch((e: Error) => {
         if (reqRef.current !== myReq) return;
@@ -174,14 +201,59 @@ export function ChatSessionList({
 
   const reload = useCallback(() => setReloadNonce((n) => n + 1), []);
 
+  // Append the next page instead of replacing. Only meaningful for the
+  // canonical store (the chat store has no total/paging); guards against
+  // overlapping clicks and against a refresh landing mid-append.
+  const loadMore = useCallback(() => {
+    if (source !== "canonical" || loadingMore) return;
+    const have = sessions?.length ?? 0;
+    if (total !== null && have >= total) return;
+    const myReq = reqRef.current;
+    setLoadingMore(true);
+    api
+      .getSessions(SESSION_LIMIT, have, scopeKey, "recent")
+      .then((res) => {
+        // Drop the append if a refresh/pick replaced the list under us.
+        if (reqRef.current !== myReq) return;
+        setSessions((prev) => {
+          const seen = new Set((prev ?? []).map((s) => s.id));
+          return [...(prev ?? []), ...res.sessions.filter((s) => !seen.has(s.id))];
+        });
+        setTotal(typeof res.total === "number" ? res.total : null);
+      })
+      .catch((e: Error) => setError(e.message || "failed to load more sessions"))
+      .finally(() => setLoadingMore(false));
+  }, [loadingMore, scopeKey, sessions, source, total]);
+
   // The active session must always be visible and on top, even when the host's
   // resume id is a canonical/worker id the chat-store list does not contain
   // (mergeActiveFirst prepends a synthetic row for that case). Pure + DOM-free
   // so the ordering contract is unit-tested alongside its own module.
+  // The FRESH sentinel is NOT a session id — prepending a row for it would
+  // show a bogus "__fresh__" entry — so it never reaches the merge.
+  const selectedSessionId =
+    activeSessionId === FRESH_CHAT_SESSION_ID ? null : activeSessionId;
   const orderedSessions = useMemo(
-    () => mergeActiveFirst(sessions, activeSessionId),
-    [sessions, activeSessionId],
+    () => mergeActiveFirst(sessions, selectedSessionId),
+    [sessions, selectedSessionId],
   );
+
+  // Which row to light as "you are here". Selection (the host's resume id) is
+  // the authority; `is_active` is only a FALLBACK for when no id is selected
+  // yet. Using `is_active` as a second, simultaneous highlight lights every
+  // live background session (a voice/WhatsApp session stays `is_active: true`
+  // while you read an old thread) and reads as two active rows.
+  // On a deliberate FRESH chat the operator is on no stored session at all, so
+  // nothing is highlighted — falling back to `is_active` there was the bug this
+  // sentinel exists to prevent (several sessions are legitimately live at once:
+  // subagents, a voice channel, the PTY itself).
+  const activeRowId = useMemo(() => {
+    if (activeSessionId) return activeSessionId;
+    return (
+      orderedSessions.find((s: SessionLike & { is_active?: boolean }) => s.is_active === true)
+        ?.id ?? null
+    );
+  }, [activeSessionId, orderedSessions]);
 
   // Picking a row sets `/chat?resume=<id>`. Re-picking the row already in
   // the terminal is a no-op (avoids a needless PTY teardown).
@@ -282,7 +354,9 @@ export function ChatSessionList({
           ) : null}
         </div>
         {orderedSessions.map((s) => {
-          const isActive = s.id === activeSessionId;
+          // Highlight exactly one row: the selected session. `is_active` is
+          // folded into activeRowId as a fallback, never a second highlight.
+          const isActive = s.id === activeRowId;
           return (
             <ListItem
               key={s.id}
@@ -330,9 +404,33 @@ export function ChatSessionList({
             </ListItem>
           );
         })}
+        {source === "canonical" &&
+          (total === null || orderedSessions.length < total) && (
+            <Button
+              outlined
+              size="sm"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="mx-1 mt-1 justify-center"
+            >
+              {loadingMore ? t.common.loading : "See more"}
+            </Button>
+          )}
       </div>
     );
-  }, [activeSessionId, error, loading, orderedSessions, pick, reload, t]);
+  }, [
+    activeRowId,
+    error,
+    loadMore,
+    loading,
+    loadingMore,
+    orderedSessions,
+    pick,
+    reload,
+    source,
+    t,
+    total,
+  ]);
 
   return (
     // Not an <aside>: the containing #chat-side-panel is the complementary
