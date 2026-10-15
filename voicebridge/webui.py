@@ -2095,17 +2095,41 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         self._file(target, ctype)
 
+    def _peer_is_loopback(self) -> bool:
+        """True when the request comes from this machine (peer AND Host).
+
+        ONE definition, because the rule was hand-copied at four call sites and
+        a five-site drift is how a loopback-only guard silently stops being one.
+        Both halves matter: the PEER address is who actually connected, and the
+        Host header is which name they used — a request arriving on the LAN
+        address with a `localhost` Host still came from off-box.
+        """
+        peer = self.client_address[0] if self.client_address else ""
+        if peer not in ("127.0.0.1", "::1", "localhost"):
+            return False
+        host = (self.headers.get("Host", "") or "").split(":")[0]
+        return host in ("127.0.0.1", "localhost", "::1")
+
     def _serve_app_html(self, target: Path) -> None:
         """Serve a plugin-app HTML document with the session token injected.
 
-        Mirrors ``_serve_qubit_index``'s injection (same global, same origin,
-        same trust boundary) for the plugin's own document. Injected only when
-        the caller is entitled to the token at all: a non-loopback peer gets the
-        token too, because the token is ALSO injected into the dashboard shell
-        for any caller — the SPA is served to whoever can reach the route, and
-        the token gates *API* access, not asset delivery. Reading the app's HTML
-        grants nothing an attacker could not already get from ``/`` — but it
-        does mean the injected value must be the configured token, not a guess.
+        THE TOKEN IS INJECTED FOR LOOPBACK CALLERS ONLY. The earlier revision
+        injected for every caller, on the premise that "the token is ALSO
+        injected into the dashboard shell for any caller". That premise is FALSE
+        on this deployment: the dashboard root answers 302 to /login and never
+        reaches its injector, so this route was the ONLY way a non-local peer
+        could obtain the token. Measured: `curl http://192.168.1.135:8890/
+        plugin-apps/qubit-office/habblaud/` returned 200 with the live token in
+        the body, and that token then authenticated `/agent/api/status` (200) and
+        `/agent/api/office/tower` (200, live data) from the LAN address.
+
+        A non-local caller still gets the app's HTML — it is a static asset and
+        the office stays viewable — but WITHOUT the credential. It then renders
+        its own "not authenticated" state, which is the honest outcome, rather
+        than being handed the keys to the API.
+
+        Loopback behaviour is unchanged, so the app is unaffected in the intended
+        deployment.
         """
         try:
             html = target.read_text(encoding="utf-8")
@@ -2113,7 +2137,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._send(404, b"not found")
             return
         token = getattr(self.app, "api_token", "") or ""
-        if token:
+        if token and self._peer_is_loopback():
             from urllib.parse import quote
             stream_url = "/api/stream?token=" + quote(token, safe="")
             inject = (
