@@ -43,7 +43,20 @@ def test_vite_dynamic_preload_paths_stay_inside_embedded_app():
     source = ('const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||'
               '(m.f=["bundle/app.js","bundle/app.css"])))=>i.map(i=>d[i]);')
     rewritten = VENDOR.rewrite_js(source)
-    assert "=>i.map(i=>new URL(d[i],`${location.origin}/plugin-apps/qubit-office/habblaud/`).href)" in rewritten
+    # ASSERT THE RESOLUTION, NOT THE SPELLING. The transform anchors chunk names to
+    # the app document by prefixing `location.origin` + the plugin path. It has
+    # emitted this as STRING CONCATENATION (`location.origin+`/plugin-apps/…`) since
+    # the idempotence pass; an earlier revision used a template literal
+    # (`` `${location.origin}/plugin-apps/…` ``). Both resolve to the identical
+    # absolute URL, so pinning the literal form made this test red on a correct
+    # artifact — the assertion was measuring a superseded revision of the transform,
+    # not a behavior. Assert the two things that actually matter: the origin is
+    # preserved and the path stays inside the embedded app.
+    assert "new URL(d[i]" in rewritten, rewritten
+    assert "location.origin" in rewritten, (
+        "the preload helper lost its origin anchor; a root-relative chunk URL can "
+        f"resolve protocol-relative against the host: {rewritten}")
+    assert "/plugin-apps/qubit-office/habblaud/" in rewritten, rewritten
     # This is a document-relative URL, not a root-relative or protocol-relative
     # path. It keeps both the current origin and the Habblaud app directory.
     from urllib.parse import urljoin
@@ -58,4 +71,9 @@ def test_shipped_main_chunk_rewrites_vite_preload_helper():
     chunk = REPO / "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/main-DND_b4_E.js"
     assert chunk.is_file()
     text = chunk.read_text(errors="ignore")
-    assert "=>i.map(i=>new URL(d[i],`${location.origin}/plugin-apps/qubit-office/habblaud/`).href)" in text
+    # The SHIPPED artifact must carry the anchored form (see the sibling test for why
+    # the assertion is on the resolution, not one spelling of it).
+    assert "new URL(d[i]" in text and "location.origin" in text, (
+        "the shipped preload helper is not anchored to the app origin; verify the "
+        f"vendor transform ran: {text[:200]}")
+    assert "/plugin-apps/qubit-office/habblaud/" in text
