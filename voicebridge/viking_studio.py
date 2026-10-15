@@ -128,7 +128,14 @@ def studio_wiring(cfg: Any = None) -> Tuple[int, Dict[str, Any]]:
         effective = load_user_config_effective() or {}
         memory = effective.get("memory") if isinstance(effective, dict) else None
         if isinstance(memory, dict):
-            provider = str(memory.get("provider") or "")
+            # The live Qubit config uses memory.semantic.provider; accept the
+            # flat form too for older profiles and dashboard fixtures. Reporting
+            # only the flat key made a working OpenViking provider look unset.
+            semantic = memory.get("semantic")
+            if isinstance(semantic, dict):
+                provider = str(semantic.get("provider") or "")
+            if not provider:
+                provider = str(memory.get("provider") or "")
     except Exception:  # noqa: BLE001 - absent/unreadable config is "unset"
         provider = ""
     return 200, {"result": {"memory": {"provider": provider}}}
