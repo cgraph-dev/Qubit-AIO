@@ -602,24 +602,35 @@ def test_office_access_route_dispatches_to_capability_read():
 
 
 def test_office_agent_route_dispatches_read_but_not_writes():
+    """``GET /api/agents/:id`` is served by the office-client front door.
+
+    The old direct ``_serve_office_agent`` required a session header the
+    tokenless iframe cannot send, so the live drawer got a 401. The read now
+    goes through ``_serve_office_client_api``, which maps it onto the compat
+    family's ``agents/<id>`` row — the SAME office store, so the two paths
+    cannot disagree. ``_serve_office_agent`` stays for direct callers and is
+    covered by ``test_office_agent_read_uses_real_seat_and_event_rows``.
+    """
     h = _make_handler(path="/api/agents/7")
     h.command = "GET"
     h._head_only = False
-    h._serve_office_agent = lambda agent_id: setattr(h, "_agent_called", agent_id)
+    h._serve_office_client_api = \
+        lambda method: setattr(h, "_front_door_called", method)
     for name in ("_maybe_pty_upgrade", "_maybe_stt_upgrade",
                  "_maybe_events_upgrade", "_maybe_gateway_rpc_upgrade",
                  "_refuse_qubit_ws"):
         setattr(h, name, lambda: False)
     h._send = lambda *args, **kwargs: None
     h.do_GET()
-    assert h._agent_called == "7"
+    assert h._front_door_called == "GET"
 
-    # Mutating Habblaud verbs do not call the read-only handler.
+    # Mutating Habblaud verbs are routed the same way (to a typed refusal /
+    # C4 stage), never to the read-only handler.
     h.command = "PUT"
     h.path = "/api/agents/7/character"
-    h._captured.clear()
+    h._front_door_called = None
     h.do_PUT()
-    assert not hasattr(h, "_agent_write_called")
+    assert h._front_door_called == "PUT"
 
 
 def test_office_agent_read_uses_real_seat_and_event_rows(monkeypatch):

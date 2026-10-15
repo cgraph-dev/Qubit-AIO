@@ -2,7 +2,7 @@
   "source": "https://github.com/marmottajr/habblaud",
   "commit": "4ccce2537472fe5a8d432f06974494d2e778ff15",
   "licence": "MIT",
-  "note": "Vendored build output of the Habblaud client. Client-side only: the server, the Claude Code mod, and the Docker setup are NOT vendored. Served from /plugin-apps/qubit-office/habblaud/.",
+  "note": "Vendored build output of the Habblaud client. Client-side only: the server, the Claude Code mod, and the Docker setup are NOT vendored. Served from /plugin-apps/qubit-office/habblaud/. Locale pinned to en by scripts/vendor_habblaud.py (English-only authoring ruling).",
   "files": [
     {
       "path": "LICENSE",
@@ -221,8 +221,8 @@
     },
     {
       "path": "bundle/app-U4Pwh2XA.js",
-      "sha256": "c87c019d5a08586ee1a883e2a00ae191e48eb9583a1184492f7962603a36487d",
-      "bytes": 698428
+      "sha256": "367365c9200c34898ceaa7e74c558031f9d92b6eb543094341ea71cfaeb27c9b",
+      "bytes": 698456
     },
     {
       "path": "bundle/daystats-CUw1NUBG.js",
@@ -246,8 +246,8 @@
     },
     {
       "path": "bundle/main-DND_b4_E.js",
-      "sha256": "e02de58bc0352b47b66cd2c89143a3f405192286230a27b6cdf2c99956de1dbe",
-      "bytes": 3989
+      "sha256": "e823327b4310ed7287dc0612f704fa085b094d4c0d31b0f30cdcdcfec5d0fba3",
+      "bytes": 3980
     },
     {
       "path": "bundle/pixelify-sans-cyrillic-400-normal-Ckz2YJkH.woff2",
@@ -381,15 +381,15 @@
     },
     {
       "path": "index.html",
-      "sha256": "41e7985409df2ce8c2a19e6d35b3fb715ff4987ca09b344d31b61c6e02b4c6a8",
-      "bytes": 2900
+      "sha256": "f10757687bb60efd5415aaae333ad9277c73eb41ad8b6daede197597587f65df",
+      "bytes": 2815
     },
     {
       "path": "manifest.webmanifest",
-      "sha256": "e10247d124a3978e67c2069de40ac1754f9b0ee4ccebb2f386d64ad3f273b729",
-      "bytes": 758
+      "sha256": "76872f4f54bebce7b48dc746ac851caa0a6dd35e5d5d1b0b1736b5ad48449539",
+      "bytes": 818
     }
   ],
-  "total_bytes": 2147637,
+  "total_bytes": 2147631,
   "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
 }

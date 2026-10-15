@@ -1611,6 +1611,162 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # operation for the local app.
         return blind_probe or not configured_token
 
+    #: The exact literal ``/api/*`` prefixes the shipped office bundle requests
+    #: (grep of app-U4Pwh2XA.js / ptypane-DxPqTDKo.js / daystats-CUw1NUBG.js).
+    #: Kept as an ALLOWLIST so this front door can only ever answer the office
+    #: client's own dialect and never shadows a Qubit-owned API path.
+    #:
+    OFFICE_CLIENT_ROOTS: tuple = (
+        "/api/sessions", "/api/timeline", "/api/spawn", "/api/deliveries",
+        "/api/permissions", "/api/messages", "/api/agents", "/api/rooms",
+        "/api/updates", "/api/remote", "/api/stats", "/api/dictation",
+        "/api/pty", "/api/demo",
+    )
+
+    def _is_office_client_path(self, path: str) -> bool:
+        """True when ``path`` is one the vendored office client asks for.
+
+        An explicit allowlist of the client's literal dialect, so a request for
+        an unrelated ``/api/*`` path is left to the normal server flow rather
+        than being funnelled through the office compat family.
+
+        A root matches ONLY itself or a ``/``-sub-path of itself
+        (``/api/sessions`` bare is Qubit's own authority and stays untouched;
+        ``/api/sessions/recent`` is the client's read). The query string is not
+        part of the match — the caller passes a path with the query stripped.
+        """
+        bare = path or "/api"
+        for root in self.OFFICE_CLIENT_ROOTS:
+            if bare == root or bare.startswith(root + "/"):
+                return True
+        return False
+
+    def _office_client_read_ok(self) -> bool:
+        """Auth for the vendored office client's LITERAL ``/api/*`` reads.
+
+        WHY THIS EXISTS (the silent-404 gap)
+        ------------------------------------
+        The full vendored app is served in the iframe as a plain document and
+        its ``fetch`` is the browser's NATIVE fetch: the host adapter that
+        would rewrite ``/api/<x>`` onto ``/agent/api/office/habblaud/<x>`` is
+        installed on the iframe's ``contentWindow`` BEFORE ``src`` is set, and
+        the navigation replaces that realm, so the patch is discarded. The live
+        page therefore asks for the upstream dialect verbatim — ``/api/agents/3``,
+        ``/api/timeline/days``, ``/api/stats/days``, ``/api/spawn/folders``,
+        ``/api/dictation``, ``/api/deliveries`` — and every one of them used to
+        land on ``do_GET``'s fallthrough as a bare 404 (or, for the agent read,
+        a 401). A silent 404 is exactly what "unsupported capabilities must be
+        visibly unavailable" forbids.
+
+        The request carries no token (there is no bridge to attach one), so it
+        cannot pass ``_office_app_caller_ok``. This predicate is the same TIGHT
+        triple that route already uses for its ``access`` bootstrap — loopback
+        peer, same-origin Host, own-app Referer — applied to the client's
+        READ-ONLY office routes. It is deliberately NOT a token bypass:
+
+          * a supplied query token is never accepted here (the only query-token
+            exception in this server stays ``/api/stream``);
+          * a chosen-body request (POST) is REFUSED outright — this gate can
+            only ever authorise reads, so it cannot widen mutation authority;
+          * a valid session header still works and is tried first.
+
+        The capability that answers is confined to the office client's own
+        compat family: real Qubit office data for reads, typed refusals for the
+        rest. Nothing here reaches the general API surface or the fork proxy.
+        """
+        if self.command != "GET":
+            return False
+        if "token=" in self.path.split("?", 1)[-1]:
+            return False
+        # A SUPPLIED token is always validated and never falls through to the
+        # constrained no-header path when it is wrong — the same rule
+        # ``_office_app_caller_ok`` follows. Otherwise a bogus credential would
+        # be silently upgraded to the loopback exemption.
+        if self.headers.get("X-Qubit-Session-Token", "") or \
+                self.headers.get("X-Api-Token", ""):
+            return self._qubit_token_ok() or self._api_token_ok()
+        peer = self.client_address[0] if self.client_address else ""
+        if peer not in ("127.0.0.1", "::1", "localhost"):
+            return False
+        host = (self.headers.get("Host", "") or "").split(":")[0]
+        if host not in ("127.0.0.1", "localhost", "::1"):
+            return False
+        referer = self.headers.get("Referer", "") or ""
+        return OFFICE_APP_PREFIX in referer
+
+    def _serve_office_client_api(self, method: str) -> None:
+        """The vendored office client's LITERAL ``/api/*`` front door.
+
+        Maps each path the shipped bundle actually requests onto its Qubit
+        compat counterpart under ``/api/office/habblaud/<suffix>`` and dispatches
+        it through the ONE compat route table (``qubit_compat.dispatch``). A read
+        answers real Qubit office state; a mutation is answered by the compat
+        rows exactly as the bridge path answers it (C4-staged or a typed
+        refusal). A path with no compat row is a **typed JSON refusal**
+        (``ok:false`` + a code), never a bare 404 — that is the whole point of
+        this route.
+
+        The rewrite is a single, uniform prefix substitution: the bundle's
+        ``/api/<suffix>`` and the compat family's ``/api/office/habblaud/<suffix>``
+        carry the SAME suffix (verified against every literal path in the three
+        served chunks), so there is no per-route table to drift here. The suffix
+        allowlist keeps the front door on the office family and out of the
+        general API.
+        """
+        from . import qubit_compat as HC
+
+        if method != "GET" and not self._office_app_caller_ok():
+            self._send(401, b"unauthorized")
+            return
+        if method == "GET" and not self._office_client_read_ok():
+            self._send(401, b"unauthorized")
+            return
+
+        raw = self.path
+        bare = raw.split("?", 1)[0].rstrip("/") or "/api"
+        suffix = bare[len("/api"):]
+        query = query_params(raw)
+        body: Dict[str, Any] = {}
+        if method != "GET":
+            try:
+                length = int(self.headers.get("Content-Length", 0) or 0)
+            except ValueError:
+                length = 0
+            if length:
+                try:
+                    raw_bytes = self.rfile.read(length)
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    raw_bytes = b""
+                try:
+                    body = json.loads(raw_bytes.decode("utf-8", "replace")
+                                      or "{}")
+                except ValueError:
+                    self._json({"ok": False, "code": "MALFORMED",
+                                "state": "FAILED",
+                                "detail": "request body is not JSON"}, 400)
+                    return
+                if not isinstance(body, dict):
+                    body = {"_list": body}
+
+        target = "/api/office/habblaud" + suffix
+        # Only the office family is reachable through this front door; anything
+        # else the client invents is a typed refusal naming the capability.
+        route, _params = HC.match(method, target)
+        if route is None:
+            self._json({
+                "ok": False, "state": "UNAVAILABLE",
+                "code": "OFFICE_CAPABILITY_UNBOUND",
+                "capability": f"{method} {bare}",
+                "detail": ("this office capability is not bound in Qubit "
+                           "Office; Qubit exposes no matching store or "
+                           "authority for it."),
+                "qubit_counterpart": "Qubit Chat + dashboard /ops + approvals",
+            }, 501)
+            return
+        code, out = HC.dispatch(self.app.orch.cfg, method, target,
+                                query=query, body=body)
+        self._json(out, code)
+
     def _qubit_dist(self) -> "Path":
         # Resolve the built Qubit dashboard from package data first (a clean
         # wheel install ships frontend/qubit-dist under voicebridge/_data/),
@@ -2890,15 +3046,28 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if path.split("?")[0] == "/api/access":
             self._serve_office_access()
             return
-        if (self.command == "GET" and path.startswith("/api/agents/")
-                and path.endswith("/character")):
-            # Habblaud profile/character reads only. Its PUT/DELETE mutation
-            # calls remain refused; Qubit settings need the broker authority.
-            self._serve_office_agent(path[len("/api/agents/"):-len("/character")].strip("/"))
+        if (self.command == "GET" and path.startswith("/api/agents/")):
+            # The client's agent read (the drawer/transcript). Served by the
+            # office-client front door, which maps it onto the compat family's
+            # ``agents/<id>`` row — the SAME office store the bridge path reads,
+            # so the two never disagree. An unknown id is a typed answer, never
+            # a bare 404. This replaces the old direct ``_serve_office_agent``
+            # call, which required a session header the tokenless iframe cannot
+            # send and so answered the live drawer with a 401.
+            self._serve_office_client_api("GET")
             return
-        if (self.command == "GET" and path.startswith("/api/agents/")
-                and path.count("/") == 3):
-            self._serve_office_agent(path[len("/api/agents/"):])
+        # The vendored office client's remaining LITERAL ``/api/*`` reads:
+        # ``/api/sessions/recent``, ``/api/timeline/days``, ``/api/stats/days``,
+        # ``/api/spawn/folders``, ``/api/dictation``, ``/api/deliveries``, ...
+        # The full app asks for the upstream dialect verbatim (its fetch is the
+        # browser's native fetch — the host's rewrite bridge is discarded by the
+        # iframe navigation), so these used to fall through to a bare 404. The
+        # front door maps each onto the Qubit office compat family and answers a
+        # TYPED refusal for anything unbound. It never shadows a Qubit-owned API
+        # path: those live under ``/agent/`` and the office/stream/access reads
+        # above. Capability is read-only (GET); mutations go through ``do_POST``.
+        if self.command == "GET" and self._is_office_client_path(path):
+            self._serve_office_client_api("GET")
             return
         if path == "/favicon.ico":
             self._serve_qubit_static("/favicon.ico")
@@ -4455,6 +4624,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # Qubit SPA POST backend (compat, same modules as CLI/voice).
             # Auth: X-Qubit-Session-Token or X-Api-Token.
             self._qubit_api("POST")
+        elif self._is_office_client_path(path):
+            # The vendored office client's LITERAL ``/api/*`` mutations
+            # (``POST /api/rooms/rename``, ``/api/spawn``, ``/api/messages``,
+            # ``/api/permissions/:id/decision``, ...). Routed through the office
+            # compat family, which C4-stages an org mutation or answers a TYPED
+            # refusal — never a bare 404. Auth is the office-app gate (token or
+            # the loopback own-app triple), so no anonymous mutation is possible.
+            self._serve_office_client_api("POST")
         else:
             self._send(404, b"not found")
 
@@ -4462,6 +4639,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path.startswith("/agent/"):
             self._qubit_api("PUT")
+        elif self._is_office_client_path(path):
+            # Office-client mutations under PUT (e.g. the character edit) are
+            # routed the same way POST is: C4-staged or a typed refusal.
+            self._serve_office_client_api("PUT")
         else:
             self._send(404, b"not found")
 
@@ -4469,6 +4650,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path.startswith("/agent/"):
             self._qubit_api("PATCH")
+        elif self._is_office_client_path(path):
+            self._serve_office_client_api("PATCH")
         else:
             self._send(404, b"not found")
 
@@ -4476,6 +4659,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path.startswith("/agent/"):
             self._qubit_api("DELETE")
+        elif self._is_office_client_path(path):
+            self._serve_office_client_api("DELETE")
         else:
             self._send(404, b"not found")
 
