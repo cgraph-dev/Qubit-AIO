@@ -229,6 +229,23 @@ def to_snapshot(tower: Dict[str, Any], revision: int,
             "startedAt": at_ms,
             "lastEventAt": at_ms,
             "statusSince": at_ms,
+            # The raw age, in seconds, of this agent's most recent event, or
+            # null when the agent has NEVER produced one. Sent alongside the
+            # derived `lastEventAt` because the two disagree in a way that
+            # matters to the reader:
+            #
+            #   * `lastEventAt: null` means "no event row at all" -- an agent
+            #     that has never run. The client renders that as an absurd age
+            #     because it does `now - undefined`; the flag below lets a
+            #     future client render "no activity yet" instead.
+            #   * `lastEventAgeS: <seconds>` means "ran, then went quiet", which
+            #     after ACTIVE_WINDOW_S is ALSO reported as `idle` by the tower.
+            #     Without this the two states are indistinguishable on screen:
+            #     an agent that ran ten minutes ago looks exactly like one that
+            #     has never run, which reads as "the office is dead".
+            "lastEventAgeS": (float(last_event["age_s"])
+                              if last_event.get("age_s") is not None else None),
+            "hasHistory": last_event.get("age_s") is not None,
             "stats": {
                 "toolCalls": 0,
                 "tokensIn": 0,
