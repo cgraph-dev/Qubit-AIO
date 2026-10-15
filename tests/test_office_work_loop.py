@@ -215,7 +215,8 @@ def test_a_rejection_without_an_instruction_is_refused(tmp_path, monkeypatch):
     finally:
         conn.close()
     with pytest.raises(OfficeError) as exc:
-        W.review(cfg, t, verdict="reject", note="  ", confirmed=True)
+        W.review(cfg, t, verdict="reject", note="  ",
+                 by_agent=ids["reviewers"][0], confirmed=True)
     assert "just a delay" in exc.value.detail
 
 
@@ -277,7 +278,8 @@ def test_attempts_are_capped_and_the_task_is_abandoned(tmp_path, monkeypatch):
         conn.commit()
     finally:
         conn.close()
-    W.review(cfg, t, verdict="reject", note="still wrong", confirmed=True)
+    W.review(cfg, t, verdict="reject", note="still wrong",
+             by_agent=ids["reviewers"][0], confirmed=True)
     assert W.tasks(cfg)["tasks"][0]["status"] == "abandoned"
 
 
