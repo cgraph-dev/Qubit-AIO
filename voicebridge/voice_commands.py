@@ -417,7 +417,10 @@ def voice_backend_coverage() -> Dict[str, Any]:
         "model_profile_status": "show",
         "model_profile_test": "test",
         "speech_profile_test": "test",
-        # model_profile_set_active: no CLI subcommand wired yet (A20).
+        # model_profile_set_active: reachable from the CLI as
+        # `model activate <profile> --global` (added when it was found that the
+        # bare form could only ever write a SESSION override, so asking for the
+        # default model silently changed nothing office-wide).
     }
     # Model-profile voice backend -> the dashboard MODEL_PROFILE_OPS it shares.
     model_profile_dash_op = {

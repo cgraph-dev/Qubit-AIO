@@ -344,6 +344,16 @@ def _add_model_profile_subcommands(container, common) -> None:
         help="select a profile for a session/role (dry-run unless --confirm)")
     pmod_activate.add_argument("profile")
     pmod_activate.add_argument("--session", default="cli")
+    # Without this, `model activate <p> ` could ONLY write a session override:
+    # `--session` defaults to "cli", so the global setter (the one the dashboard
+    # uses) was unreachable from the CLI and the A20 note below recorded that as
+    # an open gap. Asking for the default model and silently getting a
+    # session-scoped one is the worst of both -- the flag makes the two
+    # intentions spellable, and they are mutually exclusive so neither can be
+    # assumed.
+    pmod_activate.add_argument(
+        "--global", dest="global_scope", action="store_true",
+        help="set the office-wide default profile instead of a session override")
     pmod_activate.add_argument("--role", default="chat")
     pmod_activate.add_argument("--confirm", action="store_true")
     pmod_activate.add_argument("--json", action="store_true")
@@ -6302,6 +6312,13 @@ def _cmd_profile_model(cfg, args) -> int:
             return _profile_model_emit(
                 R.upsert_model_profile(cfg, edited, confirm=bool(args.confirm)))
         if cmd == "activate":
+            # Two different intentions, and the caller must say which. A session
+            # override wins over the global default for that session only; the
+            # global set is what every other session inherits.
+            if getattr(args, "global_scope", False):
+                return _profile_model_emit(R.set_active_profile(
+                    cfg, args.profile, role=args.role,
+                    confirm=bool(args.confirm)))
             return _profile_model_emit(R.set_session_profile(
                 cfg, args.session, args.profile, role=args.role,
                 confirm=bool(args.confirm)))
