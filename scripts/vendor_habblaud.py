@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -191,17 +192,39 @@ def vendor(src: Path, dest: Path, skip_build: bool) -> dict:
         build_client(src, staging)
 
     # --- assemble the vendored tree -------------------------------------
-    if dest.exists():
-        shutil.rmtree(dest)
-    dest.mkdir(parents=True)
-    shutil.copytree(staging / "bundle", dest / "bundle")
+    # PUBLISH ORDER IS THE CONSISTENCY BARRIER. `PROVENANCE.json` is the record a
+    # reader checks the tree against, so it must become visible LAST, after every
+    # file it describes is in place. The original version deleted `dest` and then
+    # wrote the record mid-assembly, so a concurrent reader could hash a
+    # half-generated tree against a record from another generation. That is the
+    # recorded intermittent failure -- "5 failed on the first run, green on four
+    # re-runs, no root cause found" (docs/OPEN_THREADS.md §4.15) -- and it was a
+    # CORRECT detection of an inconsistent tree, not a broken test.
+    #
+    # WHY NOT A DIRECTORY SWAP. The obvious fix -- build a sibling directory and
+    # `os.replace` it into place -- is NOT available here: `dest` is a real,
+    # git-tracked, NON-EMPTY directory, and `rename(2)` onto a non-empty
+    # directory fails. Measured alternatives and their concurrent-reader failure
+    # rates: two renames (old aside, new in) left a window with no `dest` at all
+    # (5 of 38 reads saw a missing file); emptying `dest` in place before a
+    # single rename was worse (49363 of 49391 reads saw no record at all). So the
+    # tree stays where it is and the RECORD is the barrier: unlink it, write the
+    # files, write the record last. A reader either finds no record (and can skip)
+    # or finds the complete new one.
+    record_path = dest / "PROVENANCE.json"
+    if record_path.is_file():
+        record_path.unlink()
+    if not dest.exists():
+        dest.mkdir(parents=True)
+
+    shutil.copytree(staging / "bundle", dest / "bundle", dirs_exist_ok=True)
     # `client/public` carries fixed-name assets and the web manifest.
     public = src / "client" / "public"
     if public.is_dir():
         for item in public.iterdir():
             target = dest / item.name
             if item.is_dir():
-                shutil.copytree(item, target)
+                shutil.copytree(item, target, dirs_exist_ok=True)
             else:
                 shutil.copy2(item, target)
 
@@ -241,10 +264,16 @@ def vendor(src: Path, dest: Path, skip_build: bool) -> dict:
         pass
     licence = src / "LICENSE"
     if licence.is_file():
-        shutil.copy2(licence, dest / "LICENSE")
+        # `copy2` truncates the destination before writing, so a concurrent
+        # reader can catch a zero-length LICENSE (measured: the same
+        # non-atomic-write class as the record below). Copy aside, rename in.
+        tmp_licence = dest / "LICENSE.tmp"
+        shutil.copy2(licence, tmp_licence)
+        os.replace(tmp_licence, dest / "LICENSE")
 
     files = sorted(
-        p for p in dest.rglob("*") if p.is_file() and p.name != "PROVENANCE.json"
+        p for p in dest.rglob("*")
+        if p.is_file() and p.name != "PROVENANCE.json"
     )
     record = {
         "source": "https://github.com/marmottajr/habblaud",
@@ -263,8 +292,15 @@ def vendor(src: Path, dest: Path, skip_build: bool) -> dict:
         "total_bytes": sum(p.stat().st_size for p in files),
         "index_rewritten_from": "/-absolute to " + ASSET_PREFIX,
     }
-    (dest / "PROVENANCE.json").write_text(
-        json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    # LAST WRITE: this is the moment the new tree becomes visible as a whole.
+    # Write to a temp file and rename, because `write_text` truncates then
+    # writes: a reader can catch the file mid-write and see TRUNCATED JSON
+    # (measured: a concurrent reader hit `Expecting value: line 1 column 1`, i.e.
+    # an empty read of a half-written record). `rename(2)` within one directory
+    # is atomic, so a reader sees the old record or the complete new one.
+    tmp_record = dest / "PROVENANCE.json.tmp"
+    tmp_record.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp_record, record_path)
     return record
 
 
