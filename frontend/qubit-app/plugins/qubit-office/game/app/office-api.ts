@@ -1,136 +1,82 @@
-/* The API contract the vendored office client expects, and what Qubit has.
- *
- * HONEST STATEMENT OF THE GAP
- * ---------------------------
- * The client was written against a server that streams SSE from `/api/*`:
- *
- *   GET  /api/access                        what this page may do
- *   GET  /api/stream                        the SSE feed of the whole office
- *   GET  /api/agents/<id>                   one agent's conversation
- *   POST /api/agents/<id>/character         set an agent's appearance
- *   GET  /api/permissions/<id>              a pending permission request
- *   POST /api/permissions/<id>/decision     answer it
- *   GET  /api/messages/<id>                 a queued message
- *
- * Qubit has ONE office route: `GET /agent/api/office/tower` (a read-only
- * snapshot, voicebridge/qubit_compat.py:9431). So:
- *
- *   * The RENDERER can be exercised today — the snapshot carries the floors,
- *     rooms, seats and per-character state the world draws from.
- *   * The INTERACTIVE half cannot. Nothing in Qubit currently serves
- *     `/api/stream`, and answering a permission from the browser is a write
- *     that must go through the confirmation authority (contract C4), not a
- *     POST from a view.
- *
- * This module therefore does two things and refuses a third:
- *   1. It translates the snapshot into the SHAPE the client's store expects.
- *   2. It names each unimplemented route explicitly, so the page can say
- *      "not bound" instead of rendering nothing and looking broken.
- *   3. It never fabricates a frame. A missing binding is reported.
- *
- * Inventing a fake SSE feed would make the page look complete and be a lie —
- * the office would show agents that do not exist.
+/* Verified capability contract for the embedded Habblaud client.
+ * Read-only endpoints are bound to Qubit's office/session stores. Writes and
+ * absent upstream concepts are deliberately not mapped to unrelated APIs.
  */
-
-/** A route the client asks for and whether Qubit serves it. */
 export interface RouteBinding {
-  /** The path the CLIENT requests, relative to its own `/api/`. */
   client: string;
-  /** What Qubit serves, or null when nothing does. */
   qubit: string | null;
-  /** True when the binding is read-only and safe to wire now. */
   readOnly: boolean;
-  /** One line, shown to a person, on what is missing and who owes it. */
+  gated?: boolean;
   note: string;
 }
 
 export const ROUTES: readonly RouteBinding[] = [
-  {
-    client: "access",
-    qubit: null,
-    readOnly: true,
-    note: "No access/permission model is served. The client uses this to decide "
-        + "whether answering from the office is allowed; with no answer it "
-        + "falls back to view-only, which is the safe default.",
-  },
-  {
-    client: "stream",
-    qubit: null,
-    readOnly: true,
-    note: "THE BLOCKING ONE. Qubit serves a snapshot, not a stream, so the "
-        + "office cannot update live. Polling /agent/api/office/tower is a "
-        + "stand-in that is honest about being a poll.",
-  },
-  {
-    client: "agents/:id",
-    qubit: null,
-    readOnly: true,
-    note: "Per-agent conversation transcripts are not exposed over HTTP.",
-  },
-  {
-    client: "permissions/:id",
-    qubit: null,
-    readOnly: false,
-    note: "Answering a permission is an org mutation and must go through the "
-        + "confirmation authority (C4). It must NOT be wired as a bare POST.",
-  },
-  {
-    client: "messages/:id",
-    qubit: null,
-    readOnly: false,
-    note: "Sending a message to an agent is an org mutation. Same rule as above.",
-  },
+  { client: "access", qubit: "/api/access", readOnly: true,
+    note: "Qubit local view and permitted capabilities." },
+  { client: "stream", qubit: "/api/stream", readOnly: true,
+    note: "SSE snapshots and notices translated from the Qubit tower report." },
+  { client: "agents/:id", qubit: "/api/agents/:id", readOnly: true,
+    note: "Qubit seat and office-event history; not an upstream conversation." },
+  { client: "sessions/recent", qubit: "/api/sessions/recent", readOnly: true,
+    note: "Actual Qubit recent sessions." },
+  { client: "timeline/days", qubit: "/api/timeline/days", readOnly: true,
+    note: "Days with real office-ledger records only." },
+  { client: "timeline/:day", qubit: "/api/timeline/:day", readOnly: true,
+    note: "Real Qubit ledger detail; no visual replay is implied." },
+  { client: "stats/days", qubit: "/api/stats/days", readOnly: true,
+    note: "Per-day totals derived from the Qubit office ledger." },
+  { client: "stats?day=", qubit: "/api/stats", readOnly: true,
+    note: "Real Qubit ledger totals for the requested day." },
+  { client: "permissions/:id", qubit: null, readOnly: false, gated: true,
+    note: "Permission decisions need the Qubit confirmation authority." },
+  { client: "messages", qubit: null, readOnly: false, gated: true,
+    note: "Sending messages is an org mutation requiring confirmation." },
+  { client: "terminal/pty", qubit: null, readOnly: false,
+    note: "No raw terminal/PTY capability is exposed by this app." },
+  { client: "spawn", qubit: null, readOnly: false,
+    note: "Starting an agent is not exposed through this client adapter." },
+  { client: "renameRoom", qubit: null, readOnly: false,
+    note: "Room rename is not exposed from this embedded app." },
+  { client: "deliveries", qubit: null, readOnly: true,
+    note: "No Qubit delivery store is bound." },
+  { client: "recording/replay", qubit: null, readOnly: true,
+    note: "Qubit has no Habblaud screen recording/replay source." },
 ];
 
-/** The one route that IS bound. */
 export const SNAPSHOT_ROUTE = "/agent/api/office/tower";
-
-/** How often the stand-in poll runs. Slower than a real stream would be. */
+export const STREAM_ROUTE = "/api/stream";
 export const POLL_INTERVAL_MS = 2000;
 
-/**
- * The verdict the page shows. Never "everything works" — it is computed from
- * the route table above, so adding a binding changes the page automatically
- * rather than requiring someone to remember to update a banner.
- */
 export interface BindingVerdict {
-  /** Routes the client needs and Qubit serves. */
   bound: string[];
-  /** Routes with no binding at all. */
   missing: string[];
-  /** Writes that must go through the authority rather than a direct call. */
   gated: string[];
-  /** True when the renderer can show something real. */
   canRender: boolean;
-  /** True when the client can only view, never act. */
   viewOnly: boolean;
+  live: boolean;
 }
 
 export function bindingVerdict(): BindingVerdict {
   const bound: string[] = [];
   const missing: string[] = [];
   const gated: string[] = [];
-  for (const r of ROUTES) {
-    if (r.readOnly === false) gated.push(r.client);
-    else if (r.qubit) bound.push(r.client);
-    else missing.push(r.client);
+  for (const route of ROUTES) {
+    if (route.gated) gated.push(route.client);
+    else if (route.qubit) bound.push(route.client);
+    else missing.push(route.client);
   }
   return {
     bound,
     missing,
     gated,
-    // The snapshot carries everything the world paints from, so the renderer
-    // is exercisable even with no stream.
     canRender: true,
-    // No write route is bound, and none may be bound outside the authority.
-    viewOnly: gated.length > 0,
+    viewOnly: true,
+    live: ROUTES.some((route) => route.client === "stream" && !!route.qubit),
   };
 }
 
-/** One line for a person. Deliberately does not say "working". */
 export function bindingSummary(): string {
   const v = bindingVerdict();
-  return `${v.bound.length} of ${ROUTES.length} routes bound · `
-    + `${v.missing.length} missing · ${v.gated.length} gated by the `
-    + `confirmation authority`;
+  return `${v.bound.length} bound · ${v.missing.length} unavailable · `
+    + `${v.gated.length} confirmation-gated`;
 }

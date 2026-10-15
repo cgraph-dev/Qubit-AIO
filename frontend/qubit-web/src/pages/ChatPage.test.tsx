@@ -294,6 +294,45 @@ describe("Qubit ChatPage", () => {
     ).not.toBeNull();
   });
 
+  it("does not force-scroll the transcript after the reader scrolls upward", async () => {
+    await renderChat();
+    const transcript = container.querySelector<HTMLElement>(".qchat__transcript")!;
+    Object.defineProperties(transcript, {
+      scrollHeight: { configurable: true, value: 1200 },
+      clientHeight: { configurable: true, value: 400 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+    });
+    await act(async () => {
+      transcript.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+    emitReply("A streamed answer");
+    await typeAndSend("hello");
+    await act(async () => { await Promise.resolve(); });
+    expect(transcript.scrollTop).toBe(0);
+  });
+
+  it("follows new output while the reader is within the near-bottom threshold", async () => {
+    // The threshold is a REAL distance test (`scrollHeight - scrollTop -
+    // clientHeight < 48`), so both sides must be pinned: far-from-bottom must
+    // NOT yank (the test above) and inside the 48px band MUST follow. Setting
+    // scrollTop so the gap is 14px (< 48) exercises the follow branch.
+    await renderChat();
+    const transcript = container.querySelector<HTMLElement>(".qchat__transcript")!;
+    Object.defineProperties(transcript, {
+      scrollHeight: { configurable: true, value: 1200 },
+      clientHeight: { configurable: true, value: 400 },
+      // 1200 - 786 - 400 = 14px from the bottom — inside the threshold.
+      scrollTop: { configurable: true, writable: true, value: 786 },
+    });
+    await act(async () => {
+      transcript.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+    emitReply("A followed answer");
+    await typeAndSend("hello again");
+    await vi.waitFor(() => expect(transcript.scrollTop).toBe(1200));
+    expect(transcript.scrollTop).toBe(1200);
+  });
+
   it("loads the persisted transcript from the chat store", async () => {
     apiMocks.getChatSessionMessages.mockResolvedValueOnce({
       session_id: "chat-abc",
@@ -725,6 +764,101 @@ describe("Qubit ChatPage", () => {
       '[data-message-index] .whitespace-pre-wrap',
     );
     expect(messageBody?.textContent).not.toContain("FULL_REPORT_BODY");
+  });
+
+  it("does not re-append a completed build report via the live voice poll", async () => {
+    // A `voice-*` session follows the persisted store on a poll that appends
+    // only rows past `voiceSyncedRef` (an index). A build turn persists THREE
+    // rows server-side (user, the "Working on it…" row from `_stream_task`,
+    // and the report row from `_finish_task`) while the client renders two —
+    // so a counter that advanced by two pointed one row short and the poll
+    // re-appended the report, rendering it twice. This pins the fix: the
+    // counter must track the real persisted row count.
+    // Seed the persisted transcript with ONE pre-existing row so the live
+    // poll's index baseline is non-zero (the realistic case: a live voice
+    // session that already has history before the build turn).
+    apiMocks.getChatSessionMessages.mockResolvedValue({
+      session_id: "voice-abc",
+      messages: [{ role: "user", content: "earlier question" }],
+      total: 1,
+    } as never);
+    await renderChatAt("/qubit-chat?resume=voice-abc");
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("earlier question"),
+    );
+    // Once the turn completes the server transcript holds 4 rows:
+    // 1 pre-existing + user + started + report.
+    apiMocks.getChatSessionMessages.mockResolvedValue({
+      session_id: "voice-abc",
+      messages: [
+        { role: "user", content: "earlier question" },
+        { role: "user", content: "build me something" },
+        {
+          role: "assistant",
+          content:
+            "Working on it in /chat (task task-1). I'll report back here.",
+          meta: { route: "task", task: "task-1", phase: "started" },
+        },
+        {
+          role: "assistant",
+          content: "FULL_REPORT_BODY\n\n_Task task-1: done_",
+          meta: { route: "task", task: "task-1", phase: "report" },
+        },
+      ],
+      total: 4,
+    } as never);
+    streamChatTurn.mockImplementationOnce(
+      async (
+        _body: unknown,
+        handlers: {
+          onProgress?: (e: unknown) => void;
+          onDelta?: (t: string, e: unknown) => void;
+          onDone?: (e: unknown) => void;
+        },
+      ) => {
+        handlers.onProgress?.({
+          event: "progress",
+          task: "task-1",
+          status: "working",
+          detail: "worker started",
+        });
+        handlers.onProgress?.({
+          event: "progress",
+          task: "task-1",
+          status: "working",
+          detail: "still working (5s)",
+        });
+        handlers.onDelta?.("FULL_REPORT_BODY", { event: "delta" });
+        handlers.onDone?.({
+          event: "done",
+          reply: "FULL_REPORT_BODY",
+          summary: "SHORT_SUMMARY",
+          route: "task",
+          task: "task-1",
+          receipt: { route: "task", task: "task-1" },
+        });
+      },
+    );
+    await typeAndSend("build me something");
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("SHORT_SUMMARY"),
+    );
+    // Fire the live-voice poll directly (the same `sync` a focus triggers),
+    // rather than waiting out the 2s interval.
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    // The report renders exactly once across the whole transcript — the poll
+    // must NOT re-append the persisted report row.
+    const transcript = container.querySelector(".qchat__transcript");
+    expect(
+      (transcript?.textContent?.match(/FULL_REPORT_BODY/g) ?? []).length,
+    ).toBe(1);
+    // And the persisted report row was not appended as a second assistant
+    // message (only the turn's own user + assistant rows exist beyond the
+    // single pre-existing row).
+    expect(container.textContent).not.toContain("_Task task-1: done_");
   });
 
   it("renders a non-string reply without crashing the page", async () => {

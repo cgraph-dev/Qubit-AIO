@@ -234,16 +234,59 @@ class CDP:
 # --------------------------------------------------------------------------- #
 # the JS used to inspect the page
 # --------------------------------------------------------------------------- #
-_PROBE_JS = r"""
+# The Office renderer does NOT draw into the top document. The SPA mounts a
+# ``qubit-office`` plugin page which embeds the vendored Habblaud app in an
+# <iframe class="office-game__frame"> served from
+# ``/plugin-apps/qubit-office/habblaud/``. The canvas (``#world``) and the
+# ``data-state="ready"`` marker live INSIDE that iframe's document. A probe that
+# only reads the top document therefore sees zero canvases and reports a false
+# blank. This preamble selects the Office iframe's document when present and
+# falls back to the top document (so the tool still works on a build that draws
+# in-page).
+_DOC_SELECT = r"""
+const __officeDoc = (() => {
+  const ifrs = Array.from(document.querySelectorAll('iframe'));
+  // Prefer the Office app frame by src, then by class, then any same-origin one.
+  const pick = ifrs.find(f => /plugin-apps\/[^/]*qubit-office\/habblaud/.test(f.src))
+            || ifrs.find(f => (f.className || '').includes('office-game__frame'))
+            || ifrs.find(f => (f.dataset && f.dataset.testid === 'office-app-frame'));
+  if (pick) {
+    try {
+      const d = pick.contentDocument;
+      if (d && d.body) return d;
+    } catch (e) { /* cross-origin: fall through */ }
+  }
+  return document;
+})();
+const __officeDocVia = (__officeDoc === document) ? 'top' : 'iframe';
+"""
+
+_PROBE_JS = (
+    r"""
 (() => {
-  const canvases = Array.from(document.querySelectorAll('canvas'));
-  const body = document.body ? document.body.innerText : '';
-  // data-state lives on an inner container, not always document.body -- read
-  // wherever it exists.
-  const stateEl = document.querySelector('[data-state]');
+  """
+    + _DOC_SELECT
+    + r"""
+  const canvases = Array.from(__officeDoc.querySelectorAll('canvas'));
+  const body = __officeDoc.body ? __officeDoc.body.innerText : '';
+  // data-state lives on an inner container, not always body -- read wherever.
+  // READINESS IS THE COMPOSED PAGE'S, NOT ONE DOCUMENT'S. The Office plugin
+  // mounts its shell in the TOP document (it sets ``data-state="ready"`` on
+  // ``office-game-shell``) and embeds the vendored Habblaud app in an iframe
+  // that paints the canvas. The vendored client sets NO ``data-state`` of its
+  // own, so a probe that only descends into the iframe sees the canvas but never
+  // the readiness marker and reports a false "never ready". Read the marker from
+  // wherever it is: prefer the selected document, fall back to the top one.
+  const findState = (doc) => doc && doc.querySelector
+    ? doc.querySelector('[data-state]') : null;
+  const stateEl = findState(__officeDoc) || findState(document);
   const dataState = stateEl ? stateEl.getAttribute('data-state') : null;
   return {
+    doc: __officeDocVia,
+    docTitle: __officeDoc.title || '',
     dataState: dataState,
+    dataStateDoc: stateEl && stateEl.ownerDocument === document
+      ? 'top' : (stateEl ? 'iframe' : null),
     dataStateTag: stateEl ? stateEl.tagName : null,
     canvasCount: canvases.length,
     canvases: canvases.map(c => ({ width: c.width, height: c.height,
@@ -252,11 +295,16 @@ _PROBE_JS = r"""
   };
 })()
 """
+)
 
 # Counts non-background pixels and colour buckets on the largest canvas.
-_PIXEL_JS = r"""
+_PIXEL_JS = (
+    r"""
 (() => {
-  const canvases = Array.from(document.querySelectorAll('canvas'));
+  """
+    + _DOC_SELECT
+    + r"""
+  const canvases = Array.from(__officeDoc.querySelectorAll('canvas'));
   if (!canvases.length) return { error: 'no canvas' };
   // largest by pixel area
   let big = canvases[0], area = 0;
@@ -283,6 +331,7 @@ _PIXEL_JS = r"""
   return { width: w, height: h, mode: '2d', data: Array.from(d) };
 })()
 """
+)
 
 
 def _bucket(rgb: tuple[int, int, int]) -> str:
@@ -349,7 +398,12 @@ def run(args) -> int:
 
     # -- launch chrome -------------------------------------------------------
     port = free_port()
-    profile = tempfile.mkdtemp(prefix="qubit-shot-profile-")
+    # Chrome's CDP/devtools unix socket lives under TMPDIR. The runtime scratch
+    # TMPDIR is long enough to overrun the 108-byte sun_path limit and abort
+    # Chrome before CDP is ready, so pin TMPDIR to /tmp for the child only.
+    child_env = dict(os.environ)
+    child_env["TMPDIR"] = "/tmp"
+    profile = tempfile.mkdtemp(prefix="qubit-shot-profile-", dir="/tmp")
     cmd = [
         CHROME,
         "--headless=new",
@@ -365,7 +419,7 @@ def run(args) -> int:
         "about:blank",
     ]
     proc = subprocess.Popen(
-        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=child_env
     )
     deadline = time.time() + args.timeout
     cdp = None
@@ -377,8 +431,14 @@ def run(args) -> int:
         cdp.call("Log.enable")
         print(f"chrome: headless on cdp port {port}")
 
-        # -- seed localStorage on the origin, then go to the Office route ---
-        cdp.call("Page.navigate", {"url": origin + "/"})
+        # -- seed localStorage AND the URL token, then go to the Office route -
+        # The dashboard injects ``window.__QUBIT_SESSION_TOKEN__`` into the HTML
+        # ONLY when the request carries ``?token=``; without it the SPA has no
+        # session and its API calls 401 (the page renders a blank shell). So the
+        # route must be navigated WITH the token in the query. localStorage keys
+        # are seeded too, for builds that still read them.
+        office_url = base + ("&" if "?" in base else "?") + "token=" + token
+        cdp.call("Page.navigate", {"url": office_url})
         _wait_ready_basic(cdp, deadline)
         seed = {k: token for k in TOKEN_KEYS}
         cdp.eval(
@@ -386,13 +446,34 @@ def run(args) -> int:
             "localStorage.setItem(k, t); return true; })()"
             % (json.dumps(token), json.dumps(TOKEN_KEYS))
         )
-        print(f"localStorage: seeded {len(TOKEN_KEYS)} token keys")
+        print(f"localStorage: seeded {len(TOKEN_KEYS)} token keys; "
+              "navigated with ?token= (session global injection)")
 
-        cdp.call("Page.navigate", {"url": base})
+        # The Office renderer's canvas + data-state live inside the plugin's
+        # iframe (see _DOC_SELECT). Give the iframe a moment to attach before
+        # the readiness poll starts hammering the probe.
+        for _ in range(40):
+            try:
+                if cdp.eval(
+                    "document.querySelector('iframe.office-game__frame,"
+                    " iframe[data-testid=office-app-frame]') ? 1 : 0"
+                ):
+                    break
+            except RenderProbeError:
+                pass
+            time.sleep(0.25)
 
         # -- poll for readiness (deadline, not sleep) ------------------------
+        # TWO RENDERERS, TWO READINESS SIGNALS. `/qubit-office` mounts the
+        # vendored app, which sets NO `data-state` of its own — its readiness is
+        # a painted office canvas. `?shell=1` mounts the hand-built shell, which
+        # sets `data-state="ready"` and paints its own canvas. Waiting on
+        # `data-state` alone reports the DEFAULT renderer as never-ready while it
+        # is visibly rendering, so accept either signal: the marker, or a canvas
+        # with non-background pixels.
         state = None
         big_canvas = 0
+        painted = 0
         polls = 0
         while time.time() < deadline:
             polls += 1
@@ -406,19 +487,31 @@ def run(args) -> int:
             big_canvas = max(widths) if widths else 0
             if state == "ready" and big_canvas > 200:
                 break
+            # The app renderer: a canvas that is actually painted.
+            if big_canvas > 200:
+                try:
+                    px = analyse_pixels(cdp.eval(_PIXEL_JS))
+                except RenderProbeError:
+                    px = {}
+                painted = px.get("non_background_pixels", 0) or 0
+                if painted > 0:
+                    break
             time.sleep(0.25)
 
-        if state != "ready" or big_canvas <= 200:
+        ready = (state == "ready" and big_canvas > 200) or (
+            big_canvas > 200 and painted > 0)
+        if not ready:
             sys.stderr.write(
-                "FAIL: page never reached data-state=ready with a canvas "
-                f">200px (last state={state!r}, largest canvas width={big_canvas}, "
-                f"polls={polls}).\n"
+                "FAIL: page never reached a rendered office — neither "
+                "data-state=ready nor a painted canvas >200px (last "
+                f"state={state!r}, largest canvas width={big_canvas}, "
+                f"painted_pixels={painted}, polls={polls}).\n"
             )
             _dump_console(cdp)
             return 1
 
-        print(f"ready: data-state=ready after {polls} polls "
-              f"(largest canvas {big_canvas}px wide)")
+        print(f"ready: {polls} polls (state={state!r}, largest canvas "
+              f"{big_canvas}px wide, {painted} non-background pixels)")
 
         # -- gather the report ----------------------------------------------
         info = cdp.eval(_PROBE_JS)

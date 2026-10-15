@@ -59,6 +59,16 @@ const apiMocks = vi.hoisted(() => ({
     },
   ]),
   wsTicket: vi.fn(() => new Promise(() => {})),
+  // `/chat?resume=<id>` existence probe (`api.getSessionDetail`). Default: a
+  // real session resolves. Tests that exercise a missing id reject with 404.
+  getSessionDetail: vi.fn(async (id: string) => ({
+    session: {
+      id,
+      title: "Panel session",
+      last_active: Date.now() / 1000,
+      message_count: 2,
+    },
+  })),
   createChatSession: vi.fn(async () => ({
     session: { id: "dashboard-abc123def456" },
   })),
@@ -122,6 +132,7 @@ vi.mock("@/lib/api", () => ({
     getPlugins: apiMocks.getPlugins,
     getMcpServers: apiMocks.getMcpServers,
     getChatWorkspaces: apiMocks.getChatWorkspaces,
+    getSessionDetail: apiMocks.getSessionDetail,
   },
   // PTY resume/session reads go through the backoff wrapper (same rationale
   // as the ChatPage mock); passthrough matches a healthy backend.
@@ -248,6 +259,15 @@ beforeEach(() => {
   });
   apiMocks.listChatSessions.mockClear();
   apiMocks.getSessions.mockClear();
+  apiMocks.getSessionDetail.mockReset();
+  apiMocks.getSessionDetail.mockImplementation(async (id: string) => ({
+    session: {
+      id,
+      title: "Panel session",
+      last_active: Date.now() / 1000,
+      message_count: 2,
+    },
+  }));
   sidebarMount.mockClear();
   FakeWebSocket.instances = [];
   vi.stubGlobal("WebSocket", FakeWebSocket);
@@ -559,5 +579,96 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(secondUrl).toContain(`attach=${persisted}`);
 
     window.sessionStorage.removeItem("qubit.pty.token.chat");
+  });
+});
+
+describe("Qubit TerminalChatPage /chat?resume=<id> existence guard", () => {
+  // Regression: a `?resume=<id>` that does not resolve must render an explicit
+  // "session not found" state and MUST NOT dial the PTY. Before the guard the
+  // page dialed unconditionally; the server's canonical_terminal_session then
+  // ENSURED the bogus id into a phantom session and painted an empty terminal —
+  // the reported "blank /chat until I click a session" symptom.
+  it("does not dial the PTY and shows 'session not found' for a missing id", async () => {
+    const notFound = Object.assign(new Error("GET /api/sessions/ghost -> 404"), {
+      status: 404,
+    });
+    apiMocks.getSessionDetail.mockRejectedValueOnce(notFound);
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "qubit-go",
+      provider: "opencode-go",
+      model: "deepseek",
+      context_tokens: 200000,
+      context_verified: true,
+    }));
+
+    const { default: TerminalChatPage } = await import("./TerminalChatPage");
+    await render(
+      <MemoryRouter initialEntries={["/chat?resume=ghost_session_id"]}>
+        <TerminalChatPage isActive />
+      </MemoryRouter>,
+    );
+
+    // The explicit not-found state paints...
+    await vi.waitFor(() =>
+      expect(
+        container.querySelector('[data-state="resume-missing"]'),
+      ).not.toBeNull(),
+    );
+    expect(container.textContent).toContain("Session not found");
+    expect(container.textContent).toContain("ghost_session_id");
+    // ...and freeze(s) the terminal rather than painting an empty canvas.
+    const host = container.querySelector('[aria-label="Qubit terminal"]');
+    expect(host?.hasAttribute("hidden")).toBe(true);
+    // Crucially: NO PTY was dialed, so the server never created a phantom.
+    expect(FakeWebSocket.instances.length).toBe(0);
+    expect(apiMocks.wsTicket).not.toHaveBeenCalled();
+  });
+
+  it("still resumes a verified id (guard does not break the happy path)", async () => {
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "qubit-go",
+      provider: "opencode-go",
+      model: "deepseek",
+      context_tokens: 200000,
+      context_verified: true,
+    }));
+
+    const { default: TerminalChatPage } = await import("./TerminalChatPage");
+    await render(
+      <MemoryRouter initialEntries={["/chat?resume=real_session"]}>
+        <TerminalChatPage isActive />
+      </MemoryRouter>,
+    );
+
+    await vi.waitFor(() =>
+      expect(FakeWebSocket.instances.length).toBeGreaterThan(0),
+    );
+    expect(FakeWebSocket.instances[0].url).toContain("resume=real_session");
+    expect(container.querySelector('[data-state="resume-missing"]')).toBeNull();
+  });
+
+  it("dials a plain /chat (no resume) without waiting on a probe", async () => {
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "qubit-go",
+      provider: "opencode-go",
+      model: "deepseek",
+      context_tokens: 200000,
+      context_verified: true,
+    }));
+
+    await renderTerminal();
+    await vi.waitFor(() =>
+      expect(FakeWebSocket.instances.length).toBeGreaterThan(0),
+    );
+    expect(apiMocks.getSessionDetail).not.toHaveBeenCalled();
   });
 });

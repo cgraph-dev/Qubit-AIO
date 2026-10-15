@@ -427,6 +427,16 @@ def _resolve_chat_argv(
     # scope overrides QUBIT_HOME before config is bridged into the env.
     from tools.environments.local import build_subprocess_env
     env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=True)
+    # The dashboard/gateway runs as a systemd user service and inherits no DISPLAY, so xclip in
+    # the spawned TUI fails with "Can't open display: (null)" and every /chat image paste
+    # reports "No image found in clipboard". Resolve the seat's reachable display into the child
+    # env; headless/ambiguous hosts stay untouched (never a stale or guessed value).
+    if sys.platform not in ("darwin", "win32") and not env.get("DISPLAY"):
+        try:
+            from qubit_cli.session_display import apply_session_display
+            apply_session_display(env)
+        except Exception:
+            _log.debug("chat PTY session display resolution failed", exc_info=True)
     if profile_dir is not None:
         env["QUBIT_HOME"] = str(profile_dir)
     try:

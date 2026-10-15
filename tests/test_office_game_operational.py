@@ -43,10 +43,12 @@ FIXTURE = (REPO / "frontend" / "qubit-web" / "src" / "lib" / "office-game"
            / "fixtures" / "tower-recording.json")
 
 from _office_toolchain import (  # noqa: E402
-    SKIP_REASON, has_tsc, node_path, tsc_path)
+    ensure_tsc, node_path, require_toolchain_or_fail)
 
 NODE = node_path()
-TSC = tsc_path()
+#: Self-healing: installs the compiler outside the tree if it vanished, so the
+#: suite RUNS after a dashboard build deleted node_modules.
+TSC = ensure_tsc()
 
 #: Every F12 module, plus the two supporting pure modules they share.
 MODULES = ["money.ts", "commands.ts", "BoardroomPanel.ts", "WorkPanel.ts",
@@ -88,10 +90,12 @@ function collect(root, id) {
 
 
 def _toolchain() -> bool:
-    return has_tsc()
+    return ensure_tsc() is not None
 
 
-pytestmark = pytest.mark.skipif(not _toolchain(), reason=SKIP_REASON)
+#: Loud, not a silent skip: a missing compiler ERRORS at collection (see the
+#: helper's docstring). A green `N skipped` is the false pass this replaces.
+require_toolchain_or_fail()
 
 
 def _stage_compile(tmp_path: Path) -> Path:

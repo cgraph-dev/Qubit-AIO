@@ -33,12 +33,13 @@
   },
   {
     "name": "qubit-office",
-    "label": "Office",
+    "label": "Qubit Office",
     "description": "Qubit Office \u2014 the agent corporation as a building: floors, rooms, seats, and characters that animate only from office_event rows.",
     "icon": "Users",
     "version": "1.0.0",
     "tab": {
       "path": "/qubit-office",
+      "hidden": true,
       "position": "end"
     },
     "entry": "qubit-office.game.js",

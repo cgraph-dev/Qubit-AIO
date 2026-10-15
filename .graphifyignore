@@ -1,0 +1,61 @@
+# .graphifyignore — excludes for the codebase knowledge graph.
+#
+# WHY: the first build took the whole tree and produced 308,550 nodes, because
+# ~55% of the files are tests (15,940 of 28,904). A query for
+# "how does the SSE feed reach the chat panel" then matched
+# `tests/qubit_cli/test_proxy.py` and `*.test.ts` files first — the graph was
+# describing the test corpus, not the product. Upstream's own guidance:
+# "Skip src/test. Test classes don't describe what production code does —
+# they echo relationships already captured in src/main. Including them bloats
+# node count 3-4x and degrades Leiden clustering quality."
+#
+# Keep infrastructure/config (it shows how services wire together), drop tests.
+
+# --- tests (the big one: ~55% of files) ---
+tests/
+qubit_runtime/tests/
+test/
+__tests__/
+*.test.ts
+*.test.tsx
+*.test.js
+*.test.mjs
+test_*.py
+*_test.py
+conftest.py
+
+# --- vendored / generated trees that are not our code ---
+node_modules/
+.venv/
+venv/
+dist/
+build/
+.graft/
+sandbox/
+_private_backup/
+frontend/qubit-dist/
+graphify-out/
+
+# --- caches and artefacts ---
+__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# --- non-source blobs the extractor cannot model ---
+*.lock
+*.log
+*.min.js
+*.map
+package-lock.json
+uv.lock
+
+# --- other agents' scratch dirs (not Qubit source) ---
+.kiro/
+.cursor/
+.windsurf/
+.claude/

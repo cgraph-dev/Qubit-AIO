@@ -2,14 +2,21 @@
  * Kitchen (`/kitchen`).
  *
  * The intake surface for absorbing other agents/apps into Qubit
- * (`docs/IDENTITY.md`): an operator pastes a repo or uploads a folder, and the
+ * (`docs/IDENTITY.md`): an operator pastes a repo or points at a folder, and the
  * Kitchen decomposes the source, maps its features/capabilities, and drafts a
  * 1:1 plan for integrating them into Qubit — how people upgrade Qubit from
  * other people's work.
  *
- * UI SHELL ONLY (this pass). Intake and planning run entirely in page state —
- * nothing is sent anywhere yet. The pipeline is shown as the intended flow and
- * is labelled as not-yet-wired rather than implying work that has not happened.
+ * WIRED (stages 1-2). "Analyze" calls `POST /api/qubit/kitchen/analyze`, whose
+ * backend is `voicebridge/kitchen.py`. Stage 1 (decompose) returns a real file
+ * inventory + entry points; stage 2 (map capabilities) runs REA — the
+ * reverse-engineering engine, used ONLY here — over the source. Analysis is
+ * local: a pasted repo is shallow-cloned to a confined runtime dir and removed
+ * afterwards; nothing is uploaded.
+ *
+ * Stages 3 (draft a 1:1 plan) and 4 (absorb) are NOT implemented. The backend
+ * says so explicitly and the UI renders that as a stated gap, never a dead
+ * button or a fake result.
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -20,6 +27,7 @@ import {
   FolderUp,
   GitBranch,
   ListChecks,
+  Loader2,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -28,8 +36,52 @@ import { Input } from "@nous-research/ui/ui/components/input";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { fetchJSON } from "@/lib/api";
 
 type Mode = "repo" | "folder";
+
+/** One inventory row from the decompose stage. */
+interface ExtCount {
+  ext: string;
+  count: number;
+}
+interface EntryPoint {
+  path: string;
+  kind: string;
+}
+interface KitchenResult {
+  ok: true;
+  mode: Mode;
+  source: string;
+  root: string;
+  cloned: boolean;
+  stage1_decompose: {
+    inventory: {
+      file_count: number;
+      total_bytes: number;
+      by_extension: ExtCount[];
+      sample_files: string[];
+    };
+    entry_points: EntryPoint[];
+  };
+  stage2_map_capabilities: {
+    rea_javascript: { ok?: boolean; skipped?: string; error?: string };
+    rea_environment: {
+      ok?: boolean;
+      available?: string[];
+      unavailable?: { operation: string; code?: string }[];
+    };
+    note?: string;
+  };
+  stage3_plan: { implemented: boolean; detail: string };
+  stage4_absorb: { implemented: boolean; detail: string };
+}
+
+function humanBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
 
 /** A source staged in this session. UI-only: never leaves the page. */
 interface StagedSource {
@@ -110,6 +162,10 @@ export default function KitchenPage() {
   const [dragging, setDragging] = useState(false);
   const [staged, setStaged] = useState<StagedSource[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  // Analysis state (stages 1-2). Real backend result, real errors.
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<KitchenResult | null>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
   const { toast, showToast } = useToast();
 
@@ -156,6 +212,27 @@ export default function KitchenPage() {
     if (dirInputRef.current) dirInputRef.current.value = "";
   }
 
+  /** Stages 1-2: call the backend and hold its real result. */
+  async function analyze(s: StagedSource) {
+    setSelected(s.id);
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const r = await fetchJSON<KitchenResult>("/api/qubit/kitchen/analyze", {
+        method: "POST",
+        body: JSON.stringify({ mode: s.kind, source: s.source }),
+      });
+      setResult(r);
+      showToast(`Decomposed ${r.stage1_decompose.inventory.file_count} files.`, "success");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragging(false);
@@ -184,8 +261,10 @@ export default function KitchenPage() {
           Qubit. This is how Qubit is upgraded from other people's work.
         </p>
         <p className="kitchen-note mt-3" role="note">
-          Preview UI — intake and planning are not wired to a backend yet. Staged
-          items below live only in this page.
+          Stages 1-2 run locally: <strong>Analyze</strong> decomposes the source
+          and maps its capabilities through REA, the reverse-engineering engine.
+          Stages 3 (draft a 1:1 plan) and 4 (absorb) are not implemented yet, and
+          are shown as such below.
         </p>
       </header>
 
@@ -323,6 +402,20 @@ export default function KitchenPage() {
                 </button>
                 <button
                   type="button"
+                  className="kitchen-item__analyze"
+                  aria-label={`Analyze ${s.name}`}
+                  disabled={busy}
+                  onClick={() => void analyze(s)}
+                >
+                  {busy && s.id === selected ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <Boxes className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                  Analyze
+                </button>
+                <button
+                  type="button"
                   className="kitchen-item__remove"
                   aria-label={`Remove ${s.name}`}
                   onClick={() =>
@@ -345,27 +438,83 @@ export default function KitchenPage() {
         </div>
         {active ? (
           <>
-            <p className="kitchen-empty">
-              Planned pipeline for <strong>{active.name}</strong> (
-              {active.kind === "repo" ? active.source : `${active.fileCount} files`}).
-              The plan is drafted here once intake is wired.
-            </p>
+            {error && (
+              <p className="kitchen-error" role="alert">
+                Analysis failed: {error}
+              </p>
+            )}
+            {result && (
+              <>
+                <p className="kitchen-empty">
+                  Decomposed <strong>{result.stage1_decompose.inventory.file_count}</strong> files
+                  ({humanBytes(result.stage1_decompose.inventory.total_bytes)})
+                  {result.cloned ? " — cloned to a confined temp dir, removed after analysis" : ""}.
+                </p>
+                <table className="kitchen-table" data-testid="kitchen-inventory">
+                  <thead>
+                    <tr>
+                      <th scope="col">Extension</th>
+                      <th scope="col">Files</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.stage1_decompose.inventory.by_extension.map((e) => (
+                      <tr key={e.ext}>
+                        <td className="font-courier">{e.ext}</td>
+                        <td>{e.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {result.stage1_decompose.entry_points.length > 0 && (
+                  <ul className="kitchen-list" data-testid="kitchen-entry-points">
+                    {result.stage1_decompose.entry_points.slice(0, 8).map((e) => (
+                      <li key={e.path}>
+                        <span className="font-courier">{e.path}</span>
+                        <span className="kitchen-item__meta">{e.kind}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="kitchen-note" role="note">
+                  {result.stage2_map_capabilities.rea_javascript.ok
+                    ? "REA mapped the JavaScript/Electron surface."
+                    : `REA JavaScript analysis: ${
+                        result.stage2_map_capabilities.rea_javascript.skipped ??
+                        result.stage2_map_capabilities.rea_javascript.error ??
+                        "not run"
+                      }`}
+                  {typeof result.stage2_map_capabilities.rea_environment.available?.length === "number"
+                    ? ` Engine: ${result.stage2_map_capabilities.rea_environment.available.length} operations available on this host.`
+                    : ""}
+                </p>
+              </>
+            )}
             <ol className="kitchen-pipeline" data-testid="kitchen-pipeline">
-              {PIPELINE.map((step) => (
-                <li key={step.title} className="kitchen-step">
-                  <step.icon className="h-4 w-4 shrink-0 text-midground" aria-hidden />
-                  <div>
-                    <p className="kitchen-step__title">{step.title}</p>
-                    <p className="kitchen-step__body">{step.body}</p>
-                  </div>
-                </li>
-              ))}
+              {PIPELINE.map((step) => {
+                // Stages 1-2 are live; 3-4 are stated gaps, not fake steps.
+                const live = step.title.startsWith("1") || step.title.startsWith("2");
+                return (
+                  <li key={step.title} className="kitchen-step">
+                    <step.icon className="h-4 w-4 shrink-0 text-midground" aria-hidden />
+                    <div>
+                      <p className="kitchen-step__title">
+                        {step.title}
+                        <span className="kitchen-item__meta">
+                          {live ? (result ? " · done" : " · ready") : " · not implemented"}
+                        </span>
+                      </p>
+                      <p className="kitchen-step__body">{step.body}</p>
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
           </>
         ) : (
           <p className="kitchen-empty">
-            Stage a source and select it to see the decomposition and integration
-            plan it would produce.
+            Stage a source, then press <strong>Analyze</strong> to decompose it and
+            map its capabilities. Stages 3-4 remain unimplemented.
           </p>
         )}
       </section>

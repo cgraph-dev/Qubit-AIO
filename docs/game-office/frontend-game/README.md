@@ -1,6 +1,14 @@
 # Qubit Office — full game frontend audit and plan
 
 **Status: audited baseline + proposed frontend specification. No game implementation performed.**
+
+> **Annotation (2026-10-14, later session):** the "no game implementation performed" line is
+> **historical and no longer true**. F01–F09 and F12 are built and their suites pass
+> (`tests/test_office_game_*.py` → **204 passed**, 0 skipped); the Office tab renders from the
+> hand-built bundle `qubit-office.game.js`. See `../frontend-game/60-IMPLEMENTATION-PLAN.md` per-packet
+> STATUS blocks and `docs/OPEN_THREADS.md` § 4.14. Separately, the **vendored third-party app**
+> (`habblaud`, MIT, commit `4ccce2537472`) is served at its own route
+> `/plugin-apps/qubit-office/habblaud/` — a parallel implementation, **not** the default tab.
 **Scope:** frontend only; the owner implements backend additions. Execute sequentially, on Sol 6.1, without delegated agents. Do not commit, push, install dependencies, spend on art, or restart services under this plan without the relevant approval.
 
 ## Recommendation

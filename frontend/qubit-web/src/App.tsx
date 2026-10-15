@@ -26,6 +26,7 @@ import {
   BookOpen,
   Bot,
   ChefHat,
+  ChevronRight,
   Clock,
   Code,
   Cpu,
@@ -39,6 +40,7 @@ import {
   KeyRound,
   Menu,
   MessageSquare,
+  Mic,
   Monitor,
   Network,
   Package,
@@ -153,6 +155,17 @@ const WebChatPage = lazy(() => import("@/pages/WebChatPage"));
 // wiring owner for the sidebar route table.
 const QubitBotPage = lazy(() => import("@/pages/QubitBotPage"));
 const HarnessRouterPage = lazy(() => import("@/pages/HarnessRouterPage"));
+// Open Viking (integrator lane 3): the EMBEDDED upstream studio — the real
+// Volcengine SPA, iframed from 127.0.0.1:1933/studio. It supersedes the old
+// group at the `/open-viking` route.
+const OpenVikingStudioPage = lazy(
+  () => import("@/pages/OpenVikingStudioPage"),
+);
+// The former "Open Viking" pages. They render Qubit's OWN local context engine
+// (voicebridge/context_store.py, `connection: "local"`) — a DIFFERENT backend
+// from the :1933 server the studio talks to. Unlisted from the sidebar (see
+// BUILTIN_NAV_REST) but kept routed so nothing breaks and their tests still
+// pass; reachable directly at these URLs.
 const OpenVikingPage = lazy(() => import("@/pages/OpenVikingPage"));
 const OpenVikingRetrievalPage = lazy(
   () => import("@/pages/OpenVikingRetrievalPage"),
@@ -174,6 +187,8 @@ const ComputerWorkspacePage = lazy(
 const AgentCardsPage = lazy(() => import("@/pages/AgentCardsPage"));
 // Kitchen: the intake surface for absorbing other agents/apps into Qubit.
 const KitchenPage = lazy(() => import("@/pages/KitchenPage"));
+// OmniRoute: local AI-gateway console (status + wiring, dashboard opens out).
+const OmniRoutePage = lazy(() => import("@/pages/OmniRoutePage"));
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useI18n } from "@/i18n";
@@ -232,10 +247,20 @@ const CHAT_NAV_ITEM: NavItem = {
 // `/qubit-chat` is the same chat surface under a Qubit-named route. It is a
 // built-in route (not a plugin) so both chat paths render the single shared
 // ChatPage host and can never diverge into a second implementation.
+//
+// WebChat hangs off it as a child: /qubit-chat is the voice + reports +
+// work-panel surface (voice_edit/heartbeat.py owns its in-page Right-Ctrl
+// push-to-talk), and the `/webchat` slash command + "list/show/resume web
+// chat" voice commands drive the sibling minimal chat. Grouping them keeps the
+// three chat surfaces adjacent without hiding either.
 const QUBIT_CHAT_NAV_ITEM: NavItem = {
   path: "/qubit-chat",
   label: "Qubit Chat",
   icon: Terminal,
+  exactEnd: true,
+  children: [
+    { path: "/webchat", label: "WebChat", icon: MessageSquare },
+  ],
 };
 
 /**
@@ -293,16 +318,24 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   // short aliases like /bot or /viking serve no in-page link and stay out).
   "/qubit-bot": QubitBotPage,
   "/qubit-harness-router": HarnessRouterPage,
-  "/open-viking": OpenVikingPage,
+  // `/open-viking` is the EMBEDDED upstream studio (the real thing).
+  // The former Qubit-local context-engine pages keep their URLs below so
+  // existing links and their tests stay valid, but they are no longer listed
+  // in the sidebar (see BUILTIN_NAV_REST).
+  "/open-viking": OpenVikingStudioPage,
   "/open-viking/retrieval": OpenVikingRetrievalPage,
   "/open-viking/uploads": OpenVikingUploadsPage,
   "/open-viking/agent-hub": OpenVikingAgentHubPage,
   "/open-viking/resources": OpenVikingResourcesPage,
+  // The Context Store sidebar entry lands on the local-engine console.
+  "/open-viking/context-store": OpenVikingPage,
   // Agent console surfaces (integrator lane): the ported computer workspace
   // and the typed agent card/artifact renderers.
   "/computer": ComputerWorkspacePage,
   "/agent-cards": AgentCardsPage,
   "/kitchen": KitchenPage,
+  "/omniroute": OmniRoutePage,
+  "/qubit-office": () => <PluginPage name="qubit-office" />,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
@@ -352,50 +385,95 @@ const BUILTIN_NAV_REST: NavItem[] = [
     label: "Documentation",
     icon: BookOpen,
   },
-  { path: "/voice-edit", label: "Voice Editing", icon: Sparkles },
-  { path: "/agent-workspace", label: "Agent Workspace", icon: Code },
-  { path: "/computer", label: "Computer", icon: Monitor },
-  { path: "/agent-cards", label: "Agent Cards", icon: Bot },
-  { path: "/kitchen", label: "Kitchen", icon: ChefHat },
-  { path: "/nodes", label: "Nodes", icon: Globe },
-  { path: "/devices", label: "Devices", icon: Shield },
-  { path: "/session-ops", label: "Session Ops", icon: Activity },
-  { path: "/worktrees", label: "Worktrees", icon: FolderOpen },
-  { path: "/checkpoints", label: "Checkpoints", icon: Database },
-  { path: "/qubit-board-admin", label: "Board Admin", icon: Star },
-  { path: "/qubit-task-inbox", label: "Task Inbox", icon: Heart },
-  { path: "/qubit-talk", label: "Talk", icon: MessageSquare },
-  { path: "/qubit-scheduler", label: "Scheduler", icon: Clock },
-  { path: "/admin/skills-review", label: "Skills Review", icon: Package },
-  { path: "/admin/mcp-calls", label: "MCP Calls", icon: Plug },
-  { path: "/admin/users", label: "Users", icon: Users },
-  { path: "/canvas", label: "Qubit Canvas", icon: Eye },
-  { path: "/qubit-taskflows", label: "Qubit Taskflows", icon: Zap },
-  { path: "/qubit-tasks", label: "Qubit Tasks", icon: FileText },
-  { path: "/qubit-memory", label: "Qubit Memory Backends", icon: Database },
-  { path: "/webchat", label: "Qubit WebChat", icon: MessageSquare },
-  { path: "/qubit-bot", label: "Qubit Bot", icon: Bot },
-  { path: "/qubit-harness-router", label: "Harness Router", icon: Workflow },
-  // Open Viking submenu group (integrator lane 3): the parent console plus
-  // its four sub-pages. Children render indented under the parent entry
-  // (see SidebarNavGroup); the parent path stays exactly-highlighted so a
-  // child route does not light up both rows.
+  // ---- Qubit groups -------------------------------------------------------
+  // These below replace what used to be ~20 flat look-alike rows. Every route
+  // is UNCHANGED and still reachable; grouping only changes what the sidebar
+  // shows by default. A group parent is a real page link (exactEnd stops a
+  // child route from lighting up both rows).
+  //
+  // Voice family: Talk (mic/TTS/wake) + Voice Editing. Qubit Chat is NOT here —
+  // it is a top-level entry beside /chat (see QUBIT_CHAT_NAV_ITEM), because it
+  // is a primary chat surface, not a voice sub-page.
   {
-    path: "/open-viking",
-    label: "Open Viking",
-    icon: Ship,
+    path: "/qubit-talk",
+    label: "Voice & Speech",
+    icon: Mic,
     exactEnd: true,
     children: [
-      { path: "/open-viking/retrieval", label: "Retrieval", icon: Search },
-      { path: "/open-viking/uploads", label: "Uploads", icon: Upload },
-      { path: "/open-viking/agent-hub", label: "Agent Hub", icon: Network },
+      { path: "/voice-edit", label: "Voice Editing", icon: Sparkles },
+    ],
+  },
+  {
+    path: "/qubit-scheduler",
+    label: "Tasks & Scheduling",
+    icon: Clock,
+    exactEnd: true,
+    children: [
+      { path: "/qubit-taskflows", label: "Taskflows", icon: Zap },
+      { path: "/qubit-tasks", label: "Tasks", icon: FileText },
+      { path: "/qubit-task-inbox", label: "Inbox", icon: Heart },
+      { path: "/qubit-board-admin", label: "Board Admin", icon: Star },
+    ],
+  },
+  // Memory family: the external provider picker and Qubit's OWN local context
+  // engine are DIFFERENT backends (provider registry vs context_store.py
+  // `connection: "local"`), so they stay distinct rows under one parent.
+  {
+    path: "/qubit-memory",
+    label: "Memory",
+    icon: Database,
+    exactEnd: true,
+    children: [
       {
-        path: "/open-viking/resources",
-        label: "Resources",
-        icon: BookOpen,
+        path: "/open-viking",
+        label: "Open Viking Studio",
+        icon: Ship,
+        exactEnd: true,
+      },
+      {
+        path: "/open-viking/context-store",
+        label: "Context Store",
+        icon: Database,
       },
     ],
   },
+  // Workspace family: agent/desktop administration surfaces.
+  {
+    path: "/agent-workspace",
+    label: "Workspace",
+    icon: Code,
+    exactEnd: true,
+    children: [
+      { path: "/nodes", label: "Nodes", icon: Globe },
+      { path: "/devices", label: "Devices", icon: Shield },
+      { path: "/session-ops", label: "Session Ops", icon: Activity },
+      { path: "/worktrees", label: "Worktrees", icon: FolderOpen },
+      { path: "/checkpoints", label: "Checkpoints", icon: Database },
+      { path: "/agent-cards", label: "Agent Cards", icon: Bot },
+    ],
+  },
+  // Admin family: operator-only surfaces.
+  {
+    path: "/admin/skills-review",
+    label: "Admin",
+    icon: Package,
+    exactEnd: true,
+    children: [
+      { path: "/admin/mcp-calls", label: "MCP Calls", icon: Plug },
+      { path: "/admin/users", label: "Users", icon: Users },
+    ],
+  },
+  // Ungrouped Qubit surfaces, each one of a kind.
+  // NB: /computer is a CopilotKit/openmuse port whose backend is a typed
+  // COMPUTER_USE_NO_DRIVER refusal (no AT-SPI actuator) — visible on purpose
+  // so the capability gap stays stated rather than hidden.
+  { path: "/computer", label: "Computer", icon: Monitor },
+  { path: "/kitchen", label: "Kitchen", icon: ChefHat },
+  { path: "/omniroute", label: "OmniRoute", icon: Network },
+  { path: "/canvas", label: "Qubit Canvas", icon: Eye },
+  { path: "/qubit-bot", label: "Qubit Bot", icon: Bot },
+  { path: "/qubit-harness-router", label: "Harness Router", icon: Workflow },
+  { path: "/qubit-office", label: "Qubit Office", icon: Users, exactEnd: true },
 ];
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
@@ -1064,6 +1142,9 @@ function SidebarNavLink({
   tooltipWarmRef,
   t,
   nested = false,
+  onNavigate,
+  expandable = false,
+  expanded = false,
 }: SidebarNavLinkProps) {
   const { path, label, labelKey, icon: Icon } = item;
   const [hovered, setHovered] = useState(false);
@@ -1089,7 +1170,10 @@ function SidebarNavLink({
       <NavLink
         to={path}
         end={item.exactEnd ?? path === "/sessions"}
-        onClick={closeMobile}
+        onClick={() => {
+          closeMobile();
+          onNavigate?.();
+        }}
         title={navLabel}
         aria-label={collapsed ? navLabel : undefined}
         onFocus={collapsed ? showTooltip : undefined}
@@ -1139,6 +1223,18 @@ function SidebarNavLink({
                 className="qagent-sidebar__active-rail absolute left-0 top-0 bottom-0 w-px bg-midground"
               />
             )}
+
+            {/* Disclosure chevron on a group parent. Hidden when the rail is
+                collapsed to icons (no room), where the tooltip carries it. */}
+            {expandable && !collapsed && (
+              <span
+                aria-hidden
+                className="ml-auto flex shrink-0 items-center text-text-secondary transition-transform duration-200"
+                style={{ transform: expanded ? "rotate(90deg)" : "none" }}
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </span>
+            )}
           </>
         )}
       </NavLink>
@@ -1165,6 +1261,14 @@ function SidebarNavGroup({
   t,
 }: SidebarNavLinkProps) {
   const children = item.children ?? [];
+  const location = useLocation();
+  // A child route keeps the group open, so the page you are ON is never
+  // hidden behind a collapsed parent. Opening the parent row itself toggles.
+  const hasActiveChild = children.some(
+    (c) => location.pathname === c.path || location.pathname.startsWith(`${c.path}/`),
+  );
+  const [open, setOpen] = useState(false);
+  const expanded = open || hasActiveChild;
   return (
     <>
       <SidebarNavLink
@@ -1173,22 +1277,27 @@ function SidebarNavGroup({
         item={item}
         t={t}
         tooltipWarmRef={tooltipWarmRef}
+        onNavigate={() => setOpen((v) => !v)}
+        expandable={children.length > 0}
+        expanded={expanded}
       />
-      <li aria-label={`${item.label} subpages`}>
-        <ul className="flex flex-col">
-          {children.map((child) => (
-            <SidebarNavLink
-              closeMobile={closeMobile}
-              collapsed={collapsed}
-              item={child}
-              key={child.path}
-              nested
-              t={t}
-              tooltipWarmRef={tooltipWarmRef}
-            />
-          ))}
-        </ul>
-      </li>
+      {expanded && (
+        <li aria-label={`${item.label} subpages`}>
+          <ul className="flex flex-col">
+            {children.map((child) => (
+              <SidebarNavLink
+                closeMobile={closeMobile}
+                collapsed={collapsed}
+                item={child}
+                key={child.path}
+                nested
+                t={t}
+                tooltipWarmRef={tooltipWarmRef}
+              />
+            ))}
+          </ul>
+        </li>
+      )}
     </>
   );
 }
@@ -1728,6 +1837,12 @@ interface SidebarNavLinkProps {
   t: Translations;
   tooltipWarmRef: TooltipWarmRef;
   nested?: boolean;
+  /** Called in addition to navigation — a group parent uses it to toggle. */
+  onNavigate?: () => void;
+  /** Renders a disclosure chevron on a group parent row. */
+  expandable?: boolean;
+  /** Whether that chevron points open (down) or closed (right). */
+  expanded?: boolean;
 }
 
 interface SidebarSystemActionsProps {

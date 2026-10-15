@@ -59,8 +59,23 @@ mkdir -p "$APPS_DIR"
 ln -sfn ../qubit-shared "$APPS_DIR/shared"
 
 cd "$WEB_DIR"
-npm install --legacy-peer-deps --no-audit --no-fund \
+# A globally-exported NODE_ENV=production makes npm default to `omit=dev`, so
+# `npm install` silently installs ONLY the production dependencies: no
+# typescript, no vite. `npx tsc` then dies with "This is not the tsc command you
+# are looking for" and -- with `set -e`/`|| build_failed` -- the build aborts
+# before vite ever runs. The bundle keeps serving whatever stale build is on
+# disk, which is how source edits can go missing for days. This is a build
+# host, not a runtime host: force dev dependencies in for the build only.
+export NODE_ENV=development
+export npm_config_omit=
+export npm_config_include=dev
+npm install --include=dev --legacy-peer-deps --no-audit --no-fund \
   || build_failed "npm install failed (network/registry unavailable?)"
+# Guard against a silently dev-less install regressing to the broken state.
+if [ ! -x "$WEB_DIR/node_modules/.bin/tsc" ] || \
+   [ ! -x "$WEB_DIR/node_modules/.bin/vite" ]; then
+  build_failed "npm install omitted devDependencies (tsc/vite missing from node_modules/.bin); check NODE_ENV/npm_config_omit in the build environment"
+fi
 npx tsc -p . --noEmit || build_failed "TypeScript typecheck failed"
 npx vite build --base=/ --outDir "$DIST_DIR" --emptyOutDir \
   || build_failed "vite build failed"

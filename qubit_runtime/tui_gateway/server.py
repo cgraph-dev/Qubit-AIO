@@ -2501,7 +2501,9 @@ class _RuntimeFallbackResolution(NamedTuple):
     used_fallback: bool
 
 
-def _resolve_runtime_with_fallback(resolve_kwargs: dict | None = None) -> _RuntimeFallbackResolution:
+def _resolve_runtime_with_fallback(
+    resolve_kwargs: dict | None = None, *, allow_fallback: bool = True,
+) -> _RuntimeFallbackResolution:
     """Resolve the primary runtime or one complete provider/model fallback. Provider-only fallback entries
     are skipped so the unavailable primary model can never leak into a different runtime."""
     from qubit_cli.auth import AuthError
@@ -2509,6 +2511,8 @@ def _resolve_runtime_with_fallback(resolve_kwargs: dict | None = None) -> _Runti
     try:
         return _RuntimeFallbackResolution(resolve_runtime_provider(**(resolve_kwargs or {})), None, False)
     except AuthError as primary_exc:
+        if not allow_fallback:
+            raise
         for entry in _load_fallback_model() or []:
             fb_provider = str(entry.get("provider") or "").strip() if isinstance(entry, dict) else ""
             fb_model = str(entry.get("model") or "").strip() if isinstance(entry, dict) else ""
@@ -2534,7 +2538,9 @@ def _resolve_runtime_with_fallback(resolve_kwargs: dict | None = None) -> _Runti
         raise
 
 
-def _resolve_agent_model_runtime(model_override, provider_override) -> tuple[str, dict]:
+def _resolve_agent_model_runtime(
+    model_override, provider_override, *, allow_fallback: bool = True,
+) -> tuple[str, dict]:
     """(model, runtime) for a new agent; a per-session override (/model switch or a resumed row's persisted
     runtime) wins over global config/env. Older rows stored the resolved provider "custom" (no named entry
     matches) — recover the identity from the persisted base_url or the rebuild fails "No LLM provider
@@ -2561,7 +2567,8 @@ def _resolve_agent_model_runtime(model_override, provider_override) -> tuple[str
             requested_provider = provider_override
         resolve_kwargs = {"requested": requested_provider, "target_model": model or None}
         overrides = {}
-    resolution = _resolve_runtime_with_fallback(resolve_kwargs)
+    resolution = (_resolve_runtime_with_fallback(resolve_kwargs) if allow_fallback else
+                  _resolve_runtime_with_fallback(resolve_kwargs, allow_fallback=False))
     if resolution.used_fallback:
         if not resolution.selected_model:
             raise RuntimeError("Auth fallback resolved without a model")
@@ -2662,7 +2669,11 @@ def _make_agent(
     from agent.shell_hooks import register_from_config
     register_from_config(cfg)
     system_prompt = _startup_system_prompt(cfg, session_id or key)
-    model, runtime = _resolve_agent_model_runtime(model_override, provider_override)
+    from agent.session_route_policy import session_fallback_disabled
+    policy_db = session_db if session_db is not None else _get_db()
+    fallback_disabled = session_fallback_disabled(policy_db, session_id or key)
+    model, runtime = (_resolve_agent_model_runtime(model_override, provider_override) if not fallback_disabled else
+                      _resolve_agent_model_runtime(model_override, provider_override, allow_fallback=False))
     fallback_notice = runtime.pop("_fallback_notice", None)
     _pr = _load_provider_routing()
     platform = _resolve_agent_platform(platform_override)
@@ -2689,10 +2700,11 @@ def _make_agent(
         # The dashboard login identity reaches memory providers as the runtime user, like a gateway user id.
         # Builds that run before the record exists (branch, eager resume, compute host) pass it explicitly.
         user_id=auth_user_id if auth_user_id is not None else _session_auth_user_id(session),
-        session_db=session_db if session_db is not None else _get_db(), ephemeral_system_prompt=system_prompt or None,
+        session_db=policy_db, ephemeral_system_prompt=system_prompt or None,
         checkpoints_enabled=_resolve_checkpoints_enabled(cfg),
         pass_session_id=is_truthy_value(os.environ.get("HERMES_TUI_PASS_SESSION_ID")),
-        skip_context_files=ignore_rules, skip_memory=ignore_rules, fallback_model=_load_fallback_model(),
+        skip_context_files=ignore_rules, skip_memory=ignore_rules,
+        fallback_model=[] if fallback_disabled else _load_fallback_model(),
         # The resolved provider's request body (a custom entry's extra_body), as the CLI/cron/gateway pass it.
         request_overrides=runtime.get("request_overrides"),
         prefill_messages=_load_prefill_messages() or None, **_agent_cbs(sid))

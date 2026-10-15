@@ -440,19 +440,51 @@ def _public(rec: Dict[str, Any],
 def config_server_names(cfg: Any) -> List[str]:
     """Operator-declared MCP server names from the Qubit config (read-only).
 
-    This is the compatibility inventory (the pre-registry ``mcp.servers``
-    config key). PRB-01: it is a READ-ONLY source merged into the canonical
-    registry view; it is never written and never a second authority.
+    The MCP CLIENT reads the top-level ``mcp_servers`` key
+    (``qubit_runtime/tools/mcp_tool_config.py::_load_mcp_config``); this reader
+    must agree or the dashboard lists a *different* set of servers than the one
+    that actually connects — config-declared servers then render as invisible
+    even though they are live. The legacy nested ``mcp.servers`` shape is still
+    accepted so a pre-existing declaration stays visible. PRB-01: read-only,
+    merged into the canonical registry view; never written, never a second
+    authority.
     """
-    get = (lambda *p, default=None: cfg.get(*p, default=default)) \
-        if hasattr(cfg, "get") else (lambda *p, default=None: default)
-    raw = get("mcp", "servers", default=[])
-    names: List[str] = []
-    if isinstance(raw, dict):
-        names = [str(k) for k in raw.keys()]
-    elif isinstance(raw, list):
-        names = [str(x if isinstance(x, str) else x.get("name", ""))
-                 for x in raw if isinstance(x, (str, dict))]
+    # ``cfg`` may be a plain dict (config.yaml) or a config object exposing
+    # ``.get``. ``dict.get`` takes ``default`` POSITIONALLY only, so normalise
+    # through an explicit helper rather than passing it as a keyword (which
+    # raises TypeError on a dict and hid every config-declared server).
+    def get(*path: str, default: Any = None) -> Any:
+        if isinstance(cfg, dict):
+            cur: Any = cfg
+            for key in path:
+                if not isinstance(cur, dict) or key not in cur:
+                    return default
+                cur = cur[key]
+            return cur
+        getter = getattr(cfg, "get", None)
+        if callable(getter):
+            try:
+                return getter(*path, default=default)
+            except TypeError:
+                try:
+                    return getter(*path)
+                except Exception:
+                    return default
+        return default
+
+    def _names(raw: Any) -> List[str]:
+        if isinstance(raw, dict):
+            return [str(k) for k in raw.keys()]
+        if isinstance(raw, list):
+            return [str(x if isinstance(x, str) else x.get("name", ""))
+                    for x in raw if isinstance(x, (str, dict))]
+        return []
+
+    # Primary: the top-level key the MCP client actually loads.
+    names = _names(get("mcp_servers", default={}))
+    # Legacy/alternate: the nested ``mcp.servers`` shape.
+    if not names:
+        names = _names(get("mcp", "servers", default=[]))
     return sorted(n for n in names if n)
 
 

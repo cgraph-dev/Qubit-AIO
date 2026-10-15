@@ -6,6 +6,32 @@
 
 ## How to use these packets
 
+> **PARALLEL TRACK — read this before interpreting the packets (added 2026-10-14).**
+> These F00–F17 packets describe a **hand-built** renderer: the packet work builds
+> `game/` TypeScript modules and the Vite bundle `qubit-office.game.js`, which *is*
+> the Office tab's served entry (`frontend/qubit-app/plugins/qubit-office/manifest.json`
+> `"entry"`). A **second, different implementation of the same goal** now also exists:
+> the **vendored third-party app** `habblaud` (`github.com/marmottajr/habblaud`, MIT,
+> commit `4ccce2537472`), served as a **separate route**
+> `/plugin-apps/qubit-office/habblaud/` — verified 200 with its real `index.html` this
+> session, and **pixel-verified** rendering (`Connected · 4 rooms · 10 agents`, 0 page
+> errors). It is the **default** renderer for `/qubit-office`; the hand-built shell is the
+> fallback, opt-in via **`?shell=1`** (`game/entry.ts`). Both are reached through the same
+> plugin entry (`qubit-office.game.js`), so the `manifest.json` `"entry"` does **not**
+> tell you which renderer you get — the entry chooses. The two are
+> independent implementations of "an office you watch agents work in"; the vendored route
+> does **not** advance or replace these packets. No document yet reconciles
+> the two tracks — that is an open item (`docs/OPEN_THREADS.md` § 4.14h).
+>
+> **Correction (same session):** an earlier revision of this note claimed the vendored app
+> was "reached by that path only; there is no `?app=1` switch" and that "the default
+> remains the hand-built `qubit-office.game.js`". That was measured **before** the
+> default-inversion landed and is now false; the paragraph above supersedes it.
+>
+> Packet STATUS blocks below are **evidence-backed as of 2026-10-14**, with the exact test
+> counts recorded; "DONE" means the named tests pass, **not** that the packet's LIVE proof
+> was exercised. Live integration claims are marked NOT VERIFIED where they were not run.
+
 Execute in order. Each packet is split into observable small steps and declares exact proposed paths. New paths/test names below do **not** exist yet unless explicitly called existing. Commands for future files are planned gates, not already-passing proof.
 
 Respect implementation-first verification: write behavioral tests/fixtures alongside each packet, run only minimal focused checks needed to prevent damage, and record deferred checks. Full final matrix runs after implementation is frozen and the integration lead permits it. No repeated broad suite loop.
@@ -145,6 +171,13 @@ prototype; do not produce the full asset batch or claim the visual problem solve
 
 **STATUS — partial (2026-10-14).** Landed, with `tests/test_office_game_shell.py` (22 tests, falsified 2 ways):
 
+> **Re-verified 2026-10-14 (later session):** the header below says the 3 pre-existing failures were
+> "RESOLVED". That statement stands for those three (`test_office_hud_panels.py` P4/P5 and
+> `test_office_plugin_wiring.py` wiring), which are **not** in the office-game glob. But a **different,
+> intermittent failure was observed this session** in the vendored-app tests — see the note at the end of
+> this F08 block. F08 itself remains **partial**: items 1–4 below are still open, item 1 (world not
+> growing) is fixed.
+
 | Built | Note |
 |---|---|
 | `game/styles/tokens.css` | Every shell value is a token. Text zoom turns ONE knob (`--office-scale`); reduced motion and contrast are token swaps, not filters — a filter over the scene would wash out the state animation colours, so a `blocked` agent could read as `idle`. |
@@ -173,6 +206,16 @@ prototype; do not produce the full asset batch or claim the visual problem solve
 
 **Environment trap hit twice, worth a note:** `NODE_ENV=production` in the shell makes `npm ci`/`npm install` omit every devDependency, so `vite`, `typescript` and `@vitejs/plugin-react` all silently vanish and 300+ packages go missing. Install with `NODE_ENV=development npm ci --include=dev`.
 
+**Vendored-app test flakiness observed 2026-10-14 (recorded, not resolved).**
+`.venv/bin/python -m pytest tests/test_office_vendor_habblaud.py tests/test_office_assets_vendored.py tests/test_office_plugin_app.py -q`
+returned **`5 failed, 81 passed`** on the first run this session (recorded-file hashes, MIT licence
+shipped, licence-in-record, index absolute-ref rewrite, plugin-prefix rewrite). The **same command
+re-run four times returned `86 passed` each time**; each file alone and each pair alone pass. So the
+failure is **order-/state-dependent and intermittent**, and it is **NOT** resolved — no root cause was
+found. The vendored-app hash assertions should be treated as **flaky pending a root cause**. The green
+re-runs are *not* evidence the first failure was spurious. (The office-game glob itself was clean:
+`tests/test_office_game_*.py` → **204 passed**, 0 skipped, with `NODE_ENV=production` set.)
+
 ## F09 — Character roster, profile and dialogue shell
 
 **Create:** `game/ui/{CharacterPanel,ConversationPanel}.ts`, `systems/CharacterPresenter.ts`; tests `character.test.ts`, `conversation.test.ts`.
@@ -181,6 +224,17 @@ prototype; do not produce the full asset batch or claim the visual problem solve
 3. Bind canonical recipient/session stream; distinct pending/streaming/tool/owner-wait/error/stale states.
 4. Finalize one message ID once; support optional typewriter/instant text, follow-up, artifacts and explicit interruption.
 **Proof:** real target receives a message, reload recovers it, stream doesn't duplicate, close doesn't cancel. If binding absent, preview tests pass but LIVE integration remains blocked.
+
+**STATUS — DONE (2026-10-14), engine-independent.** The character roster, profile and dialogue shell
+are built and tested. Real count: `tests/test_office_game_character.py` passes as part of
+`.venv/bin/python -m pytest tests/test_office_game_*.py -q` → **204 passed** (0 skipped, even with
+`NODE_ENV=production`); F09+F12 together → **66 passed in 15.07s**.
+
+See also § 4.14g in `docs/OPEN_THREADS.md` for the exact command. **NOT VERIFIED here:** whether the
+canonical recipient/session stream is bound end-to-end (the packet's own proof — a real target receives
+a message, reload recovers it, stream does not duplicate, close does not cancel). That is a LIVE
+integration claim; the passing tests prove the shell and its state machine, not that a live message
+round-trips.
 
 ## F10 — Cohesive art kit and animation
 
@@ -208,6 +262,15 @@ prototype; do not produce the full asset batch or claim the visual problem solve
 3. Bind canonical stage/settle with revision/idempotency/e-stop; read back exact target.
 4. De-noise routine notifications; preserve blocking requests and access needs.
 **Proof:** answer one real test/paper request through the existing authority; duplicate click does not duplicate settlement; stale money is marked, null is not zero.
+
+**STATUS — DONE (2026-10-14), engine-independent.** The operational panels (tasks/proposals/evidence,
+money folds, activity grouping, boardroom) are built and tested. Real count:
+`tests/test_office_game_operational.py` passes as part of
+`.venv/bin/python -m pytest tests/test_office_game_*.py -q` → **204 passed** (0 skipped); F09+F12
+together → **66 passed in 15.07s** (see `docs/OPEN_THREADS.md` § 4.14g). **NOT VERIFIED here:** the
+packet's LIVE proof — answering a real test/paper request through the existing authority, and
+duplicate-click idempotency against the real settle path. The tests prove the panel logic against its
+fixtures, not a live settlement.
 
 ## F13 — Editor and capability-aware furniture
 

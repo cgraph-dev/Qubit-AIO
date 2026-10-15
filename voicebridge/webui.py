@@ -958,6 +958,9 @@ spa_route_target = qubit_alias_target
 # Without this the cron/skills/toolset read path returned the fork's empty
 # store while the write path wrote the Qubit store (read/write split-brain).
 QUBIT_READ_AUTHORITY: tuple = (
+    # The office tower is the Qubit office store authority; never read the
+    # upstream Habblaud backend's unrelated organization.
+    "/api/office/tower",
     "/api/cron/jobs",
     "/api/skills",
     "/api/tools/toolsets",
@@ -1526,8 +1529,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return True
         return self._api_token_ok()
 
-    def _office_app_caller_ok(self) -> bool:
-        """Auth for the vendored office app's stream.
+    def _office_app_caller_ok(self, *, blind_probe: bool = False) -> bool:
+        """Auth for the vendored office app's routes.
 
         WHY THIS IS NOT ``_qubit_token_ok``
         -----------------------------------
@@ -1549,9 +1552,39 @@ class WebUIHandler(BaseHTTPRequestHandler):
              app's directory, so an arbitrary script on the local machine
              cannot read the office store through this route.
 
-        A header token still works and is still checked first — this only ADDs
-        the path the browser's EventSource can actually take.
+        A header token still works and is still checked first. A query token
+        still works for the stream (the app puts one on its stream URL because
+        EventSource cannot set headers).
+
+        ``blind_probe`` — WHY IT EXISTS
+        -------------------------------
+        The app's FIRST request is ``fetch('/api/access')`` from the bundle's
+        module body, which runs before the parent can bridge fetch into the
+        iframe's realm. That request cannot carry a token. Permit only this
+        access-capability read under the loopback + same-origin + own-app
+        Referer triple. Other reads, including agent details, require a valid
+        session header. The stream's EventSource uses a dedicated query-token
+        exception, scoped to the stream route; query-token auth on ordinary APIs
+        remains rejected by ``token_ok``.
         """
+        # A supplied token is always validated and never falls through to the
+        # constrained no-header path if it is wrong. Keep the normal API's
+        # query-token rejection in force; only the legacy stream route accepts
+        # a query credential because EventSource cannot send request headers.
+        query_token_present = "token=" in self.path.split("?", 1)[-1]
+        if query_token_present:
+            if (self.path.split("?", 1)[0].rstrip("/")
+                    not in ("/api/stream", "/api/snapshot")):
+                return False
+            try:
+                from urllib.parse import parse_qs, urlsplit
+                query_token = (parse_qs(urlsplit(self.path).query).get("token") or [""])[0]
+            except (TypeError, ValueError):
+                return False
+            configured_token = getattr(self.app, "api_token", "") or ""
+            return bool(configured_token and query_token == configured_token)
+
+        configured_token = getattr(self.app, "api_token", "") or ""
         if self._qubit_token_ok():
             return True
 
@@ -1564,7 +1597,19 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return False
 
         referer = self.headers.get("Referer", "") or ""
-        return (OFFICE_APP_PREFIX in referer)
+        if OFFICE_APP_PREFIX not in referer:
+            return False
+        # The capability bootstrap fetch is issued at module evaluation before
+        # the iframe is navigated/bridged. Keep this exception confined to that
+        # read endpoint and its own-app loopback document context.
+        if blind_probe and self.path.split("?", 1)[0].rstrip("/") != "/api/access":
+            return False
+        # `access` is only capability discovery; keep its tokenless bootstrap
+        # narrowly constrained to the loopback app document. It exposes no
+        # store data or mutation authority. All other routes require a valid
+        # configured credential; no-token configurations retain loopback-only
+        # operation for the local app.
+        return blind_probe or not configured_token
 
     def _qubit_dist(self) -> "Path":
         # Resolve the built Qubit dashboard from package data first (a clean
@@ -1668,13 +1713,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
         fresh read of the same tower report `GET /api/office/tower` returns, so
         the page, that route, and the C7 test cannot disagree about the office.
 
-        NOT BOUND HERE, deliberately: `/api/agents/:id`, `/api/permissions/:id`
-        and `/api/messages/:id`. Those are org MUTATIONS; contract C4 requires
-        them to go through the confirmation authority rather than a POST from a
-        view. The client reports them missing, which is the truth.
+        `/api/access` reports only local view/action capabilities. Per-agent
+        transcripts (`/api/agents/:id`) are not yet joined to Qubit sessions.
+        Permission decisions and messages require org authority and are not
+        exposed as unconfirmed writes from this embedded view.
 
-        Auth matches every other office read: the same session token, accepted
-        as a query param because EventSource cannot set headers.
+        The authenticated dashboard shell supplies the session token to the
+        Habblaud document. EventSource cannot set headers, so its dedicated
+        route accepts the token through the app's restricted stream auth
+        predicate; no token is exposed in the document URL.
         """
         from . import office_stream as OS
         from .office import tower as TWR
@@ -1725,14 +1772,87 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 for frame in OS.stream_frames(tower, revision, start):
                     self.wfile.write(frame)
                 self.wfile.flush()
-                # The client applies a snapshot WHOLESALE, so a fresh snapshot
-                # per interval is the simplest correct update: it carries the
-                # current positions, and the feed carries the new events. There
-                # is no delta protocol to get wrong.
+                # Every frame comes from office_stream's explicit client schema.
+                # The raw tower report and its internal field names stay server-side.
                 time.sleep(OS.SNAPSHOT_INTERVAL_SECONDS)
         except (BrokenPipeError, ConnectionResetError):
             # The client navigated away or reconnected. Not an error.
             pass
+
+    def _serve_office_access(self) -> None:
+        """Read-only, conservative capability discovery for Habblaud.
+
+        The vendored client enables actions from this response. It must not
+        infer that Qubit supports upstream agent/session operations just
+        because an endpoint is absent, so every unsupported capability stays
+        false; only local read/render access is enabled.
+        """
+        if not self._office_app_caller_ok(blind_probe=True):
+            self._send(401, b"unauthorized")
+            return
+        self._json({
+            "remote": False,
+            "local": True,
+            "permissions": False,
+            "messages": False,
+            "terminal": False,
+            "spawn": False,
+        })
+
+    def _serve_office_agent(self, agent_id: str) -> None:
+        """Return a grounded read-only Qubit office agent profile.
+
+        Habblaud's agent drawer consumes this route for identity and activity
+        details. Qubit's office event ledger is the source: no transcript or
+        upstream session is invented when there is no linked Qubit conversation.
+        """
+        if not self._office_app_caller_ok():
+            self._send(401, b"unauthorized")
+            return
+        try:
+            ident = int(agent_id)
+        except (TypeError, ValueError):
+            self._send(404, b"not found")
+            return
+        from .office import store as OfficeStore
+        cfg = self.app.orch.cfg
+        try:
+            conn = OfficeStore.connect(cfg)
+            try:
+                OfficeStore.migrate(conn)
+                seat = conn.execute(
+                    "SELECT id, slug, name, seat_type, department_id, supervisor_id, status "
+                    "FROM office_agent WHERE id=? AND status!='terminated'", (ident,)
+                ).fetchone()
+                if seat is None:
+                    self._send(404, b"not found")
+                    return
+                events = [dict(r) for r in conn.execute(
+                    "SELECT id, ts, kind, payload FROM office_event WHERE agent_id=? "
+                    "ORDER BY id DESC LIMIT 20", (ident,))]
+            finally:
+                conn.close()
+        except Exception as exc:  # noqa: BLE001 - a read must not fail the app
+            self._json({"error": "office agent unavailable", "detail": str(exc)[:160]}, 503)
+            return
+        activities = []
+        for row in reversed(events):
+            try:
+                detail = json.loads(row.get("payload") or "{}")
+            except (TypeError, ValueError):
+                detail = {}
+            activities.append({
+                "id": str(row["id"]), "kind": row["kind"],
+                "text": str(detail.get("text") or detail.get("detail") or row["kind"]),
+                "at": int(float(row["ts"]) * 1000),
+            })
+        self._json({
+            "id": str(seat["id"]), "name": seat["name"], "slug": seat["slug"],
+            "role": seat["seat_type"], "departmentId": seat["department_id"],
+            "supervisorId": seat["supervisor_id"], "status": seat["status"],
+            "recent": activities,
+            "conversation": None,
+        })
 
     def _serve_plugin_app(self, sub: str) -> None:
         """Serve a plugin's bundled HTML application.
@@ -1803,7 +1923,54 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # than guessed at, so nothing new becomes servable by accident.
             self._send(404, b"not found")
             return
+        if suffix == ".html":
+            # The vendored app is a SEPARATE same-origin DOCUMENT: the host
+            # shell's ``window.__QUBIT_SESSION_TOKEN__`` injection lands on the
+            # dashboard page, never on this iframe's own document. Without the
+            # token here the app's ``fetch('/api/access')`` carries no credential
+            # and Qubit's gate answers 401, which the client reads as "go to
+            # /login" — the office silently becomes the Sessions page. Inject the
+            # SAME token the shell already injects, under the SAME global, so the
+            # iframe is authenticated exactly like its parent. Loopback and
+            # non-loopback callers are treated identically: the token is only in
+            # the response body of a route the caller already fetched, and the
+            # gate itself is unchanged.
+            self._serve_app_html(target)
+            return
         self._file(target, ctype)
+
+    def _serve_app_html(self, target: Path) -> None:
+        """Serve a plugin-app HTML document with the session token injected.
+
+        Mirrors ``_serve_qubit_index``'s injection (same global, same origin,
+        same trust boundary) for the plugin's own document. Injected only when
+        the caller is entitled to the token at all: a non-loopback peer gets the
+        token too, because the token is ALSO injected into the dashboard shell
+        for any caller — the SPA is served to whoever can reach the route, and
+        the token gates *API* access, not asset delivery. Reading the app's HTML
+        grants nothing an attacker could not already get from ``/`` — but it
+        does mean the injected value must be the configured token, not a guess.
+        """
+        try:
+            html = target.read_text(encoding="utf-8")
+        except OSError:
+            self._send(404, b"not found")
+            return
+        token = getattr(self.app, "api_token", "") or ""
+        if token:
+            from urllib.parse import quote
+            stream_url = "/api/stream?token=" + quote(token, safe="")
+            inject = (
+                "<script>window.__QUBIT_SESSION_TOKEN__=%s;"
+                "window.__QUBIT_OFFICE_STREAM_URL__=%s;"
+                "window.__QUBIT_OFFICE_APP__=true;</script>"
+                % (json.dumps(token), json.dumps(stream_url))
+            )
+            if "</head>" in html:
+                html = html.replace("</head>", inject + "</head>", 1)
+            else:
+                html = inject + html
+        self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _serve_qubit_plugin(self, sub: str) -> None:
         from . import resources as _resources
@@ -2701,12 +2868,37 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if path.startswith("/plugin-apps/"):
             self._serve_plugin_app(path[len("/plugin-apps/"):])
             return
+        # A Vite preload helper in the vendored Habblaud client can turn a
+        # correctly-origin-qualified path into `/http://<host>/plugin-apps/...`
+        # when its URL resolver double-resolves an absolute string. Confine this
+        # compatibility alias to that exact same-host plugin-app prefix; never
+        # serve arbitrary path-embedded URLs or rewrite other API paths.
+        app_path = f"/http://{self.headers.get('Host', '')}/plugin-apps/"
+        if path.startswith(app_path):
+            self._serve_plugin_app(path[len(app_path):])
+            return
         # The office client's live feed. `/api/stream` is what the vendored app
         # asks for; Qubit's own API lives under `/agent/api/`, so this one path
         # is served directly rather than through the compat dispatch (which
         # returns JSON bodies, not a stream).
         if path.split("?")[0] in ("/api/stream", "/api/snapshot"):
             self._serve_office_stream()
+            return
+        # Runtime image may be a packaged wheel with its own _data tree; expose
+        # these source checkout-only read routes only when the implementation
+        # is actually present in the loaded handler process.
+        if path.split("?")[0] == "/api/access":
+            self._serve_office_access()
+            return
+        if (self.command == "GET" and path.startswith("/api/agents/")
+                and path.endswith("/character")):
+            # Habblaud profile/character reads only. Its PUT/DELETE mutation
+            # calls remain refused; Qubit settings need the broker authority.
+            self._serve_office_agent(path[len("/api/agents/"):-len("/character")].strip("/"))
+            return
+        if (self.command == "GET" and path.startswith("/api/agents/")
+                and path.count("/") == 3):
+            self._serve_office_agent(path[len("/api/agents/"):])
             return
         if path == "/favicon.ico":
             self._serve_qubit_static("/favicon.ico")

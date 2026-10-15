@@ -542,6 +542,17 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             exc_info=True)
     started = time.monotonic()
     agent = None
+    # Turn-time provider fallback (billing/rate-limit → next chain entry):
+    # hand the vendored agent the same chain the terminal /chat uses, read
+    # from the already-loaded vendored config. Fail-open None (today's
+    # behavior) when the config names no chain, so an unconfigured install
+    # is identical to before. Clearing ``fallback_providers`` in config
+    # restores the old behavior with no code change.
+    try:
+        from qubit_cli.fallback_config import get_fallback_chain  # type: ignore
+        _fb_chain = get_fallback_chain(vcfg) or None
+    except Exception:  # noqa: BLE001 - chain is advisory, never fatal
+        _fb_chain = None
     try:
         agent = AIAgent(
             api_key=runtime.get("api_key"),
@@ -556,6 +567,7 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             platform="cli",
             session_id=sid,
             credential_pool=runtime.get("credential_pool"),
+            fallback_model=_fb_chain,
             reasoning_config=_vendor_reasoning_config(reasoning),
             clarify_callback=_vendor_clarify_callback,
             event_callback=event_sink,

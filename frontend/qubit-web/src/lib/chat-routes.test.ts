@@ -59,6 +59,8 @@ describe("chat-routes", () => {
     // page grows to its content (measured 104,305px for /webchat).
     expect(isFullHeightPath("/webchat")).toBe(true);
     expect(isFullHeightPath("/qubit-bot")).toBe(true);
+    expect(isFullHeightPath("/qubit-office")).toBe(true);
+    expect(isFullHeightPath("/qubit-office/")).toBe(true);
     expect(isFullHeightPath("/webchat/")).toBe(true);
   });
 
@@ -80,6 +82,7 @@ describe("chat-routes", () => {
       "/qubit-chat",
       "/webchat",
       "/qubit-bot",
+      "/qubit-office",
     ]);
   });
 });

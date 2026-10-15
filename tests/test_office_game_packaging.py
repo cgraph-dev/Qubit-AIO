@@ -507,7 +507,13 @@ def test_the_scene_host_lifecycle_is_clean(tmp_path):
     assert _build(out).returncode == 0
 
     # Compile just the Canvas host to CJS so node can require it.
-    tsc = WEB / "node_modules" / "typescript" / "bin" / "tsc"
+    # `ensure_tsc()` self-heals to the scratch install when a dashboard build
+    # deleted node_modules, so a missing tsc cannot silently skip the driver.
+    from _office_toolchain import ensure_tsc
+    tsc = ensure_tsc()
+    assert tsc is not None, (
+        "no usable tsc for the node driver — see tests/_office_toolchain.py; "
+        "install with: npm install --include=dev typescript")
     staged = tmp_path / "src"
     staged.mkdir()
     for name in ("SceneHost.ts", "CanvasSceneHost.ts"):
@@ -520,9 +526,9 @@ def test_the_scene_host_lifecycle_is_clean(tmp_path):
          str(staged / "CanvasSceneHost.ts")],
         capture_output=True, text=True, timeout=180, cwd=str(staged))
     compiled = tmp_path / "js" / "CanvasSceneHost.js"
-    if not compiled.is_file():
-        pytest.skip(f"tsc could not compile the host for the node driver: "
-                    f"{proc.stderr[:400]}")
+    assert compiled.is_file(), (
+        "tsc could not compile the host for the node driver — a FAILURE, not a"
+        f" skip:\n{proc.stderr[:800]}")
 
     program = (
         'const {createCanvasHost} = require(%s);\n%s'

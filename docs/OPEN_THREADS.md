@@ -191,7 +191,56 @@ Owner directive: *"apply and start"*, then *"verify and fix and continue"*.
 `60-IMPLEMENTATION-PLAN.md` for what landed and the four items still open (the world not growing to fill
 the shell was the largest; it is now fixed and verified live). **F07 is done** (playable slice, 17 tests,
 committed `186abf7d4`); **F09 (character roster, profile, dialogue shell)** and **F12 (operational
-panels)** are unblocked and need no new engine work.
+panels)** are DONE — see § 4.14 below.
+
+### 4.14 — Current state of Qubit Office (re-verified 2026-10-14, evidence-backed)
+
+VERIFIED by running, this session. "VERIFIED" below means the exact command was run and its output is
+the evidence; "NOT VERIFIED" means it is claimed or plausible but was not exercised live.
+
+| # | Claim | State | Exact evidence |
+|---|-------|-------|----------------|
+| 4.14a | **The REAL third-party office app is vendored** — `github.com/marmottajr/habblaud`, MIT, commit `4ccce2537472`, client build output only (server / Claude Code mod / Docker NOT vendored) | **VERIFIED** | `.venv/bin/python scripts/vendor_habblaud.py --src /tmp/habblaud-full --check` → `ok: 77 files, 2147125 bytes, commit 4ccce2537472` (exit 0). `PYTHON=/dev/null PROVENANCE.json` records source URL, commit, MIT licence and per-file sha256. Lives at `frontend/qubit-app/plugins/qubit-office/habblaud/`. |
+| 4.14b | **The vendored app is served and renders** | **VERIFIED (served AND renders)** | `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8890/plugin-apps/qubit-office/habblaud/` → **200**. The body is the real Habblaud `index.html` (pt-BR, `<canvas id="world">`, module `bundle/main-DND_b4_E.js`). Bundle + an asset also return 200. **Pixel-verified** by headless-chrome probe: default `/qubit-office` frame reports `Habblaud Connected 4 rooms 10 agents` with **0 page errors**; an earlier probe of the same page counted **22,776 non-background canvas pixels across 162 tones** (a black/empty canvas would be one tone). |
+| 4.14c | **Which implementation is the default on `/qubit-office`** | **VERIFIED — the VENDORED APP** | `game/entry.ts` mounts the vendored app by default; the hand-built shell is opt-in via `?shell=1`. Live probe (headless chrome): plain `/qubit-office` → **1 iframe**, src `/plugin-apps/qubit-office/habblaud/`, frame text `Habblaud Connected 4 rooms 10 agents`; `?shell=1` → **0 iframes, 2 canvases** (the old shell). NOTE: `manifest.json` line 11 still declares `"entry": "qubit-office.game.js"` — that is the plugin entry, and the *entry itself* chooses the app. Both statements are true at different layers; do not read the manifest as "which renderer you get". An earlier revision of this row claimed the hand-built renderer was the default — **that was measured before the inversion landed and is corrected here.** |
+| 4.14d | **The default/fallback switch** | **VERIFIED — `?shell=1` opts back into the hand-built shell** | `game/entry.ts`: `const wantShell = params.has("shell")`. The earlier `?app=1` form is gone: with the app now the default, an opt-*in* to the app is meaningless and the inverse param carries the fallback. An earlier revision of this row claimed no switch existed and that no `app=`/`shell=` param was present — **that was stale** (the grep ran before the inversion landed). |
+| 4.14e | **F09 (character roster, profile, dialogue shell) is DONE** | **VERIFIED (tests pass)** | `tests/test_office_game_character.py` — real count in § 4.14g (run together with F12). |
+| 4.14f | **F12 (operational panels, boardroom) is DONE** | **VERIFIED (tests pass)** | `tests/test_office_game_operational.py` — real count in § 4.14g. |
+| 4.14g | **The office game suite passes** | **VERIFIED** | `.venv/bin/python -m pytest tests/test_office_game_*.py -q` → **`211 passed in 70.98s`**, exit 0, **0 skipped**, even with `NODE_ENV=production` set. (Earlier this session the same command reported `204 passed / 2 skipped` — the 2 skips were the toolchain gap below, not real coverage.) F09+F12 alone: `pytest tests/test_office_game_character.py tests/test_office_game_operational.py -q` → **`66 passed in 15.07s`**. |
+| 4.14h | **The vendored-app route is a PARALLEL track to the F00–F17 packet plan** | **STATED, not a status claim** | The packets describe a **hand-built** renderer (`frontend-game/60-IMPLEMENTATION-PLAN.md`; F01–F16). The vendored habblaud app is a **different implementation of the same goal** (an office you watch agents work in), shipped as a separate served route. The packets are still the plan of record for the Office tab; the vendored route does not advance or replace them. There is no reconciliation document yet — that is an open item. |
+| 4.14i | **`docs/STATUS.md` still does not exist** | **VERIFIED absent (unchanged from § 4.2)** | `ls docs/STATUS.md` → `No such file or directory`. Not invented; recorded as a labelled unknown, as before. |
+| 4.14j | **Work is UNCOMMITTED** | **VERIFIED** | `git status --short \| wc -l` → **49** dirty entries. `git log --oneline -3` top = `3d7989e36 fix(qubit-office): make the walls actually read as walls`. |
+
+### 4.15 — Office test toolchain: the `NODE_ENV=production` trap (2026-10-14)
+
+`pytest tests/test_office_game_*.py` errors when `NODE_ENV=production` is set in the shell: `npm ci` /
+`npm install` then defaults to `--omit=dev`, installs no devDependencies, and
+`frontend/qubit-web/node_modules` loses `typescript` and `vite`. `scripts/build_dashboard.sh` also
+`rm -rf`s that dir unless `KEEP_NODE_MODULES=1`. Two symptoms: the office suites used to echo
+`N skipped` as a **false green** (fixed — they now error, see below), and the packaging suite failed
+with `Cannot find module .../typescript/bin/tsc`. Recovery — set `NODE_ENV=development` first, then:
+
+```
+npm install --include=dev --prefix frontend/qubit-web typescript vite   # restore the tree copy
+KEEP_NODE_MODULES=1 scripts/build_dashboard.sh                          # rebuild keeping node_modules
+export QUBIT_TSC=/path/to/tsc                                          # or point straight at one
+```
+
+`tests/_office_toolchain.py` self-heals: when no `tsc` resolves it installs `typescript@5.9.2` into
+`~/.local/state/qubit-voicebridge/runtime/cache/scratch/ts-tool` (outside the tree, so a dashboard build
+cannot delete it) and the suites **RUN**. With `QUBIT_TSC_SELF_HEAL=0` and no compiler, every office
+suite **ERRORS at collection** naming the exact install command — never a skip. Falsified both ways
+2026-10-14 (hide `tsc` + `SELF_HEAL=0` → collection error; hide `tsc` + self-heal → `18 passed`).
+
+**Intermittent test failure — recorded, not laundered.** Running
+`pytest tests/test_office_vendor_habblaud.py tests/test_office_assets_vendored.py tests/test_office_plugin_app.py -q`
+produced **`5 failed, 81 passed`** on the first run this session (five `test_office_vendor_habblaud.py`
+assertions: recorded-file hashes, MIT licence shipped, licence in the record, index absolute-ref rewrite,
+plugin-prefix rewrite). The **same command re-run four times** produced `86 passed` every time; each file
+alone and each pair alone also pass. So the failure is **order-/state-dependent and intermittent, NOT a
+reproducible defect** — but it is NOT resolved: no root cause was found. Treat the vendored-app hash
+assertions as **flaky until a root cause is identified**. Do not read the four green re-runs as proof the
+first failure was spurious.
 
 ---
 

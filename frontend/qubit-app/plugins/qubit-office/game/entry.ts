@@ -54,22 +54,36 @@ if (!SDK || !SDK.React || !SDK.hooks) {
 } else {
   /* WHICH RENDERER MOUNTS, AND HOW TO GET BACK
    *
-   * `?app=1` mounts the VENDORED office client (the full pixel-art app, served
-   * from /dashboard-plugins/qubit-office/habblaud/). Without it, the previous
-   * hand-built shell mounts.
+   * `/qubit-office` (no query param) mounts the VENDORED office client — the
+   * full pixel-art app under /plugin-apps/qubit-office/habblaud/, fed by the
+   * live `/api/stream` SSE route. `?shell=1` mounts the previous hand-built
+   * shell (game/OfficeGameShell.tsx) instead. `?app=1` is retained as a
+   * compatibility alias for deployments/bookmarks created during the first
+   * Habblaud preview; the default is always the upstream app.
    *
-   * A URL SWITCH RATHER THAN A CODE CHANGE because the vendored app's
-   * interactive half is not bound to Qubit yet (no /api/stream, and writes must
-   * go through the confirmation authority — see app/office-api.ts). Both
-   * renderers have to stay reachable while that is settled, and a query param
+   * WHY THE OLD SHELL IS RETAINED, NOT DELETED
+   * ------------------------------------------
+   * It is not dead code. It is the ROLLBACK for this promotion, exactly as
+   * `qubit-office.bundle.js` is the rollback for the entry itself: the vendored
+   * app is an external artifact whose whole interactive half depends on bindings
+   * Qubit has not finished (writes must go through the confirmation authority —
+   * see app/office-api.ts). The hand-built shell talks directly to the tower
+   * snapshot the backend owns, so it is the renderer that still works if the
+   * vendored app or its stream regresses. Keeping it one query param away means
+   * a regression can be triaged and escaped in one reload, without a rebuild.
+   *
+   * A URL SWITCH RATHER THAN A CODE CHANGE because both renderers must stay
+   * reachable while the vendored app's write half is settled, and a query param
    * means nobody has to edit and rebuild to compare them.
    */
-  const wantApp = new URLSearchParams(window.location.search).has("app");
+  const params = new URLSearchParams(window.location.search);
+  // The fallback is opt-IN via `?shell=1`; the app is the default.
+  const wantShell = params.has("shell") && !params.has("app");
   const R = SDK.React as OfficeGameShellProps["React"];
   const H = SDK.hooks as OfficeGameShellProps["hooks"];
-  const Office = wantApp
-    ? createOfficeApp(R, H)
-    : createOfficeComponent(R, H, liveData);
+  const Office = wantShell
+    ? createOfficeComponent(R, H, liveData)
+    : createOfficeApp(R, H);
   window.__QUBIT_PLUGINS__?.register("qubit-office", Office);
 }
 

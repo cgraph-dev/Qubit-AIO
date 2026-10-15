@@ -53,6 +53,53 @@ def _cents(value: Any) -> Optional[int]:
         return None
 
 
+def _ms(value: Any, now: Any) -> Optional[int]:
+    """A seconds-since-event value as epoch MILLISECONDS, PRESERVING null.
+
+    Two different time encodings reach this function and both are handled,
+    because getting it wrong silently shifts a timestamp by a factor of 1000:
+
+      * an AGE in seconds (`last_event.age_s`) -> converted through the
+        payload's own `now`, so the client's age arithmetic measures against
+        the tower's clock rather than whenever the page happened to load.
+      * a `now`-relative value that is already an age -> same conversion.
+
+    An ABSOLUTE epoch-seconds stamp (an activity row's `ts`) must NOT come here
+    — use `_epoch_ms` for that, since this would subtract `now` from it and
+    produce a nonsense negative.
+
+    null in, null out: the tower omits a timestamp when it has no event row,
+    and a fabricated `now` would claim "this just happened" for an agent we
+    know nothing about.
+    """
+    if value is None:
+        return None
+    try:
+        base = float(now) if now is not None else time.time()
+        return int((base - float(value)) * 1000)
+    except (TypeError, ValueError):
+        return None
+
+
+def _epoch_ms(value: Any) -> int:
+    """An ABSOLUTE epoch-seconds stamp as epoch milliseconds.
+
+    The tower's activity `ts` is epoch seconds (e.g. 1791861986.937), NOT an
+    age — so it must not go through `_ms`, which would subtract `now` from it.
+
+    A row with no timestamp gets 0 rather than null: the client's `Activity.at`
+    is a required `number` and it stamps `<time datetime=...>` from it, so null
+    throws inside its own render path. 0 is the honest "epoch, i.e. unknown"
+    here — unlike money, where 0 is a *different claim* and must stay null.
+    """
+    if value is None:
+        return 0
+    try:
+        return int(float(value) * 1000)
+    except (TypeError, ValueError):
+        return 0
+
+
 def room_id_for(room: Dict[str, Any], floor_number: int) -> str:
     """A stable room id.
 
@@ -113,6 +160,54 @@ def to_snapshot(tower: Dict[str, Any], revision: int,
             # place is worse than one not drawn, because it looks like a fact.
             continue
         agent_id = str(ch.get("agent_id"))
+        # ---- the fields the client's AgentInfo declares as REQUIRED --------
+        # The client is not defensive about these: `payTasks` iterates
+        # `e.tasks`, and a pane reads `info.status` / `info.at`. Omitting them
+        # threw "Cannot read properties of undefined" inside the vendored
+        # bundle's own render path, which surfaced as console errors while the
+        # frame still said "Connected" — a silent half-failure.
+        #
+        # Each value is still DERIVED, not invented:
+        #   tasks    -- one per open task the tower attributes to this agent;
+        #               no task rows means an empty array (honest: "no tasks"),
+        #               never a synthesised placeholder task.
+        #   status   -- the tower's animation vocabulary, which is what the art
+        #               already maps; the client treats an unknown status as
+        #               idle, so passing it through is exact rather than lossy.
+        #   startedAt / lastEventAt / statusSince -- the tower's own clock, so
+        #               the client's age arithmetic measures against the payload
+        #               rather than the browser clock.
+        #   stats    -- zeroed counters. A counter with no data IS zero (unlike
+        #               money, where a missing value must stay null because 0
+        #               means something different). `subagents` is the one
+        #               honest count available.
+        #   seed     -- derived from the agent id so a character's appearance is
+        #               stable across polls, exactly as rooms already do.
+        # `at` IS A PLACE, NOT A TIME. On a character, `at` is a location name
+        # ("desk") and the only real timestamp is `last_event.age_s`. The first
+        # version of this passed `ch["at"]` through the seconds->ms converter,
+        # where float("desk") threw, the except returned None, and every agent
+        # silently got a null clock. Derive from `last_event.age_s` instead.
+        last_event = ch.get("last_event") or {}
+        at_ms = _ms(last_event.get("age_s"), now)
+        open_tasks = [
+            t for t in (ch.get("tasks") or [])
+            if isinstance(t, dict) and t.get("status") != "completed"
+        ]
+        tasks = [
+            {
+                "id": str(t.get("id") or t.get("slug") or f"{agent_id}-{i}"),
+                "title": str(t.get("title") or t.get("slug") or t.get("id") or ""),
+                "status": str(t.get("status") or "pending"),
+                **({"activeForm": t["active_form"]} if t.get("active_form") else {}),
+            }
+            for i, t in enumerate(open_tasks)
+        ]
+        subagents = sum(
+            1 for other in characters
+            if str(other.get("supervisor_id")) == agent_id
+            and other.get("supervisor_id") is not None
+        )
         agents.append({
             "id": agent_id,
             "kind": "main",
@@ -122,10 +217,25 @@ def to_snapshot(tower: Dict[str, Any], revision: int,
             "role": ch.get("seat_type") or "agent",
             "sessionId": agent_id,
             "account": "qubit",
-            # The tower's own activity vocabulary, passed through unmodified so
-            # the art maps it exactly as it does upstream.
+            # Habblaud AgentInfo's status is the activity vocabulary; it is
+            # distinct from `at` (the physical place string).
+            "status": ch.get("animation"),
+            # The tower's activity vocabulary, passed through unmodified.
             "activity": ch.get("animation"),
             "state": ch.get("animation"),
+            # required by the client's type
+            "tasks": tasks,
+            "seed": abs(hash(agent_id)) % 100000,
+            "startedAt": at_ms,
+            "lastEventAt": at_ms,
+            "statusSince": at_ms,
+            "stats": {
+                "toolCalls": 0,
+                "tokensIn": 0,
+                "tokensOut": 0,
+                "subagents": subagents,
+            },
+            "recent": [],
             "stalled": bool(ch.get("stalled")),
             "walking": bool(ch.get("walking")),
             "facing": ch.get("facing"),
@@ -171,17 +281,64 @@ def to_snapshot(tower: Dict[str, Any], revision: int,
 
 
 def to_feed(tower: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """The tower's activity rows as the client's `FeedItem`s."""
+    """The tower's activity rows as the client's `FeedItem`s.
+
+    `activity` IS AN OBJECT, NOT A STRING. The client's feed row reads
+    `item.activity.at` to stamp the row's `<time datetime=...>` and
+    `item.activity.kind`/`icon` to pick its glyph. Emitting the bare text (the
+    first version of this function did) threw "Cannot read properties of
+    undefined (reading 'at')" inside the vendored bundle's own `updateRow` and
+    aborted every other row on the feed — so an honest-looking string was a
+    worse failure than a missing row.
+
+    Fields the tower does not carry are OMITTED rather than defaulted, on the
+    same rule the rest of this module follows: `icon` is absent from the tower,
+    so the client falls back to its own per-kind glyph instead of being handed
+    an invented emoji.
+    """
+    characters = tower.get("characters") or []
+    rooms = {
+        room_id_for(room, floor.get("number", 0)): (room.get("slug") or "")
+        for floor in ((tower.get("floorplan") or {}).get("floors") or [])
+        for room in (floor.get("rooms") or [])
+    }
+    by_agent = {str(c.get("agent_id")): c for c in characters}
+
     out: List[Dict[str, Any]] = []
-    for row in tower.get("activity") or []:
-        out.append({
+    # The SSE endpoint re-sends the current snapshot on every poll. Habblaud
+    # treats a `feed` event as new rows, not as a replacement, so include only
+    # a bounded recent window here; the client itself deduplicates by id.
+    for row in (tower.get("activity") or [])[:40]:
+        agent_id = (str(row.get("agent_id"))
+                    if row.get("agent_id") is not None else None)
+        character = by_agent.get(agent_id or "") or {}
+        pos = character.get("position") or {}
+        room_id = None
+        if pos.get("floor") is not None and pos.get("room_id") is not None:
+            candidate = f"f{pos.get('floor')}r{pos.get('room_id')}"
+            if candidate in rooms:
+                room_id = candidate
+        at_ms = _epoch_ms(row.get("ts"))
+        activity = {
             "id": str(row.get("id")),
-            "ts": int((row.get("ts") or 0) * 1000),
-            "kind": row.get("kind"),
-            "agentId": (str(row.get("agent_id"))
-                        if row.get("agent_id") is not None else None),
+            # the tower's kind vocabulary is the client's ActivityKind
+            "kind": row.get("kind") or "other",
+            # `icon` deliberately absent — see the docstring
             # The tower's text is already human-readable; passing it through is
             # more honest than re-deriving a sentence from the kind.
+            "text": row.get("text") or "",
+            "at": at_ms,
+        }
+        out.append({
+            "id": str(row.get("id")),
+            "agentId": agent_id,
+            "roomId": room_id,
+            "agentName": character.get("slug") or agent_id or "",
+            "roomName": rooms.get(room_id or "", ""),
+            "activity": activity,
+            # kept for the office's own readers; the client ignores unknown keys
+            "ts": at_ms,
+            "kind": row.get("kind"),
             "text": row.get("text"),
         })
     return out

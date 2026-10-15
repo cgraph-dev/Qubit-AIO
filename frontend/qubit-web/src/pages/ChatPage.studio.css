@@ -220,7 +220,14 @@
 .qchat__mission-list button:hover .qchat__mission-arrow { transform: translate(2px, -2px); }
 
 .qchat__messages { display: flex; width: min(100%, 54rem); flex-direction: column; gap: .9rem; margin-inline: auto; }
-.qchat__message { width: fit-content; max-width: min(88%, 48rem); padding: .8rem .95rem; border: 1px solid var(--qchat-line); border-radius: .8rem; color: var(--midground-base); font: 450 .84rem/1.62 var(--theme-font-mono, ui-monospace, monospace); overflow-wrap: anywhere; contain: layout paint; content-visibility: auto; contain-intrinsic-size: auto 5rem; animation: qchat-message-in 180ms ease-out both; }
+/* NOTE: do NOT add `contain: layout paint` here. It defeats the "remember the
+   real rendered size" half of `contain-intrinsic-size: auto <len>`, so rows that
+   scroll out of view get re-sized to the fixed placeholder on the way back in
+   and paint on top of each other. That reproduced as overlapping transcript rows
+   on the very large sessions (thousands of messages / huge tool-output rows),
+   while small sessions looked fine. `content-visibility: auto` already implies
+   containment, so dropping the explicit pair keeps the skip-layout win. */
+.qchat__message { width: fit-content; max-width: min(88%, 48rem); padding: .8rem .95rem; border: 1px solid var(--qchat-line); border-radius: .8rem; color: var(--midground-base); font: 450 .84rem/1.62 var(--theme-font-mono, ui-monospace, monospace); overflow-wrap: anywhere; content-visibility: auto; contain-intrinsic-size: auto 5rem; animation: qchat-message-in 180ms ease-out both; }
 .qchat__message--assistant { margin-right: auto; border-top-left-radius: .25rem; background: var(--qchat-surface); }
 .qchat__message--user { margin-left: auto; border-color: color-mix(in srgb, var(--qchat-violet) 40%, var(--qchat-line)); border-top-right-radius: .25rem; background: color-mix(in srgb, var(--qchat-violet) 9%, var(--qchat-surface)); }
 .qchat__message--tool { width: calc(100% - 2rem); max-width: 46rem; margin-inline: auto; border-style: dashed; color: var(--qchat-muted); font-size: .76rem; }

@@ -221,8 +221,8 @@
     },
     {
       "path": "bundle/app-U4Pwh2XA.js",
-      "sha256": "5a7ec651af12609f7f73af2120f2f40d66a71853922e3f047f49fc9c5e5f9b86",
-      "bytes": 698086
+      "sha256": "c87c019d5a08586ee1a883e2a00ae191e48eb9583a1184492f7962603a36487d",
+      "bytes": 698428
     },
     {
       "path": "bundle/daystats-CUw1NUBG.js",
@@ -246,8 +246,8 @@
     },
     {
       "path": "bundle/main-DND_b4_E.js",
-      "sha256": "286f362fc50cd4261f715445d71ecd0ab8ce7e87c8f746a6d0b30579e118120e",
-      "bytes": 3921
+      "sha256": "e02de58bc0352b47b66cd2c89143a3f405192286230a27b6cdf2c99956de1dbe",
+      "bytes": 3989
     },
     {
       "path": "bundle/pixelify-sans-cyrillic-400-normal-Ckz2YJkH.woff2",
@@ -381,15 +381,15 @@
     },
     {
       "path": "index.html",
-      "sha256": "1cbabe9decd229ff5d0a3718f66db3acfaa92fb477e84e3adfc7535f3c571734",
-      "bytes": 2832
+      "sha256": "41e7985409df2ce8c2a19e6d35b3fb715ff4987ca09b344d31b61c6e02b4c6a8",
+      "bytes": 2900
     },
     {
       "path": "manifest.webmanifest",
-      "sha256": "0bc6bbdee8141fe7c4f47317c68a750d45786d39ef60ee3363627b23d2f50893",
-      "bytes": 656
+      "sha256": "e10247d124a3978e67c2069de40ac1754f9b0ee4ccebb2f386d64ad3f273b729",
+      "bytes": 758
     }
   ],
-  "total_bytes": 2147057,
+  "total_bytes": 2147637,
   "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
 }

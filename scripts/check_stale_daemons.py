@@ -169,7 +169,30 @@ def _self_test() -> int:
     # A process started now, tracking voicebridge/ (last changed long ago) is fresh.
     import time as _t
     now = _t.time()
-    if (now - 3600) > now:
+    # THIS LINE USED TO BE `if (now - 3600) > now:` -- which is arithmetically
+    # UNSATISFIABLE (`now - 3600` can never exceed `now`), so the branch could not
+    # fire and the self-test's stated purpose ("prove the stale comparison FIRES,
+    # not vacuously fresh") was the one property it did not test. A check that
+    # copies its own operand onto both sides of a comparison always passes.
+    #
+    # THE REAL PROPERTY, driven in both directions -- this is what `classify()`
+    # computes at line 147 (`stale = commit_ts is not None and commit_ts > start_ts`),
+    # so the control exercises the same comparison the tool ships rather than a
+    # restatement of it.
+    def _stale_from(commit_ts, start_ts):
+        return commit_ts is not None and commit_ts > start_ts
+
+    if _stale_from(None, now) is not False:
+        print("SELF-TEST FAILED: an unknown tree mtime was not treated as fresh")
+        ok = False
+    # `stale = commit_ts > start_ts`: a commit NEWER than the process start means
+    # the process is behind its own code, so it is STALE. (Written the other way
+    # round first -- `now - 7200` is OLDER, which is the fresh direction.)
+    if _stale_from(now + 7200, now) is not True:
+        print("SELF-TEST FAILED: a tree newer than the process did not read as STALE")
+        ok = False
+    if _stale_from(now - 7200, now) is not False:
+        print("SELF-TEST FAILED: a tree older than the process read as STALE")
         ok = False
     # The tree resolver must pick tui_gateway for the -m form, not voicebridge
     # (the checkout path contains 'voicebridge' and would otherwise win).

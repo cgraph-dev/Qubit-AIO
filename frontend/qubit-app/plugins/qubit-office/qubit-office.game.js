@@ -192400,67 +192400,233 @@ create: function(game) {
 	function officeAppUrl(base = "") {
 		return `${base.endsWith("/") ? base.slice(0, -1) : base}${OFFICE_APP_PATH}`;
 	}
+	/**
+	* The dashboard's base path, read from the host's own injected global.
+	*
+	* WHY THE GLOBAL RATHER THAN A PROP
+	* ---------------------------------
+	* The host renders a registered plugin as `<Component />` with NO props
+	* (`web/src/plugins/PluginPage.tsx`), so a `base` prop never arrives in
+	* production. `QUBIT_BASE_PATH` is not always empty — a deployment behind a
+	* subpath sets it — and the app's directory is served under that same base, so
+	* the iframe must be built from it. Reading the global the host already injects
+	* into index.html (`window.__QUBIT_BASE_PATH__`) is the same seam the dashboard
+	* itself uses, so there is one source of truth for the base, not two.
+	*/
+	function hostBasePath() {
+		if (typeof window === "undefined") return "";
+		const raw = window.__QUBIT_BASE_PATH__;
+		if (!raw) return "";
+		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
+	}
 	function officeAppSrc(opts = {}) {
-		const url = officeAppUrl(opts.base ?? "");
-		return opts.mock ? `${url}?mock=1` : url;
+		const url = officeAppUrl(opts.base ?? hostBasePath());
+		const query = new URLSearchParams();
+		if (opts.mock) query.set("mock", "1");
+		const suffix = query.toString();
+		return suffix ? `${url}?${suffix}` : url;
+	}
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/app/api-bridge.ts
+	var activeBridges = /* @__PURE__ */ new WeakMap();
+	function installOfficeApiBridge(win, opts = {}) {
+		const prefix = `${(opts.apiPrefix ?? win.__QUBIT_API_PREFIX__ ?? "/agent").replace(/\/+$/, "")}/api/office/habblaud/`;
+		const previousFetch = win.fetch;
+		const previousState = activeBridges.get(win);
+		const originalFetch = previousState?.originalFetch ?? previousFetch;
+		const priorBridge = previousState?.bridge;
+		if (previousState) previousState.active = false;
+		const state = {
+			active: true,
+			originalFetch,
+			bridge: null
+		};
+		activeBridges.set(win, state);
+		const sessionToken = () => {
+			const own = win.__QUBIT_SESSION_TOKEN__;
+			if (own) return own;
+			try {
+				const parent = win.parent;
+				return parent && parent.__QUBIT_SESSION_TOKEN__ || "";
+			} catch {
+				return "";
+			}
+		};
+		const bridge = (input, init) => {
+			if (!state.active || activeBridges.get(win) !== state) return originalFetch(input, init);
+			let request;
+			try {
+				request = new Request(input, init);
+			} catch {
+				return originalFetch(input, init);
+			}
+			const url = new URL(request.url, win.location.href);
+			if (url.origin !== win.location.origin || !url.pathname.startsWith("/api/")) return originalFetch(input, init);
+			const method = request.method.toUpperCase();
+			const path = url.pathname;
+			let target = null;
+			if (method === "GET" && path === "/api/access") target = `${prefix}access`;
+			else if (method === "GET" && path === "/api/sessions/recent") target = `${prefix}sessions/recent`;
+			else if (method === "GET" && path === "/api/timeline/days") target = `${prefix}timeline/days`;
+			else if (method === "GET" && path.startsWith("/api/timeline/") && path !== "/api/timeline/days") {
+				const day = path.slice(14);
+				target = `${prefix}timeline/${encodeURIComponent(decodeURIComponent(day))}`;
+			} else if (method === "GET" && path === "/api/stats/days") target = `${prefix}stats/days`;
+			else if (method === "GET" && path === "/api/stats") target = `${prefix}stats`;
+			else if (method === "GET" && path.startsWith("/api/agents/") && path.slice(12).indexOf("/") < 0) {
+				const id = path.slice(12);
+				target = `${prefix}agents/${encodeURIComponent(decodeURIComponent(id))}`;
+			}
+			if (!target) {
+				if (path.startsWith("/api/")) return Promise.resolve(new Response(JSON.stringify({
+					error: "This office capability is unavailable in Qubit Office.",
+					capability: path,
+					disabled: true
+				}), {
+					status: 501,
+					headers: { "Content-Type": "application/json" }
+				}));
+				return originalFetch(input, init);
+			}
+			const headers = new Headers(request.headers);
+			const token = sessionToken();
+			if (token && !headers.has("X-Qubit-Session-Token")) headers.set("X-Qubit-Session-Token", token);
+			const rewritten = new URL(target, win.location.href);
+			rewritten.search = url.search;
+			return originalFetch(new Request(rewritten, {
+				method: "GET",
+				credentials: "same-origin",
+				headers,
+				signal: request.signal
+			}));
+		};
+		const restore = () => {
+			state.active = false;
+			if (activeBridges.get(win) === state) activeBridges.delete(win);
+			if (win.fetch === bridge) win.fetch = priorBridge ?? originalFetch;
+		};
+		state.bridge = bridge;
+		win.fetch = bridge;
+		return restore;
 	}
 	//#endregion
 	//#region ../qubit-app/plugins/qubit-office/game/app/office-api.ts
 	var ROUTES = [
 		{
 			client: "access",
-			qubit: null,
+			qubit: "/api/access",
 			readOnly: true,
-			note: "No access/permission model is served. The client uses this to decide whether answering from the office is allowed; with no answer it falls back to view-only, which is the safe default."
+			note: "Qubit local view and permitted capabilities."
 		},
 		{
 			client: "stream",
-			qubit: null,
+			qubit: "/api/stream",
 			readOnly: true,
-			note: "THE BLOCKING ONE. Qubit serves a snapshot, not a stream, so the office cannot update live. Polling /agent/api/office/tower is a stand-in that is honest about being a poll."
+			note: "SSE snapshots and notices translated from the Qubit tower report."
 		},
 		{
 			client: "agents/:id",
-			qubit: null,
+			qubit: "/api/agents/:id",
 			readOnly: true,
-			note: "Per-agent conversation transcripts are not exposed over HTTP."
+			note: "Qubit seat and office-event history; not an upstream conversation."
+		},
+		{
+			client: "sessions/recent",
+			qubit: "/api/sessions/recent",
+			readOnly: true,
+			note: "Actual Qubit recent sessions."
+		},
+		{
+			client: "timeline/days",
+			qubit: "/api/timeline/days",
+			readOnly: true,
+			note: "Days with real office-ledger records only."
+		},
+		{
+			client: "timeline/:day",
+			qubit: "/api/timeline/:day",
+			readOnly: true,
+			note: "Real Qubit ledger detail; no visual replay is implied."
+		},
+		{
+			client: "stats/days",
+			qubit: "/api/stats/days",
+			readOnly: true,
+			note: "Per-day totals derived from the Qubit office ledger."
+		},
+		{
+			client: "stats?day=",
+			qubit: "/api/stats",
+			readOnly: true,
+			note: "Real Qubit ledger totals for the requested day."
 		},
 		{
 			client: "permissions/:id",
 			qubit: null,
 			readOnly: false,
-			note: "Answering a permission is an org mutation and must go through the confirmation authority (C4). It must NOT be wired as a bare POST."
+			gated: true,
+			note: "Permission decisions need the Qubit confirmation authority."
 		},
 		{
-			client: "messages/:id",
+			client: "messages",
 			qubit: null,
 			readOnly: false,
-			note: "Sending a message to an agent is an org mutation. Same rule as above."
+			gated: true,
+			note: "Sending messages is an org mutation requiring confirmation."
+		},
+		{
+			client: "terminal/pty",
+			qubit: null,
+			readOnly: false,
+			note: "No raw terminal/PTY capability is exposed by this app."
+		},
+		{
+			client: "spawn",
+			qubit: null,
+			readOnly: false,
+			note: "Starting an agent is not exposed through this client adapter."
+		},
+		{
+			client: "renameRoom",
+			qubit: null,
+			readOnly: false,
+			note: "Room rename is not exposed from this embedded app."
+		},
+		{
+			client: "deliveries",
+			qubit: null,
+			readOnly: true,
+			note: "No Qubit delivery store is bound."
+		},
+		{
+			client: "recording/replay",
+			qubit: null,
+			readOnly: true,
+			note: "Qubit has no Habblaud screen recording/replay source."
 		}
 	];
-	/** The one route that IS bound. */
 	var SNAPSHOT_ROUTE = "/agent/api/office/tower";
-	/** How often the stand-in poll runs. Slower than a real stream would be. */
+	var STREAM_ROUTE = "/api/stream";
 	var POLL_INTERVAL_MS = 2e3;
 	function bindingVerdict() {
 		const bound = [];
 		const missing = [];
 		const gated = [];
-		for (const r of ROUTES) if (r.readOnly === false) gated.push(r.client);
-		else if (r.qubit) bound.push(r.client);
-		else missing.push(r.client);
+		for (const route of ROUTES) if (route.gated) gated.push(route.client);
+		else if (route.qubit) bound.push(route.client);
+		else missing.push(route.client);
 		return {
 			bound,
 			missing,
 			gated,
 			canRender: true,
-			viewOnly: gated.length > 0
+			viewOnly: true,
+			live: ROUTES.some((route) => route.client === "stream" && !!route.qubit)
 		};
 	}
-	/** One line for a person. Deliberately does not say "working". */
 	function bindingSummary() {
 		const v = bindingVerdict();
-		return `${v.bound.length} of ${ROUTES.length} routes bound · ${v.missing.length} missing · ${v.gated.length} gated by the confirmation authority`;
+		return `${v.bound.length} bound · ${v.missing.length} unavailable · ${v.gated.length} confirmation-gated`;
 	}
 	//#endregion
 	//#region ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
@@ -192477,10 +192643,18 @@ create: function(game) {
 			useEffect(() => {
 				const frame = frameRef.current;
 				if (!frame) return;
-				frame.src = officeAppSrc({
-					base: props.base,
-					mock: props.mock
-				});
+				const win = frame.contentWindow;
+				if (!win) {
+					setFailed("The office API could not be connected from this page.");
+					return;
+				}
+				let restoreBridge;
+				try {
+					restoreBridge = installOfficeApiBridge(win);
+				} catch {
+					setFailed("The office API could not be connected from this page.");
+					return;
+				}
 				const onLoad = () => {
 					setLoaded(true);
 					setFailed(null);
@@ -192489,17 +192663,29 @@ create: function(game) {
 				const onError = () => setFailed("The office app failed to load.");
 				frame.addEventListener("load", onLoad);
 				frame.addEventListener("error", onError);
+				setFailed(null);
+				setLoaded(false);
+				frame.src = officeAppSrc({
+					base: props.base,
+					mock: props.mock
+				});
 				return () => {
 					frame.removeEventListener("load", onLoad);
 					frame.removeEventListener("error", onError);
+					restoreBridge?.();
 				};
 			}, [props.base, props.mock]);
 			const children = [R.createElement("iframe", {
 				key: "frame",
 				ref: frameRef,
-				title: "Qubit Office",
+				title: "Habblaud virtual office",
 				"data-testid": "office-app-frame",
 				className: "office-game__frame",
+				"aria-label": "Habblaud office game",
+				"aria-describedby": "office-app-description",
+				"aria-busy": !loaded && !failed,
+				"data-state": failed ? "error" : loaded ? "ready" : "loading",
+				sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
 				allow: "clipboard-read; clipboard-write",
 				style: {
 					border: "0",
@@ -192507,54 +192693,38 @@ create: function(game) {
 					height: "100%",
 					display: "block"
 				}
-			})];
+			}), R.createElement("p", {
+				key: "description",
+				id: "office-app-description",
+				className: "office-game__sr-only"
+			}, "Interactive Habblaud virtual office. Use the controls within the game; unsupported write actions are disabled.")];
 			if (!loaded && !failed) children.push(R.createElement("div", {
 				key: "loading",
-				className: "office-game__panel",
+				className: "office-game__panel office-game__loading",
 				"data-testid": "office-app-loading",
-				style: {
-					position: "absolute",
-					inset: "50% 0 auto 0",
-					textAlign: "center"
-				}
+				role: "status",
+				"aria-live": "polite"
 			}, "Loading the office…"));
 			if (failed) children.push(R.createElement("div", {
 				key: "failed",
-				className: "office-game__refusal",
+				className: "office-game__refusal office-game__error",
 				"data-testid": "office-app-failed",
-				role: "alert",
-				style: {
-					position: "absolute",
-					left: 12,
-					top: 12
-				}
-			}, [R.createElement("div", { key: "m" }, failed), R.createElement("div", {
+				role: "alert"
+			}, [R.createElement("div", { key: "m" }, `${failed} Check Qubit's office connection; do not start a separate upstream server.`), R.createElement("div", {
 				key: "p",
 				style: { fontSize: "var(--office-fs-xs)" }
 			}, OFFICE_APP_PATH)]));
+			const verdict = bindingVerdict();
 			children.push(R.createElement("div", {
 				key: "status",
-				className: "office-game__bar",
+				className: "office-game__sr-only",
 				"data-testid": "office-app-status",
 				role: "status",
-				style: {
-					position: "absolute",
-					left: 0,
-					right: 0,
-					bottom: 0
-				}
-			}, [R.createElement("span", { key: "s" }, bindingSummary()), R.createElement("span", {
-				key: "r",
-				style: { opacity: .7 }
-			}, `poll ${POLL_INTERVAL_MS / 1e3}s \u2192 ${SNAPSHOT_ROUTE}`)]));
+				"aria-label": `${bindingSummary()}; ${verdict.live ? `live stream ${STREAM_ROUTE}` : `poll ${POLL_INTERVAL_MS / 1e3}s → ${SNAPSHOT_ROUTE}`}`
+			}, bindingSummary()));
 			return R.createElement("div", {
 				"data-testid": "office-app",
-				className: "office-game",
-				style: {
-					position: "relative",
-					width: "100%",
-					height: "100%"
-				}
+				className: "office-game"
 			}, children);
 		};
 	}
@@ -192720,10 +192890,11 @@ create: function(game) {
 	var SDK = window.__QUBIT_PLUGIN_SDK__;
 	if (!SDK || !SDK.React || !SDK.hooks) console.warn("[qubit-office] plugin SDK missing (React/hooks); the game entry cannot register. The Office tab will show no office.");
 	else {
-		const wantApp = new URLSearchParams(window.location.search).has("app");
+		const params = new URLSearchParams(window.location.search);
+		const wantShell = params.has("shell") && !params.has("app");
 		const R = SDK.React;
 		const H = SDK.hooks;
-		const Office = wantApp ? createOfficeApp(R, H) : createOfficeComponent(R, H, liveData);
+		const Office = wantShell ? createOfficeComponent(R, H, liveData) : createOfficeApp(R, H);
 		window.__QUBIT_PLUGINS__?.register("qubit-office", Office);
 	}
 	/**

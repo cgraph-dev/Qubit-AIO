@@ -276,3 +276,73 @@
   line-height: 1.45;
   color: var(--muted);
 }
+
+/* --- Analysis results (stages 1-2, wired to voicebridge/kitchen.py) --------- */
+
+/* Per-row Analyze button, sitting left of the remove control. */
+.kitchen-item__analyze {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--color-foreground, #e8f0e4) 18%, transparent);
+  border-radius: var(--radius-md, 0.5rem);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--control-ui-text-xs, 11px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.kitchen-item__analyze:hover:not(:disabled) {
+  color: var(--color-foreground, #e8f0e4);
+  border-color: color-mix(in srgb, var(--color-foreground, #e8f0e4) 34%, transparent);
+}
+
+.kitchen-item__analyze:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+/* Real backend error. Never styled as success. */
+.kitchen-error {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-md, 0.5rem);
+  border: 1px solid color-mix(in srgb, #e05252 45%, transparent);
+  background: color-mix(in srgb, #e05252 12%, transparent);
+  color: #ffb4b4;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+/* Inventory table (extension -> file count). */
+.kitchen-table {
+  width: 100%;
+  margin: 0.35rem 0 0.75rem;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.kitchen-table th,
+.kitchen-table td {
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-foreground, #e8f0e4) 10%, transparent);
+  color: var(--muted);
+}
+
+.kitchen-table th {
+  font-size: var(--control-ui-text-xs, 11px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-foreground, #e8f0e4);
+}
+
+.kitchen-table td:last-child,
+.kitchen-table th:last-child {
+  text-align: right;
+}

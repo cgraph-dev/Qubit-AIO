@@ -58,22 +58,29 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/checkpoints": "Qubit Checkpoints",
   "/qubit-board-admin": "Qubit Board Admin",
   "/qubit-task-inbox": "Qubit Task Inbox",
-  "/qubit-talk": "Qubit Talk & Voice Routing",
-  "/qubit-scheduler": "Qubit Scheduler & Media",
+  "/qubit-talk": "Voice & Speech",
+  "/qubit-scheduler": "Tasks & Scheduling",
   "/admin/skills-review": "Skills Review Queue",
   "/admin/mcp-calls": "Gateway MCP Calls",
   "/admin/users": "Operator & Credentials",
   "/canvas": "Qubit Canvas",
+  "/qubit-office": "Qubit Office",
   "/qubit-taskflows": "Qubit Taskflows",
   "/qubit-tasks": "Qubit Tasks",
-  "/qubit-memory": "Qubit Memory Backends",
-  "/webchat": "Qubit WebChat",
+  "/qubit-memory": "Memory Providers",
+  "/webchat": "WebChat",
   // Integrator lane 3: the Bot / Harness Router / Open Viking console.
   // Page-documented paths (the pages link to these); titles match each
   // page's own heading.
   "/qubit-bot": "Qubit Bot",
   "/qubit-harness-router": "Harness Router",
-  "/open-viking": "Open Viking",
+  // `/open-viking` now renders the EMBEDDED upstream studio (the :1933 SPA),
+  // not the old local-engine console.
+  "/open-viking": "Open Viking Studio",
+  // The local context engine's console, moved off the group root when the
+  // studio took it over. Without this entry the header falls through to the
+  // naive de-slug fallback and renders "Open-viking/context-store".
+  "/open-viking/context-store": "Context Store",
   "/open-viking/retrieval": "Retrieval",
   "/open-viking/uploads": "Uploads",
   "/open-viking/agent-hub": "Agent Hub",
@@ -85,6 +92,8 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/agent-cards": "Agent Work & Artifacts",
   // Kitchen: the intake surface for absorbing other agents/apps.
   "/kitchen": "Kitchen",
+  // OmniRoute: local AI-gateway console (status + wiring page).
+  "/omniroute": "OmniRoute Gateway",
 };
 
 export function resolvePageTitle(

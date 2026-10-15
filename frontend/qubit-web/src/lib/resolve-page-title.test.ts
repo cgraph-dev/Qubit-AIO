@@ -71,8 +71,8 @@ describe("resolvePageTitle", () => {
     expect(resolvePageTitle("/checkpoints", t, [])).toBe("Qubit Checkpoints");
     expect(resolvePageTitle("/qubit-board-admin", t, [])).toBe("Qubit Board Admin");
     expect(resolvePageTitle("/qubit-task-inbox", t, [])).toBe("Qubit Task Inbox");
-    expect(resolvePageTitle("/qubit-talk", t, [])).toBe("Qubit Talk & Voice Routing");
-    expect(resolvePageTitle("/qubit-scheduler", t, [])).toBe("Qubit Scheduler & Media");
+    expect(resolvePageTitle("/qubit-talk", t, [])).toBe("Voice & Speech");
+    expect(resolvePageTitle("/qubit-scheduler", t, [])).toBe("Tasks & Scheduling");
     expect(resolvePageTitle("/admin/skills-review", t, [])).toBe("Skills Review Queue");
     expect(resolvePageTitle("/admin/mcp-calls", t, [])).toBe("Gateway MCP Calls");
     expect(resolvePageTitle("/admin/users", t, [])).toBe("Operator & Credentials");
@@ -82,8 +82,8 @@ describe("resolvePageTitle", () => {
     expect(resolvePageTitle("/canvas", t, [])).toBe("Qubit Canvas");
     expect(resolvePageTitle("/qubit-taskflows", t, [])).toBe("Qubit Taskflows");
     expect(resolvePageTitle("/qubit-tasks", t, [])).toBe("Qubit Tasks");
-    expect(resolvePageTitle("/qubit-memory", t, [])).toBe("Qubit Memory Backends");
-    expect(resolvePageTitle("/webchat", t, [])).toBe("Qubit WebChat");
+    expect(resolvePageTitle("/qubit-memory", t, [])).toBe("Memory Providers");
+    expect(resolvePageTitle("/webchat", t, [])).toBe("WebChat");
   });
 
   it("resolves the Bot / Harness Router / Open Viking console titles", () => {
@@ -91,7 +91,8 @@ describe("resolvePageTitle", () => {
     // own heading (the Viking children use their short h1s).
     expect(resolvePageTitle("/qubit-bot", t, [])).toBe("Qubit Bot");
     expect(resolvePageTitle("/qubit-harness-router", t, [])).toBe("Harness Router");
-    expect(resolvePageTitle("/open-viking", t, [])).toBe("Open Viking");
+    expect(resolvePageTitle("/open-viking", t, [])).toBe("Open Viking Studio");
+    expect(resolvePageTitle("/open-viking/context-store", t, [])).toBe("Context Store");
     expect(resolvePageTitle("/open-viking/retrieval", t, [])).toBe("Retrieval");
     expect(resolvePageTitle("/open-viking/uploads", t, [])).toBe("Uploads");
     expect(resolvePageTitle("/open-viking/agent-hub", t, [])).toBe("Agent Hub");

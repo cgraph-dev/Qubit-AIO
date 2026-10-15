@@ -133,5 +133,16 @@ cap-attested rather than measured.
 
 No tower page yet — the visuals are **M4**. The store is real and queryable now.
 
+> **Correction (2026-10-14):** the two sentences above are stale. The Office tab **does exist and
+> renders** — it is a page in the dashboard sidebar at `/qubit-office`, served by the hand-built Vite
+> bundle `qubit-office.game.js` (`manifest.json` `"entry"`), verified to pass its office-game suite
+> (`204 passed`) this session. The earlier "no game redesign has been implemented" line (above, line ~111)
+> is likewise superseded: F01–F12 of the packet plan are built, and a **second, vendored third-party
+> implementation** (`habblaud`, MIT) is now the **default** renderer for `/qubit-office`
+> (pixel-verified: `Connected · 4 rooms · 10 agents`), with the hand-built shell as the
+> `?shell=1` fallback. See `docs/OPEN_THREADS.md` § 4.14 for the exact evidence and
+> what remains NOT VERIFIED. The suite count is `211 passed / 0 skipped` (§ 4.14g
+> supersedes the `204` quoted here — the extra 7 previously ran as silent skips).
+
 Open before M3: the first business vertical, the payment rail, the legal entity, and which Tripo
 product line (Studio vs API — separately billed) — see `80-RISKS.md`.

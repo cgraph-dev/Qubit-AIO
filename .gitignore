@@ -128,3 +128,15 @@ audit_frozen.txt
 .hermes-update.lock
 *.hermes-update.lock
 hermes-update.lock
+
+# graphify knowledge-graph output — regenerable, and LARGE. Verified sizes at
+# time of writing: graphify-out/ = 680 MB, graphify-out.bloated-308k/ = 969 MB
+# (1.65 GB combined). These are build artifacts produced by `graphify .`, not
+# source; committing them would add ~1.6 GB of regenerable blob to history.
+# The config that produces them (.graphifyignore) IS tracked.
+graphify-out/
+graphify-out.bloated-308k/
+graphify-out.*/
+
+# Impeccable skill runtime scratch (regenerable local state).
+.impeccable/

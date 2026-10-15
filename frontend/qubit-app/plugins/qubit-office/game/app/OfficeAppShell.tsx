@@ -7,7 +7,11 @@
 
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
-import { POLL_INTERVAL_MS, SNAPSHOT_ROUTE, bindingSummary } from "./office-api";
+import { installOfficeApiBridge } from "./api-bridge";
+import {
+  POLL_INTERVAL_MS, SNAPSHOT_ROUTE, STREAM_ROUTE,
+  bindingSummary, bindingVerdict,
+} from "./office-api";
 
 export interface OfficeAppProps {
   /** The dashboard's base path (empty at the root). */
@@ -36,9 +40,22 @@ export function createOfficeApp(
     useEffect(() => {
       const frame = frameRef.current;
       if (!frame) return;
-      // The iframe filling the whole page area is the point: the client was
-      // written to BE the page, so it gets one.
-      frame.src = officeAppSrc({ base: props.base, mock: props.mock });
+      // Install before navigation. Registering onLoad first is not enough:
+      // the upstream ES module can issue `/api/access` while parsing, before
+      // the iframe's load event fires. Setting `src` only after replacing
+      // fetch closes that startup race without touching the host's fetch.
+      const win = frame.contentWindow as Window | null;
+      if (!win) {
+        setFailed("The office API could not be connected from this page.");
+        return;
+      }
+      let restoreBridge: (() => void) | undefined;
+      try {
+        restoreBridge = installOfficeApiBridge(win);
+      } catch {
+        setFailed("The office API could not be connected from this page.");
+        return;
+      }
       const onLoad = () => {
         setLoaded(true);
         setFailed(null);
@@ -47,9 +64,13 @@ export function createOfficeApp(
       const onError = () => setFailed("The office app failed to load.");
       frame.addEventListener("load", onLoad);
       frame.addEventListener("error", onError);
+      setFailed(null);
+      setLoaded(false);
+      frame.src = officeAppSrc({ base: props.base, mock: props.mock });
       return () => {
         frame.removeEventListener("load", onLoad);
         frame.removeEventListener("error", onError);
+        restoreBridge?.();
       };
     }, [props.base, props.mock]);
 
@@ -57,35 +78,46 @@ export function createOfficeApp(
       R.createElement("iframe", {
         key: "frame",
         ref: frameRef,
-        title: "Qubit Office",
+        title: "Habblaud virtual office",
         "data-testid": "office-app-frame",
         className: "office-game__frame",
-        // The app is same-origin and needs to fetch with the session cookie,
-        // but it is NOT sandboxed into a null origin, which would break that
-        // fetch. It also needs to run scripts and own its own storage.
+        "aria-label": "Habblaud office game",
+        "aria-describedby": "office-app-description",
+        "aria-busy": !loaded && !failed,
+        "data-state": failed ? "error" : loaded ? "ready" : "loading",
+        // Keep the upstream app in a distinct origin and storage namespace.
+        // allow-scripts + allow-same-origin is still required for its module
+        // worker, canvas and storage APIs; the dashboard host stays separate.
+        // The server injects the session token into the app document itself.
+        sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
         allow: "clipboard-read; clipboard-write",
         style: { border: "0", width: "100%", height: "100%", display: "block" },
       }),
+      R.createElement("p", {
+        key: "description",
+        id: "office-app-description",
+        className: "office-game__sr-only",
+      }, "Interactive Habblaud virtual office. Use the controls within the game; unsupported write actions are disabled."),
     ];
 
     if (!loaded && !failed) {
       children.push(R.createElement("div", {
         key: "loading",
-        className: "office-game__panel",
+        className: "office-game__panel office-game__loading",
         "data-testid": "office-app-loading",
-        style: { position: "absolute", inset: "50% 0 auto 0", textAlign: "center" },
+        role: "status",
+        "aria-live": "polite",
       }, "Loading the office\u2026"));
     }
 
     if (failed) {
       children.push(R.createElement("div", {
         key: "failed",
-        className: "office-game__refusal",
+        className: "office-game__refusal office-game__error",
         "data-testid": "office-app-failed",
         role: "alert",
-        style: { position: "absolute", left: 12, top: 12 },
       }, [
-        R.createElement("div", { key: "m" }, failed),
+        R.createElement("div", { key: "m" }, `${failed} Check Qubit's office connection; do not start a separate upstream server.`),
         // The one thing a reader needs when it fails: WHERE it was looking.
         R.createElement("div", {
           key: "p", style: { fontSize: "var(--office-fs-xs)" },
@@ -93,26 +125,20 @@ export function createOfficeApp(
       ]));
     }
 
-    // A status bar that states the truth about the binding. It is not a
-    // decoration: the interactive half is genuinely not wired, and a page that
-    // does not say so reads as either broken or lying.
+    // Keep binding diagnostics available to assistive technology, but do not
+    // place an invisible overlay over the game or intercept its keyboard/mouse.
+    const verdict = bindingVerdict();
     children.push(R.createElement("div", {
       key: "status",
-      className: "office-game__bar",
+      className: "office-game__sr-only",
       "data-testid": "office-app-status",
       role: "status",
-      style: { position: "absolute", left: 0, right: 0, bottom: 0 },
-    }, [
-      R.createElement("span", { key: "s" }, bindingSummary()),
-      R.createElement("span", {
-        key: "r", style: { opacity: 0.7 },
-      }, `poll ${POLL_INTERVAL_MS / 1000}s \u2192 ${SNAPSHOT_ROUTE}`),
-    ]));
+      "aria-label": `${bindingSummary()}; ${verdict.live ? `live stream ${STREAM_ROUTE}` : `poll ${POLL_INTERVAL_MS / 1000}s → ${SNAPSHOT_ROUTE}`}`,
+    }, bindingSummary()));
 
     return R.createElement("div", {
       "data-testid": "office-app",
       className: "office-game",
-      style: { position: "relative", width: "100%", height: "100%" },
     }, children);
   };
 }

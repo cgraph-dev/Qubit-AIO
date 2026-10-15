@@ -310,6 +310,13 @@ sandbox.document = {
 sandbox.location = { href: "http://localhost/qubit-office", protocol: "http:", search: "", hash: "" };
 sandbox.screen = { width: 1280, height: 720, orientation: { type: "landscape-primary" } };
 sandbox.devicePixelRatio = 1;
+/* A browser <script> has the URL/URLSearchParams constructors; a `vm` context
+ * does NOT inherit Node's globals, so without these the entry's query-param
+ * switch throws `ReferenceError: URLSearchParams is not defined` — which reads
+ * as "the entry is broken" when it is the probe's sandbox that is incomplete.
+ * Supplied here so the entry is exercised the way a browser runs it. */
+sandbox.URL = URL;
+sandbox.URLSearchParams = URLSearchParams;
 sandbox.requestAnimationFrame = (fn) => setTimeout(() => fn(Date.now()), 16);
 sandbox.cancelAnimationFrame = (id) => clearTimeout(id);
 sandbox.addEventListener = () => {};

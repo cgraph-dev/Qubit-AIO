@@ -36,20 +36,23 @@ UI_DIR = GAME_DIR / "ui"
 STYLES = GAME_DIR / "styles"
 
 from _office_toolchain import (  # noqa: E402
-    SKIP_REASON, has_tsc, node_path, tsc_path)
+    ensure_tsc, node_path, require_toolchain_or_fail)
 
 NODE = node_path()
-TSC = tsc_path()
+#: Self-healing: installs the compiler outside the tree if it vanished, so the
+#: suite RUNS after a dashboard build deleted node_modules.
+TSC = ensure_tsc()
 
 MODULES = ["settings.ts", "PanelHost.ts"]
 
 
 def _toolchain() -> bool:
-    return has_tsc()
+    return ensure_tsc() is not None
 
 
-pytestmark = pytest.mark.skipif(
-    not _toolchain(), reason=SKIP_REASON)
+#: Loud, not a silent skip: a missing compiler ERRORS at collection (see the
+#: helper's docstring). A green `N skipped` is the false pass this replaces.
+require_toolchain_or_fail()
 
 
 def _run(tmp_path: Path, js: str) -> object:
@@ -552,3 +555,267 @@ def test_the_game_css_exists_and_is_scoped_to_the_shell():
     unscoped = [s for s in unscoped if "@" not in s and ";" not in s]
     assert not unscoped, (
         f"game.css has rules that could leak into the dashboard: {unscoped}")
+
+
+# ======================================================================
+# 6 — the renderer switch: the vendored app is the DEFAULT, the shell
+#     is the reachable fallback, and the binding table tells the truth
+# ======================================================================
+APP_DIR = GAME_DIR / "app"
+APP_MODULES = ["office-api.ts", "office-app.ts"]
+ENTRY = GAME_DIR / "entry.ts"
+
+
+def _entry_source() -> str:
+    """entry.ts with comments stripped, so a check reads CODE not prose.
+
+    The header explains the OLD arrangement (`?app=1`) at length; a naive text
+    search would match that explanation and pass while the code did the wrong
+    thing. Strip block and line comments before asserting.
+    """
+    raw = ENTRY.read_text()
+    code = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
+    return re.sub(r"//[^\n]*", "", code)
+
+
+def _run_app(tmp_path: Path, js: str) -> object:
+    """Compile the two app modules with tsc and drive them under node."""
+    staged = tmp_path / "appsrc"
+    staged.mkdir(exist_ok=True)
+    for name in APP_MODULES:
+        shutil.copy(APP_DIR / name, staged / name)
+    subprocess.run(
+        [NODE, str(TSC), "--module", "commonjs", "--target", "es2020",
+         "--moduleResolution", "node",
+         "--ignoreDeprecations", "6.0", "--outDir", str(tmp_path / "appjs"),
+         "--skipLibCheck", "--noEmitOnError", "false",
+         "--lib", "es2020,dom", str(staged / "office-api.ts"),
+         str(staged / "office-app.ts")],
+        capture_output=True, text=True, timeout=240, cwd=str(staged))
+    api = tmp_path / "appjs" / "office-api.js"
+    appm = tmp_path / "appjs" / "office-app.js"
+    if not api.is_file() or not appm.is_file():
+        pytest.fail("tsc could not compile the office app modules for the "
+                    "node driver; the binding table and the iframe src are "
+                    "unchecked without this")
+    program = (
+        'const A = require(%s);\n'
+        'const AP = require(%s);\n'
+        'const out = (() => { %s })();\n'
+        'process.stdout.write(JSON.stringify(out));\n'
+    ) % (json.dumps(str(api)), json.dumps(str(appm)), js)
+    proc = run_node(program, timeout=90)
+    assert proc.returncode == 0, (
+        f"node exited {proc.returncode}\nstdout: {proc.stdout}\n"
+        f"stderr: {proc.stderr}")
+    return json.loads(proc.stdout)
+
+
+def test_the_default_renderer_is_the_app_and_the_shell_is_opt_in():
+    """THE headline of this arrangement: a plain `/qubit-office` mounts the
+    vendored app; the hand-built shell is reached only by asking for it.
+
+    Asserted on CODE (comments stripped): the entry's own header discusses the
+    old `?app=1` switch, which a whole-file text search would match.
+    """
+    code = _entry_source()
+    assert 'has("app")' not in code, (
+        "entry.ts still keys off `?app`; the vendored app must be the DEFAULT, "
+        "not something a query param turns on")
+    assert 'has("shell")' in code, (
+        "there is no `?shell=1` opt-out, so the old shell is unreachable — it "
+        "is the ROLLBACK and must stay one query param away")
+    # And the branch shapes: shell -> createOfficeComponent, else -> createOfficeApp.
+    shell_branch = re.search(
+        r"wantShell\s*\?\s*createOfficeComponent\([^)]*\)\s*:\s*createOfficeApp\(",
+        code)
+    assert shell_branch, (
+        "the switch is not `wantShell ? createOfficeComponent(...) : "
+        "createOfficeApp(...)` — the app is not the default branch")
+    assert "createOfficeComponent" in code and "createOfficeApp" in code, (
+        "one of the two renderers is not referenced; the fallback or the "
+        "default was removed rather than kept")
+
+
+def test_both_renderers_stay_reachable_one_query_param_apart():
+    """The old shell is not dead code: it is the rollback. The entry must keep
+    importing the shell's factory and the app's factory, so inverting the default
+    did not delete the path back."""
+    raw = ENTRY.read_text()
+    assert 'from "./OfficeGameShell"' in raw, (
+        "the entry no longer imports the shell factory — the fallback is gone")
+    assert 'from "./app/OfficeAppShell"' in raw, (
+        "the entry no longer imports the app factory")
+    # The shell's live-data feeder must survive the inversion: the fallback is
+    # only a real fallback if it still gets the tower payload.
+    assert "liveData" in raw, (
+        "the shell's tower feeder was dropped; the fallback would mount empty")
+
+
+def test_the_stream_is_bound_and_the_writes_are_gated_not_missing(tmp_path):
+    """THE corrected binding truth. `/api/stream` IS served (webui's
+    `_serve_office_stream`), so it must read as BOUND. permissions/messages are
+    org mutations gated by the confirmation authority (C4), NOT merely missing —
+    the distinction the old table flattened into "0 of 5".
+    """
+    got = _run_app(tmp_path, """
+      const v = A.bindingVerdict();
+      const stream = A.ROUTES.find(r => r.client === 'stream');
+      const perms = A.ROUTES.find(r => r.client === 'permissions/:id');
+      const msgs = A.ROUTES.find(r => r.client === 'messages/:id');
+      const access = A.ROUTES.find(r => r.client === 'access');
+      return {bound: v.bound, missing: v.missing, gated: v.gated,
+              live: v.live, canRender: v.canRender, viewOnly: v.viewOnly,
+              streamQubit: stream.qubit, streamReadOnly: stream.readOnly,
+              permsGated: !!perms.gated, msgsGated: !!msgs.gated,
+              accessQubit: access.qubit};
+    """)
+    assert got["streamQubit"] == "/api/stream", (
+        f"the stream route does not name a binding: {got['streamQubit']!r} — "
+        f"/api/stream is served by webui._serve_office_stream")
+    assert "stream" in got["bound"], (
+        f"the stream is not reported as bound: {got['bound']}")
+    assert got["live"] is True, (
+        "the verdict does not report the office as live, so the status bar "
+        "would still claim a poll is the feed")
+    assert got["permsGated"] is True and got["msgsGated"] is True, (
+        "permissions/messages are not flagged gated by the confirmation "
+        "authority: they are org mutations (C4), not just unwired")
+    assert set(got["gated"]) == {"permissions/:id", "messages/:id"}, (
+        f"the gated set is wrong: {got['gated']}")
+    assert set(got["missing"]) == set(), (
+        f"read-only routes remain unbound: {got['missing']}")
+    assert "agents/:id" in got["bound"], (
+        "Habblaud's read-only agent profile route is not marked bound")
+    assert got["accessQubit"] == "/api/access", (
+        "the access capability probe lacks its read-only binding")
+    assert got["canRender"] is True, (
+        "the renderer is reported as unable to render")
+    assert got["viewOnly"] is True, (
+        "the writes are gated, so the client must read as view-only")
+
+
+def test_the_binding_summary_counts_the_new_truth(tmp_path):
+    """The string a person reads. It must say 3 bound / 0 missing / 2 gated."""
+    got = _run_app(tmp_path, "return {s: A.bindingSummary()};")
+    s = got["s"]
+    assert s.startswith("3 of 5 routes bound"), (
+        f"the summary does not report three bound routes: {s!r}")
+    assert "0 missing" in s, f"the missing count is wrong: {s!r}"
+    assert "2 gated by the confirmation authority" in s, (
+        f"the gated count is wrong: {s!r}")
+    assert "0 of 5" not in s and "0 gated" not in s, (
+        f"the stale all-zero binding line survives: {s!r}")
+
+
+def test_the_app_url_resolves_at_the_plain_office_route(tmp_path):
+    """Point 2. With NO props and no base, the iframe src must point at the
+    served app directory with a TRAILING SLASH (so the app's own relative
+    bundle paths resolve inside it), and it must NOT be duplicated with the
+    host base when that base is empty.
+    """
+    got = _run_app(tmp_path, """
+      return {noBase: AP.officeAppSrc(),
+              explicitRoot: AP.officeAppSrc({base: ''}),
+              path: AP.OFFICE_APP_PATH};
+    """)
+    assert got["noBase"] == "/plugin-apps/qubit-office/habblaud/", (
+        f"the iframe src at a plain /qubit-office is {got['noBase']!r}, not the "
+        f"app directory — the app would 404")
+    assert got["noBase"].endswith("/"), (
+        "the app URL has no trailing slash, so a relative 'bundle/...' inside "
+        "the app resolves against its parent")
+    assert got["explicitRoot"] == got["noBase"], (
+        "an explicit empty base changed the URL; the default is not the root")
+
+
+def test_the_app_url_honours_a_non_empty_base_path(tmp_path):
+    """Point 2, the subpath deployment. The host renders a plugin with NO props
+    (`PluginPage.tsx` renders `<Component />`), so the base cannot come from a
+    prop in production — it must be read from the host's injected
+    `window.__QUBIT_BASE_PATH__` global. A hardcoded root prefix 404s there.
+    """
+    got = _run_app(tmp_path, """
+      globalThis.window = {__QUBIT_BASE_PATH__: '/sub'};
+      const viaGlobal = AP.officeAppSrc();
+      const viaGlobalSlash = AP.hostBasePath();
+      globalThis.window = {__QUBIT_BASE_PATH__: 'sub/'};   // unnormalized
+      const normalized = AP.hostBasePath();
+      const normalizedSrc = AP.officeAppSrc();
+      globalThis.window = {};                              // absent
+      const absent = AP.officeAppSrc();
+      return {viaGlobal, viaGlobalSlash, normalized, normalizedSrc, absent};
+    """)
+    assert got["viaGlobal"] == "/sub/plugin-apps/qubit-office/habblaud/", (
+        f"a non-empty QUBIT_BASE_PATH was ignored: {got['viaGlobal']!r} — the "
+        f"iframe would 404 under a subpath deployment")
+    assert got["viaGlobalSlash"] == "/sub", (
+        f"the base path is not normalized: {got['viaGlobalSlash']!r}")
+    assert got["normalized"] == "/sub", (
+        f"a leading-slash/trailing-slash base was not normalized: "
+        f"{got['normalized']!r}")
+    assert got["normalizedSrc"] == "/sub/plugin-apps/qubit-office/habblaud/", (
+        f"a normalized base produced the wrong src: {got['normalizedSrc']!r}")
+    assert got["absent"] == "/plugin-apps/qubit-office/habblaud/", (
+        f"an absent global must fall back to the root: {got['absent']!r}")
+
+
+def test_an_explicit_base_still_overrides_the_global(tmp_path):
+    """A caller that passes `base` (a test, or a future host that DOES pass a
+    prop) keeps control — the global is a fallback, not a hardwired source."""
+    got = _run_app(tmp_path, """
+      globalThis.window = {__QUBIT_BASE_PATH__: '/from-global'};
+      return {explicit: AP.officeAppSrc({base: '/explicit'}),
+              explicitEmpty: AP.officeAppSrc({base: ''})};
+    """)
+    assert got["explicit"] == "/explicit/plugin-apps/qubit-office/habblaud/", (
+        f"an explicit base did not win over the global: {got['explicit']!r}")
+    assert got["explicitEmpty"] == "/plugin-apps/qubit-office/habblaud/", (
+        f"an explicit empty base must mean the root, not the global: "
+        f"{got['explicitEmpty']!r}")
+
+
+def test_the_host_message_guard_accepts_only_our_own_marker(tmp_path):
+    """`isOfficeAppMessage` is the host-side filter for iframe postMessage.
+
+    The iframe is same-origin, so a foreign `postMessage` (a dashboard widget,
+    a browser extension's injected script, or the frame's own transient
+    `/sessions` navigation) can reach the host's `message` listener. The guard
+    exists so the host ignores anything that is not labelled by our own app.
+    Asserted as BEHAVIOUR: the positive marker passes, and every shape a foreign
+    post could take is rejected — including a look-alike that carries the wrong
+    `source`, a non-object, and the null/array/primitive cases a naive
+    `data.source` deref would throw on.
+    """
+    got = _run_app(tmp_path, """
+      return {
+        ours: AP.isOfficeAppMessage({source: 'qubit-office-app'}),
+        oursWithExtra: AP.isOfficeAppMessage(
+          {source: 'qubit-office-app', type: 'ready'}),
+        wrongMarker: AP.isOfficeAppMessage({source: 'other-app'}),
+        bareObject: AP.isOfficeAppMessage({}),
+        nullish: AP.isOfficeAppMessage(null),
+        undef: AP.isOfficeAppMessage(undefined),
+        string: AP.isOfficeAppMessage('qubit-office-app'),
+        number: AP.isOfficeAppMessage(7),
+        array: AP.isOfficeAppMessage(['qubit-office-app']),
+      };
+    """)
+    assert got["ours"] is True, (
+        "a message from our own app was not recognised")
+    assert got["oursWithExtra"] is True, (
+        "a message from our own app with extra fields was not recognised")
+    assert got["wrongMarker"] is False, (
+        "a foreign post carrying a different `source` was accepted — the host "
+        "would act on another origin's message")
+    assert got["bareObject"] is False, (
+        "an object with no `source` marker was accepted")
+    assert got["nullish"] is False and got["undef"] is False, (
+        "a null/undefined payload was accepted (or threw) — the guard must "
+        "reject rather than dereference")
+    assert got["string"] is False, (
+        "a bare string matching the marker was accepted; `data.source` on a "
+        "string is `undefined`, so this must be rejected")
+    assert got["number"] is False and got["array"] is False, (
+        "a non-object payload was accepted; the guard must reject primitives "
+        "and arrays")

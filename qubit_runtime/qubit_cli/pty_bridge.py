@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import errno
 import fcntl  # windows-footgun: ok — POSIX-only module by design (see docstring)
+import logging
 import math
 import os
 import select
@@ -30,6 +31,8 @@ except ImportError:  # pragma: no cover - dev env without ptyprocess
 
 
 __all__ = ["PTY_HOST_DASHBOARD", "PTY_HOST_ENV", "PtyBridge", "PtyUnavailableError"]
+
+logger = logging.getLogger(__name__)
 
 # Set on the spawned TUI so Ink knows which emulator is hosting it. Mirrored in
 # ui-tui/packages/hermes-ink/src/ink/termio/host.ts — keep the two in sync.
@@ -143,6 +146,18 @@ class PtyBridge:
         spawn_env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=False) if env is None else env.copy()
         if not spawn_env.get("TERM"):
             spawn_env["TERM"] = "xterm-256color"
+        # Carry the seat's X11 display into the child TUI. A dashboard/gateway started as a
+        # systemd user service inherits no DISPLAY, so xclip inside the embedded TUI fails with
+        # "Can't open display: (null)" and every image paste reports "No image found in
+        # clipboard" (the browser clipboard is unreachable from the server, so the TUI's own
+        # clipboard read is the only path). Resolve a genuinely reachable display rather than
+        # exporting a stale one; headless/ambiguous sessions stay untouched.
+        if sys.platform not in ("darwin", "win32") and not spawn_env.get("DISPLAY"):
+            try:
+                from qubit_cli.session_display import apply_session_display
+                apply_session_display(spawn_env)
+            except Exception:
+                logger.debug("session display resolution failed", exc_info=True)
         # Tell the child TUI it is hosted by the dashboard's xterm.js. Ink uses this to skip the
         # focus-in erase+repaint it does for native emulators that coalesce hidden-tab output
         # (xterm.js never drops frames, so under the dashboard that repaint was a visible flash on

@@ -106,7 +106,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: E402
+
+from _office_node import run_node  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 PLUGIN = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office"
@@ -262,7 +264,7 @@ def _renderer_program(payload_obj: dict, clicks: list[dict]) -> dict:
         "payload": json.dumps(payload_obj),
         "clicks": json.dumps(clicks),
     }
-    proc = subprocess.run([NODE, "-e", program], capture_output=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True,
                           text=True, timeout=60)
     assert proc.returncode == 0, (
         "node failed driving the renderer:\nSTDOUT:\n%s\nSTDERR:\n%s"
@@ -387,7 +389,7 @@ def _project(x: float, y: float, z: float) -> dict:
         "console.log(JSON.stringify(ISO.gridToScreen(%s, %s, %s, %s)));"
         % (json.dumps(str(ISO)), json.dumps(x), json.dumps(y), json.dumps(z),
            json.dumps(CAM)))
-    proc = subprocess.run([NODE, "-e", program], capture_output=True, text=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True, text=True,
                           timeout=60)
     assert proc.returncode == 0, proc.stderr
     return json.loads(proc.stdout.strip())
@@ -400,7 +402,7 @@ def _cell_of(px: float, py: float, z: float) -> dict:
         "console.log(JSON.stringify(c));"
         % (json.dumps(str(ISO)), json.dumps(px), json.dumps(py),
            json.dumps(CAM), json.dumps(z)))
-    proc = subprocess.run([NODE, "-e", program], capture_output=True, text=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True, text=True,
                           timeout=60)
     assert proc.returncode == 0, proc.stderr
     return json.loads(proc.stdout.strip())
@@ -885,7 +887,7 @@ def _run_node_with(iso_path: Path, mod_src: str, click_body: str,
         "payload": json.dumps(payload_obj),
         "clicks": json.dumps(clicks),
     }
-    proc = subprocess.run([NODE, "-e", program], capture_output=True, text=True,
+    proc = subprocess.run([NODE], input=program, capture_output=True, text=True,
                           timeout=60)
     assert proc.returncode == 0, (
         "node failed:\nSTDOUT:\n%s\nSTDERR:\n%s" % (proc.stdout, proc.stderr))

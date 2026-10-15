@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from _office_toolchain import SKIP_REASON, has_tsc, node_path  # noqa: E402
+from _office_toolchain import node_path, require_toolchain_or_fail  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 GAME = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-office" / "game"
@@ -34,7 +34,9 @@ ART = GAME / "art"
 
 NODE = node_path()
 
-pytestmark = pytest.mark.skipif(not has_tsc(), reason=SKIP_REASON)
+#: Loud, not a silent skip: a missing compiler ERRORS at collection
+#: (see the helper's docstring). A green `N skipped` is the false pass this replaces.
+require_toolchain_or_fail()
 
 
 def _run(tmp_path: Path, js: str) -> object:

@@ -385,7 +385,9 @@ def _sync_agent_fallback_with_config(sid: str, session: dict) -> None:
         from gateway.run import GatewayRunner
         from qubit_cli.config_effective import load_user_config_effective
         from qubit_cli.fallback_config import get_fallback_chain
-        chain = get_fallback_chain(load_user_config_effective(_active_config_path(), fail_closed=True))
+        from agent.session_route_policy import agent_fallback_disabled
+        chain = ([] if agent_fallback_disabled(agent) else
+                 get_fallback_chain(load_user_config_effective(_active_config_path(), fail_closed=True)))
     except Exception as e:
         logger.warning("fallback chain sync skipped for %s (keeping current chain): %s", sid, e)
         return

@@ -4945,6 +4945,666 @@ def _save_curator_control(cfg: Any, state: Dict[str, Any]) -> None:
     _save_json_store(_curator_control_path(cfg), state)
 
 
+def h_office_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/tower -> the renderable office, derived from the store.
+
+    Read-only (C4): it opens the office store, computes, and returns. Its
+    animation state comes from `office_event` rows only, computed in
+    `voicebridge.office.tower` — the same function the C7 test drives — so the
+    page and the test cannot disagree about what "busy" means.
+
+    ``?motion=1`` returns just the motion states, which is what a smoke check
+    or a test harness wants. ``?now=<epoch>`` pins the clock, so a caller can
+    ask "what would this look like at time T" without waiting for T.
+    """
+    from .office import tower as TWR
+
+    now = None
+    raw_now = (q or {}).get("now")
+    if raw_now not in (None, ""):
+        try:
+            now = float(raw_now)
+        except (TypeError, ValueError):
+            return 400, {"ok": False, "code": "BAD_INPUT",
+                         "detail": "now must be an epoch-seconds number"}
+    motion = str((q or {}).get("motion", "")).lower() in ("1", "true", "yes")
+    # A labelled preview of an org that has not started, only when asked for.
+    # It is OFF unless explicitly requested, and `state()` attaches it only to an
+    # *empty* org — so a live office is never mixed with a drawing of one, and
+    # the C7 rule that an empty tower reports itself empty still holds.
+    preview = str((q or {}).get("preview", "")).lower() in ("1", "true", "yes")
+    try:
+        out = (TWR.motion_states(cfg, now=now) if motion
+               else TWR.state(cfg, now=now, preview=preview))
+    except Exception as exc:  # noqa: BLE001 - a read surface must not 500
+        return 503, {"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",
+                     "detail": f"the office store could not be read: "
+                               f"{str(exc)[:200]}"}
+    return _ok(**out)
+
+
+# ===========================================================================
+# Habblaud office-client compat surface
+# ===========================================================================
+#
+# The vendored office client (``frontend/qubit-app/plugins/qubit-office/
+# habblaud/``) is a complete same-origin app that speaks a literal ``/api/*``
+# dialect. ``api-bridge.ts`` rewrites the two routes it dares to bind onto
+# ``/agent/api/office/habblaud/<path>`` and answers the rest client-side; the
+# Qubit compat layer must nonetheless answer EVERY sub-path it can reach, so a
+# bridge tip-over never lands on the bare ``no compat route`` 404.
+#
+# Disposition of every request the bundle actually makes (grep of the three
+# served chunks: app-U4Pwh2XA.js, ptypane-DxPqTDKo.js, daystats-CUw1NUBG.js):
+#
+#   WIRED to real Qubit state (read-only):
+#     GET  /api/access                     view-capability envelope (real config)
+#     GET  /api/agents/<id>                the seat + its real office_event rows
+#     GET  /api/sessions/recent            real auth_status.recent_sessions
+#     GET  /api/timeline/days              real office ledger days
+#     GET  /api/timeline/<day>             real office ledger day detail
+#     GET  /api/stats/days                 real office ledger day summary
+#     GET  /api/stats?day=&tz=             real office ledger day detail
+#     GET  /api/spawn/folders              real Qubit project folders
+#     GET  /api/dictation                  real streaming-STT availability
+#     GET  /api/permissions/<id>           real pending-permission lookup
+#     GET  /api/messages/<id>              real message-store lookup
+#
+#   WIRED as real mutations behind the shared confirm/authority path, or typed:
+#     POST /api/updates/check              real read-only update check
+#     POST /api/demo                       persisted demo/preview flag
+#     POST /api/rooms/rename               real office_store room rename + audit
+#     POST /api/remote/logout              typed refusal (nothing to log out)
+#
+#   TYPED REFUSAL (genuinely unsupported; never a fabricated success):
+#     POST /api/pty, /api/pty/<id>/close, /api/pty/<id>/input,
+#          /api/pty/<id>/resize, /api/pty/<id>/stream
+#     POST /api/agents/<id>/takeover | /stop | /terminal
+#     POST /api/agents/<id>/character
+#     POST /api/sessions/<a>/<b>/terminal
+#     GET  /api/deliveries, /api/deliveries/file/<id>
+#     POST /api/spawn, /api/spawn/attachments
+#     POST /api/permissions/<id>/decision   (C4 org mutation -> confirm authority)
+#     POST /api/messages                    (C4 org mutation -> confirm authority)
+#     POST /api/dictation, /api/dictation/<id>  (dictation write path)
+#
+# Nothing here invents an agent, an event, a permission or a message: an absent
+# row is a 404 the client already treats as "none", and a capability Qubit does
+# not expose is a typed ``ok:false`` with a code — never a bare 404.
+
+_OFFICE_CLIENT = ("the vendored office client (the /qubit-office embed)")
+_OFFICE_ROOM_RENAME_COUNTERPART = (
+    "CLI `qubit office room rename <dept> <slug> <name>` + dashboard /ops")
+
+
+def _office_tower_or_none(cfg: Any) -> Optional[Dict[str, Any]]:
+    """The renderable office, or None when the store cannot be read."""
+    try:
+        from .office import tower as TWR
+        return TWR.state(cfg)
+    except Exception:  # noqa: BLE001 - a read surface must not 500
+        return None
+
+
+def h_office_habblaud_access(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/access -> the client's ``AccessInfo``.
+
+    The client validates this payload with
+    ``['remote','local','permissions','messages','terminal'].every(bool)`` — a
+    missing key makes the whole document invalid and the page falls back to
+    ``/login``, so all five MUST be present as booleans.
+
+    Every flag is the REAL Qubit position, not Habblaud's server's:
+      * ``local``       — this is a loopback/local view (always true here; the
+                          route is token-gated and served on the dashboard host).
+      * ``remote``      — false: Qubit exposes no remote office session.
+      * ``permissions`` — false: answering a permission is an org mutation that
+                          must go through the confirmation authority (C4), so a
+                          direct answer is NOT available from this view.
+      * ``messages``    — false: sending a message is the same C4-gated mutation.
+      * ``terminal``    — false: Qubit forbids raw shell/PTY (PTY_NO_SHELL).
+    ``spawn``/``renameRoom`` mirror the same honest positions; ``renameRoom`` is
+    true because room rename IS wired (to the real office store).
+    """
+    # A local view is the only view Qubit serves on this surface.
+    local = True
+    return _ok(
+        schema="qubit-office-habblaud-access/1",
+        # The five booleans the client's `g()` validator requires.
+        remote=False,
+        local=local,
+        permissions=False,
+        messages=False,
+        terminal=False,
+        # Optional capabilities the client reads if present.
+        spawn=False,
+        dictation=True,
+        renameRoom=True,
+        read_only=True,
+        detail=("local read-only office view; permission/message mutations are "
+                "gated by the Qubit confirmation authority (C4); no raw PTY"),
+    )
+
+
+def h_office_habblaud_agent(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/agents/<id> -> one agent's real history.
+
+    ``id`` may be an integer seat id or a slug. The seat, its department/room,
+    its status and its ``history`` are read from the SAME office store the tower
+    folds over — one source of truth, so this route and the drawn office cannot
+    disagree. ``history`` carries the agent's real ``office_event`` rows in the
+    ``{id, at, kind, text}`` shape the client's transcript expects; an agent
+    with no events gets an empty list (honest "no events"), never a fabricated
+    turn. An unknown id is a typed 404 the client already handles (it falls back
+    to the snapshot's own ``recent``).
+    """
+    from .office import store as OSS
+    from .office.tower import _EVENT_SENTENCE as _EVENT_TEXT
+    ref = str((p or {}).get("id", "") or "").strip()
+    if not ref:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "agent id is required",
+                     "qubit_counterpart": "GET /api/office/tower"}
+    conn = OSS.connect(cfg)
+    try:
+        OSS.migrate(conn)
+        if ref.isdigit():
+            row = conn.execute(
+                "SELECT id, slug, name, seat_type, department_id, room_id,"
+                " supervisor_id, status FROM office_agent WHERE id=?",
+                (int(ref),)).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT id, slug, name, seat_type, department_id, room_id,"
+                " supervisor_id, status FROM office_agent WHERE slug=?",
+                (ref,)).fetchone()
+        if row is None:
+            return 404, {"ok": False, "code": "AGENT_NOT_FOUND",
+                         "detail": f"no office seat {ref!r}",
+                         "qubit_counterpart": "GET /api/office/tower"}
+        seat = dict(row)
+        events = [dict(r) for r in conn.execute(
+            "SELECT id, ts, kind, agent_id FROM office_event"
+            " WHERE agent_id=? ORDER BY id DESC LIMIT 200", (seat["id"],))]
+    finally:
+        conn.close()
+    history = []
+    for ev in events:
+        try:
+            at = int(float(ev.get("ts")) * 1000)
+        except (TypeError, ValueError):
+            at = 0
+        history.append({"id": str(ev.get("id")), "at": at,
+                        "kind": ev.get("kind") or "other",
+                        "text": _EVENT_TEXT.get(ev.get("kind") or "",
+                                                ev.get("kind") or "")})
+    return _ok(
+        schema="qubit-office-habblaud-agent/1",
+        id=str(seat["id"]),
+        agentId=str(seat["id"]),
+        slug=seat.get("slug"),
+        name=seat.get("name") or seat.get("slug") or str(seat["id"]),
+        seat_type=seat.get("seat_type"),
+        department_id=seat.get("department_id"),
+        room_id=seat.get("room_id"),
+        supervisor_id=seat.get("supervisor_id"),
+        status=seat.get("status"),
+        # The client reads `.history` off this response; real rows only.
+        history=history,
+        detail="real office seat + its office_event history; no synthetic turns",
+    )
+
+
+def h_office_habblaud_sessions_recent(cfg: Any, q: Dict[str, str],
+                                      b: Dict[str, Any], p: Dict[str, str]
+                                      ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/sessions/recent -> real recent action sessions."""
+    from .auth_status import recent_sessions as _rs
+    try:
+        out = _rs(cfg, int((q or {}).get("limit", 20) or 20))
+    except Exception as exc:  # noqa: BLE001
+        return 503, {"ok": False, "code": "SESSIONS_UNAVAILABLE",
+                     "detail": f"recent sessions could not be read: "
+                               f"{str(exc)[:200]}"}
+    return _ok(schema="qubit-office-habblaud-sessions/1",
+               sessions=out.get("sessions", []),
+               count=int(out.get("count", 0) or 0),
+               state=out.get("state", "OK"))
+
+
+def _office_days(cfg: Any, *, limit: int = 180) -> List[Dict[str, Any]]:
+    """Real per-day ledger rows (day index, date, revenue/cost/net cents)."""
+    from .office import tower as TWR
+    hist = TWR.history(cfg, days=max(1, min(int(limit), 180)))
+    return list(hist.get("series") or [])
+
+
+def h_office_habblaud_timeline_days(cfg: Any, q: Dict[str, str],
+                                    b: Dict[str, Any], p: Dict[str, str]
+                                    ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/timeline/days -> real ledger day list.
+
+    The client expects ``{recording, days:[{day,from,to}, ...]}``. ``day`` is an
+    integer UTC day index (the client validates it with its own day parser), and
+    ``from``/``to`` are the day's epoch-second bounds. ``recording`` is false:
+    Qubit does not record a screen/office replay. Only days with a real ledger
+    row are listed — an empty ledger yields an empty list, never a drawn one.
+    """
+    series = _office_days(cfg)
+    days = []
+    for row in series:
+        try:
+            d = int(row.get("day"))
+        except (TypeError, ValueError):
+            continue
+        rev = int(row.get("revenue_cents", 0) or 0)
+        cost = int(row.get("cost_cents", 0) or 0)
+        if rev == 0 and cost == 0:
+            continue
+        days.append({"day": d, "from": d * 86400, "to": d * 86400 + 86399,
+                     "revenue_cents": rev, "cost_cents": cost,
+                     "net_cents": rev - cost})
+    return _ok(schema="qubit-office-habblaud-timeline/1",
+               recording=False, days=days,
+               detail="real office ledger days; no screen-capture replay exists")
+
+
+def h_office_habblaud_timeline_day(cfg: Any, q: Dict[str, str],
+                                   b: Dict[str, Any], p: Dict[str, str]
+                                   ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/timeline/<day> -> real ledger detail for a day."""
+    raw = str((p or {}).get("day", "") or "").strip()
+    try:
+        day = int(raw)
+    except (TypeError, ValueError):
+        return 400, {"ok": False, "code": "BAD_INPUT",
+                     "detail": "day must be an integer UTC day index"}
+    from .office import store as OSS
+    start, end = day * 86400, day * 86400 + 86400
+    conn = OSS.connect(cfg)
+    try:
+        OSS.migrate(conn)
+        rows = [dict(r) for r in conn.execute(
+            "SELECT id, ts, kind, amount_cents, agent_id, unmetered"
+            " FROM office_ledger WHERE ts >= ? AND ts < ? ORDER BY ts",
+            (start, end))]
+    except Exception as exc:  # noqa: BLE001
+        return 503, {"ok": False, "code": "LEDGER_UNAVAILABLE",
+                     "detail": f"the office ledger could not be read: "
+                               f"{str(exc)[:200]}"}
+    finally:
+        conn.close()
+    events = []
+    for r in rows:
+        try:
+            at = int(float(r.get("ts")) * 1000)
+        except (TypeError, ValueError):
+            at = 0
+        events.append({"id": str(r.get("id")), "at": at,
+                       "kind": r.get("kind"),
+                       "agentId": (str(r.get("agent_id"))
+                                   if r.get("agent_id") is not None else None),
+                       "amountCents": int(r.get("amount_cents", 0) or 0),
+                       "unmetered": bool(r.get("unmetered"))})
+    return _ok(schema="qubit-office-habblaud-timeline-day/1",
+               day=day, events=events, count=len(events))
+
+
+def h_office_habblaud_stats_days(cfg: Any, q: Dict[str, str],
+                                 b: Dict[str, Any], p: Dict[str, str]
+                                 ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/stats/days -> real ledger totals per day.
+
+    The client's ``/api/stats/days`` answers a per-day usage book. Qubit has no
+    Habblaud usage store (waiting/working ms are a Habblaud server concept), so
+    this serves the HONEST projection Qubit does hold — the office ledger's real
+    per-day revenue/cost/net — and marks ``usage_model`` so a reader can tell
+    it is the ledger fold, not a fabricated waiting-time book.
+    """
+    from .office import tower as TWR
+    hist = TWR.history(cfg, now=None)
+    series = list(hist.get("series") or [])
+    return _ok(schema="qubit-office-habblaud-stats-days/1",
+               usage_model="office_ledger",
+               days=series, totals=hist.get("totals") or {},
+               detail="real office ledger day fold; Qubit has no waiting-time "
+                      "usage store")
+
+
+def h_office_habblaud_stats_day(cfg: Any, q: Dict[str, str],
+                                b: Dict[str, Any], p: Dict[str, str]
+                                ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/stats?day=&tz= -> one real ledger day."""
+    raw = str((q or {}).get("day", "") or "").strip()
+    from .office import store as OSS
+    conn = OSS.connect(cfg)
+    try:
+        OSS.migrate(conn)
+        if raw.isdigit():
+            day = int(raw)
+        else:
+            day = int(OSS.now() // 86400)
+        start, end = day * 86400, day * 86400 + 86400
+        rows = [dict(r) for r in conn.execute(
+            "SELECT kind, amount_cents, unmetered FROM office_ledger"
+            " WHERE ts >= ? AND ts < ?", (start, end))]
+    except Exception as exc:  # noqa: BLE001
+        return 503, {"ok": False, "code": "LEDGER_UNAVAILABLE",
+                     "detail": f"the office ledger could not be read: "
+                               f"{str(exc)[:200]}"}
+    finally:
+        conn.close()
+    rev = sum(int(r.get("amount_cents", 0) or 0) for r in rows
+              if r.get("kind") == "revenue" and not r.get("unmetered"))
+    cost = sum(int(r.get("amount_cents", 0) or 0) for r in rows
+               if r.get("kind") in ("inference", "fees", "capex")
+               and not r.get("unmetered"))
+    return _ok(schema="qubit-office-habblaud-stats-day/1",
+               day=day, tz=str((q or {}).get("tz", "") or ""),
+               usage_model="office_ledger",
+               totals={"revenue_cents": rev, "cost_cents": cost,
+                       "net_cents": rev - cost},
+               rows=len(rows),
+               detail="real office ledger day fold")
+
+
+def h_office_habblaud_spawn_folders(cfg: Any, q: Dict[str, str],
+                                    b: Dict[str, Any], p: Dict[str, str]
+                                    ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/spawn/folders -> real Qubit project folders.
+
+    Habblaud offers a list of folders to start an agent in. Qubit's real folders
+    are its registered projects; return them in the ``{path,name}`` shape the
+    client's picker reads. An empty registry is an empty list, never an invented
+    path.
+    """
+    from . import projects as PJ
+    folders: List[Dict[str, Any]] = []
+    try:
+        out = PJ.list_projects(cfg)
+        rows = out.get("projects") if isinstance(out, dict) else out
+    except Exception:  # noqa: BLE001 - a read surface must not 500
+        rows = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        path = str(r.get("path", "") or r.get("root", "")
+                   or r.get("project_root", "") or "")
+        if not path:
+            continue
+        folders.append({"path": path,
+                        "name": str(r.get("name") or r.get("slug")
+                                    or Path(path).name)})
+    return _ok(schema="qubit-office-habblaud-spawn-folders/1",
+               folders=folders, count=len(folders),
+               detail="real Qubit project folders")
+
+
+def h_office_habblaud_dictation(cfg: Any, q: Dict[str, str],
+                                b: Dict[str, Any], p: Dict[str, str]
+                                ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/dictation -> real streaming-STT availability.
+
+    The client's ``checkDictation`` reads ``available === true`` to enable its
+    microphone button. Availability is derived from the SAME configured ASR the
+    Qubit voice path uses, never a hard-coded true.
+    """
+    try:
+        from .asr.streaming import _configured_streaming_engine
+        engine = _configured_streaming_engine(cfg)
+    except Exception:  # noqa: BLE001
+        engine = ""
+    available = bool(engine)
+    return _ok(schema="qubit-office-habblaud-dictation/1",
+               available=available, engine=str(engine or ""),
+               detail=("streaming STT is configured"
+                       if available else
+                       "no streaming STT engine is configured"))
+
+
+def h_office_habblaud_permission(cfg: Any, q: Dict[str, str],
+                                 b: Dict[str, Any], p: Dict[str, str]
+                                 ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/permissions/<id> -> a real pending permission.
+
+    Qubit's pending-approval journal is the ``ops`` approvals store. The client
+    treats a 404 here as "no such pending permission" (it returns ``undefined``
+    and keeps rendering), so a missing id is a typed ``PERMISSION_NOT_FOUND``
+    404 rather than a fabricated request.
+    """
+    pid = str((p or {}).get("id", "") or "").strip()
+    try:
+        from .approvals import ApprovalJournal
+        journal = ApprovalJournal(Path(cfg.state_dir()) / "approvals.jsonl",
+                                  default_ttl_s=120.0)
+        pending = list(journal.pending())
+    except Exception:  # noqa: BLE001 - a read surface must not 500
+        pending = []
+    for a in pending:
+        if str(getattr(a, "id", "")) == pid:
+            return _ok(schema="qubit-office-habblaud-permission/1",
+                       id=pid,
+                       capability=str(getattr(a, "capability", "") or ""),
+                       summary=_redact(getattr(a, "summary", ""))[:300],
+                       created_at=getattr(a, "created_at", None),
+                       expires_at=getattr(a, "expires_at", None),
+                       state=getattr(a, "state", ""))
+    return 404, {"ok": False, "code": "PERMISSION_NOT_FOUND",
+                 "detail": f"no pending permission {pid!r}",
+                 "qubit_counterpart": "GET /api/ops/approvals"}
+
+
+def h_office_habblaud_message(cfg: Any, q: Dict[str, str],
+                              b: Dict[str, Any], p: Dict[str, str]
+                              ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/messages/<id> -> a real queued/sent message.
+
+    The client's ``messageStatus`` treats a 404 as ``null`` (no such message) and
+    stops polling. Qubit has no outbound message queue on this surface, so every
+    id is a typed ``MESSAGE_NOT_FOUND`` 404 — honest "no message", never a
+    fabricated delivery state.
+    """
+    mid = str((p or {}).get("id", "") or "").strip()
+    return 404, {"ok": False, "code": "MESSAGE_NOT_FOUND",
+                 "detail": f"no queued message {mid!r}; sending is gated by the "
+                           "confirmation authority (C4)",
+                 "qubit_counterpart": "Qubit Chat (POST /api/qubit/chat)"}
+
+
+def h_office_habblaud_updates_check(cfg: Any, q: Dict[str, str],
+                                    b: Dict[str, Any], p: Dict[str, str]
+                                    ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/habblaud/updates/check -> the real read-only update check.
+
+    The client only reads ``.ok`` off the response. This runs the SAME
+    ``update_manager.check`` the SPA System page uses — a truthful local report,
+    never a fabricated "up to date" (a probe failure is a typed DEGRADED report).
+    """
+    try:
+        out = _update_check(cfg, q, b, p)
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    return _ok(update=out if isinstance(out, dict) else {"state": "UNKNOWN"})
+
+
+def h_office_habblaud_demo(cfg: Any, q: Dict[str, str],
+                           b: Dict[str, Any], p: Dict[str, str]
+                           ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/habblaud/demo -> toggle the labelled demo/preview flag.
+
+    Habblaud's ``/api/demo`` flips its simulator on/off. Qubit has no simulator,
+    but it DOES have a labelled empty-org PREVIEW (``tower.state(preview=True)``)
+    that draws an org which has not started. This persists that preference to a
+    small store so a reload keeps it, and reports the REAL effect. It never
+    fabricates demo agents into a live office.
+    """
+    want = _truthy(b.get("enabled"))
+    try:
+        state = _load_json_store(_office_habblaud_demo_path(cfg))
+        state["enabled"] = bool(want)
+        state["updated_at"] = time.time()
+        _save_json_store(_office_habblaud_demo_path(cfg), state)
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    return _ok(schema="qubit-office-habblaud-demo/1", enabled=bool(want),
+               detail=("empty-org preview enabled; it draws only an org that "
+                       "has not started" if want else "preview disabled"))
+
+
+def h_office_habblaud_rooms_rename(cfg: Any, q: Dict[str, str],
+                                   b: Dict[str, Any], p: Dict[str, str]
+                                   ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/habblaud/rooms/rename -> rename a real office room.
+
+    ``{id, name}`` renames the room's slug in the office store — a real org
+    mutation, audited like every other office write. The room id may be the
+    tower's composite ``f<floor>r<roomid>`` id or a bare integer room id. A
+    missing name or an unknown room is a typed refusal, never a silent no-op.
+    """
+    from .office import store as OSS
+    rid = str(b.get("id", "") or "").strip()
+    name = str(b.get("name", "") or "").strip()
+    if not rid or not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "id and name are required",
+                     "qubit_counterpart": _OFFICE_ROOM_RENAME_COUNTERPART}
+    # Accept the client's composite ``f<floor>r<roomid>`` id or a bare integer.
+    m = re.fullmatch(r"f\d+r(\d+)", rid)
+    room_ref = m.group(1) if m else rid
+    if not room_ref.isdigit():
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": f"unrecognised room id {rid!r}",
+                     "qubit_counterpart": _OFFICE_ROOM_RENAME_COUNTERPART}
+    if OSS.estop_engaged(cfg):
+        return 409, {"ok": False, "code": "ESTOP_ENGAGED",
+                     "detail": "the emergency stop is engaged; room rename is "
+                               "refused",
+                     "qubit_counterpart": "release e-stop, then retry"}
+    conn = OSS.connect(cfg)
+    try:
+        OSS.migrate(conn)
+        row = conn.execute("SELECT id, slug, department_id FROM office_room"
+                           " WHERE id=?", (int(room_ref),)).fetchone()
+        if row is None:
+            return 404, {"ok": False, "code": "ROOM_NOT_FOUND",
+                         "detail": f"no office room {rid!r}",
+                         "qubit_counterpart": _OFFICE_ROOM_RENAME_COUNTERPART}
+        old = str(row["slug"])
+        conn.execute("UPDATE office_room SET slug=? WHERE id=?",
+                     (name, int(room_ref)))
+        conn.commit()
+        OSS.audit("room_rename", "dashboard:user",
+                  {"room_id": int(room_ref), "from": old, "to": name})
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    finally:
+        conn.close()
+    return _ok(schema="qubit-office-habblaud-room-rename/1",
+               id=rid, name=name, previous=old,
+               detail="office room renamed in the real office store")
+
+
+def h_office_habblaud_logout(cfg: Any, q: Dict[str, str],
+                             b: Dict[str, Any], p: Dict[str, str]
+                             ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/habblaud/remote/logout -> typed refusal.
+
+    Qubit serves no remote office session, so there is nothing to log out of.
+    Returning a fabricated success would tell the client it ended a session it
+    never had.
+    """
+    return 409, {"ok": False, "state": "UNAVAILABLE",
+                 "code": "NO_REMOTE_SESSION",
+                 "detail": "Qubit exposes no remote office session; there is no "
+                           "session to log out of.",
+                 "qubit_counterpart": "CLI `qubit auth logout` (remote auth)"}
+
+
+def h_office_habblaud_permission_decision(cfg: Any, q: Dict[str, str],
+                                          b: Dict[str, Any], p: Dict[str, str]
+                                          ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/habblaud/permissions/<id>/decision -> C4 staged refusal.
+
+    Answering an office permission is an org mutation; it must settle through
+    the Qubit confirmation authority, never a direct POST from the embed.
+    """
+    pid = str((p or {}).get("id", "") or "").strip()
+    return _staged(
+        f"Answering office permission {pid!r} is an org mutation and must go "
+        "through the Qubit confirmation authority (C4).",
+        f"office-habblaud-permission-decision:{pid}")
+
+
+def h_office_habblaud_message_send(cfg: Any, q: Dict[str, str],
+                                   b: Dict[str, Any], p: Dict[str, str]
+                                   ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/habblaud/messages -> C4 staged refusal.
+
+    Sending a message to an office agent is an org mutation; it must settle
+    through the Qubit confirmation authority, never a direct POST.
+    """
+    return _staged(
+        "Sending a message to an office agent is an org mutation and must go "
+        "through the Qubit confirmation authority (C4).",
+        "office-habblaud-message-send")
+
+
+def h_office_habblaud_character(cfg: Any, q: Dict[str, str],
+                                b: Dict[str, Any], p: Dict[str, str]
+                                ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/habblaud/agents/<id>/character -> C4 staged refusal.
+
+    Editing an agent's appearance mutates the office org; it must settle
+    through the Qubit confirmation authority, never a direct POST.
+    """
+    aid = str((p or {}).get("id", "") or "").strip()
+    return _staged(
+        f"Editing agent {aid!r}'s appearance mutates the office org and must go "
+        "through the Qubit confirmation authority (C4).",
+        f"office-habblaud-character:{aid}")
+
+
+def h_office_habblaud_refuse(cfg: Any, q: Dict[str, str],
+                             b: Dict[str, Any], p: Dict[str, str]
+                             ) -> Tuple[int, Dict[str, Any]]:
+    """Every genuinely-unsupported Habblaud capability -> a typed refusal.
+
+    Dispatch routes a family of paths here (PTY/terminal control, takeover,
+    stop, sessions terminal, deliveries file, dictation write, spawn). The
+    refusal names what Qubit does expose instead, so the page reports a missing
+    binding rather than rendering nothing.
+    """
+    path = str((p or {}).get("sub", "") or (p or {}).get("_path", "") or "")
+    return 403, {"ok": False, "state": "UNAVAILABLE",
+                 "code": "OFFICE_CLIENT_UNSUPPORTED",
+                 "detail": (f"the {path or 'requested'} capability is not "
+                            "exposed by Qubit (no raw PTY, no spawn, no "
+                            "deliveries store)."),
+                 "qubit_counterpart": "Qubit Chat + dashboard /ops + approvals"}
+
+
+def h_office_habblaud_deliveries(cfg: Any, q: Dict[str, str],
+                                 b: Dict[str, Any], p: Dict[str, str]
+                                 ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/deliveries -> typed refusal (no deliveries store).
+
+    Habblaud tracks files its agents produced. Qubit has no such artifact
+    registry, so this answers an empty, typed refusal rather than a fabricated
+    delivery list.
+    """
+    return _ok(schema="qubit-office-habblaud-deliveries/1", deliveries=[],
+               count=0, supported=False,
+               detail="Qubit has no agent-deliveries registry")
+
+
+def _office_habblaud_demo_path(cfg: Any) -> Path:
+    return Path(cfg.state_dir()) / "office" / "habblaud_demo.json"
+
+
+
 def h_curator(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import dashboard_ops as OPS
@@ -5511,7 +6171,14 @@ def _publish_chat_frame(cfg: Any, name: str, value: Dict[str, Any]) -> None:
 #: ``limit * N`` so post-filter paging still returns a full page.
 _CHAT_PICKER_OVERFETCH = 4
 #: Message count at or below which a probe/test artifact is recognisable.
-_CHAT_PICKER_NOISE_MAX_MSGS = 2
+#: A real conversation completes its first exchange (user + assistant) at TWO
+#: messages — the floor must sit BELOW that, or a freshly-started dashboard chat
+#: is hidden from the picker exactly when the live-update contract announces it
+#: (the "new session never appears" defect). Only a message-less artifact (0) or
+#: a single stray probe message (1) is tiny enough to be tooling; the probe-NAME
+#: signals above stay count-independent and still catch named artifacts at any
+#: length.
+_CHAT_PICKER_NOISE_MAX_MSGS = 1
 #: Session names probe and smoke tooling mints. Matched exactly (never a
 #: substring) so a real conversation titled similarly is never hidden.
 _CHAT_PICKER_NOISE_NAMES = frozenset({
@@ -9381,6 +10048,71 @@ _r("GET", r"/api/providers/oauth/(?P<provider_id>[^/]+)/poll/(?P<session_id>[^/]
 _r("DELETE", r"/api/providers/oauth/sessions/(?P<id>[^/]+)", "h_oauth_cancel")
 _r("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", "h_oauth_disconnect")
 _r("GET", r"/api/curator", "h_curator")
+# M4: the tower. Read-only; the plugin renders it and nothing else.
+_r("GET", r"/api/office/tower", "h_office_tower")
+# --- Habblaud office-client compat surface (see handlers above) ------------
+# The vendored office client requests these paths through the api-bridge, which
+# rewrites them onto /agent/api/office/habblaud/<path>. Every sub-path the
+# bundle can reach is bound here so a request never lands on the bare "no
+# compat route" 404. Reads answer real Qubit state; unsupported actions are
+# typed refusals. Specific patterns precede any wildcard catch-all.
+_r("GET", r"/api/office/habblaud/access", "h_office_habblaud_access")
+_r("GET", r"/api/office/habblaud/agents/(?P<id>[^/]+)", "h_office_habblaud_agent")
+_r("GET", r"/api/office/habblaud/sessions/recent",
+   "h_office_habblaud_sessions_recent")
+_r("GET", r"/api/office/habblaud/timeline/days",
+   "h_office_habblaud_timeline_days")
+_r("GET", r"/api/office/habblaud/timeline/(?P<day>[^/]+)",
+   "h_office_habblaud_timeline_day")
+_r("GET", r"/api/office/habblaud/stats/days", "h_office_habblaud_stats_days")
+_r("GET", r"/api/office/habblaud/stats", "h_office_habblaud_stats_day")
+_r("GET", r"/api/office/habblaud/spawn/folders",
+   "h_office_habblaud_spawn_folders")
+_r("GET", r"/api/office/habblaud/dictation", "h_office_habblaud_dictation")
+_r("GET", r"/api/office/habblaud/dictation/(?P<id>[^/]+)",
+   "h_office_habblaud_refuse")
+_r("GET", r"/api/office/habblaud/permissions/(?P<id>[^/]+)",
+   "h_office_habblaud_permission")
+_r("GET", r"/api/office/habblaud/messages/(?P<id>[^/]+)",
+   "h_office_habblaud_message")
+_r("POST", r"/api/office/habblaud/updates/check",
+   "h_office_habblaud_updates_check")
+_r("POST", r"/api/office/habblaud/demo", "h_office_habblaud_demo")
+_r("POST", r"/api/office/habblaud/rooms/rename",
+   "h_office_habblaud_rooms_rename")
+_r("POST", r"/api/office/habblaud/remote/logout", "h_office_habblaud_logout")
+# The deliveries registry exists in Habblaud but not in Qubit: a typed empty
+# refusal (not a 404), so the client reports "no deliveries" honestly.
+_r("GET", r"/api/office/habblaud/deliveries", "h_office_habblaud_deliveries")
+_r("GET", r"/api/office/habblaud/deliveries/file/(?P<id>[^/]+)",
+   "h_office_habblaud_refuse", "implemented")
+# Everything else the client can reach: PTY/terminal control, takeover, stop,
+# character edit, sessions terminal, spawn + attachments, permission decision,
+# message send, dictation write. All are typed refusals (or C4-staged for the
+# org mutations), matched last so the specific reads above win.
+_r("POST", r"/api/office/habblaud/agents/(?P<id>[^/]+)/character",
+   "h_office_habblaud_character")
+_r("POST", r"/api/office/habblaud/agents/(?P<id>[^/]+)/(?P<sub>[^/]+)",
+   "h_office_habblaud_refuse")
+_r("POST", r"/api/office/habblaud/sessions/(?P<a>[^/]+)/(?P<b>[^/]+)/terminal",
+   "h_office_habblaud_refuse")
+_r("POST", r"/api/office/habblaud/permissions/(?P<id>[^/]+)/decision",
+   "h_office_habblaud_permission_decision")
+_r("GET", r"/api/office/habblaud/permissions/(?P<id>[^/]+)/decision",
+   "h_office_habblaud_refuse")
+_r("POST", r"/api/office/habblaud/messages", "h_office_habblaud_message_send")
+_r("POST", r"/api/office/habblaud/dictation/(?P<id>[^/]+)",
+   "h_office_habblaud_refuse")
+_r("POST", r"/api/office/habblaud/dictation", "h_office_habblaud_refuse")
+_r("POST", r"/api/office/habblaud/spawn/attachments",
+   "h_office_habblaud_refuse")
+_r("POST", r"/api/office/habblaud/spawn", "h_office_habblaud_refuse")
+_r("POST", r"/api/office/habblaud/pty/(?P<id>[^/]+)/(?P<sub>[^/]+)",
+   "h_office_habblaud_refuse")
+_r("POST", r"/api/office/habblaud/pty", "h_office_habblaud_refuse")
+_r("GET", r"/api/office/habblaud/pty/(?P<id>[^/]+)/stream",
+   "h_office_habblaud_refuse")
+_r("POST", r"/api/office/habblaud/(?P<sub>.+)", "h_office_habblaud_refuse")
 # Real on-demand curator control (persisted pause flag + explicit pass). The
 # routes are implemented here, ahead of the GATED table, so the operator
 # controls are real rather than the old CURATOR_ON_DEMAND refusal.
@@ -9473,6 +10205,28 @@ _r("DELETE", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)",
 _r("POST", r"/api/plugins/kanban/tasks/bulk", "h_plugin_kanban_tasks_bulk")
 _r("POST", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)/comments",
    "h_plugin_kanban_tasks_comment")
+# Installed user dashboard plugin ``obsidian-memory``: its GET reads proxy
+# straight to the vendored plugin router (non-gated, fork-declared), so only the
+# WRITE/explicit-action rows are declared here. PUT drives the plugin's own
+# ``update_note`` (and creates a new note when the name is unknown); POST
+# ``/refresh`` forces its vault rescans. Both reuse the in-process fork router
+# the reads already hit — no plugin cache split, no second authority.
+_r("PUT", r"/api/plugins/obsidian-memory/notes/(?P<name>.+)",
+   "h_plugin_obsidian_note_put")
+# Nested-path READ. The plugin declares its read route as
+# ``/notes/{name:path}`` (api.py:206) and keys notes by vault-relative path
+# (api.py:127), so it natively serves a note inside a subfolder. Its OpenAPI
+# schema, however, renders that parameter as a plain ``{name}`` string, so
+# ``qubit_asgi._template_re`` (qubit_asgi.py:145) compiles ``[^/]+`` -- which
+# cannot match ``AI_Brain/YouTube/x.md``. ``known_route`` therefore reports the
+# nested path as unserved, the GET is never proxied, and it fell through to a
+# bare "no compat route" 404. This row drives the SAME in-process plugin router
+# the flat read proxies to, so a nested note is read by the plugin's own
+# ``get_note`` -- never reimplemented -- and a flat note still proxies first
+# (this handler only runs once ``known_route`` already rejected the path).
+_r("GET", r"/api/plugins/obsidian-memory/notes/(?P<name>.+)",
+   "h_plugin_obsidian_note_get")
+_r("POST", r"/api/plugins/obsidian-memory/refresh", "h_plugin_obsidian_refresh")
 # Discovery for the vendored plugin fleet. The existing
 # /api/dashboard/plugins response stays fixed to the Qubit overlay set; this
 # additive view reports the vendored manifests without changing that contract.
@@ -16609,6 +17363,212 @@ def h_plugin_kanban_tasks_comment(cfg: Any, q: Dict[str, str],
     return 200, {"ok": True}
 
 
+# ---------------------------------------------------------------------------
+# Obsidian vault write surface (installed dashboard plugin ``obsidian-memory``)
+# ---------------------------------------------------------------------------
+# The plugin's GET reads (``/vaults``, ``/notes``, ``/notes/{name}``, ``/graph``,
+# ...) are not declared here: they are non-gated reads the vendored runtime
+# declares, so ``webui._qubit_api`` proxies them in-process to the plugin's own
+# mounted router (``qubit_asgi``). Its WRITES were never reachable: the fork
+# proxy is GET/HEAD only and the compat table had no PUT row, so
+# ``PUT /api/plugins/obsidian-memory/notes/{name}`` fell through to the bare
+# "no compat route" 404 — no model could write a note.
+#
+# These handlers restore parity by driving the SAME in-process fork router the
+# reads use (``qubit_asgi.call``), so the plugin's own ``update_note`` /
+# ``refresh_vault`` coroutines, its cache, and its ``(status, JSON)`` shapes are
+# reused exactly — never reimplemented. Registered ahead of the gate loop, so a
+# later blanket gate cannot shadow the real write.
+
+def _obsidian_plugin_ready(cfg: Any) -> bool:
+    """True when the installed ``obsidian-memory`` plugin ships ``api.py``."""
+    try:
+        from . import qubit_runtime as _QR
+        home = _QR.runtime_home_for_cfg(cfg)
+    except Exception:
+        return False
+    api = Path(home) / "plugins" / "obsidian-memory" / "dashboard" / "api.py"
+    return api.is_file()
+
+
+def _obsidian_proxy(cfg: Any, method: str, path: str,
+                    query: Dict[str, str], body: Dict[str, Any]
+                    ) -> Optional[Tuple[int, Any]]:
+    """Drive the vendored plugin router in-process; ``None`` if it 404s.
+
+    A 404 from the fork means the plugin route was not matched there (e.g. the
+    plugin is absent), so the caller may fall back to its own path; every other
+    status is the plugin's real answer and is returned verbatim.
+    """
+    import json as _json
+    from . import qubit_asgi as _HA
+    payload = _json.dumps(body).encode("utf-8") if body else b""
+    code, _hdrs, rbody = _HA.call(
+        method, path, query=query,
+        headers={"accept": "application/json",
+                 "content-type": "application/json"},
+        body=payload)
+    if code == 404:
+        return None
+    try:
+        return code, _json.loads(rbody.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return code, {"ok": False, "code": "PLUGIN_BAD_RESPONSE",
+                      "detail": "obsidian plugin returned a non-JSON body"}
+
+
+def _obsidian_vault_id(cfg: Any) -> Optional[str]:
+    """Vault name the plugin resolves to (its default), else ``None``.
+
+    Read from the plugin's own discovery so a create lands in the exact vault a
+    subsequent read reports, rather than a second guess of the same env var.
+    """
+    got = _obsidian_proxy(cfg, "GET", "/api/plugins/obsidian-memory/vaults",
+                          {}, {})
+    if got is None:
+        return None
+    _code, out = got
+    if not isinstance(out, list) or not out:
+        return None
+    first = out[0]
+    return str(first.get("name") or "") or None
+
+
+def _obsidian_create_note(cfg: Any, vault: str, name: str, content: str
+                          ) -> Tuple[int, Dict[str, Any]]:
+    """Create a not-yet-existing note inside the vault (path-confined).
+
+    The plugin exposes no create route — ``update_note`` resolves the note by
+    name and 404s an unknown key — so a brand-new note is written directly to
+    the vault the plugin itself resolved. The relative path is confined to the
+    vault root (no ``..`` escape), and creation never clobbers an existing file.
+    """
+    got = _obsidian_proxy(cfg, "GET", "/api/plugins/obsidian-memory/vaults",
+                          {}, {})
+    if got is None:
+        return 404, {"ok": False, "code": "PLUGIN_NOT_FOUND",
+                     "detail": "dashboard plugin 'obsidian-memory' is not "
+                               "installed or its API is not serving",
+                     "qubit_counterpart": "dashboard /plugins"}
+    _code, vaults = got
+    root = None
+    for v in vaults if isinstance(vaults, list) else []:
+        if str(v.get("name")) == vault:
+            root = Path(str(v.get("path") or "")).resolve()
+            break
+    if root is None:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"vault {vault!r} not found"}
+    rel = name.strip().lstrip("/")
+    if not rel or ".." in rel.split("/") or rel.startswith("."):
+        return 400, {"ok": False, "code": "PLUGIN_PATH_BLOCKED",
+                     "detail": "note name must be a vault-relative path"}
+    target = (root / rel).resolve()
+    if not target.is_relative_to(root):
+        return 400, {"ok": False, "code": "PLUGIN_PATH_BLOCKED",
+                     "detail": "path traversal blocked"}
+    if target.exists():
+        return 409, {"ok": False, "code": "PLUGIN_CONFLICT",
+                     "detail": "note already exists; re-PUT to update it"}
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+    except OSError as exc:
+        return _fail(exc)
+    # Refresh the plugin's cache so the new note is immediately readable.
+    _obsidian_proxy(cfg, "POST", "/api/plugins/obsidian-memory/refresh",
+                    {"vault": vault}, {})
+    _audit("obsidian.note.create", "dashboard:user",
+           {"vault": vault, "note": rel})
+    return _ok(created=True, vault=vault, name=rel,
+               detail="note created on disk")
+
+
+def h_plugin_obsidian_note_put(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                               p: Dict[str, str]) -> Tuple[int, Any]:
+    """PUT /api/plugins/obsidian-memory/notes/{name} -> update or create a note.
+
+    An existing note is updated through the plugin's own ``update_note`` (the
+    same call its mounted router makes); an unknown name creates the note on
+    disk via the confined writer above. Body shape matches the plugin's
+    ``NoteUpdate`` model: ``{"content": "<markdown>"}``.
+    """
+    if not _obsidian_plugin_ready(cfg):
+        return 404, {"ok": False, "code": "PLUGIN_NOT_FOUND",
+                     "detail": "dashboard plugin 'obsidian-memory' is not "
+                               "installed",
+                     "qubit_counterpart": "dashboard /plugins"}
+    name = str(p.get("name", "") or "").strip()
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "note name required"}
+    if "content" not in b or not isinstance(b.get("content"), str):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "body must be {\"content\": \"<markdown>\"} "
+                               "(the plugin's NoteUpdate model)",
+                     "qubit_counterpart": "plugin PUT /notes/{name}"}
+    content = b["content"]
+    query = {"vault": q["vault"]} if q.get("vault") else {}
+    got = _obsidian_proxy(
+        cfg, "PUT", f"/api/plugins/obsidian-memory/notes/{name}",
+        query, {"content": content})
+    if got is not None:
+        code, out = got
+        if code == 200:
+            _audit("obsidian.note.update", "dashboard:user",
+                   {"note": name[:200]})
+        return code, out
+    # Fork 404 -> the plugin has no such note: create it (upsert semantics).
+    vault = q.get("vault") or _obsidian_vault_id(cfg) or ""
+    return _obsidian_create_note(cfg, vault, name, content)
+
+
+def h_plugin_obsidian_refresh(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Any]:
+    """POST /api/plugins/obsidian-memory/refresh -> rescan the vault cache."""
+    if not _obsidian_plugin_ready(cfg):
+        return 404, {"ok": False, "code": "PLUGIN_NOT_FOUND",
+                     "detail": "dashboard plugin 'obsidian-memory' is not "
+                               "installed",
+                     "qubit_counterpart": "dashboard /plugins"}
+    query = {"vault": q["vault"]} if q.get("vault") else {}
+    got = _obsidian_proxy(cfg, "POST",
+                          "/api/plugins/obsidian-memory/refresh", query, {})
+    if got is None:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": "obsidian refresh route not served"}
+    _audit("obsidian.refresh", "dashboard:user", {"vault": q.get("vault", "")})
+    return got
+
+
+def h_plugin_obsidian_note_get(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                               p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/plugins/obsidian-memory/notes/{name} -> read one note.
+
+    A flat note is served by the fork proxy (its concrete path is in the fork's
+    route table); this handler exists for the nested vault-relative path the
+    proxy's route-membership check rejects (``[^/]+`` cannot cross ``/``), so it
+    forwards to the plugin's own ``get_note`` in-process -- the same router, the
+    same ``_resolve_note_key``, the same JSON shape the flat read returns.
+    """
+    if not _obsidian_plugin_ready(cfg):
+        return 404, {"ok": False, "code": "PLUGIN_NOT_FOUND",
+                     "detail": "dashboard plugin 'obsidian-memory' is not "
+                               "installed",
+                     "qubit_counterpart": "dashboard /plugins"}
+    name = str(p.get("name", "") or "").strip().lstrip("/")
+    if not name or ".." in name.split("/"):
+        return 400, {"ok": False, "code": "PLUGIN_PATH_BLOCKED",
+                     "detail": "note name must be a vault-relative path"}
+    query = {"vault": q["vault"]} if q.get("vault") else {}
+    got = _obsidian_proxy(
+        cfg, "GET", f"/api/plugins/obsidian-memory/notes/{name}", query, {})
+    if got is None:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"note {name!r} not found in the vault"}
+    return got
+
+
 #: Legacy-brand tokens that must never be presented as a *current* Qubit API
 #: path in the served OpenAPI document. A compat alias carrying one of these
 #: still resolves on the wire, but is omitted from the /docs reference so no
@@ -16979,6 +17939,9 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_plugin_kanban_tasks_delete": h_plugin_kanban_tasks_delete,
     "h_plugin_kanban_tasks_bulk": h_plugin_kanban_tasks_bulk,
     "h_plugin_kanban_tasks_comment": h_plugin_kanban_tasks_comment,
+    "h_plugin_obsidian_note_put": h_plugin_obsidian_note_put,
+    "h_plugin_obsidian_note_get": h_plugin_obsidian_note_get,
+    "h_plugin_obsidian_refresh": h_plugin_obsidian_refresh,
     "cron_pause": lambda cfg, q, b, p: _cron_mutate("pause", cfg, q, b, p),
     "cron_resume": lambda cfg, q, b, p: _cron_mutate("resume", cfg, q, b, p),
     "cron_trigger": lambda cfg, q, b, p: _cron_mutate("run_due", cfg, q, b, p),
@@ -17296,6 +18259,28 @@ HANDLERS: Dict[str, Handler] = {
     "h_oauth_poll": h_oauth_poll, "h_oauth_cancel": h_oauth_cancel,
     "h_oauth_disconnect": h_oauth_disconnect,
     "h_curator": h_curator, "h_curator_paused": h_curator_paused,
+    "h_office_tower": h_office_tower,
+    "h_office_habblaud_access": h_office_habblaud_access,
+    "h_office_habblaud_agent": h_office_habblaud_agent,
+    "h_office_habblaud_sessions_recent": h_office_habblaud_sessions_recent,
+    "h_office_habblaud_timeline_days": h_office_habblaud_timeline_days,
+    "h_office_habblaud_timeline_day": h_office_habblaud_timeline_day,
+    "h_office_habblaud_stats_days": h_office_habblaud_stats_days,
+    "h_office_habblaud_stats_day": h_office_habblaud_stats_day,
+    "h_office_habblaud_spawn_folders": h_office_habblaud_spawn_folders,
+    "h_office_habblaud_dictation": h_office_habblaud_dictation,
+    "h_office_habblaud_permission": h_office_habblaud_permission,
+    "h_office_habblaud_message": h_office_habblaud_message,
+    "h_office_habblaud_updates_check": h_office_habblaud_updates_check,
+    "h_office_habblaud_demo": h_office_habblaud_demo,
+    "h_office_habblaud_rooms_rename": h_office_habblaud_rooms_rename,
+    "h_office_habblaud_logout": h_office_habblaud_logout,
+    "h_office_habblaud_refuse": h_office_habblaud_refuse,
+    "h_office_habblaud_permission_decision":
+        h_office_habblaud_permission_decision,
+    "h_office_habblaud_message_send": h_office_habblaud_message_send,
+    "h_office_habblaud_character": h_office_habblaud_character,
+    "h_office_habblaud_deliveries": h_office_habblaud_deliveries,
     "h_curator_run": h_curator_run, "h_env": h_env, "h_ops": h_ops,
     "h_ops_catalog": h_ops_catalog,
     "h_ops_run": h_ops_run,

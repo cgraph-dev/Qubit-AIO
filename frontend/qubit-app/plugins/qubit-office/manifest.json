@@ -6,6 +6,7 @@
   "version": "1.0.0",
   "tab": {
     "path": "/qubit-office",
+    "hidden": true,
     "position": "end"
   },
   "entry": "qubit-office.game.js",

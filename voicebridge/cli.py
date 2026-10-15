@@ -1268,6 +1268,604 @@ def build_parser() -> argparse.ArgumentParser:
                    "decompose", "gc", "repair"):
         kb_sub.add_parser(_kb_un, parents=[common],
                           help="no Qubit construct yet (typed refusal)")
+    # --- Qubit Office (docs/game-office/) ---------------------------------
+    # M0: the accounting spine. The ledger is append-only, every total is
+    # derived from it, and every seat has an accountable superior. Mutations
+    # preview under --dry-run, require --confirm, and refuse while the
+    # emergency stop is latched.
+    of = add("office",
+             help="Qubit Office — the agent corporation's ledger and org")
+    of_sub = of.add_subparsers(dest="office_command")
+    of_sub.add_parser("init", parents=[common],
+                      help="create the office store if missing (idempotent)")
+    of_sub.add_parser("health", parents=[common],
+                      help="ledger health: append-only triggers + rollup drift")
+    of_pnl = of_sub.add_parser(
+        "pnl", parents=[common],
+        help="derive P&L from the ledger (org | agent | department)")
+    of_pnl.add_argument("--scope", default="org",
+                        choices=["org", "agent", "department", "business"])
+    of_pnl.add_argument("--id", type=int, default=None, dest="scope_id")
+    of_led = of_sub.add_parser("ledger", parents=[common],
+                               help="read ledger rows, newest first")
+    of_led.add_argument("--limit", type=int, default=50)
+    of_led.add_argument("--agent", type=int, default=None)
+    of_led.add_argument("--department", type=int, default=None)
+    of_led.add_argument("--kind", default="")
+    of_rec = of_sub.add_parser(
+        "record", parents=[common],
+        help="append a ledger row (dry-run unless --confirm)")
+    of_rec.add_argument("--kind", required=True,
+                        choices=["inference", "revenue", "fees", "transfer",
+                                 "capex", "adjustment"])
+    of_rec.add_argument("--cents", type=int, required=True)
+    of_rec.add_argument("--agent", type=int, default=None)
+    of_rec.add_argument("--department", type=int, default=None)
+    of_rec.add_argument("--note", default="")
+    of_rec.add_argument("--unmetered", action="store_true",
+                        help="record it, but never count it as dollars (D16: "
+                             "subscription-backed / free-tier work)")
+    of_rec.add_argument("--attested-as", default="", dest="attested_as",
+                        choices=["", "entered", "limit"],
+                        help="owner attestation of an unknown charge (D15)")
+    of_rec.add_argument("--tokens-in", type=int, default=0, dest="tokens_in")
+    of_rec.add_argument("--tokens-out", type=int, default=0, dest="tokens_out")
+    of_rec.add_argument("--confirm", action="store_true")
+    of_rev = of_sub.add_parser(
+        "reverse", parents=[common],
+        help="append a compensating row (dry-run unless --confirm)")
+    of_rev.add_argument("row_id", type=int)
+    of_rev.add_argument("--note", default="")
+    of_rev.add_argument("--confirm", action="store_true")
+    of_sub.add_parser("tree", parents=[common],
+                      help="the org tree: seats, reporting edges, span breaches")
+    of_ch = of_sub.add_parser("chain", parents=[common],
+                              help="one seat's reporting chain, ground up")
+    of_ch.add_argument("--agent", type=int, required=True)
+    of_sub.add_parser("floors", parents=[common], help="list floors")
+    of_fc = of_sub.add_parser(
+        "floor-create", parents=[common],
+        help="create a floor (dry-run unless --confirm)")
+    of_fc.add_argument("--number", type=int, required=True)
+    of_fc.add_argument("--name", default="")
+    of_fc.add_argument("--role", default="operations",
+                       choices=["operations", "intelligence", "director",
+                                "executive", "rnd"])
+    of_fc.add_argument("--confirm", action="store_true")
+    of_dc = of_sub.add_parser(
+        "department-create", parents=[common],
+        help="create a business (dry-run unless --confirm)")
+    of_dc.add_argument("--slug", required=True)
+    of_dc.add_argument("--name", default="")
+    of_dc.add_argument("--floor", type=int, default=None)
+    of_dc.add_argument("--division-kind", default="product")
+    of_dc.add_argument("--director", type=int, default=None)
+    of_dc.add_argument("--kill-criteria", default="")
+    of_dc.add_argument("--confirm", action="store_true")
+    of_rc = of_sub.add_parser(
+        "room-create", parents=[common],
+        help="create a room (dry-run unless --confirm)")
+    of_rc.add_argument("--department", type=int, required=True)
+    of_rc.add_argument("--slug", required=True)
+    of_rc.add_argument("--kind", default="work")
+    of_rc.add_argument("--capacity", type=int, default=0)
+    of_rc.add_argument("--confirm", action="store_true")
+    of_hire = of_sub.add_parser(
+        "hire", parents=[common],
+        help="add a seat (dry-run unless --confirm)")
+    of_hire.add_argument("--slug", required=True)
+    of_hire.add_argument("--name", default="")
+    of_hire.add_argument("--seat-type", default="worker")
+    of_hire.add_argument("--department", type=int, default=None)
+    of_hire.add_argument("--room", type=int, default=None, dest="room_id",
+                         help="the room this seat's desk is in (a seat that is "
+                              "not in a room cannot be drawn in the tower)")
+    of_hire.add_argument("--supervisor", type=int, default=None)
+    of_hire.add_argument("--portfolio", default="")
+    of_hire.add_argument("--confirm", action="store_true")
+    # --- run receipts and admission (D15) ---
+    of_sub.add_parser("unsettled", parents=[common],
+                      help="runs with a receipt and no settled row (unknown spend)")
+    of_sub.add_parser("receipts", parents=[common],
+                      help="list run receipts, newest first")
+    of_rb = of_sub.add_parser(
+        "run-begin", parents=[common],
+        help="write a dispatch receipt before a turn starts (dry-run unless --confirm)")
+    of_rb.add_argument("--agent", type=int, required=True)
+    of_rb.add_argument("--cap", type=int, default=0, dest="cap_cents")
+    of_rb.add_argument("--model", default="")
+    of_rb.add_argument("--run-id", default="", dest="run_id")
+    of_rb.add_argument("--confirm", action="store_true")
+    of_rf = of_sub.add_parser(
+        "run-finish", parents=[common],
+        help="record real usage and settle the receipt (dry-run unless --confirm)")
+    of_rf.add_argument("run_id")
+    of_rf.add_argument("--cents", type=int, required=True)
+    of_rf.add_argument("--unmetered", action="store_true")
+    of_rf.add_argument("--tokens-in", type=int, default=0, dest="tokens_in")
+    of_rf.add_argument("--tokens-out", type=int, default=0, dest="tokens_out")
+    of_rf.add_argument("--model", default="")
+    of_rf.add_argument("--note", default="")
+    of_rf.add_argument("--confirm", action="store_true")
+    of_st = of_sub.add_parser(
+        "settle", parents=[common],
+        help="close an unknown spend with an owner attestation (dry-run unless --confirm)")
+    of_st.add_argument("run_id")
+    of_st.add_argument("--cents", type=int, required=True)
+    of_st.add_argument("--attested-as", default="entered",
+                       choices=["entered", "limit"], dest="attested_as")
+    of_st.add_argument("--note", default="")
+    of_st.add_argument("--confirm", action="store_true")
+    of_halt = of_sub.add_parser(
+        "run-halt", parents=[common],
+        help="mark a run halted by the e-stop (dry-run unless --confirm)")
+    of_halt.add_argument("run_id")
+    of_halt.add_argument("--reason", default="emergency stop")
+    of_halt.add_argument("--confirm", action="store_true")
+    of_adm = of_sub.add_parser(
+        "admit", parents=[common],
+        help="the admission gate: completeness, then the caps (read-only)")
+    of_adm.add_argument("--agent", type=int, required=True)
+    of_adm.add_argument("--estimate", type=int, default=0, dest="estimated_cents")
+    # --- budget caps (C8) ---
+    of_sub.add_parser("caps", parents=[common],
+                      help="the four caps in force, with provenance")
+    of_cs = of_sub.add_parser(
+        "cap-set", parents=[common],
+        help="set or clear one cap (dry-run unless --confirm)")
+    of_cs.add_argument("--key", required=True,
+                       choices=["perRun", "perAgent", "perDay", "global"])
+    of_cs.add_argument("--value", default="",
+                       help="cents; 0 = no cap; 'default'/empty = clear the override")
+    of_cs.add_argument("--confirm", action="store_true")
+    # --- M1: one real turn, attributed ---
+    of_run = of_sub.add_parser(
+        "run", parents=[common],
+        help="run ONE real attributed turn for a seat (MAKES A REAL PROVIDER "
+             "CALL; dry-run unless --confirm)")
+    of_run.add_argument("--agent", type=int, required=True)
+    of_run.add_argument("--task", required=True)
+    of_run.add_argument("--estimate", type=int, default=1,
+                        dest="estimated_cents")
+    of_run.add_argument("--cap", type=int, default=0, dest="cap_cents")
+    of_run.add_argument("--model", default="")
+    of_run.add_argument("--department", type=int, default=None)
+    of_run.add_argument("--unmetered", action="store_true")
+    of_run.add_argument("--confirm", action="store_true")
+    of_tr = of_sub.add_parser(
+        "trace", parents=[common],
+        help="everything one seat's turns produced: receipt, model, tokens, "
+             "cents, artifacts, events (read-only)")
+    of_tr.add_argument("--agent", type=int, required=True)
+    of_tr.add_argument("--limit", type=int, default=10)
+    of_at = of_sub.add_parser(
+        "attribute", parents=[common],
+        help="bind an artifact to the run that produced it (dry-run unless --confirm)")
+    of_at.add_argument("--run", required=True, dest="run_id")
+    of_at.add_argument("--ref", required=True)
+    of_at.add_argument("--kind", default="file")
+    of_at.add_argument("--agent", type=int, default=None)
+    of_at.add_argument("--sha256", default="")
+    of_at.add_argument("--bytes", type=int, default=None)
+    of_at.add_argument("--confirm", action="store_true")
+    of_sub.add_parser("attribution-check", parents=[common],
+                      help="C6: artifacts and ledger rows that name no receipt")
+    of_cn = of_sub.add_parser(
+        "consent", parents=[common],
+        help="resolve one action against the four tiers (read-only)")
+    of_cn.add_argument("--capability", required=True)
+    of_cn.add_argument("--scope", default="")
+    of_cn.add_argument("--posture", default="unattended_full",
+                       choices=["unattended_full", "supervised", "frozen"])
+    of_cn.add_argument("--grant", action="append", default=[])
+    of_cn.add_argument("--read-only", action="store_true", dest="read_only")
+    of_cn.add_argument("--network", action="store_true")
+    of_sub.add_parser("hardline", parents=[common],
+                      help="the unconditional deny floor (D18)")
+    # --- M2: envelopes, escalation, survival, reports ---
+    of_ea = of_sub.add_parser(
+        "envelope-allocate", parents=[common],
+        help="set one level's monthly envelope (dry-run unless --confirm)")
+    of_ea.add_argument("--scope", required=True,
+                       choices=["org", "portfolio", "department"])
+    of_ea.add_argument("--id", type=int, default=None, dest="scope_id")
+    of_ea.add_argument("--cents", type=int, required=True)
+    of_ea.add_argument("--by", type=int, default=None, dest="agent")
+    of_ea.add_argument("--period", default="")
+    of_ea.add_argument("--reserve", action="store_true",
+                       help="the CEO's unallocated reserve (no scope_id)")
+    of_ea.add_argument("--confirm", action="store_true")
+    of_es = of_sub.add_parser(
+        "envelope-split", parents=[common],
+        help="split the org envelope across the portfolio directors, keeping "
+             "a reserve (dry-run unless --confirm)")
+    of_es.add_argument("--by", type=int, required=True, dest="agent")
+    of_es.add_argument("--total", type=int, required=True, dest="total_cents")
+    of_es.add_argument("--reserve-pct", type=int, default=20,
+                       dest="reserve_pct")
+    of_es.add_argument("--period", default="")
+    of_es.add_argument("--confirm", action="store_true")
+    of_env = of_sub.add_parser("envelopes", parents=[common],
+                               help="every envelope with derived spend/remaining")
+    of_env.add_argument("--period", default="")
+    of_hd = of_sub.add_parser("headroom", parents=[common],
+                              help="what a seat may spend before it must raise")
+    of_hd.add_argument("--agent", type=int, required=True)
+    of_hd.add_argument("--period", default="")
+    of_rq = of_sub.add_parser(
+        "raise", parents=[common],
+        help="ask the level above for more than the envelope holds "
+             "(dry-run unless --confirm)")
+    of_rq.add_argument("--agent", type=int, required=True)
+    of_rq.add_argument("--cents", type=int, required=True,
+                       dest="amount_cents")
+    of_rq.add_argument("--thesis", required=True)
+    of_rq.add_argument("--expected-return", required=True,
+                       dest="expected_return")
+    of_rq.add_argument("--displaces", required=True)
+    of_rq.add_argument("--period", default="")
+    of_rq.add_argument("--confirm", action="store_true")
+    of_rqs = of_sub.add_parser("requests", parents=[common],
+                               help="raises above an envelope, newest first")
+    of_rqs.add_argument("--status", default="")
+    of_rd = of_sub.add_parser(
+        "request-decide", parents=[common],
+        help="approve/deny a raise — only the seat it was sent to may "
+             "(dry-run unless --confirm)")
+    of_rd.add_argument("id", type=int)
+    of_rd.add_argument("--by", type=int, required=True, dest="agent")
+    of_rd.add_argument("--note", default="")
+    g = of_rd.add_mutually_exclusive_group(required=True)
+    g.add_argument("--approve", action="store_true")
+    g.add_argument("--deny", action="store_true")
+    of_rd.add_argument("--confirm", action="store_true")
+    of_eg = of_sub.add_parser(
+        "escalate", parents=[common],
+        help="raise one item to the seat's own supervisor, onto the shared "
+             "confirmation journal")
+    of_eg.add_argument("--agent", type=int, required=True)
+    of_eg.add_argument("--kind", required=True,
+                       choices=["envelope", "runway", "blocked", "deadline",
+                                "raise"])
+    of_eg.add_argument("--summary", required=True)
+    of_egm = of_sub.add_parser("escalations", parents=[common],
+                               help="open and settled escalations")
+    of_egm.add_argument("--status", default="")
+    of_egm.add_argument("--agent", type=int, default=None)
+    of_er = of_sub.add_parser(
+        "escalation-resolve", parents=[common],
+        help="settle an escalation through the shared journal, one level up "
+             "only (dry-run unless --confirm)")
+    of_er.add_argument("id", type=int)
+    of_er.add_argument("--by", type=int, required=True, dest="agent")
+    g2 = of_er.add_mutually_exclusive_group(required=True)
+    g2.add_argument("--approve", action="store_true")
+    g2.add_argument("--deny", action="store_true")
+    of_er.add_argument("--confirm", action="store_true")
+    of_sub.add_parser("escalation-sync", parents=[common],
+                      help="close escalations the shared surface already "
+                           "settled (one queue, not two)")
+    of_tk = of_sub.add_parser(
+        "tick", parents=[common],
+        help="the daily pass: mechanical survival for every seat, then "
+             "reflection (no model call, spends nothing)")
+    of_tk.add_argument("--date", default="", dest="date_key")
+    # --- M7/L1: the autonomous driver (OFF by default; O3) ----------------
+    of_aw = of_sub.add_parser(
+        "autowork", parents=[common],
+        help="the autonomous driver: one cron-shaped tick that lets the org "
+             "notice work for itself. OFF by default (office.autowork.enabled)")
+    of_aw.add_argument("--now", action="store_true",
+                       help="run one tick now, whether or not the cadence is "
+                            "due; still refuses while the e-stop is latched")
+    of_aw.add_argument("--model", default="")
+    of_aw.add_argument("--set", choices=["on", "off"], default=None,
+                       help="persist the enabled flag")
+    of_aw.add_argument("--confirm", action="store_true",
+                       help="required for --now: run the tick for real")
+    of_rw = of_sub.add_parser("runway", parents=[common],
+                              help="days of runway at the current burn")
+    of_rw.add_argument("--agent", type=int, default=None)
+    of_sub.add_parser("at-risk", parents=[common],
+                      help="live seats below the survival floor, worst first")
+    of_ro = of_sub.add_parser("roster", parents=[common],
+                              help="the live org: seats, supervisors, balances")
+    of_ro.add_argument("--status", default="")
+    of_ro.add_argument("--all", action="store_true", dest="include_terminated",
+                       help="include terminated seats (reported separately)")
+    of_tm = of_sub.add_parser(
+        "terminate", parents=[common],
+        help="free a seat — never deletes a ledger row (dry-run unless "
+             "--confirm)")
+    of_tm.add_argument("agent", type=int)
+    of_tm.add_argument("--reason", required=True)
+    of_tm.add_argument("--by", type=int, default=None, dest="actor")
+    of_tm.add_argument("--confirm", action="store_true")
+    of_rp = of_sub.add_parser(
+        "report", parents=[common],
+        help="file a report, with its claims checked against the ledger "
+             "(dry-run unless --confirm)")
+    of_rp.add_argument("--agent", type=int, required=True)
+    of_rp.add_argument("--kind", default="daily",
+                       choices=["daily", "weekly", "memo"])
+    of_rp.add_argument("--period", required=True)
+    of_rp.add_argument("--body", default="")
+    of_rp.add_argument("--recommendation", default="")
+    of_rp.add_argument("--reasoning", default="")
+    of_rp.add_argument("--claim", action="append", default=[],
+                       help="verify one asserted number, e.g. "
+                            "--claim org.net_cents=7000")
+    of_rp.add_argument("--confirm", action="store_true")
+    # --- M3: businesses, revenue, and the audit layer ---
+    of_bp = of_sub.add_parser(
+        "business-propose", parents=[common],
+        help="open a business at `proposed` (dry-run unless --confirm)")
+    of_bp.add_argument("--slug", required=True)
+    of_bp.add_argument("--department", type=int, required=True)
+    of_bp.add_argument("--thesis", required=True)
+    of_bp.add_argument("--offer", required=True)
+    of_bp.add_argument("--channel", default="direct",
+                       choices=["direct", "marketplace", "api", "service",
+                                "affiliate"])
+    of_bp.add_argument("--price", type=int, default=None, dest="price_cents")
+    of_bp.add_argument("--currency", default="USD")
+    of_bp.add_argument("--confirm", action="store_true")
+    of_bt = of_sub.add_parser(
+        "business-terms", parents=[common],
+        help="set kill_criteria and exposure — both required before `live` "
+             "(dry-run unless --confirm)")
+    of_bt.add_argument("id", type=int)
+    of_bt.add_argument("--kill-criteria", default="", dest="kill_criteria")
+    of_bt.add_argument("--exposure", default="")
+    of_bt.add_argument("--confirm", action="store_true")
+    of_ba = of_sub.add_parser(
+        "business-advance", parents=[common],
+        help="move a business along its lifecycle; the gates fire here "
+             "(dry-run unless --confirm)")
+    of_ba.add_argument("id", type=int)
+    of_ba.add_argument("--status", required=True,
+                       choices=["proposed", "building", "live", "profitable",
+                                "paused", "dead"])
+    of_ba.add_argument("--reason", default="")
+    of_ba.add_argument("--confirm", action="store_true")
+    of_bf = of_sub.add_parser(
+        "business-fund", parents=[common],
+        help="OWNER ONLY: promote a business from paper to real money "
+             "(dry-run unless --confirm)")
+    of_bf.add_argument("id", type=int)
+    of_bf.add_argument("--owner-words", required=True, dest="owner_words",
+                       help="the owner's own sentence; this is the record of "
+                            "who threw the switch (C23)")
+    of_bf.add_argument("--confirm", action="store_true")
+    of_bl = of_sub.add_parser("businesses", parents=[common],
+                              help="every business with its derived P&L")
+    of_bl.add_argument("--department", type=int, default=None)
+    of_bl.add_argument("--status", default="")
+    of_bq = of_sub.add_parser("business-pnl", parents=[common],
+                              help="one business's P&L, derived from the ledger")
+    of_bq.add_argument("id", type=int)
+    of_rv = of_sub.add_parser(
+        "revenue", parents=[common],
+        help="book a real sale against a live, owner-funded business "
+             "(dry-run unless --confirm)")
+    of_rv.add_argument("--business", type=int, required=True)
+    of_rv.add_argument("--cents", type=int, required=True)
+    of_rv.add_argument("--source", required=True,
+                       help="stripe | gumroad | ... the processor's name")
+    of_rv.add_argument("--external-ref", required=True, dest="external_ref",
+                       help="the processor's own id; the idempotency key")
+    of_rv.add_argument("--agent", type=int, default=None)
+    of_rv.add_argument("--note", default="")
+    of_rv.add_argument("--confirm", action="store_true")
+    of_sub.add_parser("reconcile", parents=[common],
+                      help="C2: recompute every rollup from the ledger and diff "
+                           "it against the views (read-only; a diff is filed, "
+                           "never silently repaired)")
+    of_fd = of_sub.add_parser("findings", parents=[common],
+                              help="audit findings, newest first")
+    of_fd.add_argument("--period", default="")
+    of_fd.add_argument("--kind", default="")
+    of_fd.add_argument("--limit", type=int, default=50)
+    of_fc2 = of_sub.add_parser(
+        "finding-close", parents=[common],
+        help="close a finding by recording what fixed it — never by erasing it "
+             "(dry-run unless --confirm)")
+    of_fc2.add_argument("id", type=int)
+    of_fc2.add_argument("--note", default="")
+    of_fc2.add_argument("--confirm", action="store_true")
+    of_sub.add_parser("separation", parents=[common],
+                      help="separation of duties, checked rather than asserted")
+    of_sa = of_sub.add_parser("spot-audit", parents=[common],
+                              help="sample one live business and answer the "
+                                   "three audit questions")
+    of_sa.add_argument("--period", required=True)
+    of_sa.add_argument("--seed", type=int, default=None)
+    of_pn = of_sub.add_parser("penalty", parents=[common],
+                              help="which rung of the penalty ladder a seat is on")
+    of_pn.add_argument("--agent", type=int, required=True)
+    of_tw = of_sub.add_parser(
+        "tower", parents=[common],
+        help="the renderable office view: seats, positions, and animation state "
+             "derived from office_event only (read-only, spends nothing)")
+    of_tw.add_argument("--motion", action="store_true",
+                       help="just the motion states (the C7 check)")
+    of_sub.add_parser("floorplan", parents=[common],
+                      help="the procedural building: floors, rooms, seat slots "
+                           "(read-only)")
+    # The ROOM PROGRAMME (docs/game-office/42-ROOM-PROGRAMME.md). Until this
+    # verb existed, `voicebridge/office/room_layout.py` — the design layer that
+    # says how many rooms of what KIND a headcount needs and who sits in each —
+    # had no caller anywhere in the write path (`grep -rn room_layout
+    # voicebridge/` found only the module itself). So the live office's rooms
+    # were whatever an operator typed by hand, and a work room had no manager's
+    # desk. This verb materialises the programme through the EXISTING
+    # floor_create / department_create / room_create calls; it adds no new
+    # store path and previews unless --confirm is passed.
+    of_pg = of_sub.add_parser(
+        "programme", parents=[common],
+        help="materialise the room programme for a headcount: boards + one work "
+             "room per manager + a review room (dry-run unless --confirm)")
+    of_pg.add_argument("--headcount", type=int, required=True,
+                       help="seats to programme rooms for")
+    of_pg.add_argument("--departments", type=int, default=1,
+                       help="departments to spread the work rooms across")
+    of_pg.add_argument("--confirm", action="store_true",
+                       help="write the floors/departments/rooms (default: "
+                            "preview only)")
+    of_ah = of_sub.add_parser(
+        "auditor-hire", parents=[common],
+        help="hire the auditor — reports to the OWNER, not into the chain "
+             "(dry-run unless --confirm)")
+    of_ah.add_argument("--slug", default="auditor")
+    of_ah.add_argument("--auditor-of", default="", dest="auditor_of")
+    of_ah.add_argument("--confirm", action="store_true")
+    of_rps = of_sub.add_parser("reports", parents=[common],
+                               help="filed reports, newest first")
+    of_rps.add_argument("--kind", default="")
+    of_rps.add_argument("--limit", type=int, default=20)
+    of_sub.add_parser("org-facts", parents=[common],
+                      help="the mechanical inputs to a weekly review "
+                           "(read-only, spends nothing)")
+    of_rv = of_sub.add_parser(
+        "review", parents=[common],
+        help="rate a seat — only its own supervisor may, never itself "
+             "(dry-run unless --confirm)")
+    of_rv.add_argument("--subject", type=int, required=True,
+                       dest="subject_agent_id")
+    of_rv.add_argument("--reviewer", type=int, required=True,
+                       dest="reviewer_agent_id")
+    of_rv.add_argument("--verdict", required=True,
+                       choices=["exceeds", "meets", "below", "failing"])
+    of_rv.add_argument("--kind", default="weekly")
+    of_rv.add_argument("--period", default="")
+    of_rv.add_argument("--body", default="")
+    of_rv.add_argument("--confirm", action="store_true")
+    of_rvs = of_sub.add_parser("reviews", parents=[common],
+                               help="recorded reviews, newest first")
+    of_rvs.add_argument("--subject", type=int, default=None,
+                        dest="subject_agent_id")
+    of_rvs.add_argument("--limit", type=int, default=20)
+    # --- M5: the work queue and the dispatch loop -------------------------
+    of_tc = of_sub.add_parser(
+        "task-create", parents=[common],
+        help="open a task; requires a machine-checkable exit condition (C17) "
+             "and --confirm")
+    of_tc.add_argument("--title", required=True)
+    of_tc.add_argument("--brief", default="")
+    of_tc.add_argument("--exit-check", default="", dest="exit_check",
+                       help="a shell command; exit 0 means the work is done. "
+                            "Required in practice: without one the task is "
+                            "refused (C17)")
+    of_tc.add_argument("--department", type=int, default=None,
+                       dest="department_id")
+    of_tc.add_argument("--attempts", type=int, default=3, dest="max_attempts")
+    of_tc.add_argument("--confirm", action="store_true")
+    of_sm = of_sub.add_parser(
+        "seat-move", parents=[common],
+        help="put a seat at a desk (or take it off one) — the only way to seat "
+             "an agent hired before its rooms existed (needs --confirm)")
+    of_sm.add_argument("agent_id", type=int)
+    of_sm.add_argument("--room", type=int, default=None, dest="room_id")
+    of_sm.add_argument("--department", type=int, default=None,
+                       dest="department_id")
+    of_sm.add_argument("--confirm", action="store_true")
+    of_tsk = of_sub.add_parser("tasks", parents=[common],
+                               help="the work queue (read-only)")
+    of_tsk.add_argument("--status", default=None)
+    of_tsk.add_argument("--assignee", type=int, default=None,
+                        dest="assignee_id")
+    of_tsk.add_argument("--limit", type=int, default=50)
+    of_tcl = of_sub.add_parser(
+        "task-claim", parents=[common],
+        help="assign a task to a seat; the reviewer becomes its supervisor "
+             "(needs --confirm)")
+    of_tcl.add_argument("task_id", type=int)
+    of_tcl.add_argument("--agent", type=int, required=True, dest="agent_id")
+    of_tcl.add_argument("--confirm", action="store_true")
+    of_tt = of_sub.add_parser("task-trail", parents=[common],
+                              help="the append-only trail for one task")
+    of_tt.add_argument("task_id", type=int)
+    of_tt.add_argument("--limit", type=int, default=100)
+    of_trv = of_sub.add_parser(
+        "task-review", parents=[common],
+        help="accept, or reject with the instruction to fix (needs --confirm)")
+    of_trv.add_argument("task_id", type=int)
+    of_trv.add_argument("--accept", action="store_true")
+    of_trv.add_argument("--reject", action="store_true")
+    of_trv.add_argument("--note", default="")
+    of_trv.add_argument("--by", type=int, default=None, dest="by_agent")
+    of_trv.add_argument("--confirm", action="store_true")
+    of_dsp = of_sub.add_parser(
+        "dispatch", parents=[common],
+        help="run worker turns against the open queue (needs --confirm; "
+             "--dry-run previews). Flat-rate by default: turns are recorded, "
+             "not billed as dollars (D16)")
+    of_dsp.add_argument("--rounds", type=int, default=1)
+    of_dsp.add_argument("--pool", default="",
+                        help="comma-separated seat ids to draw workers from")
+    of_dsp.add_argument("--metered", action="store_true",
+                        help="book real dollars instead of a flat-rate turn")
+    of_dsp.add_argument("--confirm", action="store_true")
+    of_adj = of_sub.add_parser(
+        "adjudicate", parents=[common],
+        help="each task in review goes to its reviewer for a verdict "
+             "(needs --confirm)")
+    of_adj.add_argument("--rounds", type=int, default=1)
+    of_adj.add_argument("--confirm", action="store_true")
+    of_tcap = of_sub.add_parser(
+        "turn-cap", parents=[common],
+        help="daily turn budget for a seat: the bound that means something on "
+             "a flat-rate provider (needs --confirm)")
+    of_tcap.add_argument("--agent", type=int, required=True, dest="agent_id")
+    of_tcap.add_argument("--turns", type=int, required=True)
+    of_tcap.add_argument("--day", default=None)
+    of_tcap.add_argument("--confirm", action="store_true")
+    of_tbs = of_sub.add_parser("turn-budgets", parents=[common],
+                               help="today's turn budgets (read-only)")
+    of_tbs.add_argument("--day", default=None)
+    # --- M5's ratchet: a SEAT can propose work, never approve its own ----------
+    # Until these exist the org is purely reactive: every task is created by the
+    # owner, so eleven seats and a working loop still cannot find their own work.
+    # `approve` moves a proposal into the real queue, so it is the gate where a
+    # self-approval or a wrong-level approval would let the org authorise itself.
+    of_pp = of_sub.add_parser(
+        "propose", parents=[common],
+        help="a SEAT proposes work without queueing it (needs --confirm; a "
+             "proposal is not a task until its superior approves it)")
+    of_pp.add_argument("--by", type=int, required=True, dest="proposer_id",
+                       help="the proposing seat (must be a real agent id)")
+    of_pp.add_argument("--title", required=True)
+    of_pp.add_argument("--brief", default="")
+    of_pp.add_argument("--exit-check", default="", dest="exit_check",
+                       help="the machine-checkable completion condition (C17): a "
+                            "proposal WITHOUT one cannot be approved")
+    of_pp.add_argument("--rationale", default="",
+                       help="why this work is worth doing — the reviewer reads it")
+    of_pp.add_argument("--confirm", action="store_true")
+    of_ps = of_sub.add_parser("proposals", parents=[common],
+                              help="pending proposals (read-only)")
+    of_ps.add_argument("--status", default="proposed")
+    of_ps.add_argument("--by", type=int, default=None, dest="proposer_id")
+    of_pa = of_sub.add_parser(
+        "approve", parents=[common],
+        help="a superior approves a proposal into the real queue (needs "
+             "--confirm). A seat may NEVER approve its own, and the approver "
+             "must be exactly one level above the proposer")
+    of_pa.add_argument("proposal_id", type=int)
+    of_pa.add_argument("--by", type=int, default=None, dest="approver_id",
+                       help="the approving seat; omit for the owner (only valid "
+                            "for a proposal whose superior is the owner)")
+    of_pa.add_argument("--confirm", action="store_true")
+    of_pr = of_sub.add_parser(
+        "reject-proposal", parents=[common],
+        help="decline a proposal with the reason why (needs --confirm; a "
+             "rejection without a reason is refused)")
+    of_pr.add_argument("proposal_id", type=int)
+    of_pr.add_argument("--by", type=int, default=None, dest="approver_id")
+    of_pr.add_argument("--reason", required=True,
+                       help="required: a rejection that says nothing teaches "
+                            "the proposer nothing")
+    of_pr.add_argument("--confirm", action="store_true")
     cu = add("computer-use", help="Desktop-control capability probes (control disabled)")
     cu_sub = cu.add_subparsers(dest="computer_use_command")
     cu_sub.add_parser("status", parents=[common],
@@ -3700,6 +4298,7 @@ _INTEGRATION_DESTS = {
     "memory": "memory_command",
     "acp": "acp_command",
     "kanban": "kanban_command",
+    "office": "office_command",
     "opencode": "opencode_command",
     "backup": "backup_command",
     "reports": "reports_command",
@@ -4106,6 +4705,8 @@ def main(argv=None) -> int:
         return _cmd_project(cfg, args)
     if command == "kanban":
         return _cmd_kanban(cfg, args)
+    if command == "office":
+        return _cmd_office(cfg, args)
     if command == "runtime":
         return _cmd_runtime(cfg, args)
     # Owner Decision #11: the sanctioned native update surface (check/apply/
@@ -6242,6 +6843,588 @@ def _cmd_project(cfg, args) -> int:
                            "rollback": "registry untouched; nothing to roll back"},
                           indent=2))
         return rc
+
+
+def _cmd_office(cfg, args) -> int:
+    """voicebridge office <op> — the Qubit Office ledger and org (M0).
+
+    M0 is the accounting spine: the append-only ledger, the totals derived
+    from it, and the chain of command. Mutating ops preview under --dry-run,
+    require --confirm, refuse while the emergency stop is latched, and return
+    a typed refusal (never a traceback) otherwise.
+
+    Nothing here starts an agent or calls a provider. M0 records no money a
+    human did not record, which is why it is safe to build first.
+    """
+    import json as _json
+    from .office import caps as CAPS
+    from .office import consent
+    from .office import envelope as ENV
+    from .office import escalation as ESC
+    from .office import ledger as L, org as O, receipts as R, store as S
+    from .office import runner as RUN
+    from .office import survival as SURV
+    from .office import review as RV
+    from .office import audit as AUD
+    from .office import business as BIZ
+    from .office import tower as TWR
+    from .office import work as W
+    from .office import dispatch as DSP
+    from .office import task_proposal as TP
+    from .office import room_layout as RL
+    from .office.errors import CONFIRM_CODE as _CONFIRM_CODE
+    from .office.errors import OfficeError
+    from .office.runner import DEFAULT_TURN_CAP_CENTS as DEFAULT_TURN_CAP
+
+    cmd = getattr(args, "office_command", None) or "health"
+    confirm = bool(getattr(args, "confirm", False))
+    dry = bool(getattr(args, "dry_run", False))
+    mutating = {"record", "reverse", "floor-create", "department-create",
+                "room-create", "hire", "run-begin", "run-finish", "settle",
+                "run-halt", "cap-set", "run", "attribute",
+                # M2
+                "envelope-allocate", "envelope-split", "raise",
+                "request-decide", "escalate", "escalation-resolve",
+                "terminate", "report", "review",
+                # M3
+                "business-propose", "business-terms", "business-advance",
+                "business-fund", "revenue", "auditor-hire",
+                "finding-close",
+                # the room programme materialises real floors/rooms
+                "programme",
+                # M7/L1: running a tick stands in for the cron scheduler
+                "autowork"}
+    # A verb whose PREVIEW is the useful default (it reports the whole room
+    # programme, per room, and why) previews on a bare invocation instead of
+    # refusing the way `record` does. It still never writes without --confirm:
+    # the branch below only writes when `confirm` is true.
+    #   `autowork` is here for the same reason: a bare invocation is the
+    #   read-only *status* of the driver; only `--set`/`--now` write, and those
+    #   check `confirm` inside the handler.
+    preview_default = {"programme", "autowork"}
+    try:
+        if cmd in mutating and S.estop_engaged(cfg):
+            print(_json.dumps(S.refuse_estop(f"office {cmd}"), indent=2))
+            return 3
+        # A mutation is refused unless it is explicitly confirmed. `--dry-run`
+        # previews it instead. There is no third path: a bare `office record`
+        # must never touch the store.
+        if cmd in mutating and not confirm and cmd not in preview_default:
+            if dry:
+                print(_json.dumps(
+                    {"state": "preview", "would": f"office {cmd}",
+                     "next": "re-run with --confirm to apply"}, indent=2))
+                return 0
+            print(_json.dumps(
+                {"state": "REFUSED", "code": _CONFIRM_CODE,
+                 "operation": f"office {cmd}",
+                 "explanation": f"office {cmd} mutates the store; re-run with "
+                                f"--confirm (or --dry-run to preview it).",
+                 "owner": "docs/game-office/95-CONTRACT.md",
+                 "rollback": "store untouched; nothing to roll back"},
+                indent=2))
+            return 2
+        if cmd == "init":
+            out = S.init(cfg)
+        elif cmd == "health":
+            out = L.health(cfg)
+        elif cmd == "pnl":
+            out = L.pnl(cfg, scope=args.scope,
+                        id=getattr(args, "scope_id", None))
+        elif cmd == "ledger":
+            out = L.rows(cfg, limit=args.limit, agent_id=args.agent,
+                         department_id=args.department,
+                         kind=(args.kind or None))
+        elif cmd == "record":
+            out = L.record(cfg, args.kind, args.cents, agent_id=args.agent,
+                           department_id=args.department, note=args.note,
+                           unmetered=bool(args.unmetered),
+                           attested=bool(args.attested_as),
+                           attested_as=(args.attested_as or None),
+                           tokens_in=args.tokens_in,
+                           tokens_out=args.tokens_out,
+                           recorded_by="cli:office")
+        elif cmd == "reverse":
+            out = L.reverse(cfg, args.row_id, note=args.note,
+                            recorded_by="cli:office")
+        elif cmd == "tree":
+            out = O.tree(cfg)
+        elif cmd == "chain":
+            out = O.chain(cfg, args.agent)
+        elif cmd == "floors":
+            out = O.floors(cfg)
+        elif cmd == "floor-create":
+            out = O.floor_create(cfg, args.number, args.name, args.role,
+                                 confirmed=confirm, requested_by="cli:office")
+        elif cmd == "department-create":
+            out = O.department_create(
+                cfg, args.slug, name=args.name, floor_id=args.floor,
+                division_kind=args.division_kind, director_id=args.director,
+                kill_criteria=args.kill_criteria, confirmed=confirm,
+                requested_by="cli:office")
+        elif cmd == "room-create":
+            out = O.room_create(cfg, args.department, args.slug,
+                                kind=args.kind, capacity=args.capacity,
+                                confirmed=confirm, requested_by="cli:office")
+        elif cmd == "hire":
+            out = O.hire(cfg, args.slug, name=args.name,
+                         seat_type=args.seat_type,
+                         department_id=args.department,
+                         room_id=getattr(args, "room_id", None),
+                         supervisor_id=args.supervisor,
+                         portfolio=args.portfolio, confirmed=confirm,
+                         requested_by="cli:office")
+        elif cmd == "unsettled":
+            out = R.unsettled(cfg)
+        elif cmd == "receipts":
+            out = R.receipts(cfg)
+        elif cmd == "run-begin":
+            out = R.begin_run(cfg, args.agent,
+                              cap_cents=(args.cap_cents or CAPS.resolve(cfg)
+                                         ["perRun"]),
+                              model=args.model, run_id=(args.run_id or None))
+        elif cmd == "run-finish":
+            out = R.finish_run(cfg, args.run_id, settled_cents=args.cents,
+                               unmetered=args.unmetered,
+                               tokens_in=args.tokens_in,
+                               tokens_out=args.tokens_out, model=args.model,
+                               note=args.note)
+        elif cmd == "settle":
+            out = R.settle(cfg, args.run_id, cents=args.cents,
+                           attested_as=args.attested_as, note=args.note)
+        elif cmd == "run-halt":
+            out = R.halt(cfg, args.run_id, reason=args.reason)
+        elif cmd == "admit":
+            out = R.admit(cfg, agent_id=args.agent,
+                          estimated_cents=args.estimated_cents)
+        elif cmd == "caps":
+            out = CAPS.inspect(cfg)
+        elif cmd == "cap-set":
+            raw = (args.value or "").strip()
+            out = CAPS.set_cap(cfg, args.key, (None if raw == "" else raw),
+                               confirmed=confirm, requested_by="cli:office")
+        elif cmd == "run":
+            out = RUN.run_turn(
+                cfg, args.agent, args.task,
+                estimated_cents=args.estimated_cents,
+                cap_cents=(args.cap_cents or DEFAULT_TURN_CAP),
+                model=(args.model or None),
+                department_id=args.department,
+                unmetered=bool(args.unmetered))
+        elif cmd == "trace":
+            out = RUN.trace(cfg, args.agent, limit=args.limit)
+        elif cmd == "attribute":
+            out = RUN.attribute_artifact(
+                cfg, args.run_id, agent_id=args.agent, ref=args.ref,
+                kind=args.kind, sha256=args.sha256, size=args.bytes,
+                confirmed=confirm)
+        elif cmd == "attribution-check":
+            out = RUN.contract_check_attribution(cfg)
+        elif cmd == "consent":
+            out = consent.check(
+                cfg, capability=args.capability, scope=args.scope,
+                posture=args.posture, grants=args.grant,
+                read_only=bool(args.read_only), network=bool(args.network))
+        elif cmd == "hardline":
+            out = consent.hardline_list()
+        # --- M2 ---
+        elif cmd == "envelope-allocate":
+            out = ENV.allocate(
+                cfg, scope=args.scope, scope_id=args.scope_id,
+                cents=args.cents, by_agent=args.agent,
+                period=(args.period or None), reserve=bool(args.reserve),
+                confirmed=confirm, requested_by="cli:office")
+        elif cmd == "envelope-split":
+            out = ENV.allocate_portfolios(
+                cfg, by_agent=args.agent, total_cents=args.total_cents,
+                reserve_pct=args.reserve_pct, period=(args.period or None),
+                confirmed=confirm, requested_by="cli:office")
+        elif cmd == "envelopes":
+            out = ENV.envelopes(cfg, period=(args.period or None))
+        elif cmd == "headroom":
+            out = ENV.headroom_for(cfg, agent_id=args.agent,
+                                   period=(args.period or None))
+        elif cmd == "raise":
+            out = ENV.raise_above(
+                cfg, agent_id=args.agent, amount_cents=args.amount_cents,
+                thesis=args.thesis, expected_return=args.expected_return,
+                displaces=args.displaces, period=(args.period or None),
+                confirmed=confirm, requested_by="cli:office")
+        elif cmd == "requests":
+            out = ENV.requests(cfg, status=(args.status or None))
+        elif cmd == "request-decide":
+            out = ENV.decide_request(
+                cfg, args.id, "approve" if args.approve else "deny",
+                by_agent=args.agent, note=args.note, confirmed=confirm,
+                requested_by="cli:office")
+        elif cmd == "escalate":
+            out = ESC.raise_to_supervisor(
+                cfg, agent_id=args.agent, kind=args.kind,
+                summary=args.summary, requested_by="cli:office")
+        elif cmd == "escalations":
+            out = ESC.escalations(cfg, status=(args.status or None),
+                                  agent_id=args.agent)
+        elif cmd == "escalation-resolve":
+            out = ESC.resolve(
+                cfg, args.id, "approve" if args.approve else "deny",
+                by_agent=args.agent, confirmed=confirm,
+                requested_by="cli:office")
+        elif cmd == "escalation-sync":
+            out = ESC.sync(cfg)
+        elif cmd == "tick":
+            out = SURV.daily_tick(cfg, date_key=(args.date_key or None))
+        elif cmd == "autowork":
+            # M7/L1: the autonomous driver. OFF by default (O3) — this verb
+            # shows status, persists the flag, or runs ONE cron-shaped tick.
+            from .office import autowork as AWA
+            if getattr(args, "set", None) is not None:
+                out = AWA.enable(cfg, enabled=(args.set == "on"),
+                                 requested_by="cli:owner")
+            elif bool(getattr(args, "now", False)):
+                if not confirm:
+                    print(_json.dumps({
+                        "state": "preview", "would": "run one autonomous tick",
+                        "enabled": AWA.status(cfg)["enabled"],
+                        "next": "re-run with --confirm to run it now"},
+                        indent=2))
+                    return 0
+                out = AWA.run_now(cfg, model=(getattr(args, "model", "") or None),
+                                  requested_by="cli:owner")
+            else:
+                out = AWA.status(cfg)
+        elif cmd == "runway":
+            if args.agent is not None:
+                out = SURV.runway_days(cfg, args.agent)
+            else:
+                out = SURV.at_risk(cfg)
+        elif cmd == "at-risk":
+            out = SURV.at_risk(cfg)
+        elif cmd == "roster":
+            out = SURV.roster(cfg, status=(args.status or None),
+                              include_terminated=bool(args.include_terminated))
+        elif cmd == "terminate":
+            out = SURV.terminate(
+                cfg, args.agent, reason=args.reason, by_agent=args.actor,
+                confirmed=confirm, requested_by="cli:office")
+        elif cmd == "report":
+            claims = {}
+            for item in (args.claim or []):
+                key, _, value = str(item).partition("=")
+                try:
+                    claims[key.strip()] = int(value.strip())
+                except ValueError:
+                    raise OfficeError(
+                        "OFFICE_BAD_INPUT",
+                        f"--claim {item!r} must be <key>=<integer>, e.g. "
+                        f"org.net_cents=7000")
+            out = SURV.file_report(
+                cfg, agent_id=args.agent, kind=args.kind, period=args.period,
+                body=args.body, recommendation=args.recommendation,
+                reasoning=args.reasoning, claims=claims, confirmed=confirm,
+                requested_by="cli:office")
+        elif cmd == "reports":
+            out = SURV.reports(cfg, kind=(args.kind or None), limit=args.limit)
+        elif cmd == "org-facts":
+            out = SURV.org_facts(cfg)
+        elif cmd == "review":
+            out = RV.file_review(
+                cfg, subject_agent_id=args.subject_agent_id,
+                reviewer_agent_id=args.reviewer_agent_id,
+                verdict=args.verdict, kind=args.kind, period=args.period,
+                body=args.body, confirmed=confirm,
+                requested_by="cli:office")
+        elif cmd == "reviews":
+            out = RV.reviews(cfg, subject_agent_id=args.subject_agent_id,
+                             limit=args.limit)
+        elif cmd == "business-propose":
+            out = BIZ.propose(
+                cfg, args.slug, department_id=args.department,
+                thesis=args.thesis, offer=args.offer, channel=args.channel,
+                price_cents=args.price_cents, currency=args.currency,
+                confirmed=confirm, requested_by="cli:office")
+        elif cmd == "business-terms":
+            out = BIZ.set_terms(cfg, args.id, kill_criteria=args.kill_criteria,
+                                exposure=args.exposure, confirmed=confirm,
+                                requested_by="cli:office")
+        elif cmd == "business-advance":
+            out = BIZ.advance(cfg, args.id, args.status, reason=args.reason,
+                              confirmed=confirm, requested_by="cli:office")
+        elif cmd == "business-fund":
+            out = BIZ.owner_fund(cfg, args.id, owner_words=args.owner_words,
+                                 confirmed=confirm, requested_by="cli:owner")
+        elif cmd == "businesses":
+            out = BIZ.businesses(cfg, department_id=args.department,
+                                 status=(args.status or None))
+        elif cmd == "business-pnl":
+            out = BIZ.pnl(cfg, args.id)
+        elif cmd == "revenue":
+            out = BIZ.record_revenue(
+                cfg, args.business, args.cents, source=args.source,
+                external_ref=args.external_ref, agent_id=args.agent,
+                note=args.note, recorded_by="cli:office")
+        elif cmd == "reconcile":
+            out = AUD.reconcile_all(cfg)
+        elif cmd == "findings":
+            out = AUD.findings(cfg, period=(args.period or None),
+                               kind=(args.kind or None), limit=args.limit)
+        elif cmd == "finding-close":
+            out = AUD.close_finding(cfg, args.id, note=args.note,
+                                    confirmed=confirm,
+                                    requested_by="cli:office")
+        elif cmd == "separation":
+            out = AUD.check_separation(cfg)
+        elif cmd == "spot-audit":
+            out = AUD.spot_audit(cfg, period=args.period, seed=args.seed)
+        elif cmd == "penalty":
+            out = AUD.penalty_for(cfg, agent_id=args.agent)
+        elif cmd == "tower":
+            out = (TWR.motion_states(cfg) if bool(args.motion)
+                   else TWR.state(cfg))
+        elif cmd == "floorplan":
+            out = TWR.floorplan(cfg)
+        elif cmd == "auditor-hire":
+            out = AUD.auditor_seat(cfg, slug=args.slug,
+                                   auditor_of=args.auditor_of,
+                                   confirmed=confirm,
+                                   requested_by="cli:office")
+        elif cmd == "seat-move":
+            out = O.seat_move(cfg, args.agent_id, room_id=args.room_id,
+                              department_id=args.department_id,
+                              confirmed=confirm, requested_by="cli:owner")
+        elif cmd == "task-create":
+            out = W.create(cfg, args.title, brief=args.brief,
+                           exit_check=args.exit_check,
+                           department_id=args.department_id,
+                           max_attempts=args.max_attempts, confirmed=confirm,
+                           requested_by="cli:owner")
+        elif cmd == "tasks":
+            out = W.tasks(cfg, status=args.status,
+                          assignee_id=args.assignee_id, limit=args.limit)
+        elif cmd == "task-claim":
+            out = W.claim(cfg, args.task_id, agent_id=args.agent_id,
+                          confirmed=confirm, requested_by="cli:owner")
+        elif cmd == "task-trail":
+            out = W.trail(cfg, args.task_id, limit=args.limit)
+        elif cmd == "task-review":
+            if args.accept == args.reject:
+                print(_json.dumps(
+                    {"state": "REFUSED", "code": "OFFICE_BAD_INPUT",
+                     "explanation": "pass exactly one of --accept or --reject"},
+                    indent=2))
+                return 2
+            out = W.review(cfg, args.task_id,
+                           verdict="accept" if args.accept else "reject",
+                           note=args.note, by_agent=args.by_agent,
+                           confirmed=confirm, requested_by="cli:office")
+        elif cmd == "dispatch":
+            pool = [int(x) for x in str(args.pool).split(",") if x.strip()]
+            out = DSP.dispatch(cfg, rounds=args.rounds, pool=pool or None,
+                               unmetered=not bool(args.metered),
+                               dry_run=dry, confirmed=confirm,
+                               requested_by="cli:owner")
+        elif cmd == "adjudicate":
+            # same provider as the workers, so the same flat-rate default (D16)
+            out = DSP.adjudicate(cfg, rounds=args.rounds, unmetered=True,
+                                 dry_run=dry, confirmed=confirm,
+                                 requested_by="cli:owner")
+        elif cmd == "turn-cap":
+            out = W.set_turn_cap(cfg, agent_id=args.agent_id,
+                                 turns=args.turns, day=args.day,
+                                 confirmed=confirm, requested_by="cli:owner")
+        elif cmd == "turn-budgets":
+            out = W.budgets(cfg, day=args.day)
+        # --- M5's ratchet: propose / list / approve / reject ------------------
+        elif cmd == "propose":
+            out = TP.propose(cfg, proposer_id=args.proposer_id,
+                             title=args.title, brief=args.brief,
+                             exit_check=args.exit_check,
+                             rationale=args.rationale,
+                             confirmed=confirm, requested_by="cli:owner")
+        elif cmd == "proposals":
+            out = TP.proposals(cfg, status=args.status,
+                               proposer_id=args.proposer_id)
+        elif cmd == "approve":
+            # `--by` omitted means the OWNER approves. That is only legitimate
+            # when the proposer's superior IS the owner (D2: the CEO's own
+            # proposals); the module refuses a wrong-level owner approval rather
+            # than letting "no approver" mean "anyone may".
+            out = TP.approve(cfg, args.proposal_id,
+                             approver_id=args.approver_id,
+                             confirmed=confirm, requested_by="cli:owner")
+        elif cmd == "reject-proposal":
+            out = TP.reject(cfg, args.proposal_id,
+                            approver_id=args.approver_id,
+                            reason=args.reason,
+                            confirmed=confirm, requested_by="cli:owner")
+        elif cmd == "programme":
+            # --- the room programme: preview, or materialise through the
+            # EXISTING org write calls (no new store path). ---------------
+            headcount = int(getattr(args, "headcount", 0) or 0)
+            dept_count = int(getattr(args, "departments", 0) or 0)
+            if headcount <= 0:
+                raise OfficeError(
+                    "OFFICE_BAD_INPUT",
+                    f"--headcount must be a positive integer, got {headcount!r}")
+            if dept_count < 0:
+                raise OfficeError(
+                    "OFFICE_BAD_INPUT",
+                    f"--departments must be >= 0, got {dept_count!r}")
+            prog = RL.programme(headcount, dept_count)
+            if not prog:
+                raise OfficeError(
+                    "OFFICE_BAD_INPUT",
+                    f"headcount {headcount} / departments {dept_count} produced "
+                    f"no programme")
+            verdict = RL.check(prog, headcount)
+            if not verdict["ok"]:
+                # A programme that cannot seat its own headcount is refused by
+                # the module's own authority rather than written to the store.
+                raise OfficeError("OFFICE_PROGRAMME", str(verdict["reason"]))
+
+            staff = RL.staffing(headcount, dept_count)
+            n_depts = max(1, dept_count) if dept_count > 0 else 1
+            n_floors = max(1, verdict["floors_needed"])
+            room_plan = []
+            for room in prog:
+                slug = str(room.get("slug_hint") or room.get("kind") or "room")
+                detail = room.get("seats_detail") or []
+                room_plan.append({
+                    "slug": slug, "kind": room.get("kind"),
+                    "seats": int(room.get("seats", 0)),
+                    "supervisors": sum(1 for s in detail
+                                       if isinstance(s, dict)
+                                       and s.get("is_supervisor")),
+                    "leaves": sum(1 for s in detail
+                                  if isinstance(s, dict)
+                                  and not s.get("is_supervisor")),
+                    "why": room.get("why"),
+                })
+
+            if not confirm:
+                print(_json.dumps({
+                    "state": "preview",
+                    "headcount": headcount, "departments": dept_count,
+                    "staffing": staff,
+                    "rooms": room_plan,
+                    "seats_offered": verdict["seats_offered"],
+                    "floors_needed": n_floors,
+                    "fits_grid": verdict["fits_grid"],
+                    "would": ("create %d floor(s), %d department(s) and %d "
+                              "room(s)" % (n_floors, n_depts, len(room_plan))),
+                    "next": "re-run with --confirm to write these rooms",
+                }, indent=2))
+                return 0
+
+            # --- confirmed: write it, reusing the existing org calls -------
+            existing_floors = {int(f["number"]): int(f["id"])
+                               for f in O.floors(cfg).get("floors", [])}
+            created_floors, floors_reused = [], []
+            dept_ids = []
+            for i in range(1, n_floors + 1):
+                if i in existing_floors:
+                    floors_reused.append(i)
+                    dept_ids.append(existing_floors[i])
+                    continue
+                # role defaults to `operations`; only role `executive` is the
+                # executive floor, and a programme's first floor is ordinary.
+                f = O.floor_create(cfg, i, name=f"Programme Floor {i}",
+                                   role="operations", confirmed=confirm,
+                                   requested_by="cli:office")
+                created_floors.append(int(f["id"]))
+                dept_ids.append(int(f["id"]))
+
+            # One department owns the programme's rooms. The programme knows a
+            # department COUNT (rooms are spread across them) but not their
+            # names, so the verb creates/reuses a deterministic slug per index
+            # rather than inventing business names.
+            created_depts, existing_dept_slugs = [], []
+            rooms_created, rooms_existing = [], []
+            dept_key = dept_ids[0]
+            for i in range(n_depts):
+                slug = f"programme-{headcount}-{i + 1}"
+                try:
+                    d = O.department_create(
+                        cfg, slug, name=f"Programme {headcount}/{i + 1}",
+                        floor_id=dept_ids[i % len(dept_ids)],
+                        division_kind="product",
+                        kill_criteria=(
+                            "no seated unit in this department after the "
+                            "programme's own span budget is spent (D33)"),
+                        confirmed=confirm, requested_by="cli:office")
+                    created_depts.append({"id": int(d["id"]), "slug": d["slug"]})
+                    if i == 0:
+                        dept_key = int(d["id"])
+                except OfficeError as err:
+                    if str(err.code) != "OFFICE_EXISTS":
+                        raise
+                    # already there: reuse it and SAY so (idempotence)
+                    conn = S.connect(cfg)
+                    try:
+                        S.migrate(conn)
+                        row = conn.execute(
+                            "SELECT id FROM office_department WHERE slug=?",
+                            (slug,)).fetchone()
+                    finally:
+                        conn.close()
+                    if row is None:
+                        raise
+                    existing_dept_slugs.append(slug)
+                    if i == 0:
+                        dept_key = int(row["id"])
+
+            # every room goes to the programme department; a room slug already
+            # present under it is REPORTED, never re-created (idempotence)
+            conn = S.connect(cfg)
+            try:
+                S.migrate(conn)
+                have = {r["slug"] for r in conn.execute(
+                    "SELECT slug FROM office_room WHERE department_id=?",
+                    (dept_key,))}
+            finally:
+                conn.close()
+
+            for room in room_plan:
+                if room["slug"] in have:
+                    rooms_existing.append(room["slug"])
+                    continue
+                r = O.room_create(cfg, dept_key, room["slug"],
+                                  kind=str(room["kind"]),
+                                  capacity=int(room["seats"]),
+                                  confirmed=confirm,
+                                  requested_by="cli:office")
+                rooms_created.append({"id": int(r["id"]),
+                                      "slug": r["slug"],
+                                      "kind": room["kind"]})
+
+            out = {
+                "state": "OK",
+                "headcount": headcount, "departments": dept_count,
+                "staffing": staff,
+                "seats_offered": verdict["seats_offered"],
+                "rooms": room_plan,
+                "floors_created": created_floors,
+                "floors_reused": floors_reused,
+                "departments_created": created_depts,
+                "departments_existing": sorted(existing_dept_slugs),
+                "rooms_created": rooms_created,
+                "rooms_existing": rooms_existing,
+                "note": ("room_layout.programme is now reachable; the rooms are "
+                         "written through org.floor_create/department_create/"
+                         "room_create. Seating agents into them is a separate "
+                         "step (office seat-move)."),
+            }
+        else:
+            print(_json.dumps(
+                {"state": "REFUSED", "code": "OFFICE_UNSUPPORTED",
+                 "operation": f"office {cmd}",
+                 "explanation": "no such office subcommand"},
+                indent=2))
+            return 2
+    except OfficeError as err:
+        print(_json.dumps(err.as_dict(f"office {cmd}"), indent=2))
+        return 2
+    print(_json.dumps(out, indent=2))
+    return 0
 
 
 def _cmd_kanban(cfg, args) -> int:
