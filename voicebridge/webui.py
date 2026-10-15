@@ -1807,12 +1807,28 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         break
         except Exception:  # noqa: BLE001 - theme boost is best-effort
             pass
+        # THE TOKEN IS INJECTED FOR LOOPBACK CALLERS ONLY — same rule as
+        # `_serve_app_html`, and for the same reason. This injector had NO peer
+        # guard, so it was the WIDER leak: a non-local peer fetching `/chat`
+        # (or `/`, which 302s here) received the live session token in the body,
+        # and that token then authenticated `/agent/api/office/tower` from the
+        # LAN. Measured: `curl http://<lan-ip>:8890/chat` → 200 with the token;
+        # `curl -H "X-Qubit-Session-Token: <scraped>" .../agent/api/office/tower`
+        # → 200. Fixing only the plugin-app route left this one open.
+        #
+        # A non-local caller still gets the SPA SHELL — it is a static asset —
+        # but without the credential, so it lands on the login gate instead of
+        # being handed API access. Loopback is unchanged, which is the only
+        # deployment this dashboard is meant to serve (it is a local-first tool;
+        # `webui.host` may be 0.0.0.0 for LAN convenience, but the token is not
+        # a LAN credential).
         inject = ('<script>window.__QUBIT_SESSION_TOKEN__=%s;'
                   'window.__QUBIT_BASE_PATH__="";'
                   'window.__QUBIT_API_PREFIX__="/agent";'
                   'window.__QUBIT_THEME__=%s;'
                   'window.__QUBIT_THEME_DEF__=%s;</script>'
-                  % (safe, json.dumps(theme_name), json.dumps(theme_def)))
+                  % ("\"\"" if not self._peer_is_loopback() else safe,
+                     json.dumps(theme_name), json.dumps(theme_def)))
         if "</head>" in html:
             html = html.replace("</head>", inject + "</head>", 1)
         else:

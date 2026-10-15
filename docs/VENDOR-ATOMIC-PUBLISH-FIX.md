@@ -71,6 +71,12 @@ state is recorded rather than smoothed over.
 
 ## Verification
 
+Repeatable concurrency harness + measured rates:
+**`docs/VENDOR-CONCURRENCY-EVIDENCE.md`** (harness:
+`tests/tools/test_office_vendor_publish_concurrency.py`). It reproduces the
+OLD-vs-FIXED contrast on demand and pins the residual at 1 in ~698,700 reads
+(all-reads; the same denominator as this document's ~1-in-600k figure).
+
 - `scripts/vendor_habblaud.py --check` → `ok: 77 files, 2147637 bytes, commit 4ccce2537472`, exit 0.
 - The real vendored tree is **untouched**: `git status` shows no changes under
   `frontend/qubit-app/plugins/qubit-office/habblaud/`.
