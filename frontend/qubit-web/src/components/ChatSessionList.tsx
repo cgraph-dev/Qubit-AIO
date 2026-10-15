@@ -422,6 +422,8 @@ export function ChatSessionList({
     activeRowId,
     error,
     loadMore,
+    searchInput,
+    searchQuery,
     loading,
     loadingMore,
     orderedSessions,

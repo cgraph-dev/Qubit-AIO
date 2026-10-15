@@ -39,19 +39,27 @@ _ROUTE_WIRING = "/api/qubit/viking/studio-wiring"
 
 
 def _health_payload(endpoint: str) -> Dict[str, Any]:
-    """``GET <endpoint>/health`` — the real server payload.
+    """``GET <endpoint>/health`` using the same live auth as the memory client.
 
-    Reuses the plugin's ``_VikingClient.health_payload`` when importable (it
-    already does the anonymous-first probe and honours ``auth_mode dev``);
-    otherwise a short stdlib urllib call with the same bounded timeout. Never
-    fabricates success — every failure path raises so the caller can surface
-    the real error string.
+    The old probe constructed an anonymous client unconditionally, so a
+    protected OpenViking returned a false ``unreachable`` result even while
+    Qubit's memory provider was working.  Resolve the profile-scoped key via
+    the plugin's secret accessor and let its anonymous-first/authenticated
+    fallback perform the real probe.
     """
     try:
         from voicebridge.qubit_runtime import ensure_path
         ensure_path()
         from plugins.memory.openviking import _VikingClient
-        payload = _VikingClient(endpoint).health_payload()
+        from agent.secret_scope import get_secret
+        api_key = str(get_secret("OPENVIKING_API_KEY", "") or "")
+        account = str(get_secret("OPENVIKING_ACCOUNT", "") or "")
+        user = str(get_secret("OPENVIKING_USER", "") or "")
+        agent = str(get_secret("OPENVIKING_AGENT", "") or "")
+        payload = _VikingClient(
+            endpoint, api_key=api_key, account=account or None,
+            user=user or None, agent=agent or None,
+        ).health_payload()
         if isinstance(payload, dict) and payload:
             return payload
     except Exception:  # noqa: BLE001 - fall back to the stdlib probe below

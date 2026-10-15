@@ -33,6 +33,17 @@ def test_all_five_kinds_are_present():
         assert kind_is_registered(kind), f"kind {kind} has no registry entry"
 
 
+def test_compatibility_adapters_are_registered():
+    """Foreign capability names remain visible without replacing Qubit seams."""
+    adapters = load_adapters()
+    by_name = {(a.name, a.kind): a for a in adapters}
+    assert ("hermes", "skills") in by_name
+    assert ("openmuse", "tools") in by_name
+    assert ("harnessrouter", "channels") in by_name
+    for name in ("hermes", "openmuse", "harnessrouter"):
+        assert by_name[next(k for k in by_name if k[0] == name)].status == "shipped"
+
+
 def test_every_seam_file_exists():
     """The real deliverable: each seam's file must exist on disk."""
     missing = [a.seam for a in load_adapters()

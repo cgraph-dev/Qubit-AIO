@@ -3,7 +3,8 @@
     "graft": {
       "command": "graft",
       "args": [
-        "mcp"
+        "mcp",
+        "/home/trick/Projects/Repos/qubit-voicebridge"
       ]
     }
   }

@@ -52,3 +52,27 @@ adapters:
     source: builtin
     seam: qubit_runtime/tools/registry.py:96
     symbol: discover_builtin_tools
+
+  # Compatibility adapters reuse Qubit's existing discovery seams.  Keeping
+  # these records explicit prevents the integrations from becoming invisible
+  # just because their source ecosystems use different names.
+  - name: hermes
+    kind: skills
+    status: shipped
+    source: hermes-compatible
+    seam: qubit_runtime/tools/skills_tool.py:248
+    symbol: skills_list
+
+  - name: openmuse
+    kind: tools
+    status: shipped
+    source: openmuse-compatible
+    seam: qubit_runtime/tools/registry.py:96
+    symbol: discover_builtin_tools
+
+  - name: harnessrouter
+    kind: channels
+    status: shipped
+    source: harness-router-compatible
+    seam: qubit_runtime/gateway/platform_registry.py:414
+    symbol: PlatformRegistry.create_adapter
