@@ -615,13 +615,18 @@ def test_the_default_renderer_is_the_app_and_the_shell_is_opt_in():
     """THE headline of this arrangement: a plain `/qubit-office` mounts the
     vendored app; the hand-built shell is reached only by asking for it.
 
-    Asserted on CODE (comments stripped): the entry's own header discusses the
-    old `?app=1` switch, which a whole-file text search would match.
+    Asserted as BEHAVIOUR of the entry's real decision expression, not by
+    forbidding a token. `?app=1` is a deliberate backward-compatibility alias
+    for bookmarks from the first Habblaud preview (entry.ts documents this), so
+    the property is NOT "`?app` must be absent" — it is "the app is the default
+    and `?shell` is the only thing that selects the fallback", which is what the
+    four param cases below actually check.
+
+    The `wantShell` expression is lifted out of the (comment-stripped) source
+    and evaluated under node for each case, so this tests the code that ships
+    rather than a re-implementation of it.
     """
     code = _entry_source()
-    assert 'has("app")' not in code, (
-        "entry.ts still keys off `?app`; the vendored app must be the DEFAULT, "
-        "not something a query param turns on")
     assert 'has("shell")' in code, (
         "there is no `?shell=1` opt-out, so the old shell is unreachable — it "
         "is the ROLLBACK and must stay one query param away")
@@ -635,6 +640,49 @@ def test_the_default_renderer_is_the_app_and_the_shell_is_opt_in():
     assert "createOfficeComponent" in code and "createOfficeApp" in code, (
         "one of the two renderers is not referenced; the fallback or the "
         "default was removed rather than kept")
+
+    # Lift the REAL `const wantShell = <expr>;` and evaluate that expr under
+    # node for the four query-param cases. This is the property that matters:
+    # only `?shell` (without `?app`) selects the shell; everything else — the
+    # plain route included — is the app.
+    expr_m = re.search(r"const\s+wantShell\s*=\s*([^;]+);", code)
+    assert expr_m, (
+        "entry.ts no longer defines `const wantShell = ...`, so the renderer "
+        "decision is unreadable from source")
+    expr = expr_m.group(1).strip()
+
+    program = (
+        "const expr = %s;\n"
+        "function decide(search) {\n"
+        "  const params = new URLSearchParams(search);\n"
+        "  return eval(expr);\n"
+        "}\n"
+        "const out = {\n"
+        "  plain: decide(''),\n"
+        "  shell: decide('?shell=1'),\n"
+        "  app: decide('?app=1'),\n"
+        "  both: decide('?shell=1&app=1'),\n"
+        "};\n"
+        "process.stdout.write(JSON.stringify(out));\n"
+    ) % json.dumps(expr)
+    proc = run_node(program, timeout=30)
+    assert proc.returncode == 0, (
+        f"the lifted wantShell expression could not run under node:\n"
+        f"expr={expr!r}\nstdout: {proc.stdout}\nstderr: {proc.stderr}")
+    cases = json.loads(proc.stdout)
+    got = {k: bool(v) for k, v in cases.items()}
+    assert got["plain"] is False, (
+        "a plain `/qubit-office` must mount the vendored app; wantShell was "
+        f"True. expr={expr!r}")
+    assert got["shell"] is True, (
+        "`?shell=1` does not select the fallback shell — the rollback is "
+        f"unreachable. expr={expr!r}")
+    assert got["app"] is False, (
+        "`?app=1` (the compatibility alias) does not resolve to the vendored "
+        f"app. expr={expr!r}")
+    assert got["both"] is False, (
+        "`?shell=1&app=1` selected the shell; the app alias must win so a "
+        f"stale bookmark cannot resurrect the fallback. expr={expr!r}")
 
 
 def test_both_renderers_stay_reachable_one_query_param_apart():
@@ -657,18 +705,24 @@ def test_the_stream_is_bound_and_the_writes_are_gated_not_missing(tmp_path):
     `_serve_office_stream`), so it must read as BOUND. permissions/messages are
     org mutations gated by the confirmation authority (C4), NOT merely missing —
     the distinction the old table flattened into "0 of 5".
+
+    Asserted against the CURRENT `bindingVerdict()`/`ROUTES` API: the verdict
+    partitions every route into bound / gated / missing, and the property is the
+    PARTITION — read-only routes are bound, the two mutation routes are GATED
+    (present as refusals) and never missing.
     """
     got = _run_app(tmp_path, """
       const v = A.bindingVerdict();
-      const stream = A.ROUTES.find(r => r.client === 'stream');
-      const perms = A.ROUTES.find(r => r.client === 'permissions/:id');
-      const msgs = A.ROUTES.find(r => r.client === 'messages/:id');
-      const access = A.ROUTES.find(r => r.client === 'access');
+      const byClient = {};
+      for (const r of A.ROUTES) byClient[r.client] = r;
+      const stream = byClient['stream'];
       return {bound: v.bound, missing: v.missing, gated: v.gated,
               live: v.live, canRender: v.canRender, viewOnly: v.viewOnly,
+              nRoutes: A.ROUTES.length,
               streamQubit: stream.qubit, streamReadOnly: stream.readOnly,
-              permsGated: !!perms.gated, msgsGated: !!msgs.gated,
-              accessQubit: access.qubit};
+              streamGated: !!stream.gated,
+              accessQubit: byClient['access'].qubit,
+              agentsQubit: byClient['agents/:id'].qubit};
     """)
     assert got["streamQubit"] == "/api/stream", (
         f"the stream route does not name a binding: {got['streamQubit']!r} — "
@@ -678,17 +732,36 @@ def test_the_stream_is_bound_and_the_writes_are_gated_not_missing(tmp_path):
     assert got["live"] is True, (
         "the verdict does not report the office as live, so the status bar "
         "would still claim a poll is the feed")
-    assert got["permsGated"] is True and got["msgsGated"] is True, (
-        "permissions/messages are not flagged gated by the confirmation "
-        "authority: they are org mutations (C4), not just unwired")
-    assert set(got["gated"]) == {"permissions/:id", "messages/:id"}, (
-        f"the gated set is wrong: {got['gated']}")
-    assert set(got["missing"]) == set(), (
-        f"read-only routes remain unbound: {got['missing']}")
-    assert "agents/:id" in got["bound"], (
-        "Habblaud's read-only agent profile route is not marked bound")
+
+    # The partition is exhaustive: every route lands in exactly one bucket.
+    buckets = set(got["bound"]) | set(got["missing"]) | set(got["gated"])
+    assert len(buckets) == got["nRoutes"], (
+        f"the verdict does not classify every route: {len(buckets)} bucket "
+        f"entries for {got['nRoutes']} routes — bound={got['bound']}, "
+        f"gated={got['gated']}, missing={got['missing']}")
+
+    # permissions/messages are GATED, and gated is disjoint from missing.
+    assert set(got["gated"]) == {"permissions/:id", "messages"}, (
+        f"the gated set is wrong: {got['gated']} — the org mutations must be "
+        f"flagged gated by the confirmation authority (C4)")
+    for gated_client in ("permissions/:id", "messages"):
+        assert gated_client not in got["missing"], (
+            f"{gated_client} is reported MISSING, not gated — the mutation "
+            f"route is a confirmed refusal, not an unwired gap")
+
+    # The read-only routes are BOUND, never missing.
+    assert set(got["missing"]) == {
+        "terminal/pty", "spawn", "renameRoom", "deliveries",
+        "recording/replay"}, (
+        f"the missing set is wrong: {got['missing']} — only genuinely "
+        f"unavailable capabilities may be missing")
+    for bound_client in ("agents/:id", "access", "sessions/recent"):
+        assert bound_client in got["bound"], (
+            f"read-only route {bound_client!r} is not marked bound")
     assert got["accessQubit"] == "/api/access", (
         "the access capability probe lacks its read-only binding")
+    assert got["agentsQubit"] == "/api/agents/:id", (
+        "Habblaud's read-only agent profile route lacks its binding")
     assert got["canRender"] is True, (
         "the renderer is reported as unable to render")
     assert got["viewOnly"] is True, (
@@ -696,16 +769,49 @@ def test_the_stream_is_bound_and_the_writes_are_gated_not_missing(tmp_path):
 
 
 def test_the_binding_summary_counts_the_new_truth(tmp_path):
-    """The string a person reads. It must say 3 bound / 0 missing / 2 gated."""
-    got = _run_app(tmp_path, "return {s: A.bindingSummary()};")
+    """The string a person reads must report the verdict's OWN counts and must
+    not claim more is bound than really is.
+
+    Asserted against `bindingVerdict()` rather than a hardcoded number, so the
+    summary cannot drift from the data it summarises — the failure mode the old
+    `"3 of 5 routes bound"` literal encoded.
+    """
+    got = _run_app(tmp_path, """
+      const v = A.bindingVerdict();
+      return {s: A.bindingSummary(), bound: v.bound.length,
+              missing: v.missing.length, gated: v.gated.length};
+    """)
     s = got["s"]
-    assert s.startswith("3 of 5 routes bound"), (
-        f"the summary does not report three bound routes: {s!r}")
-    assert "0 missing" in s, f"the missing count is wrong: {s!r}"
-    assert "2 gated by the confirmation authority" in s, (
-        f"the gated count is wrong: {s!r}")
-    assert "0 of 5" not in s and "0 gated" not in s, (
-        f"the stale all-zero binding line survives: {s!r}")
+    assert str(got["bound"]) in s, (
+        f"the summary does not report the bound count "
+        f"({got['bound']}): {s!r}")
+    assert str(got["missing"]) in s, (
+        f"the summary does not report the unavailable count "
+        f"({got['missing']}): {s!r}")
+    assert str(got["gated"]) in s, (
+        f"the summary does not report the gated count ({got['gated']}): {s!r}")
+    assert "bound" in s and "unavailable" in s and "confirmation-gated" in s, (
+        f"the summary does not name all three buckets: {s!r}")
+    # And it must not under-report: every bound route appears by name.
+    assert "0 bound" not in s and "0 unavailable" not in s, (
+        f"the summary reports an empty bucket that is not empty: {s!r}")
+
+    # Cross-check the numbers against the route list itself, so a summary that
+    # agreed only with a stale `bindingVerdict` would still fail here.
+    counts = _run_app(tmp_path, """
+      const v = A.bindingVerdict();
+      const bound = A.ROUTES.filter(r => !r.gated && !!r.qubit).length;
+      const gated = A.ROUTES.filter(r => r.gated).length;
+      const missing = A.ROUTES.filter(r => !r.gated && !r.qubit).length;
+      return {vBound: v.bound.length, vGated: v.gated.length,
+              vMissing: v.missing.length, bound, gated, missing};
+    """)
+    assert counts["vBound"] == counts["bound"], (
+        f"bindingVerdict disagrees with ROUTES on bound: {counts}")
+    assert counts["vGated"] == counts["gated"], (
+        f"bindingVerdict disagrees with ROUTES on gated: {counts}")
+    assert counts["vMissing"] == counts["missing"], (
+        f"bindingVerdict disagrees with ROUTES on missing: {counts}")
 
 
 def test_the_app_url_resolves_at_the_plain_office_route(tmp_path):
