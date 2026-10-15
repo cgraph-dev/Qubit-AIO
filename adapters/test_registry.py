@@ -17,7 +17,8 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "adapters"))
 
 from registry import (  # noqa: E402
-    Adapter, VALID_STATUSES, load_adapters, load_registry_document, kind_is_registered,
+    Adapter, VALID_STATUSES, adapter_names, adapters_for, load_adapters,
+    load_registry_document, kind_is_registered,
 )
 
 
@@ -64,6 +65,12 @@ def test_seam_parsing_helpers():
                 seam="qubit_runtime/tools/registry.py:96", symbol="discover_builtin_tools")
     assert a.seam_path == "qubit_runtime/tools/registry.py"
     assert a.seam_line == 96
+
+
+def test_capability_discovery_helpers_filter_planned_and_dedupe():
+    assert [a.name for a in adapters_for("skills")] == ["builtin", "hermes"]
+    assert adapter_names("channels") == ["builtin", "harnessrouter"]
+    assert adapter_names("not-a-kind") == []
 
 
 def test_schema_rejects_bad_kind(tmp_path):

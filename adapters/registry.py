@@ -96,3 +96,22 @@ def load_adapters(path: Path | str = REGISTRY_PATH) -> List[Adapter]:
 def kind_is_registered(kind: str, path: Path | str = REGISTRY_PATH) -> bool:
     """True when *kind* has at least one entry in the registry."""
     return any(a.kind == kind for a in load_adapters(path))
+
+
+def adapters_for(kind: str, path: Path | str = REGISTRY_PATH) -> List[Adapter]:
+    """Return shipped adapters for *kind*, preserving registry order.
+
+    Discovery callers should use this small API rather than parsing YAML or
+    assuming that the builtin adapter is the only provider.  Unknown kinds are
+    treated like an empty capability set, which keeps optional integrations
+    discoverable without making the UX path fail noisily.
+    """
+    return [a for a in load_adapters(path) if a.kind == kind and a.status == "shipped"]
+
+
+def adapter_names(kind: str | None = None, path: Path | str = REGISTRY_PATH) -> List[str]:
+    """Return unique shipped adapter identifiers for capability discovery."""
+    adapters = load_adapters(path)
+    if kind is not None:
+        adapters = [a for a in adapters if a.kind == kind]
+    return list(dict.fromkeys(a.name for a in adapters if a.status == "shipped"))
