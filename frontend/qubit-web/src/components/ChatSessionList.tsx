@@ -329,30 +329,6 @@ export function ChatSessionList({
     }
     return (
       <div className="flex flex-col gap-1.5">
-        <div className="relative px-2">
-          <Search
-            className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-tertiary"
-            aria-hidden="true"
-          />
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder={t.common.search ?? "Search sessions"}
-            aria-label="Search chat sessions"
-            className="w-full rounded border border-midground/20 bg-transparent py-1 pl-7 pr-6 text-xs text-foreground outline-none placeholder:text-text-tertiary focus:border-primary/50"
-          />
-          {searchInput ? (
-            <button
-              type="button"
-              onClick={() => setSearchInput("")}
-              aria-label="Clear session search"
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          ) : null}
-        </div>
         {orderedSessions.map((s) => {
           // Highlight exactly one row: the selected session. `is_active` is
           // folded into activeRowId as a fallback, never a second highlight.
@@ -466,6 +442,31 @@ export function ChatSessionList({
           onChange={onWorkspaceChange}
         />
       )}
+
+      <div className="relative px-2 pb-2">
+        <Search
+          className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-tertiary"
+          aria-hidden="true"
+        />
+        <input
+          type="search"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder={t.common.search ?? "Search sessions"}
+          aria-label="Search chat sessions"
+          className="w-full rounded border border-midground/20 bg-transparent py-1 pl-7 pr-6 text-xs text-foreground outline-none placeholder:text-text-tertiary focus:border-primary/50"
+        />
+        {searchInput ? (
+          <button
+            type="button"
+            onClick={() => setSearchInput("")}
+            aria-label="Clear session search"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </div>
 
       <Button
         outlined
