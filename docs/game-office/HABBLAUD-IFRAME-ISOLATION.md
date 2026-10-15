@@ -1,5 +1,9 @@
 # Habblaud iframe isolation — collision audit
 
+**Status: ACCURATE** (re-checked 2026-10-15). The isolation findings still hold;
+the token-injection surface described here was additionally tightened to
+loopback-only callers (see `docs/OFFICE-SURFACE-SECURITY-AUDIT.md`).
+
 **Scope.** The vendored office client (`habblaud`) runs in an iframe at
 `/plugin-apps/qubit-office/habblaud/` inside the Qubit dashboard. It was written
 to *be* the page, not to be embedded. This document records, with evidence,

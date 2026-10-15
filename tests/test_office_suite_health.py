@@ -104,6 +104,16 @@ def test_office_tests_that_touch_state_redirect_xdg_to_tmp_path():
         r"|\bfrom\s+[.\w]*\.?office\.store\s+import\b"
         r"|\bimport\s+voicebridge\.office\.store\b)"
     )
+    # A file that PATCHES ``store.connect`` never reaches a real path: the
+    # connection object is fabricated in the test, so no XDG var can be polluted
+    # and the file is hermetic without redirection. Without this exemption the
+    # guard flags a correct test for merely NAMING the module — a false positive
+    # that pressures the author to add pointless XDG setup (or to weaken the
+    # guard), which is the opposite of what it is for.
+    patches_connect = re.compile(
+        r"monkeypatch\.setattr\(\s*\w*[Ss]tore\s*,\s*[\"']connect[\"']"
+        r"|\.connect\s*=\s*lambda"
+    )
     offenders = []
     for f in _office_test_files():
         src = _read(f)
@@ -111,7 +121,7 @@ def test_office_tests_that_touch_state_redirect_xdg_to_tmp_path():
             store_import.search(src)
             or re.search(r"\bstore\.(init|record|hire|create_agent|open)\b", src)
         )
-        if not touches_store:
+        if not touches_store or patches_connect.search(src):
             continue
         sets_xdg = all(
             var in src
@@ -129,8 +139,16 @@ def test_xdg_redirections_actually_point_at_tmp_path():
     """Setting XDG is not enough if it is set to a shared path.
 
     A regression that swapped ``tmp_path`` for a fixed directory would keep the
-    variable names present and still reintroduce cross-run coupling. Assert the
-    value expression is a ``tmp_path`` child.
+    variable names present and still reintroduce cross-run coupling. So the
+    value expression must be a PER-RUN PRIVATE directory.
+
+    ``tmp_path`` is the normal way, but it is function-scoped — a file that
+    needs its store to survive across several tests (e.g. a session-scoped store
+    for a CLI harness) cannot use it and must build its own temp root with
+    ``tempfile.mkdtemp``. That is equally private, so accept it rather than
+    forcing a fixture the file structurally cannot use. What is rejected is a
+    FIXED path: a literal, a home-relative dir, or anything not derived from a
+    temp facility would stay shared across runs.
     """
     _assert_tree_settled(_office_test_files())
     bad = []
@@ -139,7 +157,23 @@ def test_xdg_redirections_actually_point_at_tmp_path():
         for var, expr in re.findall(
             r'monkeypatch\.setenv\(\s*["\'](XDG_[A-Z_]+)["\']\s*,\s*([^)]+)\)', src
         ):
-            if "tmp_path" not in expr:
+            if "tmp_path" in expr:
+                continue
+            if "mkdtemp" in expr or "gettempdir" in expr:
+                continue
+            # The expression may be built from a LOCAL variable that was itself
+            # derived from a temp facility (e.g. `root = tempfile.mkdtemp(...)`
+            # then `os.path.join(root, "c")`). Follow the identifier to its
+            # assignment rather than pattern-matching this one line.
+            names = re.findall(r"\b([A-Za-z_]\w*)\b", expr)
+            for name in names:
+                assign = re.search(
+                    rf"\b{re.escape(name)}\s*=\s*([^\n]+)", src)
+                if assign and ("mkdtemp" in assign.group(1)
+                               or "gettempdir" in assign.group(1)
+                               or "tmp_path" in assign.group(1)):
+                    break
+            else:
                 bad.append((f.name, var, expr.strip()))
     assert not bad, (
         "XDG dirs must be redirected to tmp_path, not a shared location: %r"

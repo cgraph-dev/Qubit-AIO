@@ -1,5 +1,13 @@
 # Habblaud — vendoring provenance and licence position
 
+**Status: ACCURATE with KNOWN DRIFT.** Re-checked 2026-10-15: the commit
+(`4ccce2537472`), MIT licence, and the vendored/not-vendored split all still
+hold. Two figures in the ORIGINAL text were drift-prone: the recorded byte total
+(current real value from `scripts/vendor_habblaud.py --check` is **2147631**, and
+it legitimately changes on re-vendor) and the serving function name (it is
+`_serve_plugin_app`, not `_serve_qubit_plugin`). Assert **exit code + file
+count**, never the byte total. See `docs/VENDOR-REPRODUCIBILITY.md`.
+
 Audit date: 2026-10-14. Scope: the vendored Habblaud client under
 `frontend/qubit-app/plugins/qubit-office/habblaud/`. This is a provenance
 record, not legal advice; genuine uncertainty is flagged in §8.

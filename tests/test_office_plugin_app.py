@@ -50,16 +50,25 @@ SAMPLE_HTML = b"<!doctype html><html><body>office</body></html>"
 # Handler-layer harness (no sockets)
 # --------------------------------------------------------------------------
 
-def _make_handler(*, sub="", path=None, headers=None, peer="127.0.0.1"):
+def _make_handler(*, sub="", path=None, headers=None, peer="127.0.0.1",
+                  host="127.0.0.1"):
     """A bare ``WebUIHandler`` with ``_send`` captured.
 
     The handler functions under test touch only ``self.app``, ``self.headers``,
     ``self.client_address``, ``self.path`` and ``self._send`` — so ``__new__``
     plus those attributes is a faithful, socket-free harness.
+
+    ``host`` defaults to loopback because a REAL HTTP/1.1 request always carries
+    a ``Host``, and the app-document token injector now requires BOTH the peer
+    and the Host to be loopback (an off-box peer sending a ``localhost`` Host is
+    still off-box). A caller wanting to exercise the refusal passes
+    ``host=None`` (no header) or a non-loopback peer.
     """
     h = object.__new__(W.WebUIHandler)
     h.path = path if path is not None else (PREFIX + sub)
     h.headers = dict(headers or {})
+    if host is not None and "Host" not in h.headers:
+        h.headers["Host"] = host
     h.client_address = (peer, 51234)
     h._head_only = False
 

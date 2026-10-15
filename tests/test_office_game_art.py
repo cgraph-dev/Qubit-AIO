@@ -593,7 +593,13 @@ def test_the_scenes_import_and_use_the_shading_model():
         "still drawn with flat fills no matter what the art module proves")
     for fn in ("drawWallFace", "drawFloor"):
         assert fn in src, f"scenes.ts never calls {fn}"
-    assert "drawContactShadow" in src or "drawEntity" in src or True
+    # NOT `... or True`. The trailing `or True` made this unconditionally true, so
+    # it could never fail and asserted nothing — a decoration that the suite's own
+    # phantom-authority checker now flags. The intent is that scenes.ts reaches at
+    # least one of the surface-wiring painters, so assert exactly that.
+    assert "drawContactShadow" in src or "drawEntity" in src, (
+        "scenes.ts calls neither drawContactShadow nor drawEntity, so the "
+        "shading model is not wired into the scene at all")
 
 
 def test_the_scene_palette_is_derived_not_hardcoded():

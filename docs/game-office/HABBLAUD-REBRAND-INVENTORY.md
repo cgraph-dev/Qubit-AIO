@@ -1,5 +1,13 @@
 # Habblaud → Qubit Office — rebrand surface inventory and plan
 
+**Status: ACCURATE for the inventory; the plan is SUPERSEDED.** Re-checked
+2026-10-15: the surface list still describes the vendored tree correctly, but the
+plan's premise (`/tmp/habblaud-full` as the pinned checkout) is stale — that path
+does not exist, and the real checkout under `/home/trick/Projects/habblaud` is a
+partial clone whose HEAD differs from the vendored commit. The rebrand work was
+done via the vendor transform (`scripts/vendor_habblaud.py`) instead. See
+`docs/VENDOR-REPRODUCIBILITY.md`.
+
 Audit date: 2026-10-14. Baseline commit `c4ed3414b` (worktree dirty; see §7).
 Scope: `frontend/qubit-app/plugins/qubit-office/habblaud/` (vendored build output)
 and the source checkout at `/tmp/habblaud-full` (pinned `4ccce2537472fe5a8d432f06974494d2e778ff15`, v0.11.0).
