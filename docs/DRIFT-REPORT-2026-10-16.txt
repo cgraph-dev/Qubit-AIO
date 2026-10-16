@@ -1,0 +1,53 @@
+UPSTREAM DRIFT REPORT  pin=517b5e10febd  head=3b2f971133e4
+
+HOW FAR BEHIND (each number answers a different question):
+  commits_behind                 = 3895
+  files_changed                  = 5316
+  files_changed (all .py)        = 3661
+  production_py_changed          = 1412
+  core-dirs production_py_changed= 997   (dirs: agent, gateway, tools, cron, hermes_cli)
+
+OVERLAP LENS (what is REAL WORK vs what is upstream merely being newer):
+  genuine additions (absent here)        = 1971 files / 298 production .py / 231 core
+  upstream merely newer (we already have)= 3205 files / 1114 production .py / 766 core
+     of which plain modifications        = 118 files / 0 production .py
+  deleted upstream                       = 127 files
+
+GENUINE ADDITIONS by top-level dir (production .py only):
+  gateway                   127
+  hermes_cli                 61
+  agent                      28
+  tui_gateway                12
+  evals                      10
+  scripts                    10
+  tools                       9
+  cron                        6
+  acp_adapter                 5
+  ui-tui                      4
+  hermes_platform             2
+  plugins                     2
+  hermes_state_keys.py        1
+  hermes_state_local.py       1
+  hermes_state_local_lineage.py    1
+  hermes_state_local_migration.py    1
+  hermes_state_media.py       1
+  hermes_state_mutation_binding.py    1
+  hermes_state_mutation_branch.py    1
+  hermes_state_mutation_compress.py    1
+  hermes_state_mutation_guards.py    1
+  hermes_state_mutation_prepared.py    1
+  hermes_state_mutation_reset.py    1
+  hermes_state_mutation_retirement.py    1
+  hermes_state_mutation_transcript.py    1
+  hermes_state_mutations.py    1
+  hermes_state_runtime.py     1
+  hermes_state_runtime_workers.py    1
+  hermes_state_sessions_model_config.py    1
+  hermes_state_terminal.py    1
+  hermes_state_worker_compression.py    1
+  hermes_state_worker_context.py    1
+  hermes_state_worker_lifecycle.py    1
+  pm                          1
+
+HEADLINE:
+  We are 3895 commits behind upstream, across 5316 changed files; 1412 are production .py (997 inside the core dirs), of which 298 are files we do not have at all (231 in core dirs) -- the genuine porting work -- while 1114 are files we already carry that upstream has since revised (drift/conflict territory, not new work).
