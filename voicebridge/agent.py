@@ -513,8 +513,11 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             return None
     try:
         toolsets = sorted(_get_platform_tools(vcfg, "cli"))
-    except Exception:  # noqa: BLE001 - config toolsets are best-effort
-        toolsets = None
+    except Exception as exc:  # noqa: BLE001 - never widen permissions on failure
+        _audit("session_toolsets_error", session=sid, error=str(exc)[:160])
+        return {"state": "FAILED", "code": "TOOLSET_CONFIG_ERROR",
+                "detail": "could not resolve configured tool permissions",
+                "session": sid, "session_id": sid}
     # The vendored runtime is resolvable, so the turn will really run: persist
     # the user row now (the caller that asked for ``persist_user`` owns neither
     # side). This keeps the transcript ordered user-then-assistant and leaves a

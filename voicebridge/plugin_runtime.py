@@ -1977,6 +1977,10 @@ def invoke(cfg: Any, plugin_id: str, *, args: Optional[Dict[str, Any]] = None,
     rec = _find(cfg, clean)
     if rec is None:
         raise PluginRuntimeError(NOT_FOUND_CODE, f"no plugin {plugin_id!r}")
+    if not rec.get("enabled", True):
+        raise PluginRuntimeError(
+            DISABLED_CODE,
+            f"plugin {clean!r} is disabled; enable it before invoking")
     payload = {} if args is None else args
     if not isinstance(payload, dict):
         raise PluginRuntimeError(BAD_ARGS_CODE, "args must be an object")
