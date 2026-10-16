@@ -243,6 +243,45 @@ def test_clean_side_branch_without_commits_stays_quiet(tmp_path: Path) -> None:
     assert report.exit_code() == 0, [f.format() for f in report.findings]
 
 
+def test_stale_trunk_prefers_freshest_remote(tmp_path: Path) -> None:
+    """A stale local `main` must not be used as the trunk when a newer remote exists.
+
+    This is the real false positive in this repo: local `main` is months old and
+    the true trunk is a remote-tracking branch.  Comparing against the stale one
+    reports thousands of bogus stranded commits.
+    """
+    repo = _init_repo(tmp_path / "freshtrunk")
+    # Simulate a remote whose main is newer than the local, stale one.
+    remote = tmp_path / "freshtrunk-remote"
+    _git(repo, "clone", "-q", str(repo), str(remote))
+    _git(repo, "remote", "add", "upstream", str(remote))
+    _git(repo, "fetch", "-q", "upstream")
+    # advance upstream/main beyond the local main
+    (remote / "extra.py").write_text("x\n", encoding="utf-8")
+    _git(remote, "add", "extra.py")
+    _git(remote, "commit", "-q", "-m", "remote moves ahead")
+    _git(repo, "fetch", "-q", "upstream")
+
+    trunk, source = hygiene.resolve_trunk(repo, None)
+    assert trunk == "upstream/main", (trunk, source)
+    assert "remote-tracking" in source
+
+
+def test_behind_trunk_is_warning_not_violation(tmp_path: Path) -> None:
+    """A branch merely behind the trunk has stranded nothing: WARNING, exit 0."""
+    repo = _init_repo(tmp_path / "behindonly")
+    _git(repo, "checkout", "-q", "-b", "trunkline")
+    (repo / "advance.py").write_text("x\n", encoding="utf-8")
+    _git(repo, "add", "advance.py")
+    _git(repo, "commit", "-q", "-m", "trunk moves ahead")
+    _git(repo, "checkout", "-q", "main")   # back to the older tip
+
+    report = _run(repo, _no_sleep_probe(), stale_minutes=30, trunk_override="trunkline")
+    assert report.exit_code() == 0, [f.format() for f in report.findings]
+    assert "stranded_branch_commits" not in _checks(report)
+    assert "branch_behind_trunk" in _checks(report)
+
+
 def test_detached_head_with_work_fires(tmp_path: Path) -> None:
     """Commits made while detached live on no branch at all."""
     repo = _init_repo(tmp_path / "detached")

@@ -544,8 +544,23 @@ def check_stranded_branch(worktree: Path, branch: str, trunk: str) -> list[Findi
 
     ahead_raw = git_ok(worktree, "rev-list", "--count", f"{trunk}..HEAD").strip()
     ahead = int(ahead_raw) if ahead_raw.isdigit() else 0
+    behind_raw = git_ok(worktree, "rev-list", "--count", f"HEAD..{trunk}").strip()
+    behind = int(behind_raw) if behind_raw.isdigit() else 0
 
     if ahead == 0:
+        # HEAD is fully contained in the trunk.  If the trunk is nevertheless
+        # ahead of us, this branch is simply out of date, not stranded - that is
+        # a WARNING (nobody is losing work), and saying "stranded" here would be
+        # a false positive.
+        if behind > 0:
+            findings.append(Finding(
+                WARNING,
+                "branch_behind_trunk",
+                f"{worktree}@{tip[:12]}",
+                f"branch {branch!r} is {behind} commit(s) behind {trunk}; no work "
+                f"is stranded, the branch is just stale",
+                f"rebase or merge {trunk} when convenient",
+            ))
         return findings
 
     dirty_note = ""
@@ -553,11 +568,12 @@ def check_stranded_branch(worktree: Path, branch: str, trunk: str) -> list[Findi
     if parse_porcelain(porcelain):
         dirty_note = " (and the tree is dirty on top of it)"
 
+    diverged = f" and {behind} behind" if behind else ""
     findings.append(Finding(
         VIOLATION,
         "stranded_branch_commits",
         f"{worktree}@{tip[:12]}",
-        f"branch {branch!r} is {ahead} commit(s) ahead of {trunk}"
+        f"branch {branch!r} is {ahead} commit(s) ahead{diverged} of {trunk}"
         f"{dirty_note}; unreachable from the main line",
         f"push/merge {branch} or rebase it onto {trunk}; stranded commits are one "
         f"worktree prune away from being lost",
@@ -717,17 +733,46 @@ class HygieneReport:
 
 
 def resolve_trunk(repo: Path, override: Optional[str]) -> tuple[str, str]:
-    """Pick the main line to compare against, with the reason for the choice."""
+    """Pick the main line to compare against, with the reason for the choice.
+
+    Trunk selection is a real false-positive source.  In this repo the local
+    ``main`` is *stale* (months behind) while the true remote trunk is e.g.
+    ``canonical/main``; comparing against the stale local branch reports a huge
+    bogus "stranded" count.  So we prefer, in order:
+
+      1. an explicit ``--trunk``;
+      2. a remote-tracking trunk, picking whichever remote branch named
+         ``main``/``master`` is *freshest* (most recent committer date);
+      3. a local ``main``/``master``.
+
+    And unresolved ambiguity is surfaced through the returned reason string so
+    the caller can tell the reader which comparison was made.
+    """
     if override:
         return override, "explicit --trunk"
+
+    remotes = [
+        r.strip() for r in git_ok(repo, "remote").splitlines() if r.strip()
+    ]
+    remote_candidates: list[tuple[str, int]] = []
+    for remote in remotes:
+        for name in ("main", "master"):
+            ref = f"{remote}/{name}"
+            if not git_ok(repo, "rev-parse", "--verify", ref).strip():
+                continue
+            ts = git_ok(repo, "log", "-1", "--format=%ct", ref).strip()
+            remote_candidates.append((ref, int(ts) if ts.isdigit() else 0))
+    if remote_candidates:
+        ref, _ = max(remote_candidates, key=lambda item: item[1])
+        note = "remote-tracking"
+        if len(remote_candidates) > 1:
+            others = ", ".join(r for r, _ in remote_candidates if r != ref)
+            note = f"remote-tracking (freshest of: {others})"
+        return ref, note
+
     for candidate in ("main", "master"):
         if git_ok(repo, "rev-parse", "--verify", candidate).strip():
-            return candidate, "local branch"
-    head = git_ok(repo, "symbolic-ref", "refs/remotes/origin/HEAD").strip()
-    if head:
-        return head.rsplit("/", 1)[-1], "origin/HEAD"
-    if git_ok(repo, "rev-parse", "--verify", "origin/main").strip():
-        return "origin/main", "remote-tracking"
+            return candidate, "local branch (no remote-tracking trunk found)"
     return "HEAD", "fallback (no trunk found; stranded-commit check disabled)"
 
 
