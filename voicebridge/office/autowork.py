@@ -100,6 +100,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
 
@@ -119,6 +120,15 @@ DEFAULT_EVERY_S = 900
 #: The most a single tick may propose/approve. One, like the turn, so a tick is
 #: bounded work regardless of how large the queue has grown.
 DEFAULT_MAX_APPROVALS = 1
+
+#: How old an unsettled receipt must be before the tick's reaper considers it.
+#: A normal turn's provider round-trip (plus its tool rounds) keeps a receipt
+#: open for minutes, so the floor must comfortably exceed that — but it must
+#: exist at all, because reaping a receipt belonging to a RUNNING turn would
+#: settle a spend that is still being incurred, which is the same lie as never
+#: settling it. Two hours is far beyond any real turn and far short of a day,
+#: so the meaningful half of the report appears within one cadence cycle.
+ORPHAN_AGE_SECONDS = 2 * 3600.0
 
 #: Per-seat outcomes that are *not* a refusal — the tick simply did not use this
 #: seat this pass, and says exactly why. Distinguishing these from a failure is
@@ -655,7 +665,43 @@ def tick(cfg: Any, *, executor: Optional[Callable] = None,
                 "declined": [], "at": now,
                 "meaning": "the emergency stop is latched; no seat was woken"}
 
-    # 2 — cadence. The last tick is persisted, so a restart cannot replay a tick.
+    # 2 — THE ORPHAN REAPER, before anything can be refused by it.
+    #
+    # WHY IT RUNS HERE AND NOWHERE ELSE
+    # --------------------------------
+    # `finish_run` books the ledger row FIRST and settles the receipt SECOND
+    # (`receipts.py:103-121`), so a process that dies between the two leaves a
+    # receipt whose money is already on the book but whose status still reads
+    # `open`. That is a STATUS bug wearing the costume of unknown spend: it
+    # makes `ledger.health().complete` false, which makes EVERY admission —
+    # every seat, every tick — refuse, until a human types an attestation for
+    # spend that was already correctly recorded. That is exactly what jammed
+    # this org: one crashed turn refused all ten seats for a day.
+    #
+    # The reaper closes only those stale statuses, copying the ledger row's own
+    # cents into the receipt so the two cannot disagree. It writes NO ledger
+    # row: a receipt with no row is genuine unknown spend and stays refused
+    # until the owner attests it (D15). Reconciliation therefore cannot mint
+    # headroom, only clear a bookkeeping error.
+    #
+    # Bounded and idempotent: the age floor keeps a live turn's open receipt
+    # out of reach, and a second tick finds nothing because closed rows no
+    # longer match `status != 'settled'`.
+    reaped: Dict[str, Any] = {}
+    try:
+        from . import receipts as _receipts
+
+        reaped = _receipts.reconcile_orphans(
+            cfg, older_than_seconds=ORPHAN_AGE_SECONDS, now=now,
+            requested_by="office:autowork")
+    except Exception:                               # noqa: BLE001
+        # A store that cannot be read is unknown spend by D15's own wording,
+        # and the honest response is to let the admission refusal below say
+        # so — never to skip the tick silently.
+        logging.getLogger(__name__).debug(
+            "orphan reconciliation could not run", exc_info=True)
+
+    # 3 — cadence. The last tick is persisted, so a restart cannot replay a tick.
     every = int(every_s if every_s is not None else _every_seconds(cfg))
     state = _load_state(cfg)
     if not _due(state, now=now, every_s=every):
@@ -767,6 +813,7 @@ def tick(cfg: Any, *, executor: Optional[Callable] = None,
     summary = {
         "state": "OK", "enabled": True, "at": now, "every_seconds": every,
         "seats": len(_live_seats(cfg)),
+        "reaped": reaped,
         "adjudication": adjudication,
         "approvals": {"approved": approvals["approved"],
                       "left": approvals["left"],

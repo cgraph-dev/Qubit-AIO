@@ -237,6 +237,132 @@ def halt(cfg: Any, run_id: str, *, reason: str = "emergency stop"
         conn.close()
 
 
+def orphaned(cfg: Any, *, older_than_seconds: float = 3600.0,
+             now: Optional[float] = None) -> Dict[str, Any]:
+    """Receipts whose turn never finished — the reaper's report, never its deed.
+
+    AN ORPHAN IS NOT UNKNOWN SPEND, AND THE DIFFERENCE IS LOAD-BEARING
+    ------------------------------------------------------------------
+    ``finish_run`` writes the ledger row *first* and settles the receipt
+    *second*, so a crash between the two leaves an open receipt that DOES have
+    a settled ledger row: the money is on the book and only the status flag is
+    stale. That is a STATUS bug, and closing it costs a status update.
+
+    A turn that died *before* either write never produced a ledger row, so its
+    receipt is genuinely unknown spend. That is what D15 protects, and closing
+    it is the owner's attestation — never this function's.
+
+    This reads both facts and reports them separately, because conflating them
+    is how an orphan becomes a free turn: the reaper must never book a cent it
+    cannot see, so it reconciles the rows that exist and *names* the ones that
+    do not for ``settle``. It writes nothing.
+
+    ``older_than_seconds`` is the age a receipt must reach before it may be
+    considered: a live turn can sit open for its whole provider round-trip, and
+    reaping a run that is still running would be the same lie in a new place.
+    """
+    stamp = now if now is not None else store.now()
+    conn = store.connect(cfg)
+    try:
+        store.migrate(conn)
+        rows = [dict(r) for r in conn.execute(
+            "SELECT r.run_id, r.agent_id, r.started_at, r.cap_cents, r.status,"
+            "       a.slug AS agent_slug"
+            " FROM office_run_receipts r"
+            " LEFT JOIN office_agent a ON a.id = r.agent_id"
+            " WHERE r.status != 'settled' AND r.started_at <= ?"
+            " ORDER BY r.started_at", (stamp - float(older_than_seconds),))]
+    finally:
+        conn.close()
+
+    paid: List[Dict[str, Any]] = []      # a ledger row exists: status-only fix
+    unknown: List[Dict[str, Any]] = []   # no row: real unknown spend
+    for row in rows:
+        entry = {
+            "run_id": row["run_id"],
+            "agent_id": row["agent_id"],
+            "agent_slug": row["agent_slug"],
+            "started_at": row["started_at"],
+            "age_s": round(float(stamp) - float(row["started_at"]), 1),
+            "cap_cents": row["cap_cents"],
+            "status": row["status"],
+        }
+        settled = None
+        conn = store.connect(cfg)
+        try:
+            store.migrate(conn)
+            got = conn.execute(
+                "SELECT id, amount_cents FROM office_ledger WHERE run_id=?"
+                " LIMIT 1", (row["run_id"],)).fetchone()
+            settled = dict(got) if got else None
+        finally:
+            conn.close()
+        if settled:
+            entry["ledger_id"] = settled["id"]
+            entry["ledger_cents"] = settled["amount_cents"]
+            entry["meaning"] = ("the row was booked; only the receipt's "
+                                "status is stale (a status fix, not money)")
+            paid.append(entry)
+        else:
+            entry["meaning"] = ("no ledger row: this is unknown spend and "
+                                "needs the owner's attestation (D15)")
+            unknown.append(entry)
+    return {"state": "OK", "count": len(rows), "older_than_seconds": older_than_seconds,
+            "paid": paid, "unknown": unknown,
+            "complete": not (paid or unknown)}
+
+
+def reconcile_orphans(cfg: Any, *, older_than_seconds: float = 3600.0,
+                      now: Optional[float] = None,
+                      requested_by: str = "office:reaper") -> Dict[str, Any]:
+    """Close the STALE ones; refuse to touch the UNKNOWN ones.
+
+    This is the half of the reaper that writes, and its authority is exactly
+    one transaction wide: it marks a receipt ``settled`` **only** when a ledger
+    row for that run already exists, and it copies that row's cents into the
+    receipt so the two can never disagree again.
+
+    It deliberately does NOT write a ledger row. A run that produced no row is
+    unknown spend, and inventing a zero there is the precise failure D15 exists
+    to prevent — an agent surviving on money it already burned. Those are
+    returned under ``needs_attestation`` for :func:`settle`, which requires the
+    owner.
+
+    Idempotent: a second call finds nothing to do, because the rows it closed
+    no longer match ``status != 'settled'``.
+    """
+    report = orphaned(cfg, older_than_seconds=older_than_seconds, now=now)
+    reconciled: List[Dict[str, Any]] = []
+    for entry in report["paid"]:
+        conn = store.connect(cfg)
+        try:
+            store.migrate(conn)
+            conn.execute(
+                "UPDATE office_run_receipts SET status='settled',"
+                " settled_at=?, settled_cents=?, attested_as=NULL,"
+                " note=? WHERE run_id=? AND status != 'settled'",
+                (store.now(), int(entry["ledger_cents"]),
+                 "reconciled: the ledger row already existed; only the "
+                 "receipt status was stale (not an attestation — no owner "
+                 "figure was entered)",
+                 entry["run_id"]))
+            conn.commit()
+        finally:
+            conn.close()
+        store.audit("run.reconcile", requested_by,
+                    {"run_id": entry["run_id"], "ledger_id": entry["ledger_id"],
+                     "cents": entry["ledger_cents"],
+                     "reason": "ledger row existed; only the status was stale"})
+        reconciled.append({"run_id": entry["run_id"],
+                           "ledger_id": entry["ledger_id"],
+                           "cents": entry["ledger_cents"]})
+    return {"state": "OK", "reconciled": reconciled,
+            "needs_attestation": report["unknown"],
+            "count": report["count"],
+            "meaning": ("reconciled the stale status; unknown spend is "
+                        "untouched and still owns an owner's attestation (D15)")}
+
+
 def unsettled(cfg: Any) -> Dict[str, Any]:
     """Every receipt that is not settled: the org's known-unknown spend."""
     conn = store.connect(cfg)

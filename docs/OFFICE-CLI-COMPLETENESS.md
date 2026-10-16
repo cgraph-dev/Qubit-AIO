@@ -1,6 +1,6 @@
 # Office CLI — completeness and wiring contract
 
-**What this is.** The `qubit office <verb>` surface exposes **81 subcommands**,
+**What this is.** The `qubit office <verb>` surface exposes **83 subcommands**,
 wired across `voicebridge/cli.py` (`_cmd_office`) and `voicebridge/office/*.py`.
 This document records the result of invoking *every* verb for real, and names
 the guard that keeps it true: `tests/test_office_cli_completeness.py`.
@@ -27,14 +27,14 @@ A grep proves none of these: a branch can be present yet `NameError` on a moved
 import, and a parser line can exist while the dispatch branch is missing. Only
 invocation settles it.
 
-## Result: all 81 verbs are completely wired
+## Result: all 83 verbs are completely wired
 
-- **81 / 81** verbs are exposed by the parser (site 2 present).
+- **83 / 83** verbs are exposed by the parser (site 2 present).
 - **0** verbs returned `OFFICE_UNSUPPORTED` → every verb reaches a real dispatch
   branch (site 3 present for all).
 - **0** verbs raised a Python exception / traceback → every local import
   resolves (site 1 present for all).
-- **39** mutating verbs refuse with `OFFICE_CONFIRM_REQUIRED` when invoked
+- **40** mutating verbs refuse with `OFFICE_CONFIRM_REQUIRED` when invoked
   without `--confirm` — a typed refusal, never a traceback, and the store is
   never touched.
 
@@ -84,12 +84,14 @@ store. "traceback?" is whether any Python traceback/`NameError` was produced.
 | `init` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `ledger` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `org-facts` | read-only | 0 | `OK` | no | WIRED (read-only) |
+| `orphans` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `penalty` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `pnl` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `programme` | read-only | 0 | `preview` | no | WIRED (read-only) |
 | `proposals` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `propose` | mutating | 2 | `OFFICE_CONFIRM_REQUIRED` | no | WIRED (gated) |
 | `raise` | mutating | 2 | `OFFICE_CONFIRM_REQUIRED` | no | WIRED (gated) |
+| `reap` | mutating | 2 | `OFFICE_CONFIRM_REQUIRED` | no | WIRED (gated) |
 | `receipts` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `reconcile` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `record` | mutating | 2 | `OFFICE_CONFIRM_REQUIRED` | no | WIRED (gated) |
@@ -150,7 +152,7 @@ the four-site bug (site 3).
   traceback or any `OFFICE_UNSUPPORTED`;
 - asserts every mutating verb refuses typed without `--confirm`;
 - asserts every read-only verb succeeds (or refuses typed on a missing entity);
-- re-runs all 81 verbs bare and asserts **no row count changed** — proving a bare
+- re-runs all 83 verbs bare and asserts **no row count changed** — proving a bare
   invocation never writes;
 - smoke-tests the real `python -m voicebridge.cli` entrypoint on a representative
   sample, checking exit codes and traceback-free output; and

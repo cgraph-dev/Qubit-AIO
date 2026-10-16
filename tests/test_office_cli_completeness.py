@@ -58,7 +58,10 @@ from voicebridge import config as C
 
 # The expected subcommand count for `qubit office`. Pinned so a verb silently
 # dropping off the parser turns this guard RED instead of quietly shrinking.
-EXPECTED_VERB_COUNT = 81
+# 83 = the original 81 surface plus `orphans` (the orphan report) and `reap`
+# (the orphan reaper's write half, both added with the D15 reconciliation that
+# un-jams an org blocked by a crashed turn).
+EXPECTED_VERB_COUNT = 83
 
 # The dialect of typed refusal that means "no dispatch branch reached this
 # verb" — i.e. the FOUR-SITE BUG (site 3 missing). It must NEVER appear for a
@@ -137,7 +140,8 @@ _READ_ONLY = {
     "businesses", "caps", "chain",
     "consent", "envelopes", "escalation-sync", "escalations", "findings",
     "floorplan", "floors", "hardline", "headroom", "health", "init", "ledger",
-    "org-facts", "penalty", "pnl", "programme", "proposals", "receipts",
+    "org-facts", "orphans", "penalty", "pnl", "programme", "proposals",
+    "receipts",
     "reconcile", "reports", "requests", "reviews", "roster", "runway",
     "separation", "spot-audit", "task-trail", "tasks", "tick", "tower", "trace",
     "tree", "turn-budgets", "unsettled",
@@ -157,7 +161,8 @@ _MUTATING = {
     "business-fund", "business-propose", "business-terms", "cap-set",
     "department-create", "dispatch", "envelope-allocate", "envelope-split",
     "escalate", "escalation-resolve", "finding-close", "floor-create", "hire",
-    "propose", "raise", "record", "reject-proposal", "report", "request-decide",
+    "propose", "raise", "reap", "record", "reject-proposal", "report",
+    "request-decide",
     "revenue", "reverse", "review", "room-create", "run", "run-begin",
     "run-finish", "run-halt", "seat-move", "settle", "task-claim",
     "task-create", "task-review", "terminate", "turn-cap",

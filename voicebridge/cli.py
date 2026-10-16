@@ -1383,6 +1383,21 @@ def build_parser() -> argparse.ArgumentParser:
     # --- run receipts and admission (D15) ---
     of_sub.add_parser("unsettled", parents=[common],
                       help="runs with a receipt and no settled row (unknown spend)")
+    of_or = of_sub.add_parser(
+        "orphans", parents=[common],
+        help="report orphans: stale receipt STATUS vs genuine unknown spend "
+             "(read-only, never writes)")
+    of_or.add_argument("--older-than-hours", type=float, default=2.0,
+                       dest="older_than_hours",
+                       help="how old an unsettled receipt must be (default 2h)")
+    of_rc = of_sub.add_parser(
+        "reap", parents=[common],
+        help="reconcile orphaned receipt STATUSES: closes receipts whose ledger "
+             "row already exists; never writes a ledger row (dry-run unless "
+             "--confirm)")
+    of_rc.add_argument("--older-than-hours", type=float, default=2.0,
+                       dest="older_than_hours")
+    of_rc.add_argument("--confirm", action="store_true")
     of_sub.add_parser("receipts", parents=[common],
                       help="list run receipts, newest first")
     of_rb = of_sub.add_parser(
@@ -6956,7 +6971,10 @@ def _cmd_office(cfg, args) -> int:
                 # the room programme materialises real floors/rooms
                 "programme",
                 # M7/L1: running a tick stands in for the cron scheduler
-                "autowork"}
+                "autowork",
+                # the reaper's write half: it only ever fixes a receipt STATUS,
+                # and never books a ledger row (see receipts.reconcile_orphans)
+                "reap"}
     # A verb whose PREVIEW is the useful default (it reports the whole room
     # programme, per room, and why) previews on a bare invocation instead of
     # refusing the way `record` does. It still never writes without --confirm:
@@ -7039,6 +7057,27 @@ def _cmd_office(cfg, args) -> int:
                          requested_by="cli:office")
         elif cmd == "unsettled":
             out = R.unsettled(cfg)
+        elif cmd == "orphans":
+            # Read-only by design: the report is the deliverable, because the
+            # difference it draws (stale STATUS vs genuine unknown spend) is
+            # what decides whether a human attestation is needed at all.
+            out = R.orphaned(
+                cfg,
+                older_than_seconds=float(getattr(args, "older_than_hours", 2.0)
+                                        or 2.0) * 3600.0)
+        elif cmd == "reap":
+            out = R.reconcile_orphans(
+                cfg,
+                older_than_seconds=float(getattr(args, "older_than_hours", 2.0)
+                                        or 2.0) * 3600.0,
+                requested_by="cli:office")
+            if not confirm:
+                out = {"state": "preview",
+                        "would": "office reap",
+                        "report": out,
+                        "next": "re-run with --confirm to reconcile the "
+                                "stale statuses; genuine unknown spend is "
+                                "never written by this verb (D15)"}
         elif cmd == "receipts":
             out = R.receipts(cfg)
         elif cmd == "run-begin":
