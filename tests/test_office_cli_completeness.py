@@ -577,3 +577,99 @@ def test_doc_matches_the_parser():
     assert f"{len(VERBS)} subcommands" in text or f"{len(VERBS)} verbs" in text, (
         f"the doc does not state the real verb count ({len(VERBS)}); update "
         f"docs/OFFICE-CLI-COMPLETENESS.md")
+
+
+# --------------------------------------------------------------------------- #
+# 5. The fifth site: a flag the parser accepts but no handler ever reads.
+# --------------------------------------------------------------------------- #
+def test_every_office_flag_has_a_reader():
+    """Every `--flag` the parser exposes is read by SOME handler or module.
+
+    The four-site model covers verb GAPS (missing import / subparser / branch /
+    doc line) but not a fifth bug: a flag that parses cleanly and is then
+    dropped on the floor, because its `dest` is read nowhere. `consent
+    --read-only` was exactly this for a while — it parsed, it just never
+    decided anything under the default posture, and nothing said so.
+
+    This is a static check by design: an unused `dest` is visible in the source
+    without running anything, so it catches the bug at the cheapest point. A
+    flag named here must either be read (`args.<dest>` in cli.py, or `<dest>`
+    in any `voicebridge/office/*.py`) or the flag should not be declared.
+    """
+    import re
+    from pathlib import Path
+
+    src = Path(CLI.__file__).read_text(encoding="utf-8")
+    office_dir = Path(CLI.__file__).resolve().parent / "office"
+    other_text = "\n".join(
+        p.read_text(encoding="utf-8", errors="ignore")
+        for p in office_dir.rglob("*.py"))
+
+    # Every flag declared on an `of_sub.add_parser(...)` subparser, with the
+    # `dest` its value lands in (explicit `dest=` else the auto name).
+    lines = src.splitlines()
+    start = next(i for i, l in enumerate(lines)
+                 if "of_sub = of.add_subparsers" in l)
+    end = next(i for i, l in enumerate(lines)
+               if l.startswith('    cu = add("computer-use"'))
+    blob = "\n".join(lines[start:end])
+    chunks = re.split(r"\n(?=\s*(?:of_\w+ = )?of_sub\.add_parser\()", blob)
+
+    # `--confirm` is read as the local `confirm` variable before dispatch;
+    # the shared `common` parents are read by the top-level runner, not here.
+    EXEMPT = {"--confirm", "--config", "--no-hotkey", "--dry-run", "--mute"}
+
+    unread = []
+    for chunk in chunks:
+        m = re.search(r'add_parser\(\s*\n?\s*"([a-z0-9\-]+)"', chunk)
+        if not m:
+            continue
+        verb = m.group(1)
+        for am in re.finditer(r'add_argument\(\s*\n?\s*"(--[a-z0-9\-]+)"',
+                              chunk):
+            flag = am.group(1)
+            if flag in EXEMPT:
+                continue
+            tail = chunk[am.end():am.end() + 300]
+            dm = re.search(r'dest="([a-zA-Z_][a-zA-Z0-9_]*)"', tail)
+            dest = dm.group(1) if dm else flag[2:].replace("-", "_")
+            read_in_cli = re.search(
+                r"\bargs\." + re.escape(dest) + r"\b", src) or re.search(
+                r'getattr\(\s*args\s*,\s*"' + re.escape(dest) + r'"', src)
+            read_in_office = re.search(
+                r"\b" + re.escape(dest) + r"\b", other_text)
+            if not read_in_cli and not read_in_office:
+                unread.append((verb, flag, dest))
+
+    assert not unread, (
+        "these office flags are accepted by the parser but read NOWHERE — a "
+        "user can pass them and nothing happens (the fifth site). Either wire "
+        "them into the handler that should read them, or stop declaring "
+        "them:\n  "
+        + "\n  ".join(f"office {v} {f} (dest {d!r})" for v, f, d in unread))
+
+
+def test_consent_help_states_the_default_posture_trap():
+    """`office consent --help` must say the default posture makes flags inert.
+
+    The tier-2 bypass short-circuits before grants (tier 3) and read_only /
+    network (tier 4) are consulted under the default `unattended_full`
+    posture. Without a line saying so, `--read-only` looks like it should
+    matter and silently does not. The doc's fourth site is the parity
+    surface; this is that surface for one verb's flags.
+    """
+    import contextlib
+    import io
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        try:
+            CLI.build_parser().parse_args(["office", "consent", "--help"])
+        except SystemExit:
+            pass
+    text = buf.getvalue()
+    assert "unattended_full" in text and "supervised" in text, (
+        "`office consent --help` does not name the postures:\n" + text)
+    assert "no effect" in text.lower() or "inert" in text.lower(), (
+        "`office consent --help` does not warn that --grant/--read-only/"
+        "--network are inert under the default posture:\n" + text)
