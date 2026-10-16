@@ -302,10 +302,25 @@ def _supervised_child() -> bool:
     Launcher markers only — not INVOCATION_ID, which systemd exports to every
     descendant: an ordinary qubit command inside a CI runner still owes its repair.
     Parsed as a truthy flag, so an explicit ``0``/``false`` does not suppress the tail.
+    Both brand spellings are accepted: a unit installed before the rebrand still
+    exports ``HERMES_SUPERVISED_CHILD`` and still owes the tail. Writes use the
+    canonical ``QUBIT_`` name (see gateway/restart.py ``SUPERVISED_CHILD_ENV``).
     """
+    from gateway.restart import (
+        S6_SUPERVISED_CHILD_ENV,
+        S6_SUPERVISED_CHILD_ENV_ALIASES,
+        SUPERVISED_CHILD_ENV,
+        SUPERVISED_CHILD_ENV_ALIASES,
+    )
+
     return any(
         os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
-        for name in ("QUBIT_SUPERVISED_CHILD", "QUBIT_S6_SUPERVISED_CHILD")
+        for name in (
+            SUPERVISED_CHILD_ENV,
+            *SUPERVISED_CHILD_ENV_ALIASES,
+            S6_SUPERVISED_CHILD_ENV,
+            *S6_SUPERVISED_CHILD_ENV_ALIASES,
+        )
     )
 
 

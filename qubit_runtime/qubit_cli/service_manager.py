@@ -452,10 +452,10 @@ class S6ServiceManager:
         # Supervised-child sentinel: without it the supervised gateway re-entering
         # `_gateway_command_inner` with subcmd == "run" would dispatch `gateway start` → re-exec
         # `gateway run --replace` → `gateway start` … (see the matching guard there).
-        lines.append("export HERMES_S6_SUPERVISED_CHILD=1")
+        lines.append("export QUBIT_S6_SUPERVISED_CHILD=1")
         # Generalized supervisor marker — same meaning for the profile-redirect guard in
         # qubit_cli.main._apply_profile_override; kept alongside the s6 one for back-compat.
-        lines.append("export HERMES_SUPERVISED_CHILD=1")
+        lines.append("export QUBIT_SUPERVISED_CHILD=1")
         # ``--replace`` makes the supervised gateway authoritative for its QUBIT_HOME. Without it
         # a gateway started OUTSIDE s6 (stray ``qubit gateway run``, an agent action, the Open
         # WebUI helper) grabs the PID lock first; the slot then hits "Another gateway instance is

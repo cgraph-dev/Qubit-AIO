@@ -183,6 +183,7 @@ def _supervisor_markers(pid: int) -> str | None:
     """Why *pid* answers to a supervisor other than a Qubit unit/job (it would respawn it on old
     code), or ``None``."""
     from qubit_cli.gateway import _capture_gateway_argv
+    from gateway.restart import s6_supervised_child_marker_present
     if "--external-supervisor" in (_capture_gateway_argv(pid) or []):
         return "--external-supervisor"
     try:
@@ -190,7 +191,7 @@ def _supervisor_markers(pid: int) -> str | None:
         env = psutil.Process(pid).environ()
     except Exception:  # health: allow BLE001 -- unreadable environment: no marker proven
         return None
-    if env.get("HERMES_S6_SUPERVISED_CHILD"):
+    if s6_supervised_child_marker_present(env):
         return "s6"
     if unit := _respawning_service(pid):
         return f"systemd unit {unit}"

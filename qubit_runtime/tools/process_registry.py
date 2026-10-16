@@ -309,7 +309,8 @@ def _is_supervised_gateway_process() -> bool:
     Supervisor markers and ``_HERMES_GATEWAY`` are inherited by every descendant (and
     importing ``gateway.run`` sets the latter), so also require ownership of the live
     gateway PID file — scopes are for the gateway, not terminal children or CLIs.
-    Reads the launch marker (``HERMES_SUPERVISED_CHILD`` included), not the restart-route
+    Reads the launch marker (``QUBIT_SUPERVISED_CHILD`` included, legacy ``HERMES_`` spelling
+    accepted so an already-installed task still counts), not the restart-route
     probe: a Windows Scheduled-Task gateway sets only that marker, and the self-kill guards
     gated here must protect it too (#113667)."""
     if os.environ.get("_HERMES_GATEWAY") != "1":

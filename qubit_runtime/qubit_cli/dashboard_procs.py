@@ -185,6 +185,11 @@ def _qubit_home_for_pid(pid: int) -> str | None:
     env = _pid_environ(pid)
     if env is None:
         return None
+    from gateway.restart import (
+        external_supervisor_marker_present,
+        s6_supervised_child_marker_present,
+        supervised_child_marker_present,
+    )
     from qubit_cli.main_dashboard import _dashboard_cmdline_for_pid
     from qubit_cli.profiles import get_active_profile, normalize_profile_name, profile_root_for_env_home
     argv = _dashboard_cmdline_for_pid(pid) or []
@@ -201,8 +206,8 @@ def _qubit_home_for_pid(pid: int) -> str | None:
     else:
         default_home = Path(env.get("HOME") or _pid_passwd_home(pid) or Path.home()) / ".hermes"
     root = profile_root_for_env_home(env_home, default_home)
-    fixed_identity = any(env.get(k) for k in ("HERMES_SUPERVISED_CHILD", "HERMES_S6_SUPERVISED_CHILD",
-                                               "HERMES_GATEWAY_EXTERNAL_SUPERVISOR")) or is_desktop_ssh_backend_argv(argv)
+    fixed_identity = supervised_child_marker_present(env) or s6_supervised_child_marker_present(env) \
+        or external_supervisor_marker_present(env) or is_desktop_ssh_backend_argv(argv)
     if profile is None and not fixed_identity:
         profile = get_active_profile(root)
     canon = normalize_profile_name(profile) if profile else "default"

@@ -412,7 +412,7 @@ def generate_launchd_plist() -> str:
 
         <key>QUBIT_HOME</key>
         <string>{qubit_home}</string>
-        <key>HERMES_SUPERVISED_CHILD</key>
+        <key>QUBIT_SUPERVISED_CHILD</key>
         <string>1</string>
     </dict>
 

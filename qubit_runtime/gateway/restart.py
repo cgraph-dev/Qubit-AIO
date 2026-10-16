@@ -31,10 +31,52 @@ def map_fatal_config_exit_for_launchd(returncode: int) -> int:
         return 0
     return returncode
 
+# The supervised-child marker family. One canonical (QUBIT_) spelling is WRITTEN by every
+# generated launcher; the legacy (HERMES_) spelling stays READ-ONLY so a systemd unit,
+# launchd plist or Windows Scheduled Task installed by an older build — which exports the
+# legacy name and cannot be rewritten in place — is still recognised. Do not write the
+# aliases; they exist only to converge installed machines onto the canonical name, which
+# happens whenever the unit is regenerated (`qubit gateway install` /
+# `refresh_systemd_unit_if_needed`). S6_SUPERVISED_CHILD is the s6-image sibling of the
+# same marker.
+SUPERVISED_CHILD_ENV = "QUBIT_SUPERVISED_CHILD"
+SUPERVISED_CHILD_ENV_ALIASES = ("HERMES_SUPERVISED_CHILD",)
+S6_SUPERVISED_CHILD_ENV = "QUBIT_S6_SUPERVISED_CHILD"
+S6_SUPERVISED_CHILD_ENV_ALIASES = ("HERMES_S6_SUPERVISED_CHILD",)
+
 # Set by ``qubit gateway run --external-supervisor``. Unlike systemd's INVOCATION_ID
 # and launchd's XPC_SERVICE_NAME, this survives wrappers that replace the child
 # environment (e.g. ``sudo env -i``).
-EXTERNAL_GATEWAY_SUPERVISOR_ENV = "HERMES_GATEWAY_EXTERNAL_SUPERVISOR"
+EXTERNAL_GATEWAY_SUPERVISOR_ENV = "QUBIT_GATEWAY_EXTERNAL_SUPERVISOR"
+EXTERNAL_GATEWAY_SUPERVISOR_ENV_ALIASES = ("HERMES_GATEWAY_EXTERNAL_SUPERVISOR",)
+
+
+def supervised_child_marker_present(env: Mapping[str, str]) -> bool:
+    """True when *env* carries any supervised-child marker, canonical or legacy.
+
+    Canonical-first lookup over the family so a launcher written by either build is
+    recognised: the QUBIT_ spelling is what generated units now write, the HERMES_
+    alias is what units installed by older builds still write. Presence-only, like the
+    consumers in ``qubit_cli.dashboard_procs`` — the value is not parsed.
+    """
+    return any(
+        env.get(name) for name in (SUPERVISED_CHILD_ENV, *SUPERVISED_CHILD_ENV_ALIASES)
+    )
+
+
+def s6_supervised_child_marker_present(env: Mapping[str, str]) -> bool:
+    """True when *env* carries any s6 supervised-child marker, canonical or legacy."""
+    return any(
+        env.get(name) for name in (S6_SUPERVISED_CHILD_ENV, *S6_SUPERVISED_CHILD_ENV_ALIASES)
+    )
+
+
+def external_supervisor_marker_present(env: Mapping[str, str]) -> bool:
+    """True when *env* opts into ``--external-supervisor``, canonical or legacy."""
+    return any(
+        env.get(name)
+        for name in (EXTERNAL_GATEWAY_SUPERVISOR_ENV, *EXTERNAL_GATEWAY_SUPERVISOR_ENV_ALIASES)
+    )
 
 # Forwarded by the stderr-timestamp launchd wrapper (qubit_cli/stderr_timestamp.py) to the gateway
 # grandchild, which sees ``XPC_SERVICE_NAME=0``. Read only via :func:`launchd_job_label`.
@@ -245,28 +287,35 @@ def is_gateway_supervisor_process(environ: Mapping[str, str] | None = None) -> b
     Selects the exit-75 restart route, so only markers of a manager with a restart policy count:
     systemd ``INVOCATION_ID``, launchd ``XPC_SERVICE_NAME`` (or the wrapper-forwarded
     ``HERMES_LAUNCHD_LABEL`` the grandchild sees), the s6 sentinel, or the explicit
-    ``--external-supervisor`` opt-in. The generalized ``HERMES_SUPERVISED_CHILD`` launcher marker is
+    ``--external-supervisor`` opt-in. The generalized supervised-child launcher marker is
     deliberately NOT read here: the Windows Scheduled-Task launcher sets it without a restart policy
     (#113670), and routing its ``/restart`` through exit 75 would leave the gateway dead.
+    The s6 sentinel and the external-supervisor opt-in are BOTH accepted under either brand
+    spelling (see ``SUPERVISED_CHILD_ENV`` above) so an already-installed unit keeps working.
     """
     env = os.environ if environ is None else environ
     xpc_service = env.get("XPC_SERVICE_NAME", "")
-    return bool(env.get("INVOCATION_ID") or env.get("HERMES_S6_SUPERVISED_CHILD") or (xpc_service and xpc_service != "0")
+    return bool(env.get("INVOCATION_ID") or s6_supervised_child_marker_present(env)
+                or (xpc_service and xpc_service != "0")
                 or launchd_job_label(env)
-                or str(env.get(EXTERNAL_GATEWAY_SUPERVISOR_ENV, "")).strip().lower() in _TRUTHY)
+                or any(str(env.get(name, "")).strip().lower() in _TRUTHY
+                       for name in (EXTERNAL_GATEWAY_SUPERVISOR_ENV,
+                                    *EXTERNAL_GATEWAY_SUPERVISOR_ENV_ALIASES)))
 
 
 def is_supervised_gateway_launch(environ: Mapping[str, str] | None = None) -> bool:
     """Return whether this gateway was launched by a generated service/launcher rather than a shell.
 
-    Superset of :func:`is_gateway_supervisor_process` that also honours ``HERMES_SUPERVISED_CHILD``,
+    Superset of :func:`is_gateway_supervisor_process` that also honours the supervised-child marker,
     the marker every generated launcher exports (systemd unit, launchd plist, s6 run script, Windows
-    Scheduled Task — see ``qubit_cli.main._apply_profile_override``). This is the identity the
-    self-targeting guards key on: a kill or lifecycle command issued from inside such a gateway takes
-    down the process hosting the caller with nobody at a terminal to bring it back (#113667).
+    Scheduled Task — see ``qubit_cli.main._apply_profile_override``). Both spellings of that marker
+    count — the canonical ``QUBIT_`` name written today and the legacy ``HERMES_`` alias an
+    already-installed unit still exports. This is the identity the self-targeting guards key on: a
+    kill or lifecycle command issued from inside such a gateway takes down the process hosting the
+    caller with nobody at a terminal to bring it back (#113667).
     """
     env = os.environ if environ is None else environ
-    if env.get("HERMES_SUPERVISED_CHILD"):
+    if supervised_child_marker_present(env):
         return True
     return is_gateway_supervisor_process(environ)
 

@@ -44,6 +44,7 @@ from gateway.restart import (  # noqa: F401 — resolved lazily by siblings thro
     parse_restart_drain_timeout,
     resolve_restart_exit_wait_budget,
     resolve_systemd_timeout_stop_sec,
+    s6_supervised_child_marker_present,
 )
 from qubit_cli.config import (  # noqa: F401 — resolved lazily by siblings through the facade
     get_env_value,
@@ -3336,7 +3337,7 @@ WorkingDirectory={working_dir}
 {env_lines}Environment="PATH={sane_path}"
 
 Environment="QUBIT_HOME={qubit_home}"
-Environment="HERMES_SUPERVISED_CHILD=1"
+Environment="QUBIT_SUPERVISED_CHILD=1"
 Restart=always
 RestartSec=5
 RestartForceExitStatus={GATEWAY_SERVICE_RESTART_EXIT_CODE}
@@ -4119,7 +4120,8 @@ def _is_official_docker_checkout() -> bool:
 def _running_under_gateway_supervisor() -> bool:
     """True when this process IS the supervisor-launched gateway, so the conflict guard never wedges
     the service into a respawn/refuse loop. Markers: systemd INVOCATION_ID, launchd XPC_SERVICE_NAME
-    (shells inherit "0"), s6 HERMES_S6_SUPERVISED_CHILD, or ``--external-supervisor``."""
+    (shells inherit "0"), s6 QUBIT_S6_SUPERVISED_CHILD (legacy HERMES_ spelling accepted), or
+    ``--external-supervisor``."""
     return is_gateway_supervisor_process()
 
 
@@ -4960,13 +4962,15 @@ def gateway_command(args):
 
 def _maybe_redirect_run_to_s6_supervision(args) -> bool:
     """Inside an s6 container, upgrade bare ``gateway run`` to the supervised s6 longrun; True iff dispatched.
-    ``HERMES_S6_SUPERVISED_CHILD`` (set by ``S6ServiceManager._render_run_script``) marks the supervised
+    ``QUBIT_S6_SUPERVISED_CHILD`` (set by ``S6ServiceManager._render_run_script``) marks the supervised
     child, which must run in foreground or we'd recurse run → start → run; ``--no-supervise`` /
-    HERMES_GATEWAY_NO_SUPERVISE=1 opts out (CI smoke, debugging)."""
+    HERMES_GATEWAY_NO_SUPERVISE=1 opts out (CI smoke, debugging). The legacy
+    ``HERMES_S6_SUPERVISED_CHILD`` spelling is accepted too: an s6 image built before the rebrand
+    still exports it.  """
     no_supervise = getattr(args, "no_supervise", False) or \
         os.environ.get("HERMES_GATEWAY_NO_SUPERVISE", "").lower() in ("1", "true", "yes")
-    # HERMES_S6_SUPERVISED_CHILD: we ARE the supervised child; fall through so the gateway starts.
-    if no_supervise or os.environ.get("HERMES_S6_SUPERVISED_CHILD"):
+    # Supervised child: we ARE the supervised child; fall through so the gateway starts.
+    if no_supervise or s6_supervised_child_marker_present(os.environ):
         return False
     if not _dispatch_via_service_manager_if_s6("start"):
         return False

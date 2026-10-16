@@ -553,22 +553,41 @@ def _under_gateway_supervisor(argv: list) -> bool:
     token already owned by that profile's own gateway (#74872).
 
     Markers (see gateway/restart.py ``is_gateway_supervisor_process``):
-    HERMES_SUPERVISED_CHILD (systemd unit / launchd plist / Windows task),
-    HERMES_S6_SUPERVISED_CHILD (legacy s6 container), INVOCATION_ID (systemd
+    QUBIT_SUPERVISED_CHILD (systemd unit / launchd plist / Windows task),
+    QUBIT_S6_SUPERVISED_CHILD (legacy s6 container), INVOCATION_ID (systemd
     service children only — consulted ONLY for gateway commands because it is
     inherited by every descendant of a systemd-launched process, e.g.
-    self-hosted CI runners), HERMES_GATEWAY_EXTERNAL_SUPERVISOR (explicit
+    self-hosted CI runners), QUBIT_GATEWAY_EXTERNAL_SUPERVISOR (explicit
     opt-in). XPC_SERVICE_NAME is deliberately NOT consulted: interactive macOS
     terminals set it too.
+
+    Every member is also accepted under its legacy HERMES_ spelling, so a unit
+    installed by an older build keeps its fixed profile identity instead of
+    being silently re-homed into the sticky active_profile (the #74872
+    identity-assumption vector). Generated units only ever WRITE the QUBIT_
+    spelling; see gateway/restart.py ``SUPERVISED_CHILD_ENV``.
     """
-    if os.environ.get("HERMES_SUPERVISED_CHILD") or os.environ.get("HERMES_S6_SUPERVISED_CHILD"):
+    from gateway.restart import (
+        EXTERNAL_GATEWAY_SUPERVISOR_ENV,
+        EXTERNAL_GATEWAY_SUPERVISOR_ENV_ALIASES,
+        s6_supervised_child_marker_present,
+        supervised_child_marker_present,
+    )
+
+    if supervised_child_marker_present(os.environ) or s6_supervised_child_marker_present(
+        os.environ
+    ):
         return True
     is_gateway_cmd = next((a for a in argv if not a.startswith("-")), None) == "gateway"
     if is_gateway_cmd and os.environ.get("INVOCATION_ID"):
         return True
-    return os.environ.get(
-        "HERMES_GATEWAY_EXTERNAL_SUPERVISOR", ""
-    ).strip().lower() in {"1", "true", "yes", "on"}
+    return any(
+        os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+        for name in (
+            EXTERNAL_GATEWAY_SUPERVISOR_ENV,
+            *EXTERNAL_GATEWAY_SUPERVISOR_ENV_ALIASES,
+        )
+    )
 
 
 def _s6_supervised_gateway_run(argv: list) -> bool:
