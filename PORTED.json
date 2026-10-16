@@ -1,0 +1,128 @@
+{
+ "chunk": "port-2",
+ "upstream_pin": "517b5e10febd619ce30bb22580e29b160266eb43",
+ "branch": "port/chunk-2",
+ "counts": {
+  "ported": 8,
+  "dep_missing": 3,
+  "shim_skipped": 0,
+  "imports_clean": 10
+ },
+ "files": [
+  {
+   "path": "qubit_runtime/agent/context_compressor_retry.py",
+   "upstream_path": "agent/context_compressor_retry.py",
+   "upstream_lines": 29,
+   "status": "ported",
+   "dependencies_missing": [],
+   "imports_clean": true,
+   "note": "dependency-free leaf"
+  },
+  {
+   "path": "qubit_runtime/agent/context_compressor_tail.py",
+   "upstream_path": "agent/context_compressor_tail.py",
+   "upstream_lines": 85,
+   "status": "ported",
+   "dependencies_missing": [],
+   "imports_clean": true,
+   "note": "uses existing context_compressor seams"
+  },
+  {
+   "path": "qubit_runtime/agent/context_compressor_telemetry.py",
+   "upstream_path": "agent/context_compressor_telemetry.py",
+   "upstream_lines": 139,
+   "status": "ported",
+   "dependencies_missing": [],
+   "imports_clean": true,
+   "note": "imports existing agent.model_metadata"
+  },
+  {
+   "path": "qubit_runtime/agent/credential_pool_timestamps.py",
+   "upstream_path": "agent/credential_pool_timestamps.py",
+   "upstream_lines": 31,
+   "status": "ported",
+   "dependencies_missing": [],
+   "imports_clean": true,
+   "note": "dependency-free leaf"
+  },
+  {
+   "path": "qubit_runtime/agent/gemini_long_decode.py",
+   "upstream_path": "agent/gemini_long_decode.py",
+   "upstream_lines": 102,
+   "status": "ported",
+   "dependencies_missing": [],
+   "imports_clean": true,
+   "note": "standalone ok; consumer gemini_native_adapter behind pin"
+  },
+  {
+   "path": "qubit_runtime/agent/model_metadata_cache.py",
+   "upstream_path": "agent/model_metadata_cache.py",
+   "upstream_lines": 72,
+   "status": "ported",
+   "dependencies_missing": [],
+   "imports_clean": true,
+   "note": "deps agent.model_metadata/utils/qubit_cli.auth present"
+  },
+  {
+   "path": "qubit_runtime/agent/onboarding_first_tasks.py",
+   "upstream_path": "agent/onboarding_first_tasks.py",
+   "upstream_lines": 328,
+   "status": "ported",
+   "dependencies_missing": [],
+   "imports_clean": true,
+   "note": "pure catalog; debranded prose"
+  },
+  {
+   "path": "qubit_runtime/agent/onboarding_flow.py",
+   "upstream_path": "agent/onboarding_flow.py",
+   "upstream_lines": 429,
+   "status": "ported",
+   "dependencies_missing": [],
+   "imports_clean": true,
+   "note": "pure reducer; deps onboarding_first_tasks present"
+  },
+  {
+   "path": "qubit_runtime/agent/onboarding_facts.py",
+   "upstream_path": "agent/onboarding_facts.py",
+   "upstream_lines": 35,
+   "status": "dep-missing",
+   "dependencies_missing": [
+    "qubit_platform/host/summary.py",
+    "qubit_cli/plugin_catalog_presence.py::onboarding_names"
+   ],
+   "imports_clean": true,
+   "note": "imports clean; read_facts()/suggested_name() raise ImportError at call time"
+  },
+  {
+   "path": "qubit_runtime/agent/onboarding_record.py",
+   "upstream_path": "agent/onboarding_record.py",
+   "upstream_lines": 178,
+   "status": "dep-missing",
+   "dependencies_missing": [
+    "agent/onboarding_text.py",
+    "qubit_cli/onboarding_run.py",
+    "qubit_platform/host/summary.py"
+   ],
+   "imports_clean": false,
+   "note": "module-level import of agent.onboarding_text fails"
+  },
+  {
+   "path": "qubit_runtime/agent/managed_worker.py",
+   "upstream_path": "agent/managed_worker.py",
+   "upstream_lines": 454,
+   "status": "dep-missing",
+   "dependencies_missing": [
+    "agent/safe_worker_policy.py",
+    "gateway/session_finite.py",
+    "gateway/session_tool_events.py",
+    "gateway/session_kanban.py",
+    "gateway/session_policy.py",
+    "gateway/session_worker_construct.py",
+    "gateway/session_ingress_media.py",
+    "agent/runtime_session_store.py"
+   ],
+   "imports_clean": true,
+   "note": "module imports clean; execute() path needs the 8 deps"
+  }
+ ]
+}
