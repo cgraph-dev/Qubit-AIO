@@ -4845,6 +4845,152 @@ def frontend_status(explicit: Optional[str]):
         False, repo_version, "repo"
 
 
+#: Session-token global the served dashboard shell injects
+#: (``_serve_qubit_index``). A shipped bundle that cannot see it sends no
+#: credential and every API read 401s — the exact outage a stale dist caused.
+_QUBIT_BUNDLE_TOKEN_GLOBAL = "__QUBIT_SESSION_TOKEN__"
+#: Pre-rebrand global the server no longer emits. Any shipped chunk still
+#: reading it is older than the rename: it can never authenticate.
+_QUBIT_BUNDLE_LEGACY_GLOBAL = "__HERMES_SESSION_TOKEN__"
+#: Upper bound per scanned chunk so the boot check stays in the millisecond
+#: range even as the bundle grows.
+_QUBIT_BUNDLE_SCAN_LIMIT = 15 * 1024 * 1024
+
+
+def _repo_head_for_bundle_check() -> str:
+    """Current source HEAD for the bundle-freshness comparison, else ``""``."""
+    try:
+        import subprocess as _sp
+        root = Path(__file__).resolve().parents[1]
+        out = _sp.run(["git", "rev-parse", "HEAD"], cwd=str(root),
+                      capture_output=True, text=True, timeout=10)
+        head = (out.stdout or "").strip()
+        return head if out.returncode == 0 and len(head) == 40 else ""
+    except Exception:
+        return ""
+
+
+def _strip_js_comments(text: str) -> str:
+    """Remove ``//`` and ``/* */`` comments, respecting string literals.
+
+    The bundle check looks for shipped CODE references (a comment merely
+    mentioning a retired global must not flag the bundle). URLs inside
+    strings (``https://…``) survive because comment starts are only honored
+    outside quotes; template-literal interpolations are not parsed — a hit
+    inside ``${…}`` still counts, which is the safe direction.
+    """
+    out: List[str] = []
+    i, n = 0, len(text)
+    quote = ""
+    while i < n:
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        if quote:
+            out.append(ch)
+            if ch == "\\" and i + 1 < n:
+                out.append(nxt)
+                i += 2
+                continue
+            if ch == quote:
+                quote = ""
+            i += 1
+            continue
+        if ch in ("'", '"', "`"):
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and nxt == "/":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and nxt == "*":
+            i += 2
+            while i < n and not (text[i] == "*" and i + 1 < n and text[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def check_qubit_bundle(dist_dir) -> Dict[str, Any]:
+    """Inspect the served Qubit dashboard bundle for serving hazards.
+
+    Pure function of the directory (no server state) so tests can drive it
+    against fixture trees. Flags: a missing/unreadable ``index.html``,
+    referenced ``assets/*`` files absent from disk, shipped ``*.js`` still
+    reading the retired session-token global (cannot authenticate — rebuild
+    from current source), no shipped chunk reading the current global, and a
+    ``build-info.json`` source HEAD that differs from this checkout
+    (best-effort; skipped when git is unavailable).
+    """
+    issues: List[str] = []
+    dist = Path(dist_dir)
+    index = dist / "index.html"
+    try:
+        html = index.read_text(encoding="utf-8")
+    except OSError:
+        return {"ok": False,
+                "issues": [f"dashboard bundle has no readable index.html at {index}"],
+                "has_token_global": False, "has_legacy_global": False,
+                "missing_assets": [], "build_head": "", "repo_head": ""}
+    import re as _re
+    refs = sorted(set(_re.findall(r'''(?:src|href)=["']([^"']+)["']''', html)))
+    missing = [r.lstrip("/") for r in refs
+               if r.startswith(("assets/", "/assets/"))
+               and not (dist / r.lstrip("/")).is_file()]
+    if missing:
+        issues.append(f"bundle index references {len(missing)} missing asset(s): "
+                      + ", ".join(missing[:5]))
+    legacy_hits: List[str] = []
+    token_hits = 0
+    for chunk in sorted(dist.rglob("*.js")):
+        if chunk.suffixes[-2:] == [".js", ".map"] or chunk.name.endswith(".map"):
+            continue
+        try:
+            if chunk.stat().st_size > _QUBIT_BUNDLE_SCAN_LIMIT:
+                continue
+            text = chunk.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        code = _strip_js_comments(text)
+        if _QUBIT_BUNDLE_LEGACY_GLOBAL in code:
+            try:
+                rel = str(chunk.relative_to(dist))
+            except ValueError:
+                rel = chunk.name
+            legacy_hits.append(rel)
+        if _QUBIT_BUNDLE_TOKEN_GLOBAL in code:
+            token_hits += 1
+    if legacy_hits:
+        issues.append(f"bundle predates the session-token rename "
+                      f"({_QUBIT_BUNDLE_LEGACY_GLOBAL} in "
+                      + ", ".join(legacy_hits[:5]) + "): it cannot authenticate; "
+                      "rebuild frontend/qubit-web")
+    if not token_hits:
+        issues.append(f"no shipped chunk reads {_QUBIT_BUNDLE_TOKEN_GLOBAL}: "
+                      "the dashboard cannot authenticate; rebuild frontend/qubit-web")
+    build_head = ""
+    try:
+        import json as _json
+        info = _json.loads((dist / "build-info.json").read_text(encoding="utf-8"))
+        if isinstance(info, dict):
+            build_head = str(info.get("source_head") or "")
+    except (OSError, ValueError):
+        build_head = ""
+    repo_head = _repo_head_for_bundle_check()
+    if build_head and build_head != "unknown" and repo_head and build_head != repo_head:
+        issues.append(f"bundle built from {build_head[:12]} but checkout is at "
+                      f"{repo_head[:12]}: rebuild frontend/qubit-web")
+    return {"ok": not issues, "issues": issues,
+            "has_token_global": token_hits > 0,
+            "has_legacy_global": bool(legacy_hits),
+            "missing_assets": missing, "build_head": build_head,
+            "repo_head": repo_head}
+
+
 def token_ok(cfg_token: str, header_token: str,
              query_token_present: bool) -> tuple[bool, str]:
     """Packet 1B auth contract. Query-string tokens are ALWAYS rejected.
@@ -4926,8 +5072,22 @@ class WebUI:
                                       orchestrator.cfg.get("webui", "frontend_dir")),
                       version=self._frontend_version, active="repo",
                       detail="configured webui.frontend_dir is stale, unversioned, "
-                             "or version-mismatched; serving the repository "
-                             "frontend (Packet 8E safe fallback)")
+                              "or version-mismatched; serving the repository "
+                              "frontend (Packet 8E safe fallback)")
+        # Served Qubit bundle freshness: a dist built from pre-rename source
+        # reads a session-token global the server no longer emits, so every
+        # API read 401s (and pages render empty) with no server-side error.
+        # Fail-open serving with a loud boot record, never a silent outage.
+        try:
+            self._bundle_check = check_qubit_bundle(self._qubit_dist())
+        except Exception as _exc:  # noqa: BLE001 - the check must not break boot
+            self._bundle_check = {"ok": False,
+                                  "issues": [f"bundle check failed: {type(_exc).__name__}"]}
+        if not self._bundle_check.get("ok"):
+            detail = "; ".join(self._bundle_check.get("issues", []))[:500]
+            log.warning("webui.dashboard_bundle STALE/BROKEN: %s", detail)
+            log_event("webui.dashboard_bundle.stale", detail=detail,
+                      dist=str(self._qubit_dist()))
         # optional shared secret for tunneled/external access (config: webui.token)
         self.api_token: str = orchestrator.cfg.get("webui", "token", default="") if orchestrator is not None else ""
         self.allowed_origins = orchestrator.cfg.get("webui", "allowed_origins", default=[]) if orchestrator is not None else []
@@ -5256,6 +5416,7 @@ class WebUI:
                 "stale": bool(getattr(self, "_frontend_stale", False)),
                 "configured": bool(getattr(getattr(self.orch, "cfg", None), "get", None) and
                                   self.orch.cfg.get("webui", "frontend_dir")),
+                "bundle": getattr(self, "_bundle_check", {"ok": True, "issues": []}),
             },
         }
 
