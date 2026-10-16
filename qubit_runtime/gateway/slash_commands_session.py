@@ -95,11 +95,22 @@ def _reset_process_scoped_tool_state() -> None:
 
 def _branch_row(msg: dict) -> dict:
     """/branch child row; keeps the api_content sidecar so the branch's first turn replays the
-    parent's exact wire bytes (warm provider prompt cache) instead of a cold prefill."""
+    parent's exact wire bytes (warm provider prompt cache) instead of a cold prefill.
+
+    Carries the parent's message identity (``message_identity``) too, exactly like the CLI
+    (/branch, ``cli_commands_mixin.py``), workdir (``session_workdir.py:_persist_branch_seed``)
+    and Desktop (``methods_session.py:_persist_branch``) branch copies. Without it the child
+    rows mint fresh uids while the parent's continue to be used, so a context engine keying on
+    ``message_uid`` sees a different identity on every branch boundary
+    (agent/message_metadata.py:102-106).
+    """
+    from agent.message_metadata import message_identity
+
     row = {k: msg.get(k) for k in _BRANCH_COPIED_FIELDS}
     row["role"] = msg.get("role", "user")
     row["tool_name"] = msg.get("tool_name") or msg.get("name")
     row["api_content"] = extract_api_content_sidecar(msg)
+    row.update(message_identity(msg, with_tool_uids=True))
     return row
 
 
