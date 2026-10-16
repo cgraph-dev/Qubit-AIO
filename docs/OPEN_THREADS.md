@@ -256,3 +256,59 @@ total**, which drifts legitimately across rebuilds.
 *Generated 2026-10-12 by mining session `20261010_005652_080bf0` archives
 001–007. Re-verify any 🟡/🔴 row against the worktree before acting — status
 claims here are as-of this date and the tree is still changing.*
+
+---
+
+## SESSION 2026-10-16 — 5-lane catch-up + rebrand ruling
+
+**State verified on disk 2026-10-16 ~08:40.** Branch `pre-sync-worktree-snapshot`,
+HEAD `2808e2a58`, tree clean, **85 ahead / 0 behind `canonical/main`** (a clean superset, not
+a divergence). Tagged `session/2026-10-16-catchup`.
+
+### 🔴 THE LOSS RISK: nothing is pushed
+
+`git branch -r --contains HEAD` is empty — every commit below is **local-only**. Remote is
+`canonical` → `github.com/cgraph-dev/Qubit-AIO.git`. Push before doing anything else.
+
+### ✅ Landed this session (12 commits)
+
+| Commit | What |
+|---|---|
+| `080514a2d` | **SUPERVISED_CHILD dual-read**: writers emit `QUBIT_*`, 10 readers accept both. Fixes the `venv_sync.py:308` split-brain. 22 tests; 7 proven red without the change. |
+| `3301809e6` | lane-6 report (`REPORT-supervised-marker.md`) |
+| `70260712c` | **`docs/REBRAND-SWEEP-PLAN.md`** — the 630-symbol sweep design |
+| `63b458a41` | `scripts/upstream_drift_report.py` + pin reconciliation (reads `FROZEN_REV` from one home, fails closed; **did not touch** the `69948c0057` anchor — still 16 occurrences) |
+| `73a78da84` | drift report doc |
+| `2808e2a58` | `docs/DRIFT-REPORT-2026-10-16.txt` — verified, deterministic |
+| `6db59dfeb` | **HEAD defect fix**: branch rows lacked `message_identity()`; ported from `sync-w24` `8efc0dd62`. Verified independently. |
+| `6ee2adf0c` | Office memory-receipt fix (concurrent session's work, frozen + attributed) |
+| `516a5390a`…`62e7a4518` | `scripts/check_commit_hygiene.py` + 27 tests + report |
+| `d2c467e9a`,`1b21b26a1`,`b8cd9c233` | `sync-w24` safe subset (2 of 86) + manifests |
+
+### Verified findings worth not re-deriving
+
+- **Upstream drift = 3,895 commits, but only 298 genuine production-file additions.** 1,114
+  we already carry (upstream merely newer); 127 deleted. The commit count overstates work ~5×.
+  Re-run: `scripts/upstream_drift_report.py` (~9 min, deterministic).
+- **`sync-w24`'s 86 "TAKE" paths: 84 are unsafe.** Proven: all 84 delete 1–67 non-blank HEAD
+  lines, and 43 carry Hermes-branded branch-only content. `deferred.json` has per-path detail.
+- **`sync-w24` is not a stale dead branch** — it carried a real fix HEAD never took
+  (`8efc0dd62`), now landed. Re-read it for content, not only for conflicts.
+- **Agent lane `catchup-1` went the INVERSE direction** (~140 `QUBIT_*`→`HERMES_*` in tests,
+  treating drift as spec). Parked at `parked/catchup-1-hermes-direction` with a git note.
+  Not salvageable under the owner ruling except one `lambda force, **kw` signature fix
+  (recorded in the sweep plan).
+- **`hermes_cli` test lane hit its iteration cap** at 338 failing (from 535). Unfinished —
+  needs re-dispatch. Its orphaned edits are at `/tmp/preserved-ag1-leftovers.patch`.
+
+### 🟡 Open
+
+- **Push the branch.** Highest priority; nothing is backed up.
+- **`hermes_cli` tests**: 338 failing remain (`qubit_runtime/tests/hermes_cli/`). Re-dispatch.
+- **Rebrand sweep**: Phase 0 (manifest tool) not started. See `docs/REBRAND-SWEEP-PLAN.md`.
+- **`check_commit_hygiene.py` reports 13 live violations** — the peer worktree dirt is
+  expected; the `stranded_branch_commits` one is the push issue above.
+- **Stale stash recovery**: another session's 590-line office WIP was found in `stash@{0}` and
+  preserved to `/tmp/preserved-stash0-office-590lines.patch` (sha256 `4a16d9bc…`). **The stash
+  stack is shared across worktrees — never bare `git stash pop` in a worktree you did not
+  create.** Its owning session should reclaim it.
