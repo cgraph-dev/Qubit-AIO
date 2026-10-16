@@ -1,0 +1,17 @@
+{
+  "upstream_pin_commit": "4ccce2537472fe5a8d432f06974494d2e778ff15",
+  "build_command": "node node_modules/vite/bin/vite.js build --config vite.config.ts (from a clean `npm ci --include=dev` at the pin)",
+  "determinism_two_runs_identical": "IDENTICAL",
+  "pinned_build_hashes": [
+    "5a7ec651af12609f7f73af2120f2f40d66a71853922e3f047f49fc9c5e5f9b86  dist/client/bundle/app-U4Pwh2XA.js",
+    "286f362fc50cd4261f715445d71ecd0ab8ce7e87c8f746a6d0b30579e118120e  dist/client/bundle/main-DND_b4_E.js",
+    "929e4d993b980b3a35ca1dfe6e841381a1fbf851e25daefd8f00bf9b999bf655  dist/client/bundle/app-BW61bUik.css",
+    "81e2d0a39386205c5acdce543b7697a59e18e551488c37754bdd321de12b98a4  dist/client/index.html"
+  ],
+  "revendor_file_hashes_match_committed": "BIT-EXACT: all 77 files identical",
+  "revendor_tree_diff": "",
+  "committed_vendored_app_chunk_sha256": "367365c9200c34898ceaa7e74c558031f9d92b6eb543094341ea71cfaeb27c9b  /tmp/vendored-committed/bundle/app-U4Pwh2XA.js",
+  "rebuilt_vendored_app_chunk_sha256": "367365c9200c34898ceaa7e74c558031f9d92b6eb543094341ea71cfaeb27c9b  /tmp/vendor-rebuilt/habblaud/bundle/app-U4Pwh2XA.js",
+  "wrong_commit_head_86c0379_app_chunk": "ecf3c4d513f5d83a5d7b40cd467bd2c684969c4db805e7e78e1782b7c78b092a  /tmp/habblaud-build/dist/client/bundle/app-DrspyBzY.js",
+  "note_wrong_commit": "Building the shared checkout's HEAD (86c0379) yields app-DrspyBzY.js; building the pinned commit 4ccce25 yields app-U4Pwh2XA.js == the vendored file. The difference is the SOURCE REVISION, not build nondeterminism."
+}
