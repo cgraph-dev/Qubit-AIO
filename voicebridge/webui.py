@@ -2072,6 +2072,20 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
 
         suffix = target.suffix.lower()
+        # Extensionless licence/notice files, allowed BY BASENAME (not by
+        # dropping the allowlist): the vendored MIT app ships `LICENSE` at the
+        # tree root, and MIT requires the copyright + permission notice to be
+        # "included in all copies" — a copy served over HTTP without it is a
+        # notice omission. The file has no suffix, so the suffix map below
+        # would 404 it. Named explicitly so a bare `find`-style path cannot
+        # become servable by accident.
+        NOTICE_NAMES = {
+            "license", "licence", "license.txt", "licence.txt",
+            "notice", "notice.txt", "copying",
+        }
+        if target.name.lower() in NOTICE_NAMES:
+            self._file(target, "text/plain; charset=utf-8")
+            return
         ctype = {
             ".html": "text/html; charset=utf-8",
             ".js": "application/javascript",
@@ -2079,6 +2093,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             ".css": "text/css",
             ".json": "application/json",
             ".webmanifest": "application/manifest+json",
+            ".txt": "text/plain; charset=utf-8",
             ".png": "image/png",
             ".jpg": "image/jpeg",
             ".jpeg": "image/jpeg",
