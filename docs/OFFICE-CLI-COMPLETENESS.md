@@ -133,10 +133,12 @@ store. "traceback?" is whether any Python traceback/`NameError` was produced.
 
 | code | meaning | verbs |
 |------|---------|-------|
-| `OFFICE_CONFIRM_REQUIRED` | the mutation was refused before touching the store (Bare mutation without `--confirm`) | the 39 mutating verbs |
+| `OFFICE_CONFIRM_REQUIRED` | the mutation was refused before touching the store (Bare mutation without `--confirm`) | the 40 mutating verbs |
 | `OFFICE_NOT_FOUND` | a read-only verb named an entity this fixture has none of (`business-pnl 1`) | `business-pnl` |
 | `OFFICE_ADMISSION_REFUSED` | the read-only admission gate applied the caps to the estimate | `admit` |
-| `OK` / `preview` / (no state key) | the read-only verb ran | the remaining 40 read-only verbs |
+| `OK` / `preview` / (no state key) | the read-only verb ran | the remaining 43 read-only verbs |
+
+40 + 43 = 83, the full parser surface: the two columns above partition it.
 
 `OFFICE_UNSUPPORTED` is **absent** — its presence for any parser-exposed verb is
 the four-site bug (site 3).
@@ -147,7 +149,7 @@ the four-site bug (site 3).
 
 - enumerates verbs **from the real parser** (not a hardcoded list), so a new verb
   is covered the moment it exists;
-- asserts the count equals the pinned `EXPECTED_VERB_COUNT = 81`;
+- asserts the count equals the pinned `EXPECTED_VERB_COUNT = 83`;
 - invokes **every** verb (real parser + real dispatcher) and fails on any
   traceback or any `OFFICE_UNSUPPORTED`;
 - asserts every mutating verb refuses typed without `--confirm`;
