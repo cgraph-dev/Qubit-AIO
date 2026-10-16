@@ -556,6 +556,66 @@ describe("ChatSessionList", () => {
     expect(container.textContent).not.toContain(FRESH_CHAT_SESSION_ID);
   });
 
+  it("bounds a hung load, ignores its late success, and retries", async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveLate!: (value: unknown) => void;
+      apiMocks.getSessions.mockReturnValueOnce(new Promise((resolve) => { resolveLate = resolve; }));
+      await renderCanonicalList();
+      expect(container.querySelector('[role="status"]')).not.toBeNull();
+      await act(async () => { await vi.advanceTimersByTimeAsync(12_000); });
+      expect(container.textContent).toContain("timed out");
+      expect(container.querySelector('[role="status"]')).toBeNull();
+      await act(async () => { resolveLate({ sessions: [canonicalSession("late")], total: 1 }); });
+      expect(container.textContent).not.toContain("Session late");
+      apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("retried")], total: 1 });
+      await act(async () => {
+        Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Retry")!.click();
+      });
+      expect(container.textContent).toContain("Session retried");
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("keeps loaded rows usable when refresh fails", async () => {
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("kept")], total: 1 });
+    await renderCanonicalList();
+    apiMocks.getSessions.mockRejectedValueOnce(new Error("network unavailable"));
+    await act(async () => { container.querySelector<HTMLButtonElement>('[aria-label="Refresh"]')!.click(); });
+    expect(container.textContent).toContain("network unavailable");
+    expect(container.textContent).toContain("Session kept");
+    await act(async () => { container.querySelector<HTMLElement>('[data-testid="session-row"]')!.click(); });
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toBe("?resume=kept");
+  });
+
+  it("renders malformed payloads as retryable errors, not an empty list", async () => {
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: null, total: 1 });
+    await renderCanonicalList();
+    expect(container.textContent).toContain("Invalid session list response");
+    expect(container.textContent).toContain("Retry");
+    expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it("stops paging an empty page even when the total is stale", async () => {
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("one")], total: 100 });
+    await renderCanonicalList();
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: [], total: 100 });
+    await act(async () => { Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "See more")!.click(); });
+    expect(container.textContent).toContain("Session one");
+    expect(container.textContent).not.toContain("See more");
+  });
+
+  it("advances server offset past duplicate rows without looping the same page", async () => {
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("one")], total: 3 });
+    await renderCanonicalList();
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("one")], total: 3 });
+    await act(async () => { Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "See more")!.click(); });
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("older")], total: 3 });
+    await act(async () => { Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "See more")!.click(); });
+    expect(apiMocks.getSessions).toHaveBeenLastCalledWith(30, 2, "", "recent");
+    expect(container.textContent).toContain("Session older");
+    expect(container.textContent).not.toContain("See more");
+  });
+
   it("canonical: a real selection still wins over a live sibling", async () => {
     // Guards the fix's boundary: suppressing the fallback for the fresh-chat
     // sentinel must not weaken selection for an actual id.

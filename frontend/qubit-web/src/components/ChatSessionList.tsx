@@ -43,6 +43,19 @@ import { cn, timeAgo } from "@/lib/utils";
 const SESSION_LIMIT = 30;
 /** Best-effort live refresh cadence for the switcher while the tab is open. */
 const SESSION_REFRESH_MS = 15_000;
+export const SESSION_LOAD_TIMEOUT_MS = 12_000;
+
+// Bound the whole operation, including body decoding (and auth redirects that
+// deliberately never settle). Clear the timer on every settled request.
+function boundedSessionLoad<T>(request: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new Error("Session list request timed out. Try again.")),
+      SESSION_LOAD_TIMEOUT_MS,
+    );
+    request.then(resolve, reject).finally(() => window.clearTimeout(timer));
+  });
+}
 /** Which session store this list reads. `chat` keeps the Qubit-native
  * chat-session store (`GET /api/qubit/chat/sessions`, voice channel);
  * `canonical` reads the canonical receipts store (`GET /api/sessions`,
@@ -138,15 +151,28 @@ export function ChatSessionList({
   const reqRef = useRef(0);
   // Keep expanded history reachable across focus/interval/manual refreshes.
   const loadedLimitRef = useRef(SESSION_LIMIT);
+  const nextOffsetRef = useRef(0);
+  const busyRef = useRef(false);
 
   // `profile` scopes the canonical listing; the empty-string fallback keeps
   // the dep stable when no profile is selected (default profile). The chat
   // store is single-principal and ignores it.
   const scopeKey = profile ?? "";
 
+  // Scope changes must not leave another profile's rows visible while loading.
+  useEffect(() => {
+    loadedLimitRef.current = SESSION_LIMIT;
+    nextOffsetRef.current = 0;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSessions(null);
+    setTotal(null);
+  }, [scopeKey, source, searchQuery]);
+
   const load = useCallback(() => {
     const myReq = ++reqRef.current;
+    busyRef.current = true;
     setLoading(true);
+    setLoadingMore(false);
     setError(null);
     // Canonical rows carry the same render fields (id/title/preview/source/
     // last_active/message_count), so they flow through the shared row render.
@@ -156,9 +182,11 @@ export function ChatSessionList({
             .getSessions(loadedLimitRef.current, 0, scopeKey, "recent")
             .then((res) => ({ sessions: res.sessions, total: res.total }))
         : api.listChatSessions(SESSION_LIMIT, 0, searchQuery);
-    request
+    boundedSessionLoad<{ sessions: ChatStoreSession[]; total?: number }>(request)
       .then((res) => {
         if (reqRef.current !== myReq) return;
+        if (!Array.isArray(res.sessions)) throw new Error("Invalid session list response");
+        nextOffsetRef.current = res.sessions.length;
         setSessions(res.sessions);
         setTotal("total" in res && typeof res.total === "number" ? res.total : null);
       })
@@ -167,7 +195,10 @@ export function ChatSessionList({
         setError(e.message || "failed to load chat sessions");
       })
       .finally(() => {
-        if (reqRef.current === myReq) setLoading(false);
+        if (reqRef.current === myReq) {
+          busyRef.current = false;
+          setLoading(false);
+        }
       });
   }, [scopeKey, source, searchQuery]);
 
@@ -179,6 +210,7 @@ export function ChatSessionList({
     // switches sessions; `reloadNonce` is the manual Refresh trigger.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    return () => { ++reqRef.current; busyRef.current = false; };
   }, [load, reloadNonce, activeSessionId]);
 
   // Live updates (best-effort, no new deps): stay fresh while the tab is open
@@ -187,11 +219,16 @@ export function ChatSessionList({
   // a slow response from clobbering a newer one; all listeners + the interval
   // are torn down on unmount.
   useEffect(() => {
+    const refreshIfIdle = () => {
+      if (!busyRef.current && document.visibilityState === "visible") load();
+    };
+    // Focus is an explicit refresh and must supersede an in-flight page append;
+    // visibility/interval refreshes are best-effort and stay idle-only.
     const onFocus = () => load();
     const onVisibility = () => {
-      if (document.visibilityState === "visible") load();
+      if (document.visibilityState === "visible") refreshIfIdle();
     };
-    const interval = window.setInterval(load, SESSION_REFRESH_MS);
+    const interval = window.setInterval(refreshIfIdle, SESSION_REFRESH_MS);
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
@@ -207,27 +244,32 @@ export function ChatSessionList({
   // canonical store (the chat store has no total/paging); guards against
   // overlapping clicks and against a refresh landing mid-append.
   const loadMore = useCallback(() => {
-    if (source !== "canonical" || loading || loadingMore) return;
-    const have = sessions?.length ?? 0;
+    if (source !== "canonical" || loading || loadingMore || busyRef.current) return;
+    const have = nextOffsetRef.current;
     if (total !== null && have >= total) return;
     const myReq = reqRef.current;
+    busyRef.current = true;
+    setError(null);
     setLoadingMore(true);
-    api
-      .getSessions(SESSION_LIMIT, have, scopeKey, "recent")
+    boundedSessionLoad(api.getSessions(SESSION_LIMIT, have, scopeKey, "recent"))
       .then((res) => {
         // Drop the append if a refresh/pick replaced the list under us.
         if (reqRef.current !== myReq) return;
+        if (!Array.isArray(res.sessions)) throw new Error("Invalid session list response");
+        nextOffsetRef.current = have + res.sessions.length;
         setSessions((prev) => {
           const seen = new Set((prev ?? []).map((s) => s.id));
           return [...(prev ?? []), ...res.sessions.filter((s) => !seen.has(s.id))];
         });
         loadedLimitRef.current = Math.max(loadedLimitRef.current, have + res.sessions.length);
-        setTotal(typeof res.total === "number" ? res.total : null);
+        setTotal(res.sessions.length === 0 ? have : typeof res.total === "number" ? res.total : null);
       })
       .catch((e: Error) => {
         if (reqRef.current === myReq) setError(e.message || "failed to load more sessions");
       })
-      .finally(() => setLoadingMore(false));
+      .finally(() => {
+        if (reqRef.current === myReq) { busyRef.current = false; setLoadingMore(false); }
+      });
   }, [loading, loadingMore, scopeKey, sessions, source, total]);
 
   // The active session must always be visible and on top, even when the host's
@@ -312,7 +354,7 @@ export function ChatSessionList({
         </div>
       );
     }
-    if (error) {
+    if (error && !sessions?.length) {
       return (
         <div className="flex flex-col items-start gap-2 px-2 py-4 text-xs">
           <div className="flex items-start gap-2 text-destructive">
@@ -334,6 +376,12 @@ export function ChatSessionList({
     }
     return (
       <div className="flex flex-col gap-1.5">
+        {error && (
+          <div role="alert" className="px-2 py-1 text-xs text-destructive">
+            {error}
+            <Button size="sm" outlined onClick={reload}>{t.common.retry}</Button>
+          </div>
+        )}
         {orderedSessions.map((s) => {
           // Highlight exactly one row: the selected session. `is_active` is
           // folded into activeRowId as a fallback, never a second highlight.
@@ -386,7 +434,7 @@ export function ChatSessionList({
           );
         })}
         {source === "canonical" &&
-          (total === null || (sessions?.length ?? 0) < total) && (
+          (total === null || nextOffsetRef.current < total) && (
             <Button
               outlined
               size="sm"
