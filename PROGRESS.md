@@ -63,3 +63,46 @@ No count decreased. Both fixes are falsified (1-red without, green with).
 
 No reader-migrated-writer-not mismatch remains; the `ad2e66acc` revert is clean
 (single canonical constant, all readers through it).
+
+---
+
+# PROGRESS — lane port-5 (eval-harness chunk + PORT METHOD)
+
+Branch `port/chunk-5`, worktree `/tmp/port-5`, base `9c2f782e1`.
+Upstream read at `origin/main` = `53bec2a311979ad6f77580ba491eca261ab988e0` (2026-10-16).
+
+## Deliverable
+
+`PORT-METHOD.md` (repo root) — the reusable porting method for the 299 absent
+production files, with exact commands. `REPORT-port-5.md` + `PORTED.json`.
+This lane's real output is the method; the 5-file chunk is the worked example.
+
+## Status
+
+- [x] Mapping verified: upstream root -> `qubit_runtime/` (`gateway/run.py`
+      331139B upstream vs 329378B ours).
+- [x] Chunk 5/5 eval files ported, committed `df9007e7e`; companions
+      (`cases.json`, 2 READMEs) committed `9c8ea8cb5`.
+- [x] Proof: 4/5 import clean; the 5th (`session_readers_cli_ab.py`) is a
+      top-level script (argparse at import) -> `py_compile` + `--help` + exec.
+- [x] End-to-end: `verify_receipt.py` PASS on 47-case receipt, FAIL on tampered.
+- [x] Every literal claim in `PORT-METHOD.md` re-verified against the tree.
+
+## Method summary (full text in PORT-METHOD.md)
+
+- Brand: port NEW files with canonical `QUBIT_HOME` / `~/.qubit` / `qubit_state`
+  / `qubit_cli`; never blanket-rename; leave the frozen pin and `hermes_state_keys`
+  (a module name) alone; grep the tree and reconcile rather than adding a spelling.
+- Shim detection: <20-line re-export stub whose source module is absent ->
+  `shim-skipped`, dependency named. Worked example: `gateway/session_admission.py`
+  needs `hermes_state_keys.py`, which is itself absent (line 242 of /tmp/prod-files.txt).
+- Dep resolution: rename-map -> `test -e` -> `grep /tmp/prod-files.txt` -> name it.
+- Proof: `PYTHONPATH=qubit_runtime .venv/bin/python -c 'import <dotted>'`.
+- Commit: small, named upstream path + short SHA.
+
+## Next
+
+Sibling lanes follow `PORT-METHOD.md` §8. If a chunk reaches
+`gateway/session_admission.py`, it stays `shim-skipped` until
+`hermes_state_keys.py` lands — order it first.
+
