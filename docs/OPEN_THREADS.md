@@ -312,3 +312,28 @@ a divergence). Tagged `session/2026-10-16-catchup`.
   preserved to `/tmp/preserved-stash0-office-590lines.patch` (sha256 `4a16d9bc…`). **The stash
   stack is shared across worktrees — never bare `git stash pop` in a worktree you did not
   create.** Its owning session should reclaim it.
+
+---
+
+## COVERAGE GAP found 2026-10-16 (during the 8-lane dispatch)
+
+**🔴 Root `tests/` — 904 files — is not covered by any current lane** (all 8 lanes target
+`qubit_runtime/tests/*`). It is a real separate tree, not a symlink to `qubit_runtime/tests/`.
+
+It has live failures. Sampled at `9facd1ca9`:
+
+- `tests/agent/test_auxiliary_client.py::TestGetTextAuxiliaryClient::test_returns_none_when_nothing_available`
+  fails: the test stubs `_read_nous_auth`, `_resolve_codex_credential_and_base` and
+  `_resolve_api_key_provider` all to `None`, yet `get_text_auxiliary_client()` still returns an
+  `openai.OpenAI` instance — so a **fourth resolution path** exists that the test does not stub.
+  Likely a stale test (a route landed upstream) rather than a code bug, but that must be proven,
+  not assumed: check whether the new path is legitimate and the test is behind, or whether the
+  path should have been gated on credentials.
+
+**Action for the next session:** dispatch a lane for `tests/` (root) with the same protocol as
+lanes 8–11 (measure baseline first, per-class verdicts, isolation check, PROGRESS.md trail).
+Also still uncovered: `frontend/` (TS/Vitest) and the `ui-tui` vitest suite.
+
+**Why it was not dispatched immediately:** 8 lanes were already running and loadavg was 19.06
+with 22 GB free. Adding a 9th heavy pytest lane risks an OOM-kill that would corrupt a
+running lane's run, which costs more than the delay.
