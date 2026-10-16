@@ -63,3 +63,35 @@ No count decreased. Both fixes are falsified (1-red without, green with).
 
 No reader-migrated-writer-not mismatch remains; the `ad2e66acc` revert is clean
 (single canonical constant, all readers through it).
+
+---
+
+# PROGRESS — port/chunk-1 (agent/ + acp_adapter/, 11 files)
+
+Status: **DONE** — 5 ported (imports clean), 6 dep-missing, 0 shims.
+
+- Base `9c2f782e1`; upstream `origin/main` @ `53bec2a311979ad6f77580ba491eca261ab988e0`.
+- Deliverables in `/tmp/port-1`: `PORTED.json`, `REPORT-port-1.md`.
+
+## Committed (ported, imports clean)
+
+- [x] `agent/agent_init_params.py`
+- [x] `agent/agent_init_ollama.py`
+- [x] `agent/codex_service_tiers.py`
+- [x] `acp_adapter/elicitation.py`
+- [x] `acp_adapter/gateway_session_meta.py` (`hermes_state`->`qubit_state`; `_meta.hermes` wire key kept)
+
+## Blocked (dep-missing — dep absent AND in the 299-list; another chunk owns it)
+
+- [ ] `acp_adapter/catalog.py` — needs `hermes_state_local` (`POLICY_PREFIX`)
+- [ ] `acp_adapter/gateway_commands.py` — needs `hermes_cli.gateway_client`, `hermes_cli.gateway_mutations`
+- [ ] `acp_adapter/gateway_server.py` — needs `acp_adapter.catalog`, `acp_adapter.gateway_commands` (same chunk), `gateway.session_ingress_media`, `hermes_cli.gateway_chat|gateway_client|gateway_mutations`
+- [ ] `agent/chat_completion_helpers_tool_calls.py` — needs `agent.reasoning_carriers` (ported on `port/chunk-3`)
+- [ ] `agent/compaction_events.py` — needs `agent.relay_compaction` (ported on `port/chunk-3`)
+- [ ] `agent/compression_automation.py` — needs `agent.runtime_session_store` (ported on `port/chunk-3`)
+
+## Next (for the merge driver)
+
+After `port/chunk-3` merges: re-port the 3 `agent/*` blocked files (verbatim).
+The `acp_adapter/*` trio needs the gateway_/state_local chunks first; `gateway_server.py`
+last (two-level: it imports two files from this same chunk).
