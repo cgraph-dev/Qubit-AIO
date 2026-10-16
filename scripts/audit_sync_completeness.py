@@ -302,10 +302,11 @@ def top_defs(src: str) -> set[str]:
     return out
 
 
-def sh(args: list[str], cwd: Path | None = None, env: dict | None = None) -> str:
+def sh(args: list[str], cwd: Path | None = None, env: dict | None = None,
+       timeout: int = 600) -> str:
     try:
         p = subprocess.run(args, cwd=str(cwd) if cwd else None,
-                           capture_output=True, text=True, timeout=600, env=env)
+                           capture_output=True, text=True, timeout=timeout, env=env)
         return p.stdout
     except Exception:
         return ""
@@ -354,19 +355,23 @@ def blob(rev: str, path: str) -> str:
     `promisor = true`), so a blob it has not cached triggers an on-demand network
     fetch to GitHub. The audit calls this once per upstream file (~9,500), so an
     uncached tree turns a local walk into thousands of network round-trips and can
-    appear to hang indefinitely on a stalled SSH session (observed: 37 minutes at
-    0% CPU blocked in do_wait).
+    block indefinitely on a stalled SSH session.
 
-    `GIT_NO_LAZY_FETCH=1` makes a missing blob FAIL FAST instead of reaching for
-    the network, so the caller gets an empty string and the file is reported
-    rather than stalling the run. Prime the cache first with
-    `git fetch --filter=blob:none origin main` if a real read is needed.
+    Two guards, both needed (the first alone was not enough -- observed a run still
+    hung at 0% CPU for 6 minutes with GIT_NO_LAZY_FETCH already set, because the
+    parent blocked in do_wait on a git child that never returned):
+
+      1. `GIT_NO_LAZY_FETCH=1` makes a MISSING blob fail fast instead of reaching for
+         the network.
+      2. A short per-call TIMEOUT bounds a git that hangs anyway, so the walk
+         degrades to "file unreadable" instead of stalling the whole run. Without a
+         timeout the default 600s per call x many calls is effectively unbounded.
+
+    An unreadable file returns '' and is reported, never silently treated as absent.
+    Prime the cache with `git fetch --filter=blob:none origin main` for a full run.
     """
     env = dict(os.environ, GIT_NO_LAZY_FETCH="1")
-    try:
-        return sh(["git", "-C", str(UP), "show", f"{rev}:{path}"], env=env)
-    except Exception:
-        return ""
+    return sh(["git", "-C", str(UP), "show", f"{rev}:{path}"], env=env, timeout=20)
 
 
 _SKIP_PARTS = {"node_modules", "__pycache__", ".venv", "venv", "dist", "build",
