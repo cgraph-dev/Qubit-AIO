@@ -1,0 +1,41 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+____________ test_menu_choices_follow_language_switch_after_import _____________
+
+overlay_locales = PosixPath('/tmp/pytest-of-trick/pytest-142/test_menu_choices_follow_langu0/locales')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78c484e40cb0>
+
+    def test_menu_choices_follow_language_switch_after_import(overlay_locales, monkeypatch):
+        _use(monkeypatch, "en")
+        en_label = bm._topup_menu_choices()[0][1]
+        _use(monkeypatch, "zh")
+        zh_label = bm._topup_menu_choices()[0][1]
+>       assert zh_label == "充值"
+E       AssertionError: assert 'Add funds' == '充值'
+E         
+E         - 充值
+E         + Add funds
+
+tests/hermes_cli/test_cli_billing_i18n.py:52: AssertionError
+___________ test_charge_failed_copy_resolves_per_reason_at_call_time ___________
+
+cli = <cli.QubitCLI object at 0x78c48674e540>
+overlay_locales = PosixPath('/tmp/pytest-of-trick/pytest-142/test_charge_failed_copy_resolv0/locales')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78c484467110>
+capsys = <_pytest.capture.CaptureFixture object at 0x78c486770d40>
+
+    def test_charge_failed_copy_resolves_per_reason_at_call_time(cli, overlay_locales, monkeypatch, capsys):
+        class _State:
+            portal_url = ""
+    
+        _use(monkeypatch, "zh")
+        cli._billing_render_charge_failed(_State(), "card_declined")
+        out = capsys.readouterr().out
+>       assert "卡被拒绝" in out
+E       AssertionError: assert '卡被拒绝' in '  🔴 Your card was declined. Try another card on the portal.\n'
+
+tests/hermes_cli/test_cli_billing_i18n.py:66: AssertionError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_cli_billing_i18n.py::test_menu_choices_follow_language_switch_after_import
+FAILED tests/hermes_cli/test_cli_billing_i18n.py::test_charge_failed_copy_resolves_per_reason_at_call_time
+2 failed, 1 passed in 0.72s

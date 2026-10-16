@@ -1,0 +1,22 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+____ test_wslg_with_dxg_and_installed_d3d12_driver_selects_gpu_mesa_backend ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x729e307a40b0>
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-158/test_wslg_with_dxg_and_install0')
+
+    def test_wslg_with_dxg_and_installed_d3d12_driver_selects_gpu_mesa_backend(monkeypatch, tmp_path):
+        for var in main_desktop._MESA_DRIVER_OVERRIDES:
+            monkeypatch.delenv(var, raising=False)
+    
+        env = _launch_env(monkeypatch, tmp_path, wsl=True, dxg=True, driver=True)
+    
+        assert env["GALLIUM_DRIVER"] == "d3d12"
+>       assert Path(env["QUBIT_DESKTOP_CWD"]) == tmp_path.resolve()  # the rest of the env still builds
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'QUBIT_DESKTOP_CWD'
+
+tests/hermes_cli/test_desktop_wsl_gpu.py:37: KeyError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_desktop_wsl_gpu.py::test_wslg_with_dxg_and_installed_d3d12_driver_selects_gpu_mesa_backend
+1 failed, 1 passed in 0.36s

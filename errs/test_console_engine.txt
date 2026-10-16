@@ -1,0 +1,28 @@
+.......F....                                                             [100%]
+=================================== FAILURES ===================================
+_____________ test_repl_runs_non_interactive_lines_without_prompts _____________
+
+_isolate_qubit_home = None
+
+    def test_repl_runs_non_interactive_lines_without_prompts(_isolate_qubit_home):
+        stdin = io.StringIO("help\nexit\n")
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+    
+        code = run_console_repl(
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            interactive=False,
+        )
+    
+        assert code == 0
+>       assert "Hermes Console" in stdout.getvalue()
+E       AssertionError: assert 'Hermes Console' in 'Qubit Console\n\nSupported commands:\n * auth add                         Add a pooled credential\n   auth list      ...test POST to a webhook route\n\n* requires confirmation\nBuilt-ins: help, help <command>, history, clear, exit, quit\n'
+E        +  where 'Qubit Console\n\nSupported commands:\n * auth add                         Add a pooled credential\n   auth list      ...test POST to a webhook route\n\n* requires confirmation\nBuilt-ins: help, help <command>, history, clear, exit, quit\n' = <built-in method getvalue of _io.StringIO object at 0x778cf1ef5240>()
+E        +    where <built-in method getvalue of _io.StringIO object at 0x778cf1ef5240> = <_io.StringIO object at 0x778cf1ef5240>.getvalue
+
+tests/hermes_cli/test_console_engine.py:250: AssertionError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_console_engine.py::test_repl_runs_non_interactive_lines_without_prompts
+1 failed, 11 passed in 6.35s

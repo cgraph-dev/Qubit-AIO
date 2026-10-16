@@ -1,0 +1,61 @@
+F........................F....F.                                         [100%]
+=================================== FAILURES ===================================
+_______ TestNasRefusalCodes.test_surface_not_enabled_is_a_terminal_gate ________
+
+self = <test_anon_failure_modes.TestNasRefusalCodes object at 0x716050620080>
+nas = <tests.qubit_cli.anon_portal.FakePortal object at 0x71605002c1d0>
+
+    def test_surface_not_enabled_is_a_terminal_gate(self, nas):
+        nas.create_response = httpx.Response(404, json={"error": "not_found"})
+        err = _mint_error(nas)
+        assert err.code == anon_auth.ANON_GATE_CLOSED and err.retryable is False
+>       assert "Nous account" in str(err) and "free" in str(err)
+E       assert ('Nous account' in "This version can't be used without a Qubit account. Signing in is free.")
+E        +  where "This version can't be used without a Qubit account. Signing in is free." = str(AuthError("This version can't be used without a Qubit account. Signing in is free."))
+
+tests/hermes_cli/test_anon_failure_modes.py:49: AssertionError
+_ TestSignInFailures.test_a_service_verdict_keeps_its_code_wait_and_copy[anon_gate_closed-0-False-Nous account] _
+
+self = <test_anon_failure_modes.TestSignInFailures object at 0x716050646de0>
+code = 'anon_gate_closed', retry_after = 0, retryable = False
+needle = 'Nous account'
+
+    @pytest.mark.parametrize("code,retry_after,retryable,needle", [
+        (anon_auth.ANON_RATE_LIMITED, 45, True, "busy"),
+        (anon_auth.ANON_GATE_PAUSED, 0, True, "busy"),
+        (anon_auth.ANON_UNREACHABLE, 0, True, "internet connection"),
+        (anon_auth.ANON_GATE_CLOSED, 0, False, "Nous account"),
+        (anon_auth.ANON_POW_REQUIRED, 0, False, "proof of work"),
+    ])
+    def test_a_service_verdict_keeps_its_code_wait_and_copy(self, code, retry_after, retryable, needle):
+        state = anon_sign_in._failed_from_exception(
+            anon_auth._anon_err("x", code, retry_after=retry_after or None))
+        assert state.kind == "failed" and state.reason == code
+        assert state.retryable is retryable
+        assert state.retry_after == retry_after
+>       assert needle in state.copy
+E       assert 'Nous account' in "This version can't be used without a Qubit account. Signing in is free."
+E        +  where "This version can't be used without a Qubit account. Signing in is free." = Failed(reason='anon_gate_closed', detail='x', retry_after=0.0).copy
+
+tests/hermes_cli/test_anon_failure_modes.py:302: AssertionError
+_______ test_extra_welcome_hosts_make_a_local_stand_in_the_welcome_host ________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71604fefcbc0>
+
+    def test_extra_welcome_hosts_make_a_local_stand_in_the_welcome_host(monkeypatch):
+        """``QUBIT_EXTRA_WELCOME_HOSTS`` (env-only) extends the ROUTE predicate so a rehearsal against a
+        local stand-in gets the free tier's rules — including the route-keyed dark-tier 403."""
+        monkeypatch.delenv("QUBIT_EXTRA_WELCOME_HOSTS", raising=False)
+        assert anon_auth.route_is_welcome_host("http://127.0.0.1:8765/v1") is False
+        monkeypatch.setenv("QUBIT_EXTRA_WELCOME_HOSTS", "127.0.0.1, localhost")
+>       assert anon_auth.route_is_welcome_host("http://127.0.0.1:8765/v1") is True
+E       AssertionError: assert False is True
+E        +  where False = <function route_is_welcome_host at 0x716050c558a0>('http://127.0.0.1:8765/v1')
+E        +    where <function route_is_welcome_host at 0x716050c558a0> = anon_auth.route_is_welcome_host
+
+tests/hermes_cli/test_anon_failure_modes.py:328: AssertionError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_anon_failure_modes.py::TestNasRefusalCodes::test_surface_not_enabled_is_a_terminal_gate
+FAILED tests/hermes_cli/test_anon_failure_modes.py::TestSignInFailures::test_a_service_verdict_keeps_its_code_wait_and_copy[anon_gate_closed-0-False-Nous account]
+FAILED tests/hermes_cli/test_anon_failure_modes.py::test_extra_welcome_hosts_make_a_local_stand_in_the_welcome_host
+3 failed, 29 passed in 2.61s

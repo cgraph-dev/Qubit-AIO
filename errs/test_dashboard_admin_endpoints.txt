@@ -1,0 +1,3241 @@
+..........................F...........FFFF                               [100%]
+=================================== FAILURES ===================================
+_______ TestSkillsHubSourcesEndpoint.test_sources_lists_configured_hubs ________
+
+self = <test_dashboard_admin_endpoints.TestSkillsHubSourcesEndpoint object at 0x7732ab46c770>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7732a31cca10>
+
+    def test_sources_lists_configured_hubs(self, monkeypatch):
+        # The endpoint should enumerate the configured hub sources without
+        # requiring any live network — monkeypatch the router.
+        class _Src:
+            is_available = False
+    
+            def __init__(self, sid):
+                self._sid = sid
+    
+            def source_id(self):
+                return self._sid
+    
+            def search(self, q, limit=10):
+                return [_FakeMeta("qubit-index/featured-skill", "trusted")]
+    
+        def _fake_router():
+            srcs = [_Src("official"), _Src("github")]
+            # qubit-index source advertises availability + featured search.
+            idx = _Src("qubit-index")
+            idx.is_available = True
+            srcs.insert(1, idx)
+            return srcs
+    
+        monkeypatch.setattr(
+            "tools.skills_hub_search.create_source_router", _fake_router
+        )
+        r = self.client.get("/api/skills/hub/sources")
+        assert r.status_code == 200
+        body = r.json()
+        ids = {s["id"] for s in body["sources"]}
+        assert {"official", "github", "qubit-index"} <= ids
+        # Every source carries a human label.
+        assert all(s.get("label") for s in body["sources"])
+>       assert body["index_available"] is True
+E       assert False is True
+
+tests/hermes_cli/test_dashboard_admin_endpoints.py:646: AssertionError
+____________ test_spawn_qubit_action_scrubs_gateway_loop_guard_env _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7732ab4afaa0>
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-151/test_spawn_qubit_action_scrubs0')
+
+    def test_spawn_qubit_action_scrubs_gateway_loop_guard_env(monkeypatch, tmp_path):
+        """The dashboard runs inside the gateway, so os.environ has
+        _QUBIT_GATEWAY=1. Spawned actions (e.g. `gateway restart`) must NOT inherit
+        it, or the in-process restart-loop guard rejects the restart and it silently
+        fails (#52470).
+        """
+        import qubit_cli.web_server as ws
+    
+        monkeypatch.setenv("_QUBIT_GATEWAY", "1")
+        monkeypatch.setenv("OPENAI_API_KEY", "default-action-provider-key")
+        monkeypatch.setattr(_web_server_gateway, "_ACTION_LOG_DIR", tmp_path)
+        # Isolate the module-global proc registry: _spawn_qubit_action stores
+        # _FakeProc (no poll()) in _ACTION_PROCS, and later tests' lifespan
+        # shutdown (_terminate_desktop_managed_gateway) would trip over it.
+        monkeypatch.setattr(_web_server_gateway, "_ACTION_PROCS", {})
+    
+        captured = {}
+    
+        class _FakeProc:
+            pid = 1234
+    
+        def _fake_popen(cmd, **kwargs):
+            captured["env"] = kwargs.get("env")
+            return _FakeProc()
+    
+        monkeypatch.setattr(ws.subprocess, "Popen", _fake_popen)
+    
+        _web_server_gateway._spawn_qubit_action(["gateway", "restart"], "gateway-restart")
+    
+>       assert "_QUBIT_GATEWAY" not in captured["env"]
+E       AssertionError: assert '_QUBIT_GATEWAY' not in {'PATH': '/home/trick/.local/share/mise/installs/go/1.26.4/bin:/home/trick/.local/share/mise/installs/node/22.22.3/bin...:/snap/bin:/home/trick/.opencode/bin:/home/trick/.fly/bin', 'HOME': '/home/trick', 'TZ': 'UTC', 'LANG': 'C.UTF-8', ...}
+
+tests/hermes_cli/test_dashboard_admin_endpoints.py:994: AssertionError
+______ test_named_profile_action_isolates_parent_env_and_loads_target_env ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7732a36c8830>
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-151/test_named_profile_action_isol0')
+
+    def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypatch, tmp_path):
+        """A dashboard action for a named profile must not borrow the dashboard profile's
+        platform/provider environment, while the target profile's own dotenv still loads in the child."""
+        import json
+        import subprocess
+        import sys
+        from pathlib import Path
+    
+        import qubit_cli.env_loader as env_loader
+        import qubit_cli.web_server as ws
+    
+        user_home = tmp_path / "user"
+        default_home = user_home / ".qubit"
+        target_home = default_home / "profiles" / "verifier"
+        target_home.mkdir(parents=True)
+    
+        (default_home / ".env").write_text(
+            "\n".join([
+                "DISCORD_BOT_TOKEN=default-discord",
+                "API_SERVER_ENABLED=true",
+                "API_SERVER_KEY=default-api-server",
+                "BLUEBUBBLES_SERVER_URL=http://127.0.0.1:1234",
+                "BLUEBUBBLES_PASSWORD=default-bluebubbles",
+                "NTFY_TOPIC=default-topic",
+                "NTFY_TOKEN=default-ntfy",
+                "OPENAI_API_KEY=default-openai",
+                "ZAI_API_KEY=default-zai",
+                # Locally named routing credentials must be isolated too, even without a secret suffix.
+                "A2A_AUTH_MINI=default-a2a-auth",
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        (target_home / ".env").write_text(
+            "\n".join(["A2A_PORT=9917", "OPENAI_API_KEY=target-openai", "TARGET_ONLY_TOKEN=target-only"]) + "\n",
+            encoding="utf-8",
+        )
+    
+        monkeypatch.setattr(Path, "home", lambda: user_home)
+        monkeypatch.setenv("QUBIT_HOME", str(default_home))
+        for key, value in {
+            "DISCORD_BOT_TOKEN": "default-discord",
+            "API_SERVER_ENABLED": "true",
+            "API_SERVER_KEY": "default-api-server",
+            "BLUEBUBBLES_SERVER_URL": "http://127.0.0.1:1234",
+            "BLUEBUBBLES_PASSWORD": "default-bluebubbles",
+            "NTFY_TOPIC": "default-topic",
+            "NTFY_TOKEN": "default-ntfy",
+            "OPENAI_API_KEY": "default-openai",
+            "ZAI_API_KEY": "default-zai",
+            "A2A_AUTH_MINI": "default-a2a-auth",
+            "EXTERNAL_PROFILE_AUTH": "default-secret-source-auth",
+            "QUBIT_ACP_AUTH_METHOD": "default-acp",
+            "PROFILE_ENV_TEST_BENIGN": "keep-me",
+        }.items():
+            monkeypatch.setenv(key, value)
+        monkeypatch.setattr(_web_server_gateway, "_ACTION_LOG_DIR", tmp_path / "logs")
+        monkeypatch.setattr(_web_server_gateway, "_ACTION_PROCS", {})
+        monkeypatch.setattr(
+            env_loader,
+            "get_secret_source_values",
+            lambda home: (
+                {"EXTERNAL_PROFILE_AUTH": "default-secret-source-auth"}
+                if Path(home).resolve() == default_home.resolve() else {}
+            ),
+        )
+    
+        captured = {}
+        real_popen = subprocess.Popen
+    
+        class _FakeProc:
+            pid = 4321
+    
+        def _fake_popen(cmd, **kwargs):
+            captured["cmd"] = cmd
+            captured["env"] = kwargs["env"]
+            return _FakeProc()
+    
+        monkeypatch.setattr(ws.subprocess, "Popen", _fake_popen)
+        _web_server_gateway._spawn_qubit_action(["-p", "verifier", "gateway", "restart"], "gateway-restart")
+    
+        child_env = captured["env"]
+        assert captured["cmd"][-4:] == ["-p", "verifier", "gateway", "restart"]
+        assert child_env["QUBIT_HOME"] == str(target_home)
+>       assert child_env["QUBIT_NONINTERACTIVE"] == "1"
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'QUBIT_NONINTERACTIVE'
+
+tests/hermes_cli/test_dashboard_admin_endpoints.py:1083: KeyError
+___________ test_desktop_lifespan_terminates_managed_gateway_restart ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7732a098b770>
+
+    def test_desktop_lifespan_terminates_managed_gateway_restart(monkeypatch):
+        """A Desktop-owned gateway child must not survive its serve backend."""
+        import qubit_cli.web_server as ws
+    
+        calls = []
+    
+        class _FakeRunningProc:
+            def poll(self):
+                return None
+    
+            def terminate(self):
+                calls.append("terminate")
+    
+        monkeypatch.setenv("QUBIT_DESKTOP", "1")
+        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+        monkeypatch.setattr(ws, "_warm_gateway_module", lambda: None)
+        monkeypatch.setattr(ws, "_start_desktop_cron_ticker", lambda *_args: None)
+        monkeypatch.setitem(_web_server_gateway._ACTION_PROCS, "gateway-restart", _FakeRunningProc())
+    
+        client, _header = _client()
+>       with client:
+
+tests/hermes_cli/test_dashboard_admin_endpoints.py:1152: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient.TestClient object at 0x77327004ab40>
+args = (None, None, None)
+
+    def __exit__(self, *args: Any) -> None:
+>       self.exit_stack.close()
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:708: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib.ExitStack object at 0x77326ea8cda0>
+
+    def close(self):
+        """Immediately unwind the context stack."""
+>       self.__exit__(None, None, None)
+
+/usr/lib/python3.12/contextlib.py:618: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib.ExitStack object at 0x77326ea8cda0>
+exc_details = (<class 'TypeError'>, TypeError("PtySessionRegistry.close_all() got an unexpected keyword argument 'keep_detached'"), <traceback object at 0x77326e836580>)
+
+    def __exit__(self, *exc_details):
+        received_exc = exc_details[0] is not None
+    
+        # We manipulate the exception state so it behaves as though
+        # we were actually nesting multiple with statements
+        frame_exc = sys.exc_info()[1]
+        def _fix_exception_context(new_exc, old_exc):
+            # Context may not be correct, so find the end of the chain
+            while 1:
+                exc_context = new_exc.__context__
+                if exc_context is None or exc_context is old_exc:
+                    # Context is already set correctly (see issue 20317)
+                    return
+                if exc_context is frame_exc:
+                    break
+                new_exc = exc_context
+            # Change the end of the chain to point to the exception
+            # we expect it to reference
+            new_exc.__context__ = old_exc
+    
+        # Callbacks are invoked in LIFO order to match the behaviour of
+        # nested context managers
+        suppressed_exc = False
+        pending_raise = False
+        while self._exit_callbacks:
+            is_sync, cb = self._exit_callbacks.pop()
+            assert is_sync
+            try:
+                if cb(*exc_details):
+                    suppressed_exc = True
+                    pending_raise = False
+                    exc_details = (None, None, None)
+            except:
+                new_exc_details = sys.exc_info()
+                # simulate the stack of exceptions by setting the context
+                _fix_exception_context(new_exc_details[1], exc_details[1])
+                pending_raise = True
+                exc_details = new_exc_details
+        if pending_raise:
+            try:
+                # bare "raise exc_details[1]" replaces our carefully
+                # set-up context
+                fixed_ctx = exc_details[1].__context__
+>               raise exc_details[1]
+
+/usr/lib/python3.12/contextlib.py:610: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib.ExitStack object at 0x77326ea8cda0>
+exc_details = (<class 'TypeError'>, TypeError("PtySessionRegistry.close_all() got an unexpected keyword argument 'keep_detached'"), <traceback object at 0x77326e836580>)
+
+    def __exit__(self, *exc_details):
+        received_exc = exc_details[0] is not None
+    
+        # We manipulate the exception state so it behaves as though
+        # we were actually nesting multiple with statements
+        frame_exc = sys.exc_info()[1]
+        def _fix_exception_context(new_exc, old_exc):
+            # Context may not be correct, so find the end of the chain
+            while 1:
+                exc_context = new_exc.__context__
+                if exc_context is None or exc_context is old_exc:
+                    # Context is already set correctly (see issue 20317)
+                    return
+                if exc_context is frame_exc:
+                    break
+                new_exc = exc_context
+            # Change the end of the chain to point to the exception
+            # we expect it to reference
+            new_exc.__context__ = old_exc
+    
+        # Callbacks are invoked in LIFO order to match the behaviour of
+        # nested context managers
+        suppressed_exc = False
+        pending_raise = False
+        while self._exit_callbacks:
+            is_sync, cb = self._exit_callbacks.pop()
+            assert is_sync
+            try:
+>               if cb(*exc_details):
+                   ^^^^^^^^^^^^^^^^
+
+/usr/lib/python3.12/contextlib.py:595: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exc_type = None, exc = None, tb = None
+
+    def _exit_wrapper(exc_type, exc, tb):
+>       callback(*args, **kwds)
+
+/usr/lib/python3.12/contextlib.py:478: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    @stack.callback
+    def wait_shutdown() -> None:
+>       portal.call(self.wait_shutdown)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:701: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <anyio.from_thread.BlockingPortal object at 0x77327004a810>
+func = <bound method TestClient.wait_shutdown of <starlette.testclient.TestClient object at 0x77327004ab40>>
+args = ()
+
+    def call(
+        self,
+        func: Callable[[Unpack[PosArgsT]], Awaitable[T_Retval] | T_Retval],
+        *args: Unpack[PosArgsT],
+    ) -> T_Retval:
+        """
+        Call the given function in the event loop thread.
+    
+        If the callable returns a coroutine object, it is awaited on.
+    
+        :param func: any callable
+        :raises RuntimeError: if the portal is not running or if this method is called
+            from within the event loop thread
+    
+        """
+>       return cast(T_Retval, self.start_task_soon(func, *args).result())
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/anyio/from_thread.py:340: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = None, timeout = None
+
+    def result(self, timeout=None):
+        """Return the result of the call that the future represents.
+    
+        Args:
+            timeout: The number of seconds to wait for the result if the future
+                isn't done. If None, then there is no limit on the wait time.
+    
+        Returns:
+            The result of the call that the future represents.
+    
+        Raises:
+            CancelledError: If the future was cancelled.
+            TimeoutError: If the future didn't finish executing before the given
+                timeout.
+            Exception: If the call raised then that exception will be raised.
+        """
+        try:
+            with self._condition:
+                if self._state in [CANCELLED, CANCELLED_AND_NOTIFIED]:
+                    raise CancelledError()
+                elif self._state == FINISHED:
+                    return self.__get_result()
+    
+                self._condition.wait(timeout)
+    
+                if self._state in [CANCELLED, CANCELLED_AND_NOTIFIED]:
+                    raise CancelledError()
+                elif self._state == FINISHED:
+>                   return self.__get_result()
+                           ^^^^^^^^^^^^^^^^^^^
+
+/usr/lib/python3.12/concurrent/futures/_base.py:456: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = None
+
+    def __get_result(self):
+        if self._exception:
+            try:
+>               raise self._exception
+
+/usr/lib/python3.12/concurrent/futures/_base.py:401: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <anyio.from_thread.BlockingPortal object at 0x77327004a810>
+func = <bound method TestClient.wait_shutdown of <starlette.testclient.TestClient object at 0x77327004ab40>>
+args = (), kwargs = {}
+future = <Future at 0x77326e819a30 state=finished raised TypeError>
+
+    async def _call_func(
+        self,
+        func: Callable[[Unpack[PosArgsT]], Awaitable[T_Retval] | T_Retval],
+        args: tuple[Unpack[PosArgsT]],
+        kwargs: dict[str, Any],
+        future: Future[T_Retval],
+    ) -> None:
+        event_loop_thread_id = self._event_loop_thread_id
+    
+        def callback(f: Future[T_Retval]) -> None:
+            if f.cancelled():
+                if event_loop_thread_id == get_ident():
+                    scope.cancel("the future was cancelled")
+                elif event_loop_thread_id is not None:
+                    run_sync(
+                        scope.cancel, "the future was cancelled", token=self._token
+                    )
+    
+        try:
+            retval_or_awaitable = func(*args, **kwargs)
+            if isawaitable(retval_or_awaitable):
+                with CancelScope() as scope:
+                    future.add_done_callback(callback)
+>                   retval = await retval_or_awaitable
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/anyio/from_thread.py:265: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient.TestClient object at 0x77327004ab40>
+
+    async def wait_shutdown(self) -> None:
+        async def receive() -> Any:
+            message = await self.stream_send.receive()
+            if message is None:
+                self.task.result()
+            return message
+    
+        await self.stream_receive.send({"type": "lifespan.shutdown"})
+        message = await receive()
+        assert message["type"] in (
+            "lifespan.shutdown.complete",
+            "lifespan.shutdown.failed",
+        )
+        if message["type"] == "lifespan.shutdown.failed":
+>           await receive()
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:748: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def receive() -> Any:
+        message = await self.stream_send.receive()
+        if message is None:
+>           self.task.result()
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:738: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = None, timeout = None
+
+    def result(self, timeout=None):
+        """Return the result of the call that the future represents.
+    
+        Args:
+            timeout: The number of seconds to wait for the result if the future
+                isn't done. If None, then there is no limit on the wait time.
+    
+        Returns:
+            The result of the call that the future represents.
+    
+        Raises:
+            CancelledError: If the future was cancelled.
+            TimeoutError: If the future didn't finish executing before the given
+                timeout.
+            Exception: If the call raised then that exception will be raised.
+        """
+        try:
+            with self._condition:
+                if self._state in [CANCELLED, CANCELLED_AND_NOTIFIED]:
+                    raise CancelledError()
+                elif self._state == FINISHED:
+>                   return self.__get_result()
+                           ^^^^^^^^^^^^^^^^^^^
+
+/usr/lib/python3.12/concurrent/futures/_base.py:449: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = None
+
+    def __get_result(self):
+        if self._exception:
+            try:
+>               raise self._exception
+
+/usr/lib/python3.12/concurrent/futures/_base.py:401: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <anyio.from_thread.BlockingPortal object at 0x77327004a810>
+func = <bound method TestClient.lifespan of <starlette.testclient.TestClient object at 0x77327004ab40>>
+args = (), kwargs = {}
+future = <Future at 0x773270049760 state=finished raised TypeError>
+
+    async def _call_func(
+        self,
+        func: Callable[[Unpack[PosArgsT]], Awaitable[T_Retval] | T_Retval],
+        args: tuple[Unpack[PosArgsT]],
+        kwargs: dict[str, Any],
+        future: Future[T_Retval],
+    ) -> None:
+        event_loop_thread_id = self._event_loop_thread_id
+    
+        def callback(f: Future[T_Retval]) -> None:
+            if f.cancelled():
+                if event_loop_thread_id == get_ident():
+                    scope.cancel("the future was cancelled")
+                elif event_loop_thread_id is not None:
+                    run_sync(
+                        scope.cancel, "the future was cancelled", token=self._token
+                    )
+    
+        try:
+            retval_or_awaitable = func(*args, **kwargs)
+            if isawaitable(retval_or_awaitable):
+                with CancelScope() as scope:
+                    future.add_done_callback(callback)
+>                   retval = await retval_or_awaitable
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/anyio/from_thread.py:265: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient.TestClient object at 0x77327004ab40>
+
+    async def lifespan(self) -> None:
+        scope = {"type": "lifespan", "state": self.app_state}
+        try:
+>           await self.app(scope, self.stream_receive.receive, self.stream_send.send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:713: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if self.root_path:
+            scope["root_path"] = self.root_path
+>       await super().__call__(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/applications.py:1160: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        scope["app"] = self
+        if self.middleware_stack is None:
+            self.middleware_stack = self.build_middleware_stack()
+>       await self.middleware_stack(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/applications.py:90: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.errors.ServerErrorMiddleware object at 0x7732a985d4c0>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py:151: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a985d5b0>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a985d580>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a985d460>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a985d430>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a9b02c60>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a985d370>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.cors.CORSMiddleware object at 0x7732a9b4fb00>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":  # pragma: no cover
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/cors.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <qubit_cli.dashboard_auth.body_limit.AuthBodyLimitMiddleware object at 0x7732a985d340>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (scope["type"] != "http" or scope["method"] != "POST"
+                or not scope["path"].startswith("/auth/")
+                or not _path_is_public(scope["path"])):
+>           await self.app(scope, receive, send)
+
+qubit_cli/dashboard_auth/body_limit.py:28: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.exceptions.ExceptionMiddleware object at 0x7732a985d1c0>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.middleware.asyncexitstack.AsyncExitStackMiddleware object at 0x7732a985d2b0>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        async with AsyncExitStack() as stack:
+            scope[self.context_name] = stack
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py:18: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.routing.APIRouter object at 0x7732aa9efb60>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """
+        The main entry point to the Router class.
+        """
+>       await self.middleware_stack(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/routing.py:660: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.routing.APIRouter object at 0x7732aa9efb60>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def app(self, scope: Scope, receive: Receive, send: Send) -> None:
+        assert scope["type"] in ("http", "websocket", "lifespan")
+    
+        if "router" not in scope:
+            scope["router"] = self
+    
+        if scope["type"] == "lifespan":
+>           await self.lifespan(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/routing.py:669: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.routing.APIRouter object at 0x7732aa9efb60>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x77327002d9d0>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def lifespan(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """
+        Handle ASGI lifespan messages, which allows us to manage application
+        startup and shutdown events.
+        """
+        started = False
+        app: Any = scope.get("app")
+        await receive()
+        try:
+>           async with self.lifespan_context(app) as maybe_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/routing.py:638: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x7732700496a0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270048fe0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270049640>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270049b50>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002e1e0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002ecc0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002df40>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002dfa0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002c080>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002e3c0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002eae0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002e5d0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002e510>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002e450>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002ec00>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002f110>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002ede0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002d250>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002d490>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002ce30>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002cc50>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002cce0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002cc80>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002ccb0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002eed0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002edb0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002ef60>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002da00>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002d280>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002d340>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002d6a0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002d220>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002c3b0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002c440>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002c890>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327002c830>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def _lifespan(app: "FastAPI"):
+        app.state.event_channels = {}  # dict[str, set]
+        app.state.event_lock = asyncio.Lock()
+        app.state.pty_active_session_files = {}  # dict[str, Path]
+        # Serializes chat-argv resolution so concurrent /api/pty connections don't
+        # overlap ``npm install`` / ``npm run build``. Locks live on app.state (not
+        # module globals) so they bind to the running loop, not the import-time one.
+        app.state.chat_argv_lock = asyncio.Lock()
+    
+        # Bring state.db schema current BEFORE the first session-list poll
+        # (#79531/#80037): a store left behind by `qubit update` otherwise 500s
+        # every poll while the read-probe heal loses to sibling lock contention.
+        # Off-thread so a locked store never delays the socket (Desktop
+        # ready-probe times out at 10s, GH-73083). NOT a daemon, and joined at
+        # shutdown: its sqlite connection must be closed by the thread that is
+        # stepping it. A daemon copy that outlived the lifespan had its
+        # connection closed from the main thread mid-probe (pytest's leaked-DB
+        # sweep) and segfaulted the interpreter. The worker is time-bounded by
+        # SessionDB's lock patience, so the join cannot hang shutdown.
+        eager_reconcile_thread = threading.Thread(
+            target=_eager_reconcile_own_session_db,
+            name="statedb-eager-reconcile",
+        )
+        eager_reconcile_thread.start()
+    
+        # Import qubit_cli.gateway *before* the yield: on Windows + 3.11 the
+        # import holds the GIL, so run_in_executor still froze the loop 15-22s and
+        # the Desktop's 10s ready-probe timed out (GH-73083).
+        _warm_gateway_module()
+    
+        # Snapshot the checkout revision so lazy-import paths (model picker) can
+        # refuse with "restart required" after `qubit update` replaced the code
+        # (#86207); the update flow does not reliably restart the dashboard.
+        from gateway.code_skew import record_boot_fingerprint
+    
+        record_boot_fingerprint()
+    
+        # Hosted Bot rooms belong to the backend process. Recovery may need a
+        # contended state.db migration, so keep it off the pre-yield path: Group
+        # Chat must degrade on its own rather than block every Desktop feature.
+        from tui_gateway import methods_groups as _hosted_groups
+        import tui_gateway.server  # noqa: F401
+    
+        try:
+            tui_gateway.server.install_tui_message_injector()
+        except Exception:
+            _log.warning("TUI message injector did not install", exc_info=True)
+    
+        hosted_room_start_cancel = threading.Event()
+    
+        def _start_hosted_rooms() -> None:
+            try:
+                _hosted_groups.start_hosted_room_service()
+            except Exception:
+                _log.exception("Hosted Group Chat recovery failed during backend startup")
+            finally:
+                if hosted_room_start_cancel.is_set():
+                    _hosted_groups.stop_hosted_room_service(timeout=1.0)
+    
+        hosted_room_start_thread = threading.Thread(
+            target=_start_hosted_rooms,
+            daemon=True,
+            name="hosted-room-startup",
+        )
+        hosted_room_start_thread.start()
+    
+        # Desktop-spawned backends fire cron jobs themselves, since the app has no
+        # gateway running the scheduler. Server `qubit dashboard` is unaffected —
+        # it relies on its own gateway.
+        cron_stop: threading.Event | None = None
+        cron_thread: threading.Thread | None = None
+        desktop_owned = is_desktop_owned_backend()
+        if desktop_owned:
+            # Reap an orphaned gateway from an abnormal previous exit (reparented to
+            # launchd, still holding the platform WebSocket) before forking a fresh
+            # one that would race the same credential (#77276). Runs
+            # unconditionally; protection of a healthy standalone gateway lives
+            # INSIDE the reaper (registration probed with cleanup_stale=False).
+            # Startup grace: spare a gateway still claiming gateway.pid/lock (#122533).
+            try:
+                from qubit_cli.dashboard_procs import _REAP_MIN_AGE_SECONDS
+                from qubit_cli.gateway import _reap_unsupervised_gateway_orphans
+    
+                _reap_unsupervised_gateway_orphans(min_age_s=_REAP_MIN_AGE_SECONDS)
+            except Exception:
+                _log.exception("Desktop startup: orphan gateway reap failed")
+    
+            cron_stop = threading.Event()
+            cron_thread = threading.Thread(
+                target=_start_desktop_cron_ticker,
+                args=(cron_stop,),
+                daemon=True,
+                name="desktop-cron-ticker",
+            )
+            cron_thread.start()
+    
+        # Reap idle/dead keep-alive PTY sessions (30-min TTL).
+        pty_reaper_task = asyncio.create_task(run_reaper(PTY_REGISTRY))
+        # Periodic authenticated self-test feeding the ``dashboard`` component on /api/status.
+        selftest_task = asyncio.create_task(_dashboard_selftest_loop())
+        # Live auto-archive timer, independent of list requests.
+        auto_archive_task = asyncio.create_task(_auto_archive_ticker_loop())
+    
+        # Managed local runtime (local_runtime.enabled): bring llama-server back so a
+        # restart doesn't strand a llamacpp main model. Off-thread and best-effort;
+        # failure falls back to cloud providers like a cold start. Server only —
+        # models load on first inference (an empty router holds no VRAM).
+        def _boot_local_runtime():
+            try:
+                from qubit_cli.config import load_config
+                from qubit_cli.local_runtime.bootstrap import ensure_local_runtime
+    
+                ensure_local_runtime(load_config())
+            except Exception as exc:  # noqa: BLE001
+                logging.getLogger(__name__).warning("local runtime boot failed: %s", exc)
+    
+        threading.Thread(target=_boot_local_runtime, daemon=True, name="local-runtime-boot").start()
+    
+        # Qubit free tier: the ONE place its identity is created. Inventories credentials, mints only
+        # when HERMES_GUEST_ONBOARDING=1, records the answer for setup.status / free_tier.status and
+        # broadcasts `setup.ready`. Off-thread so a slow portal never delays the socket; the desktop's
+        # first setup.status waits on the record (bounded) instead.
+        from qubit_cli.free_tier_bootstrap import start_background_bootstrap
+    
+        start_background_bootstrap()
+    
+        try:
+            yield
+        finally:
+            try:
+                tui_gateway.server.clear_tui_message_injector()
+            except Exception:
+                _log.debug("TUI message injector clear skipped", exc_info=True)
+            hosted_room_start_cancel.set()
+            _hosted_groups.stop_hosted_room_service(timeout=5.0)
+            hosted_room_start_thread.join(timeout=1.0)
+            if cron_stop is not None:
+                cron_stop.set()
+            pty_reaper_task.cancel()
+            selftest_task.cancel()
+            auto_archive_task.cancel()
+>           await PTY_REGISTRY.close_all(keep_detached=True)
+
+qubit_cli/web_server.py:321: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = LeaseReleasingPtyRegistry(grace=45.0s, inner=<qubit_cli.pty_session.PtySessionRegistry object at 0x7732aa805f10>)
+keep_detached = True
+
+    async def close_all(self, *, keep_detached: bool = False) -> None:
+        before = []
+        try:
+            before = [(key, session) for key, session in list(getattr(self._inner, "_sessions", {}).items())
+                      if not (keep_detached and not getattr(session, "attached", False))]
+        except Exception:
+            before = []
+>       await self._inner.close_all(keep_detached=keep_detached)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: PtySessionRegistry.close_all() got an unexpected keyword argument 'keep_detached'
+
+/home/trick/Projects/Repos/qubit-voicebridge/voicebridge/pty_lease_shim.py:249: TypeError
+------------------------------ Captured log call -------------------------------
+WARNING  qubit_state:qubit_state_wal.py:560 shared-state.db (hosted_rooms): linked SQLite 3.45.1 (interpreter /home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/python) is vulnerable to the WAL-reset corruption bug (https://sqlite.org/wal.html#walresetbug) — using journal_mode=DELETE instead of enabling WAL. Upgrade to SQLite 3.51.3+ (or backports 3.50.7 / 3.44.6); Qubit-managed installs can repair the embedded runtime with `qubit update`. See `qubit doctor`. This warning fires once per process per database.
+WARNING  qubit_state:qubit_state_wal.py:560 shared-state.db (room policy checkpoint): linked SQLite 3.45.1 (interpreter /home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/python) is vulnerable to the WAL-reset corruption bug (https://sqlite.org/wal.html#walresetbug) — using journal_mode=DELETE instead of enabling WAL. Upgrade to SQLite 3.51.3+ (or backports 3.50.7 / 3.44.6); Qubit-managed installs can repair the embedded runtime with `qubit update`. See `qubit doctor`. This warning fires once per process per database.
+___________ test_desktop_lifespan_reaps_orphans_with_a_startup_grace ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77326ff59340>
+
+    def test_desktop_lifespan_reaps_orphans_with_a_startup_grace(monkeypatch):
+        """The boot sweep must pass the startup grace, not reap a just-launching gateway (#122533).
+    
+        Asserting only "the reaper ran" would not catch a revert to the bare
+        ``_reap_unsupervised_gateway_orphans()`` call, which is exactly the regression.
+        """
+        import qubit_cli.web_server as ws
+        from qubit_cli.dashboard_procs import _REAP_MIN_AGE_SECONDS
+    
+        seen = {}
+    
+        def _fake_reap(extra_exclude=None, *, min_age_s=0.0):
+            seen["min_age_s"] = min_age_s
+            return False
+    
+        monkeypatch.setenv("QUBIT_DESKTOP", "1")
+        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+        monkeypatch.setattr(ws, "_warm_gateway_module", lambda: None)
+        monkeypatch.setattr(ws, "_start_desktop_cron_ticker", lambda *_args: None)
+        monkeypatch.setattr("qubit_cli.gateway._reap_unsupervised_gateway_orphans", _fake_reap)
+    
+        client, _header = _client()
+>       with client:
+
+tests/hermes_cli/test_dashboard_admin_endpoints.py:1180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient.TestClient object at 0x77326d787b00>
+args = (None, None, None)
+
+    def __exit__(self, *args: Any) -> None:
+>       self.exit_stack.close()
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:708: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib.ExitStack object at 0x77327022bfb0>
+
+    def close(self):
+        """Immediately unwind the context stack."""
+>       self.__exit__(None, None, None)
+
+/usr/lib/python3.12/contextlib.py:618: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib.ExitStack object at 0x77327022bfb0>
+exc_details = (<class 'TypeError'>, TypeError("PtySessionRegistry.close_all() got an unexpected keyword argument 'keep_detached'"), <traceback object at 0x77326c52f040>)
+
+    def __exit__(self, *exc_details):
+        received_exc = exc_details[0] is not None
+    
+        # We manipulate the exception state so it behaves as though
+        # we were actually nesting multiple with statements
+        frame_exc = sys.exc_info()[1]
+        def _fix_exception_context(new_exc, old_exc):
+            # Context may not be correct, so find the end of the chain
+            while 1:
+                exc_context = new_exc.__context__
+                if exc_context is None or exc_context is old_exc:
+                    # Context is already set correctly (see issue 20317)
+                    return
+                if exc_context is frame_exc:
+                    break
+                new_exc = exc_context
+            # Change the end of the chain to point to the exception
+            # we expect it to reference
+            new_exc.__context__ = old_exc
+    
+        # Callbacks are invoked in LIFO order to match the behaviour of
+        # nested context managers
+        suppressed_exc = False
+        pending_raise = False
+        while self._exit_callbacks:
+            is_sync, cb = self._exit_callbacks.pop()
+            assert is_sync
+            try:
+                if cb(*exc_details):
+                    suppressed_exc = True
+                    pending_raise = False
+                    exc_details = (None, None, None)
+            except:
+                new_exc_details = sys.exc_info()
+                # simulate the stack of exceptions by setting the context
+                _fix_exception_context(new_exc_details[1], exc_details[1])
+                pending_raise = True
+                exc_details = new_exc_details
+        if pending_raise:
+            try:
+                # bare "raise exc_details[1]" replaces our carefully
+                # set-up context
+                fixed_ctx = exc_details[1].__context__
+>               raise exc_details[1]
+
+/usr/lib/python3.12/contextlib.py:610: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib.ExitStack object at 0x77327022bfb0>
+exc_details = (<class 'TypeError'>, TypeError("PtySessionRegistry.close_all() got an unexpected keyword argument 'keep_detached'"), <traceback object at 0x77326c52f040>)
+
+    def __exit__(self, *exc_details):
+        received_exc = exc_details[0] is not None
+    
+        # We manipulate the exception state so it behaves as though
+        # we were actually nesting multiple with statements
+        frame_exc = sys.exc_info()[1]
+        def _fix_exception_context(new_exc, old_exc):
+            # Context may not be correct, so find the end of the chain
+            while 1:
+                exc_context = new_exc.__context__
+                if exc_context is None or exc_context is old_exc:
+                    # Context is already set correctly (see issue 20317)
+                    return
+                if exc_context is frame_exc:
+                    break
+                new_exc = exc_context
+            # Change the end of the chain to point to the exception
+            # we expect it to reference
+            new_exc.__context__ = old_exc
+    
+        # Callbacks are invoked in LIFO order to match the behaviour of
+        # nested context managers
+        suppressed_exc = False
+        pending_raise = False
+        while self._exit_callbacks:
+            is_sync, cb = self._exit_callbacks.pop()
+            assert is_sync
+            try:
+>               if cb(*exc_details):
+                   ^^^^^^^^^^^^^^^^
+
+/usr/lib/python3.12/contextlib.py:595: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exc_type = None, exc = None, tb = None
+
+    def _exit_wrapper(exc_type, exc, tb):
+>       callback(*args, **kwds)
+
+/usr/lib/python3.12/contextlib.py:478: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    @stack.callback
+    def wait_shutdown() -> None:
+>       portal.call(self.wait_shutdown)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:701: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <anyio.from_thread.BlockingPortal object at 0x77326d3423f0>
+func = <bound method TestClient.wait_shutdown of <starlette.testclient.TestClient object at 0x77326d787b00>>
+args = ()
+
+    def call(
+        self,
+        func: Callable[[Unpack[PosArgsT]], Awaitable[T_Retval] | T_Retval],
+        *args: Unpack[PosArgsT],
+    ) -> T_Retval:
+        """
+        Call the given function in the event loop thread.
+    
+        If the callable returns a coroutine object, it is awaited on.
+    
+        :param func: any callable
+        :raises RuntimeError: if the portal is not running or if this method is called
+            from within the event loop thread
+    
+        """
+>       return cast(T_Retval, self.start_task_soon(func, *args).result())
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/anyio/from_thread.py:340: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = None, timeout = None
+
+    def result(self, timeout=None):
+        """Return the result of the call that the future represents.
+    
+        Args:
+            timeout: The number of seconds to wait for the result if the future
+                isn't done. If None, then there is no limit on the wait time.
+    
+        Returns:
+            The result of the call that the future represents.
+    
+        Raises:
+            CancelledError: If the future was cancelled.
+            TimeoutError: If the future didn't finish executing before the given
+                timeout.
+            Exception: If the call raised then that exception will be raised.
+        """
+        try:
+            with self._condition:
+                if self._state in [CANCELLED, CANCELLED_AND_NOTIFIED]:
+                    raise CancelledError()
+                elif self._state == FINISHED:
+                    return self.__get_result()
+    
+                self._condition.wait(timeout)
+    
+                if self._state in [CANCELLED, CANCELLED_AND_NOTIFIED]:
+                    raise CancelledError()
+                elif self._state == FINISHED:
+>                   return self.__get_result()
+                           ^^^^^^^^^^^^^^^^^^^
+
+/usr/lib/python3.12/concurrent/futures/_base.py:456: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = None
+
+    def __get_result(self):
+        if self._exception:
+            try:
+>               raise self._exception
+
+/usr/lib/python3.12/concurrent/futures/_base.py:401: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <anyio.from_thread.BlockingPortal object at 0x77326d3423f0>
+func = <bound method TestClient.wait_shutdown of <starlette.testclient.TestClient object at 0x77326d787b00>>
+args = (), kwargs = {}
+future = <Future at 0x77327022bf50 state=finished raised TypeError>
+
+    async def _call_func(
+        self,
+        func: Callable[[Unpack[PosArgsT]], Awaitable[T_Retval] | T_Retval],
+        args: tuple[Unpack[PosArgsT]],
+        kwargs: dict[str, Any],
+        future: Future[T_Retval],
+    ) -> None:
+        event_loop_thread_id = self._event_loop_thread_id
+    
+        def callback(f: Future[T_Retval]) -> None:
+            if f.cancelled():
+                if event_loop_thread_id == get_ident():
+                    scope.cancel("the future was cancelled")
+                elif event_loop_thread_id is not None:
+                    run_sync(
+                        scope.cancel, "the future was cancelled", token=self._token
+                    )
+    
+        try:
+            retval_or_awaitable = func(*args, **kwargs)
+            if isawaitable(retval_or_awaitable):
+                with CancelScope() as scope:
+                    future.add_done_callback(callback)
+>                   retval = await retval_or_awaitable
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/anyio/from_thread.py:265: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient.TestClient object at 0x77326d787b00>
+
+    async def wait_shutdown(self) -> None:
+        async def receive() -> Any:
+            message = await self.stream_send.receive()
+            if message is None:
+                self.task.result()
+            return message
+    
+        await self.stream_receive.send({"type": "lifespan.shutdown"})
+        message = await receive()
+        assert message["type"] in (
+            "lifespan.shutdown.complete",
+            "lifespan.shutdown.failed",
+        )
+        if message["type"] == "lifespan.shutdown.failed":
+>           await receive()
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:748: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def receive() -> Any:
+        message = await self.stream_send.receive()
+        if message is None:
+>           self.task.result()
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:738: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = None, timeout = None
+
+    def result(self, timeout=None):
+        """Return the result of the call that the future represents.
+    
+        Args:
+            timeout: The number of seconds to wait for the result if the future
+                isn't done. If None, then there is no limit on the wait time.
+    
+        Returns:
+            The result of the call that the future represents.
+    
+        Raises:
+            CancelledError: If the future was cancelled.
+            TimeoutError: If the future didn't finish executing before the given
+                timeout.
+            Exception: If the call raised then that exception will be raised.
+        """
+        try:
+            with self._condition:
+                if self._state in [CANCELLED, CANCELLED_AND_NOTIFIED]:
+                    raise CancelledError()
+                elif self._state == FINISHED:
+>                   return self.__get_result()
+                           ^^^^^^^^^^^^^^^^^^^
+
+/usr/lib/python3.12/concurrent/futures/_base.py:449: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = None
+
+    def __get_result(self):
+        if self._exception:
+            try:
+>               raise self._exception
+
+/usr/lib/python3.12/concurrent/futures/_base.py:401: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <anyio.from_thread.BlockingPortal object at 0x77326d3423f0>
+func = <bound method TestClient.lifespan of <starlette.testclient.TestClient object at 0x77326d787b00>>
+args = (), kwargs = {}
+future = <Future at 0x77326d343290 state=finished raised TypeError>
+
+    async def _call_func(
+        self,
+        func: Callable[[Unpack[PosArgsT]], Awaitable[T_Retval] | T_Retval],
+        args: tuple[Unpack[PosArgsT]],
+        kwargs: dict[str, Any],
+        future: Future[T_Retval],
+    ) -> None:
+        event_loop_thread_id = self._event_loop_thread_id
+    
+        def callback(f: Future[T_Retval]) -> None:
+            if f.cancelled():
+                if event_loop_thread_id == get_ident():
+                    scope.cancel("the future was cancelled")
+                elif event_loop_thread_id is not None:
+                    run_sync(
+                        scope.cancel, "the future was cancelled", token=self._token
+                    )
+    
+        try:
+            retval_or_awaitable = func(*args, **kwargs)
+            if isawaitable(retval_or_awaitable):
+                with CancelScope() as scope:
+                    future.add_done_callback(callback)
+>                   retval = await retval_or_awaitable
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/anyio/from_thread.py:265: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient.TestClient object at 0x77326d787b00>
+
+    async def lifespan(self) -> None:
+        scope = {"type": "lifespan", "state": self.app_state}
+        try:
+>           await self.app(scope, self.stream_receive.receive, self.stream_send.send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:713: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if self.root_path:
+            scope["root_path"] = self.root_path
+>       await super().__call__(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/applications.py:1160: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        scope["app"] = self
+        if self.middleware_stack is None:
+            self.middleware_stack = self.build_middleware_stack()
+>       await self.middleware_stack(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/applications.py:90: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.errors.ServerErrorMiddleware object at 0x7732a985d4c0>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py:151: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a985d5b0>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a985d580>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a985d460>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a985d430>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a9b02c60>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.base.BaseHTTPMiddleware object at 0x7732a985d370>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.cors.CORSMiddleware object at 0x7732a9b4fb00>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":  # pragma: no cover
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/cors.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <qubit_cli.dashboard_auth.body_limit.AuthBodyLimitMiddleware object at 0x7732a985d340>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (scope["type"] != "http" or scope["method"] != "POST"
+                or not scope["path"].startswith("/auth/")
+                or not _path_is_public(scope["path"])):
+>           await self.app(scope, receive, send)
+
+qubit_cli/dashboard_auth/body_limit.py:28: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.middleware.exceptions.ExceptionMiddleware object at 0x7732a985d1c0>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.middleware.asyncexitstack.AsyncExitStackMiddleware object at 0x7732a985d2b0>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        async with AsyncExitStack() as stack:
+            scope[self.context_name] = stack
+>           await self.app(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py:18: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.routing.APIRouter object at 0x7732aa9efb60>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """
+        The main entry point to the Router class.
+        """
+>       await self.middleware_stack(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/routing.py:660: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.routing.APIRouter object at 0x7732aa9efb60>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def app(self, scope: Scope, receive: Receive, send: Send) -> None:
+        assert scope["type"] in ("http", "websocket", "lifespan")
+    
+        if "router" not in scope:
+            scope["router"] = self
+    
+        if scope["type"] == "lifespan":
+>           await self.lifespan(scope, receive, send)
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/routing.py:669: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <fastapi.routing.APIRouter object at 0x7732aa9efb60>
+scope = {'type': 'lifespan', 'state': {}, 'app': <fastapi.applications.FastAPI object at 0x7732aa836a80>, 'fastapi_middleware_astack': <contextlib.AsyncExitStack object at 0x773270229220>, ...}
+receive = <bound method StapledObjectStream.receive of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObje...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+send = <bound method StapledObjectStream.send of StapledObjectStream(send_stream=MemoryObjectSendStream(_state=_MemoryObjectS...d_channels=0, open_receive_channels=0, waiting_receivers=OrderedDict(), waiting_senders=OrderedDict()), _closed=True))>
+
+    async def lifespan(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """
+        Handle ASGI lifespan messages, which allows us to manage application
+        startup and shutdown events.
+        """
+        started = False
+        app: Any = scope.get("app")
+        await receive()
+        try:
+>           async with self.lifespan_context(app) as maybe_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/routing.py:638: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77326d342810>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77326d343170>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270229ee0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022bb60>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022b5c0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x7732702286e0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270228980>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270229c10>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270229340>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022b230>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022be00>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270229d00>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022ad20>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270228c50>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270229160>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270228b30>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270229fd0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x7732702285c0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022bcb0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x7732702292b0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022a990>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270229610>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022ac90>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022ad50>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270229b80>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x7732702292e0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x7732702296d0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270228710>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270228500>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022bd10>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270228d10>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022bce0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022b080>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022a9c0>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x773270229100>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def merged_lifespan(
+        app: AppType,
+    ) -> AsyncIterator[Mapping[str, Any] | None]:
+>       async with original_context(app) as maybe_original_state:
+
+/home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/fastapi/routing.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <contextlib._AsyncGeneratorContextManager object at 0x77327022b770>
+typ = None, value = None, traceback = None
+
+    async def __aexit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+>               await anext(self.gen)
+
+/usr/lib/python3.12/contextlib.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+app = <fastapi.applications.FastAPI object at 0x7732aa836a80>
+
+    @asynccontextmanager
+    async def _lifespan(app: "FastAPI"):
+        app.state.event_channels = {}  # dict[str, set]
+        app.state.event_lock = asyncio.Lock()
+        app.state.pty_active_session_files = {}  # dict[str, Path]
+        # Serializes chat-argv resolution so concurrent /api/pty connections don't
+        # overlap ``npm install`` / ``npm run build``. Locks live on app.state (not
+        # module globals) so they bind to the running loop, not the import-time one.
+        app.state.chat_argv_lock = asyncio.Lock()
+    
+        # Bring state.db schema current BEFORE the first session-list poll
+        # (#79531/#80037): a store left behind by `qubit update` otherwise 500s
+        # every poll while the read-probe heal loses to sibling lock contention.
+        # Off-thread so a locked store never delays the socket (Desktop
+        # ready-probe times out at 10s, GH-73083). NOT a daemon, and joined at
+        # shutdown: its sqlite connection must be closed by the thread that is
+        # stepping it. A daemon copy that outlived the lifespan had its
+        # connection closed from the main thread mid-probe (pytest's leaked-DB
+        # sweep) and segfaulted the interpreter. The worker is time-bounded by
+        # SessionDB's lock patience, so the join cannot hang shutdown.
+        eager_reconcile_thread = threading.Thread(
+            target=_eager_reconcile_own_session_db,
+            name="statedb-eager-reconcile",
+        )
+        eager_reconcile_thread.start()
+    
+        # Import qubit_cli.gateway *before* the yield: on Windows + 3.11 the
+        # import holds the GIL, so run_in_executor still froze the loop 15-22s and
+        # the Desktop's 10s ready-probe timed out (GH-73083).
+        _warm_gateway_module()
+    
+        # Snapshot the checkout revision so lazy-import paths (model picker) can
+        # refuse with "restart required" after `qubit update` replaced the code
+        # (#86207); the update flow does not reliably restart the dashboard.
+        from gateway.code_skew import record_boot_fingerprint
+    
+        record_boot_fingerprint()
+    
+        # Hosted Bot rooms belong to the backend process. Recovery may need a
+        # contended state.db migration, so keep it off the pre-yield path: Group
+        # Chat must degrade on its own rather than block every Desktop feature.
+        from tui_gateway import methods_groups as _hosted_groups
+        import tui_gateway.server  # noqa: F401
+    
+        try:
+            tui_gateway.server.install_tui_message_injector()
+        except Exception:
+            _log.warning("TUI message injector did not install", exc_info=True)
+    
+        hosted_room_start_cancel = threading.Event()
+    
+        def _start_hosted_rooms() -> None:
+            try:
+                _hosted_groups.start_hosted_room_service()
+            except Exception:
+                _log.exception("Hosted Group Chat recovery failed during backend startup")
+            finally:
+                if hosted_room_start_cancel.is_set():
+                    _hosted_groups.stop_hosted_room_service(timeout=1.0)
+    
+        hosted_room_start_thread = threading.Thread(
+            target=_start_hosted_rooms,
+            daemon=True,
+            name="hosted-room-startup",
+        )
+        hosted_room_start_thread.start()
+    
+        # Desktop-spawned backends fire cron jobs themselves, since the app has no
+        # gateway running the scheduler. Server `qubit dashboard` is unaffected —
+        # it relies on its own gateway.
+        cron_stop: threading.Event | None = None
+        cron_thread: threading.Thread | None = None
+        desktop_owned = is_desktop_owned_backend()
+        if desktop_owned:
+            # Reap an orphaned gateway from an abnormal previous exit (reparented to
+            # launchd, still holding the platform WebSocket) before forking a fresh
+            # one that would race the same credential (#77276). Runs
+            # unconditionally; protection of a healthy standalone gateway lives
+            # INSIDE the reaper (registration probed with cleanup_stale=False).
+            # Startup grace: spare a gateway still claiming gateway.pid/lock (#122533).
+            try:
+                from qubit_cli.dashboard_procs import _REAP_MIN_AGE_SECONDS
+                from qubit_cli.gateway import _reap_unsupervised_gateway_orphans
+    
+                _reap_unsupervised_gateway_orphans(min_age_s=_REAP_MIN_AGE_SECONDS)
+            except Exception:
+                _log.exception("Desktop startup: orphan gateway reap failed")
+    
+            cron_stop = threading.Event()
+            cron_thread = threading.Thread(
+                target=_start_desktop_cron_ticker,
+                args=(cron_stop,),
+                daemon=True,
+                name="desktop-cron-ticker",
+            )
+            cron_thread.start()
+    
+        # Reap idle/dead keep-alive PTY sessions (30-min TTL).
+        pty_reaper_task = asyncio.create_task(run_reaper(PTY_REGISTRY))
+        # Periodic authenticated self-test feeding the ``dashboard`` component on /api/status.
+        selftest_task = asyncio.create_task(_dashboard_selftest_loop())
+        # Live auto-archive timer, independent of list requests.
+        auto_archive_task = asyncio.create_task(_auto_archive_ticker_loop())
+    
+        # Managed local runtime (local_runtime.enabled): bring llama-server back so a
+        # restart doesn't strand a llamacpp main model. Off-thread and best-effort;
+        # failure falls back to cloud providers like a cold start. Server only —
+        # models load on first inference (an empty router holds no VRAM).
+        def _boot_local_runtime():
+            try:
+                from qubit_cli.config import load_config
+                from qubit_cli.local_runtime.bootstrap import ensure_local_runtime
+    
+                ensure_local_runtime(load_config())
+            except Exception as exc:  # noqa: BLE001
+                logging.getLogger(__name__).warning("local runtime boot failed: %s", exc)
+    
+        threading.Thread(target=_boot_local_runtime, daemon=True, name="local-runtime-boot").start()
+    
+        # Qubit free tier: the ONE place its identity is created. Inventories credentials, mints only
+        # when HERMES_GUEST_ONBOARDING=1, records the answer for setup.status / free_tier.status and
+        # broadcasts `setup.ready`. Off-thread so a slow portal never delays the socket; the desktop's
+        # first setup.status waits on the record (bounded) instead.
+        from qubit_cli.free_tier_bootstrap import start_background_bootstrap
+    
+        start_background_bootstrap()
+    
+        try:
+            yield
+        finally:
+            try:
+                tui_gateway.server.clear_tui_message_injector()
+            except Exception:
+                _log.debug("TUI message injector clear skipped", exc_info=True)
+            hosted_room_start_cancel.set()
+            _hosted_groups.stop_hosted_room_service(timeout=5.0)
+            hosted_room_start_thread.join(timeout=1.0)
+            if cron_stop is not None:
+                cron_stop.set()
+            pty_reaper_task.cancel()
+            selftest_task.cancel()
+            auto_archive_task.cancel()
+>           await PTY_REGISTRY.close_all(keep_detached=True)
+
+qubit_cli/web_server.py:321: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = LeaseReleasingPtyRegistry(grace=45.0s, inner=<qubit_cli.pty_session.PtySessionRegistry object at 0x7732aa805f10>)
+keep_detached = True
+
+    async def close_all(self, *, keep_detached: bool = False) -> None:
+        before = []
+        try:
+            before = [(key, session) for key, session in list(getattr(self._inner, "_sessions", {}).items())
+                      if not (keep_detached and not getattr(session, "attached", False))]
+        except Exception:
+            before = []
+>       await self._inner.close_all(keep_detached=keep_detached)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: PtySessionRegistry.close_all() got an unexpected keyword argument 'keep_detached'
+
+/home/trick/Projects/Repos/qubit-voicebridge/voicebridge/pty_lease_shim.py:249: TypeError
+=============================== warnings summary ===============================
+tests/hermes_cli/test_dashboard_admin_endpoints.py::TestMcpEndpoints::test_stdio_env_is_redacted_on_read
+  /home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_dashboard_admin_endpoints.py::TestSkillsHubSourcesEndpoint::test_sources_lists_configured_hubs
+FAILED tests/hermes_cli/test_dashboard_admin_endpoints.py::test_spawn_qubit_action_scrubs_gateway_loop_guard_env
+FAILED tests/hermes_cli/test_dashboard_admin_endpoints.py::test_named_profile_action_isolates_parent_env_and_loads_target_env
+FAILED tests/hermes_cli/test_dashboard_admin_endpoints.py::test_desktop_lifespan_terminates_managed_gateway_restart
+FAILED tests/hermes_cli/test_dashboard_admin_endpoints.py::test_desktop_lifespan_reaps_orphans_with_a_startup_grace
+5 failed, 37 passed, 1 warning in 9.04s

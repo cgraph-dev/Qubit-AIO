@@ -525,7 +525,12 @@ class TestInstall:
         install_entry(_entry("demo"), enable=True)
         install_entry(_entry("demo"), enable=True)
 
-        assert calls == [{"kind": "mcp_server", "source": "catalog", "name": "demo", "outcome": "success"}]
+        # HEAD added ``failure_class``/``error`` to record_extension_install's
+        # signature (shared_metrics_events.py:139) and record_mcp_install always
+        # forwards both (mcp_catalog.py:734-741), so a success row carries them
+        # as None. ``registry`` is not passed on the MCP path.
+        assert calls == [{"kind": "mcp_server", "source": "catalog", "name": "demo", "outcome": "success",
+                          "failure_class": None, "error": None}]
 
     def test_install_with_api_key_prompts_and_saves(self, catalog_dir, monkeypatch):
         body = _basic_manifest(

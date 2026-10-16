@@ -1,0 +1,26 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+_____________ test_picker_effort_rows_follow_language_at_call_time _____________
+
+overlay_locales = PosixPath('/tmp/pytest-of-trick/pytest-144/test_picker_effort_rows_follow0/locales')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7699b13d6c30>
+
+    def test_picker_effort_rows_follow_language_at_call_time(overlay_locales, monkeypatch):
+        monkeypatch.setenv("QUBIT_LANGUAGE", "en")
+        i18n.reset_language_cache()
+        en_rows = ms._picker_reasoning_rows()
+        monkeypatch.setenv("QUBIT_LANGUAGE", "zh")
+        i18n.reset_language_cache()
+        zh_rows = ms._picker_reasoning_rows()
+        # Values (identifiers) are stable; the keep-current label moved with the language.
+        assert [v for v, _ in en_rows] == [v for v, _ in zh_rows]
+>       assert zh_rows[-1] == ("", "保持当前")
+E       AssertionError: assert ('', 'Keep current effort') == ('', '保持当前')
+E         
+E         At index 1 diff: 'Keep current effort' != '保持当前'
+E         Use -v to get more diff
+
+tests/hermes_cli/test_cli_model_switch_i18n.py:36: AssertionError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_cli_model_switch_i18n.py::test_picker_effort_rows_follow_language_at_call_time
+1 failed, 1 passed in 0.56s

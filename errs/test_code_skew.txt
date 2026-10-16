@@ -1,0 +1,20 @@
+.....F....                                                               [100%]
+=================================== FAILURES ===================================
+_ TestDashboardCodeSkewGuard.test_serve_guard_message_points_at_desktop_backend _
+
+self = <test_code_skew.TestDashboardCodeSkewGuard object at 0x766cdf180680>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x766ce05d7bc0>
+
+    def test_serve_guard_message_points_at_desktop_backend(self, monkeypatch):
+    
+        monkeypatch.setenv("QUBIT_SERVE_HEADLESS", "1")
+        monkeypatch.setattr(code_skew, "detect_code_skew", lambda: ("abc1234567", "def4567890"))
+        msg = _web_server_config._dashboard_code_skew_guard()
+        assert msg is not None
+>       assert "Desktop-owned backend" in msg
+E       AssertionError: assert 'Desktop-owned backend' in 'This process is running code from abc1234567 but the checkout on disk is now def4567890. The model picker would risk ...Qubit process to load the new code (qubit dashboard --port <port>, or the equivalent service restart for this install)'
+
+tests/hermes_cli/test_code_skew.py:88: AssertionError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_code_skew.py::TestDashboardCodeSkewGuard::test_serve_guard_message_points_at_desktop_backend
+1 failed, 9 passed in 1.32s

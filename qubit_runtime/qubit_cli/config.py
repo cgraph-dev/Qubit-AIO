@@ -119,18 +119,25 @@ _ENV_VAR_NAME_DENYLIST: frozenset[str] = frozenset({
     "GIT_PROXY_COMMAND", "GIT_TEMPLATE_DIR", "GIT_DIR",
     # Shell init files / interactive hooks — sourced before or during execution
     "BASH_ENV", "ENV", "ZDOTDIR", "PROMPT_COMMAND", "VIMINIT", "EXINIT",
-    # Qubit runtime location
+    # Qubit runtime location. The canonical names are QUBIT_*; the legacy HERMES_*
+    # spellings remain denied too (a generic writer must not escalate through either).
     "QUBIT_HOME", "HERMES_PROFILE", "HERMES_CONFIG", "HERMES_ENV",
+    "QUBIT_CONFIG_PATH", "QUBIT_ENV_PATH",
     "HERMES_CONFIG_PATH", "HERMES_ENV_PATH",
     # MCP catalog trust root; package-manager wrappers may still set it in the process env.
-    "HERMES_OPTIONAL_MCPS",
+    "QUBIT_OPTIONAL_MCPS", "HERMES_OPTIONAL_MCPS",
     # Local ACP subprocess selection (executable/argv authority).
+    "QUBIT_COPILOT_ACP_COMMAND", "QUBIT_COPILOT_ACP_ARGS",
     "HERMES_COPILOT_ACP_COMMAND", "HERMES_COPILOT_ACP_ARGS",
     # Security policy / approval-routing context — set via their dedicated controls only.
+    "QUBIT_YOLO_MODE", "QUBIT_ACCEPT_HOOKS", "QUBIT_REDACT_SECRETS",
     "HERMES_YOLO_MODE", "HERMES_ACCEPT_HOOKS", "HERMES_REDACT_SECRETS",
+    "QUBIT_INTERACTIVE", "QUBIT_EXEC_ASK", "QUBIT_GATEWAY_SESSION",
     "HERMES_INTERACTIVE", "HERMES_EXEC_ASK", "HERMES_GATEWAY_SESSION",
-    "HERMES_CRON_SESSION", "HERMES_SINGLE_QUERY_SESSION",
-    "HERMES_SESSION_KEY", "HERMES_SESSION_PLATFORM"})
+    "QUBIT_CRON_SESSION", "HERMES_CRON_SESSION",
+    "QUBIT_SINGLE_QUERY_SESSION", "HERMES_SINGLE_QUERY_SESSION",
+    "QUBIT_SESSION_KEY", "HERMES_SESSION_KEY",
+    "QUBIT_SESSION_PLATFORM", "HERMES_SESSION_PLATFORM"})
 
 
 def _env_var_policy_name(key: str, *, is_windows: Optional[bool] = None) -> str:

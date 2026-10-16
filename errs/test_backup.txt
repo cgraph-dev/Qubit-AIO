@@ -1,0 +1,709 @@
+F.......F..F.........F.....F...F...........................FFFFF.FFF.... [ 76%]
+....................F.                                                   [100%]
+=================================== FAILURES ===================================
+_________________ TestShouldExclude.test_excludes_qubit_agent __________________
+
+self = <test_backup.TestShouldExclude object at 0x7008b5a16810>
+
+    def test_excludes_qubit_agent(self):
+        from qubit_cli.backup import _should_exclude
+>       assert _should_exclude(Path("qubit/run_agent.py"))
+E       AssertionError: assert False
+E        +  where False = <function _should_exclude at 0x7008b486bd80>(PosixPath('qubit/run_agent.py'))
+E        +    where PosixPath('qubit/run_agent.py') = Path('qubit/run_agent.py')
+
+tests/hermes_cli/test_backup.py:129: AssertionError
+______ TestIterBackupFiles.test_manual_and_automatic_paths_share_one_walk ______
+
+self = <test_backup.TestIterBackupFiles object at 0x7008b5a49ca0>
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-140/test_manual_and_automatic_path0')
+
+    def test_manual_and_automatic_paths_share_one_walk(self, tmp_path):
+        """Both backup entry points must select the identical file set.
+    
+        Before the walks were unified, the automatic pre-update path pruned
+        ``qubit`` at ANY depth, silently dropping nested skill dirs
+        like ``skills/autonomous-ai-agents/qubit/`` that the manual
+        path preserved. One shared iterator makes that drift impossible;
+        this test pins the contract."""
+        from qubit_cli.backup import _iter_backup_files
+    
+        root = tmp_path / ".qubit"
+        root.mkdir()
+        _make_qubit_tree(root)
+    
+        # The case the old automatic walk got wrong: a nested dir named
+        # qubit holding real skill content.
+        nested = root / "skills" / "autonomous-ai-agents" / "qubit"
+        nested.mkdir(parents=True)
+        (nested / "SKILL.md").write_text("# nested skill\n")
+    
+        # A root-level managed runtime tree that both paths must prune.
+        (root / "models").mkdir()
+        (root / "models" / "big.gguf").write_bytes(b"\x00" * 64)
+    
+        out_path = tmp_path / "out.zip"
+        selected = {str(rel) for _, rel in _iter_backup_files(root, out_path)}
+    
+        rel_nested = str(Path("skills/autonomous-ai-agents/qubit/SKILL.md"))
+        assert rel_nested in selected
+        assert str(Path("models/big.gguf")) not in selected
+>       assert not any(s.startswith("qubit") for s in selected)
+E       assert not True
+E        +  where True = any(<generator object TestIterBackupFiles.test_manual_and_automatic_paths_share_one_walk.<locals>.<genexpr> at 0x7008b58fcad0>)
+
+tests/hermes_cli/test_backup.py:245: AssertionError
+_________ TestIterBackupFiles.test_skipped_dirs_collected_for_summary __________
+
+self = <test_backup.TestIterBackupFiles object at 0x7008b5a49190>
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-140/test_skipped_dirs_collected_fo0')
+
+    def test_skipped_dirs_collected_for_summary(self, tmp_path):
+        from qubit_cli.backup import _iter_backup_files
+    
+        root = tmp_path / ".qubit"
+        root.mkdir()
+        _make_qubit_tree(root)
+        (root / "models").mkdir()
+        (root / "models" / "big.gguf").write_bytes(b"\x00")
+    
+        skipped: set = set()
+        list(_iter_backup_files(root, tmp_path / "out.zip", skipped))
+        assert "models" in skipped
+>       assert "qubit" in skipped
+E       AssertionError: assert 'qubit' in {'models', 'plugins/__pycache__', 'qubit/.git'}
+
+tests/hermes_cli/test_backup.py:308: AssertionError
+_ TestImport.test_import_refuses_damaged_archive_before_touching_home[deflate-8] _
+
+self = <test_backup.TestImport object at 0x7008b5a4af00>
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-140/test_import_refuses_damaged_ar0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7008b5908560>
+capsys = <_pytest.capture.CaptureFixture object at 0x7008b48ea270>
+damage = 'deflate', compression = 8
+
+    @pytest.mark.parametrize("damage, compression", [
+        ("deflate", zipfile.ZIP_DEFLATED),
+        ("stored", zipfile.ZIP_STORED),
+        ("bzip2", zipfile.ZIP_BZIP2),
+        ("truncated", zipfile.ZIP_DEFLATED),
+    ])
+    def test_import_refuses_damaged_archive_before_touching_home(
+        self, tmp_path, monkeypatch, capsys, damage, compression
+    ):
+        """#121258: members that fail to decompress, fail their CRC or are cut short must all be
+        found BEFORE the first file is replaced -- not surface as a traceback half-way through
+        -- listed (capped) in one run, and the command must exit 1 without "restored" wording."""
+        qubit_home = self._home_for_corrupt_import(tmp_path, monkeypatch)
+        zip_path = tmp_path / "backup.zip"
+        names = [f"skills/s{i}/SKILL.md" for i in range(12)]
+        with zipfile.ZipFile(zip_path, "w", compression=compression) as zf:
+            zf.writestr("config.yaml", "model: restored\n")
+            for name in names:
+                zf.writestr(name, f"# {name}\n" * 20)
+            zf.writestr("sessions/after.json", '{"restored": true}')
+        for name in names:
+            self._corrupt_member(zip_path, name, damage)
+        assert zipfile.is_zipfile(zip_path)
+    
+        from qubit_cli.backup import run_import
+        from qubit_cli.main import cmd_import
+    
+        assert run_import(Namespace(zipfile=str(zip_path), force=True)) == 1
+        out = capsys.readouterr().out
+        assert "backup archive is damaged (12 member(s)" in out
+        assert sum(1 for line in out.splitlines() if line.strip().startswith("skills/s")) == 10
+        assert "... and 2 more" in out
+        assert "Importing" not in out
+        assert "restored" not in out.replace("nothing was restored", "")
+        # The home is exactly as it was.
+        assert (qubit_home / "config.yaml").read_text() == "model: live\n"
+>       assert sorted(p.name for p in qubit_home.iterdir()) == ["config.yaml"]
+E       AssertionError: assert ['SOUL.md', '... 'hooks', ...] == ['config.yaml']
+E         
+E         At index 0 diff: 'SOUL.md' != 'config.yaml'
+E         Left contains 11 more items, first extra item: 'audio_cache'
+E         Use -v to get more diff
+
+tests/hermes_cli/test_backup.py:630: AssertionError
+________ TestImport.test_skipped_member_reports_incomplete_and_exits_1 _________
+
+self = <test_backup.TestImport object at 0x7008b5a46ab0>
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-140/test_skipped_member_reports_in0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7008b6061a00>
+capsys = <_pytest.capture.CaptureFixture object at 0x7008b45b4920>
+
+    def test_skipped_member_reports_incomplete_and_exits_1(self, tmp_path, monkeypatch, capsys):
+        """A member that could not be written is a partial restore: the CLI must not print
+        "restored" or exit 0, or a script and the dashboard's "done" badge carry on over it.
+        Runtime files the import deliberately keeps are not failures."""
+        qubit_home = tmp_path / ".qubit"
+        locked = qubit_home / "skills" / "demo"
+        locked.mkdir(parents=True)
+        monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    
+        zip_path = tmp_path / "backup.zip"
+        self._make_backup_zip(zip_path, {
+            "config.yaml": "model: test\n",
+            "gateway.pid": "123\n",
+            "skills/demo/SKILL.md": "# demo\n",
+        })
+        args = Namespace(zipfile=str(zip_path), force=True)
+    
+        from qubit_cli.backup import run_import
+        from qubit_cli.main import cmd_import
+    
+        locked.chmod(0o555)
+        try:
+            if os.access(locked, os.W_OK):
+                pytest.skip("root or Windows: chmod 0555 does not make the directory read-only")
+            assert run_import(args) == 1
+            out = capsys.readouterr().out
+            assert "Import incomplete" in out
+            assert "Import complete" not in out
+            assert "skills/demo/SKILL.md" in out
+            assert "has been restored" not in out
+            assert cmd_import(args) == 1
+        finally:
+            locked.chmod(0o755)
+    
+        capsys.readouterr()
+        assert cmd_import(args) is None
+        out = capsys.readouterr().out
+        assert "Preserved 1 runtime state file(s)" in out
+>       assert "Done. Your Hermes configuration has been restored." in out
+E       AssertionError: assert 'Done. Your Hermes configuration has been restored.' in 'Backup contains 3 files\nTarget: ~/.qubit\n\nChecking archive integrity ...\n\nImporting 3 files ...\n\nImport comple...in the backup.\n  If this is a fresh install, run: qubit update\n\nDone. Your Qubit configuration has been restored.\n'
+
+tests/hermes_cli/test_backup.py:731: AssertionError
+____________________ TestRoundTrip.test_backup_then_import _____________________
+
+self = <test_backup.TestRoundTrip object at 0x7008b5a58650>
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-140/test_backup_then_import0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7008b4852c90>
+
+    def test_backup_then_import(self, tmp_path, monkeypatch):
+        """Full round-trip: backup -> import to a new location -> verify."""
+        # Source
+        src_home = tmp_path / "source" / ".qubit"
+        src_home.mkdir(parents=True)
+        _make_qubit_tree(src_home)
+    
+        monkeypatch.setenv("QUBIT_HOME", str(src_home))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path / "source")
+    
+        # Backup
+        out_zip = tmp_path / "roundtrip.zip"
+        from qubit_cli.backup import run_backup, run_import
+    
+        run_backup(Namespace(output=str(out_zip)))
+        assert out_zip.exists()
+    
+        # Import into a different location
+        dst_home = tmp_path / "dest" / ".qubit"
+        dst_home.mkdir(parents=True)
+        monkeypatch.setenv("QUBIT_HOME", str(dst_home))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path / "dest")
+    
+        run_import(Namespace(zipfile=str(out_zip), force=True))
+    
+        # Verify key files
+        assert (dst_home / "config.yaml").read_text() == "model:\n  provider: openrouter\n"
+        assert (dst_home / ".env").read_text() == "OPENROUTER_API_KEY=sk-test-123\n"
+        assert (dst_home / "skills" / "my-skill" / "SKILL.md").exists()
+        assert (dst_home / "profiles" / "coder" / "config.yaml").exists()
+        assert (dst_home / "sessions" / "abc123.json").exists()
+        assert (dst_home / "logs" / "agent.log").exists()
+    
+        # qubit should NOT be present
+>       assert not (dst_home / "qubit").exists()
+E       AssertionError: assert not True
+E        +  where True = exists()
+E        +    where exists = (PosixPath('/tmp/pytest-of-trick/pytest-140/test_backup_then_import0/dest/.qubit') / 'qubit').exists
+
+tests/hermes_cli/test_backup.py:871: AssertionError
+----------------------------- Captured stdout call -----------------------------
+Scanning ~/.qubit ...
+Backing up 13 files ...
+
+Backup complete: /tmp/pytest-of-trick/pytest-140/test_backup_then_import0/roundtrip.zip
+  Files:       13
+  Original:    16.2 KB
+  Compressed:  1.9 KB
+  Time:        0.0s
+
+  Excluded directories:
+    plugins/__pycache__/
+    qubit/.git/
+
+Restore with: qubit import roundtrip.zip
+Backup contains 13 files
+Target: ~/.qubit
+
+Checking archive integrity ...
+
+Importing 13 files ...
+
+Import complete: 13 files restored in 0.2s
+  Target: ~/.qubit
+
+  Profile aliases restored: coder
+
+  Note: /tmp/pytest-of-trick/pytest-140/test_backup_then_import0/dest/.local/bin is not in your PATH.
+  Add to your shell config (~/.bashrc or ~/.zshrc):
+    export PATH="$HOME/.local/bin:$PATH"
+
+Note: The hermes-agent codebase was not included in the backup.
+  If this is a fresh install, run: qubit update
+
+To re-enable gateway services for profiles:
+  qubit -p coder gateway install
+
+Done. Your Qubit configuration has been restored.
+------------------------------ Captured log call -------------------------------
+INFO     qubit_cli.backup:backup.py:615 backup phase=scan status=started
+INFO     qubit_cli.backup:backup.py:626 backup phase=scan status=complete duration_ms=20.8 files=13
+INFO     qubit_cli.backup:backup.py:628 backup phase=archive status=started files=13
+INFO     qubit_cli.backup:backup.py:653 backup phase=archive status=complete duration_ms=32.0 files=13 errors=0 bytes=1934
+_ TestFailedZipMemberRecovery.test_incomplete_pre_update_backup_does_not_rotate_last_complete _
+
+self = <test_backup.TestFailedZipMemberRecovery object at 0x7008b5a791f0>
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-140/test_incomplete_pre_update_bac0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7008b4829e50>
+
+    def test_incomplete_pre_update_backup_does_not_rotate_last_complete(self, tmp_path, monkeypatch):
+        qubit_home = tmp_path / ".qubit"
+        qubit_home.mkdir()
+        (qubit_home / "config.yaml").write_text("model: test\n")
+    
+        from qubit_cli.backup import create_pre_update_backup
+    
+>       good = create_pre_update_backup(qubit_home=qubit_home, keep=2)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_backup.py:1846: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_incomplete_pre_update_bac0/.qubit')
+keep = 2
+
+    def create_pre_update_backup(
+        qubit_home: Optional[Path] = None, keep: int = _PRE_UPDATE_DEFAULT_KEEP) -> Optional[Path]:
+        """Full zip backup to ``backups/pre-update-<timestamp>.zip``, auto-pruned; ``None`` if nothing
+        was found, the backup failed, or it was incomplete (salvage kept as ``*.incomplete.zip``).
+        Never raises — ``qubit update`` continues anyway."""
+>       return _create_prefixed_full_backup(qubit_home, _PRE_UPDATE_PREFIX, max(keep, 1), "pre-update", "backup")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+qubit_cli/backup.py:1180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_incomplete_pre_update_bac0/.qubit')
+prefix = 'pre-update-', keep = 2, what = 'pre-update', prune_what = 'backup'
+
+    def _create_prefixed_full_backup(
+        qubit_home: Optional[Path], prefix: str, keep: int, what: str, prune_what: str) -> Optional[Path]:
+        """Write ``<QUBIT_HOME>/backups/<prefix><timestamp>.zip`` and prune older same-prefix zips.
+        Returns the path, or ``None`` if nothing to back up, the write failed, or the archive is
+        incomplete (kept as ``<prefix><timestamp>.incomplete.zip``, excluded from retention).
+        Never raises."""
+        qubit_root = qubit_home or get_default_qubit_root()
+        if not qubit_root.is_dir():
+            return None
+>       backup_dir = hermes_root / _PRE_UPDATE_BACKUPS_DIR
+                     ^^^^^^^^^^^
+E       NameError: name 'hermes_root' is not defined
+
+qubit_cli/backup.py:1159: NameError
+__________ TestPreUpdateBackup.test_backup_contents_match_full_backup __________
+
+self = <test_backup.TestPreUpdateBackup object at 0x7008b5a79940>
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_backup_contents_match_ful0/.qubit')
+
+    def test_backup_contents_match_full_backup(self, qubit_home):
+        """Pre-update backup should include the same user data that
+        ``qubit backup`` would, and should exclude the same directories."""
+        from qubit_cli.backup import create_pre_update_backup
+>       out = create_pre_update_backup(qubit_home=qubit_home)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_backup.py:1892: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_backup_contents_match_ful0/.qubit')
+keep = 5
+
+    def create_pre_update_backup(
+        qubit_home: Optional[Path] = None, keep: int = _PRE_UPDATE_DEFAULT_KEEP) -> Optional[Path]:
+        """Full zip backup to ``backups/pre-update-<timestamp>.zip``, auto-pruned; ``None`` if nothing
+        was found, the backup failed, or it was incomplete (salvage kept as ``*.incomplete.zip``).
+        Never raises — ``qubit update`` continues anyway."""
+>       return _create_prefixed_full_backup(qubit_home, _PRE_UPDATE_PREFIX, max(keep, 1), "pre-update", "backup")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+qubit_cli/backup.py:1180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_backup_contents_match_ful0/.qubit')
+prefix = 'pre-update-', keep = 5, what = 'pre-update', prune_what = 'backup'
+
+    def _create_prefixed_full_backup(
+        qubit_home: Optional[Path], prefix: str, keep: int, what: str, prune_what: str) -> Optional[Path]:
+        """Write ``<QUBIT_HOME>/backups/<prefix><timestamp>.zip`` and prune older same-prefix zips.
+        Returns the path, or ``None`` if nothing to back up, the write failed, or the archive is
+        incomplete (kept as ``<prefix><timestamp>.incomplete.zip``, excluded from retention).
+        Never raises."""
+        qubit_root = qubit_home or get_default_qubit_root()
+        if not qubit_root.is_dir():
+            return None
+>       backup_dir = hermes_root / _PRE_UPDATE_BACKUPS_DIR
+                     ^^^^^^^^^^^
+E       NameError: name 'hermes_root' is not defined
+
+qubit_cli/backup.py:1159: NameError
+_ TestPreUpdateBackup.test_pre_update_zip_does_not_nest_the_pre_update_snapshot _
+
+self = <test_backup.TestPreUpdateBackup object at 0x7008b5a7a030>
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_pre_update_zip_does_not_n0/.qubit')
+
+    def test_pre_update_zip_does_not_nest_the_pre_update_snapshot(self, qubit_home):
+        """``qubit update`` in ``full`` mode takes the quick snapshot *before*
+        the full zip, so the zip walk sees the snapshot it just made. It must
+        skip it — otherwise every pre-update zip ships state.db twice."""
+        from qubit_cli.backup import (
+            _QUICK_SNAPSHOTS_DIR,
+            create_pre_update_backup,
+            create_quick_snapshot,
+        )
+        with sqlite3.connect(qubit_home / "state.db") as conn:
+            conn.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY)")
+    
+        snap_id = create_quick_snapshot(label="pre-update", qubit_home=qubit_home)
+        assert snap_id and (qubit_home / _QUICK_SNAPSHOTS_DIR / snap_id / "state.db").exists()
+    
+>       out = create_pre_update_backup(qubit_home=qubit_home)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_backup.py:1924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_pre_update_zip_does_not_n0/.qubit')
+keep = 5
+
+    def create_pre_update_backup(
+        qubit_home: Optional[Path] = None, keep: int = _PRE_UPDATE_DEFAULT_KEEP) -> Optional[Path]:
+        """Full zip backup to ``backups/pre-update-<timestamp>.zip``, auto-pruned; ``None`` if nothing
+        was found, the backup failed, or it was incomplete (salvage kept as ``*.incomplete.zip``).
+        Never raises — ``qubit update`` continues anyway."""
+>       return _create_prefixed_full_backup(qubit_home, _PRE_UPDATE_PREFIX, max(keep, 1), "pre-update", "backup")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+qubit_cli/backup.py:1180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_pre_update_zip_does_not_n0/.qubit')
+prefix = 'pre-update-', keep = 5, what = 'pre-update', prune_what = 'backup'
+
+    def _create_prefixed_full_backup(
+        qubit_home: Optional[Path], prefix: str, keep: int, what: str, prune_what: str) -> Optional[Path]:
+        """Write ``<QUBIT_HOME>/backups/<prefix><timestamp>.zip`` and prune older same-prefix zips.
+        Returns the path, or ``None`` if nothing to back up, the write failed, or the archive is
+        incomplete (kept as ``<prefix><timestamp>.incomplete.zip``, excluded from retention).
+        Never raises."""
+        qubit_root = qubit_home or get_default_qubit_root()
+        if not qubit_root.is_dir():
+            return None
+>       backup_dir = hermes_root / _PRE_UPDATE_BACKUPS_DIR
+                     ^^^^^^^^^^^
+E       NameError: name 'hermes_root' is not defined
+
+qubit_cli/backup.py:1159: NameError
+------------------------------ Captured log call -------------------------------
+INFO     qubit_cli.backup:backup.py:1277 quick snapshot phase=copy status=started id=20261016-054848-pre-update
+INFO     qubit_cli.backup:backup.py:1448 quick snapshot phase=copy status=complete id=20261016-054848-pre-update files=5 bytes=20543
+________________ TestPreUpdateBackup.test_rotation_keeps_only_n ________________
+
+self = <test_backup.TestPreUpdateBackup object at 0x7008b5a7a750>
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_rotation_keeps_only_n0/.qubit')
+
+    def test_rotation_keeps_only_n(self, qubit_home):
+        """After more than ``keep`` backups are created, older ones are
+        pruned automatically."""
+        from qubit_cli.backup import create_pre_update_backup
+    
+        created = []
+        for _ in range(5):
+>           out = create_pre_update_backup(qubit_home=qubit_home, keep=3)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_backup.py:1939: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_rotation_keeps_only_n0/.qubit')
+keep = 3
+
+    def create_pre_update_backup(
+        qubit_home: Optional[Path] = None, keep: int = _PRE_UPDATE_DEFAULT_KEEP) -> Optional[Path]:
+        """Full zip backup to ``backups/pre-update-<timestamp>.zip``, auto-pruned; ``None`` if nothing
+        was found, the backup failed, or it was incomplete (salvage kept as ``*.incomplete.zip``).
+        Never raises — ``qubit update`` continues anyway."""
+>       return _create_prefixed_full_backup(qubit_home, _PRE_UPDATE_PREFIX, max(keep, 1), "pre-update", "backup")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+qubit_cli/backup.py:1180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_rotation_keeps_only_n0/.qubit')
+prefix = 'pre-update-', keep = 3, what = 'pre-update', prune_what = 'backup'
+
+    def _create_prefixed_full_backup(
+        qubit_home: Optional[Path], prefix: str, keep: int, what: str, prune_what: str) -> Optional[Path]:
+        """Write ``<QUBIT_HOME>/backups/<prefix><timestamp>.zip`` and prune older same-prefix zips.
+        Returns the path, or ``None`` if nothing to back up, the write failed, or the archive is
+        incomplete (kept as ``<prefix><timestamp>.incomplete.zip``, excluded from retention).
+        Never raises."""
+        qubit_root = qubit_home or get_default_qubit_root()
+        if not qubit_root.is_dir():
+            return None
+>       backup_dir = hermes_root / _PRE_UPDATE_BACKUPS_DIR
+                     ^^^^^^^^^^^
+E       NameError: name 'hermes_root' is not defined
+
+qubit_cli/backup.py:1159: NameError
+________________ TestPreUpdateBackup.test_skips_symlinked_files ________________
+
+self = <test_backup.TestPreUpdateBackup object at 0x7008b5a7ae40>
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_skips_symlinked_files1/.qubit')
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-140/test_skips_symlinked_files1')
+
+    def test_skips_symlinked_files(self, qubit_home, tmp_path):
+        """Pre-update backups must not dereference symlinks outside QUBIT_HOME."""
+        from qubit_cli.backup import create_pre_update_backup
+    
+        outside = tmp_path / "outside-secret.txt"
+        outside.write_text("outside secret\n")
+        _symlink_file_or_skip(qubit_home / "skills" / "outside-link.txt", outside)
+    
+>       out = create_pre_update_backup(qubit_home=qubit_home)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_backup.py:1967: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_skips_symlinked_files1/.qubit')
+keep = 5
+
+    def create_pre_update_backup(
+        qubit_home: Optional[Path] = None, keep: int = _PRE_UPDATE_DEFAULT_KEEP) -> Optional[Path]:
+        """Full zip backup to ``backups/pre-update-<timestamp>.zip``, auto-pruned; ``None`` if nothing
+        was found, the backup failed, or it was incomplete (salvage kept as ``*.incomplete.zip``).
+        Never raises — ``qubit update`` continues anyway."""
+>       return _create_prefixed_full_backup(qubit_home, _PRE_UPDATE_PREFIX, max(keep, 1), "pre-update", "backup")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+qubit_cli/backup.py:1180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_skips_symlinked_files1/.qubit')
+prefix = 'pre-update-', keep = 5, what = 'pre-update', prune_what = 'backup'
+
+    def _create_prefixed_full_backup(
+        qubit_home: Optional[Path], prefix: str, keep: int, what: str, prune_what: str) -> Optional[Path]:
+        """Write ``<QUBIT_HOME>/backups/<prefix><timestamp>.zip`` and prune older same-prefix zips.
+        Returns the path, or ``None`` if nothing to back up, the write failed, or the archive is
+        incomplete (kept as ``<prefix><timestamp>.incomplete.zip``, excluded from retention).
+        Never raises."""
+        qubit_root = qubit_home or get_default_qubit_root()
+        if not qubit_root.is_dir():
+            return None
+>       backup_dir = hermes_root / _PRE_UPDATE_BACKUPS_DIR
+                     ^^^^^^^^^^^
+E       NameError: name 'hermes_root' is not defined
+
+qubit_cli/backup.py:1159: NameError
+_________________ TestRunPreUpdateBackup.test_config_full_mode _________________
+
+self = <test_backup.TestRunPreUpdateBackup object at 0x7008b5a7bd10>
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_config_full_mode0/.qubit')
+capsys = <_pytest.capture.CaptureFixture object at 0x7008b347ab70>
+
+    def test_config_full_mode(self, qubit_home, capsys):
+        self._set_mode(qubit_home, "full")
+        from qubit_cli.update_cmd import _run_pre_update_backup
+        snap_id = _run_pre_update_backup(Namespace(no_backup=False, backup=False))
+        assert snap_id is not None
+>       assert len(self._zips(qubit_home)) == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = len([])
+E        +    where [] = <function TestRunPreUpdateBackup._zips at 0x7008b5a26840>(PosixPath('/tmp/pytest-of-trick/pytest-140/test_config_full_mode0/.qubit'))
+E        +      where <function TestRunPreUpdateBackup._zips at 0x7008b5a26840> = <test_backup.TestRunPreUpdateBackup object at 0x7008b5a7bd10>._zips
+
+tests/hermes_cli/test_backup.py:2034: AssertionError
+----------------------------- Captured stdout call -----------------------------
+◆ Pre-update snapshot: 20261016-054849-pre-update
+◆ Sibling profile snapshot(s): coder
+◆ Creating pre-update backup...
+  ⚠ Backup failed: name 'hermes_root' is not defined
+  Continuing with update.
+
+------------------------------ Captured log call -------------------------------
+INFO     qubit_cli.backup:backup.py:1277 quick snapshot phase=copy status=started id=20261016-054849-pre-update
+INFO     qubit_cli.backup:backup.py:1448 quick snapshot phase=copy status=complete id=20261016-054849-pre-update files=4 bytes=8280
+INFO     qubit_cli.backup:backup.py:1277 quick snapshot phase=copy status=started id=20261016-054849-pre-update
+INFO     qubit_cli.backup:backup.py:1448 quick snapshot phase=copy status=complete id=20261016-054849-pre-update files=2 bytes=58
+___________ TestPreMigrationBackup.test_restorable_with_qubit_import ___________
+
+self = <test_backup.TestPreMigrationBackup object at 0x7008b5a88530>
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_restorable_with_qubit_imp0/.qubit')
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-140/test_restorable_with_qubit_imp0')
+
+    def test_restorable_with_qubit_import(self, qubit_home, tmp_path):
+        """The zip produced by pre-migration backup must be a valid Hermes
+        backup — `qubit import` should accept it."""
+        from qubit_cli.backup import create_pre_migration_backup, _validate_backup_zip
+>       out = create_pre_migration_backup(qubit_home=qubit_home)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_backup.py:2059: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_restorable_with_qubit_imp0/.qubit')
+keep = 5
+
+    def create_pre_migration_backup(
+        qubit_home: Optional[Path] = None, keep: int = _PRE_MIGRATION_DEFAULT_KEEP) -> Optional[Path]:
+        """Full zip backup to ``backups/pre-migration-<timestamp>.zip`` before ``qubit claw migrate``
+        (same dir as update backups so listings/``qubit import`` find it); ``None`` if nothing was
+        found, the write failed, or it was incomplete (salvage kept as ``*.incomplete.zip``). Never
+        raises."""
+>       return _create_prefixed_full_backup(
+            qubit_home, _PRE_MIGRATION_PREFIX, max(keep, 0), "pre-migration", "pre-migration backup")
+
+qubit_cli/backup.py:1189: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_restorable_with_qubit_imp0/.qubit')
+prefix = 'pre-migration-', keep = 5, what = 'pre-migration'
+prune_what = 'pre-migration backup'
+
+    def _create_prefixed_full_backup(
+        qubit_home: Optional[Path], prefix: str, keep: int, what: str, prune_what: str) -> Optional[Path]:
+        """Write ``<QUBIT_HOME>/backups/<prefix><timestamp>.zip`` and prune older same-prefix zips.
+        Returns the path, or ``None`` if nothing to back up, the write failed, or the archive is
+        incomplete (kept as ``<prefix><timestamp>.incomplete.zip``, excluded from retention).
+        Never raises."""
+        qubit_root = qubit_home or get_default_qubit_root()
+        if not qubit_root.is_dir():
+            return None
+>       backup_dir = hermes_root / _PRE_UPDATE_BACKUPS_DIR
+                     ^^^^^^^^^^^
+E       NameError: name 'hermes_root' is not defined
+
+qubit_cli/backup.py:1159: NameError
+________ TestPreMigrationBackup.test_does_not_touch_pre_update_backups _________
+
+self = <test_backup.TestPreMigrationBackup object at 0x7008b5a7bce0>
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_does_not_touch_pre_update0/.qubit')
+
+    def test_does_not_touch_pre_update_backups(self, qubit_home):
+        """Pre-migration rotation must only prune pre-migration-*.zip files,
+        leaving pre-update-*.zip backups untouched."""
+        from qubit_cli.backup import create_pre_update_backup, create_pre_migration_backup
+>       update_backup = create_pre_update_backup(qubit_home=qubit_home, keep=5)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_backup.py:2072: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_does_not_touch_pre_update0/.qubit')
+keep = 5
+
+    def create_pre_update_backup(
+        qubit_home: Optional[Path] = None, keep: int = _PRE_UPDATE_DEFAULT_KEEP) -> Optional[Path]:
+        """Full zip backup to ``backups/pre-update-<timestamp>.zip``, auto-pruned; ``None`` if nothing
+        was found, the backup failed, or it was incomplete (salvage kept as ``*.incomplete.zip``).
+        Never raises — ``qubit update`` continues anyway."""
+>       return _create_prefixed_full_backup(qubit_home, _PRE_UPDATE_PREFIX, max(keep, 1), "pre-update", "backup")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+qubit_cli/backup.py:1180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-140/test_does_not_touch_pre_update0/.qubit')
+prefix = 'pre-update-', keep = 5, what = 'pre-update', prune_what = 'backup'
+
+    def _create_prefixed_full_backup(
+        qubit_home: Optional[Path], prefix: str, keep: int, what: str, prune_what: str) -> Optional[Path]:
+        """Write ``<QUBIT_HOME>/backups/<prefix><timestamp>.zip`` and prune older same-prefix zips.
+        Returns the path, or ``None`` if nothing to back up, the write failed, or the archive is
+        incomplete (kept as ``<prefix><timestamp>.incomplete.zip``, excluded from retention).
+        Never raises."""
+        qubit_root = qubit_home or get_default_qubit_root()
+        if not qubit_root.is_dir():
+            return None
+>       backup_dir = hermes_root / _PRE_UPDATE_BACKUPS_DIR
+                     ^^^^^^^^^^^
+E       NameError: name 'hermes_root' is not defined
+
+qubit_cli/backup.py:1159: NameError
+________ test_run_backup_prunes_older_default_named_zips_but_not_others ________
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-140/test_run_backup_prunes_older_d0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7008b346b4a0>
+
+    def test_run_backup_prunes_older_default_named_zips_but_not_others(tmp_path, monkeypatch):
+        """Hourly `qubit backup` callers accumulated 150+ zips; --keep bounds the default-named
+        ones and leaves custom-named or foreign zips alone (#81317)."""
+        from argparse import Namespace
+        from qubit_cli import backup as backup_mod
+    
+        home = tmp_path / ".qubit"
+        home.mkdir()
+        (home / "config.yaml").write_text("model: x\n")
+        monkeypatch.setenv("QUBIT_HOME", str(home))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        for i in range(4):
+            (tmp_path / f"qubit-backup-2026-01-0{i + 1}-000000.zip").write_bytes(b"old")
+        (tmp_path / "my-archive.zip").write_bytes(b"mine")
+    
+        backup_mod.run_backup(Namespace(output=None, keep=2))
+    
+        kept = sorted(p.name for p in tmp_path.glob("qubit-backup-*.zip"))
+>       assert len(kept) == 2 and kept[0] == "qubit-backup-2026-01-04-000000.zip"
+E       AssertionError: assert (4 == 2)
+E        +  where 4 = len(['qubit-backup-2026-01-01-000000.zip', 'qubit-backup-2026-01-02-000000.zip', 'qubit-backup-2026-01-03-000000.zip', 'qubit-backup-2026-01-04-000000.zip'])
+
+tests/hermes_cli/test_backup.py:2840: AssertionError
+----------------------------- Captured stdout call -----------------------------
+Scanning ~/.qubit ...
+Backing up 1 files ...
+
+Backup complete: /tmp/pytest-of-trick/pytest-140/test_run_backup_prunes_older_d0/hermes-backup-2026-10-16-054850.zip
+  Files:       1
+  Original:    9 B
+  Compressed:  131 B
+  Time:        0.0s
+
+Restore with: qubit import hermes-backup-2026-10-16-054850.zip
+------------------------------ Captured log call -------------------------------
+INFO     qubit_cli.backup:backup.py:615 backup phase=scan status=started
+INFO     qubit_cli.backup:backup.py:626 backup phase=scan status=complete duration_ms=12.2 files=1
+INFO     qubit_cli.backup:backup.py:628 backup phase=archive status=started files=1
+INFO     qubit_cli.backup:backup.py:653 backup phase=archive status=complete duration_ms=0.7 files=1 errors=0 bytes=131
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_backup.py::TestShouldExclude::test_excludes_qubit_agent
+FAILED tests/hermes_cli/test_backup.py::TestIterBackupFiles::test_manual_and_automatic_paths_share_one_walk
+FAILED tests/hermes_cli/test_backup.py::TestIterBackupFiles::test_skipped_dirs_collected_for_summary
+FAILED tests/hermes_cli/test_backup.py::TestImport::test_import_refuses_damaged_archive_before_touching_home[deflate-8]
+FAILED tests/hermes_cli/test_backup.py::TestImport::test_skipped_member_reports_incomplete_and_exits_1
+FAILED tests/hermes_cli/test_backup.py::TestRoundTrip::test_backup_then_import
+FAILED tests/hermes_cli/test_backup.py::TestFailedZipMemberRecovery::test_incomplete_pre_update_backup_does_not_rotate_last_complete
+FAILED tests/hermes_cli/test_backup.py::TestPreUpdateBackup::test_backup_contents_match_full_backup
+FAILED tests/hermes_cli/test_backup.py::TestPreUpdateBackup::test_pre_update_zip_does_not_nest_the_pre_update_snapshot
+FAILED tests/hermes_cli/test_backup.py::TestPreUpdateBackup::test_rotation_keeps_only_n
+FAILED tests/hermes_cli/test_backup.py::TestPreUpdateBackup::test_skips_symlinked_files
+FAILED tests/hermes_cli/test_backup.py::TestRunPreUpdateBackup::test_config_full_mode
+FAILED tests/hermes_cli/test_backup.py::TestPreMigrationBackup::test_restorable_with_qubit_import
+FAILED tests/hermes_cli/test_backup.py::TestPreMigrationBackup::test_does_not_touch_pre_update_backups
+FAILED tests/hermes_cli/test_backup.py::test_run_backup_prunes_older_default_named_zips_but_not_others
+15 failed, 79 passed in 8.82s

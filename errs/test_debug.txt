@@ -1,0 +1,53 @@
+.............................................F....FF..                   [100%]
+=================================== FAILURES ===================================
+_______________ TestBuildNousBundle.test_envelope_shape_and_gzip _______________
+
+self = <test_debug.TestBuildNousBundle object at 0x7b248c916db0>
+qubit_home = PosixPath('/tmp/pytest-of-trick/pytest-154/test_envelope_shape_and_gzip0/.qubit')
+
+    def test_envelope_shape_and_gzip(self, qubit_home):
+        import gzip
+        import json as _json
+    
+        from qubit_cli.debug import build_nous_bundle
+    
+        files = {"report": "hello", "agent.log": "log line"}
+        blob = build_nous_bundle(files, redact=True)
+    
+        # It's gzip — magic bytes.
+        assert blob[:2] == b"\x1f\x8b"
+        envelope = _json.loads(gzip.decompress(blob).decode())
+>       assert envelope["format"] == "qubit-debug-share/1"
+E       AssertionError: assert 'hermes-debug-share/1' == 'qubit-debug-share/1'
+E         
+E         - qubit-debug-share/1
+E         + hermes-debug-share/1
+
+tests/hermes_cli/test_debug.py:911: AssertionError
+___________ TestDebugSlashCommand.test_bare_debug_defaults_to_paste ____________
+
+self = <test_debug.TestDebugSlashCommand object at 0x7b248c92c830>
+
+    def test_bare_debug_defaults_to_paste(self):
+        c = self._captured("/debug")
+>       assert c["nous"] is False and c["local"] is False
+               ^^^^^^^^^
+E       KeyError: 'nous'
+
+tests/hermes_cli/test_debug.py:1015: KeyError
+_________ TestDebugSlashCommand.test_word_parsing_is_case_insensitive __________
+
+self = <test_debug.TestDebugSlashCommand object at 0x7b248c92cef0>
+
+    def test_word_parsing_is_case_insensitive(self):
+        c = self._captured("/debug NOUS")
+>       assert c["nous"] is True
+               ^^^^^^^^^
+E       KeyError: 'nous'
+
+tests/hermes_cli/test_debug.py:1023: KeyError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_debug.py::TestBuildNousBundle::test_envelope_shape_and_gzip
+FAILED tests/hermes_cli/test_debug.py::TestDebugSlashCommand::test_bare_debug_defaults_to_paste
+FAILED tests/hermes_cli/test_debug.py::TestDebugSlashCommand::test_word_parsing_is_case_insensitive
+3 failed, 51 passed in 5.52s

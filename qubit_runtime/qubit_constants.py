@@ -458,24 +458,32 @@ def _packaged_dir(env_var: str, default: Path | None, subdir: str) -> Path:
 
     Order: *env_var* (Nix wrapper / explicit override) → caller ``default`` (source checkout) →
     ``<QUBIT_HOME>/<subdir>``.
+
+    *env_var* is the canonical ``QUBIT_*`` spelling. The legacy ``HERMES_*`` spelling is
+    still honoured as a fallback so already-generated package-manager wrappers (Nix
+    derivations, bundle manifests) keep resolving: single write, dual read
+    (docs/REBRAND-SWEEP-PLAN.md hazard 1).
     """
     override = os.getenv(env_var, "").strip()
+    if not override and env_var.startswith("QUBIT_"):
+        legacy = "HERMES_" + env_var[len("QUBIT_"):]
+        override = os.getenv(legacy, "").strip()
     return Path(override) if override else default if default is not None else get_qubit_home() / subdir
 
 
 def get_optional_skills_dir(default: Path | None = None) -> Path:
     """Return the optional-skills directory, honoring package-manager wrappers."""
-    return _packaged_dir("HERMES_OPTIONAL_SKILLS", default, "optional-skills")
+    return _packaged_dir("QUBIT_OPTIONAL_SKILLS", default, "optional-skills")
 
 
 def get_optional_mcps_dir(default: Path | None = None) -> Path:
-    """Return the optional-mcps directory, honoring package-manager wrappers (``HERMES_OPTIONAL_MCPS``)."""
-    return _packaged_dir("HERMES_OPTIONAL_MCPS", default, "optional-mcps")
+    """Return the optional-mcps directory, honoring package-manager wrappers (``QUBIT_OPTIONAL_MCPS``)."""
+    return _packaged_dir("QUBIT_OPTIONAL_MCPS", default, "optional-mcps")
 
 
 def get_bundled_skills_dir(default: Path | None = None) -> Path:
-    """Return the bundled skills directory, honoring package-manager wrappers (``HERMES_BUNDLED_SKILLS``)."""
-    return _packaged_dir("HERMES_BUNDLED_SKILLS", default, "skills")
+    """Return the bundled skills directory, honoring package-manager wrappers (``QUBIT_BUNDLED_SKILLS``)."""
+    return _packaged_dir("QUBIT_BUNDLED_SKILLS", default, "skills")
 
 
 def get_qubit_dir(new_subpath: str, old_name: str, *, home: Path | None = None) -> Path:

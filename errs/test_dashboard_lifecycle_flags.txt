@@ -1,0 +1,68 @@
+.FF......                                                                [100%]
+=================================== FAILURES ===================================
+________________ TestDashboardStatus.test_status_with_processes ________________
+
+self = <test_dashboard_lifecycle_flags.TestDashboardStatus object at 0x74082ee8f110>
+capsys = <_pytest.capture.CaptureFixture object at 0x74082e7c6a50>
+
+    def test_status_with_processes(self, capsys):
+        # Includes a serve-mode backend: --status must LIST it, not hide it —
+        # `--stop` kills serves, so hiding them let operators kill what they
+        # couldn't see (#81564).
+        processes = [
+            (12345, "qubit dashboard --port 9119"),
+            (12346, "python -m qubit_cli.main dashboard --host 0.0.0.0 --port 9120"),
+            (12347, "qubit serve --host 100.94.65.93 --port 9119"),
+        ]
+        with patch("qubit_cli.dashboard_procs._scan_dashboard_processes", return_value=processes), \
+             patch("gateway.status._pid_exists", return_value=True), \
+             patch("qubit_cli.main_dashboard._dashboard_listening", return_value=True), \
+             pytest.raises(SystemExit) as exc:
+            cmd_dashboard(_ns(status=True))
+        # Status is informational — always exits 0.
+        assert exc.value.code == 0
+        out = capsys.readouterr().out
+>       assert "PID 12345" in out
+E       AssertionError: assert 'PID 12345' in '1 qubit dashboard/serve process(es) running:\n    PID 12346 [dashboard]: python -m qubit_cli.main dashboard --host 0.0.0.0 --port 9120\n'
+
+tests/hermes_cli/test_dashboard_lifecycle_flags.py:55: AssertionError
+_ TestDashboardStatus.test_status_lists_os_assigned_port_serve_that_stop_targets _
+
+self = <test_dashboard_lifecycle_flags.TestDashboardStatus object at 0x74082ee8f770>
+capsys = <_pytest.capture.CaptureFixture object at 0x74082e80ae10>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74082eef39b0>
+
+    def test_status_lists_os_assigned_port_serve_that_stop_targets(self, capsys, monkeypatch):
+        """A ``--port 0`` serve (Desktop SSH backend) is listed on the port the ledger recorded,
+        so ``--status`` shows every backend ``--stop`` would kill (#81564)."""
+        import socket
+    
+        from qubit_cli import dashboard_procs, process_identity
+        from qubit_cli.main_dashboard import _find_stale_dashboard_pids
+    
+        pid = 424242
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen()
+            real_port = listener.getsockname()[1]
+            monkeypatch.setattr(dashboard_procs, "_iter_process_table", lambda: [
+                (pid, "/usr/local/bin/qubit serve --host 127.0.0.1 --port 0 --ssh-isolated")])
+            monkeypatch.setattr(process_identity, "ledger_entries", lambda: [
+                {"pid": pid, "purpose": "serve", "host": "127.0.0.1", "port": real_port}])
+            monkeypatch.setattr("gateway.status._pid_exists", lambda p: p == pid)
+    
+            assert _find_stale_dashboard_pids() == [pid]
+            with pytest.raises(SystemExit) as exc:
+                cmd_dashboard(_ns(status=True))
+        assert exc.value.code == 0
+>       assert f"PID {pid} [serve]" in capsys.readouterr().out
+E       AssertionError: assert 'PID 424242 [serve]' in 'No qubit dashboard or serve processes running.\n'
+E        +  where 'No qubit dashboard or serve processes running.\n' = CaptureResult(out='No qubit dashboard or serve processes running.\n', err='').out
+E        +    where CaptureResult(out='No qubit dashboard or serve processes running.\n', err='') = readouterr()
+E        +      where readouterr = <_pytest.capture.CaptureFixture object at 0x74082e80ae10>.readouterr
+
+tests/hermes_cli/test_dashboard_lifecycle_flags.py:82: AssertionError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_dashboard_lifecycle_flags.py::TestDashboardStatus::test_status_with_processes
+FAILED tests/hermes_cli/test_dashboard_lifecycle_flags.py::TestDashboardStatus::test_status_lists_os_assigned_port_serve_that_stop_targets
+2 failed, 7 passed in 0.52s

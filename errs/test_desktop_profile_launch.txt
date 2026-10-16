@@ -1,0 +1,218 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+____________ test_dash_p_desktop_appends_profile_to_packaged_launch ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-157/test_dash_p_desktop_appends_pr0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72ebeff4f560>
+
+    def test_dash_p_desktop_appends_profile_to_packaged_launch(tmp_path, monkeypatch):
+>       launched = _launch_command(tmp_path, monkeypatch, ["qubit", "-p", "desktop", "desktop"])
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_desktop_profile_launch.py:123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-157/test_dash_p_desktop_appends_pr0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72ebeff4f560>
+argv = ['qubit', '-p', 'desktop', 'desktop'], active_profile = None
+
+    def _launch_command(tmp_path, monkeypatch, argv: list[str], *, active_profile: str | None = None) -> list[str]:
+        qubit_root = tmp_path / ".qubit"
+        qubit_root.mkdir()
+        if active_profile and active_profile != "default":
+            _live_profile(qubit_root, active_profile)
+            (qubit_root / "active_profile").write_text(active_profile + "\n", encoding="utf-8")
+        for name in _named_profiles(argv):
+            _live_profile(qubit_root, name)
+    
+        project = tmp_path / "qubit"
+        (project / "apps" / "desktop").mkdir(parents=True)
+        (project / "apps" / "desktop" / "package.json").write_text("{}", encoding="utf-8")
+        exe = _packaged_exe(project)
+    
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.delenv("QUBIT_HOME", raising=False)
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+        monkeypatch.setenv("GNOME_KEYRING_CONTROL", "/run/user/1000/keyring")
+        for var in (
+            "QUBIT_SUPERVISED_CHILD",
+            "QUBIT_S6_SUPERVISED_CHILD",
+            "INVOCATION_ID",
+            "QUBIT_GATEWAY_EXTERNAL_SUPERVISOR",
+            "KDE_SESSION_VERSION",
+            "KDE_FULL_SESSION",
+        ):
+            monkeypatch.delenv(var, raising=False)
+        monkeypatch.setattr(sys, "argv", argv)
+        monkeypatch.setattr(cli_main, "PROJECT_ROOT", project)
+        monkeypatch.setattr(main_desktop, "_desktop_exe_integrity_error", lambda _path: None)
+        # Module global: restore it so a later cmd_gui test does not inherit a flag.
+        monkeypatch.setattr(cli_main, "_explicit_cli_profile", None)
+    
+        cli_main._apply_profile_override()
+    
+        calls: list[list[str]] = []
+    
+        def _run(cmd, **_kwargs):
+            calls.append(list(cmd))
+            return subprocess.CompletedProcess(cmd, 0)
+    
+        monkeypatch.setattr(subprocess, "run", _run)
+        with pytest.raises(SystemExit) as exc:
+            cli_main.cmd_gui(_ns())
+>       assert exc.value.code == 0
+E       assert 1 == 0
+E        +  where 1 = SystemExit(1).code
+E        +    where SystemExit(1) = <ExceptionInfo SystemExit(1) tblen=3>.value
+
+tests/hermes_cli/test_desktop_profile_launch.py:116: AssertionError
+----------------------------- Captured stdout call -----------------------------
+✗ --skip-build was passed but no packaged desktop app was found at: /tmp/pytest-of-trick/pytest-157/test_dash_p_desktop_appends_pr0/qubit/apps/desktop/release
+  Pre-build first:  cd apps/desktop && npm run pack
+  Or drop --skip-build to package automatically.
+__________________ test_profile_equals_spelling_is_forwarded ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-157/test_profile_equals_spelling_i0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72ebefa37380>
+
+    def test_profile_equals_spelling_is_forwarded(tmp_path, monkeypatch):
+>       launched = _launch_command(tmp_path, monkeypatch, ["qubit", "desktop", "--profile=work"])
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_desktop_profile_launch.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-157/test_profile_equals_spelling_i0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72ebefa37380>
+argv = ['qubit', 'desktop', '--profile=work'], active_profile = None
+
+    def _launch_command(tmp_path, monkeypatch, argv: list[str], *, active_profile: str | None = None) -> list[str]:
+        qubit_root = tmp_path / ".qubit"
+        qubit_root.mkdir()
+        if active_profile and active_profile != "default":
+            _live_profile(qubit_root, active_profile)
+            (qubit_root / "active_profile").write_text(active_profile + "\n", encoding="utf-8")
+        for name in _named_profiles(argv):
+            _live_profile(qubit_root, name)
+    
+        project = tmp_path / "qubit"
+        (project / "apps" / "desktop").mkdir(parents=True)
+        (project / "apps" / "desktop" / "package.json").write_text("{}", encoding="utf-8")
+        exe = _packaged_exe(project)
+    
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.delenv("QUBIT_HOME", raising=False)
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+        monkeypatch.setenv("GNOME_KEYRING_CONTROL", "/run/user/1000/keyring")
+        for var in (
+            "QUBIT_SUPERVISED_CHILD",
+            "QUBIT_S6_SUPERVISED_CHILD",
+            "INVOCATION_ID",
+            "QUBIT_GATEWAY_EXTERNAL_SUPERVISOR",
+            "KDE_SESSION_VERSION",
+            "KDE_FULL_SESSION",
+        ):
+            monkeypatch.delenv(var, raising=False)
+        monkeypatch.setattr(sys, "argv", argv)
+        monkeypatch.setattr(cli_main, "PROJECT_ROOT", project)
+        monkeypatch.setattr(main_desktop, "_desktop_exe_integrity_error", lambda _path: None)
+        # Module global: restore it so a later cmd_gui test does not inherit a flag.
+        monkeypatch.setattr(cli_main, "_explicit_cli_profile", None)
+    
+        cli_main._apply_profile_override()
+    
+        calls: list[list[str]] = []
+    
+        def _run(cmd, **_kwargs):
+            calls.append(list(cmd))
+            return subprocess.CompletedProcess(cmd, 0)
+    
+        monkeypatch.setattr(subprocess, "run", _run)
+        with pytest.raises(SystemExit) as exc:
+            cli_main.cmd_gui(_ns())
+>       assert exc.value.code == 0
+E       assert 1 == 0
+E        +  where 1 = SystemExit(1).code
+E        +    where SystemExit(1) = <ExceptionInfo SystemExit(1) tblen=3>.value
+
+tests/hermes_cli/test_desktop_profile_launch.py:116: AssertionError
+----------------------------- Captured stdout call -----------------------------
+✗ --skip-build was passed but no packaged desktop app was found at: /tmp/pytest-of-trick/pytest-157/test_profile_equals_spelling_i0/qubit/apps/desktop/release
+  Pre-build first:  cd apps/desktop && npm run pack
+  Or drop --skip-build to package automatically.
+______________ test_missing_flag_does_not_forward_sticky_profile _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-157/test_missing_flag_does_not_for0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72ebeff4f500>
+
+    def test_missing_flag_does_not_forward_sticky_profile(tmp_path, monkeypatch):
+>       launched = _launch_command(
+            tmp_path, monkeypatch, ["qubit", "desktop"], active_profile="coder"
+        )
+
+tests/hermes_cli/test_desktop_profile_launch.py:135: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-157/test_missing_flag_does_not_for0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72ebeff4f500>
+argv = ['qubit', 'desktop'], active_profile = 'coder'
+
+    def _launch_command(tmp_path, monkeypatch, argv: list[str], *, active_profile: str | None = None) -> list[str]:
+        qubit_root = tmp_path / ".qubit"
+        qubit_root.mkdir()
+        if active_profile and active_profile != "default":
+            _live_profile(qubit_root, active_profile)
+            (qubit_root / "active_profile").write_text(active_profile + "\n", encoding="utf-8")
+        for name in _named_profiles(argv):
+            _live_profile(qubit_root, name)
+    
+        project = tmp_path / "qubit"
+        (project / "apps" / "desktop").mkdir(parents=True)
+        (project / "apps" / "desktop" / "package.json").write_text("{}", encoding="utf-8")
+        exe = _packaged_exe(project)
+    
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.delenv("QUBIT_HOME", raising=False)
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+        monkeypatch.setenv("GNOME_KEYRING_CONTROL", "/run/user/1000/keyring")
+        for var in (
+            "QUBIT_SUPERVISED_CHILD",
+            "QUBIT_S6_SUPERVISED_CHILD",
+            "INVOCATION_ID",
+            "QUBIT_GATEWAY_EXTERNAL_SUPERVISOR",
+            "KDE_SESSION_VERSION",
+            "KDE_FULL_SESSION",
+        ):
+            monkeypatch.delenv(var, raising=False)
+        monkeypatch.setattr(sys, "argv", argv)
+        monkeypatch.setattr(cli_main, "PROJECT_ROOT", project)
+        monkeypatch.setattr(main_desktop, "_desktop_exe_integrity_error", lambda _path: None)
+        # Module global: restore it so a later cmd_gui test does not inherit a flag.
+        monkeypatch.setattr(cli_main, "_explicit_cli_profile", None)
+    
+        cli_main._apply_profile_override()
+    
+        calls: list[list[str]] = []
+    
+        def _run(cmd, **_kwargs):
+            calls.append(list(cmd))
+            return subprocess.CompletedProcess(cmd, 0)
+    
+        monkeypatch.setattr(subprocess, "run", _run)
+        with pytest.raises(SystemExit) as exc:
+            cli_main.cmd_gui(_ns())
+>       assert exc.value.code == 0
+E       assert 1 == 0
+E        +  where 1 = SystemExit(1).code
+E        +    where SystemExit(1) = <ExceptionInfo SystemExit(1) tblen=3>.value
+
+tests/hermes_cli/test_desktop_profile_launch.py:116: AssertionError
+----------------------------- Captured stdout call -----------------------------
+✗ --skip-build was passed but no packaged desktop app was found at: /tmp/pytest-of-trick/pytest-157/test_missing_flag_does_not_for0/qubit/apps/desktop/release
+  Pre-build first:  cd apps/desktop && npm run pack
+  Or drop --skip-build to package automatically.
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_desktop_profile_launch.py::test_dash_p_desktop_appends_profile_to_packaged_launch
+FAILED tests/hermes_cli/test_desktop_profile_launch.py::test_profile_equals_spelling_is_forwarded
+FAILED tests/hermes_cli/test_desktop_profile_launch.py::test_missing_flag_does_not_forward_sticky_profile
+3 failed in 0.47s

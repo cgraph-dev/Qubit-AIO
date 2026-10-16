@@ -1,0 +1,24 @@
+....F.............................                                       [100%]
+=================================== FAILURES ===================================
+_____ TestIdentityLifecycle.test_launch_gate_off_means_no_free_tier_at_all _____
+
+self = <test_anon_auth_core.TestIdentityLifecycle object at 0x7c179eb24860>
+portal = <tests.qubit_cli.anon_portal.FakePortal object at 0x7c179e3c1040>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c179e96ca70>
+
+    def test_launch_gate_off_means_no_free_tier_at_all(self, portal, monkeypatch):
+        """Without ``QUBIT_GUEST_ONBOARDING=1`` the free tier does not exist: no mint, no portal
+        traffic, ``nous.guest``'s default is never consulted, and an identity already on disk is
+        not treated as enabled. The env var is the only lever; ``0``/``true``/anything but ``1`` is off."""
+        monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda: False)
+        for raw in ("", "0", "true", "yes", "new"):
+            monkeypatch.setenv("QUBIT_GUEST_ONBOARDING", raw)
+>           assert anon_auth.guest_enabled() is False
+E           assert True is False
+E            +  where True = <function guest_enabled at 0x7c179f563b00>()
+E            +    where <function guest_enabled at 0x7c179f563b00> = anon_auth.guest_enabled
+
+tests/hermes_cli/test_anon_auth_core.py:94: AssertionError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_anon_auth_core.py::TestIdentityLifecycle::test_launch_gate_off_means_no_free_tier_at_all
+1 failed, 33 passed in 6.72s

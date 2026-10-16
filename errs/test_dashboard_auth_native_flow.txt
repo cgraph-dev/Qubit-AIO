@@ -1,0 +1,45 @@
+...............F.                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_password_login_without_broker_still_mints_cookies ____________
+
+pw_gated_client = <starlette.testclient.TestClient object at 0x7ddbd15cd190>
+
+    def test_password_login_without_broker_still_mints_cookies(pw_gated_client):
+        """Guard: an ordinary browser password login (no native broker cookie)
+        keeps the existing cookie-minting behaviour."""
+        r = pw_gated_client.post(
+            "/auth/password-login",
+            json={"provider": "testpw", "username": "admin", "password": "hunter2"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["next"] == "/"
+        set_cookie = r.headers.get("set-cookie", "")
+>       assert "qubit_session_at" in set_cookie
+E       assert 'qubit_session_at' in '__Host-hermes_session_at="eyJzdWIiOiJhZG1pbiIsImtpbmQiOiJhY2Nlc3MiLCJleHAiOjE3OTIxMzMzNzV9QNVYNn1nfeHUXK4eoobZY0I_EuQ...; SameSite=lax; Secure, __Host-hermes_session_provider=testpw; HttpOnly; Max-Age=2592000; Path=/; SameSite=lax; Secure'
+
+tests/hermes_cli/test_dashboard_auth_native_flow.py:684: AssertionError
+=============================== warnings summary ===============================
+../../../home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:53
+  /home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+tests/hermes_cli/test_dashboard_auth_native_flow.py::test_bearer_authenticates_gated_route_without_cookie
+tests/hermes_cli/test_dashboard_auth_native_flow.py::test_native_redirect_uri_boundary_matches_browser_authority
+tests/hermes_cli/test_dashboard_auth_native_flow.py::test_native_redirect_uri_boundary_matches_browser_authority
+tests/hermes_cli/test_dashboard_auth_native_flow.py::test_native_password_login_full_roundtrip
+tests/hermes_cli/test_dashboard_auth_native_flow.py::test_native_password_login_wrong_password_keeps_pending
+tests/hermes_cli/test_dashboard_auth_native_flow.py::test_native_password_login_wrong_password_keeps_pending
+tests/hermes_cli/test_dashboard_auth_native_flow.py::test_native_password_login_expired_broker_returns_400
+tests/hermes_cli/test_dashboard_auth_native_flow.py::test_native_password_login_rejects_cross_provider_completion
+tests/hermes_cli/test_dashboard_auth_native_flow.py::test_native_password_login_rejects_cross_provider_completion
+  /home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/starlette/testclient.py:454: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return super().request(
+
+tests/hermes_cli/test_dashboard_auth_native_flow.py::test_status_loopback_mode_has_no_auth_flows
+  /home/trick/Projects/Repos/qubit-voicebridge/.venv/lib/python3.12/site-packages/discord/player.py:30: DeprecationWarning: 'audioop' is deprecated and slated for removal in Python 3.13
+    import audioop
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_dashboard_auth_native_flow.py::test_password_login_without_broker_still_mints_cookies
+1 failed, 16 passed, 11 warnings in 2.94s

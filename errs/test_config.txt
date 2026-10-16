@@ -1,0 +1,33 @@
+...F.................................................................... [ 41%]
+................................................................ssss.... [ 82%]
+...............................                                          [100%]
+=================================== FAILURES ===================================
+________ TestEnsureQubitHome.test_upgrades_pre_rewrite_default_soul_md _________
+
+self = <test_config.TestEnsureQubitHome object at 0x7840c499daf0>
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-147/test_upgrades_pre_rewrite_defa0')
+
+    def test_upgrades_pre_rewrite_default_soul_md(self, tmp_path):
+        # Every install seeded between the old DEFAULT_SOUL_MD's introduction
+        # and its #95681 rewrite got the old text auto-written on first run —
+        # not user-authored, so it's just as safe to upgrade in place as the
+        # comment-only scaffolds above. Regression test for that upgrade path.
+        from qubit_cli.default_soul import DEFAULT_SOUL_MD
+    
+        assert self._PRE_REWRITE_DEFAULT_SOUL != DEFAULT_SOUL_MD  # sanity: fixture predates the rewrite
+    
+        with patch.dict(os.environ, {"QUBIT_HOME": str(tmp_path)}):
+            soul_path = tmp_path / "SOUL.md"
+            soul_path.write_text(self._PRE_REWRITE_DEFAULT_SOUL, encoding="utf-8")
+            ensure_qubit_home()
+>           assert soul_path.read_text(encoding="utf-8") == DEFAULT_SOUL_MD
+E           assert 'You are Herm...vestigations.' == 'You are Qubi...t by default.'
+E             
+E             - You are Qubit Agent, built by Qubit Labs. Be direct: match the length of your reply to the weight of the ask — a one-line question gets a one-line answer, and finished work gets a short report of what changed, what's verified, and what's left, never a replay of the process. No filler ("Great question," "I'd be happy to"), no restating the request back, no re-summarizing what you already said, no narrating tool calls the user can see. Plain claims over adjectives; when unsure, say so plainly. Agree because it's right, not because the user said it. Depth is earned — giv...
+E             
+E             ...Full output truncated (2 lines hidden), use '-vv' to show
+
+tests/hermes_cli/test_config.py:95: AssertionError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_config.py::TestEnsureQubitHome::test_upgrades_pre_rewrite_default_soul_md
+1 failed, 170 passed, 4 skipped in 7.47s

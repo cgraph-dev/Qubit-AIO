@@ -1,0 +1,250 @@
+...F..FFF                                                                [100%]
+=================================== FAILURES ===================================
+_________________ test_desktop_build_lock_is_keyed_by_checkout _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-156/test_desktop_build_lock_is_key0')
+
+    def test_desktop_build_lock_is_keyed_by_checkout(tmp_path):
+        """Two different checkouts must not share one lock: node_modules and release/ are checkout-scoped."""
+        other = tmp_path / "qubit-2"
+        other.mkdir()
+        first = DesktopBuildLock(tmp_path)
+        second = DesktopBuildLock(other)
+    
+        assert first.acquire() is True
+        try:
+>           assert second.acquire() is True
+                   ^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_desktop_build_lock.py:99: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <qubit_cli.desktop_build_lock.DesktopBuildLock object at 0x7a58896e23f0>
+wait = False
+
+    def acquire(self, *, wait: bool = False) -> bool:
+        """Acquire the lock; queue behind the current holder when ``wait``.
+    
+        Returns ``False`` only when another process owns the lock and ``wait``
+        is unset.  Filesystem errors propagate so callers fail explicitly
+        instead of silently falling back to the corrupting concurrent
+        behavior.
+        """
+        if self._handle is not None:
+            return True
+>       if not self._acquire_checkout(wait=wait):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+qubit_cli/desktop_build_lock.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <qubit_cli.desktop_build_lock.DesktopBuildLock object at 0x7a58896e23f0>
+wait = False
+
+    def _acquire_checkout(self, *, wait: bool) -> bool:
+        """Take (or, inside an update, join) the checkout lock before the build lock (C5)."""
+        import time
+    
+        from qubit_cli import update_lock
+    
+        held, wanted = update_lock._HELD, update_lock.checkout_lock_path(self.project_root)
+        if held is not None and held["path"] != str(wanted):
+            # This process holds a checkout lock under another path. Another spelling of this
+            # checkout's lock file (a symlinked install root) is this update's own custody: build
+            # inside it, since a second acquire would wait on its own lock. Any other checkout's
+            # lock proves nothing about this one (review Q2), and a process records one hold only.
+            if not (wanted.exists() and os.path.samefile(held["path"], wanted)):
+>               raise OSError(f"this process holds the update lock of another checkout ({held['path']}), "
+                              f"so it cannot also lock {self.project_root} for its build")
+E               OSError: this process holds the update lock of another checkout (/tmp/pytest-of-trick/pytest-156/test_desktop_build_lock_is_key0/.hermes-update.lock), so it cannot also lock /tmp/pytest-of-trick/pytest-156/test_desktop_build_lock_is_key0/qubit-2 for its build
+
+qubit_cli/desktop_build_lock.py:74: OSError
+___________ test_gui_releases_lock_before_packaged_electron_handoff ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-156/test_gui_releases_lock_before_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a588a17c050>
+
+    def test_gui_releases_lock_before_packaged_electron_handoff(tmp_path, monkeypatch):
+        root = _checkout(tmp_path)
+        desktop_dir = root / "apps" / "desktop"
+    
+        if sys.platform == "darwin":
+            executable = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Hermes"
+        elif sys.platform == "win32":
+            executable = desktop_dir / "release" / "win-unpacked" / "Hermes.exe"
+        else:
+            executable = desktop_dir / "release" / "linux-unpacked" / "qubit"
+        executable.parent.mkdir(parents=True)
+        executable.write_text("", encoding="utf-8")
+    
+        monkeypatch.setattr("qubit_cli.main.PROJECT_ROOT", root, raising=False)
+        # The lock is checkout-keyed via the profile-common Hermes root; pin it so
+        # the holder and the handoff probe agree regardless of the runner's home.
+        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qubit-home"))
+        # The fake executable has no Electron sandbox helper; the platform launch
+        # fixups are environment-dependent (sudo tty, userns policy), not the test's
+        # subject — a Linux CI runner exits 1 in _packaged_desktop_launch_command.
+        monkeypatch.setattr(cli_desktop, "_desktop_linux_sandbox_fixup", lambda _exe: True, raising=False)
+        monkeypatch.setattr(
+            cli_desktop, "_installed_desktop_launch_target", lambda _dir, exe: exe, raising=False)
+    
+        def launch_after_lock_release(*_args, **_kwargs):
+            handoff_probe = DesktopBuildLock(root)
+            assert handoff_probe.acquire() is True, "build lock was not released before the Electron handoff"
+            handoff_probe.release()
+            return subprocess.CompletedProcess([], 0)
+    
+        with patch("qubit_cli.main_desktop._desktop_launch_env", return_value=({}, [])), \
+             patch("qubit_cli.main_desktop._register_linux_desktop_entry", return_value=None), \
+             patch("qubit_cli.main_desktop.subprocess.run", side_effect=launch_after_lock_release), \
+             patch("qubit_cli.main_desktop._desktop_build_needed", return_value=False), \
+             pytest.raises(SystemExit) as exc:
+            cli_desktop.cmd_gui(_args())
+    
+>       assert exc.value.code == 0
+E       assert 1 == 0
+E        +  where 1 = SystemExit(1).code
+E        +    where SystemExit(1) = <ExceptionInfo SystemExit(1) tblen=2>.value
+
+tests/hermes_cli/test_desktop_build_lock.py:178: AssertionError
+----------------------------- Captured stdout call -----------------------------
+✓ Desktop packaged app is up to date (content stamp matches)
+✗ Desktop package build completed but no launchable app was found at: /tmp/pytest-of-trick/pytest-156/test_gui_releases_lock_before_0/qubit/apps/desktop/release
+  Expected an unpacked Electron app for the current OS.
+__________________ test_gui_releases_lock_after_build_failure __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-156/test_gui_releases_lock_after_b0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a58896e0c80>
+capsys = <_pytest.capture.CaptureFixture object at 0x7a5888abb260>
+
+    def test_gui_releases_lock_after_build_failure(tmp_path, monkeypatch, capsys):
+        """A failed build must not deadlock the next `qubit desktop`."""
+        root = _checkout(tmp_path)
+        monkeypatch.setattr("qubit_cli.main.PROJECT_ROOT", root, raising=False)
+    
+        def failing_build(*_args, **_kwargs):
+            raise RuntimeError("tsc missing: ENOTEMPTY node_modules race")
+    
+        with patch("qubit_cli.main_desktop._desktop_launch_env", return_value=({}, [])), \
+             patch("qubit_cli.main_desktop._desktop_build_needed", return_value=True), \
+             patch("qubit_cli.main_desktop.build_prepared_desktop", side_effect=failing_build), \
+             pytest.raises(SystemExit) as exc:
+            cli_desktop.cmd_gui(_args(build_only=True))
+    
+        assert exc.value.code == 1
+        successor = DesktopBuildLock(root)
+>       assert successor.acquire() is True, "build lock was not released after a failed build"
+               ^^^^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_desktop_build_lock.py:197: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <qubit_cli.desktop_build_lock.DesktopBuildLock object at 0x7a5888abadb0>
+wait = False
+
+    def acquire(self, *, wait: bool = False) -> bool:
+        """Acquire the lock; queue behind the current holder when ``wait``.
+    
+        Returns ``False`` only when another process owns the lock and ``wait``
+        is unset.  Filesystem errors propagate so callers fail explicitly
+        instead of silently falling back to the corrupting concurrent
+        behavior.
+        """
+        if self._handle is not None:
+            return True
+>       if not self._acquire_checkout(wait=wait):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+qubit_cli/desktop_build_lock.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <qubit_cli.desktop_build_lock.DesktopBuildLock object at 0x7a5888abadb0>
+wait = False
+
+    def _acquire_checkout(self, *, wait: bool) -> bool:
+        """Take (or, inside an update, join) the checkout lock before the build lock (C5)."""
+        import time
+    
+        from qubit_cli import update_lock
+    
+        held, wanted = update_lock._HELD, update_lock.checkout_lock_path(self.project_root)
+        if held is not None and held["path"] != str(wanted):
+            # This process holds a checkout lock under another path. Another spelling of this
+            # checkout's lock file (a symlinked install root) is this update's own custody: build
+            # inside it, since a second acquire would wait on its own lock. Any other checkout's
+            # lock proves nothing about this one (review Q2), and a process records one hold only.
+            if not (wanted.exists() and os.path.samefile(held["path"], wanted)):
+>               raise OSError(f"this process holds the update lock of another checkout ({held['path']}), "
+                              f"so it cannot also lock {self.project_root} for its build")
+E               OSError: this process holds the update lock of another checkout (/tmp/pytest-of-trick/pytest-156/test_gui_releases_lock_before_0/qubit/.hermes-update.lock), so it cannot also lock /tmp/pytest-of-trick/pytest-156/test_gui_releases_lock_after_b0/qubit for its build
+
+qubit_cli/desktop_build_lock.py:74: OSError
+----------------------------- Captured stdout call -----------------------------
+✗ Could not create the desktop build lock: this process holds the update lock of another checkout (/tmp/pytest-of-trick/pytest-156/test_gui_releases_lock_before_0/qubit/.hermes-update.lock), so it cannot also lock /tmp/pytest-of-trick/pytest-156/test_gui_releases_lock_after_b0/qubit for its build
+  Refusing to run npm without serialization; check the checkout permissions and retry.
+____________________ test_update_path_waits_for_a_held_lock ____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-trick/pytest-156/test_update_path_waits_for_a_h0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a588a157dd0>
+capsys = <_pytest.capture.CaptureFixture object at 0x7a58888fa240>
+
+    def test_update_path_waits_for_a_held_lock(tmp_path, monkeypatch, capsys):
+        """`qubit update`'s desktop rebuild queues behind a holder instead of failing the update."""
+        from qubit_cli import source_build as source_build_mod
+        from qubit_cli.main_desktop import _refresh_installed_desktop_apps
+    
+        root = _checkout(tmp_path)
+    
+        holder = DesktopBuildLock(root)
+>       assert holder.acquire() is True
+               ^^^^^^^^^^^^^^^^
+
+tests/hermes_cli/test_desktop_build_lock.py:209: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <qubit_cli.desktop_build_lock.DesktopBuildLock object at 0x7a58888fab70>
+wait = False
+
+    def acquire(self, *, wait: bool = False) -> bool:
+        """Acquire the lock; queue behind the current holder when ``wait``.
+    
+        Returns ``False`` only when another process owns the lock and ``wait``
+        is unset.  Filesystem errors propagate so callers fail explicitly
+        instead of silently falling back to the corrupting concurrent
+        behavior.
+        """
+        if self._handle is not None:
+            return True
+>       if not self._acquire_checkout(wait=wait):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+qubit_cli/desktop_build_lock.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <qubit_cli.desktop_build_lock.DesktopBuildLock object at 0x7a58888fab70>
+wait = False
+
+    def _acquire_checkout(self, *, wait: bool) -> bool:
+        """Take (or, inside an update, join) the checkout lock before the build lock (C5)."""
+        import time
+    
+        from qubit_cli import update_lock
+    
+        held, wanted = update_lock._HELD, update_lock.checkout_lock_path(self.project_root)
+        if held is not None and held["path"] != str(wanted):
+            # This process holds a checkout lock under another path. Another spelling of this
+            # checkout's lock file (a symlinked install root) is this update's own custody: build
+            # inside it, since a second acquire would wait on its own lock. Any other checkout's
+            # lock proves nothing about this one (review Q2), and a process records one hold only.
+            if not (wanted.exists() and os.path.samefile(held["path"], wanted)):
+>               raise OSError(f"this process holds the update lock of another checkout ({held['path']}), "
+                              f"so it cannot also lock {self.project_root} for its build")
+E               OSError: this process holds the update lock of another checkout (/tmp/pytest-of-trick/pytest-156/test_gui_releases_lock_before_0/qubit/.hermes-update.lock), so it cannot also lock /tmp/pytest-of-trick/pytest-156/test_update_path_waits_for_a_h0/qubit for its build
+
+qubit_cli/desktop_build_lock.py:74: OSError
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_desktop_build_lock.py::test_desktop_build_lock_is_keyed_by_checkout
+FAILED tests/hermes_cli/test_desktop_build_lock.py::test_gui_releases_lock_before_packaged_electron_handoff
+FAILED tests/hermes_cli/test_desktop_build_lock.py::test_gui_releases_lock_after_build_failure
+FAILED tests/hermes_cli/test_desktop_build_lock.py::test_update_path_waits_for_a_held_lock
+4 failed, 5 passed in 3.65s
