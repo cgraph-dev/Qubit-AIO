@@ -251,7 +251,14 @@ def run_turn(cfg: Any, agent_id: int, task_text: str, *,
                 "next": ("settle it with an owner-stated amount — the receipt "
                          "stays open and admission refuses until you do")}
 
-    usage = ((result.get("receipt") or {}).get("usage"))
+    usage = ((result.get("receipt") or {}).get("usage") or {})
+    # The turn's own priced verdict, and the two facts it is read from. A turn
+    # that did not return usage CANNOT be told from a flat-rate route by the
+    # runner, so it is treated as unknown spend below. This is deliberate:
+    # `unmetered` is a claim about the ROUTE, and only a turn that reports its
+    # price as "included" can be filed as free work. See the branch below.
+    cost_status = str(usage.get("cost_status") or "").strip().lower()
+    price_unknown = cost_status == "unknown"
     state = str(result.get("state") or "").upper()
 
     # THE CAPABILITY EVENTS (A5). The turn receipt reports the tools that really
@@ -280,7 +287,31 @@ def run_turn(cfg: Any, agent_id: int, task_text: str, *,
     # leaving the receipt open would block admission forever on a cost that does
     # not exist. The row is booked with unmetered=1, which every metered
     # aggregate and every dollar cap excludes by construction.
-    if unmetered and state in ("", "OK") and not usage:
+    # The ONE case that is not a subscription: the turn DID return usage, and
+    # that usage says its price could not be established (`cost_status:
+    # "unknown"`). That is a real provider call with no measured price, and
+    # booking it as unmetered would record a real charge as free — the exact
+    # arithmetic D15 refuses. It is NOT reconciled here either: the measurement
+    # is missing, so the turn is UNKNOWN SPEND and admission refuses until an
+    # owner figure exists.
+    #
+    # THE SAME HOLDS FOR NO USAGE BLOCK AT ALL. Before the vendored agent
+    # surfaced its session counters, EVERY office seat returned a receipt with
+    # no usage block, and this branch was `unmetered and ... and not usage` —
+    # which read that missing measurement as a subscription and booked every
+    # seat's real provider calls as free work. `unmetered` is a claim about the
+    # ROUTE, established by the caller that knows it is flat-rate; a turn that
+    # reports nothing is not evidence of a flat-rate route. A caller that
+    # genuinely runs on a subscription passes `unmetered=True` AND the turn's
+    # usage arrives marked `included`, which is the branch below.
+    # A credit-GATED status is NOT "no evidence": a block with a zero price and
+    # no `unknown` verdict is the provider saying "this turn cost nothing" (a
+    # local model, or a flat-rate route whose pricing entry is zero). That is a
+    # measurement of 0, not a missing measurement, and D15 is explicit that the
+    # provider's own 0 is settled as such — it never asks for an attestation for
+    # a turn the provider priced at zero.
+    flat_rate = cost_status in ("", "included") and not price_unknown
+    if state in ("", "OK") and usage and flat_rate and unmetered:
         settled = receipts.finish_run(
             cfg, run_id, settled_cents=0, unmetered=True, tokens_in=0,
             tokens_out=0, model=str(model or ""), agent_id=agent_id,
@@ -315,14 +346,22 @@ def run_turn(cfg: Any, agent_id: int, task_text: str, *,
     # can close it by stating what was charged.
     #
     # Note the discriminator: a usage block that says 0 is the provider's own
-    # figure and is settled as such (a local, genuinely free model). *No* usage
-    # block is a missing measurement, and that is different.
-    if not usage or state not in ("", "OK"):
-        why = ("the provider reported no usage for this turn"
-               if not usage else f"the turn did not succeed (state={state})")
+    # figure and is settled as such (a local, genuinely free model, or a
+    # flat-rate route the pricing engine marked `included`). *No* usage block is
+    # a missing measurement, and a block whose price the engine could not
+    # establish (`cost_status: "unknown"`) is one too — both land here, and the
+    # reason string says which.
+    if price_unknown or not usage or state not in ("", "OK"):
+        why = ("the provider returned usage but its price could not be "
+               "established, so this turn's cost is unknown"
+               if price_unknown else
+               ("the provider reported no usage for this turn"
+                if not usage else f"the turn did not succeed (state={state})"))
         _event(cfg, "run_unpriced", agent_id=agent_id,
                department_id=department_id,
-               payload={"run_id": run_id, "why": why}, visible="bubble")
+               payload={"run_id": run_id, "why": why,
+                        "cost_status": usage.get("cost_status")},
+               visible="bubble")
         return {"state": "UNKNOWN_SPEND", "run_id": run_id,
                 "unknown_spend": True, "done": False,
                 "reason": why,
@@ -331,6 +370,13 @@ def run_turn(cfg: Any, agent_id: int, task_text: str, *,
                          f"--attested-as entered --confirm "
                          f"(admission refuses until you do)")}
 
+    # `unmetered` must not be applied twice: a turn that survived to here either
+    # arrived with a real price (`actual`/`estimated` — book it as metered) or
+    # from a flat-rate route. Deciding from the turn's own verdict rather than
+    # the caller's flag is what stops a priced turn being filed as free work:
+    # the flag is the caller's *hope* about the route, the block is what the
+    # route actually reported.
+    unmetered = bool(unmetered and flat_rate)
     cost_usd = usage.get("cost_usd_est", 0.0)
     cents = usd_to_cents(cost_usd)
     micros = usd_to_micros(cost_usd)
@@ -363,6 +409,8 @@ def run_turn(cfg: Any, agent_id: int, task_text: str, *,
     return {"state": "OK", "run_id": run_id, "done": done,
             "ledger_id": settled["ledger_id"],
             "cents": cents, "provider_cost_micros": micros,
+            "unmetered": bool(unmetered),
+            "cost_status": str(usage.get("cost_status") or ""),
             "tokens_in": usage.get("prompt_tokens") or 0,
             "tokens_out": usage.get("completion_tokens") or 0,
             "model": usage.get("model") or model or "",
