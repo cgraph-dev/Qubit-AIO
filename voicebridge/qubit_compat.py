@@ -6709,17 +6709,24 @@ def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     elif "model" in b:
         # PER-SESSION model pin — the /qubit-chat panel's own write. Validated
         # through the canonical resolver FIRST (an unknown model is a typed
-        # refusal, never a silent store), then written to THIS session's
-        # ``sessions.model`` row alone. The global ``model.default`` (what
-        # ``/api/model/set`` scope=main rewrites) is never touched, so
-        # /qubit-chat and /chat keep independent models.
+        # refusal, never a silent store), then written to THIS session's row
+        # with its full route (provider/base_url/api_mode in both the nested
+        # ``gateway_runtime`` and top-level shapes, like /chat's own ``/model``
+        # persist). A bare model column restores against the ambient provider
+        # on the next /chat resume — a mismatched pair that stalls the turn.
+        # The global ``model.default`` (what ``/api/model/set`` scope=main
+        # rewrites) is never touched, so sessions keep independent models.
         requested = str(b.get("model") or "").strip()
-        routed = CT.resolve_model(cfg, requested)
+        routed = CT.resolve_route(cfg, requested)
         if not routed.get("ok"):
             return 400, {"ok": False, "code": routed.get("code",
                                                          "MODEL_NOT_ALLOWED"),
                          "detail": routed.get("detail", "")}
-        res = st.set_model(p.get("id", ""), str(routed.get("model") or requested))
+        res = st.set_model(p.get("id", ""),
+                           str(routed.get("model") or requested),
+                           provider=str(routed.get("provider") or ""),
+                           base_url=str(routed.get("base_url") or ""),
+                           api_mode=str(routed.get("api_mode") or ""))
     else:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "patch needs name, archived, reasoning, or model"}

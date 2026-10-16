@@ -684,7 +684,9 @@ class QubitSessionStore:
         self._db.set_session_archived(sid, False)
         return {"state": "OK", "session": self._rec(self._session(sid) or rec)}
 
-    def set_model(self, session_id: str, model: str) -> Dict[str, Any]:
+    def set_model(self, session_id: str, model: str, *,
+                    provider: str = "", base_url: str = "",
+                    api_mode: str = "") -> Dict[str, Any]:
         """Pin a chat session's model — PER SESSION, never the global default.
 
         The per-surface model store the operator's own panel writes: this
@@ -693,6 +695,14 @@ class QubitSessionStore:
         ``/model`` command uses), so a pick on one surface cannot drag another
         session's model or the global ``model.default`` along. ``None``/empty is
         a typed refusal — an absent model must never silently clear the row.
+
+        The route rides along in both shapes readers use — nested
+        ``gateway_runtime`` (CLI ``--resume``) and top-level keys (TUI
+        ``session.resume``) — from one or-None dict so stale keys are DELETED
+        and the shapes never diverge. This mirrors ``/model``'s
+        ``_persist_model_switch_to_session``: a bare model column with no
+        route restores the stored model against the ambient provider on the
+        next ``/chat`` resume (a mismatched pair that stalls the turn).
 
         The caller validates the model against the registry first; this method
         stores exactly what it is handed (fail-safe: an unknown row is a typed
@@ -709,6 +719,11 @@ class QubitSessionStore:
                     "detail": "set_model needs a non-empty model"}
         try:
             self._db.update_session_model(sid, clean)
+            route = {"provider": str(provider or "").strip() or None,
+                     "base_url": str(base_url or "").strip() or None,
+                     "api_mode": str(api_mode or "").strip() or None}
+            self._db.patch_session_model_config(
+                sid, {"gateway_runtime": dict(route), **route})
         except Exception as exc:  # noqa: BLE001 - a write failure is typed
             return {"state": "FAILED", "code": "MODEL_SET_FAILED",
                     "detail": str(exc)[:200]}
