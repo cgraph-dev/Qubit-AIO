@@ -63,7 +63,20 @@ config/task-templates.yaml
 # means a fresh clone omits it, exactly as tests/test_clean_clone_wave5.py
 # requires.
 frontend/qubit-web/node_modules/
+# No trailing slash on these two: the branch fix/office-acceptance-2 committed
+# frontend/qubit-dist as a symlink (mode 120000) and the dir form `.../` does
+# not match a non-directory, so the artifact slipped past the ignore rule and
+# landed in history. Ignore both directory and non-directory forms.
+frontend/qubit-dist
 frontend/qubit-dist/
+
+# Bundled client entry chunks that `vite build` can drop at the repo root
+# (seen accidentally committed on fix/office-acceptance-2: app.js, chunk.js and
+# vendored_main.js, all regenerable Vite output for the office plugin — no
+# source anywhere imports a root-level copy). Ignore them at the root only.
+/app.js
+/chunk.js
+/vendored_main.js
 
 # Generated parity/vendor reports (regenerable; never hand-edited). Both are
 # produced by their own scripts and one is ~15 MB, so committing it would add a
