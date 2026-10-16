@@ -1025,7 +1025,10 @@ export const api = {
     limit = 20,
     offset = 0,
     profileOrOptions: string | SessionQueryOptions = getManagementProfile(),
-    order: "created" | "recent" = "created",
+    // Last-worked-on first: the History list must keep the sessions the
+    // operator touched most recently on top, not bury them under
+    // newer-but-idle automation rows (server default is the same).
+    order: "created" | "recent" = "recent",
   ) => {
     const options = normalizeSessionQueryOptions(profileOrOptions, order);
     return fetchJSON<PaginatedSessions>(

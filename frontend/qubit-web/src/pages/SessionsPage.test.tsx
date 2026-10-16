@@ -344,4 +344,18 @@ describe("SessionsPage tab families + source popover dismissal", () => {
       ]),
     );
   });
+
+  it("orders the History list by last-worked-on, not creation time", async () => {
+    // Regression: the list used to request `order=created`, so a session
+    // touched minutes ago sank below newer-but-idle automation rows and the
+    // operator kept losing track of active work. Both the paginated list and
+    // the overview poll must ask for `recent` (last_active desc).
+    await renderSessionsPage(oneRow());
+    await waitFor(() =>
+      apiMocks.getSessions.mock.calls.some((call) => call[3] === "recent"),
+    );
+    const orders = apiMocks.getSessions.mock.calls.map((call) => call[3]);
+    expect(orders.length).toBeGreaterThan(0);
+    expect(orders.every((order) => order === "recent")).toBe(true);
+  });
 });

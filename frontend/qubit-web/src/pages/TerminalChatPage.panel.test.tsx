@@ -143,6 +143,8 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+// xterm viewport wipes (`Terminal.clear`) observed across renders.
+const termClearSpy = vi.hoisted(() => vi.fn());
 vi.mock("@xterm/xterm", () => ({
   Terminal: class {
     cols = 80;
@@ -152,6 +154,9 @@ vi.mock("@xterm/xterm", () => ({
     open() {}
     write() {}
     dispose() {}
+    clear() {
+      termClearSpy();
+    }
     onData() {
       return { dispose() {} };
     }
@@ -269,6 +274,7 @@ beforeEach(() => {
     },
   }));
   sidebarMount.mockClear();
+  termClearSpy.mockClear();
   FakeWebSocket.instances = [];
   vi.stubGlobal("WebSocket", FakeWebSocket);
   vi.stubGlobal(
@@ -616,6 +622,37 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(secondUrl).toContain(`attach=${persisted}`);
 
     window.sessionStorage.removeItem("qubit.pty.token.chat");
+  });
+
+  it("wipes the terminal viewport on New chat (no stale thinking state)", async () => {
+    // Regression: the xterm instance is reused across connects, so New chat
+    // left the old transcript — typed input plus "thinking" spinner — painted
+    // while the fresh PTY booted behind it. Upstream parity: a fresh xterm
+    // starts empty. Pin: New chat clears the viewport; a plain mount connect
+    // does not (resume replay paints its own transcript).
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "qubit-go",
+      provider: "opencode",
+      model: "deepseek",
+      context_tokens: 65536,
+      context_verified: true,
+    }));
+    await renderTerminal();
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
+    expect(termClearSpy).not.toHaveBeenCalled();
+
+    const newChat = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("New chat"),
+    );
+    await act(async () => {
+      newChat!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(2));
+    expect(termClearSpy).toHaveBeenCalledTimes(1);
   });
 });
 

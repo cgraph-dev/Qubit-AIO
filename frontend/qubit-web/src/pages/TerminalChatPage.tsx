@@ -450,6 +450,19 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
       reconnectTimerRef.current = null;
     }
     clearPerConnectionTimers();
+    // Forced-fresh (New chat) must also wipe the LOCAL viewport. The xterm
+    // instance is reused across connects, so without this the old transcript
+    // — including the previous turn's input and "thinking" spinner — stays
+    // painted while the new PTY boots behind it (upstream parity: a fresh
+    // xterm starts empty; chat_ws.py notes a fresh xterm cannot rebuild the
+    // TUI from a stale alternate-screen tail).
+    if (forceFresh && term) {
+      try {
+        term.clear();
+      } catch {
+        /* terminal not open yet — nothing painted to wipe */
+      }
+    }
     const picked = profileId ?? selectedRef.current ?? undefined;
     setPtyState("connecting");
     setNotice(null);
