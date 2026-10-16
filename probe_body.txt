@@ -1,0 +1,1 @@
+{"error":{"message":"Stream ended before producing a non-ping SSE event","type":"stream_early_eof","code":"STREAM_EARLY_EOF"},"upstream_details":{"error":{"message":"Prompt too long (max 6000 characters)."}}}
