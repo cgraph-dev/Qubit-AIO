@@ -729,3 +729,98 @@ def _http_get(url_path: str, *, plugin_root: Path):
         srv.server_close()
         resources.resource_path = original
     return code, body
+
+
+# --------------------------------------------------------------------------
+# 6. THE BARE PREFIX IS NOT AN ALIAS OF THE SPA SHELL
+# --------------------------------------------------------------------------
+
+def _http_get_with_shell(url_path: str, *, plugin_root: Path):
+    """GET ``url_path`` with a REAL built SPA shell available to the server.
+
+    Without a built ``qubit-dist`` the pre-fix fallthrough ends at
+    ``_serve_qubit_index``'s own "dashboard not built" 404, which is
+    indistinguishable from the refusal under test. So the harness supplies a
+    minimal shell and the route becomes observable: if the bare prefix is
+    dispatched to the shell, the shell's marker lands in the body.
+    """
+    import http.server
+    from voicebridge import resources, webui as W
+
+    original = resources.resource_path
+    shell_dir = plugin_root.parent / "qubit-dist"
+    shell_dir.mkdir(parents=True, exist_ok=True)
+    (shell_dir / "index.html").write_text(
+        "<!doctype html><html><head><title>Qubit Agent - Command Center"
+        "</title></head><body>SHELL-MARKER</body></html>", encoding="utf-8")
+
+    def _patched(name):
+        if name == "frontend/qubit-app/plugins":
+            return plugin_root
+        if name == "frontend/qubit-dist":
+            return shell_dir
+        return original(name)
+
+    class _Bound(http.server.HTTPServer):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            self.app = type("A", (), {"api_token": "tok-123",
+                                      "allowed_origins": ()})()
+
+    resources.resource_path = _patched
+    srv = _Bound(("127.0.0.1", 0), W.WebUIHandler)
+    port = srv.server_address[1]
+    t = threading.Thread(target=srv.handle_request, daemon=True)
+    t.start()
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn.request("GET", url_path)
+        resp = conn.getresponse()
+        body = resp.read()
+        code = resp.status
+        conn.close()
+    finally:
+        t.join(timeout=5)
+        srv.server_close()
+        resources.resource_path = original
+    return code, body
+
+
+def test_bare_plugin_apps_prefix_is_not_the_spa_shell(plugin_root):
+    """[wire] ``GET /plugin-apps`` (no trailing slash) 404s, never the shell.
+
+    WHY THIS IS A SECURITY TEST, not a cosmetics one. The router dispatched on
+    ``path.startswith("/plugin-apps/")``; the bare prefix failed that test and
+    fell through every remaining branch to the SPA-shell fallback. The result
+    was two URLs for one document — and the shell is the route that carries the
+    session-token injector, so the bare prefix was an undocumented second entry
+    point to it. ``/plugin-apps/<plugin>/...`` is the only shape that can name
+    a real app, so the bare prefix has no meaning and is refused outright.
+
+    The shell is made REACHABLE here (a fixture ``qubit-dist`` is served), so
+    this test FAILS if the refusal branch is removed — it asserts the dispatch,
+    not the downstream "dashboard not built" 404 that would otherwise mask it.
+    """
+    code, body = _http_get_with_shell("/plugin-apps", plugin_root=plugin_root)
+    assert code == 404, (code, body)
+    assert b"SHELL-MARKER" not in body, body
+    assert b"__QUBIT_SESSION_TOKEN__" not in body, body
+
+
+def test_bare_prefix_with_query_is_also_refused(plugin_root):
+    """[wire] ``GET /plugin-apps?x=1`` is refused the same way (query is not a bypass)."""
+    code, body = _http_get_with_shell("/plugin-apps?x=1", plugin_root=plugin_root)
+    assert code == 404, (code, body)
+    assert b"SHELL-MARKER" not in body, body
+
+
+def test_trailing_slash_still_reaches_the_plugin_route(plugin_root):
+    """[wire] The refusal is EXACT: ``/plugin-apps/`` still dispatches normally.
+
+    The fix must not narrow the real route. ``/plugin-apps/`` (trailing slash,
+    no plugin name) reaches ``_serve_plugin_app`` and answers its own 404 —
+    proof the branch added for the bare prefix did not swallow the prefix's
+    genuine form.
+    """
+    code, body = _http_get("/plugin-apps/", plugin_root=plugin_root)
+    assert code == 404, (code, body)
