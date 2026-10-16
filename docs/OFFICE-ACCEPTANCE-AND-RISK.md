@@ -357,7 +357,7 @@ Machine-checkable criteria for "the Office port is done":
 | **A6** | `/api/access` reports the conservative, view-only capability set | `curl -s -H 'Referer: http://127.0.0.1:8890/plugin-apps/qubit-office/habblaud/' http://127.0.0.1:8890/api/access` → `{"remote":false,"local":true,"permissions":false,"messages":false,"terminal":false,"spawn":false}` | **VERIFIED-NOW** |
 | **A7** | The query-token exception stays confined to `/api/stream` (+`/api/snapshot`); ordinary APIs still reject a query token | `curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:8890/agent/api/office/tower?token=x'` → `401` (and `…/api/stream?token=wrongtoken` → `401`) | **VERIFIED-NOW** |
 | **A8** | The token-bearing document route does not accept a **non-loopback, non-token** caller, and the blind-probe exemption returns no store data (S1/S2 scoping) | from a non-loopback peer: `curl -s http://<lan-ip>:8890/api/access` → `401`; and confirm the served HTML's token is only reachable under the deployment's explicit non-loopback token policy | **OPEN** — live service binds `0.0.0.0:8890` and serves the token to LAN peers (S1). Must be closed by config or by gating the document. |
-| **A9** | A re-vendor is reproducible from the checkout | `.venv/bin/python scripts/vendor_habblaud.py --src /home/trick/Projects/habblaud` then `--check` → `ok: 77 files, …` | **OPEN** — checkout exists and the script runs, but the on-disk `dist/client` is a *different build* than the vendored tree; bit-exact repro not verified (O3) |
+| **A9** | A re-vendor is reproducible from the *recorded* commit | `.venv/bin/python scripts/verify_habblaud_revendor.py` → `REPRODUCIBLE`, exit 0 | **VERIFIED-NOW** (2026-10-16) — a clean clone at the pinned `4ccce2537472` + `npm ci` + `vite build` + the vendor transforms reproduces **all 77 files byte-identical** to the committed tree. The build is deterministic (two consecutive builds of the same source are byte-identical); the earlier "not reproducible" verdict built the shared checkout's *different* HEAD (`86c0379`), not the pin. Evidence: `docs/evidence/a9-revendor-reproduction.json`, `docs/VENDOR-REPRODUCIBILITY.md` |
 | **A10** | The `?shell=1` rollback still renders and does not throw | `python scripts/render_office_screenshot.py --url 'http://127.0.0.1:8890/qubit-office?shell=1'` → `data_state ready`, `console_errors: []`, painted pixels > 0 | **VERIFIED-NOW** (recorded in `BROWSER-PARITY-FINDINGS.md` §3, all 3 viewports) |
 | **A11** | `?shell=1` uses its own data path (`/agent/api/office/tower`), independent of the SSE route — so it survives a stream regression | CDP network capture of `?shell=1` → only `GET /agent/api/office/tower`, no `/api/stream` | **VERIFIED-NOW** (recorded in `BROWSER-PARITY-FINDINGS.md` §3d) |
 | **A12** | The rollback renderer's entry (`qubit-office.bundle.js`) still exists and is reachable | `test -f frontend/qubit-app/plugins/qubit-office/qubit-office.bundle.js` | **VERIFIED-NOW** |
@@ -376,14 +376,18 @@ Machine-checkable criteria for "the Office port is done":
 exclusions.** A claim of 100% that includes the server/mod/Docker (A18–A20) is
 **wrong by contract** — it would port a second orchestrator Qubit already has.
 
-Two items (A8, A9) and one (A17) are currently **OPEN** and must not be counted
+One item (A8) and one (A17) are currently **OPEN** and must not be counted
 as done:
 
 - **A8** — the token-to-LAN exposure (S1). Inherited, not new, but real on this
   deployment because the service binds `0.0.0.0`.
-- **A9** — re-vendor reproducibility (the checkout exists; the current
-  `dist/client` is a different build, so bit-exact repro is unverified).
 - **A17** — confirm the reconciled suite is actually green at HEAD.
+
+**A9 is now VERIFIED-NOW** (2026-10-16). It was recorded OPEN on a stale-checkout
+misdiagnosis: the reproducible rebuild runs against the *recorded* commit
+(`4ccce2537472`), which is not the shared checkout's HEAD (`86c0379`). Building
+the pin reproduces all 77 vendored files byte-for-byte. See
+`docs/VENDOR-REPRODUCIBILITY.md`.
 
 ---
 
