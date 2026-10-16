@@ -112,6 +112,8 @@
 .qmodel-picker__error { color: var(--color-destructive, #b42318); }
 .qmodel-picker__warning { border-bottom: 1px solid color-mix(in srgb, var(--color-warning, #b7811b) 35%, transparent); background: color-mix(in srgb, var(--color-warning, #b7811b) 7%, transparent); }
 .qmodel-picker__choose-provider { padding-top: 1.3rem; }
+.qmodel-picker__no-providers { display: flex; flex-direction: column; gap: .6rem; }
+.qmodel-picker__no-provider-links { display: flex; flex-wrap: wrap; gap: .5rem; }
 .qmodel-picker__model-item { width: 100%; min-height: 2.5rem; border-bottom: 1px solid var(--qmp-line); color: var(--qmp-muted); font-family: var(--theme-font-mono, monospace); transition: background-color 120ms ease, color 120ms ease; }
 .qmodel-picker__model-item:hover { background: var(--qmp-wash); color: var(--qmp-fg); }
 .qmodel-picker__model-item--selected,
