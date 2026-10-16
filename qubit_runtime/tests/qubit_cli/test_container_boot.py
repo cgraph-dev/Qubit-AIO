@@ -50,8 +50,8 @@ def _hermetic_container_argv(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda: (),
     )
     # This fixture owns real files, but does not run as the image's service user.
-    monkeypatch.setattr("qubit_cli.service_manager._QUBIT_UID", os.getuid())
-    monkeypatch.setattr("qubit_cli.service_manager._QUBIT_GID", os.getgid())
+    monkeypatch.setattr("qubit_cli.service_manager._HERMES_UID", os.getuid())
+    monkeypatch.setattr("qubit_cli.service_manager._HERMES_GID", os.getgid())
 
 
 def _make_profile(
