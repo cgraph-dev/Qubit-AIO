@@ -75,10 +75,27 @@ function NestedValueEditor({
     );
   }
 
+  if (typeof value === "boolean") {
+    return <Switch aria-label={fieldKey} checked={value} onCheckedChange={onChange} />;
+  }
+
   return (
     <Input
+      aria-label={fieldKey}
+      type={typeof value === "number" ? "number" : "text"}
       value={formatScalar(value)}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        const raw = e.target.value;
+        // Nested values do not have a separate schema entry. Preserve the
+        // existing scalar type so a read-modify-write round trip does not
+        // silently serialize numbers and booleans as strings.
+        if (typeof value === "number") {
+          const parsed = raw === "" ? 0 : Number(raw);
+          if (!Number.isNaN(parsed)) onChange(parsed);
+          return;
+        }
+        onChange(raw);
+      }}
       className="text-xs"
     />
   );
