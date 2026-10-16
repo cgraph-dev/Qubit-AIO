@@ -1932,11 +1932,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     # Report the failure AS A NOTICE rather than closing: the
                     # client keeps its last good snapshot and shows the reason,
                     # instead of blanking the office on a transient store error.
-                    self.wfile.write(OS.sse("notice", {
-                        "kind": "error",
-                        "text": f"the office store could not be read: "
-                                f"{str(exc)[:200]}",
-                    }))
+                    # The frame carries the client's full toast contract
+                    # (`level` + `at`), not just `{kind, text}` -- a notice with
+                    # no `level` arms no dismissal timer and sticks forever.
+                    self.wfile.write(OS.sse("notice", OS.notice(
+                        f"the office store could not be read: {str(exc)[:200]}",
+                        level="warn", kind="error")))
                     self.wfile.flush()
                     time.sleep(OS.SNAPSHOT_INTERVAL_SECONDS)
                     continue

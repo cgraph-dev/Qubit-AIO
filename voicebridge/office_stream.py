@@ -370,6 +370,52 @@ def sse(event: str, payload: Any) -> bytes:
     return (f"event: {event}\ndata: {json.dumps(payload)}\n\n").encode("utf-8")
 
 
+#: The toast levels the vendored client's `push()` understands. It looks up an
+#: auto-dismiss duration as `$C[e.level]` and arms a timer only when the result
+#: is a finite number; a `level` outside this set (or absent) sets NO timer, so
+#: the toast never dismisses. This is the client's own vocabulary, taken from
+#: its bundle (`$C={info:5e3,success:6e3,warn:9e3,alert:1/0}`), not invented here.
+NOTICE_LEVELS = frozenset({"info", "success", "warn", "alert"})
+
+
+def notice(text: str, *, level: str = "info", kind: str = "",
+           at_ms: Optional[int] = None) -> Dict[str, Any]:
+    """A `notice` frame in the shape the vendored client actually consumes.
+
+    THE DEFECT THIS CLOSES
+    ----------------------
+    The only server-side `notice` was `{"kind": "error", "text": ...}`. The
+    client's toast handler reads `e.level` (to pick an auto-dismiss lifetime),
+    `e.text` (the body) and `e.at` (the dedup clock):
+
+        push(e){ ... key = `${e.level}|${e.agentId ?? ""}|${e.text}`;
+        n = this.toasts.find(n => n.key === key && e.at - n.notice.at < QC);
+        ... this.arm(r, $C[e.level]) }
+
+    `arm(e, t)` sets a `setTimeout` only when `Number.isFinite(t)`. The emitted
+    frame had no `level`, so `$C[undefined]` was `undefined`, no timer was armed,
+    and the error toast -- the one that says the office store could not be read
+    -- was **immortal**: it never dismissed itself.
+
+    `at` also matters for the dedup window (`e.at - n.notice.at`): absent, that
+    subtraction is `NaN`, so the "already showing, bump it" branch never fires
+    and identical notices stack instead of collapsing to a repeat counter.
+
+    Both fields are now always present. `level` is coerced into the client's
+    vocabulary rather than passed through raw, so an unknown level cannot
+    silently produce an immortal toast again. `kind` is kept for Qubit-side
+    readers and the client ignores unknown keys.
+    """
+    lvl = level if level in NOTICE_LEVELS else "info"
+    out: Dict[str, Any] = {
+        "kind": kind or lvl,
+        "level": lvl,
+        "text": text,
+        "at": int(time.time() * 1000) if at_ms is None else int(at_ms),
+    }
+    return out
+
+
 def stream_frames(tower: Dict[str, Any], revision: int, start_time: float,
                   retry_ms: int = 2000) -> Iterable[bytes]:
     """The opening frames of a stream: the retry hint, then a snapshot + feed.
