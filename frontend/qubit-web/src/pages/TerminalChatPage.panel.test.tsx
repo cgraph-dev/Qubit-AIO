@@ -690,6 +690,49 @@ describe("Qubit TerminalChatPage /chat?resume=<id> existence guard", () => {
     expect(container.querySelector('[data-state="resume-missing"]')).toBeNull();
   });
 
+  it("keeps the server-resolved session on reconnect and model polling", async () => {
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt", profile_id: "qubit-go", model: "deepseek",
+    }));
+    await renderTerminal();
+    await vi.waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    const first = FakeWebSocket.instances[0];
+    await act(async () => {
+      first.onmessage?.({ data: JSON.stringify({ type: "resume", id: "resolved-session" }) });
+    });
+    expect(apiMocks.wsTicket).toHaveBeenCalledTimes(1);
+    vi.useFakeTimers();
+    try {
+      // Both the reconnect ladder and periodic model lookup use the resolved id.
+      await act(async () => { first.onclose?.({}); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(11000); });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    expect(FakeWebSocket.instances[1].url).toContain("resume=resolved-session");
+    expect(apiMocks.wsTicket).toHaveBeenLastCalledWith("qubit-go", undefined, "resolved-session");
+  });
+
+  it("discards a model poll from the connection replaced by New chat", async () => {
+    apiMocks.wsTicket.mockImplementation(async () => ({ ticket: "tkt", model: "current-model" }));
+    vi.useFakeTimers();
+    await renderTerminal();
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    let resolvePoll!: (value: unknown) => void;
+    apiMocks.wsTicket.mockImplementationOnce(() => new Promise((resolve) => { resolvePoll = resolve; }));
+    try {
+      await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+      const newChat = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("New chat"))!;
+      await act(async () => { newChat.click(); });
+      await act(async () => { resolvePoll({ ticket: "stale", model: "previous-session-model" }); });
+      const props = sidebarMount.mock.calls.at(-1)?.[0] as { terminalModel?: { model?: string } };
+      expect(props.terminalModel?.model).toBe("current-model");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("dials a plain /chat (no resume) without waiting on a probe", async () => {
     apiMocks.wsTicket.mockImplementation(async () => ({
       ticket: "tkt",

@@ -584,6 +584,10 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             // unchanged.
             const resumeId = parseResumeControlMessage(ev.data);
             if (resumeId) {
+              // The implicit fallback is now a concrete session. Reconnects
+              // and model-card polls must target it rather than resolving the
+              // most recently active (possibly unrelated) session again.
+              resumeRef.current = resumeId;
               effectiveResumeRef.current = resumeId;
               setResumeTarget(resumeId);
               // The server told us which session this connection is on: we are
@@ -1190,6 +1194,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (disposedRef.current) return;
+      const generation = connectionGenerationRef.current;
       void api
         .wsTicket(
           selectedRef.current ?? undefined,
@@ -1197,7 +1202,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           resumeRef.current || undefined,
         )
         .then((next) => {
-          if (disposedRef.current) return;
+          if (disposedRef.current || connectionGenerationRef.current !== generation) return;
           setGrant((prev) =>
             prev && prev.model === next.model && prev.provider === next.provider
               ? prev
