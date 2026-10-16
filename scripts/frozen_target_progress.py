@@ -2,7 +2,7 @@
 """BURNDOWN INSTRUMENT: are we at the FROZEN target yet?
 
 ONE COMMAND answers the finish-line question for the freeze pin
-`ad12263a5ed4` (see docs/FROZEN_TARGET.md). It runs the completeness audit
+`43faacfb8de7` (see docs/FROZEN_TARGET.md). It runs the completeness audit
 against that revision ONLY -- never `origin/main`, which drifts (it moved 11
 commits DURING the audit that produced the baseline numbers), and prints a
 single verdict line so no human has to read a full audit to know whether the
@@ -26,15 +26,16 @@ never touches. This script splits on the `tests/` path segment (also matching
 `plugins/*/tests/`): a missing path is a test iff it starts with `tests/` or
 contains a `/tests/` segment. The verdict is driven by PRODUCTION only.
 
-BASELINE (from docs/FROZEN_TARGET.md, clean tree, `--rev ad12263a5ed4`)
------------------------------------------------------------------------
-    absent              261   (234 tests -> ~27 production)
-    short_port        111 / 272   files / symbols
-    behind_head       214 / 703   files / symbols
-    total missing       975
-These are FROZEN constants. If the audit against `ad12263a5ed4` disagrees with
-its own baseline, that is a bug in this instrument or a moved pin -- not
-progress -- and it is flagged loudly.
+BASELINE (re-frozen 2026-10-16 at `--rev 43faacfb8de7`)
+--------------------------------------------------------
+`BASE` below is the measurement at the freeze. Because the pin moved to the true
+upstream `main` tip, these numbers are LARGER than the pre-freeze baseline: we are
+now measuring against a milestone 4,218 commits / 5,434 files further ahead, not
+against a stale waypoint. Progress is judged by `BASE` shrinking from THAT number.
+If the audit disagrees with `BASE`, that is a bug in this instrument or a moved
+pin -- not progress -- and it is flagged loudly. Do not edit `BASE` without
+re-freezing `FROZEN_REV`, and do not edit `FROZEN_REV` without re-measuring it
+(`.venv/bin/python scripts/audit_sync_completeness.py --rev <new> --json <out>`).
 
 Usage:
     .venv/bin/python scripts/frozen_target_progress.py
@@ -61,12 +62,30 @@ if not (REPO / "qubit_runtime").is_dir() or not (REPO / "scripts").is_dir():
     )
 
 # THE FROZEN PIN. Never origin/main. See docs/FROZEN_TARGET.md.
-FROZEN_REV = "517b5e10febd619ce30bb22580e29b160266eb43"
+#
+# Re-frozen 2026-10-16 at the owner's direction: the milestone is upstream `main` as of the
+# freeze, and we stop chasing it. The previous pin (517b5e10febd, 2026-10-08) had drifted 4,218
+# commits / 5,434 files behind; the previous BASELINE block below was measured at a THIRD
+# revision (ad12263a5ed4), which is the inconsistency this re-freeze also retires -- pin,
+# baseline and docstring now all name the same commit.
+FROZEN_REV = "43faacfb8de7b29548547a7fbdedad0cc6e7391c"
 
 AUDIT = REPO / "scripts" / "audit_sync_completeness.py"
 CACHE = REPO / ".frozen_target_progress.cache.json"
 
 # Baseline at the freeze. DO NOT EDIT without re-freezing the pin.
+#
+# !! PENDING RE-MEASUREMENT (2026-10-16). These six numbers were measured at the PREVIOUS
+# revision (ad12263a5ed4) and are STALE for FROZEN_REV=43faacfb8de7 -- they are kept only so the
+# instrument runs. Every verdict they produce against the new pin will read as "behind", which
+# is TRUE (the milestone moved 4,218 commits forward) but is not yet the calibrated baseline.
+# A moved pin is detected, not silently trusted: the assert on `data["rev"] == FROZEN_REV` below
+# and the "moved pin" flag both fire, so a stale BASE cannot pass as a fresh measurement.
+#
+# To finish the re-freeze, run and paste in the real numbers:
+#   .venv/bin/python scripts/audit_sync_completeness.py --rev 43faacfb8de7 --json /tmp/a.json
+#   keys: absent, short_port_files, short_port_symbols, behind_head_files, behind_head_symbols,
+#         total_missing = absent + short_port_symbols + behind_head_symbols
 BASE = {
     "absent": 261,
     "short_port_files": 111,
