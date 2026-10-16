@@ -983,6 +983,7 @@ function SessionsPagination({
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -1235,10 +1236,13 @@ export default function SessionsPage() {
       .getSessions(PAGE_SIZE, p * PAGE_SIZE, sessionQueryOptions)
       .then((resp) => {
         if (requestId !== sessionsRequestRef.current) return;
+        setLoadError(null);
         setSessions(resp?.sessions ?? []);
         setTotal(resp?.total ?? 0);
       })
-      .catch(() => {})
+      .catch(() => {
+        if (requestId === sessionsRequestRef.current) setLoadError("Failed to load sessions.");
+      })
       .finally(() => {
         if (requestId !== sessionsRequestRef.current) return;
         if (!silent) setLoading(false);
@@ -1824,6 +1828,9 @@ export default function SessionsPage() {
     }
   }
 
+  if (loadError) return <div role="alert" className="p-6">
+    <p>{loadError}</p><Button disabled={loading} onClick={() => loadSessions(page)}>Retry</Button>
+  </div>;
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">

@@ -188,39 +188,28 @@ export default function ConfigPage() {
     return cat.charAt(0).toUpperCase() + cat.slice(1);
   }
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   useEffect(() => {
-    api
-      .getConfig()
-      .then(setConfig)
-      .catch(() => {});
-    api
-      .getSchema()
-      .then((resp) => {
-        // memory.provider has a dedicated management UI on the Plugins page
-        // (provider cards + guided setup/switch flow). Hide it from the
-        // generic config form so the two surfaces don't fight; the schema
-        // keeps the field for other consumers (Desktop settings).
-        const fields = { ...resp.fields } as Record<
-          string,
-          Record<string, unknown>
-        >;
+    let live = true;
+    setLoadError(null);
+    Promise.all([api.getConfig(), api.getSchema(), api.getDefaults()])
+      .then(([nextConfig, resp, nextDefaults]) => {
+        if (!live) return;
+        // The Plugins page owns memory-provider selection.
+        const fields = { ...resp.fields } as Record<string, Record<string, unknown>>;
         delete fields["memory.provider"];
+        setConfig(nextConfig);
         setSchema(fields);
         setCategoryOrder(resp.category_order ?? []);
+        setDefaults(nextDefaults);
       })
-      .catch(() => {});
-    api
-      .getDefaults()
-      .then(setDefaults)
-      .catch(() => {});
-    // /api/status's config_path is the machine-global path the vendored
-    // runtime reads. Raw-YAML export is policy-refused (SECRET_NEVER_SERVED),
-    // so the header path comes from status, not /api/config/raw.
-    api
-      .getStatus()
-      .then((resp) => setConfigPath((prev) => prev ?? resp?.config_path ?? null))
-      .catch(() => {});
-  }, []);
+      .catch(() => { if (live) setLoadError("Failed to load configuration."); });
+    api.getStatus().then((resp) => {
+      if (live) setConfigPath(resp?.config_path ?? null);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [loadAttempt]);
 
   // Set active category when categories load
   useEffect(() => {
@@ -435,6 +424,9 @@ export default function ConfigPage() {
   };
 
   /* ---- Loading ---- */
+  if (loadError) return <div role="alert" className="p-6">
+    <p>{loadError}</p><Button onClick={() => setLoadAttempt((n) => n + 1)}>Retry</Button>
+  </div>;
   if (!config || !schema) {
     return (
       <div className="flex items-center justify-center py-24">

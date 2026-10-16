@@ -579,12 +579,15 @@ export default function EnvPage() {
   const { t } = useI18n();
   const { setAfterTitle } = usePageHeader();
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   useEffect(() => {
-    api
-      .getEnvVars()
-      .then(setVars)
-      .catch(() => {});
-  }, []);
+    let live = true;
+    setLoadError(null);
+    api.getEnvVars().then((next) => { if (live) setVars(next); })
+      .catch(() => { if (live) setLoadError("Failed to load keys."); });
+    return () => { live = false; };
+  }, [loadAttempt]);
 
   // Scroll-to sub-nav in the page header. Every section is structural (the
   // Qubit OAUTH/PROVIDERS/TOOLS/GATEWAY/SETTINGS/CUSTOM KEYS tab family), so
@@ -816,6 +819,9 @@ export default function EnvPage() {
     };
   }, [vars, showAdvanced, t]);
 
+  if (loadError) return <div role="alert" className="p-6">
+    <p>{loadError}</p><Button onClick={() => setLoadAttempt((n) => n + 1)}>Retry</Button>
+  </div>;
   if (!vars) {
     return (
       <div className="flex items-center justify-center py-24">

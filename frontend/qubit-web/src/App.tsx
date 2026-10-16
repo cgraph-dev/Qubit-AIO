@@ -83,6 +83,7 @@ import { useProfileScope } from "@/contexts/useProfileScope";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { ProfileScopeBanner } from "@/components/ProfileScopeBanner";
 import { MemoryPressureBanner } from "@/components/MemoryPressureBanner";
+import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
 import "@/styles/sidebar-studio.css";
@@ -1067,7 +1068,9 @@ export default function App() {
                   <Suspense fallback={<RouteFallback />}>
                     <Routes>
                       {routes.map(({ key, path, element }) => (
-                        <Route key={key} path={path} element={element} />
+                        <Route key={key} path={path} element={
+                          <PageErrorBoundary key={key} label={path}>{element}</PageErrorBoundary>
+                        } />
                       ))}
                       <Route
                         path="*"
