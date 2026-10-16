@@ -1,0 +1,93 @@
+[
+  {
+    "path": "qubit_runtime/gateway/session_authorities.py",
+    "upstream_path": "gateway/session_authorities.py",
+    "upstream_lines": 188,
+    "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "ported",
+    "dependencies_missing": [
+      "qubit_state_runtime"
+    ],
+    "imports_clean": true,
+    "note": "Top-level: qubit_state_runtime (absent, 299-list). Deferred: qubit_state_local, gateway.run (+qubit_constants on-disk). Engages gateway/AGENTS.md profile-scope rule directly: SessionAuthorities keys by qubit_home_key(home), .active() returns None for an unserved scoped home (never the launch profile) once multiplexed -- the silent-default-profile-leak guard."
+  },
+  {
+    "path": "qubit_runtime/gateway/session_cron.py",
+    "upstream_path": "gateway/session_cron.py",
+    "upstream_lines": 256,
+    "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "ported",
+    "dependencies_missing": [
+      "gateway.session_contract",
+      "qubit_state_keys",
+      "qubit_state_runtime"
+    ],
+    "imports_clean": true,
+    "note": "Top-level: gateway.session_contract, qubit_state_keys, qubit_state_runtime (all absent, 299-list). Defers gateway.session_policy/-local_recovery/-runtime_workers/-results/-local and qubit_state_local. Ties to profile-scope: submit runs _create inside owner_scope(authority) so job id/jobs file/config read the OWNING profile, not os.environ's launch profile."
+  },
+  {
+    "path": "qubit_runtime/gateway/session_finite.py",
+    "upstream_path": "gateway/session_finite.py",
+    "upstream_lines": 80,
+    "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "ported",
+    "dependencies_missing": [
+      "qubit_state_runtime"
+    ],
+    "imports_clean": true,
+    "note": "Top-level: qubit_state_runtime only. Deferred: gateway.session_ingress/-display/-surface/-cli_turn/-policy. CONSUMER ALREADY IN TREE: agent/managed_worker.py:218 imports finite_clarify_reply, finite_turn_required."
+  },
+  {
+    "path": "qubit_runtime/gateway/session_hosted_attachments.py",
+    "upstream_path": "gateway/session_hosted_attachments.py",
+    "upstream_lines": 205,
+    "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "ported",
+    "dependencies_missing": [
+      "gateway.hosted_room_attachments",
+      "gateway.session_ingress_media",
+      "qubit_state_runtime"
+    ],
+    "imports_clean": true,
+    "note": "Top-level: all three absent (299-list). Deferred: gateway.hosted_room_driver (on-disk), gateway.platforms.base (on-disk)."
+  },
+  {
+    "path": "qubit_runtime/gateway/session_hosted_controls.py",
+    "upstream_path": "gateway/session_hosted_controls.py",
+    "upstream_lines": 81,
+    "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "ported",
+    "dependencies_missing": [
+      "qubit_state_runtime"
+    ],
+    "imports_clean": true,
+    "note": "Top-level: qubit_state_runtime (absent) + tui_gateway.hosted_room_driver (on-disk) + gateway.hosted_room_driver (on-disk). No deferred imports."
+  },
+  {
+    "path": "qubit_runtime/gateway/session_hosted_rpc.py",
+    "upstream_path": "gateway/session_hosted_rpc.py",
+    "upstream_lines": 333,
+    "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "ported",
+    "dependencies_missing": [
+      "gateway.session_contract",
+      "qubit_state_runtime"
+    ],
+    "imports_clean": true,
+    "note": "Top-level: gateway.session_contract, qubit_state_runtime (absent); gateway.hosted_room_driver on-disk. Defers gateway.session_local/-policy/-results/-runtime_workers/-local_recovery/-authorities/-hosted_attachments/-ingress_media and qubit_state_local. RPC dispatch wrapped in owner_scope(self.authority)."
+  },
+  {
+    "path": "qubit_runtime/gateway/session_hosted_service.py",
+    "upstream_path": "gateway/session_hosted_service.py",
+    "upstream_lines": 291,
+    "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "ported",
+    "dependencies_missing": [
+      "gateway.session_authorities",
+      "gateway.session_contract",
+      "qubit_state_runtime"
+    ],
+    "imports_clean": true,
+    "note": "Top-level: gateway.session_contract, qubit_state_runtime (absent); gateway.session_authorities (this chunk), gateway.session_hosted_controls (this chunk), tui_gateway.hosted_room_service (on-disk). Defers gateway.session_hosted_transport/-hosted_rpc/-hosted_attachments. profile_homes() gates every configured hosted profile on IDENTIFIER_RE + absolute+resolved path and refuses a name==own mismatch with permission_denied -- the profile-scope fail-closed rule."
+  }
+]

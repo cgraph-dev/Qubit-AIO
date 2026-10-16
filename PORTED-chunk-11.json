@@ -1,0 +1,157 @@
+[
+ {
+  "path": "qubit_runtime/gateway/session_tool_events.py",
+  "upstream_path": "gateway/session_tool_events.py",
+  "upstream_lines": 30,
+  "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+  "status": "ported",
+  "dependencies_missing": [],
+  "imports_clean": true,
+  "invariants_engaged": [
+   "gateway/AGENTS.md: no invariant touched (pure payload-bounding helpers)"
+  ],
+  "notes": "Exercised: bounded_args/bounded_result real behaviour verified."
+ },
+ {
+  "path": "qubit_runtime/gateway/session_worker_construct.py",
+  "upstream_path": "gateway/session_worker_construct.py",
+  "upstream_lines": 155,
+  "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+  "status": "ported",
+  "dependencies_missing": [
+   "gateway/session_authorities.py",
+   "gateway/session_local_mcp.py? (no)",
+   "qubit_cli/fallback_config.py present",
+   "qubit_cli/runtime_provider.py present",
+   "qubit_cli/runtime_provider_custom.py present",
+   "qubit_cli/route_identity.py present",
+   "qubit_cli/config.py present",
+   "qubit_cli/models.py present",
+   "agent/fast_mode.py present",
+   "gateway/config.py present"
+  ],
+  "imports_clean": true,
+  "invariants_engaged": [
+   "gateway/AGENTS.md: worker construction feeds AIAgent for a managed worker; construct_v1 is the closed validated shape (KEYS)."
+  ],
+  "notes": "construct_kwargs validated: closed-shape accept + invalid_managed_worker_bootstrap refusal. route_runtime/worker_api_key deps all resolvable EXCEPT deferred gateway.session_authorities (its import is inside construct_inputs)."
+ },
+ {
+  "path": "qubit_runtime/qubit_cli/gateway_chat_inject.py",
+  "upstream_path": "hermes_cli/gateway_chat_inject.py",
+  "upstream_lines": 43,
+  "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+  "status": "ported",
+  "dependencies_missing": [],
+  "imports_clean": true,
+  "invariants_engaged": [
+   "qubit_cli/AGENTS.md: plugins/PluginManager._cli_ref CLI slot -- inject_message routes into the attached gateway session, not a REPL."
+  ],
+  "notes": "qubit_cli.plugins.get_plugin_manager deferred import; present."
+ },
+ {
+  "path": "qubit_runtime/qubit_cli/gateway_chat_listing.py",
+  "upstream_path": "hermes_cli/gateway_chat_listing.py",
+  "upstream_lines": 54,
+  "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+  "status": "ported",
+  "dependencies_missing": [],
+  "imports_clean": true,
+  "invariants_engaged": [
+   "qubit_cli/AGENTS.md: --list-tools/--list-toolsets read only the registry + this profile's CLI toolset selection (no agent, no gateway)."
+  ],
+  "notes": "All imports deferred; qubit_cli.config, qubit_cli.tools_config, agent.i18n, model_tools, toolsets all present."
+ },
+ {
+  "path": "qubit_runtime/qubit_cli/gateway_chat_startup.py",
+  "upstream_path": "hermes_cli/gateway_chat_startup.py",
+  "upstream_lines": 48,
+  "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+  "status": "ported",
+  "dependencies_missing": [],
+  "imports_clean": true,
+  "invariants_engaged": [
+   "qubit_cli/AGENTS.md: first-run setup guard / free-tier bootstrap ordering; emits partial-update hint."
+  ],
+  "notes": "Reader of HERMES_TUI_GATEWAY_URL left verbatim (wire contract; writers in-tree use the same spelling)."
+ },
+ {
+  "path": "qubit_runtime/gateway/session_policy.py",
+  "upstream_path": "gateway/session_policy.py",
+  "upstream_lines": 781,
+  "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+  "status": "dep-missing",
+  "dependencies_missing": [
+   "qubit_state_runtime.py (top-level: RuntimeStoreError; upstream hermes_state_runtime.py, 266-list L256)",
+   "gateway/session_authorities.py (deferred)",
+   "gateway/session_a2a.py (deferred)",
+   "gateway/session_local.py (deferred)",
+   "gateway/session_local_editor.py (deferred)",
+   "gateway/session_local_mcp.py (deferred)",
+   "qubit_state_local.py (deferred, = hermes_state_local.py)"
+  ],
+  "imports_clean": false,
+  "invariants_engaged": [
+   "gateway/AGENTS.md: the frozen local-session launch policy -- _ACTIVE_POLICY contextvar, policy_scope, _profile_runtime_scope parity",
+   "qubit_cli/AGENTS.md: config readers (read_user_config_raw/resolve_turn_limit/DEFAULT_CONFIG); _SECRET_CONFIG_KEYS is with the config owner"
+  ],
+  "notes": "Landed as real code. TOP-LEVEL import of absent qubit_state_runtime blocks import; with that one module faked, imports cleanly."
+ },
+ {
+  "path": "qubit_runtime/gateway/session_policy_credentials.py",
+  "upstream_path": "gateway/session_policy_credentials.py",
+  "upstream_lines": 79,
+  "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+  "status": "dep-missing",
+  "dependencies_missing": [
+   "qubit_state_runtime.py (top-level: RuntimeStoreError; 266-list L256)",
+   "gateway/session_policy.py (present, same chunk)",
+   "gateway/run.py (present)",
+   "tools/terminal_scope.py (present)"
+  ],
+  "imports_clean": false,
+  "invariants_engaged": [
+   "gateway/AGENTS.md: frozen config credentials borrowed from the profile source, never a vault; scope/identity checked per profile."
+  ],
+  "notes": "Landed as real code; blocked only by top-level qubit_state_runtime. agent.credential_persistence present."
+ },
+ {
+  "path": "qubit_runtime/qubit_cli/gateway_chat.py",
+  "upstream_path": "hermes_cli/gateway_chat.py",
+  "upstream_lines": 376,
+  "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+  "status": "dep-missing",
+  "dependencies_missing": [
+   "qubit_cli/gateway_client.py (TOP-LEVEL: GatewayClientError, connect_gateway; 266-list L193)",
+   "qubit_cli/gateway_chat_view.py (deferred; 266-list L191)",
+   "gateway/session_local_route.py (deferred)",
+   "qubit_cli/command set present (main, terminal_breadcrumbs, config_effective, process_identity, shared_profile_warning, stream_json, plugins)"
+  ],
+  "imports_clean": false,
+  "invariants_engaged": [
+   "qubit_cli/AGENTS.md: gateway_chat is the classic CLI launch through the canonical gateway, never AIAgent; resume-policy refusal + creation-flag validation.",
+   "gateway/AGENTS.md: creation flags ride THIS session's session.create; resume keeps the frozen route."
+  ],
+  "notes": "Landed as real code. TOP-LEVEL qubit_cli.gateway_client blocks it; with both qubit_cli.gateway_client and qubit_state_runtime faked, imports cleanly."
+ },
+ {
+  "path": "qubit_runtime/qubit_cli/gateway_chat_commands.py",
+  "upstream_path": "hermes_cli/gateway_chat_commands.py",
+  "upstream_lines": 227,
+  "upstream_head_sha": "53bec2a311979ad6f77580ba491eca261ab988e0",
+  "status": "dep-missing",
+  "dependencies_missing": [
+   "qubit_cli/gateway_client.py (TOP-LEVEL: GatewayClientError, GatewayRPCError; 266-list L193)",
+   "gateway/session_commands.py (deferred; help_text; 266-list L103)",
+   "agent/context_compressor.py (present)",
+   "agent/i18n.py (present)",
+   "qubit_cli/commands.py (present)"
+  ],
+  "imports_clean": false,
+  "invariants_engaged": [
+   "gateway/AGENTS.md: VIEW_ROUTES maps session commands onto owner RPCs (slash.exec parity table).",
+   "qubit_cli/AGENTS.md: registry resolve_command for canonicalization; no elif ladder."
+  ],
+  "notes": "Landed as real code; blocked only by top-level qubit_cli.gateway_client."
+ }
+]

@@ -1,0 +1,94 @@
+[
+  {
+    "path": "qubit_runtime/gateway/session_hosted_transport.py",
+    "upstream_path": "gateway/session_hosted_transport.py",
+    "upstream_lines": 367,
+    "upstream_head": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "dep-missing",
+    "dependencies_missing": [
+      "hermes_state_runtime.py",
+      "gateway/session_contract.py",
+      "gateway/session_authorities.py",
+      "gateway/session_hosted_rpc.py",
+      "gateway/hosted_room_attachments.py",
+      "gateway/session_hosted_attachments.py",
+      "hermes_cli/gateway_runtime.py",
+      "hermes_cli/gateway_runtime_discovery.py"
+    ],
+    "imports_clean": false
+  },
+  {
+    "path": "qubit_runtime/gateway/session_ingress_media.py",
+    "upstream_path": "gateway/session_ingress_media.py",
+    "upstream_lines": 533,
+    "upstream_head": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "dep-missing",
+    "dependencies_missing": [
+      "hermes_state_runtime.py",
+      "gateway/session_api_media.py"
+    ],
+    "imports_clean": false
+  },
+  {
+    "path": "qubit_runtime/gateway/session_kanban.py",
+    "upstream_path": "gateway/session_kanban.py",
+    "upstream_lines": 349,
+    "upstream_head": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "dep-missing",
+    "dependencies_missing": [
+      "hermes_state_runtime.py",
+      "gateway/session_policy.py",
+      "gateway/session_local.py",
+      "gateway/session_contract.py",
+      "gateway/session_local_recovery.py",
+      "hermes_state_local.py",
+      "gateway/session_runtime_workers.py",
+      "gateway/session_managed_worker.py",
+      "gateway/session_surface.py",
+      "hermes_cli/turn_exit.py"
+    ],
+    "imports_clean": false
+  },
+  {
+    "path": "qubit_runtime/gateway/session_local.py",
+    "upstream_path": "gateway/session_local.py",
+    "upstream_lines": 349,
+    "upstream_head": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "dep-missing",
+    "dependencies_missing": [
+      "hermes_state_runtime.py",
+      "gateway/session_contract.py",
+      "gateway/session_authorities.py",
+      "gateway/session_policy.py",
+      "hermes_state_local.py",
+      "gateway/session_local_recovery.py",
+      "gateway/session_local_route.py",
+      "gateway/session_a2a.py"
+    ],
+    "imports_clean": false
+  },
+  {
+    "path": "qubit_runtime/gateway/session_local_close.py",
+    "upstream_path": "gateway/session_local_close.py",
+    "upstream_lines": 26,
+    "upstream_head": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "dep-missing",
+    "dependencies_missing": [
+      "hermes_state_local.py",
+      "hermes_state_runtime.py"
+    ],
+    "imports_clean": false
+  },
+  {
+    "path": "qubit_runtime/gateway/session_local_editor.py",
+    "upstream_path": "gateway/session_local_editor.py",
+    "upstream_lines": 62,
+    "upstream_head": "53bec2a311979ad6f77580ba491eca261ab988e0",
+    "status": "dep-missing",
+    "dependencies_missing": [
+      "hermes_state_runtime.py",
+      "gateway/session_local_mcp.py"
+    ],
+    "imports_clean": false
+  }
+]
