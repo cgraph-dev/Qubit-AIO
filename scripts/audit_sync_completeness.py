@@ -123,7 +123,35 @@ def _upstream_clone() -> Path:
 
 
 UP = _upstream_clone()
-BASELINE = "a036b13793"
+
+
+def _frozen_rev() -> str:
+    """The frozen pin, read from its single declared home (one home, no copies).
+
+    The short-port branch measures "we never even reached our own baseline" --
+    where "our own baseline" is the revision we should have synced from, i.e.
+    the frozen pin, NOT an arbitrary waypoint. This constant used to be a
+    hardcoded ``a036b13793`` (the 2026-10-06 sync waypoint, 1783 commits behind
+    the frozen pin). Measured against a stale base, every symbol upstream added
+    between that waypoint and the pin was credited to us, so a file we never
+    ported at the current revision was mis-classified as ``behind_head``
+    instead of ``short_port`` -- the same under-reporting defect the sibling
+    audits (audit_capability_gaps, audit_missing_symbols) were fixed for.
+    Read it from frozen_target_progress.FROZEN_REV so every drift-measuring
+    site agrees on one value.
+    """
+    src = Path(__file__).resolve().parent / "frozen_target_progress.py"
+    if src.is_file():
+        for line in src.read_text().splitlines():
+            if line.startswith("FROZEN_REV"):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    raise SystemExit(
+        f"cannot read the frozen pin from {src}; refusing to measure short-port "
+        "against an unknown revision."
+    )
+
+
+BASELINE = _frozen_rev()
 HEAD = "origin/main"
 
 # upstream prefix -> our prefix
