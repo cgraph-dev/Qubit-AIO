@@ -6,6 +6,11 @@ open a store of its own, and neither does this module — the memory bytes are
 written through the existing context engine
 :mod:`voicebridge.context_store` (``add_memory`` / ``search``), which is the
 seam ``95-CONTRACT.md`` names ("Memory -> ``voicebridge/context_store.py``").
+This is local state-home storage, irrespective of the runtime memory provider or
+``OPENVIKING_ENDPOINT`` / ``OBSIDIAN_VAULT_PATH`` settings. Its ``viking://``
+pointers are local identifiers, not evidence of an OpenViking submission.
+Obsidian writes use the explicit plugin note API; OpenViking's runtime provider
+returns a submission receipt, not proof that extraction created a memory file.
 
 The one thing this module *also* does is what makes the memory **visible**:
 every real memory write emits a ``memory_written`` row into the existing

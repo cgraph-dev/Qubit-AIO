@@ -740,7 +740,9 @@ def route(argv: list, cfg=None) -> Optional[FamilyRoute]:
     Returns ``None`` when the Qubit parser owns the call.
     """
     raw = list(argv or [])
-    if len(raw) >= 2 and (raw[0], raw[1]) in NATIVE_MCP_READS:
+    if len(raw) >= 2 and ((raw[0], raw[1]) in NATIVE_MCP_READS or
+                          (raw[0] == "mcp" and raw[1] in
+                           {"remove", "rm", "delete", "disable"})):
         # Native canonical MCP read (``voicebridge.mcp_servers``); never the
         # fork's second ``config.yaml mcp_servers`` store.
         return None

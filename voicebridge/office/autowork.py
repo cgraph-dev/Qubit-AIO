@@ -283,9 +283,14 @@ def _remember(cfg: Any, agent_id: int, *, text: str,
         return False
     try:
         mod = importlib.import_module(f"{__package__}.agent_memory")
-        mod.remember(cfg, int(agent_id), kind=MEMO_KIND, text=str(text)[:1000],
-                     meta=meta or {})
-        return True
+        receipt = mod.remember(
+            cfg, int(agent_id), kind=MEMO_KIND, text=str(text)[:1000],
+            meta=meta or {})
+        # A non-raising call can still refuse, fail, or merely submit work.
+        # Only the memory authority's completed persistence receipt counts.
+        return (isinstance(receipt, dict)
+                and receipt.get("state") == "OK"
+                and receipt.get("stored") is True)
     except Exception:                                   # noqa: BLE001
         return False
 
