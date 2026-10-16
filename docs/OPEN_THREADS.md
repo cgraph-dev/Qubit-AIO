@@ -337,3 +337,56 @@ Also still uncovered: `frontend/` (TS/Vitest) and the `ui-tui` vitest suite.
 **Why it was not dispatched immediately:** 8 lanes were already running and loadavg was 19.06
 with 22 GB free. Adding a 9th heavy pytest lane risks an OOM-kill that would corrupt a
 running lane's run, which costs more than the delay.
+
+---
+
+## 2026-10-16 (later) — restart recovery, a caught regression, and stale lesson
+
+### The regression that validated the sweep plan
+
+A lane renamed one env var to its canonical `QUBIT_*` name and added a dual-read alias
+(`anon_auth.GUEST_ONBOARDING_ENV`). It **looked** correct and followed the documented
+single-write/dual-read pattern — and **broke 20 tests** (baseline 1 failed → 21 failed).
+
+Cause: it migrated the *reader* while the **writers and the tests still set the old spelling**.
+Dual-read is only half a migration. Reverted as `ad2e66acc`.
+
+**Rule for any future env-var rename (all three together, never one):**
+readers, every writer (setenv / `.env` line / launcher / systemd unit / launchd plist), AND the
+tests. Then report a **before/after failure count** — the harness makes this one run, and it is
+what would have caught this in seconds instead of by hand.
+
+### 🔴 HARD RULE: never bare `git stash`/`pop` in this repo
+
+The stash stack is **shared across worktrees** and holds **13 entries from prior sessions**
+(`stash@{0}` is a 590-line office WIP, preserved to `/tmp/preserved-stash0-office-590lines.patch`,
+sha256 `4a16d9bc…`). A bare `git stash pop` collided with it **twice in one session** and produced
+4 merge conflicts in files that were never mine.
+
+To get a baseline without touching the stash: `git checkout HEAD~1 -- <file>`, run, then
+`git checkout HEAD -- <file>`. Never `git stash`.
+
+### Verified Phase 0 tooling (branch `agent/catchup-12`)
+
+`scripts/rebrand_sweep.py` — runs, gates CI, honours the pin deny-list. Measured at `ad2e66acc`:
+
+```
+symbols=926 (hermes=670 qubit=256)  dual_spelled=91 (undeclared=88)
+boundary=432   deny_list=18 files
+```
+
+So the plan's original figures (630 / 231 / 152) have **drifted** — recompute, do not quote them.
+`--check` exits 1, listing 88 symbols spelling both ways in code with no declared dual-read.
+Safety verified: the frozen pin `69948c0057` is still 16 occurrences in `scripts/`, and the branch
+modifies none of the 18 deny-listed files.
+
+### Landed during recovery (all pushed to canonical/main)
+
+| Commit | What |
+|---|---|
+| `2c9bf297f` | **Fourth branch-copy path** carries `message_identity()` — sibling to CLI/workdir/Desktop. Falsified 3-red-without / 3-green-with. |
+| `ad2e66acc` | Revert of the `GUEST_ONBOARDING` regression |
+| `0b21c3a5f` | Phase 0 sweep tooling (recovered) |
+| `7f2a2098c` | sync-triage hunk matrix harness |
+
+Rescued-but-unlanded: a `QUBIT_GUEST_ONBOARDING` change that needs writers+tests moved with it.
