@@ -24,6 +24,7 @@ def test_office_invokes_registry_capabilities(monkeypatch):
     _install_fake_vendored_agent(monkeypatch, captured)
     import qubit_cli.tools_config as TC
     monkeypatch.setattr(TC, '_get_platform_tools', lambda cfg, platform: {'office_probe'})
+    monkeypatch.setattr('agent.skill_utils.parse_config_string_list', lambda value: ['browser'])
     startup = types.ModuleType('qubit_cli.mcp_startup')
     startup.__dict__['ensure_mcp_discovery_before_agent_build'] = lambda **kw: captured.update(discovered=True)
     monkeypatch.setitem(sys.modules, 'qubit_cli.mcp_startup', startup)
@@ -32,6 +33,7 @@ def test_office_invokes_registry_capabilities(monkeypatch):
         def __init__(self, **kwargs):
             assert captured['discovered']
             assert kwargs['enabled_toolsets'] == ['office_probe']
+            assert kwargs['disabled_toolsets'] == ['browser']
             self.tools = registry.get_definitions(set(names), quiet=True)
             assert {t['function']['name'] for t in self.tools} == set(names)
         def run_conversation(self, text):

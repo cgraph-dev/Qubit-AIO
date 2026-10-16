@@ -513,6 +513,12 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             return None
     try:
         toolsets = sorted(_get_platform_tools(vcfg, "cli"))
+        # Name-level platform filtering cannot subtract a denied toolset from
+        # composite defaults. Pass the denylist into canonical schema selection
+        # as well, including deferred MCP discovery and delegated children.
+        from agent.skill_utils import parse_config_string_list
+        disabled_toolsets = parse_config_string_list(
+            (vcfg.get("agent") or {}).get("disabled_toolsets"))
     except Exception as exc:  # noqa: BLE001 - never widen permissions on failure
         _audit("session_toolsets_error", session=sid, error=str(exc)[:160])
         return {"state": "FAILED", "code": "TOOLSET_CONFIG_ERROR",
@@ -565,6 +571,7 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             api_mode=runtime.get("api_mode"),
             model=model or runtime.get("model"),
             enabled_toolsets=toolsets,
+            disabled_toolsets=disabled_toolsets,
             quiet_mode=True,
             verbose_logging=False,
             platform="cli",
