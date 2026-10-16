@@ -1,0 +1,14 @@
+--- a/config.yaml
++++ b/config.yaml
+@@
++# Add this top-level block (creates/merges into the existing delegation section).
++# Pins the child route so subagents NEVER inherit the broken OmniRoute fallback chain.
++delegation:
++  provider: cheapvibecode
++  model: deepseek-v4.1-flash
++  fallback_providers: []
++
++# The existing top-level fallback_providers (OmniRoute) is left UNTOUCHED:
++#   it still serves the parent, but pinned children no longer borrow it
++#   (qubit_runtime/tools/delegate_tool_config.py:590 pinned=True
++#    -> qubit_cli/fallback_config.py:158 default=None).
