@@ -216,6 +216,15 @@ def test_foreign_worktree_with_live_agent_is_hands_off(tmp_path: Path, monkeypat
     live = next(f for f in report.findings if f.check == "foreign_worktree_live_agent")
     assert live.kind == hygiene.HANDS_OFF
     assert "4242" in live.detail
+    # The docstring says "hands-off, NOT a violation": a peer's live worktree
+    # must not ALSO be counted as a violation, or the guard drives exit 1 for
+    # work the rule expressly says belongs to its owner. Reporting the same
+    # worktree twice (violation + hands-off) is the cry-wolf failure mode.
+    assert "foreign_worktree_dirty" not in _checks(report), [
+        f.format() for f in report.findings]
+    assert "foreign_worktree_dirty_path" not in _checks(report), [
+        f.format() for f in report.findings]
+    assert report.exit_code() == 0, [f.format() for f in report.findings]
 
 
 # --------------------------------------------------------------------------

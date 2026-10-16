@@ -670,6 +670,26 @@ def check_other_worktrees(
         dirty = parse_porcelain(porcelain)
         if not dirty:
             continue
+        # Determine liveness FIRST. A dirty worktree with a live writer is
+        # HANDS-OFF, not a violation (see the module docstring): the rule says
+        # that work belongs to its owning agent, and reporting it as a violation
+        # too is the cry-wolf failure -- the same worktree counted twice, once
+        # as a breach and once as hands-off, driving a non-zero exit for work
+        # the guard itself says it must not touch. So emit EITHER the
+        # hands-off finding OR the violations, never both.
+        live = processes_with_cwd_under(wt)
+        if live:
+            pids = ", ".join(str(p) for p, _ in live[:4])
+            hands_off.append(Finding(
+                HANDS_OFF,
+                "foreign_worktree_live_agent",
+                f"{wt}",
+                f"a process is working in this worktree right now (pid {pids}); "
+                f"{len(dirty)} uncommitted path(s) on {ref} belong to it",
+                "hands off: do not commit or rebase this worktree while its "
+                "writer is live",
+            ))
+            continue
         findings.append(Finding(
             VIOLATION,
             "foreign_worktree_dirty",
@@ -686,18 +706,6 @@ def check_other_worktrees(
                 f"{wt}/{path}:1",
                 f"uncommitted {status!r} on {ref}",
                 "commit as wip: if the owner is gone",
-            ))
-        live = processes_with_cwd_under(wt)
-        if live:
-            pids = ", ".join(str(p) for p, _ in live[:4])
-            hands_off.append(Finding(
-                HANDS_OFF,
-                "foreign_worktree_live_agent",
-                f"{wt}",
-                f"a process is working in this worktree right now (pid {pids}); "
-                f"{len(dirty)} uncommitted path(s) on {ref} belong to it",
-                "hands off: do not commit or rebase this worktree while its "
-                "writer is live",
             ))
     return findings, hands_off
 
