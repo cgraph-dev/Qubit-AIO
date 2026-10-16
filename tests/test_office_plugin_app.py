@@ -44,6 +44,8 @@ from voicebridge import webui as W  # noqa: E402
 
 PREFIX = "/plugin-apps/"
 SAMPLE_HTML = b"<!doctype html><html><body>office</body></html>"
+#: Stand-in for the server-issued office load nonce (see `_make_handler`).
+_OFFICE_NONCE = "test-office-nonce-abc123"
 
 
 # --------------------------------------------------------------------------
@@ -76,13 +78,23 @@ def _make_handler(*, sub="", path=None, headers=None, peer="127.0.0.1",
         api_token = ""                 # no configured token => "loopback-open"
         allowed_origins = ()
 
-    h.server = type("S", (), {"app": _FakeApp()})()
+    # The office gates now require a server-issued load nonce (delivered as an
+    # HttpOnly cookie) IN ADDITION to the loopback/Host/Referer triple, because
+    # the Referer alone was forgeable. Give the fake app a live nonce store and
+    # expose the value so a caller can put it on the request as a browser would.
+    import threading as _th
+    import time as _tm
+    _app = _FakeApp()
+    _app._office_nonces = {_OFFICE_NONCE: _tm.monotonic() + 3600}
+    _app._office_nonce_lock = _th.Lock()
+    h.server = type("S", (), {"app": _app})()
     captured: dict = {}
 
-    def _send(code, body, ctype="text/plain"):
+    def _send(code, body, ctype="text/plain", extra_headers=None):
         captured["code"] = code
         captured["body"] = body
         captured["ctype"] = ctype
+        captured["extra_headers"] = extra_headers
 
     h._send = _send  # type: ignore[method-assign]
     h._captured = captured
@@ -392,7 +404,7 @@ def test_empty_sub_path_404s_handler(plugin_root):
 # --------------------------------------------------------------------------
 
 def _auth_ok(*, peer="127.0.0.1", host="127.0.0.1:8890",
-             referer=None, token=None, cfg_token=""):
+             referer=None, token=None, cfg_token="", nonce=_OFFICE_NONCE):
     """Call ``_office_app_caller_ok`` directly with a crafted request context.
 
     ``_qubit_token_ok`` is stubbed to the OUTCOME implied by the crafted
@@ -400,12 +412,19 @@ def _auth_ok(*, peer="127.0.0.1", host="127.0.0.1:8890",
     (peer/Host/Referer) in isolation. The real header path is covered by
     ``test_auth_true_with_valid_header_token_regardless_of_referer`` and
     ``test_qubit_token_ok_accepts_a_valid_header`` below.
+
+    ``nonce`` carries the office-app load nonce (the cookie a browser attaches
+    to the iframe's own requests). ``None`` omits the cookie entirely — the
+    forged-header case the nonce requirement closes.
     """
     headers = {}
     if host is not None:
         headers["Host"] = host
     if referer is not None:
         headers["Referer"] = referer
+    if nonce is not None:
+        headers["Cookie"] = "%s=%s" % (W.WebUIHandler.OFFICE_NONCE_COOKIE,
+                                       nonce)
 
     h = _make_handler(path="/api/stream", headers=headers, peer=peer)
     h.server.app.api_token = cfg_token
@@ -476,21 +495,25 @@ def test_auth_false_when_referer_is_not_the_app_directory(referer):
                     referer=referer) is False
 
 
-def test_auth_referer_check_is_substring_and_origin_agnostic():
-    """[handler] PINS an observed narrowness: the Referer check is a substring.
+def test_auth_referer_check_is_substring_but_no_longer_sufficient():
+    """[handler] The Referer check is a substring, and that is WHY the nonce exists.
 
     ``OFFICE_APP_PREFIX in referer`` does not look at the Referer's ORIGIN, so
-    ``http://evil.example.com/plugin-apps/`` satisfies it. This is NOT a hole in
-    practice: the peer AND Host must also be loopback before the Referer is even
-    consulted, so only a loopback-origin page can reach this branch — and a page
-    served by this same server is exactly the caller the exemption exists for.
-    Pinned so a future change to a substring→origin comparison is a deliberate,
-    visible edit rather than an accident.
+    ``http://evil.example.com/plugin-apps/`` satisfies it — and a bare local
+    process can send that header itself. The substring never was proof of
+    anything; it is a cheap additional filter. The load nonce is what decides:
+    without the server-issued nonce these requests are refused even though the
+    Referer matches.
     """
+    # A matching Referer WITHOUT the nonce is refused — the forged-header case.
+    assert _auth_ok(peer="127.0.0.1", host="127.0.0.1:8890",
+                    referer="http://evil.example.com/plugin-apps/",
+                    nonce=None) is False
+    # With the live nonce the loopback triple is what the predicate requires; the
+    # Referer's (irrelevant) origin does not matter once both earlier gates hold.
     assert _auth_ok(peer="127.0.0.1", host="127.0.0.1:8890",
                     referer="http://evil.example.com/plugin-apps/") is True
-    # But the SAME Referer from a non-loopback peer or a non-loopback Host is
-    # still refused by the earlier gates.
+    # A non-loopback peer or Host is still refused regardless of Referer/nonce.
     assert _auth_ok(peer="10.0.0.5", host="127.0.0.1:8890",
                     referer="http://evil.example.com/plugin-apps/") is False
     assert _auth_ok(peer="127.0.0.1", host="evil.example.com:8890",

@@ -52,6 +52,13 @@ pytestmark = pytest.mark.unit
 APP = "http://127.0.0.1:8890/plugin-apps/qubit-office/habblaud/"
 BUNDLE = (ROOT / "frontend/qubit-app/plugins/qubit-office/habblaud/bundle")
 
+#: A stand-in for the server-issued office load nonce. The office gates require
+#: it IN ADDITION to the loopback/Host/Referer triple, because the Referer alone
+#: was forgeable (the bug this file's `test_forged_referer_without_nonce_is_refused`
+#: pins). The mocked app carries it in its nonce store and the request echoes it
+#: as the cookie a real browser would send.
+_VALID_NONCE = "test-office-nonce-0123456789"
+
 
 # --------------------------------------------------------------------------
 # harness
@@ -93,7 +100,8 @@ class _Handler:
 
     def __init__(self, cfg, *, path="/api/timeline/days", method="GET",
                  peer="127.0.0.1", host="127.0.0.1:8890", referer=APP,
-                 token="configured", header=None, body=b"", query=""):
+                 token="configured", header=None, body=b"", query="",
+                 nonce=_VALID_NONCE):
         h = object.__new__(W.WebUIHandler)
         h.command = method
         h.path = path + (("?" + query) if query else "")
@@ -103,18 +111,28 @@ class _Handler:
             h.headers["Referer"] = referer
         if header is not None:
             h.headers["X-Qubit-Session-Token"] = header
+        if nonce is not None:
+            h.headers["Cookie"] = "%s=%s" % (W.WebUIHandler.OFFICE_NONCE_COOKIE,
+                                             nonce)
         h.rfile = __import__("io").BytesIO(body)
         h.wfile = __import__("io").BytesIO()
-        # `app` is read as `self.app.orch.cfg` and `self.app.api_token`.
-        h.server = type("S", (), {"app": type("A", (), {
+        # `app` is read as `self.app.orch.cfg` and `self.app.api_token`, and the
+        # office gates now consult `app`'s live nonce store.
+        import threading as _t
+        import time as _time
+        app = type("A", (), {
             "api_token": token,
             "orch": type("O", (), {"cfg": cfg})(),
-        })()})()
+            "_office_nonces": ({_VALID_NONCE: _time.monotonic() + 3600}
+                               if nonce else {}),
+            "_office_nonce_lock": _t.Lock(),
+        })()
+        h.server = type("S", (), {"app": app})()
         h._api_token_ok = lambda: False
         h._qubit_token_ok = lambda: header is not None and header == token
         h._sent = None
 
-        def _send(code, body_, ctype="text/plain"):
+        def _send(code, body_, ctype="text/plain", extra_headers=None):
             h._sent = (code, body_, ctype)
 
         h._send = _send
@@ -193,6 +211,33 @@ def test_read_gate_is_loopback_same_origin_own_app():
     assert not _Handler(cfg, referer="http://127.0.0.1:8890/chat") \
         ._office_client_read_ok()
     assert not _Handler(cfg, referer=None)._office_client_read_ok()
+
+
+def test_forged_referer_without_a_live_nonce_is_refused():
+    """THE regression this file exists to pin.
+
+    A bare local process can send ANY header, so
+    ``Referer: .../plugin-apps/qubit-office/habblaud/`` on a loopback request
+    used to authorise the office read surface: a real transcript
+    (``/api/agents/ceo`` -> 200) with no credential. Without the server-issued
+    nonce cookie that request must now be REFUSED — the Referer is still
+    required, but it is no longer sufficient.
+    """
+    cfg = type("C", (), {})()
+    # The forged-header request: loopback peer, loopback Host, the app's own
+    # Referer, but no nonce — exactly what `curl -H 'Referer: ...'` sends.
+    forged = _Handler(cfg, referer=APP, nonce=None)
+    assert forged._office_client_read_ok() is False, (
+        "a forged Referer with no nonce cookie authorised the office read "
+        "surface — the transcript bypass is open again")
+    assert forged.run("GET")[0] == 401, (
+        "the read front door answered a forged-Referer, nonce-less request "
+        "with something other than 401")
+    # A nonce that the server never issued is equally refused.
+    assert _Handler(cfg, referer=APP, nonce="attacker-invented"). \
+        _office_client_read_ok() is False
+    # The full triple PLUS a live nonce is what the real app sends.
+    assert _Handler(cfg, referer=APP)._office_client_read_ok() is True
 
 
 def test_read_gate_refuses_a_query_token_but_accepts_a_header_token():

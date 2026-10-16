@@ -206,13 +206,21 @@ def _app_handler(*, token="secret", peer="127.0.0.1", host="127.0.0.1"):
         api_token = token
         allowed_origins = ()
 
-    h.server = type("S", (), {"app": _FakeApp()})()
+    import threading as _th
+    import time as _tm
+    _app = _FakeApp()
+    # `_serve_app_html` mints an office load nonce when it serves the document to
+    # a loopback peer; the fake app carries the store the issuer writes into.
+    _app._office_nonces = {}
+    _app._office_nonce_lock = _th.Lock()
+    h.server = type("S", (), {"app": _app})()
     captured: dict = {}
 
-    def _send(code, body, ctype="text/plain"):
+    def _send(code, body, ctype="text/plain", extra_headers=None):
         captured["code"] = code
         captured["body"] = body
         captured["ctype"] = ctype
+        captured["extra_headers"] = extra_headers
 
     h._send = _send  # type: ignore[method-assign]
     h._captured = captured
@@ -303,8 +311,18 @@ def test_app_html_injection_requires_both_peer_and_host_to_be_loopback():
 # --------------------------------------------------------------------------
 # 3. The gate accepts the credential the browser actually sends
 # --------------------------------------------------------------------------
+#: The live office load nonce the mocked app knows about. The gate requires it
+#: IN ADDITION to the loopback/Host/Referer triple, so tests that pin the OTHER
+#: axes of the predicate carry it by default; the forged-header tests pass
+#: ``nonce=None`` to prove the Referer alone no longer authorises.
+_GATE_NONCE = "test-gate-nonce-xyz789"
+
+
 def _gate_handler(*, peer="127.0.0.1", host="127.0.0.1:8890", referer=None,
-                  path="/api/access", token="secret", header_token=None):
+                  path="/api/access", token="secret", header_token=None,
+                  nonce=_GATE_NONCE):
+    import threading as _th
+    import time as _tm
     h = object.__new__(W.WebUIHandler)
     h.path = path
     h.client_address = (peer, 1234)
@@ -313,11 +331,25 @@ def _gate_handler(*, peer="127.0.0.1", host="127.0.0.1:8890", referer=None,
         h.headers["Referer"] = referer
     if header_token:
         h.headers["X-Qubit-Session-Token"] = header_token
-    h.server = type("S", (), {"app": type("A", (), {"api_token": token})()})()
+    if nonce is not None:
+        h.headers["Cookie"] = "%s=%s" % (W.WebUIHandler.OFFICE_NONCE_COOKIE,
+                                         nonce)
+    _app = type("A", (), {"api_token": token})()
+    _app._office_nonces = ({_GATE_NONCE: _tm.monotonic() + 3600}
+                           if nonce else {})
+    _app._office_nonce_lock = _th.Lock()
+    h.server = type("S", (), {"app": _app})()
     h._api_token_ok = lambda: False
     h._qubit_token_ok = (
         (lambda: header_token == token) if header_token else (lambda: False))
     return h
+
+
+#: The live office load nonce the mocked app knows about. The gate requires it
+#: IN ADDITION to the loopback/Host/Referer triple, so tests that pin the OTHER
+#: axes of the predicate carry it by default; the forged-header tests pass
+#: ``nonce=None`` to prove the Referer alone no longer authorises.
+_GATE_NONCE = "test-gate-nonce-xyz789"
 
 
 OFFICE_REFERER = "http://127.0.0.1:8890/plugin-apps/qubit-office/habblaud/"
@@ -332,6 +364,28 @@ def test_gate_accepts_the_loopback_own_app_probe_with_a_token_configured():
         "the office app's own pre-bridge probe is refused even though the peer "
         "is loopback, the Host is this server, and the Referer is the app — "
         "the exact triple the predicate documents")
+
+
+def test_gate_refuses_a_forged_referer_with_no_live_nonce():
+    """THE forged-header close for ``_office_app_caller_ok`` (S1).
+
+    The docstring claimed the Referer proved "THE CALLER MUST BE OUR OWN APP".
+    It cannot: a bare ``curl -H 'Referer: .../plugin-apps/qubit-office/habblaud/'``
+    reached ``/api/agents/ceo`` (200, real transcript) and ``/api/stream`` with
+    no credential. A matching Referer WITHOUT the server-issued load nonce must
+    now be refused.
+    """
+    # Forged Referer, loopback peer + Host, no nonce → refused.
+    assert _gate_handler(referer=OFFICE_REFERER, token="secret",
+                         nonce=None)._office_app_caller_ok(blind_probe=True) \
+        is False, ("a forged Referer with no nonce cookie authorised the "
+                   "office app's bootstrap/stream gate — the bypass is open")
+    # An invented nonce is refused just the same.
+    assert _gate_handler(referer=OFFICE_REFERER, nonce="attacker-nonce") \
+        ._office_app_caller_ok(blind_probe=True) is False
+    # The app's real path (Referer + live nonce) still works.
+    assert _gate_handler(referer=OFFICE_REFERER, token="secret") \
+        ._office_app_caller_ok(blind_probe=True) is True
 
 
 def test_gate_keeps_regular_app_reads_strict_when_a_token_is_configured():

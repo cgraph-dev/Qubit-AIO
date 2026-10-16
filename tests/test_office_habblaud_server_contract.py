@@ -14,8 +14,15 @@ pytestmark = pytest.mark.unit
 APP = "http://127.0.0.1:8890/plugin-apps/qubit-office/habblaud/"
 
 
+#: A stand-in for the server-issued office load nonce (see `_handler`).
+_CONTRACT_NONCE = "test-contract-nonce-ghi012"
+
+
 def _handler(*, path="/api/access", peer="127.0.0.1", host="127.0.0.1:8890",
-             referer=APP, token="configured", header=None):
+             referer=APP, token="configured", header=None,
+             nonce=_CONTRACT_NONCE):
+    import threading as _th
+    import time as _tm
     h = object.__new__(W.WebUIHandler)
     h.path = path
     h.client_address = (peer, 9000)
@@ -24,7 +31,14 @@ def _handler(*, path="/api/access", peer="127.0.0.1", host="127.0.0.1:8890",
         h.headers["Referer"] = referer
     if header is not None:
         h.headers["X-Qubit-Session-Token"] = header
-    h.server = type("S", (), {"app": type("A", (), {"api_token": token})()})()
+    if nonce is not None:
+        h.headers["Cookie"] = "%s=%s" % (W.WebUIHandler.OFFICE_NONCE_COOKIE,
+                                         nonce)
+    _app = type("A", (), {"api_token": token})()
+    _app._office_nonces = ({_CONTRACT_NONCE: _tm.monotonic() + 3600}
+                           if nonce else {})
+    _app._office_nonce_lock = _th.Lock()
+    h.server = type("S", (), {"app": _app})()
     h._api_token_ok = lambda: False
     h._qubit_token_ok = lambda: header is not None and header == token
     return h
@@ -37,6 +51,19 @@ def test_access_is_only_headerless_loopback_own_app_bootstrap():
     assert not _handler(peer="192.168.1.3")._office_app_caller_ok(blind_probe=True)
     assert not _handler(host="evil.example")._office_app_caller_ok(blind_probe=True)
     assert not _handler(referer="http://127.0.0.1:8890/chat")._office_app_caller_ok(blind_probe=True)
+
+
+def test_access_bootstrap_requires_a_live_nonce_not_just_a_referer():
+    """The forged-header close at the contract level.
+
+    The app's own Referer with no server-issued nonce is a forgery a bare local
+    process can produce; it must be refused even for ``/api/access``.
+    """
+    assert not _handler(referer=APP, nonce=None)._office_app_caller_ok(
+        blind_probe=True)
+    assert not _handler(referer=APP, nonce="invented")._office_app_caller_ok(
+        blind_probe=True)
+    assert _handler(referer=APP)._office_app_caller_ok(blind_probe=True)
 
 
 def test_agent_profile_requires_valid_header_when_token_is_configured():
