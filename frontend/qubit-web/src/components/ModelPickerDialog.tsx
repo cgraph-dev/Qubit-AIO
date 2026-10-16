@@ -9,6 +9,7 @@ import type { GatewayClient } from "@/lib/gatewayClient";
 import { Check, RefreshCw, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router";
 import { cn, themedBody } from "@/lib/utils";
 import { fuzzyRank } from "@/lib/fuzzy";
 import { queryMatchesProviderOnly } from "@/lib/model-picker-filter";
@@ -431,6 +432,7 @@ export function ModelPickerDialog(props: Props) {
             total={providers.length}
             selectedSlug={selectedSlug}
             query={trimmedQuery}
+            onClose={onClose}
             onSelect={(slug) => {
               setSelectedSlug(slug);
               setSelectedModel("");
@@ -525,6 +527,10 @@ export function ModelPickerDialog(props: Props) {
 /*  Provider column                                                    */
 /* ------------------------------------------------------------------ */
 
+/** Empty picker: no key and no OAuth login anywhere. Points at the two in-app fixes. */
+export const NO_PROVIDERS_MESSAGE =
+  "No model providers are set up yet. Add an API key under Keys or sign in to a provider under Models to see models here.";
+
 function ProviderColumn({
   loading,
   error,
@@ -533,6 +539,7 @@ function ProviderColumn({
   selectedSlug,
   query,
   onSelect,
+  onClose,
 }: {
   loading: boolean;
   error: string | null;
@@ -541,7 +548,10 @@ function ProviderColumn({
   selectedSlug: string;
   query: string;
   onSelect(slug: string): void;
+  /** The links below navigate away; the full-screen dialog must close or it keeps covering the target page. */
+  onClose(): void;
 }) {
+  const navigate = useNavigate();
   return (
     <div className="qmodel-picker__provider-column">
       <div className="qmodel-picker__column-heading">
@@ -558,11 +568,35 @@ function ProviderColumn({
 
       {!loading && !error && providers.length === 0 && (
         <div className="qmodel-picker__empty">
-          {query
-            ? "no matches"
-            : total === 0
-              ? "no authenticated providers"
-              : "no matches"}
+          {query || total > 0 ? (
+            "no matches"
+          ) : (
+            <div className="qmodel-picker__no-providers">
+              <span>{NO_PROVIDERS_MESSAGE}</span>
+              <div className="qmodel-picker__no-provider-links">
+                <Button
+                  ghost
+                  size="sm"
+                  onClick={() => {
+                    onClose();
+                    navigate("/env");
+                  }}
+                >
+                  Open Keys
+                </Button>
+                <Button
+                  ghost
+                  size="sm"
+                  onClick={() => {
+                    onClose();
+                    navigate("/models");
+                  }}
+                >
+                  Sign in to a provider
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
