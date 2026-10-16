@@ -464,6 +464,43 @@ describe("ChatSessionList", () => {
     ).toBe(false);
   });
 
+  it("canonical: a synthetic active row does not hide the last unseen page", async () => {
+    apiMocks.getSessions.mockResolvedValue({ sessions: [canonicalSession("s-1")], total: 2 });
+    await renderCanonicalList("outside-window");
+    expect(container.querySelectorAll('[data-testid="session-row"]')).toHaveLength(2);
+    expect(container.textContent).toContain("See more");
+  });
+
+  it("canonical: focus refresh preserves the expanded history window", async () => {
+    const first = Array.from({ length: 30 }, (_, i) => canonicalSession(`s-${i}`));
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: first, total: 31 });
+    await renderCanonicalList();
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("older")], total: 31 });
+    await act(async () => {
+      Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "See more")!.click();
+    });
+    expect(container.textContent).toContain("Session older");
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: [...first, canonicalSession("older")], total: 31 });
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(apiMocks.getSessions).toHaveBeenLastCalledWith(31, 0, "", "recent");
+    expect(container.textContent).toContain("Session older");
+  });
+
+  it("canonical: a stale append failure cannot replace refreshed rows with an error", async () => {
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("s-1")], total: 2 });
+    await renderCanonicalList();
+    let rejectAppend!: (error: Error) => void;
+    apiMocks.getSessions.mockReturnValueOnce(new Promise((_, reject) => { rejectAppend = reject; }));
+    await act(async () => {
+      Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "See more")!.click();
+    });
+    apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("fresh")], total: 1 });
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    await act(async () => { rejectAppend(new Error("obsolete page failed")); });
+    expect(container.textContent).toContain("Session fresh");
+    expect(container.textContent).not.toContain("obsolete page failed");
+  });
+
   it("canonical: hides See more when the first page covers the whole store", async () => {
     apiMocks.getSessions.mockResolvedValue({
       sessions: [canonicalSession("s-only")],

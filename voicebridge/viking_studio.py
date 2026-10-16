@@ -22,9 +22,7 @@ render it without importing webui internals — the same contract
 """
 from __future__ import annotations
 
-import json
 import urllib.error
-import urllib.request
 from typing import Any, Dict, Optional, Tuple
 
 # The OpenViking server the Studio is served from. Matches the plugin's
@@ -38,40 +36,24 @@ _ROUTE_HEALTH = "/api/qubit/viking/studio-health"
 _ROUTE_WIRING = "/api/qubit/viking/studio-wiring"
 
 
-def _health_payload(endpoint: str) -> Dict[str, Any]:
-    """``GET <endpoint>/health`` using the same live auth as the memory client.
+def _health_payload(endpoint: Optional[str] = None) -> Dict[str, Any]:
+    """Probe with the provider's canonical, profile-scoped connection settings.
 
-    The old probe constructed an anonymous client unconditionally, so a
-    protected OpenViking returned a false ``unreachable`` result even while
-    Qubit's memory provider was working.  Resolve the profile-scoped key via
-    the plugin's secret accessor and let its anonymous-first/authenticated
-    fallback perform the real probe.
+    Never retry anonymously after a client/configuration failure: that would
+    hide auth and secret-scope errors behind a healthy public endpoint.
     """
-    try:
-        from voicebridge.qubit_runtime import ensure_path
-        ensure_path()
-        from plugins.memory.openviking import _VikingClient
-        from agent.secret_scope import get_secret
-        api_key = str(get_secret("OPENVIKING_API_KEY", "") or "")
-        account = str(get_secret("OPENVIKING_ACCOUNT", "") or "")
-        user = str(get_secret("OPENVIKING_USER", "") or "")
-        agent = str(get_secret("OPENVIKING_AGENT", "") or "")
-        payload = _VikingClient(
-            endpoint, api_key=api_key, account=account or None,
-            user=user or None, agent=agent or None,
-        ).health_payload()
-        if isinstance(payload, dict) and payload:
-            return payload
-    except Exception:  # noqa: BLE001 - fall back to the stdlib probe below
-        pass
-
-    req = urllib.request.Request(
-        endpoint.rstrip("/") + "/health",
-        headers={"Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=_PROBE_TIMEOUT_S) as resp:
-        raw = resp.read(64 * 1024)
-    data = json.loads(raw.decode("utf-8", "replace"))
-    return data if isinstance(data, dict) else {}
+    from voicebridge.qubit_runtime import ensure_path
+    ensure_path()
+    from plugins.memory.openviking import (
+        _VikingClient, _load_qubit_openviking_config, _resolve_connection_settings,
+    )
+    settings = _resolve_connection_settings(_load_qubit_openviking_config())
+    if endpoint is not None:
+        settings["endpoint"] = endpoint
+    payload = _VikingClient(**settings).health_payload()
+    if not isinstance(payload, dict) or not payload:
+        raise ValueError("OpenViking /health returned an empty or non-object payload")
+    return payload
 
 
 def _truthy(value: Any) -> bool:
@@ -81,7 +63,7 @@ def _truthy(value: Any) -> bool:
     return str(value).strip().lower() in ("1", "true", "yes", "ok")
 
 
-def studio_health(endpoint: str = _DEFAULT_ENDPOINT) -> Tuple[int, Dict[str, Any]]:
+def studio_health(endpoint: Optional[str] = None) -> Tuple[int, Dict[str, Any]]:
     """Probe OpenViking server-side; return the page's ``result`` envelope.
 
     Success -> ``{ok:True, version, auth_mode, error:""}``.
@@ -114,31 +96,26 @@ def studio_health(endpoint: str = _DEFAULT_ENDPOINT) -> Tuple[int, Dict[str, Any
 
 
 def studio_wiring(cfg: Any = None) -> Tuple[int, Dict[str, Any]]:
-    """Which memory provider Qubit is wired to (``memory.provider``).
+    """Report configured external provider, not session activation or recall.
 
-    Reads ``load_user_config_effective()`` — the served-dashboard reader —
-    rather than the CLI's ``load_config()``: the CLI loader merges
-    ``DEFAULT_CONFIG`` first, so it can never distinguish "the operator set
-    memory.provider=openviking" from a default; the effective reader replays
-    the exact user file + managed overlay the running dashboard obeys.
+    agent_init reads the top-level memory.provider from load_config(); nested
+    memory.semantic.provider belongs to the bridge semantic adapter, not this
+    external provider. Use the same default/managed configuration reader.
     """
-    provider = ""
     try:
-        from qubit_cli.config_effective import load_user_config_effective
-        effective = load_user_config_effective() or {}
-        memory = effective.get("memory") if isinstance(effective, dict) else None
-        if isinstance(memory, dict):
-            # The live Qubit config uses memory.semantic.provider; accept the
-            # flat form too for older profiles and dashboard fixtures. Reporting
-            # only the flat key made a working OpenViking provider look unset.
-            semantic = memory.get("semantic")
-            if isinstance(semantic, dict):
-                provider = str(semantic.get("provider") or "")
-            if not provider:
-                provider = str(memory.get("provider") or "")
-    except Exception:  # noqa: BLE001 - absent/unreadable config is "unset"
-        provider = ""
-    return 200, {"result": {"memory": {"provider": provider}}}
+        from voicebridge.qubit_runtime import ensure_path
+        ensure_path()
+        from qubit_cli.config import load_config_readonly
+        from tools.memory_tool import get_builtin_memory_config
+        memory = get_builtin_memory_config(load_config_readonly())
+        provider = memory.get("provider", "")
+        if not isinstance(provider, str):
+            raise ValueError("memory.provider must be a string")
+        return 200, {"result": {"memory": {"provider": provider},
+                                "scope": "configured", "error": ""}}
+    except Exception as exc:
+        return 200, {"result": {"memory": {"provider": ""},
+                                "scope": "configured", "error": f"{type(exc).__name__}: {exc}"}}
 
 
 def handle(cfg: Any, method: str, api_path: str,

@@ -464,7 +464,7 @@ def build_parser() -> argparse.ArgumentParser:
                                       help="re-probe one provider reference (read-only)")
     auth_verify.add_argument("--provider", required=True,
                              help="provider name from the frontier config")
-    mcp_p = add("mcp", help="MCP server inventory and mount policy (read-only)")
+    mcp_p = add("mcp", help="MCP server inventory, policy and confirmed mutations")
     mcp_sub = mcp_p.add_subparsers(dest="mcp_command")
     mcp_sub.add_parser("status", parents=[common],
                        help="list configured MCP servers without mounting anything")
@@ -476,6 +476,13 @@ def build_parser() -> argparse.ArgumentParser:
                        aliases=["ls", "config", "picker"],
                        help="list configured MCP servers from the canonical "
                             "Qubit registry (read-only)")
+    for verb, aliases in (("remove", ["rm", "delete"]), ("disable", [])):
+        mutation = mcp_sub.add_parser(
+            verb, aliases=aliases, parents=[common],
+            help=f"{verb} a registered MCP server (shared confirmation gate)")
+        mutation.add_argument("server", help="registered MCP server name")
+        mutation.add_argument("--confirm", action="store_true")
+        mutation.add_argument("--confirmation-id", default="")
     mcp_inv = mcp_sub.add_parser(
         "invoke", parents=[common],
         help="call a tool on a configured MCP server (brokered; confirmed)")
@@ -4678,6 +4685,8 @@ def main(argv=None) -> int:
             return _cmd_auth_verify(cfg, args)
         return _cmd_auth_status(cfg)
     if command == "mcp":
+        if getattr(args, "mcp_command", None) in ("remove", "rm", "delete", "disable"):
+            return _cmd_mcp_mutate(cfg, args)
         if getattr(args, "mcp_command", None) == "invoke":
             return _cmd_mcp_invoke(cfg, args)
         return _cmd_mcp_status(cfg)
@@ -5150,6 +5159,29 @@ def _cmd_mcp_status(cfg) -> int:
 
     print(json.dumps(mcp_status(cfg), indent=2))
     return 0
+
+
+def _cmd_mcp_mutate(cfg, args) -> int:
+    """Reuse dashboard mutation authority, journal, audit and runtime sync.
+
+    Never call the unguarded registry writers or edit runtime YAML here.
+    Configuration removal does not purge catalog checkout directories.
+    """
+    from . import qubit_compat as HC
+
+    disable = args.mcp_command == "disable"
+    body = {"name": args.server, "confirm": bool(args.confirm),
+            "confirmation_id": args.confirmation_id}
+    if disable:
+        body["enabled"] = False
+    if args.dry_run:
+        print(json.dumps({"state": "DRY_RUN", "name": args.server,
+                          "action": "disable" if disable else "remove"}, indent=2))
+        return 0
+    handler = HC.mcp_set_enabled if disable else HC.mcp_delete
+    status, out = handler(cfg, {}, body, {})
+    print(json.dumps(out, indent=2))
+    return 0 if 200 <= status < 300 else 1
 
 
 def _cmd_mcp_invoke(cfg, args) -> int:

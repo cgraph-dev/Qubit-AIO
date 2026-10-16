@@ -136,6 +136,8 @@ export function ChatSessionList({
   // commit state, so a fast refresh (or Refresh spam) can't land a stale
   // list out of order.
   const reqRef = useRef(0);
+  // Keep expanded history reachable across focus/interval/manual refreshes.
+  const loadedLimitRef = useRef(SESSION_LIMIT);
 
   // `profile` scopes the canonical listing; the empty-string fallback keeps
   // the dep stable when no profile is selected (default profile). The chat
@@ -151,7 +153,7 @@ export function ChatSessionList({
     const request =
       source === "canonical"
         ? api
-            .getSessions(SESSION_LIMIT, 0, scopeKey, "recent")
+            .getSessions(loadedLimitRef.current, 0, scopeKey, "recent")
             .then((res) => ({ sessions: res.sessions, total: res.total }))
         : api.listChatSessions(SESSION_LIMIT, 0, searchQuery);
     request
@@ -205,7 +207,7 @@ export function ChatSessionList({
   // canonical store (the chat store has no total/paging); guards against
   // overlapping clicks and against a refresh landing mid-append.
   const loadMore = useCallback(() => {
-    if (source !== "canonical" || loadingMore) return;
+    if (source !== "canonical" || loading || loadingMore) return;
     const have = sessions?.length ?? 0;
     if (total !== null && have >= total) return;
     const myReq = reqRef.current;
@@ -219,11 +221,14 @@ export function ChatSessionList({
           const seen = new Set((prev ?? []).map((s) => s.id));
           return [...(prev ?? []), ...res.sessions.filter((s) => !seen.has(s.id))];
         });
+        loadedLimitRef.current = Math.max(loadedLimitRef.current, have + res.sessions.length);
         setTotal(typeof res.total === "number" ? res.total : null);
       })
-      .catch((e: Error) => setError(e.message || "failed to load more sessions"))
+      .catch((e: Error) => {
+        if (reqRef.current === myReq) setError(e.message || "failed to load more sessions");
+      })
       .finally(() => setLoadingMore(false));
-  }, [loadingMore, scopeKey, sessions, source, total]);
+  }, [loading, loadingMore, scopeKey, sessions, source, total]);
 
   // The active session must always be visible and on top, even when the host's
   // resume id is a canonical/worker id the chat-store list does not contain
@@ -381,12 +386,12 @@ export function ChatSessionList({
           );
         })}
         {source === "canonical" &&
-          (total === null || orderedSessions.length < total) && (
+          (total === null || (sessions?.length ?? 0) < total) && (
             <Button
               outlined
               size="sm"
               onClick={loadMore}
-              disabled={loadingMore}
+              disabled={loading || loadingMore}
               className="mx-1 mt-1 justify-center"
             >
               {loadingMore ? t.common.loading : "See more"}
@@ -403,6 +408,7 @@ export function ChatSessionList({
     loading,
     loadingMore,
     orderedSessions,
+    sessions,
     pick,
     reload,
     source,
