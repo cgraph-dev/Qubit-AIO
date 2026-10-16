@@ -82,6 +82,7 @@ import argparse
 import ast
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -301,10 +302,10 @@ def top_defs(src: str) -> set[str]:
     return out
 
 
-def sh(args: list[str], cwd: Path | None = None) -> str:
+def sh(args: list[str], cwd: Path | None = None, env: dict | None = None) -> str:
     try:
         p = subprocess.run(args, cwd=str(cwd) if cwd else None,
-                           capture_output=True, text=True, timeout=600)
+                           capture_output=True, text=True, timeout=600, env=env)
         return p.stdout
     except Exception:
         return ""
@@ -347,7 +348,25 @@ def route(path: str) -> str:
 
 
 def blob(rev: str, path: str) -> str:
-    return sh(["git", "-C", str(UP), "show", f"{rev}:{path}"])
+    """Read one file's content at a revision.
+
+    The vendored clone is a PARTIAL clone (`partialclonefilter = tree:0`,
+    `promisor = true`), so a blob it has not cached triggers an on-demand network
+    fetch to GitHub. The audit calls this once per upstream file (~9,500), so an
+    uncached tree turns a local walk into thousands of network round-trips and can
+    appear to hang indefinitely on a stalled SSH session (observed: 37 minutes at
+    0% CPU blocked in do_wait).
+
+    `GIT_NO_LAZY_FETCH=1` makes a missing blob FAIL FAST instead of reaching for
+    the network, so the caller gets an empty string and the file is reported
+    rather than stalling the run. Prime the cache first with
+    `git fetch --filter=blob:none origin main` if a real read is needed.
+    """
+    env = dict(os.environ, GIT_NO_LAZY_FETCH="1")
+    try:
+        return sh(["git", "-C", str(UP), "show", f"{rev}:{path}"], env=env)
+    except Exception:
+        return ""
 
 
 _SKIP_PARTS = {"node_modules", "__pycache__", ".venv", "venv", "dist", "build",
