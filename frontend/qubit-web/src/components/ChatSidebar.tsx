@@ -26,7 +26,6 @@ import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Card } from "@nous-research/ui/ui/components/card";
 
 import { ModelPickerDialog } from "@/components/ModelPickerDialog";
-import { ModelReloadConfirm } from "@/components/ModelReloadConfirm";
 import { ReasoningPicker } from "@/components/ReasoningPicker";
 import { api, QUBIT_BASE_PATH } from "@/lib/api";
 import { maybeReloadForLoopbackWsAuthFailure } from "@/lib/dashboard-auth-reload";
@@ -147,14 +146,8 @@ export function ChatSidebar({
   // Bumped on model change/save so ReasoningPicker re-reads the saved effort
   // (config is profile-scoped the same way the model badge is).
   const [modelRefreshKey, setModelRefreshKey] = useState(0);
-  // Set after the picker saves a model and the user declines the reload: config
-  // is updated but the running session keeps its model until rebuilt.
+  // Set after the picker saves a model, to confirm the swap to the operator.
   const [modelNotice, setModelNotice] = useState<string | null>(null);
-  // Short name of a just-saved model awaiting confirm to reload (a fresh chat
-  // session is how the running chat adopts it; we confirm before discarding it).
-  const [pendingReloadModel, setPendingReloadModel] = useState<string | null>(
-    null,
-  );
 
   const refreshEffectiveModel = useCallback(() => {
     // When the terminal grant names the model this session actually runs, read
@@ -490,7 +483,6 @@ export function ChatSidebar({
   const reconnect = useCallback(() => {
     setError(null);
     setModelNotice(null);
-    setPendingReloadModel(null);
     setVersion((v) => v + 1);
   }, []);
 
@@ -623,7 +615,6 @@ export function ChatSidebar({
           }
           onApply={async ({ provider, model, confirmExpensiveModel }) => {
             setModelNotice(null);
-            setPendingReloadModel(null);
             // PER-SESSION pick when this panel is bound to a session (the
             // /qubit-chat sidebar always is). Write THIS session's stored
             // model through the canonical store — never the global
@@ -665,16 +656,24 @@ export function ChatSidebar({
               refreshEffectiveModel();
               // The backend reports whether /chat follows the pick: when it
               // kept its pinned model (pick below the /chat context floor),
-              // say so instead of prompting a reload that would change
-              // nothing in this terminal.
+              // say so instead of claiming a switch the terminal did not take.
               if (result.terminal_follows === false) {
                 setModelNotice(
                   result.terminal_detail ||
                     "Main model set. /chat keeps its current model.",
                 );
               } else {
-                // Ask before reloading: applying the model starts a fresh chat.
-                setPendingReloadModel(model.split("/").slice(-1)[0]);
+                // No reload: `h_model_set` publishes a `model.changed` frame on
+                // the single SSE feed, and every surface (this card, /chat's
+                // model state, other tabs) repaints from it. A full-page reload
+                // here raced the SSE socket + session-token rotation and left
+                // the page blank until a manual refresh — the reported
+                // "switching a model blacks out /chat" defect. The frame is the
+                // supported apply path; just confirm the write landed.
+                setModelNotice(
+                  `Main model set to ${model.split("/").slice(-1)[0]}.`,
+                );
+                refreshEffectiveModelRef.current();
               }
             }
             return result;
@@ -685,17 +684,6 @@ export function ChatSidebar({
           }}
         />
       )}
-
-      <ModelReloadConfirm
-        model={pendingReloadModel}
-        onCancel={() => {
-          const m = pendingReloadModel;
-          setPendingReloadModel(null);
-          setModelNotice(
-            `Model set to ${m}. Run /new or refresh the page to apply it to this chat.`,
-          );
-        }}
-      />
     </div>
   );
 }

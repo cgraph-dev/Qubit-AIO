@@ -55,6 +55,10 @@ const apiMocks = vi.hoisted(() => ({
     meta: {},
   })),
   patchChatSession: vi.fn(async () => ({ ok: true })),
+  createChatSession: vi.fn(async () => ({
+    session: { id: "fresh-after-switch" },
+    ok: true,
+  })),
 }));
 
 const streamChatTurn = vi.hoisted(() => vi.fn());
@@ -73,6 +77,7 @@ vi.mock("@/lib/api", () => ({
     describeChatImage: vi.fn(async () => ({ description: "described" })),
     getChatSession: apiMocks.getChatSession,
     patchChatSession: apiMocks.patchChatSession,
+    createChatSession: apiMocks.createChatSession,
   },
   // Transcript reads go through the backoff wrapper; mocked transports
   // never transiently fail, so a first-attempt passthrough matches the
@@ -91,6 +96,7 @@ vi.mock("@/lib/api", () => ({
 }));
 vi.mock("@/components/ChatSessionList", () => ({
   ChatSessionList: () => null,
+  FRESH_CHAT_SESSION_ID: "__fresh__",
 }));
 vi.mock("@/components/ChatSidebar", () => ({
   ChatSidebar: () => null,
@@ -888,6 +894,63 @@ describe("Qubit ChatPage", () => {
     // The page is still mounted and interactive (no uncaught render throw).
     await vi.waitFor(() =>
       expect(container.querySelector("#qubit-chat-input")).not.toBeNull(),
+    );
+  });
+
+  it("does not strand a blank transcript when a session switch aborts an in-flight turn", async () => {
+    // Regression: a provider/session switch aborts the running turn's stream.
+    // The stream only clears `busy` in its `.finally` when its signal is NOT
+    // aborted, so the abort left `busy` stuck true. The fresh (empty) session
+    // then failed `!hasMessages && !busy` and rendered the message-list branch
+    // with zero rows — a blank/black transcript pane until a page refresh
+    // remounted the component. Switching sessions must clear `busy`.
+    await renderChat();
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Start a new run."),
+    );
+
+    // A turn that never settles (simulating a stream the switch will abort).
+    streamChatTurn.mockImplementationOnce(
+      () => new Promise<void>(() => {}),
+    );
+    await typeAndSend("start a long turn");
+
+    // The pane is now busy: the empty state is gone (a turn is running).
+    await vi.waitFor(() =>
+      expect(container.textContent).not.toContain("Start a new run."),
+    );
+
+    // Simulate the switch landing on a fresh, empty session.
+    apiMocks.getChatSessionMessages.mockResolvedValue({
+      session_id: "fresh-after-switch",
+      messages: [],
+      total: 0,
+    });
+    apiMocks.getChatSession.mockResolvedValue({
+      session: { id: "fresh-after-switch" },
+      messages: [],
+      message_count: 0,
+      meta: {},
+    } as never);
+    apiMocks.listChatSessions.mockResolvedValue({
+      sessions: [{ id: "fresh-after-switch" }],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+
+    // Drive the same state a session switch produces: clear + reload.
+    await act(async () => {
+      const btn = container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Start a new chat session"]',
+      );
+      btn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    // The empty state must paint on the fresh session WITHOUT a refresh.
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Start a new run."),
     );
   });
 });

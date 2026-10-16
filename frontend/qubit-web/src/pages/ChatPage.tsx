@@ -685,6 +685,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     setError(null);
     setRetryText(null);
     setPendingConfirm(null);
+    // Clear the previous turn's busy flag on ANY session switch. A turn stream
+    // whose signal is aborted (which a session switch does) skips its own
+    // `setBusy(false)` — see `startFresh` — so a switch made mid/after a turn
+    // would otherwise leave `busy` true and strand the fresh transcript pane
+    // blank until a refresh.
+    setBusy(false);
     setTranscriptState("loading");
     // Re-baseline the live-voice merge counter for this session; it is set to
     // the settled server row count once the transcript load completes.
@@ -1325,6 +1331,18 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     setMessages([]);
     setError(null);
     setRetryText(null);
+    // A switch/new-chat must clear the PREVIOUS turn's busy state. The turn
+    // stream only clears `busy` in its own `.finally` when its signal is NOT
+    // aborted; switching session aborts that stream and structurally skips the
+    // reset, leaving `busy` stuck true. The transcript then evaluates
+    // `!hasMessages && !busy` as false on the fresh (empty) session and renders
+    // the message-list branch with zero rows — a blank/black transcript pane
+    // until a page refresh remounts the component. Clear it here and on the
+    // session-change effect below so the empty state paints immediately.
+    setBusy(false);
+    setStreamingText("");
+    setTaskProgress(null);
+    setPendingConfirm(null);
     // Enter the deliberate-fresh state immediately, before the async mint and
     // its `?resume=` write land. Without this the panel keeps reading the old
     // `session` (or `DEFAULT_SESSION` -> null) and falls back to the server's
@@ -2999,6 +3017,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             <div className="qchat__sessions min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
+                // `/chat`'s PTY resumes the CANONICAL store, so the panel must
+                // list that same store — otherwise rows name sessions the PTY
+                // cannot resolve and picking one paints a blank terminal. The
+                // component defaults to the Qubit-native `chat` store; a /chat
+                // host must opt into `canonical` (its own docstring states this).
+                source="canonical"
                 activeSessionId={
                   freshChat
                     ? FRESH_CHAT_SESSION_ID
