@@ -87,6 +87,7 @@ import { useDesktopVoiceHelper } from "@/hooks/useDesktopVoiceHelper";
 import { useChatActivity } from "@/hooks/useChatActivity";
 import { useChatLiveEvents } from "@/hooks/useChatLiveEvents";
 import { type ChatSessionFrame } from "@/lib/chatLiveEvents";
+import { shouldRemountSessionList } from "@/components/chatLiveListPolicy";
 import { ChatWorkPanel } from "@/components/ChatWorkPanel";
 import { ReadAloudButton } from "@/components/ReadAloudButton";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -916,10 +917,19 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     useCallback(
       (frame: ChatSessionFrame) => {
         if (frame.isSession) {
-          // A create / rename / delete changes the list membership or order;
-          // the remount (nonce-keyed) refetches. The active session's own
-          // model follows when the updated row is ours.
-          setSessionListNonce((n) => n + 1);
+          // Only a membership/order change remounts the list. `ChatSessionList`
+          // is keyed on the nonce, so bumping it discards the panel's search
+          // text, scroll position and "See more" offset. A per-session MODEL
+          // pick publishes `session.updated` for that row — if the row is a
+          // background/voice session it changes neither membership nor order,
+          // and remounting there churned the open list under the operator (the
+          // reported "switch provider, list jumps" defect). See
+          // chatLiveListPolicy for the rule.
+          if (shouldRemountSessionList(frame, session)) {
+            setSessionListNonce((n) => n + 1);
+          }
+          // The active session's own model follows whenever the updated row is
+          // ours, regardless of whether a remount was warranted.
           if (frame.session && frame.sessionId === session) {
             const m = String(frame.session.model || "");
             if (m) setSessionModel(m);

@@ -105,8 +105,22 @@ vi.mock("@/components/ChatSessionList", () => ({
   },
   FRESH_CHAT_SESSION_ID: "__fresh__",
 }));
+const liveHandler = vi.hoisted(
+  () => ({ current: null as null | ((frame: unknown) => void) }),
+);
+vi.mock("@/hooks/useChatLiveEvents", () => ({
+  useChatLiveEvents: (onFrame: (frame: unknown) => void) => {
+    liveHandler.current = onFrame;
+  },
+}));
+const capturedSidebarProps = vi.hoisted(
+  () => [] as Array<{ terminalModel?: { model?: string } | null }>,
+);
 vi.mock("@/components/ChatSidebar", () => ({
-  ChatSidebar: () => null,
+  ChatSidebar: (props: { terminalModel?: { model?: string } | null }) => {
+    capturedSidebarProps.push(props);
+    return null;
+  },
 }));
 vi.mock("@/plugins", () => ({
   PluginSlot: () => null,
@@ -237,6 +251,7 @@ async function typeAndSend(value: string) {
 
 beforeEach(() => {
   capturedSessionListProps.length = 0;
+  capturedSidebarProps.length = 0;
   apiMocks.getModelInfo.mockClear();
   apiMocks.listChatSessions.mockReset();
   apiMocks.listChatSessions.mockResolvedValue({
@@ -975,5 +990,63 @@ describe("Qubit ChatPage", () => {
     for (const props of capturedSessionListProps) {
       expect(props.source).not.toBe("canonical");
     }
+  });
+
+  it("does not remount the session list on a model pick for a DIFFERENT session", async () => {
+    // Reported chain: with a session open, switching MODEL PROVIDER must not
+    // spawn a new chat or blank the transcript. A per-session model pick
+    // publishes `session.updated` for THAT session on the single SSE feed.
+    // ChatPage's live handler bumped `sessionListNonce` unconditionally, which
+    // remounts `ChatSessionList` (key={nonce}) — dropping its search text,
+    // scroll and paging offset, and re-ordering the rows — even though the
+    // frame belonged to an unrelated background session. Only a membership/
+    // order change (created/deleted, or an update to OUR row) may remount.
+    await renderChat();
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Start a new run."),
+    );
+
+    const before = capturedSessionListProps.length;
+    // A model pick on a DIFFERENT (background/voice) session.
+    await act(async () => {
+      liveHandler.current?.({
+        name: "session.updated",
+        isSession: true,
+        isModelChange: false,
+        sessionId: "some-other-session",
+        session: { id: "some-other-session", model: "other/model" },
+      });
+      await Promise.resolve();
+    });
+    // No remount => no new ChatSessionList render, transcript untouched.
+    expect(capturedSessionListProps.length).toBe(before);
+    expect(container.textContent).toContain("Start a new run.");
+  });
+
+  it("does not blank the transcript when OUR session's model changes", async () => {
+    // The active session's own model pick publishes `session.updated` for our
+    // id. That must update the MODEL card only — never clear the transcript.
+    await renderChat();
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Start a new run."),
+    );
+
+    await act(async () => {
+      liveHandler.current?.({
+        name: "session.updated",
+        isSession: true,
+        isModelChange: false,
+        sessionId: "dashboard-chat",
+        session: { id: "dashboard-chat", model: "newprov/newmodel" },
+      });
+      await Promise.resolve();
+    });
+
+    // The panel receives the new model, and the transcript is still mounted.
+    await vi.waitFor(() => {
+      const last = capturedSidebarProps.at(-1);
+      expect(last?.terminalModel?.model).toBe("newprov/newmodel");
+    });
+    expect(container.textContent).toContain("Start a new run.");
   });
 });
