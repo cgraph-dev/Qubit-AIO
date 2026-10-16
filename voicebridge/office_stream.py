@@ -357,6 +357,11 @@ def to_feed(tower: Dict[str, Any]) -> List[Dict[str, Any]]:
             "ts": at_ms,
             "kind": row.get("kind"),
             "text": row.get("text"),
+            # D28's visible class, passed through from the tower's activity row
+            # (which now reads it off office_event). The client ignores keys it
+            # does not know, so this is additive; it is the surface an event was
+            # written for, and until now nothing downstream could see it.
+            "visible": row.get("visible"),
         })
     return out
 

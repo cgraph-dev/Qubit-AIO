@@ -498,7 +498,8 @@ def activity(cfg: Any, *, limit: int = 40) -> Dict[str, Any]:
     try:
         store.migrate(conn)
         rows = [dict(r) for r in conn.execute(
-            "SELECT e.id, e.ts, e.kind, e.agent_id, a.slug AS agent_slug"
+            "SELECT e.id, e.ts, e.kind, e.agent_id, e.visible,"
+            " a.slug AS agent_slug"
             " FROM office_event e LEFT JOIN office_agent a ON a.id=e.agent_id"
             " ORDER BY e.id DESC LIMIT ?", (max(1, min(int(limit), 200)),))]
     finally:
@@ -510,6 +511,15 @@ def activity(cfg: Any, *, limit: int = 40) -> Dict[str, Any]:
         out.append({"id": int(r["id"]), "ts": float(r["ts"]),
                     "kind": r["kind"], "agent_id": r["agent_id"],
                     "agent_slug": r["agent_slug"],
+                    # D28's visible class (`notify` / `badge` / `bubble`), as
+                    # written by the emit sites (`runner._event`, `emit_event`,
+                    # `escalation`, `receipts`). Carried through the READ path so
+                    # it is no longer write-only: it was persisted on every event
+                    # and read by no consumer, which is exactly the "event with no
+                    # consumer" this feed is the seam for. A row predating the
+                    # column keeps whatever the default gave it; nothing is
+                    # invented here.
+                    "visible": r["visible"],
                     "text": f"{who} {what}"})
     return {"state": "OK", "count": len(out), "activity": out}
 
