@@ -192,6 +192,32 @@ def test_foreign_worktree_dirty_is_reported(tmp_path: Path) -> None:
     assert "foreign_worktree_dirty" in _checks(report)
 
 
+def test_foreign_worktree_with_live_agent_is_hands_off(tmp_path: Path, monkeypatch) -> None:
+    """A peer's dirty worktree with a process inside it is hands-off, not a violation.
+
+    The guard must not hash another agent's live files; the read-only signal is
+    ``/proc/<pid>/cwd``.  We stub that lookup so the test does not depend on a
+    real concurrent process existing.
+    """
+    repo = _init_repo(tmp_path / "wtroot2")
+    other = tmp_path / "wtother2"
+    res = _git(repo, "worktree", "add", "-q", "-b", "agent/y", str(other))
+    assert res.returncode == 0, res.stderr
+    (other / "mid_edit.py").write_text("uncommitted\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        hygiene, "processes_with_cwd_under",
+        lambda root: [(4242, "python -m pytest")],
+    )
+    report = hygiene.run_checks(
+        repo=repo, probe=_no_sleep_probe(), include_cross=True, stale_minutes=30,
+    )
+    assert "foreign_worktree_live_agent" in _checks(report)
+    live = next(f for f in report.findings if f.check == "foreign_worktree_live_agent")
+    assert live.kind == hygiene.HANDS_OFF
+    assert "4242" in live.detail
+
+
 # --------------------------------------------------------------------------
 # 3. stranded commits on a side branch  -> VIOLATION
 # --------------------------------------------------------------------------

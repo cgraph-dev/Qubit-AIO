@@ -575,6 +575,39 @@ def check_stranded_branch(worktree: Path, branch: str, trunk: str) -> list[Findi
     return findings
 
 
+def processes_with_cwd_under(root: Path) -> list[tuple[int, str]]:
+    """PIDs whose working directory is inside ``root`` (read-only, no hashing).
+
+    Used for FOREIGN worktrees: we must not hash another agent's live files, so
+    the strongest non-invasive signal is "a process is *working in that tree*
+    right now".  ``/proc/<pid>/cwd`` is read-only and cannot perturb a writer.
+    """
+    root = root.resolve()
+    out: list[tuple[int, str]] = []
+    proc_root = Path("/proc")
+    if not proc_root.is_dir():
+        return out
+    for entry in proc_root.iterdir():
+        if not entry.name.isdigit():
+            continue
+        pid = int(entry.name)
+        try:
+            cwd = Path(os.readlink(entry / "cwd"))
+        except OSError:
+            continue
+        try:
+            cwd.relative_to(root)
+        except ValueError:
+            continue
+        try:
+            raw = (entry / "cmdline").read_bytes()
+        except OSError:
+            raw = b""
+        cmd = raw.replace(b"\0", b" ").decode("utf-8", errors="ignore").strip()[:160]
+        out.append((pid, cmd))
+    return out
+
+
 def check_other_worktrees(
     repo: Path,
     primary: Path,
@@ -625,8 +658,8 @@ def check_other_worktrees(
             VIOLATION,
             "foreign_worktree_dirty",
             f"{wt}",
-            f"{len(dirty)} uncommitted path(s) on {ref}; NOT probed for a live "
-            f"writer (we do not touch another agent's worktree)",
+            f"{len(dirty)} uncommitted path(s) on {ref}; NOT hashed (we do not "
+            f"touch another agent's worktree)",
             "the owning agent commits it, or a human freezes it by re-hashing "
             "over >=40s and commits it attributed",
         ))
@@ -637,6 +670,18 @@ def check_other_worktrees(
                 f"{wt}/{path}:1",
                 f"uncommitted {status!r} on {ref}",
                 "commit as wip: if the owner is gone",
+            ))
+        live = processes_with_cwd_under(wt)
+        if live:
+            pids = ", ".join(str(p) for p, _ in live[:4])
+            hands_off.append(Finding(
+                HANDS_OFF,
+                "foreign_worktree_live_agent",
+                f"{wt}",
+                f"a process is working in this worktree right now (pid {pids}); "
+                f"{len(dirty)} uncommitted path(s) on {ref} belong to it",
+                "hands off: do not commit or rebase this worktree while its "
+                "writer is live",
             ))
     return findings, hands_off
 
@@ -752,8 +797,9 @@ def run_checks(
     )
     if trunk_source != "fallback (no trunk found; stranded-commit check disabled)":
         report.findings.extend(check_stranded_branch(repo, branch_raw, trunk))
-    cross, _ = check_other_worktrees(repo, repo, probe, stale_minutes, trunk, include_cross)
+    cross, cross_hands_off = check_other_worktrees(repo, repo, probe, stale_minutes, trunk, include_cross)
     report.findings.extend(cross)
+    report.findings.extend(cross_hands_off)
 
     if not report.writer_corroboration and dirty:
         report.warnings.append(
