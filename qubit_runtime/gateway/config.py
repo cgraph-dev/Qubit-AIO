@@ -268,11 +268,25 @@ class Platform(Enum):
 
     @classmethod
     def _add_pseudo_member(cls, value: str) -> "Platform":
+        # Reuse an already-created pseudo-member: callers compare identity
+        # (`Platform.X is Platform.X`) and `_missing_` can reach here more than once for the
+        # same name, so minting a second object would silently break those comparisons.
+        name = value.upper().replace("-", "_").replace(" ", "_")
+        existing = cls.__dict__.get(name)
+        if existing is not None:
+            return existing
         pseudo = object.__new__(cls)
         pseudo._value_ = value
-        pseudo._name_ = value.upper().replace("-", "_").replace(" ", "_")
+        pseudo._name_ = name
         cls._value2member_map_[value] = pseudo
-        cls._member_map_[pseudo._name_] = pseudo
+        cls._member_map_[name] = pseudo
+        # Register the class attribute too. Before 3.12 ``EnumMeta.__getattr__`` resolved
+        # ``Platform.NAME`` through ``_member_map_``, so filling the map was enough; 3.12
+        # dropped that fallback, leaving the member in the map but unreachable as an
+        # attribute (verified on 3.12.3: `Platform.HOMEASSISTANT` raised AttributeError).
+        # ``type.__setattr__`` bypasses ``EnumMeta.__setattr__``, which otherwise rejects
+        # this as a member reassignment.
+        type.__setattr__(cls, name, pseudo)
         return pseudo
 
     @classmethod
