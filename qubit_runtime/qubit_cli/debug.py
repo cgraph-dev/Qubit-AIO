@@ -412,7 +412,7 @@ def collect_debug_report(
 
 
 # Qubit-S3 envelope format id; the discord-support viewer keys off it.
-_NOUS_BUNDLE_FORMAT = "hermes-debug-share/1"
+_NOUS_BUNDLE_FORMAT = "qubit-debug-share/1"
 
 
 def collect_share_bundle(log_lines: int = 200, redact: bool = True) -> dict[str, str]:
@@ -542,7 +542,10 @@ def run_debug_share(args):
                 print(body)
         return
 
-    if getattr(args, "nous", False):
+    # ``qubit`` is the canonical flag (``qubit debug share --qubit`` / the
+    # ``/debug qubit`` slash word); ``nous`` is the legacy spelling. Exact-True
+    # comparison so a MagicMock args slot (auto-attribute) cannot route here.
+    if getattr(args, "qubit", False) is True or getattr(args, "nous", False) is True:
         return _run_debug_share_nous(args, log_lines=log_lines, redact=redact)
     print(_PRIVACY_NOTICE)
     if not _confirm_upload(args):

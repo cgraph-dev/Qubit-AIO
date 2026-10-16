@@ -1012,15 +1012,19 @@ class TestDebugSlashCommand:
 
     def test_bare_debug_defaults_to_paste(self):
         c = self._captured("/debug")
-        assert c["nous"] is False and c["local"] is False
+        # The slash-command writer emits the canonical ``qubit`` key
+        # (cli_commands_mixin._handle_debug_command), not the legacy ``nous``.
+        assert c["qubit"] is False and c["local"] is False
         # The slash command IS the consent action → skip the [y/N] prompt
         # (input() would hang inside prompt_toolkit's event loop).
         assert c["yes"] is True
 
 
     def test_word_parsing_is_case_insensitive(self):
+        # ``nous`` is still accepted as a legacy input word, but the writer
+        # always emits the canonical ``qubit`` arg.
         c = self._captured("/debug NOUS")
-        assert c["nous"] is True
+        assert c["qubit"] is True
 
 
 
