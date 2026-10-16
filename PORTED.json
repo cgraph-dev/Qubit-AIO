@@ -1,0 +1,171 @@
+{
+  "upstream_pin": "517b5e10febd619ce30bb22580e29b160266eb43",
+  "upstream_ref": "origin/main",
+  "branch": "port/chunk-3",
+  "files": [
+    {
+      "path": "agent/onboarding_text.py",
+      "mapped_to": "qubit_runtime/agent/onboarding_text.py",
+      "upstream_lines": 392,
+      "status": "blocked_missing_deps",
+      "dependencies_missing": [
+        "agent.onboarding_first_tasks",
+        "agent.onboarding_flow",
+        "tools.set_theme_tool"
+      ],
+      "imports_clean": false,
+      "shim": false,
+      "brand_changes": [
+        "Hermes->Qubit identity (GREETING + 9 _GREETINGS locales + facts_block + opening_prompt + REMOTE_LINE)",
+        "~/hermes-first-task/->~/qubit-first-task/",
+        "_PAGE_TASKS 'hermes'->'qubit'"
+      ]
+    },
+    {
+      "path": "agent/persisted_turn_receipt.py",
+      "mapped_to": "qubit_runtime/agent/persisted_turn_receipt.py",
+      "upstream_lines": 65,
+      "status": "imports_clean",
+      "dependencies_missing": [],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": []
+    },
+    {
+      "path": "agent/plugin_live_notes.py",
+      "mapped_to": "qubit_runtime/agent/plugin_live_notes.py",
+      "upstream_lines": 77,
+      "status": "imports_clean",
+      "dependencies_missing": [],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": [
+        "docstring 'hermes plugins install'->'qubit plugins install'",
+        "docstring 'hermes_cli.plugins_activation'->'qubit_cli.plugins_activation'"
+      ]
+    },
+    {
+      "path": "agent/reasoning_carriers.py",
+      "mapped_to": "qubit_runtime/agent/reasoning_carriers.py",
+      "upstream_lines": 147,
+      "status": "imports_clean",
+      "dependencies_missing": [],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": []
+    },
+    {
+      "path": "agent/relay_compaction.py",
+      "mapped_to": "qubit_runtime/agent/relay_compaction.py",
+      "upstream_lines": 93,
+      "status": "imports_clean",
+      "dependencies_missing": [],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": []
+    },
+    {
+      "path": "agent/runtime_session_compression.py",
+      "mapped_to": "qubit_runtime/agent/runtime_session_compression.py",
+      "upstream_lines": 151,
+      "status": "imports_clean",
+      "dependencies_missing": [
+        "qubit_state_runtime.HANDOFF_MESSAGE_FIELDS"
+      ],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": [
+        "hermes_state_runtime -> qubit_state_runtime"
+      ]
+    },
+    {
+      "path": "agent/runtime_session_lifecycle.py",
+      "mapped_to": "qubit_runtime/agent/runtime_session_lifecycle.py",
+      "upstream_lines": 90,
+      "status": "imports_clean",
+      "dependencies_missing": [],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": []
+    },
+    {
+      "path": "agent/runtime_session_store.py",
+      "mapped_to": "qubit_runtime/agent/runtime_session_store.py",
+      "upstream_lines": 473,
+      "status": "imports_clean",
+      "dependencies_missing": [
+        "qubit_cli.gateway_client",
+        "qubit_cli.gateway_runtime",
+        "qubit_cli.gateway_runtime_discovery",
+        "tools.async_delegation_worker"
+      ],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": [
+        "hermes_cli.gateway_* -> qubit_cli.gateway_*",
+        "hermes_state_compression -> qubit_state_compression",
+        "hermes_state_sessions -> qubit_state_sessions"
+      ]
+    },
+    {
+      "path": "agent/safe_worker_policy.py",
+      "mapped_to": "qubit_runtime/agent/safe_worker_policy.py",
+      "upstream_lines": 80,
+      "status": "imports_clean",
+      "dependencies_missing": [],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": [
+        "docstring hermes_cli->qubit_cli",
+        "_RUNTIME_IMPORTS hermes_cli.config/env_loader/plugins -> qubit_cli.*"
+      ]
+    },
+    {
+      "path": "agent/skills_index_delta.py",
+      "mapped_to": "qubit_runtime/agent/skills_index_delta.py",
+      "upstream_lines": 136,
+      "status": "imports_clean",
+      "dependencies_missing": [],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": []
+    },
+    {
+      "path": "agent/turn_recovery_codex.py",
+      "mapped_to": "qubit_runtime/agent/turn_recovery_codex.py",
+      "upstream_lines": 76,
+      "status": "imports_clean",
+      "dependencies_missing": [],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": []
+    },
+    {
+      "path": "cron/bot_chat_legacy.py",
+      "mapped_to": "qubit_runtime/cron/bot_chat_legacy.py",
+      "upstream_lines": 122,
+      "status": "imports_clean",
+      "dependencies_missing": [],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": [
+        "hermes_constants.get_hermes_home -> qubit_constants.get_qubit_home",
+        "hermes_cli.config_effective -> qubit_cli.config_effective"
+      ]
+    },
+    {
+      "path": "cron/delivery_outcome.py",
+      "mapped_to": "qubit_runtime/cron/delivery_outcome.py",
+      "upstream_lines": 94,
+      "status": "imports_clean",
+      "dependencies_missing": [
+        "cron.executions.settle_delivery_outcome"
+      ],
+      "imports_clean": true,
+      "shim": false,
+      "brand_changes": [
+        "docstring 'hermes cron list'->'qubit cron list'"
+      ]
+    }
+  ]
+}

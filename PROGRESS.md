@@ -63,3 +63,27 @@ No count decreased. Both fixes are falsified (1-red without, green with).
 
 No reader-migrated-writer-not mismatch remains; the `ad2e66acc` revert is clean
 (single canonical constant, all readers through it).
+
+
+---
+
+# PROGRESS — lane port/chunk-3 (agent/ + cron/ port from pin 517b5e10f)
+
+Base `9c2f782e1`. Status: COMPLETE (12 clean, 1 blocked-on-deps). Deliverable: `REPORT-port-3.md`, `PORTED.json`.
+
+## Trail
+- 13/13 upstream files carry real bodies — 0 shims skipped.
+- 12 import clean: persisted_turn_receipt, plugin_live_notes, reasoning_carriers, relay_compaction,
+  runtime_session_compression, runtime_session_lifecycle, runtime_session_store, safe_worker_policy,
+  skills_index_delta, turn_recovery_codex, cron/bot_chat_legacy, cron/delivery_outcome.
+- 1 BLOCKED: agent/onboarding_text.py — needs agent.onboarding_first_tasks, agent.onboarding_flow,
+  tools.set_theme_tool (all in the 300 list). Ported + committed, not stubbed.
+- Brand: no env var introduced (nothing to reconcile). Module renames via tree convention
+  (hermes_cli->qubit_cli, hermes_state_*->qubit_state_*, hermes_constants->qubit_constants).
+  Protocol strings kept (hermes.native_assistant kind, hermes.compaction mark). User-facing
+  identity in onboarding_text.py renamed Hermes->Qubit.
+- Cron invariants: neither cron file engages pending_slot/next_run_at/tick lock/_inflight_key/
+  _profile_cron_scope. delivery_outcome writes last_status/last_delivery_error via cron.jobs._with_job
+  (fenced, idempotent). bot_chat_legacy only touches <QUBIT_HOME>/cron/bot_chat_pending/.
+- Flagged: cron/executions.py is behind the pin (562 vs 653 lines) — settle_delivery_outcome absent,
+  so delivery_outcome.py is inert until executions.py is refreshed.
