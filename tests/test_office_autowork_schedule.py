@@ -51,7 +51,20 @@ def _qubit_home() -> Path:
     QR.ensure_path()
     QR.use_qubit_home(cfg)
     import os
-    return Path(os.environ.get("QUBIT_HOME") or (Path.home() / ".qubit"))
+    # ``ensure_path()``/``use_qubit_home()`` above publish ``QUBIT_HOME`` into
+    # the environment (see ``qubit_runtime.pin_qubit_home``), so the resolver is
+    # authoritative by this point. Fall back to NO real home: expanding the
+    # user's home directory here would let this test read whatever the developer
+    # happens to have on disk, which is exactly the hermeticity break the office
+    # suite's own health guard refuses (test_office_suite_health.py). Fail loudly
+    # instead, so a future regression in the pinning is visible rather than
+    # silently coupled to a machine.
+    home = os.environ.get("QUBIT_HOME")
+    if not home:
+        raise AssertionError(
+            "QUBIT_HOME was not published by ensure_path()/use_qubit_home() — "
+            "the office cron store would resolve to an unbound home")
+    return Path(home)
 
 
 def _jobs() -> list:
