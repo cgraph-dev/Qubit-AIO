@@ -118,3 +118,34 @@ completion and must not become a repeated test/fix loop. After implementation
 is frozen, run the final matrix once. If it fails, repair the affected area
 with focused checks and rerun the final matrix only after the repair. Do not
 commit or push before independent verification passes.
+
+## COMMIT-AS-YOU-GO (owner rule — every agent, no exceptions)
+
+**An agent commits its own work before it finishes its turn.** Work that exists
+only in the working tree is one process restart away from being lost, and this
+repo has lost work repeatedly that way: a concurrent session, a crashed agent,
+or an orphaned delegation takes an uncommitted tree with it and no record of
+what it contained survives.
+
+The rule, in order of precedence:
+
+1. **Commit each coherent unit as you finish it**, not once at the end. A commit
+   that lands is durable; a plan to commit later is not. Prefer several small
+   attributable commits over one large one.
+2. **Never end a turn holding uncommitted work you produced.** If the work is
+   unfinished, commit it as a `wip:` commit that names what is incomplete. A
+   labelled `wip:` is strictly better than a dirty tree, because a dirty tree is
+   not revertable, not attributable, and not visible to the next agent.
+3. **Commit on behalf of a stopped writer, and attribute it.** When another
+   session's uncommitted work blocks you, freeze it first (verify the writer has
+   stopped by re-reading file hashes over time, never by assuming) and commit it
+   under a message naming the other session. Do not merge over a live writer and
+   do not discard its work.
+4. **Before dispatching parallel agents, require this of them** in the task
+   text, and give each one its own `git worktree` — two agents committing in one
+   worktree corrupt each other (`git add -A` in one sweeps the other's files).
+5. **The exception is narrow**: the implementation-first cadence above says do
+   not commit before independent verification *passes* for a release gate. That
+   forbids claiming a milestone as verified — it does not license leaving work
+   uncommitted. Commit as `wip:`/ordinary work, and let the gate verdict come
+   separately.
