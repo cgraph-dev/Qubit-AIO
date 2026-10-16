@@ -357,8 +357,12 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     await vi.waitFor(() =>
       expect(container.textContent).toContain("Panel session"),
     );
-    // The panel list uses source="canonical", so it reads the receipts store.
-    expect(apiMocks.getSessions).toHaveBeenCalled();
+    // The panel list uses the DEFAULT (`chat`) transcript store — the store
+    // the PTY resumes — NOT the canonical receipts superset. Listing the
+    // canonical store put 0-message picker-noise rows in the panel whose rows
+    // opened blank (same defect class fixed on ChatPage).
+    expect(apiMocks.listChatSessions).toHaveBeenCalled();
+    expect(apiMocks.getSessions).not.toHaveBeenCalled();
   });
 
   it("collapses and re-expands the panel with the a11y toggle", async () => {
@@ -662,6 +666,67 @@ describe("Qubit TerminalChatPage /chat?resume=<id> existence guard", () => {
     // Crucially: NO PTY was dialed, so the server never created a phantom.
     expect(FakeWebSocket.instances.length).toBe(0);
     expect(apiMocks.wsTicket).not.toHaveBeenCalled();
+  });
+
+
+  it("rotates the attach token when a session row is picked so the server cannot re-adopt the old PTY", async () => {
+    // Regression (defect B): picking a row only set `?resume=<id>`. The
+    // reconnect presented the SAME stable per-tab attach token, so the
+    // server's step-1b (`pty_ws.py:890-903` `_reattach(key)`) re-attached the
+    // still-live detached PTY for this tab VERBATIM — `resume` was never
+    // consulted and the terminal kept showing its old transcript (the welcome
+    // splash) instead of the picked session. The resume reconnect must present
+    // a DIFFERENT attach token so `_reattach` misses and the server spawns a
+    // PTY seeded with `HERMES_TUI_RESUME=<id>` (web_server_chat.py:498).
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "qubit-go",
+      provider: "opencode-go",
+      model: "deepseek",
+      context_tokens: 200000,
+      context_verified: true,
+    }));
+    window.sessionStorage.setItem("qubit.pty.token.chat", "qubit-attach-mount");
+
+    await renderTerminal();
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
+    const mountToken = new URL(FakeWebSocket.instances[0].url).searchParams.get("attach");
+    expect(mountToken).toBeTruthy();
+
+    // Pick the panel's session row (the default `chat` store returns
+    // "session-1"); the row is a <button> whose label span is "Panel session".
+    await vi.waitFor(() => expect(container.textContent).toContain("Panel session"));
+    const label = Array.from(container.querySelectorAll("span")).find(
+      (el) => el.textContent?.trim() === "Panel session",
+    );
+    expect(label).toBeTruthy();
+    const row = label!.closest("button");
+    expect(row).toBeTruthy();
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    // A second socket opens carrying the new resume target...
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(2));
+    const resumedUrl = new URL(FakeWebSocket.instances[1].url);
+    expect(resumedUrl.searchParams.get("resume")).toBe("session-1");
+    // ...and a ROTATED attach token, so the server cannot re-attach the old
+    // terminal for this tab (which would ignore the resume entirely).
+    const resumedToken = resumedUrl.searchParams.get("attach");
+    expect(resumedToken).toBeTruthy();
+    expect(resumedToken).not.toBe(mountToken);
+    expect(window.sessionStorage.getItem("qubit.pty.token.chat")).toBe(resumedToken);
+    // A resume is NOT a fresh chat: the server must not drop the resume target.
+    expect(resumedUrl.searchParams.get("fresh")).toBeNull();
+    // Both the row-pick effect AND the resume-probe dial gate may dial; the
+    // LAST socket is the one that connects, so assert it too.
+    const lastUrl = new URL(FakeWebSocket.instances.at(-1)!.url);
+    expect(lastUrl.searchParams.get("attach")).not.toBe(mountToken);
+    expect(lastUrl.searchParams.get("resume")).toBe("session-1");
+
+    window.sessionStorage.removeItem("qubit.pty.token.chat");
   });
 
   it("still resumes a verified id (guard does not break the happy path)", async () => {
