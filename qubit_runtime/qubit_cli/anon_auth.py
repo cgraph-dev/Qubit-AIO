@@ -49,7 +49,11 @@ ANON_SECRET_ENV = "HERMES_ANON_API_SECRET"
 # (CLI, gateway, serve backend alike); anything else leaves every surface behaving as if the free
 # tier did not exist. ``guest_enabled`` is the only reader. Not a user preference: never written to
 # config.yaml or .env, never shown in setup. Deleted at GA together with this comment.
-GUEST_ONBOARDING_ENV = "HERMES_GUEST_ONBOARDING"
+# Canonical spelling is QUBIT_*; ``GUEST_ONBOARDING_ENV_ALIASES`` keeps the legacy HERMES_* name
+# readable so a launcher/bundle written by an older build still arms the gate (single write, dual
+# read — see gateway/restart.py for the proven shape).
+GUEST_ONBOARDING_ENV = "QUBIT_GUEST_ONBOARDING"
+GUEST_ONBOARDING_ENV_ALIASES = ("HERMES_GUEST_ONBOARDING",)
 # Preview cohort for the free tier's connector set, sent once on account creation so the account
 # service can record it on the account. Exactly "true" or "false" is sent as that boolean; anything
 # else (unset included) omits the field and the service applies its default. Self-reported and
