@@ -194,15 +194,18 @@ def remember(cfg: Any, agent_id: int, *, kind: str, text: str,
 
         res = CS.add_memory(cfg, body[:20000], scope=f"agent:{aid}",
                             confirmed=True, requested_by="office:agent_memory")
+        if not isinstance(res, dict) or res.get("state") != "OK":
+            raise RuntimeError(f"context store did not accept memory: {res!r}")
         uri = str(res.get("viking_uri") or "")
+        out["authority"] = str(res.get("authority") or "")
         out["stored"] = True
         out["viking_uri"] = uri
     except Exception as exc:                            # noqa: BLE001
-        # The memory is still RECORDED in the event stream with the reason it
-        # could not be persisted — a memory that failed to write is not a
-        # memory, and pretending otherwise would be the D14 lie.
-        out["state"] = "OK"
+        # A failed context-store write is not a memory and must not emit the
+        # success event that recall and the tower consume.
+        out["state"] = "FAILED"
         out["store_error"] = str(exc)[:200]
+        return out  # No success animation or recallable memory for a failed write.
 
     payload = {
         "kind": mkind,
@@ -277,15 +280,17 @@ def recall(cfg: Any, agent_id: int, *, kind: str = "",
     # knows the file index), but its hits are PER-FILE, and every office memory
     # lands in one file — so a URI hit is a fact about the query, not about any
     # one memory. It therefore gates relevance, it does not score a row.
-    ctx_matched = False
+    ctx_matched_refs = set()
     if terms:
         try:
             from .. import context_store as CS
 
             res = CS.search(cfg, " ".join(sorted(terms))[:200], limit=50)
-            ctx_matched = bool(res.get("hits"))
+            ctx_matched_refs = {str(hit.get("viking_uri") or "")
+                                for hit in res.get("hits", [])
+                                if isinstance(hit, dict)}
         except Exception:                               # noqa: BLE001
-            ctx_matched = False
+            ctx_matched_refs = set()
 
     ranked: List[Dict[str, Any]] = []
     for r in rows:
@@ -300,7 +305,8 @@ def recall(cfg: Any, agent_id: int, *, kind: str = "",
         # a specific ref (an artifact/viking URI the caller named) that the
         # context engine also knows is direct evidence this exact memory is
         # what was asked for; a shared file URI is not.
-        if ref and ctx_matched and ref.startswith("viking://"):
+        if (ref in ctx_matched_refs and ref.startswith("viking://")
+                and ref != "viking://user/memories.md"):
             relevance = max(relevance, min(1.0, 0.5 + overlap / 4.0))
         score = (W_RELEVANCE * relevance + W_IMPORTANCE * imp
                  + W_RECENCY * recency)
