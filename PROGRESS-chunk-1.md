@@ -66,43 +66,32 @@ No reader-migrated-writer-not mismatch remains; the `ad2e66acc` revert is clean
 
 ---
 
-# PROGRESS — lane port-5 (eval-harness chunk + PORT METHOD)
+# PROGRESS — port/chunk-1 (agent/ + acp_adapter/, 11 files)
 
-Branch `port/chunk-5`, worktree `/tmp/port-5`, base `9c2f782e1`.
-Upstream read at `origin/main` = `53bec2a311979ad6f77580ba491eca261ab988e0` (2026-10-16).
+Status: **DONE** — 5 ported (imports clean), 6 dep-missing, 0 shims.
 
-## Deliverable
+- Base `9c2f782e1`; upstream `origin/main` @ `53bec2a311979ad6f77580ba491eca261ab988e0`.
+- Deliverables in `/tmp/port-1`: `PORTED.json`, `REPORT-port-1.md`.
 
-`PORT-METHOD.md` (repo root) — the reusable porting method for the 299 absent
-production files, with exact commands. `REPORT-port-5.md` + `PORTED.json`.
-This lane's real output is the method; the 5-file chunk is the worked example.
+## Committed (ported, imports clean)
 
-## Status
+- [x] `agent/agent_init_params.py`
+- [x] `agent/agent_init_ollama.py`
+- [x] `agent/codex_service_tiers.py`
+- [x] `acp_adapter/elicitation.py`
+- [x] `acp_adapter/gateway_session_meta.py` (`hermes_state`->`qubit_state`; `_meta.hermes` wire key kept)
 
-- [x] Mapping verified: upstream root -> `qubit_runtime/` (`gateway/run.py`
-      331139B upstream vs 329378B ours).
-- [x] Chunk 5/5 eval files ported, committed `df9007e7e`; companions
-      (`cases.json`, 2 READMEs) committed `9c8ea8cb5`.
-- [x] Proof: 4/5 import clean; the 5th (`session_readers_cli_ab.py`) is a
-      top-level script (argparse at import) -> `py_compile` + `--help` + exec.
-- [x] End-to-end: `verify_receipt.py` PASS on 47-case receipt, FAIL on tampered.
-- [x] Every literal claim in `PORT-METHOD.md` re-verified against the tree.
+## Blocked (dep-missing — dep absent AND in the 299-list; another chunk owns it)
 
-## Method summary (full text in PORT-METHOD.md)
+- [ ] `acp_adapter/catalog.py` — needs `hermes_state_local` (`POLICY_PREFIX`)
+- [ ] `acp_adapter/gateway_commands.py` — needs `hermes_cli.gateway_client`, `hermes_cli.gateway_mutations`
+- [ ] `acp_adapter/gateway_server.py` — needs `acp_adapter.catalog`, `acp_adapter.gateway_commands` (same chunk), `gateway.session_ingress_media`, `hermes_cli.gateway_chat|gateway_client|gateway_mutations`
+- [ ] `agent/chat_completion_helpers_tool_calls.py` — needs `agent.reasoning_carriers` (ported on `port/chunk-3`)
+- [ ] `agent/compaction_events.py` — needs `agent.relay_compaction` (ported on `port/chunk-3`)
+- [ ] `agent/compression_automation.py` — needs `agent.runtime_session_store` (ported on `port/chunk-3`)
 
-- Brand: port NEW files with canonical `QUBIT_HOME` / `~/.qubit` / `qubit_state`
-  / `qubit_cli`; never blanket-rename; leave the frozen pin and `hermes_state_keys`
-  (a module name) alone; grep the tree and reconcile rather than adding a spelling.
-- Shim detection: <20-line re-export stub whose source module is absent ->
-  `shim-skipped`, dependency named. Worked example: `gateway/session_admission.py`
-  needs `hermes_state_keys.py`, which is itself absent (line 242 of /tmp/prod-files.txt).
-- Dep resolution: rename-map -> `test -e` -> `grep /tmp/prod-files.txt` -> name it.
-- Proof: `PYTHONPATH=qubit_runtime .venv/bin/python -c 'import <dotted>'`.
-- Commit: small, named upstream path + short SHA.
+## Next (for the merge driver)
 
-## Next
-
-Sibling lanes follow `PORT-METHOD.md` §8. If a chunk reaches
-`gateway/session_admission.py`, it stays `shim-skipped` until
-`hermes_state_keys.py` lands — order it first.
-
+After `port/chunk-3` merges: re-port the 3 `agent/*` blocked files (verbatim).
+The `acp_adapter/*` trio needs the gateway_/state_local chunks first; `gateway_server.py`
+last (two-level: it imports two files from this same chunk).

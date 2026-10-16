@@ -624,11 +624,96 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
         "provider": provider_used, "model": model_used,
         "tools": tool_names, "session_id": sid,
     }
+    # THE USAGE BLOCK THE OFFICE LEDGER NEEDS (D15/D16).
+    #
+    # `office.runner.run_turn` settles a turn's receipt from
+    # `receipt["usage"]` only. With no usage block it cannot tell a genuinely
+    # flat-rate subscription from a missing measurement, so it books the turn as
+    # `unmetered` 0 cents — a real provider call recorded as free work, which
+    # is exactly the arithmetic D15 refuses ("a real charge booked as free, and
+    # an agent that then survives on money it already burned").
+    #
+    # The agent already computed this: every successful response is folded into
+    # `session_*` counters by `agent/turn_usage.py`. They are read here, after
+    # the agent is closed and out of the counters' reach, so the figures are
+    # this turn's and immutable. A token count that is 0 because the provider
+    # sent no usage is preserved as 0 — the provider's own figure — rather than
+    # defaulted; `cost_usd_est` stays absent, because a token count is not a
+    # price and guessing one would be a fabricated dollar.
+    receipt["usage"] = _vendor_usage(agent, provider_used, model_used)
     return {"state": "OK", "reply": reply_out, "session": sid,
             "session_id": sid, "steps": len(tool_names) or 1,
             "tool_used": tool_names[0] if tool_names else "",
             "elapsed_ms": int((time.monotonic() - started) * 1000),
             "receipt": receipt}
+
+
+def _int_field(source: Any, name: str) -> Optional[int]:
+    """A non-negative int off an agent counter, or ``None`` when unusable.
+
+    ``None`` (absent) is deliberately distinct from ``0``: the seat's ledger
+    treats a missing measurement and a measured zero differently, so a missing
+    counter must not be flattened into a confident zero.
+    """
+    try:
+        value = getattr(source, name, None)
+    except Exception:                                   # noqa: BLE001
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return max(0, int(value))
+
+
+def _vendor_usage(agent: Any, provider: str, model: str) -> Dict[str, Any]:
+    """This turn's real token usage, in the office runner's shape.
+
+    Read-only over the agent's own counters — no second meter, no estimate.
+    """
+    total = _int_field(agent, "session_total_tokens")
+    if total is None:
+        return {}
+    usage: Dict[str, Any] = {
+        "provider": provider, "model": model,
+        "prompt_tokens": _int_field(agent, "session_prompt_tokens") or 0,
+        "completion_tokens": _int_field(agent, "session_completion_tokens") or 0,
+        "input_tokens": _int_field(agent, "session_input_tokens"),
+        "output_tokens": _int_field(agent, "session_output_tokens"),
+        "cache_read_tokens": _int_field(agent, "session_cache_read_tokens"),
+        "cache_write_tokens": _int_field(agent, "session_cache_write_tokens"),
+        "reasoning_tokens": _int_field(agent, "session_reasoning_tokens"),
+        "api_calls": _int_field(agent, "session_api_calls") or 0,
+        "identity": "qubit-vendored-agent",
+    }
+    # THE COST, AND WHY IT IS NOT GUESSED
+    # ---------------------------------
+    # The agent's own session counters already carry a priced verdict from
+    # `usage_pricing.estimate_usage_cost`, which knows the difference that
+    # matters to a ledger:
+    #
+    #   "included"  — the route is flat-rate (subscription_included): the turn
+    #                 really did cost nothing marginal, which is the ONLY case
+    #                 `unmetered` means.
+    #   "actual" /  — a measured price. Book it.
+    #   "estimated"
+    #   "unknown"   — a real call whose price cannot be established. That is
+    #                 NOT unmetered, and must not be booked as one.
+    #
+    # `cost_usd_est` is emitted only for the first two, so the runner settles
+    # from the provider's own figure rather than a token-count guess. For
+    # "unknown" the block instead carries `cost_status`, which
+    # `runner.run_turn` turns into UNKNOWN_SPEND — the honest outcome.
+    status = str(getattr(agent, "session_cost_status", "") or "").strip().lower()
+    price = getattr(agent, "session_estimated_cost_usd", None)
+    if status == "included":
+        usage["cost_usd_est"] = 0.0
+        usage["cost_status"] = "included"
+    elif status in ("actual", "estimated"):
+        usage["cost_usd_est"] = float(price or 0.0)
+        usage["cost_status"] = status
+    else:
+        usage["cost_status"] = "unknown"
+    return usage
+
 
 
 def _vendor_reasoning_config(reasoning: Optional[str]) -> Any:
