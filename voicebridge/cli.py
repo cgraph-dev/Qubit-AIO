@@ -1484,14 +1484,43 @@ def build_parser() -> argparse.ArgumentParser:
                       help="C6: artifacts and ledger rows that name no receipt")
     of_cn = of_sub.add_parser(
         "consent", parents=[common],
-        help="resolve one action against the four tiers (read-only)")
-    of_cn.add_argument("--capability", required=True)
-    of_cn.add_argument("--scope", default="")
-    of_cn.add_argument("--posture", default="unattended_full",
-                       choices=["unattended_full", "supervised", "frozen"])
-    of_cn.add_argument("--grant", action="append", default=[])
-    of_cn.add_argument("--read-only", action="store_true", dest="read_only")
-    of_cn.add_argument("--network", action="store_true")
+        help="resolve one action against the four tiers (read-only)",
+        description="Resolve one action against the four consent tiers "
+                    "(hardline -> bypass -> grant -> resolve), in that order. "
+                    "The verdict names the tier that decided, so a bare "
+                    "`allowed: true` is never the whole answer. NOTE: with the "
+                    "default --posture unattended_full the owner's standing "
+                    "bypass allows everything at tier 2, so --grant, "
+                    "--read-only and --network have no effect; pass "
+                    "--posture supervised (or frozen) to exercise them.")
+    of_cn.add_argument(
+        "--capability", required=True,
+        help="the action's capability, e.g. read_file, write_file, shell. The "
+             "danger CLASS is capability + ':' + scope, never the arguments")
+    of_cn.add_argument("--scope", default="",
+                       help="the danger class's scope, e.g. a repo or host; "
+                            "empty means the bare capability")
+    of_cn.add_argument(
+        "--posture", default="unattended_full",
+        choices=["unattended_full", "supervised", "frozen"],
+        help="unattended_full = the owner's standing bypass allows everything "
+             "at tier 2 (default); supervised = only a granted danger class is "
+             "allowed, everything else is staged for the owner; frozen = the "
+             "seat's bypass is off and its grants are revoked (D19)")
+    of_cn.add_argument(
+        "--grant", action="append", default=[],
+        help="a danger class this seat already holds (repeatable). Read at "
+             "tier 3, and at tier 2 under --posture supervised; ignored under "
+             "the default posture")
+    of_cn.add_argument(
+        "--read-only", action="store_true", dest="read_only",
+        help="the action only reads. Read at tier 4: read-only and "
+             "non-network auto-allows, so it only decides under "
+             "--posture supervised with no matching --grant")
+    of_cn.add_argument(
+        "--network", action="store_true",
+        help="the action reaches the network. Read at tier 4: read-only AND "
+             "network is refused without a grant (exfiltration is a read)")
     of_sub.add_parser("hardline", parents=[common],
                       help="the unconditional deny floor (D18)")
     # --- M2: envelopes, escalation, survival, reports ---
