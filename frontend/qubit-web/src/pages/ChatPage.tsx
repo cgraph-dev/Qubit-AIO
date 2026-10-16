@@ -3017,12 +3017,19 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             <div className="qchat__sessions min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
-                // `/chat`'s PTY resumes the CANONICAL store, so the panel must
-                // list that same store — otherwise rows name sessions the PTY
-                // cannot resolve and picking one paints a blank terminal. The
-                // component defaults to the Qubit-native `chat` store; a /chat
-                // host must opt into `canonical` (its own docstring states this).
-                source="canonical"
+                // The panel lists the store this page's transcript actually
+                // resumes: `GET /api/qubit/chat/sessions/<id>` (the default
+                // `chat` source), the SAME ChatSessionStore the canonical
+                // `/api/sessions` route reads first. The canonical route is a
+                // merged SUPERSET — it appends receipt rows and, unlike the
+                // chat route, does NOT filter the picker-noise rows (0-message
+                // `dashboard-*` probes). Listing it put ~18% blank rows in the
+                // panel (measured live: 55/300 canonical rows had 0 messages vs
+                // 0/324 chat rows); clicking one resolves 200 with no messages
+                // and renders the empty-state pane. `source="canonical"` was
+                // wrong for a /chat host; the default store is the one whose
+                // every row opens with a real transcript (upstream parity: one
+                // store == the transcript store).
                 activeSessionId={
                   freshChat
                     ? FRESH_CHAT_SESSION_ID
