@@ -1,8 +1,11 @@
 """Real cron prompt/scope/construction, controlled model seam; no provider calls."""
 from types import SimpleNamespace
 
+import pytest
 
-def test_agent_cron_context_and_permissions(tmp_path, monkeypatch):
+
+@pytest.mark.parametrize('agent_fails', [False, True])
+def test_agent_cron_context_and_permissions(tmp_path, monkeypatch, agent_fails):
     from voicebridge import qubit_runtime
     qubit_runtime.ensure_path()
     from qubit_constants import set_qubit_home_override, reset_qubit_home_override
@@ -28,6 +31,10 @@ def test_agent_cron_context_and_permissions(tmp_path, monkeypatch):
         def run_conversation(self, prompt, **kwargs):
             captured['prompt'] = prompt
             captured['cron_context'] = get_session_env('HERMES_CRON_SESSION')
+            from qubit_constants import get_qubit_home
+            captured['home'] = get_qubit_home()
+            if agent_fails:
+                raise RuntimeError('isolated-office-provider-failure')
             return {'final_response': 'Controlled context observed.', 'messages': []}
         def close(self):
             captured['closed'] = True
@@ -39,10 +46,14 @@ def test_agent_cron_context_and_permissions(tmp_path, monkeypatch):
                'prompt': 'Summarize the supplied context.', 'deliver': 'local',
                'enabled_toolsets': [], 'workdir': str(workdir)}
         result = sched.run_job(job, extra_prompt='unique-office-run-context')
-        assert result[0], result
+        assert result[0] is (not agent_fails), result
+        if agent_fails:
+            assert 'isolated-office-provider-failure' in (result[3] or '')
+        assert captured['model'] == 'controlled-test-model'
         assert 'unique-office-run-context' in captured['prompt']
         assert captured['platform'] == 'cron'
         assert captured['cron_context'] == '1'
+        assert captured['home'] == home
         assert captured['enabled_toolsets'] == []
         assert set(captured['disabled_toolsets']) >= {'cronjob', 'browser', 'messaging', 'clarify'}
         assert captured['skip_context_files'] is False
