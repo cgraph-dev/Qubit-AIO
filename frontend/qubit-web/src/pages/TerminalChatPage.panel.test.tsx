@@ -288,6 +288,43 @@ afterEach(async () => {
 });
 
 describe("Qubit TerminalChatPage right-side panel", () => {
+  it("ignores an obsolete ticket when New chat supersedes an in-flight connect", async () => {
+    let resolveOld!: (value: unknown) => void;
+    apiMocks.wsTicket.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }));
+    apiMocks.wsTicket.mockImplementationOnce(async () => ({ ticket: "fresh-ticket" }));
+    await renderTerminal();
+    const button = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("New chat"));
+    expect(button).toBeTruthy();
+    await act(async () => button!.click());
+    await act(async () => resolveOld({ ticket: "obsolete-ticket" }));
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(FakeWebSocket.instances[0].url).toContain("ticket=fresh-ticket");
+    expect(FakeWebSocket.instances[0].url).toContain("fresh=1");
+  });
+
+  it("ignores a rejected obsolete ticket rather than degrading the new connection", async () => {
+    let rejectOld!: (reason: Error) => void;
+    apiMocks.wsTicket.mockImplementationOnce(() => new Promise((_, reject) => { rejectOld = reject; }));
+    apiMocks.wsTicket.mockImplementationOnce(async () => ({ ticket: "fresh-ticket" }));
+    await renderTerminal();
+    const button = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("New chat"));
+    await act(async () => button!.click());
+    await act(async () => rejectOld(new Error("obsolete request failed")));
+    expect(container.textContent).not.toContain("obsolete request failed");
+    expect(FakeWebSocket.instances).toHaveLength(1);
+  });
+
+  it("uses the persisted attach identity on the very first socket and on remount", async () => {
+    apiMocks.wsTicket.mockImplementation(async () => ({ ticket: "reload-ticket" }));
+    await renderTerminal();
+    const first = new URL(FakeWebSocket.instances[0].url).searchParams.get("attach");
+    expect(first).toBeTruthy();
+    expect(first).toBe(window.sessionStorage.getItem("qubit.pty.token.chat"));
+    await act(async () => root.unmount());
+    container.remove();
+    await renderTerminal();
+    expect(new URL(FakeWebSocket.instances.at(-1)!.url).searchParams.get("attach")).toBe(first);
+  });
   it("renders the complementary panel without the extra terminal-model card", async () => {
     await renderTerminal();
     await vi.waitFor(() => expect(panel()).not.toBeNull());

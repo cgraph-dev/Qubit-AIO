@@ -33,7 +33,7 @@ import { copyTextToClipboard } from "@/lib/clipboard";
 import { createPtyCompositionForwarder } from "@/lib/pty-composition";
 import { shouldRestoreTerminalFocus } from "@/lib/pty-focus";
 import { PtyResumeSanitizer } from "@/lib/pty-resume-sanitizer";
-import { PTY_ATTACH_TOKEN_KEY, ptyAttachToken } from "@/lib/pty-attach-token";
+import { ptyAttachToken } from "@/lib/pty-attach-token";
 import {
   PTY_CONNECTING_TIMEOUT_MS,
   PTY_RECONNECT_INPUT_MESSAGE,
@@ -294,10 +294,8 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // and claims it with a Web Lock so a reload of THIS tab reuses it while a
   // second live tab mints its own (see lib/pty-attach-token.ts).
   //
-  // Read the persisted value SYNCHRONOUSLY on first use (same key the helper
-  // writes) so the very first connect does not fall through to the legacy
-  // 1:1 path while the async claim settles; `ptyAttachToken()` then confirms
-  // the claim and the ref keeps the value for the life of this document.
+  // Await the shared helper before dialing: it owns both persistence and
+  // duplicate-tab lock claims, so the wire identity cannot diverge from disk.
   const attachRef = useRef<string>("");
   // Rotate (New chat) MUST persist the new token, not just mutate the ref: a
   // reload re-reads `sessionStorage` and, with a stale token, the server's
@@ -309,35 +307,14 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // chat actually spawned. Resolved asynchronously (`connect` awaits it) so the
   // mint and the wire value are the helper's single token.
   const attachToken = useCallback(async (rotate = false): Promise<string> => {
-    if (rotate) {
-      const token = await ptyAttachToken(true);
-      attachRef.current = token;
-      return token;
-    }
-    if (attachRef.current) return attachRef.current;
-    let stored = "";
-    try {
-      stored = window.sessionStorage.getItem(PTY_ATTACH_TOKEN_KEY) ?? "";
-    } catch {
-      /* private mode / storage blocked — fall through to a fresh id */
-    }
-    // Seed the ref synchronously so the very FIRST connect does not fall
-    // through to the legacy 1:1 socket while the async claim settles.
-    attachRef.current = stored || `qubit-attach-${crypto.randomUUID()}`;
-    return attachRef.current;
+    // The persisted, lock-claimed token must be the exact wire identity. A
+    // speculative synchronous id diverges from storage on first mount and
+    // bypasses duplicate-tab ownership checks on reload.
+    const token = await ptyAttachToken(rotate);
+    attachRef.current = token;
+    return token;
   }, []);
-  // Confirm the claim (and persist the id if this document minted it) so a
-  // reload of THIS tab reuses it. Runs after the first connect; the ref value
-  // is already stable, so a later resolution never changes the live socket.
-  useEffect(() => {
-    let cancelled = false;
-    void ptyAttachToken().then((token) => {
-      if (!cancelled && !attachRef.current) attachRef.current = token;
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const connectionGenerationRef = useRef(0);
   // Right-side panel (model control + status + sessions), collapsible and open
   // by default, matching the Qubit `/qubit-chat` ChatPage panel.
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
@@ -446,6 +423,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     // empty canvas. An explicit New chat (`forceFresh`) is never gated — it
     // clears the resume and legitimately starts fresh.
     if (!forceFresh && !resumeDialAllowedRef.current) return;
+    const generation = ++connectionGenerationRef.current;
+    const current = () => !disposedRef.current && connectionGenerationRef.current === generation;
+    const resume = forceFresh ? "" : resumeRef.current;
     // Tear down any previous terminal BEFORE opening a new one. Without this
     // a Reconnect / profile switch / New chat opened a SECOND PTY while the
     // first stayed alive: the server caps concurrent PTYs and enforces one
@@ -498,11 +478,11 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     // model (server overlays `sessions.model`); without it the MODEL card
     // showed the config default while the terminal ran the session's own
     // model (2026-10-05).
-    withBackoff(() => api.wsTicket(picked, undefined, resumeRef.current || undefined), {
-      shouldStop: () => disposedRef.current,
+    withBackoff(() => api.wsTicket(picked, undefined, resume || undefined), {
+      shouldStop: () => !current(),
     })
       .then(async (ticket) => {
-        if (disposedRef.current) return;
+        if (!current()) return;
         setGrant(ticket);
         if (ticket.profile_id) {
           selectedRef.current = ticket.profile_id;
@@ -511,13 +491,13 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
         // persists + claims before we open the socket) so a reload re-attaches
         // to the terminal THIS connect spawns.
         const attach = await attachToken(forceFresh);
-        if (disposedRef.current) return;
+        if (!current()) return;
         const ws = new WebSocket(
           terminalWsUrl(
             ticket.ticket,
             cols,
             rows,
-            forceFresh ? "" : resumeRef.current,
+            resume,
             workspaceRef.current,
             attach,
             forceFresh,
@@ -698,6 +678,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
         };
       })
       .catch((err: unknown) => {
+        if (!current()) return;
         connectInFlightRef.current = false;
         setPtyState("error");
         if (err instanceof WsTicketError) {
@@ -1085,6 +1066,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     connect();
     return () => {
       disposedRef.current = true;
+      ++connectionGenerationRef.current;
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       clearPerConnectionTimers();
       try {
