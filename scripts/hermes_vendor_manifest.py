@@ -33,6 +33,17 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+# PROVENANCE ANCHOR -- do not repoint. This is the revision the vendored tree was
+# copied FROM (upstream v0.21.5). It is written into every per-file provenance
+# record below ("rev": PIN) and into the LICENSE attribution string, so changing
+# it would falsify the vendoring record and break the rebrand-determinism tests
+# (tests/test_rebrand_determinism.py, tests/test_rebase_candidate.py).
+#
+# This is NOT the "how far behind are we" pin. That one is FROZEN_REV in
+# scripts/frozen_target_progress.py (currently 517b5e10...), the later revision
+# the burndown measures against. The two DIFFER ON PURPOSE: this records where the
+# code came from, FROZEN_REV records the finish line. Drift-measuring code reads
+# FROZEN_REV; only provenance code reads this PIN. They are not a contradiction.
 PIN = "69948c005791d4d0e51670ca015238c2c7663749"
 UPSTREAM_TAG = "v0.21.5"
 UPSTREAM_REPO = "https://github.com/NousResearch/hermes-agent"

@@ -90,7 +90,34 @@ def _upstream_clone() -> Path:
 
 
 PIN = _upstream_clone()
-FROM, TO = "69948c0057", "a036b13793"
+
+# DRIFT-MEASURING range. This is the IMPORTANT fix: it previously measured
+# `69948c0057..a036b13793`, a stale 2026-09-25..2026-10-06 sync waypoint -- so the
+# "what did upstream add" answer described a window we had already closed, and it
+# was quoted interchangeably with the frozen-pin drift (a different question).
+# Read FROM from the single declared home (frozen_target_progress.FROZEN_REV, the
+# revision we actually vendored from) and TO from current upstream, so this audit
+# measures the same distance the burndown instrument calls "the finish line".
+#
+# NOT a provenance anchor: no vendoring record cites this constant. The
+# `69948c0057` provenance anchors elsewhere (hermes_vendor_manifest.py,
+# merge_v0215/freeze.py, differential_parity.py CONTRACTUAL_PINS, ...) record the
+# revision a given file was vendored from and are deliberately left untouched.
+def _frozen_rev() -> str:
+    """The frozen pin, read from frozen_target_progress.FROZEN_REV (one home)."""
+    src = Path(__file__).resolve().parent / "frozen_target_progress.py"
+    if src.is_file():
+        for line in src.read_text().splitlines():
+            if line.startswith("FROZEN_REV"):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    raise SystemExit(
+        f"cannot read the frozen pin from {src}; refusing to measure drift "
+        "against an unknown revision."
+    )
+
+
+FROM = _frozen_rev()
+TO = "origin/main"
 
 SKIP_PREFIXES = (".github/", "contributors/", "node_modules/", ".git/")
 

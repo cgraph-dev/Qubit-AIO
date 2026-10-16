@@ -31,7 +31,23 @@ def _upstream_clone() -> Path:
 
 
 UP = _upstream_clone()
-BASE = "a036b13793"
+
+# DRIFT-MEASURING: which upstream revision to compare our symbols against. This
+# was a hardcoded `a036b13793` (the 2026-10-06 sync waypoint). Measured against a
+# stale base, a symbol upstream added SINCE that waypoint is invisible -- the
+# audit under-reports the gap. Read the frozen pin (our vendoring revision) from
+# its single declared home so the comparison base agrees with the burndown
+# instrument instead of drifting on its own.
+def _frozen_rev():
+    src = Path(__file__).resolve().parent / "frozen_target_progress.py"
+    if src.is_file():
+        for line in src.read_text().splitlines():
+            if line.startswith("FROZEN_REV"):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    raise SystemExit(f"cannot read the frozen pin from {src}; refusing to compare "
+                     "symbols against an unknown revision.")
+
+BASE = _frozen_rev()
 ROUTES = {"hermes_cli":"qubit_cli","hermes_platform":"qubit_platform","hermes_state":"qubit_state"}
 
 def route(path):
