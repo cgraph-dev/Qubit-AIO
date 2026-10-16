@@ -3062,6 +3062,18 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # cannot serve one: it caps at 3 path segments and allows only
         # .js/.json/.css, so an app with `bundle/*.js`, `assets/*.png` and an
         # index.html has no way through it.
+        #
+        # The BARE `/plugin-apps` (no trailing slash) is matched explicitly and
+        # refused. `_serve_plugin_app` always needs at least a plugin segment:
+        # `/plugin-apps` alone has none, so it can never name a real app — and
+        # without this branch the request fell through every `/plugin-apps/`
+        # check and was answered by the SPA SHELL, which made the bare prefix a
+        # public alias of the dashboard rather than a not-found. Refusing it
+        # keeps the route's meaning exact: only `/plugin-apps/<plugin>/...`
+        # resolves, and the shell has exactly one URL.
+        if path == "/plugin-apps" or path.startswith("/plugin-apps?"):
+            self._send(404, b"not found")
+            return
         if path.startswith("/plugin-apps/"):
             self._serve_plugin_app(path[len("/plugin-apps/"):])
             return
