@@ -411,6 +411,24 @@ def resolve_billing_route(
 
     if provider_name == "openai-codex":
         return BillingRoute(provider="openai-codex", model=model, base_url=url, billing_mode="subscription_included")
+    # OpenCode Go/Zen are FLAT-RATE SUBSCRIPTIONS, not metered APIs, and the
+    # provider says so itself: `OpenCodeGoProfile.fetch_account_usage`
+    # (qubit_runtime/plugins/model-providers/opencode-zen/__init__.py) reads
+    # `https://opencode.ai/zen/go/v1/usage`, which answers with percent-of-window
+    # values (`rolling`/`weekly`/`monthly` `percent` + `resetsAt`) and carries no
+    # dollar figure of any kind. That is the shape of a plan already paid for,
+    # so one message's marginal cost is genuinely zero.
+    #
+    # Without this, an opencode route falls through to `billing_mode="unknown"`,
+    # and every caller then prices the turn as unmeasurable — a ledger that
+    # treats a paid-up subscription as an unpriced call both trips its own
+    # admission gate and hides the org's real spend. The plan's own $10 is an
+    # owner-recorded row, not a per-message charge, so no dollar is invented
+    # here; `included` means exactly "no marginal cost to measure" (D16).
+    if provider_name in {"opencode-go", "opencode_go", "opencode-go-sub"} or host("opencode.ai"):
+        return BillingRoute(provider="opencode-go", model=model, base_url=url, billing_mode="subscription_included")
+    if provider_name in {"opencode-zen", "opencode_zen", "opencode", "zen"}:
+        return BillingRoute(provider="opencode-zen", model=model, base_url=url, billing_mode="subscription_included")
     if provider_name == "openrouter" or host("openrouter.ai"):
         return BillingRoute(provider="openrouter", model=model, base_url=url, billing_mode="official_models_api")
     if provider_name == "nous" or host("inference-api.nousresearch.com"):

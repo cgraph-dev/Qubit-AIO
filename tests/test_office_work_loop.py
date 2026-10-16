@@ -406,12 +406,28 @@ def test_every_dispatch_needs_a_confirmation(tmp_path, monkeypatch):
 # ============================================== flat-rate vs unknown spend (D16)
 def test_an_unmetered_turn_with_no_usage_settles_and_does_not_block(
         tmp_path, monkeypatch):
-    """A flat-rate gateway reports no usage and that is not a missing figure.
+    """A flat-rate gateway reports a usage block marked `included`.
 
     D15 says unknown spend must block admission. D16 says a subscription-backed
     turn costs no marginal dollar, so there is nothing to be unknown. Both hold:
     the turn is recorded, the ledger row is `unmetered`, and the next admission
     is not refused on a cost that does not exist.
+
+    WHY THIS SHAPE AND NOT "NO USAGE AT ALL"
+    ----------------------------------------
+    This test used to pass a `receipt` with NO usage block and rely on the
+    caller's `unmetered=True` to file it as free. That is precisely the bug the
+    runner was fixed for: the vendored seat path emitted no usage block, so the
+    flag was the ONLY evidence, and every seat's real provider call settled as
+    `unmetered=1, cents=0` — a book that under-counted every seat while the
+    caps, balances and runway were read from it.
+
+    `unmetered` is now a claim about the ROUTE, and the turn has to prove it:
+    the block carries the pricing engine's verdict, and `included` is the only
+    status meaning "this route really is flat-rate". A flat-rate gateway
+    reports that; an empty receipt is not a subscription, it is a missing
+    measurement. See also `test_a_metered_turn_with_no_usage_still_goes_
+    unknown_spend`, which pins the other half of the same rule.
     """
     from voicebridge.office import dispatch as D, ledger, work as W
 
@@ -421,12 +437,15 @@ def test_an_unmetered_turn_with_no_usage_settles_and_does_not_block(
     _pay(cfg, wk)
     artifact = tmp_path / "a.txt"
 
-    def no_usage(cfg_, agent_id, task_text):
+    def flat_rate(cfg_, agent_id, task_text):
         artifact.write_text("x")
-        return {"state": "OK", "reply": "done", "receipt": {}}  # no usage block
+        return {"state": "OK", "reply": "done",
+                "receipt": {"usage": {"prompt_tokens": 10,
+                                      "completion_tokens": 5,
+                                      "cost_status": "included"}}}
 
     W.create(cfg, "t", exit_check=f"test -f {artifact}", confirmed=True)
-    out = D.dispatch(cfg, rounds=1, executor=no_usage, unmetered=True,
+    out = D.dispatch(cfg, rounds=1, executor=flat_rate, unmetered=True,
                      confirmed=True)
     assert out["ran"] == 1, out
     assert out["results"][0]["satisfied"] is True
@@ -444,11 +463,14 @@ def test_an_unmetered_turn_with_no_usage_settles_and_does_not_block(
     artifact2 = tmp_path / "b.txt"
     W.create(cfg, "t2", exit_check=f"test -f {artifact2}", confirmed=True)
 
-    def no_usage2(cfg_, agent_id, task_text):
+    def flat_rate2(cfg_, agent_id, task_text):
         artifact2.write_text("x")
-        return {"state": "OK", "reply": "done", "receipt": {}}
+        return {"state": "OK", "reply": "done",
+                "receipt": {"usage": {"prompt_tokens": 10,
+                                      "completion_tokens": 5,
+                                      "cost_status": "included"}}}
 
-    second = D.dispatch(cfg, rounds=1, executor=no_usage2, unmetered=True,
+    second = D.dispatch(cfg, rounds=1, executor=flat_rate2, unmetered=True,
                         confirmed=True)
     assert second["results"], "no work was picked up"
     assert second["results"][0]["state"] != "REFUSED", second["results"][0]

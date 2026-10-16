@@ -176,3 +176,72 @@ def test_an_included_turn_is_recorded_unmetered(tmp_path, monkeypatch):
     assert _settled(cfg) == (0, 1), "recorded, and excluded from the meter"
     # An unmetered row is still a row: the org can see the work happened.
     assert ledger.health(cfg)["complete"] is True
+
+
+# ------------------------------------- the provider routes that resolve to it
+@pytest.mark.parametrize("provider,base_url", [
+    ("opencode-go", "https://opencode.ai/zen/go/v1"),
+    ("opencode_go", ""),                       # the underscore alias
+    ("opencode-go-sub", ""),                   # the subscription alias
+    ("", "https://opencode.ai/zen/go/v1"),     # resolved from the URL alone
+])
+def test_an_opencode_route_prices_as_included(provider, base_url):
+    """A flat-rate subscription must resolve to `included`, not `unknown`.
+
+    OpenCode Go is $10/month. Its own usage endpoint
+    (`/zen/go/v1/usage`, read by `OpenCodeGoProfile.fetch_account_usage`)
+    answers percent-of-window values — rolling/weekly/monthly `percent` and
+    `resetsAt` — and carries no dollar figure at all, because a plan you have
+    already paid for has no per-message price to report. Before this, the route
+    fell through to `billing_mode="unknown"`, so every opencode turn was priced
+    as unmeasurable: the ledger showed the org's real work as unpriced, and
+    admission refused on a cost that does not exist.
+
+    Asserting the ROUTE (not a model name) is deliberate: the provider fronts
+    many models and none of them are individually priced, so the subscription
+    status has to attach to the route for any of them to settle.
+    """
+    from voicebridge import qubit_runtime as QR
+
+    QR.ensure_path()
+    from agent.usage_pricing import (estimate_usage_cost, get_pricing_entry,
+                                     resolve_billing_route)
+
+    for model in ("grok-4.7", "deepseek-v4.1-flash", "claude-sonnet-4-6"):
+        route = resolve_billing_route(model, provider=provider, base_url=base_url)
+        assert route.billing_mode == "subscription_included", (
+            f"{model} on {provider or base_url!r} must be flat-rate")
+        assert get_pricing_entry(model, provider=provider, base_url=base_url), (
+            "an `included` route still needs a price entry (a zero one)")
+        cost = estimate_usage_cost(
+            model, _usage_bucket(), provider=provider, base_url=base_url)
+        assert cost.status == "included"
+        assert cost.amount_usd == 0
+
+
+def test_an_unpriceable_route_is_still_unknown():
+    """The fix must not turn "unknown" into "free" everywhere.
+
+    A provider Qubit has no price for (a third-party relay whose rates nobody
+    can know) must keep reporting `unknown` — that is what makes the runner
+    refuse rather than book a fabricated zero. Only a route that actually
+    declares itself flat-rate gets `included`.
+    """
+    from voicebridge import qubit_runtime as QR
+
+    QR.ensure_path()
+    from agent.usage_pricing import estimate_usage_cost, resolve_billing_route
+
+    route = resolve_billing_route("grok-4.7", provider="cheapvibecode",
+                                  base_url="https://cheapvibecode.ru/v1")
+    assert route.billing_mode != "subscription_included"
+    cost = estimate_usage_cost("grok-4.7", _usage_bucket(), provider="cheapvibecode",
+                               base_url="https://cheapvibecode.ru/v1")
+    assert cost.status == "unknown", "a relay with no published rate stays unknown"
+
+
+def _usage_bucket():
+    from agent.usage_pricing import CanonicalUsage
+
+    return CanonicalUsage(input_tokens=319446, output_tokens=5349, request_count=18)
+
