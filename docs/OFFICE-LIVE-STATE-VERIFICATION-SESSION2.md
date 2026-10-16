@@ -75,3 +75,48 @@ Verified: no dropped frames observed across 28 in-connection frames.
 - NO frame-drop / cursor bug: full-snapshot re-send + client-side feed dedup by id.
 - NO dead badge: pill transitions is-connecting/is-closed/is-open correctly.
 - "idle after ACTIVE_WINDOW_S=120" is BY DESIGN (not re-reported).
+
+## Findings & fixes (with producer/consumer lines)
+
+### F1 -- `notice` frame had no consumer-complete shape (FIXED)
+- **Producer:** `voicebridge/webui.py:1935` emitted `OS.sse("notice", {"kind":"error","text":...})`.
+- **Consumer:** client toast `push(e)` (bundle `app-U4Pwh2XA.js`):
+  `key = ${e.level}|${e.agentId??""}|${e.text}; ... this.arm(r, $C[e.level])`
+  with `$C={info:5e3,success:6e3,warn:9e3,alert:1/0}` and
+  `arm(e,t){ ... Number.isFinite(t) && (setTimeout(()=>this.dismiss(e), t)) }`.
+- **Drift:** `e.level` absent -> `$C[undefined] === undefined` -> `Number.isFinite`
+  false -> **no dismissal timer** -> the store-read error toast never dismisses.
+  `e.at` also absent -> `e.at - n.notice.at` is `NaN` -> the dedup/bump branch
+  never fires, so identical notices stack instead of collapsing.
+- **Fix:** `office_stream.notice()` builds the client contract
+  (`level` coerced into `NOTICE_LEVELS`, `at`, `text`, `kind`); webui calls it.
+- **Re-verification:** drove the REAL `_serve_office_stream()` with `TWR.state`
+  raising; captured bytes:
+  `data: {"kind":"error","level":"warn","text":"the office store could not be read: synthetic store failure","at":1792178869808}`
+  -> client maps `warn` to a 9000 ms auto-dismiss.
+- **Falsifiable:** reverting the producer -> 1 RED; dropping `level` -> 4 RED.
+
+### F2 -- D28 `visible` class was write-only (FIXED)
+- **Producers (9 sites):** `runner.py:125/205/248/324`, `agent_memory.py:229/471`,
+  `escalation.py:418`, `receipts.py:150` -> `office_event.visible`.
+- **Live store:** 221 rows, `badge` 214 / `bubble` 7 (real, not schema-only).
+- **Consumers (before):** NONE. `tower.activity_feed` SELECT omitted the column;
+  `office_stream.to_feed` dropped it; the client has no `visible` reference.
+- **Fix:** `tower.activity_feed` SELECTs `e.visible` and puts it on the activity
+  row; `office_stream.to_feed` carries it onto the feed row (additive; client
+  ignores unknown keys).
+- **Re-verification (live DB, worktree code):**
+  `223 memory_written visible=badge` on both the activity row and the feed row.
+- **Falsifiable:** drop row key -> 1 RED; drop SELECT col -> 2 RED; drop feed key -> 3 RED.
+
+### Cleared (NOT bugs -- do not "fix")
+- SSE frame flow: 28 snapshots + 28 feeds in 56s, `rev` monotonic, no gaps.
+- Feed re-send: 40 distinct ids re-sent per poll; client `applyFeed` dedups by id.
+- Cursor/resync: no `id:`/`Last-Event-ID`, but the client replaces FULL state each
+  poll and its `applySnapshot` guard skips only when `rev` regresses AND
+  `meta.startedAt` matches -- which does not happen in-connection (rev monotonic,
+  startedAt fixed) or on reconnect (startedAt changes). No frames dropped.
+- Badge liveness: `.ui-pill` transitions `is-connecting` -> `is-closed` (stream
+  blocked from load: 0 agents, "server isn't responding") and `is-open` (200:
+  10 agents, real activity rows). The badge updates.
+- `idle` after `ACTIVE_WINDOW_S=120` is BY DESIGN.
