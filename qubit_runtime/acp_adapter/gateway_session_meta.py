@@ -81,7 +81,7 @@ def model_state(info: dict) -> SessionModelState | None:
 
 
 def provenance_meta(db_path: Path, acp_session_id: str, session_id: str) -> dict | None:
-    """``_meta.qubit.sessionProvenance`` for the editor's id, the logical session's current
+    """``_meta.hermes.sessionProvenance`` for the editor's id, the logical session's current
     compression tip and its lineage (``acp_adapter/provenance.py``). Blocking."""
     from acp_adapter.provenance import session_provenance_meta
     from qubit_state import SessionDB
