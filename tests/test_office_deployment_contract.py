@@ -200,10 +200,23 @@ def test_the_three_entry_declaration_sites_agree_with_the_served_truth():
     assert served_entry, f"the SERVED qubit-office row declares no entry: {served!r}"
 
     # The two fleet lists are arrays of rows; compare their office row.
-    for label, path in (
-        ("frontend/qubit-dist/plugins/fleet.json", DIST_FLEET),
-        ("frontend/qubit-web/public/plugins/fleet.json", PUBLIC_FLEET),
-    ):
+    #
+    # ``frontend/qubit-dist/`` is GITIGNORED, so a fresh ``git worktree`` (the
+    # workflow this repo mandates) does not have it on disk. Reading it as a hard
+    # requirement made every worktree run RED for a file that is legitimately
+    # absent from the checkout. The SERVED fleet truth (read over HTTP above) is
+    # already the authority for that site, so an absent dist copy is SKIPPED with
+    # a note naming the reason rather than asserted. The SPA copy and the app
+    # manifest ARE tracked and stay hard requirements.
+    sites = [("frontend/qubit-web/public/plugins/fleet.json", PUBLIC_FLEET)]
+    if DIST_FLEET.is_file():
+        sites.append(("frontend/qubit-dist/plugins/fleet.json", DIST_FLEET))
+    else:
+        print(
+            f"note: {DIST_FLEET} is absent (gitignored — not present in a fresh "
+            "worktree); checking the SERVED fleet truth and the SPA copy instead"
+        )
+    for label, path in sites:
         row = _pick(_read_json(path))
         assert row.get("entry") == served_entry, (
             f"{label} names entry {row.get('entry')!r} but the SERVED fleet "
@@ -388,16 +401,28 @@ def test_the_SERVED_bundle_still_carries_the_office_in_the_full_height_list():
 
     # The minifier emits the full-height array as the concatenation of the chat
     # list plus the literal full-height routes:
-    #   `var jt=[...Dt,`/webchat`,`/qubit-bot`,`/qubit-office`]`
+    #   `var jt=[...Dt,`/webchat`,`/qubit-bot`,`/qubit-office`,`/qubit-office2`,`/qubit-office3`]`
     # and the chat list is built from VARIABLES (`Tt=/chat`,`Et=/qubit-chat`),
-    # so pin the full-height literal and require the office to be its last member.
+    # so pin the full-height literal and require `/qubit-office` to be one of
+    # its members. It is NOT required to be the LAST member: the page family
+    # grows (`/qubit-office2`, `/qubit-office3` are appended after it), so a
+    # "last member" assertion goes red for a legitimate addition and reports a
+    # deployment break that does not exist.
     m = re.search(
-        r"\[\.\.\.[A-Za-z_$][\w$]*,\s*`/webchat`\s*,\s*`/qubit-bot`\s*,\s*`/qubit-office`\s*\]",
+        r"\[\.\.\.[A-Za-z_$][\w$]*,\s*`/webchat`\s*,\s*`/qubit-bot`\s*,"
+        r"([^\]]*)\]",
         text)
     assert m, (
+        "the SERVED dashboard bundle does not carry the `/webchat`,`/qubit-bot` "
+        "full-height route literal at all; the full-height predicate it should "
+        "extend is gone from the served bytes"
+    )
+    members = re.findall(r"`(/qubit-[\w-]+|/webchat)`", m.group(1))
+    assert "/qubit-office" in members, (
         "the SERVED dashboard bundle does not carry /qubit-office in the "
-        "full-height route list; a source edit landed but the dashboard was "
-        "never rebuilt, so the live page still has the auto-height bug"
+        f"full-height route list (saw {members}); a source edit landed but the "
+        "dashboard was never rebuilt, so the live page still has the auto-height "
+        "bug"
     )
     # And the chat list must NOT have gained the office (the two predicates are
     # separate); the served chat literal is `/chat`,`/qubit-chat` via variables,
