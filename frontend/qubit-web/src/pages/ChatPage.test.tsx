@@ -15,6 +15,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const capturedSessionListProps = vi.hoisted(
+  () => [] as Array<{ source?: string }>,
+);
+
 const apiMocks = vi.hoisted(() => ({
   getModelInfo: vi.fn(async () => ({
     model: "qubit-brain4",
@@ -95,7 +99,10 @@ vi.mock("@/lib/api", () => ({
   ],
 }));
 vi.mock("@/components/ChatSessionList", () => ({
-  ChatSessionList: () => null,
+  ChatSessionList: (props: { source?: string }) => {
+    capturedSessionListProps.push(props);
+    return null;
+  },
   FRESH_CHAT_SESSION_ID: "__fresh__",
 }));
 vi.mock("@/components/ChatSidebar", () => ({
@@ -229,6 +236,7 @@ async function typeAndSend(value: string) {
 }
 
 beforeEach(() => {
+  capturedSessionListProps.length = 0;
   apiMocks.getModelInfo.mockClear();
   apiMocks.listChatSessions.mockReset();
   apiMocks.listChatSessions.mockResolvedValue({
@@ -952,5 +960,20 @@ describe("Qubit ChatPage", () => {
     await vi.waitFor(() =>
       expect(container.textContent).toContain("Start a new run."),
     );
+  });
+
+  it("lists the transcript store, never the canonical superset", async () => {
+    // The panel must list the store whose every row opens with a real
+    // transcript (`chat`), not the canonical merged superset whose 0-message
+    // picker-noise rows open blank. Passing `canonical` from this host was the
+    // blank-pane bug; this pins the prop the host actually sends.
+    await renderChat();
+    await vi.waitFor(() => {
+      expect(capturedSessionListProps.length).toBeGreaterThan(0);
+    });
+
+    for (const props of capturedSessionListProps) {
+      expect(props.source).not.toBe("canonical");
+    }
   });
 });

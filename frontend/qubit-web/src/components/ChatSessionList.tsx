@@ -98,9 +98,11 @@ interface ChatSessionListProps {
   /** Owned by the host so the picker applies on the next New chat. */
   onWorkspaceChange?: (cwd: string) => void;
   /**
-   * Which session store to list. Defaults to `chat` (exact current
-   * behavior); `/chat` hosts pass `canonical` so rows match the store the
-   * PTY resumes.
+   * Which session store to list. Defaults to `chat`, the transcript store
+   * (`GET /api/qubit/chat/sessions`) — the store whose every row opens with a
+   * real transcript. Do NOT pass `canonical` from a /chat host: the canonical
+   * `/api/sessions` route is a merged superset that keeps the 0-message
+   * picker-noise rows, so its rows open blank.
    */
   source?: ChatSessionListSource;
 }
