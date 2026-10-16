@@ -887,7 +887,8 @@ SPA_ROUTE_PATHS = (
     # Qubit overlay plugin tabs (real client routes)
     "/reports", "/operations", "/devices", "/memory", "/qubit-approvals",
     "/qubit-boards", "/qubit-brand", "/qubit-chat", "/qubit-gateway",
-    "/qubit-models", "/qubit-office", "/qubit-runtime",
+    "/qubit-models", "/qubit-office", "/qubit-office2", "/qubit-office3",
+    "/qubit-runtime",
 )
 SPA_ROUTE_SET = frozenset(SPA_ROUTE_PATHS)
 # First path segment of every shell route, for SPA deep links such as

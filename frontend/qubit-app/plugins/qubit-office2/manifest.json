@@ -1,0 +1,16 @@
+{
+  "name": "qubit-office2",
+  "label": "Agent Quest",
+  "description": "Agent Quest — a real-time gamified dashboard for monitoring coding agents: context-window gauges, skill/plugin telemetry and subagent families. An authored Qubit surface implementing the Agent-Quest concept; the upstream Bun server+client app is not vendored (see PROVENANCE.json).",
+  "icon": "Activity",
+  "version": "1.0.0",
+  "tab": {
+    "path": "/qubit-office2",
+    "hidden": true,
+    "position": "end"
+  },
+  "entry": "qubit-office2.js",
+  "css": "qubit-office2.css",
+  "has_api": true,
+  "source": "qubit-overlay"
+}

@@ -1,0 +1,350 @@
+/* Agent Quest (qubit-office2) — the page's design tokens and layout.
+ *
+ * The tokens deliberately reuse the visual language of the office page
+ * (qubit-office.game.css: the same dark void/ground/plate ramp, the same
+ * ink/muted ink, the same accent and semantic ok/warn/bad colours, the same
+ * 4px spacing scale and radius). Agent Quest is a sibling surface, so it
+ * should read as the same product, not a different one. The tokens are named
+ * with an `aq-` prefix rather than reusing `--office-*` so the two pages can
+ * diverge later without one restyling the other by accident.
+ */
+
+:root {
+  /* surfaces, darkest to lightest — mirrors --office-void/ground/plate */
+  --aq-void: #0b0f16;
+  --aq-ground: #1b2230;
+  --aq-plate: #2a3342;
+
+  /* ink */
+  --aq-ink: #e8edf6;
+  --aq-muted: #8b97ad;
+  --aq-dim: rgba(232, 237, 246, 0.55);
+
+  /* accent + semantic state — mirrors the office scene colours */
+  --aq-accent: #e08fb0;
+  --aq-ok: #6fd3a6;
+  --aq-warn: #f0c05a;
+  --aq-bad: #e0554a;
+
+  /* the frame */
+  --aq-radius: 6px;
+  --aq-border: 1px solid rgba(255, 255, 255, 0.12);
+  --aq-border-strong: 1px solid rgba(255, 255, 255, 0.24);
+  --aq-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+
+  /* spacing scale: 4px base */
+  --aq-s1: 4px;
+  --aq-s2: 8px;
+  --aq-s3: 12px;
+  --aq-s4: 16px;
+  --aq-s5: 24px;
+  --aq-s6: 32px;
+
+  /* text. One scale knob, as in the office shell. */
+  --aq-scale: 1;
+  --aq-fs-xs: calc(10px * var(--aq-scale));
+  --aq-fs-sm: calc(12px * var(--aq-scale));
+  --aq-fs-md: calc(14px * var(--aq-scale));
+  --aq-fs-lg: calc(18px * var(--aq-scale));
+  --aq-fs-xl: calc(24px * var(--aq-scale));
+}
+
+/* The page. Bounded ancestor assumed (same chain the office page documents):
+   a plain block wrapper grows to its content, so state our own bounds with
+   `flex: 1 1 auto` + `min-height: 0` and keep `100%` only as the block-parent
+   fallback. Content scrolls, never the shell. */
+.aq-page {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: var(--aq-s5);
+  background: var(--aq-void);
+  color: var(--aq-ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--aq-fs-md);
+  line-height: 1.5;
+}
+
+.aq-page *,
+.aq-page *::before,
+.aq-page *::after {
+  box-sizing: border-box;
+}
+
+/* --- header ------------------------------------------------------------- */
+.aq-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--aq-s4);
+  flex-wrap: wrap;
+  margin-bottom: var(--aq-s4);
+}
+
+.aq-title {
+  margin: 0;
+  font-size: var(--aq-fs-xl);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.aq-sub {
+  margin: var(--aq-s1) 0 0;
+  max-width: 62ch;
+  color: var(--aq-muted);
+  font-size: var(--aq-fs-sm);
+}
+
+.aq-head__stats {
+  display: flex;
+  gap: var(--aq-s2);
+  flex-wrap: wrap;
+}
+
+.aq-pill {
+  font-size: var(--aq-fs-xs);
+  padding: 3px var(--aq-s2);
+  border-radius: 999px;
+  border: var(--aq-border);
+  color: var(--aq-muted);
+  white-space: nowrap;
+}
+
+.aq-pill--warn {
+  color: var(--aq-warn);
+  border-color: rgba(240, 192, 90, 0.45);
+}
+
+/* --- honesty banner ----------------------------------------------------- */
+.aq-banner {
+  margin: 0 0 var(--aq-s4);
+  padding: var(--aq-s3) var(--aq-s4);
+  border: var(--aq-border);
+  border-left: 3px solid var(--aq-warn);
+  border-radius: var(--aq-radius);
+  background: var(--aq-ground);
+  color: var(--aq-dim);
+  font-size: var(--aq-fs-sm);
+}
+
+.aq-banner strong {
+  color: var(--aq-warn);
+  font-weight: 600;
+}
+
+/* --- panels ------------------------------------------------------------- */
+.aq-panel {
+  margin-bottom: var(--aq-s4);
+  padding: var(--aq-s4);
+  border: var(--aq-border);
+  border-radius: var(--aq-radius);
+  background: var(--aq-ground);
+  box-shadow: var(--aq-shadow);
+}
+
+.aq-panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--aq-s3);
+  margin-bottom: var(--aq-s3);
+}
+
+.aq-panel__title {
+  margin: 0;
+  font-size: var(--aq-fs-lg);
+  font-weight: 600;
+}
+
+.aq-tag {
+  font-size: var(--aq-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--aq-muted);
+  border: var(--aq-border);
+  border-radius: 999px;
+  padding: 2px var(--aq-s2);
+  white-space: nowrap;
+}
+
+/* --- context-window gauges ---------------------------------------------- */
+.aq-gauges {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--aq-s3);
+}
+
+.aq-gauge {
+  padding: var(--aq-s3);
+  border: var(--aq-border);
+  border-radius: var(--aq-radius);
+  background: var(--aq-plate);
+}
+
+.aq-gauge__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--aq-s2);
+}
+
+.aq-gauge__label {
+  font-size: var(--aq-fs-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aq-gauge__pct {
+  font-size: var(--aq-fs-sm);
+  color: var(--aq-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.aq-gauge__track {
+  margin: var(--aq-s2) 0 var(--aq-s1);
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.aq-gauge__fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.aq-gauge__meta {
+  font-size: var(--aq-fs-xs);
+  color: var(--aq-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.aq-gauge__tag {
+  margin-top: var(--aq-s1);
+  font-size: var(--aq-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--aq-dim);
+}
+
+/* --- telemetry table ---------------------------------------------------- */
+.aq-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--aq-fs-sm);
+}
+
+.aq-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--aq-muted);
+  padding: var(--aq-s2);
+  border-bottom: var(--aq-border-strong);
+}
+
+.aq-table td {
+  padding: var(--aq-s2);
+  border-bottom: var(--aq-border);
+}
+
+.aq-table__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.aq-table__muted {
+  color: var(--aq-muted);
+}
+
+/* --- subagent families -------------------------------------------------- */
+.aq-families {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--aq-s3);
+}
+
+.aq-family {
+  padding: var(--aq-s3);
+  border: var(--aq-border);
+  border-radius: var(--aq-radius);
+  background: var(--aq-plate);
+}
+
+.aq-family__name {
+  font-size: var(--aq-fs-sm);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.aq-family__count {
+  font-size: var(--aq-fs-xs);
+  color: var(--aq-accent);
+}
+
+.aq-family__note {
+  margin-top: var(--aq-s1);
+  font-size: var(--aq-fs-xs);
+  color: var(--aq-muted);
+}
+
+/* --- provenance --------------------------------------------------------- */
+.aq-provenance {
+  padding: var(--aq-s4);
+  border: var(--aq-border-strong);
+  border-radius: var(--aq-radius);
+  background: var(--aq-plate);
+}
+
+.aq-provenance__title {
+  margin: 0 0 var(--aq-s2);
+  font-size: var(--aq-fs-md);
+  font-weight: 600;
+}
+
+.aq-provenance__body {
+  margin: 0 0 var(--aq-s2);
+  font-size: var(--aq-fs-sm);
+  color: var(--aq-dim);
+}
+
+.aq-provenance code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--aq-fs-xs);
+  color: var(--aq-ink);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 1px 4px;
+  border-radius: 3px;
+  word-break: break-all;
+}
+
+.aq-provenance__ack {
+  margin: 0;
+  font-size: var(--aq-fs-sm);
+  color: var(--aq-ok);
+}
+
+.aq-btn {
+  font: inherit;
+  font-size: var(--aq-fs-sm);
+  color: var(--aq-ink);
+  background: transparent;
+  border: var(--aq-border-strong);
+  border-radius: var(--aq-radius);
+  padding: var(--aq-s1) var(--aq-s3);
+  cursor: pointer;
+}
+
+.aq-btn:hover {
+  border-color: var(--aq-accent);
+}
+
+.aq-btn:focus-visible {
+  outline: 2px solid var(--aq-accent);
+  outline-offset: 2px;
+}

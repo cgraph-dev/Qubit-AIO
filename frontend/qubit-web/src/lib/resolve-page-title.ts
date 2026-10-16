@@ -65,6 +65,8 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/admin/users": "Operator & Credentials",
   "/canvas": "Qubit Canvas",
   "/qubit-office": "Qubit Office",
+  "/qubit-office2": "Agent Quest",
+  "/qubit-office3": "Voice Chat",
   "/qubit-taskflows": "Qubit Taskflows",
   "/qubit-tasks": "Qubit Tasks",
   "/qubit-memory": "Memory Providers",

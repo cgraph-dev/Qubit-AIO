@@ -337,6 +337,8 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/kitchen": KitchenPage,
   "/omniroute": OmniRoutePage,
   "/qubit-office": () => <PluginPage name="qubit-office" />,
+  "/qubit-office2": () => <PluginPage name="qubit-office2" />,
+  "/qubit-office3": () => <PluginPage name="qubit-office3" />,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
@@ -475,6 +477,8 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/qubit-bot", label: "Qubit Bot", icon: Bot },
   { path: "/qubit-harness-router", label: "Harness Router", icon: Workflow },
   { path: "/qubit-office", label: "Qubit Office", icon: Users, exactEnd: true },
+  { path: "/qubit-office2", label: "Agent Quest", icon: Star, exactEnd: true },
+  { path: "/qubit-office3", label: "Voice Chat", icon: Mic, exactEnd: true },
 ];
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {

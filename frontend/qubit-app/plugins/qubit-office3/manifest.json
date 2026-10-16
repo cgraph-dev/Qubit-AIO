@@ -1,0 +1,16 @@
+{
+  "name": "qubit-office3",
+  "label": "Voice Chat",
+  "description": "Voice Chat — talk to Qubit and let it talk back. Push-to-talk speech in, the transcript sent through the same text path typing uses, each agent answered with a stable voice derived from its name. Browser-native (Web Speech API); hides the mic when SpeechRecognition is absent and the mute toggle when speechSynthesis is absent, and reports the bridge's real error rather than a fabricated success.",
+  "icon": "Mic",
+  "version": "1.0.0",
+  "tab": {
+    "path": "/qubit-office3",
+    "hidden": true,
+    "position": "end"
+  },
+  "entry": "qubit-office3.js",
+  "css": "qubit-office3.css",
+  "has_api": true,
+  "source": "qubit-overlay"
+}

@@ -1,0 +1,492 @@
+/* Qubit Office3 — Voice Chat styles.
+ *
+ * The visual language is the office shell's, and deliberately so: this page
+ * sits in the same dashboard as the office and must not read as a different
+ * product. The TOKENS are lifted from `qubit-office.game.css` (`:root`), whose
+ * own header explains why they are tokens and not literals — re-skinning the
+ * office must not silently restyle these panels, and vice versa. We therefore
+ * DECLARE the same token names with the same values here rather than importing
+ * (there is no bundler on this plugin path), so this file is self-contained and
+ * the two pages can diverge without breaking each other.
+ *
+ * Layering, as in the office shell: dark vertical surface -> plate panel ->
+ * border -> ink. State colours are used ONLY for state (accent for the live
+ * mic, warn for an error, muted for anything not yet real).
+ *
+ * Every transition obeys `--office3-dur`, which a reduced-motion preference
+ * zeroes. The system `prefers-reduced-motion` media query is honoured
+ * separately at the bottom, so a saved preference cannot override the OS.
+ */
+
+:root {
+  /* surfaces, darkest to lightest — same ramp as the office shell */
+  --office3-void: #0b0f16;
+  --office3-ground: #1b2230;
+  --office3-plate: #2a3342;
+  --office3-wall: #39445a;
+
+  /* ink */
+  --office3-ink: #e8edf6;
+  --office3-muted: #8b97ad;
+  --office3-dim: rgba(232, 237, 246, 0.55);
+
+  /* accent + semantic state (mirrors the office shell's state colours) */
+  --office3-accent: #e08fb0;
+  --office3-ok: #6fd3a6;
+  --office3-warn: #f0c05a;
+  --office3-bad: #e0554a;
+
+  /* the frame */
+  --office3-radius: 6px;
+  --office3-border: 1px solid rgba(255, 255, 255, 0.12);
+  --office3-border-strong: 1px solid rgba(255, 255, 255, 0.24);
+  --office3-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+
+  /* spacing scale: 4px base */
+  --office3-s1: 4px;
+  --office3-s2: 8px;
+  --office3-s3: 12px;
+  --office3-s4: 16px;
+  --office3-s5: 24px;
+  --office3-s6: 32px;
+
+  /* text — one scale knob, nothing hardcodes a font size */
+  --office3-scale: 1;
+  --office3-fs-xs: calc(10px * var(--office3-scale));
+  --office3-fs-sm: calc(12px * var(--office3-scale));
+  --office3-fs-md: calc(14px * var(--office3-scale));
+  --office3-fs-lg: calc(18px * var(--office3-scale));
+  --office3-fs-xl: calc(24px * var(--office3-scale));
+
+  /* motion — one switch */
+  --office3-dur: 160ms;
+  --office3-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Explicit reduced-motion preference, set on the page root. */
+[data-office3-reduced-motion="1"] {
+  --office3-dur: 0ms;
+}
+
+/* ---------------------------------------------------------------------------
+ * The page shell.
+ *
+ * Same bounding problem the office shell documents: a route wrapper chain with
+ * a `display: contents` div does not carry height, so `height: 100%` resolves
+ * against an auto-height ancestor and the page grows to its content instead of
+ * being bounded. `flex: 1 1 auto` + `min-height: 0` sizes from a flex parent
+ * and `100%` stays only as the block-parent fallback.
+ * ------------------------------------------------------------------------- */
+.office3 {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;              /* the flexbox scroll trap */
+  box-sizing: border-box;
+  padding: var(--office3-s4);
+  gap: var(--office3-s3);
+  background: var(--office3-void);
+  color: var(--office3-ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--office3-fs-md);
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------------------
+ * Header: identity, live state, and the voice/mute controls.
+ * ------------------------------------------------------------------------- */
+.office3__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--office3-s3);
+  flex-wrap: wrap;
+}
+
+.office3__title {
+  display: flex;
+  align-items: center;
+  gap: var(--office3-s3);
+}
+
+.office3__name {
+  font-size: var(--office3-fs-lg);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* The phase pill. Its colour is the ONLY thing that changes between states, so
+ * the page never looks busier than the backend actually is. */
+.office3__phase {
+  font-size: var(--office3-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--office3-muted);
+  border: var(--office3-border);
+  border-radius: 999px;
+  padding: 2px var(--office3-s2);
+  transition: color var(--office3-dur) var(--office3-ease),
+              border-color var(--office3-dur) var(--office3-ease);
+}
+.office3__phase--listening {
+  color: var(--office3-accent);
+  border-color: var(--office3-accent);
+}
+.office3__phase--sending,
+.office3__phase--waiting {
+  color: var(--office3-warn);
+  border-color: var(--office3-warn);
+}
+
+/* The speaking indicator. A dot plus a word — the word is the signal, so a
+ * colour-blind reader and a screen reader both get it, and no animation is
+ * load-bearing. */
+.office3__speaking {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--office3-s2);
+  font-size: var(--office3-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--office3-ok);
+}
+.office3__speaking-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--office3-ok);
+}
+
+.office3__headRight {
+  display: flex;
+  align-items: center;
+  gap: var(--office3-s3);
+}
+
+.office3__agent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--office3-s2);
+}
+.office3__agentLabel {
+  font-size: var(--office3-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--office3-muted);
+}
+.office3__agentInput {
+  width: 11ch;
+  box-sizing: border-box;
+  background: var(--office3-ground);
+  color: var(--office3-ink);
+  border: var(--office3-border);
+  border-radius: var(--office3-radius);
+  padding: var(--office3-s1) var(--office3-s2);
+  font: inherit;
+  font-size: var(--office3-fs-sm);
+}
+.office3__agentInput:focus-visible {
+  outline: 2px solid var(--office3-accent);
+  outline-offset: 1px;
+}
+
+/* Buttons share one base. Nothing here is a fake control: a button rendered
+ * means the capability behind it exists. */
+.office3__toggle,
+.office3__cancel,
+.office3__send,
+.office3__errorDismiss {
+  font: inherit;
+  font-size: var(--office3-fs-sm);
+  color: var(--office3-ink);
+  background: var(--office3-plate);
+  border: var(--office3-border);
+  border-radius: var(--office3-radius);
+  padding: var(--office3-s2) var(--office3-s3);
+  cursor: pointer;
+  transition: border-color var(--office3-dur) var(--office3-ease),
+              color var(--office3-dur) var(--office3-ease),
+              background var(--office3-dur) var(--office3-ease);
+}
+.office3__toggle:hover,
+.office3__cancel:hover,
+.office3__send:hover:not(:disabled),
+.office3__errorDismiss:hover {
+  border-color: var(--office3-accent);
+}
+.office3__toggle:focus-visible,
+.office3__cancel:focus-visible,
+.office3__send:focus-visible,
+.office3__mic:focus-visible,
+.office3__errorDismiss:focus-visible {
+  outline: 2px solid var(--office3-accent);
+  outline-offset: 2px;
+}
+
+/* Muted is a state, and it says so in words ("Voice off"). */
+.office3__toggle.is-off {
+  color: var(--office3-muted);
+  border-color: rgba(139, 151, 173, 0.5);
+}
+
+/* ---------------------------------------------------------------------------
+ * The facts strip: which voice this agent got, why, and what this page calls.
+ * This is the surface that makes per-agent voice identity auditable rather
+ * than a claim.
+ * ------------------------------------------------------------------------- */
+.office3__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office3-s4);
+  padding: var(--office3-s2) var(--office3-s3);
+  border: var(--office3-border);
+  border-radius: var(--office3-radius);
+  background: var(--office3-ground);
+}
+.office3__fact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--office3-s2);
+  min-width: 0;
+}
+.office3__factKey {
+  font-size: var(--office3-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--office3-muted);
+}
+.office3__factVal {
+  font-size: var(--office3-fs-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--office3-ink);
+}
+.office3__factVal--dim {
+  color: var(--office3-muted);
+}
+
+/* ---------------------------------------------------------------------------
+ * The degradation notice. Warn-coloured on purpose: a missing capability is
+ * information the user needs, not chrome.
+ * ------------------------------------------------------------------------- */
+.office3__notice {
+  font-size: var(--office3-fs-sm);
+  color: var(--office3-warn);
+  border: 1px solid rgba(240, 192, 90, 0.4);
+  border-radius: var(--office3-radius);
+  background: rgba(240, 192, 90, 0.07);
+  padding: var(--office3-s2) var(--office3-s3);
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------------------------
+ * The transcript.
+ * ------------------------------------------------------------------------- */
+.office3__log {
+  flex: 1 1 auto;
+  min-height: 0;              /* must not push the composer off-screen */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--office3-s2);
+  padding: var(--office3-s3);
+  border: var(--office3-border);
+  border-radius: var(--office3-radius);
+  background: var(--office3-ground);
+}
+
+.office3__empty {
+  color: var(--office3-muted);
+  font-size: var(--office3-fs-sm);
+  line-height: 1.5;
+  max-width: 60ch;
+}
+
+.office3__msg {
+  border-radius: var(--office3-radius);
+  padding: var(--office3-s2) var(--office3-s3);
+  border: var(--office3-border);
+  background: var(--office3-plate);
+  max-width: 78ch;
+}
+/* Body text is the only content; it wraps rather than overflows, because a
+ * long reply is normal and must not widen the column. */
+.office3__msgBody {
+  font-size: var(--office3-fs-md);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.office3__msg--user {
+  align-self: flex-end;
+  background: var(--office3-wall);
+}
+.office3__msg--agent {
+  align-self: flex-start;
+}
+.office3__msg--error {
+  align-self: stretch;
+  border-color: rgba(224, 85, 74, 0.5);
+  background: rgba(224, 85, 74, 0.08);
+  color: var(--office3-bad);
+}
+/* The live transcript is visibly NOT a message yet: dashed, dim, and labelled
+ * "not sent yet" underneath. */
+.office3__msg--interim {
+  align-self: flex-end;
+  border-style: dashed;
+  border-color: var(--office3-accent);
+  background: transparent;
+  color: var(--office3-dim);
+}
+
+.office3__meta {
+  margin-top: var(--office3-s1);
+  font-size: var(--office3-fs-xs);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--office3-muted);
+}
+.office3__meta--busy {
+  padding: 0 var(--office3-s2);
+}
+
+/* ---------------------------------------------------------------------------
+ * Errors. The real backend text, wrapped and scrollable — never truncated into
+ * a lie.
+ * ------------------------------------------------------------------------- */
+.office3__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--office3-s3);
+  border: 1px solid rgba(224, 85, 74, 0.55);
+  border-radius: var(--office3-radius);
+  background: rgba(224, 85, 74, 0.1);
+  padding: var(--office3-s2) var(--office3-s3);
+}
+.office3__errorText {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--office3-fs-sm);
+  line-height: 1.45;
+  color: var(--office3-bad);
+  overflow-wrap: anywhere;
+}
+.office3__errorDismiss {
+  flex: 0 0 auto;
+}
+
+/* ---------------------------------------------------------------------------
+ * Composer. The mic is the widest target on the row because it is the control
+ * used without looking.
+ * ------------------------------------------------------------------------- */
+.office3__composer {
+  display: flex;
+  align-items: center;
+  gap: var(--office3-s2);
+  flex-wrap: wrap;
+}
+
+.office3__mic {
+  font: inherit;
+  font-size: var(--office3-fs-sm);
+  color: var(--office3-ink);
+  background: var(--office3-plate);
+  border: var(--office3-border-strong);
+  border-radius: var(--office3-radius);
+  padding: var(--office3-s3) var(--office3-s4);
+  cursor: pointer;
+  user-select: none;          /* holding must not select the label text */
+  touch-action: none;         /* a touch-hold must not scroll the page */
+  transition: border-color var(--office3-dur) var(--office3-ease),
+              color var(--office3-dur) var(--office3-ease),
+              background var(--office3-dur) var(--office3-ease);
+}
+.office3__mic:hover:not(:disabled) {
+  border-color: var(--office3-accent);
+}
+
+/* Hot state: accent border + accent ink. No keyframe pulse — the design doc's
+ * "glows red + pulses" is a CSS animation, and an animation that runs while the
+ * recognizer is dead is exactly the "implies work" failure this repo bans. The
+ * state is real (it is only applied while `phase === "listening"`, which only
+ * the recognizer's own lifecycle sets), and the LABEL changes too, so the
+ * signal does not depend on the colour. */
+.office3__mic.is-hot {
+  border-color: var(--office3-accent);
+  color: var(--office3-accent);
+  background: rgba(224, 143, 176, 0.12);
+}
+
+.office3__mic:disabled,
+.office3__send:disabled,
+.office3__input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.office3__input {
+  flex: 1 1 22ch;
+  min-width: 0;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: var(--office3-fs-md);
+  color: var(--office3-ink);
+  background: var(--office3-ground);
+  border: var(--office3-border);
+  border-radius: var(--office3-radius);
+  padding: var(--office3-s3) var(--office3-s3);
+}
+.office3__input::placeholder {
+  color: var(--office3-muted);
+}
+.office3__input:focus-visible {
+  outline: 2px solid var(--office3-accent);
+  outline-offset: 1px;
+}
+
+.office3__send {
+  border-color: var(--office3-border-strong);
+}
+
+/* ---------------------------------------------------------------------------
+ * Footer: what this page actually calls. Dim on purpose — it is provenance for
+ * a curious reader, not a control.
+ * ------------------------------------------------------------------------- */
+.office3__foot {
+  font-size: var(--office3-fs-xs);
+  line-height: 1.5;
+  color: var(--office3-muted);
+}
+.office3__footDim {
+  color: var(--office3-dim);
+}
+
+/* ---------------------------------------------------------------------------
+ * Narrow screens. 390px is the narrowest targeted width; the transcript gives
+ * up height before the controls give up reachability.
+ * ------------------------------------------------------------------------- */
+@media (max-width: 520px) {
+  .office3 {
+    padding: var(--office3-s2);
+    gap: var(--office3-s2);
+  }
+  .office3__facts {
+    gap: var(--office3-s2);
+  }
+  .office3__mic {
+    padding: var(--office3-s2) var(--office3-s3);
+  }
+}
+
+/* The system preference is honoured separately from any saved preference, so a
+ * saved value cannot override the OS. */
+@media (prefers-reduced-motion: reduce) {
+  .office3,
+  .office3 * {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}

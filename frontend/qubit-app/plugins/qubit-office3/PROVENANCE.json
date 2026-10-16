@@ -1,0 +1,33 @@
+{
+  "name": "qubit-office3",
+  "path": "frontend/qubit-app/plugins/qubit-office3",
+  "kind": "qbit-authored-reimplementation",
+  "source": "https://github.com/androoAGI/starnet/blob/feat/harness-backend/docs/VOICE_CHAT_PLAN.md",
+  "source_kind": "published design document (not source code)",
+  "licence": "MIT",
+  "upstream_commit": "unresolved",
+  "upstream_commit_note": "The design document lives on starnet's branch feat/harness-backend. No commit SHA for it could be resolved from this environment; the branch is the stable reference. Treat the SHA as unknown rather than guessed.",
+  "note": "This plugin is a Qubit-authored REIMPLEMENTATION of a published design document. No upstream starnet source code was copied. The starnet VOICE_CHAT_PLAN.md is prose: it describes the intended layout and behaviour of a voice panel (push-to-talk mic -> STT -> send exactly like typing; agent reply -> TTS -> speakers plus a speaking indicator; a swappable provider seam; per-agent deterministic voice identity; graceful degradation; cancel TTS when the mic opens; TTS fires once per finished reply, never per streamed token). Every line of qubit-office3.js and qubit-office3.css here was written for Qubit against Qubit's own bridge endpoints. No starnet file was opened for its code, and no starnet code exists in this directory. The design document's own referenced files (frontend/app/voice.js, frontend/app/chat.js, frontend/index.html, frontend/css/app.css in starnet) were NOT read; only the plan text was.",
+  "implementation": {
+    "authored_here": [
+      "qubit-office3.js",
+      "qubit-office3.css",
+      "manifest.json"
+    ],
+    "endpoints": [
+      "POST /api/type",
+      "GET /api/result/<request_id>"
+    ],
+    "deviations": [
+      "The design doc's chat.seam calls a harness '/api/run'. Qubit has no such route; this panel posts the transcript to Qubit's POST /api/type and polls GET /api/result/<id>, which is the bridge's real text path.",
+      "Phase 2 of the design doc (neural TTS via POST /api/tts, Whisper STT via POST /api/stt) is deliberately NOT implemented. No such routes exist in voicebridge/webui.py. The provider seam is present in code so Phase 2 is a swap, not a rewrite.",
+      "The design doc's room speech bubble / World.say presence is out of scope for this page and is not implemented."
+    ]
+  },
+  "cross_reference": {
+    "sibling_plugin": "frontend/qubit-app/plugins/qubit-office",
+    "relation": "qubit-office3 adopts qubit-office's manifest SHAPE and visual token language (see qubit-office.game.css :root). It reuses no qubit-office JavaScript. qubit-office itself ports MIT techniques from several projects and records that in its own file header; none of that ported code is present here.",
+    "licence_scope": "LICENSE applies to original Qubit material only. This directory contains original Qubit material."
+  },
+  "recorded_by": "office3 authoring pass, 2026-10-16"
+}

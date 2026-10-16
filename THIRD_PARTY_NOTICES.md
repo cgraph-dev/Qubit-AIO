@@ -574,3 +574,57 @@ MIT License text requirement (vendored dashboard provenance record):
 > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
+
+---
+
+## Agent-Quest — office2 concept surface (authored, no code vendored)
+
+The `/qubit-office2` page is an **AUTHORED Qubit surface** implementing the
+Agent-Quest concept from FulAppiOS/Agent-Quest (MIT © 2026 Fulvio Schilone),
+reviewed at `main`. Upstream is a **Bun server + client application** (root
+`bin/ client/ server/ scripts/ docs/` with `package.json`, `bun.lock`,
+`install.sh`) — not a static Vite build. **No upstream Agent-Quest source code
+is currently vendored in this repository**; the office2 page is Qubit's own
+implementation of the concept over existing Qubit bridges, so only the
+attribution below is required today.
+
+MIT License text requirement: include the copyright notice and this permission
+statement in distributions:
+
+> Copyright (c) 2026 Fulvio Schilone
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+
+---
+
+## starnet — office3 design reimplementation (no code copied)
+
+The `/qubit-office3` page is a Qubit-authored **REIMPLEMENTATION** of the
+published design document `docs/VOICE_CHAT_PLAN.md` from androoAGI/starnet
+(MIT © 2026 Andrew Sims), reviewed on branch `feat/harness-backend`. The
+upstream document is a **design specification**; **no upstream starnet source
+code was copied** into this repository, so only the attribution below is
+required today.
+
+MIT License text requirement: include the copyright notice and this permission
+statement in distributions:
+
+> Copyright (c) 2026 Andrew Sims
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.

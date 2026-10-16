@@ -1,0 +1,13 @@
+{
+  "source": "https://github.com/FulAppiOS/Agent-Quest",
+  "commit": "24038192d4a057c2d1976320e0862a480c6168e9",
+  "licence": "MIT",
+  "note": "This page is an AUTHORED Qubit surface implementing the Agent-Quest concept, NOT vendored upstream code. Agent-Quest (FulAppiOS, MIT, Copyright (c) 2026 Fulvio Schilone) is a Bun + TypeScript server+client application; only its client/ directory could ever be bundled as a static asset, and even that could not be built in this environment. qubit-office2.js and qubit-office2.css are written from scratch by Qubit against the SDK surface (window.__QUBIT_PLUGIN_SDK__ / window.__QUBIT_PLUGINS__); no upstream file is copied. Every numeric value shown on the page is a static placeholder and is labelled as such in the UI — no value here is live telemetry. The commit above is the Agent-Quest main branch resolved at authoring time and is recorded as a provenance reference for the concept only; no code was taken from it.",
+  "authored_files": [
+    "manifest.json",
+    "qubit-office2.js",
+    "qubit-office2.css"
+  ],
+  "upstream_stack": "Bun + TypeScript, root: bin/ client/ server/ scripts/ docs/",
+  "vendored": false
+}
