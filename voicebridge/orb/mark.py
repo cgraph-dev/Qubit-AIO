@@ -74,6 +74,14 @@ from .mark_field import (
     dust_state,
     comet,
     sparkles,
+    echo_rings,
+    ECHO_LAG_S,
+    ECHO_SCALE,
+    ECHO_ALPHA,
+    ECHO_WIDTH,
+    nucleus_sparks,
+    NUCLEUS_SPARK_COUNT,
+    NUCLEUS_SPARK_REACH,
 )
 
 #: Fringe offset in DEVICE pixels at 96px. A lens fringe is a pixel-level
@@ -309,15 +317,26 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     except Exception:  # noqa: BLE001
         glints = []
     try:
+        echoes = echo_rings(tt)
+    except Exception:  # noqa: BLE001
+        echoes = []
+    try:
+        sparks = nucleus_sparks(tt, r)
+    except Exception:  # noqa: BLE001
+        sparks = []
+    try:
         comet_info = comet(tt, r)
     except Exception:  # noqa: BLE001
         comet_info = {"alpha": 0.0, "trail": []}
     if not isinstance(comet_info, dict):
         comet_info = {"alpha": 0.0, "trail": []}
     if reduced_motion:
-        # A clean static frame: no dust, no glints, no comet, no trails.
+        # A clean static frame: no dust, no glints, no comet, no trails, no
+        # follower rings and no nucleus sparks.
         dust = []
         glints = []
+        echoes = []
+        sparks = []
         comet_info = {"alpha": 0.0, "trail": []}
 
     far_beads = [p for p in particles if float(p.get("depth", 0.0)) < 0.5]
@@ -326,7 +345,46 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     near_dust = [d for d in dust if float(d.get("depth", 0.0)) >= 0.5]
     far_glints = [g for g in glints if float(g.get("depth", 0.0)) < 0.5]
     near_glints = [g for g in glints if float(g.get("depth", 0.0)) >= 0.5]
+    # Follower rings: orbit "a" rides the NEAR ring, orbit "b" the FAR one —
+    # the same z-split the main orbits use, so the echo takes part in the
+    # three-dimensional read instead of floating on top of it.
+    far_echo = [e for e in echoes if str(e.get("orbit") or "b") != "a"]
+    near_echo = [e for e in echoes if str(e.get("orbit") or "b") == "a"]
+    far_sparks = [s for s in sparks if float(s.get("depth", 0.0)) < 0.5]
+    near_sparks = [s for s in sparks if float(s.get("depth", 0.0)) >= 0.5]
     comet_on = (not reduced_motion) and float(comet_info.get("alpha", 0.0)) > 0.0
+
+    def _echo_ring(ring: Dict[str, Any]) -> None:
+        """One thin follower ring: outline-only, dimmer, lagged and scaled.
+
+        Same ``orbit_point`` sampling as the main rings (never a re-derived
+        geometry), one stroke and no chromatic fringe, mixed toward the
+        background so it reads as a ghost trailing its orbit rather than a
+        second decal.
+        """
+        if reduced_motion:
+            return
+        try:
+            tilt = float(ring.get("tilt", TILT_A))
+            rxs = rx * float(ring.get("rx_scale", ECHO_SCALE))
+            rys = ry * float(ring.get("ry_scale", ECHO_SCALE))
+            alpha = float(ring.get("alpha", ECHO_ALPHA)) * bright
+            width = max(1, int(round(float(ring.get("width", ECHO_WIDTH)))))
+            _line(_ellipse_points(ccx, ccy, rxs, rys, tilt),
+                  _dim(ring_rgb, alpha), width)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _draw_spark(s: Dict[str, Any]) -> None:
+        """One nucleus spark as a glint: two crossing arms + a small core."""
+        if reduced_motion:
+            return
+        try:
+            _bead(cx_f + float(s["x"]), cy_f + float(s["y"]),
+                  float(s["size"]), float(s.get("lift", 0.0)),
+                  float(s["alpha"]))
+        except Exception:  # noqa: BLE001
+            pass
 
     def _draw_particle(p: Dict[str, float]) -> None:
         if not reduced_motion:
@@ -347,10 +405,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _ring(ccx, ccy, far_tilt, far_dim, 0.45)
     except Exception:  # noqa: BLE001
         pass
+    for _ring_info in far_echo:
+        _echo_ring(_ring_info)
     _beads(far_dust)
     for _p in far_beads:
         _draw_particle(_p)
     _beads(far_glints)
+    for _s in far_sparks:
+        _draw_spark(_s)
     if comet_on:
         for s in comet_info.get("trail", []):
             if float(s.get("alpha", 0.0)) > 0.0:
@@ -393,10 +455,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _ring(ccx, ccy, near_tilt, near_dim, 0.25)
     except Exception:  # noqa: BLE001
         pass
+    for _ring_info in near_echo:
+        _echo_ring(_ring_info)
     _beads(near_dust)
     for _p in near_beads:
         _draw_particle(_p)
     _beads(near_glints)
+    for _s in near_sparks:
+        _draw_spark(_s)
     if comet_on:
         _bead(cx_f + comet_info["x"], cy_f + comet_info["y"],
               comet_info["size"], comet_info["lift"], comet_info["alpha"])
@@ -421,4 +487,6 @@ __all__ = [
     "heartbeat", "nucleus_scale", "shockwave", "camera_offset",
     "orbit_tilts", "orbit_point", "particle_state", "trails",
     "dust_state", "comet", "sparkles",
+    "echo_rings", "ECHO_LAG_S", "ECHO_SCALE", "ECHO_ALPHA", "ECHO_WIDTH",
+    "nucleus_sparks", "NUCLEUS_SPARK_COUNT", "NUCLEUS_SPARK_REACH",
 ]
