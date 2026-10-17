@@ -86,6 +86,31 @@ def terminal_env(name: str, default: str = "") -> str:
     return default if value is None else str(value)
 
 
+def _apply_terminal_mapping(scope: Dict[str, str], mapping: Dict[str, Any]) -> None:
+    from qubit_cli.config import TERMINAL_CONFIG_ENV_MAP, _terminal_env_value
+
+    for cfg_key, value in mapping.items():
+        # cwd placeholders are resolved per-surface later; not a policy value.
+        if value is None or (cfg_key == "cwd" and str(value).strip() in {".", "auto", "cwd"}):
+            continue
+        env_var = TERMINAL_CONFIG_ENV_MAP.get(cfg_key)
+        if env_var:
+            # List/dict config values must be JSON (same contract as
+            # apply_terminal_config_to_env). str() yields Python repr, which
+            # json.loads in terminal_tool rejects.
+            scope[env_var] = _terminal_env_value(value)
+
+
+def default_terminal_scope() -> Dict[str, str]:
+    """Code-default ``TERMINAL_*`` policy: what a profile-bypassing session freezes instead of
+    reading ``.env``/``config.yaml``. Total like the profile projection, minus the profile."""
+    from qubit_cli.config_defaults import DEFAULT_CONFIG
+
+    scope: Dict[str, str] = {}
+    _apply_terminal_mapping(scope, {**_TOOL_LEVEL_DEFAULTS, **(DEFAULT_CONFIG.get("terminal") or {})})
+    return scope
+
+
 def build_profile_terminal_scope(
     qubit_home: "Any", *, env_overlay: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     """Build the COMPLETE effective ``TERMINAL_*`` policy for a profile home.
@@ -109,16 +134,7 @@ def build_profile_terminal_scope(
     scope: Dict[str, str] = {}
 
     def _apply(mapping: Dict[str, Any]) -> None:
-        for cfg_key, value in mapping.items():
-            # cwd placeholders are resolved per-surface later; not a policy value.
-            if value is None or (cfg_key == "cwd" and str(value).strip() in {".", "auto", "cwd"}):
-                continue
-            env_var = TERMINAL_CONFIG_ENV_MAP.get(cfg_key)
-            if env_var:
-                # List/dict config values must be JSON (same contract as
-                # apply_terminal_config_to_env). str() yields Python repr, which
-                # json.loads in terminal_tool rejects.
-                scope[env_var] = _terminal_env_value(value)
+        _apply_terminal_mapping(scope, mapping)
 
     _apply({**_TOOL_LEVEL_DEFAULTS, **(DEFAULT_CONFIG.get("terminal") or {})})
     default_image = scope.get("TERMINAL_DOCKER_IMAGE")
