@@ -410,7 +410,7 @@ def _announce_raised(cfg: Any, requested_by: str, detail: Dict[str, Any],
 
     Defined at the end of the module on purpose: this is a call-site-only
     addition, and keeping it out of the function bodies above preserves the
-    exact 1-based line numbers other modules cite (``escalation.py:321`` is the
+    exact 1-based line numbers other modules cite (``escalation.py:328`` is the
     level rule in :func:`resolve`).
     """
     store.audit("escalation.raise", requested_by, detail)

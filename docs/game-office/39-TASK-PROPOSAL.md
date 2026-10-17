@@ -58,7 +58,7 @@ performance and for escalations:
   seat's."*
 * `org.py:57` (`_walk_up`) — walks `supervisor_id` up the tree; this is what defines "one level
   above."
-* `escalation.py:321` — `if int(by_agent) != int(row["supervisor_id"]): … raise OFFICE_ESCALATION_WRONG_LEVEL`.
+* `escalation.py:328` — `if int(by_agent) != int(row["supervisor_id"]): … raise OFFICE_ESCALATION_WRONG_LEVEL`.
   The proposal layer uses the identical check for the identical reason.
 
 | Proposer | Approver | Why |

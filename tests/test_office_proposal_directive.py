@@ -615,7 +615,7 @@ def test_finding_module_docstring_cites_escalation_321_which_is_resolve_not_ask_
     """FINDING 4 (documentation): task_proposal.py cites the wrong escalation rule.
 
     task_proposal.py:18-21 says the approver rule is "the same rule
-    `escalation.resolve` enforces at ``escalation.py:321``". Line 321 IS the
+    `escalation.resolve` enforces at ``escalation.py:328``". Line 328 IS the
     `by_agent != supervisor_id` refusal inside `resolve`, so the citation is
     correct for `resolve`. But the module's own prose (task_proposal.py:15-21)
     frames the whole thing as the closest analogue to `ask_owner`, and
@@ -633,9 +633,9 @@ def test_finding_module_docstring_cites_escalation_321_which_is_resolve_not_ask_
     esc = _module_src("voicebridge.office.escalation")
     lines = esc.splitlines()
 
-    # line 321 (1-based) is the level refusal in `resolve`
-    assert "by_agent" in lines[320] and "supervisor_id" in lines[320], (
-        f"escalation.py:321 is not the level rule: {lines[320]!r}")
+    # line 328 (1-based) is the level refusal in `resolve`
+    assert "by_agent" in lines[327] and "supervisor_id" in lines[327], (
+        f"escalation.py:328 is not the level rule: {lines[327]!r}")
     assert "OFFICE_ESCALATION_WRONG_LEVEL" in esc
 
     # `ask_owner` exists and enforces no approver level
@@ -646,7 +646,7 @@ def test_finding_module_docstring_cites_escalation_321_which_is_resolve_not_ask_
 
     # the module docstring names escalation.resolve, not ask_owner
     tp = _module_src("voicebridge.office.task_proposal")
-    assert "escalation.py:321" in tp
+    assert "escalation.py:328" in tp
     assert "escalation.resolve" in tp
 
 

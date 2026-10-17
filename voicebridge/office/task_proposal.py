@@ -16,7 +16,7 @@ Three rules, each enforced here rather than hoped for:
 
 * **A seat may never approve its own proposal.** The approver is *exactly one
   level above* the proposer (C31/D38) — the same rule
-  :func:`escalation.resolve` enforces at ``escalation.py:321`` and
+  :func:`escalation.resolve` enforces at ``escalation.py:328`` and
   :func:`org._walk_up` walks at ``org.py:57``. A seat reviewing its own idea is
   the one thing the chain of command exists to prevent.
 * **A rejection carries a reason**, because a rejection with no instruction is
@@ -146,7 +146,7 @@ def approve_level(cfg: Any, proposer_id: int) -> Dict[str, Any]:
     live chain rather than assumed from ``seat_type`` (C31: "the reviewer's
     level must be exactly one above the reviewed seat's"). This is the same
     rule the escalation path enforces — :func:`escalation.resolve` requires
-    ``by_agent == supervisor_id`` (``escalation.py:321``), and
+    ``by_agent == supervisor_id`` (``escalation.py:328``), and
     :func:`org._walk_up` (``org.py:57``) is what defines "one level above".
 
     A **director** proposes to the **CEO**, its own supervisor. It does *not*
