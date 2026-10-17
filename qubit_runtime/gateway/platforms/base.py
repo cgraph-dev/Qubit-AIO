@@ -18,7 +18,7 @@ import time
 import uuid
 import weakref
 from abc import ABC, abstractmethod
-from hermes_dir_acl import make_user_dir, unusable_dir_remedy
+from qubit_dir_acl import make_user_dir, unusable_dir_remedy
 from gateway.platforms.base_log_safety import safe_url_for_log
 
 from utils import normalize_proxy_url

@@ -396,7 +396,7 @@ def _session_of(pid: int) -> int | None:
 
 def probe_refused_owner(pid: int) -> tuple[str, str] | None:
     """``(reason_code, remedy)`` naming why *pid*'s gateway refused this client, or None."""
-    from hermes_dir_acl import process_elevation, process_is_elevated
+    from qubit_dir_acl import process_elevation, process_is_elevated
     own_session, owner_session = _session_of(os.getpid()), _session_of(pid)
     reason = classify_refused_owner(own_session=own_session, owner_session=owner_session,
                                     own_elevated=process_is_elevated(), owner_elevated=process_elevation(pid))

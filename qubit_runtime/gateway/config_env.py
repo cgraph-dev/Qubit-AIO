@@ -9,7 +9,7 @@ msgraph_webhook, relay) keep their small functions here.
 
 import logging
 import os
-from typing import Optional
+from typing import Any, Callable, Dict, Optional
 
 from gateway.config import (
     GatewayConfig,

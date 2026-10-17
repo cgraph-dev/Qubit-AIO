@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 import stat
 import threading
-from hermes_dir_acl import make_user_dir
+from qubit_dir_acl import make_user_dir
 
 
 class OwnershipConflict(RuntimeError):

@@ -22,7 +22,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
-from hermes_dir_acl import make_user_dir
+from qubit_dir_acl import make_user_dir
 
 logger = logging.getLogger(__name__)
 
