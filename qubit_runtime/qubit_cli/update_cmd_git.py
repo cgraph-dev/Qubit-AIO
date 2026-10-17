@@ -272,7 +272,7 @@ OFFICIAL_REPO_URLS = install_source.official_repo_urls()
 OFFICIAL_REPO_URL = install_source.official_repo_url()
 # Operator-facing hint naming the exact command to add the upstream remote. Built from the
 # configurable installer source (``OFFICIAL_REPO_URL``) so no upstream repo URL is hardcoded here.
-_ADD_UPSTREAM_REMOTE_CMD = f"git remote add upstream {OFFICIAL_REPO_URL}"
+_UPSTREAM_ADD_CMD = f"git remote add upstream {OFFICIAL_REPO_URL}"
 SKIP_UPSTREAM_PROMPT_FILE = ".skip_upstream_prompt"
 
 
@@ -340,7 +340,7 @@ def _offer_upstream_remote(git_cmd: list[str], cwd: Path, *, assume_yes: bool, i
         "  This means you may miss upstream Qubit updates.\n"
     )
     if assume_yes or (input_fn is None and not (sys.stdin.isatty() and sys.stdout.isatty())):
-        print(f"  Skipping upstream setup (non-interactive run).\n  Add it later with: {_ADD_UPSTREAM_REMOTE_CMD}")
+        print(f"  Skipping upstream setup (non-interactive run).\n  Add it later with: {_UPSTREAM_ADD_CMD}")
         return False
     if input_fn is not None:
         response = input_fn("Add official repo as 'upstream' remote? [y/N]", "n").strip().lower()
@@ -351,7 +351,7 @@ def _offer_upstream_remote(git_cmd: list[str], cwd: Path, *, assume_yes: bool, i
             print()
             response = "n"
     if response not in {"", "y", "yes"}:
-        print(f"  Skipped. Run '{_ADD_UPSTREAM_REMOTE_CMD}' to add later.")
+        print(f"  Skipped. Run '{_UPSTREAM_ADD_CMD}' to add later.")
         _mark_skip_upstream_prompt()
         return False
     print("→ Adding upstream remote...")
