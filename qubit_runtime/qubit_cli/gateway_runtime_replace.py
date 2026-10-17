@@ -36,8 +36,8 @@ REFUSAL_DETAIL = {
 
 
 def _install_root() -> Path:
-    from qubit_constants import get_default_hermes_root
-    return Path(get_default_hermes_root()).resolve()
+    from qubit_constants import get_default_qubit_root
+    return Path(get_default_qubit_root()).resolve()
 
 
 def _identify(home: Path, timeout: float) -> tuple[Path, dict] | None:

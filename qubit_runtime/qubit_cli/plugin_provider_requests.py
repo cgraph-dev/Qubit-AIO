@@ -75,10 +75,10 @@ _PROVIDERS: dict[str, tuple[frozenset, Callable[[str], tuple[dict[str, str], str
 def _calling_plugin_dir() -> Optional[Path]:
     """Directory of the plugin whose code is nearest on the calling stack, or None."""
     from qubit_cli.plugins import get_bundled_plugins_dir
-    from qubit_constants import get_default_hermes_root, get_qubit_home, get_process_qubit_home
+    from qubit_constants import get_default_qubit_root, get_qubit_home, get_process_qubit_home
 
     bases = (get_qubit_home() / "plugins", get_process_qubit_home() / "plugins",
-             get_default_hermes_root() / "plugins", get_bundled_plugins_dir())
+             get_default_qubit_root() / "plugins", get_bundled_plugins_dir())
     roots = {r for base in bases for r in (base.absolute(), base.resolve())}
     frame = sys._getframe(2)
     while frame is not None:
