@@ -93,6 +93,40 @@ def strip_wake(text: str, aliases: Optional[List[str]] = None) -> Optional[str]:
 _FULL_WAKE_FIRST_WORDS = frozenset({"hey", "hi", "ok", "okay"})
 
 
+def _custom_triggers() -> List[str]:
+    """Owner-managed extra wake words (OpenClaw voicewake port), else []."""
+    try:
+        from . import wake_words as _ww
+        return [str(t) for t in (_ww.active_triggers() or []) if str(t).strip()]
+    except Exception:
+        return []
+
+
+def _matches_custom_trigger(text: str) -> bool:
+    """True when *text* opens with an owner custom trigger (not a built-in)."""
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return False
+    low = cleaned.lower()
+    for trigger in _custom_triggers():
+        if re.match(_FILLER_RE + re.escape(trigger.lower()) + r"\b", low):
+            return True
+    return False
+
+
+def _strip_custom_trigger(text: str) -> Optional[str]:
+    """Command text after an owner custom trigger, or None."""
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return None
+    low = cleaned.lower()
+    for trigger in _custom_triggers():
+        m = re.match(_FILLER_RE + re.escape(trigger.lower()) + r"\b", low)
+        if m:
+            return cleaned[m.end():].lstrip(" \t,.:;!?—-")
+    return None
+
+
 def wake_match_kind(text: str,
                     aliases: Optional[List[str]] = None) -> Optional[str]:
     """Classify a wake-phrase match as ``"full"`` or ``"bare"``.
@@ -1237,7 +1271,12 @@ class WakeMonitor:
                         if self._kws.feed(samples):
                             kws_hit = True
                             _trace("kws.hit")
-                            beep(self.cfg, "wake")
+                            # No beep here: the spotter fires on acoustics
+                            # alone and false-fires on room noise/TV/music.
+                            # The beep moved to actual emission (forced-path
+                            # full/trailing/custom picks and the unarmed full
+                            # match), so exactly one beep sounds per executed
+                            # command and silence otherwise.
                     except Exception as exc:
                         now = time.monotonic()
                         if now - getattr(self, "_last_kws_err", 0.0) > 5.0:
@@ -1538,20 +1577,61 @@ class WakeMonitor:
             # The keyword spotter fired: a fresh directed wake starts a new
             # conversation, so any previous continuous run is over.
             self._reset_continuous()
-            # Whatever ASR heard is the command. Strip the wake phrase if ASR
-            # rendered it, else use the whole text.
+            # The spotter fires on acoustics alone (threshold 0.25), so a
+            # noise/TV/music false-fire must not execute whatever ASR
+            # hallucinated: only a full directed wake (hey/hi/ok-prefixed),
+            # an owner custom trigger, or a deliberate trailing address
+            # ("..., qubit") emits. Bare or wakeless transcripts ARM
+            # silently instead — a real mangled wake gets its second chance
+            # inside the window, and room chatter never executes. (The
+            # unarmed path already drops bare the same way; this closes the
+            # forced-path hole.)
+            kind = wake_match_kind(text, aliases=aliases)
             remainder = strip_wake(text, aliases=aliases)
+            trailing = None
             if remainder is None:
-                remainder = strip_wake_trailing(text, aliases=aliases)
-            cmd = remainder if remainder is not None else text
-            if cmd.strip():
-                # P1-4: a fired intent consumes any open arm, exactly like
-                # the armed branch below — otherwise one intent (bare wake
-                # + KWS-hit turn) emits twice.
+                trailing = strip_wake_trailing(text, aliases=aliases)
+            custom_hit = _matches_custom_trigger(text)
+            # Bare affirm/deny goes through the Lane-1 settle-or-decline
+            # FIRST: with a live pending it settles there (helper emit or
+            # journal settle, never a raw command); with no live pending
+            # there is no consent context, so it arms like any other weak
+            # evidence instead of starting a turn on a bare "yes" from the
+            # TV. A KWS false-fire plus room dialogue must never equal a
+            # ghost turn.
+            try:
+                _affirm = bool(is_bare_affirmative(text)
+                               or is_bare_negative(text))
+            except Exception:
+                _affirm = False
+            if _affirm:
+                try:
+                    if self._maybe_confirm_bypass(text):
+                        return
+                except Exception:
+                    pass
+                _trace("forced_bare_arm", chars=len(text))
                 with self._lock:
-                    self._armed_until = 0.0
-                self._emit(cmd)
+                    self._armed_until = time.monotonic() + self.arm_window_s
+                return
+            if (pending or kind == "full" or trailing is not None
+                    or custom_hit):
+                cmd = remainder if remainder is not None else trailing
+                if cmd is None and custom_hit:
+                    cmd = _strip_custom_trigger(text)
+                if cmd is not None and cmd.strip():
+                    # P1-4: a fired intent consumes any open arm, exactly like
+                    # the armed branch below — otherwise one intent (bare wake
+                    # + KWS-hit turn) emits twice.
+                    with self._lock:
+                        self._armed_until = 0.0
+                    beep(self.cfg, "wake")
+                    self._emit(cmd)
+                else:
+                    with self._lock:
+                        self._armed_until = time.monotonic() + self.arm_window_s
             else:
+                _trace("forced_weak_arm", chars=len(text), kind=kind or "none")
                 with self._lock:
                     self._armed_until = time.monotonic() + self.arm_window_s
             return

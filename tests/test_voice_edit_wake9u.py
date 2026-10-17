@@ -305,14 +305,61 @@ def test_forced_segment_emits_command_from_kws():
     m, commands = _monitor(["hey qubit, type this for me: hello"])
     m._handle_segment(b"\x00" * 9600, forced=True)
     assert commands == ["type this for me: hello"]
-    # Keyword fired but ASR dropped the wake phrase -> use the whole text.
+    # Keyword fired but ASR rendered no wake phrase at all -> ARM silently,
+    # never execute room noise as a command (false-fire tightening: the
+    # spotter fires on acoustics alone). The command gets its second chance
+    # inside the arm window.
     m2, commands2 = _monitor(["type this for me: hello"])
     m2._handle_segment(b"\x00" * 9600, forced=True)
-    assert commands2 == ["type this for me: hello"]
+    assert commands2 == []
+    import time as _t
+    assert m2._armed_until > _t.monotonic()
     # Keyword fired with no speech -> arm, never emit.
     m3, commands3 = _monitor([""])
     m3._handle_segment(b"\x00" * 9600, forced=True)
     assert commands3 == []
+
+
+def test_forced_bare_builtin_arms_silently(monkeypatch):
+    # A bare built-in ("qubit, ...") on the forced path arms like the
+    # unarmed path does — room chatter starting with the name never executes.
+    import voicebridge.voice_edit.wake as wake_mod
+    beeps = []
+    monkeypatch.setattr(wake_mod, "beep",
+                        lambda cfg, kind="wake": beeps.append(kind) or True)
+    m, commands = _monitor(["qubit, what time is it"])
+    m._handle_segment(b"\x00" * 9600, forced=True)
+    assert commands == []
+    assert beeps == []
+
+
+def test_forced_full_phrase_beeps_once(monkeypatch):
+    # The KWS-hit beep moved to actual emission: exactly one beep per
+    # executed command, silence otherwise.
+    import voicebridge.voice_edit.wake as wake_mod
+    beeps = []
+    monkeypatch.setattr(wake_mod, "beep",
+                        lambda cfg, kind="wake": beeps.append(kind) or True)
+    m, commands = _monitor(["hey qubit, what time is it"])
+    m._handle_segment(b"\x00" * 9600, forced=True)
+    assert commands == ["what time is it"]
+    assert beeps == ["wake"]
+
+
+def test_forced_trailing_address_still_emits():
+    # A deliberate trailing address ("open youtube, qubit") stays executable.
+    m, commands = _monitor(["open youtube, qubit"])
+    m._handle_segment(b"\x00" * 9600, forced=True)
+    assert commands == ["open youtube"]
+
+
+def test_forced_custom_trigger_still_emits(monkeypatch):
+    # Owner custom triggers are directed speech, not bare chatter.
+    import voicebridge.voice_edit.wake as wake_mod
+    monkeypatch.setattr(wake_mod, "_custom_triggers", lambda: ["computer"])
+    m, commands = _monitor(["computer, open youtube"])
+    m._handle_segment(b"\x00" * 9600, forced=True)
+    assert commands == ["open youtube"]
 
 
 class SeqMic:
@@ -656,8 +703,8 @@ def test_wake_match_kind_full_vs_bare():
 def test_bare_qubit_without_hey_is_dropped():
     # Room chatter starting with a bare "Qubit, ..." (no hey) is not
     # direction: silent drop — no beep, no arm, no execute. Saying
-    # "hey qubit" stays the way to direct it; the KWS-hit path still
-    # serves acoustic bare detections.
+    # "hey qubit" stays the way to direct it; the KWS-hit path arms on
+    # bare detections instead of executing them.
     m, commands = _monitor(["Qubit, I'm coming."])
     m._handle_segment(b"\x00" * 9600)
     assert commands == []
@@ -817,8 +864,9 @@ def test_no_double_settle_on_repeated_yes(monkeypatch):
 
 
 def test_forced_kws_yes_skips_bypass(monkeypatch):
-    # A KWS-hit turn is directed speech: the forced path owns it even when
-    # the text is a bare "yes" and pending happens to be live.
+    # A KWS-hit bare "yes" with a LIVE pending settles through Lane-1 (no
+    # raw command emit): the pending is the consent context. With no live
+    # pending the same input arms instead of starting a turn on TV dialogue.
     import voicebridge.voice_edit.wake as wake_mod
     monkeypatch.setattr(wake_mod, "_live_voice_pending", lambda cfg: "task")
     settled = []
@@ -826,8 +874,8 @@ def test_forced_kws_yes_skips_bypass(monkeypatch):
                         lambda cfg, kind: settled.append(kind) or {"ok": True})
     m, commands = _bypass_monitor(["yes"])
     m._handle_segment(b"\x00" * 9600, forced=True)
-    assert settled == []
-    assert commands == ["yes"]
+    assert settled == ["task"]
+    assert commands == []
 
 
 def test_armed_yes_without_pending_keeps_legacy_path(monkeypatch):

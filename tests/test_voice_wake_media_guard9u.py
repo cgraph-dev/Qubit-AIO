@@ -209,11 +209,16 @@ def test_short_command_with_leading_wake_still_emits():
     assert commands == ["open youtube"]
 
 
-def test_short_command_forced_still_emits():
+def test_short_command_forced_without_wake_arms():
+    # False-fire tightening: a KWS false-fire on room noise must not execute
+    # whatever ASR hallucinated. Without wake evidence the forced path arms
+    # (second chance inside the window) instead of emitting.
+    import time as _t
     commands = []
     m = _monitor(commands)
     m._handle_transcript("open youtube", forced=True)
-    assert commands == ["open youtube"]
+    assert commands == []
+    assert m._armed_until > _t.monotonic()
 
 
 def test_trailing_wake_still_works():
