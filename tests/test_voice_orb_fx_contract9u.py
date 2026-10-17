@@ -12,16 +12,20 @@ so a regression that silently drops an effect fails the contract for that
 renderer. Every assertion is behavioural and runs against BOTH renderers via
 the ``renderer`` parametrisation below.
 
-Effects under contract (sibling work, may not be merged into this worktree
-yet — such tests were marked ``xfail(strict=False)`` while the effects were in
-sibling lanes; they are real assertions now that both renderers carry them.
-the file is green now and flips to a real pass once the renderer gains it):
+Effects under contract (every assertion is behavioural and runs against BOTH
+renderers via the ``renderer`` parametrisation below):
 
   (a) MOTION     — geometry changes between nearby phases for both renderers
   (b) HEARTBEAT  — nucleus size/opacity pulses; envelope repeats at ~0.95s
   (c) DEPTH      — farther beads are smaller and lower-contrast than near ones
   (d) SPARKLES   — deterministic glints turn on/off across the cycle, bounded
   (e) REDUCED    — identical frame for any ``t`` when reduced motion is on
+  (f) ECHO       — two thin follower rings trailing the main orbits
+  (g) SPARKS     — nucleus sparks leave the nucleus and reach past the orbits
+
+The (f)/(g) effects are shared-field work that the Tk renderer draws and the
+Qt painter gains in a sibling lane; their cases stay ``xfail(strict=False)``
+until both renderers carry them, then pass for both with no edit.
 """
 from __future__ import annotations
 
@@ -29,6 +33,7 @@ import math
 import os
 import sys
 import dataclasses
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -337,6 +342,28 @@ def _sample(fn, t0, t1, n):
     return [fn(t0 + (t1 - t0) * i / float(n)) for i in range(n)]
 
 
+def _multiset_diff(a, b):
+    """Primitives emitted in ``a`` but not ``b`` (both iterables of Prim)."""
+    diff = Counter(a)
+    diff.subtract(Counter(b))
+    return list(diff.elements())
+
+
+def _suppress_field_effect(monkeypatch, name):
+    """Make the shared field's ``name`` layer render nothing, for both backends.
+
+    The Qt painter reads ``mark_field.<name>`` through its module handle and
+    the Tk renderer imports it by name into ``voicebridge.orb.mark``; patching
+    both covers whichever backend the fixture is exercising.
+    """
+    from voicebridge.orb import mark as _mark
+    from voicebridge.orb import mark_field as _field
+
+    for mod in (_field, _mark):
+        if hasattr(mod, name):
+            monkeypatch.setattr(mod, name, lambda *a, **k: [])
+
+
 def _peaks(values, min_sep):
     """Circular prominent-local-maxima indices, separated by >= ``min_sep``.
 
@@ -463,3 +490,59 @@ def test_reduced_motion_is_time_invariant(renderer):
         for p in f.prims)
     assert dump(a) == dump(b), f"[{name}] reduced motion still animates"
     assert a.total > 0, f"[{name}] reduced motion blanked the mark"
+
+
+# --------------------------------------------------------------------------- #
+# (f) ECHO (FOLLOWER) RINGS — two thinner orbit ghosts, one per main orbit
+# --------------------------------------------------------------------------- #
+@pytest.mark.xfail(strict=False, reason=(
+    "ECHO follower rings are not merged into every renderer yet: the Tk "
+    "renderer draws them from mark_field.echo_rings; the Qt painter gains "
+    "them in a sibling lane, so this flips to a real pass once both meet."))
+def test_echo_rings_add_follower_outlines(renderer, monkeypatch):
+    name, draw = renderer
+    full = draw(3.0)  # precession has moved the lagged tilt off the live one
+    _suppress_field_effect(monkeypatch, "echo_rings")
+    bare = draw(3.0)
+    extra = _multiset_diff(full.prims, bare.prims)
+
+    assert len(extra) >= 2, (
+        f"[{name}] fewer than two follower rings drawn (extra={len(extra)})")
+    assert len(extra) <= 12, (
+        f"[{name}] follower rings emitted {len(extra)} primitives (unbounded)")
+    # Follower rings are OUTLINES: they never add a filled ellipse.
+    assert all(p.kind in ("line", "path") for p in extra), (
+        f"[{name}] a follower ring added a filled primitive: "
+        f"{sorted({p.kind for p in extra})}")
+
+
+# --------------------------------------------------------------------------- #
+# (g) NUCLEUS SPARKS — glints thrown OUT of the nucleus past the orbits
+# --------------------------------------------------------------------------- #
+@pytest.mark.xfail(strict=False, reason=(
+    "NUCLEUS sparks are not merged into every renderer yet: the Tk renderer "
+    "draws them from mark_field.nucleus_sparks; the Qt painter gains them in a "
+    "sibling lane, so this flips to a real pass once both meet."))
+def test_nucleus_sparks_are_glints_that_reach_past_the_orbits(renderer,
+                                                              monkeypatch):
+    name, draw = renderer
+    full = draw(0.0)  # the primary thump: the shower is out
+    _suppress_field_effect(monkeypatch, "nucleus_sparks")
+    bare = draw(0.0)
+    extra = _multiset_diff(full.prims, bare.prims)
+
+    assert len(extra) >= 3, f"[{name}] no nucleus sparks drawn ({len(extra)})"
+
+    from voicebridge.orb import mark_field as _field
+
+    # Sparks travel OUT: some reach beyond the main orbit radius.
+    reach = max(math.hypot(p.cx - CX, p.cy - CY) for p in extra)
+    assert reach > R * _field.RX_FRAC * 1.2, (
+        f"[{name}] sparks never leave the orbits (reach={reach:.1f}px)")
+
+    # A spark's core is a glint, not a solid disc the size of the nucleus.
+    nuc_r = R * _field.NUCLEUS_FRAC
+    cores = [p for p in extra if p.kind == "ellipse"]
+    assert cores, f"[{name}] sparks carry no core glint"
+    assert all(p.r < nuc_r for p in cores), (
+        f"[{name}] a spark core was drawn as a solid disc (r={max(p.r for p in cores):.2f})")
