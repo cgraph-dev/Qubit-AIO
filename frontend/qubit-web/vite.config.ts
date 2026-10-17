@@ -104,7 +104,11 @@ export default defineConfig({
   },
   build: {
     outDir: "../qubit-dist",
-    emptyOutDir: true,
+    // Never wipe: hashed chunks are immutable, and open dashboard tabs hold
+    // the previous index. emptyOutDir:true deleted their lazy chunks on
+    // every rebuild, so all background tabs broke at once ("Failed to fetch
+    // dynamically imported module"). Stale chunks are small and inert.
+    emptyOutDir: false,
     // Shell stays a bit over Vite's 500 kB default after vendor splits;
     // page/xterm chunks load on demand. Keep a modest ceiling so a true
     // regression still warns.
