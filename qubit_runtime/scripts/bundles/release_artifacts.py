@@ -159,6 +159,10 @@ def validate_windows_bundle(bundle: Path, windows: list[dict]) -> None:
         raise ValueError("Universal bundle must cover both architectures")
 
 
+# The handoff groups a candidate may carry, in the order lanes.handoffs() emits.
+ALL_HANDOFFS = ("win32-x64", "win32-arm64", "darwin-x64", "darwin-arm64", "termux", "windows-universal")
+
+
 def assemble(root: Path, tag: str, commit: str, public_base: str, out: Path,
              *, smoke_results: dict, release_epoch: int, archive: str) -> dict:
     """Bind the native metadata to files already staged by their build jobs.
@@ -169,7 +173,7 @@ def assemble(root: Path, tag: str, commit: str, public_base: str, out: Path,
     from scripts.releases.r2 import put, staging_key_for
 
     smoke_results = accepted_smoke_results(smoke_results)
-    expected = ("win32-x64", "win32-arm64", "darwin-x64", "darwin-arm64", "termux", "windows-universal")
+    expected = ALL_HANDOFFS
     by_name = {}
     for name in expected:
         file = root / receipt_name(name)
@@ -215,7 +219,14 @@ def assemble(root: Path, tag: str, commit: str, public_base: str, out: Path,
     return result
 
 
-def materialize(manifest: dict, root: Path, *, public_base: str, store_only: bool = False) -> None:
+# Package file suffixes: a metadata-only materialization skips them, since feeds
+# and APT indexes are bound by the accepted candidate's sha256 receipts, not the
+# multi-GB packages themselves.
+PACKAGE_SUFFIXES = (".dmg", ".zip", ".blockmap", ".msix", ".msixbundle", ".deb")
+
+
+def materialize(manifest: dict, root: Path, *, public_base: str, store_only: bool = False,
+                metadata_only: bool = False) -> None:
     validate_candidates(manifest, manifest["tag"], manifest["commit"], public_base,
                         archive=manifest["archive"])
     files = manifest.get("files", [])
@@ -225,6 +236,8 @@ def materialize(manifest: dict, root: Path, *, public_base: str, store_only: boo
     if any(by_url.get(row["artifact"]["url"]) != row["artifact"]["sha256"] for row in manifest["packages"]):
         raise ValueError("Package receipts differ from candidate file receipts")
     selected = [item for item in files if item["path"].startswith("Store-") and item["path"].endswith(".msixbundle")] if store_only else files
+    if metadata_only:
+        selected = [item for item in selected if not item["path"].endswith(PACKAGE_SUFFIXES)]
     if store_only and len(selected) != 1:
         raise ValueError("Expected one Store candidate")
     for item in selected:
@@ -309,7 +322,9 @@ def publish_canary_appinstaller(root: Path, *, tag: str, variant: str, bundle: P
 def promote(manifest: dict, root: Path, public_base: str) -> None:
     from scripts.releases.r2 import put, finalize
 
-    materialize(manifest, root, public_base=public_base)
+    # Feeds need the per-arch feed legs and APT indexes, not the packages: those are
+    # bound by the accepted candidate's sha256 receipts.
+    materialize(manifest, root, public_base=public_base, metadata_only=True)
     windows = next(r for r in manifest["packages"] if r["platform"] == "windows")
     uri = f"{public_base.rstrip('/')}/releases/win32/stable/stable.appinstaller"
     appinstaller = root / "stable.appinstaller"
