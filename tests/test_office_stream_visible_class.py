@@ -43,8 +43,14 @@ def test_to_feed_carries_visible_from_the_activity_row():
     assert got == {"9": "badge", "8": "bubble"}
 
 
-def test_activity_feed_carries_visible_off_office_event(tmp_path):
+def test_activity_feed_carries_visible_off_office_event(tmp_path, monkeypatch):
     """Drive the real store seam: insert a row with a chosen class, read it back."""
+    # Redirect the XDG dirs to tmp_path so the store's *own* path resolution is
+    # isolated, not just the cfg we hand in. ``test_office_suite_health``'s
+    # ``test_office_tests_that_touch_state_redirect_xdg_to_tmp_path`` holds this
+    # convention for every office test that reaches ``store.connect``.
+    for var in ("XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME"):
+        monkeypatch.setenv(var, str(tmp_path / var.lower()))
     cfg = _cfg_with_state_dir(tmp_path)
     from voicebridge.office import store as store_mod
     conn = store_mod.connect(cfg)
