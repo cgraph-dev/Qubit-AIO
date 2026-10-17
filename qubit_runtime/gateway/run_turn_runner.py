@@ -75,6 +75,43 @@ class _ExecApprovalDeclined(RuntimeError):
     """
 
 
+def _resolution_failure_reply(exc: Exception, platform: Platform) -> tuple[str, str, bool]:
+    """``(chat text, failure_reason, retryable)`` for a model/credential resolution failure before the turn."""
+    from agent.error_classifier import FailoverReason
+    from qubit_cli.auth import AuthError, is_rate_limited_auth_error
+    from qubit_state_runtime import RuntimeStoreError
+    auth_permanent = FailoverReason.auth_permanent.value
+    if isinstance(exc, RuntimeStoreError):
+        # Session-policy refusals carry a stable reason code (e.g. a CLI launch key revoked by
+        # daemon restart): keep it in the reply so clients can act on it, and do not suggest
+        # /login — the profile's own credentials were never in play.
+        return (f"⚠️ This session's launch credentials are no longer available ({exc.reason}), so this "
+                "message wasn't processed. Start a new session from the CLI to bind them again.", auth_permanent, False)
+    if is_rate_limited_auth_error(exc.__cause__):
+        # Quota cap with valid credentials: /login cannot help; name the reset window (#89401).
+        from gateway.run import _gateway_provider_error_reply
+        return _gateway_provider_error_reply(str(exc)), auth_permanent, False
+    if platform == Platform.LOCAL:
+        # The local operator reads the terminal: the resolver's own sentence ("provider 'custom'
+        # resolved without credentials ...") is the diagnosis; /login is not.
+        return f"⚠️ {exc}", auth_permanent, False
+    seen: set[int] = set()
+    host = auth = False
+    link: BaseException | None = exc
+    while link is not None and id(link) not in seen:
+        seen.add(id(link))
+        host = host or isinstance(link, OSError)
+        auth = auth or isinstance(link, AuthError)
+        link = link.__cause__ or link.__context__
+    if host and not auth:
+        # A host-side failure (a CA bundle deleted under a long-lived process, an unreadable file)
+        # with no credential verdict: /login cannot fix it, the gateway log can (#140344).
+        # host_error sits on the gateway layer, so clients don't offer "Switch provider"; not retryable,
+        # since a deleted bundle or unreadable store fails the same way until the host is fixed.
+        return t("gateway.errors.generic_failed"), "host_error", False
+    return t("gateway.errors.no_credentials"), auth_permanent, False
+
+
 class TurnRunner:
     """Per-turn collaborator carrying ``GatewayRunner._run_agent_inner``'s tool-progress callbacks."""
 
@@ -1921,17 +1958,13 @@ class TurnRunner:
         except Exception as exc:
             # Model/credential resolution failed before the turn began; the raw text (URLs, status
             # codes) belongs in the log, and the chat gets the commands that fix it.
-            logger.warning("Model resolution failed for session %s: %s", ctx.session_key or "", exc)
-            from qubit_cli.auth import is_rate_limited_auth_error
-            if is_rate_limited_auth_error(exc.__cause__):
-                # Quota cap with valid credentials: /login cannot help; name the reset window (#89401).
-                from gateway.run import _gateway_provider_error_reply
-                return {"final_response": _gateway_provider_error_reply(str(exc)),
-                        "messages": [], "api_calls": 0, "tools": []}
-            return {
-                "final_response": t("gateway.errors.no_credentials"),
-                "messages": [], "api_calls": 0, "tools": [],
-            }
+            logger.warning("Model resolution failed for session %s: %s", ctx.session_key or "", exc, exc_info=True)
+            from agent.turn_failure_copy import stamp_failure
+            text, reason, retryable = _resolution_failure_reply(exc, ctx.source.platform)
+            return stamp_failure({"final_response": text, "messages": [], "api_calls": 0, "tools": [],
+                                  "failed": True, "completed": False, "error": str(exc)}, reason, retryable)
+        # The local tree has no session-policy layer, so the session's own routing is the
+        # runner-level ``_provider_routing`` (upstream's ``session_routing`` needs a live policy).
         pr = runner._provider_routing
         reasoning_config = runner._resolve_session_reasoning_config(source=ctx.source, session_key=ctx.session_key, model=model)
         runner._reasoning_config = reasoning_config
