@@ -6,10 +6,42 @@ from qubit_state_runtime import RuntimeStoreError, admission_fingerprint, mutati
 RETIRED_PREFIX = 'gateway.retired_session.v1.'
 
 
+def retired_in(conn, session_id):
+    return conn.execute('SELECT 1 FROM state_meta WHERE key=?', (RETIRED_PREFIX + session_id,)).fetchone() is not None
+
+
 def retired_session(db, session_id):
     with db._read_ctx() as conn:
-        return conn.execute('SELECT 1 FROM state_meta WHERE key=?',
-                            (RETIRED_PREFIX + session_id,)).fetchone() is not None
+        return retired_in(conn, session_id)
+
+
+def create_conflict(conn, session_id):
+    """``(code, message)`` refusing a create of the explicit *session_id*, else None: a live row, or a
+    deleted (retired) id. A row recreated beside the fence would list fine and refuse every turn."""
+    if conn.execute('SELECT 1 FROM sessions WHERE id=?', (session_id,)).fetchone():
+        return 'session_exists', 'Session already exists'
+    if retired_in(conn, session_id):
+        return 'session_deleted', 'Session was deleted; its id cannot be reused'
+    return None
+
+
+def first_generation(db, derive, *, pinned=None, spent=None):
+    """``(n, derive(n))``: the first generation of a derived session id a NEW request may use. A
+    user-deleted id stays retired for good, so a derived id (header-less chat, Bot Chat, hosted-room
+    member, A2A context) whose session was deleted moves to its next generation, never recreated.
+    ``pinned(conn, sid)`` keeps an exact retry on the retired generation holding its identity;
+    ``spent(conn, sid)`` skips a live one used up another way (a renamed Bot Chat). Read from
+    durable rows only, so a restart and every concurrent caller pick the same id."""
+    generation = 0
+    with db._read_ctx() as conn:
+        while True:
+            sid = derive(generation)
+            if retired_in(conn, sid):
+                if pinned is not None and pinned(conn, sid):
+                    return generation, sid
+            elif spent is None or not spent(conn, sid):
+                return generation, sid
+            generation += 1
 
 
 def has_mutation_receipt(db, principal_id, session_id, request_id):
@@ -28,15 +60,15 @@ def _compact_result(conn, admission_id):
     """A retired result keeps the exact-retry outcome (final response, flags, usage/accounting)
     but not the transcript copies a turn result carries (cumulative ``messages``, reasoning, the
     settled ``_turn_user_row``)."""
-    from qubit_state_terminal import RESULT_PREFIX
+    from qubit_state_terminal import RESULT_PREFIX, encode_result, load_result
     saved = conn.execute('SELECT value FROM state_meta WHERE key=?', (RESULT_PREFIX + admission_id,)).fetchone()
     if saved is None:
         return
-    value = json.loads(saved[0])
+    value = load_result(saved[0])
     result = value.get('result')
     if isinstance(result, dict):
         value['result'] = {**{k: v for k, v in result.items() if k not in _TRANSCRIPT_FIELDS}, 'messages': []}
-    conn.execute('UPDATE state_meta SET value=? WHERE key=?', (_json(value), RESULT_PREFIX + admission_id))
+    conn.execute('UPDATE state_meta SET value=? WHERE key=?', (_json(encode_result(value)), RESULT_PREFIX + admission_id))
 
 
 def retire_terminal_receipts(conn, session_ids):
@@ -87,17 +119,18 @@ _LIVE_LEDGER_SQL = """SELECT 1 FROM session_admissions WHERE target_session_id=?
     UNION ALL SELECT 1 FROM worker_executions WHERE session_id=? AND status IN ('registered','running','unknown') LIMIT 1"""
 
 
-def retire_sessions(conn, session_ids):
+def retire_sessions(conn, session_ids, *, expiring=()):
     """The complete deletion fence for ids that are being deleted in this transaction.
 
     Terminal receipts alone are not enough: without the ``RETIRED_PREFIX`` marker an exact
     retry of a settled request reports ``not_found`` instead of its terminal receipt, a late
     accounting/constructor backfill recreates the deleted row, and the same request is then
     admitted a second time against it. Every delete path (canonical mutate, legacy
-    ``delete_session*``, prunes and sweeps) must publish the whole fence, so it lives here once."""
+    ``delete_session*``, prunes and sweeps) must publish the whole fence, so it lives here once.
+    The marker of an id in *expiring* (a housekeeping sweep's) ages out at the retry horizon."""
     retire_terminal_receipts(conn, session_ids)
     retire_mutation_receipts(conn, session_ids)
-    retire_routes(conn, session_ids)
+    retire_routes(conn, session_ids, expiring=expiring)
     from qubit_state_local import retire_local_receipts
     retire_local_receipts(conn, session_ids)
 
@@ -191,12 +224,20 @@ def entry_session_id(raw):
     return value.get('session_id') if isinstance(value, dict) else None
 
 
-def retire_routes(conn, session_ids):
+def retire_routes(conn, session_ids, *, expiring=()):
     # OR REPLACE: the marker is a fact, not a receipt; re-retiring an id that was recreated
     # beside its tombstone must not abort the delete that removes it again (and restarts its horizon).
+    # An ``expiring`` (sweep) marker ages out at the horizon and never shortens a permanent one.
+    expiring = set(expiring)
     for sid in session_ids:
-        conn.execute('INSERT OR REPLACE INTO state_meta(key,value) VALUES(?,?)',
-                     (RETIRED_PREFIX + sid, json.dumps({'retired_at': time.time()})))
+        if sid in expiring:
+            conn.execute('INSERT INTO state_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE '
+                         "SET value=excluded.value WHERE json_valid(state_meta.value) "
+                         "AND json_extract(state_meta.value, '$.expires')",
+                         (RETIRED_PREFIX + sid, json.dumps({'retired_at': time.time(), 'expires': True})))
+        else:
+            conn.execute('INSERT OR REPLACE INTO state_meta(key,value) VALUES(?,?)',
+                         (RETIRED_PREFIX + sid, json.dumps({'retired_at': time.time()})))
         conn.execute('DELETE FROM state_meta WHERE key=?', ('gateway.api.settings.v1.' + sid,))
     targets = set(session_ids)
     for row in conn.execute('SELECT scope,session_key,entry_json FROM gateway_routing').fetchall():
@@ -211,10 +252,13 @@ _EXPIRED = "json_valid(value) AND json_extract(value, '$.retired_at') < ?"
 
 def prune_retired_tombstones(conn, older_than=RETRY_HORIZON_S):
     """Reclaim deletion tombstones retired more than *older_than* seconds ago: the terminal admission
-    with its identity pointer and compacted result, terminal workers and the retired-session marker.
+    with its identity pointer and compacted result, terminal workers and a sweep's (``expires``)
+    retired-session marker. A user delete's marker is the deletion fence itself and is never
+    reclaimed: it holds only ``retired_at``, and without it a deleted id could be recreated,
+    re-admitted or reissued as a Bot Chat generation.
     Tombstones written before ``retired_at`` existed are stamped now and age from this pass."""
     from qubit_state_terminal import ADMISSION_PREFIX, RESULT_PREFIX, WORKER_PREFIX, identity_key
-    prefixes = (ADMISSION_PREFIX, WORKER_PREFIX, RETIRED_PREFIX)
+    prefixes = (ADMISSION_PREFIX, WORKER_PREFIX)
     now = time.time()
     for prefix in prefixes:
         conn.execute("UPDATE state_meta SET value=json_set(value, '$.retired_at', ?) WHERE key GLOB ? "
@@ -225,5 +269,6 @@ def prune_retired_tombstones(conn, older_than=RETRY_HORIZON_S):
         row = json.loads(raw)
         conn.execute('DELETE FROM state_meta WHERE key IN (?,?,?)', (key, RESULT_PREFIX + row['admission_id'],
                      identity_key(row['principal_id'], row['target_session_id'], row['request_id'])))
-    for prefix in prefixes[1:]:
-        conn.execute(f'DELETE FROM state_meta WHERE key GLOB ? AND {_EXPIRED}', (prefix + '*', cutoff))
+    conn.execute(f'DELETE FROM state_meta WHERE key GLOB ? AND {_EXPIRED}', (WORKER_PREFIX + '*', cutoff))
+    conn.execute(f"DELETE FROM state_meta WHERE key GLOB ? AND {_EXPIRED} AND json_extract(value, '$.expires')",
+                 (RETIRED_PREFIX + '*', cutoff))
