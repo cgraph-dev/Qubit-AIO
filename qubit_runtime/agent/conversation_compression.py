@@ -3670,6 +3670,23 @@ def held_archive_watermark(
     return min(newest_held, watermark)
 
 
+_ATTEMPT_TELEMETRY_FIELDS = (
+    "_last_compression_telemetry", "_active_compression_telemetry", "_compression_telemetry_seed",
+)
+
+
+@contextlib.contextmanager
+def _hold_attempt_telemetry(compressor: Any):
+    """Restore the live attempt's telemetry after a call that may reset it (the memory flush)."""
+    held = tuple(getattr(compressor, name, None) for name in _ATTEMPT_TELEMETRY_FIELDS)
+    try:
+        yield
+    finally:
+        for name, value in zip(_ATTEMPT_TELEMETRY_FIELDS, held):
+            with contextlib.suppress(Exception):
+                setattr(compressor, name, value)
+
+
 def _commit_compaction(
     agent: Any, messages: list, compressed: list, *, in_place: bool, lease: _CompressionLease,
     new_system_prompt: str, system_message: str, compressed_user_turn_outcome: str,
@@ -3693,7 +3710,10 @@ def _commit_compaction(
         try:
             # Memory extraction runs in BOTH modes: pre-compaction turns are summarized
             # away whether or not the id rotates.
-            agent.commit_memory_session(messages)
+            # The engine's session-end reset nulls the in-flight attempt telemetry the success emit
+            # still needs (#118580), so hold it across the call.
+            with _hold_attempt_telemetry(agent.context_compressor):
+                agent.commit_memory_session(messages)
 
             # Pop _compaction_tail tags before the size estimate / rotation: they must not
             # inflate anti-growth or reach the provider. Track ids: salvage may subset list.

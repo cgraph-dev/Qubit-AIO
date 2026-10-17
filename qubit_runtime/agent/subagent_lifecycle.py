@@ -234,6 +234,35 @@ def _handle_is_well_formed(handle: Any) -> bool:
     return isinstance(handle, SubagentHandle) and all(check(getattr(handle, field)) for field, check in _HANDLE_FIELD_CHECKS)
 
 
+def _coerce_request(request: Any) -> SubagentLaunchRequest:
+    if isinstance(request, SubagentLaunchRequest):
+        return request
+    if not isinstance(request, Mapping):
+        raise SubagentLifecycleError("request must be a SubagentLaunchRequest or a mapping of its fields.")
+    values = dict(request)
+    unknown = set(values) - {field.name for field in dataclasses.fields(SubagentLaunchRequest)}
+    if unknown:
+        raise SubagentLifecycleError(f"Unknown request fields: {', '.join(sorted(map(str, unknown)))}.")
+    for name in ("allowed_toolsets", "blocked_tools"):
+        if isinstance(values.get(name), list):
+            values[name] = tuple(values[name])
+    try:
+        return SubagentLaunchRequest(**values)
+    except TypeError as exc:
+        raise SubagentLifecycleError(f"Malformed subagent launch request: {exc}") from exc
+
+
+def _coerce_handle(handle: Any) -> Optional[SubagentHandle]:
+    if isinstance(handle, SubagentHandle):
+        return handle
+    if isinstance(handle, Mapping):
+        try:
+            return SubagentHandle.from_dict(handle)
+        except SubagentLifecycleError:
+            return None
+    return None
+
+
 class SubagentLifecycleService:
     """Stable public service behind :attr:`PluginContext.subagent_lifecycle`. Children run in-process only;
     completed results stay until process exit; ``reconnect`` reports that a serialized handle cannot
@@ -242,10 +271,11 @@ class SubagentLifecycleService:
     def __init__(self, parent_agent_resolver: Callable[[], Any]) -> None:
         self._parent_agent_resolver = parent_agent_resolver
 
-    def launch(self, request: SubagentLaunchRequest) -> SubagentHandle:
+    def launch(self, request: Any) -> SubagentHandle:
         parent = self._parent_agent_resolver()
         if parent is None:
             raise SubagentLifecycleError("No active Qubit parent session is available.")
+        request = _coerce_request(request)
         self._validate_request(request, parent)
         parent_session_id = _session_id_of(parent)
         if request.parent_session_id and request.parent_session_id != parent_session_id:
@@ -325,15 +355,16 @@ class SubagentLifecycleService:
         with _REGISTRY.lock:
             return record.result or SubagentResult(record.handle, record.state, False, error_classification="NOT_READY")
 
-    def reconnect(self, handle: SubagentHandle) -> SubagentReconnectResult:
+    def reconnect(self, handle: Any) -> SubagentReconnectResult:
         record = self._record(handle)
         if record is None:
             return SubagentReconnectResult(False, SubagentState.UNKNOWN, "RECONNECT_UNAVAILABLE")
         with _REGISTRY.lock:
             return SubagentReconnectResult(True, record.state)
 
-    def _record(self, handle: SubagentHandle) -> Optional[_Record]:
+    def _record(self, handle: Any) -> Optional[_Record]:
         """Registry record for a well-formed, capability-verified handle owned by the active parent."""
+        handle = _coerce_handle(handle)
         if not _handle_is_well_formed(handle):
             return None
         expected = self._capability(handle.subagent_id, handle.parent_session_id, handle.created_at)
