@@ -308,6 +308,11 @@ def model_profile_overrides(cfg: Any, profile_id: str) -> Dict[str, Any]:
     return out
 
 
+DEFAULT_MAX_PROMPT_CHARS = 8000
+"""Ceiling for the FULL assembled local user turn (see local_llm
+``_max_prompt_chars`` / ``intent.local_llm.max_prompt_chars``). The import-time
+default; the config key is the authority at runtime."""
+
 DEFAULTS: Dict[str, Any] = {
     # Speech input selection. Read-only setting for the /qubit-chat voice UI;
     # the frontend reads ``voice.input_engine`` to choose Chrome
@@ -527,6 +532,13 @@ DEFAULTS: Dict[str, Any] = {
             "url": "http://127.0.0.1:11434",
             "timeout_s": 8.0,           # local model chat timeout (was 4s — real 4s timeouts in the journal)
             "max_tokens": 100,         # local reply cap (short answers only)
+            # Hard ceiling on the FULL assembled local user turn (compiled
+            # context + instructions + the user's own text). The raw user text
+            # has its own bound (chat_transport MAX_TEXT_CHARS); this bounds
+            # what the assembly can grow to, so an oversized prompt is trimmed
+            # (context first, question kept) instead of reaching a provider or
+            # runner that rejects it. See local_llm._max_prompt_chars.
+            "max_prompt_chars": 8000,
         },
         # Packet 8R: supervised OpenCode coding adapter. DISABLED BY DEFAULT.
         # Master switch (packaged default False) ANDs with the state-file user

@@ -367,7 +367,12 @@ def _user_content(text: str, conversation_prompt: str, context: str,
     # Packet 4B repair round: Qwen3 soft no-think switch — this quant honors
     # it ONLY as a literal in the user turn text, so the shared payload
     # builder appends it (template/system-side insertion proved unreliable).
-    return user_content + f"\nUser: {text} /no_think"
+    # Ceiling: the FULL assembled turn (context + instructions + question) is
+    # bounded here — the one choke point shared by both payload paths — so an
+    # oversized prompt is trimmed (context first, question kept) instead of
+    # reaching a provider/runner that would reject it and kill the session.
+    return _trim_prompt_keep_question(user_content + f"\nUser: {text} /no_think",
+                                      text)
 
 
 _STYLE_CACHE: Dict[str, Any] = {}
@@ -381,6 +386,11 @@ def reset_style_cache() -> None:
     in-flight state.
     """
     _STYLE_CACHE.clear()
+    from .context_compiler import _reset_compiler_cache as _drop_compiler
+    try:
+        _drop_compiler()
+    except Exception:  # noqa: BLE001 - style reset must not raise
+        pass
 
 
 def _local_style() -> "tuple[float, bool]":
@@ -406,6 +416,65 @@ def _local_style() -> "tuple[float, bool]":
         pass
     _STYLE_CACHE["v"] = (temp, think)
     return temp, think
+
+
+def _max_prompt_chars() -> int:
+    """Ceiling (chars) for the FULL assembled local user turn.
+
+    ``intent.local_llm.max_prompt_chars`` (default 8000). Read per call — a
+    config edit takes effect on the next turn with no restart — and never
+    cached in :data:`_STYLE_CACHE`, which only holds the style snapshot.
+    A malformed or non-positive value falls back to the default so a typo can
+    neither disable the ceiling nor wedge a turn.
+    """
+    from .config import DEFAULT_MAX_PROMPT_CHARS
+    try:
+        from .config import Config
+        raw = Config.load().get("intent", "local_llm", "max_prompt_chars",
+                                default=DEFAULT_MAX_PROMPT_CHARS)
+        value = int(raw)
+    except Exception:  # noqa: BLE001 - the default is safe
+        return DEFAULT_MAX_PROMPT_CHARS
+    return value if value > 0 else DEFAULT_MAX_PROMPT_CHARS
+
+
+def _trim_prompt_keep_question(user_content: str, text: str) -> str:
+    """Enforce the ceiling on an assembled user turn, preserving the question.
+
+    The turn is ``[compiled context + instructions] + "\\nUser: {text} /no_think"``.
+    ``text`` was already bounded upstream (chat_transport MAX_TEXT_CHARS), so
+    the CONTEXT portion is what can push the assembly over a provider's limit.
+    When the whole string exceeds ``_max_prompt_chars()`` the context head is
+    dropped and the user's own tail kept intact, with a marker saying how much
+    was dropped. Under the ceiling the string is returned unchanged
+    (byte-for-byte).
+    """
+    limit = _max_prompt_chars()
+    original = len(user_content)
+    if original <= limit:
+        return user_content
+    tail = "\nUser: " + text + " /no_think"
+    if user_content.endswith(tail):
+        head = user_content[: original - len(tail)]
+    else:
+        # Unknown shape: keep the ceiling authoritative rather than guess.
+        head = user_content[:original]
+        tail = ""
+    keep = limit - len(tail)
+    if keep <= min(200, len(head)):
+        # The question alone already fills the budget: the ceiling wins, the
+        # question is cut — logging it makes that visible instead of silent.
+        trimmed = (head + tail)[:limit]
+        dropped = original - len(trimmed)
+    else:
+        marker = "\n[... context trimmed ...]"
+        keep = max(0, keep - len(marker))
+        dropped = len(head) - keep
+        trimmed = head[:keep] + marker + tail
+    log_event("runner.prompt.trimmed", original_chars=original,
+              sent_chars=len(trimmed), limit=limit,
+              context_dropped_chars=dropped, question_chars=len(text))
+    return trimmed
 
 
 def _chat_payload(text: str, conversation_prompt: str, model: str,
