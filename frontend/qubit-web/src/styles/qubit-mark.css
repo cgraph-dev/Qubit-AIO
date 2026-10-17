@@ -325,55 +325,203 @@
   animation: qubit-brand-sheen 7s ease-in-out infinite;
 }
 
-/* ---------- Spark field behind the wordmark ----------
+/* ---------- Orbital spark cloud around the wordmark ----------
  *
- * Twelve dots pinned to the text box, each drifting outward and fading. The
- * field is absolutely positioned across the label so it stretches with whatever
- * the active locale says. Decorative: aria-hidden upstream, inert to pointers.
+ * The mark reads as a qubit with particles on tilted ellipses; this continues
+ * that language across the text. Two orbit planes are threaded through the
+ * wordmark — a far plane behind the letters and a near plane in front — so the
+ * cloud genuinely wraps the label instead of sitting in a flat layer.
+ *
+ * The 3D is built from cheap 2D primitives, all on the compositor:
+ *
+ *   .qbrand-sparks__orbit  spins a whole ellipse about the label centre.
+ *   .qbrand-sparks__dot    is placed on that ellipse at its own seed angle
+ *                          (rotate + translateX in its inline base transform)
+ *                          and runs the depth cycle: scale + opacity down as it
+ *                          swings to the far half, up as it comes forward.
+ *   .qbrand-sparks__plane  fixes the stacking level per plane.
+ *
+ * WHY the seed angle matters: a dot pinned at (centre + radius) inside a
+ * rotating group would put every spark on the same coordinate at t=0 and the
+ * group would just spin around the pile. The seed rotation in the base
+ * transform is what distributes them.
  */
 .qbrand-sparks {
   position: absolute;
-  inset: -35% -6%;
+  /* Generous inset: the orbit radii below are in px, measured from the label
+   * centre, so the field box has to be visibly larger than the text or the
+   * widest far orbit gets clipped by the label. */
+  inset: -160% -140%;
   overflow: visible;
   pointer-events: none;
+  /* Establishes the stacking context the planes index into. */
   z-index: 0;
 }
 
+/* Each plane is a full-size, non-hit-testing layer inside the field. The plane
+ * is also where the STATIC ellipse tilt lives: it must not share the transform
+ * property with the spinning group, or the inline tilt would be overridden by
+ * the orbit animation for its whole duration. Two elements, two jobs. */
+.qbrand-sparks__plane {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Far plane: below the label fill (the label's chromatic pseudo-copies sit at
+ * z-index -1 inside the wordmark's stacking context, the text fill at 1). */
+.qbrand-sparks__plane--far {
+  z-index: -1;
+  /* Tilt only. The per-spark squash lives on each orbit group, because ry/rx
+   * differs per spark and this plane is shared. */
+  transform: rotate(var(--spark-tilt, 0deg));
+}
+
+/* Near plane: above the label fill, so a few sparks visibly cross the letters.
+ * Opposite tilt to the far plane — that opposition is what stops the two arcs
+ * reading as one flat ring. */
+.qbrand-sparks__plane--near {
+  z-index: 2;
+  transform: rotate(var(--spark-tilt, 0deg));
+}
+
+/* Orbit group: a zero-size box at the centre of the label. The orbit animation
+ * spins it about that centre. */
+.qbrand-sparks__orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  animation-name: qubit-brand-orbit;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+/* Dot: positioned relative to its zero-size orbit box, then carried out to the
+ * ellipse edge by its inline `rotate(seed) translateX(rx) scaleY(...)`.
+ * `transform-origin: 0 0` makes that offset resolve from the centre.
+ *
+ * IMPORTANT: the depth animation also animates `transform`, and CSS animations
+ * on one property do not stack — a running animation REPLACES the element's
+ * declared transform. That is why the orbital placement cannot live here: it
+ * would be wiped the instant the depth cycle starts and every spark would
+ * collapse toward the centre. The placement therefore sits on the parent
+ * `.qbrand-sparks__orbit` (static, inline) and this element only owns scale. */
 .qbrand-sparks__dot {
   position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
   border-radius: 50%;
   background: var(--qsidebar-accent, currentColor);
   opacity: 0;
-  animation-name: qubit-brand-spark;
-  animation-timing-function: ease-out;
+  animation-name: qubit-brand-depth;
+  animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
   will-change: transform, opacity;
 }
 
-@keyframes qubit-brand-spark {
+.qbrand-sparks__place {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  /* No animation here on purpose: this element owns the spark's fixed orbital
+   * position, so nothing may replace its transform. */
+}
+
+
+.qbrand-sparks__unsquash {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: center;
+  /* Undoes the path squash so the particle stays circular. Centred origin so
+   * the correction pivots on the dot rather than dragging it off its path. */
+  margin-left: -0.5px;
+  margin-top: -0.5px;
+}
+
+.qbrand-sparks__path {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  /* Squashes the travel path into an ellipse. Kept separate from the place
+   * wrapper so the squash does not also flatten the particle itself. */
+}
+
+/* Near sparks keep a touch of glow so they read as closer to the viewer; the
+ * far plane deliberately has none so it recedes instead of crowding the text. */
+.qbrand-sparks__dot--near {
+  box-shadow: 0 0 6px color-mix(in srgb, var(--qsidebar-accent, currentColor) 65%, transparent);
+}
+
+/* One revolution of the orbit group about the label centre.
+ *
+ * The `from` state is `none`, NOT a rotation: the group's static ellipse tilt
+ * already arrives as an inline `transform`. An inline transform beats a
+ * stylesheet keyframe for the whole animation while one is running, so baking
+ * the tilt into the keyframes would either be ignored or fight the inline
+ * value. Starting from `none` and ending at 360deg means the keyframe's rotate
+ * composes over nothing, and 360deg is visually identical to 0 — the visual
+ * jump at the loop point is zero even though the declared start differs. */
+@keyframes qubit-brand-orbit {
+  from {
+    transform: none;
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Depth cycle: one period == half a revolution, so a spark reaches full size
+ * and brightness on the near half of its ellipse and bottoms out exactly as it
+ * crosses to the far half. Only scale and opacity animate — never layout.
+ *
+ * The depth transform deliberately does NOT carry the orbital offset. That
+ * offset is a second animated transform on the same element (the dot's inline
+ * rotate/translateX/scaleY), and CSS animations on one property do not stack:
+ * the real stack is one wrapper per axis. So the dot keeps its orbital
+ * placement untouched and the depth only changes its own scale — the spark
+ * grows and recedes in place on the ellipse, which is exactly the parallax
+ * cue the eye reads as depth. */
+@keyframes qubit-brand-depth {
   0% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) scale(0.4);
+    /* Furthest point: small and faint. */
+    opacity: var(--spark-floor, 0.1);
+    /* The inverse squash rides along inside the scale: the keyframe owns
+     * `transform` outright, so the counter-scale has to be part of it or it
+     * would be discarded and the particle would flatten to a sliver. */
+    transform: scale(0.5) scaleY(var(--spark-unsquash, 1));
   }
-  18% {
-    opacity: 0.95;
-    transform: translate3d(calc(var(--spark-drift, 0px) * 0.2), -2px, 0) scale(1);
-  }
-  70% {
-    opacity: 0.4;
+  50% {
+    /* Nearest point: full size, and as bright as the plane allows. */
+    opacity: var(--spark-peak, 0.9);
+    transform: scale(1.2) scaleY(var(--spark-unsquash, 1));
   }
   100% {
-    opacity: 0;
-    transform: translate3d(var(--spark-drift, 0px), -7px, 0) scale(0.5);
+    opacity: var(--spark-floor, 0.1);
+    transform: scale(0.5) scaleY(var(--spark-unsquash, 1));
   }
 }
 
-/* Hover: the field energises — sparks run faster and brighter. */
-.qagent-sidebar__brand-row:hover .qbrand-sparks__dot,
-.qagent-sidebar__brand-row:focus-within .qbrand-sparks__dot {
-  animation-duration: 1.9s;
+/* Hover: the cloud energises — the orbits speed up and the near plane brightens
+ * a little further, so the effect reads as interest rather than stillness. */
+.qagent-sidebar__brand-row:hover .qbrand-sparks__orbit,
+.qagent-sidebar__brand-row:focus-within .qbrand-sparks__orbit {
+  animation-duration: 5.6s;
 }
 
+.qagent-sidebar__brand-row:hover .qbrand-sparks__dot,
+.qagent-sidebar__brand-row:focus-within .qbrand-sparks__dot {
+  animation-duration: 2.8s;
+}
+
+.qbrand-sparks__orbit,
 .qbrand-sparks__dot {
   transition: animation-duration 320ms ease;
 }
