@@ -15,7 +15,7 @@ import sqlite3
 from contextlib import closing
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Callable, Literal, get_args
+from typing import Any, Callable, Literal, Mapping, get_args
 
 from gateway.hosted_rooms_common import (
     DbPath, bounded_int, canonical_json, compact_json, connect, fenced_update, identifier, table_columns, text,
@@ -140,6 +140,23 @@ def _lease_window(ttl_seconds: Any, clock: Clock) -> tuple[float, float]:
     if not math.isfinite(now + ttl):
         raise DriverValidationError("lease expiry must be finite")
     return now, now + ttl
+
+
+def validate_bound_task_manifest(value: Any) -> list[dict[str, Any]]:
+    """Validate store metadata plus the exact source event for each task input."""
+    from gateway.hosted_room_attachments import validate_task_manifest
+
+    if not isinstance(value, list) or not value:
+        raise DriverValidationError("attachments must be a non-empty list")
+    if any(not isinstance(item, Mapping) or "event_id" not in item for item in value):
+        raise DriverValidationError("task attachment requires event_id")
+    event_ids = [_identifier(item["event_id"], label="attachment event_id") for item in value]
+    try:
+        manifest = validate_task_manifest([
+            {key: val for key, val in item.items() if key != "event_id"} for item in value])
+    except ValueError as exc:
+        raise DriverValidationError(str(exc)) from exc
+    return [{**item, "event_id": event_id} for item, event_id in zip(manifest, event_ids)]
 
 
 def _task_payload(value: Any) -> tuple[dict[str, Any], str, str]:
@@ -857,3 +874,21 @@ def prune_published_terminal_tasks(
             f"DELETE FROM hosted_room_driver_tasks WHERE room_id=? AND task_id IN ({','.join('?' * len(candidates))})",
             (room_id, *candidates))
         return max(0, int(deleted.rowcount))
+
+
+
+def get_task_for_turn(
+    db_path: DbPath,
+    identity: TaskIdentity,
+) -> dict[str, Any] | None:
+    """Read the immutable admission for a turn, including older payload versions."""
+    conn = _connect(db_path)
+    try:
+        row = conn.execute(
+            """SELECT * FROM hosted_room_driver_tasks
+               WHERE room_id=? AND thread_id=? AND turn_id=?""",
+            (identity.room_id, identity.thread_id, identity.turn_id),
+        ).fetchone()
+        return _task_from_row(row) if row is not None else None
+    finally:
+        conn.close()
