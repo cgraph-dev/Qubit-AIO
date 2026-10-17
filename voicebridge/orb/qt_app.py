@@ -32,6 +32,7 @@ from . import client as _client
 from . import activity as _activity
 from . import ember as _ember
 from . import mark as _mark
+from . import mark_field as _field
 from . import fullscreen as _fs
 from . import geometry as _geo
 from . import monitors as _mon
@@ -206,19 +207,18 @@ def mark_sparkles(t: Any) -> List[Tuple[int, float, float, float, float, float, 
 
 def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 state: Any, brightness: float, family: Any) -> None:
-    """Paint the Qubit mark: hairline orbits + beating nucleus + particles.
+    """Paint the Qubit mark from the shared rich animation field.
 
-    Same construction as the dashboard sidebar logo (QubitMark.tsx) and the Tk
-    ``voicebridge.orb.mark`` renderer, which own the geometry constants — this
-    only translates them to QPainter. Qt has real alpha and rotated paths, so
-    the chromatic fringe is three offset pens instead of colour mixing, and the
-    ellipse is a rotated path rather than a sampled polyline.
+    The geometry, motion and depth of every layer come from
+    :mod:`voicebridge.orb.mark_field` — the ONE deterministic description
+    shared with the Tk renderer. This function only translates field output
+    to QPainter: hairline fringed orbits, a z-split particle field (far
+    elements behind the nucleus, near elements in front), tapered trails,
+    dust, glints, one comet, the beat shockwave and the beating nucleus.
 
-    Life is layered on without the retired glow-sticker look: the nucleus has a
-    lub-dub heartbeat with a thin halo ring, each particle gets a depth-derived
-    size/alpha/lift with a parallax nudge and a short trail, and deterministic
-    sparkles glint across the near plane. Everything still reads as a crisp
-    hairline; there are no gradient or blur fills.
+    The look stays a crisp hairline construction: rings are stroked paths
+    (never gradient or blur fills), beads are small filled circles, and
+    reduced motion paints a completely static, sparkle-free frame.
     """
     from PySide6.QtCore import QRectF
     from PySide6.QtGui import QColor, QPainterPath, QPen
@@ -229,25 +229,42 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         except (TypeError, ValueError):
             return 0
 
+    def _num(v: Any, default: float) -> float:
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return default
+        return f if math.isfinite(f) else default
+
     fam = family if isinstance(family, dict) else {}
-    core = tuple(_clamp8(v) for v in (fam.get("core") or (255, 84, 0)))
-    rx = R * _mark.RX_FRAC
-    ry = R * _mark.RY_FRAC
+    core = (255, 84, 0)
+    raw_core = fam.get("core")
+    if isinstance(raw_core, (tuple, list)) and len(raw_core) >= 3:
+        core = tuple(_clamp8(v) for v in raw_core[:3])
+
+    Rf = _num(R, 32.0)
+    if Rf <= 0.0:
+        Rf = 32.0
+    rx = Rf * _field.RX_FRAC
+    ry = Rf * _field.RY_FRAC
     ring_w = 1.1
-    # A lens fringe is a PIXEL effect: scaling it with the radius drew
-    # three separate rainbow rings instead of one fringed hairline.
-    fringe = _mark.FRINGE_PX_AT_96 * 0.7
+    # A lens fringe is a PIXEL effect (fixed offset), never scaled with R.
+    fringe = _field.FRINGE_PX * 0.7
     # The sidebar mark is a BRIGHT near-white hairline with a chromatic
     # hint, not a dim state tint: lift luminance hard and use the state hue
     # only as the tint. Idle must never read as "almost off".
-    bright = max(_mark.MIN_MARK_BRIGHTNESS, float(brightness or 0.0))
-    def _lift(amount: float):
+    bright = max(_field.MIN_MARK_BRIGHTNESS, _num(brightness, 1.0))
+
+    def _lift(amount: float) -> Tuple[int, int, int]:
+        a = max(0.0, min(1.0, _num(amount, 0.0)))
         return (
-            _clamp8(core[0] + (255 - core[0]) * amount),
-            _clamp8(core[1] + (255 - core[1]) * amount),
-            _clamp8(core[2] + (255 - core[2]) * amount),
+            _clamp8(core[0] + (255 - core[0]) * a),
+            _clamp8(core[1] + (255 - core[1]) * a),
+            _clamp8(core[2] + (255 - core[2]) * a),
         )
-    ring_rgb = _lift(_mark.LIFT_RING)
+
+    ring_rgb = _lift(_field.LIFT_RING)
+    nuc_rgb = _lift(_field.LIFT_NUCLEUS)
 
     def _ring(tilt_deg: float, alpha: float) -> None:
         rect = QRectF(cx - rx, cy - ry, rx * 2, ry * 2)
@@ -267,7 +284,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # The CSS mark fringes with a BLURRED drop shadow. A crisp offset
         # stroke reads as a second line (a rainbow outline); a wide, very
         # translucent one reads as the soft chromatic halo the logo has.
-        for dx, col in ((fringe, QColor(255, 45, 85)), (-fringe, QColor(45, 130, 255))):
+        for dx, col in ((fringe, QColor(255, 45, 85)),
+                        (-fringe, QColor(45, 130, 255))):
             pen = QPen(col, ring_w * 2.6)
             pen.setColor(QColor(col.red(), col.green(), col.blue(),
                                 int(255 * min(1.0, alpha * bright * 0.16))))
@@ -276,105 +294,128 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             p.drawPath(rotated)
             p.translate(-dx, 0.0)
         pen = QPen(QColor(ring_rgb[0], ring_rgb[1], ring_rgb[2],
-                          int(255 * min(1.0, alpha * bright * 1.15))), ring_w * 1.15)
+                          int(255 * min(1.0, alpha * bright * 1.15))),
+                   ring_w * 1.15)
         p.setPen(pen)
         p.drawPath(rotated)
 
-    def _bead(x: float, y: float, rad: float, alpha: float,
-              toward_white: float) -> None:
-        c = QColor(
-            _clamp8(core[0] + (255 - core[0]) * toward_white),
-            _clamp8(core[1] + (255 - core[1]) * toward_white),
-            _clamp8(core[2] + (255 - core[2]) * toward_white),
-            _clamp8(255 * max(0.0, min(1.0, alpha))),
-        )
+    def _dot(x: float, y: float, rad: float, alpha: float,
+             rgb: Tuple[int, int, int]) -> None:
+        a = _num(alpha, 0.0)
+        r = _num(rad, 0.0)
+        if a <= 0.0 or r <= 0.0:
+            return
         p.setPen(Qt.NoPen)
-        p.setBrush(c)
-        p.drawEllipse(x - rad, y - rad, rad * 2, rad * 2)
+        p.setBrush(QColor(rgb[0], rgb[1], rgb[2],
+                          _clamp8(255.0 * min(1.0, a))))
+        p.drawEllipse(x - r, y - r, r * 2.0, r * 2.0)
+
+    def _outline(radius: float, rgb: Tuple[int, int, int], alpha: float,
+                 width: float) -> None:
+        a = _num(alpha, 0.0)
+        if a <= 0.0 or radius <= 0.0:
+            return
+        path = QPainterPath()
+        path.addEllipse(QRectF(cx - radius, cy - radius,
+                               radius * 2.0, radius * 2.0))
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
+                             _clamp8(255.0 * min(1.0, a))), width))
+        p.drawPath(path)
+        p.setPen(Qt.NoPen)
+
+    def _particle(part: Dict[str, Any], draw_trails: bool) -> None:
+        bead_lift = _num(part.get("lift"), _field.LIFT_BEAD)
+        px = cx + _num(part.get("x"), 0.0)
+        py = cy + _num(part.get("y"), 0.0)
+        if draw_trails:
+            # Trails taper: each sample carries its own size/alpha; slightly
+            # less white-lift than the bead keeps the head reading brightest.
+            trail_rgb = _lift(max(0.0, bead_lift - 0.06))
+            for smp in _field.trails(tt, Rf, part):
+                _dot(cx + smp["x"], cy + smp["y"],
+                     _num(smp.get("size"), 0.0),
+                     _num(smp.get("alpha"), 0.0) * bright, trail_rgb)
+        _dot(px, py, max(0.35, _num(part.get("size"), 0.0)),
+             _num(part.get("alpha"), 0.0) * bright, _lift(bead_lift))
+
+    def _dust(mote: Dict[str, Any]) -> None:
+        _dot(cx + mote["x"], cy + mote["y"],
+             max(0.25, _num(mote.get("size"), 0.0)),
+             _num(mote.get("alpha"), 0.0) * bright, _lift(mote.get("lift")))
+
+    def _sparkle(glint: Dict[str, Any]) -> None:
+        _dot(cx + glint["x"], cy + glint["y"],
+             max(0.3, _num(glint.get("size"), 0.0)),
+             _num(glint.get("alpha"), 0.0) * bright,
+             _lift(glint.get("lift")))
+
+    def _comet(traveller: Dict[str, Any]) -> None:
+        if _num(traveller.get("alpha"), 0.0) <= 0.0:
+            return  # outside its sweep the field reports alpha 0
+        rgb = _lift(_num(traveller.get("lift"), 0.0))
+        for smp in traveller.get("trail") or []:
+            _dot(cx + smp["x"], cy + smp["y"],
+                 _num(smp.get("size"), 0.0),
+                 _num(smp.get("alpha"), 0.0) * bright, rgb)
+        _dot(cx + _num(traveller.get("x"), 0.0),
+             cy + _num(traveller.get("y"), 0.0),
+             max(0.4, _num(traveller.get("size"), 0.0)),
+             _num(traveller.get("alpha"), 0.0) * bright, rgb)
 
     tt = _mark_tt(t)
     reduced = _reduced_motion()
-    beat = 0.0 if reduced else heartbeat_envelope(tt)
+    near_tilt, far_tilt = _field.orbit_tilts(tt)
 
-    far_tilt = _mark.TILT_B + _mark.RING_SWAY_DEG * math.sin(
-        tt * 2.0 * math.pi / _mark.RING_PERIOD_FAR)
-    near_tilt = _mark.TILT_A + _mark.RING_SWAY_DEG * math.sin(
-        tt * 2.0 * math.pi / _mark.RING_PERIOD_NEAR)
-    nuc_base = max(1.1, R * _mark.NUCLEUS_FRAC) * (0.95 + 0.05 * bright)
-    nuc_r = nuc_base * (1.0 + HEART_SCALE_AMP * beat)
+    parts = _field.particle_state(tt, Rf)
+    dust = [] if reduced else _field.dust_state(tt, Rf)
+    glints = [] if reduced else _field.sparkles(tt, Rf)
+    traveller = None if reduced else _field.comet(tt, Rf)
+    draw_trails = not reduced
 
-    layers = mark_particle_layers(tt)
-
-    def _depth_offset(px_: float, py_: float, depth: float) -> Tuple[float, float]:
-        # Parallax: the far side sits slightly inside, the near side out.
-        dx_ = px_ - cx
-        dy_ = py_ - cy
-        dist = math.hypot(dx_, dy_)
-        if dist <= 1e-6:
-            return (px_, py_)
-        off = (depth - 0.5) * DEPTH_PARALLAX * R
-        return (px_ + dx_ / dist * off, py_ + dy_ / dist * off)
-
-    def _bead_depth(orbit: str, seed: float, bead_r: float, dur: float,
-                    angle: float) -> None:
-        tilt = near_tilt if orbit == "a" else far_tilt
-        depth = 0.5 + 0.5 * math.cos(math.radians(angle))
-        bx, by = _mark._orbit_point(cx, cy, rx, ry, tilt, angle)
-        bx, by = _depth_offset(bx, by, depth)
-        rad = max(0.45, bead_r * (R / 32.0) * (DEPTH_RADIUS_MIN
-                                               + DEPTH_RADIUS_GAIN * depth))
-        alpha = DEPTH_ALPHA_MIN + DEPTH_ALPHA_GAIN * depth
-        lift = DEPTH_LIFT_MIN + DEPTH_LIFT_GAIN * depth
-        if not reduced:
-            # Trails: a short fading arc behind the motion, same hue, smaller.
-            step = TRAIL_STEP_NEAR_DEG if orbit == "a" else TRAIL_STEP_FAR_DEG
-            for k in range(1, TRAIL_SAMPLES + 1):
-                ta = angle - k * step
-                tdepth = 0.5 + 0.5 * math.cos(math.radians(ta))
-                tx, ty = _mark._orbit_point(cx, cy, rx, ry, tilt, ta)
-                tx, ty = _depth_offset(tx, ty, tdepth)
-                talpha = (TRAIL_ALPHA_BASE * (1.0 - k / float(TRAIL_SAMPLES))
-                          * (DEPTH_ALPHA_MIN + DEPTH_ALPHA_GAIN * tdepth))
-                if talpha > 0.0:
-                    _bead(tx, ty, rad * TRAIL_RADIUS_MULT, talpha, lift)
-        _bead(bx, by, rad, alpha, lift)
-
-    # ---- far field (behind the nucleus), then nucleus, then near field ----
+    # ---- far field (depth < 0.5), behind the nucleus ---------------------
     _ring(far_tilt, 0.60)
-    for idx, layer, ang, _depth in layers:
-        if layer != "far":
-            continue
-        orbit, seed, bead_r, dur = _mark.PARTICLES[idx]
-        _bead_depth(orbit, seed, bead_r, dur, ang)
+    for mote in dust:
+        if mote["depth"] < 0.5:
+            _dust(mote)
+    for part in parts:
+        if part["depth"] < 0.5:
+            _particle(part, draw_trails)
+    for glint in glints:
+        if glint["depth"] < 0.5:
+            _sparkle(glint)
+    if (traveller is not None
+            and _num(traveller.get("depth"), 1.0) < 0.5):
+        _comet(traveller)
 
-    # Sparkles sit on the near plane but behind the nucleus, so the nucleus
-    # still reads on top; deterministic positions, no random module.
-    if not reduced:
-        for _i, r_frac, ang, _phase, _fade, size, alpha in mark_sparkles(tt):
-            s_rx = R * r_frac
-            s_ry = s_rx * (_mark.RY_FRAC / _mark.RX_FRAC)
-            sx, sy = _mark._orbit_point(cx, cy, s_rx, s_ry, near_tilt, ang)
-            _bead(sx, sy, size, alpha, SPARKLE_LIFT)
-
+    # ---- the z-seam: shockwave, halo, nucleus ----------------------------
+    beat = 0.0 if reduced else _field.heartbeat(tt)
+    nuc_scale = 1.0 if reduced else _field.nucleus_scale(tt)
+    nuc_r = Rf * _field.NUCLEUS_FRAC * nuc_scale
+    sw_scale, sw_alpha = (0.0, 0.0) if reduced else _field.shockwave(tt)
+    if sw_alpha > 0.0:
+        # One thin expanding ring per beat: stroke only, never a fill/glow.
+        _outline(nuc_r * sw_scale, nuc_rgb, sw_alpha,
+                 _field.SHOCKWAVE_WIDTH)
     if beat > 0.0:
-        # Thin halo ring, its alpha riding the beat; no blur/gradient fill.
-        halo_a = int(255 * max(0.0, min(1.0, HALO_ALPHA_MAX * beat)))
-        if halo_a > 0:
-            hr, hg, hb = _lift(_mark.LIFT_NUCLEUS)
-            halo_r = nuc_r * HALO_RADIUS_MULT
-            p.setBrush(Qt.NoBrush)
-            p.setPen(QPen(QColor(hr, hg, hb, halo_a), 1.0))
-            p.drawEllipse(cx - halo_r, cy - halo_r, halo_r * 2, halo_r * 2)
-            p.setPen(Qt.NoPen)
+        _outline(nuc_r * _field.HALO_SCALE, nuc_rgb,
+                 _field.HALO_BASE * beat, 1.0)
+    _dot(cx, cy, nuc_r, 1.0, nuc_rgb)
 
-    _bead(cx, cy, nuc_r, 0.82 + 0.18 * beat, _mark.LIFT_NUCLEUS)
-
+    # ---- near field (depth >= 0.5), in front of the nucleus --------------
     _ring(near_tilt, 0.95)
-    for idx, layer, ang, _depth in layers:
-        if layer != "near":
-            continue
-        orbit, seed, bead_r, dur = _mark.PARTICLES[idx]
-        _bead_depth(orbit, seed, bead_r, dur, ang)
+    for mote in dust:
+        if mote["depth"] >= 0.5:
+            _dust(mote)
+    for part in parts:
+        if part["depth"] >= 0.5:
+            _particle(part, draw_trails)
+    for glint in glints:
+        if glint["depth"] >= 0.5:
+            _sparkle(glint)
+    if (traveller is not None
+            and _num(traveller.get("depth"), 0.0) >= 0.5):
+        _comet(traveller)
 
 
 def backend_wanted() -> str:
