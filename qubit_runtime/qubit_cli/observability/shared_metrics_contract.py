@@ -13,6 +13,7 @@ from agent.relay_runtime import (
     RUNTIME_SCHEMA_VERSION,
 )
 from qubit_cli.platforms import PLATFORMS
+from tools.connectors.gateway.names import CONNECTOR_NAME_PREFIX
 from toolsets import BUILTIN_TOOL_NAMES, BUILTIN_TOOLSET_NAMES
 
 SCHEMA_KEY = "qubit.metrics.schema_version"
