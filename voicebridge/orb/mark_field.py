@@ -29,8 +29,8 @@ import math
 from typing import Any, Dict, List, Tuple
 
 # ---------------------------------------------------------------- geometry
-RX_FRAC = 0.72
-RY_FRAC = 0.28
+RX_FRAC = 0.70
+RY_FRAC = 0.34
 TILT_A = 30.0   # near field
 TILT_B = -30.0  # far field
 NUCLEUS_FRAC = 0.050
@@ -70,9 +70,13 @@ CAMERA_SPEED_Y = 0.19
 PRECESSION_DEG = 30.0
 PRECESSION_PERIOD_NEAR = 15.0
 PRECESSION_PERIOD_FAR = 21.0
-RING_SWAY_DEG = 6.0
-RING_PERIOD_NEAR = 23.0
-RING_PERIOD_FAR = 31.0
+RING_SWAY_DEG = 3.0
+#: FULL-TURN periods. The orbits must ROTATE like an atom's shells, not sway
+#: like a pendulum: a sine precession swings back and forth and reads as
+#: pendulum motion. Counter-rotating (near +, far -) at non-harmonic periods,
+#: so the pair keeps crossing in new places without ever locking.
+RING_PERIOD_NEAR = 12.0
+RING_PERIOD_FAR = 17.0
 #: Per-particle wobble: a bounded PHASE offset in degrees, never a clock
 #: multiplier (a multiplier makes the field accelerate with uptime).
 SPEED_MOD_AMP = 0.10
@@ -201,14 +205,20 @@ def camera_offset(t: Any, R: float) -> Tuple[float, float]:
 
 
 def orbit_tilts(t: Any) -> Tuple[float, float]:
-    """(near, far) orbit tilts including a slow precession + gentle sway."""
+    """(near, far) orbit tilts: continuous COUNTER-ROTATION, atom-style.
+
+    Each shell makes full turns about the nucleus (near clockwise, far
+    anticlockwise) at non-harmonic periods, plus a small sway so the motion is
+    organic rather than mechanical. A sine-only precession swung back and
+    forth and read as a pendulum, which is not what an atom does.
+    """
     tt = _finite(t)
     near = (TILT_A
-            + RING_SWAY_DEG * math.sin(tt * 2.0 * math.pi / RING_PERIOD_NEAR)
-            + PRECESSION_DEG * math.sin(tt * 2.0 * math.pi / PRECESSION_PERIOD_NEAR))
+            + 360.0 * tt / RING_PERIOD_NEAR
+            + RING_SWAY_DEG * math.sin(tt * 2.0 * math.pi / PRECESSION_PERIOD_NEAR))
     far = (TILT_B
-           + RING_SWAY_DEG * math.sin(tt * 2.0 * math.pi / RING_PERIOD_FAR)
-           - PRECESSION_DEG * math.sin(tt * 2.0 * math.pi / PRECESSION_PERIOD_FAR))
+           - 360.0 * tt / RING_PERIOD_FAR
+           + RING_SWAY_DEG * math.sin(tt * 2.0 * math.pi / PRECESSION_PERIOD_FAR))
     return near, far
 
 
