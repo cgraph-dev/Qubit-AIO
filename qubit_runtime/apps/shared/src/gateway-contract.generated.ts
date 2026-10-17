@@ -1197,6 +1197,7 @@ export interface ConnectorAccountRow {
   label: string
   alias?: string | null
   active: boolean
+  disabled?: boolean
   created_at: string
   updated_at: string
 }
@@ -1209,6 +1210,11 @@ export interface ConnectorAccountsRemoveResult {
   connection_id: string
   connector: string
   status: 'removed'
+}
+export interface ConnectorAccountsRenameParams {
+  profile?: string | null
+  connection_id: string
+  alias: string
 }
 export interface ConnectorPolicyGetResult {
   layers: ConnectorPolicyLayer[]
@@ -3152,6 +3158,11 @@ export interface ConnectionRequestPayload {
   timeout_seconds: number
   targets: ConnectionOperationTarget[]
   tool_call_id?: string | null
+  display?: ConnectionDisplay | null
+}
+/** ``manage_connections`` action ``display``: the directory card, with these slugs pinned as Suggested. */
+export interface ConnectionDisplay {
+  suggested: string[]
 }
 /** ``tool_progress._normalize_todo_state``: the authoritative todo snapshot. */
 export interface TodoState {
@@ -4357,6 +4368,7 @@ export interface PluginsManageResult {
   error?: string | null
   written?: string[] | null
   onboarding?: OnboardingCatalogPlugin[] | null
+  presence?: CatalogPluginPresence[] | null
 }
 /** ``methods_tools._plugin_rows`` + ``plugins_cmd_catalog.catalog_row_fields`` provenance. */
 export interface AgentPluginRow {
@@ -4432,6 +4444,14 @@ export interface OnboardingCatalogPlugin {
   platforms: string[]
   app_state: CatalogAppState
   sentence: string
+}
+/** A named catalog plugin this OS runs. ``state`` is the pinned ``plugin.json`` app declaration judged on this host; ``sentence`` names what is missing (empty when present or unknown); ``disclosure`` is the catalog description's ``Disclosure:`` sentence (empty when it has none). */
+export interface CatalogPluginPresence {
+  name: string
+  title: string
+  state: CatalogAppState
+  sentence: string
+  disclosure: string
 }
 export interface PluginCatalogLookupParams {
   profile?: string | null
@@ -5062,7 +5082,7 @@ export interface PetHatchProgressPayload {
 }
 /** ``change_watcher._CHANGE_WATCHES`` payload fn — ``{}`` for every watch except pet.changed. */
 export type ChangeSignalPayload = Record<string, unknown>
-export type ConnectorErrorReason = 'INVALID_PARAMS' | 'NOT_OWNER' | 'UNSUPPORTED_RUNTIME' | 'CONNECTOR_REQUEST_FAILED' | 'INVALID_CONNECTOR_RESPONSE' | 'UNKNOWN_TARGET' | 'LINK_STILL_VALID' | 'REISSUE_REFUSED' | 'UNKNOWN_OPERATION' | 'INVALID_ANSWER' | 'NEEDS_NOUS_AUTH' | 'CONNECTOR_NOT_FOUND' | 'TOOLS_UNAVAILABLE' | 'CONNECTORS_UNAVAILABLE' | 'CATALOG_UNAVAILABLE' | 'ACCOUNTS_UNAVAILABLE' | 'CONNECTION_NOT_FOUND' | 'POLICY_UNAVAILABLE' | 'POLICY_CONFLICT' | 'FORBIDDEN_SCOPE' | 'ORG_REQUIRED' | 'ORG_ACCESS_DENIED' | 'INVALID_POLICY'
+export type ConnectorErrorReason = 'INVALID_PARAMS' | 'NOT_OWNER' | 'UNSUPPORTED_RUNTIME' | 'CONNECTOR_REQUEST_FAILED' | 'INVALID_CONNECTOR_RESPONSE' | 'UNKNOWN_TARGET' | 'LINK_STILL_VALID' | 'REISSUE_REFUSED' | 'UNKNOWN_OPERATION' | 'INVALID_ANSWER' | 'NEEDS_NOUS_AUTH' | 'CONNECTOR_NOT_FOUND' | 'TOOLS_UNAVAILABLE' | 'CONNECTORS_UNAVAILABLE' | 'CATALOG_UNAVAILABLE' | 'ACCOUNTS_UNAVAILABLE' | 'CONNECTION_NOT_FOUND' | 'POLICY_UNAVAILABLE' | 'POLICY_CONFLICT' | 'FORBIDDEN_SCOPE' | 'ORG_REQUIRED' | 'ORG_ACCESS_DENIED' | 'INVALID_POLICY' | 'ALIAS_TAKEN'
 
 // ── Client→server methods ──
 export interface RpcMethods {
@@ -5132,6 +5152,8 @@ export interface RpcMethods {
   'connectors.accounts': { params: ConnectorAccountsParams; result: ConnectorAccountsResult }
   /** Remove one hosted connector account owned by the scoped member. */
   'connectors.accounts.remove': { params: ConnectorAccountsRemoveParams; result: ConnectorAccountsRemoveResult }
+  /** Name or rename one hosted connector account owned by the scoped member. */
+  'connectors.accounts.rename': { params: ConnectorAccountsRenameParams; result: ConnectorAccountRow }
   /** The hosted connector catalog available to the scoped member. */
   'connectors.catalog': { params: ProfileParams; result: ConnectorsCatalogResult }
   /** Start or re-initiate authorization for named connectors on a session or account operation. */
@@ -5616,6 +5638,7 @@ export const RPC_METHODS = [
   'connection.respond',
   'connectors.accounts',
   'connectors.accounts.remove',
+  'connectors.accounts.rename',
   'connectors.catalog',
   'connectors.connect',
   'connectors.list',

@@ -12,6 +12,7 @@ from .connectors_operation import ConnectionOperationStatus
 from .registry import method
 
 ConnectorSlug = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")]
+ConnectorAlias = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]{0,31}$")]
 
 
 class ConnectorErrorReason(WireEnum):
@@ -38,6 +39,7 @@ class ConnectorErrorReason(WireEnum):
     org_required = "ORG_REQUIRED"
     org_access_denied = "ORG_ACCESS_DENIED"
     invalid_policy = "INVALID_POLICY"
+    alias_taken = "ALIAS_TAKEN"
 
 
 class ConnectorsListParams(ProfileParams):
@@ -181,8 +183,10 @@ class ConnectorAccountRow(Result):
     status: ConnectorAccountStatus
     status_reason: str | None = None
     label: str
-    alias: str | None = None
+    alias: ConnectorAlias | None = None
     active: bool
+    # Retired by a reconnect that replaced it; kept, never selectable.
+    disabled: bool = False
     created_at: str
     updated_at: str
 
@@ -214,6 +218,19 @@ method(
     params=ConnectorAccountsRemoveParams,
     result=ConnectorAccountsRemoveResult,
     doc="Remove one hosted connector account owned by the scoped member.",
+)
+
+
+class ConnectorAccountsRenameParams(ProfileParams):
+    connection_id: str = Field(min_length=1)
+    alias: ConnectorAlias
+
+
+method(
+    "connectors.accounts.rename",
+    params=ConnectorAccountsRenameParams,
+    result=ConnectorAccountRow,
+    doc="Name or rename one hosted connector account owned by the scoped member.",
 )
 
 

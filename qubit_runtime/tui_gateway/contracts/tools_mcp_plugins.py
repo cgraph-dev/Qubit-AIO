@@ -728,6 +728,18 @@ class OnboardingCatalogPlugin(Result):
     sentence: str
 
 
+class CatalogPluginPresence(Result):
+    """A named catalog plugin this OS runs. ``state`` is the pinned ``plugin.json`` app declaration judged
+    on this host; ``sentence`` names what is missing (empty when present or unknown); ``disclosure`` is the
+    catalog description's ``Disclosure:`` sentence (empty when it has none)."""
+
+    name: str
+    title: str
+    state: CatalogAppState
+    sentence: str
+    disclosure: str
+
+
 class PluginsManageResult(Result):
     """``list`` → ``plugins`` + counts; ``toggle`` → ``ok``/``unchanged``/``restart_required``/``name``
     (the canonical key written)/``plugin``; ``install`` → ``qubit_cli.plugins_cmd.dashboard_install_plugin``'s
@@ -766,6 +778,8 @@ class PluginsManageResult(Result):
     written: list[str] | None = None
     # ``onboarding`` → the curated catalog plugins for the onboarding card.
     onboarding: list[OnboardingCatalogPlugin] | None = None
+    # ``presence`` → the named catalog plugins this OS runs, in the order asked; unknown names dropped.
+    presence: list[CatalogPluginPresence] | None = None
 
 
 method("plugins.manage", params=PluginsManageParams, result=PluginsManageResult,
