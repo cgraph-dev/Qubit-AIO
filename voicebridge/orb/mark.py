@@ -41,8 +41,14 @@ TILT_B = -30.0  # far field (SVG +30deg)
 #: Nucleus radius as a fraction of the orb radius (SVG 2.4 / 40 box).
 NUCLEUS_FRAC = 0.075
 #: Ring counter-rotation periods in seconds (SVG: 23s / 31s, far reversed).
+#: The web mark spins each ellipse a full turn; at orb scale that reads as a
+#: vertical "lens" for half of every cycle, so the orb keeps the logo's
+#: RECOGNIZABLE crossing tilt (+/-30deg) and sways a few degrees around it
+#: instead. The particles still travel the full orbit, which is where the
+#: motion reads.
 RING_PERIOD_NEAR = 23.0
 RING_PERIOD_FAR = 31.0
+RING_SWAY_DEG = 6.0
 #: Polyline sampling resolution for one ellipse.
 RING_SEGMENTS = 72
 #: Fringe offset in pixels at the 96px design size, scaled by the orb radius.
@@ -208,7 +214,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     # ------------------------------------------------------------- far field
     # Drawn first so the nucleus and the near field sit over it (depth).
-    far_tilt = TILT_B + (tt * 360.0 / RING_PERIOD_FAR)
+    far_tilt = TILT_B + RING_SWAY_DEG * math.sin(
+        tt * 2.0 * math.pi / RING_PERIOD_FAR)
     far_pts = _ellipse_points(cx, cy, rx, ry, far_tilt)
     ring_dim = _mix(fam["core"], _ember.NEAR_BLACK, 0.80)
     _line([p + (fringe if i % 2 == 0 else 0.0) for i, p in enumerate(far_pts)],
@@ -234,7 +241,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
           _hex(_mix(nuc, _ember.NEAR_BLACK, 1.0 - min(1.0, 0.85 * brightness))))
 
     # ------------------------------------------------------------ near field
-    near_tilt = TILT_A - (tt * 360.0 / RING_PERIOD_NEAR)
+    near_tilt = TILT_A + RING_SWAY_DEG * math.sin(
+        tt * 2.0 * math.pi / RING_PERIOD_NEAR)
     near_pts = _ellipse_points(cx, cy, rx, ry, near_tilt)
     near_dim = _mix(fam["core"], _ember.NEAR_BLACK,
                     max(0.35, 0.66 - 0.18 * gain))

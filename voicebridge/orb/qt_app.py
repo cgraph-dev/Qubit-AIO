@@ -139,7 +139,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     tt = 0.0 if _reduced_motion() else t_val
 
     # Far field first (behind the nucleus), then nucleus, then near field.
-    far_tilt = _mark.TILT_B + (tt * 360.0 / _mark.RING_PERIOD_FAR)
+    far_tilt = _mark.TILT_B + _mark.RING_SWAY_DEG * math.sin(
+        tt * 2.0 * math.pi / _mark.RING_PERIOD_FAR)
     _ring(far_tilt, 0.20 * max(0.35, brightness))
     for orbit, seed, bead_r, dur in _mark.PARTICLES:
         if orbit != "b":
@@ -153,7 +154,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     _bead(cx, cy, max(1.2, R * _mark.NUCLEUS_FRAC) * (0.92 + 0.08 * brightness),
           0.85 * max(0.35, brightness), 0.10)
 
-    near_tilt = _mark.TILT_A - (tt * 360.0 / _mark.RING_PERIOD_NEAR)
+    near_tilt = _mark.TILT_A + _mark.RING_SWAY_DEG * math.sin(
+        tt * 2.0 * math.pi / _mark.RING_PERIOD_NEAR)
     _ring(near_tilt, 0.35 * max(0.35, brightness))
     for orbit, seed, bead_r, dur in _mark.PARTICLES:
         if orbit != "a":
