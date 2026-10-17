@@ -155,15 +155,19 @@ LEFT_CORE: tuple[LeftCoreFeature, ...] = (
     ),
 )
 
+def _install_sentence(feature: LeftCoreFeature) -> str:
+    from qubit_constants import get_qubit_home
+    return (f"{feature.label} moved out of core into the '{feature.plugin}' plugin: install it with "
+            f"`{_install_command(feature.plugin, Path(get_qubit_home()))}`")
+
+
 def platform_install_hint(platform: str) -> str:
     """For an unknown platform name that left core: the sentence that names its install command for
     the active home, else ``""``. Appended to "unknown platform" errors (``send_message``)."""
-    from qubit_constants import get_qubit_home
     feature = next((f for f in LEFT_CORE if f.platform and f.platform == platform), None)
     if feature is None:
         return ""
-    return (f". {feature.label} moved out of core into the '{feature.plugin}' plugin: install it with "
-            f"`{_install_command(feature.plugin, Path(get_qubit_home()))}`")
+    return f". {_install_sentence(feature)}"
 
 
 def moved_command_hint(prog: str, value: str, action: str = "") -> str:
