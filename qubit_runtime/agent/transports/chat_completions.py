@@ -4,7 +4,10 @@ Messages/tools are already OpenAI-shaped, so convert_* are near-identity; the
 provider-specific work lives in build_kwargs (max_tokens, reasoning, extra_body).
 """
 
+import hashlib
 import json
+import re
+import string
 from typing import Any
 from urllib.parse import urlparse
 
@@ -247,13 +250,39 @@ def _is_openai_api_base_url(base_url: Any) -> bool:
         return False
 
 
-def _model_consumes_thought_signature(model: Any) -> bool:
-    """True for Gemini-family targets, which require tool-call ``extra_content`` (thought_signature) replay.
+_GEMINI_SIGNATURE_HOSTS = ("generativelanguage.googleapis.com", "aiplatform.googleapis.com")
+_GEMINI_SIGNATURE_PROVIDERS = frozenset({"gemini", "vertex", "copilot"})
 
-    Every other strict provider rejects it, so it is stripped for non-Gemini targets.
+
+def _model_consumes_thought_signature(model: Any, base_url: Any = None, provider: Any = None) -> bool:
+    """True for Gemini routes, which require tool-call ``extra_content`` (thought_signature) replay.
+
+    A Gemini host or provider counts even when the model id is an alias without "gemini" in it;
+    every other strict provider (Fireworks, Cerebras) rejects the key, so it is stripped there.
     """
+    from utils import base_url_host_matches
+
     m = str(model or "").lower()
-    return "gemini" in m or "gemma" in m
+    return (
+        "gemini" in m or "gemma" in m
+        or (provider or "").strip().lower() in _GEMINI_SIGNATURE_PROVIDERS
+        or any(base_url_host_matches(base_url, host) for host in _GEMINI_SIGNATURE_HOSTS)
+    )
+
+
+def _wire_reasoning_carriers(provider: Any, base_url: Any) -> frozenset:
+    """Reasoning keys an assistant message may carry on this route; the rest are stripped.
+
+    ``message_sanitization.route_reasoning_carriers`` owns the table; keys the route rejected
+    this session were already removed upstream by ``reapply_reasoning_echo``. The table replays
+    ``reasoning_details`` to OpenRouter-format gateways (OpenRouter, Kilo, Vercel AI Gateway,
+    Nous Portal) and to vendors documenting it (Novita, MiniMax /v1, TokenHub), never to strict
+    schemas (Groq, Mistral, Cerebras, opencode relays: ``property 'reasoning_details' is
+    unsupported`` / ``Extra inputs are not permitted`` / ``no such field``, #70233).
+    Stored history always keeps every carrier."""
+    from agent.message_sanitization import route_reasoning_carriers
+
+    return route_reasoning_carriers(provider, base_url)
 
 
 def _route_replays_reasoning_details(base_url: Any) -> bool:
