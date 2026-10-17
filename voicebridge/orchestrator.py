@@ -1860,7 +1860,14 @@ class VoiceOrchestrator:
                     log.warning("TTS fallback also failed: %s", exc2)
                     return False
             else:
-                raise
+                # Best-effort audio: a dead TTS backend (missing voice pack,
+                # broken provider) must degrade to silence, never raise into
+                # the ~40 unguarded speak() call sites. Without this, one
+                # missing model silences answers, hums, progress speech and
+                # spoken confirmations at once while text keeps flowing.
+                log.warning("TTS synthesize failed; continuing silent: %s", exc)
+                log_event("tts.speak.skipped", provider=getattr(self._tts, "name", "unknown"), error=str(exc)[:160])
+                return False
         log_event("tts.speak", text=text[:300], provider=self._tts.name)
         self._cancel.clear()
         self._barge.reset()
@@ -1929,17 +1936,34 @@ class VoiceOrchestrator:
         Returns the joined text that was actually spoken.
         """
         import queue as _queue
-        joined = " ".join(sentences)
+        # Materialize ONCE: callers pass live generators (streamed model
+        # sentences). Joining first used to consume the playback loop's input,
+        # so the local path iterated an exhausted generator and streamed
+        # replies never sounded on the PC speakers.
+        items = [(s or "").strip() for s in sentences]
+        items = [s for s in items if s]
+        joined = " ".join(items)
+        local = True
         if self._web_mode:
-            # web/phone: record for the result, never play on PC speakers
-            if joined.strip():
-                self._web_spoken.append(joined.strip())
+            # web/phone: record for the result (the browser plays the reply
+            # audio). Like speak(), ALSO play on the PC speakers when
+            # webui.speak_web_locally is on (default) — streamed replies were
+            # silently local-missing while speak() replies sounded.
+            if joined:
+                self._web_spoken.append(joined)
+            local = bool(self.cfg.get("webui", "speak_web_locally",
+                                      default=True))
+        if not local:
             return joined
-        if self.muted or not sentences:
-            return " ".join(sentences)
+        if self.muted or not items:
+            return joined
         if self._tts is None:
-            log.warning("TTS not available; would say: %s",
-                        " ".join(sentences)[:120])
+            # Web mode already recorded the text above (the browser path
+            # synthesizes separately), so keep it; mic mode has no other
+            # sink and reports the outage.
+            if self._web_mode:
+                return joined
+            log.warning("TTS not available; would say: %s", joined[:120])
             return ""
         q: "_queue.Queue[Optional[Path]]" = _queue.Queue()
         spoken: list[str] = []
@@ -1966,8 +1990,7 @@ class VoiceOrchestrator:
         t = threading.Thread(target=_player, daemon=True, name="stream-speak")
         t.start()
         try:
-            for sentence in sentences:
-                sentence = (sentence or "").strip()
+            for sentence in items:
                 if not sentence:
                     continue
                 spoken.append(sentence)
