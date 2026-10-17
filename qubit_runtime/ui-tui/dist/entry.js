@@ -2263,7 +2263,7 @@ var init_userMessages = __esm({
           connectionLostActivity: "connection lost \xB7 reconnecting\u2026",
           gaveUpTitle: "Qubit stopped and could not be restarted. Your chat is saved.",
           /** `{0}` = process exit code. */
-          gaveUpTitleWithCode: (code) => `Hermes stopped (exit code ${code}) and could not be restarted. Your chat is saved.`,
+          gaveUpTitleWithCode: (code) => `Qubit stopped (exit code ${code}) and could not be restarted. Your chat is saved.`,
           gaveUpReconnect: "Qubit keeps trying to reconnect in the background and reopens this chat when it succeeds; if it does not, type /resume.",
           gaveUpLogs: "Type /logs for the full log, or /quit and run `qubit doctor` to check the install.",
           gaveUpActivity: "Qubit stopped \xB7 /logs for details",
