@@ -378,7 +378,7 @@ const classicPalette = (colors: Record<string, string>) => skinToDesktopTheme({ 
  */
 export const classicTheme: DesktopTheme = {
   name: 'classic',
-  label: 'Classic Hermes',
+  label: 'Classic Qubit',
   description: "Gold on navy, the CLI's original look",
   colors: classicPalette(CLASSIC_LIGHT_SKIN_COLORS),
   darkColors: classicPalette(CLASSIC_DARK_SKIN_COLORS)
@@ -464,5 +464,5 @@ export const DEFAULT_SKIN_NAME = 'nous'
 /** Names that no longer resolve to a skin of their own. A stored pick of one
  *  falls back to DEFAULT_SKIN_NAME, and a cached backend theme under one is
  *  dropped (the reverted #130015 build cached the CLI `default` skin as a
- *  second "Classic Hermes"). */
+ *  second "Classic Qubit"). */
 export const RETIRED_SKINS = new Set(['nous-light', 'default', 'gold'])

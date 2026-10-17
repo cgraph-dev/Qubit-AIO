@@ -58,7 +58,7 @@ async function launch(localSkin: typeof stockDefaultSkin | null) {
   return { api, bootPaint, connect }
 }
 
-describe('Classic Hermes is an explicit Desktop pick, never inferred from stock config (#76579)', () => {
+describe('Classic Qubit is an explicit Desktop pick, never inferred from stock config (#76579)', () => {
   beforeEach(() => window.localStorage.clear())
 
   afterEach(() => {
@@ -87,7 +87,7 @@ describe('Classic Hermes is an explicit Desktop pick, never inferred from stock 
 
   it('a Classic pick paints gold/navy (dark mode) and survives connect, reconnect and relaunch; a later Nous pick sticks', async () => {
     let run = await launch(stockDefaultSkin)
-    expect(run.api.theme?.availableThemes.find(t => t.name === 'classic')?.label).toBe('Classic Hermes')
+    expect(run.api.theme?.availableThemes.find(t => t.name === 'classic')?.label).toBe('Classic Qubit')
 
     act(() => run.api.theme?.setMode('dark'))
     act(() => run.api.theme?.setTheme('classic'))
@@ -143,9 +143,9 @@ describe('Classic Hermes is an explicit Desktop pick, never inferred from stock 
     run.connect()
 
     const themes = run.api.theme?.availableThemes ?? []
-    expect(themes.filter(t => t.label === 'Classic Hermes').map(t => t.name)).toEqual(['classic'])
+    expect(themes.filter(t => t.label === 'Classic Qubit').map(t => t.name)).toEqual(['classic'])
     expect(themes.some(t => t.name === 'default')).toBe(false)
-    expect(run.api.skin?.('list').match(/Classic Hermes/g)).toHaveLength(1)
+    expect(run.api.skin?.('list').match(/Classic Qubit/g)).toHaveLength(1)
     expect(JSON.parse(window.localStorage.getItem(BACKEND_THEMES_KEY) ?? '{}')).not.toHaveProperty('default')
   })
 
