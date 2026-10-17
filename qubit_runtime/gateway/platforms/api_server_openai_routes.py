@@ -25,6 +25,32 @@ except ImportError:  # pragma: no cover - mirrors api_server's optional import
 # Logger parity with the origin module (moved log records keep their name).
 logger = logging.getLogger("gateway.platforms.api_server")
 
+
+_RESPONSES_FINGERPRINT_KEYS = (
+    "input", "instructions", "previous_response_id", "conversation", "conversation_history", "model",
+    "provider", "model_options", "tools",
+)
+
+
+def _settled(record):
+    """A stored idempotency record that carries its answer. A claim written without one (an
+    older release recorded the claim before the run) has an unknown outcome and never replays."""
+    return record is not None and record.get('response') is not None
+
+
+def _responses_fingerprint_keys(body):
+    """``truncation`` joins the fingerprint only when sent, so an exact retry of a request
+    recorded before it was fingerprinted keeps matching its stored key."""
+    return _RESPONSES_FINGERPRINT_KEYS + (("truncation",) if body.get("truncation") is not None else ())
+
+
+def _response_identity(store, durable_key):
+    if durable_key is not None:
+        from gateway.platforms.api_server_response_identity import durable_response_id
+        return durable_response_id(durable_key[0]), store.request_created_at(durable_key[0])
+    return f'resp_{uuid.uuid4().hex[:28]}', int(time.time())
+
+
 async def _iter_stream_items(stream_q, agent_task, response):
     """Yield agent stream items until EOS, writing SSE keepalives while idle.
 
@@ -546,6 +572,74 @@ class _ResponsesStream:
         error = self._api._redact_api_error_text(exc, limit=500)
         env = self.terminal_envelope("failed", list(self.emitted_items), error=error)
         await self.write_event("response.failed", {"type": "response.failed", "response": env})
+
+
+def _parse_chat_messages(messages: list[Any]) -> tuple:
+    """Chat ``messages`` -> ``(system_prompt, conversation_messages, error_response_or_None)``.
+
+    System messages -> ephemeral system prompt layered ON TOP of core, flattened to text
+    (Anthropic rejects images there, OpenAI text models ignore them)."""
+    from gateway.platforms.api_server import (
+        _multimodal_validation_error, _normalize_chat_content, _normalize_multimodal_content)
+    system_prompt = None
+    conversation_messages: list[dict[str, str]] = []
+    for idx, msg in enumerate(messages):
+        role = msg.get("role", "")
+        raw_content = msg.get("content", "")
+        if role == "system":
+            content = _normalize_chat_content(raw_content)
+            system_prompt = content if system_prompt is None else system_prompt + "\n" + content
+        elif role in {"user", "assistant"}:
+            try:
+                content = _normalize_multimodal_content(raw_content)
+            except ValueError as exc:
+                return None, None, _multimodal_validation_error(exc, param=f"messages[{idx}].content")
+            conversation_messages.append({"role": role, "content": content})
+    return system_prompt, conversation_messages, None
+
+
+def _parse_responses_input(raw_input: Any) -> tuple:
+    """Responses ``input`` (string or item array) -> ``(input_messages, error_response_or_None)``."""
+    from gateway.platforms.api_server import (
+        _error_response, _multimodal_validation_error, _normalize_multimodal_content)
+    input_messages: list[dict[str, Any]] = []
+    if isinstance(raw_input, str):
+        input_messages = [{"role": "user", "content": raw_input}]
+    elif isinstance(raw_input, list):
+        for idx, item in enumerate(raw_input):
+            if isinstance(item, str):
+                input_messages.append({"role": "user", "content": item})
+            elif _is_reasoning_input_item(item):
+                continue
+            elif isinstance(item, dict):
+                try:
+                    content = _normalize_multimodal_content(item.get("content", ""))
+                except ValueError as exc:
+                    return None, _multimodal_validation_error(exc, param=f"input[{idx}].content")
+                input_messages.append({"role": item.get("role", "user"), "content": content})
+    else:
+        return None, _error_response("'input' must be a string or array", 400)
+    return input_messages, None
+
+
+def _parse_conversation_history(raw_history: Any) -> tuple:
+    """Explicit Responses ``conversation_history`` -> ``(history, error_response_or_None)``."""
+    from gateway.platforms.api_server import (
+        _error_response, _multimodal_validation_error, _normalize_multimodal_content)
+    conversation_history: list[dict[str, Any]] = []
+    if not isinstance(raw_history, list):
+        return None, _error_response("'conversation_history' must be an array of message objects", 400)
+    for i, entry in enumerate(raw_history):
+        if _is_reasoning_input_item(entry):
+            continue
+        if not isinstance(entry, dict) or "role" not in entry or "content" not in entry:
+            return None, _error_response(f"conversation_history[{i}] must have 'role' and 'content' fields", 400)
+        try:
+            entry_content = _normalize_multimodal_content(entry["content"])
+        except ValueError as exc:
+            return None, _multimodal_validation_error(exc, param=f"conversation_history[{i}].content")
+        conversation_history.append({"role": str(entry["role"]), "content": entry_content})
+    return conversation_history, None
 
 
 class OpenAICompatRoutesMixin:
