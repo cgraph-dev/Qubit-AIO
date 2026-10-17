@@ -80,6 +80,17 @@ def _lines(text: str, pad: str = "  ") -> list:
     return [f"{pad}{line}" if line else "" for line in text.splitlines()]
 
 
+def _rollback_kept(result: dict) -> None:
+    """The kept / not-removed path lines of a restore result (in-process CLI and gateway client alike)."""
+    from qubit_cli.cli_commands_mixin import _summarize_paths
+    if skipped := result.get("skipped_user_edits"):
+        _pr(*_lines(_gt("rollback.kept_user_edits", files=_summarize_paths(skipped))))
+    if oversize := result.get("skipped_oversize"):
+        print(f"  {_gt('rollback.kept_oversize', files=_summarize_paths(oversize))}")
+    if failed := result.get("failed_deletes"):
+        print(f"  {_gt('rollback.failed_deletes', files=_summarize_paths(failed))}")
+
+
 def _probe(module: str, name: str, default, *args):
     """``<module>.<name>(*args)`` or ``default`` when the import or the call fails (optional
     subsystems: browser backends, async delegations, wake word, ...)."""
@@ -275,7 +286,7 @@ class CLICommandsSessionToolsMixin:
         self._run_tools_config(tools_action=subcommand, names=names, platform="cli")
         from qubit_cli.tools_config import _get_platform_tools
         from qubit_cli.config import load_config
-        self.enabled_toolsets = _get_platform_tools(load_config(), "cli")
+        self.enabled_toolsets = sorted(_get_platform_tools(load_config(), "cli"))  # plain data for session.create
         self.new_session()
         _cp(_dim(_t("tools.session_reset")))
 

@@ -130,6 +130,7 @@ class _Catalog:
         self.canon: dict[str, str] = {}
         self.commands: dict[str, dict[str, str | None]] = {}
         self.cat_map: dict[str, list[list[str]]] = {}  # insertion order = category order
+        self.plugin_commands: dict[str, str] = {}  # every plugin command, also those a display row hides
 
     def add(self, key: str, desc: str, cat: str) -> None:
         self.canon[key.lower()] = key
@@ -173,9 +174,12 @@ def _catalog_plugin_commands(cat: _Catalog, module_loader) -> None:
         cat.cat_map.setdefault("Plugin commands", [])
     for pname, info in sorted(plugin_cmds.items()):
         key = f"/{pname}"
-        if not isinstance(info, dict) or key.lower() in cat.canon:
+        if not isinstance(info, dict):
             continue
-        cat.add(key, str(info.get("description") or "Plugin command"), "Plugin commands")
+        cat.plugin_commands[pname] = str(info.get("description") or "Plugin command")
+        if key.lower() in cat.canon:
+            continue
+        cat.add(key, cat.plugin_commands[pname], "Plugin commands")
         mode = info.get("argument_mode")
         if mode not in {"options", "text", "mixed"}:
             mode = "text" if str(info.get("args_hint") or "").strip() else None
@@ -213,7 +217,7 @@ def command_catalog(load_cfg=None, module_loader=import_module, scope=None) -> d
         load_cfg = load_config_readonly
     cat = _Catalog()
     _catalog_registry(cat, module_loader)
-    warning = ""
+    warning = plugin_error = ""
     skills: dict[str, dict] = {}
     # Each loader is a degrade boundary: user config, third-party plugin registration and skill
     # files can raise anything, and one failing source must never blank the whole palette.
@@ -227,6 +231,7 @@ def command_catalog(load_cfg=None, module_loader=import_module, scope=None) -> d
             _catalog_plugin_commands(cat, module_loader)
         except Exception as e:
             logger.debug("plugin command discovery failed", exc_info=True)
+            plugin_error = str(e) or type(e).__name__
             warning = warning or f"plugin command discovery unavailable: {e}"
         try:
             collision_note = _catalog_skills(cat, skills, module_loader)  # always runs: skills must list even when a loader failed
@@ -239,7 +244,8 @@ def command_catalog(load_cfg=None, module_loader=import_module, scope=None) -> d
         "canon": cat.canon,
         "commands": cat.commands,
         "categories": [{"name": c, "pairs": rows} for c, rows in cat.cat_map.items()],
-        "skills": skills, "skill_count": len(skills), "warning": warning}
+        "skills": skills, "skill_count": len(skills), "warning": warning, "plugin_discovery_error": plugin_error,
+        "plugin_commands": cat.plugin_commands}
 
 
 def slash_completions(text: str = "", scope=None) -> dict:
