@@ -45,11 +45,11 @@ def _fingerprint(block: Any) -> str | None:
 def tracks_rejected_thinking(agent: Any) -> bool:
     """Native Anthropic signatures only: Kimi, DeepSeek and third-party routes keep their own replay
     contract and the one-request ``reasoning_details`` repair."""
-    from agent.anthropic_thinking_policy import anthropic_thinking_route
+    from agent.anthropic_thinking_policy import SIGNED_REPLAY_ROUTES, anthropic_thinking_route
 
     return getattr(agent, "api_mode", None) == "anthropic_messages" and anthropic_thinking_route(
         getattr(agent, "base_url", None), getattr(agent, "model", None)
-    ) == "native"
+    ) in SIGNED_REPLAY_ROUTES
 
 
 def rejected_thinking_fingerprints(session_db: Any, session_id: Any) -> set[str]:
