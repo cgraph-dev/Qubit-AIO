@@ -745,6 +745,14 @@ def _ensure_skill_commands() -> dict:
     return get_interactive_skill_commands()
 
 
+def _session_skill_commands(cli) -> dict:
+    """Skill commands for ``cli``: on its gateway session the gateway's (its plugin skills included), so
+    this process scans no plugin to list them; otherwise this process's own."""
+    from qubit_cli import gateway_plugin_commands
+    found = gateway_plugin_commands.skills(cli)
+    return _ensure_skill_commands() if found is None else found
+
+
 def get_skill_commands() -> dict:
     return _ensure_skill_commands()
 
