@@ -109,8 +109,29 @@ def gemini_requires_tool_call_ids(model: str) -> bool:
     on the major version. Mirrors earendil-works/pi#7494 (their fix for the same class of bug in the
     google-shared converter).
     """
-    match = re.match(r"gemini-(\d+)", bare_gemini_model_id(model).lower())
-    return match is not None and int(match.group(1)) >= 3
+    return _gemini_version(model) >= (3, 0)
+
+
+def _gemini_version(model: str) -> tuple[int, int]:
+    """(major, minor) of a Gemini model id: ``gemini-4-argon`` -> (4, 0), ``google/gemini-3.8-flash`` ->
+    (3, 8); (0, 0) for non-Gemini and unversioned ids (``gemini-flash-latest``, ``gemini-exp-1206``)."""
+    match = re.match(r"gemini-(\d+)(?:\.(\d+))?", bare_gemini_model_id(model).lower())
+    return (int(match.group(1)), int(match.group(2) or 0)) if match else (0, 0)
+
+
+def gemini_uses_thinking_level(model: str) -> bool:
+    """Gemini 3 and every later generation steer thinking with the ``thinkingLevel`` enum (``thinkingBudget``
+    is deprecated there), as do the ``gemini-*-latest`` aliases, which Google hot-swaps to the newest
+    release of each variant. A version-number gate, not a ``gemini-3`` prefix, so a new generation
+    (``gemini-4-argon``) isn't silently treated as legacy."""
+    bare = bare_gemini_model_id(model).lower()
+    return (bare.startswith("gemini-") and bare.endswith("-latest")) or _gemini_version(bare) >= (3, 0)
+
+
+def gemini_sampling_deprecated(model: str) -> bool:
+    """Gemini 3.6+ (Gemini 4 Argon included) ignores ``temperature``/``top_p``/``top_k`` and Google
+    slated them for removal; older families (2.x, 3.0-3.5) keep them."""
+    return _gemini_version(model) >= (3, 6)
 
 
 _API_VERSION_SEGMENT = re.compile(r"^v\d+(?:alpha|beta)?\d*$", re.IGNORECASE)
@@ -611,6 +632,14 @@ def _part_text(part: Dict[str, Any]) -> tuple[Optional[str], bool]:
     return (text, part.get("thought") is True) if isinstance(text, str) else (None, False)
 
 
+def _text_part_signature(part: Dict[str, Any]) -> Optional[str]:
+    """``thoughtSignature`` on a non-functionCall part (a text turn's last part; in streams an empty-text
+    part). Replay is optional, but the server rehydrates the turn's thoughts from it (live: 31 -> 237
+    prompt tokens), so it is kept as the message-level ``extra_content`` signature."""
+    sig = part.get("thoughtSignature")
+    return sig if isinstance(sig, str) and sig and "functionCall" not in part else None
+
+
 def _part_function_call(part: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     fc = part.get("functionCall")
     return fc if isinstance(fc, dict) and fc.get("name") else None
@@ -625,19 +654,22 @@ def translate_gemini_response(resp: Dict[str, Any], model: str) -> SimpleNamespa
         parts = content_obj.get("parts") if isinstance(content_obj, dict) else []
     pieces: Dict[bool, List[str]] = {False: [], True: []}  # is_thought → text pieces
     tool_calls: List[SimpleNamespace] = []
+    text_signature = None
     for index, part in enumerate(parts or []):
         if not isinstance(part, dict):
             continue
         text, is_thought = _part_text(part)
         if text is not None:
             pieces[is_thought].append(text)
+            text_signature = _text_part_signature(part) or text_signature
         elif fc := _part_function_call(part):
             tool_calls.append(_tool_call_ns(str(fc["name"]), _dump_call_args(fc), index, _new_call_id(fc), _tool_call_extra_from_part(part)))
     finish_reason = "tool_calls" if tool_calls else _FINISH_REASON_MAP.get(str((cand or {}).get("finishReason") or "").upper(), "stop")
     usage = _usage_from_metadata((resp.get("usageMetadata") or {}) if cand is not None else {})
     reasoning = "".join(pieces[True]) or None
     message = SimpleNamespace(role="assistant", content="".join(pieces[False]) if pieces[False] else ("" if cand is None else None),
-                              tool_calls=tool_calls or None, reasoning=reasoning, reasoning_content=reasoning, reasoning_details=None)
+                              tool_calls=tool_calls or None, reasoning=reasoning, reasoning_content=reasoning, reasoning_details=None,
+                              extra_content=_tool_call_extra_from_part({"thoughtSignature": text_signature}))
     return _envelope(model, "chat.completion", SimpleNamespace(index=0, message=message, finish_reason=finish_reason), usage)
 
 
