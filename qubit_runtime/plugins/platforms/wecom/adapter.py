@@ -834,19 +834,26 @@ def _build_callback_adapter(config):
     return WecomCallbackAdapter(config)
 
 
+
+
+_MEDIA_NATIVE = (
+    "You can send files natively: write MEDIA:/absolute/path/to/file in your response. "
+)
+
+# System-prompt platform hint (PlatformEntry.platform_hint); cached-prompt bytes, keep stable.
+PLATFORM_HINT = (
+    "You are on WeCom (\\u4f01\\u4e1a\\u5fae\\u4fe1). Markdown is supported. "
+    "You can send files natively: write MEDIA:/absolute/path/to/file in your response. "
+    "Images (.jpg, .png, .webp) send as photos (\\u226410 MB), other files as documents (\\u226420 MB), "
+    "videos (.mp4) play inline. Voice messages must be AMR \\u2014 other audio formats send as file "
+    "attachments. Image URLs via ![alt](url) are downloaded and sent as photos. Never claim you lack "
+    "file-sending."
+)
+
 def register(ctx) -> None:
     common = dict(install_hint="Run `qubit setup` to install WeCom support.", emoji="💼", allow_update_command=True)
     ctx.register_platform(
         name="wecom", label="WeCom (Enterprise WeChat)", adapter_factory=WeComAdapter, check_fn=check_wecom_requirements,
         is_connected=_is_connected, validate_config=_is_connected, required_env=["WECOM_BOT_ID", "WECOM_SECRET"],
         setup_fn=interactive_setup, allowed_users_env="WECOM_ALLOWED_USERS", allow_all_env="WECOM_ALLOW_ALL_USERS",
-        cron_deliver_env_var="WECOM_HOME_CHANNEL", standalone_sender_fn=_standalone_send, max_message_length=4000, **common,
-    )
-    from plugins.platforms.wecom.callback_adapter import check_wecom_callback_requirements, ensure_wecom_callback_requirements
-    ctx.register_platform(
-        name="wecom_callback", label="WeCom Callback (self-built apps)", adapter_factory=_build_callback_adapter,
-        check_fn=check_wecom_callback_requirements, ensure_deps_fn=ensure_wecom_callback_requirements,
-        is_connected=_callback_is_connected, validate_config=_callback_is_connected,
-        required_env=["WECOM_CALLBACK_CORP_ID", "WECOM_CALLBACK_CORP_SECRET"],
-        allowed_users_env="WECOM_CALLBACK_ALLOWED_USERS", allow_all_env="WECOM_CALLBACK_ALLOW_ALL_USERS", **common,
-    )
+        cron_deliver_env_var="WECOM_HOME_CHANNEL", standalone_sender_fn=_standalone_send, max_message_length=4000, **common, platform_hint=PLATFORM_HINT,)

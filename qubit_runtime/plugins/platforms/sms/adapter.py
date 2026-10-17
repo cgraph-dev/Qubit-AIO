@@ -330,6 +330,14 @@ _is_connected = _env_is_connected("TWILIO_ACCOUNT_SID")
 
 
 
+
+
+# System-prompt platform hint (PlatformEntry.platform_hint); cached-prompt bytes, keep stable.
+PLATFORM_HINT = (
+    "You are communicating via SMS. Keep responses concise and use plain text only \\u2014 no markdown, no"
+    " formatting. SMS messages are limited to ~1600 characters, so be brief and direct."
+)
+
 def register(ctx) -> None:
     """Plugin entry point — called by the Qubit plugin system."""
     ctx.register_platform(
@@ -339,4 +347,4 @@ def register(ctx) -> None:
         install_hint="pip install aiohttp", allowed_users_env="SMS_ALLOWED_USERS",
         allow_all_env="SMS_ALLOW_ALL_USERS", cron_deliver_env_var="SMS_HOME_CHANNEL",
         standalone_sender_fn=_standalone_send, max_message_length=MAX_SMS_LENGTH, pii_safe=True,
-        emoji="📱", allow_update_command=True)
+        emoji="📱", allow_update_command=True, platform_hint=PLATFORM_HINT)

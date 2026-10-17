@@ -4479,6 +4479,17 @@ def _is_connected(config) -> bool:
 
 
 
+
+
+# System-prompt platform hint (PlatformEntry.platform_hint); cached-prompt bytes, keep stable.
+PLATFORM_HINT = (
+    "You are in a Feishu (Lark) workspace communicating with your user. Feishu renders Markdown in "
+    "messages \\u2014 bold, italic, code blocks, and links are supported. You can send media files "
+    "natively: include MEDIA:/absolute/path/to/file in your response. Images (.jpg, .png, .webp) are "
+    "uploaded and displayed inline, audio files as native voice messages (non-Opus formats are transcoded"
+    " automatically; without ffmpeg they fall back to file attachments), and other files as attachments."
+)
+
 def register(ctx) -> None:
     """Plugin entry point — called by the Qubit plugin system."""
     ctx.register_platform(
@@ -4490,5 +4501,4 @@ def register(ctx) -> None:
         apply_yaml_config_fn=_apply_yaml_config, allowed_users_env="FEISHU_ALLOWED_USERS",
         allow_all_env="FEISHU_ALLOW_ALL_USERS", cron_deliver_env_var="FEISHU_HOME_CHANNEL",
         standalone_sender_fn=_standalone_send, max_message_length=8000, emoji="🪽",
-        allow_update_command=True,
-    )
+        allow_update_command=True, platform_hint=PLATFORM_HINT,)

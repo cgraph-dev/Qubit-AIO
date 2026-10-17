@@ -7405,6 +7405,24 @@ def _apply_yaml_config(yaml_cfg: dict, telegram_cfg: dict) -> dict | None:
     return extras or None
 
 
+
+
+_MEDIA_NATIVE = (
+    "You can send files natively: write MEDIA:/absolute/path/to/file in your response. "
+)
+
+# System-prompt platform hint (PlatformEntry.platform_hint); cached-prompt bytes, keep stable.
+PLATFORM_HINT = (
+    "You are on Telegram. Standard Markdown auto-converts: **bold**, *italic*, ~~strikethrough~~, "
+    "||spoiler||, `code`, ```blocks```, [links](url), ## headers. Prefer bullets or labeled lines for "
+    "structured data (no tables). "
+    "You can send files natively: write MEDIA:/absolute/path/to/file in your response. "
+    "Images (.png, .jpg, .webp) send as photos, videos (.mp4) play inline; image URLs via ![alt](url) "
+    "send as photos. Audio: add [[audio_as_voice]] on its own line to send ANY audio file as a native "
+    "voice bubble (non-Opus transcodes automatically); without it, .mp3/.m4a arrive as audio files, other"
+    " formats as documents."
+)
+
 def register(ctx) -> None:
     """Plugin entry point — called by the Qubit plugin system."""
     ctx.register_platform(
@@ -7412,4 +7430,4 @@ def register(ctx) -> None:
         ensure_deps_fn=check_telegram_requirements, is_connected=_is_connected, required_env=["TELEGRAM_BOT_TOKEN"],
         install_hint=t("platform.telegram.install_hint"), setup_fn=interactive_setup, apply_yaml_config_fn=_apply_yaml_config,
         allowed_users_env="TELEGRAM_ALLOWED_USERS", allow_all_env="TELEGRAM_ALLOW_ALL_USERS", cron_deliver_env_var="TELEGRAM_HOME_CHANNEL",
-        standalone_sender_fn=_standalone_send, max_message_length=4096, emoji="✈️", allow_update_command=True)
+        standalone_sender_fn=_standalone_send, max_message_length=4096, emoji="✈️", allow_update_command=True, platform_hint=PLATFORM_HINT)

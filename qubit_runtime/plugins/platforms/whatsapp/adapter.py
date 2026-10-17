@@ -1134,6 +1134,22 @@ def _is_connected(config) -> bool:
 
 
 
+
+
+_MEDIA_NATIVE = (
+    "You can send files natively: write MEDIA:/absolute/path/to/file in your response. "
+)
+
+# System-prompt platform hint (PlatformEntry.platform_hint); cached-prompt bytes, keep stable.
+PLATFORM_HINT = (
+    "You are on WhatsApp. Standard markdown auto-converts to WhatsApp syntax (*bold*, _italic_, ~strike~,"
+    " monospace) \\u2014 write markdown freely, bullets included. No tables \\u2014 use bullets or labeled "
+    "lines. "
+    "You can send files natively: write MEDIA:/absolute/path/to/file in your response. "
+    "Images (.jpg, .png, .webp) send as photos, videos (.mp4, .mov) play inline, other files arrive as "
+    "documents; image URLs via ![alt](url) send as photos."
+)
+
 def register(ctx) -> None:
     ctx.register_platform(
         name="whatsapp", label="WhatsApp", adapter_factory=WhatsAppAdapter, check_fn=check_whatsapp_requirements,
@@ -1141,5 +1157,4 @@ def register(ctx) -> None:
         install_hint="WhatsApp requires a Node.js bridge — see the WhatsApp messaging docs",
         setup_fn=interactive_setup, apply_yaml_config_fn=_apply_yaml_config, allowed_users_env="WHATSAPP_ALLOWED_USERS",
         allow_all_env="WHATSAPP_ALLOW_ALL_USERS", cron_deliver_env_var="WHATSAPP_HOME_CHANNEL",
-        standalone_sender_fn=_standalone_send, max_message_length=4096, emoji="💬", allow_update_command=True,
-    )
+        standalone_sender_fn=_standalone_send, max_message_length=4096, emoji="💬", allow_update_command=True, platform_hint=PLATFORM_HINT,)
