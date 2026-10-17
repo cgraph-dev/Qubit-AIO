@@ -318,6 +318,15 @@ def _show_model_picker(cli, ctx, force_refresh: bool) -> None:
         custom_provs=ctx.custom_providers if ctx is not None else None)
 
 
+def _ask_switch_anyway(cli, title: str, detail: str) -> bool:
+    """The model-guard prompt (switch anyway once, or cancel): True only on an explicit yes."""
+    choices = [
+        ("once", t("cli.model.choice_switch_anyway"), t("cli.model.desc_switch_anyway")),
+        ("cancel", t("cli.model.choice_cancel"), t("cli.model.desc_keep_current_model"))]
+    raw = cli._prompt_text_input_modal(title=f"!!! {title} !!!", detail=detail, choices=choices, timeout=120)
+    return cli._normalize_slash_confirm_choice(raw, choices) == "once"
+
+
 class CLIModelSwitchMixin:
     """Model picker, /model switch application, runtime snapshot/restore, and codex runtime handling for the interactive CLI"""
 
@@ -562,12 +571,7 @@ class CLIModelSwitchMixin:
             warning = None
         if warning is None:
             return True
-        choices = [
-            ("once", t("cli.model.choice_switch_anyway"), t("cli.model.desc_switch_anyway")),
-            ("cancel", t("cli.model.choice_cancel"), t("cli.model.desc_keep_current_model"))]
-        raw = self._prompt_text_input_modal(
-            title=f"!!! {warning.title} !!!", detail=warning.message, choices=choices, timeout=120)
-        return self._normalize_slash_confirm_choice(raw, choices) == "once"
+        return _ask_switch_anyway(self, warning.title, warning.message)
 
     def _confirm_and_apply_model_switch_result(
         self, result, persist_global: bool, custom_providers=None, reasoning_effort: str = "") -> None:
