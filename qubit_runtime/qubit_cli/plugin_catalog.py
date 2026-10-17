@@ -29,7 +29,7 @@ from qubit_cli import install_source
 
 logger = logging.getLogger(__name__)
 
-CATALOG_TIERS = ("official", "community")
+CATALOG_TIERS = ("official", "verified", "community")
 # Browse taxonomy for the catalog page / picker. Entries without one land on the Desktop shelf
 # (the common case for community submissions); "general" is for plugins that fit no shelf.
 CATALOG_CATEGORIES = ("desktop", "memory", "platform", "web", "tools", "voice", "automation", "models", "general")

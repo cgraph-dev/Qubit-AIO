@@ -37,6 +37,12 @@ Lanes:
   shared runner; running them on every Python PR made their timing noise
   everyone's problem. They still run on push (fail-open) and whenever the
   script, its siblings, or their tests change.
+* ``catalog``     — the plugin-catalog tests (catalog-tests.yml). A diff made
+  only of catalog entry data (``plugin-catalog/*.yaml``, ``contributors/emails/``)
+  runs this lane INSTEAD of the Python suite: those files are data that a known
+  set of tests reads, so a one-entry PR need not run the whole suite on three
+  OSes. ``plugin-catalog/README.md`` is not entry data (a docs page mirrors it),
+  and any other file in the diff brings the full Python suite back.
 * ``rust``        — ``cargo test`` for the Tauri bootstrap installer. ``.rs``
   lives under ``apps/``, so without this lane a Rust change matched ``frontend``
   and only the TypeScript matrix ran.
@@ -517,6 +523,15 @@ def _is_nix(p: str) -> bool:
     return p.startswith(_NIX_PATHS) or p in _NIX_FILES
 
 
+# Catalog entry data: read by the catalog tests and the Plugin Catalog CI
+# admission gate, executed by nothing. Same set that gate allows in an entry PR.
+_CATALOG_DATA = ("plugin-catalog/", "contributors/emails/")
+
+
+def _is_catalog_data(p: str) -> bool:
+    return p.startswith(_CATALOG_DATA) and p not in _PY_RELEVANT_CONTRACT_FILES
+
+
 def _py_irrelevant(p: str) -> bool:
     if p.startswith(_PY_RELEVANT_SITE) or p in _PY_RELEVANT_CONTRACT_FILES:
         return False
@@ -582,8 +597,10 @@ def classify(files: list[str], run_e2e: bool = False) -> dict[str, bool]:
     lane on.
     """
     files = [f.strip() for f in files if f.strip()]
-    python = any(not _py_irrelevant(f) for f in files)
-    python_prod = any(not _py_irrelevant(f) and not _py_test_only(f) for f in files)
+    catalog = any(_is_catalog_data(f) for f in files)
+    code = [f for f in files if not _is_catalog_data(f)]
+    python = any(not _py_irrelevant(f) for f in code)
+    python_prod = any(not _py_irrelevant(f) and not _py_test_only(f) for f in code)
     frontend = any(
         f.startswith(_FRONTEND) or f in _ROOT_NPM or f in _FRONTEND_FILES
         or f.startswith("tests-js/")
@@ -597,6 +614,7 @@ def classify(files: list[str], run_e2e: bool = False) -> dict[str, bool]:
     ret = {
         "python": python,
         "python_prod": python_prod,
+        "catalog": catalog,
         "docker_meta": docker_meta,
         "frontend": frontend,
         "site": any(f.startswith(_SITE) for f in files),
@@ -620,6 +638,7 @@ def classify(files: list[str], run_e2e: bool = False) -> dict[str, bool]:
     if not files or any(f.startswith(".github/") for f in files):
         ret["python"] = True
         ret["python_prod"] = True
+        ret["catalog"] = True
         ret["docker_meta"] = True
         ret["frontend"] = True
         ret["site"] = True
