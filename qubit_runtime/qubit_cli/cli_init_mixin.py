@@ -21,6 +21,19 @@ from utils import base_url_host_matches, base_url_hostname, is_truthy_value
 logger = logging.getLogger("cli")
 
 
+def _adopt_gateway_toolsets(cli, store):
+    """The profile default the gateway resolved for the opened session, when this process has no list to
+    show (display only), and the "Unknown toolsets" warning as the gateway judged it against its own
+    plugins."""
+    info = (store.current or {}).get("info") or {}
+    if getattr(cli, "enabled_toolsets", None) is None and isinstance(info.get("enabled_toolsets"), list):
+        cli.enabled_toolsets = list(info["enabled_toolsets"])
+    if info.get("unknown_toolsets"):
+        from agent.i18n import t as _t
+        names = ", ".join(info["unknown_toolsets"])
+        cli._console_print(f"[bold red]{_t('cli.startup.unknown_toolsets', names=names)}[/]")
+
+
 class CLIInitMixin:
     """HermesCLI constructor phases: display options, model/provider routing, turn limits, toolsets, checkpoints, prompt/reasoning, runtime state, session store and UI state."""
 
@@ -210,28 +223,15 @@ class CLIInitMixin:
         self.run_budget_seconds = run_budget if run_budget is not None else CLI_CONFIG["agent"].get("run_budget_seconds")
 
     def _init_toolsets(self, toolsets):
-        from cli import CLI_CONFIG, validate_toolset
+        from cli import CLI_CONFIG
         self.enabled_toolsets = toolsets
         from agent.skill_utils import parse_config_string_list
 
         self.disabled_toolsets = parse_config_string_list(CLI_CONFIG["agent"].get("disabled_toolsets"))
 
-        if toolsets and "all" not in toolsets and "*" not in toolsets:
-            # MCP server names only resolve after discover_mcp_tools runs; skip them here.
-            mcp_names = set((CLI_CONFIG.get("mcp_servers") or {}).keys())
-            # Plugin toolsets register during plugin discovery, which startup runs on a background thread
-            # that has not necessarily landed yet; names it declared (or the previous launch persisted, which
-            # get_plugin_toolset_keys_nowait serves) are not typos (#71650).
-            try:
-                from qubit_cli.plugins import get_plugin_toolset_keys_nowait
-                plugin_ts_names = get_plugin_toolset_keys_nowait()
-            except Exception:
-                plugin_ts_names = set()
-            invalid = [t for t in toolsets
-                       if not validate_toolset(t) and t not in mcp_names and t not in plugin_ts_names]
-            if invalid:
-                from agent.i18n import t as _t
-                self._console_print(f"[bold red]{_t('cli.startup.unknown_toolsets', names=', '.join(invalid))}[/]")
+        # No local "Unknown toolsets" check: plugin toolsets are only known where plugins load. The gateway
+        # refuses an unknown picked name at session.create and reports a stale profile one with the session
+        # (``_adopt_gateway_toolsets``), so this process never discovers plugins to tell them apart (PLG-7).
 
     def _init_checkpoints_and_rules(self, checkpoints, pass_session_id, ignore_rules):
         from cli import CLI_CONFIG
@@ -362,6 +362,7 @@ class CLIInitMixin:
         self._pending_input = queue.Queue()
         self._interrupt_queue = queue.Queue()
         self._agent_running = self._should_exit = False
+        self._detach_on_exit = False  # Ctrl+D mid-turn: leave the gateway turn running (LC-6b)
         self._last_turn_interrupted = False  # /goal never auto-queues on a Ctrl+C'd turn
         self._terminal_io_broken = False  # stdout EIO: freeze UI paints instead of spinning
         self._delete_session_on_exit = False  # /exit --delete
