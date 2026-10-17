@@ -90,8 +90,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     core = tuple(int(v) for v in (family.get("core") or (255, 84, 0)))
     rx = R * _mark.RX_FRAC
     ry = R * _mark.RY_FRAC
-    ring_w = 1.0 if R < 64 else 1.6
-    fringe = _mark.FRINGE_PX_AT_96 * (R / 32.0)
+    ring_w = 1.1
+    # A lens fringe is a PIXEL effect: scaling it with the radius drew
+    # three separate rainbow rings instead of one fringed hairline.
+    fringe = _mark.FRINGE_PX_AT_96 * 0.7
+    # The sidebar mark is a BRIGHT near-white hairline with a chromatic
+    # hint, not a dim state tint: lift luminance hard and use the state hue
+    # only as the tint. Idle must never read as "almost off".
+    bright = max(_mark.MIN_MARK_BRIGHTNESS, float(brightness or 0.0))
+    def _lift(amount: float):
+        return (
+            int(core[0] + (255 - core[0]) * amount),
+            int(core[1] + (255 - core[1]) * amount),
+            int(core[2] + (255 - core[2]) * amount),
+        )
+    ring_rgb = _lift(_mark.LIFT_RING)
 
     def _ring(tilt_deg: float, alpha: float) -> None:
         rect = QRectF(cx - rx, cy - ry, rx * 2, ry * 2)
@@ -108,15 +121,19 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # Chromatic fringe: the same hairline offset in x, red left / blue
         # right, so overlap reads near-white and the edges split (the CSS
         # mark's technique, drawn with real alpha here).
+        # The CSS mark fringes with a BLURRED drop shadow. A crisp offset
+        # stroke reads as a second line (a rainbow outline); a wide, very
+        # translucent one reads as the soft chromatic halo the logo has.
         for dx, col in ((fringe, QColor(255, 45, 85)), (-fringe, QColor(45, 130, 255))):
-            pen = QPen(col, ring_w)
+            pen = QPen(col, ring_w * 2.6)
             pen.setColor(QColor(col.red(), col.green(), col.blue(),
-                                int(255 * min(1.0, alpha * 0.55))))
+                                int(255 * min(1.0, alpha * bright * 0.16))))
             p.setPen(pen)
             p.translate(dx, 0.0)
             p.drawPath(rotated)
             p.translate(-dx, 0.0)
-        pen = QPen(QColor(core[0], core[1], core[2], int(255 * alpha)), ring_w)
+        pen = QPen(QColor(ring_rgb[0], ring_rgb[1], ring_rgb[2],
+                          int(255 * min(1.0, alpha * bright * 1.15))), ring_w * 1.15)
         p.setPen(pen)
         p.drawPath(rotated)
 
@@ -141,30 +158,30 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # Far field first (behind the nucleus), then nucleus, then near field.
     far_tilt = _mark.TILT_B + _mark.RING_SWAY_DEG * math.sin(
         tt * 2.0 * math.pi / _mark.RING_PERIOD_FAR)
-    _ring(far_tilt, 0.20 * max(0.35, brightness))
+    _ring(far_tilt, 0.60)
     for orbit, seed, bead_r, dur in _mark.PARTICLES:
         if orbit != "b":
             continue
         ang = seed + (tt * 360.0 / max(0.1, dur))
         bx, by = _mark._orbit_point(cx, cy, rx, ry, far_tilt, ang)
         depth = 0.5 + 0.5 * math.cos(math.radians(ang))
-        _bead(bx, by, max(0.7, bead_r * (R / 32.0) * (0.75 + 0.35 * depth)),
-              0.30 + 0.45 * depth, 0.05 * depth)
+        _bead(bx, by, max(0.7, bead_r * (R / 32.0) * (0.70 + 0.30 * depth)),
+              0.70 * bright + 0.25 * depth, _mark.LIFT_BEAD)
 
-    _bead(cx, cy, max(1.2, R * _mark.NUCLEUS_FRAC) * (0.92 + 0.08 * brightness),
-          0.85 * max(0.35, brightness), 0.10)
+    _bead(cx, cy, max(1.1, R * _mark.NUCLEUS_FRAC) * (0.95 + 0.05 * bright),
+          1.0, _mark.LIFT_NUCLEUS)
 
     near_tilt = _mark.TILT_A + _mark.RING_SWAY_DEG * math.sin(
         tt * 2.0 * math.pi / _mark.RING_PERIOD_NEAR)
-    _ring(near_tilt, 0.35 * max(0.35, brightness))
+    _ring(near_tilt, 0.95)
     for orbit, seed, bead_r, dur in _mark.PARTICLES:
         if orbit != "a":
             continue
         ang = seed + (tt * 360.0 / max(0.1, dur))
         bx, by = _mark._orbit_point(cx, cy, rx, ry, near_tilt, ang)
         depth = 0.5 + 0.5 * math.cos(math.radians(ang))
-        _bead(bx, by, max(0.8, bead_r * (R / 32.0) * (0.8 + 0.45 * depth)),
-              0.55 + 0.45 * depth, 0.10 + 0.25 * depth)
+        _bead(bx, by, max(0.8, bead_r * (R / 32.0) * (0.75 + 0.35 * depth)),
+              0.85 * bright + 0.15 * depth, _mark.LIFT_BEAD)
 
 
 def backend_wanted() -> str:

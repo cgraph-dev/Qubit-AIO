@@ -39,7 +39,7 @@ RY_FRAC = 0.28
 TILT_A = 30.0   # near field (SVG -30deg, y-down here)
 TILT_B = -30.0  # far field (SVG +30deg)
 #: Nucleus radius as a fraction of the orb radius (SVG 2.4 / 40 box).
-NUCLEUS_FRAC = 0.075
+NUCLEUS_FRAC = 0.050
 #: Ring counter-rotation periods in seconds (SVG: 23s / 31s, far reversed).
 #: The web mark spins each ellipse a full turn; at orb scale that reads as a
 #: vertical "lens" for half of every cycle, so the orb keeps the logo's
@@ -51,8 +51,18 @@ RING_PERIOD_FAR = 31.0
 RING_SWAY_DEG = 6.0
 #: Polyline sampling resolution for one ellipse.
 RING_SEGMENTS = 72
-#: Fringe offset in pixels at the 96px design size, scaled by the orb radius.
+#: Chromatic fringe offset, in DEVICE pixels. A lens fringe is a pixel-level
+#: artifact, not a scaled one: scaling it with the radius turned the mark into
+#: three separate rainbow rings instead of a hint on one hairline.
 FRINGE_PX_AT_96 = 0.7
+#: How far each element is lifted toward white. The sidebar mark is a BRIGHT
+#: near-white hairline with only a chromatic hint, not a dim state tint; these
+#: keep the state hue legible while matching that crispness.
+LIFT_RING = 0.28
+LIFT_BEAD = 0.18
+LIFT_NUCLEUS = 0.16
+#: Opacity floor for the mark so idle never reads as "almost off".
+MIN_MARK_BRIGHTNESS = 0.85
 
 #: Particles from the SVG mark: (orbit, seed_deg, radius_px_at_96, period_s).
 PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
@@ -217,7 +227,13 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     far_tilt = TILT_B + RING_SWAY_DEG * math.sin(
         tt * 2.0 * math.pi / RING_PERIOD_FAR)
     far_pts = _ellipse_points(cx, cy, rx, ry, far_tilt)
-    ring_dim = _mix(fam["core"], _ember.NEAR_BLACK, 0.80)
+    # Vivid, logo-like treatment: the state hue stays SATURATED (only a
+    # slight lift) — lifting it toward white washed the mark out.
+    bright = max(MIN_MARK_BRIGHTNESS, float(brightness or 0.0))
+    ring_rgb = _mix(fam["core"], (255, 255, 255), LIFT_RING)
+    bead_rgb = _mix(fam["core"], (255, 255, 255), LIFT_BEAD)
+    nuc_rgb = _mix(fam["core"], (255, 255, 255), LIFT_NUCLEUS)
+    ring_dim = _mix(ring_rgb, _ember.NEAR_BLACK, 1.0 - 0.60 * bright)
     _line([p + (fringe if i % 2 == 0 else 0.0) for i, p in enumerate(far_pts)],
           _hex(_mix(_FRINGE_BLUE, _ember.NEAR_BLACK, 0.45)), ring_w)
     _line([p - (fringe if i % 2 == 0 else 0.0) for i, p in enumerate(far_pts)],
@@ -230,22 +246,21 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         ang = seed + (tt * 360.0 / max(0.1, dur))
         bx, by = _orbit_point(cx, cy, rx, ry, far_tilt, ang)
         depth = 0.5 + 0.5 * math.cos(math.radians(ang))
-        bead = _mix(fam["core"], _ember.NEAR_BLACK, 0.62 - 0.35 * depth)
+        bead = _mix(bead_rgb, _ember.NEAR_BLACK,
+                    1.0 - (0.70 * bright + 0.25 * depth))
         _oval(bx, by, max(0.7, bead_r * (r / 32.0) * (0.75 + 0.35 * depth)),
               _hex(bead))
         fills.append(bead)
 
     # ---------------------------------------------------------------- nucleus
-    nuc = _mix(fam["core"], (255, 255, 255), 0.10)
-    _oval(cx, cy, max(1.2, r * NUCLEUS_FRAC) * (0.92 + 0.08 * gain),
-          _hex(_mix(nuc, _ember.NEAR_BLACK, 1.0 - min(1.0, 0.85 * brightness))))
+    _oval(cx, cy, max(1.1, r * NUCLEUS_FRAC) * (0.95 + 0.05 * gain),
+          _hex(nuc_rgb))
 
     # ------------------------------------------------------------ near field
     near_tilt = TILT_A + RING_SWAY_DEG * math.sin(
         tt * 2.0 * math.pi / RING_PERIOD_NEAR)
     near_pts = _ellipse_points(cx, cy, rx, ry, near_tilt)
-    near_dim = _mix(fam["core"], _ember.NEAR_BLACK,
-                    max(0.35, 0.66 - 0.18 * gain))
+    near_dim = _mix(ring_rgb, _ember.NEAR_BLACK, 1.0 - 0.95 * bright)
     _line([p + (fringe if i % 2 == 0 else 0.0) for i, p in enumerate(near_pts)],
           _hex(_mix(_FRINGE_BLUE, _ember.NEAR_BLACK, 0.25)), ring_w)
     _line([p - (fringe if i % 2 == 0 else 0.0) for i, p in enumerate(near_pts)],
@@ -258,7 +273,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         ang = seed + (tt * 360.0 / max(0.1, dur))
         bx, by = _orbit_point(cx, cy, rx, ry, near_tilt, ang)
         depth = 0.5 + 0.5 * math.cos(math.radians(ang))
-        bead = _mix(fam["core"], (255, 255, 255), 0.10 + 0.25 * depth)
+        bead = _mix(bead_rgb, _ember.NEAR_BLACK,
+                    1.0 - (0.85 * bright + 0.15 * depth))
         _oval(bx, by, max(0.8, bead_r * (r / 32.0) * (0.8 + 0.45 * depth)),
               _hex(bead))
         fills.append(bead)
