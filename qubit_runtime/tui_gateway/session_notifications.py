@@ -5,6 +5,7 @@ desktop UI wiring, HUD surface note. Bodies are rebound onto server.py's globals
 from __future__ import annotations
 
 import contextlib
+import sys
 
 from .method_ctx import bind_module
 

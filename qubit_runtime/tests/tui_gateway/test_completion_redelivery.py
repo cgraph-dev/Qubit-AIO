@@ -134,3 +134,15 @@ def test_a_completion_dedup_key_ignores_output_and_exit_code():
 def test_a_completion_dedup_key_is_stable_across_drains():
     evt = _completion("proc_aaa")
     assert server._notification_event_dedup_key(evt) == server._notification_event_dedup_key(dict(evt))
+
+
+def test_failure_logging_does_not_raise(capsys):
+    """The failure logger must not itself raise: a swallowed NameError here turns a handled
+    dispatch failure into an unhandled one, which is how a storm hides its own cause."""
+    from tui_gateway import session_notifications as sn
+
+    sn._notif_log_failure("probe", ValueError("boom"))
+
+    err = capsys.readouterr().err
+    assert "probe" in err and "ValueError: boom" in err
+
