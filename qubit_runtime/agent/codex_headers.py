@@ -92,3 +92,37 @@ def apply_required_codex_headers(client_kwargs: Dict[str, Any], *, access_token:
         **{name: value for name, value in existing.items() if str(name).lower() not in required_names},
         **required,
     }
+
+
+def codex_request_compression_hooks(base_url: str, *, async_mode: bool = False) -> "Dict[str, list] | None":
+    """httpx ``event_hooks`` that zstd-compress Responses request bodies for the official Codex backend.
+
+    Parity with the official Codex client (zstd on ``/responses`` with ChatGPT auth, default since
+    openai/codex#10102). Lossless transport encoding: tokens and prompt caching are unchanged. Uses the
+    stdlib codec (Python 3.14+); without it, or for any other endpoint/proxy, bodies stay raw JSON.
+    """
+    if not is_official_codex_base_url(base_url):
+        return None
+    try:
+        from compression import zstd
+        import httpx
+    except ImportError:
+        return None
+
+    def compress(request: httpx.Request) -> None:
+        if (request.method != "POST" or not request.url.path.endswith("/responses")
+                or "content-encoding" in request.headers):
+            return
+        body = zstd.compress(request.read())
+        request.stream = httpx.ByteStream(body)
+        request._content = body
+        request.headers["Content-Encoding"] = "zstd"
+        request.headers["Content-Length"] = str(len(body))
+
+    if not async_mode:
+        return {"request": [compress]}
+
+    async def compress_async(request: httpx.Request) -> None:
+        compress(request)
+
+    return {"request": [compress_async]}
