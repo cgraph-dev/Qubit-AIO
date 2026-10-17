@@ -159,9 +159,9 @@ def coerce_ssh_remote_cwd(cwd: str | None, env_type: str | None) -> str | None:
     """Cwd to send to an SSH backend.
 
     ``~``-prefixed paths stay literal so the remote shell expands them to the
-    SSH user's home. The Hermes process's subprocess home (``/opt/data/home``
+    SSH user's home. The Qubit process's subprocess home (``/opt/data/home``
     in the official Docker image) is a directory on the machine running
-    Hermes: it and anything under it are rewritten onto the remote ``~``, since
+    Qubit: it and anything under it are rewritten onto the remote ``~``, since
     ``cd`` into the host path exits 126 on the target. A subprocess home that is
     the OS user's real home is left alone: a remote path may legitimately match
     it. Other backends are unchanged.

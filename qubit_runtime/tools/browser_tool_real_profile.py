@@ -286,7 +286,7 @@ def _real_profile_cdp() -> tuple:
         return None, (
             _RP + "the real-profile browser is already being prepared by another "
             "call that has not finished. Retry after that call completes, or "
-            "restart Hermes if it was abandoned."
+            "restart Qubit if it was abandoned."
         )
     try:
         cached = _bt._real_profile_cdp_cache.get("cdp")

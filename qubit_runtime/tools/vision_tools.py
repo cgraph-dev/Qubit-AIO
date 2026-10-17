@@ -233,7 +233,7 @@ def _secure_cache_dir(new_subpath: str, old_name: str) -> Path:
     they are made lazily at runtime; a hardcoded 0700 here would be the only
     thing setting their mode and would silently override a design that pins
     ``stateDir/.hermes`` to ``2770`` and runs the gateway with ``UMask =
-    "0007"`` so "interactive users in the hermes group can read/write"
+    "0007"`` so "interactive users in the qubit group can read/write"
     gateway-created state. On such a host the gateway and a hostUsers CLI
     share one ``$QUBIT_HOME``, so a 0700 cache created by whichever ran
     first makes vision fail with EACCES for the other. Skipping the explicit

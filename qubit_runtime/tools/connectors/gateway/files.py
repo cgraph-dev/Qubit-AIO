@@ -215,7 +215,7 @@ def _readable_file(raw: str, task_id: Optional[str]) -> str:
                              hint="Pass the path of an existing file.")
     raise FileInputError(
         "FILE_NOT_ALLOWED", f"{raw} may not leave this machine: the file-sending policy refuses it.",
-        hint="Files under the Hermes downloads and cache folders, or a folder listed in "
+        hint="Files under the Qubit downloads and cache folders, or a folder listed in "
              "gateway.media_delivery_allow_dirs, can be sent.")
 
 
