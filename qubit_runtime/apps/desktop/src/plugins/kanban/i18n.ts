@@ -428,7 +428,7 @@ export const en: KanbanMessages = {
   noProject: 'No project (scratch sandboxes)',
   projectHintPre:
     'New tasks run in the project’s repo (a worktree per task); each task can still override its workspace at creation. Manage projects with ',
-  projectHintCmd: 'hermes project',
+  projectHintCmd: 'qubit project',
   createBoard: 'Create board',
   orchestratorProfile: 'Orchestrator profile',
   defaultAssignee: 'Default assignee',
