@@ -516,7 +516,7 @@ DEFAULT_CONFIG = {
         "retention_days": 7,
         "min_interval_hours": 24,
     },
-    # Hard cap (chars) for one auto-loaded context file (SOUL.md, AGENTS.md, CLAUDE.md, .hermes.md,
+    # Hard cap (chars) for one auto-loaded context file (SOUL.md, AGENTS.md, CLAUDE.md, .qubit.md,
     # .cursorrules) before head/tail truncation. null = scale with the model's context window (floor
     # 20K, ceiling 500K); a positive int pins a fixed cap. Separate from read_file limits.
     "context_file_max_chars": None,

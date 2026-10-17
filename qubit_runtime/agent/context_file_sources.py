@@ -8,7 +8,7 @@ flagged but loaded), empty/unreadable, or suppressed by the install-tree guard. 
 is free of cache impact.
 
 Approximations (the manifest re-derives, it does not re-render): the truncation check sizes the raw
-``## label`` section, so a .hermes.md whose YAML frontmatter the builder strips can read a few chars larger
+``## label`` section, so a .qubit.md whose YAML frontmatter the builder strips can read a few chars larger
 here, and the AGENTS.md directory-chain cap (applied to the merged chain after per-file caps) is not modelled.
 """
 

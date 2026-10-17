@@ -92,7 +92,7 @@ def _scan_context_content(content: str, filename: str, *, user_authored: bool = 
     protected-instruction approval gate (``tools/file_tools_write_guards.py``) and project checkouts never
     supply it — so a user who *documents* "ignore previous instructions" in their security guidance
     must not lose their whole identity file to a one-line log entry (#112570). Project-dir files
-    (repo AGENTS.md / .cursorrules / .hermes.md) arrive with the checkout and keep blocking, and so does
+    (repo AGENTS.md / .cursorrules / .qubit.md) arrive with the checkout and keep blocking, and so does
     a SOUL.md owned by a profile distribution (``qubit profile install <git-url>`` copies it in unscanned;
     ``load_soul_md`` passes ``user_authored=False`` when ``distribution.yaml`` owns the file).
     """
