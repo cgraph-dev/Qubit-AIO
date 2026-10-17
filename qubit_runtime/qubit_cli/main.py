@@ -2951,6 +2951,14 @@ def _should_background_mcp_startup(args) -> bool:
     return not _is_tui_chat_launch(args) and args.command in {None, "chat", "rl"}
 
 
+def _chat_runs_at_gateway(args) -> bool:
+    """Every ``qubit`` / ``qubit chat`` turn (classic view, ``-q``, ``-z``, TUI) executes in the
+    gateway, which discovers and owns MCP servers itself. Discovery in this client only spawns a
+    second copy of every server and holds the cross-process discovery lock the cold-starting gateway
+    then waits on (measured 2.0 s with one stdio server) for tools nothing here ever calls."""
+    return args.command in {None, "chat"}
+
+
 def _prepare_agent_startup(args) -> None:
     """Discover plugins/MCP/hooks for commands that can run an agent turn."""
     # --yolo chokepoint: HERMES_YOLO_MODE must be set before any discovery
@@ -2995,6 +3003,10 @@ def _prepare_agent_startup(args) -> None:
 
     # TUI launches hand off to a startup path that backgrounds MCP discovery
     # with a bounded join; acp/gateway/cron do their own on the runtime path.
+    if _chat_runs_at_gateway(args):  # chat turns run in the gateway: it owns MCP, hooks, webhooks
+        if _accept_hooks:  # rides session.create (env_launch_flags) and the classic CLI's consent check
+            os.environ["HERMES_ACCEPT_HOOKS"] = "1"
+        return
     _run_inline_mcp_discovery = not (
         _is_tui_chat_launch(args) or _command_has_dedicated_mcp_startup(args)
     )
