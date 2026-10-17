@@ -363,8 +363,57 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     await vi.waitFor(() =>
       expect(container.textContent).toContain("Panel session"),
     );
-    // The panel list uses source="canonical", so it reads the receipts store.
-    expect(apiMocks.getSessions).toHaveBeenCalled();
+    // The /chat panel lists the SAME chat transcript store as /qubit-chat
+    // (source defaults to "chat"): both pages show the same sessions, and
+    // every row opens with a real transcript. The canonical merged route is
+    // never read here (its 0-message probe rows opened blank panes).
+    expect(apiMocks.listChatSessions).toHaveBeenCalled();
+    expect(apiMocks.getSessions).not.toHaveBeenCalled();
+  });
+
+  it("binds the MODEL card to the open session for per-session picks", async () => {
+    // Regression: /chat's ChatSidebar got no sessionId, so a model pick fell
+    // through to the GLOBAL model.default write ("Main model set to …" for
+    // every session) while /qubit-chat wrote the session row. Both pages
+    // must bind the panel: with ?resume=<id> the sidebar gets that id, so a
+    // pick PATCHes the session's own stored model.
+    const { default: TerminalChatPage } = await import("./TerminalChatPage");
+    const c2 = document.createElement("div");
+    document.body.append(c2);
+    const root2 = createRoot(c2);
+    await act(async () => {
+      root2.render(
+        <MemoryRouter initialEntries={["/chat?resume=session-1"]}>
+          <TerminalChatPage isActive />
+        </MemoryRouter>,
+      );
+    });
+    await vi.waitFor(() => expect(sidebarMount).toHaveBeenCalled());
+    const last = sidebarMount.mock.calls[sidebarMount.mock.calls.length - 1][0] as {
+      sessionId?: string;
+      onSessionModelChange?: unknown;
+    };
+    expect(last.sessionId).toBe("session-1");
+    expect(typeof last.onSessionModelChange).toBe("function");
+    await act(async () => {
+      root2.unmount();
+    });
+    c2.remove();
+  });
+
+  it("restores the picked workspace after a refresh", async () => {
+    // Regression: the WORKSPACE picker reset to Default on every refresh
+    // (plain useState), silently moving the next fresh chat's directory.
+    // The pick is per-tab persisted, so a remount restores it.
+    window.sessionStorage.setItem("qubit.chat.workspace", "/home/trick/Projects");
+    await renderTerminal();
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Panel session"),
+    );
+    expect(window.sessionStorage.getItem("qubit.chat.workspace")).toBe(
+      "/home/trick/Projects",
+    );
+    window.sessionStorage.removeItem("qubit.chat.workspace");
   });
 
   it("collapses and re-expands the panel with the a11y toggle", async () => {

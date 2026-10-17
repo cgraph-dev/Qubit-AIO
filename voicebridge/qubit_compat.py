@@ -6685,6 +6685,66 @@ def h_chat_vision(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          "state-dir-only temp image")
 
 
+def _chat_session_provider_pair(cfg: Any, provider: str, model: str,
+                                   _payload: Any = None) -> Dict[str, Any]:
+    """Validate an explicit provider+model pick against the picker catalog.
+
+    The model picker resolves WHAT the operator pointed at (a provider row +
+    a model within it); a bare model id re-enters the resolver's first-match
+    rule, so ``grok-4.7`` picked under ``cheapvibecode`` landed on
+    ``opencode-go`` (measured live). The pair form keeps the pick: the slug
+    must name a catalog row and the model must be one of its listed models
+    (bare or ``provider/model`` spellings both match). Returns the canonical
+    row slug, the as-listed model id, and the endpoint from
+    ``providers.<slug>`` (custom endpoints; registry providers resolve theirs
+    at read time, so empty stays empty).
+    """
+    slug = str(provider or "").strip().lower()
+    want = str(model or "").strip()
+    if not slug or not want:
+        return {"ok": False, "code": "MALFORMED",
+                "detail": "provider and model are both required"}
+    try:
+        if _payload is None:
+            _vendored_runtime(cfg)
+            from qubit_cli.inventory import (  # type: ignore
+                build_models_payload, load_picker_context)
+            _payload = build_models_payload(load_picker_context()) or {}
+    except Exception as exc:
+        return {"ok": False, "code": "PROVIDER_CATALOG_UNAVAILABLE",
+                "detail": f"provider catalog unreadable: {type(exc).__name__}"}
+    rows = _payload.get("providers") if isinstance(_payload, dict) else None
+    row = next((r for r in (rows or []) if isinstance(r, dict)
+                and str(r.get("slug") or "").lower() == slug), None)
+    if row is None:
+        known = sorted({str(r.get("slug") or "") for r in (rows or [])
+                        if isinstance(r, dict) and r.get("slug")})[:12]
+        return {"ok": False, "code": "UNKNOWN_PROVIDER",
+                "detail": f"unknown provider {provider!r}"
+                          + (f"; known: {', '.join(known)}" if known else "")}
+    models = [str(m) for m in (row.get("models") or [])]
+    want_bare = want.split("/")[-1].strip()
+    hit = next((m for m in models if m == want), None)
+    if hit is None and want_bare:
+        hit = next((m for m in models
+                    if m == want_bare or m.split("/")[-1] == want_bare), None)
+    if hit is None:
+        return {"ok": False, "code": "MODEL_NOT_IN_PROVIDER",
+                "detail": f"{want!r} is not offered by {row.get('slug')} "
+                          f"({len(models)} models)"}
+    canon = str(row.get("slug") or slug)
+    ep: Any = {}
+    try:
+        ep = cfg.get("providers", canon, default={}) or {}
+    except Exception:  # noqa: BLE001 - odd cfg objects degrade to registry read
+        ep = {}
+    if not isinstance(ep, dict):
+        ep = {}
+    return {"ok": True, "provider": canon, "model": hit,
+            "base_url": str(ep.get("base_url") or ""),
+            "api_mode": str(ep.get("api_mode") or "")}
+
+
 def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import chat_transport as CT
@@ -6716,7 +6776,36 @@ def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         # on the next /chat resume — a mismatched pair that stalls the turn.
         # The global ``model.default`` (what ``/api/model/set`` scope=main
         # rewrites) is never touched, so sessions keep independent models.
+        #
+        # An explicit ``provider`` (the model picker's own selection) takes the
+        # pair path: the slug must name a catalog row offering that model, and
+        # the row keeps the provider's endpoint. Without it a bare id
+        # re-enters first-match routing (``grok-4.7`` picked under
+        # ``cheapvibecode`` landed on ``opencode-go``), silently moving the
+        # session to another bill.
         requested = str(b.get("model") or "").strip()
+        provider_req = str(b.get("provider") or "").strip()
+        if provider_req:
+            pair = _chat_session_provider_pair(cfg, provider_req, requested)
+            if not pair.get("ok"):
+                return 400, {"ok": False, "code": pair.get("code"),
+                             "detail": pair.get("detail", "")}
+            res = st.set_model(p.get("id", ""), str(pair.get("model") or requested),
+                               provider=str(pair.get("provider") or ""),
+                               base_url=str(pair.get("base_url") or ""),
+                               api_mode=str(pair.get("api_mode") or ""))
+            if res.get("state") == "MISSING":
+                return 404, {"ok": False, "code": res.get("code"),
+                             "detail": res.get("detail", "")}
+            if res.get("state") != "OK":
+                return 400, {"ok": False, "code": res.get("code"),
+                             "detail": res.get("detail", "")}
+            record = _rebrand_chat_record(res["session"])
+            _publish_chat_frame(cfg, "session.updated",
+                                {"session_id": str(res["session"].get("id")
+                                                   or p.get("id", "")),
+                                 "session": record})
+            return _ok(session=record)
         routed = CT.resolve_route(cfg, requested)
         if not routed.get("ok"):
             return 400, {"ok": False, "code": routed.get("code",

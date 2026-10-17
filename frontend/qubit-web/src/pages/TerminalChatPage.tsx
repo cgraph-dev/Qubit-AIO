@@ -247,6 +247,15 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // server's one-off JSON control frame (the implicit active-session fallback).
   const effectiveResumeRef = useRef<string | null>(null);
   const [resumeTarget, setResumeTarget] = useState<string | null>(null);
+  // Per-session model picked from THIS page's MODEL card (bound below via
+  // `sessionId`). Paired with the session id so switching sessions can never
+  // show another session's pick; the next PTY grant re-resolves from the
+  // server row and converges anyway. Without this the card kept showing the
+  // stale grant until reconnect after a pick.
+  const [sessionModelPick, setSessionModelPick] = useState<{
+    id: string;
+    model: string;
+  } | null>(null);
   // True while the surface sits on a DELIBERATE fresh chat (New chat pressed,
   // nothing resumed). Drives the session panel's `activeSessionId` so it renders
   // no highlight instead of falling back to an unrelated `is_active` row. Reset
@@ -324,7 +333,23 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   const [sessionListNonce, setSessionListNonce] = useState(0);
   // Picked workspace for a FRESH chat (absolute host path; "" = server
   // default). Sent on the PTY WS as ?cwd= and only affects fresh chats.
-  const [workspaceCwd, setWorkspaceCwd] = useState("");
+  // Persisted per-tab: a refresh used to drop the pick back to Default,
+  // silently moving the next fresh chat's working directory.
+  const [workspaceCwd, setWorkspaceCwd] = useState(() => {
+    try {
+      return window.sessionStorage.getItem("qubit.chat.workspace") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  useEffect(() => {
+    try {
+      if (workspaceCwd) window.sessionStorage.setItem("qubit.chat.workspace", workspaceCwd);
+      else window.sessionStorage.removeItem("qubit.chat.workspace");
+    } catch {
+      /* storage unavailable — picker still works for this page load */
+    }
+  }, [workspaceCwd]);
   // Read inside the connect closure without re-creating it on every change.
   const workspaceRef = useRef("");
   useEffect(() => {
@@ -1347,14 +1372,26 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                   channel={channel}
                   profile={scopedProfile}
                   terminalModel={
-                    grant?.model
-                      ? {
-                          provider: grant.provider,
-                          model: grant.model,
-                          contextTokens: grant.context_tokens,
-                        }
-                      : null
+                    sessionModelPick && sessionModelPick.id === resumeTarget
+                      ? { model: sessionModelPick.model }
+                      : grant?.model
+                        ? {
+                            provider: grant.provider,
+                            model: grant.model,
+                            contextTokens: grant.context_tokens,
+                          }
+                        : null
                   }
+                  // Bind the MODEL card to the open session: a pick writes
+                  // THIS session's stored model (PATCH
+                  // /api/qubit/chat/sessions/:id), never the global
+                  // model.default — /chat and /qubit-chat keep independent
+                  // models. Null on a fresh chat (no session yet): the
+                  // global branch applies, as before.
+                  sessionId={resumeTarget ?? undefined}
+                  onSessionModelChange={(model) => {
+                    if (resumeTarget) setSessionModelPick({ id: resumeTarget, model });
+                  }}
                 />
               </Suspense>
             </div>
@@ -1368,7 +1405,6 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 onNewChat={handleNewChat}
                 workspaceCwd={workspaceCwd}
                 onWorkspaceChange={setWorkspaceCwd}
-                source="canonical"
               />
             </div>
             <div className="shrink-0 px-2">

@@ -624,7 +624,14 @@ export function ChatSidebar({
             // why a session model could not be switched.
             if (sessionId) {
               try {
-                const res = await api.patchChatSession(sessionId, { model });
+                // Send the picker's own provider alongside the model: a bare
+                // id re-enters first-match routing server-side, so an explicit
+                // cheapvibecode pick could land on another provider's same-named
+                // model. The pair is validated against the picker catalog.
+                const res = await api.patchChatSession(sessionId, {
+                  model,
+                  ...(provider ? { provider } : {}),
+                });
                 const applied = String(res?.session?.model || model);
                 onSessionModelChange?.(applied);
                 setModelNotice(
