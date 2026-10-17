@@ -26,6 +26,15 @@ export interface OfficeAppProps {
   seatAgentId?: string | number;
   /** Heading text for the panel. */
   seatLabel?: string;
+  /**
+   * Selectable seats, from the tower payload's own characters. When given, the
+   * shell offers a picker instead of relying on a fixed `seatAgentId` — the
+   * office is the same Qubit backend, so the seats it draws are the seats it
+   * can configure.
+   */
+  seats?: Array<{ agent_id: number; slug: string }>;
+  /** Called when the operator picks a different seat. */
+  onSeatChange?: (agentId: number) => void;
   /** Set once the iframe has loaded, for tests and for a load-failure banner. */
   onReady?: () => void;
 }
@@ -153,6 +162,7 @@ export function createOfficeApp(
     // iframe on purpose: the api-bridge answers every non-GET with 501, so a
     // write control inside the vendored client could not save anything.
     if (props.seatAgentId !== undefined && props.seatAgentId !== null) {
+      const seats = props.seats ?? [];
       children.push(R.createElement("button", {
         key: "seat-model-toggle",
         type: "button",
@@ -162,6 +172,26 @@ export function createOfficeApp(
         onClick: () => setPanelOpen(!panelOpen),
       }, panelOpen ? "Hide seat model" : "Seat model"));
       if (panelOpen) {
+        // The picker comes from the tower payload's own characters: the seats
+        // drawn in the office are the seats that can be configured.
+        if (seats.length > 0) {
+          children.push(R.createElement("label", {
+            key: "seat-picker", className: "seat-model__label",
+          }, "Seat",
+            R.createElement("select", {
+              key: "seat",
+              "data-testid": "seat-model-seat",
+              value: String(props.seatAgentId),
+              onChange: (e: { target: { value: string } }) => {
+                const next = Number(e.target.value);
+                if (Number.isFinite(next)) props.onSeatChange?.(next);
+              },
+            }, seats.map((s) =>
+              R.createElement("option", {
+                key: s.agent_id, value: String(s.agent_id),
+              }, s.slug || `seat ${s.agent_id}`))),
+          ));
+        }
         children.push(R.createElement(SeatModelPanel, {
           key: "seat-model-panel",
           agentId: props.seatAgentId,

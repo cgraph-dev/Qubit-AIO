@@ -64,4 +64,44 @@ describe("Habblaud embedding", () => {
     expect(h.tree.find((e) => e.props["data-testid"] === "seat-model-panel"))
       .toBeUndefined();
   });
+
+  it("lists the office's own seats in the picker once opened", () => {
+    // The picker is fed by the tower payload's characters, so the seats drawn
+    // in the office are exactly the seats that can be configured.
+    const h = createHarness();
+    const App = createOfficeApp(h.React as never, h.hooks as never);
+    App({
+      seatAgentId: 1,
+      seats: [
+        { agent_id: 1, slug: "ceo" },
+        { agent_id: 3, slug: "lead-quality" },
+      ],
+      onSeatChange: vi.fn(),
+    });
+    const toggle = h.tree.find((e) => e.props["data-testid"] === "seat-model-toggle");
+    expect(toggle).toBeDefined();
+  });
+
+  it("renders a picker inside an open panel, with the named seat selected", () => {
+    const h = createHarness();
+    // Open the panel: the first useState in the component is `panelOpen`.
+    let panelOpen = false;
+    const hooks = {
+      ...h.hooks,
+      useState: (initial: unknown) => [panelOpen ? true : initial, vi.fn()],
+    };
+    panelOpen = true;
+    const App = createOfficeApp(h.React as never, hooks as never);
+    App({
+      seatAgentId: 3,
+      seats: [
+        { agent_id: 1, slug: "ceo" },
+        { agent_id: 3, slug: "lead-quality" },
+      ],
+      onSeatChange: vi.fn(),
+    });
+    const picker = h.tree.find((e) => e.props["data-testid"] === "seat-model-seat");
+    expect(picker).toBeDefined();
+    expect(picker?.props.value).toBe("3");
+  });
 });

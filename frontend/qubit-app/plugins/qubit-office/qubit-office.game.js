@@ -192959,6 +192959,7 @@ create: function(game) {
 				"aria-label": `${bindingSummary()}; ${verdict.live ? `live stream ${STREAM_ROUTE}` : `poll ${POLL_INTERVAL_MS / 1e3}s → ${SNAPSHOT_ROUTE}`}`
 			}, bindingSummary()));
 			if (props.seatAgentId !== void 0 && props.seatAgentId !== null) {
+				const seats = props.seats ?? [];
 				children.push(R.createElement("button", {
 					key: "seat-model-toggle",
 					type: "button",
@@ -192967,11 +192968,28 @@ create: function(game) {
 					"aria-expanded": panelOpen,
 					onClick: () => setPanelOpen(!panelOpen)
 				}, panelOpen ? "Hide seat model" : "Seat model"));
-				if (panelOpen) children.push(R.createElement(SeatModelPanel, {
-					key: "seat-model-panel",
-					agentId: props.seatAgentId,
-					seatLabel: props.seatLabel
-				}));
+				if (panelOpen) {
+					if (seats.length > 0) children.push(R.createElement("label", {
+						key: "seat-picker",
+						className: "seat-model__label"
+					}, "Seat", R.createElement("select", {
+						key: "seat",
+						"data-testid": "seat-model-seat",
+						value: String(props.seatAgentId),
+						onChange: (e) => {
+							const next = Number(e.target.value);
+							if (Number.isFinite(next)) props.onSeatChange?.(next);
+						}
+					}, seats.map((s) => R.createElement("option", {
+						key: s.agent_id,
+						value: String(s.agent_id)
+					}, s.slug || `seat ${s.agent_id}`)))));
+					children.push(R.createElement(SeatModelPanel, {
+						key: "seat-model-panel",
+						agentId: props.seatAgentId,
+						seatLabel: props.seatLabel
+					}));
+				}
 			}
 			return R.createElement("div", {
 				"data-testid": "office-app",
@@ -193145,8 +193163,48 @@ create: function(game) {
 		const wantShell = params.has("shell") && !params.has("app");
 		const R = SDK.React;
 		const H = SDK.hooks;
-		const Office = wantShell ? createOfficeComponent(R, H, liveData) : createOfficeApp(R, H);
+		const Office = wantShell ? createOfficeComponent(R, H, liveData) : createOfficeWithSeatRouting(R, H);
 		window.__QUBIT_PLUGINS__?.register("qubit-office", Office);
+	}
+	/**
+	* The default office, plus per-seat model routing.
+	*
+	* WHY THIS WRAPPER EXISTS
+	* -----------------------
+	* `createOfficeApp` renders the vendored client and nothing else. Per-seat
+	* model selection needs the office's OWN seat list, which lives in the tower
+	* payload — so this polls the same adapter the shell path uses and hands the
+	* app its `seats`. Supplying the seats is what makes `seatAgentId` a real
+	* choice; without it the app renders exactly as before (no panel).
+	*
+	* The poll drives only the seat LIST. The game inside the iframe keeps its own
+	* `/api/stream` connection, so this wrapper cannot make the office stale.
+	*/
+	function createOfficeWithSeatRouting(R, H) {
+		const OfficeApp = createOfficeApp(R, H);
+		return function OfficeWithSeatRouting() {
+			const [seats, setSeats] = H.useState([]);
+			const [seatId, setSeatId] = H.useState(null);
+			H.useEffect(() => {
+				const adapter = new OfficeAdapter({ onSnapshot: (s) => {
+					const characters = s.payload?.characters ?? [];
+					if (characters.length === 0) return;
+					setSeats(characters.map((c) => ({
+						agent_id: c.agent_id,
+						slug: c.slug
+					})));
+					setSeatId((current) => current !== null && characters.some((c) => c.agent_id === current) ? current : characters[0].agent_id);
+				} });
+				adapter.start();
+				return () => adapter.dispose();
+			}, []);
+			return R.createElement(OfficeApp, {
+				seats,
+				seatAgentId: seatId ?? void 0,
+				seatLabel: seatId === null ? void 0 : seats.find((s) => s.agent_id === seatId)?.slug,
+				onSeatChange: setSeatId
+			});
+		};
 	}
 	/**
 	* Poll the tower and hand the shell a payload + the portals derived from it.

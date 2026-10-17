@@ -83,8 +83,60 @@ if (!SDK || !SDK.React || !SDK.hooks) {
   const H = SDK.hooks as OfficeGameShellProps["hooks"];
   const Office = wantShell
     ? createOfficeComponent(R, H, liveData)
-    : createOfficeApp(R, H);
+    : createOfficeWithSeatRouting(R, H);
   window.__QUBIT_PLUGINS__?.register("qubit-office", Office);
+}
+
+/**
+ * The default office, plus per-seat model routing.
+ *
+ * WHY THIS WRAPPER EXISTS
+ * -----------------------
+ * `createOfficeApp` renders the vendored client and nothing else. Per-seat
+ * model selection needs the office's OWN seat list, which lives in the tower
+ * payload — so this polls the same adapter the shell path uses and hands the
+ * app its `seats`. Supplying the seats is what makes `seatAgentId` a real
+ * choice; without it the app renders exactly as before (no panel).
+ *
+ * The poll drives only the seat LIST. The game inside the iframe keeps its own
+ * `/api/stream` connection, so this wrapper cannot make the office stale.
+ */
+function createOfficeWithSeatRouting(
+  R: OfficeGameShellProps["React"],
+  H: OfficeGameShellProps["hooks"],
+) {
+  const OfficeApp = createOfficeApp(R, H);
+
+  return function OfficeWithSeatRouting() {
+    const [seats, setSeats] = H.useState<Array<{ agent_id: number; slug: string }>>([]);
+    const [seatId, setSeatId] = H.useState<number | null>(null);
+
+    H.useEffect(() => {
+      const adapter = new OfficeAdapter({
+        onSnapshot: (s) => {
+          const characters = s.payload?.characters ?? [];
+          if (characters.length === 0) return;
+          setSeats(characters.map((c) => ({ agent_id: c.agent_id, slug: c.slug })));
+          // Select the first seat once, then keep the operator's choice.
+          setSeatId((current) =>
+            current !== null && characters.some((c) => c.agent_id === current)
+              ? current
+              : characters[0].agent_id);
+        },
+      });
+      adapter.start();
+      return () => adapter.dispose();
+    }, []);
+
+    return R.createElement(OfficeApp, {
+      seats,
+      seatAgentId: seatId ?? undefined,
+      seatLabel: seatId === null
+        ? undefined
+        : seats.find((s) => s.agent_id === seatId)?.slug,
+      onSeatChange: setSeatId,
+    });
+  };
 }
 
 /**
