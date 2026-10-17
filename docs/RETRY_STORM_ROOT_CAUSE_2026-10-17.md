@@ -124,3 +124,70 @@ key answers **403** on `/models`; deepseek-direct is priceable but
 `DEEPSEEK_API_KEY` is absent. Settling receipts by hand does not help — the
 book is already complete; the org needs one working credential or a route
 change before it can run a turn.
+
+## Corrections, measured 2026-10-17 19:52 (seat 3, run run_9bfdee4fe6834895)
+
+Two claims above do not survive a second measurement. Both matter, because a
+write-up that overstates a fix is the same failure as the stale memories it
+replaced: the next reader acts on it.
+
+### 1. The org *can* run a turn. It cannot *price* one.
+
+The paragraph above says the org "needs one working credential or a route
+change before it can run a turn". It has been running turns the whole time —
+this one included. `run_9bfdee4fe6834895` is a live seat-3 turn executing on
+the live route. What is true is narrower and worse:
+
+- every turn still emits `run_unpriced` with `cost_status="unknown"`
+  (events 280, 293, 337, 349 — one per run, no exceptions);
+- the receipts nevertheless settle at **0c, `unmetered=1`** (ledger rows 33-36,
+  notes naming opencode-go flat-rate). That is an *attestation under D16*, not
+  a price. The book is complete because someone said the marginal cost is zero,
+  not because the layer measured it;
+- `ledger.health().complete` is `false` only while a turn's own receipt is
+  open. Read between turns and it is `true`. Treating a running turn's open
+  receipt as "unknown spend" is what produced the stale memories in the first
+  place.
+
+So the open question is not "can a seat run". It is "is 0c a measurement or a
+standing attestation", and only the owner can answer that.
+
+### 2. The `true` stub still reaches the queue — through approval, not the tick
+
+`819a03626` fixed what a tick *files*. It did not fix what an *approval*
+creates, and the difference is a live row:
+
+| | |
+|---|---|
+| proposal #128 filed | 17:08:57, before the fix, carrying `exit_check='true'` |
+| `819a03626` committed | 18:20:46 |
+| proposal #128 approved | 19:30:50, by seat 1 |
+| task #125 created | 19:30:50, with `exit_check='true'` |
+
+`task_proposal.approve` copies the stored check verbatim
+(`voicebridge/office/task_proposal.py:341`) and its C17 gate refuses only an
+*empty* one (`:349`). A proposal floated before the fix therefore re-imports
+the defect at approval time, after the fix, with the fix's own commit message
+claiming it is closed.
+
+Scale: of the 12 proposals still pending, **8 carry `exit_check='true'`**
+(ids 13, 89, 90, 91, 129, 130, 131, 132) and 4 carry real evidence checks
+(133-136, filed after the fix). Every one of the 8 reproduces #125 on approval.
+
+Not fixed here, deliberately: a guard that refuses a non-falsifiable check at
+approval would also refuse the ~15 existing tests that pass `"true"` as a
+convenient always-pass stand-in while testing the loop's mechanics. That is a
+real decision with a real blast radius, not a patch to slip in behind a
+write-up. The narrow fix — refuse `true` / `:` / `exit 0` after stripping a
+shell comment, at both `work.create` and `task_proposal.approve` — needs those
+tests moved to a real check (`test -f <tmpfile>`) in the same commit.
+
+### What seat 3 did with the queue
+
+- **#2 → `review`.** Its exit check was run in this turn (`rc=0`) and the turn
+  recorded against `run_9bfdee4fe6834895` with the write-up as the artifact.
+  Not accepted: C31 leaves the verdict to seat 1.
+- **#125 → `abandoned`** via `work.abandon` with a reason. No `run_id`, no
+  artifact, so the guard admitted it. `office_task` is now
+  `{abandoned: 123, accepted: 1, review: 1, open: 0}` — the queue claims no
+  work in flight for the first time.
