@@ -71,6 +71,7 @@ LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
 # WebSocket opcodes.
 _OP_CONT = 0x0
 _OP_TEXT = 0x1
+_OP_TXT = 0x1
 _OP_BIN = 0x2
 _OP_CLOSE = 0x8
 _OP_PING = 0x9
@@ -916,6 +917,19 @@ class PtyWsServer:
                         "Too many concurrent terminal sessions.")
                 return
 
+        # Upstream parity (hermes_cli/web_routers/chat_ws.py:446 does
+        # ``await ws.accept()`` before resolving argv and spawning): accept the
+        # upgrade BEFORE the spawn. Booting the TUI and resuming a large
+        # transcript can exceed the client's 8 s connect budget under load;
+        # with the accept done the client stays in its loading state instead
+        # of force-closing the socket and entering a reconnect loop. Every
+        # AUTHORITY refusal above stays a typed HTTP status on purpose.
+        try:
+            handshake(handler)
+        except WsProtocolError as exc:
+            _reject(handler, 400, "WS_HANDSHAKE", str(exc))
+            return
+
         # 1b) Re-attach to a terminal this conversation already owns. A browser
         #     refresh or close drops the socket but must NOT kill an in-flight
         #     turn, so a previously detached session for the same conversation
@@ -944,12 +958,8 @@ class PtyWsServer:
                 session = prior
                 with self._lock:
                     self._active[id(session)] = session
-                try:
-                    handshake(handler)
-                except WsProtocolError as exc:
-                    self._teardown(session)
-                    _reject(handler, 400, "WS_HANDSHAKE", str(exc))
-                    return
+                # The upgrade is already accepted (see above); only the
+                # repaint poke and the pump remain.
                 # The fresh xterm cannot rebuild an idle alternate-screen TUI
                 # from nothing: the pump below only forwards NEW output, so a
                 # reattached-but-quiet terminal stays black until something
@@ -982,23 +992,17 @@ class PtyWsServer:
             # resolving the terminal argv). ``SystemExit`` is a ``BaseException``,
             # so ``except Exception`` would let it escape this handler thread and
             # close the socket with no reply — the operator sees a blank terminal
-            # with no cause. Convert it (and any other spawn failure) into a
-            # truthful typed refusal naming the real error instead.
-            detail = getattr(exc, "code", None) or str(exc)
-            _reject(handler, 503, "PTY_UNAVAILABLE",
-                    _redact(str(detail))[:200])
+            # with no cause. The upgrade is ALREADY accepted at this point, so
+            # answer in-band exactly like upstream ``_pty_fail``: a red line the
+            # terminal renders, then a 1011 close (never a stray HTTP status on
+            # an upgraded socket).
+            _fail_chat_start(handler, exc)
             return
 
         session = _Session(bridge=bridge, ticket=ticket, key=key,
                            session_id=str(meta.get("session_id") or ""))
         with self._lock:
             self._active[id(session)] = session
-        try:
-            handshake(handler)
-        except WsProtocolError as exc:
-            self._teardown(session)
-            _reject(handler, 400, "WS_HANDSHAKE", str(exc))
-            return
         resolved = guard if isinstance(guard, dict) else {}
         bridge_meta = meta.get("bridge") if isinstance(meta, dict) else None
         mcp_meta = (bridge_meta or {}).get("mcp") if isinstance(
@@ -1246,6 +1250,31 @@ def _safe_pid(bridge: Any) -> int:
         return int(bridge.pid)
     except Exception:
         return -1
+
+
+def _fail_chat_start(handler: Any, exc: BaseException) -> None:
+    """In-band spawn failure on an already-upgraded socket (upstream parity).
+
+    The upgrade is accepted before the spawn, so a spawn failure cannot be an
+    HTTP status any more. Mirror the reference ``_pty_fail``: one red line the
+    xterm renders, then a 1011 close (the client's ended/reconnect state).
+    """
+    detail = getattr(exc, "code", None) or str(exc)
+    msg = _redact(str(detail))[:200]
+    line = f"\r\n\x1b[31mQubit chat could not start: {msg}\x1b[0m\r\n"
+    try:
+        write_frame(handler.connection, _OP_TXT, line.encode("utf-8"))
+    except Exception:  # noqa: BLE001 - best-effort delivery
+        pass
+    try:
+        close_frame(handler.connection, 1011, "pty start failed")
+    except Exception:  # noqa: BLE001 - already gone
+        pass
+    log_event("webui.pty.spawn_failed", detail=msg)
+    try:
+        handler.close_connection = True
+    except Exception:  # noqa: BLE001 - plain doubles
+        pass
 
 
 def _reject(handler: Any, status: int, code: str, detail: str) -> None:
