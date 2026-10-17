@@ -116,7 +116,7 @@ def close_discarded_turn(db, conn, row):
     gets the same boundary (merged onto the call row, whose calls are then pruned)."""
     import time
     from agent.turn_failure_copy import FAILED_TURN_DISPLAY_KIND, PARTIAL_FAILED_TURN_NOTICE
-    from hermes_state_local_lineage import local_physical_target
+    from qubit_state_local_lineage import local_physical_target
     from qubit_state_runtime import _canonical_chain
     target = _canonical_chain(conn, local_physical_target(conn, row['target_session_id']))[-1]
     tail = conn.execute("SELECT role, tool_calls FROM messages WHERE session_id=? AND active=1 "

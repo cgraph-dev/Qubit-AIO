@@ -73,7 +73,7 @@ def retry_terminal_admission(db, *, epoch, principal_id, session_id, request_id,
         payload={'input': json.loads(_json(payload)), 'intent': intent})
     with db._read_ctx() as conn:
         _epoch(conn, epoch)
-        from hermes_state_mutation_retirement import RETIRED_PREFIX
+        from qubit_state_mutation_retirement import RETIRED_PREFIX
         if not conn.execute('SELECT 1 FROM state_meta WHERE key=?', (RETIRED_PREFIX + session_id,)).fetchone():
             return None
         saved = conn.execute('SELECT value FROM state_meta WHERE key=?',

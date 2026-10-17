@@ -29,7 +29,7 @@ def commit_local_session(db, *, epoch, receipt):
             if not same:
                 raise RuntimeStoreError('invalid_params')
             return saved
-        from hermes_state_mutation_retirement import RETIRED_PREFIX
+        from qubit_state_mutation_retirement import RETIRED_PREFIX
         if conn.execute('SELECT 1 FROM state_meta WHERE key=?', (RETIRED_PREFIX + sid,)).fetchone():
             # Deleted: its receipt was retired with the transcript; a create/cron retry must not
             # resurrect the row (and re-fire its prompt) under the same deterministic id.
@@ -40,7 +40,7 @@ def commit_local_session(db, *, epoch, receipt):
         if conn.execute("SELECT 1 FROM gateway_routing WHERE scope='' AND session_key=?", (route,)).fetchone():
             raise RuntimeStoreError('admission_conflict')
         if 'legacy_session_id' in receipt:
-            from hermes_state_local_migration import bind_legacy_target
+            from qubit_state_local_migration import bind_legacy_target
             bind_legacy_target(db, conn, receipt)
         policy, entry = receipt['policy'], receipt['entry']
         from datetime import datetime
@@ -144,7 +144,7 @@ def local_lineage_index(conn):
     transcript to a child, so every segment is one conversation. ``superseded`` holds the listable
     roots of earlier reset segments (filtered in SQL, before paging); ``heads`` maps the latest
     reset segment to ``(owner, lineage)`` for the row that represents the conversation. A delete
-    of that row removes the whole lineage (``hermes_state_mutation_guards.delete_targets``)."""
+    of that row removes the whole lineage (``qubit_state_mutation_guards.delete_targets``)."""
     superseded, heads = set(), {}
     rows = conn.execute("SELECT value FROM state_meta WHERE key GLOB ? AND json_valid(value) "
                         "AND json_array_length(value, '$.lineage') > 1", (POLICY_PREFIX + '*',)).fetchall()
