@@ -426,19 +426,19 @@ def _prune_idle_entries(
         except OSError as exc:
             audit.info("scratch prune: could not remove %r: %s", os.fspath(entry), exc)
             continue
+        # rmtree ignores errors, so only a path that is really gone counts as removed.
         # Only an explicit lstat proves absence: lexists() swallows OSError from lstat,
         # so an entry that stayed (rmtree left residue) but cannot be inspected would be
         # counted and recorded as removed — the same invented reason the vanish rule
         # above refuses to invent (P2 on #134173).
         try:
             os.lstat(entry)
+            audit.info("scratch prune: could not fully remove %r", os.fspath(entry))
+            continue
         except FileNotFoundError:
             pass
         except OSError:
             audit.info("scratch prune: could not confirm removal of %r", os.fspath(entry))
-            continue
-        else:
-            audit.info("scratch prune: could not fully remove %r", os.fspath(entry))
             continue
         audit.info("scratch prune: removed %r (%d bytes)", os.fspath(entry), size)
         removed += 1

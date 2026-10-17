@@ -55,8 +55,8 @@ def collect_retired_spillover(db):
 def collect_retired_media(db):
     """Release retired candidates no admission or retained transcript row owns; drop collected keys.
     Synchronous SQLite plus one messages pass: async callers must run it off the event loop."""
-    collect_retired_spillover(db)
     from gateway.session_ingress_media import release_unheld_media
+    collect_retired_spillover(db)
     with db._read_ctx() as conn:
         # Primary-key range, not LIKE: the common no-candidate case costs one index probe.
         rows = conn.execute('SELECT key,value FROM state_meta WHERE key>=? AND key<?',

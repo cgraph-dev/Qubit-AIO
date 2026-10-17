@@ -689,7 +689,7 @@ class SessionSchemaMixin:
 
     def _trigram_tokenizer_available(self, cursor: sqlite3.Cursor) -> bool:
         """Probe trigram support without publishing a persistent FTS object."""
-        probe = "temp.hermes_fts5_trigram_probe"
+        probe = "temp.qubit_fts5_trigram_probe"
         cursor.execute(f"DROP TABLE IF EXISTS {probe}")
         try:
             cursor.execute(f"CREATE VIRTUAL TABLE {probe} USING fts5(content, tokenize='trigram')")

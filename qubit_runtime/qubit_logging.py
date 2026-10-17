@@ -83,7 +83,7 @@ def _portalocker_probe() -> bool:
 # 0660 chmod and eager file creation; CLH opens lazily and rotates differently.
 if sys.platform == "win32":
     if _portalocker_probe():
-        from concurrent_log_handler import (  # noqa: E402
+        from concurrent_log_handler import (
             ConcurrentRotatingFileHandler as RotatingFileHandler,
         )
     else:
@@ -94,11 +94,11 @@ if sys.platform == "win32":
         # below; fall back to stdlib rotation instead. Rollover is disabled in
         # the fallback: multi-process appends make Windows renames fail with
         # WinError 32, the exact #44873 trap CLH exists to avoid.
-        from logging.handlers import RotatingFileHandler  # noqa: E402
+        from logging.handlers import RotatingFileHandler
 
         _WINDOWS_CLH_FALLBACK = True
 else:
-    from logging.handlers import RotatingFileHandler  # noqa: E402
+    from logging.handlers import RotatingFileHandler
 
 # Thread-local per-conversation session context.
 _session_context = threading.local()
@@ -306,9 +306,8 @@ class _ComponentFilter(logging.Filter):
 COMPONENT_PREFIXES = {
     # ``plugins.platforms``: messaging adapters that migrated out of
     # ``gateway/platforms/`` into bundled plugins (#41112) are still gateway
-    # components and belong in gateway.log.
-    # ``agent.memory_caller_scope``: a multiplexed gateway's memory-provider profile refusals
-    # (#140058), which the operator reads in gateway.log.
+    # components and belong in gateway.log. ``agent.memory_caller_scope``: a multiplexed gateway's
+    # memory-provider profile refusals (#140058), which the operator reads in gateway.log.
     "gateway": ("gateway", "qubit_plugins", "plugins.platforms", "agent.memory_caller_scope"),
     "agent": ("agent", "run_agent", "model_tools", "batch_runner"),
     "tools": ("tools",),
@@ -607,7 +606,7 @@ class _ManagedRotatingFileHandler(RotatingFileHandler):
 
 def _new_file_handler(
     path: Path, *, level: int, max_bytes: int, backup_count: int, formatter
-) -> "_ManagedRotatingFileHandler":
+) -> _ManagedRotatingFileHandler:
     """Create the ``logs/`` directory and a configured ``_ManagedRotatingFileHandler``."""
     mkdir_under_qubit_home(path.parent)
     if _WINDOWS_CLH_FALLBACK:
@@ -688,7 +687,7 @@ class _ProfileRoutingFileHandler(logging.Handler):
         self.release_profile(home)
         return True
 
-    def _handler_for_home(self, home: Path) -> "_ManagedRotatingFileHandler":
+    def _handler_for_home(self, home: Path) -> _ManagedRotatingFileHandler:
         with self._profile_handlers_lock:
             if home not in self._profile_handlers:
                 handler = _new_file_handler(
@@ -931,7 +930,7 @@ def _reset_queued_handlers() -> None:
         for h in list(root.handlers):
             if getattr(h, "_qubit_queue", False):
                 root.removeHandler(h)
-        for h in list(_queued_file_handlers):
+        for h in _queued_file_handlers:
             _quietly(h.close)
         _queued_file_handlers.clear()
         _log_queue = None
