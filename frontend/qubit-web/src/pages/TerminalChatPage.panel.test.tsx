@@ -438,6 +438,30 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     c2.remove();
   });
 
+  it("repaints the MODEL card immediately after a pick (no refresh)", async () => {
+    // Regression: the card showed the PTY GRANT, which only refreshes on
+    // reconnect, so a model pick applied server-side but the badge stayed on
+    // the old model until a page reload. A fresh chat has no session yet and
+    // takes the global write path, so the sidebar must report the applied
+    // model on BOTH paths and the page must display it right away.
+    await renderTerminal();
+    await vi.waitFor(() => expect(sidebarMount).toHaveBeenCalled());
+    const first = sidebarMount.mock.calls[0][0] as {
+      onAppliedModel?: (model: string) => void;
+    };
+    expect(typeof first.onAppliedModel).toBe("function");
+    await act(async () => {
+      first.onAppliedModel?.("claude-opus-5-5");
+    });
+    await vi.waitFor(() => {
+      const calls = sidebarMount.mock.calls;
+      const latest = calls[calls.length - 1][0] as {
+        terminalModel?: { model?: string } | null;
+      };
+      expect(latest.terminalModel?.model).toBe("claude-opus-5-5");
+    });
+  });
+
   it("restores the picked workspace after a refresh", async () => {    // Regression: the WORKSPACE picker reset to Default on every refresh
     // (plain useState), silently moving the next fresh chat's directory.
     // The pick is per-tab persisted, so a remount restores it.

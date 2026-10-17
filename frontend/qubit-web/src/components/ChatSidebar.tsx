@@ -95,6 +95,14 @@ interface ChatSidebarProps {
   sessionId?: string;
   /** Notified with the session's new model after a per-session pick succeeds. */
   onSessionModelChange?: (model: string) => void;
+  /**
+   * Notified with the model just applied on EITHER write path (per-session or
+   * the global ``model.default``). `/chat` needs this for the global branch:
+   * its MODEL card shows the PTY grant, which only refreshes on reconnect, so
+   * without this a fresh-chat pick applied but the badge stayed stale until a
+   * page reload.
+   */
+  onAppliedModel?: (model: string) => void;
   className?: string;
   onDashboardNewSessionRequest?: () => void;
   onSessionTitleChange?: (title: string | null) => void;
@@ -121,6 +129,7 @@ export function ChatSidebar({
   terminalModel,
   sessionId,
   onSessionModelChange,
+  onAppliedModel,
   className,
   onDashboardNewSessionRequest,
   onSessionTitleChange,
@@ -634,6 +643,7 @@ export function ChatSidebar({
                 });
                 const applied = String(res?.session?.model || model);
                 onSessionModelChange?.(applied);
+                onAppliedModel?.(applied);
                 setModelNotice(
                   `Model set to ${applied.split("/").slice(-1)[0]} for this session.`,
                 );
@@ -661,6 +671,12 @@ export function ChatSidebar({
             // and calls back; don't announce until the user confirms.
             if (!result.confirm_required) {
               refreshEffectiveModel();
+              // Report the applied model so a host whose card reads the PTY
+              // grant (i.e. /chat) can repaint immediately instead of waiting
+              // for a reconnect/reload.
+              onAppliedModel?.(
+                String((result as { model?: string }).model || model),
+              );
               // The backend reports whether /chat follows the pick: when it
               // kept its pinned model (pick below the /chat context floor),
               // say so instead of claiming a switch the terminal did not take.

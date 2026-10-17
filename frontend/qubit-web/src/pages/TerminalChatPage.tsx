@@ -890,6 +890,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   useEffect(() => {
     if (resumeRef.current === resumeParam) return;
     resumeRef.current = resumeParam;
+    // The previous session's MODEL-card override must not leak onto the newly
+    // picked session: each session carries its own model.
+    setSessionModelPick(null);
     // A real `?resume=` id means we are on a stored session again, not a fresh
     // one; clearing it via the URL (back button) leaves the deliberate-fresh
     // flag untouched so New chat's intent survives a client-side nav.
@@ -1448,7 +1451,11 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                   channel={channel}
                   profile={scopedProfile}
                   terminalModel={
-                    sessionModelPick && sessionModelPick.id === resumeTarget
+                    // A pick made in THIS tab wins immediately. The grant is
+                    // only refreshed on reconnect, so waiting for it showed
+                    // the old model until a page reload (the reported stale
+                    // MODEL card). Cleared when the session target changes.
+                    sessionModelPick
                       ? { model: sessionModelPick.model }
                       : grant?.model
                         ? {
@@ -1468,6 +1475,11 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                   onSessionModelChange={(model) => {
                     if (resumeTarget) setSessionModelPick({ id: resumeTarget, model });
                   }}
+                  // The global branch (fresh chat, no session yet) applies
+                  // model.default; report it too so the card repaints now.
+                  onAppliedModel={(model) =>
+                    setSessionModelPick({ id: resumeTarget ?? "", model })
+                  }
                 />
               </Suspense>
             </div>
