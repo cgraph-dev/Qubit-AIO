@@ -11,6 +11,7 @@ import copy
 import logging
 import re
 from typing import Any, Callable
+from urllib.parse import unquote
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,54 @@ def unrename_tool_args(params_schema: Any, args: Any) -> Any:
 def sanitize_tool_schemas(tools: list[dict]) -> list[dict]:
     """Deep-copied ``tools`` (OpenAI format) with sanitized parameter schemas; safe to mutate."""
     return [_sanitize_single_tool(tool) for tool in tools] if tools else tools
+
+
+# RFC 6901: an array index is "0" or a number without leading zeros; "~" escapes only "~0" and "~1".
+_POINTER_INDEX = re.compile(r"0|[1-9][0-9]*")
+_BAD_POINTER_ESCAPE = re.compile(r"~(?![01])")
+
+
+def resolve_local_schema_ref(schema: Any, root_schema: Any, seen_refs: set[str] | None = None) -> Any:
+    """Follow a document-local ``$ref`` in *schema* against *root_schema*, for dispatch-time
+    decisions (argument coercion, key unrenaming). Remote, malformed or dangling refs come back
+    unchanged; sibling keywords are kept, and the referenced schema wins where they conflict."""
+    if not isinstance(schema, dict) or not isinstance(root_schema, dict):
+        return schema
+
+    ref = schema.get("$ref")
+    if not isinstance(ref, str) or not ref.startswith("#"):
+        return schema
+    # A $ref is a URI reference: percent-decode the fragment, then read it as a JSON Pointer.
+    pointer = unquote(ref[1:])
+    if pointer and not pointer.startswith("/"):
+        return schema  # a plain-name anchor such as "#Address", not a pointer
+    seen = seen_refs or set()
+    if ref in seen:
+        return schema
+
+    target: Any = root_schema
+    for raw_token in pointer.split("/")[1:]:
+        if _BAD_POINTER_ESCAPE.search(raw_token):
+            return schema
+        token = raw_token.replace("~1", "/").replace("~0", "~")
+        if isinstance(target, dict) and token in target:
+            target = target[token]
+        elif isinstance(target, list) and _POINTER_INDEX.fullmatch(token) and int(token) < len(target):
+            # Path refs can pass through arrays, e.g. zod-to-json-schema's "#/properties/a/anyOf/0".
+            target = target[int(token)]
+        else:
+            return schema
+    if not isinstance(target, dict):
+        return schema
+
+    resolved = resolve_local_schema_ref(target, root_schema, seen | {ref})
+    siblings = {key: value for key, value in schema.items() if key != "$ref"}
+    if not siblings or not isinstance(resolved, dict):
+        return resolved
+    combined = dict(resolved)
+    for key, value in siblings.items():
+        combined.setdefault(key, value)
+    return combined
 
 
 def _sanitize_single_tool(tool: dict) -> dict:
