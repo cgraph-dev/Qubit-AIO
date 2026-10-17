@@ -3296,6 +3296,14 @@ def parse_qubitchat_slash(text: Any) -> Optional[Dict[str, Any]]:
     character is ``/`` parses — known verbs carry ``command`` + ``args``,
     anything else carries ``command: "unknown"`` so the caller answers
     honest help instead of letting the classifier chatter about it.
+
+    Known = the executed tuple, the composer conveniences + registry aliases
+    (normalized to their canonical verb, original kept as ``name``), the
+    ``GET /api/chat/slash-commands`` catalog prefixes (``skill-``/``plugin-``/
+    ``mcp-``/``toolset-``), and every other CLI-registry verb (answered with
+    honest /chat + dashboard guidance by :func:`run_qubitchat_slash`). The
+    registry read is lazy and fail-soft — without it parsing is exactly the
+    old tuple behavior.
     """
     raw = str(text or "").strip()
     if not raw.startswith("/"):
@@ -3307,6 +3315,13 @@ def parse_qubitchat_slash(text: Any) -> Optional[Dict[str, Any]]:
     name = parts[0].lower()
     args = parts[1].strip() if len(parts) > 1 else ""
     if name in SLASH_COMMANDS:
+        return {"command": name, "name": name, "args": args}
+    canonical = _slash_alias_target(name)
+    if canonical is not None:
+        return {"command": canonical, "name": name, "args": args}
+    if _slash_catalog_entry(name) is not None:
+        return {"command": name, "name": name, "args": args}
+    if name in _registry_slash_names():
         return {"command": name, "name": name, "args": args}
     return {"command": "unknown", "name": name, "args": args}
 
@@ -3321,6 +3336,11 @@ def extract_inline_slash(text: Any) -> Optional[Dict[str, Any]]:
     URLs (``https://…``), and ``file://`` can never match (``.``/``/``/``:``
     are not verb chars and ``tmp``/``etc`` are not verbs). Zero or 2+ matches
     return None (a multi-command sentence is never guessed).
+
+    Known here = the executed tuple plus the composer conveniences and the
+    skill/plugin/MCP/toolset catalog prefixes (all import-free, so this stays
+    cheap on the every-turn path — the matched token re-dispatches through
+    :func:`run_qubitchat_slash`, where alias/registry normalization owns it).
     """
     try:
         raw = str(text or "")
@@ -3336,7 +3356,7 @@ def extract_inline_slash(text: Any) -> Optional[Dict[str, Any]]:
         single = ""
         for match in re.finditer(pattern, raw):
             name = str(match.group(1) or "").lower()
-            if name in SLASH_COMMANDS:
+            if _is_inline_slash_verb(name):
                 total += 1
                 single = name
         if total != 1:
@@ -3541,6 +3561,216 @@ def _slash_whoami(session_id: str) -> str:
             f"(identity dashboard:user on the canonical store).")
 
 
+#: Composer-only conveniences (``frontend/.../lib/slashCommands.ts``): tokens
+#: the ``/qubit-chat`` composer inserts that are not registry names. Resolved
+#: to their canonical verb so a raw-typed or palette-sent token executes
+#: instead of answering unknown. ``/mcp`` intentionally stays its own verb
+#: (the real server list above), so only ``/models`` maps.
+_SLASH_CONVENIENCES = {"models": "model"}
+
+
+def _is_inline_slash_verb(name: str) -> bool:
+    """True when ``name`` may trigger the mid-sentence slash path.
+
+    Import-free (tuple + conveniences + catalog prefixes) so the every-turn
+    inline scan never pays the vendored-registry import; the matched token
+    re-dispatches through :func:`run_qubitchat_slash`, where full
+    alias/registry normalization owns it. Never raises.
+    """
+    try:
+        if name in SLASH_COMMANDS or name in _SLASH_CONVENIENCES:
+            return True
+        return _slash_catalog_entry(name) is not None
+    except Exception:  # noqa: BLE001 - a matcher fault means "no match"
+        return False
+
+#: Catalog-namespace prefixes served by ``GET /api/chat/slash-commands``
+#: (skills / plugins / MCP servers / toolsets — the "hundreds of commands").
+#: A ``/<prefix><name>`` turn executes against the same authority the catalog
+#: reads (real describe, never unknown, never phantom execution).
+_SLASH_CATALOG_PREFIXES = ("skill-", "plugin-", "mcp-", "toolset-")
+
+#: Lazily-loaded CLI-registry slash shape: (names, aliases, descriptions).
+#: ``None`` until the first slash turn needs it; ``(frozenset(), {}, {})`` on
+#: a vendored-import miss (fail-soft: parsing stays the old tuple behavior).
+_REGISTRY_SLASH_CACHE: Optional[tuple] = None
+
+
+def _registry_slash_map() -> tuple:
+    """CLI-registry slash names, aliases and descriptions (lazy, cached).
+
+    Same single source the ``/chat`` completer and the slash catalog read
+    (``qubit_cli.commands.COMMAND_REGISTRY``). Never raises: a vendored miss
+    caches empty so every later slash turn skips the import attempt cost of
+    retrying. Only called for leading-slash turns (never the every-turn
+    inline path), so the import cost lands at most once per process.
+    """
+    global _REGISTRY_SLASH_CACHE
+    if _REGISTRY_SLASH_CACHE is not None:
+        return _REGISTRY_SLASH_CACHE
+    names: set = set()
+    aliases: dict = {}
+    descriptions: dict = {}
+    try:
+        from . import qubit_runtime as _QR
+
+        _QR.ensure_path()
+        from qubit_cli.commands import (  # type: ignore
+            COMMAND_REGISTRY)
+        for cmd in COMMAND_REGISTRY or []:
+            cname = str(getattr(cmd, "name", "") or "").strip().lower()
+            if not cname:
+                continue
+            names.add(cname)
+            desc = str(getattr(cmd, "description", "") or "").strip()
+            if desc:
+                descriptions[cname] = desc
+            for alias in (getattr(cmd, "aliases", None) or ()):
+                aname = str(alias or "").strip().lower()
+                if aname and aname not in names:
+                    aliases[aname] = cname
+    except Exception:  # noqa: BLE001 - fail-soft to tuple-only parsing
+        pass
+    _REGISTRY_SLASH_CACHE = (frozenset(names), aliases, descriptions)
+    return _REGISTRY_SLASH_CACHE
+
+
+def _registry_slash_names() -> frozenset:
+    return _registry_slash_map()[0]
+
+
+def _slash_alias_target(name: str) -> Optional[str]:
+    """Canonical verb for a composer convenience or registry alias."""
+    if name in _SLASH_CONVENIENCES:
+        return _SLASH_CONVENIENCES[name]
+    try:
+        return _registry_slash_map()[1].get(name)
+    except Exception:  # noqa: BLE001 - fail-soft: no alias resolution
+        return None
+
+
+def _slash_catalog_entry(name: str) -> Optional[tuple]:
+    """Split a ``<prefix><key>`` catalog verb, or None (pure, never raises)."""
+    try:
+        low = str(name or "").strip().lower()
+    except Exception:
+        return None
+    for prefix in _SLASH_CATALOG_PREFIXES:
+        if low.startswith(prefix) and len(low) > len(prefix):
+            return (prefix[:-1], low[len(prefix):])
+    return None
+
+
+def _slash_catalog_reply(cfg: Any, command: str) -> str:
+    """Describe one catalog entry against its real authority (read-only).
+
+    ``/skill-<name>`` / ``/plugin-<name>`` / ``/mcp-<name>`` /
+    ``/toolset-<name>`` name the entry, its description, and how to run it
+    from this surface (plain-language turn; the agent holds the tool). A miss
+    names the miss plus the listing verb — never a typed refusal, never
+    phantom success.
+    """
+    parsed = _slash_catalog_entry(command)
+    if parsed is None:
+        return _slash_help_reply(command)
+    kind, key = parsed
+    if kind == "skill":
+        try:
+            from .skill_catalog import catalog_entries
+
+            rows = catalog_entries(cfg) or []
+        except Exception:  # noqa: BLE001 - honest miss, never fatal
+            rows = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("name") or "").strip().lower() == key:
+                desc = str(row.get("description") or "").strip()
+                return (f"Skill '{key}'"
+                        + (f": {desc}" if desc else " (no description).")
+                        + " To run it, send a message asking for it "
+                        + f"(e.g. 'use the {key} skill to …') — the agent "
+                        + "loads the skill and does the work here.")
+        return (f"No skill '{key}'. List installed skills with /skills "
+                f"(or filter: /skills {key}).")
+    if kind == "plugin":
+        try:
+            from .plugin_runtime import list_plugins
+
+            rows = (list_plugins(cfg) or {}).get("plugins") or []
+        except Exception:  # noqa: BLE001 - honest miss, never fatal
+            rows = []
+        names = sorted({str(r.get("id", "")) for r in rows
+                        if isinstance(r, dict) and r.get("id")})
+        for ident in names:
+            if ident.strip().lower() == key or ident.strip().lower().endswith(
+                    "-" + key) or ident.strip().lower() == "qubit-" + key:
+                return (f"Plugin '{ident}' is registered. Manage it on the "
+                        f"Plugins page; to use it, send a message describing "
+                        f"what it should do.")
+        return (f"No plugin '{key}'. List registered plugins with /plugins.")
+    if kind == "mcp":
+        try:
+            from .mcp_servers import list_servers
+
+            rows = (list_servers(cfg) or {}).get("servers") or []
+        except Exception:  # noqa: BLE001 - honest miss, never fatal
+            rows = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("name") or "").strip().lower() == key:
+                transport = str(row.get("transport") or "stdio")
+                state = ("invocable" if row.get("invocable")
+                         else str(row.get("status") or "configured"))
+                return (f"MCP server '{key}' [{transport}] — {state}. To call "
+                        f"a tool on it, send a message describing the call.")
+        return (f"No MCP server '{key}'. List configured servers with /mcp.")
+    if kind == "toolset":
+        return (f"Toolset '{key}': the agent's tool scope. Send a message "
+                f"describing the work and the agent uses the tools it needs; "
+                f"available toolsets are listed by the catalog.")
+    return _slash_help_reply(command)
+
+
+#: Registry verbs with a load-bearing dashboard equivalent (mirrors the
+#: terminal-guidance table above for the CLI-registry delta). Everything else
+#: in the registry falls back to the generic /chat pointer in
+#: :func:`_slash_registry_guidance`.
+_SLASH_REGISTRY_DASHBOARD = {
+    "new": "start a fresh conversation here with New chat.",
+    "sessions": "browse + resume past sessions on the Sessions page.",
+    "quit": "nothing server-side to stop — just close this tab.",
+    "exit": "nothing server-side to stop — just close this tab.",
+    "palette": "press Ctrl-K on this page for the command palette.",
+    "copy": "use 'copy last response' under the composer.",
+    "image": "use Attach under the composer (routed to the agent).",
+    "login": "this dashboard session is already authenticated.",
+    "platform": "no messaging transport exists on this surface.",
+    "platforms": "no messaging transport exists on this surface.",
+}
+
+
+def _slash_registry_guidance(command: str) -> str:
+    """Honest guidance for a CLI-registry verb with no dashboard executor.
+
+    Names the verb, its registry description, and where it runs (the /chat
+    terminal, or the dashboard equivalent when one exists) — never a typed
+    refusal, never phantom success. Covers every present and future registry
+    verb, so the offered set can never outgrow the executed set again.
+    """
+    _names, _aliases, descriptions = _registry_slash_map()
+    desc = str(descriptions.get(command) or "").strip()
+    if desc and not desc.endswith((".", "!", "?", ":")):
+        desc += "."
+    head = f"/{command}" + (f" — {desc}" if desc else "")
+    pointer = _SLASH_REGISTRY_DASHBOARD.get(command)
+    if pointer is not None:
+        return f"{head} {pointer}"
+    return (f"{head} It runs in the /chat terminal (open it from this "
+            f"page's 'open in /chat' link).")
+
+
 def run_qubitchat_slash(cfg: Any, text: str,
                          *, session_id: str = "") -> Dict[str, Any]:
     """Execute one leading-slash turn against a real backend.
@@ -3577,6 +3807,10 @@ def run_qubitchat_slash(cfg: Any, text: str,
             reply = _slash_whoami(session_id)
         elif command in _SLASH_TERMINAL_GUIDANCE:
             reply = (f"/{command} {_SLASH_TERMINAL_GUIDANCE[command]}")
+        elif _slash_catalog_entry(command) is not None:
+            reply = _slash_catalog_reply(cfg, command)
+        elif command in _registry_slash_names():
+            reply = _slash_registry_guidance(command)
         else:
             reply = _slash_help_reply(str(parsed.get("name") or ""))
     except Exception as exc:  # noqa: BLE001 - typed, redacted, never narrated
