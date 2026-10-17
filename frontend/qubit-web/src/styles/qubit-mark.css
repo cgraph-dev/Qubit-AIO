@@ -16,26 +16,53 @@
   overflow: visible;
 }
 
-.qubit-mark__orbit {
+/* Each particle spins about the nucleus. Durations are set inline per particle
+ * (see PARTICLES), so this rule only supplies the shared mechanics. */
+.qubit-mark__spin {
   transform-box: view-box;
   transform-origin: 20px 20px;
+  animation-name: qubit-mark-revolve;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
   will-change: transform;
 }
 
-/* Counter-rotating orbits at mutually prime periods read as a live qubit
- * rather than a spinning icon: the lattice does not visibly repeat. */
-.qubit-mark__orbit--a {
-  animation: qubit-mark-orbit 11s linear infinite;
-}
-
-.qubit-mark__orbit--b {
-  animation: qubit-mark-orbit 17s linear infinite reverse;
-}
-
-@keyframes qubit-mark-orbit {
+@keyframes qubit-mark-revolve {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Depth: a particle on a tilted ellipse is nearest the viewer at orbital angle
+ * 0 and farthest at 180deg. Scaling + brightening on that same beat is what
+ * sells perspective — without it particles just slide flat across the ring. */
+.qubit-mark__bead {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: qubit-mark-depth;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes qubit-mark-depth {
+  0% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  50% {
+    opacity: 0.28;
+    transform: scale(0.72);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+/* The far field sits behind the nucleus, so its particles never reach full
+ * brightness — that difference is the depth cue between the two orbits. */
+.qubit-mark__bead--b {
+  opacity: 0.55;
 }
 
 .qubit-mark__nucleus {
@@ -51,8 +78,8 @@
     opacity: 1;
   }
   50% {
-    transform: scale(1.14);
-    opacity: 0.86;
+    transform: scale(1.13);
+    opacity: 0.87;
   }
 }
 
@@ -74,8 +101,8 @@
   }
 }
 
-/* Shockwaves from the nucleus: expand once per beat, then hold invisible for
- * the remainder of the cycle. The second ring runs half a beat behind. */
+/* Shockwaves: expand once per beat, then hold invisible for the rest. The
+ * second ring runs half a beat behind, so emission reads as continuous. */
 .qubit-mark__pulse {
   transform-box: view-box;
   transform-origin: 20px 20px;
@@ -90,7 +117,7 @@
 @keyframes qubit-mark-pulse {
   0% {
     transform: scale(1);
-    opacity: 0.6;
+    opacity: 0.65;
   }
   62% {
     transform: scale(3.4);
@@ -102,46 +129,58 @@
   }
 }
 
-/* Beads: each one is a child of a rotating group, so it already travels the
- * ellipse. Only its brightness changes, phased by a negative delay tied to its
- * seed angle — that turns "dots on a ring" into "particles passing the
- * viewer", without an per-frame path calculation. */
+/* ---------- Hover: the mark opens up ----------
+ *
+ * Idle is a steady orbit. Hover is a deliberate state change, not a slightly
+ * faster version of idle: the two fields splay apart, both push outward, the
+ * glow lifts, and the mark breathes up a notch. Transitions rather than
+ * re-animations, so the change can be interrupted cleanly mid-flight.
+ */
+.qubit-mark {
+  transition: filter 320ms cubic-bezier(0.22, 1, 0.36, 1), transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.qubit-mark__field {
+  transform-box: view-box;
+  transform-origin: 20px 20px;
+  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.qubit-mark__field--far {
+  opacity: 0.75;
+}
+
+.qagent-sidebar__brand-row:hover .qubit-mark,
+.qagent-sidebar__brand-row:focus-within .qubit-mark {
+  transform: scale(1.06);
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--qsidebar-accent, currentColor) 65%, transparent));
+}
+
+/* The two fields splay apart — the strongest read of "the orbits opened up". */
+.qagent-sidebar__brand-row:hover .qubit-mark__field--near,
+.qagent-sidebar__brand-row:focus-within .qubit-mark__field--near {
+  transform: rotate(9deg) scale(1.04);
+}
+
+.qagent-sidebar__brand-row:hover .qubit-mark__field--far,
+.qagent-sidebar__brand-row:focus-within .qubit-mark__field--far {
+  transform: rotate(-9deg) scale(1.04);
+  opacity: 1;
+}
+
+/* Particles accelerate while the pointer is on the brand. */
+.qagent-sidebar__brand-row:hover .qubit-mark__spin {
+  animation-duration: 4.4s;
+}
+
+.qagent-sidebar__brand-row:hover .qubit-mark__bead {
+  animation-duration: 1.8s;
+  opacity: 1;
+}
+
+.qubit-mark__spin,
 .qubit-mark__bead {
-  animation: qubit-mark-bead 11s linear infinite;
-}
-
-.qubit-mark__bead--far {
-  animation-duration: 17s;
-  animation-direction: reverse;
-}
-
-@keyframes qubit-mark-bead {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-/* Hover: the whole mark leans in and the orbits accelerate smoothly rather
- * than snapping to a new speed. */
-.qagent-sidebar__brand-row:hover .qubit-mark__orbit--a,
-.qagent-sidebar__brand-row:hover .qubit-mark__bead--near {
-  animation-duration: 3.2s;
-}
-.qagent-sidebar__brand-row:hover .qubit-mark__orbit--b,
-.qagent-sidebar__brand-row:hover .qubit-mark__bead--far {
-  animation-duration: 4.6s;
-}
-.qubit-mark,
-.qubit-mark__orbit,
-.qubit-mark__bead {
-  transition: filter 280ms ease, animation-duration 280ms ease;
-}
-.qagent-sidebar__brand-row:hover .qubit-mark {
-  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--qsidebar-accent, currentColor) 60%, transparent));
+  transition: animation-duration 320ms ease;
 }
 
 /* ---------- Wordmark ---------- */
@@ -194,37 +233,50 @@
   }
 }
 
-/* Hover: letters settle and a soft accent glow forms under the wordmark. */
-.qagent-sidebar .qagent-sidebar__brand-row:hover .qagent-sidebar__brand-name {
-  animation-play-state: paused;
-  background-position: 50% 0;
-  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--qsidebar-accent, currentColor) 50%, transparent));
+/* Hover: the wordmark lifts toward the viewer with a glow, and the sheen keeps
+ * running instead of freezing mid-letter (the old rule paused it, which read
+ * as the animation breaking on contact). */
+.qagent-sidebar .qagent-sidebar__brand-name {
+  transition: filter 320ms cubic-bezier(0.22, 1, 0.36, 1), transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.qagent-sidebar .qagent-sidebar__brand-name {
-  transition: filter 280ms ease;
+.qagent-sidebar .qagent-sidebar__brand-row:hover .qagent-sidebar__brand-name,
+.qagent-sidebar .qagent-sidebar__brand-row:focus-within .qagent-sidebar__brand-name {
+  transform: translateX(2px) scale(1.03);
+  transform-origin: left center;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--qsidebar-accent, currentColor) 55%, transparent));
 }
 
 /* ---------- Reduced motion: everything rests ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .qubit-mark__orbit,
+  .qubit-mark,
+  .qubit-mark__spin,
   .qubit-mark__nucleus,
   .qubit-mark__halo,
   .qubit-mark__pulse,
   .qubit-mark__bead,
+  .qubit-mark__field,
   .qagent-sidebar .qagent-sidebar__brand-name,
   .qagent-sidebar .qagent-sidebar__brand-row > div:first-child > .qagent-sidebar__brand-name {
     animation: none !important;
+    transition: none !important;
   }
   .qubit-mark__pulse {
     opacity: 0;
   }
   .qubit-mark__bead {
-    opacity: 0.8;
+    opacity: 0.9;
   }
   .qagent-sidebar .qagent-sidebar__brand-name {
     -webkit-text-fill-color: currentColor;
     background-image: none;
+  }
+  .qagent-sidebar__brand-row:hover .qubit-mark,
+  .qagent-sidebar__brand-row:hover .qubit-mark__field,
+  .qagent-sidebar__brand-row:hover .qubit-mark__field--far,
+  .qagent-sidebar__brand-row:hover .qubit-mark__field--near,
+  .qagent-sidebar .qagent-sidebar__brand-row:hover .qagent-sidebar__brand-name {
+    transform: none;
   }
 }
