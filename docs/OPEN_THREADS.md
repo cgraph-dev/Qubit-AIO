@@ -390,3 +390,66 @@ modifies none of the 18 deny-listed files.
 | `7f2a2098c` | sync-triage hunk matrix harness |
 
 Rescued-but-unlanded: a `QUBIT_GUEST_ONBOARDING` change that needs writers+tests moved with it.
+---
+
+## 2026-10-17 — Desktop vitest: node-builtin tests are dead in the jsdom project
+
+**🔴 OPEN (documented, not fixed).** `apps/desktop/src/**` tests that import a `node:`
+builtin cannot run under the `ui` vitest project, which pins `environment: 'jsdom'`.
+Vite externalizes `node:` for browser compatibility and jsdom has no loader for it, so the
+suite fails at import with `Error: No such built-in module: node:` — reported as `(0 test)`,
+i.e. the file never even collects.
+
+**Scale (measured).** 12 of the 14 `src/**` tests importing a `node:` builtin have no
+`@vitest-environment` directive and are in this state:
+
+```
+src/app/chat/right-rail/preview-act.test.ts
+src/app/chat/right-rail/preview-file-save-scope.test.tsx
+src/app/right-sidebar/files/ipc.test.ts
+src/components/assistant-ui/thread/system-message.test.tsx
+src/components/assistant-ui/tool/inline-edit-persistence.test.tsx
+src/components/pane-shell/pane-visibility.test.ts
+src/components/ui/__tests__/no-native-title.test.ts
+src/lib/speech-text.identifier-corpus.test.ts
+src/plugins/hermes-bots/cron-prompt.test.ts
+src/plugins/hermes-bots/group-chat-view.inline-code.test.tsx
+src/plugins/hermes-bots/group-chat-view.wrap.test.tsx
+src/plugins/hermes-bots/relay-deliver-budget.test.ts
+src/store/nanostores-batch-guard.test.ts
+```
+
+Only `src/hover-variant.test.ts` is fine, because it imports **no app code** — a pure node
+test that carries `// @vitest-environment node` and so runs correctly.
+
+**What does NOT work (probed, not assumed).** A minimal reproduction (one file using
+`node:child_process` + jsdom) was used to test each candidate; all still failed with
+`No such built-in module: node:`:
+
+- `test.server.deps.inline: [/node:/]`  ·  `inline: true`
+- `ssr.noExternal: true`  ·  `resolve.conditions: ['node']`
+- `test.pool: 'forks'`
+- `test.server.deps.external: [/node:/]`
+- `resolve.alias` mapping each `node:<m>` to `<m>`
+- static **and** dynamic `await import('node:child_process')` inside a test body
+
+So it cannot be fixed by a config knob. The two requirements are mutually exclusive in one
+file: a `node` environment gives real builtins but no `window`; `jsdom` gives `window` but no
+builtins. `// @vitest-environment node` alone swaps one failure for the other
+(`ReferenceError: window is not defined` from the app import graph).
+
+**The real fix (not done).** `cron-prompt.test.ts` needs both: it shells out (`spawnSync`) and
+imports `./cron`, whose module graph reaches `src/store/onboarding-gate.ts`, which calls
+`loadGate()` at import time and dereferences `window.hermesDesktop`. Hand-stubbing `window` in
+the test fails twice over — vitest hoists static imports above any statement in the file, and
+the graph then wants `window.addEventListener` and more (it pulls `src/sdk/index.ts`). The
+prescribed fix is the one the root AGENTS.md gives for logic trapped in a god-file:
+**extract the pure functions** (`routinePrompt`, `normalizedProfileName`, `routineInputError`,
+`isLegacyDelegatedRoutine`, plus `shellQuote` and the three literals they use) into a light
+`cron-prompt.ts` sibling with no React/SDK import, and point the test at that. `botsText()`
+(from `./i18n`, which imports `@qubit/plugin-sdk`) is the coupling to break or pass in.
+
+**Interim state.** `cron.tsx`'s delegation wrapper was rebranded to `qubit -p … chat` and the
+test's assertion moved with it (commit `3338de83a`) — the pairing is correct, but the test
+cannot execute until the above is done, so it currently proves nothing.
+
