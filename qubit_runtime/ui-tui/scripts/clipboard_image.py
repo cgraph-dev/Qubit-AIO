@@ -15,7 +15,7 @@ sys.path.insert(0, str(python_root()))
 def main(destination: Path) -> bool:
     # Ink runs this on HERMES_PYTHON with PYTHONPATH=<root> only, which on a source install is PM's
     # store Python: without the committed generation, Pillow is missing and non-PNG clipboard
-    # images silently depend on ImageMagick being installed. Activate before any Hermes import, so
+    # images silently depend on ImageMagick being installed. Activate before any Qubit import, so
     # a module that grows a third-party import still loads from the generation.
     from pm.environments import activate_dependencies
 

@@ -2,8 +2,8 @@
 
 ``--start`` ensures the owner (first launch). A reconnect discovers only, except ``--recover``
 (a bounded slot, ``gatewayClient.ts`` ``OWNER_RECOVERY_LIMIT`` per window) re-ensures whenever the
-owner is not ready: it crashed, ended by its idle exit, was stopped with ``hermes gateway stop``
-while this TUI was open, or an older Hermes's gateway answers (ensure replaces that one). Main's TUI
+owner is not ready: it crashed, ended by its idle exit, was stopped with ``qubit gateway stop``
+while this TUI was open, or an older Qubit's gateway answers (ensure replaces that one). Main's TUI
 ran its own sidecar and never depended on an external daemon, so an open TUI comes back on its own.
 """
 import contextlib
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     # bad JSON (ValueError), rejected grants (RuntimeError), malformed reply shapes. Anything else
     # still exits 1, with a traceback.
     except ImportError as exc:
-        # This interpreter cannot load Hermes at all: no reconnect fixes that, so name it
+        # This interpreter cannot load Qubit at all: no reconnect fixes that, so name it
         # (gatewayClient.ts stops retrying on this verdict).
         print(f"gateway unavailable: bootstrap_dependencies\n{exc}\n{BOOTSTRAP_REMEDY}", file=sys.stderr)
         raise SystemExit(1)

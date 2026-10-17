@@ -14,7 +14,7 @@ vi.mock('../config/env.js', async importActual => ({
 const ref = <T>(current: T) => ({ current })
 
 describe('startup latency in a dashboard-embedded TUI', () => {
-  it('never reports: each Chat-tab terminal spawns a TUI, which is not a Hermes launch', () => {
+  it('never reports: each Chat-tab terminal spawns a TUI, which is not a Qubit launch', () => {
     const request = vi.fn(async () => ({ ok: true }))
 
     const ctx = {
