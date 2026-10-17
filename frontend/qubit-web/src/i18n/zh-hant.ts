@@ -50,7 +50,7 @@ export const zhHant: Translations = {
   },
 
   app: {
-    brand: "Qubit Agent",
+    brand: "Qubit AiO",
     brandShort: "QA",
     closeNavigation: "關閉導覽",
     closeModelTools: "關閉模型與工具",

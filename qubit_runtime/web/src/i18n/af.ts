@@ -50,7 +50,7 @@ export const af: Translations = {
   },
 
   app: {
-    brand: "Qubit Agent",
+    brand: "Qubit AiO",
     brandShort: "HA",
     closeNavigation: "Maak navigasie toe",
     closeModelTools: "Maak model en gereedskap toe",

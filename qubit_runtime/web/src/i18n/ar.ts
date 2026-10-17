@@ -50,7 +50,7 @@ export const ar = defineLocale({
   },
 
   app: {
-    brand: "Qubit Agent",
+    brand: "Qubit AiO",
     brandShort: "HA",
     closeNavigation: "إغلاق التنقل",
     closeModelTools: "إغلاق النموذج والأدوات",

@@ -50,7 +50,7 @@ export const uk: Translations = {
   },
 
   app: {
-    brand: "Qubit Agent",
+    brand: "Qubit AiO",
     brandShort: "QA",
     closeNavigation: "Закрити навігацію",
     closeModelTools: "Закрити модель та інструменти",

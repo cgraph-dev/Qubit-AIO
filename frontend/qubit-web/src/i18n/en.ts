@@ -55,7 +55,7 @@ export const en: Translations = {
   },
 
   app: {
-    brand: "Qubit Agent",
+    brand: "Qubit AiO",
     brandShort: "QA",
     closeNavigation: "Close navigation",
     closeModelTools: "Close model and tools",
