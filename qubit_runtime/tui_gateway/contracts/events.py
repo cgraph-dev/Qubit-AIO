@@ -262,9 +262,24 @@ event("status.update", StatusUpdatePayload, doc="Transient status line (kind: st
 
 
 class SessionUsagePayload(Payload):
-    """``server._start_usage_ticker``."""
+    """``usage``: the status-bar view (``server._get_usage``), sent by the embedded backend's ticker
+    (``server._start_usage_ticker``) and by a canonical local viewer's gateway after every API call
+    and at turn end (``gateway/session_usage.publish_usage``). Read this.
 
-    usage: Usage
+    Deprecated: the top-level session-cumulative counters (``usage_stats``, the ``session.stats``
+    dict) that the gateway frame also carries. They are kept for existing readers; new readers use
+    ``usage``, or ``session.stats`` for the raw counters. The embedded ticker never sends them."""
+
+    usage: Usage | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    api_calls: int | None = None
 
 
 event("session.usage", SessionUsagePayload, doc="Mid-turn usage tick; message.complete carries the authoritative final usage.")
@@ -385,7 +400,9 @@ event("todo.updated", TodoUpdatedPayload, doc="Full todo snapshot after a todo t
 
 class NotificationShowPayload(Payload):
     """``agent/credits_tracker.py::AgentNotice`` via notice_callback, and ``server._await_agent_ready``'s
-    slow-build notice. ``level``: info | warn | error | success; ``kind``: sticky | ttl | agent."""
+    slow-build notice. ``level``: info | warn | error | success; ``kind``: sticky | ttl | agent.
+    ``detail``: the full text behind a short ``text`` (the low-disk auto-prune question): Desktop shows
+    it in the toast's expandable body, the Ink TUI prints it into the transcript."""
 
     text: str
     level: str
@@ -393,6 +410,7 @@ class NotificationShowPayload(Payload):
     ttl_ms: int | None = None
     key: str | None = None
     id: str | None = None
+    detail: str | None = None
 
 
 class NotificationClearPayload(Payload):
@@ -792,6 +810,8 @@ event("sessions.changed", ChangeSignalPayload, doc="state.db moved; refetch the 
 event("platforms.changed", ChangeSignalPayload, doc="gateway_state.json moved; refetch platform status.")
 event("projects.changed", ChangeSignalPayload, doc="projects.db moved; refetch the project list + tree.")
 event("pairing.changed", ChangeSignalPayload, doc="Pairing state moved; refetch pairing.")
+event("skills.changed", ChangeSignalPayload,
+      doc="A skill root moved (installed/removed elsewhere); refetch commands.catalog from the gateway.")
 event("bot_relay.outbox.pending", ChangeSignalPayload, doc="A bot-relay outbox envelope is queued; drain it.")
 
 
