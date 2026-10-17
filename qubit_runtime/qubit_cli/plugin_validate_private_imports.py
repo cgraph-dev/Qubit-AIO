@@ -15,7 +15,7 @@ import tomllib
 from functools import lru_cache
 from pathlib import Path
 
-from qubit_cli.plugin_validate_core_override import _hermes_top_level, _python_files
+from qubit_cli.plugin_validate_core_override import _qubit_top_level, _python_files
 
 # WHY: "public" must mean what Hermes documents for plugin authors, not a reviewer's taste.
 # Derived from every Hermes-module ``import`` in website/docs/developer-guide/**/*.md and
