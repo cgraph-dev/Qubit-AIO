@@ -393,7 +393,7 @@ async def _exec_buzz(
 ) -> Tuple[int, str, str]:
     """Run the buzz CLI (argv, never a shell) -> ``(rc, stdout, stderr)``. Key travels via env only."""
     from tools.environments.local import qubit_subprocess_env
-    env = qubit_subprocess_env()  # a third-party CLI: its own key only, never Hermes' credentials
+    env = qubit_subprocess_env()  # a third-party CLI: its own key only, never Qubit's credentials
     env["HOME"] = env["HERMES_REAL_HOME"]  # its own config and credentials file live under the user's HOME
     env["BUZZ_RELAY_URL"] = relay_url
     env["BUZZ_PRIVATE_KEY"] = private_key

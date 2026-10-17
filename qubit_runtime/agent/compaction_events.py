@@ -2,7 +2,7 @@
 
 One record per ``compress_context`` attempt (built from the attempt telemetry seam), per
 micro-compaction pass, per committed proactive tool-result prune, and per Codex-native thread
-compaction Hermes observes. A persistence-detached fork (background review) shares the live session id
+compaction Qubit observes. A persistence-detached fork (background review) shares the live session id
 but rewrites only its own throwaway transcript, so it publishes nothing. The payload is flat because OpenTelemetry exporters flatten only top-level
 keys; every categorical field except the free-form ``summarizer_provider`` / ``summarizer_model`` identifiers
 comes from a closed set with an ``other`` fallback; no field carries message, summary, focus-topic, error or
@@ -228,7 +228,7 @@ def prune_payload(
 
 
 def provider_native_payload(*, session_id: str, compression_count: Any = None) -> dict[str, Any]:
-    """A compaction the provider ran on its own thread and Hermes only observed."""
+    """A compaction the provider ran on its own thread and Qubit only observed."""
     return _payload(
         kind="provider_native", scope="provider", official=False, trigger="provider", outcome="committed",
         method="provider", failure_class="none", session_id=session_id, compression_count=_int(compression_count),
@@ -298,7 +298,7 @@ def publish_prune(agent: Any, messages: list, pruned: list, tool_results_pruned:
 
 
 def publish_provider_native(agent: Any) -> None:
-    """Publish one provider-native compaction Hermes observed but did not run."""
+    """Publish one provider-native compaction Qubit observed but did not run."""
     if _publishes_for(agent):
         _publish(
             provider_native_payload, session_id=getattr(agent, "session_id", None) or "",

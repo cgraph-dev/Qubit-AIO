@@ -183,12 +183,12 @@ def _report_requires_managed_execution(report: Any) -> bool:
     """Return whether a Relay plugin-host report enables any static or dynamic plugin.
 
     Relay owns the report contract. An unfamiliar report stays fail-safe by
-    retaining Hermes managed execution instead of silently bypassing plugins.
+    retaining Qubit managed execution instead of silently bypassing plugins.
     """
 
     def keep_enabled() -> bool:
         logger.warning(
-            "Hermes could not determine whether the Relay plugin configuration is empty; keeping managed "
+            "Qubit could not determine whether the Relay plugin configuration is empty; keeping managed "
             "execution enabled"
         )
         return True
@@ -321,11 +321,11 @@ class _ProcessRelayPluginConfiguration:
             self._activation = None
             if _is_relay_host_conflict(exc):
                 logger.warning(
-                    "A process-global Relay plugin configuration is already active outside Hermes native "
-                    "ownership; leaving it unchanged and disabling Hermes-managed Relay middleware for this process"
+                    "A process-global Relay plugin configuration is already active outside Qubit native "
+                    "ownership; leaving it unchanged and disabling Qubit-managed Relay middleware for this process"
                 )
                 return _RelayPluginConfigurationState.FOREIGN
-            logger.warning("Hermes Relay plugin initialization failed: %s", exc, exc_info=True)
+            logger.warning("Qubit Relay plugin initialization failed: %s", exc, exc_info=True)
             return _RelayPluginConfigurationState.FAILED
         self._relay = relay
         return _RelayPluginConfigurationState.ACTIVE
