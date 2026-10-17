@@ -329,9 +329,9 @@ class TestInsightsPopulated:
     _INDEX = "idx_messages_assistant_calls_by_session"
     _PINNED_QUERIES = (
         ("_GET_TOOL_CALLS_ALL", (0.0,)),
-        ("_GET_TOOL_CALLS_WITH_SOURCE", (0.0, "cli")),
+        ("_GET_TOOL_CALLS_WITH_SOURCE", (0.0, "cli", "cli")),  # label, then created_source of a local row
         ("_GET_SKILL_CALLS_ALL", (0.0,)),
-        ("_GET_SKILL_CALLS_WITH_SOURCE", (0.0, "cli")),
+        ("_GET_SKILL_CALLS_WITH_SOURCE", (0.0, "cli", "cli")),
     )
 
     def test_assistant_call_queries_use_partial_index_without_analyze(
