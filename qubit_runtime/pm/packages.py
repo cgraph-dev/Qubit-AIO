@@ -12,6 +12,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
+from pm.filesystem import long_root
 from pm.package import (
     DebPackage,
     InstallError,
@@ -301,6 +302,29 @@ def _uv_lock_digest(path: Path) -> bytes:
 _uv_lock_digest_cache: dict[Path, tuple] = {}
 
 
+def _copy_seed_file(src: str | os.PathLike, dst: str | os.PathLike) -> str | os.PathLike:
+    """Copy one payload cache file unless an earlier seed already copied it whole.
+
+    A copy cut short leaves the file in place with too few bytes, so a matching
+    size is what counts as done; a finished file is not rewritten.
+    """
+    try:
+        if os.stat(dst).st_size == os.stat(src).st_size:
+            return dst
+    except FileNotFoundError:
+        pass
+    # Other profiles share this cache: publish only a complete copy, without
+    # truncating the live entry or leaving a failed copy visible to readers.
+    fd, staging = tempfile.mkstemp(prefix=".seed-", dir=Path(dst).parent)
+    os.close(fd)
+    try:
+        shutil.copy2(src, staging)
+        os.replace(staging, dst)
+    finally:
+        Path(staging).unlink(missing_ok=True)
+    return dst
+
+
 def uv_cache_dir() -> Path:
     """The hermes-owned uv cache: machine-scoped and shared (keyed by
     content — two profiles reuse one cache), anchored to the DEFAULT
@@ -325,17 +349,20 @@ def uv_cache_dir() -> Path:
 
             payload_cache = store_root().parent / "uv-cache"
             if payload_cache.is_dir():
-                machine_cache.mkdir(parents=True, exist_ok=True)
+                # uv's cache trees run deep; both roots get the long spelling so
+                # the copy is not cut at MAX_PATH. The returned path stays ordinary.
+                seeded = long_root(machine_cache)
+                seeded.mkdir(parents=True, exist_ok=True)
                 for entry in payload_cache.iterdir():
                     if entry.name == ".seeded":
                         continue
-                    dest = machine_cache / entry.name
-                    if not dest.exists():
-                        (
-                            shutil.copytree(entry, dest)
-                            if entry.is_dir()
-                            else shutil.copy2(entry, dest)
-                        )
+                    dest = seeded / entry.name
+                    # Merge into whatever an earlier failed or killed seed left: skipping
+                    # an existing directory would record that partial copy as complete.
+                    if entry.is_dir():
+                        shutil.copytree(entry, dest, dirs_exist_ok=True, copy_function=_copy_seed_file)
+                    else:
+                        _copy_seed_file(entry, dest)
         except OSError as exc:
             LOG.warning("uv cache seed incomplete, retrying on the next install: %s", exc)
         else:
