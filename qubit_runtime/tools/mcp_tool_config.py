@@ -271,9 +271,9 @@ def _is_hermes_managed_bin_dir(directory: str) -> bool:
         return False
     if resolved == Path(sys.executable).resolve().parent:
         return True
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     try:
-        home = Path(get_hermes_home()).resolve()
+        home = Path(get_qubit_home()).resolve()
     except Exception:
         return False
     return resolved == home / "bin" or home in resolved.parents

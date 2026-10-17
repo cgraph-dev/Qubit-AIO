@@ -22,7 +22,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 from tools.environments.base import BaseEnvironment, EnvironmentConnectionError, _SHELL_ENV_NAME_RE
 from tools.terminal_tool_config import (
     _host_path_key, _is_windows_drive_path, cwd_follows_host_mount,
@@ -152,7 +152,7 @@ def _is_volatile_mount_spec(spec: str) -> bool:
         return False
 
 
-def _reuse_environment_fingerprint(*, image: str, mount_args: list[str], hermes_home: str) -> str:
+def _reuse_environment_fingerprint(*, image: str, mount_args: list[str], qubit_home: str) -> str:
     """Hash immutable configuration so reuse cannot silently attach to stale mounts.
 
     Hash requested values rather than exposing profile paths and volume sources in labels.
@@ -163,13 +163,13 @@ def _reuse_environment_fingerprint(*, image: str, mount_args: list[str], hermes_
     matched for users with any symlink under ``skills/``. The container path stays in the
     hash, so moving where that mount lands still forces a fresh container.
     """
-    normalized_home = os.path.normcase(os.path.abspath(os.path.expanduser(hermes_home)))
+    normalized_home = os.path.normcase(os.path.abspath(os.path.expanduser(qubit_home)))
     canonical_mounts = [
         (f"<volatile-tempdir-mount>:{spec.split(':', 1)[1]}"
          if _is_volatile_mount_spec(spec) else spec)
         for spec in mount_args]
     payload = json.dumps(
-        {"image": image, "mount_args": canonical_mounts, "hermes_home": normalized_home},
+        {"image": image, "mount_args": canonical_mounts, "qubit_home": normalized_home},
         sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
 
@@ -738,7 +738,7 @@ class DockerEnvironment(BaseEnvironment):
         if not shared_container_key:
             self._labels[_ENVIRONMENT_LABEL_KEY] = _reuse_environment_fingerprint(
                 image=image, mount_args=[*writable_args, *volume_args],
-                hermes_home=str(get_hermes_home()))
+                qubit_home=str(get_qubit_home()))
         # Saved for container recreation on "No such container" recovery.
         self._image = image
         self._image_pinned = image_pinned

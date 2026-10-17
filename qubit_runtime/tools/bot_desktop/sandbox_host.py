@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 from tools.environments import streams
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ _RELAY = (
 
 
 def _marker() -> Path:
-    return get_hermes_home() / "bot-desktop" / "sandbox.json"
+    return get_qubit_home() / "bot-desktop" / "sandbox.json"
 
 
 def _read_marker() -> Dict[str, Any]:

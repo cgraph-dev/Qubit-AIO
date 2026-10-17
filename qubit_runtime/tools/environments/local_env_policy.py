@@ -146,8 +146,8 @@ def _home_adapter_secret_env() -> frozenset:
     or flat manifest unreadable or unparsable) keeps the names this home already had and is not
     cached, so a failed discovery never releases a known denial and recovery is seen at once."""
     from qubit_cli.config import platform_manifest_secret_scan, platform_manifest_stamp
-    from qubit_constants import get_hermes_home, qubit_home_key
-    home = get_hermes_home()
+    from qubit_constants import get_qubit_home, qubit_home_key
+    home = get_qubit_home()
     key, stamp = qubit_home_key(home), platform_manifest_stamp(home)
     cached = _HOME_ADAPTER_SECRET_CACHE.get(key)
     if cached is None or cached[0] is None or cached[0] != stamp:

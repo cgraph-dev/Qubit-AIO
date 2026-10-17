@@ -98,7 +98,7 @@ def _handle_sudo_failure(output: str, env_type: str) -> str:
     no_user = _no_sudo_user()
     if not (is_gateway or no_user) or not any(f in output for f in _SUDO_HEADLESS_FAILURES):
         return output
-    from qubit_constants import display_hermes_home as _dhh
+    from qubit_constants import display_qubit_home as _dhh
     if no_user:
         return output + (
             "\n\n💡 Tip: This session cannot prompt for a sudo password. "
