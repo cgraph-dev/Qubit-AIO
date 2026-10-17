@@ -110,10 +110,19 @@ function createOfficeWithSeatRouting(
   return function OfficeWithSeatRouting() {
     const [seats, setSeats] = H.useState<Array<{ agent_id: number; slug: string }>>([]);
     const [seatId, setSeatId] = H.useState<number | null>(null);
+    const [seatError, setSeatError] = H.useState<string>("");
 
     H.useEffect(() => {
       const adapter = new OfficeAdapter({
         onSnapshot: (s) => {
+          // Name a failed read rather than rendering an empty seat list: an
+          // office with no seats and an office whose poll 401'd look identical
+          // otherwise, and the operator cannot tell a quiet org from a broken one.
+          if (s.error) {
+            setSeatError(s.error);
+          } else {
+            setSeatError("");
+          }
           const characters = s.payload?.characters ?? [];
           if (characters.length === 0) return;
           setSeats(characters.map((c) => ({ agent_id: c.agent_id, slug: c.slug })));
@@ -134,6 +143,7 @@ function createOfficeWithSeatRouting(
       seatLabel: seatId === null
         ? undefined
         : seats.find((s) => s.agent_id === seatId)?.slug,
+      seatError,
       onSeatChange: setSeatId,
     });
   };

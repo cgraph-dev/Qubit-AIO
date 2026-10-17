@@ -104,9 +104,19 @@ export class OfficeAdapter {
     const f = this.opts.fetchImpl ?? fetch;
     const token = this.opts.token ?? readSessionToken();
     try {
+      // Send BOTH identities. `X-Api-Token` is what `_api_token_ok` reads and
+      // is what this adapter has always used; `X-Qubit-Session-Token` is the
+      // canonical wire identity the seat-model panel and the office api-bridge
+      // send. Carrying both means a future tightening of `_qubit_token_ok`
+      // cannot split this read from the panel's, without changing a working path.
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["X-Api-Token"] = token;
+        headers["X-Qubit-Session-Token"] = token;
+      }
       const res = await f(`${this.opts.baseUrl}/api/office/tower`, {
         signal: ctl.signal,
-        headers: token ? { "X-Api-Token": token } : undefined,
+        headers: token ? headers : undefined,
       });
       if (ctl.signal.aborted) return;
       if (!res.ok) {

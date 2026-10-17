@@ -35,6 +35,11 @@ export interface OfficeAppProps {
   seats?: Array<{ agent_id: number; slug: string }>;
   /** Called when the operator picks a different seat. */
   onSeatChange?: (agentId: number) => void;
+  /**
+   * Why the seat list is empty, when it is empty because a read failed rather
+   * than because the office has no seats. Shown as a banner, never swallowed.
+   */
+  seatError?: string;
   /** Set once the iframe has loaded, for tests and for a load-failure banner. */
   onReady?: () => void;
 }
@@ -172,6 +177,16 @@ export function createOfficeApp(
         onClick: () => setPanelOpen(!panelOpen),
       }, panelOpen ? "Hide seat model" : "Seat model"));
       if (panelOpen) {
+        // A failed poll is named BEFORE the picker, so an empty office and an
+        // unreachable one never look the same.
+        if (props.seatError) {
+          children.push(R.createElement("div", {
+            key: "seat-error",
+            className: "seat-model__error",
+            role: "alert",
+            "data-testid": "seat-model-seat-error",
+          }, `The seat list could not be read (${props.seatError}); model routing is unavailable.`));
+        }
         // The picker comes from the tower payload's own characters: the seats
         // drawn in the office are the seats that can be configured.
         if (seats.length > 0) {

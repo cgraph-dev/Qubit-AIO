@@ -104,4 +104,36 @@ describe("Habblaud embedding", () => {
     expect(picker).toBeDefined();
     expect(picker?.props.value).toBe("3");
   });
+
+  it("names a failed seat read instead of showing an empty list", () => {
+    // An office with no seats and an office whose poll failed must not look
+    // identical — one is quiet, the other is broken.
+    const h = createHarness();
+    let panelOpen = false;
+    const hooks = {
+      ...h.hooks,
+      useState: (initial: unknown) => [panelOpen ? true : initial, vi.fn()],
+    };
+    panelOpen = true;
+    const App = createOfficeApp(h.React as never, hooks as never);
+    App({ seatAgentId: 1, seats: [], seatError: "HTTP 401" });
+    const banner = h.tree.find(
+      (e) => e.props["data-testid"] === "seat-model-seat-error");
+    expect(banner).toBeDefined();
+    expect(String(banner?.props.children)).toContain("HTTP 401");
+  });
+
+  it("shows no error banner when the read succeeded", () => {
+    const h = createHarness();
+    let panelOpen = false;
+    const hooks = {
+      ...h.hooks,
+      useState: (initial: unknown) => [panelOpen ? true : initial, vi.fn()],
+    };
+    panelOpen = true;
+    const App = createOfficeApp(h.React as never, hooks as never);
+    App({ seatAgentId: 1, seats: [{ agent_id: 1, slug: "ceo" }] });
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "seat-model-seat-error")).toBeUndefined();
+  });
 });

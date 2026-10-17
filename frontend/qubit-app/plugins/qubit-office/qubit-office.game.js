@@ -192969,6 +192969,12 @@ create: function(game) {
 					onClick: () => setPanelOpen(!panelOpen)
 				}, panelOpen ? "Hide seat model" : "Seat model"));
 				if (panelOpen) {
+					if (props.seatError) children.push(R.createElement("div", {
+						key: "seat-error",
+						className: "seat-model__error",
+						role: "alert",
+						"data-testid": "seat-model-seat-error"
+					}, `The seat list could not be read (${props.seatError}); model routing is unavailable.`));
 					if (seats.length > 0) children.push(R.createElement("label", {
 						key: "seat-picker",
 						className: "seat-model__label"
@@ -193047,9 +193053,14 @@ create: function(game) {
 			const f = this.opts.fetchImpl ?? fetch;
 			const token = this.opts.token ?? readSessionToken();
 			try {
+				const headers = {};
+				if (token) {
+					headers["X-Api-Token"] = token;
+					headers["X-Qubit-Session-Token"] = token;
+				}
 				const res = await f(`${this.opts.baseUrl}/api/office/tower`, {
 					signal: ctl.signal,
-					headers: token ? { "X-Api-Token": token } : void 0
+					headers: token ? headers : void 0
 				});
 				if (ctl.signal.aborted) return;
 				if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -193185,8 +193196,11 @@ create: function(game) {
 		return function OfficeWithSeatRouting() {
 			const [seats, setSeats] = H.useState([]);
 			const [seatId, setSeatId] = H.useState(null);
+			const [seatError, setSeatError] = H.useState("");
 			H.useEffect(() => {
 				const adapter = new OfficeAdapter({ onSnapshot: (s) => {
+					if (s.error) setSeatError(s.error);
+					else setSeatError("");
 					const characters = s.payload?.characters ?? [];
 					if (characters.length === 0) return;
 					setSeats(characters.map((c) => ({
@@ -193202,6 +193216,7 @@ create: function(game) {
 				seats,
 				seatAgentId: seatId ?? void 0,
 				seatLabel: seatId === null ? void 0 : seats.find((s) => s.agent_id === seatId)?.slug,
+				seatError,
 				onSeatChange: setSeatId
 			});
 		};
