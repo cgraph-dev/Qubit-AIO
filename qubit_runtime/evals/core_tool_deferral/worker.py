@@ -27,20 +27,23 @@ if not os.environ.get("OPENROUTER_API_KEY"):
     print("ABORT: OPENROUTER_API_KEY missing", file=sys.stderr)
     sys.exit(3)
 
-# --- hermetic env BEFORE any hermes import -------------------------------
+# --- hermetic env BEFORE any qubit import -------------------------------
 for var in list(os.environ):
     if var.endswith(("_API_KEY", "_TOKEN")) and var != "OPENROUTER_API_KEY":
         os.environ.pop(var, None)
 os.environ.pop("FAL_KEY", None)
 os.environ.pop("HERMES_PROFILE", None)
 
+from sandbox import isolate_host
+
 tmp_root = tempfile.mkdtemp(prefix=f"ab-{ARM}-{TASK_ID}-")
 qubit_home = os.path.join(tmp_root, ".hermes")
 workspace = os.path.join(tmp_root, "ws")
 os.makedirs(qubit_home)
 os.makedirs(workspace)
+isolate_host(tmp_root, qubit_home)
 with open(os.path.join(qubit_home, "config.yaml"), "w", encoding="utf-8") as f:
-    f.write("model:\n  provider: openrouter\n  model: %s\n" % MODEL)
+    f.write(f"model:\n  provider: openrouter\n  model: {MODEL}\n")
 
 os.environ["QUBIT_HOME"] = qubit_home
 os.environ["TERMINAL_CWD"] = workspace
@@ -104,17 +107,19 @@ IMG_URL = taskmod.IMG_URL
 
 _clarify_answers = list(TASK.get("clarify_answers") or [])
 
-def clarify_cb(question, choices, multi_select=False):
-    CALLBACK_LOG.append({"name": "clarify", "question": question, "choices": choices})
-    if _clarify_answers:
-        ans = _clarify_answers.pop(0)
-    else:
-        ans = "Use your best judgement."
-    if choices:
-        for c in choices:
-            if ans.lower() in str(c).lower():
-                return str(c)
-    return ans
+def clarify_cb(questions):
+    answers = {}
+    for entry in questions:
+        CALLBACK_LOG.append({"name": "clarify", "question": entry["question"], "choices": entry["choices"]})
+        ans = _clarify_answers.pop(0) if _clarify_answers else "Use your best judgement."
+        match = next((str(c) for c in entry["choices"] or [] if ans.lower() in str(c).lower()), None)
+        answers[entry["qid"]] = match or ans
+    return {"answers": answers, "outcome": "submitted"}
+
+def theme_cb(payload):
+    CALLBACK_LOG.append({"name": "theme", "payload": payload})
+    return {"success": True, "applied": {k: v for k, v in payload.items() if k != "picker"}}
+
 
 def tour_cb(payload):
     CALLBACK_LOG.append({"name": "tour", "payload": payload})
@@ -157,8 +162,8 @@ def drive_preview_cb(payload):
     if action in ("snapshot", "read", "links"):
         return json.dumps({"success": True, "title": PREVIEW_TITLE,
                            "url": "https://example.com/docs/",
-                           "text": ("Page: %s\nLinks: [Docs]->/docs/ [ref=e3]\n"
-                                    "Search box: input#docs-search [ref=e12]") % PREVIEW_TITLE})
+                           "text": (f"Page: {PREVIEW_TITLE}\nLinks: [Docs]->/docs/ [ref=e3]\n"
+                                    "Search box: input#docs-search [ref=e12]")})
     return json.dumps({"success": True, "action": action, "title": PREVIEW_TITLE})
 
 def read_window_below_cb(**kw):
@@ -172,7 +177,7 @@ def connection_cb(payload):
         {"name": t["name"], "status": "installed"} for t in payload.get("targets", [])]})
 
 # --- import the tree's model_tools + patch registry stubs ------------------
-import model_tools  # noqa: E402  (triggers registrations + plugin discovery)
+import model_tools  # noqa: E402
 from tools.registry import registry  # noqa: E402
 
 def _stub_entry(name, handler):
@@ -192,8 +197,8 @@ def computer_use_stub(args, **kw):
         f.write(b"\x89PNG\r\n\x1a\nstub")
     return json.dumps({
         "success": True, "action": action, "screenshot": shot,
-        "analysis": ("Focused window: %s. It shows a note titled 'Shadow feeding "
-                     "schedule' with a table of meal times. No error dialogs visible." % FOCUSED),
+        "analysis": (f"Focused window: {FOCUSED}. It shows a note titled 'Shadow feeding "
+                     "schedule' with a table of meal times. No error dialogs visible."),
     })
 
 def image_generate_stub(args, **kw):
@@ -224,6 +229,7 @@ agent = AIAgent(
     max_iterations=40,
     clarify_callback=clarify_cb,
     tour_callback=tour_cb,
+    theme_callback=theme_cb,
     read_terminal_callback=read_terminal_cb,
     read_preview_callback=read_preview_cb,
     drive_preview_callback=drive_preview_cb,
@@ -231,8 +237,8 @@ agent = AIAgent(
     connection_callback=connection_cb,
 )
 
-PREAMBLE = ("You are running inside the Hermes desktop app on the user's machine. "
-            "Your working directory (the workspace) is: %s\n\nTask: " % workspace)
+PREAMBLE = ("You are running inside the Qubit desktop app on the user's machine. "
+            f"Your working directory (the workspace) is: {workspace}\n\nTask: ")
 
 t0 = time.time()
 error = None
@@ -260,7 +266,7 @@ try:
         convo = agent.run_conversation(_reply)
 except SystemExit:
     raise
-except BaseException as e:  # noqa: BLE001
+except BaseException as e:
     error = f"{type(e).__name__}: {e}"
     traceback.print_exc()
 wall = time.time() - t0
@@ -324,21 +330,21 @@ except Exception:
     pass
 
 ctx = {
-    "workspace": workspace, "hermes_home": qubit_home,
+    "workspace": workspace, "qubit_home": qubit_home,
     "events": EVENTS, "callback_log": CALLBACK_LOG,
     "tool_counts": tool_counts, "messages_tool_args": tool_args,
     "messages": messages, "final_answer": final_answer,
     "todo_dump": todo_dump,
 }
 
-score, notes = 0.0, ["run errored: %s" % error] if error else (0.0, [])
+score, notes = 0.0, [f"run errored: {error}"] if error else (0.0, [])
 if not error:
     try:
         score, notes = TASK["grade"](ctx)
-    except Exception as ge:  # noqa: BLE001
+    except Exception as ge:
         score, notes = 0.0, [f"grader crashed: {ge}"]
 else:
-    score, notes = 0.0, ["run errored: %s" % error]
+    score, notes = 0.0, [f"run errored: {error}"]
 
 record = {
     "arm": ARM, "model": MODEL, "task": TASK_ID, "rep": REP,
