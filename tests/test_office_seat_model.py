@@ -172,9 +172,22 @@ def test_default_executor_passes_the_seats_model_and_provider(tmp_path,
             seen.update(model=model, provider=provider, session=session)
             return {"state": "OK", "reply": "ok"}
 
+    # Patch the attribute the executor actually resolves. `runner` does
+    # `from .. import agent as _agent` at call time, so it reads the module
+    # attribute off the PACKAGE, not necessarily sys.modules["voicebridge.agent"]
+    # — another test that swaps sys.modules can leave the two objects
+    # disagreeing. Setting the attribute on the resolved module is correct
+    # regardless of which object that is.
+    import voicebridge as _pkg
+    real_agent = getattr(_pkg, "agent", None)
+    monkeypatch.setattr(_pkg, "agent", _Agent, raising=False)
     monkeypatch.setitem(__import__("sys").modules,
                         "voicebridge.agent", _Agent)
-    out = R._default_executor(cfg, seat_id, "do the thing")
+    try:
+        out = R._default_executor(cfg, seat_id, "do the thing")
+    finally:
+        if real_agent is not None:
+            _pkg.agent = real_agent
     assert out["state"] == "OK"
     assert seen["model"] == "grok-4.7"
     assert seen["provider"] == "omniroute"
@@ -198,9 +211,18 @@ def test_default_executor_sends_none_when_the_seat_inherits(tmp_path,
             seen.update(model=model, provider=provider)
             return {"state": "OK", "reply": "ok"}
 
+    # Same reasoning as above: patch the PACKAGE attribute the executor
+    # resolves, so a sibling test's sys.modules swap cannot desynchronise it.
+    import voicebridge as _pkg
+    real_agent = getattr(_pkg, "agent", None)
+    monkeypatch.setattr(_pkg, "agent", _Agent, raising=False)
     monkeypatch.setitem(__import__("sys").modules,
                         "voicebridge.agent", _Agent)
-    R._default_executor(cfg, seat_id, "do the thing")
+    try:
+        R._default_executor(cfg, seat_id, "do the thing")
+    finally:
+        if real_agent is not None:
+            _pkg.agent = real_agent
     assert seen["model"] is None
     assert seen["provider"] is None
 
