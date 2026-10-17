@@ -115,9 +115,9 @@ def _qubit_home() -> Path:
     return Path(get_qubit_home())
 
 
-def hermes_service_roots() -> tuple[str, ...]:
+def qubit_service_roots() -> tuple[str, ...]:
     """Directories a Qubit-owned SCM service binary lives under: the checkout (its ``venv`` included),
-    the running interpreter's ``Scripts`` dir (``hermes.exe`` shim) and the ``gateway-service`` launcher dir."""
+    the running interpreter's ``Scripts`` dir (``qubit.exe`` shim) and the ``gateway-service`` launcher dir."""
     project_root = Path(__file__).resolve().parent.parent
     return (str(project_root), str(Path(sys.executable).parent), str(_qubit_home() / "gateway-service"))
 
@@ -126,16 +126,19 @@ def _normalize_windows_path(value: str) -> str:
     return value.strip().lstrip('"').replace("\\", "/").rstrip("/").casefold()
 
 
-def hermes_owns_windows_service(name: str, binpath: str, hermes_roots: tuple[str, ...]) -> bool:
+def qubit_owns_windows_service(name: str, binpath: str, qubit_roots: tuple[str, ...]) -> bool:
     """Positive ownership of an SCM service: Qubit-named (``qubit*``) or its binary path starts under a
     Qubit root. Pure so it is testable off-Windows. A Scheduled-Task-launched gateway descends from
     ``svchost.exe`` hosting ``Schedule``; without this gate the updater took Task Scheduler for the
     gateway's supervisor and ``sc.exe stop Schedule`` aborted every update (#97208)."""
     normalized_name = "".join(char for char in name.casefold() if char.isalnum())
-    if normalized_name.startswith("hermes"):
+    # ``hermes`` is retained as a read-side literal: a service registered before the rebrand
+    # (or an install upgraded in place) is still Qubit-owned.  Never drop it, or such a service
+    # is treated as foreign and the updater stops the wrong supervisor.
+    if normalized_name.startswith(("qubit", "hermes")):
         return True
     candidate = _normalize_windows_path(binpath)
-    return any(candidate.startswith(_normalize_windows_path(root) + "/") for root in hermes_roots if root)
+    return any(candidate.startswith(_normalize_windows_path(root) + "/") for root in qubit_roots if root)
 
 
 def _preserve_qubit_home_path(path: str | Path) -> str:

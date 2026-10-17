@@ -819,7 +819,7 @@ def find_windows_gateway_services(
 ) -> list[WindowsGatewayService]:
     """Profile gateways supervised by real, Qubit-owned Windows services. Service-logon processes may
     hide their command lines, so identity = Qubit's own PID file + a parent chain ending at a running
-    SCM service PID whose name or binary path is Qubit's (``gateway_windows.hermes_owns_windows_service``).
+    SCM service PID whose name or binary path is Qubit's (``gateway_windows.qubit_owns_windows_service``).
     The whole service subtree is returned so the Desktop preflight exempts exactly what the updater stops
     through the SCM; a gateway under any other service (a Scheduled Task's svchost) is a plain process."""
     if sys.platform != "win32":
@@ -829,9 +829,9 @@ def find_windows_gateway_services(
             import psutil as psutil_module  # type: ignore[no-redef]  # noqa: PLC0415
         if profile_processes is None:
             profile_processes = find_profile_gateway_processes(strict=True)
-        from qubit_cli.gateway_windows import hermes_owns_windows_service, hermes_service_roots
+        from qubit_cli.gateway_windows import qubit_owns_windows_service, qubit_service_roots
 
-        hermes_roots = hermes_service_roots()
+        qubit_roots = qubit_service_roots()
         service_names_by_pid: dict[int, set[str]] = {}
         indeterminate_services_by_pid: dict[int, list[tuple[str, object]]] = {}
         for service in psutil_module.win_service_iter():
@@ -845,13 +845,13 @@ def find_windows_gateway_services(
                 # The name alone settles Qubit-named services; binpath (QueryServiceConfig) is asked only
                 # for the rest, and a service that refuses even that to this user is one this user could
                 # not `sc stop` either — never Qubit's, never a reason to abort the enumeration.
-                owned = hermes_owns_windows_service(service_name, "", hermes_roots)
+                owned = qubit_owns_windows_service(service_name, "", qubit_roots)
                 if not owned:
                     try:
                         service_binpath = str(_scm_service_field(service, "binpath") or "")
                     except (psutil_module.AccessDenied, OSError):
                         continue
-                    owned = hermes_owns_windows_service(service_name, service_binpath, hermes_roots)
+                    owned = qubit_owns_windows_service(service_name, service_binpath, qubit_roots)
                 if not owned:
                     continue
                 service_status = _scm_service_field(service, "status")
