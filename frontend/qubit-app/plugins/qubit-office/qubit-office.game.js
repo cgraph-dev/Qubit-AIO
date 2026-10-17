@@ -192454,6 +192454,20 @@ create: function(game) {
 		};
 		const bridge = (input, init) => {
 			if (!state.active || activeBridges.get(win) !== state) return originalFetch(input, init);
+			try {
+				const probe = new Request(input, init);
+				const probeUrl = new URL(probe.url, win.location.href);
+				if (probeUrl.origin === win.location.origin && probeUrl.pathname.startsWith("/api/")) {
+					if ((init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase() !== "GET") return Promise.resolve(new Response(JSON.stringify({
+						error: "This office capability is unavailable in Qubit Office.",
+						capability: probeUrl.pathname,
+						disabled: true
+					}), {
+						status: 501,
+						headers: { "Content-Type": "application/json" }
+					}));
+				}
+			} catch {}
 			let request;
 			try {
 				request = new Request(input, init);
@@ -192508,6 +192522,226 @@ create: function(game) {
 		state.bridge = bridge;
 		win.fetch = bridge;
 		return restore;
+	}
+	var SEAT_MODEL_ROUTE = `/agent/api/office/habblaud/agents`;
+	function seatModelUrl(agentId) {
+		return `${SEAT_MODEL_ROUTE}/${encodeURIComponent(String(agentId))}/model`;
+	}
+	/** "provider/model" for display, or the inherit notice. Never a blank cell. */
+	function describeSeatRouting(state) {
+		if (!state || !state.ok) return "Model assignment unavailable";
+		if (state.inherits || !state.model && !state.provider) return "Inherits the profile default model";
+		const provider = state.provider || "default provider";
+		return state.model ? `${provider} / ${state.model}` : provider;
+	}
+	/** Only providers the host actually holds a credential for are selectable. */
+	function selectableProviders(state) {
+		return (state?.providers ?? []).filter((row) => !!row && typeof row.slug === "string" && row.slug.length > 0).filter((row) => (row.models ?? []).length > 0).filter((row) => row.authenticated !== false);
+	}
+	function modelsFor(state, providerSlug) {
+		return [...selectableProviders(state).find((r) => r.slug === providerSlug)?.models ?? []];
+	}
+	/**
+	* The body to POST. An empty model is a deliberate CLEAR (back to inherit),
+	* so it is sent as an empty string rather than omitted — omitting it would
+	* read as "no change" on the server.
+	*/
+	function assignmentPayload(provider, model) {
+		return {
+			provider: (provider ?? "").trim(),
+			model: (model ?? "").trim()
+		};
+	}
+	/**
+	* Turn a failed response into one sentence a person can act on. The server's
+	* typed codes are the source; this never invents a cause.
+	*/
+	function describeWriteFailure(status, body) {
+		const code = body && typeof body === "object" && "code" in body ? String(body.code) : "";
+		const detail = body && typeof body === "object" && "detail" in body ? String(body.detail) : "";
+		if (code === "UNKNOWN_MODEL") return "That model is not in the catalogue. Refresh the model list, or assign it as a custom model.";
+		if (code === "AGENT_NOT_FOUND") return "That seat no longer exists; reload the office.";
+		if (code === "ESTOP_ENGAGED") return "The emergency stop is latched; release it before changing a seat.";
+		if (code === "MALFORMED") return "The request was incomplete; pick a provider and a model.";
+		if (detail) return detail;
+		return `The change was not saved (HTTP ${status}).`;
+	}
+	/** Attach the host session token, exactly as api-bridge.ts does for reads. */
+	function authHeaders(token) {
+		const headers = { "Content-Type": "application/json" };
+		if (token) headers["X-Qubit-Session-Token"] = token;
+		return headers;
+	}
+	function hostToken(win) {
+		if (!win) return "";
+		const own = win.__QUBIT_SESSION_TOKEN__;
+		if (own) return own;
+		try {
+			const parent = win.parent;
+			return parent && parent.__QUBIT_SESSION_TOKEN__ || "";
+		} catch {
+			return "";
+		}
+	}
+	async function fetchSeatModel(agentId, fetchImpl, win) {
+		const res = await fetchImpl(seatModelUrl(agentId), {
+			method: "GET",
+			credentials: "same-origin",
+			headers: authHeaders(hostToken(win))
+		});
+		const body = await res.json().catch(() => ({}));
+		if (!res.ok || body.ok === false) return {
+			...body,
+			ok: false,
+			detail: describeWriteFailure(res.status, body)
+		};
+		return {
+			...body,
+			ok: true
+		};
+	}
+	async function saveSeatModel(agentId, provider, model, fetchImpl, win) {
+		const res = await fetchImpl(seatModelUrl(agentId), {
+			method: "POST",
+			credentials: "same-origin",
+			headers: authHeaders(hostToken(win)),
+			body: JSON.stringify(assignmentPayload(provider, model))
+		});
+		const body = await res.json().catch(() => ({}));
+		if (!res.ok || body.ok === false) return {
+			...body,
+			ok: false,
+			detail: describeWriteFailure(res.status, body)
+		};
+		return {
+			...body,
+			ok: true
+		};
+	}
+	//#endregion
+	//#region ../qubit-app/plugins/qubit-office/game/app/SeatModelPanel.tsx
+	function createSeatModelPanel(R, hooks) {
+		const { useState, useEffect } = hooks;
+		return function SeatModelPanel(props) {
+			const [state, setState] = useState(null);
+			const [provider, setProvider] = useState("");
+			const [model, setModel] = useState("");
+			const [saving, setSaving] = useState(false);
+			const [notice, setNotice] = useState("");
+			useEffect(() => {
+				let live = true;
+				fetchSeatModel(props.agentId, window.fetch.bind(window), window).then((next) => {
+					if (!live) return;
+					setState(next);
+					setProvider(next.provider ?? "");
+					setModel(next.model ?? "");
+				}).catch(() => {
+					if (live) setState({
+						ok: false,
+						detail: "The office API did not answer."
+					});
+				});
+				return () => {
+					live = false;
+				};
+			}, [props.agentId]);
+			const providers = selectableProviders(state);
+			const models = modelsFor(state, provider);
+			const onSave = () => {
+				setSaving(true);
+				setNotice("");
+				saveSeatModel(props.agentId, provider, model, window.fetch.bind(window), window).then((next) => {
+					setState((prev) => ({
+						...prev ?? {},
+						...next
+					}));
+					if (next.ok === false) setNotice(next.detail || "The change was not saved.");
+					else setNotice(next.inherits ? "Cleared — this seat inherits the profile default." : "Saved.");
+					setSaving(false);
+				}).catch(() => {
+					setNotice("The office API did not answer; nothing was changed.");
+					setSaving(false);
+				});
+			};
+			const children = [R.createElement("div", {
+				key: "head",
+				className: "seat-model__head"
+			}, props.seatLabel ? `${props.seatLabel} — model` : "Seat model"), R.createElement("div", {
+				key: "current",
+				className: "seat-model__current",
+				"data-testid": "seat-model-current"
+			}, describeSeatRouting(state))];
+			if (!state) children.push(R.createElement("div", {
+				key: "loading",
+				className: "seat-model__loading",
+				role: "status"
+			}, "Loading model assignment…"));
+			else if (!state.ok) children.push(R.createElement("div", {
+				key: "error",
+				className: "seat-model__error",
+				role: "alert",
+				"data-testid": "seat-model-error"
+			}, state.detail || "Model assignment unavailable"));
+			else {
+				children.push(R.createElement("label", {
+					key: "prov-label",
+					className: "seat-model__label"
+				}, "Provider", R.createElement("select", {
+					key: "prov",
+					"data-testid": "seat-model-provider",
+					value: provider,
+					disabled: saving,
+					onChange: (e) => {
+						setProvider(e.target.value);
+						setModel("");
+					}
+				}, [R.createElement("option", {
+					key: "inherit",
+					value: ""
+				}, "Inherit profile default"), ...providers.map((p) => R.createElement("option", {
+					key: p.slug,
+					value: p.slug
+				}, p.name || p.slug))])));
+				children.push(R.createElement("label", {
+					key: "model-label",
+					className: "seat-model__label"
+				}, "Model", R.createElement("select", {
+					key: "model",
+					"data-testid": "seat-model-model",
+					value: model,
+					disabled: saving || !provider,
+					onChange: (e) => setModel(e.target.value)
+				}, [R.createElement("option", {
+					key: "none",
+					value: ""
+				}, provider ? "— pick a model —" : "— pick a provider first —"), ...models.map((m) => R.createElement("option", {
+					key: m,
+					value: m
+				}, m))])));
+				if (state.providers_note) children.push(R.createElement("div", {
+					key: "note",
+					className: "seat-model__note"
+				}, state.providers_note));
+				children.push(R.createElement("button", {
+					key: "save",
+					type: "button",
+					className: "seat-model__save",
+					"data-testid": "seat-model-save",
+					disabled: saving,
+					onClick: onSave
+				}, saving ? "Saving…" : "Save"));
+			}
+			if (notice) children.push(R.createElement("div", {
+				key: "notice",
+				className: "seat-model__notice",
+				role: "status",
+				"data-testid": "seat-model-notice"
+			}, notice));
+			return R.createElement("div", {
+				"data-testid": "seat-model-panel",
+				className: "seat-model"
+			}, children);
+		};
 	}
 	//#endregion
 	//#region ../qubit-app/plugins/qubit-office/game/app/office-api.ts
@@ -192639,7 +192873,9 @@ create: function(game) {
 		return function OfficeApp(props = {}) {
 			const [loaded, setLoaded] = useState(false);
 			const [failed, setFailed] = useState(null);
+			const [panelOpen, setPanelOpen] = useState(false);
 			const frameRef = useRef(null);
+			const SeatModelPanel = createSeatModelPanel(R, hooks);
 			useEffect(() => {
 				const frame = frameRef.current;
 				if (!frame) return;
@@ -192722,6 +192958,21 @@ create: function(game) {
 				role: "status",
 				"aria-label": `${bindingSummary()}; ${verdict.live ? `live stream ${STREAM_ROUTE}` : `poll ${POLL_INTERVAL_MS / 1e3}s → ${SNAPSHOT_ROUTE}`}`
 			}, bindingSummary()));
+			if (props.seatAgentId !== void 0 && props.seatAgentId !== null) {
+				children.push(R.createElement("button", {
+					key: "seat-model-toggle",
+					type: "button",
+					className: "seat-model__toggle",
+					"data-testid": "seat-model-toggle",
+					"aria-expanded": panelOpen,
+					onClick: () => setPanelOpen(!panelOpen)
+				}, panelOpen ? "Hide seat model" : "Seat model"));
+				if (panelOpen) children.push(R.createElement(SeatModelPanel, {
+					key: "seat-model-panel",
+					agentId: props.seatAgentId,
+					seatLabel: props.seatLabel
+				}));
+			}
 			return R.createElement("div", {
 				"data-testid": "office-app",
 				className: "office-game"

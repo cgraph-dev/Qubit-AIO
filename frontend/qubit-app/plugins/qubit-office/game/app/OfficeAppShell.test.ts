@@ -41,4 +41,27 @@ describe("Habblaud embedding", () => {
     h.cleanup();
     expect(h.frame.removeEventListener).toHaveBeenCalledWith("load", expect.any(Function));
   });
+
+  it("has no seat-model control when no seat is named", () => {
+    // The default office view must stay exactly the game.
+    const h = createHarness();
+    const App = createOfficeApp(h.React as never, h.hooks as never);
+    App({});
+    expect(h.tree.find((e) => e.props["data-testid"] === "seat-model-toggle"))
+      .toBeUndefined();
+    expect(h.tree.find((e) => e.props["data-testid"] === "seat-model-panel"))
+      .toBeUndefined();
+  });
+
+  it("offers a toggle for a named seat, and only renders the panel when open", () => {
+    const h = createHarness();
+    const App = createOfficeApp(h.React as never, h.hooks as never);
+    App({ seatAgentId: 3, seatLabel: "lead-quality" });
+    const toggle = h.tree.find((e) => e.props["data-testid"] === "seat-model-toggle");
+    expect(toggle).toBeDefined();
+    expect(toggle?.props["aria-expanded"]).toBe(false);
+    // Closed by default: the game is not covered until the operator asks.
+    expect(h.tree.find((e) => e.props["data-testid"] === "seat-model-panel"))
+      .toBeUndefined();
+  });
 });

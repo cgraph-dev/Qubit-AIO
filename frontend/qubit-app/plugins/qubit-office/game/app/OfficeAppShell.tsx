@@ -8,6 +8,7 @@
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
+import { createSeatModelPanel } from "./SeatModelPanel";
 import {
   POLL_INTERVAL_MS, SNAPSHOT_ROUTE, STREAM_ROUTE,
   bindingSummary, bindingVerdict,
@@ -18,6 +19,13 @@ export interface OfficeAppProps {
   base?: string;
   /** Serve the client's own demo data. Off by default — see office-app.ts. */
   mock?: boolean;
+  /**
+   * Which seat the model panel configures. Omitted = no panel, so the pure
+   * game view (and every existing caller) is unchanged.
+   */
+  seatAgentId?: string | number;
+  /** Heading text for the panel. */
+  seatLabel?: string;
   /** Set once the iframe has loaded, for tests and for a load-failure banner. */
   onReady?: () => void;
 }
@@ -35,7 +43,11 @@ export function createOfficeApp(
   return function OfficeApp(props: OfficeAppProps = {}) {
     const [loaded, setLoaded] = useState(false);
     const [failed, setFailed] = useState<string | null>(null);
+    const [panelOpen, setPanelOpen] = useState(false);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
+    // Built unconditionally (hooks must not be conditional) but only rendered
+    // when a seat is chosen, so the default view is still just the game.
+    const SeatModelPanel = createSeatModelPanel(R, hooks);
 
     useEffect(() => {
       const frame = frameRef.current;
@@ -135,6 +147,28 @@ export function createOfficeApp(
       role: "status",
       "aria-label": `${bindingSummary()}; ${verdict.live ? `live stream ${STREAM_ROUTE}` : `poll ${POLL_INTERVAL_MS / 1000}s → ${SNAPSHOT_ROUTE}`}`,
     }, bindingSummary()));
+
+    // Per-seat model routing. Rendered only when the host names a seat, so the
+    // default office view is the game and nothing else. It sits OUTSIDE the
+    // iframe on purpose: the api-bridge answers every non-GET with 501, so a
+    // write control inside the vendored client could not save anything.
+    if (props.seatAgentId !== undefined && props.seatAgentId !== null) {
+      children.push(R.createElement("button", {
+        key: "seat-model-toggle",
+        type: "button",
+        className: "seat-model__toggle",
+        "data-testid": "seat-model-toggle",
+        "aria-expanded": panelOpen,
+        onClick: () => setPanelOpen(!panelOpen),
+      }, panelOpen ? "Hide seat model" : "Seat model"));
+      if (panelOpen) {
+        children.push(R.createElement(SeatModelPanel, {
+          key: "seat-model-panel",
+          agentId: props.seatAgentId,
+          seatLabel: props.seatLabel,
+        }));
+      }
+    }
 
     return R.createElement("div", {
       "data-testid": "office-app",
