@@ -48,10 +48,20 @@ per seat:
    frozen posture        -> skip, never woken
    no turns left         -> skipped/turn_budget
    proposals at its cap  -> skipped/proposal_cap
+   leaf seat             -> skipped/organ_assigned, and (if the dispatch dial
+                            is on) ONE dispatch pass drains the queue it owns
    file a proposal from its own context (goal + memo + org workload)
    > left to its approver, OR the kitty cannot cover a turn -> skipped/'envelope'
    < turns left          -> spend one turn, run one real attributed turn
 ```
+
+**The dispatch dial** (`office.autowork.dispatch`, off by default) is the queue's
+consumer. Without it the leaf branch above defers every leaf's work to
+`dispatch.pick_worker` and nothing in the tree ever calls `dispatch` — its only
+call site is the `qubit office dispatch` CLI verb — so the queue can only grow.
+With it on, a tick runs at most one dispatch round (`DEFAULT_DISPATCH_ROUNDS`)
+through the *existing* loop: same worker choice, same exit check, same budget,
+same requeue-on-refusal. The tick adds no queue logic; it only says when.
 
 **At most one turn per seat per tick** (O3) falls out of the structure: the loop
 runs a seat once and moves on. The daily turn budget is what bounds the day; the
@@ -120,6 +130,27 @@ DEFAULT_EVERY_S = 900
 #: The most a single tick may propose/approve. One, like the turn, so a tick is
 #: bounded work regardless of how large the queue has grown.
 DEFAULT_MAX_APPROVALS = 1
+
+#: The dial that gives the *queue* the consumer it never had. The tick's leaf
+#: branch below hands a leaf seat's work to ``dispatch.pick_worker`` in so many
+#: words — and then nothing ever called ``dispatch``. Its only production call
+#: site is the ``qubit office dispatch`` CLI verb, so the queue could only ever
+#: grow: 82 approved proposals became 81 `open` tasks, every one of them a
+#: self-directed stub, with no path that could assign or run a single one. The
+#: tick fixed the *proposal* half of exactly this gap ("the proposal layer had
+#: no consumer at all in production"); this is the other half.
+#:
+#: It ships **off**, the same way the driver itself does (O3): it is the dial
+#: that lets a tick spend a worker turn, and that decision belongs to the owner,
+#: not to a default. Off means the old behaviour exactly — a leaf is skipped and
+#: the report says the dial is off, rather than repeating a claim ("dispatch
+#: assigns it") that nothing was honouring.
+CONFIG_KEY_DISPATCH = ("office", "autowork", "dispatch")
+
+#: One round per tick, like one turn per seat: the tick's bound is *how often a
+#: seat is woken*, never what it may spend, and a tick that drained a 200-task
+#: queue in one pass would be a budget of its own.
+DEFAULT_DISPATCH_ROUNDS = 1
 
 #: How old an unsettled receipt must be before the tick's reaper considers it.
 #: A normal turn's provider round-trip (plus its tool rounds) keeps a receipt
@@ -193,6 +224,21 @@ def _flag(cfg: Any) -> bool:
         return bool(persisted)
     try:
         return bool(cfg.get(*CONFIG_KEY, default=False))
+    except Exception:                                   # noqa: BLE001
+        return False
+
+
+def _dispatch_flag(cfg: Any) -> bool:
+    """May a tick hand leaf work to the dispatch loop? **Off unless asked.**
+
+    Config only — there is deliberately no persisted override here, unlike the
+    driver's own flag: the driver's switch says *whether the org notices work*,
+    and this one says *whether the org may start spending on the queue it
+    noticed*. The second is the narrower grant and it reads from the deployment
+    config, so a runtime flip of `enabled` can never silently arm it.
+    """
+    try:
+        return bool(cfg.get(*CONFIG_KEY_DISPATCH, default=False))
     except Exception:                                   # noqa: BLE001
         return False
 
@@ -570,6 +616,29 @@ def _approve_pending(cfg: Any, *, limit: int,
     return {"approved": approved, "left": left, "declined": declined}
 
 
+def _dispatch_queue(cfg: Any, *, executor: Optional[Callable],
+                    model: Optional[str], unmetered: bool,
+                    rounds: int = DEFAULT_DISPATCH_ROUNDS,
+                    requested_by: str = "office:autowork") -> Dict[str, Any]:
+    """One bounded pass of the *existing* dispatch loop, or a refusal.
+
+    This adds no queue logic of its own: it calls ``dispatch.dispatch`` — the
+    same function ``qubit office dispatch`` calls — so the worker is chosen by
+    ``pick_worker``, the exit check is evaluated before any turn is spent, the
+    turn budget is consumed only after a successful claim, and a refused turn
+    requeues the task. The tick's only contribution is *when* it runs.
+    """
+    if not _installed("dispatch"):
+        return {"state": "SKIPPED", "reason": "dispatch is not installed"}
+    from . import dispatch as D
+    try:
+        return D.dispatch(cfg, rounds=int(rounds), executor=executor,
+                          model=model, unmetered=unmetered, confirmed=True,
+                          requested_by=requested_by)
+    except OfficeError as err:
+        return {"state": "REFUSED", "code": err.code, "detail": err.detail[:200]}
+
+
 def _adjudicate(cfg: Any, *, executor: Optional[Callable],
                 model: Optional[str], unmetered: bool) -> Dict[str, Any]:
     """One review turn, if a task is waiting for one. Refusals are reported."""
@@ -722,6 +791,11 @@ def tick(cfg: Any, *, executor: Optional[Callable] = None,
     proposed: List[Dict[str, Any]] = []
     skipped_seats: List[Dict[str, Any]] = []
     declined: List[Dict[str, Any]] = []
+    #: One dispatch pass per tick at most, and only if the dial is on. `None`
+    #: means "the queue was never touched this tick", which is a different fact
+    #: from "the pass ran and moved nothing" and is reported as such.
+    dispatched: Optional[Dict[str, Any]] = None
+    dispatch_armed = _dispatch_flag(cfg)
 
     # 3 — review any finished task, then take pending proposals one level up.
     # The approval pass runs AFTER the seat loop (below), so a proposal floated
@@ -759,11 +833,31 @@ def tick(cfg: Any, *, executor: Optional[Callable] = None,
         # left to the org: `dispatch.pick_worker` assigns leaf seats only, so it
         # is the org that owns a manager's idea. A manager/director/CEO seat
         # supervises somebody, so its own self-directed work runs here, once.
+        #
+        # "The org owns it" is only true if something in the org actually
+        # dispatches. Nothing did: `dispatch.dispatch` had exactly one call site
+        # in the whole tree — the CLI verb — so this branch deferred leaf work to
+        # a consumer that never ran, and the queue could only grow. With the
+        # dispatch dial on, the tick runs that pass here, once, and the leaf is
+        # reported as handed over rather than skipped.
         if _installed("org") and _is_leaf(cfg, agent_id=agent_id):
-            skipped_seats.append({"agent_id": agent_id, "slug": seat["slug"],
-                                  "outcome": SKIP_ORGAN_ASSIGNED,
-                                  "reason": "the org owns a leaf's idea: "
-                                            "dispatch assigns it"})
+            if not dispatch_armed:
+                skipped_seats.append(
+                    {"agent_id": agent_id, "slug": seat["slug"],
+                     "outcome": SKIP_ORGAN_ASSIGNED,
+                     "reason": "the org owns a leaf's idea, but the dispatch "
+                               "pass is off (office.autowork.dispatch=false), "
+                               "so nothing in the org runs it"})
+                continue
+            if dispatched is None:
+                dispatched = _dispatch_queue(
+                    cfg, executor=executor, model=model, unmetered=unmetered,
+                    requested_by=requested_by)
+            skipped_seats.append(
+                {"agent_id": agent_id, "slug": seat["slug"],
+                 "outcome": SKIP_ORGAN_ASSIGNED,
+                 "reason": "the org owns a leaf's idea: the dispatch pass "
+                           "assigns it"})
             continue
 
         # 4c — budget, read before anything is charged (O3: <=1 turn/seat/tick).
@@ -820,6 +914,7 @@ def tick(cfg: Any, *, executor: Optional[Callable] = None,
                       "declined": approvals["declined"]},
         "proposed": proposed, "ran": ran,
         "skipped_seats": skipped_seats, "declined": declined,
+        "dispatched": dispatched,
         "meaning": ("a tick that did nothing wrote nothing: every row above is "
                     "an outcome, and an empty list is an idle org, not a "
                     "missing one"),
@@ -856,6 +951,9 @@ def status(cfg: Any) -> Dict[str, Any]:
     every = _every_seconds(cfg)
     return {"state": "OK", "enabled": _flag(cfg),
             "config_key": ".".join(CONFIG_KEY),
+            "dispatch": _dispatch_flag(cfg),
+            "dispatch_key": ".".join(CONFIG_KEY_DISPATCH),
+            "dispatch_rounds_per_tick": DEFAULT_DISPATCH_ROUNDS,
             "every_seconds": every,
             "last_tick_at": state.get("last_tick_at"),
             "last_tick_date": state.get("last_tick_date"),
@@ -881,7 +979,8 @@ def run_now(cfg: Any, *, executor: Optional[Callable] = None,
 
 
 __all__ = [
-    "CONFIG_KEY", "DEFAULT_EVERY_S", "ACTING_POSTURES", "SEAT_DIRECTIVES",
+    "CONFIG_KEY", "CONFIG_KEY_DISPATCH", "DEFAULT_EVERY_S",
+    "DEFAULT_DISPATCH_ROUNDS", "ACTING_POSTURES", "SEAT_DIRECTIVES",
     "SKIP_FROZEN", "SKIP_TURN_BUDGET", "SKIP_PROPOSAL_CAP",
     "SKIP_ORGAN_ASSIGNED", "SKIP_TURN_LIMIT",
     "tick", "run_now", "assess", "enable", "status",

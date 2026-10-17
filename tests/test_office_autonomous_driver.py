@@ -15,7 +15,9 @@ The proofs, one test each, in the order they matter:
   4. the cadence is honoured against a frozen clock (the MIN_GAP rule);
   5. the driver is cron-shaped, not a second loop — no thread, no ``while True``;
   6. a frozen posture seat is never woken;
-  7. a quiet tick writes no event (no event, no motion).
+  7. a quiet tick writes no event (no event, no motion);
+  8. the leaf queue is left to the owner unless the dispatch dial is on — and
+     with it on, a tick drains it through the EXISTING dispatch loop.
 
 Hermetic: tmp XDG state only; the executor is stubbed everywhere, so not one
 cent is spent and no provider is touched. No wall-clock waits: ``now`` is passed
@@ -38,6 +40,19 @@ def _cfg(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
+    return C.Config.load(p)
+
+
+def _cfg_dispatch(tmp_path, monkeypatch, *, on):
+    """A config with the queue's consumer dial set explicitly."""
+    from voicebridge import config as C
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "c"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
+    p = tmp_path / "voice.yaml"
+    p.write_text("logging:\n  jsonl: false\noffice:\n  autowork:\n"
+                 f"    dispatch: {'true' if on else 'false'}\n")
     return C.Config.load(p)
 
 
@@ -521,3 +536,69 @@ def test_assess_is_a_read_only_preview_of_what_a_tick_would_do(
     assert _proposal_rows(cfg) == []
     assert out["would_act"], "the funded manager should be an acting seat"
     assert db.exists()  # the org was already hired, so the store exists
+
+
+# ===========================================================================
+# 8 — THE QUEUE'S CONSUMER: off unless the owner arms it, and then real.
+# ===========================================================================
+def test_the_leaf_queue_is_not_touched_unless_the_dispatch_dial_is_on(
+        tmp_path, monkeypatch):
+    """A leaf's task is deferred to a consumer that does not run by default.
+
+    The tick's leaf branch hands leaf work to ``dispatch.pick_worker`` and then
+    nothing in the tree calls ``dispatch`` — its only production call site is
+    the CLI verb — so the queue can only grow. The dial is what makes that
+    deferral true, and it is off: the task must be exactly as it was left, and
+    the report must say *why* rather than repeating the claim.
+    """
+    from voicebridge.office import autowork as AW, work as W
+
+    cfg = _cfg_dispatch(tmp_path, monkeypatch, on=False)
+    ids = _org(cfg, workers=1, managers=1)
+    tid = W.create(cfg, "a leaf's own work", exit_check="false",
+                   confirmed=True)["id"]
+
+    out = AW.tick(cfg, executor=_stub(), now=1_000_000.0, enabled=True)
+
+    assert out["dispatched"] is None, "the dial is off; the queue was touched"
+    row = [t for t in W.tasks(cfg)["tasks"] if t["id"] == tid][0]
+    assert row["status"] == "open" and row["assignee_id"] is None
+    assert row["turns_used"] == 0, "a turn was spent with the dial off"
+    skipped = [s for s in out["skipped_seats"]
+               if s["agent_id"] == ids["workers"][0]]
+    assert skipped and "dispatch" in skipped[0]["reason"], (
+        f"the leaf's skip does not name the dial: {out['skipped_seats']}")
+
+
+def test_the_dispatch_dial_moves_a_leaf_task_through_the_existing_queue(
+        tmp_path, monkeypatch):
+    """With the dial on, one tick runs one round of the REAL dispatch loop.
+
+    The task's own exit check passes, so the dispatch loop closes it out before
+    any turn is spent — the honest kind of free. Nothing here is a second queue
+    implementation: the worker is chosen by ``pick_worker`` and the claim, the
+    check and the record all come from ``dispatch.dispatch``.
+    """
+    from voicebridge.office import autowork as AW, work as W
+
+    cfg = _cfg_dispatch(tmp_path, monkeypatch, on=True)
+    ids = _org(cfg, workers=1, managers=1)
+    tid = W.create(cfg, "already true", exit_check="true",
+                   confirmed=True)["id"]
+
+    out = AW.tick(cfg, executor=_stub(), now=1_000_000.0, enabled=True)
+
+    assert out["dispatched"] is not None, "the dial is on and nothing ran"
+    assert out["dispatched"]["state"] == "OK"
+    results = out["dispatched"]["results"]
+    assert [r["task"] for r in results] == [tid], (
+        f"the dispatch pass did not take the queue's first task: {results}")
+    assert results[0]["satisfied"] is True and results[0]["turns_spent"] == 0
+
+    row = [t for t in W.tasks(cfg)["tasks"] if t["id"] == tid][0]
+    assert row["status"] == "review", (
+        "a satisfied exit check did not move the task to review")
+    assert row["assignee_id"] == ids["workers"][0]
+    # at most ONE pass per tick, however many leaves are waiting
+    assert AW.status(cfg)["dispatch"] is True
+    assert AW.status(cfg)["dispatch_rounds_per_tick"] == 1
