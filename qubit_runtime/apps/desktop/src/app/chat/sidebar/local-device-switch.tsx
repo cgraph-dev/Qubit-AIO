@@ -24,7 +24,7 @@ export interface LocalDeviceTarget {
   connectionId: string
   label: string
   profile?: string
-  /** The switch replaces the center with a fresh session, even when Hermes is already installed. */
+  /** The switch replaces the center with a fresh session, even when Qubit is already installed. */
   replaceCenter?: boolean
 }
 

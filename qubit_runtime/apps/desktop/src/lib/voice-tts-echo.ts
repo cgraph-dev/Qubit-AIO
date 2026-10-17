@@ -122,7 +122,7 @@ export function sequenceMatcherRatio(a: readonly string[], b: readonly string[])
 
 /**
  * True when `transcript` looks like a self-capture of `spokenText` (the reply
- * Hermes was speaking when the barge tripped). A genuine interjection rarely
+ * Qubit was speaking when the barge tripped). A genuine interjection rarely
  * matches Hermes' own words, so a high ratio signals speaker bleed. Playback
  * captures span only pre-roll plus time-to-silence, so for long replies the
  * transcript is a FRAGMENT; when the whole-string ratio misses, a
