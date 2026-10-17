@@ -28,7 +28,7 @@ from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 from qubit_constants import get_qubit_home
-from utils import atomic_json_write
+from utils import atomic_json_write, base_url_hostname
 from agent.secret_scope import get_secret as _get_secret
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,12 @@ def anthropic_route_is_oauth(base_url: Any, credential: Any, *, provider: Option
         except Exception:  # noqa: BLE001 — classification must never raise
             return False
     return isinstance(credential, str) and _is_oauth_token(credential)
+
+
+def is_native_anthropic_host(base_url: Any) -> bool:
+    """True when *base_url* is exactly ``api.anthropic.com`` (an empty base_url is the native default)."""
+    text = str(base_url or "").strip()
+    return not text or base_url_hostname(text) == "api.anthropic.com"
 
 
 class CredentialPersistError(RuntimeError):

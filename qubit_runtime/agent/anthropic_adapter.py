@@ -197,6 +197,16 @@ def _accepts_thinking_disable(model: str) -> bool:
     )
 
 
+def _is_pre_thinking_haiku(model: str) -> bool:
+    """Haiku generations that never get a thinking request (through 4.5). Haiku 5.5+ uses adaptive thinking."""
+    from agent.anthropic_thinking_policy import claude_family_version
+
+    if "haiku" not in model.lower():
+        return False
+    parsed = claude_family_version(model)
+    return parsed is None or parsed[0] != "haiku" or parsed[1] < (5, 5)
+
+
 def _forbids_sampling_params(model: str) -> bool:
     """True for models that 400 on any non-default temperature/top_p/top_k (Opus 4.7 and later;
     unknown Claude defaults to forbidding). The 4.6 family and the legacy manual-thinking families

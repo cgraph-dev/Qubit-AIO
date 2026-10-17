@@ -8,6 +8,7 @@ skill share a slug, the bundle wins — slash dispatch checks bundles first, on 
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -21,7 +22,7 @@ from agent.skill_commands import command_snapshot, diff_command_snapshots, resol
 logger = logging.getLogger(__name__)
 
 _bundles_cache: Dict[str, Dict[str, Any]] = {}
-_bundles_cache_mtime: Optional[float] = None
+_bundles_cache_mtime: Optional[tuple] = None  # _bundles_sig() (content digests) of the cached scan
 
 
 def _bundles_dir() -> Path:
@@ -35,15 +36,17 @@ def _iter_bundle_files() -> List[Path]:
     return [f for ext in ("*.yaml", "*.yml") for f in sorted(base.glob(ext))] if base.exists() else []
 
 
-def _max_mtime(files: List[Path]) -> float:
-    """Highest mtime across the bundle files plus the dir itself (dir mtime catches deletions)."""
-    mtimes = []
-    for f in (_bundles_dir(), *files):
+def _bundles_sig(files: List[Path]) -> tuple:
+    """Sorted ``(path, content digest)`` of the bundle files. Content, not timestamps: a same-size
+    rewrite within one coarse mtime/ctime tick, or under host/filesystem clock skew, still moves it.
+    Bundles are a handful of small YAML files, so reading them per check is cheap."""
+    entries = []
+    for f in files:
         try:
-            mtimes.append(f.stat().st_mtime)
+            entries.append((str(f), hashlib.sha256(f.read_bytes()).hexdigest()))
         except OSError:
             continue
-    return max(mtimes, default=0.0)
+    return tuple(sorted(entries))
 
 
 def _load_bundle_file(path: Path) -> Optional[Dict[str, Any]]:
@@ -94,13 +97,13 @@ def scan_bundles() -> Dict[str, Dict[str, Any]]:
             continue
         out[key] = info
     _bundles_cache = out
-    _bundles_cache_mtime = _max_mtime(files)
+    _bundles_cache_mtime = _bundles_sig(files)
     return out
 
 
 def get_skill_bundles() -> Dict[str, Dict[str, Any]]:
-    """Current bundle mapping; rescans only when a bundle file or the dir mtime changed."""
-    current_mtime = _max_mtime(_iter_bundle_files())
+    """Current bundle mapping; rescans only when the set of bundle files or their content changed."""
+    current_mtime = _bundles_sig(_iter_bundle_files())
     if not _bundles_cache or _bundles_cache_mtime != current_mtime:
         scan_bundles()
     return _bundles_cache

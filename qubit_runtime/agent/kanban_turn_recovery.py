@@ -92,9 +92,16 @@ def kanban_task_id() -> Optional[str]:
     return task_id or None
 
 
-def kanban_turn_recovery_enabled() -> bool:
-    """On when ``HERMES_KANBAN_TASK`` is set and the attempt budget is non-zero."""
-    if kanban_task_id() is None:
+def _resolve_task_id(task_id: Optional[str]) -> Optional[str]:
+    """An explicit carrier id (managed worker frame) wins; ``None`` reads the env pin."""
+    if task_id is None:
+        return kanban_task_id()
+    return task_id.strip() or None
+
+
+def kanban_turn_recovery_enabled(task_id: Optional[str] = None) -> bool:
+    """On when a worker task id is carried and the attempt budget is non-zero."""
+    if _resolve_task_id(task_id) is None:
         return False
     return max_recovery_attempts() > 0
 
