@@ -231,6 +231,23 @@ def _session_stored_model(session_id: str, cfg: Any = None
         return "", ""
 
 
+def _poke_redraw(session: Any, cols: int, rows: int) -> bool:
+    """Ask a reattached terminal to emit a full frame (best-effort).
+
+    Returns True when the resize was issued. Never raises: a reattach must
+    not fail because the repaint poke did.
+    """
+    try:
+        bridge = getattr(session, "bridge", None)
+        resize = getattr(bridge, "resize", None)
+        if not callable(resize):
+            return False
+        resize(cols=int(cols or 80), rows=int(rows or 24))
+        return True
+    except Exception:  # noqa: BLE001 - repaint is advisory only
+        return False
+
+
 def _accept_key(sec_key: str) -> str:
     digest = hashlib.sha1((sec_key + _WS_GUID).encode("ascii")).digest()
     return base64.b64encode(digest).decode("ascii")
@@ -923,6 +940,13 @@ class PtyWsServer:
                     self._teardown(session)
                     _reject(handler, 400, "WS_HANDSHAKE", str(exc))
                     return
+                # The fresh xterm cannot rebuild an idle alternate-screen TUI
+                # from nothing: the pump below only forwards NEW output, so a
+                # reattached-but-quiet terminal stays black until something
+                # prints (the keepalive resize would eventually repaint it, up
+                # to 20 s later — or never for an app that ignores SIGWINCH).
+                # Poke a resize now so the child emits a full frame at once.
+                _poke_redraw(session, cols, rows)
                 log_event("webui.pty.session_reattach", session=ticket.session,
                           pid=_safe_pid(session.bridge),
                           conversation_id=key)

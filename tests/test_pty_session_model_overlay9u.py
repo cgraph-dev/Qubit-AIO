@@ -86,3 +86,29 @@ def test_stored_model_prefers_explicit_pair_route(tmp_path, monkeypatch):
     monkeypatch.setattr(_QR, "use_qubit_home", lambda cfg=None: tmp_path)
     provider, model = pty_ws._session_stored_model("sess-pair")
     assert (provider, model) == ("cheapvibecode", "grok-4.7")
+
+
+def test_poke_redraw_issues_resize_and_never_raises():
+    from voicebridge import pty_ws
+
+    calls = []
+
+    class Bridge:
+        def resize(self, cols=80, rows=24):
+            calls.append((cols, rows))
+
+    class Session:
+        bridge = Bridge()
+
+    assert pty_ws._poke_redraw(Session(), 100, 30) is True
+    assert calls == [(100, 30)]
+
+    class DeadBridge:
+        def resize(self, **kw):
+            raise OSError("gone")
+
+    class DeadSession:
+        bridge = DeadBridge()
+
+    assert pty_ws._poke_redraw(DeadSession(), 80, 24) is False
+    assert pty_ws._poke_redraw(object(), 80, 24) is False
