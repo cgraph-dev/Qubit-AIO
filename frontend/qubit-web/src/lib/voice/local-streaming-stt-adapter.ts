@@ -510,6 +510,15 @@ export class LocalStreamingSTTAdapter implements TranscriptionAdapter {
           if (this.#finalText.trim()) {
             this.#events?.onFinal(this.#finalText.trim());
             this.#finalText = "";
+          } else if (typeof msg.warning === "string" && msg.warning) {
+            // The server completed with no transcript and said why (nothing
+            // buffered vs rescore failure) — surface it instead of a silent
+            // empty turn.
+            const code =
+              typeof msg.warning_code === "string" && msg.warning_code
+                ? msg.warning_code
+                : "STT_NO_TRANSCRIPT";
+            this.#events?.onError(code, msg.warning);
           }
           this.#endResolve?.();
           this.#events?.onEnd?.();

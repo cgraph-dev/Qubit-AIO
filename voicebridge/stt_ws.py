@@ -406,9 +406,17 @@ class SttWsServer:
                       audio_ms=session.metrics.as_dict(st["stop_at"]).get("audio_ms"),
                       rescore=winner, rescore_reason=rescore_reason or None)
         metrics = session.metrics.as_dict(st["stop_at"])
+        extra: Dict[str, Any] = {}
+        if not final_text and rescore_reason:
+            # Silent completion, explained: the socket yielded no transcript
+            # because nothing was buffered (the client sent no audio) or the
+            # rescore failed. Carried on the event (not just the journal) so
+            # the UI can say WHICH instead of going quiet.
+            extra["warning_code"] = "STT_NO_TRANSCRIPT"
+            extra["warning"] = rescore_reason
         self._send(sock, st, "stt.completed", sequence=sequence,
                    final_text=final_text,
-                   cancelled=False, metrics=metrics)
+                   cancelled=False, metrics=metrics, **extra)
         self._reset_request(st)
 
     def _on_cancel(self, sock: Any, st: Dict[str, Any], sequence: int) -> None:
