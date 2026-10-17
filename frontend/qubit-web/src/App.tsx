@@ -72,6 +72,7 @@ import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { cn } from "@/lib/utils";
+import { QubitMark } from "@/components/QubitMark";
 import { SidebarFooter } from "@/components/SidebarFooter";
 import { SidebarStatusStrip, gatewayLine } from "@/components/SidebarStatusStrip";
 import { useBelowBreakpoint } from "@nous-research/ui/hooks/use-below-breakpoint";
@@ -87,22 +88,6 @@ import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
 import "@/styles/sidebar-studio.css";
-
-function QubitMark({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      viewBox="0 0 40 40"
-    >
-      <rect x="3" y="3" width="34" height="34" rx="10" fill="var(--background-base)" stroke="currentColor" strokeOpacity=".72" />
-      <text x="19" y="27" fill="currentColor" fontFamily="var(--theme-font-display, var(--theme-font-sans))" fontSize="23" fontWeight="700" textAnchor="middle">Q</text>
-      <circle cx="29" cy="11" r="3.1" fill="currentColor" stroke="var(--background-base)" strokeWidth="1.6" />
-      <circle cx="29" cy="11" r="5.2" stroke="currentColor" strokeOpacity=".25" />
-    </svg>
-  );
-}
 
 // Route pages are lazy-loaded so the initial dashboard shell does not pay for
 // every admin surface (and heavy deps like xterm) up front.
