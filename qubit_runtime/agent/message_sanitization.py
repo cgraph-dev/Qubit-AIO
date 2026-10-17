@@ -12,7 +12,7 @@ import json
 import logging
 import re
 from functools import partial
-from typing import Any, Callable
+from typing import Any, Callable, Iterable, NamedTuple
 
 from agent.agent_runtime_helpers_placeholders import _INTERRUPTED_PLACEHOLDER, hidden_interrupt_placeholder_row
 from agent.message_metadata import DB_ROW_SNAPSHOT
@@ -466,6 +466,8 @@ __all__ = [
     "close_interrupted_tool_sequence", "coalesce_tool_call_id", "coerce_tool_name",
     "deterministic_call_id", "matches_reasoning_echo_family", "needs_reasoning_echo",
     "normalize_provider_tool_call_ids", "reapply_reasoning_echo", "reasoning_echo_family",
+    "reasoning_replay_route", "record_reasoning_field_rejection", "rejected_reasoning_carriers",
+    "route_reasoning_carriers",
     "sanitize_outbound_kwargs", "stale_thinking_reaches_wire", "strip_images_for_rejecting_model",
     "tool_call_id_variants", "tool_result_id_variants", "uniquify_tool_call_ids",
 ]
@@ -537,16 +539,19 @@ def coalesce_tool_call_id(tc: Any) -> str:
     return ""
 
 
-def uniquify_tool_call_ids(tool_calls: list) -> list:
-    """Ensure every tool call in one assistant turn has a distinct id.
+def uniquify_tool_call_ids(tool_calls: list, taken: Iterable[str] = ()) -> list:
+    """Ensure every tool call in one assistant turn has an id no other call in the session has.
 
-    Some providers reuse one id across a batch; the pre-API sanitizer then keeps only the
-    first call/result pair per id and strict providers reject duplicates. Later collisions
-    get a deterministic ``<id>_d<n>`` suffix (never uuid4 — cache-prefix stability). Mutates
-    entries (SDK models / SimpleNamespace / dicts) in place. Blank ids are left for the
-    deterministic fallback in ``build_assistant_message``.
+    Some providers reuse one id across a batch, and some name every call ``call_0`` turn after
+    turn; the pre-API sanitizer then keeps only the first call/result pair per id, strict
+    providers reject duplicates, and the desktop binds a tool card to the wrong call. ``taken``
+    is the ids already in this session's history: they are never rewritten (prompt cache), so
+    the incoming call is renamed instead. Collisions get a deterministic ``<id>_d<n>`` suffix
+    (never uuid4 — cache-prefix stability). Mutates entries (SDK models / SimpleNamespace /
+    dicts) in place. Blank ids are left for the deterministic fallback in
+    ``build_assistant_message``.
     """
-    seen: set = set()
+    seen: set = set(taken)
     for tc in tool_calls or []:
         # Same coalescing rule as coalesce_tool_call_id, tolerant of non-string ids.
         raw = _tc_field(tc, "call_id") or _tc_field(tc, "id") or ""
@@ -573,8 +578,8 @@ def uniquify_tool_call_ids(tool_calls: list) -> list:
             continue
         _fn_name = _tc_field(_tc_field(tc, "function"), "name") or "?"
         logger.warning(
-            "Model reused tool call id %s within one turn; renamed the duplicate to %s (tool=%s) to keep "
-            "call/result pairing lossless.", cid, new_id, _fn_name,
+            "Model reused tool call id %s; renamed the duplicate to %s (tool=%s) to keep call/result "
+            "pairing lossless.", cid, new_id, _fn_name,
         )
     return tool_calls
 
@@ -648,6 +653,36 @@ _REASONING_ECHO_RULES: tuple = (
 )
 _REASONING_ECHO_RULE_BY_FAMILY = {rule[0]: rule for rule in _REASONING_ECHO_RULES}
 
+RC, R, RD = "reasoning_content", "reasoning", "reasoning_details"
+REASONING_CARRIERS = (RC, R, RD)
+_ALL_CARRIERS = frozenset(REASONING_CARRIERS)
+_DEFAULT_CARRIERS = frozenset({RC})
+_LOCAL_CARRIERS = frozenset({RC, R})  # llama.cpp/SGLang read reasoning_content, vLLM/Ollama read reasoning
+
+_REASONING_CARRIER_ROUTES: tuple = (
+    # (carriers, providers (lowered), hosts) — evidence per row in the PR body / FINDINGS.
+    (frozenset(), frozenset({"mistral", "groq", "cerebras", "sambanova"}),
+     ("mistral.ai", "groq.com", "cerebras.ai", "sambanova.ai", "hunyuan.cloud.tencent.com")),
+    # Fireworks' ChatMessage schema is additionalProperties:false with reasoning_content only.
+    (frozenset({RC}), frozenset({"fireworks"}), ("fireworks.ai",)),
+    # OpenRouter-format gateways read the unified array, the string and the alias.
+    (_ALL_CARRIERS, frozenset({"openrouter", "kilocode", "ai-gateway", "nous"}),
+     ("openrouter.ai", "kilo.ai", "ai-gateway.vercel.sh", "nousresearch.com")),
+    # Vendors that document reasoning_details replay next to reasoning_content.
+    (frozenset({RC, RD}), frozenset({"novita", "tencent-tokenhub", "minimax", "minimax-cn"}),
+     ("novita.ai", "tokenhub.tencentmaas.com", "tokenhub-intl.tencentcloudmaas.com", "minimax.io", "minimaxi.com")),
+    (_LOCAL_CARRIERS, frozenset({"ollama-cloud", "custom", "lmstudio", "upstage"}), ("ollama.com", "upstage.ai")),
+)
+
+
+class ReasoningReplayRoute(NamedTuple):
+    """``pad``: must-echo tier (missing reasoning_content -> " "). ``carriers``: the reasoning
+    keys an assistant wire copy carries; ``None`` outside chat_completions, where the native
+    adapters own reasoning replay (only the must-echo pad is applied, details are untouched)."""
+
+    pad: bool
+    carriers: frozenset | None
+
 
 def matches_reasoning_echo_family(family: str, provider: Any, model: Any, base_url: Any) -> bool:
     """True when (provider, model, base_url) matches one echo-back family (families can overlap;
@@ -670,8 +705,50 @@ def reasoning_echo_family(provider: Any, model: Any, base_url: Any) -> str | Non
 
 
 def needs_reasoning_echo(provider: Any, model: Any, base_url: Any) -> bool:
-    """True when the endpoint requires reasoning_content echo-back."""
+    """True when the endpoint requires reasoning_content echo-back (the must-echo tier)."""
     return reasoning_echo_family(provider, model, base_url) is not None
+
+
+def route_reasoning_carriers(provider: Any, base_url: Any) -> frozenset:
+    """Reasoning carriers the chat-completions route reads (before any runtime rejection)."""
+    from utils import base_url_host_matches
+
+    provider_lower = (provider or "").strip().lower()
+    carriers = next(
+        (c for c, providers, hosts in _REASONING_CARRIER_ROUTES
+         if provider_lower in providers or any(base_url_host_matches(base_url, h) for h in hosts)),
+        None,
+    )
+    if carriers is None:
+        from agent.model_metadata import is_local_endpoint
+
+        carriers = _LOCAL_CARRIERS if base_url and is_local_endpoint(str(base_url)) else _DEFAULT_CARRIERS
+    if RD not in carriers and carriers and _profile_declares_native_details(provider_lower):
+        carriers = carriers | {RD}
+    return carriers
+
+
+def _profile_declares_native_details(provider_lower: str) -> bool:
+    """A profile declaring ``native_reasoning_details_type`` consumes replayed details by contract."""
+    if not provider_lower:
+        return False
+    from providers import get_provider_profile
+
+    return bool(getattr(get_provider_profile(provider_lower), "native_reasoning_details_type", None))
+
+
+def reasoning_replay_route(
+    api_mode: Any, provider: Any, model: Any, base_url: Any, *, echo_opt_in: bool = False,
+    rejected: Iterable[str] = (),
+) -> ReasoningReplayRoute:
+    """Replay decision for one route. Deterministic in its inputs, so the wire prefix is byte-stable
+    across turns and changes only on a route switch or a recorded rejection (``rejected``)."""
+    pad = bool(echo_opt_in) or needs_reasoning_echo(provider, model, base_url)
+    if (api_mode or "chat_completions") != "chat_completions":
+        return ReasoningReplayRoute(pad, None)
+    carriers = route_reasoning_carriers(provider, base_url) - frozenset(rejected)
+    # A strict route never gets a reasoning key, not even the must-echo pad.
+    return ReasoningReplayRoute(pad and RC in carriers, carriers)
 
 
 def stale_thinking_reaches_wire(api_mode: Any, provider: Any, model: Any, base_url: Any) -> bool:
@@ -681,12 +758,19 @@ def stale_thinking_reaches_wire(api_mode: Any, provider: Any, model: Any, base_u
     walks must share: if they disagree, a reasoning-heavy session can look over-threshold
     to preflight yet fully tail-protected to the walk — an infinite compaction loop.
     ``codex_responses`` never reads the text keys (continuity rides the encrypted sidecar).
+    A runtime rejection is not visible here; both sides then over-charge identically.
     """
     if (api_mode or "") == "anthropic_messages":
         from agent.anthropic_thinking_policy import native_anthropic_preserves_prior_thinking
         if native_anthropic_preserves_prior_thinking(base_url, model):
             return True
-    return (api_mode or "") != "codex_responses" and needs_reasoning_echo(provider, model, base_url)
+    if not api_mode:
+        # No route facts (a bare compressor): only the must-echo tier is known to replay.
+        return needs_reasoning_echo(provider, model, base_url)
+    route = reasoning_replay_route(api_mode, provider, model, base_url)
+    if route.carriers is None:
+        return (api_mode or "") != "codex_responses" and route.pad
+    return bool(route.carriers & {RC, R})
 
 
 def native_anthropic_accounting_projection(messages: Any) -> tuple[Any, tuple[str, ...]]:
@@ -741,71 +825,183 @@ def native_anthropic_accounting_projection(messages: Any) -> tuple[Any, tuple[st
     return projected, tuple(replayed_thinking)
 
 
-def apply_reasoning_content_policy(source_msg: dict, api_msg: dict, needs_thinking_pad: bool) -> None:
-    """Copy provider-facing reasoning fields onto an API replay message (mutates ``api_msg``).
-    ``needs_thinking_pad`` is the require-side flag (``needs_reasoning_echo``)."""
+def _replayable_reasoning_text(msg: dict) -> str | None:
+    """The turn's reasoning text: a non-blank ``reasoning_content`` wins over ``reasoning``."""
+    for key in (RC, R):
+        value = msg.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
+def _apply_legacy_must_echo_pad(source_msg: dict, api_msg: dict) -> None:
+    """Native-adapter wires (``carriers=None``): the pre-replay contract, byte-for-byte. An explicit
+    value is kept verbatim (legacy "" upgraded to " "); a tool-call turn holding only another
+    provider's ``reasoning`` is padded instead of converted into a native thinking block."""
+    existing, reasoning = source_msg.get(RC), source_msg.get(R)
+    if isinstance(existing, str):
+        api_msg[RC] = existing or " "
+    elif isinstance(reasoning, str) and reasoning and not source_msg.get("tool_calls"):
+        api_msg[RC] = reasoning
+    else:
+        api_msg[RC] = " "
+
+
+def apply_reasoning_content_policy(
+    source_msg: dict, api_msg: dict, needs_thinking_pad: bool, carriers: frozenset | None = None,
+) -> None:
+    """Shape an assistant replay message's reasoning keys for the active route (mutates ``api_msg``).
+
+    ``needs_thinking_pad`` is the must-echo flag; ``carriers`` the keys the route reads
+    (``reasoning_replay_route``). ``carriers=None`` is a non-chat-completions wire: only the
+    must-echo ``reasoning_content`` rides there and ``reasoning_details`` is left to the adapter.
+    Keys the route does not read are removed, so a strict host never sees one (#45655, #70233).
+    """
     if source_msg.get("role") != "assistant":
         return
-    if not needs_thinking_pad:
-        # Strict side: never carry the field — a reasoning primary pads history with " ",
-        # then a fallback to Mistral/Cerebras/Groq replays the pad and 422s. Also drops a
-        # non-string value (None after compaction): never pass null to the API.
-        api_msg.pop("reasoning_content", None)
-        return
-    existing, reasoning = source_msg.get("reasoning_content"), source_msg.get("reasoning")
-    # 1. Explicit reasoning_content already set. When the active provider enforces the thinking-mode
-    #   echo-back (DeepSeek / Kimi / MiMo), preserve it verbatim — that includes their own space-placeholder
-    #   written at creation time and any valid reasoning from the same provider. Sessions persisted BEFORE
-    #   #17341 have empty-string placeholders pinned at creation time; DeepSeek V4 Pro rejects those with
-    #   HTTP 400, so upgrade "" → " " on replay. When the active provider does NOT enforce echo-back, strip
-    #   the field entirely. Strict OpenAI-compatible providers (Mistral, Cerebras, Groq, SambaNova, …)
-    #   reject ANY reasoning_content key in input messages with HTTP 400/422 ("Extra inputs are not
-    #   permitted"), even an empty string or a single-space pad. Stripping here covers the rebuild path;
-    #   ``reapply_reasoning_echo`` covers the already-built api_messages path. Refs #45655.
-    if isinstance(existing, str):
-        # Explicit value: preserve verbatim, upgrading legacy "" to " " (DeepSeek V4 400s on "").
-        api_msg["reasoning_content"] = existing or " "
-    elif isinstance(reasoning, str) and reasoning and not source_msg.get("tool_calls"):
-        # Healthy session: promote internal 'reasoning' → 'reasoning_content'.
-        api_msg["reasoning_content"] = reasoning
+    text = _replayable_reasoning_text(source_msg)
+    effective = carriers if carriers is not None else (frozenset({RC}) if needs_thinking_pad else frozenset())
+    if carriers is None and needs_thinking_pad:
+        _apply_legacy_must_echo_pad(source_msg, api_msg)
+    elif RC in effective and (text is not None or needs_thinking_pad):
+        # Must-echo tier: every assistant turn carries the field; " " (not "") when there is no
+        # text, because DeepSeek V4 rejects empty string (#17341) and a legacy "" pad upgrades.
+        api_msg[RC] = text if text is not None else " "
     else:
-        # tool_calls + 'reasoning' but no 'reasoning_content' means the reasoning came from
-        # ANOTHER provider (DeepSeek's own build pins reasoning_content for tool-call turns):
-        # pad without leaking foreign CoT. No reasoning at all: every assistant turn still needs
-        # the field; " " (not "") because DeepSeek V4 rejects empty string.
-        api_msg["reasoning_content"] = " "
+        # Also drops a non-string value (None after compaction) and a whitespace pad written
+        # for a must-echo provider: never pass null, never replay a pad as reasoning.
+        api_msg.pop(RC, None)
+    if R in effective and text is not None:
+        api_msg[R] = text
+    else:
+        api_msg.pop(R, None)
+    if carriers is not None and RD not in carriers:
+        # Private ``*.native_assistant`` records (Gemini/Copilot carriers) survive: the transport lifts
+        # them onto the route that reads them and filters them from every other wire.
+        private = [d for d in api_msg.pop(RD, None) or () if isinstance(d, dict)
+                   and str(d.get("type") or "").endswith(".native_assistant")]
+        if private:
+            api_msg[RD] = private
 
 
-def reapply_reasoning_echo(api_messages: list, needs_thinking_pad: bool) -> int:
-    """Re-pad (or strip) assistant turns' reasoning_content for the ACTIVE provider.
+def _reasoning_shape(msg: dict) -> tuple:
+    return tuple(msg.get(key) for key in REASONING_CARRIERS)
 
-    ``api_messages`` is built once under the primary provider; a mid-conversation fallback
-    can switch providers, so baked-in fields must be reconciled: TO a require-side provider
-    re-applies the pad (else 400), TO a strict one strips it (else 422). Idempotent.
-    Returns the number of assistant turns changed.
+
+def reapply_reasoning_echo(api_messages: list, needs_thinking_pad: bool, carriers: frozenset | None = None) -> int:
+    """Reconcile already-built assistant turns with the ACTIVE route.
+
+    ``api_messages`` is built once under the primary; a mid-conversation fallback or a recorded
+    field rejection changes the route, so baked-in keys are reconciled both ways: TO a must-echo
+    provider the pad is re-applied (else 400), TO a strict one the keys are stripped (else 422),
+    and a carrier the new route reads is restored from the text that is still present.
+    Idempotent. Returns the number of assistant turns changed.
     """
     changed = 0
     for api_msg in api_messages:
         if api_msg.get("role") != "assistant":
             continue
-        # 3. Healthy session: promote 'reasoning' field to 'reasoning_content' for providers that use the
-        #   internal 'reasoning' key. This must happen before the unconditional empty-string fallback so
-        #   genuine reasoning content is not overwritten (#15812 regression in PR #15478). Only promote for
-        #   providers that enforce echo-back — strict providers reject the field (refs #45655).
-        # 4. DeepSeek / Kimi thinking mode: all assistant messages need reasoning_content. Inject a single
-        #   space to satisfy the provider's requirement when no explicit reasoning content is present.
-        #   Covers both tool-call turns (already-poisoned history with no reasoning at all) and plain text
-        #   turns. Space (not "") because DeepSeek V4 Pro tightened validation and rejects empty string with
-        #   HTTP 400 ("The reasoning content in the thinking mode must be passed back to the API"). Refs
-        #   #17341.
-        if needs_thinking_pad:
-            if not api_msg.get("reasoning_content"):
-                apply_reasoning_content_policy(api_msg, api_msg, needs_thinking_pad)
-                changed += 1 if api_msg.get("reasoning_content") else 0
-        elif "reasoning_content" in api_msg:
-            api_msg.pop("reasoning_content", None)
-            changed += 1
+        before = _reasoning_shape(api_msg)
+        if carriers is None and needs_thinking_pad and api_msg.get(RC):
+            continue
+        apply_reasoning_content_policy(api_msg, api_msg, needs_thinking_pad, carriers)
+        changed += _reasoning_shape(api_msg) != before
     return changed
+
+
+# Provider error bodies (lowercased) for "this request carries a key my schema does not know".
+_UNKNOWN_FIELD_PHRASES = (
+    "extra inputs are not permitted", "is unsupported", "no such field", "unknown field",
+    "unrecognized request argument", "unrecognized field", "unknown parameter", "unexpected field",
+    "additional propert", "unknown key",
+)
+_NAMED_FIELD_RES = {
+    RC: re.compile(r"(?<![\w])reasoning_content(?![\w])"),
+    RD: re.compile(r"(?<![\w])reasoning_details(?![\w])"),
+    # The bare word is also a top-level request param; only a message-path mention counts.
+    R: re.compile(r"messages[^\n]{0,80}?(?<![\w])reasoning(?![\w])"),
+}
+
+
+def rejected_reasoning_fields(error_body: Any, sent_messages: Any) -> frozenset:
+    """Reasoning keys to drop after an unknown-field rejection that names one this request carried.
+
+    Strict schemas report one offending key per error, so the drop is widened to the keys the
+    same schema will reject next: a rejected ``reasoning_details`` / ``reasoning`` takes the
+    other non-standard carrier too (``reasoning_content`` still carries the text); a rejected
+    ``reasoning_content`` (the most widely accepted alias) takes all three. One retry, not three.
+    """
+    body = str(error_body or "").lower()
+    if not any(phrase in body for phrase in _UNKNOWN_FIELD_PHRASES):
+        return frozenset()
+    sent = {
+        key for msg in (sent_messages if isinstance(sent_messages, list) else ())
+        if isinstance(msg, dict) and msg.get("role") == "assistant" for key in REASONING_CARRIERS if key in msg
+    }
+    named = {key for key in sent if _NAMED_FIELD_RES[key].search(body)}
+    if not named:
+        return frozenset()
+    return frozenset(sent & (_ALL_CARRIERS if RC in named else {R, RD}))
+
+
+def reasoning_route_key(agent: Any) -> tuple[str, str, str]:
+    """``(provider, base_url host, model)``: one gateway serves models on different upstream lanes,
+    so a rejection learned for one model must not strip carriers from its siblings."""
+    from utils import base_url_hostname
+
+    return (
+        (getattr(agent, "provider", "") or "").strip().lower(),
+        base_url_hostname(getattr(agent, "base_url", "") or "") or "",
+        (getattr(agent, "model", "") or "").strip(),
+    )
+
+
+_REJECTION_MODEL_CONFIG_KEY = "reasoning_rejected_carriers"
+
+
+def rejected_reasoning_carriers(agent: Any) -> frozenset:
+    """Reasoning keys the active (provider, host, model) rejected in this session.
+
+    Persisted in the session's ``model_config`` so a resumed process (``--resume``, a gateway
+    restart) never re-learns a rejection with another 400. Loaded once per ``session_id``.
+    """
+    routes = agent.__dict__.setdefault("_reasoning_rejecting_routes", {})
+    session_id = getattr(agent, "session_id", None)
+    if session_id and getattr(agent, "_reasoning_rejections_loaded_for", None) != session_id:
+        agent._reasoning_rejections_loaded_for = session_id
+        getter = getattr(getattr(agent, "_session_db", None), "get_session_model_config_value", None)
+        stored = getter(session_id, _REJECTION_MODEL_CONFIG_KEY, []) if callable(getter) else []
+        for entry in stored if isinstance(stored, list) else ():
+            if isinstance(entry, list) and len(entry) == 4 and isinstance(entry[3], list):
+                routes.setdefault(tuple(entry[:3]), set()).update(k for k in entry[3] if k in _ALL_CARRIERS)
+    return frozenset(routes.get(reasoning_route_key(agent), ()))
+
+
+def record_reasoning_field_rejection(agent: Any, error_body: Any, sent_messages: Any) -> frozenset:
+    """Remember the reasoning keys this route rejected; returns the NEW ones (empty = no retry).
+
+    The next ``build_api_request`` re-shapes ``api_messages`` without them for this
+    (provider, host, model) for the rest of the session. A repeat rejection of an already
+    recorded key returns empty, so recovery can never loop. History is never touched.
+    """
+    if getattr(agent, "api_mode", "chat_completions") != "chat_completions":
+        return frozenset()
+    fields = rejected_reasoning_fields(error_body, sent_messages)
+    if needs_reasoning_echo(getattr(agent, "provider", ""), getattr(agent, "model", ""), getattr(agent, "base_url", "")):
+        # Must-echo routes 400 on any tool turn WITHOUT reasoning_content; a body naming it is a
+        # value complaint ("must not be empty"), never a schema that lacks the field.
+        fields -= {RC}
+    if not fields:
+        return frozenset()
+    new = fields - rejected_reasoning_carriers(agent)
+    if not new:
+        return frozenset()
+    routes = agent._reasoning_rejecting_routes
+    routes.setdefault(reasoning_route_key(agent), set()).update(new)
+    patcher = getattr(getattr(agent, "_session_db", None), "patch_session_model_config", None)
+    if callable(patcher) and getattr(agent, "session_id", None) and not getattr(agent, "_persist_disabled", False):
+        patcher(agent.session_id, {_REJECTION_MODEL_CONFIG_KEY: [[*key, sorted(v)] for key, v in sorted(routes.items())]})
+    return frozenset(new)
 
 
 # Image / multimodal parts are deliberately NOT consolidated here: per-adapter handling is
