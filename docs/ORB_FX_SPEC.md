@@ -14,6 +14,31 @@ Geometry constants are owned by `mark.py` (`RX_FRAC=0.72`, `RY_FRAC=0.28`,
 `PARTICLES`). Qt translates those constants to `QPainter`; it must not invent
 its own.
 
+## v2 — the dense field (owner 2026-10-17: "more particles, more 3D")
+
+All motion now comes from ONE module, `voicebridge/orb/mark_field.py`, consumed
+by both renderers (Qt live orb + Tk fallback); the painters contain no geometry.
+
+| Layer | What it adds | Period / range |
+|---|---|---|
+| Camera sway | whole mark floats (`camera_offset`) | 0.27 / 0.19 Hz, ±1.6% R |
+| Precession | orbit tilts drift as well as sway | ±9°, 41 s / 57 s |
+| Heartbeat | lub-dub nucleus + thin halo | 0.95 s, 2nd thump 62% |
+| Shockwave | thin ring expands out of the nucleus | 0.5 s, 1.0→2.3× |
+| Particles | 9 logo beads, depth size/alpha/lift/parallax + 6-sample trails | 6.4–18.9 s |
+| Dust | 22 slow motes on the same orbits | 5–14 s |
+| Comet | one fast traveller, 12-sample tapered tail | every 7 s, 2.4× |
+| Glints | 26 deterministic sparkles | life 1.1–2.15 s, first 45% visible |
+
+Depth ordering is the 3-D read: every `depth < 0.5` element draws before the
+nucleus, every `depth >= 0.5` element after it. Reduced motion freezes `t=0`
+and hides the comet, trails, glints, dust and shockwave.
+
+Contract bounds were reconciled when density increased: the visible-primitive
+delta cap is 40 (26 glints + comet tail) and the perf test asserts a bounded
+per-frame SPREAD (120) rather than comparing batch halves, because the comet's
+periodic sweep makes half-comparison a phase lottery.
+
 ## Effects
 
 All effects are pure functions of the frame clock `t` — **no randomness** — so

@@ -442,7 +442,11 @@ def test_sparkles_add_bounded_extra_primitives(renderer):
     extra = live - hidden
 
     assert extra > 0, f"[{name}] no glints appear/disappear across the cycle"
-    assert extra <= 20, f"[{name}] sparkle count {extra} exceeds the cap of 20"
+    # Bound raised from 20 when the field went dense (owner 2026-10-17): 26
+    # glints plus the comet's 12-sample tail can enter/leave the visible set in
+    # one frame. The contract is still "pulses, and stays bounded" — an
+    # exploding field would blow past this.
+    assert extra <= 40, f"[{name}] sparkle count {extra} exceeds the cap of 40"
 
 
 # --------------------------------------------------------------------------- #
