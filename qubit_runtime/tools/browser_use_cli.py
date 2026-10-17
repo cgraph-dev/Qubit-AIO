@@ -258,7 +258,7 @@ def default_downgrade_notice() -> Optional[str]:
             stamp.touch()
             os.utime(stamp, (now, now))
         return ("browser-harness is missing from Qubit's Python environment — using the built-in browser tools. "
-                "Run `hermes update` to re-sync it, or set `browser.backend: off` in config.yaml to silence this.")
+                "Run `qubit update` to re-sync it, or set `browser.backend: off` in config.yaml to silence this.")
     except Exception as e:  # pragma: no cover — a notice must never break startup
         logger.debug("browser-use downgrade notice failed: %s", e)
         return None
@@ -411,7 +411,7 @@ def _resolve_managed_chromium_cdp(env: dict, task_id: Optional[str], session_nam
     cdp = str(((res or {}).get("data") or {}).get("cdpUrl") or "") if (res or {}).get("success") else ""
     if not cdp:
         return (f"The local browser could not be started: {(res or {}).get('error') or 'agent-browser returned no CDP endpoint'} "
-                "Run `hermes tools` → Browser Automation to (re)install Chromium, or switch backends.")
+                "Run `qubit tools` → Browser Automation to (re)install Chromium, or switch backends.")
     cdp = _reach_sandbox_cdp(cdp)
     _set_cdp_env(env, cdp)
     env[_PRIVATE_BROWSER_SENTINEL] = "1"  # one Chromium per cache key: nothing to share a tab with
@@ -639,7 +639,7 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
     cmd = _find_cli()
     if not cmd:
         return tool_error("browser-harness is missing from Qubit's Python environment. "
-                          "Run `hermes update` to re-sync it.")
+                          "Run `qubit update` to re-sync it.")
 
     env = _base_subprocess_env()
     if session:

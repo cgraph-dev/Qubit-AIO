@@ -51,7 +51,7 @@ _PROCESS_GLOBAL = frozenset({"process.stop", "delegation.pause", "reload.mcp", "
 # ``status`` and ``use`` (the profile's ``browser.backend``) stay. A missing action means ``status``.
 _PROCESS_GLOBAL_ACTIONS = {"browser.manage": ({"connect", "disconnect"}, (
     "/browser connect and /browser disconnect would switch the browser for every chat on this shared "
-    "gateway. Set browser.cdp_url in config.yaml instead, or use the classic CLI (hermes --cli)."))}
+    "gateway. Set browser.cdp_url in config.yaml instead, or use the classic CLI (qubit --cli)."))}
 
 
 def legacy_fallback_allowed(actor: Any, method: str) -> bool:

@@ -41,11 +41,11 @@ def _update_output_tail(output: str, limit: int) -> str:
 
 
 class GatewayUpdateNotificationsMixin:
-    """Update watcher: streams ``hermes update --gateway`` output, forwards prompts, sends the final notice."""
+    """Update watcher: streams ``qubit update --gateway`` output, forwards prompts, sends the final notice."""
 
     @dataclasses.dataclass
     class _UpdatePaths:
-        """Marker files ``hermes update --gateway`` and its watcher exchange under QUBIT_HOME."""
+        """Marker files ``qubit update --gateway`` and its watcher exchange under QUBIT_HOME."""
 
         pending: Path
         claimed: Path
