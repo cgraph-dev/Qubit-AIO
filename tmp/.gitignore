@@ -1,6 +1,11 @@
-# Audit run outputs — regenerable, and ~1.8 MB per run. The probes (tmp/audit/*.py)
+# Audit run outputs — regenerable, and ~1.8 MB per run. The probes (audit/*.py)
 # and the audit scripts themselves are the durable part; these are just their output.
-tmp/audit/*.json
-tmp/audit/*.log
-tmp/audit/*.out
-tmp/audit/*.err
+#
+# Patterns are relative to THIS directory (a .gitignore applies below its own
+# root), so the prefix is `audit/`, not `tmp/audit/` — the earlier `tmp/audit/`
+# form matched nothing and every audit output was one `git add` from the repo.
+audit/*.json
+audit/*.log
+audit/*.out
+audit/*.err
+audit/*.txt
