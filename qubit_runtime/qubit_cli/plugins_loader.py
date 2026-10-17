@@ -33,6 +33,9 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = logging.getLogger("qubit_cli.plugins")
 
+# Guards creating a manager's plugin host, so concurrent first callers share one host process.
+_PLUGIN_HOST_CREATE_LOCK = threading.Lock()
+
 _NS_PARENT = "qubit_plugins"
 _MODULE_NAMESPACE_LOCK = threading.RLock()
 _BARE_MODULE_SCOPE: Dict[str, str] = {}  # bare module name -> owning scope_key
@@ -152,10 +155,20 @@ def run_with_load_deadline(plugin_key: str, ctx: "PluginContext", fn: Callable[[
 
 
 def _evict_modules(module_name: str) -> None:
-    """Drop ``module_name`` and every ``module_name.*`` submodule from ``sys.modules``."""
+    """Drop ``module_name`` and every ``module_name.*`` submodule from ``sys.modules``.
+
+    ``sys.modules`` is process-global, so any concurrent import — another profile's plugin
+    load, a lazy import on a worker thread — mutates it while this runs. The ``list()`` is
+    load-bearing, not a style choice: it is one atomic C-level copy, where iterating the live
+    mapping raises ``RuntimeError: dictionary changed size during iteration`` and
+    ``PluginLoaderMixin._load_plugin_scoped`` degrades that to a warning that loses the whole
+    plugin. ``pop`` (not ``del``) keeps the snapshot-to-delete window tolerant of a key another
+    evictor already removed.
+    """
     prefix = f"{module_name}."
-    for name in [n for n in sys.modules if n == module_name or n.startswith(prefix)]:
-        del sys.modules[name]
+    for name in list(sys.modules):  # snapshot first — never iterate the live mapping
+        if name == module_name or name.startswith(prefix):
+            sys.modules.pop(name, None)
 
 
 def _serialized_replacement(method):
@@ -574,7 +587,10 @@ class PluginLoaderMixin:
         host = getattr(self, "_plugin_host_instance", None)
         if host is None:
             from qubit_cli.plugin_host import PluginHost
-            host = self._plugin_host_instance = PluginHost(self)
+            with _PLUGIN_HOST_CREATE_LOCK:
+                host = getattr(self, "_plugin_host_instance", None)
+                if host is None:
+                    host = self._plugin_host_instance = PluginHost(self)
         return host
 
     def _track_tool_override_policy(self, manifest: PluginManifest, module_name: str) -> None:
