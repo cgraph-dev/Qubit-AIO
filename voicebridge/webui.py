@@ -5078,16 +5078,27 @@ class WebUI:
         # reads a session-token global the server no longer emits, so every
         # API read 401s (and pages render empty) with no server-side error.
         # Fail-open serving with a loud boot record, never a silent outage.
+        # The whole block is guarded: a guard that can kill boot is worse
+        # than no guard (2026-10-17: self._qubit_dist() is a HANDLER method,
+        # absent on WebUI — calling it here threw AttributeError out of
+        # __init__ and the dashboard never listened).
         try:
-            self._bundle_check = check_qubit_bundle(self._qubit_dist())
+            from . import resources as _bundle_resources
+            _bundle_dist = _bundle_resources.resource_path("frontend/qubit-dist")
+            self._bundle_check = check_qubit_bundle(_bundle_dist)
+            if not self._bundle_check.get("ok"):
+                _bundle_detail = "; ".join(
+                    self._bundle_check.get("issues", []))[:500]
+                log.warning("webui.dashboard_bundle STALE/BROKEN: %s",
+                            _bundle_detail)
+                log_event("webui.dashboard_bundle.stale",
+                          detail=_bundle_detail, dist=str(_bundle_dist))
         except Exception as _exc:  # noqa: BLE001 - the check must not break boot
-            self._bundle_check = {"ok": False,
-                                  "issues": [f"bundle check failed: {type(_exc).__name__}"]}
-        if not self._bundle_check.get("ok"):
-            detail = "; ".join(self._bundle_check.get("issues", []))[:500]
-            log.warning("webui.dashboard_bundle STALE/BROKEN: %s", detail)
-            log_event("webui.dashboard_bundle.stale", detail=detail,
-                      dist=str(self._qubit_dist()))
+            import traceback as _tb
+            self._bundle_check = {"ok": False, "issues": [
+                f"bundle check failed: {type(_exc).__name__}: {_exc}"]}
+            log.warning("webui.dashboard_bundle check errored (serving anyway): %s",
+                        _tb.format_exc(limit=3)[-300:])
         # optional shared secret for tunneled/external access (config: webui.token)
         self.api_token: str = orchestrator.cfg.get("webui", "token", default="") if orchestrator is not None else ""
         self.allowed_origins = orchestrator.cfg.get("webui", "allowed_origins", default=[]) if orchestrator is not None else []
