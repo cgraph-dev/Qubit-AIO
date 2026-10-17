@@ -67,6 +67,46 @@ AMBER = (227, 179, 65)
 
 _QT_BACKEND_ENV = "QUBIT_ORB_BACKEND"
 
+#: -- mark life constants (the Tk sibling mirrors these exact numbers) ------
+#: Nucleus heartbeat: a "lub-dub" double thump. One primary beat per period,
+#: a weaker second thump a fraction of the way in, each a smooth ~0.16s pulse.
+HEART_PERIOD_S = 0.95
+HEART_SECOND_PHASE = 0.22
+HEART_SECOND_AMP = 0.62
+HEART_THUMP_S = 0.16
+HEART_SCALE_AMP = 0.18
+HALO_RADIUS_MULT = 1.6
+HALO_ALPHA_MAX = 0.22
+#: Depth: `depth = 0.5 + 0.5*cos(angle)` maps orbital angle to nearness
+#: (1 = nearest). Radius/alpha/lift all ride it; parallax nudges the far
+#: side inward along the orbit normal.
+DEPTH_RADIUS_MIN = 0.55
+DEPTH_RADIUS_GAIN = 0.75
+DEPTH_ALPHA_MIN = 0.35
+DEPTH_ALPHA_GAIN = 0.65
+DEPTH_LIFT_MIN = 0.05
+DEPTH_LIFT_GAIN = 0.30
+DEPTH_PARALLAX = 0.06
+#: Particle trails: short fading arc behind each bead's motion.
+TRAIL_SAMPLES = 4
+TRAIL_STEP_NEAR_DEG = 6.0
+TRAIL_STEP_FAR_DEG = 4.0
+TRAIL_ALPHA_BASE = 0.28
+TRAIL_RADIUS_MULT = 0.55
+#: Deterministic sparkles (no `random`; all derived from t and the index).
+SPARKLE_COUNT = 14
+SPARKLE_SEED_STEP = 97.3
+SPARKLE_R_MIN_FRAC = 0.30
+SPARKLE_R_SPAN_FRAC = 0.75
+SPARKLE_LIFE_BASE = 1.1
+SPARKLE_LIFE_STEP = 0.35
+SPARKLE_VISIBLE_FRAC = 0.45
+SPARKLE_MAX_ALPHA = 0.55
+SPARKLE_SIZE_BASE = 0.5
+SPARKLE_SIZE_PEAK = 0.9
+SPARKLE_LIFT = 0.55
+_GOLDEN = 0.6180339887498949
+
 
 def _orb_style() -> str:
     """Orb look: ``mark`` (the dashboard logo, default) or ``ember``."""
@@ -74,20 +114,123 @@ def _orb_style() -> str:
     return str(_os.environ.get("QUBIT_ORB_STYLE", "mark") or "mark").strip().lower()
 
 
+def _fract(x: float) -> float:
+    """Fractional part of ``x`` (frame-reproducible pseudo-randomness)."""
+    return float(x) - math.floor(float(x))
+
+
+def heartbeat_envelope(t: Any) -> float:
+    """Double-thump beat envelope in ``[0, 1]`` for clock time ``t``.
+
+    Primary thump at the start of each :data:`HEART_PERIOD_S` cycle, a second
+    thump at :data:`HEART_SECOND_PHASE` into it and :data:`HEART_SECOND_AMP`
+    of its amplitude. Each is a raised-cosine pulse of width
+    :data:`HEART_THUMP_S`. Pure, never raises.
+    """
+    try:
+        x = float(t)
+    except (TypeError, ValueError):
+        x = 0.0
+    if not math.isfinite(x):
+        x = 0.0
+    period = HEART_PERIOD_S
+    local = x % period
+
+    def _thump(center: float, amp: float) -> float:
+        d = abs(local - center)
+        d = min(d, period - d)
+        if d >= HEART_THUMP_S:
+            return 0.0
+        return amp * 0.5 * (1.0 + math.cos(math.pi * d / HEART_THUMP_S))
+
+    return min(1.0, _thump(0.0, 1.0) + _thump(HEART_SECOND_PHASE * period,
+                                               HEART_SECOND_AMP))
+
+
+def _mark_tt(t: Any) -> float:
+    """Clamped mark clock: frozen at rest under reduced motion."""
+    try:
+        tv = float(t)
+    except (TypeError, ValueError):
+        tv = 0.0
+    if not math.isfinite(tv):
+        tv = 0.0
+    return 0.0 if _reduced_motion() else tv
+
+
+def mark_particle_layers(t: Any) -> List[Tuple[int, str, float, float]]:
+    """Per-particle ``(index, "far"|"near", angle_deg, depth)`` for clock ``t``.
+
+    Pure and frame-reproducible; the painter draws every ``far`` entry behind
+    the nucleus and every ``near`` entry in front, so this is also the bead
+    z-order. Never raises.
+    """
+    tt = _mark_tt(t)
+    out: List[Tuple[int, str, float, float]] = []
+    for idx, (orbit, seed, _bead_r, dur) in enumerate(_mark.PARTICLES):
+        ang = seed + (tt * 360.0 / max(0.1, dur))
+        depth = 0.5 + 0.5 * math.cos(math.radians(ang))
+        out.append((idx, "near" if depth >= 0.5 else "far", ang, depth))
+    return out
+
+
+def mark_sparkles(t: Any) -> List[Tuple[int, float, float, float, float, float, float]]:
+    """Visible sparkles for clock ``t`` as ``(i, r_frac, angle_deg, phase,
+    fade, size, alpha)``.
+
+    Deterministic: radius/speed/life/phase derive only from ``t`` and the
+    index. Empty under reduced motion (a still frame has no glints). Never
+    raises.
+    """
+    if _reduced_motion():
+        return []
+    tt = _mark_tt(t)
+    out: List[Tuple[int, float, float, float, float, float, float]] = []
+    for i in range(SPARKLE_COUNT):
+        seed = i * SPARKLE_SEED_STEP
+        r_frac = SPARKLE_R_MIN_FRAC + SPARKLE_R_SPAN_FRAC * _fract(seed * _GOLDEN)
+        ang = seed + tt * (18.0 + (i % 5) * 6.0)
+        life = SPARKLE_LIFE_BASE + (i % 4) * SPARKLE_LIFE_STEP
+        phase = (tt / life + seed / 360.0) % 1.0
+        if phase >= SPARKLE_VISIBLE_FRAC:
+            continue
+        p01 = phase / SPARKLE_VISIBLE_FRAC
+        fade = 0.5 * (1.0 - math.cos(2.0 * math.pi * p01))
+        alpha = SPARKLE_MAX_ALPHA * fade
+        if alpha <= 0.0:
+            continue
+        size = SPARKLE_SIZE_BASE + SPARKLE_SIZE_PEAK * fade
+        out.append((i, r_frac, ang, phase, fade, size, alpha))
+    return out
+
+
 def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 state: Any, brightness: float, family: Any) -> None:
-    """Paint the Qubit mark: hairline orbits + nucleus + orbiting particles.
+    """Paint the Qubit mark: hairline orbits + beating nucleus + particles.
 
     Same construction as the dashboard sidebar logo (QubitMark.tsx) and the Tk
     ``voicebridge.orb.mark`` renderer, which own the geometry constants — this
     only translates them to QPainter. Qt has real alpha and rotated paths, so
     the chromatic fringe is three offset pens instead of colour mixing, and the
     ellipse is a rotated path rather than a sampled polyline.
+
+    Life is layered on without the retired glow-sticker look: the nucleus has a
+    lub-dub heartbeat with a thin halo ring, each particle gets a depth-derived
+    size/alpha/lift with a parallax nudge and a short trail, and deterministic
+    sparkles glint across the near plane. Everything still reads as a crisp
+    hairline; there are no gradient or blur fills.
     """
     from PySide6.QtCore import QRectF
     from PySide6.QtGui import QColor, QPainterPath, QPen
 
-    core = tuple(int(v) for v in (family.get("core") or (255, 84, 0)))
+    def _clamp8(v: Any) -> int:
+        try:
+            return max(0, min(255, int(v)))
+        except (TypeError, ValueError):
+            return 0
+
+    fam = family if isinstance(family, dict) else {}
+    core = tuple(_clamp8(v) for v in (fam.get("core") or (255, 84, 0)))
     rx = R * _mark.RX_FRAC
     ry = R * _mark.RY_FRAC
     ring_w = 1.1
@@ -100,9 +243,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     bright = max(_mark.MIN_MARK_BRIGHTNESS, float(brightness or 0.0))
     def _lift(amount: float):
         return (
-            int(core[0] + (255 - core[0]) * amount),
-            int(core[1] + (255 - core[1]) * amount),
-            int(core[2] + (255 - core[2]) * amount),
+            _clamp8(core[0] + (255 - core[0]) * amount),
+            _clamp8(core[1] + (255 - core[1]) * amount),
+            _clamp8(core[2] + (255 - core[2]) * amount),
         )
     ring_rgb = _lift(_mark.LIFT_RING)
 
@@ -140,48 +283,98 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     def _bead(x: float, y: float, rad: float, alpha: float,
               toward_white: float) -> None:
         c = QColor(
-            int(core[0] + (255 - core[0]) * toward_white),
-            int(core[1] + (255 - core[1]) * toward_white),
-            int(core[2] + (255 - core[2]) * toward_white),
-            int(255 * max(0.0, min(1.0, alpha))),
+            _clamp8(core[0] + (255 - core[0]) * toward_white),
+            _clamp8(core[1] + (255 - core[1]) * toward_white),
+            _clamp8(core[2] + (255 - core[2]) * toward_white),
+            _clamp8(255 * max(0.0, min(1.0, alpha))),
         )
         p.setPen(Qt.NoPen)
         p.setBrush(c)
         p.drawEllipse(x - rad, y - rad, rad * 2, rad * 2)
 
-    try:
-        t_val = float(t)
-    except (TypeError, ValueError):
-        t_val = 0.0
-    tt = 0.0 if _reduced_motion() else t_val
+    tt = _mark_tt(t)
+    reduced = _reduced_motion()
+    beat = 0.0 if reduced else heartbeat_envelope(tt)
 
-    # Far field first (behind the nucleus), then nucleus, then near field.
     far_tilt = _mark.TILT_B + _mark.RING_SWAY_DEG * math.sin(
         tt * 2.0 * math.pi / _mark.RING_PERIOD_FAR)
-    _ring(far_tilt, 0.60)
-    for orbit, seed, bead_r, dur in _mark.PARTICLES:
-        if orbit != "b":
-            continue
-        ang = seed + (tt * 360.0 / max(0.1, dur))
-        bx, by = _mark._orbit_point(cx, cy, rx, ry, far_tilt, ang)
-        depth = 0.5 + 0.5 * math.cos(math.radians(ang))
-        _bead(bx, by, max(0.7, bead_r * (R / 32.0) * (0.70 + 0.30 * depth)),
-              0.70 * bright + 0.25 * depth, _mark.LIFT_BEAD)
-
-    _bead(cx, cy, max(1.1, R * _mark.NUCLEUS_FRAC) * (0.95 + 0.05 * bright),
-          1.0, _mark.LIFT_NUCLEUS)
-
     near_tilt = _mark.TILT_A + _mark.RING_SWAY_DEG * math.sin(
         tt * 2.0 * math.pi / _mark.RING_PERIOD_NEAR)
-    _ring(near_tilt, 0.95)
-    for orbit, seed, bead_r, dur in _mark.PARTICLES:
-        if orbit != "a":
+    nuc_base = max(1.1, R * _mark.NUCLEUS_FRAC) * (0.95 + 0.05 * bright)
+    nuc_r = nuc_base * (1.0 + HEART_SCALE_AMP * beat)
+
+    layers = mark_particle_layers(tt)
+
+    def _depth_offset(px_: float, py_: float, depth: float) -> Tuple[float, float]:
+        # Parallax: the far side sits slightly inside, the near side out.
+        dx_ = px_ - cx
+        dy_ = py_ - cy
+        dist = math.hypot(dx_, dy_)
+        if dist <= 1e-6:
+            return (px_, py_)
+        off = (depth - 0.5) * DEPTH_PARALLAX * R
+        return (px_ + dx_ / dist * off, py_ + dy_ / dist * off)
+
+    def _bead_depth(orbit: str, seed: float, bead_r: float, dur: float,
+                    angle: float) -> None:
+        tilt = near_tilt if orbit == "a" else far_tilt
+        depth = 0.5 + 0.5 * math.cos(math.radians(angle))
+        bx, by = _mark._orbit_point(cx, cy, rx, ry, tilt, angle)
+        bx, by = _depth_offset(bx, by, depth)
+        rad = max(0.45, bead_r * (R / 32.0) * (DEPTH_RADIUS_MIN
+                                               + DEPTH_RADIUS_GAIN * depth))
+        alpha = DEPTH_ALPHA_MIN + DEPTH_ALPHA_GAIN * depth
+        lift = DEPTH_LIFT_MIN + DEPTH_LIFT_GAIN * depth
+        if not reduced:
+            # Trails: a short fading arc behind the motion, same hue, smaller.
+            step = TRAIL_STEP_NEAR_DEG if orbit == "a" else TRAIL_STEP_FAR_DEG
+            for k in range(1, TRAIL_SAMPLES + 1):
+                ta = angle - k * step
+                tdepth = 0.5 + 0.5 * math.cos(math.radians(ta))
+                tx, ty = _mark._orbit_point(cx, cy, rx, ry, tilt, ta)
+                tx, ty = _depth_offset(tx, ty, tdepth)
+                talpha = (TRAIL_ALPHA_BASE * (1.0 - k / float(TRAIL_SAMPLES))
+                          * (DEPTH_ALPHA_MIN + DEPTH_ALPHA_GAIN * tdepth))
+                if talpha > 0.0:
+                    _bead(tx, ty, rad * TRAIL_RADIUS_MULT, talpha, lift)
+        _bead(bx, by, rad, alpha, lift)
+
+    # ---- far field (behind the nucleus), then nucleus, then near field ----
+    _ring(far_tilt, 0.60)
+    for idx, layer, ang, _depth in layers:
+        if layer != "far":
             continue
-        ang = seed + (tt * 360.0 / max(0.1, dur))
-        bx, by = _mark._orbit_point(cx, cy, rx, ry, near_tilt, ang)
-        depth = 0.5 + 0.5 * math.cos(math.radians(ang))
-        _bead(bx, by, max(0.8, bead_r * (R / 32.0) * (0.75 + 0.35 * depth)),
-              0.85 * bright + 0.15 * depth, _mark.LIFT_BEAD)
+        orbit, seed, bead_r, dur = _mark.PARTICLES[idx]
+        _bead_depth(orbit, seed, bead_r, dur, ang)
+
+    # Sparkles sit on the near plane but behind the nucleus, so the nucleus
+    # still reads on top; deterministic positions, no random module.
+    if not reduced:
+        for _i, r_frac, ang, _phase, _fade, size, alpha in mark_sparkles(tt):
+            s_rx = R * r_frac
+            s_ry = s_rx * (_mark.RY_FRAC / _mark.RX_FRAC)
+            sx, sy = _mark._orbit_point(cx, cy, s_rx, s_ry, near_tilt, ang)
+            _bead(sx, sy, size, alpha, SPARKLE_LIFT)
+
+    if beat > 0.0:
+        # Thin halo ring, its alpha riding the beat; no blur/gradient fill.
+        halo_a = int(255 * max(0.0, min(1.0, HALO_ALPHA_MAX * beat)))
+        if halo_a > 0:
+            hr, hg, hb = _lift(_mark.LIFT_NUCLEUS)
+            halo_r = nuc_r * HALO_RADIUS_MULT
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(QColor(hr, hg, hb, halo_a), 1.0))
+            p.drawEllipse(cx - halo_r, cy - halo_r, halo_r * 2, halo_r * 2)
+            p.setPen(Qt.NoPen)
+
+    _bead(cx, cy, nuc_r, 0.82 + 0.18 * beat, _mark.LIFT_NUCLEUS)
+
+    _ring(near_tilt, 0.95)
+    for idx, layer, ang, _depth in layers:
+        if layer != "near":
+            continue
+        orbit, seed, bead_r, dur = _mark.PARTICLES[idx]
+        _bead_depth(orbit, seed, bead_r, dur, ang)
 
 
 def backend_wanted() -> str:
@@ -1432,4 +1625,39 @@ __all__ = [
     "core_stops",
     "ring_pen",
     "spec_bars_wanted",
+    # mark life constants (shared with the Tk sibling / verifier)
+    "HEART_PERIOD_S",
+    "HEART_SECOND_PHASE",
+    "HEART_SECOND_AMP",
+    "HEART_THUMP_S",
+    "HEART_SCALE_AMP",
+    "HALO_RADIUS_MULT",
+    "HALO_ALPHA_MAX",
+    "DEPTH_RADIUS_MIN",
+    "DEPTH_RADIUS_GAIN",
+    "DEPTH_ALPHA_MIN",
+    "DEPTH_ALPHA_GAIN",
+    "DEPTH_LIFT_MIN",
+    "DEPTH_LIFT_GAIN",
+    "DEPTH_PARALLAX",
+    "TRAIL_SAMPLES",
+    "TRAIL_STEP_NEAR_DEG",
+    "TRAIL_STEP_FAR_DEG",
+    "TRAIL_ALPHA_BASE",
+    "TRAIL_RADIUS_MULT",
+    "SPARKLE_COUNT",
+    "SPARKLE_SEED_STEP",
+    "SPARKLE_R_MIN_FRAC",
+    "SPARKLE_R_SPAN_FRAC",
+    "SPARKLE_LIFE_BASE",
+    "SPARKLE_LIFE_STEP",
+    "SPARKLE_VISIBLE_FRAC",
+    "SPARKLE_MAX_ALPHA",
+    "SPARKLE_SIZE_BASE",
+    "SPARKLE_SIZE_PEAK",
+    "SPARKLE_LIFT",
+    # pure frame helpers
+    "heartbeat_envelope",
+    "mark_particle_layers",
+    "mark_sparkles",
 ]
