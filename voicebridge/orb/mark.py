@@ -45,6 +45,7 @@ from . import ember as _ember
 from .mark_field import (
     GLINT_ARM_FRAC,
     GLINT_CORE_FRAC,
+    SPARK_ARM_FRAC,
     PARTICLES,
     RX_FRAC,
     RY_FRAC,
@@ -264,7 +265,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         a = 1.0 - max(0.0, min(1.0, float(alpha)))
         return _hex(_mix(colour, _ember.NEAR_BLACK, a))
 
-    def _bead(x: float, y: float, rad: float, lift: float, alpha: float) -> None:
+    def _bead(x: float, y: float, rad: float, lift: float, alpha: float,
+              arm_frac: float = GLINT_ARM_FRAC) -> None:
         """A GLINT (four-point star), never an orb: the nucleus is the mark's
         only solid body. Two thin crossing arms + a small core read as a
         twinkle at orb size; a filled disc here looked like a marble."""
@@ -272,7 +274,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             return
         colour = _mix(fam["core"], (255, 255, 255), lift)
         shown = _dim(colour, float(alpha) * bright)
-        arm = max(0.6, float(rad) * GLINT_ARM_FRAC)
+        arm = max(0.6, float(rad) * arm_frac)
         _line([x - arm, y, x + arm, y], shown, 1)
         _line([x, y - arm, x, y + arm], shown, 1)
         _oval(x, y, max(0.4, float(rad) * GLINT_CORE_FRAC), shown)
@@ -382,7 +384,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         try:
             _bead(cx_f + float(s["x"]), cy_f + float(s["y"]),
                   float(s["size"]), float(s.get("lift", 0.0)),
-                  float(s["alpha"]))
+                  float(s["alpha"]), arm_frac=SPARK_ARM_FRAC)
         except Exception:  # noqa: BLE001
             pass
 

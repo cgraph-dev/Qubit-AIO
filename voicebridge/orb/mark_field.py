@@ -67,14 +67,16 @@ CAMERA_SPEED_X = 0.27
 CAMERA_SPEED_Y = 0.19
 
 # ------------------------------------------------------------------ orbits
-PRECESSION_DEG = 24.0
-PRECESSION_PERIOD_NEAR = 29.0
-PRECESSION_PERIOD_FAR = 43.0
+PRECESSION_DEG = 30.0
+PRECESSION_PERIOD_NEAR = 15.0
+PRECESSION_PERIOD_FAR = 21.0
 RING_SWAY_DEG = 6.0
 RING_PERIOD_NEAR = 23.0
 RING_PERIOD_FAR = 31.0
-#: Per-particle speed wobble so travel never looks metronomic.
+#: Per-particle wobble: a bounded PHASE offset in degrees, never a clock
+#: multiplier (a multiplier makes the field accelerate with uptime).
 SPEED_MOD_AMP = 0.10
+SPEED_MOD_DEG = 7.0
 SPEED_MOD_HZ = 0.7
 
 # ------------------------------------------------------------------ trails
@@ -95,8 +97,8 @@ SHOCKWAVE_WIDTH = 1.0
 #: the nucleus is the mark's only solid body. ``GLINT_ARM_FRAC`` is the star
 #: arm length as a multiple of the particle radius, and the twinkle period is
 #: per-particle so the field shimmers instead of pulsing in unison.
-GLINT_ARM_FRAC = 3.0
-GLINT_CORE_FRAC = 0.42
+GLINT_ARM_FRAC = 1.8
+GLINT_CORE_FRAC = 0.5
 GLINT_TWINKLE_BASE_S = 1.6
 GLINT_TWINKLE_SPAN_S = 1.9
 GLINT_MIN_ALPHA = 0.35
@@ -150,12 +152,15 @@ ECHO_WIDTH = 1.0
 #: past the orbits, shrink and fade. Deterministic (index + time), never
 #: random, and connected to the heartbeat so the shower reads as the nucleus
 #: breathing rather than a separate effect.
+#: Spark arms are SHORTER than a particle glint's: at the nucleus they must
+#: read as pinpricks, not stars the size of the nucleus itself.
+SPARK_ARM_FRAC = 1.7
 NUCLEUS_SPARK_COUNT = 18
 NUCLEUS_SPARK_LIFE_BASE = 1.30
 NUCLEUS_SPARK_LIFE_SPAN = 0.90
 NUCLEUS_SPARK_REACH = 1.28
-NUCLEUS_SPARK_SIZE = 1.30
-NUCLEUS_SPARK_ALPHA = 0.85
+NUCLEUS_SPARK_SIZE = 0.55
+NUCLEUS_SPARK_ALPHA = 0.70
 NUCLEUS_SPARK_LIFT = 0.70
 
 # ----------------------------------------------------------------- glints
@@ -167,8 +172,8 @@ SPARKLE_LIFE_BASE = 1.1
 SPARKLE_LIFE_STEP = 0.35
 SPARKLE_VISIBLE_FRAC = 0.45
 SPARKLE_MAX_ALPHA = 0.60
-SPARKLE_SIZE_BASE = 0.45
-SPARKLE_SIZE_PEAK = 0.95
+SPARKLE_SIZE_BASE = 0.28
+SPARKLE_SIZE_PEAK = 0.55
 SPARKLE_LIFT = 0.60
 
 
@@ -253,8 +258,25 @@ def shockwave(t: Any) -> Tuple[float, float]:
 
 
 def _speed_mod(t: float, seed: float) -> float:
+    """Legacy amplitude helper (kept for callers); see ``_phase_wobble``.
+
+    Multiplying the CLOCK by a wobbling factor makes angular velocity grow
+    linearly with uptime (the orb strobed after minutes and the motion-speed
+    setting was swamped by the drift), so travel now adds a bounded PHASE
+    offset instead.
+    """
     return 1.0 + SPEED_MOD_AMP * math.sin(t * SPEED_MOD_HZ * 2.0 * math.pi
                                           + seed * math.pi / 180.0)
+
+
+def _phase_wobble(t: float, seed: float) -> float:
+    """Bounded phase offset (degrees) added to a particle's orbit angle.
+
+    Constant angular speed + a small sinusoidal offset: the motion breathes
+    without ever accelerating with uptime.
+    """
+    return SPEED_MOD_DEG * math.sin(t * SPEED_MOD_HZ * 2.0 * math.pi
+                                    + seed * math.pi / 180.0)
 
 
 def _depth(angle_deg: float) -> float:
@@ -284,8 +306,8 @@ def particle_state(t: Any, R: float) -> List[Dict[str, float]]:
     out: List[Dict[str, float]] = []
     for idx, (orbit, seed, size96, period) in enumerate(PARTICLES):
         tilt = near_tilt if orbit == "a" else far_tilt
-        span = _speed_mod(tt, seed) * tt
-        ang = seed + (span * 360.0 / max(0.1, period))
+        ang = (seed + tt * 360.0 / max(0.1, period)
+               + _phase_wobble(tt, seed))
         depth = _depth(ang)
         # Perspective: far points pull toward the centre.
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
@@ -411,8 +433,8 @@ def dust_state(t: Any, R: float) -> List[Dict[str, float]]:
         tilt = near_tilt if orbit == "a" else far_tilt
         seed = 360.0 * hash01(i, 1.7)
         period = DUST_PERIOD_BASE + DUST_PERIOD_SPAN * hash01(i, 3.1)
-        span = _speed_mod(tt, seed) * tt
-        ang = seed + span * 360.0 / max(0.1, period)
+        ang = (seed + tt * 360.0 / max(0.1, period)
+               + _phase_wobble(tt, seed))
         depth = _depth(ang)
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
         grow = DUST_R_FRAC_MIN + DUST_R_FRAC_SPAN * hash01(i, 5.9)
@@ -510,7 +532,8 @@ __all__ = [
     "COMET_ALPHA", "SPARKLE_COUNT", "SPARKLE_MAX_ALPHA", "SPARKLE_LIFT",
     "PRECESSION_DEG", "RING_SWAY_DEG", "CAMERA_SWAY_FRAC", "SPEED_MOD_AMP", "hash01", "camera_offset", "orbit_tilts",
     "orbit_point", "heartbeat", "nucleus_scale", "shockwave", "particle_state",
-    "glint", "GLINT_ARM_FRAC", "GLINT_CORE_FRAC",
+    "glint", "GLINT_ARM_FRAC", "GLINT_CORE_FRAC", "SPARK_ARM_FRAC",
+    "_phase_wobble", "SPEED_MOD_DEG",
     "echo_rings", "ECHO_LAG_S", "ECHO_SCALE", "ECHO_ALPHA",
     "nucleus_sparks", "NUCLEUS_SPARK_COUNT", "NUCLEUS_SPARK_REACH",
     "trails", "dust_state", "comet", "sparkles",

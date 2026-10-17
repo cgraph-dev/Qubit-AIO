@@ -109,7 +109,10 @@ SPARKLE_LIFT = 0.55
 #: Nucleus sparks are drawn at a fraction of their field size: many young
 #: sparks crowd the nucleus at once, so full-size crossing arms would mat
 #: into a mesh instead of reading as a shower of tiny glints.
-NUCLEUS_SPARK_DRAW_SCALE = 0.62
+#: Sparks are already pinpoint-sized in the field; a glint's arms are
+#: sized by SPARK_ARM_FRAC (shorter than a particle's) so they read as
+#: pinpricks, never as stars the size of the nucleus.
+NUCLEUS_SPARK_DRAW_SCALE = 1.0
 _GOLDEN = 0.6180339887498949
 
 
@@ -382,7 +385,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.setPen(Qt.NoPen)
 
     def _glint(gx: float, gy: float, size: float, alpha: float,
-               rgb: Tuple[int, int, int]) -> None:
+               rgb: Tuple[int, int, int],
+               arm_frac: float = _field.GLINT_ARM_FRAC) -> None:
         """A twinkling star, never a filled orb (owner 2026-10-17).
 
         Two thin crossing arms plus a small core read as a glint at this size
@@ -424,7 +428,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                cy + _num(spark.get("y"), 0.0),
                _num(spark.get("size"), 0.0) * NUCLEUS_SPARK_DRAW_SCALE,
                _num(spark.get("alpha"), 0.0),
-               _lift(_num(spark.get("lift"), _field.LIFT_NUCLEUS)))
+               _lift(_num(spark.get("lift"), _field.LIFT_NUCLEUS)),
+               arm_frac=_field.SPARK_ARM_FRAC)
 
     def _dust(mote: Dict[str, Any]) -> None:
         _dot(cx + mote["x"], cy + mote["y"],
