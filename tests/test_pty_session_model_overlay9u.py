@@ -112,3 +112,41 @@ def test_poke_redraw_issues_resize_and_never_raises():
 
     assert pty_ws._poke_redraw(DeadSession(), 80, 24) is False
     assert pty_ws._poke_redraw(object(), 80, 24) is False
+
+
+def test_guard_overlays_provider_when_model_matches(tmp_path, monkeypatch):
+    # Same model on two bills: the row's explicit provider must still win.
+    # Without this the grant (and the spawn env) kept the default provider
+    # and the terminal booted into an empty account while the funded route
+    # sat in the row.
+    import json
+    import sqlite3
+
+    from voicebridge import pty_ws
+    from voicebridge import qubit_runtime as _QR
+
+    db = tmp_path / "state.db"
+    con = sqlite3.connect(str(db))
+    con.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, model TEXT, model_config TEXT)")
+    con.execute(
+        "CREATE TABLE session_model_usage (session_id TEXT, model TEXT, billing_provider TEXT, last_seen REAL)")
+    con.execute(
+        "INSERT INTO sessions (id, model, model_config) VALUES (?, ?, ?)",
+        ("sess-same", "deepseek-v4.1-flash", json.dumps({
+            "provider": "cheapvibecode",
+            "base_url": "https://cheapvibecode.ru/v1",
+            "api_mode": "chat_completions"})))
+    con.commit()
+    con.close()
+    monkeypatch.setattr(_QR, "use_qubit_home", lambda cfg=None: tmp_path)
+
+    server = object.__new__(pty_ws.PtyWsServer)
+    server.cfg = object()
+    server._context_guard = lambda cfg, profile_id=None: {
+        "ok": True, "provider": "opencode-go", "model": "deepseek-v4.1-flash"}
+    server._spawn = pty_ws.PtyWsServer._production_spawn.__get__(server)
+    guard = server._resolve_guard("", session_id="sess-same")
+    assert guard["provider"] == "cheapvibecode", guard
+    assert guard["model"] == "deepseek-v4.1-flash"
+    assert guard["session_pinned"] is True
+    assert guard["default_provider"] == "opencode-go"

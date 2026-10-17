@@ -698,12 +698,22 @@ class PtyWsServer:
         if resume and guard.get("ok") is not False:
             stored_provider, stored_model = _session_stored_model(
                 resume, self.cfg)
-            if stored_model and stored_model != str(guard.get("model") or ""):
+            guard_model = str(guard.get("model") or "")
+            guard_provider = str(guard.get("provider") or "")
+            # Overlay when EITHER differs: a same-model/different-provider row
+            # (an explicit cheapvibecode pick on a model the default provider
+            # also sells) must still move the terminal AND its spawn env onto
+            # the stored route — otherwise the grant reports the default
+            # provider and the TUI boots into it (measured: 402s on the empty
+            # account while the funded route sat in the row).
+            if stored_model and (
+                    stored_model != guard_model
+                    or (stored_provider
+                        and stored_provider != guard_provider)):
                 guard = dict(guard)
-                guard["default_provider"] = str(guard.get("provider") or "")
-                guard["default_model"] = str(guard.get("model") or "")
-                guard["provider"] = stored_provider or str(
-                    guard.get("provider") or "")
+                guard["default_provider"] = guard_provider
+                guard["default_model"] = guard_model
+                guard["provider"] = stored_provider or guard_provider
                 guard["model"] = stored_model
                 guard["session_pinned"] = True
                 guard["resumed_session"] = resume
