@@ -1162,14 +1162,19 @@ class GatewayNotificationsMixin:
             async with self._completion_event_scope(evt):
                 if self._load_background_notifications_mode() == "off":
                     continue
-                synth_text = _format_gateway_process_notification(evt)
-                if not synth_text:
-                    continue
-                try:
-                    delivered = await self._inject_watch_notification(synth_text, evt)
-                except Exception:
-                    logger.exception("Watch notification injection error")
-                    delivered = False
+                if evt.get("type") == "heartbeat":
+                    from gateway.session_automation import deliver_heartbeat
+                    delivered = await deliver_heartbeat(self, evt)
+                else:
+                    synth_text = _format_gateway_process_notification(evt)
+                    if not synth_text:
+                        continue
+                    try:
+                        delivered = await self._inject_watch_notification(synth_text, evt)
+                    except Exception:
+                        logger.exception("Watch notification injection error")
+                        delivered = False
+            # The original event: a requeued tick folds again from what is still queued.
             if delivered is False:
                 completion_queue.put(evt)
 
@@ -1344,9 +1349,21 @@ class GatewayNotificationsMixin:
             _prime = getattr(adapter, "prime_routing_cache", None)
             if callable(_prime):
                 _prime(synth_event)
-            await admit_internal_event(adapter, synth_event)
+            from gateway.session_authorities import active_authority
+            authority = active_authority(self)
+            if authority is not None:
+                from gateway.session_automation import admit_process_notice
+                from qubit_state_runtime import RuntimeStoreError
+                try:
+                    await admit_process_notice(self, authority, adapter, synth_event, evt)
+                except RuntimeStoreError as exc:
+                    raise WakeNotAccepted(str(exc)) from exc
+            else:
+                await admit_internal_event(adapter, synth_event)
             return True
-        except WakeNotAccepted:
+        except WakeNotAccepted as exc:
+            logger.warning("Watch notification not admitted for %s chat=%s: %s",
+                           platform_name, source.chat_id, exc)
             # Durable callers refund the claim; ordinary watch callers just requeue.
             if raise_not_accepted:
                 raise
