@@ -68,9 +68,13 @@ ORPHAN_MAX_AGE_S = 7200.0
 # root-owned system locations present inside the confinement sandbox.
 SAFE_PATH = "/usr/bin:/bin"
 
-# Directories that can never be a project root or workdir.
+# Directories that can never be a project root or workdir: credential and
+# agent-state stores. ``.local`` is deliberately NOT here — this check matches
+# a component ANYWHERE in the resolved path, and ``.local`` is the XDG home for
+# ``*.local/share`` and ``*.local/state``, so listing it refused every project
+# (and every ordinary XDG data dir) for the whole user.
 _SECRET_DIR_NAMES = frozenset({
-    ".ssh", ".gnupg", ".opencode", ".config", ".local", ".password-store",
+    ".ssh", ".gnupg", ".opencode", ".config", ".password-store",
     ".aws", ".qubit",
 })
 _SECRET_FILE_HINTS = (".env", "credentials", "secret", "token", ".pem",

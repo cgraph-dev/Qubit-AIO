@@ -26,12 +26,14 @@ Fail-closed guarantees (enforced here + tests):
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import multiprocessing
 import os
 import re
 import shlex
 import signal
+import tempfile
 import threading
 import time
 import uuid
@@ -49,6 +51,47 @@ from .capabilities import (
 from .logging_setup import log_event
 from .redaction import redact_text
 from .sandbox import run_tool
+
+# ``multiprocessing.Pipe`` binds a unix socket under a SHORT random name in
+# ``tempfile.gettempdir()``, and ``AF_UNIX`` addresses are capped at 107 bytes on
+# Linux. When TMPDIR is a deep per-run scratch directory (the repo's pytest
+# basetemp is ``~/.local/state/.../cache/scratch/qubit-pytest-<pid>-<token>/``,
+# and an operator may point QUBIT_PYTEST_TMPROOT anywhere), the bind fails with
+# ``AF_UNIX path too long`` and EVERY side-effecting broker tool reports
+# EXEC_FAILED regardless of its own logic. The socket carries only a pickled
+# handoff between processes on this host, so its directory location is not
+# security-relevant: bind it in the shortest writable directory available.
+_SHORT_SOCKET_DIRS = ("/tmp", "/var/tmp", "/dev/shm")
+
+
+def _short_socket_dir() -> Optional[str]:
+    """First writable directory whose path leaves room for a socket name.
+
+    ``None`` means "keep the ambient temp dir as-is" when no shorter candidate
+    exists (nothing worse than the status quo) — never a silent failure.
+    """
+    for cand in _SHORT_SOCKET_DIRS:
+        try:
+            if os.path.isdir(cand) and os.access(cand, os.W_OK | os.X_OK):
+                return cand
+        except OSError:
+            continue
+    return None
+
+
+@contextlib.contextmanager
+def _short_tempdir():
+    """Temporarily point ``tempfile.gettempdir()`` at a short path."""
+    short = _short_socket_dir()
+    if short is None:
+        yield
+        return
+    saved = tempfile.tempdir
+    tempfile.tempdir = short
+    try:
+        yield
+    finally:
+        tempfile.tempdir = saved
 
 DENY_DESTRUCTIVE_SCREEN = "DESTRUCTIVE_SCREEN"
 DENY_CONFIRM = "CONFIRMATION_REQUIRED"
@@ -775,7 +818,6 @@ class CapabilityBroker:
         # setsid()s into its own group, so cancel/timeout SIGKILL isolation is
         # identical to the former fork design.
         ctx = multiprocessing.get_context("forkserver")
-        parent_conn, child_conn = ctx.Pipe(duplex=False)
         try:
             payload = cloudpickle.dumps((binding.fn, dict(args)))
         except Exception as exc:
@@ -784,9 +826,16 @@ class CapabilityBroker:
 
         proc = None
         self._activate(cid, active)
-        proc = ctx.Process(target=broker_child_main,
-                           args=(payload, child_conn), daemon=False)
-        proc.start()
+        # The whole spawn must run with the short temp dir in force: the
+        # forkserver binds its OWN listener socket lazily inside
+        # ``proc.start()`` (multiprocessing/forkserver.py: `arbitrary_address`
+        # under `tempfile.gettempdir()`), so scoping only the Pipe is not
+        # enough — a deep TMPDIR still raised `AF_UNIX path too long` there.
+        with _short_tempdir():
+            parent_conn, child_conn = ctx.Pipe(duplex=False)
+            proc = ctx.Process(target=broker_child_main,
+                               args=(payload, child_conn), daemon=False)
+            proc.start()
         active.pid = proc.pid
         try:
             child_conn.close()          # parent's copy of the write end
