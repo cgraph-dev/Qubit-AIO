@@ -134,6 +134,26 @@ def _session_images_dir(session: dict) -> Path:
     return _session_home_dir(session, "images")
 
 
+def stage_image_bytes(directory, img_bytes: bytes, ext: str, *, prefix: str):
+    """Private, collision-free staging shared by local and canonical byte uploads."""
+    import os
+    from pathlib import Path
+    import tempfile
+    directory = Path(directory)
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(dir=directory, prefix=prefix + "_", suffix=ext)
+    path = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as output:
+            output.write(img_bytes)
+            output.flush()
+            os.fsync(output.fileno())
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+    return path
+
+
 def _queue_attached_image(session: dict, img_bytes: bytes, ext: str, *, prefix: str) -> Path:
     """Write image bytes into the session images dir and queue them for the next submit."""
     img_dir = _session_images_dir(session)

@@ -1349,6 +1349,28 @@ _PREVIEW_RESTART_HISTORY_NOTE = (
 )
 
 
+def _preview_restart_prompt(url: str, cwd: str, context: str, has_history: bool) -> str:
+    """The hidden restart agent's task, shared by this transport and the gateway's
+    (``gateway/session_tui_side.py``) so the two cannot drift."""
+    return "\n".join(line for line in [
+        "The desktop preview pane cannot load a local server URL.", f"Preview URL: {url.strip()}",
+        f"Current working directory: {cwd or '(unknown)'}",
+        f"Preview console:\n{context}" if context else "",
+        _PREVIEW_RESTART_HISTORY_NOTE if has_history else "", *_PREVIEW_RESTART_RULES] if line)
+
+
+def _validated_preview_cwd(cwd: str) -> str:
+    """The client's cwd as an existing absolute directory, else ``""``. A malformed client path
+    (embedded NUL, a missing dir) is "no validated cwd", never an error."""
+    import os  # this module's globals are bound by tui_gateway.server; the gateway calls it unbound
+
+    try:
+        preview_cwd = os.path.abspath(os.path.expanduser(cwd)) if cwd else ""
+        return preview_cwd if preview_cwd and os.path.isdir(preview_cwd) else ""
+    except (OSError, ValueError):
+        return ""
+
+
 # ── batch clarify locks ─────────────────────────────────────────────────────
 # A batch ``clarify`` server request is answered one question at a time: each lock is a normal RPC
 # (update-in-place, editable until every qid is locked); the LAST lock resolves the request itself.
