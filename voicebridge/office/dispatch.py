@@ -136,8 +136,13 @@ def dispatch(cfg: Any, *, rounds: int = 1, pool: Optional[List[int]] = None,
     `unmetered=True` by default: on a subscription-backed gateway a turn costs no
     marginal dollar, so recording it as one would manufacture phantom spend that
     later denies real work (D16). The dollar caps still apply if it is set false.
+
+    A **preview** (`dry_run=True`) needs no `--confirm`: it reads the queue and
+    each candidate's turn budget and writes nothing, so requiring confirmation
+    for it would only mean the pass could be inspected by arming it blind — the
+    exact opposite of what a preview is for.
     """
-    if not confirmed:
+    if not confirmed and not dry_run:
         raise OfficeError(store.CONFIRM_CODE, "office dispatch requires --confirm")
     from . import runner as R
 
@@ -310,8 +315,14 @@ def adjudicate(cfg: Any, *, rounds: int = 1, executor: Optional[Callable] = None
     recorded as *no decision* and the task stays in review — the alternative,
     treating silence as acceptance, is how nine agents produce a green board and
     nothing that works.
+
+    A **preview** (`dry_run=True`) needs no `--confirm` and, unlike the work
+    pass, it must not consume a turn either: the reviewer's budget is READ, not
+    spent. Spending it was a real defect — a preview of the review queue charged
+    the reviewer for a review it never performed, and turns are the scarcest
+    thing a seat has.
     """
-    if not confirmed:
+    if not confirmed and not dry_run:
         raise OfficeError(store.CONFIRM_CODE, "office adjudicate requires --confirm")
     from . import runner as R
 
@@ -343,15 +354,26 @@ def adjudicate(cfg: Any, *, rounds: int = 1, executor: Optional[Callable] = None
             results.append({"task": task["id"], "state": "NO_REVIEWER"})
             break
 
+        if dry_run:
+            # READ the budget, never spend it: a preview must not charge the
+            # reviewer for a review that never happened.
+            peek = W.turn_budget(cfg, agent_id=int(reviewer))
+            if peek["turns_cap"] is not None and \
+                    int(peek["turns_used"]) >= int(peek["turns_cap"]):
+                results.append({"task": task["id"], "state": "BUDGET_EXHAUSTED",
+                                "detail": (f"seat #{reviewer} would be refused: "
+                                           f"{peek['turns_used']}/"
+                                           f"{peek['turns_cap']} turns used")})
+                break
+            results.append({"task": task["id"], "state": "preview",
+                            "reviewer": reviewer})
+            continue
+
         budget = W.spend_turn(cfg, agent_id=int(reviewer))
         if not budget["allowed"]:
             results.append({"task": task["id"], "state": "BUDGET_EXHAUSTED",
                             "detail": budget["detail"]})
             break
-        if dry_run:
-            results.append({"task": task["id"], "state": "preview",
-                            "reviewer": reviewer})
-            continue
 
         brief = (
             f"You are reviewing task #{task['id']}: {task['title']}\n\n"
