@@ -115,6 +115,10 @@ _DEDUP_EXTRA_FIELDS = {
     "heartbeat": ("seq",),
     "watch_disabled": ("command", "message", "suppressed"),
     "watch_overflow_": ("command", "message", "suppressed"),  # prefix match
+    # NOTE: a completion's identity stays process-session scoped (no output/exit_code):
+    # one process has one completion, so a replay must key identically to the original.
+    # Re-delivery is stopped at dispatch (_notif_dispatch_completions), not here —
+    # test_notification_event_dedup_key_keeps_completions_one_shot pins that contract.
 }
 
 
@@ -605,6 +609,18 @@ def _notif_dispatch_completions(sid, session, notifications, registry, deferred)
         if deferred is None:
             time.sleep(0.25)
         return
+    # A completion carries no durable delivery row (claim_event_delivery only owns
+    # async_delegation), so a re-queued copy used to re-dispatch as a fresh user turn
+    # forever. Drop any event whose turn already ran; unknown keys still deliver, so a
+    # distinct completion (different process session) is never suppressed.
+    # (#redelivery-loop, 2026-10-17)
+    delivered = session.get("_completion_delivered") or set()
+    pending = [(evt, text) for evt, text in notifications
+               if _notification_event_dedup_key(evt) not in delivered]
+    if not pending:
+        _notif_release_turn(session)
+        return
+    notifications = pending
     claimed: list = []
     try:
         for event, event_text in notifications:
@@ -635,6 +651,14 @@ def _notif_dispatch_completions(sid, session, notifications, registry, deferred)
         return
     for event, _text, claim in claimed:
         complete_event_delivery(event, claim)
+    # Accept-time acknowledgement for completions: they carry no durable delivery row
+    # (claim_event_delivery only owns async_delegation), so this set is the sole record
+    # that their turn already ran. A separate `_delivered` set keeps it distinct from
+    # `_notification_emitted`, which `_notif_handle_event` fills on first SIGHT — using
+    # that one here would suppress the very first dispatch.
+    # (#redelivery-loop, 2026-10-17)
+    for event, _text in notifications:
+        session.setdefault("_completion_delivered", set()).add(_notification_event_dedup_key(event))
 
 
 def _notif_defer_event(evt, claim, put=None):
