@@ -6382,11 +6382,21 @@ def _is_chat_picker_noise(record: Any) -> bool:
     human would not choose) or exceeds the message floor while being human-typed
     (``tui``). Erring toward SHOWING is deliberate — a hidden real session is
     worse than a visible probe row.
+
+    Voice-namespace exemption: ``voice-*`` ids are minted only by the voice
+    path (the stable ``voice-chat`` session plus per-command
+    ``voice-<ts>-<hash>`` rows); probe/smoke tooling never mints them. A fresh
+    live voice session sits at 0-1 messages with source ``dashboard`` — exactly
+    Signal 2's shape — and hiding it blinds the ``/qubit-chat`` live-voice
+    follow jump (``pickNewestVoiceSession`` reads this filtered list) at the
+    moment a voice turn starts. Voice rows always show.
     """
     if not isinstance(record, dict):
         return False
     title = str(record.get("title") or record.get("name") or "").strip()
     sid = str(record.get("id") or "")
+    if sid.startswith("voice-"):
+        return False
     # Signal 1: a name only tooling mints. Count-independent.
     if title.lower() in _CHAT_PICKER_NOISE_NAMES:
         return True

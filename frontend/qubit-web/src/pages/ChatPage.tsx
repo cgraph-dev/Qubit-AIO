@@ -97,6 +97,8 @@ import { type PaletteItem } from "@/lib/commandPalette";
 import {
   atTokenAt,
   filterSlashCommands,
+  mergeSlashCatalog,
+  slashCompletionFor,
   slashCompletionText,
   slashTokenAt,
   SLASH_COMMANDS,
@@ -167,6 +169,7 @@ function toChatMessage(message: ChatStoreMessage): ChatMessage {
     tool_calls?: unknown;
     route?: string;
     task?: string;
+    phase?: string;
     sources?: unknown;
   };
   const parts = [
@@ -180,8 +183,13 @@ function toChatMessage(message: ChatStoreMessage): ChatMessage {
     Array.isArray(meta.tool_calls);
   // A persisted /chat-worker build turn carries meta.route="task" + meta.task;
   // keep it rendering as a report with its task key + /chat link after a
-  // reload (the live stream sets these, but the reload path must too).
-  const isTask = meta.route === "task" && Boolean(meta.task);
+  // reload (the live stream sets these, but the reload path must too — the
+  // store persists the envelope in the message sidecar). The transient
+  // "Working on it in /chat (task …)" starter row shares the envelope
+  // (phase "started") but is NOT the report: the report index lists only the
+  // finished report and terminal states, never the placeholder.
+  const isTask =
+    meta.route === "task" && Boolean(meta.task) && meta.phase !== "started";
   const sources = Array.isArray(meta.sources)
     ? meta.sources.filter((s): s is string => typeof s === "string")
     : undefined;
@@ -517,9 +525,32 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const [foreignSession, setForeignSession] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [input, setInput] = useState("");
-  // Slash autocomplete selection + Esc-dismissal (single-token "/" prefix only;
-  // see `slashVisible` below). The composer owns no gateway socket, so the
-  // popup filters the static registry catalog, not `complete.slash`.
+  // Slash catalog: the static registry table merged over ONCE with the live
+  // unified catalog (`GET /api/chat/slash-commands` — registry + /skill-*,
+  // /plugin-*, /mcp-*, /toolset-*). Best-effort: a failed read keeps the
+  // static table, so the popup never breaks when the backend is restarting.
+  const [slashCatalog, setSlashCatalog] =
+    useState<SlashCommandItem[]>(SLASH_COMMANDS);
+  useEffect(() => {
+    let alive = true;
+    // Optional-chained: older cached bundles and unit mocks may not expose
+    // the method; the static table is the fallback either way.
+    const read = api.getChatSlashCommands?.();
+    if (!read) return;
+    read
+      .then((res) => {
+        if (!alive) return;
+        setSlashCatalog(mergeSlashCatalog(res?.commands));
+      })
+      .catch(() => {
+        /* offline fallback: the static registry table stays */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  // Slash autocomplete selection + Esc-dismissal (single-token "/" prefix
+  // only; see `slashVisible` below).
   const [slashIndex, setSlashIndex] = useState(0);
   const [slashDismissedFor, setSlashDismissedFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1249,8 +1280,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // input, so "/" typed mid-sentence never opened the palette.
   const slashToken = slashTokenAt(input);
   const slashMatches = useMemo(
-    () => (slashToken === null ? [] : filterSlashCommands(slashToken.token)),
-    [slashToken],
+    () =>
+      slashToken === null
+        ? []
+        : filterSlashCommands(slashToken.token, 12, slashCatalog),
+    [slashToken, slashCatalog],
   );
   const slashVisible =
     slashToken !== null &&
@@ -1730,9 +1764,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         keywords: "logs runtime inspect",
       },
     ];
-    // Slash commands the surface already resolves (same catalog the composer's
-    // `/` popover uses, so the palette never invents a command).
-    for (const cmd of SLASH_COMMANDS) {
+    // Slash commands the surface already resolves (the merged live catalog
+    // the composer's `/` popover uses, so the palette never invents a
+    // command and never sends a token the backend cannot dispatch).
+    for (const cmd of slashCatalog) {
       rows.push({
         id: `command:${cmd.name}`,
         kind: "command",
@@ -1752,7 +1787,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       });
     }
     return rows;
-  }, [debugOpen, messages, selectedMessages.size]);
+  }, [debugOpen, messages, selectedMessages.size, slashCatalog]);
 
   const runPaletteItem = useCallback(
     (item: PaletteItem) => {
@@ -1772,7 +1807,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         }
       }
       if (item.kind === "command") {
-        sendRef.current?.(item.label);
+        // Send the canonical completion text (aliases like `/compact` resolve
+        // to `/compress`), so a palette pick executes exactly like accepting
+        // the composer's autocomplete — never a raw alias the turn path
+        // would not dispatch.
+        sendRef.current?.(slashCompletionFor(item.label));
         return;
       }
       if (item.kind === "report") {

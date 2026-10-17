@@ -9,12 +9,18 @@
  * except two legacy home paths re-pointed at the Qubit home (`/plan`,
  * `/reload-skills`).
  *
- * Data-source note: no `GET /api/chat/slash-commands` route exists, and the
- * live `complete.slash` JSON-RPC method only answers on the retired `/api/ws`
- * socket (`WS_SINGLE_PATH` — see `ChatSidebar.tsx`), which this page never
- * opens. So the composer filters this static catalog client-side instead of
- * fetching per keystroke. The gateway dispatches every name here
- * (`GATEWAY_KNOWN_COMMANDS`), including the nine `gateway_only` rows.
+ * Data-source note: `GET /api/chat/slash-commands` serves the unified live
+ * catalog (registry + gateway verbs plus the `/skill-*`, `/plugin-*`,
+ * `/mcp-*` and `/toolset-*` namespaces). The composer fetches it once and
+ * merges it over this static table via `mergeSlashCatalog` (live entries win
+ * per name; unknown shapes are dropped); this static table is the offline
+ * fallback so the popup still offers the registry verbs when that read fails.
+ * The gateway dispatches every registry name here (`GATEWAY_KNOWN_COMMANDS`),
+ * including the nine `gateway_only` rows. The `/qubit-chat` turn path
+ * (`voicebridge.chat_transport.run_qubitchat_slash`) executes the same names:
+ * registry verbs against their real backends or honest guidance, catalog
+ * namespaces against the catalog authorities — so an offered token never
+ * answers "unknown".
  *
  * `/mcp` and `/models` are not registry names; they complete to their
  * canonical commands (`/reload-mcp`, `/model`) so the popup never inserts a
@@ -246,14 +252,64 @@ function prefixedTokenAt(
  * (registry order kept), then substring matches. Empty query (bare "/")
  * returns the head of the registry.
  */
-export function filterSlashCommands(query: string, limit = 12): SlashCommandItem[] {
+export function filterSlashCommands(
+  query: string,
+  limit = 12,
+  catalog: readonly SlashCommandItem[] = SLASH_COMMANDS,
+): SlashCommandItem[] {
   const q = query.toLowerCase().replace(/^\//, "");
   const prefix: SlashCommandItem[] = [];
   const sub: SlashCommandItem[] = [];
-  for (const item of SLASH_COMMANDS) {
+  for (const item of catalog) {
     const bare = item.name.slice(1).toLowerCase();
     if (bare.startsWith(q)) prefix.push(item);
     else if (q !== "" && bare.includes(q)) sub.push(item);
   }
   return [...prefix, ...sub].slice(0, limit);
+}
+
+/** One live catalog row (`GET /api/chat/slash-commands`). */
+export interface LiveSlashCommand {
+  name?: unknown;
+  description?: unknown;
+  source?: unknown;
+}
+
+/**
+ * Merge live catalog rows over the static table. Live rows win per name (so
+ * a renamed description surfaces); static-only rows stay (offline fallback);
+ * rows without a `/name` shape are dropped, never fabricated. Pure.
+ */
+export function mergeSlashCatalog(
+  live: readonly LiveSlashCommand[] | null | undefined,
+): SlashCommandItem[] {
+  if (!live || live.length === 0) return [...SLASH_COMMANDS];
+  const merged = new Map<string, SlashCommandItem>();
+  for (const item of SLASH_COMMANDS) merged.set(item.name, item);
+  for (const row of live) {
+    if (!row || typeof row.name !== "string") continue;
+    const name = row.name.trim();
+    if (!name.startsWith("/") || name.includes(" ")) continue;
+    const description =
+      typeof row.description === "string" ? row.description : "";
+    const source = typeof row.source === "string" ? row.source : "";
+    const category =
+      source === "skill"
+        ? "Skills"
+        : source === "plugin"
+          ? "Plugins"
+          : source === "mcp"
+            ? "MCP"
+            : source === "toolset"
+              ? "Toolsets"
+              : "Session";
+    merged.set(name, { name, description, category });
+  }
+  return [...merged.values()];
+}
+
+/** Canonical completion text for a catalog name (alias-aware). */
+export function slashCompletionFor(name: string): string {
+  const item = SLASH_COMMANDS.find((c) => c.name === name);
+  return slashCompletionText(item ?? { name, description: "", category: "" });
 }

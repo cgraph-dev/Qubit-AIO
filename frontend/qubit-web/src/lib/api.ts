@@ -1166,6 +1166,16 @@ export const api = {
       `/api/qubit/chat/sessions/${encodeURIComponent(id)}/messages?limit=${limit}&offset=0`,
     ),
   /**
+   * Unified slash catalog for the `/qubit-chat` composer
+   * (`GET /api/chat/slash-commands`): the CLI registry + gateway verbs plus
+   * the skill (`/skill-*`), plugin (`/plugin-*`), MCP (`/mcp-*`) and toolset
+   * (`/toolset-*`) namespaces — the "hundreds of commands". Read-only and
+   * fail-soft per source; the composer merges these with its static catalog
+   * and falls back to the static catalog alone when this read fails.
+   */
+  getChatSlashCommands: () =>
+    fetchJSON<ChatSlashCommandsResponse>("/api/chat/slash-commands"),
+  /**
    * Persist a per-session preference (`reasoning`, `name`, `archived`) on
    * the canonical session store (`PATCH /api/qubit/chat/sessions/:id`).
    * The preference is reloaded with the session, so it survives refresh.
@@ -3687,6 +3697,19 @@ export interface ChatStoreMessage {
   content: string;
   timestamp?: number;
   meta?: Record<string, unknown>;
+}
+
+export interface ChatSlashCommand {
+  name: string;
+  description: string;
+  source: string;
+}
+
+export interface ChatSlashCommandsResponse {
+  ok?: boolean;
+  commands: ChatSlashCommand[];
+  total: number;
+  sources: Record<string, string>;
 }
 
 export interface ChatStoreMessagesResponse {
