@@ -47,7 +47,7 @@ interface EndpointForm {
   name: string
 }
 
-// Same choices as `hermes model`'s custom-provider setup; '' = runtime auto-detect.
+// Same choices as `qubit model`'s custom-provider setup; '' = runtime auto-detect.
 const API_MODE_OPTIONS: readonly { id: CustomEndpointApiMode; label: string }[] = [
   { id: '', label: 'Auto-detect' },
   { id: 'chat_completions', label: 'Chat Completions' },

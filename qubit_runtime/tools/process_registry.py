@@ -1693,6 +1693,19 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin):
         """Check if a completion notification was already consumed via wait/log."""
         return session_id in self._completion_consumed
 
+    def mark_completion_consumed(self, session_id: str) -> None:
+        """Record that a consumer turned this completion into a delivered notification.
+
+        ``wait``/``log``/``poll`` record their reads themselves. A surface that delivers the
+        completion as its own turn (the TUI poller) must acknowledge it too, or
+        ``unread_completions_owned_by`` keeps offering the same exited process and every drain
+        re-delivers it — one envelope became a user message every ~13s for hours (2026-10-17).
+        """
+        if not session_id:
+            return
+        with self._lock:
+            self._completion_consumed.add(session_id)
+
     def is_session_waiting(self, session_id: str) -> bool:
         """Whether a goal loop (``qubit_cli.goals`` wait barrier) should stay parked on
         this session: still running AND, with ``watch_patterns``, none matched yet (a

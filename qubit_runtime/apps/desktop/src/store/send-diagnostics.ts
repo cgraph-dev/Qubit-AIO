@@ -8,7 +8,7 @@
 // Discord).
 //
 // Consent is per-upload and explicit — no "always allow", mirroring the CLI's
-// `hermes debug share --nous` confirmation contract. On a remote connection
+// `qubit debug share --nous` confirmation contract. On a remote connection
 // the backend bundles ITS OWN logs (the runtime that owns the failure); the
 // local desktop.log is attached as a client-side extra so support sees both
 // halves in one bundle.

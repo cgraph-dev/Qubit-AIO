@@ -187,7 +187,7 @@ export interface EnvVarInfo {
   is_set: boolean
   // Backend-derived provider grouping hints (from the unified provider catalog
   // in qubit_cli/provider_catalog.py). When present, the Keys tab groups by
-  // this provider identity — the SAME one `hermes model` uses — instead of
+  // this provider identity — the SAME one `qubit model` uses — instead of
   // desktop-only env-var prefix guesses. Empty for non-provider env vars.
   provider?: string
   provider_label?: string
@@ -226,7 +226,7 @@ export interface MemoryProviderConfig {
 }
 
 /** Transport pinned on a custom endpoint; `''` = let the runtime auto-detect. Same
- * choices as `hermes model`'s custom-provider setup (#93622). */
+ * choices as `qubit model`'s custom-provider setup (#93622). */
 export type CustomEndpointApiMode = '' | 'anthropic_messages' | 'chat_completions' | 'codex_responses'
 
 /** One `/v1/models` row; a gateway may advertise a reasoning alias
@@ -1168,7 +1168,7 @@ export interface ToolProvider {
   post_setup: string | null
   requires_nous_auth: boolean
   /** True when this is the provider currently written to config (mirrors the
-   *  CLI `hermes tools` active-provider detection). */
+   *  CLI `qubit tools` active-provider detection). */
   is_active: boolean
   /** Honest readiness computed server-side (keys ∧ Qubit entitlement ∧
    *  post-setup install state). Optional for older backends. */

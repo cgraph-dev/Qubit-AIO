@@ -169,7 +169,7 @@ export function primaryRuntimeConnectionId(connection: Pick<HermesConnection, 'c
 // A freshly spawned backend can block its event loop for 15-30s while it
 // connects MCP servers and discovers plugins, so a single initial connect
 // attempt races backend cold-start and loses intermittently — the renderer
-// surfaced "Could not connect to Hermes gateway" even though the backend
+// surfaced "Could not connect to Qubit gateway" even though the backend
 // became healthy moments later (#49645). Retry the initial dial, re-minting
 // the WS URL on every attempt (OAuth tickets are single-use), instead of
 // failing the whole boot on the first transport error. Reauth failures
@@ -1496,7 +1496,7 @@ export function useGatewayBoot({
           // still stall its event loop for seconds on the first WS handshake —
           // a local boot failure is latched non-retryable, so without this
           // retry the one lost race ended the boot in "Could not connect to
-          // Hermes gateway". The first attempt reuses the URL minted at the
+          // Qubit gateway". The first attempt reuses the URL minted at the
           // boot boundary above — the mint count stays observable (#93454) —
           // while later attempts re-mint; local token URLs are long-lived, so
           // the re-mint is a cheap no-op.

@@ -70,7 +70,7 @@ function showsHandle(name: string, meta: BotMeta | null | undefined, bot?: Roste
 //
 // Jobs are namespaced "[bot:<name>] <routine>". A job running in the active
 // bot profile uses the plain instruction; a different profile keeps the
-// hermes -p <bot> chat delegation wrapper so the run reaches that bot's
+// qubit -p <bot> chat delegation wrapper so the run reaches that bot's
 // history. The tile follows the bot you're chatting with (gateway profile).
 const BOT_TAG_RE = /^\[bot:([a-z0-9][a-z0-9_-]*)\]\s*/i
 const SAFE_ROUTINE_MARKER = '[bot-mode:routine:v2] '

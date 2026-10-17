@@ -369,7 +369,7 @@ const CLASSIC_LIGHT_SKIN_COLORS = {
 const classicPalette = (colors: Record<string, string>) => skinToDesktopTheme({ name: 'classic', colors })!.colors
 
 /**
- * Classic Hermes — the CLI's stock `default` skin (gold on navy), offered as a
+ * Classic Qubit — the CLI's stock `default` skin (gold on navy), offered as a
  * Desktop pick under its OWN id. Never `default`: stock config ships
  * `display.skin: default`, and Desktop reads that as "no pick" (→ nous), so a
  * user only ever gets Classic by choosing it (#76579). Both palettes go through

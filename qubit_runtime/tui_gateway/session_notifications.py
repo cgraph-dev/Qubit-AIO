@@ -164,14 +164,23 @@ def _notif_log_failure(what: str, exc: BaseException) -> None:
     print(f"[tui_gateway] {what}: {type(exc).__name__}: {exc}", file=sys.stderr)
 
 
-def _notif_submit(rid: str, sid: str, session: dict, text: str, what: str, **kwargs) -> None:
-    """message.start + _run_prompt_submit for a claimed (running=True) turn; releases on failure."""
+def _notif_submit(rid: str, sid: str, session: dict, text: str, what: str, **kwargs) -> bool:
+    """message.start + _run_prompt_submit for a claimed (running=True) turn; releases on failure.
+
+    Returns ``_run_prompt_submit``'s admission verdict: True when the turn actually
+    started, False when it was refused (session closed / not registered / closing) and
+    nothing was delivered. Callers use this to decide between acknowledging a durable
+    delivery and deferring it — so the bool MUST reflect the real admission result, never
+    a constant. Returning ``None`` here made ``if not _notif_submit(...)`` unconditionally
+    true, deferring (and re-queueing) every delegation completion as a fresh turn forever
+    (#redelivery-loop, 2026-10-17). Exceptions still propagate; the caller releases.
+    """
     try:
         from gateway.warning_notifications import render_notification
         with _session_profile_runtime_scope(session):
             render_notification(lambda: _emit("message.start", sid), platform="tui",
                                 diagnostic=(kwargs.get("display_metadata") or {}).get("notification_category") == "diagnostic")
-        _run_prompt_submit(rid, sid, session, text, **kwargs)
+        return bool(_run_prompt_submit(rid, sid, session, text, **kwargs))
     except Exception as exc:
         _notif_log_failure(what, exc)
         _notif_release_turn(session)
@@ -521,6 +530,10 @@ def _notif_dispatch_event(sid: str, session: dict, evt: dict, text: str) -> None
     if diagnostic_process_event(evt):
         kwargs.setdefault("display_metadata", {})["notification_category"] = "diagnostic"
     try:
+        # ``_notif_submit`` returns the turn-admission verdict. A REFUSED turn never delivered
+        # the event, so defer (row stays pending, attempt refunded) and re-queue for a later
+        # drain. An ADMITTED turn delivered it — acknowledge the durable row. Getting this
+        # backwards re-queues a delivered delegation forever (#redelivery-loop, 2026-10-17).
         if not _notif_submit(f"__notif__{int(time.time() * 1000)}", sid, session, text,
                              "notification poller dispatch failed", **kwargs):
             _notif_defer_event(evt, claim)
@@ -659,6 +672,13 @@ def _notif_dispatch_completions(sid, session, notifications, registry, deferred)
     # (#redelivery-loop, 2026-10-17)
     for event, _text in notifications:
         session.setdefault("_completion_delivered", set()).add(_notification_event_dedup_key(event))
+    # The registry is what keeps OFFERING an exited notify process
+    # (``unread_completions_owned_by``), and only wait/log/poll ever cleared it. This
+    # batch WAS the delivery, so acknowledge each process — otherwise every later drain
+    # re-offers the same completion as another turn (#redelivery-loop, 2026-10-17).
+    for event, _text in notifications:
+        if event.get("type", "completion") == "completion" and event.get("task_id"):
+            registry.mark_completion_consumed(str(event["task_id"]))
 
 
 def _notif_defer_event(evt, claim, put=None):

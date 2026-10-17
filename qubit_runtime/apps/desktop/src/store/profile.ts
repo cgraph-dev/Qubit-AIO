@@ -517,7 +517,7 @@ export function prewarmProfileBackend(name: string, connectionId: null | string 
   }
 
   // SSH sources are connect-on-demand (#89756): dialing one bootstraps the
-  // tunnel and spawns `hermes -p <profile> serve --isolated` on the remote
+  // tunnel and spawns `qubit -p <profile> serve --isolated` on the remote
   // box, so a hover sweep across the roster spawned one isolated backend per
   // bot and knocked the primary chat over. Only an explicit open may dial SSH.
   if (connection && registryConnectionKind(connection) === 'ssh') {

@@ -4,7 +4,7 @@ import { type FC, useEffect, useState } from 'react'
 import { messageContentText } from '@/components/assistant-ui/thread/content'
 import { AGENT_MESSAGE_RE, agentAvatarCache, resolveAgentAvatar } from '@/components/assistant-ui/thread/user-message'
 
-// Sender-side inter-agent delivery: `hermes -p <agent> chat … -q "Message
+// Sender-side inter-agent delivery: `qubit -p <agent> chat … -q "Message
 // from 🤖 <sender>…"` run through the terminal tool IS the messaging
 // pipeline (the Bot Mode / multi-profile convention shipped with #85855).
 // Rendering it as a terminal transcript makes the sending bot's chat read

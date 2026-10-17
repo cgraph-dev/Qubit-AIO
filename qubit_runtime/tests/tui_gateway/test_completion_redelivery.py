@@ -34,6 +34,10 @@ class _Registry:
     def __init__(self):
         self.queue: list = []
         self.completion_queue = self
+        self.consumed: set = set()
+
+    def mark_completion_consumed(self, session_id):
+        self.consumed.add(session_id)
 
     def put(self, evt):
         self.queue.append(evt)
@@ -107,6 +111,9 @@ def test_a_plain_completion_is_delivered_once(monkeypatch, fixed_batch):
 
     _dispatch(session, registry, [evt])
     assert len(started) == 1, "the first drain delivers the batch"
+    assert registry.consumed == {"proc_64dd4f6f1cf1"}, (
+        "the registry must be told the completion was delivered, or it keeps offering it"
+    )
 
     for _ in range(3):
         _dispatch(session, registry, [evt])

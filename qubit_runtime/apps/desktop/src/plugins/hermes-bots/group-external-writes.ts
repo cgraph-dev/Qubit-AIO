@@ -3,7 +3,7 @@
  *
  * A member's hidden per-group session is an ordinary Qubit session, so other
  * writers legitimately append to it: the user resuming it from the CLI
- * (`hermes -p <bot> chat --resume "Group: <room> · <thread>"`), a cron job, the
+ * (`qubit -p <bot> chat --resume "Group: <room> · <thread>"`), a cron job, the
  * agent's own tools. Those rows reach the transcript but never the room log,
  * so the room silently diverges from the member's real conversation. The
  * sweep below reads each member session's unseen tail and appends the rows

@@ -233,7 +233,7 @@ interface GatewayRegistryState {
   /** Registry source currently served by primaryGateway, when known. */
   primaryConnectionId: null | string
   /** Resolved mode of the primary's descriptor: a `local` primary is ONE
-   *  `hermes serve --profile <primary>` child and can never stand in for a
+   *  `qubit serve --profile <primary>` child and can never stand in for a
    *  pooled profile's own backend. */
   primaryConnectionMode: 'local' | 'remote' | null
   primaryProfile: string
