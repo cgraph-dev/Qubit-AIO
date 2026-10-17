@@ -991,8 +991,8 @@ def _parse_docker_volume_mounts() -> List[Tuple[Path, Path]]:
     mounts: List[Tuple[Path, Path]] = []
     for entry in parsed if isinstance(parsed, list) else ():
         spec = entry.strip() if isinstance(entry, str) else ""
-        # Prefer the first ':/' so absolute container paths are unambiguous.
-        sep = spec.find(":/")
+        # First ':/' past any Windows drive colon (``C:/data:/workspace``) splits host from container.
+        sep = spec.find(":/", 2 if re.match(r"[A-Za-z]:[/\\]", spec) else 0)
         if sep <= 0:
             continue
         container_raw = spec[sep + 1:].split(":", 1)[0]  # starts with /
@@ -1104,10 +1104,10 @@ def _warn_unresolved_docker_media(candidate: Path, session_key: str, reason: str
                    f", session_key={session_key}" if session_key else "")
 
 
-def _translate_docker_container_media_path(candidate: Path, session_key: str = "") -> Optional[Path]:
+def _translate_docker_container_media_path(candidate: Path, session_key: str = "", *, quiet: bool = False) -> Optional[Path]:
     """Container-absolute path -> host path via longest-prefix match over ``docker_volumes``, the
     auto-mounted cache dirs (``/root/.hermes/...``), persistent ``/workspace`` and ``/root``."""
-    if not candidate.is_absolute():
+    if not candidate.as_posix().startswith("/"):  # POSIX even on Windows gateways (not is_absolute)
         return None
     # In-process gateways (Desktop, `qubit serve`) may not have bridged terminal.* config into
     # TERMINAL_* env yet; the bridge is idempotent.
