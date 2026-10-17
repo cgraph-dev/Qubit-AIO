@@ -389,6 +389,25 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(apiMocks.getSessions).not.toHaveBeenCalled();
   });
 
+  it("renders the Agent tools panel (tools/skills/plugins/MCP)", async () => {
+    // Regression: the 2026-09-30 checkpoint dropped ChatToolsSummary from
+    // /chat, so the right rail lost the read-only registry summary that
+    // /qubit-chat still shows (the reported "everything is missing").
+    await renderTerminal();
+    await vi.waitFor(() =>
+      expect(container.querySelector('[data-testid="chat-tools-summary"]'))
+        .not.toBeNull(),
+    );
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Agent tools"),
+    );
+    // Each registry read the card performs is the real one, not a stub list.
+    expect(apiMocks.getToolsets).toHaveBeenCalled();
+    expect(apiMocks.getSkills).toHaveBeenCalled();
+    expect(apiMocks.getPlugins).toHaveBeenCalled();
+    expect(apiMocks.getMcpServers).toHaveBeenCalled();
+  });
+
   it("binds the MODEL card to the open session for per-session picks", async () => {
     // Regression: /chat's ChatSidebar got no sessionId, so a model pick fell
     // through to the GLOBAL model.default write ("Main model set to …" for

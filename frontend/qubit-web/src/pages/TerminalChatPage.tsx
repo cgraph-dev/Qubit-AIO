@@ -29,6 +29,8 @@ import {
   ChatSessionList,
   FRESH_CHAT_SESSION_ID,
 } from "@/components/ChatSessionList";
+import { ChatToolsSummary } from "@/components/ChatToolsSummary";
+import { PluginSlot } from "@/plugins";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { createPtyCompositionForwarder } from "@/lib/pty-composition";
 import { shouldRestoreTerminalFocus } from "@/lib/pty-focus";
@@ -1469,6 +1471,14 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 />
               </Suspense>
             </div>
+            {/* Read-only summary of the real tools/skills/plugins/MCP
+                registries (the panel /qubit-chat has). Restored after the
+                2026-09-30 checkpoint dropped it from /chat: the registries
+                are independent of the PTY child, so a failed fetch renders a
+                short note and never blocks the terminal. */}
+            <div className="shrink-0">
+              <ChatToolsSummary profile={scopedProfile} />
+            </div>
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
@@ -1514,6 +1524,11 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           </div>
         ) : null}
       </div>
+      {/* Plugin slots parity with the /qubit-chat host: a plugin that mounts
+          into chat:top / chat:bottom must appear on /chat too. Empty today
+          (nothing registers these slots) and inert when empty. */}
+      <PluginSlot name="chat:top" />
+      <PluginSlot name="chat:bottom" />
     </div>
   );
 }
