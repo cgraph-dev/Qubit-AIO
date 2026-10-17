@@ -773,17 +773,76 @@ def _parse_tool_args(args) -> Any:
         return {}
 
 
-def _assistant_blocks(msg: Dict, content) -> List[Dict]:
-    """Assistant message → Converse blocks. An ordered ``bedrock_content_blocks`` sidecar is authoritative;
-    otherwise redacted thinking from ``reasoning_details`` (byte-for-byte), then text, then tool calls."""
+def _redacted_reasoning_block(encoded) -> Optional[Dict]:
+    redacted = _decode_redacted(encoded)
+    return {"reasoningContent": {"redactedContent": redacted}} if redacted is not None else None
+
+
+def _reasoning_text_block(text, signature) -> Dict:
+    reasoning_text = {"text": text if isinstance(text, str) else ""}
+    if isinstance(signature, str) and signature:
+        reasoning_text["signature"] = signature
+    return {"reasoningContent": {"reasoningText": reasoning_text}}
+
+
+# Anthropic Messages block -> Converse block, for turns produced on the AnthropicBedrock path and sent
+# over Converse after the sticky stream-denied fallback (same Claude signatures, Converse union shape).
+_ANTHROPIC_TO_CONVERSE = {
+    "thinking": lambda b, args: _reasoning_text_block(b.get("thinking"), b.get("signature")),
+    "redacted_thinking": lambda b, args: _redacted_reasoning_block(b.get("data")),
+    "text": lambda b, args: {"text": b["text"]} if isinstance(b.get("text"), str) and b["text"].strip() else None,
+    # Input is re-sourced from the redacted tool_calls, never the raw captured block.
+    "tool_use": lambda b, args: _tool_use_block(b.get("id", ""), b.get("name", ""), args.get(b.get("id"), b.get("input", {}))),
+}
+
+
+def _anthropic_ordered_blocks(msg: Dict) -> List[Dict]:
+    args = {
+        tc.get("id"): _parse_tool_args((tc.get("function") or {}).get("arguments", "{}"))
+        for tc in (msg.get("tool_calls") or []) if isinstance(tc, dict)
+    }
+    converted = (
+        _ANTHROPIC_TO_CONVERSE[b["type"]](b, args)
+        for b in (msg.get("anthropic_content_blocks") or [])
+        if isinstance(b, dict) and b.get("type") in _ANTHROPIC_TO_CONVERSE
+    )
+    return [block for block in converted if block is not None]
+
+
+def _reasoning_details_blocks(msg: Dict, claude: bool, own: bool = False) -> List[Dict]:
+    """Thinking from the persisted ``reasoning_details`` (Anthropic shape, as Converse captures it), in stored
+    order: Claude gets signed thinking + redacted blobs, other models readable text only (falling back to
+    ``reasoning_content``). This is the carrier a turn reloaded from state.db replays from, since the
+    ordered ``bedrock_content_blocks`` sidecar is live-only. Converse wants reasoning ahead of toolUse."""
+    blocks = []
+    for d in msg.get("reasoning_details") or []:
+        if not isinstance(d, dict):
+            continue
+        if d.get("type") == "thinking" and isinstance(d.get("thinking"), str) and d["thinking"].strip():
+            if (claude or own) and d.get("signature"):
+                blocks.append(_reasoning_text_block(d["thinking"], d["signature"]))
+            elif not claude:
+                blocks.append(_reasoning_text_block(d["thinking"], None))
+        elif d.get("type") == "redacted_thinking" and (
+                block := _redacted_reasoning_block(d.get("data") or d.get("redactedContentBase64"))):
+            blocks.append(block)
+    text = msg.get("reasoning_content")
+    if not blocks and not claude and isinstance(text, str) and text.strip():
+        blocks.append(_reasoning_text_block(text, None))
+    return blocks
+
+
+def _assistant_blocks(msg: Dict, content, claude: bool = True, own: bool = False) -> List[Dict]:
+    """Assistant message → Converse blocks, from the first carrier that yields any: the ordered
+    ``bedrock_content_blocks`` sidecar, (Claude only) the ordered ``anthropic_content_blocks`` sidecar,
+    else thinking from ``reasoning_details`` followed by text, then tool calls. Anthropic-shaped carriers
+    hold Claude signatures, so other models never read them."""
     ordered_blocks = msg.get("bedrock_content_blocks")
     if isinstance(ordered_blocks, list) and (content_blocks := _replay_ordered_blocks(ordered_blocks)):
         return content_blocks
-    redacted = [
-        _decode_redacted(d.get("data") or d.get("redactedContentBase64"))
-        for d in (msg.get("reasoning_details") or []) if isinstance(d, dict) and d.get("type") == "redacted_thinking"
-    ]
-    content_blocks: List[Dict] = [{"reasoningContent": {"redactedContent": r}} for r in redacted if r is not None]
+    if claude and (content_blocks := _anthropic_ordered_blocks(msg)):
+        return content_blocks
+    content_blocks = _reasoning_details_blocks(msg, claude, own)
     if isinstance(content, str) and content.strip():
         content_blocks.append({"text": content})
     elif isinstance(content, list):
@@ -794,10 +853,79 @@ def _assistant_blocks(msg: Dict, content) -> List[Dict]:
     return content_blocks
 
 
-def convert_messages_to_converse(messages: List[Dict]) -> Tuple[Optional[List[Dict]], List[Dict]]:
+# Per-model reasoning replay on Converse: (turns before the in-flight tool loop, turns inside it).
+#   signed   — Claude: everything verbatim, signatures and redactedContent included (AWS: "You must include
+#              the signature and all previous messages"; Bedrock ignores older turns server-side for free).
+#   strip    — DeepSeek-R1 (AWS's multi-turn sample removes reasoningContent) and Kimi K3 (Converse raises
+#              InternalServerException "when reasoning content from earlier turns is included"): prior turns
+#              lose reasoning, the in-flight loop replays the model's own blocks as captured.
+#   unsigned — every other model: prior turns carry readable reasoningText only, since their signatures and
+#              redacted blobs may be another model's (a /model switch from Claude) and non-Claude models
+#              reject them ("This model doesn't support the reasoningContent.reasoningText.signature field");
+#              the in-flight loop was produced by the model now answering and replays as captured.
+_CONVERSE_REPLAY_STRIP_PATTERNS = ("deepseek.r1", "deepseek-r1", "moonshotai.kimi-k3")
+
+
+# reasoning_details record naming the model that minted a turn's Converse reasoning: its signatures are that
+# model's own, so it gets them back unmodified on every later turn and after a reload (AWS: "include the text and
+# its signature unmodified"); any other model still gets the per-policy prior-turn treatment.
+CONVERSE_ISSUER_TYPE = "bedrock.native_assistant"
+
+
+def _issued_by(msg: Dict, model: Optional[str]) -> bool:
+    return model is not None and any(isinstance(d, dict) and d.get("type") == CONVERSE_ISSUER_TYPE
+                                     and d.get("model") == model for d in msg.get("reasoning_details") or [])
+
+
+def _converse_replay_policy(model: Optional[str]) -> str:
+    if model is None:
+        return "signed"
+    if _APPLICATION_PROFILE_ARN_RE.search(model):
+        model = _resolve_inference_profile_model_id(model)  # cached; the profile ARN names no model
+    lowered = model.lower()
+    if "claude" in lowered:
+        return "signed"
+    return "strip" if any(p in lowered for p in _CONVERSE_REPLAY_STRIP_PATTERNS) else "unsigned"
+
+
+def _unsigned_reasoning(block: Dict) -> Optional[Dict]:
+    reasoning = block.get("reasoningContent")
+    if not isinstance(reasoning, dict):
+        return block
+    text = (reasoning.get("reasoningText") or {}).get("text")
+    return {"reasoningContent": {"reasoningText": {"text": text}}} if isinstance(text, str) and text.strip() else None
+
+
+def _verbatim(block: Dict) -> Dict:
+    return block
+
+
+def _without_reasoning(block: Dict) -> Optional[Dict]:
+    return None if "reasoningContent" in block else block
+
+
+_REASONING_FILTERS = {  # policy -> (before the in-flight tool loop, inside it)
+    "signed": (_verbatim, _verbatim),
+    "strip": (_without_reasoning, _verbatim),
+    "unsigned": (_unsigned_reasoning, _verbatim),
+}
+
+
+def _filter_reasoning(blocks: List[Dict], keep) -> List[Dict]:
+    return [kept for kept in map(keep, blocks) if kept is not None]
+
+
+def convert_messages_to_converse(
+    messages: List[Dict], model: Optional[str] = None,
+) -> Tuple[Optional[List[Dict]], List[Dict]]:
     """OpenAI messages → ``(system_blocks_or_None, converse_messages)``; tool results become ``toolResult``
     user blocks. Converse needs strict user/assistant alternation with a user turn first and last:
-    same-role neighbours merge, placeholder user turns pad the ends."""
+    same-role neighbours merge, placeholder user turns pad the ends. ``model`` selects the reasoning
+    replay policy for turns before the in-flight tool loop (None replays every carrier verbatim)."""
+    policy = _converse_replay_policy(model)
+    prior_filter, loop_filter = _REASONING_FILTERS[policy]
+    # Tool results are role "tool" here, so the last role "user" message opens the in-flight tool loop.
+    loop_start = next((i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "user"), -1)
     system_blocks: List[Dict] = []
     converse_msgs: List[Dict] = []
 
@@ -807,7 +935,7 @@ def convert_messages_to_converse(messages: List[Dict]) -> Tuple[Optional[List[Di
         else:
             converse_msgs.append({"role": role, "content": blocks})
 
-    for msg in messages:
+    for idx, msg in enumerate(messages):
         role = msg.get("role", "")
         content = msg.get("content")
         if role == "system":
@@ -817,7 +945,10 @@ def convert_messages_to_converse(messages: List[Dict]) -> Tuple[Optional[List[Di
             append_turn("user", [{"toolResult": {
                 "toolUseId": msg.get("tool_call_id", ""), "content": [{"text": _safe_text(result_content)}]}}])
         elif role == "assistant":
-            append_turn("assistant", _assistant_blocks(msg, content) or [dict(_PLACEHOLDER_BLOCK)])
+            own = _issued_by(msg, model)
+            keep = loop_filter if idx >= loop_start or (own and policy == "unsigned") else prior_filter
+            blocks = _filter_reasoning(_assistant_blocks(msg, content, claude=policy == "signed", own=own), keep)
+            append_turn("assistant", blocks or [dict(_PLACEHOLDER_BLOCK)])
         elif role == "user":
             append_turn("user", _convert_content_to_converse(content))
     if converse_msgs and converse_msgs[0]["role"] != "user":
@@ -847,6 +978,20 @@ def _tool_call_ns(tool_use_id: str, name: str, input_dict) -> SimpleNamespace:
     return SimpleNamespace(
         id=tool_use_id, type="function", function=SimpleNamespace(name=name, arguments=json.dumps(input_dict)),
     )
+
+
+def _persisted_reasoning_details(ordered_blocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    details: List[Dict[str, Any]] = []
+    for block in ordered_blocks:
+        reasoning = block.get("reasoningContent") if isinstance(block, dict) else None
+        if not isinstance(reasoning, dict):
+            continue
+        if isinstance(reasoning.get("text"), str) and reasoning["text"]:
+            details.append({"type": "thinking", "thinking": reasoning["text"],
+                            **({"signature": reasoning["signature"]} if reasoning.get("signature") else {})})
+        if reasoning.get("redactedContentBase64"):
+            details.append({"type": "redacted_thinking", "data": reasoning["redactedContentBase64"]})
+    return details
 
 
 class _ResponseParts:
@@ -881,11 +1026,14 @@ class _ResponseParts:
 
     def build(self, ordered_blocks: List[Dict[str, Any]], usage_data: Dict[str, int], stop_reason: str, model: str) -> SimpleNamespace:
         """Assemble the OpenAI-shaped response. Converse's inputTokens EXCLUDES cache read/write tokens
-        (OpenAI's prompt_tokens includes them), so they are added back."""
+        (OpenAI's prompt_tokens includes them), so they are added back. ``reasoning_details`` carries every
+        reasoning block in Anthropic shape (signed thinking included) because it is the persisted column."""
         msg = SimpleNamespace(
             role="assistant", content="\n".join(self.text_parts) if self.text_parts else None,
-            tool_calls=self.tool_calls or None, reasoning_details=self.reasoning_details or None,
-            reasoning_content="\n\n".join(self.reasoning_parts) if self.reasoning_parts else None,
+            tool_calls=self.tool_calls or None,
+            reasoning_details=_persisted_reasoning_details(ordered_blocks) or self.reasoning_details or None,
+            reasoning_content="\n\n".join(texts) if (texts := [b["reasoningContent"]["text"] for b in ordered_blocks
+                if isinstance(b.get("reasoningContent"), dict) and b["reasoningContent"].get("text")]) else None,
             bedrock_content_blocks=ordered_blocks or None,
         )
         cache_read_tokens, cache_write_tokens, output_tokens = (
@@ -1028,16 +1176,69 @@ def stream_converse_with_callbacks(
 
 # --- High-level API: call Bedrock Converse ---
 
+def _claude_converse_reasoning(model: str, reasoning_config: Dict, max_tokens: Optional[int]) -> Tuple[Dict, Dict]:
+    """Claude thinking over Converse: the same ``thinking``/``output_config`` the AnthropicBedrock path sends,
+    carried in ``additionalModelRequestFields`` (AWS: "pass the thinking and effort parameters inside
+    additionalModelRequestFields"); manual budgets also need temperature 1 and room above the budget."""
+    from agent.anthropic_adapter import _thinking_kwargs
+
+    thinking = _thinking_kwargs(reasoning_config, model, max_tokens or 0)
+    fields = {k: thinking[k] for k in ("thinking", "output_config") if k in thinking}
+    inference: Dict[str, Any] = {}
+    if (fields.get("thinking") or {}).get("type") == "enabled":
+        if "claude-3" not in model.lower():  # 3.7 has no interleaved thinking
+            fields["anthropic_beta"] = ["interleaved-thinking-2025-05-14"]
+        inference["temperature"] = thinking.get("temperature", 1)
+        if max_tokens is not None:
+            inference["maxTokens"] = thinking.get("max_tokens", max_tokens)
+    return fields, inference
+
+
+_NOVA_EFFORT = {"minimal": "low", "low": "low", "medium": "medium"}  # anything stronger -> "high"
+
+
+def _nova_converse_reasoning(model: str, reasoning_config: Dict, max_tokens: Optional[int]) -> Tuple[Dict, Dict]:
+    """Nova 2 ``reasoningConfig`` (off by default). At ``high``, temperature/topP/maxTokens must be unset."""
+    if reasoning_config.get("enabled") is False:
+        return {}, {}
+    effort = _NOVA_EFFORT.get(str(reasoning_config.get("effort", "medium")).lower(), "high")
+    return {"reasoningConfig": {"type": "enabled", "maxReasoningEffort": effort}}, (
+        {"temperature": None, "topP": None, "maxTokens": None} if effort == "high" else {}
+    )
+
+
+_CONVERSE_REASONING_BUILDERS = (
+    (is_anthropic_bedrock_model, _claude_converse_reasoning),
+    (lambda model: "amazon.nova-2-lite" in model.lower(), _nova_converse_reasoning),
+)
+
+
+def _apply_converse_reasoning(kwargs: Dict, inference_config: Dict, model: str, reasoning_config: Dict, max_tokens) -> None:
+    builder = next((b for matches, b in _CONVERSE_REASONING_BUILDERS if matches(model or "")), None)
+    if builder is None:
+        return
+    fields, inference = builder(model, reasoning_config, max_tokens)
+    if fields:
+        kwargs["additionalModelRequestFields"] = fields
+    for key, value in inference.items():
+        if value is None:
+            inference_config.pop(key, None)
+        else:
+            inference_config[key] = value
+
+
 def build_converse_kwargs(
     model: str, messages: List[Dict], tools: Optional[List[Dict]] = None, max_tokens: Optional[int] = 4096,
     temperature: Optional[float] = None, top_p: Optional[float] = None,
     stop_sequences: Optional[List[str]] = None, guardrail_config: Optional[Dict] = None,
+    reasoning_config: Optional[Dict] = None,
 ) -> Dict[str, Any]:
     """Build kwargs for ``bedrock-runtime.converse()`` / ``converse_stream()``. ``max_tokens=None`` omits
     ``maxTokens`` (model maximum; default stays 4096). cachePoint markers go on system, tools and the
     second-newest message (survives as the tail grows — mirrors Anthropic system_and_3), each only if the
-    model supports caching and Bedrock has not rejected that placement."""
-    system_prompt, converse_messages = convert_messages_to_converse(messages)
+    model supports caching and Bedrock has not rejected that placement. ``reasoning_config`` becomes the
+    model's ``additionalModelRequestFields`` reasoning switch (Claude ``thinking``, Nova 2 ``reasoningConfig``)."""
+    system_prompt, converse_messages = convert_messages_to_converse(messages, model=model)
     cache_at = {p for p in CACHE_POINT_PLACEMENTS if cache_point_allowed(model, p)} if _model_supports_prompt_cache(model) else set()
     inference_config: Dict[str, Any] = {} if max_tokens is None else {"maxTokens": max_tokens}
     kwargs: Dict[str, Any] = {"modelId": model, "messages": converse_messages, "inferenceConfig": inference_config}
@@ -1063,6 +1264,8 @@ def build_converse_kwargs(
             content.append(dict(_CACHE_POINT))
     if guardrail_config:
         kwargs["guardrailConfig"] = guardrail_config
+    if reasoning_config and isinstance(reasoning_config, dict):
+        _apply_converse_reasoning(kwargs, inference_config, model, reasoning_config, max_tokens)
     if not inference_config:
         del kwargs["inferenceConfig"]  # optional on the wire; don't send {}
     return kwargs
