@@ -1151,9 +1151,9 @@ def _build_replay_entry(
             entry[_rkey] = _rval
     if preserve_timestamp and msg.get("timestamp"):
         entry["timestamp"] = msg["timestamp"]
-    # Replay rebuilds the SAME conversation for its next turn: every role keeps its uid and merge witness, so a
-    # context engine sees the uids the store holds. Tool-call uid maps stay with the rows that still carry
-    # their calls (those pass through whole); on a plain row a leftover map would name calls it no longer has.
+    entry.update(scaffolding_replay_fields(msg))  # a proactive prune re-persists this view: keep the flags
+    # Replay rebuilds the SAME conversation: every role keeps its uid and merge witness, so a context engine sees the
+    # uids the store holds. Tool-call uid maps stay on rows that still carry their calls (those pass through whole).
     copy_identity_fields({key: msg[key] for key in (MESSAGE_UID, ABSORBED_MESSAGE_UIDS) if key in msg}, entry)
     # Replay rewrites are view-only: keep the durable-row stamp so marker-only
     # flushes skip rows already in state.db (#121462/#123462).
@@ -1301,7 +1301,7 @@ def _build_gateway_agent_history(
                     continue
             # Keep user timestamps for the stale-dangerous-confirmation stripper in agent/replay_cleanup.py.
             entry = _build_replay_entry(role, content, msg, preserve_timestamp=(role == "user"))
-            if inject_timestamps and role == "user" and isinstance(content, str):
+            if inject_timestamps and role == "user" and isinstance(content, str) and not is_compaction_scaffolding(msg):
                 rendered = _render_msg_ts(content, replay_timestamp, tz=_msg_tz)
                 # Preserve only a sidecar matching the complete rendered message,
                 # optionally followed by the normal context separator. Cleanup
@@ -1541,7 +1541,7 @@ def _collect_history_media_paths(agent_history: List[Dict[str, Any]]) -> set:
     return paths
 
 def _home_target_env_var(platform_name: str) -> str:
-    """Home-target env var: built-in ``_HOME_TARGET_ENV_VARS``, plugin registry, then
+    """Home-target env var: the plugin's ``cron_deliver_env_var``, then
     ``<PLATFORM>_HOME_CHANNEL``."""
     from cron.scheduler_delivery import _resolve_home_env_var
     return _resolve_home_env_var(platform_name) or f"{platform_name.upper()}_HOME_CHANNEL"
@@ -2181,7 +2181,7 @@ from gateway.run_turn import GatewayTurnMixin, is_context_overflow_failure_resul
 from gateway.run_shutdown import GatewayShutdownMixin, _resolve_gateway_exit_verdict
 from gateway.run_busy import GatewayBusySessionMixin
 from gateway.run_config_loaders import GatewayConfigLoadersMixin
-from gateway.run_startup import GatewayStartupMixin
+from gateway.run_startup import GatewayStartupMixin, _own_policy_envs
 from gateway.run_watchers import GatewaySessionWatchersMixin
 from gateway.run_notifications import GatewayNotificationsMixin
 from gateway.run_inbound import GatewayInboundMixin
@@ -2220,20 +2220,15 @@ def _best_effort(fn: Callable[[], Any], debug_msg: Optional[str] = None) -> Any:
 _EXECUTOR_QUIESCE_TIMEOUT = 2.0
 
 
-_OWN_POLICY_OPEN_ENV = {
-    Platform.WECOM: ("WECOM_DM_POLICY", "WECOM_GROUP_POLICY", "WECOM_ALLOW_ALL_USERS"),
-    Platform.WEIXIN: ("WEIXIN_DM_POLICY", "WEIXIN_GROUP_POLICY", "WEIXIN_ALLOW_ALL_USERS"),
-    Platform.YUANBAO: ("YUANBAO_DM_POLICY", "YUANBAO_GROUP_POLICY", "YUANBAO_ALLOW_ALL_USERS"),
-    Platform.QQBOT: (None, None, "QQ_ALLOW_ALL_USERS"),
-    Platform.WHATSAPP: ("WHATSAPP_DM_POLICY", "WHATSAPP_GROUP_POLICY", "WHATSAPP_ALLOW_ALL_USERS")}
-
-
 def _own_policy_open_startup_violation(config) -> Optional[str]:
     """Return a startup-abort reason when open policy lacks allow-all opt-in."""
+    with suppress(Exception):  # idempotent; callers may hand in a config load_gateway_config never built
+        from qubit_cli.plugins import discover_plugins
+        discover_plugins()
     for platform, platform_config in getattr(config, "platforms", {}).items():
         if not getattr(platform_config, "enabled", False):
             continue
-        open_env = _OWN_POLICY_OPEN_ENV.get(platform)
+        open_env = _own_policy_envs(platform)
         if not open_env:
             continue
         dm_env, group_env, allow_all_env = open_env
@@ -3346,11 +3341,6 @@ def _instantiate_builtin_adapter(platform: Platform, config: Any) -> Optional[Ba
     if not (requirements_ok() if callable(requirements_ok) else requirements_ok):
         logger.warning(warning)
         return None
-    if platform == Platform.SIGNAL:
-        from gateway.platforms.signal import validate_signal_config
-        if not validate_signal_config(config):
-            logger.warning("Signal: SIGNAL_HTTP_URL or SIGNAL_ACCOUNT not configured")
-            return None
     return adapter_cls(config)
 
 
@@ -4461,7 +4451,7 @@ class GatewayRunner(
                 logger.warning(
                     "Rejecting profile route %r: target profile %r is not served",
                     matched.name, matched.profile)
-                raise ProfileRouteRejected(matched.name)
+                raise ProfileRouteRejected(matched.name, matched.profile)
             return matched.profile
         logger.debug(
             "No profile route matched: platform=%s chat_id=%s thread_id=%s parent_chat_id=%s",
@@ -4605,30 +4595,6 @@ def _housekeeping_channel_directory(adapters, loop) -> None:
             log_message="Channel directory refresh scheduling error")
         if fut is not None:
             fut.result(timeout=30)
-
-
-def _housekeeping_media_caches() -> None:
-    """Every platform media cache prunes on the same hourly cadence (24h max age)."""
-    from gateway.platforms.base import (
-        cleanup_audio_cache, cleanup_document_cache, cleanup_image_cache, cleanup_screenshot_cache,
-        cleanup_video_cache)
-    from tools.tool_result_storage import cleanup_spillover_cache
-    from tools.environments.local import cleanup_terminal_temp_cache
-    from tools.bot_mode_dm import cleanup_bot_dm_cache
-    from tools.bot_relay import cleanup_bot_relay_artifacts
-    from agent.provider_media import MEDIA_CACHE_MAX_AGE_HOURS
-
-    for cache_name, cleanup_fn in (
-        ("Image", cleanup_image_cache), ("Document", cleanup_document_cache),
-        ("Audio", cleanup_audio_cache), ("Video", cleanup_video_cache),
-        ("Screenshot", cleanup_screenshot_cache), ("Spillover", cleanup_spillover_cache),
-        ("Terminal temp", cleanup_terminal_temp_cache), ("Bot DM", cleanup_bot_dm_cache),
-        ("Bot relay", cleanup_bot_relay_artifacts)):
-        def _one(name=cache_name, fn=cleanup_fn):
-            removed = fn(max_age_hours=MEDIA_CACHE_MAX_AGE_HOURS)
-            if removed:
-                logger.info("%s cache cleanup: removed %d stale file(s)", name, removed)
-        _housekeeping_chore(f"{cache_name} cache cleanup", _one)
 
 
 def _housekeeping_paste_sweep() -> None:
@@ -4810,8 +4776,10 @@ def _start_gateway_housekeeping(
         chores.append((1, DRAIN_LABEL, lambda: _drain_restart_safe_cron_deliveries(adapters, loop, runner)))
     chores += [
         (5, "Channel directory refresh", lambda: adapters and _housekeeping_channel_directory(adapters, loop)),
-        (60, "Media cache cleanup", _housekeeping_media_caches),
+        (60, "Media cache cleanup", housekeeping_media_caches),
         (60, "Paste sweep", _housekeeping_paste_sweep)]
+    # Low disk + auto-prune undecided: ask on the home channel (two syscalls; snoozed per post).
+    chores.append((1, "Auto-prune low-disk prompt", lambda: maybe_post_auto_prune_prompt(runner, loop)))
     if cron_provider is not None:
         chores.append((5, "Misfire catch-up sweep", lambda: _housekeeping_misfire_catch_up(cron_provider, adapters, loop)))
     if cron_thread is not None:

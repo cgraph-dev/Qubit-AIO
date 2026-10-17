@@ -18,7 +18,8 @@ import time
 import uuid
 import weakref
 from abc import ABC, abstractmethod
-from urllib.parse import urlsplit
+from hermes_dir_acl import make_user_dir, unusable_dir_remedy
+from gateway.platforms.base_log_safety import safe_url_for_log
 
 from utils import normalize_proxy_url
 from agent.i18n import t
@@ -500,27 +501,6 @@ def unauthorized_action_notice(platform: Any) -> str:
     return t("gateway.unauthorized.action_notice", platform=str(name or "<platform>"))
 
 
-def safe_url_for_log(url: str, max_len: int = 80) -> str:
-    """Return a URL string safe for logs (no query/fragment/userinfo)."""
-    raw = str(url) if max_len > 0 and url is not None else ""
-    if not raw:
-        return ""
-    try:
-        parsed = urlsplit(raw)
-    except Exception:
-        return raw[:max_len]
-    safe = raw
-    if parsed.scheme and parsed.netloc:
-        # Strip potential embedded credentials (user:pass@host).
-        path = parsed.path or ""
-        basename = path.rsplit("/", 1)[-1]
-        tail = "" if path in ("", "/") else f"/.../{basename}" if basename else "/..."
-        safe = f"{parsed.scheme}://{parsed.netloc.rsplit('@', 1)[-1]}{tail}"
-    if len(safe) <= max_len:
-        return safe
-    return "." * max_len if max_len <= 3 else f"{safe[:max_len - 3]}..."
-
-
 async def _ssrf_redirect_guard(response):
     """Re-validate each redirect target (a public URL 302-ing to http://169.254.169.254/ would
     bypass the pre-flight is_safe_url()). Async because httpx awaits response event hooks."""
@@ -643,7 +623,7 @@ def _secure_media_cache_dir(cache_dir: Path) -> None:
         if managed:
             cache_dir.mkdir(parents=True, exist_ok=True)
             return
-        cache_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        make_user_dir(cache_dir, parents=True, exist_ok=True, mode=0o700)
         try:
             from qubit_cli.config import _secure_dir
 
@@ -1020,9 +1000,8 @@ def _parse_docker_volume_mounts() -> List[Tuple[Path, Path]]:
         host_expanded = os.path.expanduser(spec[:sep])
         if not (host_expanded.startswith("/") or (len(host_expanded) > 1 and host_expanded[1] == ":")):
             continue
-        host_path, container_path = _resolve_path(Path(host_expanded)), Path(container_raw)
-        if host_path is not None and container_path.is_absolute():
-            mounts.append((host_path, container_path))
+        if (host_path := _resolve_path(Path(host_expanded))) is not None:  # container_raw is POSIX on any OS
+            mounts.append((host_path, Path(container_raw)))
     return mounts
 
 
@@ -1110,13 +1089,14 @@ def _cache_dir_container_mounts() -> List[Tuple[Path, Path]]:
         return []
 
 
-def _warn_unresolved_docker_media(candidate: Path, session_key: str, reason: str) -> None:
+def _warn_unresolved_docker_media(candidate: Path, session_key: str, reason: str, quiet: bool = False) -> None:
     """Name WHY a container-absolute MEDIA path failed translation (otherwise the only signal is
-    the generic "Skipping unsafe MEDIA directive path" line). Docker-only; host rejections quiet.
+    the generic "Skipping unsafe MEDIA directive path" line). Docker-only; host rejections and ``quiet``
+    callers (fs routes, which also see ordinary host paths) stay silent.
 
     See #93950.
     """
-    if not _docker_env_active():
+    if quiet or not _docker_env_active():
         return
     logger.warning("Docker MEDIA path %s did not resolve to a host sandbox file (%s%s); "
                    "the producing container's sandbox directory may not exist yet or "
@@ -1146,7 +1126,7 @@ def _translate_docker_container_media_path(candidate: Path, session_key: str = "
         mounts.extend(
             (root, Path("/root")) for root in _docker_persistent_sandbox_roots(session_key, "home"))
     if not mounts:
-        _warn_unresolved_docker_media(candidate, session_key, "no sandbox mounts resolved")
+        _warn_unresolved_docker_media(candidate, session_key, "no sandbox mounts resolved", quiet)
         return None
     # Longest container-prefix match; equal-length prefixes are tried in insertion order.
     candidate_posix = candidate.as_posix()
@@ -1154,14 +1134,14 @@ def _translate_docker_container_media_path(candidate: Path, session_key: str = "
                for prefix in (container_root.as_posix().rstrip("/") or "/",)
                if candidate_posix == prefix or candidate_posix.startswith(prefix + "/")]
     if not matched:
-        _warn_unresolved_docker_media(candidate, session_key, "no mounted prefix matches")
+        _warn_unresolved_docker_media(candidate, session_key, "no mounted prefix matches", quiet)
         return None
     for host_root, container_root, _score in sorted(matched, key=lambda m: -m[2]):
         translated = _resolve_path(host_root / candidate.relative_to(container_root), strict=True)
         if translated is not None and (
                 translated == host_root or _path_is_within(translated, host_root)):
             return translated
-    _warn_unresolved_docker_media(candidate, session_key, "host file missing from sandbox")
+    _warn_unresolved_docker_media(candidate, session_key, "host file missing from sandbox", quiet)
     return None
 
 
@@ -2256,11 +2236,26 @@ class BasePlatformAdapter(ABC):
         """Acquire a scoped lock for this adapter; True on success. A live cross-QUBIT_HOME
         holder is replaced only when the runner armed this adapter for its initial
         ``--replace`` connect (the status module validates ownership and terminates)."""
-        from gateway.status import (
-            acquire_scoped_lock, scoped_lock_owner_label, take_over_scoped_lock_holder)
+        from gateway.status import acquire_scoped_lock, scoped_lock_owner_label, take_over_scoped_lock_holder
+        from gateway.status_lock_dir import ScopedLockDirUnusable
         self._platform_lock_scope, self._platform_lock_identity = scope, identity
         lock_meta = {"platform": self.platform.value}
-        acquired, existing = acquire_scoped_lock(scope, identity, metadata=lock_meta)
+        try:
+            acquired, existing = acquire_scoped_lock(scope, identity, metadata=lock_meta)
+        except ScopedLockDirUnusable as exc:
+            # An ACL an elevated install left on the lock dir (#134889 W2): name the repair. Stay
+            # RETRYABLE: the dir is shared by every token-locked adapter, so a non-retryable park
+            # on a gateway that runs only those exits 78 and takes cron and the Desktop attach
+            # endpoint down with it. The status module logs the WARNING once per dir (DEBUG after),
+            # so the watcher's backoff retries quietly and picks the repair up without a restart.
+            self._platform_lock_identity = None
+            self._set_fatal_error(
+                "lock_dir_unusable",
+                f"{resource_desc} lock cannot be taken: the gateway lock directory {exc.filename} is not "
+                f"usable by this user (likely created by an elevated Hermes). To repair, "
+                f"{unusable_dir_remedy(exc.filename)}; the gateway retries on its own.",
+                retryable=True)
+            return False
         if acquired:
             return True
         if (self._platform_lock_takeover_allowed and not self._platform_lock_takeover_attempted
@@ -2295,7 +2290,7 @@ class BasePlatformAdapter(ABC):
         identity = getattr(self, '_platform_lock_identity', None)
         if not identity:
             return
-        from gateway.status import release_scoped_lock
+        from gateway.status_scoped_locks import release_scoped_lock
         release_scoped_lock(self._platform_lock_scope, identity)
         self._platform_lock_identity = None
 
@@ -2485,9 +2480,8 @@ class BasePlatformAdapter(ABC):
             return False
         if getattr(source, "profile_route_rejected", False) is not True:
             return False
-        logger.warning(
-            "[%s] Dropping inbound event for %s: explicit profile route targets an unserved profile",
-            self.name, getattr(source, "chat_id", "?"))
+        from gateway.parked_route_refusal import drop_rejected_route
+        drop_rejected_route(self, source)  # one WARNING; a parked target is also refused to the sender
         return True
 
     def _session_key_profile(self, source: Optional[Any] = None) -> Optional[str]:
@@ -4835,14 +4829,14 @@ class BasePlatformAdapter(ABC):
         # Profile from configured routes, else the owning profile of a dedicated secondary bot (so no
         # later ``source.profile``-less fallback can re-route the message through the default bot's routes).
         owner_profile = getattr(self, "_owner_profile", None)
-        profile, profile_route_rejected = owner_profile, False
+        profile, profile_route_rejected, rejected_profile = owner_profile, False, None
         if self.gateway_runner is not None:
             from gateway.profile_routing import ProfileRouteRejected
             try:
                 profile = self.gateway_runner._profile_name_for_source(
                     SessionSource(**fields), adapter_profile=owner_profile) or owner_profile
-            except ProfileRouteRejected:
-                profile_route_rejected = True
+            except ProfileRouteRejected as exc:
+                profile_route_rejected, rejected_profile = True, exc.profile
             except Exception:
                 logger.warning("Profile resolution failed for %s/%s, defaulting to active profile",
                                self.platform, chat_id, exc_info=True)
@@ -4852,7 +4846,7 @@ class BasePlatformAdapter(ABC):
         # Transport-only, kept out of to_dict(): the receiving adapter is authoritative this turn
         # even if profile_routes picks another runtime; the reject flag is consumed before auth.
         source._transport_adapter_ref = weakref.ref(self)
-        source.profile_route_rejected = profile_route_rejected
+        source.profile_route_rejected, source._rejected_route_profile = profile_route_rejected, rejected_profile
         return source
 
     @abstractmethod

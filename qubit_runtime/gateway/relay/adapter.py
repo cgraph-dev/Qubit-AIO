@@ -872,8 +872,9 @@ class RelayAdapter(BasePlatformAdapter):
         # class default is False, so only an explicit descriptor bit turns it on.
         self.supports_inchannel_continuable = bool(getattr(descriptor, "supports_inchannel_continuable", False))
 
-    async def _on_inbound(self, event) -> None:
-        """Bridge a connector-delivered MessageEvent into the normal adapter path."""
+    async def _on_inbound(self, event) -> Optional[asyncio.Task]:
+        """Bridge a connector-delivered MessageEvent into the normal adapter path; a task when its
+        admission runs off the reader (``admit_relay_delivery``) and the transport ACKs on its end."""
         # Inbound replay dedupe: the relay leg is at-least-once — on WS re-handshake
         # the connector replays its durable buffer, and a long turn straddling a
         # quiet socket drop got re-run (final answer 2-5x). Platform message identity

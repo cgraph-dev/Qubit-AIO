@@ -365,6 +365,7 @@ class WebSocketRelayTransport:
         self._ws: Any = None
         self._reader: Optional[asyncio.Task[None]] = None
         self._inbound: Optional[InboundHandler] = None
+        self._inbound_acks: set[asyncio.Task[None]] = set()  # ACKs of off-reader admissions
         self._interrupt_inbound_handler: Any = None
         self._passthrough_handler: Any = None
         # `_descriptor` is the FIRST (primary-identity) descriptor; the map holds
@@ -959,8 +960,12 @@ class WebSocketRelayTransport:
         # Edge-ACKed passthrough request riding the same WS (no public inbound
         # port needed); bufferId (§5.3) is passed through for ack.
         if self._passthrough_handler is not None:
+            from gateway.session_ingress_context import relay_callback
             fwd = _passthrough_from_wire(frame.get("forward", {}))
-            await self._passthrough_handler(fwd, frame.get("bufferId"))
+            # Same authenticated-reader proof as _on_inbound, bound to the forward; the
+            # adapter moves it onto the event it decodes from this forward.
+            with relay_callback(self, fwd):
+                await self._passthrough_handler(fwd, frame.get("bufferId"))
 
     _FRAME_HANDLERS = {
         "descriptor": _on_descriptor,
