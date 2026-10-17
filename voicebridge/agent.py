@@ -903,6 +903,47 @@ def _vendor_usage(agent: Any, provider: str, model: str) -> Dict[str, Any]:
     # `runner.run_turn` turns into UNKNOWN_SPEND — the honest outcome.
     status = str(getattr(agent, "session_cost_status", "") or "").strip().lower()
     price = getattr(agent, "session_estimated_cost_usd", None)
+    # THE AGENT'S OWN VERDICT IS OFTEN ABSENT, AND ITS DEFAULT IS A LIE
+    # -----------------------------------------------------------------
+    # `run_agent.AIAgent` initialises `session_cost_status = "unknown"`
+    # (run_agent.py:406) and NOTHING updates it on a normal turn — only the
+    # delegate tool paths do (delegate_tool_results.py:388). So every ordinary
+    # seat turn reported "unknown" even on a flat-rate route, `runner.run_turn`
+    # turned that into UNKNOWN_SPEND, the receipt stayed open, and D15 then
+    # refused admission for the WHOLE org until a human settled it by hand.
+    # That is the loop that kept wedging the office.
+    #
+    # An unset/unknown verdict is therefore not evidence of unknown spend: it
+    # is evidence of no verdict. Ask the pricing layer, which resolves the route
+    # from the provider/model we actually ran and knows that
+    # opencode-go/zen are `subscription_included`. Only a route that is neither
+    # flat-rate nor priceable stays "unknown" — the honest case.
+    if status not in ("included", "actual", "estimated"):
+        try:
+            from . import qubit_runtime as _qr
+
+            _qr.ensure_path()
+            from agent.usage_pricing import (  # type: ignore
+                CanonicalUsage, estimate_usage_cost)
+
+            base_url = ""
+            try:
+                base_url = str(getattr(agent, "base_url", "") or "")
+            except Exception:  # noqa: BLE001 - advisory only
+                base_url = ""
+            cost = estimate_usage_cost(
+                model or "", CanonicalUsage(
+                    input_tokens=usage.get("prompt_tokens") or 0,
+                    output_tokens=usage.get("completion_tokens") or 0),
+                provider=provider or None, base_url=base_url or None)
+            resolved = str(getattr(cost, "status", "") or "").lower()
+            amount = getattr(cost, "amount_usd", None)
+            if resolved in ("included", "actual", "estimated"):
+                status = resolved
+                if resolved != "included" and amount is not None:
+                    price = float(amount)
+        except Exception:  # noqa: BLE001 - a missing verdict stays unknown
+            pass
     if status == "included":
         usage["cost_usd_est"] = 0.0
         usage["cost_status"] = "included"
