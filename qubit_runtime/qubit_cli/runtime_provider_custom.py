@@ -136,8 +136,10 @@ def _shadowed_by_builtin(requested_norm: str) -> bool:
     return (canonical or "").strip().lower() == requested_norm
 
 
-def _match_new_style_provider(requested_norm: str, providers: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Scan ``providers:`` (new-style, keyed) for ``requested_norm``."""
+def _match_new_style_provider(
+    requested_norm: str, providers: Dict[str, Any], *, resolve_credentials: bool = True,
+) -> Optional[Tuple[Dict[str, Any], Any]]:
+    """Scan ``providers:`` (new-style, keyed) for ``requested_norm``; ``(entry, config key)``."""
     from qubit_cli.config import is_provider_enabled
     rp = _rp()
     for ep_name, entry in providers.items():
@@ -152,7 +154,7 @@ def _match_new_style_provider(requested_norm: str, providers: Dict[str, Any]) ->
         # Resolve credentials only after identity and endpoint validation. Merely scanning an
         # unrelated entry must not read its profile-scoped secret.
         key_env = _clean(entry.get("key_env") or entry.get("api_key_env"))
-        api_key = get_secret_str(key_env, "").strip() if key_env else ""
+        api_key = get_secret_str(key_env, "").strip() if key_env and resolve_credentials else ""
         result: Dict[str, Any] = {"name": entry.get("name", ep_name), "base_url": base_url.strip(),
                                   "api_key": api_key or _clean(entry.get("api_key", "")), "model": entry.get("default_model", "")}
         # Command that PRINTS a short-lived credential; wrapped in a per-request token provider.
@@ -165,12 +167,12 @@ def _match_new_style_provider(requested_norm: str, providers: Dict[str, Any]) ->
             entry, result, provider_key=_clean(ep_name), key_env=key_env,
             api_mode=rp._parse_api_mode(entry.get("api_mode") or entry.get("transport")),
         )
-        return result
+        return result, ep_name
     return None
 
 
-def _match_legacy_custom_provider(requested_norm: str, custom_providers) -> Optional[Dict[str, Any]]:
-    """Scan the legacy ``custom_providers:`` list for ``requested_norm``."""
+def _match_legacy_custom_provider(requested_norm: str, custom_providers) -> Optional[Tuple[Dict[str, Any], dict]]:
+    """Scan the legacy ``custom_providers:`` list for ``requested_norm``; ``(result, matched entry)``."""
     for entry in custom_providers:
         name, base_url = (entry.get("name"), entry.get("base_url")) if isinstance(entry, dict) else (None, None)
         if not isinstance(name, str) or not isinstance(base_url, str):
@@ -184,27 +186,79 @@ def _match_legacy_custom_provider(requested_norm: str, custom_providers) -> Opti
             result["model"] = model_name
         _lift_common_custom_fields(entry, result, provider_key=provider_key, key_env=_clean(entry.get("key_env", "")),
                                    api_mode=_rp()._parse_api_mode(entry.get("api_mode")))
-        return result
+        return result, entry
     return None
 
 
-def _get_named_custom_provider(requested_provider: str) -> Optional[Dict[str, Any]]:
+def _get_named_custom_provider(
+    requested_provider: str, *, config: Optional[Dict[str, Any]] = None,
+    resolve_credentials: bool = True,
+) -> Optional[Dict[str, Any]]:
+    """Resolve a named endpoint. Creation-time config copying supplies its own config snapshot
+    and skips credential reads; ordinary runtime callers keep their existing scoped resolution."""
+    found = _select_named_custom_provider(requested_provider, config=config, resolve_credentials=resolve_credentials)
+    return found[0] if found else None
+
+
+def named_custom_provider_config_path(requested_provider: str, config: Dict[str, Any]) -> Optional[tuple]:
+    """The config path (``("providers", key)`` / ``("custom_providers", index)``) of the ONE entry
+    the runtime routes *requested_provider* through, else None. Reads no credential."""
+    found = _select_named_custom_provider(requested_provider, config=config, resolve_credentials=False)
+    return found[1] if found else None
+
+
+def custom_provider_config_path_for_url(base_url: Any, config: Dict[str, Any]) -> Optional[tuple]:
+    """The config path of the entry a bare ``custom`` route at *base_url* takes its key from: the
+    first compatible ``custom_providers`` / ``providers`` entry with that URL (trailing slash
+    ignored), the same owner the credential pool seeds from. Reads no credential."""
+    url = str(base_url or "").strip().rstrip("/")
+    if not url or isinstance(config.get("custom_providers"), dict):
+        return None
+    for entry in _rp().get_compatible_custom_providers(config) or ():
+        if isinstance(entry, dict) and str(entry.get("base_url") or "").strip().rstrip("/") == url:
+            return _compatible_entry_path(config, entry)
+    return None
+
+
+def _select_named_custom_provider(
+    requested_provider: str, *, config: Optional[Dict[str, Any]], resolve_credentials: bool,
+) -> Optional[Tuple[Dict[str, Any], Optional[tuple]]]:
+    """``(resolved entry, its config path)`` for the first usable match: ``providers:`` first,
+    then the legacy list view."""
     requested_norm = _normalize_custom_provider_name(requested_provider or "")
     if not requested_norm or requested_norm == "auto" or _shadowed_by_builtin(requested_norm):
         return None
     rp = _rp()
-    config = rp.load_config()
+    if config is None:
+        config = rp.load_config()
     providers = config.get("providers")
-    found = _match_new_style_provider(requested_norm, providers) if isinstance(providers, dict) else None
+    found = (
+        _match_new_style_provider(requested_norm, providers, resolve_credentials=resolve_credentials)
+        if isinstance(providers, dict) else None
+    )
     if found:
-        return found
+        return found[0], ("providers", found[1])
     if isinstance(config.get("custom_providers"), dict):
         logger.warning("custom_providers in config.yaml is a dict, not a list. "
                        "Each entry must be prefixed with '-' in YAML. "
                        "Run 'qubit doctor' for details.")
         return None
     custom_providers = rp.get_compatible_custom_providers(config)
-    return _match_legacy_custom_provider(requested_norm, custom_providers) if custom_providers else None
+    found = _match_legacy_custom_provider(requested_norm, custom_providers) if custom_providers else None
+    return (found[0], _compatible_entry_path(config, found[1])) if found else None
+
+
+def _compatible_entry_path(config: Dict[str, Any], entry: Dict[str, Any]) -> Optional[tuple]:
+    """Where a ``get_compatible_custom_providers`` entry lives in *config*. The view keeps the first
+    of identical legacy entries, so the first raw entry normalizing to it is its source."""
+    from qubit_cli.config_providers import _normalize_custom_provider_entry
+    providers = config.get("providers")
+    key = entry.get("provider_key")
+    if key and isinstance(providers, dict):
+        return next((("providers", k) for k in providers if str(k).strip() == key), None)
+    legacy = config.get("custom_providers")
+    return next((("custom_providers", i) for i, raw in enumerate(legacy if isinstance(legacy, list) else ())
+                 if _normalize_custom_provider_entry(raw) == entry), None)
 
 
 def has_named_custom_provider(requested_provider: str) -> bool:
