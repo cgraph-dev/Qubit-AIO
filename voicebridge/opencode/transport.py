@@ -165,15 +165,33 @@ def _looks_like_auth_failure(stderr: str, code: str) -> bool:
 def parse_run_output(stdout: str) -> Dict[str, Any]:
     """Parse ``--format json`` event stream (bounded, fail closed).
 
-    Only JSON-object lines carrying a text/content/message string field count
-    as model output. Anything else — prose, HTML, tool dumps, partial JSON —
-    is a typed MALFORMED_OUTPUT failure, never success. A failed or partial
-    run must never be reported complete.
+    The real wire shape (verified against ``opencode run --format json``) is one
+    JSON object per line with the payload nested under ``part``::
+
+        {"type":"text","part":{"type":"text","text":"ok", ...}}
+        {"type":"step_finish","part":{"type":"step-finish",
+            "tokens":{"total":14913,"input":12863,"output":2,
+                      "reasoning":0,"cache":{"read":2048,"write":0}},
+            "cost":0.001936794}}
+
+    Text is read from ``part.text`` first and the top-level key only as a
+    legacy fallback — the earlier version looked at the top level alone, so a
+    perfect run parsed as MALFORMED_OUTPUT.
+
+    ``step_finish.part.cost``/``.tokens`` are the provider's OWN measured
+    figures, summed across steps. They are returned as ``cost_usd`` (float, or
+    ``None`` when no step reported one) and ``tokens_in``/``tokens_out``.
+    ``None`` — never ``0.0`` — is the honest answer for "not reported": a zero
+    would book a real call as free.
     """
     if not stdout.strip():
         return {"state": "failed", "code": "EMPTY_OUTPUT",
                 "detail": "opencode produced no output"}
     texts: List[str] = []
+    cost_usd = None
+    tokens_in = 0
+    tokens_out = 0
+    steps = 0
     try:
         for line in stdout.splitlines()[:500]:
             line = line.strip()
@@ -183,12 +201,36 @@ def parse_run_output(stdout: str) -> Dict[str, Any]:
                 evt = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if isinstance(evt, dict):
+            if not isinstance(evt, dict):
+                continue
+            part = evt.get("part")
+            part = part if isinstance(part, dict) else {}
+            # --- model text: nested part.text, then legacy top-level keys ---
+            val = part.get("text")
+            if not (isinstance(val, str) and val.strip()):
                 for key in ("text", "content", "message"):
-                    val = evt.get(key)
-                    if isinstance(val, str) and val.strip():
-                        texts.append(val.strip()[:2000])
+                    cand = evt.get(key)
+                    if isinstance(cand, str) and cand.strip():
+                        val = cand
                         break
+            if isinstance(val, str) and val.strip():
+                texts.append(val.strip()[:2000])
+            # --- measured cost/usage from a finished step ---
+            if str(part.get("type") or "").lower() == "step-finish":
+                steps += 1
+                step_cost = part.get("cost")
+                if isinstance(step_cost, (int, float)) and not isinstance(
+                        step_cost, bool):
+                    cost_usd = (cost_usd or 0.0) + float(step_cost)
+                tok = part.get("tokens")
+                if isinstance(tok, dict):
+                    for src, acc in ((("input"), "in"), (("output"), "out")):
+                        n = tok.get(src)
+                        if isinstance(n, int) and not isinstance(n, bool):
+                            if acc == "in":
+                                tokens_in += n
+                            else:
+                                tokens_out += n
     except Exception as exc:
         return {"state": "failed", "code": "PATCH_MALFORMED",
                 "detail": f"output parse failed: {exc}"[:200]}
@@ -197,7 +239,11 @@ def parse_run_output(stdout: str) -> Dict[str, Any]:
                 "detail": "opencode output carried no JSON text event; "
                           "raw/nonconforming output is never success"}
     combined = "\n".join(texts)[:MAX_OUTPUT_CHARS]
-    return {"state": "OK", "text": combined}
+    return {"state": "OK", "text": combined,
+            "cost_usd": cost_usd,
+            "tokens_in": tokens_in, "tokens_out": tokens_out,
+            "steps": steps,
+            "usage_measured": cost_usd is not None}
 
 def _probe_version(binary: str) -> str:
     """Report the configured binary's ``--version`` (never shell, gated).
