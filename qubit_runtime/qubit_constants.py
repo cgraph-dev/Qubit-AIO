@@ -273,6 +273,9 @@ def get_routing_process_qubit_home() -> Path:
 # default profile) so the two lists cannot drift apart.
 LOCAL_RUNTIME_ROOT_DIRS: frozenset[str] = frozenset({"models", "runtimes", "node"})
 
+# Where connector tool results save the files they return, under each profile's home.
+CONNECTOR_DOWNLOADS_SUBDIR = Path("downloads", "connectors")
+
 # get_default_qubit_root() memo keyed on (native home, expanded QUBIT_HOME) so it stays
 # fresh when a test or plugin mutates either input; saves ~80us/call at 31+ sites.
 _default_qubit_root_memo: tuple[str, str, Path] | None = None

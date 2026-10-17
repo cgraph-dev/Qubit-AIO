@@ -58,6 +58,13 @@ def _table_columns(conn, table: str) -> List[str]:
 _MESSAGE_MOVE_SKIP = frozenset({"id", "display_order"})
 
 
+class SessionLedgeredError(RuntimeError):
+    """A session with gateway admission/worker history cannot be moved between stores."""
+
+    def __init__(self, session_id: str) -> None:
+        super().__init__(f"{session_id} has gateway admission/worker history; not moved")
+
+
 class SessionProfileRepairMixin:
     """Per-store crossed-profile identity: find, relabel, sever, move, and settle routing/topic rows."""
 
