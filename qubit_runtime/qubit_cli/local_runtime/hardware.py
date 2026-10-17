@@ -22,10 +22,14 @@ from pathlib import Path
 
 from qubit_cli.local_runtime.devices import GGML_DEVICE_GPU
 from qubit_cli.local_runtime.estimator import HardwareBudget
+from qubit_platform.host.facts import gpu_class
 
 logger = logging.getLogger(__name__)
 
 _GIB = 1 << 30
+_NVIDIA_VENDOR_ID = 0x10DE
+# Engines whose devices the ggml probe reports; the CPU, CUDA and Metal builds answer elsewhere.
+_GPU_ENGINE_BACKENDS = ("vulkan", "hip")
 # Reserve carved off the card before any grant: the desktop's own co-residents (compositor,
 # browser, Electron) measure ~2-2.5 GiB, and a window granted into that space demotes silently
 # under WDDM. 7% covers big cards; the 2 GiB floor is what a 512 MiB floor failed to cover (a
@@ -361,7 +365,7 @@ def _accelerator_device(*, fresh: bool = False) -> "dict | None":
         from qubit_cli.local_runtime.devices import probe_devices
 
         engine = _configured_engine()
-        if engine is None or engine.backend not in ("vulkan", "hip"):
+        if engine is None or engine.backend not in _GPU_ENGINE_BACKENDS:
             return None
         key, now = str(engine.binary), time.monotonic()
         cached = _accelerator_cache.get(key)
@@ -393,11 +397,44 @@ def _unified_pool_bytes(smi_total: int, ram_total: int) -> int | None:
 
 
 def _uma_budget(base: int, total: int, *, gpu_name: str = "",
-                gpu_pci_id: int | None = None) -> HardwareBudget:
+                gpu_pci_id: int | None = None, lazy_reads: bool = True) -> HardwareBudget:
     usable = max(0, int(base * (1 - _UMA_HEADROOM_FRACTION)))
     return HardwareBudget(usable_vram_bytes=usable, total_device_bytes=total,
                           ram_available_bytes=0, uma=True, gpu_name=gpu_name, platform=sys.platform,
-                          gpu_pci_id=gpu_pci_id)
+                          gpu_pci_id=gpu_pci_id, lazy_reads=lazy_reads)
+
+
+def _gpu_engine_runs_the_model() -> bool:
+    """Whether a Vulkan/HIP engine runs the model: the serving or installed engine, else the one
+    setup would install for ``local_runtime.backend``. False when the engine can't be resolved."""
+    with suppress(Exception):
+        engine = _configured_engine()
+        if engine is not None:
+            return engine.backend in _GPU_ENGINE_BACKENDS
+        from qubit_cli.config import load_config_readonly
+        from qubit_cli.local_runtime.binaries import resolve_backend
+
+        section = load_config_readonly().get("local_runtime") or {}
+        return resolve_backend(section.get("backend") or "auto") in _GPU_ENGINE_BACKENDS
+    return False
+
+
+def _windows_igpu_bytes(device: dict | None) -> int | None:
+    """What Windows lets the integrated GPU allocate (Task Manager's GPU memory), or None.
+
+    The adapter is the one the engine named, else the only non-NVIDIA hardware adapter when a
+    Vulkan/HIP engine will run the model; the CPU engine (chosen, or the only build for a Snapdragon)
+    keeps the model in system RAM. Not the engine's own figure: ggml-vulkan sums every memory heap
+    of an integrated GPU, host-visible ones included, so it can exceed what Windows grants.
+    """
+    from qubit_platform.host.gpu_adapters import windows_gpu_adapters
+
+    hardware = [a for a in windows_gpu_adapters() if not a.software]
+    named = [a for a in hardware if device is not None and a.description == device["description"]]
+    candidates = named or [a for a in hardware if a.vendor_id != _NVIDIA_VENDOR_ID]
+    if len(candidates) != 1 or (device is None and not _gpu_engine_runs_the_model()):
+        return None
+    return candidates[0].memory_bytes
 
 
 def probe_budget(*, planning: bool = False) -> HardwareBudget:
@@ -444,8 +481,13 @@ def probe_budget(*, planning: bool = False) -> HardwareBudget:
             return HardwareBudget(usable_vram_bytes=max(0, total - margin), total_device_bytes=total,
                                   ram_available_bytes=ram_total if planning else ram_avail,
                                   uma=False, gpu_name=device["description"], platform=sys.platform)
-        # Integrated GPU, Metal, CPU, or no answer: budget from RAM as unified memory.
-        return _uma_budget(ram_total if planning else ram_avail, ram_total)
+        # Integrated GPU, Metal, CPU, or no answer: budget from RAM as unified memory, capped at what
+        # Windows lets an integrated GPU allocate (18 GB of 31.5 on an Arc B390). llama.cpp loads
+        # lazy tensors up front on an AMD/Intel integrated GPU, where reading them on demand halved
+        # prefill (#28160).
+        pool = min(ram_total, _windows_igpu_bytes(device) or ram_total)
+        return _uma_budget(pool if planning else min(pool, ram_avail), pool,
+                           lazy_reads=gpu_class() not in ("amd", "intel"))
 
     total, free, gpu_name, gpu_pci_id = vram
     margin = max(_MARGIN_FLOOR, int(total * _MARGIN_FRACTION))
