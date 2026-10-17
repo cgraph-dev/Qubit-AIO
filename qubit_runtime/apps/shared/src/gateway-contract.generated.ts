@@ -1037,6 +1037,7 @@ export interface ConnectionOperationTarget {
   kind: ConnectionTargetKind
   action: ConnectionTargetAction
   state: ConnectionTargetState
+  resolved?: boolean | null
   detail?: string | null
   instructions?: string | null
   discovery_error?: string | null
@@ -4560,6 +4561,31 @@ export interface TourStep {
 }
 /** Which built-in tour ``start`` without steps runs. */
 export type TourPreset = 'quick' | 'full'
+/** ``tools/set_theme_tool.py`` values; accent is a swatch id, ``theme`` or ``#rrggbb``. */
+export interface ThemeApplyRequestParams {
+  session_id: string
+  accent?: string | null
+  mode?: ThemeMode | null
+  layout?: string | null
+}
+export type ThemeMode = 'light' | 'dark' | 'system'
+export interface ThemePickRequestParams {
+  session_id: string
+  picker: ThemePicker
+}
+export type ThemePicker = 'accent' | 'layout'
+/** ``picked`` once the user chose (already applied); ``cancelled`` when the card was dismissed. A response with neither is a cancel. */
+export interface ThemePickResult {
+  picked?: ThemeValues | null
+  said?: string | null
+  cancelled?: boolean | null
+}
+/** What the renderer applied. ``accent`` is a swatch id, ``custom:#rrggbb``, or null for the theme's own. */
+export interface ThemeValues {
+  accent?: string | null
+  mode?: ThemeMode | null
+  layout?: string | null
+}
 export interface DisplayInstallSudoParams {
   session_id: string
   profile_key: string
@@ -5800,6 +5826,10 @@ export interface ServerRequestMap {
   sudo: { params: SudoRequestParams; result: ValueResult }
   /** Read the visible in-app terminal buffer (JSON text answer). */
   'terminal.read': { params: ReadRangeRequestParams; result: ValueResult }
+  /** Apply set_theme values in the window showing the session (JSON text answer). */
+  'theme.apply': { params: ThemeApplyRequestParams; result: ValueResult }
+  /** Show an accent or layout picker card in the chat and wait for the pick. */
+  'theme.pick': { params: ThemePickRequestParams; result: ThemePickResult }
   /** Drive a guided tour highlight in the desktop renderer. */
   tour: { params: TourRequestParams; result: ValueResult }
   /** A one-time / 2FA code the user reads from their device. */
@@ -5822,6 +5852,8 @@ export const SERVER_REQUEST_METHODS = [
   'setup_choose',
   'sudo',
   'terminal.read',
+  'theme.apply',
+  'theme.pick',
   'tour',
   'vault.code',
   'vault.save_login',
