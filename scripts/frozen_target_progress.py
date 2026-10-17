@@ -75,24 +75,35 @@ CACHE = REPO / ".frozen_target_progress.cache.json"
 
 # Baseline at the freeze. DO NOT EDIT without re-freezing the pin.
 #
-# !! PENDING RE-MEASUREMENT (2026-10-16). These six numbers were measured at the PREVIOUS
-# revision (ad12263a5ed4) and are STALE for FROZEN_REV=43faacfb8de7 -- they are kept only so the
-# instrument runs. Every verdict they produce against the new pin will read as "behind", which
-# is TRUE (the milestone moved 4,218 commits forward) but is not yet the calibrated baseline.
-# A moved pin is detected, not silently trusted: the assert on `data["rev"] == FROZEN_REV` below
-# and the "moved pin" flag both fire, so a stale BASE cannot pass as a fresh measurement.
+# MEASURED 2026-10-17 at FROZEN_REV=43faacfb8de7 with:
+#   .venv/bin/python scripts/audit_sync_completeness.py --rev 43faacfb8de7 --json tmp/audit/refreeze.json
 #
-# To finish the re-freeze, run and paste in the real numbers:
-#   .venv/bin/python scripts/audit_sync_completeness.py --rev 43faacfb8de7 --json /tmp/a.json
-#   keys: absent, short_port_files, short_port_symbols, behind_head_files, behind_head_symbols,
-#         total_missing = absent + short_port_symbols + behind_head_symbols
+# These replace a PREVIOUS revision's numbers (ad12263a5ed4), which had been left in
+# place as a placeholder after the 2026-10-16 re-freeze. Against the new pin that
+# stale base made every verdict read "behind" and produced an impossible delta
+# (absent files RISING against a fixed revision -- only porting can lower that
+# count), which the instrument flagged rather than trusting.
+#
+# The old placeholder was: absent 261, short_port_files 111, short_port_symbols 272,
+# behind_head_files 214, behind_head_symbols 703, total_missing 975.
+#
+# The audit itself was under-reporting when these were first regenerated: it fed
+# '<rev>:<path>' specs to `cat-file --batch`, which stopped after 8,570/9,503 blobs
+# and silently credited the unread remainder as present (see 8c487d5e3). It now
+# completes in ~2 minutes and serves every blob, so these numbers are the first
+# measured against a complete read of the pin.
+#
+# NOTE the shape of the change: behind_head fell to ZERO while absent and short_port
+# rose. That is the corrected classifier, not a regression -- with the pin's blobs
+# actually readable, a file we never ported is ABSENT (or short against our own
+# baseline) instead of being mis-credited as merely "behind head".
 BASE = {
-    "absent": 261,
-    "short_port_files": 111,
-    "short_port_symbols": 272,
-    "behind_head_files": 214,
-    "behind_head_symbols": 703,
-    "total_missing": 975,
+    "absent": 974,
+    "short_port_files": 610,
+    "short_port_symbols": 1649,
+    "behind_head_files": 0,
+    "behind_head_symbols": 0,
+    "total_missing": 2623,
 }
 
 
