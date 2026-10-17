@@ -770,6 +770,23 @@ def _format_failure_streams(result) -> str:
     return redact_sensitive_text(" | ".join(parts), force=True, redact_url_credentials=True)
 
 
+def bot_chat_message(job: dict, content: str) -> str:
+    """The inbound Bot Chat turn text for one cron output.
+
+    Outward lane: this text becomes an inbound turn in another profile's Bot Chat through the
+    live owner's durable admission record, so it gets the same fail-closed scrub as the chat
+    message and the session mirror; the admitted record carries the scrubbed copy, never the raw
+    output.
+    """
+    content = _redact_cron_payload(content, "bot-chat payload")
+    job_name = _redact_cron_payload(job.get("name", job.get("id", "?")), "job name")
+    return (
+        f'[Cronjob "{job_name}" output — '
+        f"scheduled job, not the user. Review it, act on anything that needs action, and "
+        f"summarize for the chat.]\n\n{content}"
+    )
+
+
 def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Optional[dict] = None,
                          for_failure: bool = False) -> Optional[str]:
     """Hand output to the live Bot Chat owner, or use the legacy unowned CLI lane.
@@ -797,12 +814,7 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
     # fail-closed scrub as the chat message and the session mirror. Rebind ``content`` itself so
     # the durable deferred record below also carries the scrubbed copy, not the raw output.
     content = _redact_cron_payload(content, "bot-chat payload")
-    job_name = _redact_cron_payload(job.get("name", job_id), "job name")
-    message = (
-        f'[Cronjob "{job_name}" output — '
-        f"scheduled job, not the user. Review it, act on anything that needs action, and "
-        f"summarize for the chat.]\n\n{content}"
-    )
+    message = bot_chat_message(job, content)
     try:
         source_home = get_qubit_home().resolve()
         from pathlib import Path
