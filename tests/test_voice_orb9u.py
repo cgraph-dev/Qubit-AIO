@@ -515,7 +515,10 @@ class _FakeOrbCanvas:
         pass
 
 
-def test_app_draws_ember_bands_for_every_state():
+def test_app_draws_ember_bands_for_every_state(monkeypatch):
+    # The app defaults to the Qubit-mark renderer (owner 2026-10-17); these
+    # ember-band assertions pin the opt-in ember look explicitly.
+    monkeypatch.setenv("QUBIT_ORB_STYLE", "ember")
     from voicebridge.orb import app as orb_app
     for st in ("idle", "listening", "thinking", "speaking"):
         fc = _FakeOrbCanvas()
@@ -527,7 +530,8 @@ def test_app_draws_ember_bands_for_every_state():
         assert stats["ovals"] >= 1 + 3, st  # core + min rings
 
 
-def test_app_unknown_state_falls_back_to_idle_frame():
+def test_app_unknown_state_falls_back_to_idle_frame(monkeypatch):
+    monkeypatch.setenv("QUBIT_ORB_STYLE", "ember")
     from voicebridge.orb import app as orb_app
     bogus = orb_app.draw_orb_frame(_FakeOrbCanvas(), 68, "warp-drive", 4.2)
     idle = orb_app.draw_orb_frame(_FakeOrbCanvas(), 68, "idle", 4.2)
@@ -535,7 +539,8 @@ def test_app_unknown_state_falls_back_to_idle_frame():
     assert bogus["points"] == idle["points"]
 
 
-def test_app_speaking_brighter_than_idle():
+def test_app_speaking_brighter_than_idle(monkeypatch):
+    monkeypatch.setenv("QUBIT_ORB_STYLE", "ember")
     from voicebridge.orb import app as orb_app
     idle = orb_app.draw_orb_frame(_FakeOrbCanvas(), 68, "idle", 4.2)
     speak = orb_app.draw_orb_frame(_FakeOrbCanvas(), 68, "speaking", 4.2)

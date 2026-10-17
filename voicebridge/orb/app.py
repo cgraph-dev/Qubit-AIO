@@ -32,6 +32,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 from . import client as _client
 from . import ember as _ember
+from . import mark as _mark
 from . import fullscreen as _fs
 from . import geometry as _geo
 from . import monitors as _mon
@@ -115,10 +116,16 @@ def draw_orb_frame(canvas: Any, size: int, state: Any, t: float, *,
                 "collapsed": True, "offline": bool(offline)}
     try:
         cx = cy = size_i / 2
-        stats = _ember.render(canvas, cx, cy, max(4.0, size_i / 2 - 2),
-                              t, state, reduced_motion=reduced_motion,
-                              level=level, spectrum=spectrum,
-                              spec_peaks=spec_peaks, colors=colors)
+        # The orb wears the product mark by default (owner 2026-10-17: match the
+        # dashboard sidebar logo). QUBIT_ORB_STYLE=ember restores the previous
+        # ember-orb look without a code change; any other value falls back to
+        # the ember renderer so a typo can never blank the orb.
+        _orb_style = str(os.environ.get("QUBIT_ORB_STYLE", "mark") or "mark").strip().lower()
+        _renderer = _mark.render if _orb_style == "mark" else _ember.render
+        stats = _renderer(canvas, cx, cy, max(4.0, size_i / 2 - 2),
+                          t, state, reduced_motion=reduced_motion,
+                          level=level, spectrum=spectrum,
+                          spec_peaks=spec_peaks, colors=colors)
     except Exception:
         stats = {"ovals": 0, "lines": 0, "points": 0,
                  "min_y": 0.0, "max_y": float(size_i), "fills": [],
