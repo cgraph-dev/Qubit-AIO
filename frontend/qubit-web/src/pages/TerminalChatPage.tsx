@@ -306,6 +306,16 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // Await the shared helper before dialing: it owns both persistence and
   // duplicate-tab lock claims, so the wire identity cannot diverge from disk.
   const attachRef = useRef<string>("");
+  // The canonical session the terminal behind `attachRef.current` currently
+  // owns ("\"\" = a fresh chat, no session). The server maps one attach token to
+  // one PTY and, on a reconnect presenting a token it still holds detached,
+  // re-attaches that PTY VERBATIM (pty_ws.py step-1b) — `?resume=` is never
+  // consulted. So a RESUME (row pick, `?resume=` change, server control frame)
+  // must present a DIFFERENT token when the target differs from what this token
+  // owns, or the terminal keeps its old transcript (the reported "clicking a
+  // session shows the welcome splash" defect). Kept as a ref so `connect` reads
+  // it without re-creating.
+  const attachSessionRef = useRef<string>("");
   // Rotate (New chat) MUST persist the new token, not just mutate the ref: a
   // reload re-reads `sessionStorage` and, with a stale token, the server's
   // step-1b `_reattach(staleKey)` re-adopts the still-live DETACHED terminal —
@@ -359,7 +369,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // Stable indirection for the self-scheduled reconnect: `connect` cannot
   // reference itself inside its own initializer, so it schedules the latest
   // callback through this ref instead (assigned after each render).
-  const connectRef = useRef<(profileId?: string, forceFresh?: boolean) => void>(() => {});
+  const connectRef = useRef<(profileId?: string, forceFresh?: boolean, rotateAttach?: boolean) => void>(() => {});
   // "New chat" clears the resume param and spawns a genuinely fresh PTY
   // (upstream semantics): with no `?resume=` the server emits no resume env,
   // so the vendored TUI forges a brand-new session instead of resuming an
@@ -440,7 +450,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     if (!disposedRef.current) setHydrating(false);
   }, []);
 
-  const connect = useCallback((profileId?: string, forceFresh = false) => {
+  const connect = useCallback((profileId?: string, forceFresh = false, rotateAttach = false) => {
     const term = termRef.current;
     if (!term || disposedRef.current) return;
     // Do not dial while a `?resume=<id>` is unverified or known-missing: the
@@ -528,7 +538,30 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
         // Resolve the attach token (async for a rotated/fresh one, which
         // persists + claims before we open the socket) so a reload re-attaches
         // to the terminal THIS connect spawns.
-        const attach = await attachToken(forceFresh);
+        //
+        // ROTATE whenever this connection's target is not the session the
+        // current token's terminal owns. The server maps one attach token to
+        // one PTY and re-attaches a still-live detached one VERBATIM on a
+        // repeated token (pty_ws.py:890-903), ignoring `?resume=` — so a plain
+        // resume with the old token reopened the OLD transcript (the reported
+        // "clicking a session keeps the welcome splash" bug). A new token makes
+        // `_reattach(key)` miss and `_reattach_session(resume)` miss too (no
+        // live terminal for the new id), so the server spawns a PTY seeded with
+        // `HERMES_TUI_RESUME=<id>` (web_server_chat.py:498) — the var
+        // ui-tui/src/config/env.ts:28 actually reads.
+        //
+        // Derived from the target rather than a caller-supplied flag: the
+        // resume-probe dial gate (the effect below) re-dials with no extra
+        // args and would otherwise drop a resume's rotation, re-opening the
+        // old terminal and discarding the fix.
+        const target = forceFresh ? "" : (resumeRef.current || "");
+        const rotateAttachNow =
+          forceFresh || rotateAttach || target !== attachSessionRef.current;
+        const attach = await attachToken(rotateAttachNow);
+        // This token now owns the connection's target for subsequent reconnects:
+        // a later reconnect with the SAME target keeps the token (and re-attaches
+        // this terminal), while a different target rotates it (above).
+        attachSessionRef.current = target;
         if (!current()) return;
         const ws = new WebSocket(
           terminalWsUrl(
@@ -627,6 +660,10 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
               // most recently active (possibly unrelated) session again.
               resumeRef.current = resumeId;
               effectiveResumeRef.current = resumeId;
+              // This connection's token now owns `resumeId`; keep the two in
+              // step so a later reconnect to the SAME session re-attaches this
+              // live terminal instead of forking a second one.
+              attachSessionRef.current = resumeId;
               setResumeTarget(resumeId);
               // The server told us which session this connection is on: we are
               // no longer on a fresh chat, so let the panel highlight it.
@@ -759,7 +796,8 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   }, [attachToken, beginResumeReplay, clearPerConnectionTimers, finishResumeHydration]);
 
   useEffect(() => {
-    connectRef.current = (profileId, forceFresh) => connect(profileId, forceFresh);
+    connectRef.current = (profileId, forceFresh, rotateAttach) =>
+      connect(profileId, forceFresh, rotateAttach);
   }, [connect]);
 
   // Verify a `?resume=<id>` against the read-only session probe BEFORE the
@@ -838,6 +876,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     // one; clearing it via the URL (back button) leaves the deliberate-fresh
     // flag untouched so New chat's intent survives a client-side nav.
     if (resumeParam) setFreshChat(false);
+    // `connect` rotates the attach token itself when the target differs from
+    // the terminal's current session (see it), so the server cannot re-adopt
+    // this tab's still-live terminal and ignore the new resume target.
     connectRef.current();
   }, [resumeParam]);
 
@@ -1405,6 +1446,15 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 onNewChat={handleNewChat}
                 workspaceCwd={workspaceCwd}
                 onWorkspaceChange={setWorkspaceCwd}
+                // The panel must list the store whose every row opens with a
+                // real transcript — the same defect class fixed on
+                // `pages/ChatPage.tsx`. `source="canonical"` reads
+                // `GET /api/sessions`, a merged SUPERSET that keeps the
+                // 0-message `dashboard-*` picker-noise rows; clicking one
+                // resolves 200 with no messages and paints an empty canvas.
+                // The default (`chat`) store is the transcript store the PTY
+                // resumes, so its rows open with the real conversation.
+                // Omitting `source` uses that default.
               />
             </div>
             <div className="shrink-0 px-2">
