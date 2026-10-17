@@ -329,6 +329,13 @@ class _ThreadCountStore:
         self._save()
         return prev
 
+    def decr(self, chat_id: str, thread_name: str) -> None:
+        """Undo one :meth:`incr` for an inbound that was not admitted; never below zero."""
+        chat_counts = self._counts.get(chat_id, {})
+        if chat_counts.get(thread_name, 0) > 0:
+            chat_counts[thread_name] -= 1
+            self._save()
+
     def _save(self) -> None:
         """Atomic write; failure is non-fatal (in-memory counts stay consistent)."""
         try:
@@ -859,8 +866,9 @@ class GoogleChatAdapter(BasePlatformAdapter):
 
     async def dispatch_http_event(self, envelope: Dict[str, Any]) -> Dict[str, Any]:
         prepared = self._prepare_inbound(envelope)
-        if prepared is not None:
-            await self._dispatch_message(*prepared)
+        if prepared is None:
+            return {}
+        await self._dispatch_message(*prepared)
         return {}
 
     def verify_http_event_request(self, auth_header: str) -> Tuple[bool, str]:
