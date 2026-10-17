@@ -4870,6 +4870,32 @@ def _repo_head_for_bundle_check() -> str:
         return ""
 
 
+#: Frontend source trees that make a bundle stale when they change after
+#: the build. Backend-only commits must never flag the bundle.
+_QUBIT_BUNDLE_SOURCE_PATHS = ("frontend/qubit-web/src", "frontend/qubit-web/public",
+                              "frontend/qubit-app", "frontend/qubit-shared")
+
+
+def _frontend_changed_since(build_head: str) -> bool:
+    """True when frontend sources changed between *build_head* and HEAD.
+
+    Fail-open: any git error means "unknown", treated as unchanged — the
+    token-global and asset checks above are the hard signals; HEAD drift
+    without them is not worth paging the operator.
+    """
+    try:
+        import subprocess as _sp
+        root = Path(__file__).resolve().parents[1]
+        out = _sp.run(["git", "diff", "--name-only", build_head, "HEAD", "--",
+                       *_QUBIT_BUNDLE_SOURCE_PATHS],
+                      cwd=str(root), capture_output=True, text=True, timeout=15)
+        if out.returncode != 0:
+            return False
+        return bool((out.stdout or "").strip())
+    except Exception:
+        return False
+
+
 def _strip_js_comments(text: str) -> str:
     """Remove ``//`` and ``/* */`` comments, respecting string literals.
 
@@ -4982,8 +5008,13 @@ def check_qubit_bundle(dist_dir) -> Dict[str, Any]:
         build_head = ""
     repo_head = _repo_head_for_bundle_check()
     if build_head and build_head != "unknown" and repo_head and build_head != repo_head:
-        issues.append(f"bundle built from {build_head[:12]} but checkout is at "
-                      f"{repo_head[:12]}: rebuild frontend/qubit-web")
+        # Backend-only commits must not flag the bundle: compare only the
+        # frontend sources. (2026-10-17: a webui.py-only fix commit kept
+        # warning after a fresh build.)
+        if _frontend_changed_since(build_head):
+            issues.append(f"bundle built from {build_head[:12]} but frontend "
+                          f"sources changed since (checkout {repo_head[:12]}): "
+                          "rebuild frontend/qubit-web")
     return {"ok": not issues, "issues": issues,
             "has_token_global": token_hits > 0,
             "has_legacy_global": bool(legacy_hits),

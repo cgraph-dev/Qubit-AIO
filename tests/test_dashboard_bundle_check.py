@@ -73,3 +73,24 @@ def test_legacy_name_in_comments_only_is_ok(tmp_path):
     check = W.check_qubit_bundle(dist)
     assert check["ok"] is True, check["issues"]
     assert check["has_legacy_global"] is False
+
+
+def test_frontend_changed_since_head_is_false():
+    assert W._frontend_changed_since("HEAD") is False
+
+
+def test_frontend_changed_since_bogus_head_fails_open():
+    assert W._frontend_changed_since("0" * 40) is False
+
+
+def test_build_info_matching_head_is_ok(tmp_path):
+    import json
+    import subprocess
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT,
+                          capture_output=True, text=True).stdout.strip()
+    dist = _write_dist(tmp_path, chunks={
+        "assets/app.js": "var t=window.__QUBIT_SESSION_TOKEN__;fetch(t);",
+    })
+    (dist / "build-info.json").write_text(json.dumps({"source_head": head}))
+    check = W.check_qubit_bundle(dist)
+    assert check["ok"] is True, check["issues"]
