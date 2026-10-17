@@ -1,0 +1,286 @@
+======================================================================
+/chat -> http://127.0.0.1:8890/chat textlen 7954 unavailable 0 has401 False
+errors: ["TypeError: Cannot destructure property 'React' of 'SDK' as it is undefined.\n    at http://127.0.0.1:8890/dashboard-plugins/memory-wiki/dist/index.js:5:9\n    at http://127.0.0.1:8890/dashboard-plugins/memory-wiki/dist/index.js:324:3"]
+SHOT: /tmp/e2e-shots/ok_chat.png
+QUBIT
+AGENT
+CHAT
+QUBIT CHAT
+SESSIONS
+FILES
+ANALYTICS
+MODELS
+LOGS
+CRON
+SKILLS
+PLUGINS
+MCP
+CHANNELS
+WEBHOOKS
+PAIRING
+PROFILES
+CONFIG
+KEYS
+SYSTEM
+AGENTS
+DOCUMENTATION
+VOICE EDITING
+Plugins
+MEMORY WIKI
+REPORTS
+ACHIEVEMENTS
+MODELS & PROVIDERS
+QUBIT BOARDS
+OBSIDIAN
+ANALYTICS
+KANBAN
+GATEWAY
+MEMORY
+RUNTIME INVENTORY
+OPERATIONS
+DEVICES
+System
+
+Gateway Status: Running
+
+Active Sessions: 1
+
+Latency 134 ms
+
+Restart Gateway
+Update Qubit
+CYBERPUNK
+EN
+vqubit-1.0.0
+Qubit
+Chat
+Chat · Qubit
+cheapvibecode/deepseek-v4.1-flash · 1,000,000 ctx
+open
+Reconnect
+ ────────────────────────────────────── Qubit Agent ──────────────────────────────────────
+                        Qubit Labs · Messenger of the Digital Gods
+
+======================================================================
+/qubit-chat -> http://127.0.0.1:8890/qubit-chat textlen 2930 unavailable 0 has401 False
+errors: ["TypeError: Cannot destructure property 'React' of 'SDK' as it is undefined.\n    at http://127.0.0.1:8890/dashboard-plugins/memory-wiki/dist/index.js:5:9\n    at http://127.0.0.1:8890/dashboard-plugins/memory-wiki/dist/index.js:324:3"]
+SHOT: /tmp/e2e-shots/ok_qubit-chat.png
+QUBIT
+AGENT
+CHAT
+QUBIT CHAT
+SESSIONS
+FILES
+ANALYTICS
+MODELS
+LOGS
+CRON
+SKILLS
+PLUGINS
+MCP
+CHANNELS
+WEBHOOKS
+PAIRING
+PROFILES
+CONFIG
+KEYS
+SYSTEM
+AGENTS
+DOCUMENTATION
+VOICE EDITING
+Plugins
+MEMORY WIKI
+REPORTS
+ACHIEVEMENTS
+MODELS & PROVIDERS
+QUBIT BOARDS
+OBSIDIAN
+ANALYTICS
+KANBAN
+GATEWAY
+MEMORY
+RUNTIME INVENTORY
+OPERATIONS
+DEVICES
+System
+
+Gateway Status: Running
+
+Active Sessions: 1
+
+Latency 347 ms
+
+Restart Gateway
+Update Qubit
+CYBERPUNK
+EN
+vqubit-1.0.0
+Qubit
+Chat
+Qubit Chat
+model deepseek-v4.1-flash
+engine: local
+active: —
+mic: idle
+stt: —
+ttfp: —
+link: —
+Right-Ctrl: ready
+privacy: local STT — audio is transcribed on this machine
+
+No messages yet — ask something.
+
+Native agent turns on the share
+======================================================================
+/sessions -> http://127.0.0.1:8890/sessions textlen 1285 unavailable 0 has401 False
+errors: ["TypeError: Cannot destructure property 'React' of 'SDK' as it is undefined.\n    at http://127.0.0.1:8890/dashboard-plugins/memory-wiki/dist/index.js:5:9\n    at http://127.0.0.1:8890/dashboard-plugins/memory-wiki/dist/index.js:324:3"]
+SHOT: /tmp/e2e-shots/ok_sessions.png
+QUBIT
+AGENT
+CHAT
+QUBIT CHAT
+SESSIONS
+FILES
+ANALYTICS
+MODELS
+LOGS
+CRON
+SKILLS
+PLUGINS
+MCP
+CHANNELS
+WEBHOOKS
+PAIRING
+PROFILES
+CONFIG
+KEYS
+SYSTEM
+AGENTS
+DOCUMENTATION
+VOICE EDITING
+Plugins
+MEMORY WIKI
+REPORTS
+ACHIEVEMENTS
+MODELS & PROVIDERS
+QUBIT BOARDS
+OBSIDIAN
+ANALYTICS
+KANBAN
+GATEWAY
+MEMORY
+RUNTIME INVENTORY
+OPERATIONS
+DEVICES
+System
+
+Gateway Status: Running
+
+Active Sessions: 1
+
+Latency 209 ms
+
+Restart Gateway
+Update Qubit
+CYBERPUNK
+EN
+vqubit-1.0.0
+Qubit
+Sessions
+501
+Prune old sessions
+541
+Total
+541
+Active in store
+0
+Archived
+16884
+Messages
+8
+Sources
+Chats
+Automation
+All
+Any chat source
+Overview
+History
+Import sessions
+CONNECTED PLATFORMS
+whatsapp
+Last update: 10h ago
+Connected
+telegram
+Last
+======================================================================
+/models -> http://127.0.0.1:8890/models textlen 5038 unavailable 0 has401 False
+errors: ["TypeError: Cannot destructure property 'React' of 'SDK' as it is undefined.\n    at http://127.0.0.1:8890/dashboard-plugins/memory-wiki/dist/index.js:5:9\n    at http://127.0.0.1:8890/dashboard-plugins/memory-wiki/dist/index.js:324:3"]
+SHOT: /tmp/e2e-shots/ok_models.png
+QUBIT
+AGENT
+CHAT
+QUBIT CHAT
+SESSIONS
+FILES
+ANALYTICS
+MODELS
+LOGS
+CRON
+SKILLS
+PLUGINS
+MCP
+CHANNELS
+WEBHOOKS
+PAIRING
+PROFILES
+CONFIG
+KEYS
+SYSTEM
+AGENTS
+DOCUMENTATION
+VOICE EDITING
+Plugins
+MEMORY WIKI
+REPORTS
+ACHIEVEMENTS
+MODELS & PROVIDERS
+QUBIT BOARDS
+OBSIDIAN
+ANALYTICS
+KANBAN
+GATEWAY
+MEMORY
+RUNTIME INVENTORY
+OPERATIONS
+DEVICES
+System
+
+Gateway Status: Running
+
+Active Sessions: 1
+
+Latency 399 ms
+
+Restart Gateway
+Update Qubit
+CYBERPUNK
+EN
+vqubit-1.0.0
+Qubit
+Models
+7D
+30D
+90D
+MODEL SETTINGS
+applies to new sessions
+MAIN MODEL
+cheapvibecode · deepseek-v4.1-flash
+CHANGE
+AUXILIARY TASKS
+1 override · 10 auto
+CONFIGURE
+MODEL PROFILES
+use as the active model profile
+qubit-brain4
+below floor
+ollama · qu
