@@ -223,3 +223,70 @@ def test_an_already_settled_escalation_cannot_be_settled_again(
         E.resolve(cfg, out["id"], "approve", by_agent=ids["manager"],
                   confirmed=True)
     assert exc.value.code == "OFFICE_BAD_STATE"
+
+
+# --- owner dashboard path: banner Confirm/Cancel settle office rows
+def test_owner_can_approve_via_dashboard_confirm_op(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as OPS
+    from voicebridge.office import escalation as E
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ids = _chain(cfg)
+    out = E.raise_to_supervisor(cfg, agent_id=ids["worker"], kind="blocked",
+                                summary="stuck")
+    res = OPS.confirm_op(cfg, out["confirmation_id"],
+                         actor="dashboard:user", session="dashboard")
+    assert res["state"] == "executed", res
+    assert res["receipt"]["decided_by"] == 0
+    row = E.escalations(cfg)["escalations"][0]
+    assert row["status"] == "resolved"
+    # journal agrees: banner no longer lists it
+    journal = E.journal_for(cfg)
+    assert out["confirmation_id"] not in {a.id for a in journal.pending()}
+
+
+def test_owner_can_deny_via_dashboard_cancel_op(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as OPS
+    from voicebridge.office import escalation as E
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ids = _chain(cfg)
+    out = E.raise_to_supervisor(cfg, agent_id=ids["worker"], kind="blocked",
+                                summary="stuck")
+    res = OPS.cancel_op(cfg, out["confirmation_id"],
+                        actor="dashboard:user", session="dashboard")
+    assert res["state"] == "executed", res
+    row = E.escalations(cfg)["escalations"][0]
+    assert row["status"] == "resolved"
+    assert row["decided_by"] == 0
+
+
+def test_non_owner_dashboard_actor_is_refused(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as OPS
+    from voicebridge.office import escalation as E
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ids = _chain(cfg)
+    out = E.raise_to_supervisor(cfg, agent_id=ids["worker"], kind="blocked",
+                                summary="stuck")
+    res = OPS.confirm_op(cfg, out["confirmation_id"],
+                         actor="voice:user", session="voice")
+    assert res["state"] == "failed", res
+    assert res["code"] == "OFFICE_ESCALATION_OWNER_ONLY"
+    # still open, still pending
+    assert E.escalations(cfg, status="open")["count"] == 1
+
+
+def test_supervisor_seat_path_unchanged(tmp_path, monkeypatch):
+    from voicebridge.office import escalation as E
+    from voicebridge.office.errors import OfficeError
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ids = _chain(cfg)
+    out = E.raise_to_supervisor(cfg, agent_id=ids["worker"], kind="blocked",
+                                summary="stuck")
+    # D34 intact: wrong seat still refused without owner=True
+    with pytest.raises(OfficeError) as exc:
+        E.resolve(cfg, out["id"], "approve", by_agent=ids["worker"],
+                  confirmed=True)
+    assert exc.value.code == "OFFICE_ESCALATION_WRONG_LEVEL"

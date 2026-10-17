@@ -1205,6 +1205,93 @@ def run_op(cfg: Any, op_id: str, args: Dict[str, Any], *,
             "detail": f"unknown operation {op_id!r}"}
 
 
+def _office_escalation_row(cfg: Any, confirmation_id: str) -> Any:
+    """Open office_escalation row for a journal confirmation id, else None."""
+    from .office import store as _store
+    try:
+        conn = _store.connect(cfg)
+    except Exception:
+        return None
+    try:
+        _store.migrate(conn)
+        return conn.execute(
+            "SELECT * FROM office_escalation WHERE confirmation_id=? "
+            "AND status='open'", (confirmation_id,)).fetchone()
+    except Exception:
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def confirm_office_escalation_op(cfg: Any, target: Any, *,
+                                 actor: str = "dashboard:user",
+                                 session: str = "dashboard"
+                                 ) -> Dict[str, Any]:
+    """Approve an office escalation from the owner surfaces (banner/CLI owner).
+
+    D34: only the supervisor seat or the owner (above the top seat) may
+    settle. The dashboard owner channel acts as owner (audited decided_by=0);
+    any other actor gets the typed refusal naming the CLI seat path.
+    """
+    from .office import escalation as ESC
+    cid = str(getattr(target, "id", "") or "")
+    row = _office_escalation_row(cfg, cid)
+    if row is None:
+        return {"state": "failed", "code": "NO_CONFIRMATION",
+                "detail": "That confirmation is gone."}
+    if actor != "dashboard:user":
+        return {"state": "failed", "code": "OFFICE_ESCALATION_OWNER_ONLY",
+                "detail": "Only the owner (dashboard) or seat #"
+                          f"{row['supervisor_id']} via CLI escalation-resolve "
+                          "may settle this."}
+    try:
+        out = ESC.resolve(cfg, int(row["id"]), "approve", owner=True,
+                          confirmed=True,
+                          requested_by="dashboard:user")
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return {"state": "failed", "code": str(code)[:60],
+                "detail": str(exc)[:300]}
+    return {"state": "executed",
+            "speech": f"Escalation #{row['id']} approved.",
+            "receipt": {"escalation_id": int(row["id"]), "decision": "approve",
+                        "decided_by": out.get("decided_by"),
+                        "confirmation_id": cid}}
+
+
+def cancel_office_escalation_op(cfg: Any, target: Any, *,
+                                actor: str = "dashboard:user",
+                                session: str = "dashboard") -> Dict[str, Any]:
+    """Deny an office escalation from the owner surfaces (a decision, kept)."""
+    from .office import escalation as ESC
+    cid = str(getattr(target, "id", "") or "")
+    row = _office_escalation_row(cfg, cid)
+    if row is None:
+        return {"state": "failed", "code": "NO_CONFIRMATION",
+                "detail": "That confirmation is gone."}
+    if actor != "dashboard:user":
+        return {"state": "failed", "code": "OFFICE_ESCALATION_OWNER_ONLY",
+                "detail": "Only the owner (dashboard) or seat #"
+                          f"{row['supervisor_id']} via CLI escalation-resolve "
+                          "may settle this."}
+    try:
+        out = ESC.resolve(cfg, int(row["id"]), "deny", owner=True,
+                          confirmed=True,
+                          requested_by="dashboard:user")
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return {"state": "failed", "code": str(code)[:60],
+                "detail": str(exc)[:300]}
+    return {"state": "executed",
+            "speech": f"Escalation #{row['id']} denied.",
+            "receipt": {"escalation_id": int(row["id"]), "decision": "deny",
+                        "decided_by": out.get("decided_by"),
+                        "confirmation_id": cid}}
+
+
 def confirm_op(cfg: Any, confirmation_id: str, *,
                actor: str = "dashboard:user",
                session: str = "dashboard",
@@ -1218,6 +1305,14 @@ def confirm_op(cfg: Any, confirmation_id: str, *,
     target = pending.get(confirmation_id) if confirmation_id else None
     if target is not None:
         capability = str(getattr(target, "capability", "") or "")
+        if capability.startswith("office.escalation"):
+            # Office escalations live on the shared journal but settle in
+            # the office store (supervisor-or-owner rule D34). The voice /
+            # skill / compat registries know nothing about them, so without
+            # this branch the banner Confirm fell through to "That
+            # confirmation is gone."
+            return confirm_office_escalation_op(
+                cfg, target, actor=actor, session=session)
         if capability.startswith("dashboard."):
             return confirm_extra_op(cfg, confirmation_id, actor=actor,
                                     session=session, sensitive=sensitive)
@@ -1251,6 +1346,9 @@ def cancel_op(cfg: Any, confirmation_id: Optional[str] = None, *,
     target = pending.get(confirmation_id) if confirmation_id else None
     if target is not None:
         capability = str(getattr(target, "capability", "") or "")
+        if capability.startswith("office.escalation"):
+            return cancel_office_escalation_op(
+                cfg, target, actor=actor, session=session)
         if capability.startswith("dashboard."):
             return cancel_extra_op(cfg, confirmation_id, actor=actor,
                                    session=session)

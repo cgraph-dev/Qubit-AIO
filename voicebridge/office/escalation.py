@@ -294,12 +294,13 @@ def escalations(cfg: Any, *, status: Optional[str] = None,
 
 
 def resolve(cfg: Any, escalation_id: int, decision: str, *,
-            by_agent: int, confirmed: bool = False,
-            requested_by: str = "cli:office") -> Dict[str, Any]:
+            by_agent: int = 0, confirmed: bool = False,
+            requested_by: str = "cli:office", owner: bool = False,
+            ) -> Dict[str, Any]:
     """Settle an escalation through the shared journal, one level up only.
 
-    `approve` and `deny` land as `resolved`; a denial is a decision, not a
-    silence, and the seat is told either way.
+    `approve` and `deny` land as `resolved`; a denial is a decision, not
+    a silence, and the seat is told either way.
     """
     if not confirmed:
         raise OfficeError(store.CONFIRM_CODE,
@@ -318,12 +319,19 @@ def resolve(cfg: Any, escalation_id: int, decision: str, *,
             raise OfficeError(BAD_STATE_CODE,
                               f"escalation #{escalation_id} is already"
                               f" {row['status']}")
-        if int(by_agent) != int(row["supervisor_id"]):
-            raise OfficeError(
-                "OFFICE_ESCALATION_WRONG_LEVEL",
-                f"refused: escalation #{escalation_id} was raised to seat "
-                f"#{row['supervisor_id']} and this seat is #{by_agent}. Only "
-                f"the seat it was raised to may settle it (D34).")
+        # The owner sits above the top seat: an owner decision is always one
+        # level up, so it satisfies D34 without impersonating the supervisor
+        # (audited as decided_by=0, never as the supervisor's seat).
+        if owner:
+            decided_by = 0
+        else:
+            if int(by_agent) != int(row["supervisor_id"]):
+                raise OfficeError(
+                    "OFFICE_ESCALATION_WRONG_LEVEL",
+                    f"refused: escalation #{escalation_id} was raised to seat "
+                    f"#{row['supervisor_id']} and this seat is #{by_agent}. Only "
+                    f"the seat it was raised to may settle it (D34).")
+            decided_by = int(by_agent)
         confirmation_id = row["confirmation_id"]
     finally:
         conn.close()
@@ -339,12 +347,13 @@ def resolve(cfg: Any, escalation_id: int, decision: str, *,
         store.migrate(conn)
         conn.execute("UPDATE office_escalation SET status='resolved',"
                      " decided_by=?, decided_at=? WHERE id=?",
-                     (int(by_agent), store.now(), escalation_id))
+                     (int(decided_by), store.now(), escalation_id))
         conn.commit()
         store.audit("escalation.resolve", requested_by,
-                    {"id": escalation_id, "decision": decision})
+                    {"id": escalation_id, "decision": decision,
+                     "owner": bool(owner)})
         return {"state": "OK", "id": escalation_id, "status": RESOLVED,
-                "decision": decision, "decided_by": int(by_agent),
+                "decision": decision, "decided_by": int(decided_by),
                 "confirmation_id": confirmation_id}
     finally:
         conn.close()
