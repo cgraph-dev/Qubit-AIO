@@ -324,3 +324,17 @@ def _shlex_args(cmd: str) -> list:
         return shlex.split(cmd)[1:] if cmd else []
     except ValueError:
         return (cmd or "").split()[1:]
+
+
+def print_session_diff(cli, result: dict, stat_only: bool) -> None:
+    """Render a ``CheckpointManager.session_diff`` result (``/diff session``): this process's agent's,
+    or the gateway session's ``rollback.session_diff`` (``diff_lines``: its uncut body's line count)."""
+    if not result.get("success"):
+        return print(f"  {result.get('error') or _t('shared.could_not_generate_diff')}")
+    stat, diff = result.get("stat", ""), result.get("diff", "")
+    if result.get("empty") or (not stat and not diff):
+        return print(f"  {_t('diff.no_session_changes')}")
+    if stat:
+        cli._print_diff_text(f"\n{stat}")
+    if diff and not stat_only:
+        cli._print_diff_body(diff, _t("diff.stat_hint_session"), total=int(result.get("diff_lines") or 0))
