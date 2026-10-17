@@ -9,6 +9,7 @@ orchestrator, CLI task path) shares one execution contract.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any, Callable, Dict, Optional
 
@@ -29,6 +30,161 @@ def _redact(text: str) -> str:
     from .redaction import redact_text
 
     return redact_text(text)
+
+
+# ---------------------------------------------------------------------------
+# Provider prompt-size rejection (typed, not a generic MODEL_ERROR)
+# ---------------------------------------------------------------------------
+#: Provider phrasings meaning "the INPUT overflows the window", lowercase. An
+#: output-cap error ("max_tokens too large") is deliberately NOT here: the input
+#: fits in that case and shrinking history would be the wrong repair.
+_PROMPT_TOO_LONG_PHRASES = (
+    "prompt too long", "prompt is too long", "input too long",
+    "input is too long", "context length", "maximum context",
+    "context window", "too many tokens", "prompt length", "reduce the length",
+    "input token", "context_length_exceeded", "string too long",
+)
+
+#: Only unambiguous input-overflow numbers are candidates for "the limit".
+_PROMPT_LIMIT_PATTERNS = (
+    re.compile(r"(\d[\d,]{1,})\s*(?:characters?|chars?)\b", re.I),
+    re.compile(r"(?:maximum|max|limit(?:ed)?(?:\s+to)?|of)\D{0,24}?"
+               r"(\d[\d,]{2,})", re.I),
+)
+
+_CONTEXT_WINDOW_RE = re.compile(
+    r"(\d[\d,]{2,})\s*tokens?\D{0,16}?(?:>|of|for)\D{0,16}?(\d[\d,]{2,})", re.I)
+
+
+def _is_prompt_too_long(exc: Any) -> "Optional[Dict[str, Any]]":
+    """Classify a provider rejection as "prompt too long".
+
+    Returns ``None`` when the error is not an input-overflow rejection,
+    otherwise ``{'limit': <int|None>, 'unit': 'chars'|'tokens', 'detail': str}``
+    where ``limit`` is the ceiling the provider reported (``None`` when it
+    quoted no parseable number). Never raises: a non-string, empty, or odd
+    exception object classifies as "not too long".
+    """
+    if exc is None:
+        return None
+    if isinstance(exc, BaseException):
+        raw = f"{type(exc).__name__}: {exc}"
+        body = str(exc)
+    else:
+        raw = body = str(exc)
+    low = raw.lower()
+    if not any(p in low for p in _PROMPT_TOO_LONG_PHRASES):
+        return None
+    unit = "chars"
+    limit: Optional[int] = None
+    for pat in _PROMPT_LIMIT_PATTERNS:
+        m = pat.search(body)
+        if not m:
+            continue
+        try:
+            limit = int(m.group(1).replace(",", ""))
+        except (TypeError, ValueError):
+            limit = None
+            continue
+        break  # the first parseable number is the ceiling
+    if limit is None:
+        # "N tokens > M" — the value AFTER the comparison is the window.
+        m = _CONTEXT_WINDOW_RE.search(body)
+        if m:
+            try:
+                limit = int(m.group(2).replace(",", ""))
+                unit = "tokens"
+            except (TypeError, ValueError):
+                limit = None
+    if "token" in low or "context" in low:
+        # A context window is measured in tokens even when the message omits
+        # the word ("exceeds the context window of this model").
+        if not re.search(r"characters?|chars?\b", low):
+            unit = "tokens"
+    return {"limit": limit, "unit": unit,
+            "detail": _redact(str(body or raw))[:300]}
+
+
+#: The provider ceiling reported by the last recognised rejection, so the
+#: operator-facing log can name it on the NEXT turn instead of only the one
+#: that failed. Process-local and advisory: never a policy input.
+_RECOGNISED_PROMPT_LIMIT: Dict[str, Any] = {}
+
+
+def _prompt_ceiling_chars(cfg: Any) -> int:
+    """Local ceiling (chars) for ONE user turn, or ``0`` for "no pre-empt".
+
+    Reads ``agent.max_prompt_chars`` when the operator set it, else
+    ``intent.local_llm.max_prompt_chars`` (the ceiling the local runner already
+    enforces), else :data:`~voicebridge.config.DEFAULT_MAX_PROMPT_CHARS`.
+    ``0``/negative disables the pre-empt (an operator who wants the provider to
+    decide). Never raises — a malformed value falls back to the default.
+    """
+    try:
+        from .config import DEFAULT_MAX_PROMPT_CHARS
+    except Exception:  # noqa: BLE001 - default is safe
+        DEFAULT_MAX_PROMPT_CHARS = 8000
+    for section, key in (("agent", "max_prompt_chars"),
+                         ("intent.local_llm", "max_prompt_chars")):
+        # ``Config.get(section, key, default=)``: the section is ONE dotted
+        # string, the key is the leaf. Passing every path element positionally
+        # made the leaf land in the ``default`` slot and silently returned the
+        # default — the bug this shape exists to avoid.
+        try:
+            raw = (cfg.get(section, key, default=None)
+                   if cfg is not None else None)
+        except Exception:  # noqa: BLE001 - try the next source
+            raw = None
+        if raw is None or str(raw).strip() == "":
+            continue
+        try:
+            value = int(str(raw).strip())
+        except (TypeError, ValueError):
+            continue
+        return value if value > 0 else 0
+    return int(DEFAULT_MAX_PROMPT_CHARS)
+
+
+def _prompt_too_long_outcome(*, session: str, limit: Optional[int],
+                             unit: str, detail: str,
+                             prompt_chars: int = 0,
+                             ceiling_chars: int = 0,
+                             prevented: bool = False
+                             ) -> Dict[str, Any]:
+    """The typed ``PROMPT_TOO_LONG`` failure every caller can act on.
+
+    ``retryable`` is False: resending the same turn to the same model is what
+    produced the rejection, so a retry loop can only fail identically. The
+    ``limits`` block names what the provider said (when it said anything) and
+    what voicebridge enforces locally, so the operator has the number to raise.
+    """
+    try:
+        _audit("prompt_too_long", session=session, limit=limit, unit=unit,
+               prompt_chars=prompt_chars, ceiling_chars=ceiling_chars,
+               prevented=bool(prevented))
+    except Exception:  # noqa: BLE001 - telemetry never masks the outcome
+        pass
+    numbers = [n for n in (prompt_chars, ceiling_chars) if n]
+    fallback = ("the turn did not fit the provider's prompt ceiling; raise "
+                "agent.max_prompt_chars / intent.local_llm.max_prompt_chars "
+                "or shorten the conversation")
+    return {
+        "state": "FAILED",
+        "code": "PROMPT_TOO_LONG",
+        "retryable": False,
+        "detail": detail or fallback,
+        "session": session,
+        "session_id": session,
+        "limits": {
+            "source": "local_preempt" if prevented else "provider",
+            "limit": limit,
+            "unit": unit,
+            "prompt_chars": prompt_chars or None,
+            "ceiling_chars": ceiling_chars or None,
+            "config_key": "intent.local_llm.max_prompt_chars",
+        },
+        "prompt_chars": max(numbers) if numbers else None,
+    }
 
 
 def _audit(op: str, **fields: Any) -> None:
@@ -550,6 +706,30 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             "MCP discovery readiness check failed before agent build",
             exc_info=True)
     started = time.monotonic()
+    # Pre-empt a certainly-rejected call: the serialized prompt alone already
+    # exceeds the local ceiling, so the provider would only be asked to reject
+    # it again (billable, slow, and nothing learned). Cheap and safe: only the
+    # user's own turn text is measured here — history replay the agent adds
+    # later is invisible from this seam, so this is a floor, not a guarantee.
+    # ``agent.max_prompt_chars`` / ``intent.local_llm.max_prompt_chars`` = 0
+    # disables it.
+    ceiling = _prompt_ceiling_chars(cfg)
+    known = _RECOGNISED_PROMPT_LIMIT.get("limit")
+    measured_ceiling = ceiling
+    if isinstance(known, int) and known > 0 and str(
+            _RECOGNISED_PROMPT_LIMIT.get("unit") or "") == "chars":
+        measured_ceiling = min(ceiling, known) if ceiling else known
+    if measured_ceiling and len(text) > measured_ceiling:
+        return _prompt_too_long_outcome(
+            session=sid, limit=None, unit="chars",
+            detail=f"prevented locally: a {len(text)}-char turn exceeds the "
+                   f"{measured_ceiling}-char prompt ceiling "
+                   f"(agent.max_prompt_chars / "
+                   f"intent.local_llm.max_prompt_chars); the provider would "
+                   f"reject it, so nothing was sent. Shorten the turn or raise "
+                   f"the ceiling.",
+            prompt_chars=len(text), ceiling_chars=measured_ceiling,
+            prevented=True)
     agent = None
     # Turn-time provider fallback (billing/rate-limit → next chain entry):
     # hand the vendored agent the same chain the terminal /chat uses, read
@@ -588,6 +768,25 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
         raise
     except Exception as exc:  # noqa: BLE001 - typed, redacted, no fabrication
         _audit("session_vendored_error", session=sid, error=str(exc)[:160])
+        too_long = _is_prompt_too_long(exc)
+        if too_long is not None:
+            # A provider prompt-size rejection is its OWN outcome: retrying it
+            # verbatim can only fail identically, and the operator needs the
+            # number the provider quoted to raise the trim ceiling.
+            _RECOGNISED_PROMPT_LIMIT.update(
+                {"limit": too_long.get("limit"),
+                 "unit": too_long.get("unit"),
+                 "session": sid})
+            logging.getLogger(__name__).warning(
+                "provider rejected the prompt as too long "
+                "(limit=%s %s); raise agent.max_prompt_chars / "
+                "intent.local_llm.max_prompt_chars above the turn size",
+                too_long.get("limit"), too_long.get("unit"))
+            return _prompt_too_long_outcome(
+                session=sid, limit=too_long.get("limit"),
+                unit=str(too_long.get("unit") or "chars"),
+                detail=str(too_long.get("detail") or ""),
+                prompt_chars=len(text), ceiling_chars=ceiling)
         return {"state": "FAILED", "code": "MODEL_ERROR",
                 "detail": _redact(str(exc))[:300], "session": sid,
                 "session_id": sid}
@@ -889,6 +1088,17 @@ def run_session(cfg: Any, task_text: str, *, session: str,
             max_tokens=1024, timeout_s=min(budget, 300.0),
             local_mode="chat", should_stop=check, reasoning=reasoning)
     except Exception as exc:  # noqa: BLE001 - typed, redacted
+        too_long = _is_prompt_too_long(exc)
+        if too_long is not None:
+            _RECOGNISED_PROMPT_LIMIT.update(
+                {"limit": too_long.get("limit"),
+                 "unit": too_long.get("unit"), "session": sid})
+            return _prompt_too_long_outcome(
+                session=sid, limit=too_long.get("limit"),
+                unit=str(too_long.get("unit") or "chars"),
+                detail=str(too_long.get("detail") or ""),
+                prompt_chars=len(prompt),
+                ceiling_chars=_prompt_ceiling_chars(cfg))
         return {"state": "FAILED", "code": "MODEL_ERROR",
                 "detail": _redact(str(exc))[:300], "session": sid,
                 "steps": steps, "tool_used": tool_used}
