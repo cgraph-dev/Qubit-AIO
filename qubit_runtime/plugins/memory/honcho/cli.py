@@ -388,18 +388,18 @@ def cmd_disable(args) -> None:
 
 # ── identity mapping (setup wizard) ────────────────────────────────────────
 
-def _resolve_effective_identity_mapping(cfg: dict, hermes_host: dict) -> tuple[bool, dict, str, bool, bool]:
+def _resolve_effective_identity_mapping(cfg: dict, qubit_host: dict) -> tuple[bool, dict, str, bool, bool]:
     """``(pin, aliases, prefix, aliases_from_root, prefix_from_root)`` for the active host,
     mirroring ``from_global_config`` precedence (host over root; ``pinUserPeer`` beats
     ``pinPeerName``) so setup classifies the shape the gateway actually runs with.
     ``*_from_root`` lets writes skip inherited values."""
-    pin_sources = (hermes_host.get("pinUserPeer"), hermes_host.get("pinPeerName"),
+    pin_sources = (qubit_host.get("pinUserPeer"), qubit_host.get("pinPeerName"),
                    cfg.get("pinUserPeer"), cfg.get("pinPeerName"))
     pin = bool(next((v for v in pin_sources if v is not None), False))
 
     def _inherit(key):
-        if key in hermes_host:
-            return hermes_host.get(key), False
+        if key in qubit_host:
+            return qubit_host.get(key), False
         val = cfg.get(key)
         return val, val is not None
 
@@ -409,10 +409,10 @@ def _resolve_effective_identity_mapping(cfg: dict, hermes_host: dict) -> tuple[b
     return pin, aliases, str(prefix_src or ""), aliases_from_root, prefix_from_root
 
 
-def _scrub_identity_mapping(hermes_host: dict) -> None:
+def _scrub_identity_mapping(qubit_host: dict) -> None:
     """Drop every peer-mapping key so a stale alias/prefix/pin can't bleed into the new shape."""
     for key in _IDENTITY_MAPPING_KEYS:
-        hermes_host.pop(key, None)
+        qubit_host.pop(key, None)
 
 
 def _migrate_pin_key(block: dict) -> bool:
@@ -447,29 +447,29 @@ def _collect_operator_aliases(existing: dict, peer_target: str) -> dict:
     return aliases
 
 
-def _apply_runtime_prefix(hermes_host: dict, current_prefix: str, prefix_from_root: bool, label: str) -> None:
+def _apply_runtime_prefix(qubit_host: dict, current_prefix: str, prefix_from_root: bool, label: str) -> None:
     """Write a host-level runtimePeerPrefix only when it diverges from an
     inherited root value; otherwise let the root cascade stand."""
     new_prefix = _prompt(label, default=current_prefix or "").strip()
     if new_prefix and not (prefix_from_root and new_prefix == current_prefix):
-        hermes_host["runtimePeerPrefix"] = new_prefix
+        qubit_host["runtimePeerPrefix"] = new_prefix
 
 
-def _echo_identity_mapping(hermes_host: dict) -> None:
-    print(f"  resolved →\n    pinUserPeer       = {bool(hermes_host.get('pinUserPeer'))}\n"
-          f"    userPeerAliases   = {hermes_host.get('userPeerAliases') or '{}'}\n"
-          f"    runtimePeerPrefix = {hermes_host.get('runtimePeerPrefix') or '(none)'}")
+def _echo_identity_mapping(qubit_host: dict) -> None:
+    print(f"  resolved →\n    pinUserPeer       = {bool(qubit_host.get('pinUserPeer'))}\n"
+          f"    userPeerAliases   = {qubit_host.get('userPeerAliases') or '{}'}\n"
+          f"    runtimePeerPrefix = {qubit_host.get('runtimePeerPrefix') or '(none)'}")
 
 
-def _configure_raw_identity_mapping(hermes_host, current_pin, current_aliases, current_prefix,
+def _configure_raw_identity_mapping(qubit_host, current_pin, current_aliases, current_prefix,
                                     aliases_from_root, prefix_from_root) -> None:
     """Power-user escape hatch: set the three resolver knobs directly."""
     print("\n  Raw identity-mapping keys (resolver tries them top-down):")
     pin_in = _prompt("pinUserPeer — pin all gateway users to your peer? (true/false)",
                      default=str(bool(current_pin)).lower()).strip().lower()
     pin = pin_in in {"true", "t", "yes", "y", "1"}
-    _scrub_identity_mapping(hermes_host)
-    hermes_host["pinUserPeer"] = pin
+    _scrub_identity_mapping(qubit_host)
+    qubit_host["pinUserPeer"] = pin
     if pin:
         return
     aliases = dict(current_aliases) if isinstance(current_aliases, dict) and not aliases_from_root else {}
@@ -479,16 +479,16 @@ def _configure_raw_identity_mapping(hermes_host, current_pin, current_aliases, c
         if rid and peer:
             aliases[rid] = peer
     if aliases:
-        hermes_host["userPeerAliases"] = aliases
-    _apply_runtime_prefix(hermes_host, current_prefix, prefix_from_root,
+        qubit_host["userPeerAliases"] = aliases
+    _apply_runtime_prefix(qubit_host, current_prefix, prefix_from_root,
                           "runtimePeerPrefix — namespace for unknown IDs (blank for none)")
 
 
-def _setup_identity_mapping(cfg: dict, hermes_host: dict, current_peer: str, new_host: bool) -> None:
+def _setup_identity_mapping(cfg: dict, qubit_host: dict, current_peer: str, new_host: bool) -> None:
     """Gateway identity mapping step. Only the gateway supplies a runtime user ID (CLI/TUI/
     desktop fall through to peerName), so the step is gated on gateway detection."""
     current_pin, current_aliases, current_prefix, aliases_from_root, prefix_from_root = (
-        _resolve_effective_identity_mapping(cfg, hermes_host))
+        _resolve_effective_identity_mapping(cfg, qubit_host))
     current_shape = "single" if current_pin else "hybrid" if current_aliases else "multi"
 
     gw_platforms = _gateway_platforms()
@@ -504,8 +504,8 @@ def _setup_identity_mapping(cfg: dict, hermes_host: dict, current_peer: str, new
         if not _yes(_prompt(question, default="n")):
             return
 
-    peer_target = hermes_host.get("peerName") or current_peer or "user"
-    ai_peer_label = hermes_host.get("aiPeer") or cfg.get("aiPeer") or "hermes"
+    peer_target = qubit_host.get("peerName") or current_peer or "user"
+    ai_peer_label = qubit_host.get("aiPeer") or cfg.get("aiPeer") or "hermes"
     # Fresh configs default to the personal shape; configured ones keep their detected shape.
     identity_configured = not new_host or any(k in cfg for k in _IDENTITY_MAPPING_KEYS)
     default_choice = {"single": "1", "hybrid": "2", "multi": "3"}[current_shape] if identity_configured else "1"
@@ -545,7 +545,7 @@ def _setup_identity_mapping(cfg: dict, hermes_host: dict, current_peer: str, new
     if shape == "skip":
         return print("  Identity mapping left untouched.")
     if shape == "raw":
-        _configure_raw_identity_mapping(hermes_host, current_pin, current_aliases, current_prefix,
+        _configure_raw_identity_mapping(qubit_host, current_pin, current_aliases, current_prefix,
                                         aliases_from_root, prefix_from_root)
     else:
         # Preserve operator-curated host-level aliases across multi → multi re-runs. Root-sourced
@@ -553,20 +553,20 @@ def _setup_identity_mapping(cfg: dict, hermes_host: dict, current_peer: str, new
         prior_aliases = dict(current_aliases) if isinstance(current_aliases, dict) else {}
         if shape == "multi" and aliases_from_root:
             prior_aliases = {}
-        _scrub_identity_mapping(hermes_host)  # each shape starts from a clean slate
-        hermes_host["pinUserPeer"] = shape == "single"
+        _scrub_identity_mapping(qubit_host)  # each shape starts from a clean slate
+        qubit_host["pinUserPeer"] = shape == "single"
         if shape == "single":
             print(f"  Every gateway account resolves to peer '{peer_target}'.")
         else:
             aliases = prior_aliases if shape == "multi" else _collect_operator_aliases(prior_aliases, peer_target)
             if aliases:
-                hermes_host["userPeerAliases"] = aliases
-            _apply_runtime_prefix(hermes_host, current_prefix, prefix_from_root,
+                qubit_host["userPeerAliases"] = aliases
+            _apply_runtime_prefix(qubit_host, current_prefix, prefix_from_root,
                                   "Runtime peer prefix (e.g. 'telegram_', blank for none)" if shape == "multi" else
                                   "Runtime peer prefix for unknown users (e.g. 'telegram_', blank for none)")
             print("  Each gateway account resolves to its own peer." if shape == "multi" else
                   f"  Your accounts resolve to '{peer_target}'; each other account to its own peer.")
-    _echo_identity_mapping(hermes_host)
+    _echo_identity_mapping(qubit_host)
 
 
 # ── setup wizard ───────────────────────────────────────────────────────────
@@ -611,31 +611,31 @@ def _headless() -> tuple[bool, bool]:
         return False, True
 
 
-def _apply_grant_to_host(cfg: dict, hermes_host: dict, cred) -> None:
+def _apply_grant_to_host(cfg: dict, qubit_host: dict, cred) -> None:
     """Store an OAuth grant on the host block and in ``cfg``'s snapshot. install_grant already wrote it to disk,
     so the final save must not copy it over a rotation that lands during the later prompts."""
-    hermes_host["apiKey"] = cred.access_token
-    hermes_host["oauth"] = cred.oauth_block()
+    qubit_host["apiKey"] = cred.access_token
+    qubit_host["oauth"] = cred.oauth_block()
     if (snapshot := getattr(cfg, "snapshot", None)) is not None:
         snapshot.setdefault("hosts", {}).setdefault(_host_key(), {}).update(apiKey=cred.access_token, oauth=cred.oauth_block())
     if cred.consent_peer_name:  # default the peer prompt to the consent name
-        hermes_host["peerName"] = cred.consent_peer_name
+        qubit_host["peerName"] = cred.consent_peer_name
     print("  Authorized — token saved. Let's finish configuring.\n")
 
 
-def _setup_local_auth(cfg: dict, hermes_host: dict) -> None:
+def _setup_local_auth(cfg: dict, qubit_host: dict) -> None:
     """Self-hosted Honcho may run with AUTH_USE_AUTH=true; clients then send a JWT signed with
     the server's AUTH_JWT_SECRET as the bearer token. It is stored under the host block (not
     top-level apiKey) so ``get_honcho_client`` treats it as an explicit local auth opt-in and
     cloud/hybrid switching is unaffected."""
     if new_url := _prompt("Base URL", default=cfg.get("baseUrl") or "http://localhost:8000"):
         cfg["baseUrl"] = new_url
-    current_host_key = hermes_host.get("apiKey", "")
+    current_host_key = qubit_host.get("apiKey", "")
     print("\n  Local Honcho auth (JWT signed with the server's AUTH_JWT_SECRET).\n"
           f"  Leave blank if your server runs with AUTH_USE_AUTH=false. Current: {_mask(current_host_key)}")
     new_local_key = _prompt("Local JWT / bearer token (blank to skip / keep current)", secret=True)
     if new_local_key:
-        hermes_host["apiKey"] = new_local_key
+        qubit_host["apiKey"] = new_local_key
     elif current_host_key:
         print("  Keeping existing local JWT.")
     elif cfg.get("apiKey", ""):
@@ -645,7 +645,7 @@ def _setup_local_auth(cfg: dict, hermes_host: dict) -> None:
         print("\n  No local JWT set. Local no-auth ready.")
 
 
-def _setup_device_login(cfg: dict, hermes_host: dict, write_path: Path, *, open_browser: bool) -> bool:
+def _setup_device_login(cfg: dict, qubit_host: dict, write_path: Path, *, open_browser: bool) -> bool:
     """RFC 8628 device-code sign-in. Returns False if setup must abort."""
     from plugins.memory.honcho.oauth_flow import (
         AccessDenied, AuthorizationTimeout, DeviceCode, DeviceCodeExpired, DeviceFlowError, authorize_via_device_code,
@@ -675,12 +675,12 @@ def _setup_device_login(cfg: dict, hermes_host: dict, write_path: Path, *, open_
               if isinstance(e, DeviceFlowError) and e.error == "http_429" else f"\n  Device sign-in failed: {e}\n" + _RETRY_HINT)
     else:
         print(" approved")
-        _apply_grant_to_host(cfg, hermes_host, cred)
+        _apply_grant_to_host(cfg, qubit_host, cred)
         return True
     return False
 
 
-def _setup_browser_login(cfg: dict, hermes_host: dict, write_path: Path) -> bool:
+def _setup_browser_login(cfg: dict, qubit_host: dict, write_path: Path) -> bool:
     """Loopback OAuth sign-in. Tokens merge into the in-memory cfg so the wizard's final save
     keeps them; settings stay wizard-owned (apply_config=False). Returns False on abort."""
     from plugins.memory.honcho.oauth_flow import authorize_via_loopback
@@ -696,15 +696,15 @@ def _setup_browser_login(cfg: dict, hermes_host: dict, write_path: Path) -> bool
     except Exception as e:
         print(f"  OAuth sign-in failed: {e}\n" + _RETRY_HINT)
         return False
-    _apply_grant_to_host(cfg, hermes_host, cred)
+    _apply_grant_to_host(cfg, qubit_host, cred)
     return True
 
 
-def _setup_cloud_auth(cfg: dict, hermes_host: dict, write_path: Path) -> bool:
+def _setup_cloud_auth(cfg: dict, qubit_host: dict, write_path: Path) -> bool:
     """Cloud auth: OAuth (browser), device code, or API key. Returns False on abort."""
     cfg.pop("baseUrl", None)  # cloud uses SDK default
     from plugins.memory.honcho.oauth import OAuthCredential, is_oauth_access_token
-    existing_oauth = OAuthCredential.from_host_block(hermes_host)
+    existing_oauth = OAuthCredential.from_host_block(qubit_host)
     device_available = _device_login_available()
     is_remote, can_browse = _headless()
 
@@ -725,12 +725,12 @@ def _setup_cloud_auth(cfg: dict, hermes_host: dict, write_path: Path) -> bool:
                      default=default_method).strip().lower()
 
     if device_available and method in {"device", "d"}:
-        return _setup_device_login(cfg, hermes_host, write_path, open_browser=can_browse and not is_remote)
+        return _setup_device_login(cfg, qubit_host, write_path, open_browser=can_browse and not is_remote)
     if method in {"oauth", "o"}:
-        return _setup_browser_login(cfg, hermes_host, write_path)
+        return _setup_browser_login(cfg, qubit_host, write_path)
     # A leftover grant on the host block would shadow the pasted key.
-    stale_grant = existing_oauth is not None or is_oauth_access_token(hermes_host.get("apiKey"))
-    current = ("" if stale_grant else hermes_host.get("apiKey", "")) or cfg.get("apiKey", "")
+    stale_grant = existing_oauth is not None or is_oauth_access_token(qubit_host.get("apiKey"))
+    current = ("" if stale_grant else qubit_host.get("apiKey", "")) or cfg.get("apiKey", "")
     print(f"\n  Current API key: {_mask(current)}")
     if new_key := _prompt("Honcho API key (leave blank to keep current)", secret=True):
         cfg["apiKey"] = new_key
@@ -739,8 +739,8 @@ def _setup_cloud_auth(cfg: dict, hermes_host: dict, write_path: Path) -> bool:
         print("\n  No API key configured. Get yours at https://app.honcho.dev\n"
               "  Run 'qubit honcho setup' again once you have a key.\n")
         return False
-    hermes_host.pop("oauth", None)
-    hermes_host["apiKey"] = key
+    qubit_host.pop("oauth", None)
+    qubit_host["apiKey"] = key
     return True
 
 
@@ -748,21 +748,21 @@ def _menu(header: str, *lines: str) -> None:
     print(f"\n  {header}:\n" + "\n".join(f"    {line}" for line in lines))
 
 
-def _choice_step(hermes_host, key, current, label, valid, fallback=None) -> None:
+def _choice_step(qubit_host, key, current, label, valid, fallback=None) -> None:
     """Prompt for one of ``valid``; an invalid answer writes ``fallback`` (None = keep current)."""
     new = _prompt(label, default=current)
     if new in valid:
-        hermes_host[key] = new
+        qubit_host[key] = new
     elif fallback is not None:
-        hermes_host[key] = fallback
+        qubit_host[key] = fallback
 
 
-def _setup_tuning(cfg: dict, hermes_host: dict) -> None:
+def _setup_tuning(cfg: dict, qubit_host: dict) -> None:
     """Wizard steps 4-8: observation, write frequency, recall, budgets, reasoning, strategy."""
     _menu("Observation mode",
           "directional  -- all observations on, each AI peer builds its own view (default)",
           "unified      -- user observes self, AI observes others only")
-    _choice_step(hermes_host, "observationMode", _pref(hermes_host, cfg, "observationMode", "directional"),
+    _choice_step(qubit_host, "observationMode", _pref(qubit_host, cfg, "observationMode", "directional"),
                  "Observation mode", {"unified", "directional"}, "directional")
 
     _menu("Write frequency",
@@ -770,36 +770,36 @@ def _setup_tuning(cfg: dict, hermes_host: dict) -> None:
           "turn    -- sync write after every turn",
           "session -- batch write at session end only",
           "N       -- write every N turns (e.g. 5)")
-    new_wf = _prompt("Write frequency", default=str(_pref(hermes_host, cfg, "writeFrequency", "async")))
-    hermes_host["writeFrequency"] = _first_parsed([new_wf], int, new_wf if new_wf in {"async", "turn", "session"} else "async")
+    new_wf = _prompt("Write frequency", default=str(_pref(qubit_host, cfg, "writeFrequency", "async")))
+    qubit_host["writeFrequency"] = _first_parsed([new_wf], int, new_wf if new_wf in {"async", "turn", "session"} else "async")
 
     _menu("Recall mode", *(f"{m:<7} -- {desc}" for m, desc in _MODES.items()))
-    raw_recall = _pref(hermes_host, cfg, "recallMode", "hybrid")
-    _choice_step(hermes_host, "recallMode", raw_recall if raw_recall in _MODES else "hybrid", "Recall mode", _MODES)
+    raw_recall = _pref(qubit_host, cfg, "recallMode", "hybrid")
+    _choice_step(qubit_host, "recallMode", raw_recall if raw_recall in _MODES else "hybrid", "Recall mode", _MODES)
 
-    hermes_host["recallSync"] = _yes(_prompt(
+    qubit_host["recallSync"] = _yes(_prompt(
         "Wait for current-query recall (bounded by request timeout, default 5s)? (y/N)",
-        default="y" if hermes_host.get("recallSync", cfg.get("recallSync", False)) else "n"))
+        default="y" if qubit_host.get("recallSync", cfg.get("recallSync", False)) else "n"))
 
-    current_ctx_tokens = _pref(hermes_host, cfg, "contextTokens")
+    current_ctx_tokens = _pref(qubit_host, cfg, "contextTokens")
     _menu("Context injection per turn (hybrid/context recall modes only)",
           "uncapped -- no limit (default)",
           "N        -- token limit per turn (e.g. 1200)")
     new_ctx_tokens = _prompt("Context tokens", default=str(current_ctx_tokens) if current_ctx_tokens else "uncapped").strip()
     if new_ctx_tokens.lower() in {"none", "uncapped", "no limit"}:
-        hermes_host.pop("contextTokens", None)
+        qubit_host.pop("contextTokens", None)
     elif new_ctx_tokens and (val := _first_parsed([new_ctx_tokens], int, -1)) >= 0:  # non-numeric keeps current
-        hermes_host["contextTokens"] = val
+        qubit_host["contextTokens"] = val
 
     _menu("Dialectic cadence",
           "How often Honcho rebuilds its user model (LLM call on Honcho backend).",
           "1 = every turn, 2 = every other turn, 3+ = sparser.",
           "Recommended: 1-5.")
-    new_dialectic = _prompt("Dialectic cadence", default=str(_pref(hermes_host, cfg, "dialecticCadence") or "2"))
+    new_dialectic = _prompt("Dialectic cadence", default=str(_pref(qubit_host, cfg, "dialecticCadence") or "2"))
     if (val := _first_parsed([new_dialectic], int, None)) is None:
-        hermes_host["dialecticCadence"] = 2
+        qubit_host["dialecticCadence"] = 2
     elif val >= 1:
-        hermes_host["dialecticCadence"] = val
+        qubit_host["dialecticCadence"] = val
 
     _menu("Dialectic reasoning level",
           "Depth Honcho uses when synthesizing user context on auto-injected calls.",
@@ -808,11 +808,11 @@ def _setup_tuning(cfg: dict, hermes_host: dict) -> None:
           "medium   -- multi-aspect synthesis",
           "high     -- complex behavioral patterns",
           "max      -- thorough audit-level analysis")
-    _choice_step(hermes_host, "dialecticReasoningLevel", _pref(hermes_host, cfg, "dialecticReasoningLevel") or "low",
+    _choice_step(qubit_host, "dialecticReasoningLevel", _pref(qubit_host, cfg, "dialecticReasoningLevel") or "low",
                  "Reasoning level", REASONING_LEVELS, "low")
 
     _menu("Session strategy", *(f"{s:<13} -- {desc}" for s, desc in _STRATEGIES.items()))
-    _choice_step(hermes_host, "sessionStrategy", _pref(hermes_host, cfg, "sessionStrategy", "per-session"),
+    _choice_step(qubit_host, "sessionStrategy", _pref(qubit_host, cfg, "sessionStrategy", "per-session"),
                  "Session strategy", _STRATEGIES)
 
 
@@ -835,11 +835,11 @@ def _setup_wizard(args) -> None:
     if not _ensure_sdk_installed():
         return
 
-    hermes_host = cfg.setdefault("hosts", {}).setdefault(_host_key(), {})
+    qubit_host = cfg.setdefault("hosts", {}).setdefault(_host_key(), {})
     _migrate_pin_key(cfg)  # canonicalize legacy pinPeerName before detection/writes
-    _migrate_pin_key(hermes_host)
+    _migrate_pin_key(qubit_host)
     # Taken before the prompts populate the block: an existing install must not default to pinning every account.
-    new_host = not any(k in hermes_host or k in cfg for k in (*_IDENTITY_MAPPING_KEYS, "peerName", "workspace", "enabled"))
+    new_host = not any(k in qubit_host or k in cfg for k in (*_IDENTITY_MAPPING_KEYS, "peerName", "workspace", "enabled"))
 
     # --- 1. Cloud or local? ---
     print("  Deployment:\n    cloud -- Honcho cloud (api.honcho.dev)\n    local -- self-hosted Honcho server")
@@ -848,35 +848,35 @@ def _setup_wizard(args) -> None:
     is_local = _prompt("Cloud or local?", default=current_deploy).lower() in {"local", "l"}
     cfg.pop("base_url", None)  # legacy snake_case key
     if is_local:
-        _setup_local_auth(cfg, hermes_host)
-    elif not _setup_cloud_auth(cfg, hermes_host, write_path):
+        _setup_local_auth(cfg, qubit_host)
+    elif not _setup_cloud_auth(cfg, qubit_host, write_path):
         return
 
     # --- 3. Identity ---
-    current_peer = hermes_host.get("peerName") or cfg.get("peerName", "")
+    current_peer = qubit_host.get("peerName") or cfg.get("peerName", "")
     for key, label, default in (
         ("peerName", "Your name (user peer)", current_peer or os.getenv("USER", "user")),
-        ("aiPeer", "AI peer name", _pref(hermes_host, cfg, "aiPeer", "hermes")),
-        ("workspace", "Workspace ID", _pref(hermes_host, cfg, "workspace", "hermes")),
+        ("aiPeer", "AI peer name", _pref(qubit_host, cfg, "aiPeer", "hermes")),
+        ("workspace", "Workspace ID", _pref(qubit_host, cfg, "workspace", "hermes")),
     ):
         if new := _prompt(label, default=default):
-            hermes_host[key] = new
+            qubit_host[key] = new
 
-    _setup_identity_mapping(cfg, hermes_host, current_peer, new_host)
+    _setup_identity_mapping(cfg, qubit_host, current_peer, new_host)
     print("\n  For a gateway with many users and agents, run\n"
           "  'qubit honcho peers map' to map accounts interactively.")
 
-    _setup_tuning(cfg, hermes_host)
-    hermes_host["enabled"] = True
-    hermes_host.setdefault("saveMessages", True)
+    _setup_tuning(cfg, qubit_host)
+    qubit_host["enabled"] = True
+    qubit_host.setdefault("saveMessages", True)
     _write_config(cfg)
     print(f"\n  Config written to {write_path}")
 
     try:  # auto-enable Honcho as memory provider in config.yaml
         from qubit_cli.config import load_config, save_config
-        hermes_config = load_config()
-        hermes_config.setdefault("memory", {})["provider"] = "honcho"
-        save_config(hermes_config)
+        qubit_config = load_config()
+        qubit_config.setdefault("memory", {})["provider"] = "honcho"
+        save_config(qubit_config)
         print("  Memory provider set to 'honcho' in config.yaml")
     except Exception as e:
         print(f"  Could not auto-enable in config.yaml: {e}\n  Run: qubit config set memory.provider honcho")
@@ -1384,9 +1384,9 @@ def cmd_peers_map(args) -> None:
     """Interactively map gateway accounts to Honcho user peers."""
     cfg = _read_config()
     host = _host_key()
-    hermes_host = _host_block(cfg, host)
-    pin, aliases, prefix, aliases_from_root, _ = _resolve_effective_identity_mapping(cfg, hermes_host)
-    peer_name = hermes_host.get("peerName") or cfg.get("peerName") or ""
+    qubit_host = _host_block(cfg, host)
+    pin, aliases, prefix, aliases_from_root, _ = _resolve_effective_identity_mapping(cfg, qubit_host)
+    peer_name = qubit_host.get("peerName") or cfg.get("peerName") or ""
 
     if pin:
         print("\n  pinUserPeer is on: every gateway account resolves to peer")
@@ -1401,7 +1401,7 @@ def cmd_peers_map(args) -> None:
     client, client_cfg = _peers_map_client()
     workspace = (
         getattr(client_cfg, "workspace_id", None)
-        or hermes_host.get("workspace") or cfg.get("workspace") or host
+        or qubit_host.get("workspace") or cfg.get("workspace") or host
     )
     ws_peers = _api_workspace_peers(client)
     # list_profiles() parses every profile's config.yaml; one scan serves every row and re-render.
