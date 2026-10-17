@@ -4801,6 +4801,10 @@ export interface ReactionPayload {
 export interface ReviewSummaryPayload {
   text: string
 }
+/** A session-authority local-viewer turn: one line the agent printed through ``_print_fn`` (subagent completion, compaction, errors, budget notices), which main's classic CLI rendered through ``_agent_status_print``. */
+export interface AgentPrintPayload {
+  text: string
+}
 /** ``tool_progress._on_tool_start`` (+ ``agent_callbacks._mirror_subagent_to_child`` rows with ``preview`` and empty ``args``). ``todos``/``revision`` are NOT set by the emitter; kept optional because tool.start rows may pass through connector redaction unchanged. */
 export interface ToolStartPayload {
   tool_id: string
@@ -5896,6 +5900,8 @@ export const SERVER_REQUEST_METHODS = [
 
 // ── Notifications (`event` frames) ──
 export interface BackendGatewayEventMap {
+  /** A status line the agent printed during a local viewer's turn. */
+  'agent.print': AgentPrintPayload
   /** Output chunk from an agent-owned background process. */
   'agent.terminal.output': TerminalOutputPayload
   /** Pending gateway approvals were dropped by interrupt/reap/teardown; the wait resolved as deny (not a user refusal). */
@@ -6053,6 +6059,7 @@ export interface BackendGatewayEventMap {
 }
 export type BackendGatewayEventName = keyof BackendGatewayEventMap
 export const GATEWAY_EVENT_TYPES = [
+  'agent.print',
   'agent.terminal.output',
   'approval.cancelled',
   'background.complete',

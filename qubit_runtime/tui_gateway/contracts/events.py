@@ -97,8 +97,6 @@ class OnboardingEndedPayload(Payload):
     outcome: OnboardingOutcome
 
 
-event("onboarding.ended", OnboardingEndedPayload,
-      doc="A first-run onboarding run ended; sent to every connected window.")
 event("setup.ready", SetupReadyPayload,
       doc="The free-tier bootstrap finished (broadcast); the desktop's setup gate reads the record.")
 

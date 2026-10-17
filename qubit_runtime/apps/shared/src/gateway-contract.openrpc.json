@@ -4990,6 +4990,21 @@
         "title": "AgentPluginRow",
         "type": "object"
       },
+      "AgentPrintPayload": {
+        "additionalProperties": false,
+        "description": "A session-authority local-viewer turn: one line the agent printed through ``_print_fn``\n(subagent completion, compaction, errors, budget notices), which main's classic CLI rendered\nthrough ``_agent_status_print``.",
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "AgentPrintPayload",
+        "type": "object"
+      },
       "AgentProcessRow": {
         "additionalProperties": false,
         "properties": {
@@ -40793,6 +40808,18 @@
     }
   ],
   "x-notifications": [
+    {
+      "name": "agent.print",
+      "summary": "A status line the agent printed during a local viewer's turn.",
+      "params": [
+        {
+          "name": "payload",
+          "schema": {
+            "$ref": "#/components/schemas/AgentPrintPayload"
+          }
+        }
+      ]
+    },
     {
       "name": "agent.terminal.output",
       "summary": "Output chunk from an agent-owned background process.",
