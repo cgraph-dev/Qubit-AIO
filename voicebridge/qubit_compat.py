@@ -5507,6 +5507,171 @@ def h_office_habblaud_rooms_rename(cfg: Any, q: Dict[str, str],
                detail="office room renamed in the real office store")
 
 
+#: What the client falls back to when it asks a build that has no seat-model
+#: route. Named once so every refusal points at the same counterpart.
+_OFFICE_SEAT_MODEL_COUNTERPART = "GET/POST /api/office/habblaud/agents/<id>/model"
+
+
+def _office_seat_ref(conn: Any, ref: str) -> Any:
+    """Look a seat up by integer id or slug. ``None`` when it does not exist."""
+    if ref.isdigit():
+        return conn.execute("SELECT * FROM office_agent WHERE id=?",
+                            (int(ref),)).fetchone()
+    return conn.execute("SELECT * FROM office_agent WHERE slug=?",
+                        (ref,)).fetchone()
+
+
+def h_office_habblaud_agent_model(cfg: Any, q: Dict[str, str],
+                                  b: Dict[str, Any], p: Dict[str, str]
+                                  ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/agents/<id>/model -> a seat's model routing.
+
+    Reports what this ONE seat will actually run: its own ``provider``/``model``
+    when set, or an explicit ``inherits`` verdict when it has never been
+    assigned one. It also returns the selectable catalogue — the same
+    ``GET /api/model/options`` payload the Model Provider panel serves, so the
+    office panel and the Model Provider panel can never offer different
+    providers (the Office is the same Qubit backend).
+
+    Credential values never leave the backend: the catalogue is passed through
+    the same ``_strip_provider_secret_fields`` guard the model route uses.
+    """
+    from .office import store as OSS
+    ref = str((p or {}).get("id", "") or "").strip()
+    if not ref:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "agent id is required",
+                     "qubit_counterpart": _OFFICE_SEAT_MODEL_COUNTERPART}
+    conn = OSS.connect(cfg)
+    try:
+        OSS.migrate(conn)
+        row = _office_seat_ref(conn, ref)
+        if row is None:
+            return 404, {"ok": False, "code": "AGENT_NOT_FOUND",
+                         "detail": f"no office seat {ref!r}",
+                         "qubit_counterpart": _OFFICE_SEAT_MODEL_COUNTERPART}
+        seat = dict(row)
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    finally:
+        conn.close()
+    model = str(seat.get("model") or "").strip()
+    provider = str(seat.get("provider") or "").strip()
+    # The catalogue is advisory for the panel; a broken catalogue must never
+    # make this route fail, so it degrades to an empty list with a note.
+    options: List[Dict[str, Any]] = []
+    options_note = ""
+    try:
+        _status, payload = h_model_options(cfg, {"refresh": "0"}, {}, {})
+        options = _strip_provider_secret_fields(
+            payload).get("providers") or []
+    except Exception as exc:  # noqa: BLE001 - panel still renders the seat
+        options_note = f"catalogue unavailable: {_redact(str(exc))[:120]}"
+    return _ok(schema="qubit-office-seat-model/1",
+               agent_id=int(seat.get("id") or 0),
+               slug=str(seat.get("slug") or ""),
+               model=model, provider=provider,
+               inherits=not (model or provider),
+               providers=options,
+               providers_note=options_note,
+               detail=("this seat runs its own provider/model"
+                       if (model or provider) else
+                       "this seat inherits the profile default model"))
+
+
+def h_office_habblaud_agent_model_set(cfg: Any, q: Dict[str, str],
+                                      b: Dict[str, Any], p: Dict[str, str]
+                                      ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/habblaud/agents/<id>/model -> assign a seat's model.
+
+    ``{provider, model}`` writes the seat's own routing. An empty ``model``
+    clears the assignment and the seat goes back to inheriting the profile
+    default — that is the only way to unset it, so a mistake is recoverable
+    without a database edit.
+
+    Validation is against the REAL catalogue (``/api/model/options``), not a
+    hardcoded list. ``force`` skips the catalogue check for a model the
+    catalogue does not know (an operator's custom endpoint that has not been
+    refreshed yet); without it an unknown pair is a typed 400 rather than a
+    silent write that would fail at the first turn. A stale/unavailable
+    catalogue degrades to accepting the write with a NOTE, because refusing
+    every assignment when the network is down would make the panel unusable.
+    """
+    from .office import store as OSS
+    ref = str((p or {}).get("id", "") or "").strip()
+    want_model = str(b.get("model", "") or "").strip()
+    want_provider = str(b.get("provider", "") or "").strip()
+    force = bool(b.get("force"))
+    if not ref:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "agent id is required",
+                     "qubit_counterpart": _OFFICE_SEAT_MODEL_COUNTERPART}
+    if OSS.estop_engaged(cfg):
+        return 409, {"ok": False, "code": "ESTOP_ENGAGED",
+                     "detail": "the emergency stop is engaged; a seat model "
+                               "change is refused",
+                     "qubit_counterpart": "release e-stop, then retry"}
+    # --- validate against the real catalogue before touching the store ---
+    note = ""
+    if want_model and not force:
+        try:
+            _status, payload = h_model_options(cfg, {}, {}, {})
+            rows = _strip_provider_secret_fields(payload).get("providers") or []
+            ok_pair = False
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                slug = str(row.get("slug") or "").lower()
+                if want_provider and slug != want_provider.lower():
+                    continue
+                if want_model in [str(m) for m in (row.get("models") or [])]:
+                    ok_pair = True
+                    want_provider = want_provider or slug
+                    break
+            if not ok_pair:
+                return 400, {
+                    "ok": False, "code": "UNKNOWN_MODEL",
+                    "detail": (f"{want_provider or 'any provider'}/{want_model}"
+                               " is not in the model catalogue; pass force=true"
+                               " to assign it anyway"),
+                    "qubit_counterpart": _OFFICE_SEAT_MODEL_COUNTERPART}
+        except Exception as exc:  # noqa: BLE001 - network down is not a refusal
+            note = (f"catalogue unavailable, assignment accepted unverified: "
+                    f"{_redact(str(exc))[:120]}")
+    conn = OSS.connect(cfg)
+    try:
+        OSS.migrate(conn)
+        row = _office_seat_ref(conn, ref)
+        if row is None:
+            return 404, {"ok": False, "code": "AGENT_NOT_FOUND",
+                         "detail": f"no office seat {ref!r}",
+                         "qubit_counterpart": _OFFICE_SEAT_MODEL_COUNTERPART}
+        before = {"model": str(row["model"] or ""),
+                  "provider": str(row["provider"] or "")}
+        conn.execute("UPDATE office_agent SET model=?, provider=? WHERE id=?",
+                     (want_model, want_provider, int(row["id"])))
+        conn.commit()
+        OSS.audit("seat_model", "dashboard:user",
+                  {"agent_id": int(row["id"]), "slug": str(row["slug"] or ""),
+                   "from": before,
+                   "to": {"model": want_model, "provider": want_provider}})
+        seat_id = int(row["id"])
+        slug = str(row["slug"] or "")
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    finally:
+        conn.close()
+    return _ok(schema="qubit-office-seat-model/1",
+               agent_id=seat_id, slug=slug,
+               model=want_model, provider=want_provider,
+               inherits=not (want_model or want_provider),
+               previous=before, note=note,
+               detail=("seat now runs its own provider/model"
+                       if (want_model or want_provider) else
+                       "assignment cleared; the seat inherits the profile "
+                       "default model"))
+
+
 def h_office_habblaud_logout(cfg: Any, q: Dict[str, str],
                              b: Dict[str, Any], p: Dict[str, str]
                              ) -> Tuple[int, Dict[str, Any]]:
@@ -10153,6 +10318,14 @@ _r("GET", r"/api/office/tower", "h_office_tower")
 # compat route" 404. Reads answer real Qubit state; unsupported actions are
 # typed refusals. Specific patterns precede any wildcard catch-all.
 _r("GET", r"/api/office/habblaud/access", "h_office_habblaud_access")
+# Per-seat model routing. Registered BEFORE the ``agents/<id>`` read and the
+# ``agents/<id>/<sub>`` catch-all below, because both would otherwise swallow
+# this path (a regex alternation matches the first pattern that fits, and
+# ``model`` also satisfies the generic ``<sub>`` slot).
+_r("GET", r"/api/office/habblaud/agents/(?P<id>[^/]+)/model",
+   "h_office_habblaud_agent_model")
+_r("POST", r"/api/office/habblaud/agents/(?P<id>[^/]+)/model",
+   "h_office_habblaud_agent_model_set")
 _r("GET", r"/api/office/habblaud/agents/(?P<id>[^/]+)", "h_office_habblaud_agent")
 _r("GET", r"/api/office/habblaud/sessions/recent",
    "h_office_habblaud_sessions_recent")

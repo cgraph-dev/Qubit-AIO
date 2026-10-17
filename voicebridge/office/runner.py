@@ -426,13 +426,22 @@ def _default_executor(cfg: Any, agent_id: int,
     No new loop, no new provider path. This calls the same
     ``run_agent.AIAgent`` the terminal drives, so the office can never drift
     from the bridge it is drawn in.
+
+    The seat's own provider/model (``office_agent.provider``/``office_agent.
+    model``) is passed through when set, so each seat can run on a different
+    provider — the same catalogue the Model Provider panel serves. Empty means
+    inherit the profile default, exactly as before this field existed.
     """
     from .. import agent as _agent
 
     seat = _seat(cfg, agent_id)
     session = seat.get("slug") or f"office-{agent_id}"
+    seat_model = str(seat.get("model") or "").strip()
+    seat_provider = str(seat.get("provider") or "").strip()
     result = _agent.run_agent_turn(
         cfg, task_text, session=session,
+        model=seat_model or None,
+        provider=seat_provider or None,
         estop_engaged=lambda: store.estop_engaged(cfg))
     if result is None:
         raise OfficeError(

@@ -936,7 +936,9 @@ def run_agent_turn(cfg: Any, text: str, *, session: str,
                    reasoning: Optional[str] = None,
                    estop_engaged: Optional[Callable[[], bool]] = None,
                    event_sink: Optional[Callable[[str, dict], None]] = None,
-                   progress_sink: Optional[Callable[..., None]] = None
+                   progress_sink: Optional[Callable[..., None]] = None,
+                   model: Optional[str] = None,
+                   provider: Optional[str] = None
                    ) -> "Optional[Dict[str, Any]]":
     """Run one general turn through the tool-capable vendored agent.
 
@@ -988,6 +990,18 @@ def run_agent_turn(cfg: Any, text: str, *, session: str,
         session_model = _pinned_session_model(cfg, sid)
     except Exception:  # noqa: BLE001 - a preference, never fatal
         session_model = None
+    # A caller-supplied model (an Office seat's own provider/model pick) is the
+    # most specific request there is, so it outranks the session pin. The pin
+    # is a preference for a conversation; the argument is a decision about this
+    # turn. Local names are tried first by ``_run_vendored_session`` either way,
+    # so a local pin keeps resolving to the Ollama endpoint.
+    _model_arg = str(model or "").strip()
+    if _model_arg:
+        _prov_arg = str(provider or "").strip()
+        # The session pin is a single string; carry the provider alongside the
+        # model so a seat can name "omniroute/auto" or "cheapvibecode/x".
+        session_model = (f"{_prov_arg}/{_model_arg}" if _prov_arg
+                         else _model_arg)
     return _run_vendored_session(cfg, clean, sid, check=check, store=store,
                                  reasoning=reasoning, persist_user=True,
                                  event_sink=event_sink,

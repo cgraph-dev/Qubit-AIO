@@ -122,7 +122,13 @@ CREATE TABLE IF NOT EXISTS office_agent(
   created_by TEXT NOT NULL DEFAULT 'owner',
   terminated_at REAL,
   -- M3: which businesses this auditor may sample (17-AUDIT.md)
-  auditor_of TEXT);
+  auditor_of TEXT,
+  -- Per-seat model routing. Each seat may name its own provider and model,
+  -- chosen from the same catalogue the Model Provider panel serves
+  -- (GET /api/model/options). Empty means "inherit the profile default", so
+  -- every existing seat keeps working without a migration decision.
+  model TEXT NOT NULL DEFAULT '',
+  provider TEXT NOT NULL DEFAULT '');
 
 CREATE INDEX IF NOT EXISTS idx_agent_dept ON office_agent(department_id);
 CREATE INDEX IF NOT EXISTS idx_agent_supervisor ON office_agent(supervisor_id);
@@ -787,6 +793,11 @@ def migrate(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "office_ledger", "external_ref", "TEXT")
     _ensure_column(conn, "office_ledger", "business_id", "INTEGER")
     _ensure_column(conn, "office_agent", "auditor_of", "TEXT")
+    # Per-seat model routing. Additive with an empty default, so a seat created
+    # before this column existed keeps inheriting the profile default rather
+    # than being silently pinned to a model nobody chose.
+    _ensure_column(conn, "office_agent", "model", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "office_agent", "provider", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "office_run_receipts", "status",
                    "TEXT NOT NULL DEFAULT 'open'")
     _ensure_column(conn, "office_run_receipts", "cap_cents", "INTEGER")
