@@ -17,9 +17,10 @@ Lanes:
 * ``nix``         — ``nix flake check``: the flake files and the dependency
   manifests.
 * ``e2e``, ``e2e_upgrade``, ``e2e_desktop_core``, ``e2e_desktop_update`` —
-  the end-to-end suites. Each runs on a pull request only when the PR edits
-  that suite or the code the suite exists to guard (``_E2E_LANES``), or
-  carries the ``run-e2e`` label.
+  the end-to-end suites. The classifier still says which suites a diff
+  touches (``_E2E_LANES``, the ``run-e2e`` label), but ci.yaml's ``detect``
+  gate forces these lanes off on pull requests and pushes to main: the E2E
+  suites run only on a release run or a manual dispatch.
 * ``frontend``    — TS typecheck matrix + desktop build.
 * ``site``        — Docusaurus + generated skill docs.
 * ``scan``        — supply-chain scan (Python files, .pth, setup hooks).
@@ -39,6 +40,10 @@ Lanes:
 * ``rust``        — ``cargo test`` for the Tauri bootstrap installer. ``.rs``
   lives under ``apps/``, so without this lane a Rust change matched ``frontend``
   and only the TypeScript matrix ran.
+* ``remote_backends`` — the SSH and Docker terminal backends against a real
+  sshd container and the runner's Docker daemon (remote-backends.yml). Every
+  other test of those backends is mocked, so a change to the backends, the
+  terminal tool, or the real-backend tests runs it on the PR.
 
 ``docker``, ``nix`` and the E2E lanes take most of the larger-runner minutes.
 An ordinary product change does not start them on a pull request. Every push
@@ -96,7 +101,7 @@ _PY_SKIP = ("docs/", "website/") + _FRONTEND
 # every CIMD login on main.
 # website/docs/ and website/scripts/ are asserted about the same way. The docs
 # tree generates llms.txt — the index every LLM (Qubit included, via the
-# hermes-agent skill) reads to learn what Qubit can do — and
+# qubit-agent skill) reads to learn what Qubit can do — and
 # tests/website/test_generate_llms_txt.py holds every page to appearing in it.
 # Skipping Python on a docs-only PR is how the index drifted to 53% coverage.
 _PY_RELEVANT_SITE = (
@@ -183,6 +188,19 @@ _FIXTURE_CONSUMER_LANES = ("python", "rust", "frontend", "desktop_updater")
 # and the crate's unit tests had never executed in CI at all.
 _RUST_PATHS = ("apps/bootstrap-installer/src-tauri/",)
 _RUST_FILENAMES = {"Cargo.toml", "Cargo.lock"}
+
+# The real SSH/Docker backend lane: the backends, the terminal tool that drives
+# them, the tests it runs, the sshd it starts, and the runner's env allowlist
+# that carries the sshd/image coordinates into each pytest process.
+_REMOTE_BACKEND_PATHS = (
+    "tools/environments/",
+    "tools/terminal_tool",
+    "tests/tools/test_ssh_environment.py",
+    "tests/tools/test_docker_backend_real.py",
+    "scripts/ci/start_test_sshd.sh",
+    "scripts/ci/test_sshd_container_setup.sh",
+    "scripts/run_tests.sh",
+)
 
 # The slow lanes and the paths that start each one on a pull request. A path
 # belongs here when the lane is the only CI that exercises it for real: the
@@ -303,6 +321,7 @@ _UPDATE_DEPENDENCIES = (
     "qubit_cli/desktop_build_lock.py",
     "qubit_cli/memory_provider_migration.py",
     "qubit_cli/left_core_migration.py",  # source_build migrates plugins that left core
+    "qubit_cli/web_build_limits.py",  # source_build caps the dashboard Node build
     "qubit_cli/desktop_console.py",
     "qubit_cli/bundled_app.py",
     "qubit_cli/gui_uninstall.py",
@@ -311,6 +330,7 @@ _UPDATE_DEPENDENCIES = (
     "qubit_cli/build_info.py",
     "qubit_cli/image_provenance.py",
     "qubit_cli/backup.py",  # pre-update backup
+    "qubit_cli/backup_cron_prompts.py",  # restore_cron_prompt_fields_if_degraded (update_cmd_config)
     "qubit_cli/backup_restore.py",
     "qubit_cli/relay_plugin_migrate.py",
     "qubit_cli/macos_tcc_anchor.py",
@@ -372,6 +392,12 @@ _E2E_LANES: dict[str, tuple[str, ...]] = {
         # The state.db torture chamber and the compaction/exactly-once
         # suites are the only tests that run real concurrent writers.
         "qubit_state",
+        # Messaging-gated gateway cases: only the e2e job installs the real
+        # Discord/Telegram SDKs (tests.yml "Run messaging-gated gateway cases").
+        "tests/gateway/test_native_role_reauthorization.py",
+        "tests/gateway/test_native_telegram_startup_recovery.py",
+        "tests/gateway/test_native_pause_notice.py",
+        "tests/gateway/test_native_reply_crash_recovery.py",
     ),
     "e2e_upgrade": (
         *_PY_TEST_HARNESS,
@@ -385,6 +411,8 @@ _E2E_LANES: dict[str, tuple[str, ...]] = {
         "qubit_cli/update_",
         "qubit_cli/_update_",
         "qubit_cli/old_updater",
+        # The downgrade refusal (qubit_cli/update_downgrade_guard.py) reads state.db through it.
+        "qubit_state_holders.py",
         "qubit_cli/_old_updater",
         "qubit_cli/post_update",
         "qubit_cli/config_migrations",
@@ -433,7 +461,6 @@ _E2E_LANES: dict[str, tuple[str, ...]] = {
         "apps/desktop/electron/app-installer-file",
         "scripts/desktop-update/",
         "scripts/install.sh",
-        "qubit_cli/desktop_update",  # desktop_update_verify (also via _DESKTOP_BUILD_ENTRY_POINTS)
         "qubit_cli/update_",
         "qubit_cli/main_desktop",  # the entry point and the main_desktop_* siblings it imports
         *_DESKTOP_BUILD_ENTRY_POINTS,
@@ -447,8 +474,8 @@ _E2E_LANES: dict[str, tuple[str, ...]] = {
         "scripts/msix-shared.mjs",
         # The launchers the Desktop relaunches through reach the launch-time repair first.
         "qubit_cli/_launchers.py",
-        # The backend's /api/health `commit`, which host-backend-attach compares to the
-        # checkout before attaching to a running backend after an update.
+        # The backend's /api/health `commit`, which the Desktop compares to the checkout
+        # before attaching to a running backend after an update.
         "qubit_cli/web_routers/status.py",
     ),
 }
@@ -582,6 +609,7 @@ def classify(files: list[str], run_e2e: bool = False) -> dict[str, bool]:
         ),
         "desktop_updater": any(_is_desktop_updater(f) for f in files),
         "rust": any(_is_rust(f) for f in files),
+        "remote_backends": any(f.startswith(_REMOTE_BACKEND_PATHS) for f in files),
         **{lane: run_e2e or on for lane, on in _slow_lanes(files).items()},
     }
     consumers = [c for f in files for c in _SHARED_FIXTURE_CONSUMERS.get(f, ())]
@@ -602,6 +630,7 @@ def classify(files: list[str], run_e2e: bool = False) -> dict[str, bool]:
         ret["bootstrap"] = True
         ret["desktop_updater"] = True
         ret["rust"] = True
+        ret["remote_backends"] = True
         ret.update(dict.fromkeys(_slow_lanes([]), True))
     return ret
 
