@@ -899,8 +899,18 @@ def _extract_pruned_skill_names(text: str) -> list[str]:
     return list(dict.fromkeys(m.group(1) for m in _SKILL_PRUNED_MARKER_RE.finditer(text or "")))
 
 
+def _skill_view_failed(content: Any) -> bool:
+    """True for a ``skill_view`` that loaded nothing: the raw failure payload or its ``[skill_view] … FAILED`` stub."""
+    if not isinstance(content, str):
+        return False
+    return bool(_result_failure_suffix(content)) or (
+        content.startswith("[skill_view] ") and " FAILED" in content.split(" (", 1)[0])
+
+
 def _collect_ghosted_skill_names(turns: List[Dict[str, Any]]) -> list[str]:
     """Skill names about to be lost in compaction: demoted ``skill_view`` rows and raw, never-demoted bodies."""
+    from agent.skill_commands import skills_loaded_by_scaffold
+
     call_id_to_skill: dict[str, str] = {}
     for idx, skill in _skill_view_call_sites(turns):
         for tc in turns[idx].get("tool_calls") or []:
@@ -910,8 +920,11 @@ def _collect_ghosted_skill_names(turns: List[Dict[str, Any]]) -> list[str]:
     names: list[str] = []
     for msg in turns:
         content = msg.get("content")
-        names += _extract_pruned_skill_names(_content_text_for_contains(content))
-        if msg.get("role") == "tool" and isinstance(content, str) and len(content) > _SKILL_VIEW_PRUNE_MIN_CHARS:
+        text = _content_text_for_contains(content)
+        names += _extract_pruned_skill_names(text)
+        if msg.get("role") == "user":
+            names += skills_loaded_by_scaffold(text)
+        elif msg.get("role") == "tool" and not _skill_view_failed(content):
             names.append(call_id_to_skill.get(str(msg.get("tool_call_id") or ""), ""))
     return [name for name in dict.fromkeys(names) if name]
 
@@ -980,6 +993,13 @@ def _synthetic_user_row(content: str) -> bool:
     return content.lstrip().startswith(_SYNTHETIC_USER_ROW_PREFIXES)
 
 
+def _typed_user_text(content: str) -> str:
+    """A ``/skill``, bundle or auto-load turn as the user typed it (``/skill do X``); other text unchanged.
+    Its inline skill body is not the user's words — it is carried by a ``[SKILL_PRUNED: ...]`` marker instead."""
+    from agent.skill_commands import describe_skill_invocation, skills_loaded_by_scaffold
+    return (describe_skill_invocation(content, separator=" ") or "") if skills_loaded_by_scaffold(content) else content
+
+
 def _build_verbatim_user_section(turns: List[Dict[str, Any]]) -> str:
     """Compacted region's REAL user messages verbatim, newest-first under a char budget (straddler truncated); "" if none."""
     collected: list[str] = []
@@ -987,7 +1007,7 @@ def _build_verbatim_user_section(turns: List[Dict[str, Any]]) -> str:
     for msg in reversed(turns):
         if msg.get("role") != "user":
             continue
-        content = _content_text_for_contains(msg.get("content"))
+        content = _typed_user_text(_content_text_for_contains(msg.get("content")))
         if _synthetic_user_row(content):
             continue
         remaining = _LEAN_USER_MESSAGES_BUDGET_CHARS - used

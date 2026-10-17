@@ -118,6 +118,28 @@ def extract_user_instruction_from_skill_message(content: Any) -> Optional[str]:
     return None
 
 
+_AUTO_LOAD_HEADER_RE = re.compile(re.escape(_AUTO_LOAD_PREFIX) + r'([^"]*)' + _AUTO_LOAD_SUFFIX_RE.pattern)
+_BUNDLE_LOADED_RE = re.compile(r"^Skills loaded: (.+)$", re.MULTILINE)
+
+
+def skills_loaded_by_scaffold(content: Any) -> list[str]:
+    """Skill names a slash-skill, bundle/stacked or gateway auto-load turn carries inline; ``[]`` for any
+    other text. Only a complete activation header counts, so typed text that merely starts like one
+    (``[IMPORTANT: The "config" file is broken]``) is not mistaken for a skill load."""
+    if not isinstance(content, str):
+        return []
+    if content.startswith(_AUTO_LOAD_PREFIX):
+        return [m.group(1) for m in _AUTO_LOAD_HEADER_RE.finditer(content)] if _AUTO_LOAD_HEADER_RE.match(content) else []
+    if not content.startswith(_SKILL_INVOCATION_PREFIX):
+        return []
+    header = content.split("\n", 1)[0]
+    if _BUNDLE_MARKER in header:
+        loaded = _BUNDLE_LOADED_RE.search(content)
+        return [n.strip() for n in loaded.group(1).split(",") if n.strip()] if loaded else []
+    match = _SKILL_NAME_RE.match(content)
+    return [match.group(1)] if header.endswith(_SINGLE_SKILL_MARKER) and match and match.group(1) else []
+
+
 def _describe_auto_loaded_skill_turn(content: str) -> Optional[str]:
     """``[IMPORTANT: The "X" skill is auto-loaded. …]`` + payload(s) + typed text
     -> the typed text.
@@ -298,6 +320,11 @@ _SKILL_DIR_NOTE = (
     "`templates/config.yaml`) against that directory, then run them "
     "with the terminal tool using the absolute path."
 )
+# Closing text of the optional blocks _build_skill_message appends after the directory note; the
+# auto-load describer skips them so they are never read as the user's typed request.
+_SUPPORTING_FILES_END = "/scripts/foo.js`)."
+_TRAILING_BLOCK_ENDS = (("[Skill config (", "\n]"), ("[Skill setup note: ", "]\n\n"),
+                        ("[This skill has supporting files", _SUPPORTING_FILES_END))
 _SETUP_SKIPPED_NOTE = (
     "Required environment setup was skipped. Continue loading the skill "
     "and explain any reduced functionality if it matters."
