@@ -109,6 +109,10 @@ class Prim:
     fill: tuple | None        # (r, g, b, a) or None for an outline
     pen: tuple | None         # (r, g, b, a) or None
     width: float = 0.0
+    #: Bounding-box size for paths (0 for ellipses/lines). Letting a test
+    #: recover an outline's tilt needs w and h separately, not just r.
+    w: float = 0.0
+    h: float = 0.0
 
     @property
     def alpha(self) -> float:
@@ -187,15 +191,16 @@ class _Recorder:
         self._p.drawEllipse(*args)
 
     def drawPath(self, path):
-        cx = cy = r = 0.0
+        cx = cy = r = w = h = 0.0
         try:
             rect = path.boundingRect()
             cx, cy = float(rect.center().x()), float(rect.center().y())
-            r = (float(rect.width()) + float(rect.height())) / 4.0
+            w, h = float(rect.width()), float(rect.height())
+            r = (w + h) / 4.0
         except Exception:
             pass
         self.prims.append(Prim("path", cx, cy, r, self._fill_rgba(),
-                               self._pen_rgba(), self._width()))
+                               self._pen_rgba(), self._width(), w, h))
         self._p.drawPath(path)
 
     def drawLine(self, *args):
@@ -203,6 +208,11 @@ class _Recorder:
         try:
             if len(args) == 4:
                 x0, y0, x1, y1 = (float(v) for v in args)
+                cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+                r = math.hypot(x1 - x0, y1 - y0) / 2.0
+            elif len(args) == 2:  # drawLine(QPointF, QPointF), as _glint uses
+                x0, y0 = float(args[0].x()), float(args[0].y())
+                x1, y1 = float(args[1].x()), float(args[1].y())
                 cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
                 r = math.hypot(x1 - x0, y1 - y0) / 2.0
         except Exception:
@@ -508,3 +518,269 @@ def test_mark_effects_never_raise_on_bad_input():
 def test_mark_effects_never_raise_under_reduced_motion():
     _paint(t="x", state="???", family={}, brightness=0.0, reduced=True)
     _record(t="x", state="???", family={}, brightness=0.0, reduced=True)
+
+
+# --------------------------------------------------------------------------- #
+# (i) echo follower rings
+# --------------------------------------------------------------------------- #
+def _thin_orbit_outlines(prims, c):
+    """Centred outline paths that are neither the main stroke nor a circle."""
+    return [p for p in prims
+            if p.kind == "path" and p.fill is None and p.pen is not None
+            and math.hypot(p.cx - c, p.cy - c) <= 0.75
+            and p.width <= 1.2 and 0.2 <= p.alpha <= 0.45
+            and abs(p.w - p.h) > 4.0]
+
+
+def _tilt_abs_deg(prim, rxs, rys):
+    """Recover |tilt| of a rotated ellipse from its bounding-box width.
+
+    A rotated ellipse has ``w^2/4 = rxs^2 cos^2 + rys^2 sin^2`` for rx > ry,
+    so ``sin^2`` (and thus |tilt|) follows from the recorded width.
+    """
+    s2 = (rxs * rxs - (prim.w * prim.w) / 4.0) / (rxs * rxs - rys * rys)
+    s2 = max(0.0, min(1.0, s2))
+    return math.degrees(math.asin(math.sqrt(s2)))
+
+
+def test_echo_rings_are_two_thin_lagged_followers():
+    from voicebridge.orb import mark_field as F
+
+    size, c = 192, 96.0
+    R = size / 2.0 - 6.0
+    t = 0.37
+    prims = _record(t=t, size=size)
+
+    thin = _thin_orbit_outlines(prims, c)
+    assert len(thin) == 2, thin                 # exactly one per main orbit
+    rx, ry = R * F.RX_FRAC, R * F.RY_FRAC
+    rxs, rys = rx * F.ECHO_SCALE, ry * F.ECHO_SCALE
+    got = sorted(_tilt_abs_deg(p, rxs, rys) for p in thin)
+    expected = sorted(abs(e["tilt"]) for e in F.echo_rings(t))
+    assert got == pytest.approx(expected, abs=2.0), (got, expected)
+
+    # The lag matters: the follower tilt is the orbit tilt ECHO_LAG_S ago,
+    # not today's, so at this phase the two disagree by a visible margin.
+    unl = sorted(abs(v) for v in F.orbit_tilts(t))
+    assert max(abs(a - b) for a, b in zip(got, unl)) > 0.5, (got, unl)
+
+
+def test_echo_rings_follow_tilt_changes_continuously():
+    from voicebridge.orb import mark_field as F
+
+    # The follower tilt is a continuous function of the render clock, so a
+    # 1/60s step can never jump: this is what keeps the spin fluid.
+    prev = None
+    for k in range(120):
+        e = F.echo_rings(k / 60.0)
+        cur = [ring["tilt"] for ring in e]
+        if prev is not None:
+            assert max(abs(a - b) for a, b in zip(cur, prev)) < 1.0
+        prev = cur
+
+
+# --------------------------------------------------------------------------- #
+# (j) nucleus spark shower
+# --------------------------------------------------------------------------- #
+def test_nucleus_sparks_are_a_deterministic_outward_shower():
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    R = 90.0
+    # A shower exists at a primary thump and is frame-reproducible.
+    at_thump = Q.mark_nucleus_sparks(0.0, R)
+    assert 0 < len(at_thump) <= F.NUCLEUS_SPARK_COUNT
+    assert at_thump == Q.mark_nucleus_sparks(0.0, R)
+
+    for t in (0.0, 0.4, 1.2, 2.7):
+        sparks = Q.mark_nucleus_sparks(t, R)
+        dx, dy = F.camera_offset(t, R)
+        for s in sparks:
+            # Recover phase from alpha (alpha = SPARK_ALPHA * (1-phase)^1.5).
+            phase = 1.0 - (s["alpha"] / F.NUCLEUS_SPARK_ALPHA) ** (2.0 / 3.0)
+            assert 0.0 <= phase < 1.0
+            grow = phase ** 0.65
+            dist = F.NUCLEUS_SPARK_REACH * R * grow
+            # Radial distance is governed by phase -- the spark travels OUT
+            # of the nucleus -- within the squashed-plane factor and the
+            # small camera offset.
+            d = math.hypot(s["x"] - dx, s["y"] - dy)
+            assert 0.66 * dist - 1.5 <= d <= 1.05 * dist + 1.5, (t, s, d, dist)
+            # Shrinks and fades with phase: both bounded by the constants.
+            assert 0.30 - 1e-9 <= s["size"] <= \
+                F.NUCLEUS_SPARK_SIZE * (R / 32.0) + 1e-9
+            assert 0.0 < s["alpha"] <= F.NUCLEUS_SPARK_ALPHA + 1e-9
+
+    # Bigger (younger) sparks are brighter: size and alpha fall together.
+    sparks = Q.mark_nucleus_sparks(1.2, R)
+    order = sorted(sparks, key=lambda s: s["size"])
+    agree = sum(1 for a, b in zip(order, order[1:])
+                if b["alpha"] >= a["alpha"])
+    assert agree >= len(order) - 1, order
+
+    # The shower reaches OUTSIDE the near orbit at its peak.
+    peak = max(max((math.hypot(s["x"], s["y"])
+                    for s in Q.mark_nucleus_sparks(k / 60.0, R)), default=0.0)
+               for k in range(600))
+    assert peak > R * F.RX_FRAC * 1.2, peak
+
+
+def test_nucleus_sparks_paint_glints():
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    size, c = 192, 96.0
+    R = size / 2.0 - 6.0
+    t = 0.4
+    prims = _record(t=t, size=size)
+    sparks = Q.mark_nucleus_sparks(t, R)
+    assert sparks
+    for s in sparks:
+        px, py = c + s["x"], c + s["y"]
+        arms = [p for p in prims if p.kind == "line"
+                and math.hypot(p.cx - px, p.cy - py) <= 0.6]
+        core = [p for p in prims if p.kind == "ellipse" and p.fill is not None
+                and math.hypot(p.cx - px, p.cy - py) <= 0.6]
+        assert len(arms) == 2, (s, arms)   # two crossing arms
+        assert len(core) == 1, (s, core)   # plus a small core
+
+
+# --------------------------------------------------------------------------- #
+# (k) reduced motion drops the new life too
+# --------------------------------------------------------------------------- #
+def test_reduced_motion_has_no_echo_or_sparks(monkeypatch):
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    with monkeypatch.context() as m:
+        m.setenv("QUBIT_REDUCED_MOTION", "1")
+        assert Q.mark_echo_rings(0.31) == []
+        assert Q.mark_nucleus_sparks(0.31, 90.0) == []
+        assert Q.mark_sparkles(0.31) == []
+
+    # Painting a still frame must not even consult the moving-field layers.
+    calls = []
+    for name in ("echo_rings", "nucleus_sparks", "dust_state", "sparkles",
+                 "comet", "trails"):
+        orig = getattr(F, name)
+
+        def _spy(*args, _n=name, _o=orig, **kwargs):
+            calls.append(_n)
+            return _o(*args, **kwargs)
+
+        monkeypatch.setattr(F, name, _spy)
+
+    a = _record(t=0.31, reduced=True)
+    b = _record(t=3.77, reduced=True)
+    assert calls == [], calls
+    assert _dump(a) == _dump(b)
+    # No thin follower outline can survive into the still frame.
+    assert _thin_orbit_outlines(a, 96.0) == []
+
+
+def test_comet_and_glints_ease_instead_of_stepping():
+    from voicebridge.orb import mark_field as F
+
+    # The comet is invisible at its sweep boundary and eases in: no hard on.
+    start = 0.45 * F.COMET_PERIOD_S
+    assert F.comet(start, 90.0)["alpha"] == pytest.approx(0.0, abs=1e-6)
+    assert F.comet(start + 0.02, 90.0)["alpha"] < 0.1
+    assert F.comet(start + 0.6, 90.0)["alpha"] > F.comet(start + 0.02, 90.0)["alpha"]
+
+    # Glints never pop in or out: alpha stays above the shared floor.
+    for k in range(400):
+        assert F.glint(k / 100.0, 137.5)["alpha"] >= F.GLINT_MIN_ALPHA - 1e-9
+
+
+# --------------------------------------------------------------------------- #
+# (l) continuity: the "fluid" contract
+# --------------------------------------------------------------------------- #
+#: Largest allowed position change of any entity between two adjacent 60fps
+#: frames, in pixels, at R=90. The fastest legitimate motion is a fresh spark
+#: leaving the nucleus and the comet head sweeping its orbit: both measured
+#: <= ~5.1 px/frame here, so 6 px fails any real pop while leaving headroom.
+CONTINUITY_EPS_PX = 6.0
+CONTINUITY_DT = 1.0 / 60.0
+
+
+def _stable_positions(t, R):
+    """Per-identity positions of every continuously-lived layer at ``t``."""
+    from voicebridge.orb import mark_field as F
+
+    d = {}
+    for i, p in enumerate(F.particle_state(t, R)):
+        d[("particle", i)] = (p["x"], p["y"])
+    for i, m in enumerate(F.dust_state(t, R)):
+        d[("dust", i)] = (m["x"], m["y"])
+    # Echo-ring tilt continuity is asserted in its own test (degrees, not px).
+    comet = F.comet(t, R)
+    if comet.get("alpha", 0.0) > 0.0 and "x" in comet:
+        d[("comet", "head")] = (comet["x"], comet["y"])
+        for k, smp in enumerate(comet.get("trail") or []):
+            d[("comet", k)] = (smp["x"], smp["y"])
+    for i, p in enumerate(F.particle_state(t, R)):
+        for k, smp in enumerate(F.trails(t, R, p)):
+            d[("trail", i, k)] = (smp["x"], smp["y"])
+    d[("nucleus", "r")] = (F.NUCLEUS_FRAC * R * F.nucleus_scale(t), 0.0)
+    return d
+
+
+def _spark_positions(t, R):
+    from voicebridge.orb import mark_field as F
+
+    return [(s["x"], s["y"]) for s in F.nucleus_sparks(t, R)]
+
+
+def _mutual_deltas(prev, cur):
+    """Distances for sparks that are each other's nearest neighbour.
+
+    The field does not carry a spark identity across frames (a spark is born
+    at the nucleus and culled when it fades), so an identity-based delta is
+    impossible; mutual-nearest matching reports the true within-life motion
+    and leaves births/deaths unmatched.
+    """
+    out = []
+    for ci, c in enumerate(cur):
+        bi = min(range(len(prev)),
+                 key=lambda j: math.hypot(c[0] - prev[j][0], c[1] - prev[j][1]))
+        cur_near = min(range(len(cur)),
+                       key=lambda j: math.hypot(prev[bi][0] - cur[j][0],
+                                                prev[bi][1] - cur[j][1]))
+        if cur_near == ci:
+            out.append(math.hypot(c[0] - prev[bi][0], c[1] - prev[bi][1]))
+    return out
+
+
+def test_motion_is_frame_to_frame_continuous():
+    from voicebridge.orb import mark_field as F
+
+    R = 90.0
+    # Start at 3.0s so the 60-frame window also crosses the comet's fade-in
+    # boundary (phase 0.45 of its 7s period) and a heartbeat wrap.
+    t0 = 3.0
+    worst = 0.0
+    worst_key = None
+    unmatched_max = 0
+    prev = _stable_positions(t0, R)
+    prev_sparks = _spark_positions(t0, R)
+    for k in range(1, 60):
+        t = t0 + k * CONTINUITY_DT
+        cur = _stable_positions(t, R)
+        for key, pos in cur.items():
+            if key not in prev:
+                continue
+            dd = math.hypot(pos[0] - prev[key][0], pos[1] - prev[key][1])
+            if dd > worst:
+                worst, worst_key = dd, key
+        sparks = _spark_positions(t, R)
+        matched = _mutual_deltas(prev_sparks, sparks)
+        unmatched_max = max(unmatched_max, len(sparks) - len(matched))
+        for dd in matched:
+            if dd > worst:
+                worst, worst_key = dd, "spark"
+        prev, prev_sparks = cur, sparks
+
+    assert unmatched_max <= 3, unmatched_max
+    assert worst <= CONTINUITY_EPS_PX, (worst, worst_key)
+    # And the contract is not vacuous: something really did move.
+    assert worst > 0.5, worst
