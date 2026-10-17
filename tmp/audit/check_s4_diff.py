@@ -44,7 +44,11 @@ HARD = {
 SOFT = {
     "hermes-gateway": "systemd unit names are protected; a local smoke-test label is not",
     "hermes_service": "service identity -- check whether a live unit depends on it",
-    "hermes.": "metric namespace -- protected; a docstring mention is not",
+    # the metric namespace IS protected, but `hermes.` alone also matches `.hermes.md`
+    # (a context filename that is NOT protected), so require a metric-shaped occurrence.
+    "hermes.tokenReload": "wire-format metric name",
+    "hermes.kanban": "wire-format metric/namespace string",
+    "hermes.flow": "wire-format namespace string",
 }
 
 rng = sys.argv[1] if len(sys.argv) > 1 else "HEAD~10..HEAD"
