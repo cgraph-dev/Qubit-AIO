@@ -106,6 +106,10 @@ SPARKLE_MAX_ALPHA = 0.55
 SPARKLE_SIZE_BASE = 0.5
 SPARKLE_SIZE_PEAK = 0.9
 SPARKLE_LIFT = 0.55
+#: Nucleus sparks are drawn at a fraction of their field size: many young
+#: sparks crowd the nucleus at once, so full-size crossing arms would mat
+#: into a mesh instead of reading as a shower of tiny glints.
+NUCLEUS_SPARK_DRAW_SCALE = 0.62
 _GOLDEN = 0.6180339887498949
 
 
@@ -205,6 +209,35 @@ def mark_sparkles(t: Any) -> List[Tuple[int, float, float, float, float, float, 
     return out
 
 
+def mark_echo_rings(t: Any) -> List[Dict[str, float]]:
+    """Two thinner follower rings (shared field), frozen out under reduced.
+
+    A pure pass-through to :func:`mark_field.echo_rings` on the clamped mark
+    clock, with the same reduced-motion rule as :func:`mark_sparkles`: a still
+    frame carries no echo rings. Never raises.
+    """
+    if _reduced_motion():
+        return []
+    try:
+        return list(_field.echo_rings(_mark_tt(t)))
+    except Exception:
+        return []
+
+
+def mark_nucleus_sparks(t: Any, R: Any) -> List[Dict[str, float]]:
+    """Sparks thrown out of the nucleus (shared field), gone under reduced.
+
+    A pure pass-through to :func:`mark_field.nucleus_sparks`, empty under
+    reduced motion so a still frame stays clean. Never raises.
+    """
+    if _reduced_motion():
+        return []
+    try:
+        return list(_field.nucleus_sparks(_mark_tt(t), R))
+    except Exception:
+        return []
+
+
 def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 state: Any, brightness: float, family: Any) -> None:
     """Paint the Qubit mark from the shared rich animation field.
@@ -212,9 +245,11 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     The geometry, motion and depth of every layer come from
     :mod:`voicebridge.orb.mark_field` — the ONE deterministic description
     shared with the Tk renderer. This function only translates field output
-    to QPainter: hairline fringed orbits, a z-split particle field (far
-    elements behind the nucleus, near elements in front), tapered trails,
-    dust, glints, one comet, the beat shockwave and the beating nucleus.
+    to QPainter: hairline fringed orbits with a thinner lagged echo ring
+    following each, a z-split particle field (far elements behind the
+    nucleus, near elements in front), tapered trails, dust, glints, one
+    comet, a spark shower thrown out of the nucleus on the beat, the beat
+    shockwave and the beating nucleus.
 
     The look stays a crisp hairline construction: rings are stroked paths
     (never gradient or blur fills), beads are small filled circles, and
@@ -266,17 +301,20 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     ring_rgb = _lift(_field.LIFT_RING)
     nuc_rgb = _lift(_field.LIFT_NUCLEUS)
 
-    def _ring(tilt_deg: float, alpha: float) -> None:
-        rect = QRectF(cx - rx, cy - ry, rx * 2, ry * 2)
+    def _ring_path(rxs: float, rys: float, tilt_deg: float) -> Any:
+        """One tilted ellipse outline, rotated about the mark centre."""
+        rect = QRectF(cx - rxs, cy - rys, rxs * 2.0, rys * 2.0)
         path = QPainterPath()
         path.addEllipse(rect)
-        # Rotate about the centre for the orbit tilt.
         from PySide6.QtGui import QTransform
         tr = QTransform()
         tr.translate(cx, cy)
         tr.rotate(tilt_deg)
         tr.translate(-cx, -cy)
-        rotated = tr.map(path)
+        return tr.map(path)
+
+    def _ring(tilt_deg: float, alpha: float) -> None:
+        rotated = _ring_path(rx, ry, tilt_deg)
         p.setBrush(Qt.NoBrush)
         # Chromatic fringe: the same hairline offset in x, red left / blue
         # right, so overlap reads near-white and the edges split (the CSS
@@ -298,6 +336,25 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                    ring_w * 1.15)
         p.setPen(pen)
         p.drawPath(rotated)
+
+    def _echo_ring(rxs: float, rys: float, tilt_deg: float,
+                   alpha: float, width: float) -> None:
+        """One thinner follower ring: a plain faint outline, never fringed.
+
+        The chromatic fringe stays exclusive to the two main orbits so the
+        main hairline keeps reading as the brightest element; an echo is a
+        dim, thin ghost that trails its orbit's (lagged) tilt.
+        """
+        a = _num(alpha, 0.0)
+        if a <= 0.0 or rxs <= 0.0 or rys <= 0.0:
+            return
+        path = _ring_path(rxs, rys, tilt_deg)
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor(ring_rgb[0], ring_rgb[1], ring_rgb[2],
+                             _clamp8(255.0 * min(1.0, a * bright))),
+                      max(0.6, _num(width, 1.0))))
+        p.drawPath(path)
+        p.setPen(Qt.NoPen)
 
     def _dot(x: float, y: float, rad: float, alpha: float,
              rgb: Tuple[int, int, int]) -> None:
@@ -324,6 +381,28 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.drawPath(path)
         p.setPen(Qt.NoPen)
 
+    def _glint(gx: float, gy: float, size: float, alpha: float,
+               rgb: Tuple[int, int, int]) -> None:
+        """A twinkling star, never a filled orb (owner 2026-10-17).
+
+        Two thin crossing arms plus a small core read as a glint at this size
+        and stay crisp — a filled disc here was what made the field look like
+        marbles. Shared by the nine logo particles and the nucleus sparks so
+        the shower reads as the same kind of element as the field.
+        """
+        sz = max(0.35, _num(size, 0.0))
+        a = _num(alpha, 0.0) * bright
+        if a <= 0.0:
+            return
+        arm = sz * _field.GLINT_ARM_FRAC
+        pen = QPen(QColor(rgb[0], rgb[1], rgb[2], int(255 * min(1.0, a))))
+        pen.setWidthF(1.0)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+        p.drawLine(QPointF(gx - arm, gy), QPointF(gx + arm, gy))
+        p.drawLine(QPointF(gx, gy - arm), QPointF(gx, gy + arm))
+        _dot(gx, gy, max(0.25, sz * _field.GLINT_CORE_FRAC), a, rgb)
+
     def _particle(part: Dict[str, Any], draw_trails: bool) -> None:
         bead_lift = _num(part.get("lift"), _field.LIFT_BEAD)
         px = cx + _num(part.get("x"), 0.0)
@@ -336,21 +415,16 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 _dot(cx + smp["x"], cy + smp["y"],
                      _num(smp.get("size"), 0.0),
                      _num(smp.get("alpha"), 0.0) * bright, trail_rgb)
-        # A particle is a GLINT, not an orb (owner 2026-10-17): the nucleus is
-        # the mark's only solid body. Two thin crossing arms plus a small core
-        # read as a twinkling star at this size and stay crisp — a filled disc
-        # here was what made the field look like marbles.
-        size = max(0.35, _num(part.get("size"), 0.0))
-        alpha = _num(part.get("alpha"), 0.0) * bright
-        rgb = _lift(bead_lift)
-        arm = size * _field.GLINT_ARM_FRAC
-        pen = QPen(QColor(rgb[0], rgb[1], rgb[2], int(255 * min(1.0, alpha))))
-        pen.setWidthF(1.0)
-        p.setPen(pen)
-        p.setBrush(Qt.NoBrush)
-        p.drawLine(QPointF(px - arm, py), QPointF(px + arm, py))
-        p.drawLine(QPointF(px, py - arm), QPointF(px, py + arm))
-        _dot(px, py, max(0.25, size * _field.GLINT_CORE_FRAC), alpha, rgb)
+        _glint(px, py, _num(part.get("size"), 0.0),
+               _num(part.get("alpha"), 0.0), _lift(bead_lift))
+
+    def _spark(spark: Dict[str, Any]) -> None:
+        """One nucleus spark: the same glint shape, thrown out past the orbits."""
+        _glint(cx + _num(spark.get("x"), 0.0),
+               cy + _num(spark.get("y"), 0.0),
+               _num(spark.get("size"), 0.0) * NUCLEUS_SPARK_DRAW_SCALE,
+               _num(spark.get("alpha"), 0.0),
+               _lift(_num(spark.get("lift"), _field.LIFT_NUCLEUS)))
 
     def _dust(mote: Dict[str, Any]) -> None:
         _dot(cx + mote["x"], cy + mote["y"],
@@ -384,10 +458,27 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     dust = [] if reduced else _field.dust_state(tt, Rf)
     glints = [] if reduced else _field.sparkles(tt, Rf)
     traveller = None if reduced else _field.comet(tt, Rf)
+    # Echo follower rings and the nucleus spark shower both come from the
+    # shared field and both vanish under reduced motion, so a still frame is
+    # just the main orbits, the glints and the resting nucleus.
+    echoes = mark_echo_rings(t)
+    sparks = mark_nucleus_sparks(t, Rf)
+    far_echo = [e for e in echoes if e.get("orbit") == "b"]
+    near_echo = [e for e in echoes if e.get("orbit") != "b"]
+    far_sparks = [s for s in sparks
+                  if _num(s.get("depth"), 0.0) < 0.5]
+    near_sparks = [s for s in sparks
+                   if _num(s.get("depth"), 0.0) >= 0.5]
     draw_trails = not reduced
 
     # ---- far field (depth < 0.5), behind the nucleus ---------------------
     _ring(far_tilt, 0.60)
+    for echo in far_echo:
+        _echo_ring(rx * _num(echo.get("rx_scale"), 1.0),
+                   ry * _num(echo.get("ry_scale"), 1.0),
+                   _num(echo.get("tilt"), far_tilt),
+                   _num(echo.get("alpha"), 0.0),
+                   _num(echo.get("width"), _field.ECHO_WIDTH))
     for mote in dust:
         if mote["depth"] < 0.5:
             _dust(mote)
@@ -397,6 +488,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     for glint in glints:
         if glint["depth"] < 0.5:
             _sparkle(glint)
+    for spark in far_sparks:
+        _spark(spark)
     if (traveller is not None
             and _num(traveller.get("depth"), 1.0) < 0.5):
         _comet(traveller)
@@ -417,6 +510,12 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
 
     # ---- near field (depth >= 0.5), in front of the nucleus --------------
     _ring(near_tilt, 0.95)
+    for echo in near_echo:
+        _echo_ring(rx * _num(echo.get("rx_scale"), 1.0),
+                   ry * _num(echo.get("ry_scale"), 1.0),
+                   _num(echo.get("tilt"), near_tilt),
+                   _num(echo.get("alpha"), 0.0),
+                   _num(echo.get("width"), _field.ECHO_WIDTH))
     for mote in dust:
         if mote["depth"] >= 0.5:
             _dust(mote)
@@ -426,6 +525,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     for glint in glints:
         if glint["depth"] >= 0.5:
             _sparkle(glint)
+    for spark in near_sparks:
+        _spark(spark)
     if (traveller is not None
             and _num(traveller.get("depth"), 0.0) >= 0.5):
         _comet(traveller)
@@ -1714,4 +1815,6 @@ __all__ = [
     "heartbeat_envelope",
     "mark_particle_layers",
     "mark_sparkles",
+    "mark_echo_rings",
+    "mark_nucleus_sparks",
 ]
