@@ -17,7 +17,9 @@
 }
 .qagent-sidebar .qagent-sidebar__brand-row > div:first-child { min-width: 0; }
 .qagent-sidebar .qagent-sidebar__brand-row svg { color: var(--qsidebar-accent); }
-.qagent-sidebar .qagent-sidebar__brand-name { font-family: var(--theme-font-display, var(--theme-font-sans)); }
+/* The wordmark must not inherit the monospace nav face: in "Qubit AiO" a
+ * monospace O reads as a zero ("Ai0"), which misstates the product name. */
+.qagent-sidebar .qagent-sidebar__brand-name { font-family: var(--theme-font-display, var(--theme-font-sans, sans-serif)); }
 .qagent-sidebar .qagent-sidebar__brand-name { display: inline-flex !important; }
 .qagent-sidebar .qagent-sidebar__nav {
   border-top-color: var(--qsidebar-line);
@@ -96,9 +98,9 @@
 
 /* Qubit navigation: compact control-room rail, still driven by the active theme. */
 .qagent-sidebar { position: relative; isolation: isolate; background: color-mix(in srgb, var(--background-base) 94%, var(--qsidebar-accent)) !important; }
-.qagent-sidebar::before { position: absolute; z-index: -1; inset: 3.5rem 0 0; content: ""; background: radial-gradient(ellipse at 0 8%, color-mix(in srgb, var(--qsidebar-accent) 9%, transparent), transparent 46%), radial-gradient(circle, color-mix(in srgb, var(--qsidebar-accent) 26%, transparent) 0 1px, transparent 1.4px); background-size: auto, 29px 29px; mask-image: linear-gradient(180deg, #000, transparent 75%); pointer-events: none; opacity: .42; }
-.qagent-sidebar .qagent-sidebar__brand-row { min-height: 3.65rem; padding-inline: .85rem; background: color-mix(in srgb, var(--qsidebar-surface) 92%, transparent); }
-.qagent-sidebar .qagent-sidebar__brand-name { font-size: .88rem; font-weight: 750; letter-spacing: .015em; }
+.qagent-sidebar::before { position: absolute; z-index: -1; inset: 4.6rem 0 0; content: ""; background: radial-gradient(ellipse at 0 8%, color-mix(in srgb, var(--qsidebar-accent) 9%, transparent), transparent 46%), radial-gradient(circle, color-mix(in srgb, var(--qsidebar-accent) 26%, transparent) 0 1px, transparent 1.4px); background-size: auto, 29px 29px; mask-image: linear-gradient(180deg, #000, transparent 75%); pointer-events: none; opacity: .42; }
+.qagent-sidebar .qagent-sidebar__brand-row { min-height: 4.6rem; padding-inline: .95rem; background: color-mix(in srgb, var(--qsidebar-surface) 92%, transparent); }
+.qagent-sidebar .qagent-sidebar__brand-name { font-size: 1.35rem; font-weight: 750; letter-spacing: .03em; }
 .qagent-sidebar .qagent-sidebar__nav { padding-block: .55rem; }
 .qagent-sidebar .qagent-sidebar__nav > ul { gap: .2rem; padding-inline: .45rem; }
 .qagent-sidebar .qagent-sidebar__link { min-height: 2.45rem; margin: .06rem .15rem; padding: .5rem .62rem; gap: .62rem; border-radius: calc(var(--theme-radius, .55rem) + .1rem); font-family: var(--theme-font-mono, ui-monospace, monospace); font-size: .69rem; font-weight: 620; letter-spacing: .045em; }

@@ -88,6 +88,7 @@ import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
 import "@/styles/sidebar-studio.css";
+import "@/styles/qubit-mark.css";
 
 // Route pages are lazy-loaded so the initial dashboard shell does not pay for
 // every admin surface (and heavy deps like xterm) up front.
@@ -815,8 +816,8 @@ export default function App() {
           <Menu />
         </Button>
 
-        <QubitMark className="h-8 w-8 shrink-0 text-midground" />
-        <Typography className="font-bold text-[0.95rem] tracking-[0.04em] text-midground">
+        <QubitMark className="h-10 w-10 shrink-0 text-midground" />
+        <Typography className="font-bold text-[1.3rem] tracking-[0.03em] text-midground">
           {t.app.brand}
         </Typography>
       </header>
@@ -881,8 +882,8 @@ export default function App() {
                 )}
               >
                 <PluginSlot name="header-left" />
-                <QubitMark className="h-8 w-8 shrink-0 text-midground" />
-                <span className="qagent-sidebar__brand-name font-bold text-[1rem] tracking-[0.02em] text-midground">
+                <QubitMark className="h-11 w-11 shrink-0 text-midground" />
+                <span className="qagent-sidebar__brand-name font-bold text-[1.35rem] tracking-[0.03em] text-midground">
                   {t.app.brand}
                 </span>
               </div>

@@ -1937,14 +1937,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
         else:
             html = inject + html
         # Qubit rebrand (server-side template; vendored index.html untouched):
-        # product title carries the Qubit name, and any residual upstream
-        # asset prefix in the served markup is rewritten to the Qubit root so
-        # no public URL exposes the upstream name. Upstream names remain only
-        # in legal notices, attribution, provenance, and compat records.
-        import re as _re
-        html = _re.sub(r"<title>.*?</title>",
-                       "<title>Qubit Agent - Command Center</title>", html,
-                       count=1, flags=_re.S)
+        # any residual upstream asset prefix in the served markup is rewritten
+        # to the Qubit root so no public URL exposes the upstream name.
+        # Upstream names remain only in legal notices, attribution, provenance,
+        # and compat records.
+        #
+        # The product title is NOT rewritten here: the built dashboard already
+        # carries it from frontend/qubit-web/index.html, and overriding it per
+        # request silently reverted a rebuilt title back to a stale hard-coded
+        # string. Title ownership belongs to the build.
         html = html.replace('"/hermes/', '"/')
         html = debrand_theme_style_id(html)
         self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")

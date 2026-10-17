@@ -18,9 +18,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional
 
 # --- 8T-F canonical identity (single source; CLI/docs/installer mirror it) ---
-# Public product: Qubit Agent. Voice subsystem: Qubit VoiceBridge.
-PRODUCT_NAME = "Qubit Agent"
-PUBLIC_IDENTITY = "Qubit Agent"
+# Public product: Qubit AiO. Voice subsystem: Qubit VoiceBridge.
+PRODUCT_NAME = "Qubit AiO"
+PUBLIC_IDENTITY = "Qubit AiO"
 VOICE_SUBSYSTEM = "Qubit VoiceBridge"
 INSTALL_IDENTITY = "qubit-voicebridge"
 IMPORT_PACKAGE = "voicebridge"

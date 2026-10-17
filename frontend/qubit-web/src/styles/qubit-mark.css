@@ -1,0 +1,230 @@
+/* Animated Qubit wordmark + sidebar brand.
+ *
+ * Two pieces of motion, both driven from theme variables so they re-skin with
+ * the active theme instead of hard-coding brand teal:
+ *   .qubit-mark        the orbit glyph (components/QubitMark.tsx)
+ *   .qagent-sidebar__brand-name  the "Qubit AiO" wordmark
+ *
+ * All timings are GPU-friendly (transform/opacity only) so the sidebar keeps
+ * 60fps while the chat stream renders. `prefers-reduced-motion` kills every
+ * animation below; nothing about the resting appearance depends on motion.
+ */
+
+/* ---------- Orbit glyph ---------- */
+
+.qubit-mark {
+  overflow: visible;
+}
+
+.qubit-mark__orbit {
+  transform-box: view-box;
+  transform-origin: 20px 20px;
+  will-change: transform;
+}
+
+/* Counter-rotating orbits at mutually prime periods read as a live qubit
+ * rather than a spinning icon: the lattice does not visibly repeat. */
+.qubit-mark__orbit--a {
+  animation: qubit-mark-orbit 11s linear infinite;
+}
+
+.qubit-mark__orbit--b {
+  animation: qubit-mark-orbit 17s linear infinite reverse;
+}
+
+@keyframes qubit-mark-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.qubit-mark__nucleus {
+  transform-box: view-box;
+  transform-origin: 20px 20px;
+  animation: qubit-mark-nucleus 3.6s ease-in-out infinite;
+}
+
+@keyframes qubit-mark-nucleus {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.14);
+    opacity: 0.86;
+  }
+}
+
+.qubit-mark__halo {
+  transform-box: view-box;
+  transform-origin: 20px 20px;
+  animation: qubit-mark-halo 3.6s ease-in-out infinite;
+}
+
+@keyframes qubit-mark-halo {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.1);
+  }
+}
+
+/* Shockwaves from the nucleus: expand once per beat, then hold invisible for
+ * the remainder of the cycle. The second ring runs half a beat behind. */
+.qubit-mark__pulse {
+  transform-box: view-box;
+  transform-origin: 20px 20px;
+  opacity: 0;
+  animation: qubit-mark-pulse 3.6s cubic-bezier(0.16, 0.84, 0.44, 1) infinite;
+}
+
+.qubit-mark__pulse--late {
+  animation-delay: -1.8s;
+}
+
+@keyframes qubit-mark-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  62% {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+
+/* Beads: each one is a child of a rotating group, so it already travels the
+ * ellipse. Only its brightness changes, phased by a negative delay tied to its
+ * seed angle — that turns "dots on a ring" into "particles passing the
+ * viewer", without an per-frame path calculation. */
+.qubit-mark__bead {
+  animation: qubit-mark-bead 11s linear infinite;
+}
+
+.qubit-mark__bead--far {
+  animation-duration: 17s;
+  animation-direction: reverse;
+}
+
+@keyframes qubit-mark-bead {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Hover: the whole mark leans in and the orbits accelerate smoothly rather
+ * than snapping to a new speed. */
+.qagent-sidebar__brand-row:hover .qubit-mark__orbit--a,
+.qagent-sidebar__brand-row:hover .qubit-mark__bead--near {
+  animation-duration: 3.2s;
+}
+.qagent-sidebar__brand-row:hover .qubit-mark__orbit--b,
+.qagent-sidebar__brand-row:hover .qubit-mark__bead--far {
+  animation-duration: 4.6s;
+}
+.qubit-mark,
+.qubit-mark__orbit,
+.qubit-mark__bead {
+  transition: filter 280ms ease, animation-duration 280ms ease;
+}
+.qagent-sidebar__brand-row:hover .qubit-mark {
+  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--qsidebar-accent, currentColor) 60%, transparent));
+}
+
+/* ---------- Wordmark ---------- */
+
+/* Gradient sweep across the letters. The gradient is wider than the text and
+ * slides via background-position, which keeps it on the compositor. */
+.qagent-sidebar .qagent-sidebar__brand-name {
+  background-image: linear-gradient(
+    100deg,
+    var(--midground-base) 0%,
+    var(--qsidebar-accent, var(--midground-base)) 42%,
+    var(--midground-base) 46%,
+    var(--midground-base) 100%
+  );
+  background-size: 340% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: qubit-brand-sheen 7s ease-in-out infinite;
+}
+
+@keyframes qubit-brand-sheen {
+  0%,
+  55% {
+    background-position: 100% 0;
+  }
+  80%,
+  100% {
+    background-position: -140% 0;
+  }
+}
+
+/* Entrance: the wordmark fades up once when the shell mounts, so the brand
+ * reads as arriving rather than already parked. */
+.qagent-sidebar .qagent-sidebar__brand-row > div:first-child > .qagent-sidebar__brand-name {
+  animation: qubit-brand-sheen 7s ease-in-out infinite, qubit-brand-in 620ms cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+}
+
+@keyframes qubit-brand-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    letter-spacing: 0.12em;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    letter-spacing: inherit;
+  }
+}
+
+/* Hover: letters settle and a soft accent glow forms under the wordmark. */
+.qagent-sidebar .qagent-sidebar__brand-row:hover .qagent-sidebar__brand-name {
+  animation-play-state: paused;
+  background-position: 50% 0;
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--qsidebar-accent, currentColor) 50%, transparent));
+}
+
+.qagent-sidebar .qagent-sidebar__brand-name {
+  transition: filter 280ms ease;
+}
+
+/* ---------- Reduced motion: everything rests ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .qubit-mark__orbit,
+  .qubit-mark__nucleus,
+  .qubit-mark__halo,
+  .qubit-mark__pulse,
+  .qubit-mark__bead,
+  .qagent-sidebar .qagent-sidebar__brand-name,
+  .qagent-sidebar .qagent-sidebar__brand-row > div:first-child > .qagent-sidebar__brand-name {
+    animation: none !important;
+  }
+  .qubit-mark__pulse {
+    opacity: 0;
+  }
+  .qubit-mark__bead {
+    opacity: 0.8;
+  }
+  .qagent-sidebar .qagent-sidebar__brand-name {
+    -webkit-text-fill-color: currentColor;
+    background-image: none;
+  }
+}

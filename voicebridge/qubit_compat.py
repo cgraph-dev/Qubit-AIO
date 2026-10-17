@@ -17909,7 +17909,7 @@ def h_openapi(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return 200, {
         "openapi": "3.0.3",
         "info": {
-            "title": "Qubit Agent API",
+            "title": "Qubit AiO API",
             "version": "1.0.0",
             "description": "Qubit-branded API surface generated from the "
                            "canonical Qubit compat route table. Operations "
