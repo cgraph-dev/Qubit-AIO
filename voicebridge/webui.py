@@ -3255,8 +3255,19 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if self.command == "GET" and self._is_office_client_path(path):
             self._serve_office_client_api("GET")
             return
-        if path == "/favicon.ico":
-            self._serve_qubit_static("/favicon.ico")
+        # Root-level icon files are served from the built dashboard rather than
+        # through the SPA fallback. This was previously hardcoded to
+        # ``/favicon.ico`` only, so any additional icon (an SVG, an
+        # apple-touch-icon) silently received the HTML shell: the browser never
+        # loaded it, fell back to the .ico, and the tab kept showing the stale
+        # icon. Serving every root icon by extension keeps that from recurring.
+        _root_icon = path.strip("/")
+        if (
+            "/" not in _root_icon
+            and _root_icon.startswith(("favicon", "apple-touch-icon"))
+            and _root_icon.rsplit(".", 1)[-1].lower() in ("ico", "svg", "png")
+        ):
+            self._serve_qubit_static(_root_icon)
             return
         # Every canonical public dashboard route renders the root-served SPA
         # shell; Qubit family aliases redirect to their real Qubit route. No
