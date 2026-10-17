@@ -72,8 +72,10 @@ class GatewayGoalCommandsMixin:
     ) -> None:
         """Enqueue *text* as the next turn through the adapter FIFO (the post-turn judge's path).
 
-        A kickoff keeps the triggering message id / channel prompt; a resume continuation carries
-        none. Best-effort: failures only logged.
+        A kickoff keeps the triggering message id / channel prompt / bound skills; a resume
+        continuation carries none. Best-effort: failures only logged. A local ``slash.exec`` returns
+        the turn to the client as its ``send`` directive instead (the client submits it with its own
+        input id).
         """
         try:
             adapter, quick_key = self._adapter_and_key_for(event)

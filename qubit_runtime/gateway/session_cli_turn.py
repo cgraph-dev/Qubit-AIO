@@ -49,9 +49,9 @@ def admit_cli_turn(params):
     if batch is not None and type(batch) is not bool:
         raise RuntimeStoreError('invalid_params')
     if batch:
-        # The submitting viewer is main's QubitCLI, which answers the clarify tool's whole batch
-        # in one ``clarify`` server request (its batch panel). Other viewers of a ``cli``-source
-        # session (an ACP editor, a raw WebSocket client) answer per-question cards.
+        # The submitting viewer answers the clarify tool's whole batch in one ``clarify`` server
+        # request (main's batch panel: classic CLI, Ink TUI). Viewers that never set it (an ACP
+        # editor, a raw WebSocket client) answer per-question cards.
         committed['clarify_batch'] = True
     return {'cli_turn_v1': committed} if committed else {}
 
