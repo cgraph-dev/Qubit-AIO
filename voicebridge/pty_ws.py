@@ -191,10 +191,23 @@ def _session_stored_model(session_id: str, cfg: Any = None
         con = _sql.connect(f"file:{db}?mode=ro", uri=True, timeout=2.0)
         try:
             row = con.execute(
-                "SELECT model FROM sessions WHERE id = ?", (sid,)).fetchone()
-            model = str((row or ("",))[0] or "").strip()
+                "SELECT model, model_config FROM sessions WHERE id = ?",
+                (sid,)).fetchone()
+            model = str(((row or ("", ""))[0]) or "").strip()
             provider = ""
             if model:
+                # An explicit provider+model pick writes its route into the
+                # row's model_config (set_model): most authoritative, and the
+                # only signal present before the first billed turn.
+                try:
+                    import json as _json
+                    _mcfg = _json.loads((row[1] if len(row) > 1 else None)
+                                        or "{}")
+                    if isinstance(_mcfg, dict):
+                        provider = str(_mcfg.get("provider") or "").strip()
+                except Exception:  # noqa: BLE001 - corrupt config degrades below
+                    provider = ""
+            if model and not provider:
                 prow = con.execute(
                     "SELECT billing_provider FROM session_model_usage "
                     "WHERE session_id = ? AND model = ? "
