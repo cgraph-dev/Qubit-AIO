@@ -76,6 +76,8 @@ from .mark_field import (
     comet,
     sparkles,
     echo_rings,
+    satellites,
+    SATELLITE_RING_ALPHA,
     ECHO_LAG_S,
     ECHO_SCALE,
     ECHO_ALPHA,
@@ -320,6 +322,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         glints = []
     try:
         echoes = echo_rings(tt)
+        shells = [] if reduced_motion else satellites(tt, r)
     except Exception:  # noqa: BLE001
         echoes = []
     try:
@@ -374,6 +377,34 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             width = max(1, int(round(float(ring.get("width", ECHO_WIDTH)))))
             _line(_ellipse_points(ccx, ccy, rxs, rys, tilt),
                   _dim(ring_rgb, alpha), width)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _satellite(shell: Dict[str, Any]) -> None:
+        """One satellite shell: a thin CIRCLE and the small body on it."""
+        try:
+            ring = shell.get("ring") or {}
+            body = shell.get("body") or {}
+            rxs = rx * float(ring.get("rx_frac") or 0.0) / max(1e-9, RX_FRAC)
+            rys = ry * float(ring.get("ry_frac") or 0.0) / max(1e-9, RY_FRAC)
+            if rxs > 0.0 and rys > 0.0:
+                pts = _ellipse_points(cx_f, cy_f, rxs, rys,
+                                      float(ring.get("tilt") or 0.0))
+                _line(pts, _dim(ring_rgb, float(ring.get("alpha")
+                                               or SATELLITE_RING_ALPHA)),
+                      int(ring.get("width") or 1))
+            if not reduced_motion:
+                for smp in shell.get("trail") or []:
+                    _bead(cx_f + float(smp.get("x") or 0.0),
+                          cy_f + float(smp.get("y") or 0.0),
+                          float(smp.get("size") or 0.0),
+                          float(smp.get("lift") or 0.0),
+                          float(smp.get("alpha") or 0.0))
+            _bead(cx_f + float(body.get("x") or 0.0),
+                  cy_f + float(body.get("y") or 0.0),
+                  float(body.get("size") or 0.0),
+                  float(body.get("lift") or 0.0),
+                  float(body.get("alpha") or 0.0))
         except Exception:  # noqa: BLE001
             pass
 
@@ -489,6 +520,6 @@ __all__ = [
     "heartbeat", "nucleus_scale", "shockwave", "camera_offset",
     "orbit_tilts", "orbit_point", "particle_state", "trails",
     "dust_state", "comet", "sparkles",
-    "echo_rings", "ECHO_LAG_S", "ECHO_SCALE", "ECHO_ALPHA", "ECHO_WIDTH",
+    "echo_rings", "satellites", "ECHO_LAG_S", "ECHO_SCALE", "ECHO_ALPHA", "ECHO_WIDTH",
     "nucleus_sparks", "NUCLEUS_SPARK_COUNT", "NUCLEUS_SPARK_REACH",
 ]

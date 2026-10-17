@@ -53,13 +53,16 @@ HALO_WIDTH = 1.0
 # --------------------------------------------------------------- 3D depth
 DEPTH_RADIUS_BASE = 0.42
 DEPTH_RADIUS_GAIN = 1.05
-DEPTH_ALPHA_BASE = 0.20
-DEPTH_ALPHA_GAIN = 0.85
+DEPTH_ALPHA_BASE = 0.10
+DEPTH_ALPHA_GAIN = 1.00
 DEPTH_LIFT_BASE = 0.04
 DEPTH_LIFT_GAIN = 0.42
-DEPTH_PARALLAX = 0.14
+DEPTH_PARALLAX = 0.20
 #: Far points contract slightly toward the centre: a cheap perspective cue.
-DEPTH_PERSPECTIVE = 0.11
+DEPTH_PERSPECTIVE = 0.15
+#: Elements nearest the viewer grow past their plane's size so the field reads
+#: as coming OUT of the screen (and the nearest can cross the orbit envelope).
+DEPTH_POPOUT = 0.55
 
 # ------------------------------------------------------------ camera drift
 CAMERA_SWAY_FRAC = 0.016
@@ -101,7 +104,7 @@ SHOCKWAVE_WIDTH = 1.0
 #: the nucleus is the mark's only solid body. ``GLINT_ARM_FRAC`` is the star
 #: arm length as a multiple of the particle radius, and the twinkle period is
 #: per-particle so the field shimmers instead of pulsing in unison.
-GLINT_ARM_FRAC = 1.8
+GLINT_ARM_FRAC = 1.45
 GLINT_CORE_FRAC = 0.5
 GLINT_TWINKLE_BASE_S = 1.6
 GLINT_TWINKLE_SPAN_S = 1.9
@@ -124,8 +127,8 @@ PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
 DUST_COUNT = 30
 DUST_R_FRAC_MIN = 0.86
 DUST_R_FRAC_SPAN = 0.30
-DUST_SIZE_BASE = 0.26
-DUST_SIZE_SPAN = 0.32
+DUST_SIZE_BASE = 0.20
+DUST_SIZE_SPAN = 0.26
 DUST_PERIOD_BASE = 5.0
 DUST_PERIOD_SPAN = 9.0
 DUST_ALPHA_BASE = 0.16
@@ -135,7 +138,7 @@ DUST_LIFT_GAIN = 0.35
 
 #: One fast traveller with a long tail, sweeping the near orbit periodically.
 COMET_PERIOD_S = 7.0
-COMET_SPEED_MULT = 2.4
+COMET_SPEED_MULT = 1.9
 COMET_TRAIL_SAMPLES = 12
 COMET_STEP_DEG = 3.2
 COMET_SIZE = 1.5
@@ -158,14 +161,29 @@ ECHO_WIDTH = 1.0
 #: breathing rather than a separate effect.
 #: Spark arms are SHORTER than a particle glint's: at the nucleus they must
 #: read as pinpricks, not stars the size of the nucleus itself.
-SPARK_ARM_FRAC = 1.7
+SPARK_ARM_FRAC = 1.30
 NUCLEUS_SPARK_COUNT = 18
 NUCLEUS_SPARK_LIFE_BASE = 1.30
 NUCLEUS_SPARK_LIFE_SPAN = 0.90
 NUCLEUS_SPARK_REACH = 1.28
-NUCLEUS_SPARK_SIZE = 0.55
+NUCLEUS_SPARK_SIZE = 0.34
 NUCLEUS_SPARK_ALPHA = 0.70
 NUCLEUS_SPARK_LIFT = 0.70
+
+# ------------------------------------------------------ satellite shells
+#: Two extra CIRCULAR paths in the mark's plane, each carrying one small body
+#: travelling it at its own rate ("two more rotating orbs on different circles
+#: with different timing"). Circles, not ellipses: the tilt still squashes them
+#: into the same plane, but they read as round shells around the nucleus.
+SATELLITE_SHELLS = (
+    # (rx_frac, ry_frac_ratio, period_s, direction, size_px, alpha, lift)
+    (0.50, 1.0, 5.5, 1.0, 1.05, 0.95, 0.85),
+    (0.93, 1.0, 9.0, -1.0, 0.85, 0.90, 0.75),
+)
+SATELLITE_RING_ALPHA = 0.22
+SATELLITE_RING_WIDTH = 1.0
+SATELLITE_TRAIL_SAMPLES = 5
+SATELLITE_TRAIL_STEP_DEG = 7.0
 
 # ----------------------------------------------------------------- glints
 SPARKLE_COUNT = 26
@@ -176,8 +194,8 @@ SPARKLE_LIFE_BASE = 1.1
 SPARKLE_LIFE_STEP = 0.35
 SPARKLE_VISIBLE_FRAC = 0.45
 SPARKLE_MAX_ALPHA = 0.60
-SPARKLE_SIZE_BASE = 0.28
-SPARKLE_SIZE_PEAK = 0.55
+SPARKLE_SIZE_BASE = 0.18
+SPARKLE_SIZE_PEAK = 0.36
 SPARKLE_LIFT = 0.60
 
 
@@ -294,7 +312,10 @@ def _depth(angle_deg: float) -> float:
 
 
 def _depth_size(depth: float, base: float) -> float:
-    return base * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth)
+    """Depth size with a pop-out term: near elements leave the plane."""
+    plane = DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth
+    pop = 1.0 + DEPTH_POPOUT * max(0.0, depth - 0.5)
+    return base * plane * pop
 
 
 def _depth_alpha(depth: float, top: float = 1.0) -> float:
@@ -400,6 +421,53 @@ def nucleus_sparks(t: Any, R: float) -> List[Dict[str, float]]:
     return out
 
 
+def satellites(t: Any, R: float) -> List[Dict[str, Any]]:
+    """Two circular shells, each with a small body travelling it.
+
+    Returns one dict per shell: ``ring`` (the circular path, drawn thin) and
+    ``body`` (position/depth/size/alpha/lift plus a short ``trail``). Bodies
+    run in opposite directions at different periods, so the pair never beats
+    in sync.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    near_tilt, far_tilt = orbit_tilts(tt)
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    out: List[Dict[str, Any]] = []
+    for idx, (rx_frac, ratio, period, direction, size96, alpha, lift) in enumerate(
+            SATELLITE_SHELLS):
+        # A circle in this plane: same squash ratio as the mark's ellipses.
+        tilt = near_tilt if idx == 0 else far_tilt
+        rx = r * rx_frac
+        ry = rx * (RY_FRAC / RX_FRAC) * ratio
+        ang = 360.0 * direction * tt / max(0.1, period) + 137.0 * idx
+        depth = _depth(ang)
+        pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+        bx, by = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
+        trail: List[Dict[str, float]] = []
+        for k in range(1, SATELLITE_TRAIL_SAMPLES + 1):
+            a = ang - direction * k * SATELLITE_TRAIL_STEP_DEG
+            d = _depth(a)
+            pp = 1.0 - DEPTH_PERSPECTIVE * (1.0 - d)
+            tx, ty = orbit_point(0.0, 0.0, rx * pp, ry * pp, tilt, a)
+            trail.append({"x": tx + dx, "y": ty + dy,
+                          "size": _depth_size(d, size96 * scale) * 0.5,
+                          "alpha": 0.30 * alpha * (1.0 - k / (SATELLITE_TRAIL_SAMPLES + 1.0)),
+                          "lift": lift})
+        out.append({
+            "index": float(idx),
+            "ring": {"tilt": tilt, "rx_frac": rx_frac,
+                     "ry_frac": rx_frac * (RY_FRAC / RX_FRAC) * ratio,
+                     "alpha": SATELLITE_RING_ALPHA, "width": SATELLITE_RING_WIDTH},
+            "body": {"x": bx + dx, "y": by + dy, "depth": depth,
+                     "size": _depth_size(depth, size96 * scale),
+                     "alpha": _depth_alpha(depth, alpha), "lift": lift},
+            "trail": trail,
+        })
+    return out
+
+
 def trails(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, float]]:
     """Tapered tail behind one particle (oldest last, alpha fading)."""
     tt = _finite(t)
@@ -480,7 +548,9 @@ def comet(t: Any, R: float) -> Dict[str, Any]:
         return {"alpha": 0.0, "trail": []}
     f = (phase - 0.45) / 0.55
     ang = 360.0 * f * COMET_SPEED_MULT
-    fade = math.sin(math.pi * f) ** 0.7
+    # Eased in and out (smoothstep-ish) so the traveller never pops
+    # into or out of existence at its sweep boundary.
+    fade = math.sin(math.pi * f) ** 1.1
     depth = _depth(ang)
     pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
     x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, near_tilt, ang)
@@ -545,6 +615,8 @@ __all__ = [
     "glint", "GLINT_ARM_FRAC", "GLINT_CORE_FRAC", "SPARK_ARM_FRAC",
     "_phase_wobble", "SPEED_MOD_DEG",
     "echo_rings", "ECHO_LAG_S", "ECHO_SCALE", "ECHO_ALPHA",
+    "satellites", "SATELLITE_SHELLS", "SATELLITE_RING_ALPHA",
+    "DEPTH_POPOUT",
     "nucleus_sparks", "NUCLEUS_SPARK_COUNT", "NUCLEUS_SPARK_REACH",
     "trails", "dust_state", "comet", "sparkles",
 ]

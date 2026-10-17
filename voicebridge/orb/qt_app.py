@@ -227,6 +227,19 @@ def mark_echo_rings(t: Any) -> List[Dict[str, float]]:
         return []
 
 
+def mark_satellites(t: Any, R: float) -> List[Dict[str, Any]]:
+    """Satellite shells (circular paths + a travelling body each).
+
+    Empty under reduced motion so a still frame keeps only the mark itself.
+    """
+    try:
+        if _reduced_motion():
+            return []
+        return list(_field.satellites(_mark_tt(t), R))
+    except Exception:  # noqa: BLE001 - a field fault must not blank the orb
+        return []
+
+
 def mark_nucleus_sparks(t: Any, R: Any) -> List[Dict[str, float]]:
     """Sparks thrown out of the nucleus (shared field), gone under reduced.
 
@@ -422,6 +435,38 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         _glint(px, py, _num(part.get("size"), 0.0),
                _num(part.get("alpha"), 0.0), _lift(bead_lift))
 
+    def _satellite(shell: Dict[str, Any], draw_trail: bool) -> None:
+        """One satellite shell: a thin CIRCLE plus the small body on it.
+
+        The path is a circle in the mark's plane (so it shares the plane's
+        squash) and stays dim and thin; the body is a small glint with a short
+        tapered trail, sized by depth so the near one leaves the screen.
+        """
+        ring = shell.get("ring") or {}
+        body = shell.get("body") or {}
+        rxs = Rf * _num(ring.get("rx_frac"), 0.0)
+        rys = Rf * _num(ring.get("ry_frac"), 0.0)
+        if rxs > 0.0 and rys > 0.0:
+            path = _ring_path(rxs, rys, _num(ring.get("tilt"), 0.0))
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(QColor(ring_rgb[0], ring_rgb[1], ring_rgb[2],
+                                 _clamp8(255.0 * min(
+                                     1.0,
+                                     _num(ring.get("alpha"), 0.0) * bright))),
+                          max(0.6, _num(ring.get("width"), 1.0))))
+            p.drawPath(path)
+            p.setPen(Qt.NoPen)
+        if draw_trail:
+            for smp in shell.get("trail") or []:
+                _dot(cx + _num(smp.get("x"), 0.0), cy + _num(smp.get("y"), 0.0),
+                     max(0.25, _num(smp.get("size"), 0.0)),
+                     _num(smp.get("alpha"), 0.0) * bright,
+                     _lift(_num(smp.get("lift"), _field.LIFT_BEAD)))
+        _glint(cx + _num(body.get("x"), 0.0), cy + _num(body.get("y"), 0.0),
+               max(0.3, _num(body.get("size"), 0.0)),
+               _num(body.get("alpha"), 0.0) * bright,
+               _lift(_num(body.get("lift"), _field.LIFT_BEAD)))
+
     def _spark(spark: Dict[str, Any]) -> None:
         """One nucleus spark: the same glint shape, thrown out past the orbits."""
         _glint(cx + _num(spark.get("x"), 0.0),
@@ -468,6 +513,11 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # just the main orbits, the glints and the resting nucleus.
     echoes = mark_echo_rings(t)
     sparks = mark_nucleus_sparks(t, Rf)
+    shells = mark_satellites(t, Rf)
+    far_shells = [s for s in shells
+                  if _num((s.get("body") or {}).get("depth"), 0.0) < 0.5]
+    near_shells = [s for s in shells
+                   if _num((s.get("body") or {}).get("depth"), 0.0) >= 0.5]
     far_echo = [e for e in echoes if e.get("orbit") == "b"]
     near_echo = [e for e in echoes if e.get("orbit") != "b"]
     far_sparks = [s for s in sparks
@@ -484,6 +534,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                    _num(echo.get("tilt"), far_tilt),
                    _num(echo.get("alpha"), 0.0),
                    _num(echo.get("width"), _field.ECHO_WIDTH))
+    for shell in far_shells:
+        _satellite(shell, draw_trails)
     for mote in dust:
         if mote["depth"] < 0.5:
             _dust(mote)
@@ -521,6 +573,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                    _num(echo.get("tilt"), near_tilt),
                    _num(echo.get("alpha"), 0.0),
                    _num(echo.get("width"), _field.ECHO_WIDTH))
+    for shell in near_shells:
+        _satellite(shell, draw_trails)
     for mote in dust:
         if mote["depth"] >= 0.5:
             _dust(mote)
@@ -1821,5 +1875,6 @@ __all__ = [
     "mark_particle_layers",
     "mark_sparkles",
     "mark_echo_rings",
+    "mark_satellites",
     "mark_nucleus_sparks",
 ]

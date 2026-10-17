@@ -581,3 +581,40 @@ def test_unknown_style_falls_back_to_ember(monkeypatch):
 
     stats = orb_app.draw_orb_frame(C(), 68, "idle", 4.2)
     assert stats["lines"] >= 4  # ember bands still drew; a typo never blanks the orb
+
+
+def test_two_satellite_shells_travel_their_own_circles():
+    # Owner ask: "2 more rotating orbs that follow circle line on different
+    # circles with different timing". Contract: two shells, circular paths in
+    # the mark's plane, bodies travelling in OPPOSITE directions at different
+    # periods, each body's distance matching its own circle.
+    from voicebridge.orb import mark_field as F
+
+    sats = F.satellites(2.0, 106.0)
+    assert len(sats) == 2
+    r0 = sats[0]["ring"]["rx_frac"]
+    r1 = sats[1]["ring"]["rx_frac"]
+    assert r0 != r1, "the two shells must ride different circles"
+    # Circular in-plane: same squash ratio as the mark's ellipses.
+    for s in sats:
+        assert s["ring"]["ry_frac"] / s["ring"]["rx_frac"] == pytest.approx(
+            F.RY_FRAC / F.RX_FRAC, abs=0.02)
+
+    # Opposite directions at different periods -> the bodies separate over time.
+    a = [((s["body"]["x"] ** 2 + s["body"]["y"] ** 2) ** 0.5) for s in
+         F.satellites(2.0, 106.0)]
+    b = [((s["body"]["x"] ** 2 + s["body"]["y"] ** 2) ** 0.5) for s in
+         F.satellites(3.7, 106.0)]
+    assert a != b, "the bodies must move"
+    assert F.SATELLITE_SHELLS[0][3] != F.SATELLITE_SHELLS[1][3], "opposite spins"
+    assert F.SATELLITE_SHELLS[0][2] != F.SATELLITE_SHELLS[1][2], "different timing"
+
+
+def test_satellite_shells_are_drawn_and_vanish_when_frozen():
+    live = FakeCanvas()
+    M.render(live, 34.0, 34.0, 32.0, 2.0, "idle")
+    frozen = FakeCanvas()
+    M.render(frozen, 34.0, 34.0, 32.0, 2.0, "idle", reduced_motion=True)
+    # A shell adds a thin circle (a line) plus a body/trail glints (lines+ovals).
+    assert len(live.lines) > len(frozen.lines)
+    assert len(live.ovals) > len(frozen.ovals)

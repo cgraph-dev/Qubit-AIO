@@ -552,9 +552,15 @@ def test_echo_rings_are_two_thin_lagged_followers():
     prims = _record(t=t, size=size)
 
     thin = _thin_orbit_outlines(prims, c)
-    assert len(thin) == 2, thin                 # exactly one per main orbit
+    # Thin centred outlines now include the two satellite CIRCLES, so pick the
+    # echo followers by geometry: they are scaled copies of the main ellipses
+    # (same rx/ry ratio), while a satellite is a circle in the same plane.
     rx, ry = R * F.RX_FRAC, R * F.RY_FRAC
     rxs, rys = rx * F.ECHO_SCALE, ry * F.ECHO_SCALE
+    ratio = rys / rxs
+    thin = [p for p in thin
+            if abs(((p.h / p.w) if p.w else 0.0) - ratio) < 0.12]
+    assert len(thin) == 2, thin                 # exactly one per main orbit
     got = sorted(_tilt_abs_deg(p, rxs, rys) for p in thin)
     expected = sorted(abs(e["tilt"]) for e in F.echo_rings(t))
     assert got == pytest.approx(expected, abs=2.0), (got, expected)
