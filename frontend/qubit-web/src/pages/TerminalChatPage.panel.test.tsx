@@ -150,8 +150,18 @@ vi.mock("@xterm/xterm", () => ({
     cols = 80;
     rows = 24;
     unicode = { activeVersion: "11" };
-    loadAddon() {}
-    open() {}
+    private loaded: { activate?: () => void }[] = [];
+    loadAddon(a: { activate?: () => void }) {
+      // Real xterm activates a loaded addon when open() runs, NOT here. The
+      // WebGL addon therefore throws from inside open() on a host without
+      // WebGL2 — the defect the dedicated test pins.
+      this.loaded.push(a);
+    }
+    open() {
+      for (const addon of this.loaded) {
+        if (typeof addon.activate === "function") addon.activate();
+      }
+    }
     write() {}
     dispose() {}
     clear() {
@@ -178,7 +188,15 @@ vi.mock("@xterm/xterm", () => ({
 vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { fit() {} } }));
 vi.mock("@xterm/addon-unicode11", () => ({ Unicode11Addon: class {} }));
 vi.mock("@xterm/addon-web-links", () => ({ WebLinksAddon: class {} }));
-
+// WebGL tier: the addon is a no-op here so the bootstrap path is the plain
+// canvas one. The WebGL2-unavailable case is covered by the dedicated test
+// below, which swaps this class for one that throws during activation.
+vi.mock("@xterm/addon-webgl", () => ({
+  WebglAddon: class {
+    onContextLoss() {}
+    dispose() {}
+  },
+}));
 // ChatSidebar is lazy-imported; record the mount + props without opening the
 // real SSE feed.
 const sidebarMount = vi.hoisted(() => vi.fn());
@@ -401,8 +419,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     c2.remove();
   });
 
-  it("restores the picked workspace after a refresh", async () => {
-    // Regression: the WORKSPACE picker reset to Default on every refresh
+  it("restores the picked workspace after a refresh", async () => {    // Regression: the WORKSPACE picker reset to Default on every refresh
     // (plain useState), silently moving the next fresh chat's directory.
     // The pick is per-tab persisted, so a remount restores it.
     window.sessionStorage.setItem("qubit.chat.workspace", "/home/trick/Projects");
@@ -703,6 +720,67 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(2));
     expect(termClearSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("highlights the picked row from the URL before the PTY dials", async () => {
+    // /qubit-chat parity: the highlight follows the click synchronously.
+    // Before, /chat lit the row only after probe + ticket + connect
+    // (resumeTarget), so the click read as dead for a full round-trip.
+    // wsTicket never resolves here, so any highlight must come from the URL.
+    await act(async () => {
+      root?.unmount();
+    });
+    const { default: TerminalChatPage } = await import("./TerminalChatPage");
+    const c2 = document.createElement("div");
+    document.body.append(c2);
+    const root2 = createRoot(c2);
+    await act(async () => {
+      root2.render(
+        <MemoryRouter initialEntries={["/chat?resume=session-1"]}>
+          <TerminalChatPage isActive />
+        </MemoryRouter>,
+      );
+    });
+    await vi.waitFor(() =>
+      expect(c2.textContent).toContain("Panel session"),
+    );
+    const active = c2.querySelector('[aria-current="true"]');
+    expect(active?.textContent).toContain("Panel session");
+    await act(async () => {
+      root2.unmount();
+    });
+    c2.remove();
+  });
+
+  it("wipes the viewport when switching sessions, not on same-target reconnect", async () => {
+    // /qubit-chat parity: switching sessions clears synchronously (its
+    // transcript resets in the same frame). Before, /chat kept the old
+    // transcript painted through ticket + spawn, reading as stuck — while a
+    // same-target reconnect must NEVER clear a live transcript on a blip.
+    apiMocks.listChatSessions.mockImplementationOnce(async () => ({
+      sessions: [
+        { id: "session-1", title: "Panel session", last_active: Date.now() / 1000, message_count: 2 },
+        { id: "session-2", title: "Second session", last_active: Date.now() / 1000, message_count: 1 },
+      ],
+      total: 2,
+      limit: 30,
+      offset: 0,
+    }));
+    apiMocks.wsTicket.mockImplementation(() => new Promise(() => {}));
+    await renderTerminal();
+    await vi.waitFor(() => expect(container.textContent).toContain("Second session"));
+    expect(termClearSpy).not.toHaveBeenCalled();
+    const row = Array.from(container.querySelectorAll("span")).find(
+      (el) => el.textContent === "Second session",
+    );
+    expect(row).toBeDefined();
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    // The switch clears synchronously once the reconnect runs for the new
+    // target (probe resolves via the default mock); the mount connect never
+    // cleared.
+    await vi.waitFor(() => expect(termClearSpy).toHaveBeenCalledTimes(1));
+  });
 });
 
 describe("Qubit TerminalChatPage /chat?resume=<id> existence guard", () => {
@@ -897,5 +975,35 @@ describe("Qubit TerminalChatPage /chat?resume=<id> existence guard", () => {
       expect(FakeWebSocket.instances.length).toBeGreaterThan(0),
     );
     expect(apiMocks.getSessionDetail).not.toHaveBeenCalled();
+  });
+
+  it("renders when the host has no WebGL2 (addon throws from open, not the ctor)", async () => {
+    // Live defect (127.0.0.1:8890/chat): the pane went black and only a refresh
+    // fixed it. xterm's WebglAddon builds its GL context inside `term.open()`,
+    // so a try/catch around `new WebglAddon()` / `loadAddon()` caught nothing;
+    // the throw ("Error: WebGL2 not supported null") escaped open() before any
+    // renderer attached, and FitAddon then measured an unrendered screen.
+    //
+    // Falsifiability: with the old ordering (loadAddon then a bare open()), the
+    // addon below activates during loadAddon and this test fails.
+    const mod = await import("@xterm/addon-webgl");
+    const original = mod.WebglAddon;
+    class ThrowingWebglAddon {
+      onContextLoss() {}
+      dispose() {}
+      activate(): void {
+        throw new Error("WebGL2 not supported null");
+      }
+    }
+    (mod as unknown as { WebglAddon: unknown }).WebglAddon = ThrowingWebglAddon;
+    try {
+      apiMocks.wsTicket.mockImplementation(() => new Promise(() => {}));
+      await renderTerminal();
+      // The page must still mount its terminal chrome rather than crash out.
+      expect(container.querySelector('[aria-label="Qubit terminal"]')).not.toBeNull();
+      expect(panel()).not.toBeNull();
+    } finally {
+      (mod as unknown as { WebglAddon: unknown }).WebglAddon = original;
+    }
   });
 });

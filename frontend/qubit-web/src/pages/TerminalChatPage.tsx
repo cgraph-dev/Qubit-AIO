@@ -256,6 +256,10 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     id: string;
     model: string;
   } | null>(null);
+  // Previous connect's resume target: switching sessions wipes the LOCAL
+  // viewport synchronously (in connect), but a plain reconnect to the SAME
+  // target must never clear a live transcript on a network blip.
+  const lastConnectTargetRef = useRef<string | null | undefined>(undefined);
   // True while the surface sits on a DELIBERATE fresh chat (New chat pressed,
   // nothing resumed). Drives the session panel's `activeSessionId` so it renders
   // no highlight instead of falling back to an unrelated `is_active` row. Reset
@@ -382,6 +386,10 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // PTY on a later reload (upstream parity: chat_ws.py `fresh` handling).
   const handleNewChat = useCallback(() => {
     setNotice(null);
+    // Drop the previous session's MODEL-card override: it is gated on the
+    // session id so it is inert on a fresh chat, but keeping it would flash
+    // the old pick if the same session is re-opened later in this tab.
+    setSessionModelPick(null);
     resumeRef.current = "";
     // Mark the surface as a DELIBERATE fresh chat so the session panel stops
     // highlighting the previously-resumed row. Clearing `?resume=` alone made
@@ -485,19 +493,27 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
       reconnectTimerRef.current = null;
     }
     clearPerConnectionTimers();
-    // Forced-fresh (New chat) must also wipe the LOCAL viewport. The xterm
-    // instance is reused across connects, so without this the old transcript
-    // — including the previous turn's input and "thinking" spinner — stays
-    // painted while the new PTY boots behind it (upstream parity: a fresh
-    // xterm starts empty; chat_ws.py notes a fresh xterm cannot rebuild the
-    // TUI from a stale alternate-screen tail).
-    if (forceFresh && term) {
+    // Wipe the LOCAL viewport when the target changed (or a deliberate
+    // fresh chat): the xterm instance is reused across connects, so without
+    // this the previous session stays painted through the whole ticket +
+    // spawn round-trip and the switch reads as dead (/qubit-chat clears its
+    // transcript synchronously on switch for the same reason). Same-target
+    // reconnects keep the live transcript untouched. Upstream parity for the
+    // fresh case: a fresh xterm starts empty (chat_ws.py `fresh` handling).
+    const connectTarget = forceFresh ? "" : resumeRef.current;
+    if (
+      term &&
+      (forceFresh ||
+        (lastConnectTargetRef.current !== undefined &&
+          connectTarget !== lastConnectTargetRef.current))
+    ) {
       try {
         term.clear();
       } catch {
         /* terminal not open yet — nothing painted to wipe */
       }
     }
+    lastConnectTargetRef.current = connectTarget;
     const picked = profileId ?? selectedRef.current ?? undefined;
     setPtyState("connecting");
     setNotice(null);
@@ -946,8 +962,17 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     // faithfully; wide layouts get WebGL for crisp box-drawing. A lost
     // context disposes its addon so the terminal falls back instead of
     // blanking.
+    //
+    // NOTE: WebglAddon does NOT create its GL context in the constructor — it
+    // activates on `term.open()`. Constructing it inside a try/catch therefore
+    // proves nothing, and a host without WebGL2 threw from inside `open()`
+    // ("Error: WebGL2 not supported null"), aborting `open()` before any
+    // renderer attached: the PTY connected but the pane stayed black until a
+    // refresh happened to get a working context. Load the addon only after
+    // `open()` succeeds, and treat a throw from either step as "use canvas".
     if (terminalTierWidthPx(el) >= 768) {
       try {
+        term.open(el);
         const webgl = new WebglAddon();
         webgl.onContextLoss(() => {
           try {
@@ -962,9 +987,17 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           "[qubit-chat] WebGL renderer unavailable; falling back to canvas",
           err,
         );
+        // A throw out of `term.open()` can leave the terminal unrendered.
+        // Re-open (idempotent) so the canvas renderer takes over.
+        try {
+          term.open(el);
+        } catch {
+          /* open() already ran; canvas renderer is attached */
+        }
       }
+    } else {
+      term.open(el);
     }
-    term.open(el);
     fit.fit();
     termRef.current = term;
     fitRef.current = fit;
@@ -1439,8 +1472,15 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
+                // Highlight from the URL synchronously: `resumeTarget` only
+                // lands after probe + connect, so the row lit up a full
+                // round-trip after the click (/qubit-chat highlights from its
+                // session memo in the same frame). The URL is highlight-only —
+                // dialing still waits for the verified target below.
                 activeSessionId={
-                  freshChat ? FRESH_CHAT_SESSION_ID : resumeTarget
+                  freshChat
+                    ? FRESH_CHAT_SESSION_ID
+                    : resumeParam || resumeTarget
                 }
                 profile={scopedProfile}
                 onNewChat={handleNewChat}
