@@ -8,9 +8,47 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <title>Qubit Agent - Command Center</title>
+    <style>
+      /* Boot splash: paints before ANY chunk arrives (pre-hydration window).
+         Without this a slow chunk load shows a blank shell indistinguishable
+         from a broken page. React replaces #root content on first commit. */
+      html, body { margin: 0; height: 100%; background: #041c1c; }
+      #root { min-height: 100%; }
+      #qubit-boot { min-height: 100vh; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 14px;
+        background: radial-gradient(ellipse at 50% 60%, #0a2e2e 0%, #041c1c 70%);
+        color: #7dd3c8; font: 14px/1.5 system-ui, sans-serif; }
+      #qubit-boot .orb { width: 54px; height: 54px; border-radius: 50%;
+        background: radial-gradient(circle at 50% 45%, #ff9a3c, #c2410c 65%, #7c2d12);
+        box-shadow: 0 0 32px rgba(255, 122, 26, .45);
+        animation: qubit-pulse 2.2s ease-in-out infinite; }
+      @keyframes qubit-pulse { 50% { transform: scale(.92); opacity: .8; } }
+      #qubit-boot .stall { display: none; text-align: center; }
+      #qubit-boot.stalled .stall { display: block; }
+      #qubit-boot button { margin-top: 10px; padding: 6px 18px; cursor: pointer;
+        color: #041c1c; background: #7dd3c8; border: 0; border-radius: 6px;
+        font: inherit; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="qubit-boot" role="status" aria-label="Loading Qubit dashboard">
+        <div class="orb" aria-hidden="true"></div>
+        <div>Loading Qubit…</div>
+        <div class="stall">Still loading — the connection may be slow.<br />
+          <button type="button" onclick="window.location.reload()">Retry</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      // Stall disclosure for the pre-hydration window (plain script: module
+      // execution itself may be what's stalled). If React hasn't replaced the
+      // splash after 8 s, say so with a retry. Removed with the splash.
+      setTimeout(function () {
+        var s = document.getElementById("qubit-boot");
+        if (s) s.classList.add("stalled");
+      }, 8000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
