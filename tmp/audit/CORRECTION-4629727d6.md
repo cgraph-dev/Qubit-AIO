@@ -14,15 +14,23 @@ The script DOES emit both numbers (find_brand_leaks.py:77-78), so the claim was
 checkable and I did not check it. That is the whole of the error: a measured-sounding
 number that was not measured.
 
-Independently re-measured now, at three points across the wave:
+Independently re-measured now (probe rooted at a throwaway worktree, so the number
+comes from that tree and not the live one):
 
-    before the wave   1,059 strings / 473 files
+    before the wave   1,070 strings / 480 files
     after the wave      970 strings / 450 files
-    delta               -89 strings / -23 files
+    delta              -100 strings / -30 files
 
-The direction and the per-wave delta are sound. The absolute baseline I originally
-published was wrong by 10 strings / 6 files, and every later reference in this session
-repeated it.
+A second correction, on top of the first. The figure this document originally carried
+(1,059 / 473) was itself restated, not measured — and this document exists precisely to
+fault restating. A verifier could not reproduce 1,059/473 at any commit; the pre-wave
+parent measures 1,070/480. Re-measured here at f9d4900be with the probe's hardcoded
+RUNTIME repointed at that worktree: 1070 / 480.
+
+Two errors of the same shape, in a document about that shape. The rule this establishes:
+the probe hardcodes its root, so measuring an older tree requires a worktree with the
+probe's path repointed — running it from a different cwd silently measures the live tree
+and reports the current number twice.
 
 The lesson: a number in a commit message is a claim like any other and has to come from
 a command whose output you read. Restating a figure from memory, in a message whose
