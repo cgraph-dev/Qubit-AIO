@@ -659,6 +659,11 @@ def _clamp_to_affordable_budget(agent: Any, api_error: Exception, classified: An
     return True
 
 
+def _reject_all_turns(agent: Any, api_error: Exception) -> bool:
+    reject = getattr(agent._get_transport(), "reject_all_turns", None)
+    return bool(reject(api_error)) if callable(reject) else False
+
+
 def recover_after_classification(
     agent: Any, api_error: Exception, classified: Any, _retry: TurnRetryState, *,
     status_code: Optional[int], error_context: Any, messages: List[Dict[str, Any]],
@@ -674,10 +679,11 @@ def recover_after_classification(
     from agent.conversation_loop import _is_nous_inference_route
 
     # The credit-limited 402 clamp runs before pool rotation, which would bench a credential
-    # that still has credit.
+    # that still has credit. A ``reasoning.context`` 400 is classified reasoning_mandatory, whose rung
+    # would drop the whole reasoning config; omit only the all_turns opt-in, ahead of it.
     if _recover_welcome_tier(agent, classified, _retry) or _clamp_to_affordable_budget(
         agent, api_error, classified, _retry
-    ):
+    ) or (agent.api_mode == "codex_responses" and _reject_all_turns(agent, api_error)):
         return True, False
 
     # 401 ``token_expired`` while the transcript still carries ``codex_reasoning_items`` is a
