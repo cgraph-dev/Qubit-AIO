@@ -408,6 +408,39 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(apiMocks.getMcpServers).toHaveBeenCalled();
   });
 
+  it("shows the Session artifacts card for a resumed session", async () => {
+    // /qubit-chat's panel has the artifacts card (drafts/comments/CI);
+    // /chat's did not, so the two panels looked and behaved differently.
+    // A fresh chat has no session to read, so the card stays hidden.
+    await renderTerminal();
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Panel session"),
+    );
+    expect(container.textContent).not.toContain("Session artifacts");
+
+    await act(async () => {
+      root?.unmount();
+    });
+    const { default: TerminalChatPage } = await import("./TerminalChatPage");
+    const c2 = document.createElement("div");
+    document.body.append(c2);
+    const root2 = createRoot(c2);
+    await act(async () => {
+      root2.render(
+        <MemoryRouter initialEntries={["/chat?resume=session-1"]}>
+          <TerminalChatPage isActive />
+        </MemoryRouter>,
+      );
+    });
+    await vi.waitFor(() =>
+      expect(c2.textContent).toContain("Session artifacts"),
+    );
+    await act(async () => {
+      root2.unmount();
+    });
+    c2.remove();
+  });
+
   it("binds the MODEL card to the open session for per-session picks", async () => {
     // Regression: /chat's ChatSidebar got no sessionId, so a model pick fell
     // through to the GLOBAL model.default write ("Main model set to …" for

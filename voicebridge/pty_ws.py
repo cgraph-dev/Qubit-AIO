@@ -63,6 +63,10 @@ TICKET_TTL_S = 30.0
 MAX_SESSIONS = 12
 IDLE_TIMEOUT_S = 30 * 60.0
 MAX_FRAME_BYTES = 1 << 20          # 1 MiB inbound frame cap
+# Replay ring per session (upstream parity: 1 MB). A refresh detaches the
+# socket while the turn keeps printing; on reattach the ring is replayed so
+# the transcript has no hole.
+PTY_BUFFER_CAP = 1 << 20
 PTY_READ_TIMEOUT = 0.2
 PTY_READ_CHUNK = 65536
 POLL_TIMEOUT = 0.05
@@ -633,6 +637,16 @@ class _Session:
     # so the reopened tab presents a NEW key and would otherwise spawn a second
     # terminal that the live one's session lease refuses (#open-in-another-window).
     session_id: str = ""
+    # Bounded ring of PTY output since spawn, replayed to a re-attaching
+    # socket. Upstream parity (``PtySession.buffer``, 1 MB): a browser refresh
+    # detaches the socket while the turn keeps printing, and the pump only
+    # forwards NEW bytes — without this, everything printed during the
+    # refresh gap was lost from the transcript for good.
+    buffer: bytearray = field(default_factory=bytearray)
+    # The socket currently attached (set by the pump), used by the duplicate-
+    # key guard so a second connection is refused fast instead of forking a
+    # second PTY that the TUI's single-writer lease would refuse.
+    sock: Any = None
 
 
 class PtyWsServer:
@@ -954,12 +968,35 @@ class PtyWsServer:
                 prior = self._reattach_session(resume)
                 if prior is not None:
                     prior.key = key
+            if prior is None:
+                # A live terminal already attached under this key (a cloned
+                # tab reusing the attach token) must not fork a second PTY:
+                # the TUI's single-writer session lease refuses the duplicate
+                # and the tab waits until the client's connect budget expires.
+                # Refuse in-band and fast instead (upstream would supersede;
+                # our client mints a unique token per document, so this is a
+                # safety net, not a path the UI takes).
+                with self._lock:
+                    live = next((s for s in self._active.values()
+                                 if s.key == key and s.sock is not None), None)
+                if live is not None:
+                    _fail_chat_start(handler, RuntimeError(
+                        "this chat is already open in another connection; "
+                        "close that tab or press New chat"))
+                    return
             if prior is not None:
                 session = prior
                 with self._lock:
                     self._active[id(session)] = session
-                # The upgrade is already accepted (see above); only the
-                # repaint poke and the pump remain.
+                # Replay everything printed since spawn before live output
+                # resumes: the browser refresh/close left a gap the pump
+                # alone could never fill (upstream PtySession.attach parity).
+                # The TUI runs on the alternate screen, so the replay plus
+                # the forced redraw repaints in place rather than appending.
+                if not _replay_buffer(session, handler.connection):
+                    _fail_chat_start(
+                        handler, RuntimeError("replay to the new socket failed"))
+                    return
                 # The fresh xterm cannot rebuild an idle alternate-screen TUI
                 # from nothing: the pump below only forwards NEW output, so a
                 # reattached-but-quiet terminal stays black until something
@@ -1038,6 +1075,7 @@ class PtyWsServer:
     def _pump(self, handler: Any, session: _Session) -> None:
         sock = handler.connection
         sock.settimeout(POLL_TIMEOUT)
+        session.sock = sock
         bridge = session.bridge
         while True:
             if session.cancelled:
@@ -1064,6 +1102,7 @@ class PtyWsServer:
                 return
             if chunk:
                 session.last_activity = time.monotonic()
+                _buffer_output(session, chunk)
                 if not write_frame(sock, _OP_BIN, chunk):
                     return
             # WS -> PTY
@@ -1250,6 +1289,31 @@ def _safe_pid(bridge: Any) -> int:
         return int(bridge.pid)
     except Exception:
         return -1
+
+
+def _buffer_output(session: Any, chunk: bytes) -> None:
+    """Append to a session's bounded replay ring (oldest bytes drop first)."""
+    buf = getattr(session, "buffer", None)
+    if buf is None:
+        return
+    try:
+        buf.extend(chunk)
+        overflow = len(buf) - PTY_BUFFER_CAP
+        if overflow > 0:
+            del buf[:overflow]
+    except Exception:  # noqa: BLE001 - replay is advisory, never fatal
+        pass
+
+
+def _replay_buffer(session: Any, sock: Any) -> bool:
+    """Send the session's replay ring to a freshly attached socket."""
+    buf = getattr(session, "buffer", None)
+    if not buf:
+        return True
+    try:
+        return write_frame(sock, _OP_BIN, bytes(buf))
+    except Exception:  # noqa: BLE001 - caller treats a failed replay as a drop
+        return False
 
 
 def _fail_chat_start(handler: Any, exc: BaseException) -> None:

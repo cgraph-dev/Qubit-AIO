@@ -30,6 +30,7 @@ import {
   FRESH_CHAT_SESSION_ID,
 } from "@/components/ChatSessionList";
 import { ChatToolsSummary } from "@/components/ChatToolsSummary";
+import { ChatSessionArtifacts } from "@/components/ChatSessionArtifacts";
 import { PluginSlot } from "@/plugins";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { createPtyCompositionForwarder } from "@/lib/pty-composition";
@@ -1491,6 +1492,17 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             <div className="shrink-0">
               <ChatToolsSummary profile={scopedProfile} />
             </div>
+            {/* Session artifacts (drafts / comments / CI) for the open
+                session — the card /qubit-chat's panel has. A fresh chat has
+                no session id yet, so nothing is read. */}
+            {!freshChat && (resumeTarget || resumeParam) ? (
+              <div className="shrink-0">
+                <ChatSessionArtifacts
+                  key={resumeTarget || resumeParam}
+                  sessionId={resumeTarget || resumeParam}
+                />
+              </div>
+            ) : null}
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
                 key={sessionListNonce}
