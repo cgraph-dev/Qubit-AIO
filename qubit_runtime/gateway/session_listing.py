@@ -34,7 +34,7 @@ def stored_picker_sessions(authority, actor, *, limit, include_hidden=False):
                     break
                 continue
             try:
-                validate_legacy_row(db, tip, subject=actor.subject)
+                validate_legacy_row(db, tip)
                 with db._read_ctx() as conn:
                     if not authorize_history(conn, actor, sid):
                         continue
