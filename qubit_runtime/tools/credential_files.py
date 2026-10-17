@@ -243,7 +243,7 @@ def iter_skills_files(container_base: str = "/root/.hermes") -> List[Dict[str, s
 
 # --- Cache directory mounts (documents, images, audio, videos, screenshots) ---
 
-# (new_subpath, old_name) pairs matching qubit_constants.get_hermes_dir().
+# (new_subpath, old_name) pairs matching qubit_constants.get_qubit_dir().
 _GENERATED_CACHE = f"cache/{GENERATED_SUBDIR}"
 _CACHE_DIRS: list[tuple[str, str]] = [
     ("cache/documents", "document_cache"),

@@ -261,7 +261,7 @@ def _managed_launcher(command: str) -> Optional[tuple[str, list[str]]]:
     return executable, dirs
 
 
-def _is_hermes_managed_bin_dir(directory: str) -> bool:
+def _is_qubit_managed_bin_dir(directory: str) -> bool:
     """True for the bin dirs Hermes' bootstrap prepends to this process's PATH: anything
     under the active hermes home (the sealed payload's venv, ``<home>/bin``, PM store
     runtimes) plus the running interpreter's own bin dir (a repo checkout's venv)."""
@@ -317,7 +317,7 @@ def _first_user_which_hit(command: str, path_arg: Optional[str],
     else:
         names = [command + ext for ext in exts]
     for directory in str(path_arg or "").split(os.pathsep):
-        if not directory or _is_hermes_managed_bin_dir(directory):
+        if not directory or _is_qubit_managed_bin_dir(directory):
             continue
         for name in names:
             candidate = os.path.join(directory, name)

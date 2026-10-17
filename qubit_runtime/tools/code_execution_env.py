@@ -154,7 +154,7 @@ def _build_child_env(*, rpc_endpoint: str, rpc_token: str, tmpdir: str,
     # must not inherit Hermes dependencies (#74817). PM's own interpreter, however, can be a
     # bare bundled Python whose dependencies live in the selected generation, not sys.prefix.
     from tools.environments.local_pythonpath import (
-        _strip_hermes_owned_pythonpath, _validated_runtime_venv, _same_path,
+        _strip_qubit_owned_pythonpath, _validated_runtime_venv, _same_path,
     )
     _runtime_path = None
     if child_python == sys.executable:
@@ -168,7 +168,7 @@ def _build_child_env(*, rpc_endpoint: str, rpc_token: str, tmpdir: str,
             if any(_same_path(Path(entry), candidate)
                    for entry in child_env.get("PYTHONPATH", "").split(os.pathsep) if entry):
                 _runtime_path = str(candidate)
-    _strip_hermes_owned_pythonpath(child_env)
+    _strip_qubit_owned_pythonpath(child_env)
     _existing_pp = child_env.get("PYTHONPATH", "")
     _pp_parts = [tmpdir]
     if _runtime_path is not None:
