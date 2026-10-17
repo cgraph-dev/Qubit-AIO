@@ -43,6 +43,8 @@ from typing import Any, Dict, List, Tuple
 
 from . import ember as _ember
 from .mark_field import (
+    GLINT_ARM_FRAC,
+    GLINT_CORE_FRAC,
     PARTICLES,
     RX_FRAC,
     RY_FRAC,
@@ -255,11 +257,17 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         return _hex(_mix(colour, _ember.NEAR_BLACK, a))
 
     def _bead(x: float, y: float, rad: float, lift: float, alpha: float) -> None:
-        """One filled circle: field radius/alpha/lift, dimmed by state."""
+        """A GLINT (four-point star), never an orb: the nucleus is the mark's
+        only solid body. Two thin crossing arms + a small core read as a
+        twinkle at orb size; a filled disc here looked like a marble."""
         if not (float(alpha) > 1e-3) or not (float(rad) > 0.0):
             return
         colour = _mix(fam["core"], (255, 255, 255), lift)
-        _oval(x, y, max(0.4, float(rad)), _dim(colour, float(alpha) * bright))
+        shown = _dim(colour, float(alpha) * bright)
+        arm = max(0.6, float(rad) * GLINT_ARM_FRAC)
+        _line([x - arm, y, x + arm, y], shown, 1)
+        _line([x, y - arm, x, y + arm], shown, 1)
+        _oval(x, y, max(0.4, float(rad) * GLINT_CORE_FRAC), shown)
         fills.append(colour)
 
     def _beads(group: List[Dict[str, float]]) -> None:

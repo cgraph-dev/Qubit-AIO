@@ -78,6 +78,15 @@ def slider_to_opacity(slider: Any) -> float:
         OPACITY_MAX - OPACITY_MIN)
 
 
+def readout_setter(label: Any, fmt: Any) -> Any:
+    """Return a ``valueChanged`` slot that renders a slider readout label."""
+    def _apply(pos: Any) -> None:
+        try:
+            label.setText(fmt(int(pos)))
+        except Exception:
+            pass
+    return _apply
+
 def speed_to_slider(speed: Any) -> int:
     """Option speed (0.4..2.0) -> integer slider position 40..200.
 
@@ -286,13 +295,38 @@ if QWidget is not None:
                 rid = row["id"]
                 kind = row["kind"]
                 if kind == "slider":
-                    layout.addWidget(QLabel(str(row["label"])))
+                    label = QLabel(str(row["label"]))
                     sld = QSlider(Qt.Horizontal, self)
                     sld.setRange(int(row["min"]), int(row["max"]))
+                    # A bare 40..200 slider gives no clue where "slow" is: the
+                    # owner set 96 and reasonably read it as slow when it is
+                    # essentially the 1.00x default. Each slider shows the value
+                    # it actually applies, live.
+                    sld.setTickPosition(QSlider.TicksBelow)
+                    sld.setTickInterval(max(1, (int(row["max"]) - int(row["min"])) // 8))
                     sld.setValue(int(row["value"]))
+                    readout = QLabel("")
+                    readout.setMinimumWidth(56)
+
+                    def _fmt(pos: int, _rid: str = rid) -> str:
+                        try:
+                            if _rid == "speed":
+                                return f"{slider_to_speed(pos):.2f}\u00d7"
+                            if _rid == "opacity":
+                                return f"{slider_to_opacity(pos) * 100:.0f}%"
+                            return str(int(pos))
+                        except Exception:
+                            return ""
+
+                    readout.setText(_fmt(int(row["value"])))
+                    sld.valueChanged.connect(readout_setter(readout, _fmt))
                     sld.valueChanged.connect(self._on_edit)
                     self._sliders[rid] = sld
-                    layout.addWidget(sld)
+                    row_layout = QHBoxLayout()
+                    row_layout.addWidget(sld, 1)
+                    row_layout.addWidget(readout, 0)
+                    layout.addWidget(label)
+                    layout.addLayout(row_layout)
                 elif kind == "check":
                     chk = QCheckBox(str(row["label"]), self)
                     chk.setChecked(bool(row["checked"]))

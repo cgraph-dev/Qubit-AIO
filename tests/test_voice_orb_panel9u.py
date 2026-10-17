@@ -51,9 +51,9 @@ def test_slider_ranges_match_options():
     # opacity/speed sliders use the panel's own integer coordinates.
     assert (rows["opacity"]["min"], rows["opacity"]["max"]) == (0, 100)
     assert (rows["speed"]["min"], rows["speed"]["max"]) == (40, 200)
-    # Defaults land where the widget starts (speed 1.0 -> 100).
+    # Defaults land where the widget starts (speed 1.0 -> the 1.0x position).
     assert rows["opacity"]["value"] == 100
-    assert rows["speed"]["value"] == 100
+    assert panel.slider_to_speed(rows["speed"]["value"]) == pytest.approx(1.0, abs=0.02)
 
 
 def test_color_rows_carry_ember_default_hex():
@@ -88,10 +88,14 @@ def test_speed_slider_roundtrip():
     from voicebridge.orb import panel
     assert panel.slider_to_speed(panel.speed_to_slider(1.5)) == pytest.approx(
         1.5, abs=0.01)
-    assert panel.speed_to_slider(0.4) == 40
+    # The floor moved to 0.25x (owner 2026-10-17: slow motion must be
+    # reachable and visibly slow, not a 4% nudge around the default).
+    assert panel.speed_to_slider(panel.SPEED_MIN) == 40
     assert panel.speed_to_slider(2.0) == 200
-    assert panel.slider_to_speed(40) == pytest.approx(0.4)
+    assert panel.slider_to_speed(40) == pytest.approx(0.25)
     assert panel.slider_to_speed(200) == pytest.approx(2.0)
+    assert panel.slider_to_speed(panel.speed_to_slider(1.0)) == pytest.approx(
+        1.0, abs=0.02)
 
 
 def test_apply_row_change_clamps_and_maps():

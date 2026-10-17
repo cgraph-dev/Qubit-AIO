@@ -22,7 +22,7 @@ OPTIONS_FILENAME = "voice_orb_options.json"
 #: Clamp ranges (single source for the panel sliders + validation).
 SIZE_MIN, SIZE_MAX, SIZE_DEFAULT = 96, 320, 168
 OPACITY_MIN, OPACITY_MAX, OPACITY_DEFAULT = 0.35, 1.0, 1.0
-SPEED_MIN, SPEED_MAX, SPEED_DEFAULT = 0.4, 2.0, 1.0
+SPEED_MIN, SPEED_MAX, SPEED_DEFAULT = 0.25, 2.0, 1.0
 
 #: Per-action color overrides are optional; empty means "use ember's
 #: built-in palette". Keys are the orb states.

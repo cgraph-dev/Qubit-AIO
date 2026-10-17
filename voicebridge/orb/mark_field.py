@@ -51,15 +51,15 @@ HALO_BASE = 0.22
 HALO_WIDTH = 1.0
 
 # --------------------------------------------------------------- 3D depth
-DEPTH_RADIUS_BASE = 0.50
-DEPTH_RADIUS_GAIN = 0.85
-DEPTH_ALPHA_BASE = 0.30
-DEPTH_ALPHA_GAIN = 0.70
+DEPTH_RADIUS_BASE = 0.42
+DEPTH_RADIUS_GAIN = 1.05
+DEPTH_ALPHA_BASE = 0.20
+DEPTH_ALPHA_GAIN = 0.85
 DEPTH_LIFT_BASE = 0.04
 DEPTH_LIFT_GAIN = 0.42
-DEPTH_PARALLAX = 0.09
+DEPTH_PARALLAX = 0.14
 #: Far points contract slightly toward the centre: a cheap perspective cue.
-DEPTH_PERSPECTIVE = 0.06
+DEPTH_PERSPECTIVE = 0.11
 
 # ------------------------------------------------------------ camera drift
 CAMERA_SWAY_FRAC = 0.016
@@ -67,9 +67,9 @@ CAMERA_SPEED_X = 0.27
 CAMERA_SPEED_Y = 0.19
 
 # ------------------------------------------------------------------ orbits
-PRECESSION_DEG = 9.0
-PRECESSION_PERIOD_NEAR = 41.0
-PRECESSION_PERIOD_FAR = 57.0
+PRECESSION_DEG = 24.0
+PRECESSION_PERIOD_NEAR = 29.0
+PRECESSION_PERIOD_FAR = 43.0
 RING_SWAY_DEG = 6.0
 RING_PERIOD_NEAR = 23.0
 RING_PERIOD_FAR = 31.0
@@ -81,8 +81,8 @@ SPEED_MOD_HZ = 0.7
 TRAIL_SAMPLES = 6
 TRAIL_STEP_NEAR_DEG = 6.0
 TRAIL_STEP_FAR_DEG = 4.0
-TRAIL_ALPHA_BASE = 0.34
-TRAIL_RADIUS_BASE = 0.62
+TRAIL_ALPHA_BASE = 0.26
+TRAIL_RADIUS_BASE = 0.42
 TRAIL_FALLOFF = 1.6
 
 # ------------------------------------------------------------- shockwave
@@ -90,6 +90,16 @@ SHOCKWAVE_S = 0.50
 SHOCKWAVE_MAX_SCALE = 2.30
 SHOCKWAVE_ALPHA = 0.20
 SHOCKWAVE_WIDTH = 1.0
+
+#: A particle is a GLINT (a twinkling four-point star), never a filled orb —
+#: the nucleus is the mark's only solid body. ``GLINT_ARM_FRAC`` is the star
+#: arm length as a multiple of the particle radius, and the twinkle period is
+#: per-particle so the field shimmers instead of pulsing in unison.
+GLINT_ARM_FRAC = 3.0
+GLINT_CORE_FRAC = 0.42
+GLINT_TWINKLE_BASE_S = 1.6
+GLINT_TWINKLE_SPAN_S = 1.9
+GLINT_MIN_ALPHA = 0.35
 
 #: The nine logo particles: (orbit, seed_deg, radius_px_at_96, period_s).
 PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
@@ -261,14 +271,31 @@ def particle_state(t: Any, R: float) -> List[Dict[str, float]]:
         x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
         nx, ny = (math.sin(math.radians(tilt)), -math.cos(math.radians(tilt)))
         # Parallax along the orbit normal, then the camera sway.
+        tw = glint(tt, seed)
         out.append({
             "index": float(idx), "orbit": orbit, "angle": ang, "depth": depth,
             "x": x + nx * par + dx, "y": y + ny * par * 0.35 + dy,
-            "size": _depth_size(depth, size96 * scale),
-            "alpha": _depth_alpha(depth),
+            "size": _depth_size(depth, size96 * scale) * tw["scale"],
+            "alpha": _depth_alpha(depth) * tw["alpha"],
             "lift": _depth_lift(depth),
+            "glint_scale": tw["scale"], "glint_alpha": tw["alpha"],
         })
     return out
+
+
+def glint(t: Any, seed: float) -> Dict[str, float]:
+    """Twinkle factors for one glint: ``scale`` and ``alpha`` multipliers.
+
+    Deterministic per-particle phase so the field shimmers rather than
+    blinking in unison. Never below ``GLINT_MIN_ALPHA`` so a glint is always
+    faintly present instead of popping in and out of existence.
+    """
+    tt = _finite(t)
+    period = GLINT_TWINKLE_BASE_S + GLINT_TWINKLE_SPAN_S * hash01(int(seed) % 97, 17.3)
+    phase = (tt / max(0.1, period) + seed / 360.0) % 1.0
+    wave = 0.5 * (1.0 - math.cos(2.0 * math.pi * phase))
+    return {"scale": 0.75 + 0.45 * wave,
+            "alpha": GLINT_MIN_ALPHA + (1.0 - GLINT_MIN_ALPHA) * wave}
 
 
 def trails(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, float]]:
@@ -413,5 +440,6 @@ __all__ = [
     "COMET_ALPHA", "SPARKLE_COUNT", "SPARKLE_MAX_ALPHA", "SPARKLE_LIFT",
     "PRECESSION_DEG", "RING_SWAY_DEG", "CAMERA_SWAY_FRAC", "SPEED_MOD_AMP", "hash01", "camera_offset", "orbit_tilts",
     "orbit_point", "heartbeat", "nucleus_scale", "shockwave", "particle_state",
+    "glint", "GLINT_ARM_FRAC", "GLINT_CORE_FRAC",
     "trails", "dust_state", "comet", "sparkles",
 ]

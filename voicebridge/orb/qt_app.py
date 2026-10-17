@@ -220,7 +220,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     (never gradient or blur fills), beads are small filled circles, and
     reduced motion paints a completely static, sparkle-free frame.
     """
-    from PySide6.QtCore import QRectF
+    from PySide6.QtCore import QPointF, QRectF
     from PySide6.QtGui import QColor, QPainterPath, QPen
 
     def _clamp8(v: Any) -> int:
@@ -336,8 +336,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 _dot(cx + smp["x"], cy + smp["y"],
                      _num(smp.get("size"), 0.0),
                      _num(smp.get("alpha"), 0.0) * bright, trail_rgb)
-        _dot(px, py, max(0.35, _num(part.get("size"), 0.0)),
-             _num(part.get("alpha"), 0.0) * bright, _lift(bead_lift))
+        # A particle is a GLINT, not an orb (owner 2026-10-17): the nucleus is
+        # the mark's only solid body. Two thin crossing arms plus a small core
+        # read as a twinkling star at this size and stay crisp — a filled disc
+        # here was what made the field look like marbles.
+        size = max(0.35, _num(part.get("size"), 0.0))
+        alpha = _num(part.get("alpha"), 0.0) * bright
+        rgb = _lift(bead_lift)
+        arm = size * _field.GLINT_ARM_FRAC
+        pen = QPen(QColor(rgb[0], rgb[1], rgb[2], int(255 * min(1.0, alpha))))
+        pen.setWidthF(1.0)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+        p.drawLine(QPointF(px - arm, py), QPointF(px + arm, py))
+        p.drawLine(QPointF(px, py - arm), QPointF(px, py + arm))
+        _dot(px, py, max(0.25, size * _field.GLINT_CORE_FRAC), alpha, rgb)
 
     def _dust(mote: Dict[str, Any]) -> None:
         _dot(cx + mote["x"], cy + mote["y"],
