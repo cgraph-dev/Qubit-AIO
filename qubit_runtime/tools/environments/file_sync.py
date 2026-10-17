@@ -28,6 +28,7 @@ import psutil
 
 from qubit_constants import get_qubit_home
 from tools.environments.base import _file_mtime_key
+from utils import mtime_is_racy
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,9 @@ logger = logging.getLogger(__name__)
 # call counts.
 _sleep = time.sleep
 _monotonic = time.monotonic
+
+# Synced-state key no stat result equals (see _plan_sync): forces a content check next sync.
+_RACY_SYNC_KEY = (-1, -1)
 
 _SYNC_INTERVAL_SECONDS = 5.0
 _FORCE_SYNC_ENV = "HERMES_FORCE_FILE_SYNC"
@@ -272,8 +276,15 @@ class FileSyncManager:
             file_key = _file_mtime_key(host_path)
             if file_key is None or self._synced_files.get(remote_path) == file_key:
                 continue
+            # A key whose mtime is still inside the racy window is recorded as never-matching: a
+            # same-size rewrite in the same coarse tick would keep every stat field (ctime ticks
+            # just as coarsely). The next sync then confirms the bytes against the pushed hash.
+            recorded_key = _RACY_SYNC_KEY if mtime_is_racy(file_key[0]) else file_key
+            new_files[remote_path] = recorded_key
+            pushed_hash = self._pushed_hashes.get(remote_path)
+            if pushed_hash is not None and _sha256_file(host_path) == pushed_hash:
+                continue  # the remote already holds these bytes
             to_upload.append((host_path, remote_path))
-            new_files[remote_path] = file_key
         current_remote_paths = {remote for _, remote in current_files}
         to_delete = [p for p in self._synced_files if p not in current_remote_paths]
         return to_upload, new_files, to_delete
