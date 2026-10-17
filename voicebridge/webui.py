@@ -1295,12 +1295,17 @@ class WebUIHandler(BaseHTTPRequestHandler):
         return self.server.app  # type: ignore[attr-defined]
 
     # -- helpers ---------------------------------------------------------
-    def _send(self, code: int, body: bytes, ctype: str = "text/plain") -> None:
+    def _send(self, code: int, body: bytes, ctype: str = "text/plain",
+              extra_headers: Optional[list] = None) -> None:
         try:
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            # Caller-supplied headers (e.g. the office nonce Set-Cookie). Kept
+            # explicit and narrow so the general response shape is unchanged.
+            for k, v in (extra_headers or []):
+                self.send_header(k, v)
             # CORS (Packet 1B): only exact configured origins; no wildcard.
             origin = self.headers.get("Origin", "")
             for k, v in cors_headers_for(self.app.allowed_origins, origin):
@@ -1530,6 +1535,83 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return True
         return self._api_token_ok()
 
+    #: Name of the HttpOnly cookie that carries the office app's load nonce. A
+    #: browser attaches it to every same-origin request the iframe makes — FETCH
+    #: and EventSource alike — so the app never has to attach a header itself.
+    OFFICE_NONCE_COOKIE = "qubit_office_nonce"
+
+    #: A nonce lives long enough for a page load plus its first fetches and the
+    #: SSE stream, and no longer. Refreshing the office tab mints a new one.
+    OFFICE_NONCE_TTL_SECONDS = 12 * 3600
+
+    def _issue_office_nonce(self) -> str:
+        """Mint a fresh office-app load nonce and remember it until it expires.
+
+        Called only when the office DOCUMENT is served to a loopback peer. The
+        value is random (``secrets``), single-purpose, and stored in-process
+        with a TTL; expired entries are pruned on every issue so the map cannot
+        grow without bound.
+        """
+        import secrets
+        import time as _time
+        nonce = secrets.token_urlsafe(32)
+        now = _time.monotonic()
+        app = self.app
+        if getattr(app, "_office_nonce_lock", None) is None:
+            app._office_nonces = {}
+            app._office_nonce_lock = threading.Lock()
+        with app._office_nonce_lock:
+            dead = [n for n, exp in app._office_nonces.items() if exp < now]
+            for n in dead:
+                app._office_nonces.pop(n, None)
+            app._office_nonces[nonce] = now + self.OFFICE_NONCE_TTL_SECONDS
+        return nonce
+
+    def _office_nonce_ok(self) -> bool:
+        """True when the request carries a LIVE office-app load nonce cookie.
+
+        THIS IS THE FIX for the forged-Referer reads. ``Referer`` (and
+        ``Origin`` / ``Sec-Fetch-*``) are caller-supplied, so a bare
+        ``curl -H 'Referer: .../plugin-apps/qubit-office/habblaud/'`` proved
+        nothing and read real office transcripts. The cookie is issued by THIS
+        server when it serves the office document and is unguessable, so the
+        one-line forgery no longer authorises anything.
+
+        HONEST LIMIT: this is NOT cryptographic proof that the caller is the
+        iframe. A local process that performs the full handshake — GET the
+        office document, keep the ``Set-Cookie``, replay it — still passes. What
+        it removes is the *blind* forgery the brief measured: the attacker must
+        now run the real bootstrap, hold a live per-load nonce, and it expires.
+        Every header a client can send is replayable by a client that speaks
+        HTTP; no header scheme can do better, which is why this is a nonce and
+        not another header comparison.
+        """
+        import time as _time
+        raw = self.headers.get("Cookie", "") or ""
+        if not raw:
+            return False
+        presented = ""
+        for part in raw.split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == self.OFFICE_NONCE_COOKIE:
+                presented = v
+                break
+        if not presented:
+            return False
+        now = _time.monotonic()
+        app = self.app
+        lock = getattr(app, "_office_nonce_lock", None)
+        if lock is None:
+            return False
+        with lock:
+            exp = getattr(app, "_office_nonces", {}).get(presented)
+            if exp is None:
+                return False
+            if exp < now:
+                app._office_nonces.pop(presented, None)
+                return False
+        return True
+
     def _office_app_caller_ok(self, *, blind_probe: bool = False) -> bool:
         """Auth for the vendored office app's routes.
 
@@ -1597,8 +1679,20 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if host not in ("127.0.0.1", "localhost", "::1"):
             return False
 
+        # THE FORGED-HEADER CLOSE. Until this change the ONLY remaining proof
+        # was `OFFICE_APP_PREFIX in Referer`, which is caller-supplied: a bare
+        # `curl -H 'Referer: .../plugin-apps/qubit-office/habblaud/'` read real
+        # office transcripts (measured: /api/agents/ceo → 200 with history).
+        # The Referer is still REQUIRED (it keeps off-app documents out), but it
+        # is no longer SUFFICIENT: the caller must also present the live,
+        # server-issued load nonce the office document carried as a cookie. A
+        # header-only forgery cannot mint that nonce, so the one-line bypass is
+        # closed while the app's own fetches and SSE stream (which send the
+        # cookie automatically) keep working.
         referer = self.headers.get("Referer", "") or ""
         if OFFICE_APP_PREFIX not in referer:
+            return False
+        if not self._office_nonce_ok():
             return False
         # The capability bootstrap fetch is issued at module evaluation before
         # the iframe is navigated/bridged. Keep this exception confined to that
@@ -1693,7 +1787,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if host not in ("127.0.0.1", "localhost", "::1"):
             return False
         referer = self.headers.get("Referer", "") or ""
-        return OFFICE_APP_PREFIX in referer
+        if OFFICE_APP_PREFIX not in referer:
+            return False
+        # THE FORGED-HEADER CLOSE (S2). The Referer alone is caller-supplied and
+        # gave a bare `curl -H 'Referer: .../plugin-apps/qubit-office/habblaud/'`
+        # the office client's read surface (measured: /api/agents/ceo → 200 with
+        # real transcript, /api/sessions/recent, /api/stats → 200). Require the
+        # live server-issued load nonce cookie in addition; the app's same-origin
+        # fetches send it automatically, so the front door still answers the app.
+        return self._office_nonce_ok()
 
     def _serve_office_client_api(self, method: str) -> None:
         """The vendored office client's LITERAL ``/api/*`` front door.
@@ -2170,7 +2272,20 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._send(404, b"not found")
             return
         token = getattr(self.app, "api_token", "") or ""
-        if token and self._peer_is_loopback():
+        extra_headers: list = []
+        loopback = self._peer_is_loopback()
+        if loopback:
+            # Issue the office load nonce for the document the iframe is about
+            # to evaluate. The browser attaches this HttpOnly cookie to every
+            # same-origin request the app makes — FETCH and EventSource alike —
+            # so the app never attaches a header, and the forged-Referer bypass
+            # has nothing to replay. Issued EVEN with no configured token: the
+            # office gates now require the nonce regardless.
+            nonce = self._issue_office_nonce()
+            extra_headers.append(("Set-Cookie",
+                "%s=%s; Path=/; HttpOnly; SameSite=Strict"
+                % (self.OFFICE_NONCE_COOKIE, nonce)))
+        if token and loopback:
             from urllib.parse import quote
             stream_url = "/api/stream?token=" + quote(token, safe="")
             inject = (
@@ -2183,7 +2298,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 html = html.replace("</head>", inject + "</head>", 1)
             else:
                 html = inject + html
-        self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+        self._send(200, html.encode("utf-8"), "text/html; charset=utf-8",
+                   extra_headers=extra_headers)
 
     def _serve_qubit_plugin(self, sub: str) -> None:
         from . import resources as _resources
@@ -5132,6 +5248,16 @@ class WebUI:
                         _tb.format_exc(limit=3)[-300:])
         # optional shared secret for tunneled/external access (config: webui.token)
         self.api_token: str = orchestrator.cfg.get("webui", "token", default="") if orchestrator is not None else ""
+        # Office-app load nonce (the forged-Referer close). A Referer header is
+        # caller-supplied, so `Referer: .../plugin-apps/qubit-office/habblaud/`
+        # on a bare curl read real office transcripts. The nonce is a
+        # server-issued, per-document, expiring secret delivered as an
+        # HttpOnly cookie when the office document is served, and echoed back
+        # automatically on the app's own same-origin fetches AND its
+        # EventSource (both send cookies). A blind local process with no live
+        # nonce is refused; see `_issue_office_nonce` / `_office_nonce_ok`.
+        self._office_nonces: Dict[str, float] = {}
+        self._office_nonce_lock = threading.Lock()
         self.allowed_origins = orchestrator.cfg.get("webui", "allowed_origins", default=[]) if orchestrator is not None else []
         # Qubit terminal WebSocket (/agent/api/pty): one upgrade path on THIS
         # listener, no second server. Lazily constructed so the module (and the

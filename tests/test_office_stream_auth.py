@@ -12,15 +12,30 @@ if str(REPO_ROOT) not in sys.path:
 from voicebridge import webui as W  # noqa: E402
 
 
+#: A stand-in for the server-issued office load nonce. The gate requires it in
+#: addition to the loopback/Host/Referer triple; the mocked app knows this one
+#: and the request echoes it as the cookie a real browser sends.
+_STREAM_NONCE = "test-stream-nonce-def456"
+
+
 def _handler(*, peer="127.0.0.1", host="127.0.0.1:8890", referer=None,
-             path="/api/stream", token="secret"):
+             path="/api/stream", token="secret", nonce=_STREAM_NONCE):
+    import threading as _th
+    import time as _tm
     h = object.__new__(W.WebUIHandler)
     h.path = path
     h.client_address = (peer, 1234)
     h.headers = {"Host": host}  # type: ignore[assignment]
     if referer:
         h.headers["Referer"] = referer
-    h.server = type("S", (), {"app": type("A", (), {"api_token": token})()})()  # type: ignore[assignment]
+    if nonce is not None:
+        h.headers["Cookie"] = "%s=%s" % (W.WebUIHandler.OFFICE_NONCE_COOKIE,
+                                         nonce)
+    _app = type("A", (), {"api_token": token})()
+    _app._office_nonces = ({_STREAM_NONCE: _tm.monotonic() + 3600}
+                           if nonce else {})
+    _app._office_nonce_lock = _th.Lock()
+    h.server = type("S", (), {"app": _app})()  # type: ignore[assignment]
     h._api_token_ok = lambda: False
     return h
 
@@ -75,6 +90,26 @@ def test_unconfigured_local_app_referer_remains_allowed():
     h = _handler(referer="http://127.0.0.1:8890/plugin-apps/qubit-office/habblaud/",
                  token="")
     assert h._office_app_caller_ok() is True
+
+
+def test_configured_referer_without_a_live_nonce_is_refused():
+    """The forged-header close: a Referer alone no longer authorises the stream.
+
+    A bare local process could send ``Referer: .../plugin-apps/qubit-office/
+    habblaud/`` on ``/api/stream`` and read the office feed. Without the
+    server-issued load nonce that request is now refused.
+    """
+    ref = "http://127.0.0.1:8890/plugin-apps/qubit-office/habblaud/"
+    assert _handler(referer=ref, nonce=None)._office_app_caller_ok() is False
+    assert _handler(referer=ref, nonce="attacker")._office_app_caller_ok() is False
+    # With a configured token the stream still needs its credential: the Referer
+    # and the live nonce are necessary but the token (query, for EventSource) is
+    # what authorises the stream when one is set — as the app's
+    # `__QUBIT_OFFICE_STREAM_URL__` carries.
+    assert _handler(path="/api/stream?token=secret", referer=ref) \
+        ._office_app_caller_ok() is True
+    # With NO configured token, the pair (Referer + live nonce) authorises it.
+    assert _handler(referer=ref, token="")._office_app_caller_ok() is True
 
 
 def test_non_loopback_client_cannot_use_no_token_exception():
