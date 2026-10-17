@@ -73,7 +73,7 @@ FIRST_TASKS: tuple[FirstTask, ...] = (
             "Use the skills this chat loaded.",
             "Screen 3, out in the world: cron jobs, connectors and messaging, one example each built on their apps.",
         ),
-        output="One HTML file in ~/hermes-first-task/, three screens that each fill the pane with one animated "
+        output="One HTML file in ~/qubit-first-task/, three screens that each fill the pane with one animated "
                "graphic; open in the preview pane.",
         quality="Every name and number comes from the docs or this install. A few short lines per screen.",
         done="All three screens move and show real facts, and you said where the file is."),
@@ -130,7 +130,7 @@ FIRST_TASKS: tuple[FirstTask, ...] = (
             "and re-render once at most.",
             "Save only the new scene with bpy.data.libraries.write as scene.blend, and the code as scene.py.",
         ),
-        output="scene.blend, scene.py, preview.png and render.png in ~/hermes-first-task/; the render open in the "
+        output="scene.blend, scene.py, preview.png and render.png in ~/qubit-first-task/; the render open in the "
                "preview pane.",
         quality="Made in their open Blender, never headless, never a placeholder.",
         done="The final still is shown and you named the files. Next-step idea: a turntable video or a GPU Cycles "
@@ -144,7 +144,7 @@ FIRST_TASKS: tuple[FirstTask, ...] = (
             "Show a first version early, then fill it in: what needs attention, what changed, what is next.",
             "Offer a morning cron job that sends the brief. Schedule it only on yes.",
         ),
-        output="One designed HTML page in ~/hermes-first-task/, open in the preview pane.",
+        output="One designed HTML page in ~/qubit-first-task/, open in the preview pane.",
         quality="Every item comes from a connected app and says which one. Nothing invented.",
         done="The brief is shown and the morning job is set up or declined."),
     FirstTask(
@@ -156,7 +156,7 @@ FIRST_TASKS: tuple[FirstTask, ...] = (
             "Show a first version early, then fill it in: meetings, threads, work shipped, open loops.",
             "End with a short plan for next week built from the open loops.",
         ),
-        output="One designed HTML page in ~/hermes-first-task/, open in the preview pane.",
+        output="One designed HTML page in ~/qubit-first-task/, open in the preview pane.",
         quality="Every item comes from a connected app and says which one. Nothing invented.",
         done="The page is shown with all five parts filled from real data."),
     FirstTask(
@@ -179,7 +179,7 @@ FIRST_TASKS: tuple[FirstTask, ...] = (
             "Write an index page and three linked topic pages, each citing the notes it came from.",
             "Show the index page.",
         ),
-        output="Four Markdown pages in ~/hermes-first-task/wiki/, unless they ask for their notes folder.",
+        output="Four Markdown pages in ~/qubit-first-task/wiki/, unless they ask for their notes folder.",
         quality="Only what their notes say. Every link resolves.",
         done="The four pages exist, the links work and the index is shown."),
     FirstTask(
@@ -194,7 +194,7 @@ FIRST_TASKS: tuple[FirstTask, ...] = (
             "Research it with citations (load arxiv for a technical topic), then write short sections around the "
             "figure. End on the most surprising thing you found.",
         ),
-        output="One HTML file in ~/hermes-first-task/, open in the preview pane, sources at the end.",
+        output="One HTML file in ~/qubit-first-task/, open in the preview pane, sources at the end.",
         quality="Every claim and every number in the figure is cited. Under 400 words of text.",
         done="The figure responds to input and every source is listed."),
     FirstTask(
@@ -206,7 +206,7 @@ FIRST_TASKS: tuple[FirstTask, ...] = (
             "Pull out the main ideas, each with a timestamp and a quote.",
             "Show a first version early, then lay the ideas out visually, with one figure where it helps.",
         ),
-        output="One self-contained HTML file in ~/hermes-first-task/, open in the preview pane; each "
+        output="One self-contained HTML file in ~/qubit-first-task/, open in the preview pane; each "
                "timestamp links to that moment in the video.",
         quality="Designed with claude-design. Quotes are exact words from the transcript.",
         done="The page is shown and every idea has its timestamp and quote."),
@@ -231,7 +231,7 @@ FIRST_TASKS: tuple[FirstTask, ...] = (
             "Show a first version early with a p5js hero, then refine the same file.",
             "Offer one variation.",
         ),
-        output="One self-contained HTML file in ~/hermes-first-task/, open in the preview pane.",
+        output="One self-contained HTML file in ~/qubit-first-task/, open in the preview pane.",
         quality="Designed with the skills. Real content they gave you, never filler text.",
         done="The page is shown and a variation is offered."),
     FirstTask(
@@ -243,7 +243,7 @@ FIRST_TASKS: tuple[FirstTask, ...] = (
             "Read its entry points and main modules.",
             "Draw the architecture page: the modules, how they connect, where to start reading.",
         ),
-        output="One self-contained HTML file in ~/hermes-first-task/, open in the preview pane.",
+        output="One self-contained HTML file in ~/qubit-first-task/, open in the preview pane.",
         quality="Only modules that are really in the repo, named by their paths.",
         done="The page is shown and every box on it maps to a real path."),
 )
