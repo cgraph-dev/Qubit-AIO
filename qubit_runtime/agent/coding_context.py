@@ -291,6 +291,17 @@ def _enabled_mcp_servers(config: Optional[dict[str, Any]]) -> list[str]:
         return []
 
 
+def _posture_toolsets(config: Optional[dict[str, Any]]) -> list[str]:
+    """The coding posture's toolset list; callers own the ``focus`` check."""
+    return [CODING_TOOLSET, *_enabled_mcp_servers(config)]
+
+
+def focus_toolsets(config: Optional[dict[str, Any]]) -> Optional[list[str]]:
+    """The coding posture's toolsets when ``agent.coding_context`` is ``focus``, else None, for a
+    session whose workspace decision is already made (no cwd probe)."""
+    return _posture_toolsets(config) if _coding_mode(config) == "focus" else None
+
+
 # ── RuntimeMode (the seam) ──────────────────────────────────────────────────
 
 @dataclass(frozen=True)
@@ -391,8 +402,16 @@ def is_coding_context(*, platform: Optional[str] = None, cwd: Optional[str | Pat
     return resolve_runtime_mode(platform=platform, cwd=cwd, config=config).is_coding
 
 
+def in_focus_workspace(*, platform: Optional[str] = None, cwd: Optional[str | Path] = None, config: Optional[dict[str, Any]] = None) -> bool:
+    """Whether *cwd* selects the coding posture's toolsets (``focus`` and a code workspace), without
+    building them; ``focus_toolsets`` builds them once the decision is made."""
+    return _coding_mode(config) == "focus" and is_coding_context(platform=platform, cwd=cwd, config=config)
+
+
 def coding_selection(*, platform: Optional[str] = None, cwd: Optional[str | Path] = None, config: Optional[dict[str, Any]] = None) -> Optional[list[str]]:
     """Toolset selection for the coding posture (``None`` unless ``focus`` and active)."""
+    if _coding_mode(config) != "focus":  # only focus swaps toolsets: skip the workspace probe
+        return None
     return resolve_runtime_mode(platform=platform, cwd=cwd, config=config).toolset_selection(config)
 
 
