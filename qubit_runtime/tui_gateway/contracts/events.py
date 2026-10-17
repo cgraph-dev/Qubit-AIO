@@ -107,10 +107,23 @@ class NoticePayload(Payload):
 event("notice", NoticePayload, doc="Informational one-liner for the session (capabilities refreshed).")
 
 
-# ── turn stream ───────────────────────────────────────────────────────────────────────────────
+# ── turn stream ───────────────────────────────────────────────────────────────
 
 
-event("message.start", None, doc="A turn began streaming; no payload.")
+class MessageStartPayload(Payload):
+    """``message.start``. Empty from the TUI gateway's emitters and for an ordinary admission;
+    ``gateway/session_authority._stamp_claim`` adds an automation admission's async-result card
+    (``session_automation.admission_display``: a background-process completion) and its model
+    text, so a viewer that did not submit the turn paints the same header the submitter would."""
+
+    display_kind: str | None = None
+    display_text: str | None = None
+    notification_category: str | None = None
+    text: str | None = None
+
+
+event("message.start", MessageStartPayload,
+      doc="A turn began streaming; an automation turn carries its async-result card.")
 
 
 class StreamDeltaPayload(Payload):
@@ -123,7 +136,15 @@ class StreamDeltaPayload(Payload):
     verbose: bool | None = None
 
 
-event("message.delta", StreamDeltaPayload, doc="One streamed chunk of the assistant reply.")
+class MessageDeltaPayload(StreamDeltaPayload):
+    """``message.delta``. A session-authority local-viewer turn also publishes ``text: null``: the
+    reply segment boundary (the agent's ``stream_delta_callback(None)``, before tool lines) that
+    closes the classic CLI's reply box. Every other viewer ignores an empty chunk."""
+
+    text: str | None
+
+
+event("message.delta", MessageDeltaPayload, doc="One streamed chunk of the assistant reply (null text: segment boundary).")
 event("reasoning.delta", StreamDeltaPayload, doc="One streamed chunk of the model's reasoning.")
 event("reasoning.available", StreamDeltaPayload, doc="A completed reasoning block (non-streaming providers).")
 event("thinking.delta", StreamDeltaPayload, doc="Legacy thinking-text chunk (thinking_callback).")

@@ -4690,6 +4690,19 @@ export interface ErrorPayload {
 export interface NoticePayload {
   message: string
 }
+/** ``message.start``. Empty from the TUI gateway's emitters and for an ordinary admission; ``gateway/session_authority._stamp_claim`` adds an automation admission's async-result card (``session_automation.admission_display``: a background-process completion) and its model text, so a viewer that did not submit the turn paints the same header the submitter would. */
+export interface MessageStartPayload {
+  display_kind?: string | null
+  display_text?: string | null
+  notification_category?: string | null
+  text?: string | null
+}
+/** ``message.delta``. A session-authority local-viewer turn also publishes ``text: null``: the reply segment boundary (the agent's ``stream_delta_callback(None)``, before tool lines) that closes the classic CLI's reply box. Every other viewer ignores an empty chunk. */
+export interface MessageDeltaPayload {
+  text: string | null
+  rendered?: string | null
+  verbose?: boolean | null
+}
 /** ``prompt_turn._invoke_agent._stream`` (message.delta: ``text`` + optional ``rendered``), ``agent_callbacks._agent_cbs`` (reasoning.delta / thinking.delta), ``tool_progress._progress_reasoning`` (reasoning.available). ``verbose`` rides only when the session's verbose reasoning mode is on. */
 export interface StreamDeltaPayload {
   text: string
@@ -5905,14 +5918,14 @@ export interface BackendGatewayEventMap {
   'layout.apply': LayoutApplyPayload
   /** The turn ended: final text, usage and outcome. */
   'message.complete': MessageCompletePayload
-  /** One streamed chunk of the assistant reply. */
-  'message.delta': StreamDeltaPayload
+  /** One streamed chunk of the assistant reply (null text: segment boundary). */
+  'message.delta': MessageDeltaPayload
   /** Interim assistant commentary (text beside tool calls) sealed as its own segment. */
   'message.interim': MessageInterimPayload
   /** The agent reacted to a message; paint it live. */
   'message.reaction': MessageReactionPayload
-  /** A turn began streaming; no payload. */
-  'message.start': Record<string, never>
+  /** A turn began streaming; an automation turn carries its async-result card. */
+  'message.start': MessageStartPayload
   /** The MoA aggregator started. */
   'moa.aggregating': MoaAggregatingPayload
   /** MoA phase transition (currently only ``aggregator``). */
