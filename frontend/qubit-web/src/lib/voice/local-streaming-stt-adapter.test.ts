@@ -152,6 +152,31 @@ describe("LocalStreamingSTTAdapter", () => {
     expect(finals).toEqual(["hello world"]);
   });
 
+  it("surfaces the server's no-transcript warning instead of a silent turn", async () => {
+    const socket = fakeSocket();
+    const { adapter, errors, finals } = await startAdapter({ socket });
+    const requestId = (
+      JSON.parse(String(socket.sent[0])) as { request_id: string }
+    ).request_id;
+    const stopP = adapter.stop();
+    // Server stopped with no transcript and explained why (nothing buffered
+    // vs rescore failure) — the turn must say so, not go quiet.
+    socket.onmessage?.({
+      data: JSON.stringify({
+        type: "stt.completed",
+        request_id: requestId,
+        cancelled: false,
+        final_text: "",
+        warning_code: "STT_NO_TRANSCRIPT",
+        warning: "no buffered audio",
+        metrics: { audio_ms: 0 },
+      }),
+    });
+    await stopP;
+    expect(finals).toEqual([]);
+    expect(errors).toEqual([["STT_NO_TRANSCRIPT", "no buffered audio"]]);
+  });
+
   it("ignores stale request events", async () => {
     const socket = fakeSocket();
     const { adapter, partials } = await startAdapter({ socket });
