@@ -1998,7 +1998,7 @@ def interactive_setup() -> None:
         allowed = ask("Allowed users (comma-separated npubs or hex pubkeys, empty to deny everyone)", "BUZZ_ALLOWED_USERS")
         save_env_value("BUZZ_ALLOWED_USERS", allowed.replace(" ", "") if allowed else "")
     print()
-    print_success("Buzz configuration saved to ~/.hermes/.env")
+    print_success("Buzz configuration saved to ~/.qubit/.env")
     print_info("Restart the gateway for changes to take effect: qubit gateway restart")
 
 

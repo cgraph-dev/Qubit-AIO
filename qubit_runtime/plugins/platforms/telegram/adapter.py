@@ -2551,8 +2551,8 @@ class TelegramAdapter(BasePlatformAdapter):
             f"Telegram polling could not recover after {MAX_CONFLICT_RETRIES} retries "
             f"({sum(10 + i * 10 for i in range(1, MAX_CONFLICT_RETRIES + 1))}s total wait). "
             "The previous gateway session is still held open on Telegram's servers, "
-            "or another process is using the same bot token. To recover: ensure no other Hermes or OpenClaw instance is running "
-            "with this token, then restart the gateway with 'hermes gateway restart'.")
+            "or another process is using the same bot token. To recover: ensure no other Qubit or OpenClaw instance is running "
+            "with this token, then restart the gateway with 'qubit gateway restart'.")
         logger.error("[%s] %s Original error: %s", self.name, message, _redact_telegram_error_text(error))
         # Snapshot whether WE transition to fatal: a concurrent retry task suspended past the entry
         # guard reaches this branch too. Only the first transition notifies.

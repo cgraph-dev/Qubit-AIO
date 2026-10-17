@@ -405,7 +405,7 @@ def interactive_setup() -> None:
             save_env_value("IRC_ALLOWED_USERS", "")
             print_info("No nicks allowed — the bot will ignore all messages until you add nicks.")
     print()
-    print_success("IRC configuration saved to ~/.hermes/.env")
+    print_success("IRC configuration saved to ~/.qubit/.env")
     print_info("Restart the gateway for changes to take effect: qubit gateway restart")
 
 
