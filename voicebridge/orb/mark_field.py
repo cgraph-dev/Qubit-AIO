@@ -136,6 +136,28 @@ COMET_SIZE = 1.5
 COMET_ALPHA = 0.95
 COMET_LIFT = 0.80
 
+# ------------------------------------------------------- echo (follower) rings
+#: Two THINNER rings that follow the two main orbits: same tilt, lagged by a
+#: phase and slightly scaled, so each orbit trails a ghost of itself. The lag
+#: is what makes the pair read as one connected system rather than two decals.
+ECHO_LAG_S = 1.15
+ECHO_SCALE = 1.14
+ECHO_ALPHA = 0.30
+ECHO_WIDTH = 1.0
+
+# ------------------------------------------------------ nucleus spark shower
+#: Sparks thrown OUT of the nucleus: they are born on the beat, travel outward
+#: past the orbits, shrink and fade. Deterministic (index + time), never
+#: random, and connected to the heartbeat so the shower reads as the nucleus
+#: breathing rather than a separate effect.
+NUCLEUS_SPARK_COUNT = 18
+NUCLEUS_SPARK_LIFE_BASE = 1.30
+NUCLEUS_SPARK_LIFE_SPAN = 0.90
+NUCLEUS_SPARK_REACH = 1.28
+NUCLEUS_SPARK_SIZE = 1.30
+NUCLEUS_SPARK_ALPHA = 0.85
+NUCLEUS_SPARK_LIFT = 0.70
+
 # ----------------------------------------------------------------- glints
 SPARKLE_COUNT = 26
 SPARKLE_SEED_STEP = 97.3
@@ -298,6 +320,54 @@ def glint(t: Any, seed: float) -> Dict[str, float]:
             "alpha": GLINT_MIN_ALPHA + (1.0 - GLINT_MIN_ALPHA) * wave}
 
 
+def echo_rings(t: Any) -> List[Dict[str, float]]:
+    """Two thinner follower rings, one per main orbit (lagged, scaled, faint)."""
+    tt = _finite(t)
+    lag = tt - ECHO_LAG_S
+    near, far = orbit_tilts(lag)
+    return [
+        {"orbit": "a", "tilt": near, "rx_scale": ECHO_SCALE,
+         "ry_scale": ECHO_SCALE, "alpha": ECHO_ALPHA, "width": ECHO_WIDTH},
+        {"orbit": "b", "tilt": far, "rx_scale": ECHO_SCALE,
+         "ry_scale": ECHO_SCALE, "alpha": ECHO_ALPHA, "width": ECHO_WIDTH},
+    ]
+
+
+def nucleus_sparks(t: Any, R: float) -> List[Dict[str, float]]:
+    """Sparks thrown out of the nucleus, connected to the heartbeat.
+
+    Each spark has its own deterministic birth phase inside the beat cycle, so
+    a shower leaves the nucleus every thump and travels past the orbits while
+    shrinking and fading. Empty under a still clock (the renderers pass t=0).
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    out: List[Dict[str, float]] = []
+    for i in range(NUCLEUS_SPARK_COUNT):
+        seed = i * 137.5
+        life = NUCLEUS_SPARK_LIFE_BASE + (i % 5) * (
+            NUCLEUS_SPARK_LIFE_SPAN / 4.0)
+        # Births are tied to the heartbeat: a spark leaves on the thump.
+        phase = ((tt - HEART_PERIOD_S * hash01(i, 23.7)) / max(0.1, life)) % 1.0
+        if phase >= 0.92:
+            continue
+        grow = phase ** 0.65
+        dist = r * NUCLEUS_SPARK_REACH * grow
+        ang = math.radians(seed + 40.0 * phase)
+        x = math.cos(ang) * dist
+        y = math.sin(ang) * dist * 0.72  # squash: the plane is tilted
+        fade = (1.0 - phase) ** 1.5
+        out.append({
+            "x": x + dx, "y": y + dy, "depth": 0.5 + 0.5 * math.cos(ang),
+            "size": max(0.30, NUCLEUS_SPARK_SIZE * (r / 32.0)
+                        * (1.0 - 0.72 * grow)),
+            "alpha": NUCLEUS_SPARK_ALPHA * fade,
+            "lift": NUCLEUS_SPARK_LIFT,
+        })
+    return out
+
+
 def trails(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, float]]:
     """Tapered tail behind one particle (oldest last, alpha fading)."""
     tt = _finite(t)
@@ -441,5 +511,7 @@ __all__ = [
     "PRECESSION_DEG", "RING_SWAY_DEG", "CAMERA_SWAY_FRAC", "SPEED_MOD_AMP", "hash01", "camera_offset", "orbit_tilts",
     "orbit_point", "heartbeat", "nucleus_scale", "shockwave", "particle_state",
     "glint", "GLINT_ARM_FRAC", "GLINT_CORE_FRAC",
+    "echo_rings", "ECHO_LAG_S", "ECHO_SCALE", "ECHO_ALPHA",
+    "nucleus_sparks", "NUCLEUS_SPARK_COUNT", "NUCLEUS_SPARK_REACH",
     "trails", "dust_state", "comet", "sparkles",
 ]
