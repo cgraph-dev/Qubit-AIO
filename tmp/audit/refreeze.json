@@ -1,0 +1,4039 @@
+{
+  "rev": "43faacfb8de7b29548547a7fbdedad0cc6e7391c",
+  "upstream_py": 9503,
+  "exists": 8529,
+  "absent": 974,
+  "current": 7919,
+  "short_port_files": 610,
+  "short_port_symbols": 1649,
+  "behind_head_files": 0,
+  "behind_head_symbols": 0,
+  "worst_short_ports": [
+    {
+      "path": "tools/plugin_guard_context.py",
+      "missing": 36,
+      "baseline_defs": 96
+    },
+    {
+      "path": "tests/scripts/test_release_entrypoint.py",
+      "missing": 25,
+      "baseline_defs": 63
+    },
+    {
+      "path": "tui_gateway/contracts/server_requests.py",
+      "missing": 22,
+      "baseline_defs": 42
+    },
+    {
+      "path": "tui_gateway/methods_onboarding.py",
+      "missing": 20,
+      "baseline_defs": 26
+    },
+    {
+      "path": "agent/bedrock_adapter.py",
+      "missing": 19,
+      "baseline_defs": 130
+    },
+    {
+      "path": "agent/message_sanitization.py",
+      "missing": 19,
+      "baseline_defs": 73
+    },
+    {
+      "path": "tests/scripts/test_stable_release.py",
+      "missing": 18,
+      "baseline_defs": 66
+    },
+    {
+      "path": "tests/agent/test_relay_runtime_plugins.py",
+      "missing": 16,
+      "baseline_defs": 39
+    },
+    {
+      "path": "tests/tools/test_local_env_blocklist.py",
+      "missing": 16,
+      "baseline_defs": 40
+    },
+    {
+      "path": "hermes_cli/observability/shared_metrics_contract.py",
+      "missing": 15,
+      "baseline_defs": 431
+    },
+    {
+      "path": "scripts/releases/stable.py",
+      "missing": 15,
+      "baseline_defs": 70
+    },
+    {
+      "path": "tests/tools/test_bot_mode_dm.py",
+      "missing": 15,
+      "baseline_defs": 64
+    },
+    {
+      "path": "tests/tools/test_kanban_tools.py",
+      "missing": 15,
+      "baseline_defs": 58
+    },
+    {
+      "path": "agent/shell_hooks.py",
+      "missing": 14,
+      "baseline_defs": 75
+    },
+    {
+      "path": "tools/connectors/gateway/client.py",
+      "missing": 14,
+      "baseline_defs": 30
+    },
+    {
+      "path": "tools/connectors/gateway/wire.py",
+      "missing": 14,
+      "baseline_defs": 47
+    },
+    {
+      "path": "tests/tools/test_known_file_write_baseline.py",
+      "missing": 13,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tests/agent/test_auxiliary_relay.py",
+      "missing": 12,
+      "baseline_defs": 21
+    },
+    {
+      "path": "tests/agent/test_split_turn_compaction.py",
+      "missing": 12,
+      "baseline_defs": 25
+    },
+    {
+      "path": "tools/browser_use_cli.py",
+      "missing": 12,
+      "baseline_defs": 75
+    },
+    {
+      "path": "tools/connectors/managed.py",
+      "missing": 12,
+      "baseline_defs": 31
+    },
+    {
+      "path": "tests/gateway/test_lifecycle_state_db_check.py",
+      "missing": 11,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tests/ci/test_stable_release_graph.py",
+      "missing": 10,
+      "baseline_defs": 23
+    },
+    {
+      "path": "tests/gateway/test_gateway_inline_bootstrap_identity.py",
+      "missing": 10,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/tools/test_bot_live_owner_delivery.py",
+      "missing": 10,
+      "baseline_defs": 13
+    },
+    {
+      "path": "hermes_cli/anon_auth.py",
+      "missing": 9,
+      "baseline_defs": 108
+    },
+    {
+      "path": "tests/agent/test_subagent_lifecycle.py",
+      "missing": 9,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/scripts/test_release_sequencer.py",
+      "missing": 9,
+      "baseline_defs": 35
+    },
+    {
+      "path": "agent/transports/chat_completions.py",
+      "missing": 8,
+      "baseline_defs": 36
+    },
+    {
+      "path": "gateway/platforms/api_server_runs.py",
+      "missing": 8,
+      "baseline_defs": 72
+    },
+    {
+      "path": "tests/hermes_cli/test_source_launcher_publication.py",
+      "missing": 8,
+      "baseline_defs": 30
+    },
+    {
+      "path": "tests/hermes_platform/test_products.py",
+      "missing": 8,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tui_gateway/change_watcher.py",
+      "missing": 8,
+      "baseline_defs": 41
+    },
+    {
+      "path": "tui_gateway/contracts/profiles_vault_complete_foreign_subagents.py",
+      "missing": 8,
+      "baseline_defs": 71
+    },
+    {
+      "path": "agent/conversation_compression_telemetry.py",
+      "missing": 7,
+      "baseline_defs": 11
+    },
+    {
+      "path": "gateway/drain_control.py",
+      "missing": 7,
+      "baseline_defs": 20
+    },
+    {
+      "path": "hermes_cli/backup.py",
+      "missing": 7,
+      "baseline_defs": 91
+    },
+    {
+      "path": "hermes_cli/left_core_migration.py",
+      "missing": 7,
+      "baseline_defs": 34
+    },
+    {
+      "path": "hermes_cli/main_tui_launch.py",
+      "missing": 7,
+      "baseline_defs": 27
+    },
+    {
+      "path": "tests/agent/test_compression_attempt_telemetry.py",
+      "missing": 7,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/hermes_cli/test_left_core_migration.py",
+      "missing": 7,
+      "baseline_defs": 26
+    },
+    {
+      "path": "tests/hermes_cli/test_post_update_expose_cli.py",
+      "missing": 7,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/hermes_cli/test_web_server_files.py",
+      "missing": 7,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tests/tui_gateway/test_free_tier_rpc.py",
+      "missing": 7,
+      "baseline_defs": 14
+    },
+    {
+      "path": "tui_gateway/ws.py",
+      "missing": 7,
+      "baseline_defs": 24
+    },
+    {
+      "path": "agent/anthropic_thinking_policy.py",
+      "missing": 6,
+      "baseline_defs": 11
+    },
+    {
+      "path": "cron/executions.py",
+      "missing": 6,
+      "baseline_defs": 42
+    },
+    {
+      "path": "gateway/platforms/api_server_openai_routes.py",
+      "missing": 6,
+      "baseline_defs": 24
+    },
+    {
+      "path": "gateway/session_policy.py",
+      "missing": 6,
+      "baseline_defs": 42
+    },
+    {
+      "path": "gateway/session_policy_credentials.py",
+      "missing": 6,
+      "baseline_defs": 12
+    },
+    {
+      "path": "hermes_cli/_launchers.py",
+      "missing": 6,
+      "baseline_defs": 38
+    },
+    {
+      "path": "pm/environment.py",
+      "missing": 6,
+      "baseline_defs": 20
+    },
+    {
+      "path": "scripts/releases/entrypoint.py",
+      "missing": 6,
+      "baseline_defs": 45
+    },
+    {
+      "path": "tests/agent/test_gemini_thinking_config.py",
+      "missing": 6,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/cron/test_sessiondb_init_hang.py",
+      "missing": 6,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/gateway/test_scale_to_zero_dashboard_client.py",
+      "missing": 6,
+      "baseline_defs": 28
+    },
+    {
+      "path": "tests/hermes_cli/test_agent_plugins.py",
+      "missing": 6,
+      "baseline_defs": 32
+    },
+    {
+      "path": "tests/hermes_cli/test_plugins_cmd_activation_keys.py",
+      "missing": 6,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/hermes_cli/test_pty_keepalive_ws.py",
+      "missing": 6,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/hermes_cli/test_update_parked_branch_guard.py",
+      "missing": 6,
+      "baseline_defs": 29
+    },
+    {
+      "path": "tests/hermes_cli/test_update_zip_completion.py",
+      "missing": 6,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/scripts/test_verify_user_state.py",
+      "missing": 6,
+      "baseline_defs": 42
+    },
+    {
+      "path": "tests/tools/test_skills_guard.py",
+      "missing": 6,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tests/tui_gateway/test_tui_gateway_ws.py",
+      "missing": 6,
+      "baseline_defs": 20
+    },
+    {
+      "path": "tools/connectors/targets.py",
+      "missing": 6,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tools/skills_guard.py",
+      "missing": 6,
+      "baseline_defs": 61
+    },
+    {
+      "path": "agent/codex_responses_adapter.py",
+      "missing": 5,
+      "baseline_defs": 85
+    },
+    {
+      "path": "agent/gemini_native_adapter.py",
+      "missing": 5,
+      "baseline_defs": 78
+    },
+    {
+      "path": "agent/skill_commands.py",
+      "missing": 5,
+      "baseline_defs": 72
+    },
+    {
+      "path": "gateway/run_turn_runner.py",
+      "missing": 5,
+      "baseline_defs": 12
+    },
+    {
+      "path": "hermes_cli/backup_restore.py",
+      "missing": 5,
+      "baseline_defs": 16
+    },
+    {
+      "path": "hermes_cli/gateway_multiplex_mode.py",
+      "missing": 5,
+      "baseline_defs": 28
+    },
+    {
+      "path": "hermes_cli/plugin_catalog_presence.py",
+      "missing": 5,
+      "baseline_defs": 18
+    },
+    {
+      "path": "hermes_cli/source_releases.py",
+      "missing": 5,
+      "baseline_defs": 24
+    },
+    {
+      "path": "hermes_cli/web_server_sessions.py",
+      "missing": 5,
+      "baseline_defs": 18
+    },
+    {
+      "path": "hermes_constants.py",
+      "missing": 5,
+      "baseline_defs": 131
+    },
+    {
+      "path": "hermes_platform/host/products.py",
+      "missing": 5,
+      "baseline_defs": 6
+    },
+    {
+      "path": "hermes_platform/resolver/known_dirs.py",
+      "missing": 5,
+      "baseline_defs": 16
+    },
+    {
+      "path": "tests/agent/test_kanban_turn_recovery.py",
+      "missing": 5,
+      "baseline_defs": 40
+    },
+    {
+      "path": "tests/hermes_cli/test_gateway_job_teardown_live.py",
+      "missing": 5,
+      "baseline_defs": 22
+    },
+    {
+      "path": "tests/hermes_cli/test_nous_subscription.py",
+      "missing": 5,
+      "baseline_defs": 30
+    },
+    {
+      "path": "tests/hermes_cli/test_update_host_obligation.py",
+      "missing": 5,
+      "baseline_defs": 23
+    },
+    {
+      "path": "tests/test_live_system_guard_self_test.py",
+      "missing": 5,
+      "baseline_defs": 37
+    },
+    {
+      "path": "tests/tools/test_bot_relay.py",
+      "missing": 5,
+      "baseline_defs": 45
+    },
+    {
+      "path": "tests/tools/test_browser_process_tree.py",
+      "missing": 5,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/tools/test_docker_environment.py",
+      "missing": 5,
+      "baseline_defs": 79
+    },
+    {
+      "path": "tests/tui_gateway/test_bot_relay_methods.py",
+      "missing": 5,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/tui_gateway/test_deferred_model_switch_confirm.py",
+      "missing": 5,
+      "baseline_defs": 14
+    },
+    {
+      "path": "tools/connectors/gateway/errors.py",
+      "missing": 5,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tools/memory_tool_store.py",
+      "missing": 5,
+      "baseline_defs": 22
+    },
+    {
+      "path": "tui_gateway/contracts/events.py",
+      "missing": 5,
+      "baseline_defs": 63
+    },
+    {
+      "path": "tui_gateway/contracts/tools_mcp_plugins.py",
+      "missing": 5,
+      "baseline_defs": 80
+    },
+    {
+      "path": "gateway/control_socket.py",
+      "missing": 4,
+      "baseline_defs": 37
+    },
+    {
+      "path": "gateway/run_notifications.py",
+      "missing": 4,
+      "baseline_defs": 16
+    },
+    {
+      "path": "hermes_cli/cli_init_mixin.py",
+      "missing": 4,
+      "baseline_defs": 6
+    },
+    {
+      "path": "hermes_cli/local_runtime/hardware.py",
+      "missing": 4,
+      "baseline_defs": 37
+    },
+    {
+      "path": "hermes_cli/runtime_provider.py",
+      "missing": 4,
+      "baseline_defs": 85
+    },
+    {
+      "path": "hermes_cli/runtime_provider_custom.py",
+      "missing": 4,
+      "baseline_defs": 39
+    },
+    {
+      "path": "hermes_cli/worktree_ops.py",
+      "missing": 4,
+      "baseline_defs": 54
+    },
+    {
+      "path": "hermes_state_portability.py",
+      "missing": 4,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/agent/test_credential_pool_profile_oauth_fork.py",
+      "missing": 4,
+      "baseline_defs": 39
+    },
+    {
+      "path": "tests/agent/test_empty_terminal_reasoning_surface.py",
+      "missing": 4,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/agent/test_openai_ultrafast.py",
+      "missing": 4,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/agent/test_run_agent_codex_responses.py",
+      "missing": 4,
+      "baseline_defs": 88
+    },
+    {
+      "path": "tests/agent/test_vault_backends.py",
+      "missing": 4,
+      "baseline_defs": 14
+    },
+    {
+      "path": "tests/agent/test_verification_evidence.py",
+      "missing": 4,
+      "baseline_defs": 23
+    },
+    {
+      "path": "tests/cron/test_cron_bot_chat_delivery.py",
+      "missing": 4,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/e2e/core/upgrade/network/test_release_channel_records.py",
+      "missing": 4,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/gateway/test_async_delegation_session_binding.py",
+      "missing": 4,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/gateway/test_chat_completions_approval.py",
+      "missing": 4,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/gateway/test_windows_venv_import_guard.py",
+      "missing": 4,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/hermes_cli/test_external_process_auth_status.py",
+      "missing": 4,
+      "baseline_defs": 21
+    },
+    {
+      "path": "tests/hermes_cli/test_kanban_worktree_teardown.py",
+      "missing": 4,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tests/hermes_cli/test_local_recommendation.py",
+      "missing": 4,
+      "baseline_defs": 14
+    },
+    {
+      "path": "tests/hermes_cli/test_relay_shared_metrics.py",
+      "missing": 4,
+      "baseline_defs": 69
+    },
+    {
+      "path": "tests/hermes_cli/test_update_finish.py",
+      "missing": 4,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/hermes_cli/test_vertex_provider.py",
+      "missing": 4,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/pm/test_uv_cache_seed.py",
+      "missing": 4,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/providers/test_named_custom_reasoning.py",
+      "missing": 4,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/scripts/install/test_install_clone_throttle_fallback.py",
+      "missing": 4,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/scripts/install/test_install_ps1_native_calls.py",
+      "missing": 4,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/scripts/test_run_tests_parallel.py",
+      "missing": 4,
+      "baseline_defs": 23
+    },
+    {
+      "path": "tests/test_scratch_dir.py",
+      "missing": 4,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/tools/test_approval_plugin_hooks.py",
+      "missing": 4,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/tools/test_mcp_tool_issue_948.py",
+      "missing": 4,
+      "baseline_defs": 22
+    },
+    {
+      "path": "tools/connectors/gateway/config.py",
+      "missing": 4,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tools/registry.py",
+      "missing": 4,
+      "baseline_defs": 47
+    },
+    {
+      "path": "tui_gateway/methods_prompt.py",
+      "missing": 4,
+      "baseline_defs": 44
+    },
+    {
+      "path": "agent/anthropic_endpoints.py",
+      "missing": 3,
+      "baseline_defs": 21
+    },
+    {
+      "path": "agent/coding_context.py",
+      "missing": 3,
+      "baseline_defs": 51
+    },
+    {
+      "path": "agent/reasoning_effort.py",
+      "missing": 3,
+      "baseline_defs": 45
+    },
+    {
+      "path": "agent/vertex_adapter.py",
+      "missing": 3,
+      "baseline_defs": 21
+    },
+    {
+      "path": "gateway/hosted_room_discussion.py",
+      "missing": 3,
+      "baseline_defs": 87
+    },
+    {
+      "path": "gateway/lifecycle_ledger.py",
+      "missing": 3,
+      "baseline_defs": 26
+    },
+    {
+      "path": "gateway/pairing.py",
+      "missing": 3,
+      "baseline_defs": 37
+    },
+    {
+      "path": "gateway/response_filters.py",
+      "missing": 3,
+      "baseline_defs": 20
+    },
+    {
+      "path": "hermes_cli/cli_commands_session_tools.py",
+      "missing": 3,
+      "baseline_defs": 20
+    },
+    {
+      "path": "hermes_cli/memory_provider_migration.py",
+      "missing": 3,
+      "baseline_defs": 25
+    },
+    {
+      "path": "plugins/platforms/a2a/protocol.py",
+      "missing": 3,
+      "baseline_defs": 38
+    },
+    {
+      "path": "scripts/releases/channel_releases.py",
+      "missing": 3,
+      "baseline_defs": 20
+    },
+    {
+      "path": "scripts/run_tests_parallel.py",
+      "missing": 3,
+      "baseline_defs": 39
+    },
+    {
+      "path": "tests/agent/test_context_compressor.py",
+      "missing": 3,
+      "baseline_defs": 47
+    },
+    {
+      "path": "tests/agent/test_run_budget.py",
+      "missing": 3,
+      "baseline_defs": 25
+    },
+    {
+      "path": "tests/agent/test_welcome_tier_recovery.py",
+      "missing": 3,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/conftest.py",
+      "missing": 3,
+      "baseline_defs": 56
+    },
+    {
+      "path": "tests/e2e/core/delivery/_cron_clock.py",
+      "missing": 3,
+      "baseline_defs": 35
+    },
+    {
+      "path": "tests/gateway/test_discord_plugin_setup.py",
+      "missing": 3,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/gateway/test_internal_event_pin_wiring.py",
+      "missing": 3,
+      "baseline_defs": 23
+    },
+    {
+      "path": "tests/gateway/test_multiplex_hot_serve.py",
+      "missing": 3,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tests/gateway/test_telegram_voice_v0_regressions.py",
+      "missing": 3,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/gateway/test_yolo_command.py",
+      "missing": 3,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/hermes_cli/test_browser_connect_default_chromium.py",
+      "missing": 3,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/hermes_cli/test_dashboard_auth_middleware.py",
+      "missing": 3,
+      "baseline_defs": 21
+    },
+    {
+      "path": "tests/hermes_cli/test_dashboard_auth_prefix.py",
+      "missing": 3,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/hermes_cli/test_kanban_cli.py",
+      "missing": 3,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/hermes_cli/test_relay_shared_metrics_runtime.py",
+      "missing": 3,
+      "baseline_defs": 63
+    },
+    {
+      "path": "tests/hermes_cli/test_shared_metrics_update_stop_reasons.py",
+      "missing": 3,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/hermes_cli/test_source_check.py",
+      "missing": 3,
+      "baseline_defs": 28
+    },
+    {
+      "path": "tests/hermes_cli/test_source_release_channels.py",
+      "missing": 3,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/hermes_cli/test_web_multi_profile_scope.py",
+      "missing": 3,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/hermes_cli/test_web_routers_endpoint_probe.py",
+      "missing": 3,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/pm/test_member_selection.py",
+      "missing": 3,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/pm/test_workspace.py",
+      "missing": 3,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/scripts/desktop_update/test_desktop_update_gateway_flag.py",
+      "missing": 3,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/tools/test_connectors_gateway_client.py",
+      "missing": 3,
+      "baseline_defs": 22
+    },
+    {
+      "path": "tests/tools/test_skill_view_dedup.py",
+      "missing": 3,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/tools/test_tts_plugin_dispatch.py",
+      "missing": 3,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/tools/test_whatsapp_send_message_media.py",
+      "missing": 3,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/tui_gateway/test_profiles_list_session_field_cache.py",
+      "missing": 3,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tools/bot_live_delivery.py",
+      "missing": 3,
+      "baseline_defs": 30
+    },
+    {
+      "path": "tools/connectors/gateway/bridge.py",
+      "missing": 3,
+      "baseline_defs": 14
+    },
+    {
+      "path": "tools/image_generation_tool.py",
+      "missing": 3,
+      "baseline_defs": 55
+    },
+    {
+      "path": "tools/process_registry_notifications.py",
+      "missing": 3,
+      "baseline_defs": 31
+    },
+    {
+      "path": "tools/schema_sanitizer.py",
+      "missing": 3,
+      "baseline_defs": 37
+    },
+    {
+      "path": "tui_gateway/contracts/registry.py",
+      "missing": 3,
+      "baseline_defs": 23
+    },
+    {
+      "path": "agent/auxiliary_task_config.py",
+      "missing": 2,
+      "baseline_defs": 6
+    },
+    {
+      "path": "agent/context_compressor.py",
+      "missing": 2,
+      "baseline_defs": 212
+    },
+    {
+      "path": "agent/conversation_compression.py",
+      "missing": 2,
+      "baseline_defs": 178
+    },
+    {
+      "path": "agent/display.py",
+      "missing": 2,
+      "baseline_defs": 119
+    },
+    {
+      "path": "agent/subagent_lifecycle.py",
+      "missing": 2,
+      "baseline_defs": 32
+    },
+    {
+      "path": "agent/tool_dispatch_helpers.py",
+      "missing": 2,
+      "baseline_defs": 50
+    },
+    {
+      "path": "gateway/hosted_room_driver.py",
+      "missing": 2,
+      "baseline_defs": 105
+    },
+    {
+      "path": "hermes_cli/agent_plugins.py",
+      "missing": 2,
+      "baseline_defs": 44
+    },
+    {
+      "path": "hermes_cli/browser_connect.py",
+      "missing": 2,
+      "baseline_defs": 78
+    },
+    {
+      "path": "hermes_cli/cli_session_dock.py",
+      "missing": 2,
+      "baseline_defs": 6
+    },
+    {
+      "path": "hermes_cli/config.py",
+      "missing": 2,
+      "baseline_defs": 246
+    },
+    {
+      "path": "hermes_cli/debug.py",
+      "missing": 2,
+      "baseline_defs": 51
+    },
+    {
+      "path": "hermes_cli/free_tier_bootstrap.py",
+      "missing": 2,
+      "baseline_defs": 23
+    },
+    {
+      "path": "hermes_cli/gateway_service_owner.py",
+      "missing": 2,
+      "baseline_defs": 9
+    },
+    {
+      "path": "hermes_cli/gateway_windows.py",
+      "missing": 2,
+      "baseline_defs": 128
+    },
+    {
+      "path": "hermes_cli/kanban_db_dispatch.py",
+      "missing": 2,
+      "baseline_defs": 114
+    },
+    {
+      "path": "hermes_cli/nous_subscription.py",
+      "missing": 2,
+      "baseline_defs": 46
+    },
+    {
+      "path": "hermes_cli/observability/shared_metrics_events.py",
+      "missing": 2,
+      "baseline_defs": 16
+    },
+    {
+      "path": "hermes_cli/plugins_activation_live.py",
+      "missing": 2,
+      "baseline_defs": 8
+    },
+    {
+      "path": "hermes_cli/plugins_cmd_catalog.py",
+      "missing": 2,
+      "baseline_defs": 52
+    },
+    {
+      "path": "hermes_cli/profiles.py",
+      "missing": 2,
+      "baseline_defs": 152
+    },
+    {
+      "path": "hermes_cli/session_lost_and_found.py",
+      "missing": 2,
+      "baseline_defs": 59
+    },
+    {
+      "path": "hermes_cli/session_recovery.py",
+      "missing": 2,
+      "baseline_defs": 67
+    },
+    {
+      "path": "hermes_cli/subcommands/sessions.py",
+      "missing": 2,
+      "baseline_defs": 4
+    },
+    {
+      "path": "hermes_cli/update_channel.py",
+      "missing": 2,
+      "baseline_defs": 25
+    },
+    {
+      "path": "hermes_cli/update_cmd.py",
+      "missing": 2,
+      "baseline_defs": 76
+    },
+    {
+      "path": "hermes_cli/web_routers/cron.py",
+      "missing": 2,
+      "baseline_defs": 63
+    },
+    {
+      "path": "hermes_cli/web_routers/sessions.py",
+      "missing": 2,
+      "baseline_defs": 48
+    },
+    {
+      "path": "hermes_logging.py",
+      "missing": 2,
+      "baseline_defs": 50
+    },
+    {
+      "path": "hermes_state_compression.py",
+      "missing": 2,
+      "baseline_defs": 10
+    },
+    {
+      "path": "plugins/google_meet/_jsonfile.py",
+      "missing": 2,
+      "baseline_defs": 3
+    },
+    {
+      "path": "plugins/image_gen/krea/__init__.py",
+      "missing": 2,
+      "baseline_defs": 46
+    },
+    {
+      "path": "pm/build_env.py",
+      "missing": 2,
+      "baseline_defs": 3
+    },
+    {
+      "path": "pm/install.py",
+      "missing": 2,
+      "baseline_defs": 52
+    },
+    {
+      "path": "pm/network.py",
+      "missing": 2,
+      "baseline_defs": 10
+    },
+    {
+      "path": "scripts/build_skills_index.py",
+      "missing": 2,
+      "baseline_defs": 12
+    },
+    {
+      "path": "scripts/bundles/release_artifacts.py",
+      "missing": 2,
+      "baseline_defs": 15
+    },
+    {
+      "path": "scripts/releases/job_groups.py",
+      "missing": 2,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/agent/test_anthropic_client_auth.py",
+      "missing": 2,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/agent/test_bedrock_adapter.py",
+      "missing": 2,
+      "baseline_defs": 41
+    },
+    {
+      "path": "tests/agent/test_codex_responses_settle_pending_tool_calls.py",
+      "missing": 2,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/agent/test_empty_response_recovery_persistence.py",
+      "missing": 2,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/agent/test_init_fallback_on_exhausted_pool.py",
+      "missing": 2,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/agent/test_insights.py",
+      "missing": 2,
+      "baseline_defs": 14
+    },
+    {
+      "path": "tests/agent/test_reasoning_only_stop_persistence.py",
+      "missing": 2,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/agent/test_session_row_under_live_agent_persist.py",
+      "missing": 2,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/agent/test_skill_inline_shell_trust.py",
+      "missing": 2,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/agent/test_usage_pricing.py",
+      "missing": 2,
+      "baseline_defs": 48
+    },
+    {
+      "path": "tests/ci/test_plugin_catalog_ci_confinement.py",
+      "missing": 2,
+      "baseline_defs": 33
+    },
+    {
+      "path": "tests/ci/workflow_steps.py",
+      "missing": 2,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/cron/conftest.py",
+      "missing": 2,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/cron/test_jobs_shrink_merge.py",
+      "missing": 2,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/e2e/core/_pending_fixes.py",
+      "missing": 2,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/e2e/core/upgrade/_install_helpers.py",
+      "missing": 2,
+      "baseline_defs": 19
+    },
+    {
+      "path": "tests/e2e/core/upgrade/network/_seed.py",
+      "missing": 2,
+      "baseline_defs": 20
+    },
+    {
+      "path": "tests/gateway/conftest.py",
+      "missing": 2,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tests/gateway/test_discord_component_auth.py",
+      "missing": 2,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/gateway/test_discord_slash_auth.py",
+      "missing": 2,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tests/gateway/test_housekeeping_profile_scope.py",
+      "missing": 2,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/gateway/test_multiplex_unserved_shared_ingress.py",
+      "missing": 2,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/gateway/test_post_gateway_admission.py",
+      "missing": 2,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/gateway/test_pre_gateway_dispatch.py",
+      "missing": 2,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/gateway/test_startup_failed_platform_reports_degraded.py",
+      "missing": 2,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/gateway/test_telegram_ingress_delivery_gap.py",
+      "missing": 2,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/gateway/test_webhook_adapter.py",
+      "missing": 2,
+      "baseline_defs": 31
+    },
+    {
+      "path": "tests/gateway/test_webhook_profile_egress.py",
+      "missing": 2,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/hermes_cli/anon_portal.py",
+      "missing": 2,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/hermes_cli/test_anon_first_notice.py",
+      "missing": 2,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/hermes_cli/test_api_key_providers.py",
+      "missing": 2,
+      "baseline_defs": 27
+    },
+    {
+      "path": "tests/hermes_cli/test_audio_router_scope.py",
+      "missing": 2,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/hermes_cli/test_catalog_json.py",
+      "missing": 2,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/hermes_cli/test_dashboard_admin_endpoints.py",
+      "missing": 2,
+      "baseline_defs": 23
+    },
+    {
+      "path": "tests/hermes_cli/test_dashboard_auth_audit.py",
+      "missing": 2,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/hermes_cli/test_doctor_audit_remedy.py",
+      "missing": 2,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/hermes_cli/test_ensure_windows_bin_launchers.py",
+      "missing": 2,
+      "baseline_defs": 28
+    },
+    {
+      "path": "tests/hermes_cli/test_gateway_windows.py",
+      "missing": 2,
+      "baseline_defs": 34
+    },
+    {
+      "path": "tests/hermes_cli/test_kanban_review_lifecycle_complete.py",
+      "missing": 2,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tests/hermes_cli/test_kanban_worker_spawn_toolsets.py",
+      "missing": 2,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/hermes_cli/test_keyed_provider_credential_pool.py",
+      "missing": 2,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/hermes_cli/test_mcp_startup.py",
+      "missing": 2,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tests/hermes_cli/test_provider_precedence.py",
+      "missing": 2,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/hermes_cli/test_safe_mode.py",
+      "missing": 2,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/hermes_cli/test_session_detail_malformed_db.py",
+      "missing": 2,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/hermes_cli/test_session_dock.py",
+      "missing": 2,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/hermes_cli/test_sessions_repair_profiles.py",
+      "missing": 2,
+      "baseline_defs": 19
+    },
+    {
+      "path": "tests/hermes_cli/test_setup_telemetry.py",
+      "missing": 2,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/hermes_cli/test_skills_hub.py",
+      "missing": 2,
+      "baseline_defs": 33
+    },
+    {
+      "path": "tests/hermes_cli/test_update_autostash.py",
+      "missing": 2,
+      "baseline_defs": 25
+    },
+    {
+      "path": "tests/hermes_cli/test_update_existing_branch_baseline.py",
+      "missing": 2,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tests/hermes_cli/test_update_serve_generation_recovery.py",
+      "missing": 2,
+      "baseline_defs": 65
+    },
+    {
+      "path": "tests/hermes_platform/test_resolver_app.py",
+      "missing": 2,
+      "baseline_defs": 21
+    },
+    {
+      "path": "tests/install/e2e-assets/verify-user-state.py",
+      "missing": 2,
+      "baseline_defs": 38
+    },
+    {
+      "path": "tests/plugins/test_telegram_update_admission.py",
+      "missing": 2,
+      "baseline_defs": 14
+    },
+    {
+      "path": "tests/scripts/install/test_install_sh_repository_stage.py",
+      "missing": 2,
+      "baseline_defs": 19
+    },
+    {
+      "path": "tests/scripts/test_release_channels.py",
+      "missing": 2,
+      "baseline_defs": 20
+    },
+    {
+      "path": "tests/test_packaging_metadata.py",
+      "missing": 2,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/tools/test_bot_retry_policy.py",
+      "missing": 2,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/tools/test_file_operations.py",
+      "missing": 2,
+      "baseline_defs": 19
+    },
+    {
+      "path": "tests/tools/test_mcp_oauth.py",
+      "missing": 2,
+      "baseline_defs": 31
+    },
+    {
+      "path": "tests/tools/test_modal_snapshot_isolation.py",
+      "missing": 2,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/tools/test_subagent_sudo_prompt.py",
+      "missing": 2,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/tools/test_terminal_config_env_sync.py",
+      "missing": 2,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/tools/test_web_managed_routing.py",
+      "missing": 2,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/tools/test_write_approval.py",
+      "missing": 2,
+      "baseline_defs": 27
+    },
+    {
+      "path": "tests/tui_gateway/test_change_watcher.py",
+      "missing": 2,
+      "baseline_defs": 29
+    },
+    {
+      "path": "tests/tui_gateway/test_profiles_inherit_launch_model.py",
+      "missing": 2,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/tui_gateway/test_prompt_accept_logging.py",
+      "missing": 2,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/tui_gateway/test_tui_gateway_event_replay.py",
+      "missing": 2,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tools/approval.py",
+      "missing": 2,
+      "baseline_defs": 83
+    },
+    {
+      "path": "tools/approval_yolo.py",
+      "missing": 2,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tools/bot_mode_dm.py",
+      "missing": 2,
+      "baseline_defs": 41
+    },
+    {
+      "path": "tools/bot_relay.py",
+      "missing": 2,
+      "baseline_defs": 56
+    },
+    {
+      "path": "tools/browser_vault_tool.py",
+      "missing": 2,
+      "baseline_defs": 19
+    },
+    {
+      "path": "tools/connectors/gateway/merge.py",
+      "missing": 2,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tools/environments/base.py",
+      "missing": 2,
+      "baseline_defs": 26
+    },
+    {
+      "path": "tools/environments/local.py",
+      "missing": 2,
+      "baseline_defs": 65
+    },
+    {
+      "path": "tools/fuzzy_match.py",
+      "missing": 2,
+      "baseline_defs": 45
+    },
+    {
+      "path": "tools/mcp_tool_config.py",
+      "missing": 2,
+      "baseline_defs": 34
+    },
+    {
+      "path": "tools/skills_tool.py",
+      "missing": 2,
+      "baseline_defs": 46
+    },
+    {
+      "path": "tools/terminal_scope.py",
+      "missing": 2,
+      "baseline_defs": 16
+    },
+    {
+      "path": "tui_gateway/contracts/connectors.py",
+      "missing": 2,
+      "baseline_defs": 43
+    },
+    {
+      "path": "tui_gateway/methods_connectors.py",
+      "missing": 2,
+      "baseline_defs": 33
+    },
+    {
+      "path": "tui_gateway/session_lifecycle.py",
+      "missing": 2,
+      "baseline_defs": 52
+    },
+    {
+      "path": "tui_gateway/session_workdir.py",
+      "missing": 2,
+      "baseline_defs": 55
+    },
+    {
+      "path": "tui_gateway/turn_marker.py",
+      "missing": 2,
+      "baseline_defs": 18
+    },
+    {
+      "path": "utils.py",
+      "missing": 2,
+      "baseline_defs": 64
+    },
+    {
+      "path": "agent/anthropic_adapter.py",
+      "missing": 1,
+      "baseline_defs": 71
+    },
+    {
+      "path": "agent/anthropic_credentials.py",
+      "missing": 1,
+      "baseline_defs": 63
+    },
+    {
+      "path": "agent/anthropic_message_convert.py",
+      "missing": 1,
+      "baseline_defs": 57
+    },
+    {
+      "path": "agent/auxiliary_wire.py",
+      "missing": 1,
+      "baseline_defs": 2
+    },
+    {
+      "path": "agent/codex_headers.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "agent/fast_mode.py",
+      "missing": 1,
+      "baseline_defs": 15
+    },
+    {
+      "path": "agent/insights.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "agent/kanban_turn_recovery.py",
+      "missing": 1,
+      "baseline_defs": 21
+    },
+    {
+      "path": "agent/message_metadata.py",
+      "missing": 1,
+      "baseline_defs": 28
+    },
+    {
+      "path": "agent/relay_runtime.py",
+      "missing": 1,
+      "baseline_defs": 67
+    },
+    {
+      "path": "agent/skill_bundles.py",
+      "missing": 1,
+      "baseline_defs": 17
+    },
+    {
+      "path": "agent/transports/codex.py",
+      "missing": 1,
+      "baseline_defs": 41
+    },
+    {
+      "path": "agent/turn_context.py",
+      "missing": 1,
+      "baseline_defs": 50
+    },
+    {
+      "path": "agent/turn_recovery.py",
+      "missing": 1,
+      "baseline_defs": 59
+    },
+    {
+      "path": "agent/turn_scripted_prelude.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "agent/turn_tool_round.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "cron/scheduler.py",
+      "missing": 1,
+      "baseline_defs": 168
+    },
+    {
+      "path": "cron/scheduler_delivery.py",
+      "missing": 1,
+      "baseline_defs": 75
+    },
+    {
+      "path": "cron/scheduler_liveness.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "cron/scheduler_tick.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "evals/core_tool_deferral/worker.py",
+      "missing": 1,
+      "baseline_defs": 46
+    },
+    {
+      "path": "gateway/hosted_room_policy_checkpoint.py",
+      "missing": 1,
+      "baseline_defs": 15
+    },
+    {
+      "path": "gateway/relay/adapter.py",
+      "missing": 1,
+      "baseline_defs": 18
+    },
+    {
+      "path": "gateway/run_heartbeat_acceptance.py",
+      "missing": 1,
+      "baseline_defs": 5
+    },
+    {
+      "path": "gateway/session_identity.py",
+      "missing": 1,
+      "baseline_defs": 14
+    },
+    {
+      "path": "gateway/session_local_migration.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "gateway/slash_commands_login.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "hermes_cli/_early_recovery.py",
+      "missing": 1,
+      "baseline_defs": 87
+    },
+    {
+      "path": "hermes_cli/_update_takeover.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "hermes_cli/auth_constants.py",
+      "missing": 1,
+      "baseline_defs": 64
+    },
+    {
+      "path": "hermes_cli/cli_chat_error_copy.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "hermes_cli/cli_model_switch_mixin.py",
+      "missing": 1,
+      "baseline_defs": 18
+    },
+    {
+      "path": "hermes_cli/cli_shutdown.py",
+      "missing": 1,
+      "baseline_defs": 23
+    },
+    {
+      "path": "hermes_cli/config_migrations.py",
+      "missing": 1,
+      "baseline_defs": 36
+    },
+    {
+      "path": "hermes_cli/gateway_migrate_guards.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "hermes_cli/kanban_db.py",
+      "missing": 1,
+      "baseline_defs": 203
+    },
+    {
+      "path": "hermes_cli/main.py",
+      "missing": 1,
+      "baseline_defs": 146
+    },
+    {
+      "path": "hermes_cli/model_switch.py",
+      "missing": 1,
+      "baseline_defs": 98
+    },
+    {
+      "path": "hermes_cli/observability/shared_metrics_fields.py",
+      "missing": 1,
+      "baseline_defs": 33
+    },
+    {
+      "path": "hermes_cli/process_identity.py",
+      "missing": 1,
+      "baseline_defs": 36
+    },
+    {
+      "path": "hermes_cli/sessions_cmd.py",
+      "missing": 1,
+      "baseline_defs": 56
+    },
+    {
+      "path": "hermes_cli/sessions_repair_profiles.py",
+      "missing": 1,
+      "baseline_defs": 19
+    },
+    {
+      "path": "hermes_cli/source_check.py",
+      "missing": 1,
+      "baseline_defs": 35
+    },
+    {
+      "path": "hermes_cli/subcommands/gateway.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "hermes_cli/update_cmd_check.py",
+      "missing": 1,
+      "baseline_defs": 14
+    },
+    {
+      "path": "hermes_cli/update_cmd_git.py",
+      "missing": 1,
+      "baseline_defs": 45
+    },
+    {
+      "path": "hermes_cli/venv_sync.py",
+      "missing": 1,
+      "baseline_defs": 28
+    },
+    {
+      "path": "hermes_cli/web_routers/_common.py",
+      "missing": 1,
+      "baseline_defs": 24
+    },
+    {
+      "path": "hermes_cli/web_routers/profiles.py",
+      "missing": 1,
+      "baseline_defs": 69
+    },
+    {
+      "path": "hermes_cli/web_server.py",
+      "missing": 1,
+      "baseline_defs": 64
+    },
+    {
+      "path": "hermes_cli/web_server_lifecycle.py",
+      "missing": 1,
+      "baseline_defs": 24
+    },
+    {
+      "path": "hermes_platform/host/facts.py",
+      "missing": 1,
+      "baseline_defs": 47
+    },
+    {
+      "path": "hermes_state_common.py",
+      "missing": 1,
+      "baseline_defs": 98
+    },
+    {
+      "path": "hermes_state_profile_repair.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "hermes_state_titles.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "mcp_serve.py",
+      "missing": 1,
+      "baseline_defs": 30
+    },
+    {
+      "path": "plugins/image_gen/_common.py",
+      "missing": 1,
+      "baseline_defs": 26
+    },
+    {
+      "path": "plugins/model-providers/alibaba-coding-plan/__init__.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "plugins/model-providers/alibaba/__init__.py",
+      "missing": 1,
+      "baseline_defs": 5
+    },
+    {
+      "path": "pm/environments.py",
+      "missing": 1,
+      "baseline_defs": 43
+    },
+    {
+      "path": "pm/packages.py",
+      "missing": 1,
+      "baseline_defs": 34
+    },
+    {
+      "path": "pm/recovery.py",
+      "missing": 1,
+      "baseline_defs": 5
+    },
+    {
+      "path": "pm/workspace.py",
+      "missing": 1,
+      "baseline_defs": 15
+    },
+    {
+      "path": "scripts/bundles/channel_artifacts.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "scripts/bundles/desktop_prepare.py",
+      "missing": 1,
+      "baseline_defs": 15
+    },
+    {
+      "path": "scripts/ci/classify_changes.py",
+      "missing": 1,
+      "baseline_defs": 53
+    },
+    {
+      "path": "scripts/releases/r2.py",
+      "missing": 1,
+      "baseline_defs": 68
+    },
+    {
+      "path": "scripts/validate_plugin_catalog.py",
+      "missing": 1,
+      "baseline_defs": 25
+    },
+    {
+      "path": "tests/acp_adapter/conftest.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/agent/test_anthropic_route_oauth_identity.py",
+      "missing": 1,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/agent/test_auxiliary_client.py",
+      "missing": 1,
+      "baseline_defs": 73
+    },
+    {
+      "path": "tests/agent/test_bot_chat_toolset_refresh.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/agent/test_codex_runtime_prompt_handoff.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/agent/test_compression_stall_deterministic_fallback.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/agent/test_context_file_sources.py",
+      "missing": 1,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/agent/test_exit_cleanup_interrupt.py",
+      "missing": 1,
+      "baseline_defs": 1
+    },
+    {
+      "path": "tests/agent/test_gemini_native_adapter.py",
+      "missing": 1,
+      "baseline_defs": 39
+    },
+    {
+      "path": "tests/agent/test_interrupt_issuer_attribution.py",
+      "missing": 1,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/agent/test_memory_write_bridge.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/agent/test_oneshot_footprint.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/agent/test_provider_history_parity.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/agent/test_reasoning_stale_timeout_floor.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/agent/test_relay_llm.py",
+      "missing": 1,
+      "baseline_defs": 47
+    },
+    {
+      "path": "tests/agent/test_salvage_grown_transcript.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/agent/test_session_activity_persist.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/agent/test_skill_bundles.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/agent/test_skill_commands.py",
+      "missing": 1,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/agent/test_skill_invocation_description.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/agent/test_stale_replay_prune.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/agent/test_turn_facade_lease.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/agent/test_turn_usage_log_line.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/agent/test_unsupported_temperature_retry.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/agent/transports/test_chat_completions_reasoning_details_replay.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/ci/test_classify_changes.py",
+      "missing": 1,
+      "baseline_defs": 36
+    },
+    {
+      "path": "tests/ci/test_desktop_release_tag_admission.py",
+      "missing": 1,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tests/ci/test_live_comment.py",
+      "missing": 1,
+      "baseline_defs": 19
+    },
+    {
+      "path": "tests/ci/test_required_results.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/ci/test_update_ci_routing.py",
+      "missing": 1,
+      "baseline_defs": 77
+    },
+    {
+      "path": "tests/computer_use/test_cua_perf_knobs.py",
+      "missing": 1,
+      "baseline_defs": 1
+    },
+    {
+      "path": "tests/cron/test_cleanup_timeout.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/cron/test_codex_execution_paths.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/cron/test_cron_live_bot_delivery.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/cron/test_cron_mcp_toolset_empty_block.py",
+      "missing": 1,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/cron/test_cron_no_agent.py",
+      "missing": 1,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/cron/test_cron_pinned_job_fallback.py",
+      "missing": 1,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/cron/test_cron_provider_pin.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/cron/test_cron_session_workdir.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/cron/test_cron_workdir.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/cron/test_monitor_kind.py",
+      "missing": 1,
+      "baseline_defs": 22
+    },
+    {
+      "path": "tests/cron/test_scheduler.py",
+      "missing": 1,
+      "baseline_defs": 32
+    },
+    {
+      "path": "tests/cron/test_stale_running_recovery.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/cron/test_unreachable_retry.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/cron/test_warning_execution_outcome.py",
+      "missing": 1,
+      "baseline_defs": 2
+    },
+    {
+      "path": "tests/e2e/core/mcp_plugins/test_plugin_activation.py",
+      "missing": 1,
+      "baseline_defs": 27
+    },
+    {
+      "path": "tests/e2e/core/parity/_drive_cli.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/e2e/core/providers/test_chat_reasoning_variants.py",
+      "missing": 1,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/e2e/core/tui_pty/test_modals_resize.py",
+      "missing": 1,
+      "baseline_defs": 16
+    },
+    {
+      "path": "tests/e2e/core/upgrade/git/test_truthful_outcome.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/e2e/core/upgrade/network/test_offline_and_flaky.py",
+      "missing": 1,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/e2e/core/upgrade/network/test_proxy_only_egress.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/e2e/core/upgrade/pm/test_stamps_and_doctor.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/e2e/core/windows/_helpers.py",
+      "missing": 1,
+      "baseline_defs": 33
+    },
+    {
+      "path": "tests/e2e/core/windows_update/_machine.py",
+      "missing": 1,
+      "baseline_defs": 25
+    },
+    {
+      "path": "tests/e2e/test_relay_native_openai_stream.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/gateway/test_approval_prompt_redaction.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/gateway/test_background_process_notifications.py",
+      "missing": 1,
+      "baseline_defs": 32
+    },
+    {
+      "path": "tests/gateway/test_clarify_card_retire_on_timeout.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/gateway/test_compress_command.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/gateway/test_control_socket.py",
+      "missing": 1,
+      "baseline_defs": 22
+    },
+    {
+      "path": "tests/gateway/test_email.py",
+      "missing": 1,
+      "baseline_defs": 20
+    },
+    {
+      "path": "tests/gateway/test_exec_approval_timeout_notice.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/gateway/test_hosted_room_discussion.py",
+      "missing": 1,
+      "baseline_defs": 38
+    },
+    {
+      "path": "tests/gateway/test_login_command.py",
+      "missing": 1,
+      "baseline_defs": 31
+    },
+    {
+      "path": "tests/gateway/test_model_switch_persistence.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/gateway/test_multiplex_routing_authz.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/gateway/test_multiplex_transport_matrix.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/gateway/test_platform_registry.py",
+      "missing": 1,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/gateway/test_platform_shared_metrics.py",
+      "missing": 1,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/gateway/test_plugin_message_injection.py",
+      "missing": 1,
+      "baseline_defs": 16
+    },
+    {
+      "path": "tests/gateway/test_session_api.py",
+      "missing": 1,
+      "baseline_defs": 43
+    },
+    {
+      "path": "tests/gateway/test_session_env.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/gateway/test_telegram_closewait_limits.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/gateway/test_update_command.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/gateway/test_voice_command.py",
+      "missing": 1,
+      "baseline_defs": 23
+    },
+    {
+      "path": "tests/gateway/test_webhook_coalescing.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/gateway/test_webhook_session_close.py",
+      "missing": 1,
+      "baseline_defs": 1
+    },
+    {
+      "path": "tests/gateway/test_whatsapp_connect.py",
+      "missing": 1,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/hermes_cli/conftest.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/hermes_cli/test_anon_auth_core.py",
+      "missing": 1,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/hermes_cli/test_anon_challenge.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/hermes_cli/test_anon_desktop_signin.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/hermes_cli/test_anon_failure_modes.py",
+      "missing": 1,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/hermes_cli/test_anon_sign_in_flow.py",
+      "missing": 1,
+      "baseline_defs": 27
+    },
+    {
+      "path": "tests/hermes_cli/test_anon_surfaces.py",
+      "missing": 1,
+      "baseline_defs": 16
+    },
+    {
+      "path": "tests/hermes_cli/test_argparse_flag_propagation.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/hermes_cli/test_banner.py",
+      "missing": 1,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/hermes_cli/test_browser_connect_real_profile_snapshot_errors.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/hermes_cli/test_cli_insights_command.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/hermes_cli/test_cli_partial_update_hint.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/hermes_cli/test_cli_session_store_shared_registry.py",
+      "missing": 1,
+      "baseline_defs": 1
+    },
+    {
+      "path": "tests/hermes_cli/test_config_backups.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/hermes_cli/test_context_switch_guard.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/hermes_cli/test_cron.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/hermes_cli/test_curses_arrow_keys.py",
+      "missing": 1,
+      "baseline_defs": 16
+    },
+    {
+      "path": "tests/hermes_cli/test_doctor.py",
+      "missing": 1,
+      "baseline_defs": 41
+    },
+    {
+      "path": "tests/hermes_cli/test_gateway_migrate_multiplex.py",
+      "missing": 1,
+      "baseline_defs": 45
+    },
+    {
+      "path": "tests/hermes_cli/test_gateway_multiplex_lifecycle.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/hermes_cli/test_gateway_multiplex_mode.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/hermes_cli/test_gateway_proc_fallback.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/hermes_cli/test_gitlock.py",
+      "missing": 1,
+      "baseline_defs": 33
+    },
+    {
+      "path": "tests/hermes_cli/test_gui_command.py",
+      "missing": 1,
+      "baseline_defs": 74
+    },
+    {
+      "path": "tests/hermes_cli/test_kanban_worker_terminal_scope.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/hermes_cli/test_local_models_routes.py",
+      "missing": 1,
+      "baseline_defs": 32
+    },
+    {
+      "path": "tests/hermes_cli/test_logs.py",
+      "missing": 1,
+      "baseline_defs": 14
+    },
+    {
+      "path": "tests/hermes_cli/test_manual_serve_deferral.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/hermes_cli/test_memory_provider_migration.py",
+      "missing": 1,
+      "baseline_defs": 14
+    },
+    {
+      "path": "tests/hermes_cli/test_model_cache_parallel_prefetch.py",
+      "missing": 1,
+      "baseline_defs": 2
+    },
+    {
+      "path": "tests/hermes_cli/test_models_dev_preferred_merge.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/hermes_cli/test_models_relay_base_url.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/hermes_cli/test_plugin_host.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/hermes_cli/test_plugin_install_manifest_version.py",
+      "missing": 1,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/hermes_cli/test_plugins_cmd_catalog.py",
+      "missing": 1,
+      "baseline_defs": 26
+    },
+    {
+      "path": "tests/hermes_cli/test_proxy.py",
+      "missing": 1,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tests/hermes_cli/test_real_home_tripwire.py",
+      "missing": 1,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/hermes_cli/test_reasoning_effort_menu.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/hermes_cli/test_release_channels.py",
+      "missing": 1,
+      "baseline_defs": 22
+    },
+    {
+      "path": "tests/hermes_cli/test_restore_own_holder_guard.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/hermes_cli/test_runtime_paths.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/hermes_cli/test_session_recovery_lost_and_found.py",
+      "missing": 1,
+      "baseline_defs": 29
+    },
+    {
+      "path": "tests/hermes_cli/test_sessions_delete.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/hermes_cli/test_sessions_export_md_cli.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/hermes_cli/test_sessions_pin.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/hermes_cli/test_shared_metrics_install_failures.py",
+      "missing": 1,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/hermes_cli/test_shared_metrics_loop.py",
+      "missing": 1,
+      "baseline_defs": 21
+    },
+    {
+      "path": "tests/hermes_cli/test_source_build.py",
+      "missing": 1,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/hermes_cli/test_source_channel_integration.py",
+      "missing": 1,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tests/hermes_cli/test_source_completion_stamp.py",
+      "missing": 1,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/hermes_cli/test_tools_config.py",
+      "missing": 1,
+      "baseline_defs": 42
+    },
+    {
+      "path": "tests/hermes_cli/test_tui_resume_flow.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/hermes_cli/test_update_config_migration_on_current.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/hermes_cli/test_update_launch_completion.py",
+      "missing": 1,
+      "baseline_defs": 23
+    },
+    {
+      "path": "tests/hermes_cli/test_update_lock.py",
+      "missing": 1,
+      "baseline_defs": 53
+    },
+    {
+      "path": "tests/hermes_cli/test_update_lock_protocol.py",
+      "missing": 1,
+      "baseline_defs": 36
+    },
+    {
+      "path": "tests/hermes_cli/test_update_target_identity.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/hermes_cli/test_version_info.py",
+      "missing": 1,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tests/hermes_cli/test_web_build_limits.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/hermes_cli/test_web_server.py",
+      "missing": 1,
+      "baseline_defs": 45
+    },
+    {
+      "path": "tests/hermes_cli/test_web_server_boot_handshake.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/hermes_cli/test_windows_update_restart_reconciliation.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/hermes_platform/test_declaration.py",
+      "missing": 1,
+      "baseline_defs": 16
+    },
+    {
+      "path": "tests/hermes_state/test_never_active_keyed_prune.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/monitoring/test_cron_health_export.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/plugins/dashboard_auth/test_self_hosted_provider.py",
+      "missing": 1,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tests/plugins/memory/test_discovery_sources.py",
+      "missing": 1,
+      "baseline_defs": 16
+    },
+    {
+      "path": "tests/plugins/test_google_meet_realtime.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/plugins/test_kanban_board_done_order.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/plugins/test_kanban_model_override.py",
+      "missing": 1,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tests/pm/test_deb_safety.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/pm/test_held_entry_windows_live.py",
+      "missing": 1,
+      "baseline_defs": 2
+    },
+    {
+      "path": "tests/pm/test_network.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/pm/test_node_resolution.py",
+      "missing": 1,
+      "baseline_defs": 16
+    },
+    {
+      "path": "tests/pm/test_pm_core.py",
+      "missing": 1,
+      "baseline_defs": 44
+    },
+    {
+      "path": "tests/pm/test_runtime_bootstrap_tls.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/providers/test_provider_registry.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/scripts/desktop_update/test_desktop_update_windows_python_handoff.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/scripts/install/test_install_sh_shell_path.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/scripts/test_desktop_preparation.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/scripts/test_job_groups.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/scripts/test_release_store.py",
+      "missing": 1,
+      "baseline_defs": 20
+    },
+    {
+      "path": "tests/skills/test_google_workspace_api.py",
+      "missing": 1,
+      "baseline_defs": 13
+    },
+    {
+      "path": "tests/tools/test_approval.py",
+      "missing": 1,
+      "baseline_defs": 53
+    },
+    {
+      "path": "tests/tools/test_bot_delivery_install_launcher.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/tools/test_browser_use_cli.py",
+      "missing": 1,
+      "baseline_defs": 28
+    },
+    {
+      "path": "tests/tools/test_code_execution.py",
+      "missing": 1,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/tools/test_command_guards.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/tools/test_completed_process_results.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/tools/test_connectors_managed.py",
+      "missing": 1,
+      "baseline_defs": 20
+    },
+    {
+      "path": "tests/tools/test_file_tools_live.py",
+      "missing": 1,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/tools/test_finite_delegation_outcomes.py",
+      "missing": 1,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/tools/test_local_env_windows_msys.py",
+      "missing": 1,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/tools/test_mcp_failure_classification.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/tools/test_mcp_image_content.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/tools/test_mcp_liveness.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/tools/test_modal_bulk_upload.py",
+      "missing": 1,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/tools/test_plugin_guard.py",
+      "missing": 1,
+      "baseline_defs": 16
+    },
+    {
+      "path": "tests/tools/test_refresh_agent_mcp_tools.py",
+      "missing": 1,
+      "baseline_defs": 25
+    },
+    {
+      "path": "tests/tools/test_search_native_rg.py",
+      "missing": 1,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/tools/test_send_message_target_parse.py",
+      "missing": 1,
+      "baseline_defs": 21
+    },
+    {
+      "path": "tests/tools/test_single_query_approval_mode.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tests/tools/test_ssh_environment.py",
+      "missing": 1,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tests/tools/test_subprocess_stdin_guard.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/tools/test_todo_tool.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/tools/test_tour_tool.py",
+      "missing": 1,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/tools/test_transcription_tools.py",
+      "missing": 1,
+      "baseline_defs": 39
+    },
+    {
+      "path": "tests/tools/test_voice_client_config.py",
+      "missing": 1,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tests/tools/test_voice_mode.py",
+      "missing": 1,
+      "baseline_defs": 34
+    },
+    {
+      "path": "tests/tools/test_web_free_fast_search.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/tui_gateway/contracts/test_generated.py",
+      "missing": 1,
+      "baseline_defs": 20
+    },
+    {
+      "path": "tests/tui_gateway/test_auto_continue.py",
+      "missing": 1,
+      "baseline_defs": 32
+    },
+    {
+      "path": "tests/tui_gateway/test_bot_live_owner_delivery.py",
+      "missing": 1,
+      "baseline_defs": 3
+    },
+    {
+      "path": "tests/tui_gateway/test_busy_compression_demotion.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tests/tui_gateway/test_change_watcher_sessions.py",
+      "missing": 1,
+      "baseline_defs": 4
+    },
+    {
+      "path": "tests/tui_gateway/test_compute_host_phase1.py",
+      "missing": 1,
+      "baseline_defs": 14
+    },
+    {
+      "path": "tests/tui_gateway/test_diagnostics_share_nous.py",
+      "missing": 1,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tests/tui_gateway/test_display_watch.py",
+      "missing": 1,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/tui_gateway/test_eager_multiplex_activation.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/tui_gateway/test_file_attachment_allocation.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/tui_gateway/test_first_contact_onboarding.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/tui_gateway/test_gui_surface_toolsets.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/tui_gateway/test_hosted_room_peer_transport.py",
+      "missing": 1,
+      "baseline_defs": 15
+    },
+    {
+      "path": "tests/tui_gateway/test_profile_db_readonly.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tests/tui_gateway/test_queued_prompt_restart_retire.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/tui_gateway/test_reasoning_session_scope.py",
+      "missing": 1,
+      "baseline_defs": 5
+    },
+    {
+      "path": "tests/tui_gateway/test_relay_live_author.py",
+      "missing": 1,
+      "baseline_defs": 11
+    },
+    {
+      "path": "tests/tui_gateway/test_shared_metrics_consent_rpc.py",
+      "missing": 1,
+      "baseline_defs": 8
+    },
+    {
+      "path": "tests/tui_gateway/test_tui_gateway_server.py",
+      "missing": 1,
+      "baseline_defs": 679
+    },
+    {
+      "path": "tests/verify/test_environment_and_runner.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tests/verify/test_ledger_and_nudge_integration.py",
+      "missing": 1,
+      "baseline_defs": 19
+    },
+    {
+      "path": "tools/async_delegation.py",
+      "missing": 1,
+      "baseline_defs": 96
+    },
+    {
+      "path": "tools/browser_tool.py",
+      "missing": 1,
+      "baseline_defs": 126
+    },
+    {
+      "path": "tools/browser_tool_real_profile.py",
+      "missing": 1,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tools/browser_tool_session.py",
+      "missing": 1,
+      "baseline_defs": 54
+    },
+    {
+      "path": "tools/connectors/portal/client.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tools/connectors/run.py",
+      "missing": 1,
+      "baseline_defs": 17
+    },
+    {
+      "path": "tools/delegate_tool.py",
+      "missing": 1,
+      "baseline_defs": 31
+    },
+    {
+      "path": "tools/environments/file_sync.py",
+      "missing": 1,
+      "baseline_defs": 29
+    },
+    {
+      "path": "tools/environments/modal.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tools/environments/singularity.py",
+      "missing": 1,
+      "baseline_defs": 10
+    },
+    {
+      "path": "tools/file_operations_search.py",
+      "missing": 1,
+      "baseline_defs": 26
+    },
+    {
+      "path": "tools/memory_tool.py",
+      "missing": 1,
+      "baseline_defs": 27
+    },
+    {
+      "path": "tools/plugin_guard.py",
+      "missing": 1,
+      "baseline_defs": 31
+    },
+    {
+      "path": "tools/skills_tool_dedup.py",
+      "missing": 1,
+      "baseline_defs": 6
+    },
+    {
+      "path": "tools/terminal_tool_backends.py",
+      "missing": 1,
+      "baseline_defs": 41
+    },
+    {
+      "path": "tools/tool_search.py",
+      "missing": 1,
+      "baseline_defs": 39
+    },
+    {
+      "path": "tui_gateway/compute_host_bridge.py",
+      "missing": 1,
+      "baseline_defs": 27
+    },
+    {
+      "path": "tui_gateway/contracts/connectors_operation.py",
+      "missing": 1,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tui_gateway/contracts/tools_commands.py",
+      "missing": 1,
+      "baseline_defs": 53
+    },
+    {
+      "path": "tui_gateway/entry.py",
+      "missing": 1,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tui_gateway/host_supervisor.py",
+      "missing": 1,
+      "baseline_defs": 20
+    },
+    {
+      "path": "tui_gateway/hosted_room_driver.py",
+      "missing": 1,
+      "baseline_defs": 24
+    },
+    {
+      "path": "tui_gateway/methods_complete.py",
+      "missing": 1,
+      "baseline_defs": 18
+    },
+    {
+      "path": "tui_gateway/methods_connectors_account.py",
+      "missing": 1,
+      "baseline_defs": 12
+    },
+    {
+      "path": "tui_gateway/methods_free_tier.py",
+      "missing": 1,
+      "baseline_defs": 7
+    },
+    {
+      "path": "tui_gateway/methods_session_interrupt.py",
+      "missing": 1,
+      "baseline_defs": 9
+    },
+    {
+      "path": "tui_gateway/methods_tools.py",
+      "missing": 1,
+      "baseline_defs": 93
+    },
+    {
+      "path": "tui_gateway/methods_voice.py",
+      "missing": 1,
+      "baseline_defs": 57
+    },
+    {
+      "path": "tui_gateway/prompt_attachments.py",
+      "missing": 1,
+      "baseline_defs": 22
+    },
+    {
+      "path": "tui_gateway/server.py",
+      "missing": 1,
+      "baseline_defs": 192
+    },
+    {
+      "path": "tui_gateway/session_notifications.py",
+      "missing": 1,
+      "baseline_defs": 51
+    }
+  ],
+  "absent_paths": [
+    "gateway/run_bootstrap.py",
+    "gateway/run_idle_exit.py",
+    "gateway/run_inbound_hooks.py",
+    "gateway/run_turn_hygiene.py",
+    "gateway/run_turn_persistence.py",
+    "gateway/run_turn_prepare.py",
+    "gateway/run_turn_progress.py",
+    "gateway/session_a2a.py",
+    "gateway/session_ancillary.py",
+    "gateway/session_api.py",
+    "gateway/session_api_media.py",
+    "gateway/session_api_turn.py",
+    "gateway/session_authority.py",
+    "gateway/session_automation.py",
+    "gateway/session_bot.py",
+    "gateway/session_bot_mailbox.py",
+    "gateway/session_busy_controls.py",
+    "gateway/session_cli_turn.py",
+    "gateway/session_commands.py",
+    "gateway/session_complete_path.py",
+    "gateway/session_controls.py",
+    "gateway/session_envelope.py",
+    "gateway/session_execution.py",
+    "gateway/session_group_controls.py",
+    "gateway/session_ingress.py",
+    "gateway/session_managed_worker.py",
+    "gateway/session_mutation_model.py",
+    "gateway/session_mutations.py",
+    "gateway/session_reactions.py",
+    "gateway/session_settlement_recovery.py",
+    "gateway/session_tui_config.py",
+    "gateway/session_tui_ops.py",
+    "gateway/session_tui_reads.py",
+    "gateway/session_tui_side.py",
+    "gateway/session_viewer_automation.py",
+    "gateway/session_worker_delegation.py",
+    "hermes_cli/backup_cron_prompts.py",
+    "hermes_cli/config_show.py",
+    "hermes_cli/connectors_cmd.py",
+    "hermes_cli/dashboard_auth/native_http.py",
+    "hermes_cli/gateway_agent.py",
+    "hermes_cli/gateway_automation.py",
+    "hermes_cli/gateway_connection.py",
+    "hermes_cli/gateway_runtime.py",
+    "hermes_cli/gateway_runtime_discovery.py",
+    "hermes_cli/gateway_runtime_service.py",
+    "hermes_cli/gateway_runtime_service_identity.py",
+    "hermes_cli/gateway_runtime_start.py",
+    "hermes_cli/gateway_session_store.py",
+    "hermes_cli/gateway_tools.py",
+    "hermes_cli/install_state.py",
+    "hermes_cli/kanban_db_context.py",
+    "hermes_cli/kanban_worker_client.py",
+    "hermes_cli/observability/shared_metrics_connectors.py",
+    "hermes_cli/web_server_app.py",
+    "hermes_cli/web_server_boundary.py",
+    "hermes_cli/welcome_trial.py",
+    "scripts/ci/check_blob_size.py",
+    "scripts/ci/check_docs_drift.py",
+    "scripts/ci/prompt_surface.py",
+    "scripts/code_health/py_rules_sleep.py",
+    "scripts/gen_gateway_command_parity.py",
+    "scripts/releases/lanes.py",
+    "scripts/scan_plugin_payloads.py",
+    "tests/_fixtures/model_peer.py",
+    "tests/acp_adapter/test_acp_image_staging_boundary.py",
+    "tests/acp_adapter/test_acp_image_strict_reject.py",
+    "tests/acp_adapter/test_acp_reattach_unknown_notice.py",
+    "tests/acp_adapter/test_acp_unacked_identity_retry.py",
+    "tests/acp_adapter/test_adversarial_unknown_follower.py",
+    "tests/acp_adapter/test_catalog_read_only.py",
+    "tests/acp_adapter/test_gateway_acp_session_end.py",
+    "tests/acp_adapter/test_gateway_attach_shutdown.py",
+    "tests/acp_adapter/test_gateway_cancel_admission.py",
+    "tests/acp_adapter/test_gateway_catalog_cwd.py",
+    "tests/acp_adapter/test_gateway_catalog_reset_owner.py",
+    "tests/acp_adapter/test_gateway_client_boundary.py",
+    "tests/acp_adapter/test_gateway_compressed_reopen.py",
+    "tests/acp_adapter/test_gateway_controls.py",
+    "tests/acp_adapter/test_gateway_delivery_shapes.py",
+    "tests/acp_adapter/test_gateway_editor_clarify.py",
+    "tests/acp_adapter/test_gateway_editor_cwd.py",
+    "tests/acp_adapter/test_gateway_editor_mcp.py",
+    "tests/acp_adapter/test_gateway_editor_mcp_held.py",
+    "tests/acp_adapter/test_gateway_editor_policy.py",
+    "tests/acp_adapter/test_gateway_editor_v4a.py",
+    "tests/acp_adapter/test_gateway_editor_wire.py",
+    "tests/acp_adapter/test_gateway_entry_lifecycle.py",
+    "tests/acp_adapter/test_gateway_launch_flags.py",
+    "tests/acp_adapter/test_gateway_new_cold.py",
+    "tests/acp_adapter/test_gateway_prompt_content.py",
+    "tests/acp_adapter/test_gateway_prompt_reoffer.py",
+    "tests/acp_adapter/test_gateway_queued_unknown.py",
+    "tests/acp_adapter/test_gateway_reconnect.py",
+    "tests/acp_adapter/test_gateway_session_commands.py",
+    "tests/acp_adapter/test_gateway_session_metadata.py",
+    "tests/acp_adapter/test_gateway_sessions.py",
+    "tests/acp_adapter/test_gateway_slash_text.py",
+    "tests/acp_adapter/test_gateway_submit_retry.py",
+    "tests/acp_adapter/test_gateway_terminal_projection.py",
+    "tests/acp_adapter/test_gateway_terminal_receipt_claim.py",
+    "tests/acp_adapter/test_gateway_tool_projection.py",
+    "tests/acp_adapter/test_gateway_unacked_slash.py",
+    "tests/acp_adapter/test_gateway_wire_controls.py",
+    "tests/acp_adapter/test_policy_identity_compat.py",
+    "tests/acp_adapter/test_retained_identity_retirement.py",
+    "tests/acp_adapter/test_session_mcp_branch_gate.py",
+    "tests/acp_adapter/test_session_mcp_frozen.py",
+    "tests/acp_adapter/test_session_mcp_ownership.py",
+    "tests/acp_adapter/test_session_mcp_policy.py",
+    "tests/acp_adapter/test_session_mcp_selection.py",
+    "tests/acp_adapter/test_session_mcp_workspace_move.py",
+    "tests/agent/test_anthropic_signed_platform_replay.py",
+    "tests/agent/test_bedrock_converse_reasoning_replay.py",
+    "tests/agent/test_bedrock_credential_probe.py",
+    "tests/agent/test_codex_request_compression.py",
+    "tests/agent/test_codex_service_tiers.py",
+    "tests/agent/test_codex_stream_rotating_item_ids.py",
+    "tests/agent/test_coding_worktree_note.py",
+    "tests/agent/test_compaction_events.py",
+    "tests/agent/test_compression_attempt_effect.py",
+    "tests/agent/test_compression_refusal_restores_transcript.py",
+    "tests/agent/test_compression_trigger_labels.py",
+    "tests/agent/test_context_compressor_tail.py",
+    "tests/agent/test_credential_pool_connectors_guest.py",
+    "tests/agent/test_cross_turn_reasoning_continuity.py",
+    "tests/agent/test_error_classifier_content_policy.py",
+    "tests/agent/test_gemini_long_decode.py",
+    "tests/agent/test_mcp_execution_deadline.py",
+    "tests/agent/test_mistral_tool_ids.py",
+    "tests/agent/test_model_metadata_cache.py",
+    "tests/agent/test_onboarding_first_tasks.py",
+    "tests/agent/test_onboarding_flow.py",
+    "tests/agent/test_plugin_live_notes_delivery.py",
+    "tests/agent/test_reasoning_carriers.py",
+    "tests/agent/test_reasoning_replay_routes.py",
+    "tests/agent/test_relay_compaction.py",
+    "tests/agent/test_relay_compaction_atof.py",
+    "tests/agent/test_runtime_session_store.py",
+    "tests/agent/test_runtime_session_store_lease_refresh.py",
+    "tests/agent/test_runtime_session_store_proxy.py",
+    "tests/agent/test_runtime_session_store_surface_parity.py",
+    "tests/agent/test_safe_worker_policy.py",
+    "tests/agent/test_setup_beat_card_round.py",
+    "tests/agent/test_skills_index_delta.py",
+    "tests/agent/test_turn_scripted_prelude.py",
+    "tests/agent/test_worker_outbox_adoption.py",
+    "tests/agent/test_worker_outbox_reopen.py",
+    "tests/agent/test_worker_rpc_connection_reuse.py",
+    "tests/agent/test_worker_rpc_loop_diagnostic.py",
+    "tests/agent/test_worker_rpc_proxy.py",
+    "tests/ci/test_check_blob_size.py",
+    "tests/ci/test_check_catalog_cors.py",
+    "tests/ci/test_clean_worktree_check.py",
+    "tests/ci/test_docs_drift.py",
+    "tests/ci/test_e2e_strict_acceptance.py",
+    "tests/ci/test_messaging_gated_selection.py",
+    "tests/ci/test_pending_fixes_strict.py",
+    "tests/ci/test_prompt_surface.py",
+    "tests/ci/test_stable_release_commit_threading.py",
+    "tests/ci/test_strict_ruff_target.py",
+    "tests/ci/test_update_transitive_routing.py",
+    "tests/ci/test_windows_update_crash_oracles.py",
+    "tests/cron/test_bot_chat_delivery_no_owner.py",
+    "tests/cron/test_bot_chat_legacy_isolation.py",
+    "tests/cron/test_canonical_completion_retention.py",
+    "tests/cron/test_canonical_cron.py",
+    "tests/cron/test_canonical_firer_give_up.py",
+    "tests/cron/test_canonical_receipt_bookkeeping.py",
+    "tests/cron/test_cron_bot_chat_create_if_missing.py",
+    "tests/cron/test_cron_journal_terminal_exits.py",
+    "tests/cron/test_cron_recover_after_commit.py",
+    "tests/cron/test_cron_recover_pause.py",
+    "tests/cron/test_cron_recovery.py",
+    "tests/cron/test_delivery_outcome_writeback.py",
+    "tests/cron/test_live_firer_receipt_recovery.py",
+    "tests/cron/test_queued_delivery_fencing.py",
+    "tests/cron/test_scheduler_session_title_nudge.py",
+    "tests/cron/test_tick_without_gateway.py",
+    "tests/docker/test_interactive_logging.py",
+    "tests/docker/test_tui_gateway_startup.py",
+    "tests/e2e/core/providers/test_native_codex_app_server_tui.py",
+    "tests/e2e/core/windows/conftest.py",
+    "tests/e2e/core/windows_update/test_crash_cells.py",
+    "tests/e2e/core/windows_update/test_pause_custody.py",
+    "tests/e2e/core/windows_update/test_pause_durable.py",
+    "tests/e2e/core/windows_update/test_update_lock_tree.py",
+    "tests/fakes/cron_owner.py",
+    "tests/file_write_observer.py",
+    "tests/gateway/fixtures/agent_persistence_worker.py",
+    "tests/gateway/fixtures/ancillary_reads_peer.py",
+    "tests/gateway/fixtures/api_authority_peer.py",
+    "tests/gateway/fixtures/api_daemon_witness.py",
+    "tests/gateway/fixtures/api_recovery_daemon.py",
+    "tests/gateway/fixtures/api_usage_peer.py",
+    "tests/gateway/fixtures/authority_clarify_peer.py",
+    "tests/gateway/fixtures/authority_controls_peer.py",
+    "tests/gateway/fixtures/authority_events_peer.py",
+    "tests/gateway/fixtures/authority_stream_peer.py",
+    "tests/gateway/fixtures/automation_peer.py",
+    "tests/gateway/fixtures/bot_authority_peer.py",
+    "tests/gateway/fixtures/browser_scope_peer.py",
+    "tests/gateway/fixtures/cli_launch_policy_probe.py",
+    "tests/gateway/fixtures/compression_persistence_worker.py",
+    "tests/gateway/fixtures/config_policy_recovery_probe.py",
+    "tests/gateway/fixtures/control_boundaries.py",
+    "tests/gateway/fixtures/desktop_process_verbs_peer.py",
+    "tests/gateway/fixtures/execution_frames_capture.py",
+    "tests/gateway/fixtures/hosted_auth_probe.py",
+    "tests/gateway/fixtures/kanban_owner_probe.py",
+    "tests/gateway/fixtures/kanban_recovery_probe.py",
+    "tests/gateway/fixtures/ledger_tool_worker.py",
+    "tests/gateway/fixtures/legacy_bot_mailbox.py",
+    "tests/gateway/fixtures/legacy_migration_probe.py",
+    "tests/gateway/fixtures/lifecycle_persistence_worker.py",
+    "tests/gateway/fixtures/local_automation_daemon.py",
+    "tests/gateway/fixtures/local_automation_peer.py",
+    "tests/gateway/fixtures/local_lineage_daemon.py",
+    "tests/gateway/fixtures/local_lineage_probe.py",
+    "tests/gateway/fixtures/local_recovery_daemon.py",
+    "tests/gateway/fixtures/local_recovery_probe.py",
+    "tests/gateway/fixtures/local_session_peer.py",
+    "tests/gateway/fixtures/local_status_notice_peer.py",
+    "tests/gateway/fixtures/native_ingress_media_peer.py",
+    "tests/gateway/fixtures/native_ingress_trust_multiplex.py",
+    "tests/gateway/fixtures/native_ingress_trust_peer.py",
+    "tests/gateway/fixtures/native_reply_crash_daemon.py",
+    "tests/gateway/fixtures/native_role_fences.py",
+    "tests/gateway/fixtures/native_role_peer.py",
+    "tests/gateway/fixtures/native_telegram_recovery_daemon.py",
+    "tests/gateway/fixtures/operator_cross_surface_peer.py",
+    "tests/gateway/fixtures/persistence_worker.py",
+    "tests/gateway/fixtures/process_scope_peer.py",
+    "tests/gateway/fixtures/rotation_persistence_worker.py",
+    "tests/gateway/fixtures/session_policy_peer.py",
+    "tests/gateway/fixtures/shared_authority_peer.py",
+    "tests/gateway/fixtures/shared_authority_recovery.py",
+    "tests/gateway/fixtures/shell_exec_peer.py",
+    "tests/gateway/fixtures/stack_dump_daemon.py",
+    "tests/gateway/fixtures/subagent_controls_peer.py",
+    "tests/gateway/fixtures/terminal_commit_daemon.py",
+    "tests/gateway/fixtures/trampoline_daemon.py",
+    "tests/gateway/fixtures/tui_desktop_routes_peer.py",
+    "tests/gateway/fixtures/webhook_route_authority.py",
+    "tests/gateway/relay/test_relay_native_refusal_ack.py",
+    "tests/gateway/test_admission_queue_cap.py",
+    "tests/gateway/test_admission_queue_cap_notice.py",
+    "tests/gateway/test_admission_results.py",
+    "tests/gateway/test_adversarial_mutation_lifecycle.py",
+    "tests/gateway/test_adversarial_responses_eviction.py",
+    "tests/gateway/test_adversarial_responses_pending.py",
+    "tests/gateway/test_adversarial_settlement_review.py",
+    "tests/gateway/test_api_admission_off_loop.py",
+    "tests/gateway/test_api_admission_queued_on_drain.py",
+    "tests/gateway/test_api_authority_continuity.py",
+    "tests/gateway/test_api_authority_controls.py",
+    "tests/gateway/test_api_authority_daemon.py",
+    "tests/gateway/test_api_authority_execution.py",
+    "tests/gateway/test_api_authority_retry.py",
+    "tests/gateway/test_api_authority_runs.py",
+    "tests/gateway/test_api_authority_store.py",
+    "tests/gateway/test_api_binding_served_profile.py",
+    "tests/gateway/test_api_canonical_projection.py",
+    "tests/gateway/test_api_chat_run_owner.py",
+    "tests/gateway/test_api_compressed_receipt_history.py",
+    "tests/gateway/test_api_crash_recovery.py",
+    "tests/gateway/test_api_cutover_contract.py",
+    "tests/gateway/test_api_cutover_results.py",
+    "tests/gateway/test_api_doors_logical_owner.py",
+    "tests/gateway/test_api_hosted_binding.py",
+    "tests/gateway/test_api_hosted_daemon.py",
+    "tests/gateway/test_api_idempotency_namespace.py",
+    "tests/gateway/test_api_image_capture_lease.py",
+    "tests/gateway/test_api_image_mislabelled_mime.py",
+    "tests/gateway/test_api_media_admission_bounds.py",
+    "tests/gateway/test_api_media_profile_scope.py",
+    "tests/gateway/test_api_media_retention.py",
+    "tests/gateway/test_api_model_lock_fallback.py",
+    "tests/gateway/test_api_observe_settled.py",
+    "tests/gateway/test_api_observer_gone_session.py",
+    "tests/gateway/test_api_pending_daemon.py",
+    "tests/gateway/test_api_relay_metadata_handoff.py",
+    "tests/gateway/test_api_request_one_target.py",
+    "tests/gateway/test_api_responses_replay_frozen_tool_events.py",
+    "tests/gateway/test_api_responses_stream_retry.py",
+    "tests/gateway/test_api_retired_media.py",
+    "tests/gateway/test_api_run_steer_before_adopt.py",
+    "tests/gateway/test_api_runs_admission_storage_error.py",
+    "tests/gateway/test_api_runs_native_session_refusal.py",
+    "tests/gateway/test_api_runs_poll_shape.py",
+    "tests/gateway/test_api_server_runs_hosted_room.py",
+    "tests/gateway/test_api_settled_history_release.py",
+    "tests/gateway/test_api_settled_payload_compaction.py",
+    "tests/gateway/test_api_settled_row_retention.py",
+    "tests/gateway/test_api_source_binding.py",
+    "tests/gateway/test_api_stop_claim_race.py",
+    "tests/gateway/test_api_store_error_status.py",
+    "tests/gateway/test_api_synthetic_nudge_receipt.py",
+    "tests/gateway/test_api_terminal_http.py",
+    "tests/gateway/test_api_unknown_resolution.py",
+    "tests/gateway/test_attachment_retry_mixed_staging.py",
+    "tests/gateway/test_authenticated_session_identity.py",
+    "tests/gateway/test_authority_active_list.py",
+    "tests/gateway/test_authority_approval_projection.py",
+    "tests/gateway/test_authority_automation.py",
+    "tests/gateway/test_authority_busy_plaintext_approval.py",
+    "tests/gateway/test_authority_busy_preempt_parity.py",
+    "tests/gateway/test_authority_complete_persisted_turn.py",
+    "tests/gateway/test_authority_complete_reused_final.py",
+    "tests/gateway/test_authority_connection.py",
+    "tests/gateway/test_authority_events.py",
+    "tests/gateway/test_authority_pause_recovery.py",
+    "tests/gateway/test_authority_principal.py",
+    "tests/gateway/test_authority_resident_stop.py",
+    "tests/gateway/test_authority_stream.py",
+    "tests/gateway/test_authority_unknown_resolution.py",
+    "tests/gateway/test_automation_compression_media.py",
+    "tests/gateway/test_automation_notification_category.py",
+    "tests/gateway/test_automation_retry.py",
+    "tests/gateway/test_bootstrap_deferred_integrity_scan.py",
+    "tests/gateway/test_bootstrap_early_exit_teardown.py",
+    "tests/gateway/test_bot_authority.py",
+    "tests/gateway/test_bot_door_message_cap.py",
+    "tests/gateway/test_bot_mailbox_async.py",
+    "tests/gateway/test_bot_mailbox_cancellation.py",
+    "tests/gateway/test_bot_paused_waiter.py",
+    "tests/gateway/test_bot_receipt_corruption.py",
+    "tests/gateway/test_bot_receipt_pin_fifo.py",
+    "tests/gateway/test_bot_receipt_queue_full.py",
+    "tests/gateway/test_bot_receipt_refusal.py",
+    "tests/gateway/test_bot_receipt_stale_pin.py",
+    "tests/gateway/test_bot_result_recovery.py",
+    "tests/gateway/test_boundary_evict_commits_memory.py",
+    "tests/gateway/test_branch_secondary_profile_origin.py",
+    "tests/gateway/test_browser_manage_shared_owner.py",
+    "tests/gateway/test_busy_burst_merge_shared.py",
+    "tests/gateway/test_busy_durable_acceptance.py",
+    "tests/gateway/test_busy_followup_marker_handoff.py",
+    "tests/gateway/test_canonical_complete_path.py",
+    "tests/gateway/test_canonical_desktop_metadata.py",
+    "tests/gateway/test_canonical_resume_display_projection.py",
+    "tests/gateway/test_canonical_resume_reasoning_snapshot.py",
+    "tests/gateway/test_canonical_session_inventory.py",
+    "tests/gateway/test_canonical_stop_hard_cancel.py",
+    "tests/gateway/test_canonical_tui_desktop_routes.py",
+    "tests/gateway/test_canonical_wire_contract.py",
+    "tests/gateway/test_canonical_wire_contracts.py",
+    "tests/gateway/test_child_notice_profile_admission.py",
+    "tests/gateway/test_claim_reopen_off_loop.py",
+    "tests/gateway/test_classic_slot_holds_fifo_head.py",
+    "tests/gateway/test_cold_platform_activation.py",
+    "tests/gateway/test_command_discovery.py",
+    "tests/gateway/test_completion_admission_compression_race.py",
+    "tests/gateway/test_completion_owner_retry.py",
+    "tests/gateway/test_completion_ownership_proof.py",
+    "tests/gateway/test_config_policy_daemon.py",
+    "tests/gateway/test_config_policy_recovery.py",
+    "tests/gateway/test_control_socket_peer_security.py",
+    "tests/gateway/test_cron_canonical_receipt_regression.py",
+    "tests/gateway/test_cron_owner_progress_stamp.py",
+    "tests/gateway/test_dashboard_mount_close_race.py",
+    "tests/gateway/test_desktop_process_verbs.py",
+    "tests/gateway/test_discard_delivers_captured_answer.py",
+    "tests/gateway/test_display_admission.py",
+    "tests/gateway/test_exec_quick_command_tree.py",
+    "tests/gateway/test_finite_unattended_wire_grant.py",
+    "tests/gateway/test_first_contact_dm.py",
+    "tests/gateway/test_follow_profile_followups.py",
+    "tests/gateway/test_follower_marker_handoff.py",
+    "tests/gateway/test_foreign_stale_gateway_lock.py",
+    "tests/gateway/test_gateway_api_token_exposure.py",
+    "tests/gateway/test_gateway_watchdog_host_sleep.py",
+    "tests/gateway/test_heartbeat_inflight_owner_scan.py",
+    "tests/gateway/test_hosted_attachment_bridge.py",
+    "tests/gateway/test_hosted_clarification_refusal.py",
+    "tests/gateway/test_hosted_discussion_manifests.py",
+    "tests/gateway/test_hosted_document_custody.py",
+    "tests/gateway/test_hosted_mux_runtime.py",
+    "tests/gateway/test_hosted_observation_bounded.py",
+    "tests/gateway/test_hosted_room_attachment_publication.py",
+    "tests/gateway/test_hosted_room_attachments.py",
+    "tests/gateway/test_hosted_room_auth_daemon.py",
+    "tests/gateway/test_hosted_room_expired_commit.py",
+    "tests/gateway/test_hosted_room_member_binding.py",
+    "tests/gateway/test_hosted_room_retention_restart.py",
+    "tests/gateway/test_hosted_room_runtime_attachments.py",
+    "tests/gateway/test_hosted_submission_capture_lease.py",
+    "tests/gateway/test_hygiene_compaction_trigger_label.py",
+    "tests/gateway/test_inactivity_timeout_receipt.py",
+    "tests/gateway/test_ingress_admission_off_loop.py",
+    "tests/gateway/test_internal_wake_never_interrupts.py",
+    "tests/gateway/test_internal_wake_reply_anchor.py",
+    "tests/gateway/test_journey_compress_restart_fifo.py",
+    "tests/gateway/test_journey_new_session_queued_work.py",
+    "tests/gateway/test_journey_restart_open_prompts.py",
+    "tests/gateway/test_kanban_finite_admission.py",
+    "tests/gateway/test_kanban_recovery.py",
+    "tests/gateway/test_kanban_result_exit.py",
+    "tests/gateway/test_launch_key_resume_rebind.py",
+    "tests/gateway/test_launch_secret_retirement.py",
+    "tests/gateway/test_legacy_acp_route.py",
+    "tests/gateway/test_legacy_desktop_source.py",
+    "tests/gateway/test_legacy_session_migration.py",
+    "tests/gateway/test_legacy_session_owner_backfill.py",
+    "tests/gateway/test_legacy_session_route_turn.py",
+    "tests/gateway/test_legacy_session_row_parity.py",
+    "tests/gateway/test_live_settlement_recovery.py",
+    "tests/gateway/test_local_authority_transitions.py",
+    "tests/gateway/test_local_automation.py",
+    "tests/gateway/test_local_context_ref_session_cwd.py",
+    "tests/gateway/test_local_context_ref_turn_text.py",
+    "tests/gateway/test_local_desktop_ui.py",
+    "tests/gateway/test_local_reset_lineage_one_conversation.py",
+    "tests/gateway/test_local_review_summary_event.py",
+    "tests/gateway/test_local_session.py",
+    "tests/gateway/test_local_session_info_fields.py",
+    "tests/gateway/test_local_session_lineage.py",
+    "tests/gateway/test_local_session_recovery.py",
+    "tests/gateway/test_local_source_labels.py",
+    "tests/gateway/test_local_viewer_clarify_batch.py",
+    "tests/gateway/test_local_viewer_events_submit.py",
+    "tests/gateway/test_local_viewer_events_turn.py",
+    "tests/gateway/test_local_viewer_secret_prompt.py",
+    "tests/gateway/test_local_viewer_status_notice.py",
+    "tests/gateway/test_local_viewer_sudo_prompt.py",
+    "tests/gateway/test_local_viewer_usage.py",
+    "tests/gateway/test_local_yolo_cold_restore.py",
+    "tests/gateway/test_lost_worker_receipt_compaction.py",
+    "tests/gateway/test_managed_runtime_live_drain.py",
+    "tests/gateway/test_managed_spawn_cancellation.py",
+    "tests/gateway/test_managed_turn_contract.py",
+    "tests/gateway/test_managed_turn_shutdown_drain.py",
+    "tests/gateway/test_managed_unstarted_cancel.py",
+    "tests/gateway/test_managed_worker_background_output.py",
+    "tests/gateway/test_managed_worker_bypass.py",
+    "tests/gateway/test_managed_worker_checkpoint_limits.py",
+    "tests/gateway/test_managed_worker_clarify_timeout.py",
+    "tests/gateway/test_managed_worker_construct.py",
+    "tests/gateway/test_managed_worker_detached_work.py",
+    "tests/gateway/test_managed_worker_drain.py",
+    "tests/gateway/test_managed_worker_env_boundary.py",
+    "tests/gateway/test_managed_worker_fencing.py",
+    "tests/gateway/test_managed_worker_finished_exit.py",
+    "tests/gateway/test_managed_worker_frozen_config.py",
+    "tests/gateway/test_managed_worker_group_close.py",
+    "tests/gateway/test_managed_worker_hard_stop_frame_fence.py",
+    "tests/gateway/test_managed_worker_hooks.py",
+    "tests/gateway/test_managed_worker_images.py",
+    "tests/gateway/test_managed_worker_kill_escalation.py",
+    "tests/gateway/test_managed_worker_late_stop.py",
+    "tests/gateway/test_managed_worker_launch.py",
+    "tests/gateway/test_managed_worker_lineage.py",
+    "tests/gateway/test_managed_worker_no_delegation.py",
+    "tests/gateway/test_managed_worker_parent_death.py",
+    "tests/gateway/test_managed_worker_profile_env.py",
+    "tests/gateway/test_managed_worker_reader_thread.py",
+    "tests/gateway/test_managed_worker_reservation_off_loop.py",
+    "tests/gateway/test_managed_worker_result_usage.py",
+    "tests/gateway/test_managed_worker_retire.py",
+    "tests/gateway/test_managed_worker_route_key.py",
+    "tests/gateway/test_managed_worker_routing_kwargs.py",
+    "tests/gateway/test_managed_worker_rpc_close.py",
+    "tests/gateway/test_managed_worker_stderr_log.py",
+    "tests/gateway/test_managed_worker_stop_before_hello.py",
+    "tests/gateway/test_managed_worker_stop_deadline.py",
+    "tests/gateway/test_managed_worker_tool_events.py",
+    "tests/gateway/test_managed_worker_trampoline.py",
+    "tests/gateway/test_managed_worker_turn_author.py",
+    "tests/gateway/test_managed_worker_turn_flags.py",
+    "tests/gateway/test_managed_worker_unknown_status.py",
+    "tests/gateway/test_mattermost_native_admission.py",
+    "tests/gateway/test_messaging_stop_new_cancel_queued.py",
+    "tests/gateway/test_messaging_stop_owner_turn.py",
+    "tests/gateway/test_model_alias_credential.py",
+    "tests/gateway/test_model_alias_credential_restart.py",
+    "tests/gateway/test_model_alias_scalar_model.py",
+    "tests/gateway/test_model_confirmation_clients.py",
+    "tests/gateway/test_msgraph_authority.py",
+    "tests/gateway/test_multiplex_cold_profile_sidebar_mutation.py",
+    "tests/gateway/test_multiplex_hot_serve_live.py",
+    "tests/gateway/test_multiplex_requires_default_profile.py",
+    "tests/gateway/test_mutation_prepare_off_loop.py",
+    "tests/gateway/test_native_admission_metadata.py",
+    "tests/gateway/test_native_admission_named_refusal.py",
+    "tests/gateway/test_native_config_owner_scope.py",
+    "tests/gateway/test_native_epoch_timestamp.py",
+    "tests/gateway/test_native_execution_secret_scope_off_loop.py",
+    "tests/gateway/test_native_fifo_compression_identity.py",
+    "tests/gateway/test_native_http_auth.py",
+    "tests/gateway/test_native_http_per_profile_edits.py",
+    "tests/gateway/test_native_http_secondary_profile_binding.py",
+    "tests/gateway/test_native_ingress_media.py",
+    "tests/gateway/test_native_ingress_trust.py",
+    "tests/gateway/test_native_media_alias_safety.py",
+    "tests/gateway/test_native_media_budget.py",
+    "tests/gateway/test_native_media_capture_lease.py",
+    "tests/gateway/test_native_media_capture_off_loop.py",
+    "tests/gateway/test_native_media_history_retention.py",
+    "tests/gateway/test_native_media_ownership.py",
+    "tests/gateway/test_native_media_redelivery.py",
+    "tests/gateway/test_native_operator_provenance.py",
+    "tests/gateway/test_native_pause_notice.py",
+    "tests/gateway/test_native_profile_create.py",
+    "tests/gateway/test_native_recovery_viewer_queue.py",
+    "tests/gateway/test_native_reply_crash_recovery.py",
+    "tests/gateway/test_native_reply_delivered_once.py",
+    "tests/gateway/test_native_role_reauthorization.py",
+    "tests/gateway/test_native_startup_recovery.py",
+    "tests/gateway/test_native_telegram_startup_recovery.py",
+    "tests/gateway/test_new_moves_automation_wake.py",
+    "tests/gateway/test_normal_runtime_boot.py",
+    "tests/gateway/test_offloop_write_retirement_join.py",
+    "tests/gateway/test_operator_cross_surface.py",
+    "tests/gateway/test_owner_backfill_live_owner.py",
+    "tests/gateway/test_owner_loop_writes_a2a_hosted_create.py",
+    "tests/gateway/test_owner_loop_writes_bot_chat_create.py",
+    "tests/gateway/test_owner_loop_writes_class.py",
+    "tests/gateway/test_owner_loop_writes_create_api.py",
+    "tests/gateway/test_owner_loop_writes_cron_create.py",
+    "tests/gateway/test_pairing_reply_off_loop.py",
+    "tests/gateway/test_parked_profile_served_set.py",
+    "tests/gateway/test_peer_client_unknown_run.py",
+    "tests/gateway/test_peer_dm_bot_chat_authority.py",
+    "tests/gateway/test_peer_dm_bot_chat_headless.py",
+    "tests/gateway/test_policy_secret_projections.py",
+    "tests/gateway/test_producer_owner_continuity.py",
+    "tests/gateway/test_profile_retire_stops_turns.py",
+    "tests/gateway/test_prompt_attachments.py",
+    "tests/gateway/test_prompt_cancel_claimed.py",
+    "tests/gateway/test_publish_execution_stamp_fence.py",
+    "tests/gateway/test_reconcile_probe_skip_keeps_parked.py",
+    "tests/gateway/test_relay_authority.py",
+    "tests/gateway/test_reset_lineage_session_count.py",
+    "tests/gateway/test_reset_tip_unknown_barrier.py",
+    "tests/gateway/test_responses_chain_api_content.py",
+    "tests/gateway/test_responses_compressed_chain.py",
+    "tests/gateway/test_responses_disconnected_identity.py",
+    "tests/gateway/test_responses_idem_replay_record.py",
+    "tests/gateway/test_responses_identity_bound_on_open.py",
+    "tests/gateway/test_responses_identity_migration.py",
+    "tests/gateway/test_responses_identity_retention.py",
+    "tests/gateway/test_responses_output_order.py",
+    "tests/gateway/test_responses_request_identity.py",
+    "tests/gateway/test_responses_unkeyed_stream_no_recording.py",
+    "tests/gateway/test_restart_wait_prompt_reach.py",
+    "tests/gateway/test_resume_latest_local_cli.py",
+    "tests/gateway/test_retire_settles_waiters.py",
+    "tests/gateway/test_retired_authority_cron_fence.py",
+    "tests/gateway/test_retired_media_ownership.py",
+    "tests/gateway/test_retired_media_scan_bound.py",
+    "tests/gateway/test_retry_native_provenance.py",
+    "tests/gateway/test_room_work_evidence.py",
+    "tests/gateway/test_room_work_receipt_capture.py",
+    "tests/gateway/test_room_work_service_capture.py",
+    "tests/gateway/test_room_work_transition_capture.py",
+    "tests/gateway/test_run_progress_verbose_args.py",
+    "tests/gateway/test_run_runtime_hot_serve_cleanup.py",
+    "tests/gateway/test_runner_compressed_receipt.py",
+    "tests/gateway/test_runtime_api.py",
+    "tests/gateway/test_runtime_bootstrap.py",
+    "tests/gateway/test_runtime_bootstrap_lifecycle.py",
+    "tests/gateway/test_runtime_describe_skin.py",
+    "tests/gateway/test_runtime_downgrade_exit.py",
+    "tests/gateway/test_runtime_listener_supervision.py",
+    "tests/gateway/test_runtime_ownership.py",
+    "tests/gateway/test_runtime_token_identity.py",
+    "tests/gateway/test_runtime_worker_shutdown.py",
+    "tests/gateway/test_runtime_writer_drain.py",
+    "tests/gateway/test_scalar_model_config_policy.py",
+    "tests/gateway/test_secondary_local_pick_multiplex.py",
+    "tests/gateway/test_session_a2a.py",
+    "tests/gateway/test_session_activity_ordering.py",
+    "tests/gateway/test_session_ancillary_reads.py",
+    "tests/gateway/test_session_approval_commands.py",
+    "tests/gateway/test_session_authoring_commands.py",
+    "tests/gateway/test_session_authorities_multiplex.py",
+    "tests/gateway/test_session_authority.py",
+    "tests/gateway/test_session_authority_adopted_stop.py",
+    "tests/gateway/test_session_authority_cancel_settlement.py",
+    "tests/gateway/test_session_authority_late_stop.py",
+    "tests/gateway/test_session_authority_preadopt_stop.py",
+    "tests/gateway/test_session_bot_retry.py",
+    "tests/gateway/test_session_bot_target_lifecycle.py",
+    "tests/gateway/test_session_busy_controls.py",
+    "tests/gateway/test_session_bypass_policy.py",
+    "tests/gateway/test_session_commands.py",
+    "tests/gateway/test_session_commands_session_scope.py",
+    "tests/gateway/test_session_config_projection.py",
+    "tests/gateway/test_session_create_tier_cwd.py",
+    "tests/gateway/test_session_cron.py",
+    "tests/gateway/test_session_deferred_pick_restart.py",
+    "tests/gateway/test_session_detach_end_reason.py",
+    "tests/gateway/test_session_event_observer_isolation.py",
+    "tests/gateway/test_session_events_execution_stamp.py",
+    "tests/gateway/test_session_events_overflow.py",
+    "tests/gateway/test_session_follow_profile_config.py",
+    "tests/gateway/test_session_group_controls.py",
+    "tests/gateway/test_session_group_execution_controls.py",
+    "tests/gateway/test_session_hosted_controls.py",
+    "tests/gateway/test_session_hosted_daemon.py",
+    "tests/gateway/test_session_hosted_rpc.py",
+    "tests/gateway/test_session_hosted_service.py",
+    "tests/gateway/test_session_hosted_transport.py",
+    "tests/gateway/test_session_images.py",
+    "tests/gateway/test_session_images_profile.py",
+    "tests/gateway/test_session_import_chain_ownership.py",
+    "tests/gateway/test_session_kanban.py",
+    "tests/gateway/test_session_kanban_run_off_loop.py",
+    "tests/gateway/test_session_kanban_turn_recovery.py",
+    "tests/gateway/test_session_list_live_hidden.py",
+    "tests/gateway/test_session_listener_lazy_dashboard.py",
+    "tests/gateway/test_session_local_mcp_refreeze.py",
+    "tests/gateway/test_session_local_reopen_on_turn.py",
+    "tests/gateway/test_session_local_route.py",
+    "tests/gateway/test_session_local_title.py",
+    "tests/gateway/test_session_model_command_commits.py",
+    "tests/gateway/test_session_mutation_branch.py",
+    "tests/gateway/test_session_mutation_branch_boundary.py",
+    "tests/gateway/test_session_mutation_cold.py",
+    "tests/gateway/test_session_mutation_compress.py",
+    "tests/gateway/test_session_mutation_compress_managed.py",
+    "tests/gateway/test_session_mutation_compress_preview.py",
+    "tests/gateway/test_session_mutation_coordinator.py",
+    "tests/gateway/test_session_mutation_delete_fences.py",
+    "tests/gateway/test_session_mutation_import_owner.py",
+    "tests/gateway/test_session_mutation_lineage_delete.py",
+    "tests/gateway/test_session_mutation_model.py",
+    "tests/gateway/test_session_mutation_model_busy.py",
+    "tests/gateway/test_session_mutation_model_route.py",
+    "tests/gateway/test_session_mutation_reset.py",
+    "tests/gateway/test_session_mutation_retirement.py",
+    "tests/gateway/test_session_mutation_retry_repair.py",
+    "tests/gateway/test_session_mutation_rpc.py",
+    "tests/gateway/test_session_operator_scope.py",
+    "tests/gateway/test_session_policy.py",
+    "tests/gateway/test_session_policy_coding_posture.py",
+    "tests/gateway/test_session_policy_refusal_fields.py",
+    "tests/gateway/test_session_policy_remote_cwd.py",
+    "tests/gateway/test_session_policy_verbs.py",
+    "tests/gateway/test_session_policy_workspace_readiness.py",
+    "tests/gateway/test_session_process_scope.py",
+    "tests/gateway/test_session_read_commands.py",
+    "tests/gateway/test_session_route_identity.py",
+    "tests/gateway/test_session_row_cwd.py",
+    "tests/gateway/test_session_setting_commands.py",
+    "tests/gateway/test_session_shell.py",
+    "tests/gateway/test_session_steer_before_adopt.py",
+    "tests/gateway/test_session_subagent_controls.py",
+    "tests/gateway/test_session_tui_config.py",
+    "tests/gateway/test_session_tui_ops.py",
+    "tests/gateway/test_session_tui_ops_session_diff.py",
+    "tests/gateway/test_session_tui_side.py",
+    "tests/gateway/test_session_viewer_automation.py",
+    "tests/gateway/test_settled_result_size.py",
+    "tests/gateway/test_settlement_lock_liveness.py",
+    "tests/gateway/test_settlement_off_loop.py",
+    "tests/gateway/test_shared_busy_receive_loop.py",
+    "tests/gateway/test_shared_clarify.py",
+    "tests/gateway/test_shared_gateway_harness.py",
+    "tests/gateway/test_shared_session_controls.py",
+    "tests/gateway/test_shell_hook_resync.py",
+    "tests/gateway/test_shutdown_runtime_ownership.py",
+    "tests/gateway/test_shutdown_settle_leash.py",
+    "tests/gateway/test_sibling_route_reserve.py",
+    "tests/gateway/test_slack_agent_sessions_api.py",
+    "tests/gateway/test_static_token_session_mutations.py",
+    "tests/gateway/test_stop_claim_race_class.py",
+    "tests/gateway/test_stored_session_picker.py",
+    "tests/gateway/test_submit_after_delete_gate.py",
+    "tests/gateway/test_surface_admission.py",
+    "tests/gateway/test_terminal_commit_crash.py",
+    "tests/gateway/test_ticket_profile_scope.py",
+    "tests/gateway/test_tui_busy_default.py",
+    "tests/gateway/test_tui_detach_end_stamp.py",
+    "tests/gateway/test_tui_session_reads.py",
+    "tests/gateway/test_turn_result_retention.py",
+    "tests/gateway/test_unified_gateway_native_live.py",
+    "tests/gateway/test_unified_runtime_init_multiplex.py",
+    "tests/gateway/test_unknown_receipt_boundaries.py",
+    "tests/gateway/test_unknown_resolution_physical_worker.py",
+    "tests/gateway/test_unmanaged_idle_exit.py",
+    "tests/gateway/test_unserve_release_order.py",
+    "tests/gateway/test_upstream_native_admission.py",
+    "tests/gateway/test_used_delete_restart.py",
+    "tests/gateway/test_viewer_close_lifecycle.py",
+    "tests/gateway/test_watch_automation_identity.py",
+    "tests/gateway/test_webhook_authority.py",
+    "tests/gateway/test_webhook_durable_destination.py",
+    "tests/gateway/test_webhook_finalization_recovery.py",
+    "tests/gateway/test_webhook_replay_scope.py",
+    "tests/gateway/test_webhook_startup_restore_admission.py",
+    "tests/gateway/test_worker_admission_reservation.py",
+    "tests/gateway/test_worker_agent_execution.py",
+    "tests/gateway/test_worker_compression_admission.py",
+    "tests/gateway/test_worker_compression_execution.py",
+    "tests/gateway/test_worker_delegation_bridge.py",
+    "tests/gateway/test_worker_delegation_receipts.py",
+    "tests/gateway/test_worker_ledger_tool_execution.py",
+    "tests/gateway/test_worker_lifecycle_execution.py",
+    "tests/gateway/test_worker_persistence.py",
+    "tests/gateway/test_worker_register_restriction.py",
+    "tests/gateway/test_worker_rotation_adoption.py",
+    "tests/gateway/test_worker_rotation_execution.py",
+    "tests/gateway/test_yolo_launch_tristate.py",
+    "tests/gateway/test_yolo_restart_revocation.py",
+    "tests/hermes_cli/gateway_client_options.py",
+    "tests/hermes_cli/test_anon_connectors_token.py",
+    "tests/hermes_cli/test_backup_cron_prompts_lock.py",
+    "tests/hermes_cli/test_backup_retention_roundtrip.py",
+    "tests/hermes_cli/test_classic_cli_routing.py",
+    "tests/hermes_cli/test_cli_context_reference_passthrough.py",
+    "tests/hermes_cli/test_cli_ctrl_c_draft_priority.py",
+    "tests/hermes_cli/test_cli_profile_toolsets.py",
+    "tests/hermes_cli/test_cli_sessions_behind_newer_surfaces.py",
+    "tests/hermes_cli/test_cli_startup_trim.py",
+    "tests/hermes_cli/test_config_retired_key_migrations.py",
+    "tests/hermes_cli/test_config_worker_save_deletion.py",
+    "tests/hermes_cli/test_connectors_cmd.py",
+    "tests/hermes_cli/test_corelane_frozen_worker_skill_env.py",
+    "tests/hermes_cli/test_cron_run_history_sessions.py",
+    "tests/hermes_cli/test_daemon_env_profile_donation.py",
+    "tests/hermes_cli/test_daemon_launch_env_strip.py",
+    "tests/hermes_cli/test_doctor_workspace_audit.py",
+    "tests/hermes_cli/test_gateway_agent.py",
+    "tests/hermes_cli/test_gateway_automation.py",
+    "tests/hermes_cli/test_gateway_chat.py",
+    "tests/hermes_cli/test_gateway_chat_blocking_controls.py",
+    "tests/hermes_cli/test_gateway_chat_commands_live.py",
+    "tests/hermes_cli/test_gateway_chat_failures.py",
+    "tests/hermes_cli/test_gateway_chat_flags_live.py",
+    "tests/hermes_cli/test_gateway_chat_native.py",
+    "tests/hermes_cli/test_gateway_chat_pending_preview.py",
+    "tests/hermes_cli/test_gateway_chat_plugin_inject.py",
+    "tests/hermes_cli/test_gateway_chat_query_file_read.py",
+    "tests/hermes_cli/test_gateway_chat_retry_validate.py",
+    "tests/hermes_cli/test_gateway_chat_send_directive.py",
+    "tests/hermes_cli/test_gateway_chat_title_live.py",
+    "tests/hermes_cli/test_gateway_chat_unknown.py",
+    "tests/hermes_cli/test_gateway_cli_commands.py",
+    "tests/hermes_cli/test_gateway_client_rpc.py",
+    "tests/hermes_cli/test_gateway_client_ws_target.py",
+    "tests/hermes_cli/test_gateway_command_parity.py",
+    "tests/hermes_cli/test_gateway_command_parity_live_session.py",
+    "tests/hermes_cli/test_gateway_connection_reconnect.py",
+    "tests/hermes_cli/test_gateway_disconnect_outcome.py",
+    "tests/hermes_cli/test_gateway_first_run_live.py",
+    "tests/hermes_cli/test_gateway_launch_lifetime.py",
+    "tests/hermes_cli/test_gateway_launch_supervisor.py",
+    "tests/hermes_cli/test_gateway_model_switch_cli.py",
+    "tests/hermes_cli/test_gateway_queued_unknown.py",
+    "tests/hermes_cli/test_gateway_reload_mcp.py",
+    "tests/hermes_cli/test_gateway_restart_warm_probe_cache.py",
+    "tests/hermes_cli/test_gateway_rollback.py",
+    "tests/hermes_cli/test_gateway_runtime.py",
+    "tests/hermes_cli/test_gateway_runtime_discovery.py",
+    "tests/hermes_cli/test_gateway_runtime_ensure.py",
+    "tests/hermes_cli/test_gateway_runtime_home_identity.py",
+    "tests/hermes_cli/test_gateway_runtime_replace_incompatible.py",
+    "tests/hermes_cli/test_gateway_runtime_service.py",
+    "tests/hermes_cli/test_gateway_runtime_service_roots.py",
+    "tests/hermes_cli/test_gateway_service_choice.py",
+    "tests/hermes_cli/test_gateway_service_owner.py",
+    "tests/hermes_cli/test_gateway_session_end_ownership.py",
+    "tests/hermes_cli/test_gateway_session_store.py",
+    "tests/hermes_cli/test_gateway_setting_commands.py",
+    "tests/hermes_cli/test_gateway_side.py",
+    "tests/hermes_cli/test_gateway_startup_consent.py",
+    "tests/hermes_cli/test_gateway_startup_validation.py",
+    "tests/hermes_cli/test_gateway_tools.py",
+    "tests/hermes_cli/test_gateway_tools_notify.py",
+    "tests/hermes_cli/test_install_state.py",
+    "tests/hermes_cli/test_kanban_managed_exit_reconciliation.py",
+    "tests/hermes_cli/test_kanban_managed_result_pid.py",
+    "tests/hermes_cli/test_kanban_worker_owner_wait.py",
+    "tests/hermes_cli/test_launch_readonly.py",
+    "tests/hermes_cli/test_local_windows_igpu_pool.py",
+    "tests/hermes_cli/test_main_merge_lifecycle.py",
+    "tests/hermes_cli/test_native_profile_scope_threads.py",
+    "tests/hermes_cli/test_onboarding_due.py",
+    "tests/hermes_cli/test_onboarding_run.py",
+    "tests/hermes_cli/test_plugin_presence_by_name.py",
+    "tests/hermes_cli/test_plugin_provider_requests.py",
+    "tests/hermes_cli/test_plugin_validate_private_imports.py",
+    "tests/hermes_cli/test_plugins_live_notice.py",
+    "tests/hermes_cli/test_profile_alias_orphan_removal.py",
+    "tests/hermes_cli/test_profile_delete_held_lock.py",
+    "tests/hermes_cli/test_profile_delete_read_only_copy.py",
+    "tests/hermes_cli/test_profile_delete_wrapper.py",
+    "tests/hermes_cli/test_profile_model_seed.py",
+    "tests/hermes_cli/test_prompt_turn_ack_order.py",
+    "tests/hermes_cli/test_readers_concurrent_owner.py",
+    "tests/hermes_cli/test_resume_alias_model.py",
+    "tests/hermes_cli/test_resume_alias_remote_config.py",
+    "tests/hermes_cli/test_runtime_maintenance_exclusion.py",
+    "tests/hermes_cli/test_runtime_provider_openai_runtime.py",
+    "tests/hermes_cli/test_session_maintenance_http.py",
+    "tests/hermes_cli/test_session_mutation_http.py",
+    "tests/hermes_cli/test_session_mutation_models.py",
+    "tests/hermes_cli/test_session_mutation_snapshot.py",
+    "tests/hermes_cli/test_session_mutation_standalone.py",
+    "tests/hermes_cli/test_sessions_discard.py",
+    "tests/hermes_cli/test_sessions_observation.py",
+    "tests/hermes_cli/test_sessions_prune_via_owner.py",
+    "tests/hermes_cli/test_shared_metrics_compression_outcome.py",
+    "tests/hermes_cli/test_shared_metrics_connectors.py",
+    "tests/hermes_cli/test_snapshot_restore_gateway_session.py",
+    "tests/hermes_cli/test_stable_forward_only_shallow.py",
+    "tests/hermes_cli/test_stable_lookup_github_auth.py",
+    "tests/hermes_cli/test_status_readonly.py",
+    "tests/hermes_cli/test_termux_gateway_launch.py",
+    "tests/hermes_cli/test_tui_exit_summary_short_id.py",
+    "tests/hermes_cli/test_tui_first_run_routing.py",
+    "tests/hermes_cli/test_update_downgrade_guard.py",
+    "tests/hermes_cli/test_update_downgrade_guard_named_profile.py",
+    "tests/hermes_cli/test_update_exit_code_publication.py",
+    "tests/hermes_cli/test_update_restore_authority.py",
+    "tests/hermes_cli/test_web_server_nous_recommended_default.py",
+    "tests/hermes_cli/test_welcome_trial.py",
+    "tests/hermes_cli/test_worktree_lock_old_git.py",
+    "tests/hermes_cli/test_worktree_retained_cwd_identity.py",
+    "tests/hermes_platform/test_gpu_adapters.py",
+    "tests/hermes_platform/test_host_summary.py",
+    "tests/hermes_state/conftest.py",
+    "tests/hermes_state/test_cron_run_sessions.py",
+    "tests/hermes_state/test_downgrade_delete_guard.py",
+    "tests/hermes_state/test_ledger_delete_consistency.py",
+    "tests/hermes_state/test_reset_lineage_delete_queued_work.py",
+    "tests/hermes_state/test_reset_owner_housekeeping.py",
+    "tests/hermes_state/test_runtime_admission.py",
+    "tests/hermes_state/test_runtime_adoption.py",
+    "tests/hermes_state/test_runtime_destructive_mutations.py",
+    "tests/hermes_state/test_runtime_import_mutations.py",
+    "tests/hermes_state/test_runtime_mutation_actions.py",
+    "tests/hermes_state/test_runtime_mutation_retired_import.py",
+    "tests/hermes_state/test_runtime_mutations.py",
+    "tests/hermes_state/test_runtime_recovery.py",
+    "tests/hermes_state/test_runtime_rewind_carrier_handoff.py",
+    "tests/hermes_state/test_runtime_rewind_mutations.py",
+    "tests/hermes_state/test_runtime_schema.py",
+    "tests/hermes_state/test_runtime_worker.py",
+    "tests/hermes_state/test_runtime_worker_compaction.py",
+    "tests/hermes_state/test_runtime_worker_compression.py",
+    "tests/hermes_state/test_runtime_worker_compression_admission.py",
+    "tests/hermes_state/test_runtime_worker_compression_annotations.py",
+    "tests/hermes_state/test_runtime_worker_compression_cleanup.py",
+    "tests/hermes_state/test_runtime_worker_compression_flush.py",
+    "tests/hermes_state/test_runtime_worker_context.py",
+    "tests/hermes_state/test_runtime_worker_history.py",
+    "tests/hermes_state/test_runtime_worker_lifecycle.py",
+    "tests/hermes_state/test_runtime_worker_metadata.py",
+    "tests/hermes_state/test_runtime_worker_operations.py",
+    "tests/hermes_state/test_runtime_worker_read_fence.py",
+    "tests/hermes_state/test_runtime_worker_rotation_automation.py",
+    "tests/hermes_state/test_runtime_worker_title_retry.py",
+    "tests/hermes_state/test_runtime_worker_turn_cleanup.py",
+    "tests/hermes_state/test_runtime_worker_usage.py",
+    "tests/hermes_state/test_storage_import_boundary.py",
+    "tests/hermes_state/test_target_advance_fence.py",
+    "tests/hermes_state/test_terminal_retirement.py",
+    "tests/hermes_state/test_worker_lineage_exclusion.py",
+    "tests/hermes_state/test_worker_lineage_index.py",
+    "tests/lock_contention.py",
+    "tests/plugins/platforms/test_discord_reauthorize_allowed_roles.py",
+    "tests/plugins/test_a2a_forwarded_cancel_retry.py",
+    "tests/plugins/test_a2a_rejected_resend.py",
+    "tests/plugins/test_irc_inbound_identity.py",
+    "tests/plugins/test_teams_duplicate_job_claim.py",
+    "tests/pm/test_baked_selection.py",
+    "tests/pm/test_filesystem_is_junction.py",
+    "tests/pm/test_sync_bytecode_compile_fallback.py",
+    "tests/pm/test_user_facing.py",
+    "tests/pm/test_uv_cache_publication.py",
+    "tests/scripts/desktop_update/test_posix_handoff_pid_export.py",
+    "tests/scripts/test_build_skills_index_resolve.py",
+    "tests/scripts/test_code_health_sleep_rule.py",
+    "tests/scripts/test_install_ps1_chosen_channel.py",
+    "tests/scripts/test_install_ps1_stable_default.py",
+    "tests/scripts/test_install_sh_chosen_channel.py",
+    "tests/scripts/test_install_sh_stable_default.py",
+    "tests/scripts/test_release_lanes.py",
+    "tests/scripts/test_release_progress.py",
+    "tests/scripts/test_scan_plugin_payloads.py",
+    "tests/test_session_daemon_reaper.py",
+    "tests/test_state_config_contention.py",
+    "tests/tools/test_approval_gateway_wait_coalesce_race.py",
+    "tests/tools/test_approval_lifecycle_guard_parity.py",
+    "tests/tools/test_async_delegation_requeue.py",
+    "tests/tools/test_async_delegation_worker.py",
+    "tests/tools/test_async_delegation_worker_routing.py",
+    "tests/tools/test_bot_legacy_producer.py",
+    "tests/tools/test_bot_no_fallback.py",
+    "tests/tools/test_bot_profile_relay.py",
+    "tests/tools/test_bot_receipt_read_lock.py",
+    "tests/tools/test_bot_reply_receipt.py",
+    "tests/tools/test_browser_supervisor_capture_dispatch.py",
+    "tests/tools/test_connector_accounts.py",
+    "tests/tools/test_connector_files.py",
+    "tests/tools/test_connector_wire_identity.py",
+    "tests/tools/test_connectors_display.py",
+    "tests/tools/test_connectors_execute_status.py",
+    "tests/tools/test_connectors_guest_on_first_use.py",
+    "tests/tools/test_docker_backend_real.py",
+    "tests/tools/test_escape_drift_autocorrect.py",
+    "tests/tools/test_explicit_mcp_schema_reload.py",
+    "tests/tools/test_local_persistent_shell.py",
+    "tests/tools/test_mcp_auth_park_discovery_nudge.py",
+    "tests/tools/test_mcp_session_scope.py",
+    "tests/tools/test_memory_patch_action.py",
+    "tests/tools/test_memory_target_contract.py",
+    "tests/tools/test_permanent_allowlist_live_reload.py",
+    "tests/tools/test_process_checkpoint_worker_handoff.py",
+    "tests/tools/test_process_registry_import_fence.py",
+    "tests/tools/test_safe_worker_mcp.py",
+    "tests/tools/test_safe_worker_tools.py",
+    "tests/tools/test_session_search_readonly.py",
+    "tests/tools/test_set_theme_tool.py",
+    "tests/tools/test_setup_beat_plugin_skills.py",
+    "tests/tools/test_setup_beat_tool.py",
+    "tests/tools/test_skills_hub_github_fetch.py",
+    "tests/tools/test_skills_hub_lock_file.py",
+    "tests/tools/test_tts_failure_preserves_existing.py",
+    "tests/tui_gateway/_turn_marker_backend.py",
+    "tests/tui_gateway/test_adversarial_sidecar_availability.py",
+    "tests/tui_gateway/test_canonical_voice_events.py",
+    "tests/tui_gateway/test_connector_account_surface.py",
+    "tests/tui_gateway/test_connector_accounts_rpc.py",
+    "tests/tui_gateway/test_detached_loop_keepalive.py",
+    "tests/tui_gateway/test_entry_home_ownership.py",
+    "tests/tui_gateway/test_fanout_burst_batching.py",
+    "tests/tui_gateway/test_fanout_send_membership.py",
+    "tests/tui_gateway/test_gateway_bootstrap_control_home.py",
+    "tests/tui_gateway/test_gateway_bootstrap_recover.py",
+    "tests/tui_gateway/test_history_identity.py",
+    "tests/tui_gateway/test_hosted_file_publication.py",
+    "tests/tui_gateway/test_hosted_room_attachment_routes.py",
+    "tests/tui_gateway/test_hosted_room_frozen_publication.py",
+    "tests/tui_gateway/test_hosted_room_member_submit.py",
+    "tests/tui_gateway/test_hosted_room_policy_upgrade.py",
+    "tests/tui_gateway/test_ink_helper_dependencies.py",
+    "tests/tui_gateway/test_interrupt_dead_compute_host.py",
+    "tests/tui_gateway/test_interrupt_does_not_wait_for_agent.py",
+    "tests/tui_gateway/test_legacy_fallback_profile_scope.py",
+    "tests/tui_gateway/test_legacy_fallback_ticket_profile_verbs.py",
+    "tests/tui_gateway/test_legacy_paste_profile_home.py",
+    "tests/tui_gateway/test_legacy_turn_canonical_barrier.py",
+    "tests/tui_gateway/test_machine_facts_rpc.py",
+    "tests/tui_gateway/test_main_merge_projections.py",
+    "tests/tui_gateway/test_notification_admission_refusal.py",
+    "tests/tui_gateway/test_onboarding_e2e.py",
+    "tests/tui_gateway/test_onboarding_endings.py",
+    "tests/tui_gateway/test_onboarding_fresh_launch.py",
+    "tests/tui_gateway/test_onboarding_run_rpc.py",
+    "tests/tui_gateway/test_onboarding_session.py",
+    "tests/tui_gateway/test_onboarding_welcome_claim.py",
+    "tests/tui_gateway/test_plugins_catalog_lookup.py",
+    "tests/tui_gateway/test_profile_resume_cwd.py",
+    "tests/tui_gateway/test_profile_resume_cwd_persist.py",
+    "tests/tui_gateway/test_server_requests.py",
+    "tests/tui_gateway/test_session_delete_rpc.py",
+    "tests/tui_gateway/test_skin_watcher_profile_scope.py",
+    "tests/tui_gateway/test_theme_bridge.py",
+    "tests/tui_gateway/test_tui_gateway_notification_poller.py",
+    "tests/tui_gateway/test_tui_gateway_server_branch_idempotency.py",
+    "tests/tui_gateway/test_tui_gateway_server_deep_truncate.py",
+    "tests/waiting.py",
+    "tools/connectors/display.py",
+    "tools/connectors/gateway/files.py",
+    "tools/setup_beat_tool.py",
+    "tui_gateway/agent_factory.py",
+    "tui_gateway/command_discovery.py",
+    "tui_gateway/contracts/canonical.py",
+    "tui_gateway/contracts/canonical_sessions.py",
+    "tui_gateway/session_registry.py",
+    "ui-tui/scripts/native_canonical_probe.py"
+  ]
+}
