@@ -86,6 +86,17 @@ def _account_gate_closed(rid):
     return _connector_rpc_error(rid, 4031, ConnectorErrorReason.connectors_unavailable, "Connectors are not available.")
 
 
+def _account_identity_error(rid):
+    """Opening the Connectors page or connecting from it is the user asking for apps: create the
+    guest identity here when the user has none. Operation polls never call this."""
+    from tools.connectors import ensure_guest_identity
+    from tui_gateway.contracts.connectors import ConnectorErrorReason
+
+    if setup_error := ensure_guest_identity():
+        return _connector_rpc_error(rid, 5034, ConnectorErrorReason.connector_request_failed, setup_error)
+    return None
+
+
 def _parse_params(rid, params, model):
     from pydantic import ValidationError
 
@@ -222,6 +233,8 @@ def _connector_rpc(rid, params, action):
         with _account_scope(request):
             if closed := _account_gate_closed(rid):
                 return _ok(rid, {"available": False, "connectors": []}) if action == "status" else closed
+            if setup_error := _account_identity_error(rid):
+                return setup_error
             return _account_connector_list(rid) if action == "status" else _account_connector_connect(rid, request)
 
     runtime_token = _current_runtime_session_record.set(session)
@@ -293,13 +306,23 @@ def _account_home(request):
 
 
 @contextlib.contextmanager
+def _desktop_page_vars():
+    """Bind the session vars of a sessionless request from the desktop Connectors page. Only that
+    page sends account-owned and account RPCs, so the surface comes from the request: the backend's
+    ``QUBIT_DESKTOP`` is absent on a URL or cloud backend and would name the caller ``tui``."""
+    from gateway.session_context import set_session_vars
+
+    tokens = set_session_vars(source="desktop", profile=_current_profile_name(), cron_session="")
+    try:
+        yield
+    finally:
+        _clear_session_context(tokens)
+
+
+@contextlib.contextmanager
 def _account_scope(request):
-    with _session_profile_runtime_scope({"profile_home": _account_home(request)}):
-        tokens = _set_session_context("")
-        try:
-            yield
-        finally:
-            _clear_session_context(tokens)
+    with _session_profile_runtime_scope({"profile_home": _account_home(request)}), _desktop_page_vars():
+        yield
 
 
 def _operation_for_request(rid, request, session):
