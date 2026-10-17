@@ -1,0 +1,6 @@
+# Audit run outputs — regenerable, and ~1.8 MB per run. The probes (tmp/audit/*.py)
+# and the audit scripts themselves are the durable part; these are just their output.
+tmp/audit/*.json
+tmp/audit/*.log
+tmp/audit/*.out
+tmp/audit/*.err
