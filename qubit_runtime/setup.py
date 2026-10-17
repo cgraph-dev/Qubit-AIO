@@ -34,7 +34,7 @@ _ROOT = os.path.dirname(os.path.abspath(__file__))
 _IN_NIX_BUILD = os.environ.get("HERMES_NIX_BUILD") == "1"
 
 _BLOCK_MESSAGE = (
-    "Building wheels or sdists for hermes-agent is not supported.\n"
+    "Building wheels or sdists for Qubit is not supported.\n"
     "Qubit is distributed via the shell installer, Docker image, or Nix.\n"
     "See: https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/getting-started/installation\n"
     "\n"

@@ -14,7 +14,7 @@ from qubit_constants import get_qubit_home, profile_name_for_home
 
 logger = logging.getLogger(__name__)
 
-SETUP_PROFILE_NAME = "hermes-setup"
+SETUP_PROFILE_NAME = "qubit-setup"
 SETUP_PROFILE_DESCRIPTION = "Where Qubit met you — walks your first run, then checks in as you find your feet."
 SETUP_CHAT_TITLE = "Welcome to Qubit"
 MAX_FAILED_STARTS = 3
@@ -234,6 +234,46 @@ def record_cards(session_id: str, cards: dict) -> None:
 def read_cards(session_id: str) -> dict:
     from utils import read_json_or_empty
     return read_json_or_empty(_cards_path(session_id))
+
+
+def resumable_session() -> Optional[str]:
+    """The setup conversation to continue, or None when there is nothing to resume.
+
+    The point of resume: a user who quit halfway through the first-run guide should come
+    back to where they were, not start over. Upstream gets this from a saved *run*; Qubit
+    keeps the equivalent per conversation (``record_cards`` writes "what its
+    ``/initiate-setup`` turn embedded, and where it is"), so the missing piece is finding
+    which setup conversation to continue.
+
+    Deliberately conservative -- returns a session id ONLY when all of these hold:
+      * a setup profile exists (nothing to resume otherwise);
+      * its card file records a position (``record_cards`` ran at least once), so a
+        conversation that never started the guide is not "resumed" into an empty state;
+      * the guide was never completed (``completed_at`` unset), so a finished guide is not
+        reopened;
+      * the user has not exhausted ``MAX_FAILED_STARTS`` -- once the intro is forced to
+        ``seen`` the guide has given up and must not be resurrected.
+    """
+    found = find_setup_profile()
+    if found is None:
+        return None
+    state = _read_state(found[1])
+    if state.get("completed_at") or state.get("intro") == "seen":
+        return None
+    if state.get("failed_starts", 0) >= MAX_FAILED_STARTS:
+        return None
+    for path in sorted(_cards_dir().glob("*.json")):
+        try:
+            cards = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            continue
+        if cards:
+            return path.stem
+    return None
+
+
+def _cards_dir() -> Path:
+    return get_qubit_home() / _CARDS_DIR
 
 
 def _free_setup_profile_name() -> str:

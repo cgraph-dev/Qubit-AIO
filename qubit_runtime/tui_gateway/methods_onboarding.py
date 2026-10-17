@@ -50,11 +50,11 @@ def _(rid, params: dict) -> dict:
 
 @method("onboarding.state")
 def _(rid, params: dict) -> dict:
-    from qubit_cli.setup_profile import read_state, settle_returning_user
+    from qubit_cli.setup_profile import read_state, resumable_session, settle_returning_user
 
     def settle_then_read() -> dict:
         settle_returning_user()
-        return read_state()
+        return {**read_state(), "resumable_session": resumable_session()}
     return _onboarding_state_result(rid, settle_then_read)
 
 
@@ -107,6 +107,40 @@ def _onboarding_state_result(rid, change) -> dict:
         return _err(rid, 5076, str(e))
     return _ok(rid, {"eligible": onboarding_eligible(), "profile": found[0] if found else None, **state})
 
+
+def start_due_boot() -> None:
+    """Serve boot, desktop's local backend: work out the onboarding answer off the RPC path.
+
+    Bound to OUR state, not upstream's ``onboarding_run``. Upstream warms
+    ``onboarding_due`` (a saved-run model); Qubit's onboarding is a SETUP PROFILE
+    (``qubit_cli.setup_profile``), so the question worth pre-answering here is our own:
+    is a fresh user due the intro, and is there a setup profile to resume?
+
+    Why this exists as a callable at all: ``qubit_cli/web_server_app.py`` calls
+    ``tui_gateway.server.start_due_boot()`` in its boot lifespan. Upstream defines it in
+    this module; ours did not, so every desktop ``serve`` boot raised AttributeError.
+    The call ran with the server's globals (``bind_module``), which is why it resolves
+    through the server rather than by direct import.
+
+    Non-fatal by construction: the desktop's first ``setup.status`` asks the same
+    question over RPC and must never wait on a dead thread, so a failure here is logged
+    and swallowed -- boot proceeds and the RPC path still answers.
+    """
+    def compute() -> None:
+        from qubit_cli.setup_profile import read_state, resumable_session
+        state = read_state()
+        logger.debug("onboarding due at boot: intro=%s failed_starts=%s resumable=%s",
+                     state.get("intro"), state.get("failed_starts"), resumable_session())
+
+    try:
+        from agent.memory_provider import spawn_context_thread
+    except Exception:
+        logger.debug("onboarding due boot probe skipped: no context-thread helper", exc_info=True)
+        return
+    try:
+        spawn_context_thread(compute, name="onboarding-due").start()
+    except Exception:
+        logger.debug("onboarding due boot probe failed to start", exc_info=True)
 
 def _clear_setup_sessions(profile_dir) -> None:
     target = Path(profile_dir).resolve()

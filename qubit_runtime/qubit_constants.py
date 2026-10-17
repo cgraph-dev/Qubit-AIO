@@ -690,7 +690,7 @@ def secure_parent_dir(path: Path) -> None:
 
         logging.getLogger(__name__).warning(
             "Not restricting permissions on %s: it is inside the "
-            "hermes-agent install directory (%s). Credential files are "
+            "Qubit install directory (%s). Credential files are "
             "normally stored under the qubit home directory instead.", parent, _INSTALL_ROOT,
         )
         return

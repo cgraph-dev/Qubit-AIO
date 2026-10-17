@@ -154,7 +154,7 @@ def setup_beat_tool(args: Mapping[str, Any], *, db=None, session_id: str = "", t
             return json.dumps({"next": "done", "reminder": finish_reminder(record)} if flow.is_active(record)
                               else {"error": "Onboarding is over in this chat; it is a normal chat now."})
     if callback is None:
-        return tool_error("setup_beat cards show only in the Hermes desktop app.")
+        return tool_error("setup_beat cards show only in the Qubit desktop app.")
     if beat == "connectors" and (refused := _unlisted_suggestions(args)):
         return refused
     shown = records.advance(db, session_id, flow.Shown(beat, tool_call_id, args.get("options"), args.get("suggest")))

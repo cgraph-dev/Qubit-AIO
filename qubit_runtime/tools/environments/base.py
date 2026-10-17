@@ -551,7 +551,7 @@ class BaseEnvironment(ABC):
                     rendered = output.render(suffix=f"\n[Command timed out after {timeout}s]")
                     if output.total_chars == 0:
                         rendered = rendered.lstrip()
-                    # The flag tells Hermes' own deadline apart from a command's own ``exit 124``.
+                    # The flag tells Qubit's own deadline apart from a command's own ``exit 124``.
                     return {**self._finalize_wait_result(output, rendered, 124), "qubit_timed_out": True}
                 touch_activity_if_due(_activity_state, "terminal command running")
                 trace.heartbeat()
@@ -781,7 +781,7 @@ class BaseEnvironment(ABC):
 
         Also applies the macOS ``open`` frontmost raise-ladder (a pure string
         rewrite, no-op on non-Darwin) so files opened via tool calls are
-        brought to the front instead of landing behind the Hermes window.
+        brought to the front instead of landing behind the Qubit window.
         """
         from tools.terminal_tool_macos_open import _transform_macos_open_command
         from tools.terminal_tool_sudo import _transform_sudo_command

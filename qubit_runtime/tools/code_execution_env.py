@@ -146,12 +146,12 @@ def _build_child_env(*, rpc_endpoint: str, rpc_token: str, tmpdir: str,
         child_env["QUBIT_HOME"] = _home_override
         apply_scratch_tmp_env(child_env)  # TMPDIR follows the routed home, like HOME does
     # PYTHONPATH: the staging dir (qubit_tools.py) must always be importable even when project
-    # mode changes CWD. Hermes's root is added ONLY when the child runs in Hermes's Python env —
-    # exposing Hermes's site-packages to an external interpreter can mix incompatible compiled
-    # extensions (3.12 NumPy under a 3.9 venv). Inherited Hermes-owned entries are stripped first.
-    # Before re-injecting PYTHONPATH, strip Hermes-owned entries that leaked through _scrub_child_env
+    # mode changes CWD. Qubit's root is added ONLY when the child runs in Qubit's Python env —
+    # exposing Qubit's site-packages to an external interpreter can mix incompatible compiled
+    # extensions (3.12 NumPy under a 3.9 venv). Inherited Qubit-owned entries are stripped first.
+    # Before re-injecting PYTHONPATH, strip Qubit-owned entries that leaked through _scrub_child_env
     # (PYTHONPATH is in _SAFE_ENV_PREFIXES so it passes the scrub). External project interpreters
-    # must not inherit Hermes dependencies (#74817). PM's own interpreter, however, can be a
+    # must not inherit Qubit dependencies (#74817). PM's own interpreter, however, can be a
     # bare bundled Python whose dependencies live in the selected generation, not sys.prefix.
     from tools.environments.local_pythonpath import (
         _strip_qubit_owned_pythonpath, _validated_runtime_venv, _same_path,

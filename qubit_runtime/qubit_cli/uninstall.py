@@ -462,7 +462,7 @@ def remove_desktop_app_leftovers(*, full_uninstall: bool) -> list[Path]:
     Electron scatter, and the XDG cache dir on every platform. On a full
     uninstall the XDG data dir (``~/.local/share/qubit``) goes too.
 
-    Only well-known Hermes-named entries are touched — never a glob of the
+    Only well-known Qubit-named entries are touched — never a glob of the
     whole Library.
     """
     import sys as _sys
@@ -501,7 +501,7 @@ def remove_legacy_runtime_trees(qubit_home: Path) -> list[Path]:
 
     Runtime artifacts are install-scoped now, so the current locations go
     away with ``rmtree(project_root)``. But a checkout OUTSIDE the home
-    (the common case: ``~/src/hermes-agent``) used to put its node/uv
+    (the common case: ``~/src/qubit``) used to put its node/uv
     under ``$QUBIT_HOME`` — that tree survives removing the checkout and
     survives "keep my data" uninstalls, because it is not data.
 
