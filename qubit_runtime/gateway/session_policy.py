@@ -421,14 +421,30 @@ def _keeps_profile_route(picked, config):
     `deepinfra`, `custom:<name>` for a named entry) is the same route. A block with an endpoint
     and no provider (or `auto`) already routes to `custom` there.
     """
-    from gateway.session_route_identity import resolved_route
-    held = dict(config.get('model') or {}) if isinstance(config.get('model'), dict) else {}
-    if str(held.get('provider') or '').strip().lower() in ('', 'auto') and str(held.get('base_url') or '').strip():
-        held['provider'] = 'custom'
-    held_id = resolved_route(held, config)[0]
+    from gateway.session_route_identity import profile_route_identity, resolved_route
+    held_id = profile_route_identity(config)
     if held_id == 'auto' or not isinstance(picked, str) or not picked.strip():
         return False
     return resolved_route({'provider': picked}, config)[0] == held_id
+
+
+def _with_entry_pick(params, config):
+    """*params* with a provider pick of the held entry's bare config key spelled as its ``custom:<key>``.
+
+    A configured entry keyed like a canonical built-in (`providers: deepseek`) is shadowed by the
+    built-in in raw provider resolution, so the bare spelling would route, and be frozen, as a
+    different provider than the entry the profile runs (#140107). Only the held entry's bare key
+    is that entry (Desktop's guard). A keyed entry's display name is not; a keyless legacy
+    ``custom_providers:`` entry's is (``configured_entry_key``). Other picks stay as they came.
+    """
+    from gateway.session_route_identity import configured_entry_key, profile_route_identity
+    picked = params.get('provider')
+    if not isinstance(picked, str):
+        return params
+    identity = profile_route_identity(config)
+    if identity == 'auto' or picked.strip().lower() != (configured_entry_key(identity, config) or None):
+        return params
+    return {**params, 'provider': identity}
 
 
 def _apply_launch_overrides(params, config):
@@ -436,6 +452,7 @@ def _apply_launch_overrides(params, config):
     from urllib.parse import urlsplit
     from qubit_cli.config import resolve_turn_limit
     from qubit_constants import parse_reasoning_effort
+    params = _with_entry_pick(_without_auto_pick(params), config)
     for key in ('provider', 'base_url'):
         if key in params:
             value = params[key]
@@ -884,7 +901,7 @@ def policy_scope(policy, *, authority=None):
     from gateway.session_local_editor import editor_scope
     try:
         from gateway.session_local_mcp import editor_mcp_scope
-        with editor_scope(policy), editor_mcp_scope(authority, policy):
+        with editor_scope(policy), editor_mcp_scope(authority, policy), policy.client_env_scope():
             yield
     finally:
         _ACTIVE_POLICY.reset(policy_token)
