@@ -551,6 +551,33 @@ def _event_delivery(fn, evt: Dict[str, Any], claim_id: str) -> None:
         fn(str(evt.get("delegation_id") or ""), claim_id)
 
 
+def requeue_admitted_completion(delegation_id: str, target_queue) -> bool:
+    """Offer an acknowledged completion again when its receiving turn could not confirm the owner.
+
+    The row returns to pending and its event goes back on ``target_queue``, so the next delivery
+    re-runs the pre-flight. A row past the delivery budget converges to ``dropped`` instead, which
+    bounds the loop; a row without a stored event is left as it is."""
+    now = time.time()
+    with _DB_LOCK, _transaction() as conn:
+        exhausted = conn.execute("""UPDATE async_delegations SET delivery_state='dropped', updated_at=?
+               WHERE delegation_id=? AND delivery_state='delivered' AND delivery_attempts>=?""",
+            (now, delegation_id, _MAX_DELIVERY_ATTEMPTS))
+        if exhausted.rowcount == 1:
+            logger.warning("Async delegation %s exhausted its %d delivery attempts; "
+                           "marking terminally dropped (result remains queryable).",
+                           delegation_id, _MAX_DELIVERY_ATTEMPTS)
+            return False
+        reopened = conn.execute("""UPDATE async_delegations SET delivery_state='pending',
+                      delivered_at=NULL, updated_at=?
+               WHERE delegation_id=? AND delivery_state='delivered' AND event_json IS NOT NULL""",
+            (now, delegation_id))
+        if reopened.rowcount != 1:
+            return False
+        rows = conn.execute("""SELECT delegation_id, event_json, completed_at, dispatched_at
+               FROM async_delegations WHERE delegation_id=?""", (delegation_id,)).fetchall()
+        return _replay_pending(conn, rows, target_queue, now) == 1
+
+
 def get_durable_delegation(delegation_id: str) -> Optional[Dict[str, Any]]:
     with _DB_LOCK, _transaction() as conn:
         row = conn.execute("""SELECT origin_session, state, dispatched_at, completed_at,
