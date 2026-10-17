@@ -125,7 +125,15 @@ def _real_plugin_source() -> str:
     Read from the pinned commit so the test cannot drift with our tree. It is a lazy
     in-function import — the exact shape that silently broke the provider-fallback path
     during the vendor sync, which makes it the right fixture here.
+
+    The pin is an OPTIONAL developer checkout (see docs/VENDOR-REPRODUCIBILITY.md), so a
+    machine without it must skip rather than fail. Check existence FIRST: passing a
+    non-existent path as ``cwd`` makes subprocess.run raise FileNotFoundError from the
+    child's chdir, which would bypass the skip below and turn an absent optional fixture
+    into a hard error.
     """
+    if not PIN.is_dir():
+        pytest.skip(f"pinned fixture unavailable at {PIN}")
     out = subprocess.run(
         ["git", "show", "bd0affe5:plugins/web/xai/provider.py"],
         cwd=PIN, capture_output=True, text=True,
