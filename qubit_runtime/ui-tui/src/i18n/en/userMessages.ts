@@ -19,7 +19,7 @@ export const userMessagesEn = {
       gaveUpTitle: 'Qubit stopped and could not be restarted. Your chat is saved.',
       /** `{0}` = process exit code. */
       gaveUpTitleWithCode: (code: string) =>
-        `Hermes stopped (exit code ${code}) and could not be restarted. Your chat is saved.`,
+        `Qubit stopped (exit code ${code}) and could not be restarted. Your chat is saved.`,
       gaveUpReconnect:
         'Qubit keeps trying to reconnect in the background and reopens this chat when it succeeds; if it does not, type /resume.',
       gaveUpLogs: 'Type /logs for the full log, or /quit and run `qubit doctor` to check the install.',
