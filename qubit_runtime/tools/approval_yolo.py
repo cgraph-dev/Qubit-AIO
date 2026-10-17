@@ -55,6 +55,40 @@ def restore_session_yolo(session_key: str, persisted: bool) -> bool:
     return True
 
 
+def apply_launch_yolo(session_key: str) -> None:
+    """Seed a gateway-owned session's launch ``--yolo`` policy once per session boundary.
+
+    Called every turn of such a route; only the first call (or the first after ``clear_session``) arms it,
+    so a later ``/yolo`` off sticks instead of lasting one turn. Skipped under the frozen process ``--yolo``.
+    """
+    if not session_key or approval._YOLO_MODE_FROZEN:
+        return
+    with approval._lock:
+        if session_key in approval._launch_yolo_applied:
+            return
+        approval._launch_yolo_applied.add(session_key)
+    approval.enable_session_yolo(session_key)
+
+
+def restore_gateway_yolo(session_key: str, persisted: Optional[bool], *, launch: bool = False) -> None:
+    """Restore the authoritative routing value, including OFF, before frozen launch seeding.
+
+    ``persisted`` None means nobody toggled this route: the ``--yolo`` launch policy (*launch*) is seeded
+    once per boundary instead, so an untouched entry never reads as a revocation.
+    """
+    if not session_key:
+        return
+    if persisted is None:
+        if launch:
+            apply_launch_yolo(session_key)
+        return
+    with approval._lock:
+        if session_key in approval._launch_yolo_applied:
+            return  # after restoration, the live toggle remains authoritative in this process
+        approval._launch_yolo_applied.add(session_key)
+        (approval._session_yolo.add if persisted else approval._session_yolo.discard)(session_key)
+
+
 def transfer_session_yolo(old_key: str, new_key: str) -> None:
     """Move the live bypass when the conversation continues under a new id (compression rotation, /branch).
     The new row records it at creation (``with_session_yolo``), so nothing is written here."""
