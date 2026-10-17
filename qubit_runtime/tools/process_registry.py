@@ -1854,7 +1854,7 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin):
             logger.warning("Could not restore async delegation completions: %s", exc)
             return 0
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
 
     def drain_notifications(
         self, session_key: str = "", owns_event=None, *, skip_poll_observed: bool = True,
