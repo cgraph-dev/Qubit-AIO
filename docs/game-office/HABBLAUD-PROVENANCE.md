@@ -1,12 +1,14 @@
 # Habblaud — vendoring provenance and licence position
 
-**Status: ACCURATE with KNOWN DRIFT.** Re-checked 2026-10-15: the commit
-(`4ccce2537472`), MIT licence, and the vendored/not-vendored split all still
-hold. Two figures in the ORIGINAL text were drift-prone: the recorded byte total
-(current real value from `scripts/vendor_habblaud.py --check` is **2147631**, and
-it legitimately changes on re-vendor) and the serving function name (it is
-`_serve_plugin_app`, not `_serve_qubit_plugin`). Assert **exit code + file
-count**, never the byte total. See `docs/VENDOR-REPRODUCIBILITY.md`.
+**Status: ACCURATE — reproducibility CONFIRMED (A9).** Re-checked 2026-10-16: the
+commit (`4ccce2537472`), MIT licence, and the vendored/not-vendored split all
+still hold, and the tree is now proven **reproducible bit-for-bit** from the
+pinned commit (`scripts/verify_habblaud_revendor.py` → `REPRODUCIBLE`, 77 files
+byte-identical; see `docs/VENDOR-REPRODUCIBILITY.md`). Two figures in the ORIGINAL
+text were drift-prone: the recorded byte total (current real value from
+`scripts/vendor_habblaud.py --check` is **2147631**, and it legitimately changes on
+re-vendor) and the serving function name (it is `_serve_plugin_app`, not
+`_serve_qubit_plugin`). Assert **exit code + file count**, never the byte total.
 
 Audit date: 2026-10-14. Scope: the vendored Habblaud client under
 `frontend/qubit-app/plugins/qubit-office/habblaud/`. This is a provenance
@@ -181,8 +183,8 @@ carries the copyright + permission text verbatim.
 `PROVENANCE.json` against the tree. Real output at audit time:
 
 ```
-$ .venv/bin/python scripts/vendor_habblaud.py --src /tmp/habblaud-full --check
-ok: 77 files, 2147057 bytes, commit 4ccce2537472
+$ .venv/bin/python scripts/vendor_habblaud.py --check
+ok: 77 files, 2147631 bytes, commit 4ccce2537472
 ```
 
 Exit 0. The manifest matches the tree: every recorded path exists and its
