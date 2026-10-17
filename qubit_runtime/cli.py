@@ -1213,14 +1213,6 @@ class QubitCLI(CLIInitMixin, CLITuiRuntimeMixin, CLIProcessNotificationsMixin, C
             from qubit_cli.observability.shared_metrics_events import record_slash_command
             record_slash_command(command=canonical, surface=self._slash_metrics_surface)
 
-        # Observer-only pre_command plugin hook (return values ignored; never raises).
-        if _cmd_def is not None:
-            from qubit_cli.plugins import fire_pre_command_hook
-            fire_pre_command_hook(
-                surface="cli", command=canonical, alias_used=_base_word, args_raw=_slash_args(cmd_original),
-                session_key=getattr(self, "session_id", None), platform="cli",
-            )
-
         # A bare `/resume` prompt is one-shot: any other command disarms it so a later
         # number isn't swallowed as a stale selection.
         # See #34584.
@@ -1232,8 +1224,22 @@ class QubitCLI(CLIInitMixin, CLITuiRuntimeMixin, CLIProcessNotificationsMixin, C
             self._pending_resume_sessions = None
 
         entry = self._slash_handler(canonical)
+        # Observer-only pre_command plugin hook (return values ignored; never raises), fired by the gateway
+        # for a command this process runs (not a named refusal, not a command with no handler here).
+        from qubit_cli.gateway_cli_commands import REFUSED
+        from qubit_cli.gateway_plugin_commands import observe
+        runs = entry is not None and canonical not in REFUSED
+        if _cmd_def is not None and not observe(self, _base_word, _slash_args(cmd_original), runs=runs):
+            from qubit_cli.plugins import fire_pre_command_hook
+            fire_pre_command_hook(
+                surface="cli", command=canonical, alias_used=_base_word, args_raw=_slash_args(cmd_original),
+                session_key=getattr(self, "session_id", None), platform="cli",
+            )
         if entry is None:
             return self._process_unregistered_slash(cmd_original, cmd_lower)
+        from qubit_cli.gateway_cli_commands import run as run_gateway_command
+        if run_gateway_command(self, canonical, cmd_original):
+            return True  # state the gateway session owns (checkpoints, .env, handoff)
         method_name, pass_arg = entry
         handler = getattr(self, method_name)
         result = handler(cmd_original) if pass_arg else handler()
@@ -1243,19 +1249,28 @@ class QubitCLI(CLIInitMixin, CLITuiRuntimeMixin, CLIProcessNotificationsMixin, C
         """Slash input with no built-in handler; precedence: quick_commands -> plugins -> bundles -> skills -> prefix expansion."""
         base_cmd = cmd_lower.split()[0]
         bare = base_cmd.lstrip("/")
-        skill_commands = _ensure_skill_commands()
         skill_bundles = get_skill_bundles()
         quick_commands = self.config.get("quick_commands", {})
         user_args = cmd_original[len(base_cmd):].strip()
         if bare in quick_commands:
             return self._run_quick_command(base_cmd, quick_commands[bare], user_args)
-        if bare in _get_plugin_cmd_handler_names():
-            self._run_plugin_slash_command(base_cmd, user_args)
-        elif base_cmd in skill_bundles:
+        from qubit_cli import gateway_plugin_commands
+        try:
+            plugin = gateway_plugin_commands.lookup(self, bare)  # the gateway's; None off the gateway
+        except gateway_plugin_commands.CatalogUnavailable:
+            return True  # printed; an unreadable catalog never selects a skill, bundle or expansion
+        gone = False
+        skill_commands = _session_skill_commands(self)  # after lookup: the catalog its miss re-read
+        if plugin or (plugin is None and bare in _get_plugin_cmd_handler_names()):
+            gone = self._run_plugin_slash_command(base_cmd, user_args) is gateway_plugin_commands.GONE
+            if not gone:
+                return True
+            skill_commands = _session_skill_commands(self)  # the reload may have changed the skills
+        if base_cmd in skill_bundles:  # also a name a gateway plugin reload just dropped (GONE)
             self._run_skill_bundle_command(base_cmd, skill_bundles[base_cmd], user_args)
         elif base_cmd in skill_commands:
             self._run_skill_slash_command(base_cmd, skill_commands[base_cmd], user_args)
-        else:
+        elif not (gone and gateway_plugin_commands.report_gone(bare, skill_commands, skill_bundles)):
             return self._expand_slash_prefix(cmd_original, cmd_lower, skill_commands, skill_bundles)
         return True
 
@@ -1300,9 +1315,12 @@ class QubitCLI(CLIInitMixin, CLITuiRuntimeMixin, CLIProcessNotificationsMixin, C
             self._console_print(f"[bold red]{_t('cli.quick.error', error=str(e))}[/]")
         return True
 
-    def _run_plugin_slash_command(self, base_cmd: str, user_args: str) -> None:
+    def _run_plugin_slash_command(self, base_cmd: str, user_args: str):
+        from qubit_cli import gateway_plugin_commands
+        answered = gateway_plugin_commands.run(self, base_cmd.lstrip("/"), user_args)
+        if answered:
+            return answered  # ran beside the plugin's hooks, tools and MCP servers in the gateway, or GONE
         from qubit_cli.plugins import get_plugin_command_handler, resolve_plugin_command_result
-
         plugin_handler = get_plugin_command_handler(base_cmd.lstrip("/"))
         if not plugin_handler:
             return
