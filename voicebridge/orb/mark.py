@@ -3,11 +3,18 @@
 Same visual language as ``frontend/qubit-web/src/components/QubitMark.tsx`` +
 ``styles/qubit-mark.css``: a hairline construction drawing, never a glow sticker.
 
-  * two thin ellipse orbits (tilted -30deg / +30deg) that counter-rotate slowly,
-  * a small solid nucleus at the centre,
-  * particles riding each ellipse, each at its own period and orbital seed,
+  * two thin ellipse orbits (tilted -30deg / +30deg) that precess slowly,
+  * a small solid nucleus at the centre, beating,
+  * nine particles riding each ellipse, each at its own period and orbital seed,
   * a chromatic fringe faked on the hairline rings (Tk has no blend modes, so
     the fringe is two extra offset strokes in dark red / blue on near-black).
+
+ALL of the motion — orbits, particles, trails, dust, comet, beat and glints —
+comes from :mod:`voicebridge.orb.mark_field`, the single deterministic
+description shared with the Qt renderer. This module is ONLY the Tk translator:
+it consumes the field, adds ``(cx, cy)`` to the centre-relative coordinates the
+field returns, and draws with the techniques Tk actually has. It never
+re-derives geometry or re-implements the field's maths.
 
 State meaning is preserved from ``ember`` (the single palette source): the
 ``STATE_CORES`` hue still tints nucleus, beads and rings, so idle / listening /
@@ -17,9 +24,14 @@ untouched.
 
 Tk has no rotated ellipse and no per-item alpha, so:
 
-  * an ellipse is drawn as a smoothed closed polyline sampled from its
-    parametric form, rotated about the centre at draw time;
-  * "opacity" is a mix toward the near-black background, precomputed per bead.
+  * an ellipse is drawn as a smoothed closed polyline sampled from the field's
+    ``orbit_point`` (``_ellipse_points``);
+  * "opacity" is a mix toward the near-black background, precomputed per bead
+    (``_mix`` + ``_hex``); circles are ``create_oval``.
+
+Depth is the 3-D read: the field splits every element at ``depth = 0.5`` and
+this renderer draws the far half behind the nucleus, the halo/shockwave at the
+seam, and the near half in front.
 
 This module never opens a window: ``render`` takes any canvas-like object with
 ``create_oval``/``create_line`` (a hermetic fake works for proof).
@@ -30,121 +42,53 @@ import math
 from typing import Any, Dict, List, Tuple
 
 from . import ember as _ember
+from .mark_field import (
+    PARTICLES,
+    RX_FRAC,
+    RY_FRAC,
+    TILT_A,
+    TILT_B,
+    NUCLEUS_FRAC,
+    FRINGE_PX,
+    LIFT_RING,
+    LIFT_BEAD,
+    LIFT_NUCLEUS,
+    MIN_MARK_BRIGHTNESS,
+    HALO_SCALE,
+    HALO_BASE,
+    HALO_WIDTH,
+    SHOCKWAVE_WIDTH,
+    RING_SWAY_DEG,
+    RING_PERIOD_NEAR,
+    RING_PERIOD_FAR,
+    heartbeat,
+    nucleus_scale,
+    shockwave,
+    camera_offset,
+    orbit_tilts,
+    orbit_point,
+    particle_state,
+    trails,
+    dust_state,
+    comet,
+    sparkles,
+)
 
-#: Ring half-widths as a fraction of the orb radius, matching the SVG mark's
-#: 40x40 viewBox (RX 14.5, RY 5.6 -> ratio 2.59) scaled to fill the disc.
-RX_FRAC = 0.72
-RY_FRAC = 0.28
-#: Orbit tilts in degrees (degrees are negated as Tk's y axis grows downward).
-TILT_A = 30.0   # near field (SVG -30deg, y-down here)
-TILT_B = -30.0  # far field (SVG +30deg)
-#: Nucleus radius as a fraction of the orb radius (SVG 2.4 / 40 box).
-NUCLEUS_FRAC = 0.050
-#: Ring counter-rotation periods in seconds (SVG: 23s / 31s, far reversed).
-#: The web mark spins each ellipse a full turn; at orb scale that reads as a
-#: vertical "lens" for half of every cycle, so the orb keeps the logo's
-#: RECOGNIZABLE crossing tilt (+/-30deg) and sways a few degrees around it
-#: instead. The particles still travel the full orbit, which is where the
-#: motion reads.
-RING_PERIOD_NEAR = 23.0
-RING_PERIOD_FAR = 31.0
-RING_SWAY_DEG = 6.0
+#: Fringe offset in DEVICE pixels at 96px. A lens fringe is a pixel-level
+#: artifact, not a scaled one: scaling it with the radius turned the mark into
+#: three separate rainbow rings instead of a hint on one hairline. Kept as its
+#: own name because the Qt renderer reads it too (``mark.FRINGE_PX_AT_96``).
+FRINGE_PX_AT_96 = FRINGE_PX
+
 #: Polyline sampling resolution for one ellipse.
 RING_SEGMENTS = 72
-#: Chromatic fringe offset, in DEVICE pixels. A lens fringe is a pixel-level
-#: artifact, not a scaled one: scaling it with the radius turned the mark into
-#: three separate rainbow rings instead of a hint on one hairline.
-FRINGE_PX_AT_96 = 0.7
-#: How far each element is lifted toward white. The sidebar mark is a BRIGHT
-#: near-white hairline with only a chromatic hint, not a dim state tint; these
-#: keep the state hue legible while matching that crispness.
-LIFT_RING = 0.28
-LIFT_BEAD = 0.18
-LIFT_NUCLEUS = 0.16
-#: Opacity floor for the mark so idle never reads as "almost off".
-MIN_MARK_BRIGHTNESS = 0.85
-
-# -- heartbeat nucleus (owner 2026-10-17: the mark must live, but stay crisp) --
-#
-# A double thump: a primary beat every HEART_PERIOD_S, a second thump at
-# HEART_SECOND_AMP of the primary amplitude HEART_SECOND_PHASE into the cycle,
-# each HEART_THUMP_S wide (a raised-cosine pulse, never a square edge). The
-# envelope is 1.00 -> 1.18 -> 1.00. A thin halo ring rides the same beat at
-# 1.6x the nucleus radius (a hairline outline, NOT a filled glow disc: Tk has
-# no alpha or blur, so the ring is dimmed toward the background instead).
-HEART_PERIOD_S = 0.95
-HEART_SCALE_AMP = 0.18
-HEART_SECOND_AMP = 0.62
-HEART_SECOND_PHASE = 0.22
-HEART_THUMP_S = 0.16
-HALO_SCALE = 1.6
-HALO_BASE = 0.22
-HALO_WIDTH = 1
-
-# -- particle depth (3-D near/far read) ------------------------------------
-#
-# depth = 0.5 + 0.5*cos(radians(angle)); the FAR half (depth < 0.5) draws
-# behind the nucleus, the NEAR half in front. Radius, opacity and white lift
-# are all linear in depth; beads also slide along the radial by
-# (depth-0.5)*DEPTH_PARALLAX*radius (toward the centre on the far side).
-DEPTH_RADIUS_BASE = 0.55
-DEPTH_RADIUS_GAIN = 0.75
-DEPTH_OPACITY_BASE = 0.35
-DEPTH_OPACITY_GAIN = 0.65
-DEPTH_LIFT_BASE = 0.05
-DEPTH_LIFT_GAIN = 0.30
-DEPTH_PARALLAX = 0.06
-
-# -- particle trails -------------------------------------------------------
-#
-# TRAIL_COUNT fading samples behind each bead at angle - k*STEP (STEP is
-# TRAIL_STEP_NEAR on orbit "a", TRAIL_STEP_FAR on orbit "b"), each at
-# TRAIL_RADIUS_SCALE of the bead radius and alpha TRAIL_ALPHA*(1 - k/COUNT).
-TRAIL_COUNT = 4
-TRAIL_STEP_NEAR = 6.0
-TRAIL_STEP_FAR = 4.0
-TRAIL_ALPHA = 0.28
-TRAIL_RADIUS_SCALE = 0.55
-
-# -- deterministic sparkles ------------------------------------------------
-#
-# 14 glints, a pure function of the clock (never ``random``). Glint i:
-# seed = i*SPARKLE_SEED_STEP; angle = seed + t*(SPARKLE_SPEED_BASE +
-# (i%5)*SPARKLE_SPEED_STEP); radius in SPARKLE_R0..SPARKLE_R1 * radius;
-# projected with the near orbit's tilt; life = SPARKLE_LIFE_BASE +
-# (i%4)*SPARKLE_LIFE_STEP; phase = (t/life + seed/360) % 1, visible only in
-# the first SPARKLE_VISIBLE_FRAC of the cycle with a raised-cosine fade.
-SPARKLE_COUNT = 14
-SPARKLE_SEED_STEP = 97.3
-SPARKLE_SPEED_BASE = 18.0
-SPARKLE_SPEED_STEP = 6.0
-SPARKLE_LIFE_BASE = 1.1
-SPARKLE_LIFE_STEP = 0.35
-SPARKLE_VISIBLE_FRAC = 0.45
-SPARKLE_R0 = 0.30
-SPARKLE_R1 = 1.05
-SPARKLE_RADIUS_BASE = 0.5
-SPARKLE_RADIUS_GAIN = 0.9
-SPARKLE_WHITE_MIX = 0.55
-#: Golden-ratio low-discrepancy step for the deterministic sparkle radii.
-_GOLDEN = 0.6180339887498949
-
-#: Particles from the SVG mark: (orbit, seed_deg, radius_px_at_96, period_s).
-PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
-    ("a", 18.0, 1.15, 7.3),
-    ("a", 97.0, 0.90, 9.1),
-    ("a", 165.0, 1.00, 6.4),
-    ("a", 249.0, 0.85, 10.7),
-    ("a", 318.0, 1.10, 8.2),
-    ("b", 41.0, 0.85, 15.4),
-    ("b", 128.0, 1.00, 13.7),
-    ("b", 212.0, 0.80, 18.9),
-    ("b", 291.0, 0.95, 16.3),
-)
 
 #: Fringe channel colors, mixed toward the background (Tk alpha substitute).
 _FRINGE_RED = (150, 30, 55)
 _FRINGE_BLUE = (30, 80, 160)
+
+#: Signature-compatible alias: the Qt renderer calls ``_mark._orbit_point``.
+_orbit_point = orbit_point
 
 
 def _hex(rgb: Tuple[int, int, int]) -> str:
@@ -172,170 +116,18 @@ def resolve_core(state: Any, colors: Any = None) -> Tuple[int, int, int]:
 
 def _ellipse_points(cx: float, cy: float, rx: float, ry: float,
                     tilt_deg: float) -> List[float]:
-    """Closed smoothed polyline for a tilted ellipse (x0,y0,x1,y1,...)."""
-    tilt = math.radians(tilt_deg)
-    cos_t, sin_t = math.cos(tilt), math.sin(tilt)
+    """Closed smoothed polyline for a tilted ellipse (x0,y0,x1,y1,...).
+
+    Sampled through the field's ``orbit_point`` so ring geometry and particle
+    geometry can never disagree about where the ellipse is.
+    """
     pts: List[float] = []
     for i in range(RING_SEGMENTS):
-        ang = (2.0 * math.pi * i) / RING_SEGMENTS
-        x = rx * math.cos(ang)
-        y = ry * math.sin(ang)
-        pts.append(cx + x * cos_t - y * sin_t)
-        pts.append(cy + x * sin_t + y * cos_t)
+        deg = (360.0 * i) / RING_SEGMENTS
+        x, y = orbit_point(cx, cy, rx, ry, tilt_deg, deg)
+        pts.append(x)
+        pts.append(y)
     return pts
-
-
-def _orbit_point(cx: float, cy: float, rx: float, ry: float,
-                 tilt_deg: float, deg: float) -> Tuple[float, float]:
-    """A point on a tilted ellipse at orbital parameter ``deg``."""
-    rad = math.radians(deg)
-    tilt = math.radians(tilt_deg)
-    x = rx * math.cos(rad)
-    y = ry * math.sin(rad)
-    cos_t, sin_t = math.cos(tilt), math.sin(tilt)
-    return (cx + x * cos_t - y * sin_t, cy + x * sin_t + y * cos_t)
-
-
-def _bump(frac: float) -> float:
-    """Raised-cosine bump 0 -> 1 -> 0 over ``frac`` in [0, 1]; 0 outside."""
-    if frac <= 0.0 or frac >= 1.0:
-        return 0.0
-    return 0.5 * (1.0 - math.cos(2.0 * math.pi * frac))
-
-
-def _finite(v: Any, default: float = 0.0) -> float:
-    """Float ``v`` or ``default`` when malformed / non-finite. Never raises."""
-    try:
-        f = float(v)
-    except (TypeError, ValueError):
-        return default
-    return f if math.isfinite(f) else default
-
-
-def heart_envelope(tt: float) -> float:
-    """Nucleus scale envelope (a smooth double thump). Never raises.
-
-    1.00 at rest, up to 1.00 + HEART_SCALE_AMP on the primary beat; the
-    secondary thump peaks at HEART_SECOND_AMP of that. Both are
-    raised-cosine pulses HEART_THUMP_S wide, so the beat never snaps.
-    A malformed / non-finite clock rests at 1.00.
-    """
-    try:
-        f = float(tt)
-    except (TypeError, ValueError):
-        return 1.0
-    if not math.isfinite(f):
-        return 1.0
-    phase = (f / HEART_PERIOD_S) % 1.0
-    half = (HEART_THUMP_S / HEART_PERIOD_S) * 0.5
-
-    def _thump(center: float, amp: float) -> float:
-        d = abs((phase - center + 0.5) % 1.0 - 0.5)
-        if d >= half:
-            return 0.0
-        return amp * 0.5 * (1.0 + math.cos(math.pi * d / half))
-
-    return (1.0
-            + _thump(0.0, HEART_SCALE_AMP)
-            + _thump(HEART_SECOND_PHASE, HEART_SCALE_AMP * HEART_SECOND_AMP))
-
-
-def heart_beat(tt: float) -> float:
-    """Primary-thump strength 0..1 for clock ``tt`` (drives the halo)."""
-    f = _finite(tt)
-    phase = (f / HEART_PERIOD_S) % 1.0
-    half = (HEART_THUMP_S / HEART_PERIOD_S) * 0.5
-    d = abs((phase + 0.5) % 1.0 - 0.5)
-    if d >= half:
-        return 0.0
-    return 0.5 * (1.0 + math.cos(math.pi * d / half))
-
-
-def orbit_tilts(tt: float) -> Tuple[float, float]:
-    """(near_tilt, far_tilt) in degrees for the animated mark clock."""
-    t_f = _finite(tt)
-    near = TILT_A + RING_SWAY_DEG * math.sin(
-        t_f * 2.0 * math.pi / RING_PERIOD_NEAR)
-    far = TILT_B + RING_SWAY_DEG * math.sin(
-        t_f * 2.0 * math.pi / RING_PERIOD_FAR)
-    return (near, far)
-
-
-def particle_frames(cx: float, cy: float, radius: float, tt: float,
-                    near_tilt: float, far_tilt: float) -> List[Dict[str, Any]]:
-    """Pure geometry for every particle at clock ``tt`` (incl. parallax).
-
-    Each frame carries ``orbit``, ``ang``, ``depth``, the depth-scaled
-    ``x``/``y`` (raw orbit point plus the radial parallax slide) and the
-    ``tilt``/``seed``/``bead_r``/``dur`` it rides. Never raises.
-    """
-    frames: List[Dict[str, Any]] = []
-    try:
-        rx = float(radius) * RX_FRAC
-        ry = float(radius) * RY_FRAC
-        cxf, cyf = float(cx), float(cy)
-    except (TypeError, ValueError):
-        return frames
-    tt_f = _finite(tt)
-    for orbit, seed, bead_r, dur in PARTICLES:
-        tilt = near_tilt if orbit == "a" else far_tilt
-        ang = seed + (tt_f * 360.0 / max(0.1, dur))
-        depth = 0.5 + 0.5 * math.cos(math.radians(ang))
-        bx, by = _orbit_point(cxf, cyf, rx, ry, tilt, ang)
-        ox, oy = bx - cxf, by - cyf
-        dist = math.hypot(ox, oy)
-        if dist > 1e-9:
-            slide = (depth - 0.5) * DEPTH_PARALLAX * float(radius)
-            bx += ox / dist * slide
-            by += oy / dist * slide
-        frames.append({"orbit": orbit, "seed": seed, "bead_r": bead_r,
-                       "dur": dur, "ang": ang, "depth": depth,
-                       "x": bx, "y": by, "tilt": tilt})
-    return frames
-
-
-def sparkles(cx: float, cy: float, radius: float, tt: float,
-             nuc_rgb: Tuple[int, int, int],
-             near_tilt: float) -> List[Dict[str, Any]]:
-    """Deterministic glints for clock ``tt`` (pure; never ``random``).
-
-    Returns the visible glints only (the first SPARKLE_VISIBLE_FRAC of each
-    glint's life, raised-cosine faded), each ``{i, x, y, rad, peak, rgb}``.
-    Projected with the near orbit's tilt. Never raises.
-    """
-    out: List[Dict[str, Any]] = []
-    try:
-        cxf, cyf, r_f = float(cx), float(cy), float(radius)
-        tilt = math.radians(near_tilt)
-        cos_t, sin_t = math.cos(tilt), math.sin(tilt)
-    except (TypeError, ValueError):
-        return out
-    tt_f = _finite(tt)
-    col = _mix(nuc_rgb, (255, 255, 255), SPARKLE_WHITE_MIX)
-    for i in range(SPARKLE_COUNT):
-        seed = i * SPARKLE_SEED_STEP
-        life = SPARKLE_LIFE_BASE + (i % 4) * SPARKLE_LIFE_STEP
-        phase = (tt_f / life + seed / 360.0) % 1.0
-        if phase >= SPARKLE_VISIBLE_FRAC:
-            continue
-        peak = _bump(phase / SPARKLE_VISIBLE_FRAC)
-        if peak <= 1e-6:
-            continue
-        frac = (i * _GOLDEN) % 1.0
-        dist = r_f * (SPARKLE_R0 + (SPARKLE_R1 - SPARKLE_R0) * frac)
-        ang = math.radians(seed + tt_f * (SPARKLE_SPEED_BASE
-                                          + (i % 5) * SPARKLE_SPEED_STEP))
-        sx = dist * math.cos(ang)
-        sy = dist * math.sin(ang)
-        out.append({
-            "i": i,
-            "x": cxf + sx * cos_t - sy * sin_t,
-            "y": cyf + sx * sin_t + sy * cos_t,
-            "rad": SPARKLE_RADIUS_BASE + SPARKLE_RADIUS_GAIN * peak,
-            "peak": peak,
-            "rgb": _mix(col, _ember.NEAR_BLACK, 1.0 - peak),
-        })
-    return out
 
 
 def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
@@ -346,10 +138,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     """Draw one Qubit-mark frame on a canvas-like object.
 
     Signature and return shape mirror :func:`voicebridge.orb.ember.render` so
-    the host can swap renderers without touching frame discipline. ``level``
-    (0..1 talk meter) brightens the near ring + nucleus while listening so
-    speech still visibly pumps; ``reduced_motion`` freezes the animation clock
-    at a fixed phase (a static, complete mark).
+    the host can swap renderers without touching frame discipline. The motion
+    is read whole from :mod:`voicebridge.orb.mark_field`; ``level`` (0..1 talk
+    meter) still visibly pumps the nucleus while listening, and
+    ``reduced_motion`` freezes the clock at ``t=0`` for a clean static frame
+    (no sparkles, trails, comet, shockwave or dust; nucleus at rest).
     """
     ovals = 0
     lines = 0
@@ -362,8 +155,16 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         r = float(radius)
     except (TypeError, ValueError):
         r = 32.0
-    if r <= 0:
+    if not math.isfinite(r) or r <= 0:
         r = 32.0
+    try:
+        cx_f = float(cx)
+    except (TypeError, ValueError):
+        cx_f = 0.0
+    try:
+        cy_f = float(cy)
+    except (TypeError, ValueError):
+        cy_f = 0.0
 
     core = resolve_core(state, colors)
     fam = _ember.family_from_core(core)
@@ -373,6 +174,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         brightness = float(params.get("brightness", 1.0))
     except Exception:  # noqa: BLE001 - unknown state renders as idle
         brightness = 1.0
+    bright = max(MIN_MARK_BRIGHTNESS, float(brightness or 0.0))
     try:
         speed = max(0.2, min(3.0, float(speed_scale or 1.0)))
     except (TypeError, ValueError):
@@ -386,9 +188,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         gain = 1.0
 
     # ------------------------------------------------------------------ time
-    # The host already advances/clamps its own clock; reduced motion freezes
-    # it so the mark is complete but perfectly still. A malformed clock is
-    # treated as 0 (a static frame), never an exception mid-paint.
+    # The host advances/clamps its own clock; reduced motion freezes it at 0
+    # so two wall-clock times paint byte-identical frames.
     try:
         t_val = float(t)
     except (TypeError, ValueError):
@@ -399,8 +200,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     rx = r * RX_FRAC
     ry = r * RY_FRAC
-    fringe = FRINGE_PX_AT_96 * (r / 32.0)
+    fringe = FRINGE_PX * (r / 32.0)
     ring_w = 1 if r < 64 else 2
+    ring_rgb = _mix(fam["core"], (255, 255, 255), LIFT_RING)
+    nuc_rgb = _mix(fam["core"], (255, 255, 255), LIFT_NUCLEUS)
 
     def _line(pts: List[float], fill: str, width: int = 1) -> None:
         nonlocal lines, points, min_y, max_y
@@ -446,90 +249,154 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         except Exception:
             pass
 
-    # ------------------------------------------------------------- far field
-    # Drawn first so the nucleus and the near field sit over it (depth).
-    bright = max(MIN_MARK_BRIGHTNESS, float(brightness or 0.0))
-    ring_rgb = _mix(fam["core"], (255, 255, 255), LIFT_RING)
-    nuc_rgb = _mix(fam["core"], (255, 255, 255), LIFT_NUCLEUS)
-    near_tilt, far_tilt = orbit_tilts(tt)
-    frames = particle_frames(cx, cy, r, tt, near_tilt, far_tilt)
-    far_beads = [f for f in frames if f["depth"] < 0.5]
-    near_beads = [f for f in frames if f["depth"] >= 0.5]
-    draw_trails = not reduced_motion
+    def _dim(colour: Tuple[int, int, int], alpha: float) -> str:
+        """Tk alpha substitute: mix the colour toward the near-black bg."""
+        a = 1.0 - max(0.0, min(1.0, float(alpha)))
+        return _hex(_mix(colour, _ember.NEAR_BLACK, a))
 
-    def _draw_particle(fr: Dict[str, Any]) -> None:
-        depth = fr["depth"]
-        step = TRAIL_STEP_NEAR if fr["orbit"] == "a" else TRAIL_STEP_FAR
-        raw_x, raw_y = _orbit_point(cx, cy, rx, ry, fr["tilt"], fr["ang"])
-        slide_x = fr["x"] - raw_x
-        slide_y = fr["y"] - raw_y
-        colour = _mix(fam["core"], (255, 255, 255),
-                      DEPTH_LIFT_BASE + DEPTH_LIFT_GAIN * depth)
-        opacity = DEPTH_OPACITY_BASE + DEPTH_OPACITY_GAIN * depth
-        bead_rad = max(0.7, fr["bead_r"] * (r / 32.0)
-                       * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth))
-        if draw_trails:
-            for k in range(1, TRAIL_COUNT + 1):
-                t_alpha = TRAIL_ALPHA * (1.0 - k / float(TRAIL_COUNT))
-                if t_alpha <= 1e-6:
-                    continue
-                tx, ty = _orbit_point(cx, cy, rx, ry, fr["tilt"],
-                                      fr["ang"] - k * step)
-                _oval(tx + slide_x, ty + slide_y,
-                      bead_rad * TRAIL_RADIUS_SCALE,
-                      _hex(_mix(colour, _ember.NEAR_BLACK, 1.0 - t_alpha)))
-        _oval(fr["x"], fr["y"], bead_rad,
-              _hex(_mix(colour, _ember.NEAR_BLACK, 1.0 - opacity)))
+    def _bead(x: float, y: float, rad: float, lift: float, alpha: float) -> None:
+        """One filled circle: field radius/alpha/lift, dimmed by state."""
+        if not (float(alpha) > 1e-3) or not (float(rad) > 0.0):
+            return
+        colour = _mix(fam["core"], (255, 255, 255), lift)
+        _oval(x, y, max(0.4, float(rad)), _dim(colour, float(alpha) * bright))
         fills.append(colour)
 
-    far_pts = _ellipse_points(cx, cy, rx, ry, far_tilt)
-    ring_dim = _mix(ring_rgb, _ember.NEAR_BLACK, 1.0 - 0.60 * bright)
-    _line([p + (fringe if i % 2 == 0 else 0.0) for i, p in enumerate(far_pts)],
-          _hex(_mix(_FRINGE_BLUE, _ember.NEAR_BLACK, 0.45)), ring_w)
-    _line([p - (fringe if i % 2 == 0 else 0.0) for i, p in enumerate(far_pts)],
-          _hex(_mix(_FRINGE_RED, _ember.NEAR_BLACK, 0.45)), ring_w)
-    _line(far_pts, _hex(ring_dim), ring_w)
+    def _beads(group: List[Dict[str, float]]) -> None:
+        for b in group:
+            _bead(cx_f + b["x"], cy_f + b["y"], b["size"], b["lift"], b["alpha"])
 
-    for fr in far_beads:
-        _draw_particle(fr)
+    def _ring(ccx: float, ccy: float, tilt: float,
+              colour: Tuple[int, int, int], fringe_mix: float) -> None:
+        """Three strokes: blue fringe, red fringe, then the hairline."""
+        pts = _ellipse_points(ccx, ccy, rx, ry, tilt)
+        blue = _hex(_mix(_FRINGE_BLUE, _ember.NEAR_BLACK, fringe_mix))
+        red = _hex(_mix(_FRINGE_RED, _ember.NEAR_BLACK, fringe_mix))
+        _line([p + (fringe if i % 2 == 0 else 0.0)
+               for i, p in enumerate(pts)], blue, ring_w)
+        _line([p - (fringe if i % 2 == 0 else 0.0)
+               for i, p in enumerate(pts)], red, ring_w)
+        _line(pts, _hex(colour), ring_w)
 
-    # ---------------------------------------------------------------- nucleus
-    # A heartbeat scale envelope (double thump) + a thin halo ring that
-    # brightens on the beat. Reduced motion rests: scale 1.0, no beat.
+    # ----------------------------------------------------------------- field
+    # Every layer is one pure call; malformed input (already normalised) or a
+    # future field change can never take the frame down.
+    try:
+        near_tilt, far_tilt = orbit_tilts(tt)
+        ox, oy = camera_offset(tt, r)
+    except Exception:  # noqa: BLE001
+        near_tilt, far_tilt, ox, oy = TILT_A, TILT_B, 0.0, 0.0
+    ccx, ccy = cx_f + ox, cy_f + oy
+
+    try:
+        particles = particle_state(tt, r)
+    except Exception:  # noqa: BLE001
+        particles = []
+    try:
+        dust = dust_state(tt, r)
+    except Exception:  # noqa: BLE001
+        dust = []
+    try:
+        glints = sparkles(tt, r)
+    except Exception:  # noqa: BLE001
+        glints = []
+    try:
+        comet_info = comet(tt, r)
+    except Exception:  # noqa: BLE001
+        comet_info = {"alpha": 0.0, "trail": []}
+    if not isinstance(comet_info, dict):
+        comet_info = {"alpha": 0.0, "trail": []}
     if reduced_motion:
-        heart, beat = 1.0, 0.0
+        # A clean static frame: no dust, no glints, no comet, no trails.
+        dust = []
+        glints = []
+        comet_info = {"alpha": 0.0, "trail": []}
+
+    far_beads = [p for p in particles if float(p.get("depth", 0.0)) < 0.5]
+    near_beads = [p for p in particles if float(p.get("depth", 0.0)) >= 0.5]
+    far_dust = [d for d in dust if float(d.get("depth", 0.0)) < 0.5]
+    near_dust = [d for d in dust if float(d.get("depth", 0.0)) >= 0.5]
+    far_glints = [g for g in glints if float(g.get("depth", 0.0)) < 0.5]
+    near_glints = [g for g in glints if float(g.get("depth", 0.0)) >= 0.5]
+    comet_on = (not reduced_motion) and float(comet_info.get("alpha", 0.0)) > 0.0
+
+    def _draw_particle(p: Dict[str, float]) -> None:
+        if not reduced_motion:
+            try:
+                tail = trails(tt, r, p)
+            except Exception:  # noqa: BLE001
+                tail = []
+            for s in tail:
+                _bead(cx_f + s["x"], cy_f + s["y"], s["size"], s["lift"],
+                      s["alpha"])
+        _bead(cx_f + p["x"], cy_f + p["y"], p["size"], p["lift"], p["alpha"])
+
+    # ------------------------------------------------------------- far field
+    # Behind the nucleus: far orbit, far dust, far particles + trails, far
+    # glints, then the comet's long tail.
+    far_dim = _mix(ring_rgb, _ember.NEAR_BLACK, 1.0 - 0.60 * bright)
+    try:
+        _ring(ccx, ccy, far_tilt, far_dim, 0.45)
+    except Exception:  # noqa: BLE001
+        pass
+    _beads(far_dust)
+    for _p in far_beads:
+        _draw_particle(_p)
+    _beads(far_glints)
+    if comet_on:
+        for s in comet_info.get("trail", []):
+            if float(s.get("alpha", 0.0)) > 0.0:
+                _bead(cx_f + s["x"], cy_f + s["y"], s["size"], s["lift"],
+                      s["alpha"])
+
+    # --------------------------------------------------------- beat shockwave
+    # Outline-only tilted ellipse at nucleus_radius*scale, strongest at the
+    # beat; no filled disc (Tk has no alpha to fake one convincingly).
+    if not reduced_motion:
+        try:
+            sw_scale, sw_alpha = shockwave(tt)
+        except Exception:  # noqa: BLE001
+            sw_scale, sw_alpha = 0.0, 0.0
+        if sw_scale > 0.0 and sw_alpha > 0.0:
+            sw_r = max(1.1, r * NUCLEUS_FRAC) * sw_scale
+            sw_pts = _ellipse_points(ccx, ccy, sw_r,
+                                     sw_r * (RY_FRAC / RX_FRAC), near_tilt)
+            _line(sw_pts, _dim(ring_rgb, sw_alpha * bright),
+                  max(1, int(round(SHOCKWAVE_WIDTH))))
+
+    # ------------------------------------------------------- seam: halo + nuc
+    if reduced_motion:
+        nscale, beat = 1.0, 0.0
     else:
-        heart, beat = heart_envelope(tt), heart_beat(tt)
-    nuc_rad = max(1.1, r * NUCLEUS_FRAC) * (0.95 + 0.05 * gain) * heart
-    halo_rgb = _mix(nuc_rgb, _ember.NEAR_BLACK,
-                    1.0 - min(1.0, (HALO_BASE + (1.0 - HALO_BASE) * beat)
-                              * bright))
-    _ring_oval(cx, cy, nuc_rad * HALO_SCALE, _hex(halo_rgb), HALO_WIDTH)
-    _oval(cx, cy, nuc_rad, _hex(nuc_rgb))
+        try:
+            nscale, beat = nucleus_scale(tt), heartbeat(tt)
+        except Exception:  # noqa: BLE001
+            nscale, beat = 1.0, 0.0
+    nuc_rad = max(1.1, r * NUCLEUS_FRAC) * nscale * (0.95 + 0.05 * gain)
+    halo_a = min(1.0, (HALO_BASE + (1.0 - HALO_BASE) * beat) * bright)
+    _ring_oval(ccx, ccy, nuc_rad * HALO_SCALE, _dim(nuc_rgb, halo_a),
+               max(1, int(HALO_WIDTH)))
+    _oval(ccx, ccy, nuc_rad, _hex(nuc_rgb))
     fills.append(nuc_rgb)
 
     # ------------------------------------------------------------ near field
-    near_pts = _ellipse_points(cx, cy, rx, ry, near_tilt)
     near_dim = _mix(ring_rgb, _ember.NEAR_BLACK, 1.0 - 0.95 * bright)
-    _line([p + (fringe if i % 2 == 0 else 0.0) for i, p in enumerate(near_pts)],
-          _hex(_mix(_FRINGE_BLUE, _ember.NEAR_BLACK, 0.25)), ring_w)
-    _line([p - (fringe if i % 2 == 0 else 0.0) for i, p in enumerate(near_pts)],
-          _hex(_mix(_FRINGE_RED, _ember.NEAR_BLACK, 0.25)), ring_w)
-    _line(near_pts, _hex(near_dim), ring_w)
-
-    for fr in near_beads:
-        _draw_particle(fr)
-
-    # -------------------------------------------------------------- sparkles
-    if not reduced_motion:
-        for sp in sparkles(cx, cy, r, tt, nuc_rgb, near_tilt):
-            _oval(sp["x"], sp["y"], sp["rad"], _hex(sp["rgb"]))
-            fills.append(sp["rgb"])
+    try:
+        _ring(ccx, ccy, near_tilt, near_dim, 0.25)
+    except Exception:  # noqa: BLE001
+        pass
+    _beads(near_dust)
+    for _p in near_beads:
+        _draw_particle(_p)
+    _beads(near_glints)
+    if comet_on:
+        _bead(cx_f + comet_info["x"], cy_f + comet_info["y"],
+              comet_info["size"], comet_info["lift"], comet_info["alpha"])
 
     if min_y == float("inf"):
-        min_y = cy - r
+        min_y = cy_f - r
     if max_y == float("-inf"):
-        max_y = cy + r
+        max_y = cy_f + r
 
     return {"ovals": ovals, "lines": lines, "points": points,
             "min_y": min_y, "max_y": max_y, "fills": fills,
@@ -537,16 +404,13 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
 
 __all__ = [
-    "render", "PARTICLES", "resolve_core", "RX_FRAC", "RY_FRAC",
-    "HEART_PERIOD_S", "HEART_SCALE_AMP", "HEART_SECOND_AMP",
-    "HEART_SECOND_PHASE", "HEART_THUMP_S", "HALO_SCALE", "HALO_BASE",
-    "HALO_WIDTH", "DEPTH_RADIUS_BASE", "DEPTH_RADIUS_GAIN",
-    "DEPTH_OPACITY_BASE", "DEPTH_OPACITY_GAIN", "DEPTH_LIFT_BASE",
-    "DEPTH_LIFT_GAIN", "DEPTH_PARALLAX", "TRAIL_COUNT", "TRAIL_STEP_NEAR",
-    "TRAIL_STEP_FAR", "TRAIL_ALPHA", "TRAIL_RADIUS_SCALE", "SPARKLE_COUNT",
-    "SPARKLE_SEED_STEP", "SPARKLE_SPEED_BASE", "SPARKLE_SPEED_STEP",
-    "SPARKLE_LIFE_BASE", "SPARKLE_LIFE_STEP", "SPARKLE_VISIBLE_FRAC",
-    "SPARKLE_R0", "SPARKLE_R1", "SPARKLE_RADIUS_BASE",
-    "SPARKLE_RADIUS_GAIN", "SPARKLE_WHITE_MIX", "orbit_tilts",
-    "particle_frames", "sparkles", "heart_envelope", "heart_beat",
+    "render", "resolve_core", "PARTICLES", "RING_SEGMENTS",
+    "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
+    "FRINGE_PX", "FRINGE_PX_AT_96", "LIFT_RING", "LIFT_BEAD",
+    "LIFT_NUCLEUS", "MIN_MARK_BRIGHTNESS", "HALO_SCALE", "HALO_BASE",
+    "HALO_WIDTH", "SHOCKWAVE_WIDTH", "RING_SWAY_DEG", "RING_PERIOD_NEAR",
+    "RING_PERIOD_FAR",
+    "heartbeat", "nucleus_scale", "shockwave", "camera_offset",
+    "orbit_tilts", "orbit_point", "particle_state", "trails",
+    "dust_state", "comet", "sparkles",
 ]
