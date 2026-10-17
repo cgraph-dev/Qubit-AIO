@@ -194,7 +194,7 @@ def attempt_payload(record: dict[str, Any], *, compression_count: Any = None) ->
         has_focus_topic=record.get("has_focus_topic") if isinstance(record.get("has_focus_topic"), bool) else None,
     )
     if codex:
-        values["cache_break"] = None  # the Codex thread's provider cache is not Hermes's prompt cache
+        values["cache_break"] = None  # the Codex thread's provider cache is not Qubit's prompt cache
     return _payload(**values)
 
 
