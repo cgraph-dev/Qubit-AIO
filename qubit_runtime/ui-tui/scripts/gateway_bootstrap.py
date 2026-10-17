@@ -16,14 +16,14 @@ import sys
 # dist/scripts/ (a separate Nix store path), so parents[2] is only right in a source tree.
 # gatewayClient.ts passes the root it put on PYTHONPATH.
 def python_root() -> Path:
-    return Path(os.environ.get("HERMES_PYTHON_SRC_ROOT") or Path(__file__).resolve().parents[2])
+    return Path(os.environ.get("QUBIT_PYTHON_SRC_ROOT") or Path(__file__).resolve().parents[2])
 
 
 sys.path.insert(0, str(python_root()))
 
 # The terminal verdict's next step: the client stops retrying on it, so the user needs one. A
 # verdict line like the rest, so the TUI echoes it inline (userMessages.ts STDERR_PROBLEM_RE).
-BOOTSTRAP_REMEDY = "gateway unavailable: run `hermes pm repair`, then restart the TUI"
+BOOTSTRAP_REMEDY = "gateway unavailable: run `qubit pm repair`, then restart the TUI"
 
 
 def failure_message(receipt) -> str:
@@ -42,9 +42,9 @@ def failure_message(receipt) -> str:
 def bootstrap(start: bool, recover: bool = False) -> dict:
     from pm.environments import NoCommittedEnvironment, activate_dependencies
 
-    # Ink runs this on HERMES_PYTHON with PYTHONPATH=<root> only. On a source install that is PM's
+    # Ink runs this on QUBIT_PYTHON with PYTHONPATH=<root> only. On a source install that is PM's
     # store Python, which owns no packages, and the no-owner discovery fallback already imports one
-    # (gateway.status -> utils -> hermes_yaml -> ruamel): boot the committed generation first, as
+    # (gateway.status -> utils -> qubit_yaml -> ruamel): boot the committed generation first, as
     # qubit_bootstrap does for every other entry point.
     try:
         activate_dependencies(python_root())
@@ -60,14 +60,14 @@ def bootstrap(start: bool, recover: bool = False) -> dict:
 
     home = get_qubit_home().resolve()
     # Launch policy travels in session.create, not into daemon-wide defaults. That includes the
-    # Kanban board `hermes --tui` pins at launch (_pin_kanban_board_env): a daemon started from
+    # Kanban board `qubit --tui` pins at launch (_pin_kanban_board_env): a daemon started from
     # here would otherwise resolve every later chat's, Desktop window's and cron job's board to
     # this terminal's launch-time board instead of the profile's `kanban/current`.
-    for key in ("HERMES_MODEL", "HERMES_INFERENCE_MODEL", "HERMES_TUI_PROVIDER",
-                "HERMES_INFERENCE_PROVIDER", "HERMES_TUI_TOOLSETS", "HERMES_TUI_SKILLS",
-                "HERMES_CWD", "TERMINAL_CWD", "HERMES_YOLO", "HERMES_ACCEPT_HOOKS",
-                "HERMES_TUI_CHECKPOINTS", "HERMES_TUI_PASS_SESSION_ID", "HERMES_KANBAN_BOARD",
-                "HERMES_TUI_CLIENT_ENV"):
+    for key in ("QUBIT_MODEL", "QUBIT_INFERENCE_MODEL", "QUBIT_TUI_PROVIDER",
+                "QUBIT_INFERENCE_PROVIDER", "QUBIT_TUI_TOOLSETS", "QUBIT_TUI_SKILLS",
+                "QUBIT_CWD", "TERMINAL_CWD", "QUBIT_YOLO", "QUBIT_ACCEPT_HOOKS",
+                "QUBIT_TUI_CHECKPOINTS", "QUBIT_TUI_PASS_SESSION_ID", "QUBIT_KANBAN_BOARD",
+                "QUBIT_TUI_CLIENT_ENV"):
         os.environ.pop(key, None)
     receipt = (ensure_gateway_runtime(home, timeout=30, idle_exit=True) if start
                else discover_gateway_endpoint(home, timeout=5))
