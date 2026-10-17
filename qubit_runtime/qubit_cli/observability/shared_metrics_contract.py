@@ -470,6 +470,14 @@ FEATURE_USED_MARK = "qubit.feature.used"
 PROVIDER_SETUP_SURFACES = frozenset({"cli_model", "cli_setup", "dashboard", "desktop", "tui"})
 PROVIDER_SETUP_EVENTS = frozenset({"abandoned", "completed", "failed", "started"})
 PROVIDER_SETUP_FAILURE_CLASSES = frozenset({"auth", "cancelled", "network", "no_models", "none", "other"})
+# ---- v4 connectors ----
+TOOL_SEARCH_MARK = TOOL_SEARCH_METRIC = "qubit.tool_search.count"
+TOOL_BATCH_MARK = TOOL_BATCH_METRIC = "qubit.tool_batch.count"
+CONNECTOR_CHAIN_MARK = CONNECTOR_CHAIN_METRIC = "qubit.connector_chain.count"
+TOOL_SEARCH_SCOPES = frozenset({"both", "connector", "local"})
+TOOL_SEARCH_OUTCOMES = frozenset({"connector_unavailable", "error", "hits", "no_hits"})
+CONNECTOR_SHARES = frozenset({"all", "none", "some"})
+# ---- end v4 connectors ----
 FEATURES = frozenset({
     "browser", "bot_mode", "cron", "curator", "delegation", "desktop", "gateway_platform", "kanban", "mcp",
     "memory", "plugins", "projects", "skills_created", "tui", "voice",
@@ -1082,6 +1090,14 @@ FEATURE_USED_MARK = "qubit.feature.used"
 PROVIDER_SETUP_SURFACES = frozenset({"cli_model", "cli_setup", "dashboard", "desktop", "tui"})
 PROVIDER_SETUP_EVENTS = frozenset({"abandoned", "completed", "failed", "started"})
 PROVIDER_SETUP_FAILURE_CLASSES = frozenset({"auth", "cancelled", "network", "no_models", "none", "other"})
+# ---- v4 connectors ----
+TOOL_SEARCH_MARK = TOOL_SEARCH_METRIC = "qubit.tool_search.count"
+TOOL_BATCH_MARK = TOOL_BATCH_METRIC = "qubit.tool_batch.count"
+CONNECTOR_CHAIN_MARK = CONNECTOR_CHAIN_METRIC = "qubit.connector_chain.count"
+TOOL_SEARCH_SCOPES = frozenset({"both", "connector", "local"})
+TOOL_SEARCH_OUTCOMES = frozenset({"connector_unavailable", "error", "hits", "no_hits"})
+CONNECTOR_SHARES = frozenset({"all", "none", "some"})
+# ---- end v4 connectors ----
 FEATURES = frozenset({
     "browser", "bot_mode", "cron", "curator", "delegation", "desktop", "gateway_platform", "kanban", "mcp",
     "memory", "plugins", "projects", "skills_created", "tui", "voice",
