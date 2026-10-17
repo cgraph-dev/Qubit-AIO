@@ -20,11 +20,37 @@
 }
 
 /* Guide rings: hairline, no fill. The three-channel fringe is applied per
- * channel below via a single stroke plus screen-blended shadow copies. */
+ * channel below via a single stroke plus screen-blended shadow copies.
+ *
+ * The rings SPIN — each counter-rotates about the nucleus at a slow, mutually
+ * prime period, so the lattice is never still and never visibly loops. The
+ * ellipse has no SVG transform attribute of its own; the tilt is carried by a
+ * wrapper group, which leaves this element free to be rotated by CSS. */
 .qubit-mark__ring {
   fill: none;
   stroke-width: 1.1;
   vector-effect: non-scaling-stroke;
+  transform-box: view-box;
+  transform-origin: 20px 20px;
+  animation-name: qubit-mark-ring-spin;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.qubit-mark__ring--near {
+  animation-duration: 23s;
+}
+
+.qubit-mark__ring--far {
+  animation-duration: 31s;
+  animation-direction: reverse;
+}
+
+@keyframes qubit-mark-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* The near ring keeps the mark's own colour (currentColor from the caller);
@@ -231,6 +257,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .qubit-mark__spin,
+  .qubit-mark__ring,
   .qubit-mark__nucleus,
   .qubit-mark__bead,
   .qubit-mark__field,

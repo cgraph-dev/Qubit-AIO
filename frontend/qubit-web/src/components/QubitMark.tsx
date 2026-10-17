@@ -107,16 +107,20 @@ export function QubitMark({ className }: { className?: string }) {
       viewBox="0 0 40 40"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Far field: hairline ring, particles behind the nucleus. */}
+      {/* Far field: hairline ring, particles behind the nucleus.
+       * The tilt lives on the wrapper <g>; the ellipse itself is free for CSS
+       * to rotate, so the ring actually spins instead of sitting static while
+       * only the particles travel. */}
       <g className="qubit-mark__field qubit-mark__field--far">
-        <ellipse
-          className="qubit-mark__ring qubit-mark__ring--far"
-          cx="20"
-          cy="20"
-          rx={RX}
-          ry={RY}
-          transform={`rotate(${TILT_B} 20 20)`}
-        />
+        <g transform={`rotate(${TILT_B} 20 20)`}>
+          <ellipse
+            className="qubit-mark__ring qubit-mark__ring--far"
+            cx="20"
+            cy="20"
+            rx={RX}
+            ry={RY}
+          />
+        </g>
         {beads("b")}
       </g>
 
@@ -125,14 +129,15 @@ export function QubitMark({ className }: { className?: string }) {
 
       {/* Near field: hairline ring over the nucleus, particles on top. */}
       <g className="qubit-mark__field qubit-mark__field--near">
-        <ellipse
-          className="qubit-mark__ring qubit-mark__ring--near"
-          cx="20"
-          cy="20"
-          rx={RX}
-          ry={RY}
-          transform={`rotate(${TILT_A} 20 20)`}
-        />
+        <g transform={`rotate(${TILT_A} 20 20)`}>
+          <ellipse
+            className="qubit-mark__ring qubit-mark__ring--near"
+            cx="20"
+            cy="20"
+            rx={RX}
+            ry={RY}
+          />
+        </g>
         {beads("a")}
       </g>
     </svg>
