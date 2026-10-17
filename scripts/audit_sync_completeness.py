@@ -155,6 +155,12 @@ def _frozen_rev() -> str:
 BASELINE = _frozen_rev()
 HEAD = "origin/main"
 
+# Set once the audited revision is known (see main()): the revision being measured,
+# and the blob cache built for it. `_baseline_blob` serves from the cache when
+# BASELINE == _AUDITED_REV, avoiding an uncached network fetch per file.
+_AUDITED_REV: str = ""
+_HEAD_BLOBS: dict[str, str] = {}
+
 # upstream prefix -> our prefix
 ROUTES = {
     "hermes_cli": "qubit_cli",
@@ -351,11 +357,14 @@ def route(path: str) -> str:
 def blob(rev: str, path: str) -> str:
     """Read one file's content at a revision.
 
+    Prefer `blob_many` when reading more than a handful of files: this per-file
+    path spawns a git process (and, in a partial clone, may trigger a network
+    fetch) for EACH call, which is what made the full walk take ~66 minutes.
+    Retained as the fallback for singles and for files `blob_many` could not read.
+
     The vendored clone is a PARTIAL clone (`partialclonefilter = tree:0`,
     `promisor = true`), so a blob it has not cached triggers an on-demand network
-    fetch to GitHub. The audit calls this once per upstream file (~9,500), so an
-    uncached tree turns a local walk into thousands of network round-trips and can
-    block indefinitely on a stalled SSH session.
+    fetch to GitHub.
 
     Two guards, both needed (the first alone was not enough -- observed a run still
     hung at 0% CPU for 6 minutes with GIT_NO_LAZY_FETCH already set, because the
@@ -372,6 +381,102 @@ def blob(rev: str, path: str) -> str:
     """
     env = dict(os.environ, GIT_NO_LAZY_FETCH="1")
     return sh(["git", "-C", str(UP), "show", f"{rev}:{path}"], env=env, timeout=20)
+
+
+_BASELINE_CACHE: dict[str, str] = {}
+
+
+def _baseline_blob(path: str) -> str:
+    """Read one file at BASELINE, memoised, preferring the batch already in hand.
+
+    Called only for files that already trail the head (the short-port / behind-head
+    branches), so the cache stays small -- but it must be memoised because the same
+    path can be visited on more than one branch.
+
+    IMPORTANT: the upstream clone is a PARTIAL clone (promisor, filter=tree:0), so a
+    blob outside the cached set triggers an on-demand NETWORK fetch. When BASELINE
+    equals the revision being audited (the normal case -- both are the frozen pin),
+    the content is already in ``_HEAD_BLOBS`` and MUST be served from there; going
+    to the network here is what pinned the audit in poll_schedule_timeout for
+    minutes. Falls back to ``blob()`` only when the two revisions genuinely differ.
+    """
+    if path not in _BASELINE_CACHE:
+        if BASELINE == _AUDITED_REV and path in _HEAD_BLOBS:
+            _BASELINE_CACHE[path] = _HEAD_BLOBS[path]
+        else:
+            _BASELINE_CACHE[path] = blob(BASELINE, path)
+    return _BASELINE_CACHE[path]
+
+
+def blob_many(rev: str, paths: list[str]) -> dict[str, str]:
+    """Read MANY files' contents at a revision in a SINGLE git process.
+
+    Why by OID, not by ``<rev>:<path>``: ``cat-file --batch`` fed ``<rev>:<path>``
+    specs resolves each one by walking the tree, and this clone carries 4,260 packs,
+    so the walk's per-spec caches grow without bound. Measured on the frozen pin,
+    the ``<rev>:<path>`` form served ~8,570 of 9,503 blobs (90.2%) and then stopped
+    producing output while the process stayed alive -- silently truncating the
+    audit, whose caller reads each unserved path as "could not read". Resolving
+    paths to OIDs with a single ``ls-tree -r`` (0.3s for the whole pin) and
+    streaming the OIDs completes all 9,503 in ~96s with exit 0, because no tree
+    walk happens at all.
+
+    Protocol: write one OID per line, then read a header "<sha> <type> <size>"
+    followed by <size> bytes and a trailing newline. Returns {path: content}; a
+    path git could not serve is simply absent from the result, so the caller's
+    ``blob()`` fallback handles it -- a speedup, never a correctness change.
+    """
+    if not paths:
+        return {}
+
+    env = dict(os.environ, GIT_NO_LAZY_FETCH="1")
+    # path -> blob oid, in ONE tree walk.
+    ls = sh(["git", "-C", str(UP), "ls-tree", "-r", rev], env=env, timeout=120)
+    oid_of: dict[str, str] = {}
+    for line in ls.split("\n"):
+        meta, _, path = line.partition("\t")      # "<mode> blob <oid>\t<path>"
+        parts = meta.split()
+        if len(parts) == 3 and parts[1] == "blob":
+            oid_of[path] = parts[2]
+
+    wanted = [(p, oid_of[p]) for p in paths if p in oid_of]
+    if not wanted:
+        return {}
+
+    proc = subprocess.Popen(
+        ["git", "-C", str(UP), "cat-file", "--batch"],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        env=env,
+    )
+    assert proc.stdin is not None and proc.stdout is not None
+    stdin, stdout = proc.stdin, proc.stdout
+    out: dict[str, str] = {}
+    try:
+        for path, oid in wanted:
+            try:
+                stdin.write((oid + "\n").encode())
+                stdin.flush()
+                header = stdout.readline().decode("utf-8", "replace").rstrip("\n")
+            except (BrokenPipeError, OSError, ValueError):
+                break
+            parts = header.rsplit(" ", 2)
+            if len(parts) != 3 or not parts[2].isdigit():
+                continue          # git could not serve it; caller falls back
+            size = int(parts[2])
+            data = stdout.read(size)
+            stdout.read(1)        # trailing newline
+            out[path] = data.decode("utf-8", "replace")
+    finally:
+        for stream in (stdin, stdout):
+            try:
+                stream.close()
+            except Exception:
+                pass
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    return out
 
 
 _SKIP_PARTS = {"node_modules", "__pycache__", ".venv", "venv", "dist", "build",
@@ -445,6 +550,18 @@ def main() -> int:
     # One tree-wide def index; used to credit moved symbols. ~20s for the tree.
     tree_defs = build_tree_def_index()
 
+    # Prefetch every upstream blob in ONE git process. The per-file `git show` path
+    # spawns ~9,500 processes (and, in this partial clone, can fetch per blob),
+    # which is what made a full walk take ~66 minutes; `cat-file --batch` does the
+    # same reads in a single pass. Any path the batch could not serve falls back to
+    # `blob()` below, so this is a speedup, never a correctness change.
+    upstream_blobs = blob_many(args.rev, files)
+    # Publish to module scope so `_baseline_blob` can reuse this batch instead of
+    # re-reading (and, in a partial clone, re-FETCHING) each baseline blob.
+    global _AUDITED_REV, _HEAD_BLOBS
+    _AUDITED_REV = args.rev
+    _HEAD_BLOBS = upstream_blobs
+
     exists = 0
     absent: list[str] = []
     short_port: list[tuple[str, int, int]] = []   # present but trails our own baseline
@@ -470,7 +587,10 @@ def main() -> int:
         except OSError:
             our_src = ""
         our_syms = top_defs(our_src)
-        head_syms = top_defs(blob(args.rev, up_path))
+        up_src = upstream_blobs.get(up_path)
+        if up_src is None:
+            up_src = blob(args.rev, up_path)   # batch missed it: slow path
+        head_syms = top_defs(up_src)
 
         # --- the rename subtraction, applied to EVERY comparison below ---
         # A head symbol is "present" if it resolves in our tree by any credited
@@ -482,7 +602,7 @@ def main() -> int:
             current += 1
             continue
 
-        base_syms = top_defs(blob(BASELINE, up_path))
+        base_syms = top_defs(_baseline_blob(up_path))
         missing_base = sorted(
             s for s in (base_syms - our_syms)
             if resolve(s, our_syms, tree_defs) is None)
