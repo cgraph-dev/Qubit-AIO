@@ -8,12 +8,18 @@ import { exposePluginSDK } from "./plugins";
 import { ThemeProvider } from "./themes";
 import { QUBIT_BASE_PATH } from "./lib/api";
 import { installChunkReloadRecovery } from "./lib/preload-recovery";
+import { installBuildWatch, showBuildNotice } from "./lib/build-watch";
 
 // A rebuild wipes replaced chunks: an already-open tab whose index references
 // one gets "Failed to fetch dynamically imported module" on the next lazy
 // route. Recover with a single reload to the current index instead of a dead
 // page (loop-guarded inside).
 installChunkReloadRecovery();
+
+// Builds keep old chunks on disk, so an open tab keeps running old code until
+// it reloads — which is how a shipped fix can look like it "disappeared". Tell
+// the operator when the served entry chunk differs from the loaded one.
+installBuildWatch({ onNewBuild: (bundle) => showBuildNotice(bundle) });
 
 // Expose the plugin SDK before rendering so plugins loaded via <script>
 // can access React, components, etc. immediately.
