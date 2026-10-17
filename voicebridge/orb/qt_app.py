@@ -31,6 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from . import client as _client
 from . import activity as _activity
 from . import ember as _ember
+from . import mark as _mark
 from . import fullscreen as _fs
 from . import geometry as _geo
 from . import monitors as _mon
@@ -65,6 +66,103 @@ GREY = (139, 148, 158)
 AMBER = (227, 179, 65)
 
 _QT_BACKEND_ENV = "QUBIT_ORB_BACKEND"
+
+
+def _orb_style() -> str:
+    """Orb look: ``mark`` (the dashboard logo, default) or ``ember``."""
+    import os as _os
+    return str(_os.environ.get("QUBIT_ORB_STYLE", "mark") or "mark").strip().lower()
+
+
+def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
+                state: Any, brightness: float, family: Any) -> None:
+    """Paint the Qubit mark: hairline orbits + nucleus + orbiting particles.
+
+    Same construction as the dashboard sidebar logo (QubitMark.tsx) and the Tk
+    ``voicebridge.orb.mark`` renderer, which own the geometry constants — this
+    only translates them to QPainter. Qt has real alpha and rotated paths, so
+    the chromatic fringe is three offset pens instead of colour mixing, and the
+    ellipse is a rotated path rather than a sampled polyline.
+    """
+    from PySide6.QtCore import QRectF
+    from PySide6.QtGui import QColor, QPainterPath, QPen
+
+    core = tuple(int(v) for v in (family.get("core") or (255, 84, 0)))
+    rx = R * _mark.RX_FRAC
+    ry = R * _mark.RY_FRAC
+    ring_w = 1.0 if R < 64 else 1.6
+    fringe = _mark.FRINGE_PX_AT_96 * (R / 32.0)
+
+    def _ring(tilt_deg: float, alpha: float) -> None:
+        rect = QRectF(cx - rx, cy - ry, rx * 2, ry * 2)
+        path = QPainterPath()
+        path.addEllipse(rect)
+        # Rotate about the centre for the orbit tilt.
+        from PySide6.QtGui import QTransform
+        tr = QTransform()
+        tr.translate(cx, cy)
+        tr.rotate(tilt_deg)
+        tr.translate(-cx, -cy)
+        rotated = tr.map(path)
+        p.setBrush(Qt.NoBrush)
+        # Chromatic fringe: the same hairline offset in x, red left / blue
+        # right, so overlap reads near-white and the edges split (the CSS
+        # mark's technique, drawn with real alpha here).
+        for dx, col in ((fringe, QColor(255, 45, 85)), (-fringe, QColor(45, 130, 255))):
+            pen = QPen(col, ring_w)
+            pen.setColor(QColor(col.red(), col.green(), col.blue(),
+                                int(255 * min(1.0, alpha * 0.55))))
+            p.setPen(pen)
+            p.translate(dx, 0.0)
+            p.drawPath(rotated)
+            p.translate(-dx, 0.0)
+        pen = QPen(QColor(core[0], core[1], core[2], int(255 * alpha)), ring_w)
+        p.setPen(pen)
+        p.drawPath(rotated)
+
+    def _bead(x: float, y: float, rad: float, alpha: float,
+              toward_white: float) -> None:
+        c = QColor(
+            int(core[0] + (255 - core[0]) * toward_white),
+            int(core[1] + (255 - core[1]) * toward_white),
+            int(core[2] + (255 - core[2]) * toward_white),
+            int(255 * max(0.0, min(1.0, alpha))),
+        )
+        p.setPen(Qt.NoPen)
+        p.setBrush(c)
+        p.drawEllipse(x - rad, y - rad, rad * 2, rad * 2)
+
+    try:
+        t_val = float(t)
+    except (TypeError, ValueError):
+        t_val = 0.0
+    tt = 0.0 if _reduced_motion() else t_val
+
+    # Far field first (behind the nucleus), then nucleus, then near field.
+    far_tilt = _mark.TILT_B + (tt * 360.0 / _mark.RING_PERIOD_FAR)
+    _ring(far_tilt, 0.20 * max(0.35, brightness))
+    for orbit, seed, bead_r, dur in _mark.PARTICLES:
+        if orbit != "b":
+            continue
+        ang = seed + (tt * 360.0 / max(0.1, dur))
+        bx, by = _mark._orbit_point(cx, cy, rx, ry, far_tilt, ang)
+        depth = 0.5 + 0.5 * math.cos(math.radians(ang))
+        _bead(bx, by, max(0.7, bead_r * (R / 32.0) * (0.75 + 0.35 * depth)),
+              0.30 + 0.45 * depth, 0.05 * depth)
+
+    _bead(cx, cy, max(1.2, R * _mark.NUCLEUS_FRAC) * (0.92 + 0.08 * brightness),
+          0.85 * max(0.35, brightness), 0.10)
+
+    near_tilt = _mark.TILT_A - (tt * 360.0 / _mark.RING_PERIOD_NEAR)
+    _ring(near_tilt, 0.35 * max(0.35, brightness))
+    for orbit, seed, bead_r, dur in _mark.PARTICLES:
+        if orbit != "a":
+            continue
+        ang = seed + (tt * 360.0 / max(0.1, dur))
+        bx, by = _mark._orbit_point(cx, cy, rx, ry, near_tilt, ang)
+        depth = 0.5 + 0.5 * math.cos(math.radians(ang))
+        _bead(bx, by, max(0.8, bead_r * (R / 32.0) * (0.8 + 0.45 * depth)),
+              0.55 + 0.45 * depth, 0.10 + 0.25 * depth)
 
 
 def backend_wanted() -> str:
@@ -1156,6 +1254,32 @@ if QWidget is not None:
                     _bscale = None
                 _bright_eff = float(bright) * (
                     float(_bscale) if _bscale is not None else 1.0)
+
+                # Default look: the product mark (dashboard sidebar logo).
+                # QUBIT_ORB_STYLE=ember restores the ember glow; a bad value
+                # falls back to ember so the orb can never paint nothing.
+                if _orb_style() == "mark":
+                    try:
+                        _paint_mark(p, cx, cy, R, t, self.orb_state,
+                                    _bright_eff, fam)
+                    except Exception:  # noqa: BLE001 - never blank the orb
+                        pass
+                    # indicators + bookkeeping below are shared with ember.
+                    s = size / 96.0
+                    try:
+                        rr_, gg_, bb_ = (int(v) for v in _ember.INDICATOR_RED)
+                    except Exception:
+                        rr_, gg_, bb_ = (255, 60, 50)
+                    p.setPen(Qt.NoPen)
+                    if self.offline:
+                        p.setBrush(QColor(rr_, gg_, bb_, int(255 * 0.8)))
+                        p.drawEllipse(cx + 24 * s, cy + 24 * s, 8 * s, 8 * s)
+                    if time.time() < self.notice_until:
+                        p.setBrush(QColor(rr_, gg_, bb_, int(255 * 0.95)))
+                        p.drawEllipse(cx + 24 * s, cy - 32 * s, 8 * s, 8 * s)
+                    p.end()
+                    self.frames += 1
+                    return
 
                 # ambient mesh: two drifting radial glows
                 for gi in range(2):
