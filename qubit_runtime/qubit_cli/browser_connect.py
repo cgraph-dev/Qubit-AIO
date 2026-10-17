@@ -431,15 +431,21 @@ _SQLITE_AUTH_DBS = frozenset({"Cookies", "Login Data", "Login Data For Account",
 _AUTH_BACKUP_DEADLINE_S = 5.0
 _AUTH_DB_LOCKED = ("SQLite backup made no progress within five seconds — "
                    "a running browser holds a write lock on it")
+# Session cookies keep the copy signed in. Login Data / Web Data are saved passwords and
+# autofill, which a running Chrome on macOS/Linux holds with a write lock even when Cookies
+# copy in milliseconds; failing the snapshot over them forced users to quit Chrome before
+# every browser session. They get a short best-effort budget and are skipped when locked.
+_SESSION_AUTH_DBS = frozenset({"Cookies"})
+_OPTIONAL_AUTH_BACKUP_DEADLINE_S = 0.5
 
 
-def _copy_auth_file(src_file: str, dst_file: str) -> str | None:
+def _copy_auth_file(src_file: str, dst_file: str, *, deadline_s: float | None = None) -> str | None:
     """Copy auth state; returns None on success, else WHY the file could not be snapshotted.
     A DB that cannot be backed up consistently within the deadline is refused, never raw-copied."""
     os.makedirs(os.path.dirname(dst_file), exist_ok=True)
     try:
         if os.path.basename(src_file) in _SQLITE_AUTH_DBS:
-            deadline = time.monotonic() + _AUTH_BACKUP_DEADLINE_S
+            deadline = time.monotonic() + (_AUTH_BACKUP_DEADLINE_S if deadline_s is None else deadline_s)
             last_remaining: list[int | None] = [None]
 
             def check_deadline(_status: int, remaining: int, total: int) -> None:
@@ -472,15 +478,24 @@ def _copy_auth_file(src_file: str, dst_file: str) -> str | None:
 
 def _mirror_profile_auth(src: str, dst: str, source_profile: str) -> dict[str, str]:
     """Mirror ``source_profile``'s auth files into the copy's ``Default`` (agent-browser opens it);
-    returns ``{relative name: reason}`` for the DB auth files that could NOT be copied ({} = clean)."""
+    returns ``{relative name: reason}`` for the session-cookie DBs that could NOT be copied ({} =
+    the signed-in state is usable). Locked password/autofill DBs are logged and skipped."""
     failed: dict[str, str] = {}
     for rel in _AUTH_REFRESH_PROFILE_FILES:
         s = os.path.join(src, source_profile, rel)
         if not os.path.isfile(s):
             continue
-        reason = _copy_auth_file(s, os.path.join(dst, "Default", rel))
-        if reason and os.path.basename(rel) in _SQLITE_AUTH_DBS:
+        base = os.path.basename(rel)
+        session_db = base in _SESSION_AUTH_DBS
+        reason = _copy_auth_file(s, os.path.join(dst, "Default", rel),
+                                 deadline_s=None if session_db else _OPTIONAL_AUTH_BACKUP_DEADLINE_S)
+        if not reason or base not in _SQLITE_AUTH_DBS:
+            continue
+        if session_db:
             failed[rel] = reason
+        else:
+            why = "the running browser holds a write lock on it" if reason == _AUTH_DB_LOCKED else reason
+            logger.info("real-profile snapshot: skipped %s (%s); session cookies still copied", rel, why)
     return failed
 
 
