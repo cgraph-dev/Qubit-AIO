@@ -470,6 +470,19 @@ def test_reduced_motion_is_free_of_the_moving_layers():
         assert len(c.lines) == 2 * len(M.PARTICLES) + 6   # 18 arms + 6 ring strokes
 
 
+def test_speed_scale_drives_every_layer_on_one_clock():
+    # Owner 2026-10-18: the speed setting must scale the whole system together
+    # (the follower lag included), never just some layers. Rendering at 2x
+    # speed must be byte-identical to rendering at twice the time.
+    R, t = 32.0, 1.3
+    fast = FakeCanvas()
+    M.render(fast, 34.0, 34.0, R, t, "idle", speed_scale=2.0)
+    equiv = FakeCanvas()
+    M.render(equiv, 34.0, 34.0, R, t * 2.0, "idle", speed_scale=1.0)
+    assert fast.lines == equiv.lines
+    assert fast.ovals == equiv.ovals
+
+
 def test_state_hue_tints_the_mark_through_embers_palette():
     idle, listening = FakeCanvas(), FakeCanvas()
     M.render(idle, 34.0, 34.0, 32.0, 0.0, "idle")
