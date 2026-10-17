@@ -105,15 +105,15 @@ PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
 )
 
 #: Dust motes: a denser, slower field so the orbits are never bare.
-DUST_COUNT = 22
+DUST_COUNT = 30
 DUST_R_FRAC_MIN = 0.86
 DUST_R_FRAC_SPAN = 0.30
-DUST_SIZE_BASE = 0.35
-DUST_SIZE_SPAN = 0.45
+DUST_SIZE_BASE = 0.26
+DUST_SIZE_SPAN = 0.32
 DUST_PERIOD_BASE = 5.0
 DUST_PERIOD_SPAN = 9.0
-DUST_ALPHA_BASE = 0.22
-DUST_ALPHA_GAIN = 0.45
+DUST_ALPHA_BASE = 0.16
+DUST_ALPHA_GAIN = 0.40
 DUST_LIFT_BASE = 0.45
 DUST_LIFT_GAIN = 0.35
 
