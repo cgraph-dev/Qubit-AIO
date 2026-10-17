@@ -20,6 +20,7 @@ from typing import Any, Dict, Iterator, List, Optional
 import httpx
 
 from agent.bounded_response import read_streaming_error_body
+from agent.gemini_long_decode import continuation_token, long_decode_hops, merge_hop_responses, merge_hop_usage, split_stream_continuation
 from agent.retry_utils import parse_retry_after_seconds
 from agent.gemini_schema import prepare_gemini_tool_parameters, sanitize_gemini_tool_parameters
 
@@ -79,9 +80,11 @@ _INTERRUPTED_RESPONSE_PLACEHOLDER = "[The previous response was interrupted befo
 # without this sentinel Gemini 3 thinking models reject replayed history with 400 INVALID_ARGUMENT.
 _SKIP_SIGNATURE = "skip_thought_signature_validator"
 _END = object()  # stream-exhausted marker for _advance_stream_iterator
+_MAX_TOKEN_SENDS = 3  # requests one long-decode token may ride, so a network that keeps dropping ends in an error
 _TOOL_CHOICE_MODES = {"auto": "AUTO", "required": "ANY", "none": "NONE"}
 _FINISH_REASON_MAP = {
     "STOP": "stop", "MAX_TOKENS": "length", "SAFETY": "content_filter", "RECITATION": "content_filter", "OTHER": "stop",
+    "CONTINUATION": "length",  # only reachable without a continuationToken: the output was cut short
 }
 _HTTP_ERROR_CODES = {401: "gemini_unauthorized", 429: "gemini_rate_limited", 404: "gemini_model_not_found"}
 _MISSING_KEY_ERROR = (
@@ -861,7 +864,9 @@ class GeminiNativeClient:
         self.base_url = normalize_gemini_base_url(base_url)
         self._default_headers = dict(default_headers or {})
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create_chat_completion))
-        self._http = http_client or httpx.Client(timeout=timeout or httpx.Timeout(connect=15.0, read=600.0, write=30.0, pool=30.0))
+        # read=1200: Gemini 4 hops can think for minutes; Google asks for a >=20 min read timeout (its
+        # stream limit), and a shorter one cuts long-decode hops off mid-think.
+        self._http = http_client or httpx.Client(timeout=timeout or httpx.Timeout(connect=15.0, read=1200.0, write=30.0, pool=30.0))
 
     def close(self) -> None:
         self.is_closed = True
@@ -897,6 +902,10 @@ class GeminiNativeClient:
         timeout: Any = None, **_: Any,
     ) -> Any:
         extra = extra_body if isinstance(extra_body, dict) else {}
+        # Long-decode budget (Gemini 4, effort above high) raises the total cap; an explicit larger cap still wins.
+        budget = extra.get("max_output_tokens")
+        if isinstance(budget, int) and budget > int(max_tokens or 0):
+            max_tokens = budget
         request = build_gemini_request(
             messages=messages or [], tools=tools, tool_choice=tool_choice, temperature=temperature, max_tokens=max_tokens,
             top_p=top_p, stop=stop, thinking_config=extra.get("thinking_config") or extra.get("thinkingConfig"),
@@ -907,28 +916,57 @@ class GeminiNativeClient:
         url = f"{self.base_url}/models/{model}:"
         if stream:
             return self._stream_completion(model, f"{url}{self.STREAM_METHOD}?alt=sse", request, timeout)
-        response = self._http.post(url + self.GENERATE_METHOD, json=request, headers=self._headers(), timeout=timeout)
+        hops = [self._generate(url + self.GENERATE_METHOD, request, timeout)]
+        max_hops = long_decode_hops(request["generationConfig"].get("maxOutputTokens")) + 1
+        # Long decode: same request + token, never the partial output. Past the ceiling the last hop's
+        # CONTINUATION finish translates to ``length``.
+        while (token := continuation_token(hops[-1])) and len(hops) < max_hops:
+            hops.append(self._generate(url + self.GENERATE_METHOD, {**request, "continuationToken": token}, timeout))
+        return translate_gemini_response(merge_hop_responses(hops) if len(hops) > 1 else hops[0], model=model)
+
+    def _generate(self, url: str, request: Dict[str, Any], timeout: Any) -> Dict[str, Any]:
+        response = self._http.post(url, json=request, headers=self._headers(), timeout=timeout)
         if response.status_code != 200:
             raise self._http_error(response)
         try:
-            payload = response.json()
+            return response.json()
         except ValueError as exc:
             raise GeminiAPIError(
                 f"Invalid JSON from Gemini native API: {exc}", code="gemini_invalid_json", status_code=response.status_code, response=response,
             ) from exc
-        return translate_gemini_response(payload, model=model)
 
     def _stream_completion(self, model: str, url: str, request: Dict[str, Any], timeout: Any) -> Iterator[_GeminiStreamChunk]:
-        try:
-            headers = {**self._headers(), "Accept": "text/event-stream"}
-            with self._http.stream("POST", url, json=request, headers=headers, timeout=timeout) as response:
-                if response.status_code != 200:
-                    raise self._http_error(response, read_streaming_error_body(response))
-                tool_call_indices: Dict[str, Dict[str, Any]] = {}
-                for event in _iter_sse_events(response):
-                    yield from translate_stream_event(event, model, tool_call_indices)
-        except httpx.HTTPError as exc:
-            raise GeminiAPIError(f"Gemini streaming request failed: {exc}", code="gemini_stream_error") from exc
+        tool_call_indices: Dict[str, Dict[str, Any]] = {}  # shared across hops: they form one model turn
+        hop_usage: List[Dict[str, Any]] = []
+        max_hops = long_decode_hops(request["generationConfig"].get("maxOutputTokens")) + 1
+        body: Dict[str, Any] = request
+        # ``resume``: the latest token (hop end or mid-stream checkpoint) with nothing yielded after it.
+        # The next hop, or a dropped stream, resends the request with it; ``sends`` bounds a stuck token.
+        resume, sends = None, 0
+        while True:
+            try:
+                headers = {**self._headers(), "Accept": "text/event-stream"}
+                with self._http.stream("POST", url, json=body, headers=headers, timeout=timeout) as response:
+                    if response.status_code != 200:
+                        raise self._http_error(response, read_streaming_error_body(response))
+                    for event in _iter_sse_events(response):
+                        hops_done = len(hop_usage)
+                        event, token = split_stream_continuation(event, hop_usage)
+                        if token and len(hop_usage) > hops_done and len(hop_usage) >= max_hops:
+                            # Hop ceiling: end the turn as truncated, usage summed over every hop.
+                            cand = {**event["candidates"][0], "finishReason": "MAX_TOKENS"}
+                            event, token = {**event, "candidates": [cand], "usageMetadata": merge_hop_usage(hop_usage)}, None
+                        chunks = translate_stream_event(event, model, tool_call_indices)
+                        if token or chunks:  # a token commits its own event's chunks; a later chunk voids it
+                            resume, sends = token, 0 if token else sends
+                        yield from chunks
+            except httpx.HTTPError as exc:
+                if not resume or sends >= _MAX_TOKEN_SENDS:  # nothing committed to resume from: retry from the start
+                    raise GeminiAPIError(f"Gemini streaming request failed: {exc}", code="gemini_stream_error") from exc
+                logger.warning("Gemini stream dropped (%s); resuming from its last checkpoint", exc)
+            if not resume or sends >= _MAX_TOKEN_SENDS:
+                return
+            body, sends = {**request, "continuationToken": resume}, sends + 1
 
 
 class AsyncGeminiNativeClient:
