@@ -19,6 +19,7 @@ from gateway.hosted_rooms_common import DbPath, compact_json, fenced_update
 
 MAX_ACTIVE_POLICY_EVENTS = 64
 MAX_THREAD_TRANSCRIPT_EVENTS = 24
+MAX_TRANSCRIPT_POLICY_EVENTS = MAX_THREAD_TRANSCRIPT_EVENTS * (MAX_ACTIVE_POLICY_EVENTS + 2)
 _TRANSCRIPT_SCHEMA_VERSION = 1
 _TERMINAL_KINDS = frozenset({"turn.settled", "turn.failed", "turn.cancelled", "turn.deferred"})
 
@@ -63,7 +64,7 @@ _TRANSCRIPT_EVENTS_SQL = f"""WITH transcript_events(seq) AS (
     SELECT {", ".join("events." + column for column in _ROOM_EVENT_COLUMNS.split(", "))}
     FROM transcript_events
     JOIN hosted_room_events AS events ON events.room_id=? AND events.seq=transcript_events.seq
-    ORDER BY events.seq"""
+    ORDER BY events.seq LIMIT ?"""
 
 
 @dataclass(frozen=True)
@@ -178,7 +179,10 @@ class HostedRoomPolicyCheckpoint:
             (room_id, discussion_event_id, MAX_ACTIVE_POLICY_EVENTS + 1)).fetchall()
         if len(active_rows) > MAX_ACTIVE_POLICY_EVENTS:
             raise RuntimeError(bound_error)
-        rows = conn.execute(_TRANSCRIPT_EVENTS_SQL, (room_id, thread_id, room_id, thread_id, room_id)).fetchall()
+        rows = conn.execute(_TRANSCRIPT_EVENTS_SQL,
+                            (room_id, thread_id, room_id, thread_id, room_id, MAX_TRANSCRIPT_POLICY_EVENTS + 1)).fetchall()
+        if len(rows) > MAX_TRANSCRIPT_POLICY_EVENTS:
+            raise RuntimeError("thread policy transcript exceeded its bound")
         events_by_seq = {
             int(event["seq"]): event
             for event in (*map(_event_from_room_row, rows), *(json.loads(row["event_json"]) for row in active_rows))}
