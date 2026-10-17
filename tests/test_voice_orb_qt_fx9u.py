@@ -678,6 +678,20 @@ def test_reduced_motion_has_no_echo_or_sparks(monkeypatch):
     assert _thin_orbit_outlines(a, 96.0) == []
 
 
+def test_comet_and_glints_ease_instead_of_stepping():
+    from voicebridge.orb import mark_field as F
+
+    # The comet is invisible at its sweep boundary and eases in: no hard on.
+    start = 0.45 * F.COMET_PERIOD_S
+    assert F.comet(start, 90.0)["alpha"] == pytest.approx(0.0, abs=1e-6)
+    assert F.comet(start + 0.02, 90.0)["alpha"] < 0.1
+    assert F.comet(start + 0.6, 90.0)["alpha"] > F.comet(start + 0.02, 90.0)["alpha"]
+
+    # Glints never pop in or out: alpha stays above the shared floor.
+    for k in range(400):
+        assert F.glint(k / 100.0, 137.5)["alpha"] >= F.GLINT_MIN_ALPHA - 1e-9
+
+
 # --------------------------------------------------------------------------- #
 # (l) continuity: the "fluid" contract
 # --------------------------------------------------------------------------- #
