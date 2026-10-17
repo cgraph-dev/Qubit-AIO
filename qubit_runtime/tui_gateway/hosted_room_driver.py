@@ -580,10 +580,12 @@ class HostedRoomRuntime:
         self, binding: HostedRoomBinding, task: Mapping[str, Any], attempt: state.TaskAttempt
     ) -> None:
         profile, submit_attempted = task["payload"]["target_profile"], False
-        transport = self._transport_for(binding, task)
         with self._status_lock:
             self._current_tasks[binding.room_id] = attempt.identity
         try:
+            # Inside the try: a member whose destination is gone (an unserved bot) fails its own
+            # turn before submit instead of leaving the task running and the room wedged.
+            transport = self._transport_for(binding, task)
             with self.turn_lock(profile):
                 session = self._resolve_or_create(transport, profile, binding.room_id)
                 # A submit should fail before admission or return after it; an unexpected

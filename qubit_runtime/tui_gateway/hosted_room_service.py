@@ -137,6 +137,11 @@ class HostedRoomService:
                 and named_profile_has_identity(path) and not named_profile_is_deleted(path))
         return tuple(sorted(profiles))
 
+    def room_profiles(self, room: Mapping[str, Any]) -> tuple[str, ...]:
+        """Profiles a SAVED room's roster is checked against. New groups use ``local_profiles``;
+        a subclass may keep a seated member valid after it stops being eligible for new groups."""
+        return self.local_profiles()
+
     def bindings(self) -> tuple[HostedRoomBinding, ...]:
         local_gateway_id = hosted_rooms.local_authority_gateway_id()
         return tuple(
@@ -371,7 +376,7 @@ class HostedRoomService:
             room_id=str(room["room_id"]), latest_seq=int(room["latest_seq"]))
 
     def _publish_terminal_tasks(self, room: Mapping[str, Any]) -> bool:
-        changed, room_id, local_profiles = False, str(room["room_id"]), self.local_profiles()
+        changed, room_id, local_profiles = False, str(room["room_id"]), self.room_profiles(room)
         for task in self._list_tasks(room_id, _TERMINAL_STATUSES):
             status, execution_generation = task["status"], int(task["execution_generation"])
             if self.policy_checkpoint.publication_exists(
@@ -419,7 +424,7 @@ class HostedRoomService:
             if next(iter(self._list_tasks(binding.room_id, _LIVE_STATUSES)), None) is not None:
                 return
             decision = discussion.plan_next_task(
-                room, list(snapshot.events), local_profiles=self.local_profiles(),
+                room, list(snapshot.events), local_profiles=self.room_profiles(room),
                 initial_watermarks=snapshot.watermarks)
             if decision.status == "task" and decision.task is not None:
                 driver.admit_task(
