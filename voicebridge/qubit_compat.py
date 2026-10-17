@@ -8384,11 +8384,21 @@ def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     import base64
     import os
     import tempfile
-    from .tts.base import TTSUnavailable
+    from .tts.base import TTSUnavailable, speakable_text
     counterpart = "Qubit Chat voice + CLI `qubit tts-test`"
     text = str(b.get("text", "") or "").strip()
     if not text:
         return _gate("AUDIO_TEXT_REQUIRED", "text is required",
+                     counterpart, 400)
+    # Starnet parity (frontend/app/voice.js:speakable): chat replies are
+    # markdown by construction — sanitize before synthesis so TTS does not
+    # read out formatting/URLs literally. Pure markup with no speakable
+    # words is an honest 400, never silent audio.
+    text = speakable_text(text)
+    if not text:
+        return _gate("AUDIO_TEXT_REQUIRED",
+                     "text has no speakable words after removing "
+                     "markdown/code/URLs",
                      counterpart, 400)
     out = Path(tempfile.gettempdir()) / (
         f"qubit-runtime-tts-{os.getpid()}-{abs(hash(text)) % 10 ** 8}.wav")
