@@ -59,9 +59,12 @@ def _rename_property_keys(props: dict, path: str) -> dict[str, str]:
     return renames
 
 
-def unrename_tool_args(params_schema: Any, args: Any) -> Any:
+def unrename_tool_args(params_schema: Any, args: Any, root_schema: Any = None) -> Any:
     """Map sanitized keys in model-emitted args back to wire names. ``params_schema`` is the
-    ORIGINAL registry schema; recurses into objects/array items; unknown keys pass through."""
+    ORIGINAL registry schema; recurses into objects/array items, following local ``$ref``s
+    (the sanitizer renames keys inside ``$defs`` too); unknown keys pass through."""
+    root = params_schema if root_schema is None else root_schema
+    params_schema = resolve_local_schema_ref(params_schema, root)
     props = params_schema.get("properties") if isinstance(params_schema, dict) else None
     if not isinstance(props, dict) or not isinstance(args, dict):
         return args
@@ -69,11 +72,11 @@ def unrename_tool_args(params_schema: Any, args: Any) -> Any:
     out = {}
     for key, value in args.items():
         orig = reverse.get(key, key)
-        sub = props.get(orig) if isinstance(props.get(orig), dict) else {}
+        sub = resolve_local_schema_ref(props[orig], root) if isinstance(props.get(orig), dict) else {}
         if isinstance(value, dict) and sub:
-            value = unrename_tool_args(sub, value)
+            value = unrename_tool_args(sub, value, root)
         elif isinstance(value, list) and isinstance(sub.get("items"), dict):
-            value = [unrename_tool_args(sub["items"], item) if isinstance(item, dict) else item
+            value = [unrename_tool_args(sub["items"], item, root) if isinstance(item, dict) else item
                      for item in value]
         out[orig] = value
     return out
