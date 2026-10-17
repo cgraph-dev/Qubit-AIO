@@ -725,7 +725,9 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     // /qubit-chat parity: the highlight follows the click synchronously.
     // Before, /chat lit the row only after probe + ticket + connect
     // (resumeTarget), so the click read as dead for a full round-trip.
-    // wsTicket never resolves here, so any highlight must come from the URL.
+    // The probe AND the ticket never resolve here, so connect() never runs
+    // and any highlight must come from the URL itself.
+    apiMocks.getSessionDetail.mockImplementation(() => new Promise(() => {}));
     await act(async () => {
       root?.unmount();
     });
