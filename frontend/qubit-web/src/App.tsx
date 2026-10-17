@@ -73,6 +73,7 @@ import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { QubitMark } from "@/components/QubitMark";
+import { QubitBrandSparks } from "@/components/QubitBrandSparks";
 import { SidebarFooter } from "@/components/SidebarFooter";
 import { SidebarStatusStrip, gatewayLine } from "@/components/SidebarStatusStrip";
 import { useBelowBreakpoint } from "@nous-research/ui/hooks/use-below-breakpoint";
@@ -883,8 +884,12 @@ export default function App() {
               >
                 <PluginSlot name="header-left" />
                 <QubitMark className="h-11 w-11 shrink-0 text-midground" />
-                <span className="qagent-sidebar__brand-name font-bold text-[1.35rem] tracking-[0.03em] text-midground">
-                  {t.app.brand}
+                <span
+                  className="qagent-sidebar__brand-name relative font-bold text-[1.35rem] tracking-[0.03em] text-midground"
+                  data-brand={t.app.brand}
+                >
+                  <QubitBrandSparks />
+                  <span className="qbrand-label">{t.app.brand}</span>
                 </span>
               </div>
 

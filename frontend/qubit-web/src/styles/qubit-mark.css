@@ -195,8 +195,21 @@
 
 /* ---------- Wordmark ---------- */
 
-/* Gradient sweep across the letters, clipped to the text. */
+/* The wordmark carries the same RGB-outline language as the mark: a hairline
+ * chromatic fringe around each letter, on top of the gradient sheen.
+ *
+ * Text cannot take a real stroke that looks thin at any size (a `-webkit-text-
+ * stroke` of 1px is heavy on a 20px face), and `drop-shadow` frges fight the
+ * background-clip:text fill. So the RGB outline is drawn by two pseudo-element
+ * copies of the text data attribute sitting BEHIND the fill: one nudged left in
+ * red, one nudged right in blue. Their combined coverage shows only at the
+ * letter edges, which gives the chromatic split without thickening the glyphs.
+ *
+ * The copies read their text from `data-brand`, which App.tsx sets to the same
+ * string as the label — no duplicated copy in CSS. */
 .qagent-sidebar .qagent-sidebar__brand-name {
+  position: relative;
+  isolation: isolate;
   background-image: linear-gradient(
     100deg,
     var(--midground-base) 0%,
@@ -210,6 +223,39 @@
   background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: qubit-brand-sheen 7s ease-in-out infinite;
+}
+
+.qagent-sidebar .qagent-sidebar__brand-name::before,
+.qagent-sidebar .qagent-sidebar__brand-name::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: attr(data-brand);
+  pointer-events: none;
+  white-space: nowrap;
+  /* These copies must NOT inherit the parent's text-clip fill: their whole job
+   * is to paint a coloured outline, so they keep a normal painted fill and a
+   * hairline stroke in one channel. */
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  background-image: none;
+  /* Transparent fill, hairline stroke: only the glyph OUTLINE paints, so the
+   * two copies read as colour fringing at the edges instead of two offset
+   * copies of the word sitting behind the real one. */
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+.qagent-sidebar .qagent-sidebar__brand-name::before {
+  transform: translateX(-0.6px);
+  -webkit-text-stroke: 0.6px rgb(255 60 95 / 0.85);
+}
+
+.qagent-sidebar .qagent-sidebar__brand-name::after {
+  transform: translateX(0.6px);
+  -webkit-text-stroke: 0.6px rgb(70 150 255 / 0.85);
 }
 
 @keyframes qubit-brand-sheen {
@@ -253,6 +299,85 @@
   transform-origin: left center;
 }
 
+/* The label child carries the gradient fill itself.
+ *
+ * The parent paints the fringe pseudo-elements; the actual text lives in this
+ * span. It must re-declare the gradient + text-clip, because
+ * -webkit-text-fill-color is INHERITED — without this the span inherits
+ * `transparent` from the parent but has no background of its own, and the
+ * letters render hollow. */
+.qagent-sidebar .qagent-sidebar__brand-name .qbrand-label {
+  position: relative;
+  z-index: 1;
+  background-image: linear-gradient(
+    100deg,
+    var(--midground-base) 0%,
+    var(--qsidebar-accent, var(--midground-base)) 42%,
+    var(--midground-base) 46%,
+    var(--midground-base) 100%
+  );
+  background-size: 340% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: inherit;
+  animation: qubit-brand-sheen 7s ease-in-out infinite;
+}
+
+/* ---------- Spark field behind the wordmark ----------
+ *
+ * Twelve dots pinned to the text box, each drifting outward and fading. The
+ * field is absolutely positioned across the label so it stretches with whatever
+ * the active locale says. Decorative: aria-hidden upstream, inert to pointers.
+ */
+.qbrand-sparks {
+  position: absolute;
+  inset: -35% -6%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.qbrand-sparks__dot {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--qsidebar-accent, currentColor);
+  opacity: 0;
+  animation-name: qubit-brand-spark;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes qubit-brand-spark {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.4);
+  }
+  18% {
+    opacity: 0.95;
+    transform: translate3d(calc(var(--spark-drift, 0px) * 0.2), -2px, 0) scale(1);
+  }
+  70% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--spark-drift, 0px), -7px, 0) scale(0.5);
+  }
+}
+
+/* Hover: the field energises — sparks run faster and brighter. */
+.qagent-sidebar__brand-row:hover .qbrand-sparks__dot,
+.qagent-sidebar__brand-row:focus-within .qbrand-sparks__dot {
+  animation-duration: 1.9s;
+}
+
+.qbrand-sparks__dot {
+  transition: animation-duration 320ms ease;
+}
+
 /* ---------- Reduced motion: everything rests ---------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -261,10 +386,14 @@
   .qubit-mark__nucleus,
   .qubit-mark__bead,
   .qubit-mark__field,
+  .qbrand-sparks__dot,
   .qagent-sidebar .qagent-sidebar__brand-name,
   .qagent-sidebar .qagent-sidebar__brand-row > div:first-child > .qagent-sidebar__brand-name {
     animation: none !important;
     transition: none !important;
+  }
+  .qbrand-sparks {
+    display: none;
   }
   .qubit-mark__bead {
     opacity: 0.9;
