@@ -35,7 +35,7 @@ def _ensure_browser_use_cli(*, verbose_hints: bool = False) -> None:
     if _find_cli() is not None:
         _print_success("    Browser Use CLI ready (browser-harness, bundled with Hermes)")
     else:
-        _print_warning("    browser-harness is missing from Hermes's Python environment")
+        _print_warning("    browser-harness is missing from Qubit's Python environment")
         _print_info("    Re-sync it with: qubit update")
     if verbose_hints:
         _info_lines("Local Chrome needs remote debugging: chrome://inspect/#remote-debugging",

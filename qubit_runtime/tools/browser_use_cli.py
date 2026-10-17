@@ -257,7 +257,7 @@ def default_downgrade_notice() -> Optional[str]:
             stamp.parent.mkdir(parents=True, exist_ok=True)
             stamp.touch()
             os.utime(stamp, (now, now))
-        return ("browser-harness is missing from Hermes's Python environment — using the built-in browser tools. "
+        return ("browser-harness is missing from Qubit's Python environment — using the built-in browser tools. "
                 "Run `hermes update` to re-sync it, or set `browser.backend: off` in config.yaml to silence this.")
     except Exception as e:  # pragma: no cover — a notice must never break startup
         logger.debug("browser-use downgrade notice failed: %s", e)
@@ -638,7 +638,7 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
 
     cmd = _find_cli()
     if not cmd:
-        return tool_error("browser-harness is missing from Hermes's Python environment. "
+        return tool_error("browser-harness is missing from Qubit's Python environment. "
                           "Run `hermes update` to re-sync it.")
 
     env = _base_subprocess_env()
