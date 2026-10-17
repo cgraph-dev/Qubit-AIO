@@ -663,11 +663,19 @@ class Task:
         g = lambda col, default=None: _lossy_text(_row_get(row, col, default))  # noqa: E731
         parsed = _json_or(g("skills"))
         skills_value = [str(s) for s in parsed if s] if isinstance(parsed, list) else None
+        # `created_at`, `claim_expires` and `last_heartbeat_at` live in more than
+        # one of the column tables below, so the groups are MERGED into one
+        # mapping instead of splatted as sibling `**` kwargs: a repeated keyword
+        # is a TypeError, and splatting it raised on every single row, so no task
+        # could be read at all. Epoch coercion is applied last because it is the
+        # reader that can still make sense of a text value written by an outside
+        # writer, and it must not be overwritten by the raw-text group.
+        fields: dict = {col: _lossy_text(row[col]) for col in _TASK_REQUIRED_COLUMNS}
+        fields.update({col: g(col) for col in _TASK_OPTIONAL_COLUMNS})
+        fields.update({col: _to_epoch(g(col)) for col in _TASK_EPOCH_COLUMNS})
+        fields.update({col: g(col) or None for col in _TASK_EMPTY_IS_NULL_COLUMNS})
         return cls(
-            **{col: _lossy_text(row[col]) for col in _TASK_REQUIRED_COLUMNS},
-            **{col: _to_epoch(g(col)) for col in _TASK_EPOCH_COLUMNS},  # outside writers may store text: epoch or None
-            **{col: g(col) for col in _TASK_OPTIONAL_COLUMNS},
-            **{col: g(col) or None for col in _TASK_EMPTY_IS_NULL_COLUMNS},
+            **fields,
             # Pre-migration fallbacks (spawn_failures / last_spawn_error) are only
             # reachable on a DB never opened since the rename migration landed.
             consecutive_failures=g("consecutive_failures", g("spawn_failures", 0)),

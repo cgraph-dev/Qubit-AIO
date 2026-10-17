@@ -1394,3 +1394,37 @@ def test_dead_worker_reap_reads_the_log_of_the_dispatching_board(kanban_home):
         assert "no reassignment operation" in (task.last_failure_error or "")
     finally:
         conn.close()
+
+
+# --------------------------------------------------------------- row reading
+def test_reading_a_task_row_does_not_repeat_epoch_columns(kanban_home):
+    """A row must be readable at all: `Task.from_row` splatted `created_at`
+    twice (once as text, once as an epoch), which is a TypeError on *every*
+    row — so `list_tasks`, `get_task` and every board read raised, and an
+    org-wide queue looked empty instead of full."""
+    conn = kbc.connect()
+    try:
+        tid = kb.create_task(conn, title="readable")
+        rows = kb.list_tasks(conn)
+        assert [t.id for t in rows] == [tid]
+        task = kb.get_task(conn, tid)
+        assert task is not None
+        assert isinstance(task.created_at, int) and task.created_at > 0
+    finally:
+        conn.close()
+
+
+def test_an_outside_writers_text_timestamp_is_read_as_an_epoch(kanban_home):
+    """Epoch coercion wins the overlap: a text timestamp written by another
+    process must not be handed back as raw text, and must not shadow the int."""
+    conn = kbc.connect()
+    try:
+        tid = kb.create_task(conn, title="text stamp")
+        conn.execute("UPDATE tasks SET last_heartbeat_at='1700000000' WHERE id=?",
+                     (tid,))
+        conn.commit()
+        task = kb.get_task(conn, tid)
+        assert task is not None
+        assert task.last_heartbeat_at == 1700000000
+    finally:
+        conn.close()
