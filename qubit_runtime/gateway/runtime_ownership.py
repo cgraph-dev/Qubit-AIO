@@ -167,6 +167,8 @@ class ProfileOwnership:
                         if not _try_acquire_file_lock(handle) or not _still_names(path, handle.fileno()):
                             raise OwnershipConflict(f'Gateway runtime already owns profile {home}')
                         record = {**_build_pid_record(), 'qubit_home': str(home)}
+                        if purpose:
+                            record['purpose'] = purpose
                         handle.seek(0)
                         handle.truncate()
                         json.dump(record, handle)
