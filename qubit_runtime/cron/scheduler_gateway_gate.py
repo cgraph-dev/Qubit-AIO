@@ -2,7 +2,7 @@
 
 ``run_canonical_job`` reaches the owner through ``connect_gateway`` → ``ensure_gateway_runtime``,
 which spawns an unmanaged daemon when nothing owns the profile. That is right for an interactive
-caller (``hermes cron run``) and wrong for ``hermes cron tick`` from a system crontab: every tick
+caller (``qubit cron run``) and wrong for ``qubit cron tick`` from a system crontab: every tick
 would leave a stray gateway behind. Headless surfaces refuse rather than spawn (same policy as
 approvals), so a headless tick skips its agent jobs while the gateway is down and lets them fire
 on the next tick once it is up — no run is recorded and the due instant does not move. The
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 GATEWAY_DOWN_HINT = (
     "the gateway is not running, so agent jobs cannot fire; they run at the next tick once it is "
-    "up. Start it with `hermes gateway start` (or `hermes gateway install` for a service)."
+    "up. Start it with `qubit gateway start` (or `qubit gateway install` for a service)."
 )
 # A crontab tick has a minute; a gateway still starting answers within a few seconds or not at all.
 _HEADLESS_PROBE_TIMEOUT_S = 5.0
@@ -42,11 +42,11 @@ def _gateway_unavailable(home) -> str | None:
         return GATEWAY_DOWN_HINT
     reason = observed.state + (f" ({observed.reason_code})" if observed.reason_code else "")
     return (f"the gateway is {reason}, so agent jobs cannot fire; they run at the next tick once it "
-            "is ready. Check it with `hermes gateway status`.")
+            "is ready. Check it with `qubit gateway status`.")
 
 
 def _note_fire_refused(job_ids, detail: str) -> None:
-    """Stamp ``last_fire_error`` (shown by ``hermes cron list``) and drop the dispatch marks the
+    """Stamp ``last_fire_error`` (shown by ``qubit cron list``) and drop the dispatch marks the
     due scan just wrote: the slot was never handed over, so nothing must "restore" or "reclaim" it."""
     from cron.jobs import _qubit_now, _jobs_lock, load_jobs, save_jobs
 
