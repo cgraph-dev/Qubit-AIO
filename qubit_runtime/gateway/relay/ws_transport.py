@@ -18,7 +18,7 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 from gateway.platforms.event import MessageEvent, MessageType
 from gateway.session import SessionSource
@@ -365,6 +365,7 @@ class WebSocketRelayTransport:
         self._ws: Any = None
         self._reader: Optional[asyncio.Task[None]] = None
         self._inbound: Optional[InboundHandler] = None
+        self._inbound_acks: Set[asyncio.Task] = set()  # ACKs of off-reader admissions
         self._inbound_acks: set[asyncio.Task[None]] = set()  # ACKs of off-reader admissions
         self._interrupt_inbound_handler: Any = None
         self._passthrough_handler: Any = None
@@ -936,12 +937,28 @@ class WebSocketRelayTransport:
     async def _on_inbound(self, frame: Dict[str, Any]) -> None:
         if self._inbound is None:
             return
-        await self._inbound(_event_from_wire(frame.get("event", {})))
+        admitting = await self._inbound(_event_from_wire(frame.get("event", {})))
         # A replayed buffered delivery carries a bufferId; ack AFTER the handler
         # has taken it so the connector advances its cursor (no dup).
         buffer_id = frame.get("bufferId")
-        if buffer_id:
+        if admitting is not None:
+            # Admitted off this reader (plugin hooks may await a send only this reader answers).
+            admitting.add_done_callback(lambda done: self._ack_admitted(done, buffer_id))
+        elif buffer_id:
             await self._send_inbound_ack(str(buffer_id))
+
+    def _ack_admitted(self, admission: asyncio.Task, buffer_id: Optional[str]) -> None:
+        """ACK a frame once its off-reader admission committed (or was permanently refused); a
+        cancelled or failed one stays unacknowledged, as above, so the connector redelivers it."""
+        if admission.cancelled() or admission.exception() is not None:
+            if not admission.cancelled():
+                logger.error("relay: inbound handler failed; frame left unacknowledged",
+                             exc_info=admission.exception())
+            return
+        if buffer_id:
+            ack = asyncio.create_task(self._send_inbound_ack(str(buffer_id)))
+            self._inbound_acks.add(ack)
+            ack.add_done_callback(self._inbound_acks.discard)
 
     async def _on_going_idle_ack(self, frame: Dict[str, Any]) -> None:
         if self._going_idle_ack is not None and not self._going_idle_ack.done():
