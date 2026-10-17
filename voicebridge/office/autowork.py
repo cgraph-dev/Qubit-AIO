@@ -111,6 +111,7 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+import shlex
 import time
 from typing import Any, Callable, Dict, List, Optional
 
@@ -653,15 +654,35 @@ def _adjudicate(cfg: Any, *, executor: Optional[Callable],
         return {"state": "REFUSED", "code": err.code, "detail": err.detail[:200]}
 
 
+def _tick_exit_check(cfg: Any, ctx: Dict[str, Any], nonce: str) -> str:
+    """The tick's completion is *evidence*, never the literal command ``true``.
+
+    A self-directed turn is done when the task's own run has a **settled**
+    receipt on the record. ``office_task.run_id`` is written by the claim that
+    actually ran the work, so the join below can only pass for a turn this task
+    paid for. Before the turn there is no such row — which is what stops a
+    dispatch pass from marking the stub ``satisfied`` at zero spend and painting
+    a green board with no work behind it (escalation #2).
+
+    The nonce is carried in the brief so the check names *this* task and cannot
+    be satisfied by a later tick that happens to run the same seat.
+    """
+    db = shlex.quote(str(store.db_path(cfg)))
+    sql = ("SELECT 1 FROM office_task t JOIN office_run_receipts r"
+           " ON r.run_id = t.run_id"
+           " WHERE t.brief LIKE '%" + nonce + "%'"
+           " AND r.status = 'settled' LIMIT 1")
+    return f"sqlite3 -readonly {db} {shlex.quote(sql)} | grep -q 1"
+
+
 def _propose(cfg: Any, ctx: Dict[str, Any]) -> Dict[str, Any]:
     """File the seat's proposal through the existing layer. Raises on refusal."""
     mod = importlib.import_module(f"{__package__}.task_proposal")
+    nonce = f"tick:{int(time.time() * 1000)}:{int(ctx['agent_id'])}"
     out = mod.propose(
         cfg, ctx["agent_id"], _title_for(ctx),
-        brief=f"{ctx['brief']}\n\nRationale: {ctx['reason']}",
-        exit_check=("true  # a one-turn self-directed tick completed on the "
-                    "record; the level above decides whether it earned a "
-                    "longer task"),
+        brief=(f"{ctx['brief']}\n\nRationale: {ctx['reason']}\n\n[{nonce}]"),
+        exit_check=_tick_exit_check(cfg, ctx, nonce),
         rationale=(f"{ctx['reason']}. Seat {ctx['slug']} "
                    f"({ctx['seat_type']}) with {ctx['open_tasks']} open task(s) "
                    f"org-wide"

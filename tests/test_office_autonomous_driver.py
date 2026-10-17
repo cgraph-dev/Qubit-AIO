@@ -602,3 +602,58 @@ def test_the_dispatch_dial_moves_a_leaf_task_through_the_existing_queue(
     # at most ONE pass per tick, however many leaves are waiting
     assert AW.status(cfg)["dispatch"] is True
     assert AW.status(cfg)["dispatch_rounds_per_tick"] == 1
+
+
+def test_a_self_directed_task_is_done_only_when_its_own_turn_settles(
+        tmp_path, monkeypatch):
+    """C17 for the tick's own work: evidence, never the literal command ``true``.
+
+    A self-directed stub used to carry ``exit_check='true'``. ``dispatch`` runs
+    the exit check BEFORE spending a turn, so arming the dial marked every stub
+    ``satisfied`` at zero spend — a green board with no work behind it. The check
+    the tick files now names the task's own run: it fails before the turn, and it
+    cannot be satisfied by another turn the same seat happens to run.
+    """
+    from voicebridge.office import autowork as AW, dispatch as D, store, work as W
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ids = _org(cfg, workers=1, managers=1)
+    _pay_all(cfg, ids)
+
+    out = AW.tick(cfg, executor=_stub(), now=1_000_000.0, enabled=True)
+    approved = out["approvals"]["approved"]
+    assert approved, f"nothing was approved: {out['approvals']}"
+    tid = approved[0]["task_id"]
+    row = [t for t in W.tasks(cfg)["tasks"] if t["id"] == tid][0]
+
+    # 1 — it is not the one exit check that can never fail
+    assert row["exit_check"].strip() != "true"
+    assert "office_run_receipts" in row["exit_check"]
+
+    # 2 — before any turn: it FAILS, so dispatch cannot close it for free
+    assert D.shell_checker(row["exit_check"])({}) is False
+
+    # 3 — a settled receipt for the same seat, but not THIS task's run, still
+    #     does not satisfy it: the evidence has to be the task's own claim.
+    conn = store.connect(cfg)
+    try:
+        store.migrate(conn)
+        conn.execute(
+            "INSERT INTO office_run_receipts"
+            "(run_id, agent_id, started_at, settled_at, settled_cents, model,"
+            " status) VALUES('run_other', ?, 1.0, 2.0, 0, 'stub', 'settled')",
+            (int(row["assignee_id"] or ids["managers"][0]),))
+        conn.commit()
+    finally:
+        conn.close()
+    assert D.shell_checker(row["exit_check"])({}) is False
+
+    # 4 — link it to the task (what a real claim writes) and the check passes
+    conn = store.connect(cfg)
+    try:
+        conn.execute("UPDATE office_task SET run_id='run_other' WHERE id=?",
+                     (tid,))
+        conn.commit()
+    finally:
+        conn.close()
+    assert D.shell_checker(row["exit_check"])({}) is True
