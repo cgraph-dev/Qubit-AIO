@@ -1,23 +1,92 @@
 /* Animated Qubit wordmark + sidebar brand.
  *
- * Two pieces of motion, both driven from theme variables so they re-skin with
- * the active theme instead of hard-coding brand teal:
- *   .qubit-mark        the orbit glyph (components/QubitMark.tsx)
- *   .qagent-sidebar__brand-name  the "Qubit AiO" wordmark
+ * Visual language: THIN RGB OUTLINE, no glow.
  *
- * All timings are GPU-friendly (transform/opacity only) so the sidebar keeps
- * 60fps while the chat stream renders. `prefers-reduced-motion` kills every
- * animation below; nothing about the resting appearance depends on motion.
+ * The "RGB" look here is a chromatic-fringe technique, not a rainbow gradient:
+ * the same hairline ellipse is drawn three times, offset by a fraction of a
+ * pixel in red / green / blue with `mix-blend-mode: screen`. Because the
+ * offsets are sub-pixel, the strokes overlap into near-white at the centre of
+ * the line and split into colour only at the edges — the way an unfocused lens
+ * fringes a thin bright line. That is what reads as technical rather than
+ * childish; a drop-shadow bloom reads as a sticker.
+ *
+ * No drop-shadow, no radial gradients, no blur on this mark.
  */
 
-/* ---------- Orbit glyph ---------- */
+/* ---------- Base ---------- */
 
 .qubit-mark {
   overflow: visible;
 }
 
-/* Each particle spins about the nucleus. Durations are set inline per particle
- * (see PARTICLES), so this rule only supplies the shared mechanics. */
+/* Guide rings: hairline, no fill. The three-channel fringe is applied per
+ * channel below via a single stroke plus screen-blended shadow copies. */
+.qubit-mark__ring {
+  fill: none;
+  stroke-width: 1.1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The near ring keeps the mark's own colour (currentColor from the caller);
+ * the far ring is dimmer so the two fields read as depth. */
+/* Low base opacity: the chromatic copies below are the visible line, so a
+ * solid stroke here would bury them. */
+.qubit-mark__ring--near {
+  stroke: currentColor;
+  stroke-opacity: 0.35;
+}
+
+.qubit-mark__ring--far {
+  stroke: currentColor;
+  stroke-opacity: 0.2;
+}
+
+/* RGB fringe.
+ *
+ * The base stroke is the SAME hairline drawn three times, once per channel,
+ * offset in opposite directions. Painting a solid currentColor stroke on top
+ * would bury the fringe (that is why the first attempt showed only a blue
+ * hint) — so the near ring's own stroke is kept low-opacity and the three
+ * chromatic copies carry the visible line. Overlap reads near-white; edges
+ * split into red/blue. */
+.qubit-mark__ring--near,
+.qubit-mark__ring--far {
+  filter:
+    drop-shadow(0.7px 0 0 rgb(255 45 85 / 0.95))
+    drop-shadow(-0.7px 0 0 rgb(45 130 255 / 0.95))
+    drop-shadow(0 0.5px 0 rgb(60 255 150 / 0.55));
+}
+
+/* ---------- Particles ---------- */
+
+.qubit-mark__bead {
+  fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: qubit-mark-depth;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* Depth: a particle on a tilted ellipse is nearest the viewer at orbital angle
+ * 0 and farthest at 180deg. Scaling + brightening on that beat is the
+ * perspective cue — without it particles slide flat across the ring. */
+@keyframes qubit-mark-depth {
+  0% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* Each particle spins about the nucleus at its own duration (set inline). */
 .qubit-mark__spin {
   transform-box: view-box;
   transform-origin: 20px 20px;
@@ -33,113 +102,34 @@
   }
 }
 
-/* Depth: a particle on a tilted ellipse is nearest the viewer at orbital angle
- * 0 and farthest at 180deg. Scaling + brightening on that same beat is what
- * sells perspective — without it particles just slide flat across the ring. */
-.qubit-mark__bead {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation-name: qubit-mark-depth;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-@keyframes qubit-mark-depth {
-  0% {
-    opacity: 1;
-    transform: scale(1.18);
-  }
-  50% {
-    opacity: 0.28;
-    transform: scale(0.72);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1.18);
-  }
-}
-
-/* The far field sits behind the nucleus, so its particles never reach full
- * brightness — that difference is the depth cue between the two orbits. */
-.qubit-mark__bead--b {
-  opacity: 0.55;
-}
+/* ---------- Nucleus ---------- */
 
 .qubit-mark__nucleus {
-  transform-box: view-box;
-  transform-origin: 20px 20px;
+  fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center;
   animation: qubit-mark-nucleus 3.6s ease-in-out infinite;
 }
 
 @keyframes qubit-mark-nucleus {
   0%,
   100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.13);
-    opacity: 0.87;
-  }
-}
-
-.qubit-mark__halo {
-  transform-box: view-box;
-  transform-origin: 20px 20px;
-  animation: qubit-mark-halo 3.6s ease-in-out infinite;
-}
-
-@keyframes qubit-mark-halo {
-  0%,
-  100% {
-    opacity: 0.5;
-    transform: scale(0.92);
-  }
-  50% {
     opacity: 0.95;
-    transform: scale(1.1);
-  }
-}
-
-/* Shockwaves: expand once per beat, then hold invisible for the rest. The
- * second ring runs half a beat behind, so emission reads as continuous. */
-.qubit-mark__pulse {
-  transform-box: view-box;
-  transform-origin: 20px 20px;
-  opacity: 0;
-  animation: qubit-mark-pulse 3.6s cubic-bezier(0.16, 0.84, 0.44, 1) infinite;
-}
-
-.qubit-mark__pulse--late {
-  animation-delay: -1.8s;
-}
-
-@keyframes qubit-mark-pulse {
-  0% {
     transform: scale(1);
+  }
+  50% {
     opacity: 0.65;
-  }
-  62% {
-    transform: scale(3.4);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(3.4);
-    opacity: 0;
+    transform: scale(0.85);
   }
 }
 
-/* ---------- Hover: the mark opens up ----------
+/* ---------- Hover: the lattice opens up ----------
  *
- * Idle is a steady orbit. Hover is a deliberate state change, not a slightly
- * faster version of idle: the two fields splay apart, both push outward, the
- * glow lifts, and the mark breathes up a notch. Transitions rather than
- * re-animations, so the change can be interrupted cleanly mid-flight.
+ * Transitions, not re-animations, so the change can be interrupted cleanly.
+ * The two fields splay apart and the ring brightens; there is deliberately no
+ * glow added on hover (the mark is an outline, and glowing on contact would
+ * reintroduce exactly the look this replaces).
  */
-.qubit-mark {
-  transition: filter 320ms cubic-bezier(0.22, 1, 0.36, 1), transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
 .qubit-mark__field {
   transform-box: view-box;
   transform-origin: 20px 20px;
@@ -150,43 +140,36 @@
   opacity: 0.75;
 }
 
-.qagent-sidebar__brand-row:hover .qubit-mark,
-.qagent-sidebar__brand-row:focus-within .qubit-mark {
-  transform: scale(1.06);
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--qsidebar-accent, currentColor) 65%, transparent));
+.qubit-mark__ring {
+  transition: stroke-opacity 320ms ease;
 }
 
-/* The two fields splay apart — the strongest read of "the orbits opened up". */
 .qagent-sidebar__brand-row:hover .qubit-mark__field--near,
 .qagent-sidebar__brand-row:focus-within .qubit-mark__field--near {
-  transform: rotate(9deg) scale(1.04);
+  transform: rotate(7deg) scale(1.03);
 }
 
 .qagent-sidebar__brand-row:hover .qubit-mark__field--far,
 .qagent-sidebar__brand-row:focus-within .qubit-mark__field--far {
-  transform: rotate(-9deg) scale(1.04);
+  transform: rotate(-7deg) scale(1.03);
   opacity: 1;
 }
 
-/* Particles accelerate while the pointer is on the brand. */
+.qagent-sidebar__brand-row:hover .qubit-mark__ring--far {
+  stroke-opacity: 0.7;
+}
+
 .qagent-sidebar__brand-row:hover .qubit-mark__spin {
   animation-duration: 4.4s;
 }
 
-.qagent-sidebar__brand-row:hover .qubit-mark__bead {
-  animation-duration: 1.8s;
-  opacity: 1;
-}
-
-.qubit-mark__spin,
-.qubit-mark__bead {
+.qubit-mark__spin {
   transition: animation-duration 320ms ease;
 }
 
 /* ---------- Wordmark ---------- */
 
-/* Gradient sweep across the letters. The gradient is wider than the text and
- * slides via background-position, which keeps it on the compositor. */
+/* Gradient sweep across the letters, clipped to the text. */
 .qagent-sidebar .qagent-sidebar__brand-name {
   background-image: linear-gradient(
     100deg,
@@ -214,8 +197,7 @@
   }
 }
 
-/* Entrance: the wordmark fades up once when the shell mounts, so the brand
- * reads as arriving rather than already parked. */
+/* Entrance: the wordmark fades up once when the shell mounts. */
 .qagent-sidebar .qagent-sidebar__brand-row > div:first-child > .qagent-sidebar__brand-name {
   animation: qubit-brand-sheen 7s ease-in-out infinite, qubit-brand-in 620ms cubic-bezier(0.22, 1, 0.36, 1) 1 both;
 }
@@ -233,37 +215,29 @@
   }
 }
 
-/* Hover: the wordmark lifts toward the viewer with a glow, and the sheen keeps
- * running instead of freezing mid-letter (the old rule paused it, which read
- * as the animation breaking on contact). */
+/* Hover: the wordmark lifts toward the viewer. The sheen keeps running rather
+ * than freezing (pausing it read as the animation breaking on contact). */
 .qagent-sidebar .qagent-sidebar__brand-name {
   transition: filter 320ms cubic-bezier(0.22, 1, 0.36, 1), transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .qagent-sidebar .qagent-sidebar__brand-row:hover .qagent-sidebar__brand-name,
 .qagent-sidebar .qagent-sidebar__brand-row:focus-within .qagent-sidebar__brand-name {
-  transform: translateX(2px) scale(1.03);
+  transform: translateX(2px) scale(1.02);
   transform-origin: left center;
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--qsidebar-accent, currentColor) 55%, transparent));
 }
 
 /* ---------- Reduced motion: everything rests ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .qubit-mark,
   .qubit-mark__spin,
   .qubit-mark__nucleus,
-  .qubit-mark__halo,
-  .qubit-mark__pulse,
   .qubit-mark__bead,
   .qubit-mark__field,
   .qagent-sidebar .qagent-sidebar__brand-name,
   .qagent-sidebar .qagent-sidebar__brand-row > div:first-child > .qagent-sidebar__brand-name {
     animation: none !important;
     transition: none !important;
-  }
-  .qubit-mark__pulse {
-    opacity: 0;
   }
   .qubit-mark__bead {
     opacity: 0.9;
@@ -272,11 +246,9 @@
     -webkit-text-fill-color: currentColor;
     background-image: none;
   }
-  .qagent-sidebar__brand-row:hover .qubit-mark,
   .qagent-sidebar__brand-row:hover .qubit-mark__field,
   .qagent-sidebar__brand-row:hover .qubit-mark__field--far,
-  .qagent-sidebar__brand-row:hover .qubit-mark__field--near,
-  .qagent-sidebar .qagent-sidebar__brand-row:hover .qagent-sidebar__brand-name {
+  .qagent-sidebar__brand-row:hover .qubit-mark__field--near {
     transform: none;
   }
 }
