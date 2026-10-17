@@ -910,13 +910,23 @@ def tick(cfg: Any, *, executor: Optional[Callable] = None,
                     "done": result.get("done"), "cents": result.get("cents"),
                     "code": result.get("code"),
                     "detail": result.get("detail")})
-        _remember(cfg, agent_id,
-                  text=(f"tick {time.strftime('%Y-%m-%dT%H:%M', time.localtime(now))}: "
-                        f"ran a self-directed turn ({outcome}); "
-                        f"{result.get('detail') or result.get('reply') or ''}"
-                        )[:800],
-                  meta={"run_id": result.get("run_id"), "outcome": str(outcome),
-                        "state": result.get("state")})
+        # A memory is a claim about the world, and only a turn that actually ran
+        # can make one. A refused, skipped or failed turn produced a DIAGNOSTIC,
+        # not knowledge — and that diagnostic names an ephemeral run id. Writing
+        # it every 16 minutes is how 250 identical "unknown spend: run X" rows
+        # outlived the run they described (it settled at 0c an hour later) and
+        # taught every later tick a fact that had stopped being true: `_recall`
+        # fed the claim straight back into the brief and the seat repeated it.
+        # The diagnostic still lands in `ran` and in `office_event`; it just does
+        # not become something the org believes.
+        if str(result.get("state") or "").upper() == "OK":
+            _remember(cfg, agent_id,
+                      text=(f"tick {time.strftime('%Y-%m-%dT%H:%M', time.localtime(now))}: "
+                            f"ran a self-directed turn ({outcome}); "
+                            f"{result.get('detail') or result.get('reply') or ''}"
+                            )[:800],
+                      meta={"run_id": result.get("run_id"), "outcome": str(outcome),
+                            "state": result.get("state")})
 
     _last_tick_memo.update({"at": now, "result": None})
 

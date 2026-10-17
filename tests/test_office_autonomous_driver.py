@@ -657,3 +657,53 @@ def test_a_self_directed_task_is_done_only_when_its_own_turn_settles(
     finally:
         conn.close()
     assert D.shell_checker(row["exit_check"])({}) is True
+
+
+# ===========================================================================
+# 2b — A REFUSED TURN IS A DIAGNOSTIC, NOT A MEMORY.
+# ========================================================================
+def test_a_refused_turn_writes_no_memory(tmp_path, monkeypatch):
+    """The org must not learn a run id that will be settled an hour later.
+
+    Every refused tick used to persist its refusal detail — "unknown spend: run
+    X has a receipt and no settled ledger row" — as a durable memory. 250 such
+    rows accumulated; `_recall` fed them back into the next brief, the seat
+    repeated the claim, and the tick wrote it again. The diagnostic belongs in
+    the tick summary, not in what the org believes.
+    """
+    from voicebridge.office import autowork as AW, runner as R
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ids = _org(cfg, workers=1, managers=1)
+    _pay(cfg, ids["managers"][0])
+
+    def refused(cfg_, agent_id, brief, **kw):
+        return {"state": "UNKNOWN_SPEND", "run_id": "run_deadbeef",
+                "detail": ("unknown spend: run 'run_deadbeef' has a receipt and "
+                           "no settled ledger row. Unknown spend is not "
+                           "headroom — settle it before admitting new work")}
+
+    monkeypatch.setattr(R, "run_turn", refused)
+    out = AW.tick(cfg, executor=_stub(), now=1_000_000.0, enabled=True)
+
+    assert out["ran"], f"the seat did not even attempt a turn: {out}"
+    assert out["ran"][0]["outcome"] == "UNKNOWN_SPEND"
+    memories = [e for e in _event_rows(cfg) if e["kind"] == "memory_written"]
+    assert memories == [], (
+        "a refused turn persisted a memory; that is how the stale "
+        f"'unknown spend' claim re-enters the brief: {memories[:2]}")
+
+
+def test_a_turn_that_ran_still_writes_its_memory(tmp_path, monkeypatch):
+    """The gate is 'did it run', not 'did the tick happen' — a real turn is
+    still remembered, or the org would forget everything it actually did."""
+    from voicebridge.office import autowork as AW
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ids = _org(cfg, workers=1, managers=1)
+    _pay(cfg, ids["managers"][0])
+
+    out = AW.tick(cfg, executor=_stub(), now=1_000_000.0, enabled=True)
+    assert out["ran"]
+    memories = [e for e in _event_rows(cfg) if e["kind"] == "memory_written"]
+    assert memories, "a turn that ran left no memory at all"
