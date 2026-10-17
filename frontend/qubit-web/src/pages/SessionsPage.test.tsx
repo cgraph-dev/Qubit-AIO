@@ -235,9 +235,10 @@ describe("SessionsPage overview recent-session cards", () => {
 
   // The overview used to drop every live session (`.filter((s) => !s.is_active)`),
   // so the conversation the operator was actually in never appeared in "Recent
-  // sessions" — the reported defect. A live row must render, and it must lead
-  // the card even when a more recently-touched closed row is present.
-  it("shows an active session, sorted ahead of closed rows", async () => {
+  // sessions". It must still appear — but the owner's ordering rule is LAST
+  // WORKED ON, not live-first: a closed session touched more recently outranks
+  // a live one that has been idle longer.
+  it("shows an active session, ordered by last work not by live state", async () => {
     const live = {
       id: "sid-live", profile: null, source: "tui", model: "prov/model",
       title: "Live one", started_at: 5, ended_at: null, last_active: 5,
@@ -255,7 +256,41 @@ describe("SessionsPage overview recent-session cards", () => {
       document.querySelectorAll('[data-testid^="recent-session-"]'),
     ).map((n) => n.getAttribute("data-testid"));
     expect(cards).toContain("recent-session-sid-live");
-    expect(cards[0]).toBe("recent-session-sid-live");
+    // last_active 9 (closed) > 5 (live) -> the one worked on most recently leads.
+    expect(cards[0]).toBe("recent-session-sid-closed");
+  });
+
+  it("orders the History list by last worked on, not start time", async () => {
+    // The owner's report: a session worked on for hours sank below newer ones
+    // that finished faster, because rows were ordered by creation. Sort is by
+    // last_active even if the server ever returns creation order.
+    const oldButActive = {
+      id: "sid-old", profile: null, source: "tui", model: null,
+      title: "Long session", started_at: 1, ended_at: null,
+      last_active: 900, is_active: false, message_count: 400,
+      tool_call_count: 0, input_tokens: 0, output_tokens: 0, preview: "p",
+    };
+    const newButDone = {
+      id: "sid-new", profile: null, source: "voice", model: null,
+      title: "Quick session", started_at: 800, ended_at: 850,
+      last_active: 850, is_active: false, message_count: 4,
+      tool_call_count: 0, input_tokens: 0, output_tokens: 0, preview: "q",
+    };
+    const middle = {
+      id: "sid-mid", profile: null, source: "cli", model: null,
+      title: "Middle session", started_at: 500, ended_at: null,
+      last_active: 870, is_active: false, message_count: 12,
+      tool_call_count: 0, input_tokens: 0, output_tokens: 0, preview: "r",
+    };
+    // Deliberately wrong server order (creation order).
+    await renderSessionsPage([newButDone, middle, oldButActive]);
+    await waitFor(() => Boolean(document.querySelector('[data-testid^="session-row-"]')));
+    const titles = Array.from(document.querySelectorAll('[data-testid^="session-row-"]'))
+      .map((n) => n.textContent || "");
+    const idx = (t: string) => titles.findIndex((x) => x.includes(t));
+    expect(idx("Long session")).toBeGreaterThanOrEqual(0);
+    expect(idx("Long session")).toBeLessThan(idx("Middle session"));
+    expect(idx("Middle session")).toBeLessThan(idx("Quick session"));
   });
 });
 describe("SessionsPage tab families + source popover dismissal", () => {

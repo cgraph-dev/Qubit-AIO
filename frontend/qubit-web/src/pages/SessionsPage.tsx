@@ -785,6 +785,7 @@ function SessionRow({
 
   return (
     <div
+      data-testid={`session-row-${session.id}`}
       className={`max-w-full min-w-0 overflow-hidden border transition-colors ${containerClasses}`}
     >
       <div
@@ -1237,7 +1238,14 @@ export default function SessionsPage() {
       .then((resp) => {
         if (requestId !== sessionsRequestRef.current) return;
         setLoadError(null);
-        setSessions(resp?.sessions ?? []);
+        // Last WORKED on first, enforced client-side too: the backend is
+        // asked for `order=recent`, but a stale tab's older bundle/endpoint
+        // (or a future regression) must never bury a long-running session
+        // under faster ones that merely started later.
+        const rows = [...(resp?.sessions ?? [])].sort(
+          (a, b) => (b.last_active ?? 0) - (a.last_active ?? 0),
+        );
+        setSessions(rows);
         setTotal(resp?.total ?? 0);
       })
       .catch(() => {
@@ -1779,16 +1787,13 @@ export default function SessionsPage() {
   const platformEntries = status
     ? Object.entries(status.gateway_platforms ?? {})
     : [];
-  // Live sessions FIRST, then the most recent closed ones, capped at 5. The
-  // previous ``.filter((s) => !s.is_active)`` dropped every session the user was
-  // actively talking to, so Overview's "Recent sessions" never showed the
-  // conversation on screen (the reported defect). ``is_active`` is computed by
-  // the store from the row (ended_at NULL + activity inside the 5-min window),
-  // never synthesized, so a stale-but-open row stays out and the card is
-  // honest. Sorting is stable on ``last_active`` (already recency-ordered by
-  // the poll), so the live rows keep their own newest-first order.
+  // Most recently WORKED-ON sessions first, capped at 5. The owner's rule:
+  // order by last activity, never by creation — a session worked on for hours
+  // must outrank newer ones that already finished. `is_active` is a badge,
+  // not the primary sort key (live-first pushed an idle background session
+  // above the conversation actually being worked in).
   const recentSessions = [...overviewSessions]
-    .sort((a, b) => Number(b.is_active) - Number(a.is_active))
+    .sort((a, b) => (b.last_active ?? 0) - (a.last_active ?? 0))
     .slice(0, 5);
 
   const isSearching = Boolean(search.trim());
