@@ -77,7 +77,7 @@ by_file = Counter(h[0] for h in hits)
 print(f"  USER-VISIBLE 'hermes' strings in production .py: {len(hits)}")
 print(f"  across {len(by_file)} files")
 print()
-for f, n in by_file.most_common(18):
+for f, n in by_file.most_common(200):
     print(f"    {n:3d}  {f}")
 print()
 print("  first 25:")
