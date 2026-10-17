@@ -213,3 +213,14 @@ class SessionTitlesMixin:
     def get_next_title_in_lineage(self, base_title: str) -> str:
         """Next title in a lineage ("my session" -> "my session #2")."""
         return self._read_retrying_ioerr(lambda conn: next_title_in_lineage(conn, base_title))
+
+
+def lineage_title_on_conn(conn, base_title: str) -> str:
+    """``get_next_title_in_lineage`` inside an authority-owned transaction (same
+    connection, so a sibling branch committed in this transaction is counted).
+
+    Ported short: qubit_state_mutation_branch imports this and the symbol was absent
+    from our copy of the module (upstream hermes_state_titles.py:227). It delegates
+    to next_title_in_lineage, which we already carry.
+    """
+    return next_title_in_lineage(conn, base_title)
