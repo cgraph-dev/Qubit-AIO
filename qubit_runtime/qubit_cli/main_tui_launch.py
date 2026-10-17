@@ -9,6 +9,7 @@ import contextlib
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 
@@ -30,6 +31,41 @@ def _read_tui_active_session_file(path: Optional[str]) -> Optional[str]:
         return None
 
 
+# A canonical local session is keyed ``local-`` + 64 hex; main's epilogue printed 22-char stored ids.
+_SHORT_RESUME_LEN = 22
+
+
+def _short_resume_id(db, session_id: str) -> str:
+    """The 22-char prefix of a canonical ``local-…`` id when it names only that session (``--resume``
+    resolves a unique prefix back); every other id, or an ambiguous prefix, prints whole."""
+    if not session_id.startswith("local-") or len(session_id) <= _SHORT_RESUME_LEN:
+        return session_id
+    short = session_id[:_SHORT_RESUME_LEN]
+    try:
+        return short if db.resolve_session_id(short) == session_id else session_id
+    except sqlite3.Error:  # an unreadable store prints the whole id
+        return session_id
+
+
+def _branch_lineage(db, session: dict) -> list:
+    """*session* plus each ``/branch`` ancestor it was cut from. Main's epilogue after ``/branch`` still
+    named the parent and so reported the conversation's tokens; a canonical branch child is named
+    itself, and its copied history was billed on the ancestors."""
+    rows, seen = [session], {session.get("id")}
+    while True:
+        try:
+            config = json.loads(rows[-1].get("model_config") or "{}")
+        except (TypeError, ValueError):
+            break
+        parent_id = config.get("_branched_from") if isinstance(config, dict) else None
+        parent = db.get_session(parent_id) if parent_id and parent_id not in seen else None
+        if not parent:
+            break
+        seen.add(parent_id)
+        rows.append(parent)
+    return rows
+
+
 def _print_tui_exit_summary(session_id: Optional[str], active_session_file: Optional[str] = None) -> None:
     """Print a shell-visible epilogue after TUI exits."""
     from qubit_cli.main import _resolve_last_session
@@ -48,12 +84,14 @@ def _print_tui_exit_summary(session_id: Optional[str], active_session_file: Opti
             return
 
         title = db.get_session_title(target)
+        resume_id = _short_resume_id(db, target)
         message_count = int(session.get("message_count") or 0)
         if message_count == 0:
             return  # No real conversation — don't show resume info
-        tokens = {
-            k: int(session.get(f"{k}_tokens") or 0)
-            for k in ("input", "output", "cache_read", "cache_write", "reasoning")}
+        tokens = {k: 0 for k in ("input", "output", "cache_read", "cache_write", "reasoning")}
+        for row in _branch_lineage(db, session):
+            for k in tokens:
+                tokens[k] += int(row.get(f"{k}_tokens") or 0)
     except Exception:
         return
     finally:
@@ -64,10 +102,10 @@ def _print_tui_exit_summary(session_id: Optional[str], active_session_file: Opti
     from qubit_cli.profiles import get_active_profile_name
     active_profile = get_active_profile_name()
     profile_flag = "" if active_profile in ("default", "custom") else f" -p {active_profile}"
-    print(f"\n{t('cli.session.exit_resume_hint')}\n  qubit --tui --resume {target}{profile_flag}")
+    print(f"\n{t('cli.session.exit_resume_hint')}\n  qubit --tui --resume {resume_id}{profile_flag}")
     if title:
         print(f'  qubit --tui -c "{title}"{profile_flag}')
-    print(f"\nSession:        {target}")
+    print(f"\nSession:        {resume_id}")
     if title:
         print(f"Title:          {title}")
     print(f"Messages:       {message_count}")
@@ -348,6 +386,20 @@ def _setup_tui_worktree() -> dict:
     return wt_info
 
 
+def _require_bypass_model(env: dict, model: Optional[str], resume_session_id: Optional[str]) -> None:
+    """A --safe-mode / --ignore-user-config session reads no profile default model, so the owner
+    refuses its session.create without one (bare invalid_params). Say so before the TUI starts,
+    as classic chat does; a resume reuses the frozen route and needs none."""
+    from utils import is_truthy_value
+    bypass = any(is_truthy_value(env.get(name)) for name in ("HERMES_SAFE_MODE", "HERMES_IGNORE_USER_CONFIG"))
+    if bypass and not resume_session_id and not (model or env.get("HERMES_MODEL", "").strip()):
+        print("Error: --safe-mode / --ignore-user-config (or HERMES_IGNORE_USER_CONFIG=1) read no profile "
+              "default model: pass --model explicitly.\n"
+              "  Example: qubit --tui --safe-mode --provider openrouter --model anthropic/claude-sonnet-4",
+              file=sys.stderr)
+        raise SystemExit(1)
+
+
 def _launch_tui(
     resume_session_id: Optional[str] = None, tui_dev: bool = False, native_mode: Optional[bool] = None,
     model: Optional[str] = None,
@@ -364,6 +416,7 @@ def _launch_tui(
     # the single factory; keep secrets (the TUI/agent needs provider creds).
     from tools.environments.local import build_subprocess_env
     env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=True)
+    _require_bypass_model(env, model, resume_session_id)
     # The directory this launch was invoked from is the source of truth. An inherited
     # QUBIT_CWD (exported by an outer `qubit --tui`, or by the user's own shell) merely
     # names *a* real directory, so the is_dir() repair in _apply_tui_python_env keeps it
