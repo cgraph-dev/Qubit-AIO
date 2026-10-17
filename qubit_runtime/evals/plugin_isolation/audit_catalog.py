@@ -60,9 +60,9 @@ def _audit(entry, src_root: Path) -> dict:
 
 def _reason_class(reason: str) -> str:
     if "patches" in reason or "setattr()" in reason:
-        return "patches a Hermes module attribute"
+        return "patches a Qubit module attribute"
     if "directly instead of through ctx" in reason:
-        return "mutates a Hermes registry directly (not through ctx)"
+        return "mutates a Qubit registry directly (not through ctx)"
     match = re.search(r"ctx\.(\w+)\(\)", reason)
     if match:
         return f"ctx.{match.group(1)}()"

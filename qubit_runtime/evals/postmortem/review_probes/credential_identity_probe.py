@@ -11,11 +11,11 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 ROOT = Path(sys.argv[1]); MODE = sys.argv[2]
 sys.path.insert(0, str(ROOT))
 home = Path(tempfile.mkdtemp(prefix='pr103526-probe-'))
-os.environ.update(HOME=str(home), QUBIT_HOME=str(home/'hermes'), XDG_CONFIG_HOME=str(home/'config'), CODEX_HOME=str(home/'codex'))
+os.environ.update(HOME=str(home), QUBIT_HOME=str(home/'qubit'), XDG_CONFIG_HOME=str(home/'config'), CODEX_HOME=str(home/'codex'))
 for k in list(os.environ):
     if any(x in k for x in ('API_KEY','TOKEN','NOUS_','SECRET')): os.environ.pop(k, None)
-(home/'hermes').mkdir()
-(home/'hermes'/'config.yaml').write_text('nous:\n  keepalive_interval_seconds: 0\nmemory:\n  memory_enabled: false\n', encoding='utf-8')
+(home/'qubit').mkdir()
+(home/'qubit'/'config.yaml').write_text('nous:\n  keepalive_interval_seconds: 0\nmemory:\n  memory_enabled: false\n', encoding='utf-8')
 def guard(event,args):
     if event == 'socket.connect' and isinstance(args[1], tuple) and args[1][0] not in ('127.0.0.1','::1'):
         raise RuntimeError('External network forbidden by review probe')
@@ -56,7 +56,7 @@ if MODE=='main':
 
 def store(token):
     exp=claims(token)['exp']; state={'portal_base_url':'https://portal.nousresearch.com','inference_base_url':'https://inference-api.nousresearch.com/v1','client_id':'hermes-cli','token_type':'Bearer','scope':'inference:invoke','access_token':token,'refresh_token':'fixture-refresh-never-send','expires_at':datetime.fromtimestamp(exp,timezone.utc).isoformat(),'expires_in':3600,'agent_key':token,'agent_key_expires_at':datetime.fromtimestamp(exp,timezone.utc).isoformat()}
-    (home/'hermes'/'auth.json').write_text(json.dumps({'version':1,'active_provider':'nous','providers':{'nous':state}}), encoding='utf-8')
+    (home/'qubit'/'auth.json').write_text(json.dumps({'version':1,'active_provider':'nous','providers':{'nous':state}}), encoding='utf-8')
 results=[]
 for case, own_sub, store_sub, ttl in [('same-account','account-A','account-A',30),('explicit-account','account-A','account-B',30),('far-from-expiry','account-A','account-B',3000)]:
     own=jwt(own_sub,ttl);fresh=jwt(store_sub,3600);store(fresh)
@@ -97,7 +97,7 @@ if MODE != 'main':
     import shutil
     shutil.rmtree(home/'shared',ignore_errors=True)
     expired=jwt('account-A',30); store(expired)
-    state_file=home/'hermes'/'auth.json'
+    state_file=home/'qubit'/'auth.json'
     state=json.loads(state_file.read_text(encoding='utf-8')); state['providers']['nous']['portal_base_url']=url.removesuffix('/v1');state_file.write_text(json.dumps(state), encoding='utf-8')
     barrier=threading.Barrier(12);records.clear()
     with ThreadPoolExecutor(max_workers=12) as executor:

@@ -1,6 +1,6 @@
 """Live prompt-cache concurrency probe: does a route keep cache routing sticky under a fan-out?
 
-Runs N independent Hermes ``AIAgent`` sessions concurrently, each the same ~8-step tool loop whose
+Runs N independent Qubit ``AIAgent`` sessions concurrently, each the same ~8-step tool loop whose
 context grows 6K -> ~240K, and records for EVERY API call: prompt / cache_read / cache_creation /
 output tokens, the response id, the upstream provider when the route reports one, and a sha of the
 system prompt, tools and every message, so client-side prefix mutation can be ruled in or out.
@@ -25,7 +25,7 @@ Usage:
       [--pin anthropic] [--settle 2] [--ttl 5m]
   providers: nous (Portal creds from QUBIT_HOME), openrouter (OPENROUTER_API_KEY or --api-key),
              anthropic (ANTHROPIC_API_KEY or --api-key)
-Cost: ~$50 per 20x6 arm on Fable 5.1 at the 5m tier. Every run starts from the real Hermes request
+Cost: ~$50 per 20x6 arm on Fable 5.1 at the 5m tier. Every run starts from the real Qubit request
 path; the only patch is a read-only wrapper on the SDK stream that records usage and headers.
 """
 from __future__ import annotations
@@ -50,7 +50,7 @@ def _parse():
     ap.add_argument("--calls", type=int, default=6, help="tool calls per session")
     ap.add_argument("--out", required=True, help="JSONL of every call; summary written next to it")
     ap.add_argument("--wire", choices=["chat", "native"], default=None,
-                    help="force the wire (default: what Hermes would pick for the provider/model)")
+                    help="force the wire (default: what Qubit would pick for the provider/model)")
     ap.add_argument("--model", default=None)
     ap.add_argument("--pin", default=None, help="OpenRouter provider slug to pin (providers_allowed)")
     ap.add_argument("--settle", type=float, default=0.0, help="seconds to sleep before every request")
@@ -63,7 +63,7 @@ ARGS = _parse()
 REPO, PROVIDER, N, CALLS, OUT = ARGS.repo, ARGS.provider, ARGS.workers, ARGS.calls, ARGS.out
 SETTLE_S = ARGS.settle
 sys.path.insert(0, os.path.abspath(REPO))
-os.environ.setdefault("QUBIT_HOME", os.path.expanduser("~/.hermes"))
+os.environ.setdefault("QUBIT_HOME", os.path.expanduser("~/.qubit"))
 import anthropic
 from anthropic.resources.messages import Messages
 _orig_stream = Messages.stream
