@@ -32,6 +32,13 @@ _TURN_PROFILE: ContextVar = ContextVar('follow_profile_read', default=None)  # (
 SURFACES = {'cli': 'cli', 'tui': 'tui', 'gui': 'desktop', 'acp': 'acp', 'tool': 'cli', 'oneshot': 'cli'}
 
 
+def pin_reasoning_effort(config, effort):
+    """Write an explicit session reasoning level into *config*: it wins over a per-model default
+    (``reasoning_overrides``), at creation, on ``/reasoning`` and on a model pick that carries one."""
+    config.setdefault('agent', {})['reasoning_effort'] = effort
+    config['agent'].pop('reasoning_overrides', None)
+
+
 def _refuse(field, detail=None):
     """One named refusal: the launch field the check read, and why it failed.
 
@@ -254,6 +261,26 @@ def _held_pick(frozen, live):
             **{k: frozen[k] for k in SELECTION_KEYS if k in frozen}}
 
 
+def model_route(block):
+    """``(provider, endpoint)`` identity of a ``model:`` block: what an endpoint-bound credential belongs to."""
+    from qubit_cli.route_identity import normalize_route_base_url
+    block = block if isinstance(block, dict) else {}
+    return str(block.get('provider') or '').strip().lower(), normalize_route_base_url(block.get('base_url'))
+
+
+def bound_route_holds(bound, bound_config, block, config):
+    """True when *block* (resolved in *config*) is the route *bound* was bound to, *bound* resolved in
+    the config it was bound in: a respelled provider on one endpoint is one route, and a named entry
+    whose ``base_url`` moved is another. An ``auto``/unset side keeps the literal comparison: a
+    credential never follows a route the resolver picks later."""
+    from gateway.session_route_identity import resolved_route, same_route
+    bound = bound if isinstance(bound, dict) else {}
+    identity, url = resolved_route(bound, bound_config)
+    if 'auto' in (identity, resolved_route(block, config)[0]):
+        return model_route(bound) == model_route(block)
+    return same_route({**bound, 'base_url': url} if url else bound, block, config)
+
+
 def present_sections(config):
     """A bare ``gateway:`` key parses as YAML null; like load_config's merge (#58277), treat it as absent so
     ``cfg.get('gateway', {}).get(...)`` reads the default instead of crashing a fresh install's first turn."""
@@ -347,6 +374,30 @@ def _profile_workspace_cwd(home):
     raw = str((terminal if isinstance(terminal, dict) else {}).get('cwd') or '').strip()
     configured = os.path.abspath(os.path.expanduser(raw)) if raw not in {'', '.', 'auto', 'cwd'} else None
     return configured if configured and os.path.isdir(configured) else None
+
+
+def _without_auto_pick(params):
+    """`provider: auto` is the thin client's "no pick" sentinel: the profile's route stands as configured."""
+    if isinstance(params.get('provider'), str) and params['provider'].strip().lower() == 'auto':
+        return {k: v for k, v in params.items() if k != 'provider'}
+    return params
+
+
+def _keeps_profile_route(picked, config):
+    """Whether a provider pick resolves to the profile's own route, so its endpoint and key pins stay.
+
+    The same resolved provider under another spelling (`vllm` for `custom`, `deep-infra` for
+    `deepinfra`, `custom:<name>` for a named entry) is the same route. A block with an endpoint
+    and no provider (or `auto`) already routes to `custom` there.
+    """
+    from gateway.session_route_identity import resolved_route
+    held = dict(config.get('model') or {}) if isinstance(config.get('model'), dict) else {}
+    if str(held.get('provider') or '').strip().lower() in ('', 'auto') and str(held.get('base_url') or '').strip():
+        held['provider'] = 'custom'
+    held_id = resolved_route(held, config)[0]
+    if held_id == 'auto' or not isinstance(picked, str) or not picked.strip():
+        return False
+    return resolved_route({'provider': picked}, config)[0] == held_id
 
 
 def _apply_launch_overrides(params, config):
@@ -692,6 +743,16 @@ def launch_key(authority, policy):
     return value
 
 
+def route_launch_key(authority, policy, config):
+    """The launch key a turn on *config* (the route it runs, a followed profile's included) sends.
+    A launch key authenticates the frozen route it was bound with: once the followed profile
+    supersedes that pick and moves to another endpoint, the key stays behind with its route."""
+    bound = present_sections(json.loads(policy.config_json))  # the route the key was bound with
+    if not bound_route_holds(bound.get('model'), bound, config.get('model'), config):
+        return None
+    return launch_key(authority, policy)
+
+
 def restore_policy(data):
     """Reject incomplete private policy rather than rebuilding from current defaults."""
     try:
@@ -773,6 +834,18 @@ def policy_scope(policy, *, authority=None):
         reset_terminal_scope(terminal_token)
         cwd_token.var.reset(cwd_token)
         _TURN_PROFILE.reset(profile_token)
+
+
+@contextmanager
+def profile_read_scope(policy, authority):
+    """Hold ONE read of a following session's profile for every resolution inside, as a turn's
+    ``policy_scope`` does, without that scope's workspace and terminal setup (a session control
+    reads the route, it runs nothing)."""
+    token = _TURN_PROFILE.set((policy, policy.read_profile(authority)))
+    try:
+        yield
+    finally:
+        _TURN_PROFILE.reset(token)
 
 
 def active_policy():
