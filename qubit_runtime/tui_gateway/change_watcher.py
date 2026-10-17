@@ -12,9 +12,15 @@ _registry = HandlerRegistry()
 
 
 def resolve_skin() -> dict:
+    return skin_payload(_load_cfg())
+
+
+def skin_payload(config: dict) -> dict:
+    """The ``skin.changed`` / ``gateway.ready`` skin for ``config``'s ``display.skin`` (``{}`` when the
+    skin engine fails). Pure of server state: the shared owner calls it under the profile's scope."""
     try:
         from qubit_cli.skin_engine import init_skin_from_config, get_active_skin
-        init_skin_from_config(_load_cfg())
+        init_skin_from_config(config)
         skin = get_active_skin()
         # light/dark are paired palettes: the TUI prefers the block matching terminal polarity.
         return {
@@ -25,7 +31,7 @@ def resolve_skin() -> dict:
             "help_header": (skin.branding or {}).get("help_header", ""),
             # Raw user CSS for the desktop GUI's <style> tag (32 KiB cap in the skin engine).
             "customCSS": skin.custom_css}
-    except Exception:
+    except Exception:  # health: allow BLE001 -- moved unchanged from resolve_skin (main keeps the same handler): a broken skin file boots the default theme
         return {}
 
 
