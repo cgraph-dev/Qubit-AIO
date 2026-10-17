@@ -611,3 +611,87 @@ def test_a_refused_claim_costs_the_seat_nothing(tmp_path, monkeypatch):
     assert after == before, f"a refused claim was charged: {before} -> {after}"
     # and the task is back in the queue, not left claimed
     assert W.tasks(cfg)["tasks"][0]["status"] == "open"
+
+
+# ============================================================== abandonment
+def test_abandon_closes_an_unworkable_task_and_keeps_the_reason(
+        tmp_path, monkeypatch):
+    """A stub no turn will ever claim has an honest exit that costs no turn."""
+    from voicebridge.office import work as W
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _org(cfg)
+    t = W.create(cfg, "Self-directed: wk-0", exit_check="true", confirmed=True)["id"]
+
+    out = W.abandon(cfg, t, reason="tick stub: no run, no artifact, superseded",
+                    confirmed=True)
+    assert out["abandoned"] is True and out["status"] == "abandoned"
+
+    row = W.tasks(cfg, status="abandoned")["tasks"][0]
+    assert row["id"] == t
+    assert row["closed_at"] is not None
+    assert "tick stub" in row["review_note"]
+    assert W.tasks(cfg, status="open")["count"] == 0, \
+        "the row must leave the queue, or the board still reports work in flight"
+
+    kinds = [e["kind"] for e in W.trail(cfg, t)["events"]]
+    assert "abandoned" in kinds, "an abandonment without a trail row is a deletion"
+
+
+def test_an_abandonment_without_a_reason_is_refused(tmp_path, monkeypatch):
+    from voicebridge.office import work as W
+    from voicebridge.office.errors import OfficeError
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _org(cfg)
+    t = W.create(cfg, "t", exit_check="true", confirmed=True)["id"]
+
+    with pytest.raises(OfficeError) as exc:
+        W.abandon(cfg, t, reason="   ", confirmed=True)
+    assert exc.value.code == "OFFICE_BAD_INPUT"
+    assert "indistinguishable from a deletion" in exc.value.detail
+    assert W.tasks(cfg, status="open")["count"] == 1
+
+
+def test_abandon_refuses_work_that_actually_happened(tmp_path, monkeypatch):
+    """An artifact is a result the org paid for: it goes to review, not away."""
+    from voicebridge.office import store as S, work as W
+    from voicebridge.office.errors import OfficeError
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _org(cfg)
+    t = W.create(cfg, "t", exit_check="true", confirmed=True)["id"]
+    conn = S.connect(cfg)
+    try:
+        S.migrate(conn)
+        conn.execute("UPDATE office_task SET artifact=? WHERE id=?",
+                     ("out/report.md", t))
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(OfficeError) as exc:
+        W.abandon(cfg, t, reason="cleanup", confirmed=True)
+    assert exc.value.code == "OFFICE_BAD_STATE"
+    assert "goes through review" in exc.value.detail
+    assert W.tasks(cfg, status="open")["count"] == 1
+
+
+def test_abandon_never_rewrites_a_verdict_that_was_ruled_on(tmp_path, monkeypatch):
+    from voicebridge.office import store as S, work as W
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _org(cfg)
+    t = W.create(cfg, "t", exit_check="true", confirmed=True)["id"]
+    conn = S.connect(cfg)
+    try:
+        S.migrate(conn)
+        conn.execute("UPDATE office_task SET status='accepted', verdict='accept',"
+                     " closed_at=? WHERE id=?", (S.now(), t))
+        conn.commit()
+    finally:
+        conn.close()
+
+    out = W.abandon(cfg, t, reason="cleanup", confirmed=True)
+    assert out["abandoned"] is False and out["status"] == "accepted"
+    assert "already accepted" in out["reason"]

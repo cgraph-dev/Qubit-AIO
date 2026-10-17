@@ -377,6 +377,77 @@ def requeue(cfg: Any, task_id: int, *, reason: str = "",
             "requeued": True}
 
 
+def abandon(cfg: Any, task_id: int, *, reason: str,
+            by_agent: Optional[int] = None, confirmed: bool = False,
+            requested_by: str = "cli:office") -> Dict[str, Any]:
+    """Close a task that will never be worked, and say why.
+
+    ``abandoned`` has always been a terminal state in the schema, but the only
+    way to reach it was a *rejection* that exhausted ``max_attempts`` — which
+    costs a review turn and needs a reviewer. So a queue full of rows that no
+    turn will ever claim had no honest exit: a tick stub filed and then refused,
+    a proposal approved after its reason expired, a task whose exit check can no
+    longer be met. Leaving them ``open`` is the worst of the three outcomes,
+    because ``open`` means *work in flight*: the board reports throughput it
+    does not have, and ``dispatch`` keeps handing the row to a seat that spends
+    a turn discovering there is nothing to do.
+
+    The verb is deliberately narrow:
+
+    * a **reason is required** — the row is evidence, and an abandonment without
+      one is indistinguishable from a deletion;
+    * **work that happened is refused**: a task carrying an artifact, or whose
+      run booked a non-zero amount, is not unworkable and must go through
+      ``review``;
+    * an already-closed task is **left alone**, so a real verdict is never
+      rewritten and a second call is a no-op.
+    """
+    if not confirmed:
+        raise OfficeError(store.CONFIRM_CODE,
+                          "office task-abandon requires --confirm")
+    clean = str(reason or "").strip()
+    if not clean:
+        raise OfficeError(
+            BAD_INPUT_CODE,
+            "an abandonment must say why: the row is evidence, and a closure "
+            "without a reason is indistinguishable from a deletion")
+    conn = store.connect(cfg)
+    try:
+        store.migrate(conn)
+        task = _task(conn, task_id)
+        if task["status"] in CLOSED_STATES:
+            return {"state": "OK", "id": int(task_id), "status": task["status"],
+                    "abandoned": False,
+                    "reason": f"task #{task_id} is already {task['status']}"}
+        artifact = str(task.get("artifact") or "").strip()
+        run_id = str(task.get("run_id") or "").strip()
+        booked = None
+        if run_id:
+            got = conn.execute(
+                "SELECT amount_cents FROM office_ledger WHERE run_id=? LIMIT 1",
+                (run_id,)).fetchone()
+            booked = int(got["amount_cents"] or 0) if got is not None else None
+        if artifact or booked:
+            produced = artifact or f"{booked} cents booked on {run_id}"
+            raise OfficeError(
+                BAD_STATE_CODE,
+                f"refused: task #{task_id} produced work ({produced}). It is "
+                f"not unworkable, so it goes through review — abandoning it "
+                f"would erase a result the org paid for")
+        conn.execute("UPDATE office_task SET status='abandoned', verdict=?,"
+                     " review_note=?, closed_at=? WHERE id=?",
+                     ("abandon", clean, store.now(), int(task_id)))
+        conn.commit()
+    finally:
+        conn.close()
+    _trail(cfg, task_id, actor=f"seat:{by_agent or 'owner'}", kind="abandoned",
+           body=clean, payload={"reason": clean, "by_agent": by_agent})
+    store.audit("task.abandon", requested_by,
+                {"id": int(task_id), "reason": clean[:160]})
+    return {"state": "OK", "id": int(task_id), "status": "abandoned",
+            "abandoned": True, "reason": clean}
+
+
 def tasks(cfg: Any, *, status: Optional[str] = None,
           assignee_id: Optional[int] = None, limit: int = 50) -> Dict[str, Any]:
     conn = store.connect(cfg)
