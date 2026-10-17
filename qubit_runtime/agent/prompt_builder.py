@@ -1856,7 +1856,7 @@ def build_context_files_prompt(
 ) -> str:
     """Discover and load context files for the system prompt (each capped, see ``_get_context_file_max_chars``).
 
-    Only ONE project context type loads, first found wins: .hermes.md/HERMES.md (walk to git root) →
+    Only ONE project context type loads, first found wins: .qubit.md/QUBIT.md (walk to git root) →
     AGENTS.md chain (git root → cwd) → CLAUDE.md (cwd) → .cursorrules + .cursor/rules/*.mdc (cwd). SOUL.md
     from QUBIT_HOME is independent and always included unless *skip_soul* (already the identity slot).
     """
