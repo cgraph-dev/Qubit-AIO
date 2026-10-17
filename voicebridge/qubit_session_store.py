@@ -130,6 +130,52 @@ _TERMINAL_SESSION_COLUMNS = ("ended_at", "end_reason")
 _DEFERRED_SESSION_COLUMNS = _TERMINAL_SESSION_COLUMNS + (
     "message_count", "tool_call_count")
 # Message fields the vendored batch append preserves verbatim.
+_QCHAT_ENVELOPE_KEY = "qubit_chat"
+#: Turn-envelope keys the ``/qubit-chat`` path persists per message. The
+#: vendored message row has no ``route``/``task``/``phase``/``model``/``sources``
+#: columns, so without this envelope a finished ``/chat``-worker build report
+#: (``route=task`` + ``task=<key>``) read back as a plain assistant message and
+#: the report index, the task-key mapping and the model/elapsed line never
+#: survived a reload or a live-voice poll (the live stream sets them, the
+#: reload path must too). ``provider``/``profile`` ride along for receipt
+#: fidelity; the render layer reads ``route``/``task``/``phase``/``sources``.
+_QCHAT_ENVELOPE_FIELDS = (
+    "route", "task", "phase", "entry", "model", "provider", "profile",
+    "elapsed_ms", "sources",
+)
+
+
+def _sanitize_envelope(value: Any) -> Dict[str, Any]:
+    """Coerce a turn envelope to a JSON-safe dict (never raises).
+
+    ``sources`` is bounded to plain strings; anything non-serializable falls
+    back to ``str()`` so a rich receipt object can never abort the message
+    append (which would abort the turn).
+    """
+    out: Dict[str, Any] = {}
+    if not isinstance(value, dict):
+        return out
+    for key in _QCHAT_ENVELOPE_FIELDS:
+        raw = value.get(key)
+        if raw is None:
+            continue
+        if key == "sources":
+            try:
+                items = [str(s) for s in raw if isinstance(
+                    s, (str, int, float))][:50]
+            except TypeError:
+                continue
+            if items:
+                out[key] = items
+            continue
+        if isinstance(raw, (str, int, float, bool)):
+            out[key] = raw
+        else:
+            try:
+                out[key] = str(raw)[:500]
+            except Exception:
+                continue
+    return out
 _MESSAGE_FIELDS = (
     "tool_name", "tool_call_id", "tool_calls", "reasoning",
     "reasoning_content", "reasoning_details", "codex_reasoning_items",
@@ -362,6 +408,18 @@ class QubitSessionStore:
             "display_metadata", "token_count", "finish_reason",
             "effect_disposition", "api_content", "id",
             "platform_message_id", "message_id") if m.get(k) is not None}
+        # Turn-envelope restore: rows the ``/qubit-chat`` path appended carry
+        # the turn envelope under ``display_metadata["qubit_chat"]`` (written by
+        # :meth:`append` — the vendored row has no route/task columns). Surface
+        # it as top-level ``meta`` keys so every reader (transcript reload,
+        # live-voice poll, activity summary) sees exactly what the turn
+        # produced. Rows the terminal/TUI wrote carry no such sidecar and read
+        # back byte-identical.
+        _dm = m.get("display_metadata")
+        _env = _sanitize_envelope(
+            _dm.get(_QCHAT_ENVELOPE_KEY) if isinstance(_dm, dict) else None)
+        for _key, _val in _env.items():
+            meta.setdefault(_key, _val)
         if meta:
             out["meta"] = meta
         # B-04M: surface the preserved platform/message identity at the top
@@ -738,10 +796,25 @@ class QubitSessionStore:
             return {"state": "MISSING", "code": "SESSION_NOT_FOUND",
                     "detail": f"no chat session {sid!r}"}
         meta = meta or {}
+        # Turn-envelope persist: stash the ``/qubit-chat`` turn envelope
+        # (``route``/``task``/``phase``/``model``/``sources`` …) in the vendored
+        # ``display_metadata`` sidecar under the ``qubit_chat`` key.
+        # ``display_kind`` stays None so no other surface renders the row
+        # differently, and a caller-supplied ``display_metadata`` dict is kept
+        # (the envelope merges in, never clobbers). Without this the envelope
+        # was silently dropped here — only tool_name/tool_calls/tool_call_id
+        # reached the row — and every report/task receipt vanished on reload.
+        _envelope = _sanitize_envelope(
+            {k: meta.get(k) for k in _QCHAT_ENVELOPE_FIELDS})
+        _sidecar = meta.get("display_metadata")
+        if _envelope:
+            _sidecar = dict(_sidecar) if isinstance(_sidecar, dict) else {}
+            _sidecar.setdefault(_QCHAT_ENVELOPE_KEY, _envelope)
         self._db.append_message(
             sid, role=str(role), content=_bounded(content, MAX_TEXT_CHARS),
             tool_name=meta.get("tool_name"), tool_calls=meta.get("tool_calls"),
-            tool_call_id=meta.get("tool_call_id"), timestamp=timestamp)
+            tool_call_id=meta.get("tool_call_id"), timestamp=timestamp,
+            display_metadata=_sidecar if _sidecar else None)
         # Append a message. ``model`` is an ADVISORY hint for a brand-new row
         # only — it must never overwrite a model the operator already pinned on
         # this session. The turn path passes the model it just ran, so

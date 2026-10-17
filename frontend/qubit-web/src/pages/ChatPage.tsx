@@ -167,6 +167,7 @@ function toChatMessage(message: ChatStoreMessage): ChatMessage {
     tool_calls?: unknown;
     route?: string;
     task?: string;
+    phase?: string;
     sources?: unknown;
   };
   const parts = [
@@ -180,8 +181,13 @@ function toChatMessage(message: ChatStoreMessage): ChatMessage {
     Array.isArray(meta.tool_calls);
   // A persisted /chat-worker build turn carries meta.route="task" + meta.task;
   // keep it rendering as a report with its task key + /chat link after a
-  // reload (the live stream sets these, but the reload path must too).
-  const isTask = meta.route === "task" && Boolean(meta.task);
+  // reload (the live stream sets these, but the reload path must too — the
+  // store persists the envelope in the message sidecar). The transient
+  // "Working on it in /chat (task …)" starter row shares the envelope
+  // (phase "started") but is NOT the report: the report index lists only the
+  // finished report and terminal states, never the placeholder.
+  const isTask =
+    meta.route === "task" && Boolean(meta.task) && meta.phase !== "started";
   const sources = Array.isArray(meta.sources)
     ? meta.sources.filter((s): s is string => typeof s === "string")
     : undefined;
