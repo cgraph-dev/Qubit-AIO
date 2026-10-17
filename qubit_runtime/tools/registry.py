@@ -14,6 +14,8 @@ import logging
 import sys
 import threading
 import time
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
@@ -21,6 +23,28 @@ from typing import Callable, Dict, List, Optional, Set
 from qubit_constants import qubit_home_key, normalize_scope
 
 logger = logging.getLogger(__name__)
+
+_session_tool_scope = ContextVar("session_tool_scope", default=None)
+
+
+@contextmanager
+def session_tool_scope(scope):
+    """Execution-owned overlay, additive to the existing profile registry."""
+    token = _session_tool_scope.set(scope)
+    try:
+        yield
+    finally:
+        _session_tool_scope.reset(token)
+
+
+def current_session_tool_scope():
+    return _session_tool_scope.get()
+
+
+def _session_slot_key():
+    """The overlay slot key for the current session scope: writes go through ``normalize_scope``
+    (``register``/``deregister``), so reads must key the same way or the overlay is invisible."""
+    return normalize_scope(_session_tool_scope.get())
 
 # Cap on a tool error body; only trims runaway interpolated exceptions (static msgs are ~115 chars).
 _MAX_TOOL_ERROR_CHARS = 2048
