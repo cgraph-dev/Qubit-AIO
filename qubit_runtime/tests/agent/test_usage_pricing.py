@@ -188,10 +188,18 @@ def test_unknown_model_falls_back_to_endpoint_metadata(monkeypatch):
 def test_deepseek_deprecated_aliases_price_as_flash():
     """Invariant: deepseek-v4-flash / deepseek-chat / deepseek-reasoner are retired aliases
     served by the current Flash model — they must bill at identical rates to the
-    ``deepseek-flash`` entry, or sessions on the legacy names over/under-report cost."""
+    ``deepseek-flash`` entry, or sessions on the legacy names over/under-report cost.
+
+    ``deepseek-v4.1-flash`` belongs in this list for the same reason and one more: it is
+    the *current* spelling that the live profiles pass. While it was absent from the
+    table, every seat turn on that name priced as ``unknown``, which the office runner
+    books as UNKNOWN_SPEND (D15) and refuses org-wide admission on until an owner
+    settles the receipt by hand.
+    """
     flash = get_pricing_entry("deepseek-flash", provider="deepseek")
     assert flash is not None
-    for alias in ("deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner"):
+    for alias in ("deepseek-v4-flash", "deepseek-v4.1-flash",
+                  "deepseek-chat", "deepseek-reasoner"):
         entry = get_pricing_entry(alias, provider="deepseek")
         assert entry is not None, alias
         assert entry.input_cost_per_million == flash.input_cost_per_million, alias
