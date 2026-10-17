@@ -48,6 +48,66 @@ def _canonical_issuer_kind(kind: Any) -> Any:
 _CROSS_ISSUER_WARN_EMITTED = False
 
 
+# api.openai.com model families that accept ``reasoning.context: "all_turns"`` and honour a reasoning blob
+# minted by a sibling variant of the same family (LIVE: gpt-5.4<->5.4-mini, 5.5->5.5-pro, 5.6-luna<->terra,
+# 6-astra<->6.1-sol all rendered the blob). o-series, base gpt-5-mini/nano and gpt-5.1/5.2/5.3-codex 400 on
+# all_turns, so they are deliberately absent; a blob from another family is silently left out (200), so those
+# keep exact-model matching.
+_OPENAI_ALL_TURNS_FAMILIES = ("gpt-5.4", "gpt-5.5", "gpt-5.6", "gpt-6")
+
+
+def openai_reasoning_family(model: Any) -> Optional[str]:
+    """``_OPENAI_ALL_TURNS_FAMILIES`` entry ``model`` belongs to (``gpt-6.1-sol`` -> ``gpt-6``), else None."""
+    name = str(model or "").strip().lower()
+    return next((f for f in _OPENAI_ALL_TURNS_FAMILIES if name == f or name.startswith((f + "-", f + "."))), None)
+
+
+def _is_openai_api_issuer(issuer_kind: Any) -> bool:
+    from utils import base_url_hostname
+
+    return isinstance(issuer_kind, str) and issuer_kind.startswith("other:") and (
+        base_url_hostname(issuer_kind[len("other:"):]).lower() == "api.openai.com"
+    )
+
+
+def _model_can_read_blob(issuer_kind: Optional[str], item_model: Any, current_model: Optional[str]) -> bool:
+    """Exact model everywhere; same all_turns family on api.openai.com, which accepts sibling-variant blobs."""
+    if current_model is None or item_model is None or item_model == current_model:
+        return True
+    family = openai_reasoning_family(current_model)
+    return family is not None and family == openai_reasoning_family(item_model) and _is_openai_api_issuer(issuer_kind)
+
+
+def strip_unverified_reasoning_items(
+    messages: Any, *, issuer_kind: Optional[str], issuer_model: Optional[str],
+) -> int:
+    """First ``invalid_encrypted_content`` rung: drop the items the failing request REPLAYED without an exact
+    issuer+model stamp (unstamped legacy blobs, sibling-variant blobs). Items another issuer or model minted
+    were never sent (``_replay_reasoning_items`` skips them) and stay in history for a switch back.
+    Consumes its own precondition (a second call removes nothing), so recovery cannot loop.
+    Rebinds the filtered list, never mutates a shared one; returns the number of items removed."""
+    def unverified_but_sent(item: Any) -> bool:
+        if not isinstance(item, dict) or item.get("type") == "compaction":
+            return False
+        kind, model = _canonical_issuer_kind(item.get("_issuer_kind")), item.get("_issuer_model")
+        if kind == issuer_kind and model == issuer_model:
+            return False
+        return (kind is None or kind == issuer_kind) and _model_can_read_blob(issuer_kind, model, issuer_model)
+
+    removed = 0
+    for msg in messages if isinstance(messages, list) else []:
+        items = msg.get("codex_reasoning_items") if isinstance(msg, dict) and msg.get("role") == "assistant" else None
+        if not isinstance(items, list) or not items:
+            continue
+        kept = [i for i in items if not unverified_but_sent(i)]
+        removed += len(items) - len(kept)
+        if kept:
+            msg["codex_reasoning_items"] = kept
+        else:
+            msg.pop("codex_reasoning_items")
+    return removed
+
+
 def _wire_model_identity(model: Any) -> Optional[str]:
     """Canonical Responses wire model stamped on encrypted reasoning: blobs are sealed to the issuing
     model too, so a same-endpoint model switch must not replay them (HTTP 400)."""
