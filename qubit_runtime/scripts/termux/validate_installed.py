@@ -93,7 +93,7 @@ def validate_update_refusal(project_root: Path, result: subprocess.CompletedProc
 def main() -> None:
     prefix = Path(os.environ["PREFIX"])
     root = prefix / "lib/hermes-agent"
-    with tempfile.TemporaryDirectory(prefix="hermes-install-proof-", dir=prefix / "tmp") as tmp:
+    with tempfile.TemporaryDirectory(prefix="qubit-install-proof-", dir=prefix / "tmp") as tmp:
         home = Path(tmp)
         env = {
             "PREFIX": str(prefix), "HOME": str(home), "QUBIT_HOME": str(home / "state"),

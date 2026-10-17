@@ -6,7 +6,7 @@ import os, sys, re, tempfile, time, json, copy, subprocess
 # LIVE: makes ~6 real calls to the configured provider (a few cents). Usage:
 #   python cache_prefix_wire.py <repo_root> <A|B> [--hermes-home DIR]   (default QUBIT_HOME: the real one, for credentials)
 sys.path.insert(0, sys.argv[1])
-os.environ.setdefault("QUBIT_HOME", os.path.expanduser("~/.hermes"))
+os.environ.setdefault("QUBIT_HOME", os.path.expanduser("~/.qubit"))
 if "--hermes-home" in sys.argv:
     os.environ["QUBIT_HOME"] = sys.argv[sys.argv.index("--hermes-home") + 1]
 arm = sys.argv[2] if len(sys.argv) > 2 else "A"

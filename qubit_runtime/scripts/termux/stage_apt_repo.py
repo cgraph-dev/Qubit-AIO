@@ -6,7 +6,7 @@ and copies .debs into pool/<first-char>/.
 
 Usage:
   python stage_apt_repo.py --pool POOL_DIR --out OUT_DIR \
-      --suite hermes-stable|hermes-canary [--gpg-key-file PATH]
+      --suite <channel-suite> [--gpg-key-file PATH]
 
 Exit codes:
   0 - success
@@ -297,7 +297,7 @@ def stage(
     # security information"). One paragraph, no blank lines.
     release_fields = [
         "Origin: Qubit Agent",
-        "Label: hermes-agent",
+        "Label: Qubit Agent",
         f"Suite: {suite}",
         f"Codename: {suite}",
         f"Architectures: {ARCH}",

@@ -373,14 +373,14 @@ _PAGE_STYLE = (
 
 # The record a channel page keeps of the release it describes; the write
 # guard reads it back so an older tag re-run never regresses the page.
-_BUILD_META_RE = re.compile(r'<meta name="hermes-build" content="([^"]*)"')
+_BUILD_META_RE = re.compile(r'<meta name="qubit-build" content="([^"]*)"')
 
 
 def _page(title: str, build: str, body: list[str]) -> str:
     return (
         '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        f'<meta name="hermes-build" content="{html.escape(build, quote=True)}">\n'
+        f'<meta name="qubit-build" content="{html.escape(build, quote=True)}">\n'
         f"<title>{html.escape(title)}</title>\n<style>{_PAGE_STYLE}</style>\n</head>\n<body>\n"
         + "\n".join(body)
         + "\n</body>\n</html>\n"

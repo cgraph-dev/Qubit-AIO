@@ -24,7 +24,7 @@ def main() -> None:
     parser.add_argument("--wait", type=float, default=7.0)
     args = parser.parse_args()
 
-    qubit_home = Path(tempfile.mkdtemp(prefix="hermes-otel-smoke-"))
+    qubit_home = Path(tempfile.mkdtemp(prefix="qubit-otel-smoke-"))
     os.environ["QUBIT_HOME"] = str(qubit_home)
 
     from gateway.status import write_runtime_status
@@ -42,7 +42,7 @@ def main() -> None:
                 "export_interval_seconds": 5,
                 "logs_export_interval_seconds": 5,
                 "resource_attributes": {
-                    "service.name": "hermes-gateway-smoke",
+                    "service.name": "qubit-gateway-smoke",
                     "deployment.environment.name": "local-smoke",
                 },
             },
@@ -79,7 +79,7 @@ def main() -> None:
     log_path = Path(args.log)
     rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
     paths = {row["path"] for row in rows}
-    print(json.dumps({"hermes_home": str(qubit_home), "requests": len(rows), "paths": sorted(paths)}, indent=2))
+    print(json.dumps({"qubit_home": str(qubit_home), "requests": len(rows), "paths": sorted(paths)}, indent=2))
     if "/v1/traces" not in paths:
         raise SystemExit("missing /v1/traces request")
     if "/v1/logs" not in paths:

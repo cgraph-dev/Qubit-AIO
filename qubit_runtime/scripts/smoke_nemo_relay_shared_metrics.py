@@ -235,7 +235,7 @@ class _ModelHandler(BaseHTTPRequestHandler):
 def _arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--hermes-repo",
+        "--qubit-repo",
         type=Path,
         default=Path.cwd(),
         help="Qubit source checkout containing .venv/bin/qubit",
@@ -700,8 +700,8 @@ def main() -> int:
             raise SystemExit(f"Refusing to replace existing output directory: {root}")
         root.mkdir(parents=True)
     else:
-        root = Path(tempfile.mkdtemp(prefix="hermes-relay-shared-metrics-"))
-    home = root / "hermes-home"
+        root = Path(tempfile.mkdtemp(prefix="qubit-relay-shared-metrics-"))
+    home = root / "qubit-home"
     workdir = root / "workspace"
     workdir.mkdir()
     (workdir / TOOL_FILE).write_text(TOOL_RESULT_CANARY, encoding="utf-8")
