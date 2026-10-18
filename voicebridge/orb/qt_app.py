@@ -416,6 +416,18 @@ NUCLEUS_CAUSTIC_PERIOD_S = 4.7
 #: How much the beat opens the swirl lobes' alpha: the core's internal motion
 #: is louder on the thump and settles between beats.
 NUCLEUS_SWIRL_BEAT_GAIN = 0.55
+# --- interior core shells: layered depth INSIDE the nucleus ---------------
+#: Owner: "make inside orb more 3d give more depth and animations". The field
+#: now declares nested interior bodies (``core_shells``): small shaders at
+#: different radii, plane tilts and depths, each turning on its own period. The
+#: nucleus body stays the ONE solid ellipse at the centre, so these shells are
+#: drawn as small SHADED gradient paths (never ellipses) and layered back to
+#: front by depth — the core then reads as a volume you look INTO rather than a
+#: flat disc.
+CORE_SHELL_MIN_PX = 0.4
+CORE_SHELL_SAT = 0.88
+CORE_SHELL_CORE_LIFT = 0.55
+CORE_SHELL_DRAW_LIMIT = 5
 #: Below this alpha a primitive is imperceptible: skip it rather than let the
 #: 8-bit quantisation snap it to zero in one frame (a tiny hard pop).
 ALPHA_EPS = 0.004
@@ -1883,6 +1895,39 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         rgb = _anchor(_spec_rgb(hue, BLINK_DOT_SAT))
         _dot(bx, by, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
 
+    def _core_body(shell: Dict[str, Any]) -> None:
+        """One nested interior body of the nucleus, as a shaded gradient path.
+
+        Sized and brightened by its rotated depth (a shell swinging toward the
+        viewer swells and brightens), tinted by its own spectral hue and pulled
+        toward the core's hot colour at the centre, so a stack of them reads as
+        layered depth INSIDE the sphere. Drawn as a ``drawPath`` gradient, never
+        a ``drawEllipse``: the nucleus body must remain the mark's only solid
+        ellipse.
+        """
+        d = _num(shell.get("depth"), 0.5)
+        gx, gy, g = _place(shell.get("x"), shell.get("y"), d,
+                           zseed=_num(shell.get("index"), None),
+                           zflat=True, z=shell.get("z"), z2=shell.get("z2"))
+        rr = max(CORE_SHELL_MIN_PX, _num(shell.get("size"), 0.0) * g)
+        a = _shade(_num(shell.get("alpha"), 0.0), d, g) * bright
+        if a <= ALPHA_EPS or rr <= 0.0:
+            return
+        rgb = _anchor(_spec_rgb(_num(shell.get("hue"), 0.0), CORE_SHELL_SAT))
+        hot = _lift(CORE_SHELL_CORE_LIFT)
+        grad = QRadialGradient(QPointF(gx, gy), rr)
+        grad.setColorAt(0.0, QColor(hot[0], hot[1], hot[2],
+                                    _clamp8(255.0 * min(1.0, a))))
+        grad.setColorAt(0.42, QColor(rgb[0], rgb[1], rgb[2],
+                                     _clamp8(255.0 * min(1.0, a) * 0.9)))
+        grad.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
+        path = QPainterPath()
+        path.addEllipse(QRectF(gx - rr, gy - rr, rr * 2.0, rr * 2.0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(grad))
+        p.drawPath(path)
+        p.setBrush(Qt.NoBrush)
+
     tt = _mark_tt(t)
     reduced = _reduced_motion()
     # The combined X+Y tumble's phases, bound here now that the clamped clock
@@ -1921,6 +1966,12 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     traveller = None if reduced else _field.comet(tt, Rf)
     sparks = mark_nucleus_sparks(t, Rf)
     shells = mark_satellites(t, Rf)
+    # Interior core shells, back to front: the nucleus's own nested bodies. The
+    # field declares them all depths; sorting by depth and drawing after the
+    # body is what makes the core read as layered interior depth.
+    core_shells = sorted(mark_core_shells(t, Rf),
+                         key=lambda s: _num(s.get("depth"), 0.5)
+                         )[:max(0, int(CORE_SHELL_DRAW_LIMIT))]
     far_shells = [s for s in shells
                   if _num((s.get("body") or {}).get("depth"), 0.0) < 0.5]
     near_shells = [s for s in shells
@@ -2039,6 +2090,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # It still carries the turn, through its specular highlight and a small
     # uniform scale.
     _nucleus(nuc_r, nuc_rgb, tt, beat)
+    # Interior shells paint ON the body, far to near, so the core's inside is
+    # layered depth that turns and pulses with the rest of the mark.
+    for _shell in core_shells:
+        _core_body(_shell)
 
     # ---- near field (depth >= 0.5), in front of the nucleus --------------
     _field_pass(True, near_shells, near_dust, near_parts, near_binaries,
