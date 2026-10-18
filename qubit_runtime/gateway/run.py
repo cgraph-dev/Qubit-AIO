@@ -1151,7 +1151,6 @@ def _build_replay_entry(
             entry[_rkey] = _rval
     if preserve_timestamp and msg.get("timestamp"):
         entry["timestamp"] = msg["timestamp"]
-    entry.update(scaffolding_replay_fields(msg))  # a proactive prune re-persists this view: keep the flags
     # Replay rebuilds the SAME conversation: every role keeps its uid and merge witness, so a context engine sees the
     # uids the store holds. Tool-call uid maps stay on rows that still carry their calls (those pass through whole).
     copy_identity_fields({key: msg[key] for key in (MESSAGE_UID, ABSORBED_MESSAGE_UIDS) if key in msg}, entry)

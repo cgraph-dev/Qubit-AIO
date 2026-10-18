@@ -590,6 +590,19 @@ class GatewaySlashCommandsMixin(
         """Handle /version — show the running Qubit Agent version."""
         return _execute("version").text
 
+    async def _handle_autoprune_command(self, event: MessageEvent) -> str:
+        """Handle /autoprune [on|off|later|status].
+
+        ``prune_advisor.run_command`` is the single handler behind the CLI, TUI,
+        Desktop and messaging surfaces; the gateway only forwards the argument
+        text to it, so the answer and the persisted ``sessions.auto_prune``
+        value agree everywhere.
+        """
+        from qubit_cli import prune_advisor
+        args = " ".join(str(getattr(event, "args", "") or "").split())
+        return prune_advisor.run_command(args)
+
+
     def _catalog_options(self, event: MessageEvent) -> dict:
         """``allowed_commands`` for /help and /commands when the caller is a gated non-admin:
         the slash-access floor + ``user_allowed_commands`` (mirrors /whoami), so the catalog
