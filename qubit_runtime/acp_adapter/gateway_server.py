@@ -22,6 +22,51 @@ from acp_adapter.session import _translate_acp_cwd, _normalize_cwd_for_compare
 logger = logging.getLogger(__name__)
 
 
+def _stage_user_content(content):
+    """Shared-converter output -> ``(text, attachments)`` for ``prompt.submit``.
+
+    Text-only prompts stay a plain string. Media parts (image ``data:`` URLs from
+    image blocks, image resource links and embedded blobs) are staged as bytes in
+    the profile image cache; the authority commits them at admission. Remote
+    image URLs cannot be staged and are kept as text so the model still sees them."""
+    if isinstance(content, str):
+        return content, []
+    import base64
+    import binascii
+    from gateway.platforms.base import cache_image_from_bytes
+    from gateway.session_ingress_media import _ATTACHMENT_LIMIT, _IMAGE_EXT, sniff_image_mime
+    texts, attachments = [], []
+    for part in content:
+        if part.get('type') == 'text':
+            texts.append(part['text'])
+            continue
+        url = part['image_url']['url']
+        if not url.startswith('data:'):
+            texts.append(f"[Image attached: {url}]")
+            continue
+        if len(attachments) >= _ATTACHMENT_LIMIT:
+            raise GatewayClientError('acp_content_invalid')
+        try:
+            raw = base64.b64decode(url.partition(',')[2], validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise GatewayClientError('acp_content_invalid') from exc
+        # The sniffed bytes are authoritative for the staged extension and admitted type; the
+        # client's declared type (a file suffix, or image/png by default) is never trusted. A
+        # part admission cannot carry (bmp/svg, over the media cap) degrades to a text note so
+        # the user's text still runs, as main's in-process server did for oversize images.
+        mime = sniff_image_mime(raw)
+        if mime is None:
+            texts.append("[Image omitted: unsupported image format]")
+            continue
+        try:
+            path = cache_image_from_bytes(raw, _IMAGE_EXT[mime])
+        except ValueError as exc:
+            texts.append(f"[Image omitted: {exc}]")
+            continue
+        attachments.append({'path': path, 'mime': mime})
+    return "\n".join(texts), attachments
+
+
 def _slash_command(text):
     """Canonical Qubit command name ``text`` invokes, or None for ordinary text.
 
@@ -38,6 +83,17 @@ def _slash_command(text):
     from qubit_cli.commands import resolve_command
     command = resolve_command(name)
     return command.name if command is not None else None
+
+
+def _submit_fingerprint(session_id, text, attachments):
+    """Content identity of one logical prompt: its text and the staged image bytes (staging names
+    are disposable; the authority reconciles a retry by the same digests)."""
+    import hashlib
+    digest = hashlib.sha256(text.encode())
+    for item in attachments:
+        with open(item['path'], 'rb') as staged:
+            digest.update(item['mime'].encode() + b'\0' + hashlib.sha256(staged.read()).digest())
+    return session_id, digest.hexdigest()
 
 
 def _bypass_route():

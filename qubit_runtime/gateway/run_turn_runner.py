@@ -65,6 +65,42 @@ def _clarify_expired_notice() -> str:
     return t("gateway.clarify.expired")
 
 
+# run_conversation result keys the gateway projection carries verbatim so a finite viewer's
+# `-z --usage-file` ledger (qubit_cli/oneshot._USAGE_KEYS) reads what the in-process path did.
+_LEDGER_PASSTHROUGH_KEYS = (
+    "estimated_cost_usd", "cost_status", "cost_source", "cache_read_tokens", "cache_write_tokens",
+    "reasoning_tokens", "total_tokens", "provider", "turn_exit_reason", "service_tier",
+)
+
+
+def _finite_viewer_turn() -> bool:
+    from gateway.session_finite import finite_turn_required
+    return finite_turn_required() is True
+
+
+def _persisted_turn(agent, agent_history, result, compressions) -> dict | None:
+    """``message.complete.persisted_turn`` for this turn, the receipt the TUI gateway's own turns
+    publish: clients bind the streamed reply to its stored row instead of comparing words. The
+    agent copies ``conversation_history`` into its message list, so an untouched pre-turn prefix
+    is the same dicts (transcript rows here carry no ``_row_id`` to compare)."""
+    from agent.persisted_turn_receipt import persisted_turn_receipt
+    if not isinstance(result, dict):
+        return None
+    status = ("interrupted" if result.get("interrupted")
+              else "error" if result.get("failed") or result.get("error") else "complete")
+    return persisted_turn_receipt(
+        result.get("messages"), getattr(agent, "_persist_user_message_idx", None), agent_history,
+        result.get("final_response"), status,
+        compression_unchanged=type(compressions) is int and compressions == getattr(
+            getattr(agent, "context_compressor", None), "compression_count", None),
+        prefix_row_matches=lambda before, after: before is after)
+
+
+class _NoStreamConsumer(RuntimeError):
+    """Raised by the delta callback when nothing consumed the text; ``_call_quietly`` turns it into
+    'not delivered' so the agent's partial-delivery accounting matches what the user saw."""
+
+
 class _ExecApprovalDeclined(RuntimeError):
     """The connector refused the approval card's destination.
 
@@ -110,6 +146,26 @@ def _resolution_failure_reply(exc: Exception, platform: Platform) -> tuple[str, 
         # since a deleted bundle or unreadable store fails the same way until the host is fixed.
         return t("gateway.errors.generic_failed"), "host_error", False
     return t("gateway.errors.no_credentials"), auth_permanent, False
+
+
+from gateway.run_turn_progress import GatewayTurnProgressMixin  # noqa: E402
+from gateway.session_execution import GatewaySessionAgentMixin  # noqa: E402
+
+
+def _settle_api_runtime_lock(agent, result, captured):
+    """A confirmed API model lock settles only on the runtime it named (main's
+    ``_finish_turn_result``): the served runtime rides the usage, a mismatch fails the turn."""
+    from gateway.session_api_turn import api_runtime_locked
+    api = api_runtime_locked()
+    if api is None or not isinstance(result, dict):
+        return
+    settings = api['settings']
+    try:
+        captured['usage']['runtime'] = api['adapter']._turn_runtime_metadata(
+            agent, route=settings.get('route'), requested_runtime=settings.get('requested_runtime'),
+            route_source=settings.get('route_source') or '', confirmed_runtime_lock=True)
+    except RuntimeError as exc:
+        result.update(final_response='', failed=True, completed=False, error=str(exc))
 
 
 class TurnRunner:

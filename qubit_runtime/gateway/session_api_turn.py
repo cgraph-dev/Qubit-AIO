@@ -347,6 +347,30 @@ def recover_authority_api_turns(adapter, authority):
             logging.getLogger(__name__).warning('API session %s paused: %s', sid, exc.reason)
 
 
+def _recover_api_turns(adapter, authority):
+    from qubit_state_runtime import list_session_admissions
+    from gateway.session_ingress_media import collect_unheld_api_images
+    import logging
+    collect_unheld_api_images(authority.db)
+    from gateway.session_api_media import compact_settled_api_payloads
+    compact_settled_api_payloads(authority.db)
+    with authority.db._read_ctx() as conn:
+        targets = [row[0] for row in conn.execute(
+            "SELECT DISTINCT target_session_id FROM session_admissions WHERE principal_id='api' AND status='queued'")]
+    for sid in targets:
+        try:
+            ref = restore_api_session(authority, sid)
+            pending = list_session_admissions(authority.db, session_id=sid)
+            if any(row['status'] == 'unknown' for row in pending):
+                continue
+            for row in pending:
+                if row['status'] == 'queued':
+                    check_api_turn(authority, ref, row['payload'])
+            authority._schedule(ref)
+        except RuntimeStoreError as exc:
+            logging.getLogger(__name__).warning('API session %s paused: %s', sid, exc.reason)
+
+
 async def run_api_turn(adapter, *, approval_notify_callback=None, approval_session_key=None, **kwargs):
     admitted = await admit_api_turn_async(adapter, **kwargs)
     if approval_notify_callback is None or not approval_session_key:

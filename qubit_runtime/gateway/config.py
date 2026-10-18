@@ -567,6 +567,10 @@ def _has_usable_api_server_key(key: object) -> bool:
         return len(str(key).strip()) >= 16
 
 
+def _needs_extra(*keys: str) -> Callable[[PlatformConfig], bool]:
+    return lambda cfg: all(cfg.extra.get(k) for k in keys)
+
+
 # Core-only "sufficiently configured?" checks (no plugin entry). Plugin platforms declare theirs as
 # ``PlatformEntry.config_connected_fn`` (or rely on the generic ``token or api_key`` check).
 _PLATFORM_CONNECTED_CHECKERS: dict[Platform, Callable[[PlatformConfig], bool]] = {
