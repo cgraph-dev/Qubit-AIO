@@ -462,6 +462,51 @@ async def _matrix_send_core(adapter, chat_id, message, media_files, metadata):
     return {"error": _NO_DELIVERABLE} if last_result is None else _success("matrix", chat_id, message_id=last_result.message_id)
 
 
+def _gateway_platform_module(name, *, unavailable, unmet):
+    """``(gateway.platforms.<name>, None)`` once its ``check_<name>_requirements`` passes, else ``(None, error)``."""
+    import importlib
+    try:
+        module = importlib.import_module(f"gateway.platforms.{name}")
+    except ImportError:
+        return None, {"error": unavailable}
+    return (module, None) if getattr(module, f"check_{name}_requirements")() else (None, {"error": unmet})
+
+
+async def _send_weixin(pconfig, chat_id, message, media_files=None):
+    """Send via Weixin iLink using the native adapter helper."""
+    wx, err = _gateway_platform_module("weixin", unavailable="Weixin adapter not available.",
+                                       unmet="Weixin requirements not met. Need aiohttp + cryptography.")
+    if err:
+        return err
+    try:
+        return await wx.send_weixin_direct(extra=pconfig.extra, token=pconfig.token, chat_id=chat_id,
+                                           message=message, media_files=media_files)
+    except Exception as e:
+        return _error(f"Weixin send failed: {e}")
+
+
+async def _send_bluebubbles(extra, chat_id, message):
+    """Send via BlueBubbles iMessage server using the adapter's REST API."""
+    bb, err = _gateway_platform_module("bluebubbles", unavailable="BlueBubbles adapter not available.",
+                                       unmet="BlueBubbles requirements not met (need aiohttp + httpx).")
+    if err:
+        return err
+    try:
+        from gateway.config import PlatformConfig
+        adapter = bb.BlueBubblesAdapter(PlatformConfig(extra=extra))
+        if not await adapter.connect():
+            return _error("BlueBubbles: failed to connect to server")
+        try:
+            result = await adapter.send(chat_id, message)
+        finally:
+            await adapter.disconnect()
+        if not result.success:
+            return _error(f"BlueBubbles send failed: {result.error}")
+        return _success("bluebubbles", chat_id, message_id=result.message_id)
+    except Exception as e:
+        return _error(f"BlueBubbles send failed: {e}")
+
+
 def _send_signal(extra, chat_id, message, media_files=None):
     """Signal's standalone sender lives in the plugin (upstream "drop core wiring",
     43faacfb8de7..origin/main; attachments ride the final chunk via the plugin's
@@ -482,6 +527,21 @@ def _qqbot_media_file_type(media_path: str, is_voice: bool) -> int:
 async def _qqbot_deliver_one_media(*args, **kwargs):
     from plugins.platforms.qqbot.send import _qqbot_deliver_one_media as _impl
     return await _impl(*args, **kwargs)
+
+
+async def _send_yuanbao(chat_id, message, media_files=None):
+    """Send via the running Yuanbao adapter's persistent WebSocket (no throwaway client possible)."""
+    try:
+        from gateway.platforms.yuanbao import YuanbaoAdapter
+    except ImportError:
+        return _error("Yuanbao adapter module not available.")
+    adapter = YuanbaoAdapter.get_active()
+    if adapter is None:
+        return _error("Yuanbao adapter is not running. Start the gateway with yuanbao platform enabled first.")
+    try:
+        return await adapter._outbound.sender.send_direct(chat_id, message, media_files)
+    except Exception as e:
+        return _error(f"Yuanbao send failed: {e}")
 
 
 async def _send_qqbot(pconfig, chat_id, message, media_files=None, caption=None):
