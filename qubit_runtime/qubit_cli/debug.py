@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import sys
+import threading
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -37,6 +38,9 @@ _AUTO_DELETE_SECONDS = 21600  # 6 hours
 
 def _pending_file() -> Path:
     return get_qubit_home() / "pastes" / "pending.json"
+
+
+_PENDING_LOCK_HOLDER = threading.local()
 
 
 def _load_pending() -> list[dict]:
@@ -87,6 +91,15 @@ def _sweep_expired_pastes(now: Optional[float] = None) -> tuple[int, int]:
     if deleted:
         _save_pending(remaining)
     return (deleted, len(remaining))
+
+
+def _keep_after_sweep(entry: dict, reaped: set[str], current: float) -> bool:
+    try:
+        expire_at = float(entry.get("expire_at", 0))
+    except (TypeError, ValueError):
+        return False
+    # A URL re-scheduled during the sweep has a future expiry and must stay.
+    return not (entry.get("url", "") in reaped and expire_at <= current)
 
 
 def _best_effort_sweep_expired_pastes() -> None:

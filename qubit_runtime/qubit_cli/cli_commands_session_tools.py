@@ -100,6 +100,64 @@ def _probe(module: str, name: str, default, *args):
         return default
 
 
+def _stop_background_work() -> None:
+    """``/stop``'s cleanup: kill the background processes, then interrupt the background (async)
+    delegations. Mid-turn it runs on a worker thread and prints its result from there."""
+    from qubit_cli.gateway_tools import process_registry as _registry, process_view
+    process_registry, view = _registry(), process_view()
+    if view is not None:
+        view.refresh(force=True)
+    running = [p for p in process_registry.list_sessions() if p.get("status") == "running"]
+    # Background subagents live in their own registry, not the process registry.
+    n_async = view.active_delegations() if view is not None else _probe("tools.async_delegation", "active_count", 0)
+    if not running and not n_async:
+        return print(f"  {_t('stop.none_running')}")
+    if running:
+        print(f"  {_t('stop.stopping', count=len(running))}")
+        print(f"  {_t('stop.stopped', count=process_registry.kill_all(source='cli.stop'))}")
+    if n_async:
+        if view is not None:
+            interrupted = view.interrupt_delegations()  # the gateway interrupts this session's own
+        else:
+            from tools.async_delegation import interrupt_all
+            interrupted = interrupt_all(reason='/stop')
+        print(f"  {_t('stop.interrupted_delegations', count=interrupted)}")
+
+
+def _print_local_delegations() -> None:
+    """This process's background (async) delegations — delegate_task(background=true)."""
+    delegations = _probe("tools.async_delegation", "list_async_delegations", [])
+    if not delegations:
+        return
+    running_d = [d for d in delegations if d.get("status") in ("running", "stalling")]
+    _cp(f"  {_t('agents.background_delegations', count=len(running_d))}")
+    for d in delegations:
+        status = d.get("status", "?")
+        line = f"    {d.get('delegation_id', '?')} · {status} · {(d.get('goal') or '')[:60]}"
+        # Live-status detail for in-flight delegations.
+        # See #51690.
+        if status == "stalling":
+            quiet = d.get("stalled_after_quiet_seconds")
+            if quiet is not None:
+                line += _t("agents.no_progress", seconds=f"{quiet:.0f}")
+        elif status == "running":
+            quiet = d.get("seconds_since_progress")
+            if quiet is not None and quiet >= 60:
+                line += _t("agents.quiet", seconds=f"{quiet:.0f}")
+        _cp(line)
+        for i, child in enumerate(d.get("children_activity") or []):
+            if not isinstance(child, dict):
+                continue
+            tool = child.get("current_tool")
+            doing = _t("agents.in_tool", tool=tool) if tool else _t("agents.between_turns")
+            part = "      " + _t("agents.child_line", index=i + 1,
+                                 api_calls=child.get("api_calls", "?"), doing=doing)
+            idle = child.get("seconds_since_activity")
+            if idle is not None:
+                part += _t("agents.last_activity", seconds=f"{idle:.0f}")
+            _cp(part)
+
+
 class CLICommandsSessionToolsMixin:
     """``/stop``, ``/agents``, ``/journey``, ``/paste``, ``/copy``, ``/image``, ``/tools``,
     ``/profile`` handlers (moved from ``CLICommandsMixin``)."""
