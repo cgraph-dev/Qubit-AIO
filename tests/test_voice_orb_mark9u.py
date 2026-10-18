@@ -923,3 +923,57 @@ def test_ring_alpha_breathes_without_ever_vanishing_or_saturating():
             prev = cur
         # The two orbits breathe on different periods: the set never pulses.
         assert 0.0 < F.ring_alpha(0.0, ring) <= 1.0
+
+
+def test_rgb_trails_and_shells_stay_continuous_between_adjacent_frames():
+    # The same fluid contract as the drawn elements, extended to the layers
+    # added for the 3D/rgb round: the streaks behind every star, the three
+    # satellite bodies and the declared ring paths. Measured worst case over
+    # four windows is ~0.72 px/frame at R=32 against a 1.92 px budget.
+    R, dt, eps = 32.0, 1.0 / 60.0, CONTINUITY_EPS_FRAC * 32.0
+    for start in (0.0, 3.0, 5.1, 9.7):
+        prev = _streak_snapshot(start, R)
+        for k in range(1, 61):
+            cur = _streak_snapshot(start + k * dt, R)
+            for layer in cur:
+                for a, b in zip(prev[layer], cur[layer]):
+                    assert _worst_step(a, b) <= eps, (
+                        layer, start + k * dt, a, b)
+            prev = cur
+
+
+def _worst_step(a, b):
+    """Largest point-to-point step between two (possibly nested) samples."""
+    if isinstance(a[0], tuple):
+        return max(_worst_step(x, y) for x, y in zip(a, b))
+    return math.dist(a, b)
+
+
+def _streak_snapshot(t, R):
+    """Per-index point for every new layer: streaks, shell bodies, ring tips."""
+    return {
+        "rgb": [tuple((s["x"], s["y"]) for s in F.rgb_trail(t, R, p))
+                for p in F.particle_state(t, R)],
+        "dust": [tuple((s["x"], s["y"]) for s in F.dust_trail(t, R, m))
+                 for m in F.dust_state(t, R)],
+        "sat": [(s["body"]["x"], s["body"]["y"])
+                for s in F.satellites(t, R)],
+        "ring": [F.ring_path(t, R, r)[F.RING_PATH_SAMPLES // 2]
+                 for r in F.ring_geometry(t)],
+    }
+
+
+def test_rgb_trail_alpha_never_steps_between_frames():
+    # A streak that flickers between two alphas at the same sample index is a
+    # visible strobe even when its geometry is perfectly continuous.
+    R, dt = 64.0, 1.0 / 60.0
+    for idx in range(len(F.particle_state(0.0, R))):
+        prev = [(s["alpha"], s["size"]) for s in
+                F.rgb_trail(0.0, R, F.particle_state(0.0, R)[idx])]
+        for k in range(1, 181):
+            part = F.particle_state(k * dt, R)[idx]
+            cur = [(s["alpha"], s["size"]) for s in F.rgb_trail(k * dt, R, part)]
+            for (pa, ps), (ca, cs) in zip(prev, cur):
+                assert abs(ca - pa) < 0.02, (idx, k, pa, ca)
+                assert abs(cs - ps) < 0.1, (idx, k, ps, cs)
+            prev = cur
