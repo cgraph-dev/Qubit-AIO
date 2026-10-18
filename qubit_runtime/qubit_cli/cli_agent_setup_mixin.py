@@ -685,8 +685,14 @@ class CLIAgentSetupMixin:
                 openrouter_min_coding_score=self._openrouter_min_coding_score,
                 session_id=self.session_id, platform="cli", session_db=self._session_db,
                 clarify_callback=clarify_callback, connection_callback=connection_callback,
-                # Another viewer answering the gateway's clarify/sudo/secret request closes this modal.
-                modal_withdraw_callback=None if single_query_mode else self._withdraw_gateway_modal,
+                # NOTE: modal_withdraw_callback is deliberately NOT passed. The port brought the
+                # call site across but AIAgent.__init__ (run_agent.py, 86 params, no **kwargs) never
+                # grew the parameter, so every construction raised
+                #     TypeError: AIAgent.__init__() got an unexpected keyword argument
+                #               'modal_withdraw_callback'
+                # which broke the CLI, the gateway and every kanban worker. gateway_agent.py has a
+                # separate class that does accept it; this AIAgent does not, and nothing reads it
+                # from here. Restore the kwarg only together with the parameter on AIAgent.
                 reasoning_callback=self._current_reasoning_callback(),
                 fallback_model=self._fallback_model, thinking_callback=self._on_thinking,
                 checkpoints_enabled=self.checkpoints_enabled,
