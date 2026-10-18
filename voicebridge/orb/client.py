@@ -22,6 +22,11 @@ the orb never imports the helper's capture/mic tree:
   its existing PTT capture + transcribe path. The orb still never
   opens the mic. When no helper is live, the click falls back to the
   stage-only begin (next click cancels it).
+- stop path: ``stop_speaking()`` signals the same validated helper pid
+  with SIGUSR2; the helper terminates its live player subprocess and
+  emits ``interrupt`` / ``playback.stopped`` / ``response.done``, so an
+  orb STOP during ``speaking`` ends the reply at once. Distinct from
+  SIGUSR1, so a stop can never start a capture.
 
 Errors surface as :class:`OrbError` (typed code, short detail). The
 token is never included in any error, log line, or persisted file.
@@ -328,16 +333,14 @@ class OrbClient:
         return self._request("POST", f"/api/voice-edit/{rid}/cancel", {},
                              timeout=2)
 
-    def trigger_helper_capture(self) -> Dict[str, Any]:
-        """Ask the running desktop helper to start/finish one PTT capture.
+    def _validated_helper_pid(self) -> int:
+        """Live desktop-helper pid, cmdline-validated; raises when absent.
 
-        Sends SIGUSR1 to the helper's heartbeat pid (cmdline-validated, so
-        a recycled pid belonging to another process is never signalled).
-        The helper — the single mic owner — then runs its existing PTT
-        path (begin + mic + STT + turn); the orb captures nothing itself.
-        Raises ``OrbError("ORB_HELPER_NOT_RUNNING")`` when no live helper
-        is found (caller falls back to stage-only begin). Never raises
-        anything else; carries no secret.
+        Shared by the SIGUSR1 capture trigger and the SIGUSR2 stop trigger
+        so both use the identical validation: a fresh heartbeat AND a
+        ``/proc`` cmdline that names ``voicebridge.desktop_helper``. A
+        recycled pid belonging to another process is refused. Never raises
+        anything but :class:`OrbError`.
         """
         try:
             hb = _helper_heartbeat()
@@ -357,8 +360,44 @@ class OrbClient:
         if _HELPER_CMDLINE_MARK not in (cmdline or ""):
             raise OrbError("ORB_HELPER_NOT_RUNNING",
                            "desktop helper pid not validated")
+        return pid
+
+    def trigger_helper_capture(self) -> Dict[str, Any]:
+        """Ask the running desktop helper to start/finish one PTT capture.
+
+        Sends SIGUSR1 to the helper's heartbeat pid (cmdline-validated, so
+        a recycled pid belonging to another process is never signalled).
+        The helper — the single mic owner — then runs its existing PTT
+        path (begin + mic + STT + turn); the orb captures nothing itself.
+        Raises ``OrbError("ORB_HELPER_NOT_RUNNING")`` when no live helper
+        is found (caller falls back to stage-only begin). Never raises
+        anything else; carries no secret.
+        """
+        pid = self._validated_helper_pid()
         try:
             os.kill(pid, signal.SIGUSR1)
+        except (OSError, ValueError):
+            raise OrbError("ORB_HELPER_NOT_RUNNING",
+                           "desktop helper not reachable")
+        return {"ok": True, "helper_pid": pid}
+
+    def stop_speaking(self) -> Dict[str, Any]:
+        """Ask the running desktop helper to stop its current spoken reply.
+
+        Sends SIGUSR2 to the helper's heartbeat pid, validated exactly like
+        :meth:`trigger_helper_capture` (fresh heartbeat + helper cmdline),
+        so a recycled/foreign pid is never signalled. The helper's
+        ``on_orb_stop`` -> ``stop_speaking`` terminates the live player
+        subprocess and emits ``interrupt`` / ``playback.stopped`` /
+        ``response.done`` on its talk stream, so the orb's state machine
+        ends immediately. The helper owns TTS; the orb still never touches
+        audio. Raises ``OrbError("ORB_HELPER_NOT_RUNNING")`` when no live
+        helper is found (caller may fall back to ``cancel_request``). Never
+        raises anything else; carries no secret.
+        """
+        pid = self._validated_helper_pid()
+        try:
+            os.kill(pid, signal.SIGUSR2)
         except (OSError, ValueError):
             raise OrbError("ORB_HELPER_NOT_RUNNING",
                            "desktop helper not reachable")

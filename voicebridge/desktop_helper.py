@@ -1046,6 +1046,13 @@ class DesktopHelper:
         # True when the last _speak() was stopped by barge-in (reset each
         # speak; read by callers/tests, never a second audio authority).
         self._barge_interrupted = False
+        # Live player subprocess for the current spoken reply (set in
+        # _speak, cleared in its finally). ``_speak_stop`` is the explicit
+        # stop flag: SIGUSR2 from the orb -> stop_speaking() sets it and
+        # terminates this process, so an orb STOP ends the reply even when
+        # barge-in is disabled. Both are junk-safe / never fatal.
+        self._playback_proc: Any = None
+        self._speak_stop = threading.Event()
         # Accurate-model prewarm readiness (explicit, not blind): the background
         # prewarm sets the event/state, and the first activation waits for it
         # with a bounded timeout so the user is never left waiting blind.
@@ -1281,12 +1288,8 @@ class DesktopHelper:
         # the existing PTT path. Installed best-effort (main thread only);
         # never raises out of start().
         self._orb_prev_sigusr1: Any = None
-        try:
-            import signal as _sig
-            self._orb_prev_sigusr1 = _sig.getsignal(_sig.SIGUSR1)
-            _sig.signal(_sig.SIGUSR1, lambda _s, _f: self.on_orb_toggle())
-        except Exception:
-            pass
+        self._orb_prev_sigusr2: Any = None
+        self._install_orb_signal_handlers()
         self._ui_status("idle", "hold Right-Ctrl to speak")
         return True
 
@@ -1371,6 +1374,12 @@ class DesktopHelper:
                     _sig.signal(_sig.SIGUSR1, prev)
                 except Exception:
                     pass
+            prev2 = getattr(self, "_orb_prev_sigusr2", None)
+            if prev2 is not None:
+                try:
+                    _sig.signal(_sig.SIGUSR2, prev2)
+                except Exception:
+                    pass
         except Exception:
             pass
         try:
@@ -1414,6 +1423,30 @@ class DesktopHelper:
             return
         self._handle_hotkey(event, key)
 
+    def _install_orb_signal_handlers(self) -> None:
+        """Install the orb's SIGUSR1 (toggle) + SIGUSR2 (stop) handlers.
+
+        SIGUSR1 toggles click-to-talk capture; SIGUSR2 stops the live
+        spoken reply. Two distinct signals so a stop can never start a
+        capture. The previous handlers are saved for :meth:`shutdown`;
+        handlers only set flags / enqueue, so they are signal-safe.
+        Best-effort (main thread only): a failure never breaks start().
+        """
+        try:
+            import signal as _sig
+            self._orb_prev_sigusr1 = _sig.getsignal(_sig.SIGUSR1)
+            _sig.signal(_sig.SIGUSR1, lambda _s, _f: self.on_orb_toggle())
+        except Exception:
+            pass
+        # Orb STOP while Qubit is speaking (2026-10-19): SIGUSR2 from the
+        # orb terminates the live player subprocess.
+        try:
+            import signal as _sig
+            self._orb_prev_sigusr2 = _sig.getsignal(_sig.SIGUSR2)
+            _sig.signal(_sig.SIGUSR2, lambda _s, _f: self.on_orb_stop())
+        except Exception:
+            pass
+
     def on_orb_toggle(self) -> None:
         """Orb click-to-talk trigger (SIGUSR1 from the voice orb).
 
@@ -1432,6 +1465,54 @@ class DesktopHelper:
             self._handle_hotkey("orb_toggle", "orb")
         except Exception:
             pass
+
+    def on_orb_stop(self) -> None:
+        """Orb STOP trigger (SIGUSR2 from the voice orb): end the reply.
+
+        Unlike :meth:`on_orb_toggle` this does not queue to the hotkey
+        worker: stopping playback only sets a flag and terminates the
+        player subprocess, both non-blocking and safe from the
+        (main-thread) signal handler. It never starts or stops a capture.
+        The canonical ``interrupt`` / ``playback.stopped`` /
+        ``response.done`` talk events are emitted by the ``_speak`` that
+        owns the player as it unblocks. Never raises.
+        """
+        try:
+            self.stop_speaking()
+        except Exception:
+            pass
+
+    def stop_speaking(self) -> bool:
+        """Stop the current spoken reply now (explicit orb STOP path).
+
+        Returns True when a reply was live (``_speaking`` or a player
+        subprocess). Sets ``_speak_stop`` and terminates ``_playback_proc``;
+        the owning ``_speak`` then emits the same ``interrupt`` /
+        ``playback.stopped`` / ``response.done`` events the barge-in path
+        does, so the orb's state machine ends immediately. Safe to call
+        from any thread (including a signal handler), idempotent, and
+        never fatal: a failed terminate leaves the normal playback path
+        intact. Does not touch the mic or the answer path.
+        """
+        try:
+            proc = getattr(self, "_playback_proc", None)
+            was_live = bool(getattr(self, "_speaking", False)) or proc is not None
+            if not was_live:
+                return False
+            try:
+                self._speak_stop.set()
+            except Exception:
+                pass
+            self._barge_interrupted = True
+            if proc is not None:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+            _trace("speak.stop")
+            return True
+        except Exception:
+            return False
 
     def _hotkey_loop(self) -> None:
         while not self._hk_stop.is_set():
@@ -2816,16 +2897,16 @@ class DesktopHelper:
             min_ms = 200
         return enabled, threshold, max(150, min(300, min_ms))
 
-    def _play_with_barge_in(self, proc: Any) -> bool:
-        """Block until ``proc`` ends; stop it on confident speech. Pure flow.
+    def _wait_playback(self, proc: Any) -> bool:
+        """Wait out ``proc``; True when the explicit stop flag ended it.
 
-        Returns True when barge-in stopped playback. Disabled (or an
-        unopenable mic) degrades to a plain blocking wait — speech never
-        breaks because detection cannot run. The mic stream is short-lived
-        (this playback only) and never touches the wake monitor's mic.
+        Waits in short slices so an orb STOP (``stop_speaking`` / SIGUSR2)
+        terminates playback promptly even when barge-in is disabled or no
+        mic could be opened. Never raises; a dead process simply reads as
+        finished.
         """
-        enabled, threshold, min_ms = self._barge_in_settings()
-        if not enabled or not threshold > 0:
+        stop = getattr(self, "_speak_stop", None)
+        if stop is None:
             try:
                 proc.wait(timeout=90)
             except Exception:
@@ -2834,31 +2915,62 @@ class DesktopHelper:
                 except Exception:
                     pass
             return False
+        while True:
+            try:
+                if stop.is_set():
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                    return True
+            except Exception:
+                pass
+            try:
+                # Both waits and returns when the process ends; a running
+                # process raises TimeoutExpired, so we poll the stop flag.
+                proc.wait(timeout=0.05)
+                return False
+            except Exception:
+                try:
+                    if proc.poll() is not None:
+                        return False
+                except Exception:
+                    return False
+
+    def _play_with_barge_in(self, proc: Any) -> bool:
+        """Block until ``proc`` ends; stop it on confident speech or STOP.
+
+        Returns True when playback was interrupted (confident room speech
+        or an explicit orb STOP). Disabled (or an unopenable mic) degrades
+        to a plain wait — speech never breaks because detection cannot run.
+        The mic stream is short-lived (this playback only) and never
+        touches the wake monitor's mic.
+        """
+        stop = getattr(self, "_speak_stop", None)
+        if stop is not None:
+            try:
+                if stop.is_set():
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                    return True
+            except Exception:
+                pass
+        enabled, threshold, min_ms = self._barge_in_settings()
+        if not enabled or not threshold > 0:
+            return self._wait_playback(proc)
         try:
             mic = self._mic_factory()
         except Exception:
             mic = None
         if mic is None:
-            try:
-                proc.wait(timeout=90)
-            except Exception:
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
-            return False
+            return self._wait_playback(proc)
         watcher = BargeInWatcher(threshold=threshold, min_ms=min_ms)
         try:
             mic.start()
         except Exception:
-            try:
-                proc.wait(timeout=90)
-            except Exception:
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
-            return False
+            return self._wait_playback(proc)
         interrupted = False
         try:
             frame_ms = int(getattr(mic, "frame_ms", 300) or 300)
@@ -2866,6 +2978,17 @@ class DesktopHelper:
             frame_ms = 300
         try:
             while proc.poll() is None:
+                if stop is not None:
+                    try:
+                        if stop.is_set():
+                            try:
+                                proc.terminate()
+                            except Exception:
+                                pass
+                            interrupted = True
+                            break
+                    except Exception:
+                        pass
                 try:
                     frame = mic.read_frame(timeout=0.5)
                 except Exception:
@@ -2887,6 +3010,12 @@ class DesktopHelper:
         finally:
             try:
                 mic.stop()
+            except Exception:
+                pass
+        if stop is not None:
+            try:
+                if stop.is_set():
+                    interrupted = True
             except Exception:
                 pass
         try:
@@ -2916,6 +3045,13 @@ class DesktopHelper:
         import shutil
         import subprocess
         import tempfile
+        # Fresh reply: a STOP flag from a previous turn must never cut this
+        # one. Cleared before synth so an orb STOP arriving mid-synthesis is
+        # still honored when playback starts.
+        try:
+            self._speak_stop.clear()
+        except Exception:
+            pass
         spoken = self._spoken_excerpt(text)
         if not spoken:
             return
@@ -2954,6 +3090,7 @@ class DesktopHelper:
             proc = subprocess.Popen(
                 [player, path], stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL)
+            self._playback_proc = proc
             if self._play_with_barge_in(proc):
                 self._barge_interrupted = True
                 self._talk_emit("interrupt")
@@ -2961,6 +3098,7 @@ class DesktopHelper:
         except Exception as exc:  # never fatal
             _trace("speak_failed", detail=str(exc)[:120])
         finally:
+            self._playback_proc = None
             self._speaking = False
             # Playback finished: a done marker so the orb's green ends the
             # moment Qubit stops talking instead of lingering for the whole
