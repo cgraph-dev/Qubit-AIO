@@ -20,6 +20,59 @@ from utils import base_url_host_matches, base_url_hostname, is_truthy_value
 # Log-record parity with the origin module.
 logger = logging.getLogger("cli")
 
+# The launch flags that pick the model route: ``/new`` starts on the profile's default route.
+_ROUTE_FLAGS = ("model", "provider", "api_key", "base_url")
+
+
+def _gateway_launch(cli):
+    """This run's explicit launch flags as gateway ``session.create`` policy (main handed them to AIAgent)."""
+    explicit_model = getattr(cli, "_explicit_model_override", False)
+    provider = getattr(cli, "_explicit_provider", None)
+    return {"model": cli.model if explicit_model else None,
+            "provider": provider if explicit_model and provider not in {None, "", "auto"} else None,
+            "api_key": getattr(cli, "_explicit_api_key", None),
+            "base_url": getattr(cli, "_explicit_base_url", None),
+            # Only a typed -t; the gateway resolves the profile default and the coding posture (#138670).
+            "toolsets": getattr(cli, "enabled_toolsets", None) if getattr(cli, "_explicit_toolsets", False) else None,
+            "reasoning": getattr(cli, "_explicit_reasoning", None),
+            "max_turns": getattr(cli, "_explicit_max_turns", None),
+            "checkpoints": getattr(cli, "_explicit_checkpoints", False) or None,
+            "pass_session_id": getattr(cli, "pass_session_id", False) or None,
+            "ignore_rules": getattr(cli, "ignore_rules", False) or None,
+            "run_budget": getattr(cli, "_explicit_run_budget", None),
+            "verbose": getattr(cli, "verbose", False) or None,
+            "skills": _explicit_launch_skills(cli)}
+
+
+def _explicit_launch_skills(cli):
+    """The `-s/--skills` names, which the gateway renders into the session once at creation (the CLI's
+    own prompt never reaches it). ``skills.auto_load`` names are left out: the gateway's agent loads those."""
+    requested = getattr(cli, "_preload_skills_requested", None) or []
+    if not requested:
+        return None
+    from agent.skill_commands import resolve_auto_load_skills
+    from cli import CLI_CONFIG
+    auto = set() if getattr(cli, "ignore_rules", False) else set(resolve_auto_load_skills(CLI_CONFIG))
+    return [name for name in requested if name not in auto] or None
+
+
+def _record_shell_hook_consent():
+    """Main's first-use shell-hook prompt, on this terminal. The gateway that registers the hooks
+    has no TTY; it reads the allowlist this writes when the session opens (create or resume).
+    ``--accept-hooks`` / QUBIT_ACCEPT_HOOKS / ``hooks_auto_accept`` approve without asking.
+    A remote gateway has its own home and allowlist, and a bypass launch reads no profile hooks,
+    so nothing is asked for either."""
+    from qubit_cli.gateway_chat import env_launch_flags
+    flags = env_launch_flags()
+    if os.environ.get("QUBIT_TUI_GATEWAY_URL", "").strip() or flags.get("safe_mode") or flags.get("ignore_user_config"):
+        return
+    try:
+        from agent.shell_hooks import record_consent_from_config
+        from qubit_cli.config import load_config
+        record_consent_from_config(load_config())
+    except Exception:  # health: allow BLE001 -- consent is best effort; the gateway skips unapproved hooks
+        logger.warning("shell-hook consent check failed", exc_info=True)
+
 
 def _adopt_gateway_toolsets(cli, store):
     """The profile default the gateway resolved for the opened session, when this process has no list to
