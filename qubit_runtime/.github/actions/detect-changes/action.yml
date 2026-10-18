@@ -66,6 +66,9 @@ outputs:
   rust:
     description: Run `cargo test` for the Tauri bootstrap installer.
     value: ${{ steps.classify.outputs.rust }}
+  catalog:
+    description: Run the plugin-catalog tests (catalog-only diffs run these instead of the Python suite).
+    value: ${{ steps.classify.outputs.catalog }}
   mcp_catalog:
     description: Require MCP catalog security review label.
     value: ${{ steps.classify.outputs.mcp_catalog }}

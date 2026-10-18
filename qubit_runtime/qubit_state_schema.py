@@ -689,7 +689,7 @@ class SessionSchemaMixin:
 
     def _trigram_tokenizer_available(self, cursor: sqlite3.Cursor) -> bool:
         """Probe trigram support without publishing a persistent FTS object."""
-        probe = "temp.hermes_fts5_trigram_probe"
+        probe = "temp.qubit_fts5_trigram_probe"
         cursor.execute(f"DROP TABLE IF EXISTS {probe}")
         try:
             cursor.execute(f"CREATE VIRTUAL TABLE {probe} USING fts5(content, tokenize='trigram')")
@@ -762,6 +762,8 @@ class SessionSchemaMixin:
                 rows = cursor.execute(f'PRAGMA table_info("{table_name}")').fetchall()
             except sqlite3.OperationalError:
                 continue  # Table doesn't exist yet (shouldn't happen after executescript)
+            if not rows:
+                continue  # PRAGMA table_info returns [] for a missing table; the DDL creates it whole
             # PRAGMA table_info rows: (cid, name, type, notnull, dflt_value, pk)
             live_cols = {row[1] for row in rows}
             for col_name, col_type in declared_cols.items():
@@ -1066,6 +1068,9 @@ class SessionSchemaMixin:
             # v30: delegate-child transcripts too (FTS_TRIGRAM_EXCLUDED_SOURCES + _delegate_from).
             # Rebuild once so rows indexed by older view/trigger definitions do not linger.
             fts_migrations_complete = self._migrate_trigram_cron_exclusion(cursor)
+        # v32: nothing to run here. The declared tables/columns added under v31 were already
+        # created by _init_schema's executescript(SCHEMA_SQL) + _reconcile_columns() before this
+        # chain; the version only records that the store has them (#140315).
 
         # Stamp the FTS layout version (fresh/optimized DBs); a legacy DB keeps its absent/0
         # marker until optimize-storage runs. An INTERRUPTED optimize (markers, trash, or an
@@ -1345,8 +1350,21 @@ class SessionSchemaMixin:
             )
 
 
+def apply_declared_schema(cursor: sqlite3.Cursor) -> None:
+    """The one additive catch-up order for raw ``state.db`` connections: columns (SCHEMA_SQL indexes may
+    name columns an old table lacks), then the canonical DDL statement by statement (no
+    ``executescript`` implicit COMMIT, so callers keep their own transaction), then columns again
+    (a no-op for tables the script just created whole). Locking, snapshots and commit stay with the
+    callers. ``_reconcile_columns`` only touches the staticmethod ``_parse_schema_columns``, so a bare
+    instance is enough and the column reconciler keeps one implementation."""
+    shim = object.__new__(SessionSchemaMixin)
+    shim._reconcile_columns(cursor)
+    SessionSchemaMixin._execute_ddl_script_transactional(cursor, SCHEMA_SQL)
+    shim._reconcile_columns(cursor)
+
+
 def reconcile_state_schema(conn: sqlite3.Connection) -> None:
-    """Bring a raw ``state.db`` connection to the canonical SCHEMA_SQL shape.
+    """Bring a raw ``state.db`` connection to the canonical SCHEMA_SQL shape and commit.
 
     Single durable-shape authority for callers that open ``state.db``
     outside SessionDB. The async-delegation tool used to carry its own
@@ -1354,14 +1372,8 @@ def reconcile_state_schema(conn: sqlite3.Connection) -> None:
     from SCHEMA_SQL (same-name columns with different nullability/defaults
     depending on which authority touched the database first, #94691). This
     helper instead replays the canonical DDL (every statement is
-    IF NOT EXISTS/idempotent) and reuses SessionDB's declarative column
-    reconciliation, so out-of-band openers can never grow a second
-    hand-maintained shape for the same durable tables.
+    IF NOT EXISTS/idempotent) through :func:`apply_declared_schema`.
     """
-    conn.executescript(SCHEMA_SQL)
-    # _reconcile_columns only touches the staticmethod _parse_schema_columns,
-    # so a bare instance works; reusing it keeps one reconciliation
-    # implementation (one authority) instead of a near-copy on raw
-    # connections.
-    shim = object.__new__(SessionSchemaMixin)
-    shim._reconcile_columns(conn.cursor())
+    apply_declared_schema(conn.cursor())
+    if conn.in_transaction:
+        conn.commit()

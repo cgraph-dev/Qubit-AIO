@@ -1756,11 +1756,12 @@ class SessionSessionsMixin:
         row whose first turn is already leased but not yet flushed would be deleted mid-turn
         (#123583). A guarded row is simply not deleted (returns ``False``), like any non-empty row."""
         def _do(conn):
-            if self._guarded_ids(conn, [session_id]):
-                return False
-            cursor = conn.execute(
+            from qubit_state_local import owned_lineage_ids
+            if self._guarded_ids(conn, [session_id]) or owned_lineage_ids(conn, session_id) != [session_id]:
+                return False  # an empty reset tip is still its conversation's current target
+            eligible = conn.execute(
                 """
-                DELETE FROM sessions
+                SELECT 1 FROM sessions
                 WHERE id = ?
                   AND title IS NULL
                   AND NOT EXISTS (
@@ -1772,11 +1773,20 @@ class SessionSessionsMixin:
                   )
                 """,
                 (session_id,),
-            )
-            if cursor.rowcount > 0:
-                self._delete_unreferenced_system_prompts(conn)
-            return cursor.rowcount > 0
+            ).fetchone()
+            if eligible is None:
+                return False
+            # Same BEGIN IMMEDIATE transaction as the check above: retire the ledger rows
+            # (ON DELETE RESTRICT) and delete without re-evaluating eligibility. Housekeeping, not
+            # a user delete: its fence ages out at the horizon (an untitled row is never a Bot Chat).
+            from qubit_state_mutation_retirement import retire_sessions
+            retire_sessions(conn, [session_id], expiring=[session_id])
+            conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            self._delete_unreferenced_system_prompts(conn)
+            return True
         deleted = self._execute_write(_do)
+        from qubit_state_media import collect_retired_media
+        collect_retired_media(self)
         if deleted:
             self._remove_session_files(sessions_dir, session_id)
         return deleted

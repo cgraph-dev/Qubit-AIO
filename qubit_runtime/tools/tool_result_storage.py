@@ -98,7 +98,7 @@ def spillover_names_in_text(*texts) -> set:
     return names
 
 
-def referenced_spillover_names(spill_dir) -> set | None:
+def referenced_spillover_names(spill_dir) -> "set | None":
     """Basenames under *spill_dir* still referenced by any message in the home's ``state.db``.
 
     ``set()`` when no database exists (no sessions → nothing references anything), ``None``
@@ -126,7 +126,7 @@ def referenced_spillover_names(spill_dir) -> set | None:
     return names
 
 
-def cleanup_spillover_cache(max_age_hours: int | None = None) -> int:
+def cleanup_spillover_cache(max_age_hours: "int | None" = None) -> int:
     """Delete spillover files older than *max_age_hours*; returns count removed (same
     contract as the ``cleanup_*_cache`` helpers the gateway housekeeping loop runs hourly).
     A ``None`` age means the session retention window, not a cache TTL — an explicit

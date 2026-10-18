@@ -50,11 +50,6 @@ def compact_result(result, *, user_message=None):
     return result
 
 
-def identity_key(principal_id, session_id, request_id):
-    return IDENTITY_PREFIX + admission_fingerprint(canonical_target=session_id,
-        payload={'principal': principal_id, 'request': request_id})
-
-
 # Top-level row key only ``encode_result`` writes. The row's top level is built by the gateway
 # (``result``/``usage``), never by the agent or a message, so message fields can't collide with it.
 _STORED = '_stored'
@@ -104,6 +99,11 @@ def load_result(text):
     messages[ref] = {k: value['final_response'] if k == 'content' else v for k, v in messages[ref].items()}
     del result[_STORED]
     return result
+
+
+def identity_key(principal_id, session_id, request_id):
+    return IDENTITY_PREFIX + admission_fingerprint(canonical_target=session_id,
+        payload={'principal': principal_id, 'request': request_id})
 
 
 def terminal_api_admissions(conn, request_id):
