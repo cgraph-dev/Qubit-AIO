@@ -104,7 +104,6 @@ from .mark_field import (
     sparkles,
     echo_rings,
     satellites,
-    SATELLITE_RING_ALPHA,
     ECHO_LAG_S,
     ECHO_SCALE,
     ECHO_ALPHA,
