@@ -288,10 +288,20 @@ def test_dust_field_adds_its_motes(monkeypatch):
 
 
 def test_sparkles_are_deterministic_and_turn_on_and_off():
-    visible_at, gone_at = 24.15, 46.7
+    visible_at = 24.15
     visible = M.sparkles(visible_at, 32.0)
     assert len(visible) > 0
-    assert M.sparkles(gone_at, 32.0) == []
+    # Denser field: no single clock hides all forty at once, so on/off is a
+    # per-dot property — over one sweep every dot is both seen and missed.
+    seen = {i: [False, False] for i in range(F.SPARKLE_COUNT)}
+    t = 0.0
+    while t < 60.0:
+        present = {d["index"] for d in F.sparkles(t, 32.0)}
+        for i in seen:
+            seen[i][0] |= float(i) in present
+            seen[i][1] |= float(i) not in present
+        t += 0.05
+    assert all(on and off for on, off in seen.values())
     # Deterministic: the same clock yields the identical glints (never random).
     assert visible == M.sparkles(visible_at, 32.0)
     assert len(visible) <= F.SPARKLE_COUNT
@@ -738,20 +748,42 @@ def test_rgb_trail_is_pure_deterministic_and_starts_on_the_star():
                      (a[0]["x"], a[0]["y"])) > 1e-6
 
 
-def test_rgb_trail_hue_rotates_along_its_length_and_with_the_clock():
+def test_rgb_trail_is_a_duotone_pair_lerp_that_drifts_with_the_clock():
+    # Owner: two colours per streak, not a rainbow. Every streak is the
+    # head hue and its half-turn partner, lerped along the tail.
     from voicebridge.orb import mark_field as F
     R, t = 64.0, 1.7
     part = F.particle_state(t, R)[0]
     samples = F.rgb_trail(t, R, part)
+    n = F.RGB_TRAIL_SAMPLES
+    head = (part["hue"] + t * F.RGB_TRAIL_HUE_DRIFT) % 1.0
+    tail = (head + F.HUE_PAIR_OFFSET) % 1.0
+    assert F.HUE_PAIR_OFFSET == pytest.approx(0.5)
+    for s in samples:
+        # One shared pair across the whole streak: exactly two hues.
+        assert s["hue2"] == pytest.approx(tail)
+    for s, k in zip(samples, range(n)):
+        assert s["hue"] == pytest.approx(
+            (head + (k / float(n - 1)) * F.HUE_PAIR_OFFSET) % 1.0)
     steps = [(b["hue"] - a["hue"]) % 1.0 for a, b in zip(samples, samples[1:])]
     assert all(s > 0.0 for s in steps), steps
-    assert all(s == pytest.approx(F.RGB_TRAIL_HUE_STEP, abs=1e-9) for s in steps)
-    # Total spread along the tail stays well inside a visible spectrum.
+    assert all(s == pytest.approx(F.HUE_PAIR_OFFSET / (n - 1), abs=1e-9)
+               for s in steps)
+    # Head-to-tail spans exactly half the wheel: two colours, no spectrum.
     span = (samples[-1]["hue"] - samples[0]["hue"]) % 1.0
-    assert 0.05 < span < 0.9, span
-    # The wheel also drifts with time, so no two moments share a streak.
+    assert span == pytest.approx(F.HUE_PAIR_OFFSET)
+    # The pair drifts with time TOGETHER, so no two moments share a streak.
     later = F.rgb_trail(t + 1.0, R, part)
     assert later[0]["hue"] != pytest.approx(samples[0]["hue"], abs=1e-6)
+    assert later[0]["hue2"] == pytest.approx(
+        (samples[0]["hue2"] + F.RGB_TRAIL_HUE_DRIFT) % 1.0)
+    # The short variant is a duotone too.
+    mote = F.dust_state(t, R)[0]
+    dust = F.dust_trail(t, R, mote)
+    assert len(dust) == F.DUST_TRAIL_SAMPLES
+    assert all(s["hue2"] == pytest.approx(dust[0]["hue2"]) for s in dust)
+    assert ((dust[-1]["hue"] - dust[0]["hue"]) % 1.0) == pytest.approx(
+        F.HUE_PAIR_OFFSET)
 
 
 def test_rgb_trail_tapers_fades_and_follows_the_orbit_path():
@@ -1013,3 +1045,39 @@ def test_rgb_trail_alpha_never_steps_between_frames():
                 assert abs(ca - pa) < 0.02, (idx, k, pa, ca)
                 assert abs(cs - ps) < 0.1, (idx, k, ps, cs)
             prev = cur
+
+
+# --------------------------------------------------------------------------- #
+# DUOTONE PAIRS — owner: two colours per streak. Every element dict carries
+# hue2, the half-turn partner of its hue, so both render lanes stroke the
+# same pair without carrying their own colour wheel.
+# --------------------------------------------------------------------------- #
+def test_every_element_dict_carries_its_duotone_partner():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    layers = {
+        "particle": F.particle_state(t, R),
+        "dust": F.dust_state(t, R),
+        "binary": F.binary_state(t, R),
+        "sparkle": F.sparkles(3.3, R),
+        "spark": F.nucleus_sparks(0.4, R),
+    }
+    for name, items in layers.items():
+        assert items, name
+        for d in items:
+            assert "hue2" in d, (name, d)
+            assert d["hue2"] == pytest.approx(
+                (d["hue"] + F.HUE_PAIR_OFFSET) % 1.0), (name, d)
+    for shell in F.satellites(t, R):
+        body = shell["body"]
+        assert body["hue2"] == pytest.approx(
+            (body["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+    comet = F.comet(t, R)
+    if comet.get("alpha", 0.0) > 0.0:
+        assert comet["hue2"] == pytest.approx(
+            (comet["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+    assert F._hue_pair(0.2) == pytest.approx(0.7)
+    assert F._hue_pair(0.9) == pytest.approx(0.4)  # wraps like the wheel
+
+
+# --------------------------------------------------------------------------- #
