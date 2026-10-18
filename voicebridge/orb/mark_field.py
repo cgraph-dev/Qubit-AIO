@@ -19,14 +19,29 @@ Layers, back to front:
   * ``dust_state``      — a denser field of tiny, slow motes on the orbits.
   * ``comet``           — one fast traveller with a long tail, periodic.
   * ``sparkles``        — short-lived deterministic glints across the plane.
+  * ``blink_dots``      — pinpricks that materialise in place and vanish.
+  * ``flare_dots``      — a second, rarer family of larger flare blinks.
   * ``rgb_trail``       — the spectrum streak each star LEAVES instead of an
     outer glow: hue walks the wheel along the tail and with the clock, and
     ``hue_to_rgb`` is the one colour conversion both renderers use.
+  * ``core_shells``     — the nucleus's INTERIOR structure: nested bodies at
+    different radii and tilts, each turning at its own period.
+  * ``filament_state``  — a travelling standing wave running around a ring.
 
 Depth convention: ``depth = 0.5 + 0.5*cos(radians(angle))`` on a particle's
 orbit — 1.0 is nearest the viewer. Renderers draw every ``depth < 0.5`` element
 BEHIND the nucleus and every ``depth >= 0.5`` element IN FRONT; that z-split is
-what makes the flat mark read as three-dimensional.
+what makes the flat mark read as three-dimensional. ``depth`` is unchanged and
+remains the shading / z-split scalar every existing contract reads.
+
+Volume convention (ADDITIVE): every element dict also carries ``z`` and ``z2``,
+two INDEPENDENT deterministic depth axes in 0..1 built by :func:`depth_axes`
+from ``hash01`` of the element's index with two distinct salts. ``depth`` is a
+flat function of an element's orbit angle, so on its own it leaves elements at
+the same orbit phase coplanar; ``z`` decorrelates them (a real volume) and
+``z2`` gives a second, independent axis so a renderer can build a true 2.5D/3D
+cloud rather than one scalar. Both are purely additive — nothing that reads
+``depth`` changes, and a renderer may ignore ``z``/``z2`` entirely.
 """
 from __future__ import annotations
 
@@ -76,6 +91,18 @@ DOF_GAMMA = 1.7
 #: tilted plane is foreshortened along one axis; a few degrees of skew is what
 #: stops a glint from reading as a flat sticker pasted on the orbit.
 SKEW_GAIN_DEG = 7.0
+
+# --------------------------------------------------------- volume axes (z/z2)
+#: ADDITIVE volume axes. ``depth`` (above) is a flat function of an element's
+#: orbit angle, so elements sharing a phase share a plane. ``z``/``z2`` are two
+#: independent 0..1 hashes of the element's index — distinct salts so the axes
+#: never move in lockstep — that let a renderer offset an element along two
+#: independent directions and so build a genuine 2.5D/3D cloud. ``depth`` is
+#: untouched; these are extra keys only.
+Z_SALT = 14.7
+#: Distinct from ``Z_SALT`` on purpose: same hash, different salt, so ``z`` and
+#: ``z2`` are uncorrelated.
+Z2_SALT = 42.9
 
 # ------------------------------------------------------------ camera drift
 CAMERA_SWAY_FRAC = 0.016
@@ -160,7 +187,7 @@ PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
 )
 
 #: Dust motes: a denser, slower field so the orbits are never bare.
-DUST_COUNT = 48
+DUST_COUNT = 64
 DUST_R_FRAC_MIN = 0.86
 DUST_R_FRAC_SPAN = 0.30
 DUST_SIZE_BASE = 0.10
@@ -198,7 +225,7 @@ ECHO_WIDTH = 1.0
 #: Spark arms are SHORTER than a particle glint's: at the nucleus they must
 #: read as pinpricks, not stars the size of the nucleus itself.
 SPARK_ARM_FRAC = 0.65
-NUCLEUS_SPARK_COUNT = 26
+NUCLEUS_SPARK_COUNT = 32
 NUCLEUS_SPARK_LIFE_BASE = 1.30
 NUCLEUS_SPARK_LIFE_SPAN = 0.90
 NUCLEUS_SPARK_REACH = 1.28
@@ -235,7 +262,7 @@ SATELLITE_TRAIL_SAMPLES = 5
 SATELLITE_TRAIL_STEP_DEG = 7.0
 
 # ----------------------------------------------------------------- glints
-SPARKLE_COUNT = 40
+SPARKLE_COUNT = 52
 SPARKLE_SEED_STEP = 97.3
 SPARKLE_R_MIN_FRAC = 0.30
 SPARKLE_R_SPAN_FRAC = 0.78
@@ -409,6 +436,7 @@ def _rgb_trail(t: Any, R: float, body: Dict[str, Any], samples: int,
             # No path and no velocity: hold the body's place rather than invent
             # a direction, so a hand-built dict still yields a usable streak.
             x, y, depth = bx, by, _finite(body.get("depth"), 0.5)
+        tz, tz2 = depth_axes(int(_finite(idx)) + k, 123.4)
         out.append({
             "k": float(k),
             "x": x, "y": y,
@@ -420,6 +448,7 @@ def _rgb_trail(t: Any, R: float, body: Dict[str, Any], samples: int,
             "alpha": alpha_base * strength * ((1.0 - f) ** RGB_TRAIL_FALLOFF),
             "size": size * size_base * (1.0 - RGB_TRAIL_TAPER * f),
             "depth": depth,
+            "z": tz, "z2": tz2,
             "dof": dof(depth),
         })
     return out
@@ -464,6 +493,19 @@ def hash01(i: int, salt: float = 0.0) -> float:
     """Deterministic 0..1 hash of an index — the field's only 'randomness'."""
     x = math.sin((i + 1) * 12.9898 + salt * 78.233) * 43758.5453
     return x - math.floor(x)
+
+
+def depth_axes(index: Any, salt: float = 0.0) -> Tuple[float, float]:
+    """``(z, z2)``: two independent deterministic volume axes in 0..1.
+
+    ``z = hash01(index, Z_SALT + salt)`` and ``z2 = hash01(index, Z2_SALT +
+    salt)``. The salts are distinct, so the two axes are uncorrelated: a
+    renderer can offset a body along two independent directions (a real volume)
+    instead of one. ADDITIVE — ``depth`` is unchanged and remains the shading /
+    z-split scalar every existing contract reads. Renderers may ignore these.
+    """
+    i = int(_finite(index))
+    return (hash01(i, Z_SALT + salt), hash01(i, Z2_SALT + salt))
 
 
 def smoothstep(x: Any) -> float:
@@ -643,9 +685,11 @@ def particle_state(t: Any, R: float) -> List[Dict[str, float]]:
         nx, ny = (math.sin(math.radians(tilt)), -math.cos(math.radians(tilt)))
         # Parallax along the orbit normal, then the camera sway.
         tw = glint(tt, seed)
+        pz, pz2 = depth_axes(idx, 17.1)
         out.append({
             "index": float(idx), "orbit": orbit, "angle": ang, "depth": depth,
             "x": x + nx * par + dx, "y": y + ny * par * 0.35 + dy,
+            "z": pz, "z2": pz2,
             "size": _depth_size(depth, size96 * scale) * tw["scale"],
             "alpha": _depth_alpha(depth) * tw["alpha"],
             "lift": _depth_lift(depth),
@@ -714,9 +758,11 @@ def nucleus_sparks(t: Any, R: float) -> List[Dict[str, float]]:
         fade = (1.0 - f) ** 1.5
         if NUCLEUS_SPARK_ALPHA * fade < NUCLEUS_SPARK_MIN_ALPHA:
             continue
+        sz, sz2 = depth_axes(i, 197.9)
         out.append({
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": 0.5 + 0.5 * math.cos(ang),
+            "z": sz, "z2": sz2,
             "hue": _hue_for(i, 97.1), "hue2": _hue_pair(_hue_for(i, 97.1)),
             "dof": dof(0.5 + 0.5 * math.cos(ang)),
             "size": max(0.30, NUCLEUS_SPARK_SIZE * (r / 32.0)
@@ -757,11 +803,14 @@ def satellites(t: Any, R: float) -> List[Dict[str, Any]]:
             d = _depth(a)
             pp = 1.0 - DEPTH_PERSPECTIVE * (1.0 - d)
             tx, ty = orbit_point(0.0, 0.0, rx * pp, ry * pp, tilt, a)
+            sz, sz2 = depth_axes(int(idx) * 100 + k, 151.7)
             trail.append({"x": tx + dx, "y": ty + dy,
+                          "z": sz, "z2": sz2,
                           "size": _depth_size(d, size96 * scale) * 0.5,
                           "alpha": 0.30 * alpha * (1.0 - k / (SATELLITE_TRAIL_SAMPLES + 1.0)),
                           "lift": lift})
         bvx, bvy = _orbit_velocity(rx, ry, tilt, ang)
+        bz, bz2 = depth_axes(idx, 157.3)
         out.append({
             "index": float(idx),
             "ring": {"tilt": tilt, "rx_frac": rx_frac,
@@ -770,6 +819,7 @@ def satellites(t: Any, R: float) -> List[Dict[str, Any]]:
             "body": {"index": float(idx), "x": bx + dx, "y": by + dy,
                       "depth": depth, "hue": _hue_for(idx, 89.3),
                       "hue2": _hue_pair(_hue_for(idx, 89.3)),
+                     "z": bz, "z2": bz2,
                      "vx": bvx * direction, "vy": bvy * direction,
                      "dof": dof(depth), "skew": skew(depth),
                      "size": _depth_size(depth, size96 * scale),
@@ -797,8 +847,11 @@ def trails(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, float]]
         depth = _depth(ang)
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
         x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
+        tz, tz2 = depth_axes(int(_finite(particle.get("index", 0.0))) + k,
+                             173.1)
         out.append({
             "x": x + dx, "y": y + dy,
+            "z": tz, "z2": tz2,
             "hue": _hue_for(particle.get("index", 0.0), 31.7),
             "hue2": _hue_pair(_hue_for(particle.get("index", 0.0), 31.7)),
             "dof": dof(depth),
@@ -812,17 +865,33 @@ def trails(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, float]]
 
 
 def dust_state(t: Any, R: float) -> List[Dict[str, float]]:
-    """Denser motes on the same orbits: the field never looks bare."""
+    """Denser motes spread across EVERY declared ring, not just the two orbits.
+
+    Each mote rides one of the circles :func:`ring_geometry` declares (cycling
+    the list so the field is populated uniformly), on that ring's REAL animated
+    path — live tilt plus precession and a radius scaled by
+    :func:`ring_radius_scale`. The dict shape is unchanged.
+    """
     tt = _finite(t)
     r = _finite(R, 32.0) or 32.0
+    # Declare the same circles the renderers stroke, but from the field's own
+    # tilts directly: dust rides the geometry, not a stubbed ``echo_rings``.
+    # ``ring_geometry`` composes its echo tilts from ``echo_rings(tt -
+    # ECHO_LAG_S)``, which subtracts the lag itself, so the declared follower
+    # sits at a DOUBLE lag — match it exactly so dust rides the drawn circle.
     near_tilt, far_tilt = orbit_tilts(tt)
+    lag_near, lag_far = orbit_tilts(tt - 2.0 * ECHO_LAG_S)
+    rings = _ring_specs(tt, near_tilt, far_tilt, lag_near, lag_far)
     dx, dy = camera_offset(tt, r)
-    rx, ry = r * RX_FRAC, r * RY_FRAC
     scale = r / 32.0
     out: List[Dict[str, float]] = []
     for i in range(DUST_COUNT):
-        orbit = "a" if i % 3 else "b"
-        tilt = near_tilt if orbit == "a" else far_tilt
+        ring = rings[i % len(rings)] if rings else {}
+        tilt = (_finite(ring.get("tilt"))
+                + _finite(ring.get("tilt_spin_deg")))
+        rad = ring_radius_scale(tt, ring)
+        rx = r * _finite(ring.get("rx_frac"), RX_FRAC) * rad
+        ry = r * _finite(ring.get("ry_frac"), RY_FRAC) * rad
         seed = 360.0 * hash01(i, 1.7)
         period = DUST_PERIOD_BASE + DUST_PERIOD_SPAN * hash01(i, 3.1)
         ang = (seed + tt * 360.0 / max(0.1, period)
@@ -832,9 +901,11 @@ def dust_state(t: Any, R: float) -> List[Dict[str, float]]:
         grow = DUST_R_FRAC_MIN + DUST_R_FRAC_SPAN * hash01(i, 5.9)
         x, y = orbit_point(0.0, 0.0, rx * pull * grow, ry * pull * grow, tilt, ang)
         vx, vy = _orbit_velocity(rx * pull * grow, ry * pull * grow, tilt, ang)
+        dz, dz2 = depth_axes(i, 23.3)
         out.append({
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
+            "z": dz, "z2": dz2,
             "vx": vx * 360.0 / max(0.1, period),
             "vy": vy * 360.0 / max(0.1, period),
             "hue": _hue_for(i, 53.9), "hue2": _hue_pair(_hue_for(i, 53.9)),
@@ -882,14 +953,18 @@ def comet(t: Any, R: float) -> Dict[str, Any]:
         d = _depth(a)
         p = 1.0 - DEPTH_PERSPECTIVE * (1.0 - d)
         tx, ty = orbit_point(0.0, 0.0, rx * p, ry * p, near_tilt, a)
+        tz, tz2 = depth_axes(k, 181.3)
         tail.append({"x": tx + dx, "y": ty + dy,
+                     "z": tz, "z2": tz2,
                      "size": COMET_SIZE * scale * 0.62 * (1.0 - k / 14.0),
                      "alpha": COMET_ALPHA * fade * (1.0 - k / (COMET_TRAIL_SAMPLES + 1.0)) ** 1.3,
                      "lift": COMET_LIFT})
     cvx, cvy = _orbit_velocity(rx * pull, ry * pull, near_tilt, ang)
+    cz, cz2 = depth_axes(0, 187.7)
     return {"x": x + dx, "y": y + dy, "depth": depth,
             "index": 0.0, "hue": _hue_for(0, 101.3),
             "hue2": _hue_pair(_hue_for(0, 101.3)),
+            "z": cz, "z2": cz2,
             "vx": cvx * COMET_SPEED_MULT, "vy": cvy * COMET_SPEED_MULT,
             "dof": dof(depth), "skew": skew(depth),
             "size": COMET_SIZE * scale * (0.8 + 0.4 * depth),
@@ -919,9 +994,11 @@ def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
         sx, sy = r * rfrac * RX_FRAC * pull, r * rfrac * RY_FRAC * pull
         x, y = orbit_point(0.0, 0.0, sx, sy, near_tilt, ang)
         vx, vy = _orbit_velocity(sx, sy, near_tilt, ang)
+        gz, gz2 = depth_axes(i, 191.3)
         out.append({"index": float(i), "x": x + dx, "y": y + dy,
                     "depth": depth, "hue": _hue_for(i, 67.1),
                     "hue2": _hue_pair(_hue_for(i, 67.1)),
+                    "z": gz, "z2": gz2,
                     "dof": dof(depth), "skew": skew(depth),
                     "vx": vx * rate, "vy": vy * rate,
                     "size": (SPARKLE_SIZE_BASE + SPARKLE_SIZE_PEAK * peak)
@@ -937,7 +1014,7 @@ def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
 #: each dot fades in from nothing and vanishes the same way, like data
 #: materialising. The full count is always returned (stable frame to frame);
 #: the envelope decides which dots are visible.
-BLINK_COUNT = 24
+BLINK_COUNT = 32
 BLINK_SIZE_BASE = 0.10
 BLINK_SIZE_SPAN = 0.12
 BLINK_ALPHA_PEAK = 0.75
@@ -975,14 +1052,73 @@ def blink_dots(t: Any, R: float) -> List[Dict[str, float]]:
         x, y = orbit_point(0.0, 0.0, r * RX_FRAC * pull * grow,
                            r * RY_FRAC * pull * grow, tilt, ang)
         hue = _hue_for(i, 91.7)
+        bz, bz2 = depth_axes(i, 227.1)
         out.append({
             "index": float(i), "x": x + dx, "y": y + dy, "depth": depth,
             "hue": hue, "hue2": _hue_pair(hue),
+            "z": bz, "z2": bz2,
             "dof": dof(depth), "skew": skew(depth),
             "size": ((BLINK_SIZE_BASE + BLINK_SIZE_SPAN * hash01(i, 39.3))
                      * scale * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth)),
             "alpha": BLINK_ALPHA_PEAK * env * (0.35 + 0.65 * depth),
             "lift": BLINK_LIFT,
+        })
+    return out
+
+
+# --------------------------------------------------------- flare blink family
+#: A SECOND blink family: the same "materialise in place, never travel" idea
+#: but rarer, larger and longer-lived, so the field has occasional bright
+#: flares among the dense pinpricks instead of one uniform dot population.
+#: Distinct salts and a lower count keep it a rare event, not a second field.
+FLARE_COUNT = 8
+FLARE_SIZE_BASE = 0.16
+FLARE_SIZE_SPAN = 0.10
+FLARE_ALPHA_PEAK = 0.50
+FLARE_LIFE_BASE = 4.6
+FLARE_LIFE_SPAN = 4.0
+FLARE_LIFT = 0.55
+FLARE_R_FRAC_MIN = 0.42
+FLARE_R_FRAC_SPAN = 0.50
+
+
+def flare_dots(t: Any, R: float) -> List[Dict[str, float]]:
+    """Rare, larger blink flares — a second, slower materialise-in-place family.
+
+    Same contract as :func:`blink_dots` (fixed positions, only ``alpha`` moves
+    through a raised-cosine 0 -> peak -> 0 envelope, so every birth and death is
+    a fade), but fewer, bigger dots with much longer lives. ``FLARE_COUNT``
+    is always returned so a renderer's primitive count stays stable. Carries the
+    additive ``z``/``z2`` volume axes like every other element.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    near_tilt, far_tilt = orbit_tilts(tt)
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    out: List[Dict[str, float]] = []
+    for i in range(FLARE_COUNT):
+        tilt = far_tilt if i % 2 else near_tilt
+        ang = 360.0 * hash01(i, 41.1)
+        life = FLARE_LIFE_BASE + FLARE_LIFE_SPAN * hash01(i, 43.7)
+        phase = (tt / max(0.1, life) + hash01(i, 45.9)) % 1.0
+        env = 0.5 * (1.0 - math.cos(2.0 * math.pi * phase))
+        depth = _depth(ang)
+        pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+        grow = FLARE_R_FRAC_MIN + FLARE_R_FRAC_SPAN * hash01(i, 47.3)
+        x, y = orbit_point(0.0, 0.0, r * RX_FRAC * pull * grow,
+                           r * RY_FRAC * pull * grow, tilt, ang)
+        hue = _hue_for(i, 107.3)
+        fz, fz2 = depth_axes(i, 233.9)
+        out.append({
+            "index": float(i), "x": x + dx, "y": y + dy, "depth": depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "z": fz, "z2": fz2,
+            "dof": dof(depth), "skew": skew(depth),
+            "size": ((FLARE_SIZE_BASE + FLARE_SIZE_SPAN * hash01(i, 49.1))
+                     * scale * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth)),
+            "alpha": FLARE_ALPHA_PEAK * env * (0.30 + 0.70 * depth),
+            "lift": FLARE_LIFT,
         })
     return out
 
@@ -994,7 +1130,7 @@ INNER_RING_DIRECTION = 1.0
 INNER_RING_TILT_BASE = 0.0
 
 # ------------------------------------------------------------- binary particle field
-BINARY_COUNT = 72
+BINARY_COUNT = 88
 BINARY_SIZE_BASE = 0.07
 BINARY_SIZE_SPAN = 0.06
 BINARY_PERIOD_BASE = 6.0
@@ -1040,9 +1176,11 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
         x, y = orbit_point(0.0, 0.0, rx * pull * grow, ry * pull * grow,
                            tilt, ang)
         vx, vy = _orbit_velocity(rx * pull * grow, ry * pull * grow, tilt, ang)
+        bz, bz2 = depth_axes(i, 211.3)
         out.append({
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
+            "z": bz, "z2": bz2,
             "vx": vx * 360.0 / max(0.1, period),
             "vy": vy * 360.0 / max(0.1, period),
             "hue": _hue_for(i, 71.5), "hue2": _hue_pair(_hue_for(i, 71.5)),
@@ -1068,9 +1206,11 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
         x, y = orbit_point(0.0, 0.0, rx_s * pull, ry_s * pull, tilt, ang)
         vx, vy = _orbit_velocity(rx_s * pull, ry_s * pull, tilt, ang)
         i = main_n + j
+        bz, bz2 = depth_axes(i, 223.7)
         out.append({
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
+            "z": bz, "z2": bz2,
             "vx": vx * direction * 360.0 / max(0.1, period),
             "vy": vy * direction * 360.0 / max(0.1, period),
             "hue": _hue_for(i, 83.9), "hue2": _hue_pair(_hue_for(i, 83.9)),
@@ -1079,6 +1219,146 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
             "alpha": _depth_alpha(depth, BINARY_ALPHA_BASE),
             "lift": BINARY_LIFT_BASE,
             "char": "1" if (i % 2 == 0) else "0",
+        })
+    return out
+
+
+# ---------------------------------------------------------------- core shells
+#: The nucleus is not a flat disc: it has INTERIOR structure. ``core_shells``
+#: declares a few nested bodies at different radii and plane tilts, each
+#: turning the nucleus at its own NON-HARMONIC period, so a renderer can draw
+#: them as layered depth INSIDE the core (owner: "make inside orb more 3d give
+#: more depth and animations"). Radii are fractions of the MARK radius and sit
+#: comfortably inside the nucleus body (``NUCLEUS_FRAC`` = 0.05).
+CORE_SHELL_COUNT = 4
+CORE_SHELL_R_FRAC_MIN = 0.014
+CORE_SHELL_R_FRAC_SPAN = 0.031
+#: One full-turn period per shell (seconds). Non-harmonic against each other,
+#: against the ring turns (9.5/13.5) and against the spins (20.5/27).
+CORE_SHELL_PERIODS_S = (2.9, 4.3, 5.9, 8.1)
+#: Each shell's orbit plane tilt: base + step*index, so the shells nest at
+#: different angles instead of sharing one plane.
+CORE_SHELL_TILT_BASE = 16.0
+CORE_SHELL_TILT_STEP = 53.0
+#: Each shell's own spin phase (degrees): the shell turns under the light,
+#: independent of where its body travels.
+CORE_SHELL_SPIN_BASE = 11.0
+CORE_SHELL_SPIN_STEP = 67.0
+CORE_SHELL_SIZE_FRAC = 0.022
+CORE_SHELL_SIZE_SPAN = 0.014
+CORE_SHELL_ALPHA_BASE = 0.40
+CORE_SHELL_ALPHA_GAIN = 0.36
+CORE_SHELL_LIFT_BASE = 0.45
+CORE_SHELL_LIFT_GAIN = 0.35
+
+
+def core_shells(t: Any, R: float) -> List[Dict[str, float]]:
+    """Nested interior bodies of the nucleus, one dict per shell.
+
+    Each shell: ``{"index", "x", "y", "depth", "z", "z2", "size", "alpha",
+    "hue", "hue2", "tilt", "spin_deg", "dof", "skew", "lift", "r_frac"}``.
+    ``x``/``y`` are the shell body's position (camera sway included) inside the
+    core; ``size`` is its drawn radius; ``tilt``/``spin_deg`` describe its plane
+    and its own rotation so a renderer can layer them as real interior depth.
+    Deterministic in ``(t, R)``; empty-safe and junk-safe like every layer.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    out: List[Dict[str, float]] = []
+    for i in range(CORE_SHELL_COUNT):
+        period = CORE_SHELL_PERIODS_S[i % len(CORE_SHELL_PERIODS_S)]
+        direction = 1.0 if (i % 2 == 0) else -1.0
+        rfrac = (CORE_SHELL_R_FRAC_MIN
+                 + CORE_SHELL_R_FRAC_SPAN * hash01(i, 61.3))
+        rx = r * rfrac
+        ry = rx * (RY_FRAC / RX_FRAC)
+        tilt = CORE_SHELL_TILT_BASE + CORE_SHELL_TILT_STEP * i
+        ang = (360.0 * direction * tt / max(0.1, period)
+               + 360.0 * hash01(i, 63.1))
+        depth = _depth(ang)
+        pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+        x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
+        cz, cz2 = depth_axes(i, 73.0)
+        hue = _hue_for(i, 79.7)
+        out.append({
+            "index": float(i), "x": x + dx, "y": y + dy, "depth": depth,
+            "z": cz, "z2": cz2,
+            "size": ((CORE_SHELL_SIZE_FRAC
+                      + CORE_SHELL_SIZE_SPAN * hash01(i, 65.7)) * r
+                     * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth)),
+            "alpha": CORE_SHELL_ALPHA_BASE + CORE_SHELL_ALPHA_GAIN * depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "tilt": tilt,
+            "spin_deg": (CORE_SHELL_SPIN_BASE + CORE_SHELL_SPIN_STEP * i
+                         + 360.0 * tt / max(0.1, period)) % 360.0,
+            "dof": dof(depth), "skew": skew(depth),
+            "lift": CORE_SHELL_LIFT_BASE
+                    + CORE_SHELL_LIFT_GAIN * hash01(i, 67.1),
+            "r_frac": rfrac,
+        })
+    return out
+
+
+# ------------------------------------------------------------- energy filament
+#: A travelling standing wave running around a tilted ring: a bright band that
+#: sweeps the circle, so the mark gains a continuous "energy filament" layer
+#: that is neither a body nor a static circle. Positions are fixed on the ring;
+#: only the wave's phase moves, so the layer is fluid and cheap.
+FILAMENT_SAMPLES = 36
+FILAMENT_RX_FRAC = 0.78
+FILAMENT_PERIOD_S = 8.3
+FILAMENT_WAVE_COUNT = 3
+FILAMENT_WAVE_SPEED = 0.55
+FILAMENT_TILT_BASE = 12.0
+FILAMENT_TILT_SWAY_DEG = 8.0
+FILAMENT_ALPHA_BASE = 0.06
+FILAMENT_ALPHA_PEAK = 0.42
+FILAMENT_SIZE_BASE = 0.09
+FILAMENT_SIZE_PEAK = 0.16
+FILAMENT_LIFT = 0.62
+
+
+def filament_state(t: Any, R: float) -> List[Dict[str, float]]:
+    """A travelling standing wave around a tilted ring.
+
+    ``FILAMENT_SAMPLES`` points on a ring; each carries ``{"index", "x", "y",
+    "depth", "z", "z2", "size", "alpha", "hue", "hue2", "lift"}``. The point
+    positions are fixed on the circle; the ALPHA (and size) ride a travelling
+    sine wave, ``FILAMENT_WAVE_COUNT`` crests running around the ring at
+    ``FILAMENT_WAVE_SPEED``, so a renderer strokes a pulsing energy filament.
+    Deterministic and junk-safe.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    n = FILAMENT_SAMPLES
+    tilt = FILAMENT_TILT_BASE + FILAMENT_TILT_SWAY_DEG * math.sin(
+        2.0 * math.pi * tt / max(0.1, FILAMENT_PERIOD_S))
+    rx = r * FILAMENT_RX_FRAC
+    ry = rx * (RY_FRAC / RX_FRAC)
+    out: List[Dict[str, float]] = []
+    for i in range(n):
+        ang = 360.0 * i / float(n)
+        depth = _depth(ang)
+        pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+        x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
+        wave = 0.5 + 0.5 * math.sin(
+            2.0 * math.pi * (FILAMENT_WAVE_COUNT * i / float(n)
+                             - FILAMENT_WAVE_SPEED * tt
+                             / max(0.1, FILAMENT_PERIOD_S)))
+        fz, fz2 = depth_axes(i, 251.3)
+        hue = (_hue_for(i, 109.3) + tt * RGB_TRAIL_HUE_DRIFT) % 1.0
+        out.append({
+            "index": float(i), "x": x + dx, "y": y + dy, "depth": depth,
+            "z": fz, "z2": fz2,
+            "size": (FILAMENT_SIZE_BASE + FILAMENT_SIZE_PEAK * wave)
+                    * (r / 32.0) * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth),
+            "alpha": (FILAMENT_ALPHA_BASE + FILAMENT_ALPHA_PEAK * wave)
+                     * (0.35 + 0.65 * depth),
+            "hue": hue, "hue2": _hue_pair(hue),
+            "lift": FILAMENT_LIFT,
+            "dof": dof(depth), "skew": skew(depth),
         })
     return out
 
@@ -1105,21 +1385,110 @@ RING_BREATH_PERIOD_INNER = 6.5
 RING_BREATH_PERIOD_ECHO = 17.0
 #: Points in :func:`ring_path`; enough that a 300px ring shows no facets.
 RING_PATH_SAMPLES = 72
+#: Per-ring plane PRECESSION and radius BREATH. Each ring tips and breathes on
+#: its OWN period, and every period is non-harmonic against the ring turns
+#: (9.5/13.5), the spins (20.5/27) and every other ring period, so the set never
+#: pulses or tips in unison. Exposed additively: ``tilt`` stays the base tilt
+#: the contracts assert; ``tilt_spin_deg`` is the offset a renderer ADDS to it,
+#: and :func:`ring_radius_scale` is a gentle multiplier on the radii.
+RING_PRECESS_PERIODS_S = {
+    "orbit_a": 15.5, "orbit_b": 18.5, "echo_a": 22.5, "echo_b": 24.5,
+    "inner": 30.0,
+}
+RING_PRECESS_PERIOD_SAT = (16.0, 17.5, 21.0)
+RING_PRECESS_AMP_DEG = 5.0
+#: Radius breath: a fraction of the ring radius, never enough to disturb the
+#: composition (always > 0.95). Same per-ring period as the precession, with a
+#: different phase so tilt and radius do not move together.
+RING_RADIUS_BREATH_SPAN = 0.035
+RING_RADIUS_BREATH_PHASE = 1.9
+
+
+def ring_precess_period(ring: Dict[str, Any]) -> float:
+    """The ring's own non-harmonic precession/breath period (seconds).
+
+    Looks the period up by ``id``, then by satellite-shell index, then falls
+    back on the ring's ``seed`` so a hand-built ring still gets a stable period.
+    """
+    ring = ring if isinstance(ring, dict) else {}
+    rid = str(ring.get("id") or "")
+    if rid in RING_PRECESS_PERIODS_S:
+        return RING_PRECESS_PERIODS_S[rid]
+    if rid.startswith("shell_"):
+        try:
+            idx = int(rid.split("_", 1)[1])
+        except (ValueError, IndexError):
+            idx = 0
+        return RING_PRECESS_PERIOD_SAT[idx % len(RING_PRECESS_PERIOD_SAT)]
+    seed = int(_finite(ring.get("seed")))
+    return RING_PRECESS_PERIOD_SAT[seed % len(RING_PRECESS_PERIOD_SAT)]
+
+
+def ring_tilt_spin(t: Any, ring: Dict[str, Any]) -> float:
+    """The ring's plane-precession offset in DEGREES at clock ``t``.
+
+    ADDITIVE: a renderer adds this to the entry's ``tilt`` to get the ring's
+    live plane. A bounded, continuous sway (zero at the phase wrap is not
+    needed because a sine is smooth everywhere), so the circle's plane evolves
+    fluidly instead of snapping to a new tilt each turn.
+    """
+    ring = ring if isinstance(ring, dict) else {}
+    period = ring_precess_period(ring)
+    seed = _finite(ring.get("seed"))
+    phase = 2.0 * math.pi * _finite(t) / max(0.1, period) + seed * 0.9
+    return RING_PRECESS_AMP_DEG * math.sin(phase)
+
+
+def ring_radius_scale(t: Any, ring: Dict[str, Any]) -> float:
+    """A gentle per-ring radius breath, ``~1.0`` and always positive.
+
+    Same non-harmonic period as the ring's precession but phase-shifted, so a
+    ring's radius and its plane do not move together. A renderer multiplies the
+    declared ``rx``/``ry`` by this; the declared fractions are untouched.
+    """
+    ring = ring if isinstance(ring, dict) else {}
+    period = ring_precess_period(ring)
+    seed = _finite(ring.get("seed"))
+    phase = (2.0 * math.pi * _finite(t) / max(0.1, period)
+             + seed * 0.9 + RING_RADIUS_BREATH_PHASE)
+    return 1.0 + RING_RADIUS_BREATH_SPAN * 0.5 * math.sin(phase)
+
+
+#: Every per-ring motion period the field declares (the ring's own evolution).
+#: The contract test checks no two of these are harmonically locked.
+RING_MOTION_PERIODS_S = (
+    tuple(RING_PRECESS_PERIODS_S.values()) + RING_PRECESS_PERIOD_SAT)
 
 
 def ring_geometry(t: Any) -> List[Dict[str, Any]]:
     """Every circle of the mark as a stroke description, back to front.
 
     Each entry: ``{"id", "layer", "orbit", "tilt", "rx_frac", "ry_frac",
-    "alpha", "width", "echo", "seed"}``. Radii are FRACTIONS of the mark
-    radius and the tilt is in degrees, so the same entry scales to any size;
-    :func:`ring_path` turns one into points. ``layer`` is ``main``, ``echo``,
-    ``inner`` or ``satellite``; the list is ordered so a renderer can paint it
-    in order and get the near rings on top.
+    "alpha", "width", "echo", "seed", "tilt_spin_deg", "precess_period_s"}``.
+    Radii are FRACTIONS of the mark radius and the tilt is in degrees, so the
+    same entry scales to any size; :func:`ring_path` turns one into points.
+    ``layer`` is ``main``, ``echo``, ``inner`` or ``satellite``; the list is
+    ordered so a renderer can paint it in order and get the near rings on top.
+
+    ADDITIVE evolution keys: ``tilt`` remains the base tilt the contracts
+    assert; ``tilt_spin_deg`` is a bounded per-ring plane-precession offset the
+    renderer ADDS to ``tilt`` (:func:`ring_tilt_spin`), and ``precess_period_s``
+    is that ring's own non-harmonic period.
     """
     tt = _finite(t)
     near_tilt, far_tilt = orbit_tilts(tt)
     lag_near, lag_far = (e["tilt"] for e in echo_rings(tt - ECHO_LAG_S))
+    return _ring_specs(tt, near_tilt, far_tilt, lag_near, lag_far)
+
+
+def _ring_specs(tt: float, near_tilt: float, far_tilt: float,
+                lag_near: float, lag_far: float) -> List[Dict[str, Any]]:
+    """Build the declared circle list from already-resolved ring tilts.
+
+    Split out of :func:`ring_geometry` so the field's OWN consumers (dust)
+    can declare the same circles without going through the patchable
+    ``echo_rings`` reader: dust rides the geometry, not a stubbed layer.
+    """
     out: List[Dict[str, Any]] = [
         {"id": "orbit_b", "layer": "main", "orbit": "b", "tilt": far_tilt,
          "rx_frac": RX_FRAC, "ry_frac": RY_FRAC, "alpha": RING_ALPHA_MAIN,
@@ -1155,6 +1524,10 @@ def ring_geometry(t: Any) -> List[Dict[str, Any]]:
         "id": "orbit_a", "layer": "main", "orbit": "a", "tilt": near_tilt,
         "rx_frac": RX_FRAC, "ry_frac": RY_FRAC, "alpha": RING_ALPHA_MAIN,
         "width": RING_WIDTH_MAIN, "echo": False, "seed": 7.0})
+    # Additive per-ring plane precession: each ring tips on its own period.
+    for entry in out:
+        entry["precess_period_s"] = ring_precess_period(entry)
+        entry["tilt_spin_deg"] = ring_tilt_spin(tt, entry)
     return out
 
 
@@ -1190,6 +1563,149 @@ def ring_alpha(t: Any, ring: Dict[str, Any]) -> float:
     return _finite(ring.get("alpha"), RING_ALPHA_MAIN) * (
         1.0 - RING_BREATH_SPAN * 0.5
         + RING_BREATH_SPAN * 0.5 * math.sin(phase))
+
+
+# -------------------------------------------------------------- ring particles
+#: Bodies riding EVERY circle :func:`ring_geometry` declares, so the mark reads
+#: as populated everywhere instead of on the two main orbits alone. Each ring
+#: contributes at least ``RING_PARTICLE_DEFAULT`` bodies (the two main orbits
+#: more), each at its own non-harmonic period and direction, and each riding the
+#: ring's REAL animated path — the live tilt (``tilt`` + ``tilt_spin_deg``) and
+#: a radius scaled by :func:`ring_radius_scale` — rather than a stale circle.
+RING_PARTICLE_COUNTS = {
+    "orbit_a": 4, "orbit_b": 4,
+    "echo_a": 3, "echo_b": 3,
+    "shell_0": 2, "shell_1": 2, "shell_2": 2,
+    "inner": 2,
+}
+RING_PARTICLE_DEFAULT = 2
+RING_PARTICLE_PERIOD_BASE = 6.5
+RING_PARTICLE_PERIOD_SPAN = 9.0
+RING_PARTICLE_SIZE = 0.14
+RING_PARTICLE_ALPHA = 0.55
+RING_PARTICLE_LIFT_BASE = 0.30
+RING_PARTICLE_LIFT_GAIN = 0.35
+
+
+def ring_particles(t: Any, R: float) -> List[Dict[str, Any]]:
+    """Deterministic bodies spread across EVERY :func:`ring_geometry` ring.
+
+    One dict per body: ``{"index", "x", "y", "depth", "z", "z2", "size",
+    "alpha", "lift", "hue", "hue2", "dof", "skew", "orbit", "ring_id"}``. Each
+    body travels its own ring at its own non-harmonic period and direction,
+    riding the ring's REAL animated path — its live tilt and a radius scaled by
+    :func:`ring_radius_scale` — so the bodies follow the circles the renderers
+    actually stroke. Pure in ``(t, R)``: no ``random`` anywhere.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    out: List[Dict[str, Any]] = []
+    gi = 0
+    for ring in ring_geometry(tt):
+        rid = str(ring.get("id") or "")
+        count = int(RING_PARTICLE_COUNTS.get(rid, RING_PARTICLE_DEFAULT))
+        tilt = _finite(ring.get("tilt")) + _finite(ring.get("tilt_spin_deg"))
+        rad = ring_radius_scale(tt, ring)
+        rx = r * _finite(ring.get("rx_frac"), RX_FRAC) * rad
+        ry = r * _finite(ring.get("ry_frac"), RY_FRAC) * rad
+        for _k in range(max(1, count)):
+            gi += 1
+            seed = 360.0 * hash01(gi, 211.1)
+            direction = 1.0 if hash01(gi, 213.7) >= 0.5 else -1.0
+            period = (RING_PARTICLE_PERIOD_BASE
+                      + RING_PARTICLE_PERIOD_SPAN * hash01(gi, 217.3))
+            ang = (seed + direction * 360.0 * tt / max(0.1, period)
+                   + _phase_wobble(tt, seed))
+            depth = _depth(ang)
+            pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+            x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
+            pz, pz2 = depth_axes(gi, 223.9)
+            hue = _hue_for(gi, 227.1)
+            out.append({
+                "index": float(gi), "x": x + dx, "y": y + dy, "depth": depth,
+                "z": pz, "z2": pz2,
+                "size": _depth_size(depth, RING_PARTICLE_SIZE * scale),
+                "alpha": _depth_alpha(depth, RING_PARTICLE_ALPHA),
+                "lift": (RING_PARTICLE_LIFT_BASE
+                         + RING_PARTICLE_LIFT_GAIN * depth),
+                "hue": hue, "hue2": _hue_pair(hue),
+                "dof": dof(depth), "skew": skew(depth),
+                "orbit": str(ring.get("orbit") or ""), "ring_id": rid,
+            })
+    return out
+
+
+# ---------------------------------------------------------- cylinder particles
+#: A vertical column of particles wrapped around the nucleus: bodies on a
+#: cylinder (axis = the mark's vertical Y axis) at deterministic radii and
+#: heights, ORBITING the axis in a full 360 about the middle orb while the
+#: column slowly drifts up and down. This is the strong volume cue the owner
+#: asked for — the mark's interior is no longer only the rings. Radius is a
+#: fraction of R so the column hugs the nucleus and stays around the orbit
+#: envelope; height is signed and bounded to ~±0.5 R so it reads as a column.
+CYLINDER_COUNT = 32
+CYLINDER_R_FRAC_MIN = 0.18
+CYLINDER_R_FRAC_SPAN = 0.37
+CYLINDER_H_FRAC = 0.50
+CYLINDER_PERIOD_S = 6.1
+CYLINDER_DRIFT_PERIOD_S = 9.5
+CYLINDER_DRIFT_AMP = 0.30
+CYLINDER_H_BASE = 0.65
+CYLINDER_SIZE_BASE = 0.16
+CYLINDER_ALPHA_BASE = 0.55
+CYLINDER_LIFT_BASE = 0.30
+CYLINDER_LIFT_GAIN = 0.35
+
+
+def cylinder_particles(t: Any, R: float) -> List[Dict[str, Any]]:
+    """A breathing vertical cylinder of particles around the nucleus.
+
+    One dict per particle: ``{"index", "x", "y", "depth", "z", "z2", "size",
+    "alpha", "lift", "hue", "hue2", "dof", "skew", "r", "h"}``. ``r`` is the
+    cylinder radius the particle sits at (a fraction of R, so the column hugs
+    the nucleus and stays inside the orbit envelope); ``h`` is its signed
+    height, so a renderer can shade by height. Particles orbit the mark's
+    vertical axis — a full 360 over ``CYLINDER_PERIOD_S``, half of them the
+    other way — while a slow vertical drift makes the column breathe. Pure in
+    ``(t, R)``: no ``random`` anywhere.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    out: List[Dict[str, Any]] = []
+    for i in range(CYLINDER_COUNT):
+        idx = i + 1
+        rad = r * (CYLINDER_R_FRAC_MIN
+                   + CYLINDER_R_FRAC_SPAN * hash01(idx, 311.3))
+        direction = 1.0 if hash01(idx, 313.9) >= 0.5 else -1.0
+        phase0 = 360.0 * hash01(idx, 319.7)
+        ang = (phase0 + direction * 360.0 * tt / max(0.1, CYLINDER_PERIOD_S)
+               + _phase_wobble(tt, phase0))
+        depth = 0.5 + 0.5 * math.sin(math.radians(ang))
+        h_unit = (CYLINDER_H_BASE * (2.0 * hash01(idx, 323.3) - 1.0)
+                  + CYLINDER_DRIFT_AMP
+                  * math.sin(2.0 * math.pi * tt
+                             / max(0.1, CYLINDER_DRIFT_PERIOD_S)
+                             + hash01(idx, 327.9) * 2.0 * math.pi))
+        h = r * CYLINDER_H_FRAC * h_unit
+        cz, cz2 = depth_axes(idx, 331.1)
+        hue = _hue_for(idx, 337.7)
+        out.append({
+            "index": float(idx),
+            "x": rad * math.cos(math.radians(ang)) + dx, "y": h + dy,
+            "depth": depth,
+            "z": cz, "z2": cz2,
+            "size": _depth_size(depth, CYLINDER_SIZE_BASE * scale),
+            "alpha": _depth_alpha(depth, CYLINDER_ALPHA_BASE),
+            "lift": CYLINDER_LIFT_BASE + CYLINDER_LIFT_GAIN * depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "dof": dof(depth), "skew": skew(depth),
+            "r": rad, "h": h,
+        })
+    return out
 
 
 __all__ = [
@@ -1230,5 +1746,32 @@ __all__ = [
     "blink_dots", "BLINK_COUNT", "BLINK_SIZE_BASE", "BLINK_ALPHA_PEAK",
     "BLINK_LIFE_BASE", "BLINK_LIFE_SPAN", "BLINK_LIFT",
     "BLINK_R_FRAC_MIN", "BLINK_R_FRAC_SPAN",
+    "flare_dots", "FLARE_COUNT", "FLARE_SIZE_BASE", "FLARE_SIZE_SPAN",
+    "FLARE_ALPHA_PEAK", "FLARE_LIFE_BASE", "FLARE_LIFE_SPAN", "FLARE_LIFT",
+    "FLARE_R_FRAC_MIN", "FLARE_R_FRAC_SPAN",
     "spin_angles", "X_SPIN_PERIOD_S", "Y_SPIN_PERIOD_S",
+    "depth_axes", "Z_SALT", "Z2_SALT",
+    "core_shells", "CORE_SHELL_COUNT", "CORE_SHELL_PERIODS_S",
+    "CORE_SHELL_R_FRAC_MIN", "CORE_SHELL_R_FRAC_SPAN", "CORE_SHELL_TILT_BASE",
+    "CORE_SHELL_TILT_STEP", "CORE_SHELL_SPIN_BASE", "CORE_SHELL_SPIN_STEP",
+    "CORE_SHELL_SIZE_FRAC", "CORE_SHELL_SIZE_SPAN", "CORE_SHELL_ALPHA_BASE",
+    "CORE_SHELL_ALPHA_GAIN", "CORE_SHELL_LIFT_BASE", "CORE_SHELL_LIFT_GAIN",
+    "filament_state", "FILAMENT_SAMPLES", "FILAMENT_PERIOD_S",
+    "FILAMENT_WAVE_COUNT", "FILAMENT_WAVE_SPEED", "FILAMENT_RX_FRAC",
+    "FILAMENT_TILT_BASE", "FILAMENT_TILT_SWAY_DEG", "FILAMENT_ALPHA_BASE",
+    "FILAMENT_ALPHA_PEAK", "FILAMENT_SIZE_BASE", "FILAMENT_SIZE_PEAK",
+    "FILAMENT_LIFT",
+    "ring_precess_period", "ring_tilt_spin", "ring_radius_scale",
+    "RING_PRECESS_PERIODS_S", "RING_PRECESS_PERIOD_SAT",
+    "RING_PRECESS_AMP_DEG", "RING_RADIUS_BREATH_SPAN",
+    "RING_RADIUS_BREATH_PHASE", "RING_MOTION_PERIODS_S",
+    "ring_particles", "RING_PARTICLE_COUNTS", "RING_PARTICLE_DEFAULT",
+    "RING_PARTICLE_PERIOD_BASE", "RING_PARTICLE_PERIOD_SPAN",
+    "RING_PARTICLE_SIZE", "RING_PARTICLE_ALPHA",
+    "RING_PARTICLE_LIFT_BASE", "RING_PARTICLE_LIFT_GAIN",
+    "cylinder_particles", "CYLINDER_COUNT", "CYLINDER_R_FRAC_MIN",
+    "CYLINDER_R_FRAC_SPAN", "CYLINDER_H_FRAC", "CYLINDER_PERIOD_S",
+    "CYLINDER_DRIFT_PERIOD_S", "CYLINDER_DRIFT_AMP", "CYLINDER_H_BASE",
+    "CYLINDER_SIZE_BASE", "CYLINDER_ALPHA_BASE", "CYLINDER_LIFT_BASE",
+    "CYLINDER_LIFT_GAIN",
 ]
