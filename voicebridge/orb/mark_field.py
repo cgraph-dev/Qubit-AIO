@@ -137,7 +137,7 @@ PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
 )
 
 #: Dust motes: a denser, slower field so the orbits are never bare.
-DUST_COUNT = 30
+DUST_COUNT = 48
 DUST_R_FRAC_MIN = 0.86
 DUST_R_FRAC_SPAN = 0.30
 DUST_SIZE_BASE = 0.10
@@ -175,7 +175,7 @@ ECHO_WIDTH = 1.0
 #: Spark arms are SHORTER than a particle glint's: at the nucleus they must
 #: read as pinpricks, not stars the size of the nucleus itself.
 SPARK_ARM_FRAC = 0.65
-NUCLEUS_SPARK_COUNT = 18
+NUCLEUS_SPARK_COUNT = 26
 NUCLEUS_SPARK_LIFE_BASE = 1.30
 NUCLEUS_SPARK_LIFE_SPAN = 0.90
 NUCLEUS_SPARK_REACH = 1.28
@@ -212,7 +212,7 @@ SATELLITE_TRAIL_SAMPLES = 5
 SATELLITE_TRAIL_STEP_DEG = 7.0
 
 # ----------------------------------------------------------------- glints
-SPARKLE_COUNT = 26
+SPARKLE_COUNT = 40
 SPARKLE_SEED_STEP = 97.3
 SPARKLE_R_MIN_FRAC = 0.30
 SPARKLE_R_SPAN_FRAC = 0.78
@@ -915,7 +915,7 @@ INNER_RING_DIRECTION = 1.0
 INNER_RING_TILT_BASE = 0.0
 
 # ------------------------------------------------------------- binary particle field
-BINARY_COUNT = 56
+BINARY_COUNT = 72
 BINARY_SIZE_BASE = 0.07
 BINARY_SIZE_SPAN = 0.06
 BINARY_PERIOD_BASE = 6.0

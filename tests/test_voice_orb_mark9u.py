@@ -692,7 +692,7 @@ def test_binary_state_determinism_and_count():
     a = F.binary_state(1.23, 32.0)
     b = F.binary_state(1.23, 32.0)
     assert a == b
-    assert 48 <= len(a) <= 64
+    assert len(a) == F.BINARY_COUNT
     for d in a:
         assert set(d) >= {"x", "y", "depth", "size", "alpha", "lift", "char"}
         assert d["char"] in ("0", "1")
