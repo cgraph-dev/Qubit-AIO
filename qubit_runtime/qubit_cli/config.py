@@ -4033,6 +4033,24 @@ _CONFIG_USAGE = """Available commands:
   qubit config env-path  Show .env file path"""
 
 
+def _cmd_config_show() -> None:
+    from qubit_cli.config_show import show_config
+    show_config()
+
+
+def _worker_config_snapshot() -> Optional[dict[str, Any]]:
+    """A safe worker's frozen config, or None. Install-time loads run from ``qubit_cli`` alone
+    (the installer's completion step ships no ``agent`` package), and without ``agent`` there
+    is no worker policy to consult."""
+    try:
+        from agent.safe_worker_policy import worker_config_snapshot
+    except ModuleNotFoundError as exc:
+        if exc.name != "agent":
+            raise
+        return None
+    return worker_config_snapshot()
+
+
 def config_command(args):
     """Handle config subcommands."""
     subcmd = getattr(args, 'config_command', None)

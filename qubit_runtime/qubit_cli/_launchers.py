@@ -875,6 +875,96 @@ def expose_cli(project_root: Path | None = None, *, create: bool = True) -> dict
         return {"ok": False, "error": str(exc)}
 
 
+_TOKEN_DUPLICATE = 0x0002
+_TOKEN_QUERY = 0x0008
+
+
+def _new_console_environment() -> dict[str, str] | None:
+    """The environment Windows gives a new process of this user, or None.
+
+    CreateEnvironmentBlock builds it from the user's stored variables
+    (HKCU\\Environment, the profile folders, the system variables) and ignores
+    this process's environment. A sandbox that overrides QUBIT_HOME or
+    LOCALAPPDATA for its own processes does not change the result. Names are
+    upper-cased because Windows compares them case-insensitively.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
+    userenv = ctypes.WinDLL("userenv", use_last_error=True)
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    advapi32.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    userenv.CreateEnvironmentBlock.argtypes = [ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, wintypes.BOOL]
+    userenv.DestroyEnvironmentBlock.argtypes = [ctypes.c_void_p]
+
+    token = wintypes.HANDLE()
+    if not advapi32.OpenProcessToken(kernel32.GetCurrentProcess(), _TOKEN_QUERY | _TOKEN_DUPLICATE,
+                                     ctypes.byref(token)):
+        return None
+    block = ctypes.c_void_p()
+    try:
+        if not userenv.CreateEnvironmentBlock(ctypes.byref(block), token, False):
+            return None
+        return _read_environment_block(block.value)
+    finally:
+        if block.value:
+            userenv.DestroyEnvironmentBlock(block)
+        kernel32.CloseHandle(token)
+
+
+def _read_environment_block(address: int) -> dict[str, str]:
+    """Parse a Windows environment block: NUL-terminated UTF-16 ``NAME=value`` entries, then an empty one.
+
+    The cursor advances by UTF-16 code units, not Python characters: a value
+    holding a character outside the Basic Multilingual Plane (an emoji) takes
+    two units and one character.
+    """
+    import ctypes
+
+    environ: dict[str, str] = {}
+    cursor = address
+    while entry := ctypes.wstring_at(cursor):
+        name, _, value = entry.partition("=")
+        if name:  # "=C:=C:\\..." entries carry per-drive directories, not variables
+            environ[name.upper()] = value
+        cursor += len(entry.encode("utf-16-le", "surrogatepass")) + ctypes.sizeof(ctypes.c_wchar)
+    return environ
+
+
+def new_console_qubit_root() -> Path | None:
+    """The Qubit root that a newly opened console resolves, or None when Windows cannot say."""
+    from qubit_constants import hermes_root_for_environment
+
+    environ = _new_console_environment()
+    return None if environ is None else hermes_root_for_environment(environ)
+
+
+def owns_user_path(root: Path) -> bool:
+    """May ``root`` put its commands on the User PATH?
+
+    Every console the user opens reads the User PATH, so only the root that
+    new consoles resolve may register there. A custom root qualifies only when
+    QUBIT_HOME is stored as a user variable. A process whose own QUBIT_HOME,
+    LOCALAPPDATA or USERPROFILE override selects a different root (a review
+    sandbox, a test home, a suffixed data directory) gets False. So does any
+    root when Windows cannot report the console environment.
+    """
+    console_root = new_console_qubit_root()
+    if console_root is not None and (
+        os.path.normcase(os.path.realpath(root)) == os.path.normcase(os.path.realpath(console_root))
+    ):
+        return True
+    import logging
+
+    logging.getLogger(__name__).info(
+        "User PATH left unchanged: new consoles use %s, not %s",
+        console_root or "an unknown Qubit home", root)
+    return False
+
+
 def _merge_user_path(existing: str, entry: str) -> str | None:
     """``entry`` first, or None when the PATH already names it.
 

@@ -26,7 +26,7 @@ from tools.skills_tool_plugin import (  # noqa: F401
     _mark_background_review_read, _preprocess_skill, _read_skill_text, _safe_frontmatter,
     _serve_plugin_skill, _serve_skill_file, _truncate_description)
 from tools.skills_tool_dedup import (  # noqa: F401
-    _check_skill_view_dedup, _record_skill_view, reset_skill_view_dedup)
+    _check_skill_view_dedup, _record_skill_view, dedup_skill_view, reset_skill_view_dedup)
 from tools.skill_provenance import is_background_review
 
 logger = logging.getLogger(__name__)
@@ -754,13 +754,12 @@ def _skill_view_with_bump(args, **kw):
     # possibly-pruned transcript copy (#95976). No dedup in the fork; None also keeps its views
     # out of the parent's bucket.
     dedup_task_id = None if is_background_review() else task_id
-    if (stub := _check_skill_view_dedup(dedup_task_id, name, args.get("file_path"))) is not None:
-        return stub
     result = skill_view(name, file_path=args.get("file_path"), task_id=task_id)
     with suppress(Exception):
         parsed = json.loads(result)
         if isinstance(parsed, dict) and parsed.get("success"):
-            _record_skill_view(dedup_task_id, name, args.get("file_path"), parsed)
+            if (stub := dedup_skill_view(dedup_task_id, name, args.get("file_path"), parsed, result)) is not None:
+                return stub
             if resolved := parsed.get("name") or name:  # qualified forms return the canonical name
                 from tools.skill_usage import bump_use, bump_view
                 bump_view(str(resolved))
