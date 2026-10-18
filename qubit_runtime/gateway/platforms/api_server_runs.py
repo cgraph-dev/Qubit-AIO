@@ -349,11 +349,17 @@ def _make_run_event_callback(self, run_id: str, loop: "asyncio.AbstractEventLoop
     return _callback
 
 
+# Answering a prompt the run raised is one capability whichever tool asked: approvals
+# and clarify share the grant's ``approve`` permission. Acknowledging a lost owner epoch
+# ends the run like a stop, so ``/resolve-unknown`` rides the ``stop`` permission.
+_ROOM_CONTROL_PERMISSIONS = {
+    "/stop": "stop", "/resolve-unknown": "stop", "/approval": "approve", "/clarify": "approve"}
+
+
 def _room_permission_for(request: "web.Request") -> str:
-    if request.path.endswith("/stop"):
-        return "stop"
-    if request.path.endswith("/approval"):
-        return "approve"
+    for suffix, permission in _ROOM_CONTROL_PERMISSIONS.items():
+        if request.path.endswith(suffix):
+            return permission
     return "status" if request.method == "GET" else "dispatch"
 
 
@@ -615,6 +621,66 @@ async def run_internal_session_turn(self, *, session_id: str, text: str, profile
     finally:
         if token is not None:
             _api_server._api_request_profile.reset(token)
+
+
+def _run_idempotency_identity(self, request, body, gateway_session_key, idempotency_key) -> tuple:
+    """``(principal scope, request fingerprint)`` for a keyed POST /v1/runs; ``("", "")`` unkeyed."""
+    if not idempotency_key:
+        return "", ""
+    return self._run_idempotency_scope(request), hashlib.sha256(json.dumps(
+        {"body": body, "gateway_session_key": gateway_session_key or ""},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode()).hexdigest()
+
+
+def _run_user_message(raw_input, _openai_error) -> tuple:
+    """POST /v1/runs ``input`` -> ``(user_message, error_response_or_None)``."""
+    if not raw_input:
+        return None, _json_error(_openai_error, "Missing 'input' field", status=400)
+    if isinstance(raw_input, str):
+        user_message = raw_input
+    else:
+        user_message = raw_input[-1].get("content", "") if isinstance(raw_input, list) else ""
+    if not user_message:
+        return None, _json_error(_openai_error, "No user message found in input", status=400)
+    return user_message, None
+
+
+async def _admit_run_to_authority(
+    self, launch, run_id, session_history_delivery, _declared_selected,
+    idempotency_scope, idempotency_key, _openai_error,
+) -> "web.Response | None":
+    """Admit a /v1/runs turn to the session authority FIFO -> ``None``, or the refusal."""
+    from gateway.platforms.api_server_authority_runs import run_admission, store_error_response
+    from gateway.session_api_turn import admit_api_turn_async
+    from gateway.session_contract import SessionRef
+    from qubit_state_runtime import RuntimeStoreError
+    try:
+        with self._profile_scope(launch.request_profile):
+            launch.admission = await admit_api_turn_async(self, user_message=launch.user_message,
+                conversation_history=launch.conversation_history, active_run_id=run_id,
+                run_owner_scope=self._run_owners[run_id],
+                turn_author=launch.turn_author,
+                history_from_session=session_history_delivery,
+                session_history_delivery='1' if session_history_delivery else '',
+                bind_declared_conversation=_declared_selected,
+                **launch.agent_kwargs)
+    except Exception as exc:  # health: allow BLE001 -- answered below; a committed admission is kept
+        # A storage failure after the admission committed (a later media-release write) still
+        # owns that run: forgetting it would let a keyed retry admit the same work twice.
+        owned = None if isinstance(exc, RuntimeStoreError) else await asyncio.to_thread(run_admission, self, run_id)
+        if owned is not None:
+            launch.admission = (owned[0], SessionRef(owned[0].profile_id, owned[1]['target_session_id']), owned[1])
+            return None
+        # A refused admission owns no run: drop every reservation so an exact
+        # retry is refused again instead of replaying a run nobody executes.
+        _forget_run(
+            self, run_id, self._run_streams, self._run_streams_created, self._run_approval_sessions,
+            self._run_statuses, self._run_owners, self._run_idempotency_ids)
+        if idempotency_key:
+            self._run_idempotency_store.forget(idempotency_scope, idempotency_key)
+        return store_error_response(_openai_error, exc)
+    return None
 
 
 async def _handle_runs(self, request: "web.Request", *, _api_server) -> "web.Response":
@@ -1216,6 +1282,32 @@ async def _handle_run_approval(self, request: "web.Request", *, _api_server) -> 
         "resolved": resolved})
 
 
+async def _respond_authority_run(self, run_id, body, *, kind, _api_server):
+    from gateway.platforms.api_server_authority_runs import respond_run, store_error_response
+    from qubit_state_runtime import RuntimeStoreError
+    try:
+        result = await respond_run(self, run_id, body, kind=kind)
+        return web.json_response({'run_id': run_id, **result})
+    except RuntimeStoreError as exc:
+        return store_error_response(_api_server._openai_error, exc)
+
+
+async def _handle_run_clarify(self, request, *, _api_server):
+    run_id, _, _, _, err = _load_owned_run(
+        self, request, _api_server=_api_server, permission="approve", active_fallback=False)
+    if err is not None:
+        return err
+    body, err = await self._read_json_body(request)
+    if err is not None:
+        return err
+    return await _respond_authority_run(self, run_id, body, kind='clarify', _api_server=_api_server)
+
+
+def _steer_refused(_openai_error, run_id):
+    return _json_error(_openai_error, f"Run is not currently accepting steer input: {run_id}",
+                       code="run_not_accepting_steer", status=409)
+
+
 async def _handle_steer_run(self, request: "web.Request", *, _api_server) -> "web.Response":
     """POST /v1/runs/{run_id}/steer — inject guidance into a running agent."""
     _openai_error = _api_server._openai_error
@@ -1272,6 +1364,27 @@ async def _handle_stop_run(self, request: "web.Request", *, _api_server) -> "web
         # run on the same session_id keeps its own); no-op if the run already finished.
         _api_server._reap_disconnected_agent_processes(agent, source="api_server_run_stop")
     return web.json_response({"run_id": run_id, "status": "stopping"})
+
+
+async def _handle_resolve_unknown_run(
+    self, request: "web.Request", *, _api_server
+) -> "web.Response":
+    """POST /v1/runs/{run_id}/resolve-unknown — acknowledge one lost owner epoch."""
+    run_id, _, _, _, err = _load_owned_run(
+        self, request, _api_server=_api_server, permission="stop", active_fallback=False)
+    if err is not None:
+        return err
+    try:
+        body = await request.json()
+    except (ValueError, LookupError):  # bad JSON/UTF-8 (ValueError) or unknown charset: no body
+        body = None
+    from gateway.platforms.api_server_authority_runs import resolve_unknown_run, store_error_response
+    from qubit_state_runtime import RuntimeStoreError
+    try:
+        result = await resolve_unknown_run(self, run_id, body)
+        return web.json_response({'run_id': run_id, **result})
+    except RuntimeStoreError as exc:
+        return store_error_response(_api_server._openai_error, exc)
 
 
 async def _sweep_orphaned_runs(self) -> None:
