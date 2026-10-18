@@ -720,6 +720,37 @@ def test_the_combined_tumble_never_goes_thin():
     assert thin_ink >= 0.45 * face_ink, (thin_ink, face_ink)
 
 
+def test_the_tumble_opens_depth_along_whichever_axis_is_edge_on():
+    # The pose that broke the first X+Y build: Y face-on while X is edge-on.
+    # The Y-only ``sin²θy`` fade zeroes the depth exactly there, so the whole
+    # mark folded to a line every 6.75 s. The combined fade keeps the depth
+    # whenever EITHER axis has turned, so the ring lays its depth vertical
+    # instead — wide in both axes, like the Y quarters always were.
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    R = 90.0
+    spec = [r for r in F.ring_geometry(0.0) if r["id"] == "orbit_a"][0]
+    pts = F.ring_path(0.0, R, spec)
+    n = len(pts) - 1
+    depths = [0.5 + 0.5 * math.cos(2.0 * math.pi * (i % n) / n)
+              for i in range(len(pts))]
+
+    def box(t):
+        xs = [Q.tumble_point(t, R, x, y, d)[0]
+              for (x, y), d in zip(pts, depths)]
+        ys = [Q.tumble_point(t, R, x, y, d)[1]
+              for (x, y), d in zip(pts, depths)]
+        return (max(xs) - min(xs), max(ys) - min(ys))
+
+    face = box(0.0)
+    # t = 20.5 s: exactly one Y turn (face-on) while X sits at ~273 deg,
+    # a quarter turn past edge-on.
+    w, h = box(20.5)
+    assert w >= 0.45 * face[0], (w, h, face)
+    assert h >= 0.45 * face[1], (w, h, face)
+
+
 def test_the_painter_really_consumes_the_x_turn():
     # Killing the X phase must move the frame: if the painter quietly
     # projected Y-only, this diff would be zero. The tumble memo is dropped

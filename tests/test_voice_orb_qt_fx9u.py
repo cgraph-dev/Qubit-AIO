@@ -638,9 +638,12 @@ def _turned(t, R, x, y, depth=0.5):
     Re-derived HERE from the painter's documented formula rather than by
     calling it, so the tests below pin the geometry the renderer claims to
     draw rather than agreeing with it by construction. Rotation order Y
-    first, then X — the painter's order::
+    first, then X — the painter's order. The depth offset is faded by the
+    COMBINED turn (``sin²θy + sin²φx − sin²θy·sin²φx``, 0 only when both
+    phases are 0), so the mark opens its depth along whichever axis is
+    edge-on::
 
-        z     = (depth - 0.5) * Z_GAIN * R * sin(theta_y)**2
+        z     = (depth - 0.5) * Z_GAIN * R * fade
         xr    = x*cos_y + z*sin_y
         zr    = -x*sin_y + z*cos_y
         yr    = y*cos_x - zr*sin_x
@@ -661,7 +664,8 @@ def _turned(t, R, x, y, depth=0.5):
     px = math.radians(Q.mark_vertical_spin_deg(t))
     cy, sy, cx, sx = math.cos(ty), math.sin(ty), math.cos(px), math.sin(px)
     d = min(1.0, max(0.0, float(depth)))
-    z = (d - 0.5) * Q.Y_SPIN_Z_GAIN * R * sy * sy
+    fade = sy * sy + sx * sx - sy * sy * sx * sx
+    z = (d - 0.5) * Q.Y_SPIN_Z_GAIN * R * fade
     xr = x * cy + z * sy
     zr = -x * sy + z * cy
     yr = y * cx - zr * sx

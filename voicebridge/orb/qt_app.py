@@ -785,12 +785,25 @@ def _tumble_project(x: float, y: float, depth: float,
         X, Y = xr * persp, yr * persp
 
     The gain reads the FINAL rotated depth ``zr2``, so a body recedes (and
-    shrinks, dims, cools) through both turns, not just the Y one. At
-    ``phi_x = 0`` this is bit-for-bit :func:`_y3d_project`; at
+    shrinks, dims, cools) through both turns, not just the Y one.
+
+    The depth offset is faded by the COMBINED turn — ``f = sin²θy + sin²φx −
+    sin²θy·sin²φx`` — instead of by the Y turn alone. The Y-only ``sin²θy``
+    fade exists so the face-on phases are the unturned mark bit for bit (and
+    the still frame with it); but under a second axis it also guarantees a
+    total collapse: near Y face-on the depth vanishes exactly where the X
+    turn tips the orbital plane edge-on, and the whole mark folds to a line.
+    The combined fade is 0 if and only if BOTH phases are 0 — so ``t = 0``
+    and reduced motion are still the exact identity — and 1 at ANY quarter
+    turn of either axis, so the mark opens up to show its depth along
+    whichever axis is edge-on, exactly as the Y-only turn does at its own
+    quarters. It is a polynomial in the sines, so it has no kink anywhere.
+    At ``phi_x = 0`` this is bit-for-bit :func:`_y3d_project`; at
     ``theta_y = phi_x = 0`` it is the identity with gain 1, so a still clock
     paints the unturned mark and reduced motion is an exact no-op.
     """
-    z = (depth - 0.5) * Y_SPIN_Z_GAIN * r * sy * sy
+    fade = sy * sy + sx * sx - sy * sy * sx * sx
+    z = (depth - 0.5) * Y_SPIN_Z_GAIN * r * fade
     xr = x * cy + z * sy
     zr = -x * sy + z * cy
     yr = y * cx - zr * sx
