@@ -123,52 +123,52 @@ def test_horizontal_spin_is_a_no_op_under_reduced_motion():
         assert Q.mark_horizontal_spin_deg(37.4) == 0.0
 
 
-def test_horizontal_spin_for_shortens_the_plane_and_mirrors_it():
+def test_horizontal_spin_is_the_turns_cosine_and_mirrors_it():
     from voicebridge.orb import qt_app as Q
 
-    # Face-on at the start of a turn, and MIRRORED at half a turn: a negative
-    # factor is what a real rotation about a vertical axis does past 90 deg,
-    # and it is the cue that reads as 3D rather than as a squash.
+    # ``mark_horizontal_spin`` is the foreshortening of a FLAT plane: the
+    # mark itself is no longer flat (see y_turn_point), but this stays the
+    # public read of the turn's PHASE. Face-on at the start of a turn, and
+    # MIRRORED at half a turn: a negative factor is what a rotation about a
+    # vertical axis does past 90 degrees.
     assert Q.mark_horizontal_spin(0.0) == pytest.approx(1.0)
     assert Q.mark_horizontal_spin(Q.Y_SPIN_PERIOD_S / 2.0) == pytest.approx(
         -1.0, abs=1e-6)
     assert Q.mark_horizontal_spin(Q.Y_SPIN_PERIOD_S) == pytest.approx(1.0)
-    # The mirror band sits between the first edge-on crossing and the half
-    # turn; the warp (which dwells near face-on) leaves the crossings at the
+    # The turn is an even 360 now: no phase warp survives, because the warp
+    # existed only to shorten the moments the mark went edge-on to a line and
+    # there are none left to shorten. So the crossings sit exactly on the
     # quarter points.
     assert Q.mark_horizontal_spin(0.25 * Q.Y_SPIN_PERIOD_S) == pytest.approx(
         0.0, abs=1e-6)
     assert Q.mark_horizontal_spin(0.75 * Q.Y_SPIN_PERIOD_S) == pytest.approx(
         0.0, abs=1e-6)
-    assert Q.mark_horizontal_spin(Q.Y_SPIN_PERIOD_S / 3.0) < -0.5
+    assert Q.mark_horizontal_spin(Q.Y_SPIN_PERIOD_S / 3.0) == pytest.approx(
+        -0.5, abs=1e-6)
 
 
-def test_horizontal_spin_crosses_edge_on_quickly_and_never_snaps():
+def test_the_turn_is_continuous_and_never_collapses():
+    # The OLD contract here was "not edge-on for long" — it measured how
+    # briefly the flat squash went to zero, which is the behaviour the owner
+    # rejected. The contract now is the opposite: the turn is continuous
+    # everywhere and its cos(theta) has no dwell at any value.
+    dt = 1.0 / 60.0
     from voicebridge.orb import qt_app as Q
 
-    dt = 1.0 / 60.0
-    # The mark goes fully edge-on — that moment is the point — so the contract
-    # is not "never zero" but "not for long": the warped turn crosses at
-    # roughly twice the rate of a linear one.
-    narrow = [k * dt for k in range(int(60 * Q.Y_SPIN_PERIOD_S))
-              if abs(Q.mark_horizontal_spin(0.5 + k * dt)) < 0.10]
-    fraction = len(narrow) / float(60 * Q.Y_SPIN_PERIOD_S)
-    assert 0.0 < fraction < 0.06, fraction
-    # And the factor itself is continuous: no frame-to-frame step anywhere in
-    # the turn, including through both edge-on crossings and the turn wrap.
-    prev = Q.mark_horizontal_spin(0.0)
-    worst = 0.0
-    for k in range(1, int(60 * Q.Y_SPIN_PERIOD_S) + 1):
-        cur = Q.mark_horizontal_spin(k * dt)
-        worst = max(worst, abs(cur - prev))
-        prev = cur
+    values = [Q.mark_horizontal_spin(k * dt)
+              for k in range(int(60 * Q.Y_SPIN_PERIOD_S) + 1)]
+    assert min(values) <= -0.999, min(values)
+    assert max(values) >= 0.999, max(values)
+    # Continuous: no frame-to-frame step anywhere, through both crossings and
+    # the turn wrap.
+    worst = max(abs(b - a) for a, b in zip(values, values[1:]))
     assert worst < 0.05, worst
 
 
 def test_horizontal_spin_paint_frame_is_continuous_across_its_whole_turn():
     # Measured on pixels: the painted frame must move by about ONE frame's
-    # worth at every point of the turn, including through both edge-on
-    # crossings and the wrap. A snap anywhere shows up here as an outlier.
+    # worth at every point of the turn, including through both crossings and
+    # the wrap. A snap anywhere shows up here as an outlier.
     dt = 1.0 / 60.0
     from voicebridge.orb import qt_app as Q
 
@@ -194,7 +194,7 @@ def test_horizontal_spin_is_additive_to_the_master_spin():
         assert abs(ratio - round(ratio)) > 1e-6, other
 
     # Painted proof of independence: hold one turn still and move the other.
-    q = Q.Y_SPIN_PERIOD_S / 8.0          # |cos| peaks here
+    q = Q.Y_SPIN_PERIOD_S / 8.0          # a quarter of the way in
     r = Q.MASTER_SPIN_PERIOD_S / 4.0
     a = _paint(t=q)
     b = _paint(t=q + r)                 # same Y turn, different master angle
@@ -203,12 +203,163 @@ def test_horizontal_spin_is_additive_to_the_master_spin():
     assert _diff(a, c) > 0, "the horizontal spin stopped moving the mark"
 
 
-def test_the_nucleus_stays_round_while_the_orbital_plane_collapses():
-    # The per-layer squash decision, measured: at a strongly edge-on clock the
-    # orbital plane foreshortens away and the mark's painted width collapses —
-    # but the CORE must stay a circle. A sphere keeps its silhouette when you
-    # rotate it about its own vertical axis; squashing the nucleus into a lens
-    # is the one transform here that reads as a bug rather than as depth.
+# --------------------------------------------------------------------------- #
+# (a2) the turn is a real 3D rotation, so the mark NEVER goes thin
+# --------------------------------------------------------------------------- #
+def test_the_turn_opens_the_mark_instead_of_flattening_it():
+    """The owner's complaint, pinned at the numbers AND at the pixels.
+
+    A flat mark projected about a vertical axis foreshortens to
+    ``cos(theta)`` and degenerates to a line at a quarter turn — the "i dont
+    what that thin" the flat squash produced. This mark is not flat: every
+    element carries the field's ``depth``, so the near and far halves SEPARATE
+    across x instead of piling onto one line.
+    """
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    R = 90.0
+    quarter = Q.Y_SPIN_PERIOD_S / 4.0
+
+    # One DECLARED orbit, so this measures the projection and nothing else.
+    spec = [r for r in F.ring_geometry(0.0) if r["id"] == "orbit_a"][0]
+    pts = F.ring_path(0.0, R, spec)
+    n = len(pts) - 1
+    depths = [0.5 + 0.5 * math.cos(2.0 * math.pi * (i % n) / n)
+              for i in range(len(pts))]
+
+    def width_at(t):
+        xs = [Q.y_turn_point(t, R, x, y, d)[0]
+              for (x, y), d in zip(pts, depths)]
+        return max(xs) - min(xs)
+
+    face = width_at(0.0)
+    quarter_w = width_at(quarter)
+    assert quarter_w >= 0.45 * face, (quarter_w, face)
+    assert width_at(Q.Y_SPIN_PERIOD_S / 2.0) >= 0.45 * face, face
+
+    # ...and the halves really have parted. Take two elements that sit on top
+    # of each other in x face-on — one at the very front of the plane, one at
+    # the very back — which is exactly what the flat squash left stacked on a
+    # single line. Under the rotation they end up half a mark radius apart.
+    def front_back_gap(t):
+        return (Q.y_turn_point(t, R, 0.0, 0.0, 1.0)[0]
+                - Q.y_turn_point(t, R, 0.0, 0.0, 0.0)[0])
+    assert front_back_gap(0.0) == pytest.approx(0.0, abs=1e-9)
+    assert front_back_gap(quarter) >= 0.50 * face, front_back_gap(quarter)
+    # The depth axis is a real one: enough separation to carry the mark's own
+    # width, which is why the quarter turn no longer blanks the orb.
+    assert Q.Y_SPIN_Z_GAIN * R >= 0.45 * face, (Q.Y_SPIN_Z_GAIN * R, face)
+
+
+def _ink_width(t, size=192):
+    """Inked bounding-box width of a painted frame, from the recorded prims."""
+    import test_voice_orb_qt_fx9u as T
+
+    c = size / 2.0
+    lo, hi = size, -1
+    for p in T._record(t=t, size=size):
+        if p.kind == "text":
+            r = 4.0
+        elif p.kind == "path":
+            r = max(p.w, p.h) / 2.0
+        else:
+            r = p.r
+        lo = min(lo, p.cx - r)
+        hi = max(hi, p.cx + r)
+    return hi - lo
+
+
+def test_the_mark_never_goes_thin_across_a_whole_turn():
+    # The same complaint, measured on the whole assembly. Every phase of the
+    # turn is painted and its INKED width compared with the widest frame in
+    # the period: the mark may narrow as it turns, but it must never collapse
+    # toward a line the way the flat squash did (which reached roughly a fifth
+    # of the full width, and looked like the orb had switched off).
+    from voicebridge.orb import qt_app as Q
+
+    widths = {}
+    for k in range(0, int(Q.Y_SPIN_PERIOD_S * 20)):
+        t = k / 20.0
+        widths[t] = _ink_width(t)
+    full = max(widths.values())
+    thin = min(widths.values())
+    worst = min(widths, key=lambda t: widths[t])
+    assert thin >= 0.50 * full, (
+        f"mark thinned to {thin:.1f}px ({thin / full:.0%} of {full:.1f}px) at "
+        f"t={worst:.2f}s theta={Q.mark_horizontal_spin_deg(worst):.1f}deg")
+
+
+def test_the_turn_is_the_identity_face_on_and_a_pure_mirror_at_the_half_turn():
+    # theta = 0 must be an EXACT identity — no pop on start-up, and a still
+    # frame (reduced motion clamps the clock to 0) is the unturned mark. The
+    # half turn is its exact mirror in x: a rotation, not a squash, so it is
+    # as wide as it started.
+    from voicebridge.orb import qt_app as Q
+
+    R, half = 90.0, Q.Y_SPIN_PERIOD_S / 2.0
+    for x, y in ((63.0, -21.0), (-63.0, 21.0), (0.0, 30.0), (-12.5, 0.0)):
+        for d in (0.0, 0.5, 1.0):
+            X, Y, g = Q.y_turn_point(0.0, R, x, y, d)
+            assert (X, Y, g) == pytest.approx((x, y, 1.0), abs=1e-9), (x, y, d)
+            X, Y, g = Q.y_turn_point(half, R, x, y, d)
+            assert (X, Y, g) == pytest.approx((-x, y, 1.0),
+                                            abs=1e-9), (x, y, d)
+    # And on the pixels: the still frame is the mark itself, not the nucleus.
+    still_a = _paint(t=0.0, reduced=True)
+    assert _diff(still_a, _paint(t=37.4, reduced=True)) == 0
+
+
+def test_rotated_depth_drives_size_and_brightness():
+    # A body swinging toward the viewer gets BIGGER and BRIGHTER; one tucking
+    # away gets smaller and dimmer. This is the cue that makes the turn read
+    # as rotation rather than as a wobble, so it is pinned directly.
+    from voicebridge.orb import qt_app as Q
+
+    assert Q.y_turn_gain(0.0) == pytest.approx(1.0)
+    assert Q.y_turn_gain(0.5) > 1.0 and Q.y_turn_gain(-0.5) < 1.0
+    # Clamped, so no field value outside its depth range can blow a body up.
+    assert Q.y_turn_gain(1e6) == Q.Y_SPIN_GAIN_MAX
+    assert Q.y_turn_gain(-1e6) == Q.Y_SPIN_GAIN_MIN
+    # ...and it is the ROTATED depth that drives it, so the same element swaps
+    # as the turn carries it round: at a quarter turn the LEFT of the plane
+    # swings toward the viewer and gains, where face-on it was balanced.
+    quarter = Q.Y_SPIN_PERIOD_S / 4.0
+    left = Q.y_turn_point(0.0, 90.0, -60.0, 0.0, 1.0)[2]
+    left_q = Q.y_turn_point(quarter, 90.0, -60.0, 0.0, 1.0)[2]
+    assert left_q > left, (left, left_q)
+
+
+def test_the_painter_really_consumes_the_turn_and_its_depth_gain():
+    # Numbers in a module prove nothing on their own: if the painter quietly
+    # stopped placing points through the projection (or stopped scaling them by
+    # their rotated depth) these tests would still pass. Killing each term and
+    # watching the frame change is the wiring proof.
+    from voicebridge.orb import qt_app as Q
+
+    t = Q.Y_SPIN_PERIOD_S / 4.0
+    plain = _paint(t=t, size=192)
+
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(Q, "Y_SPIN_Z_GAIN", 0.0)
+        assert _diff(plain, _paint(t=t, size=192)) > 0, "depth axis dead"
+
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(Q, "Y_SPIN_PERSP", 0.0)
+        assert _diff(plain, _paint(t=t, size=192)) > 0, "perspective is unused"
+
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(Q, "Y_SPIN_DEPTH_GAIN", 0.0)
+        assert _diff(plain, _paint(t=t, size=192)) > 0, "the gain is dead"
+
+
+def test_the_nucleus_stays_round_while_the_orbital_plane_opens():
+    # The nucleus is EXEMPT from the turn: a sphere keeps its circular
+    # silhouette when you rotate it about its own vertical axis, and squashing
+    # the core into a lens is the one transform here that would read as a bug
+    # rather than as depth. Meanwhile the orbital plane around it OPENS at the
+    # quarter turn instead of collapsing — which is what used to leave a bare
+    # nucleus floating in the middle of an empty orb.
     from voicebridge.orb import qt_app as Q
 
     def core_extent(t, size=192):
@@ -226,22 +377,19 @@ def test_the_nucleus_stays_round_while_the_orbital_plane_collapses():
                     rows = max(rows, abs(dy))
         return cols, rows
 
-    # A clock where the plane is edge-on: cos ~= 0.
-    edge_t = 0.0
-    for k in range(0, int(60 * Q.Y_SPIN_PERIOD_S)):
-        if abs(Q.mark_horizontal_spin(k / 60.0)) < 0.02:
-            edge_t = k / 60.0
-            break
-    assert edge_t, "no edge-on clock found"
-
+    quarter = Q.Y_SPIN_PERIOD_S / 4.0
     face_cols, face_rows = core_extent(0.0)
-    edge_cols, edge_rows = core_extent(edge_t)
+    edge_cols, edge_rows = core_extent(quarter)
     assert face_rows > 0 and edge_rows > 0, (face_rows, edge_rows)
     # Vertical extent is untouched by a Y rotation of a sphere...
     assert edge_rows == pytest.approx(face_rows, rel=0.6)
     # ...and the horizontal extent stays close to it, not collapsed with the
     # plane. A squashed nucleus would come back far narrower than tall.
     assert edge_cols > 0.45 * edge_rows, (edge_cols, edge_rows)
+    # The mark around it did NOT collapse either: at this clock the whole
+    # frame is far wider than the bare core.
+    assert _ink_width(quarter) > 3.0 * edge_cols, (_ink_width(quarter),
+                                                  edge_cols)
 
 
 # --------------------------------------------------------------------------- #
@@ -276,6 +424,29 @@ def _boom(*_a, **_k):
     raise ValueError("field fault")
 
 
+def _projected_ring_box(t, R, spec):
+    """Box of one declared ring's path AFTER the mark's Y-axis turn.
+
+    Mirrors the painter exactly: sample :func:`mark_field.ring_path` (with
+    the painter's sample count), take the camera sway back out, give each
+    point the field's own depth for its orbital angle, and project through
+    :func:`qt_app.y_turn_point`.
+    """
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    dx, dy = F.camera_offset(t, R)
+    pts = F.ring_path(t, R, spec, samples=Q.RING_WARP_SAMPLES)
+    n = max(1, len(pts) - 1)
+    xs, ys = [], []
+    for i, (px, py) in enumerate(pts):
+        d = 0.5 + 0.5 * math.cos(2.0 * math.pi * (i % n) / n)
+        X, Y, _g = Q.y_turn_point(t, R, px - dx, py - dy, d)
+        xs.append(X)
+        ys.append(Y)
+    return (max(xs) - min(xs), max(ys) - min(ys))
+
+
 def test_every_stroked_circle_matches_the_declared_geometry():
     """Each declared circle leaves a stroke whose box is its own path's box."""
     import test_voice_orb_qt_fx9u as T  # the recording painter lives there
@@ -301,11 +472,11 @@ def test_every_stroked_circle_matches_the_declared_geometry():
             # single-lag echo contract; the radii/layer/width are the
             # declaration's.
             spec["tilt"] = echo_tilt.get(str(ring["orbit"]), ring["tilt"])
-        pts = F.ring_path(t, R, spec)
-        dx, dy = F.camera_offset(t, R)
-        xs = [c + px - dx for px, _ in pts]
-        ys = [c + py - dy for _, py in pts]
-        want = (max(xs) - min(xs), max(ys) - min(ys))
+        # The stroke's box is the DECLARED path's box AFTER the mark's Y-axis
+        # turn, not the flat one: a circle is a stroked path, so each point is
+        # projected individually (with its own depth, taken from the field's
+        # orbital angle) and the box is measured on the projected points.
+        want = _projected_ring_box(t, R, spec)
         hit = None
         for p in unmatched:
             if (abs(p.w - want[0]) <= 1.5 and abs(p.h - want[1]) <= 1.5):
@@ -328,9 +499,13 @@ def test_the_chromatic_fringe_stays_exclusive_to_the_two_main_orbits():
     fringe = [p for p in prims if p.kind == "path" and p.pen is not None
               and tuple(p.pen[:3]) in ((255, 45, 85), (45, 130, 255))]
     assert len(fringe) == 4, [p.pen for p in fringe]
-    # Each main orbit's fringe sits within a pixel of the mark centre, i.e. it
-    # is a main orbit and not an echo / core ring / shell wearing the fringe.
-    assert all(math.hypot(p.cx - c, p.cy - c) <= 0.75 for p in fringe)
+    # Each main orbit's fringe sits on the mark's axis, i.e. it is a main orbit
+    # and not an echo / core ring / shell wearing the fringe. The bound is a
+    # few pixels rather than one because the stroke's box CENTRE, not the
+    # circle, is being measured: under the Y turn a circle's projected
+    # silhouette is genuinely off-centre by a pixel or two (the near arc grows
+    # while the far arc shrinks). A stray ring would be off by tens of pixels.
+    assert all(math.hypot(p.cx - c, p.cy - c) <= 0.05 * c for p in fringe)
 
 
 # --------------------------------------------------------------------------- #

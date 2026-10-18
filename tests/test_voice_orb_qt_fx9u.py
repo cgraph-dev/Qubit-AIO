@@ -445,7 +445,12 @@ def test_far_elements_draw_before_nucleus_and_near_after():
         if p.fill is None or i == seam:
             continue
         for part in parts:
-            px, py = c + part["x"], c + part["y"]
+            # The painter places each particle through the mark's Y-axis turn,
+            # so the expected pixel is the projected one, not the raw field
+            # coordinate. The z-split being asserted is the FIELD's, and it is
+            # the field's depth that feeds the projection too.
+            tx, ty = _turned(t, R, part["x"], part["y"], part["depth"])
+            px, py = c + tx, c + ty
             if math.hypot(p.cx - px, p.cy - py) <= 0.6:
                 (far_idx if part["depth"] < 0.5 else near_idx).append(i)
                 break
@@ -493,19 +498,18 @@ def test_dust_and_comet_paint_and_vanish_under_reduced_motion():
     assert traveller["alpha"] > 0.2 and traveller["trail"]
 
     prims = _record(t=t, size=size)
-    head = _at(prims, c + traveller["x"], c + traveller["y"], tol=0.6)
+    head = _at(prims, *_pix(t, R, c, traveller), tol=0.6)
     assert head and max(p.alpha for p in head) > 0.05
 
     tail_hits = sum(
         1 for smp in traveller["trail"]
         if smp["alpha"] > 0.02
-        and _at(prims, c + smp["x"], c + smp["y"], tol=0.6))
+        and _at(prims, *_pix(t, R, c, smp, depth=traveller["depth"]), tol=0.6))
     assert tail_hits >= 6, tail_hits
 
     dust = F.dust_state(t, R)
-    dust_hits = sum(
-        1 for mote in dust
-        if _at(prims, c + mote["x"], c + mote["y"], tol=0.5))
+    dust_hits = sum(1 for mote in dust
+                    if _at(prims, *_pix(t, R, c, mote), tol=0.5))
     assert dust_hits >= len(dust) - 1, (dust_hits, len(dust))
 
     # Reduced motion: the field clock freezes at 0, so compare against t=0.
@@ -615,11 +619,86 @@ def test_mark_effects_never_raise_under_reduced_motion():
 # --------------------------------------------------------------------------- #
 # (i) echo follower rings
 # --------------------------------------------------------------------------- #
-def _thin_orbit_outlines(prims, c):
-    """Centred outline paths that are neither the main stroke nor a circle."""
+def _turned(t, R, x, y, depth=0.5):
+    """Where the painter puts a field point: the Y-axis 360 turn's projection.
+
+    Re-derived HERE from ``qt_app.y_turn_point``'s documented formula rather
+    than by calling it, so the tests below pin the geometry the renderer claims
+    to draw rather than agreeing with it by construction::
+
+        z     = (depth - 0.5) * Z_GAIN * R * sin(theta)**2
+        xr    = x*cos(theta) + z*sin(theta)
+        zr    = -x*sin(theta) + z*cos(theta)
+        X, Y  = xr*(1 + PERSP*zr/R), y*(1 + PERSP*zr/R)
+
+    ``theta = 0`` and ``theta = pi`` are exact: an identity and a pure mirror
+    in x. That is why several tests below probe at a whole number of
+    :data:`qt_app.Y_SPIN_PERIOD_S`: at those clocks the turn contributes
+    nothing to a bounding box, so a box-based assertion (an orbit's recovered
+    tilt, say) measures the FIELD and not the projection on top of it.
+    """
+    from voicebridge.orb import qt_app as Q
+
+    theta = Q.mark_horizontal_theta(t)
+    ct, st = math.cos(theta), math.sin(theta)
+    d = min(1.0, max(0.0, float(depth)))
+    z = (d - 0.5) * Q.Y_SPIN_Z_GAIN * R * st * st
+    zr = -x * st + z * ct
+    persp = 1.0 + Q.Y_SPIN_PERSP * zr / R
+    persp = min(Q.Y_SPIN_PERSP_MAX, max(Q.Y_SPIN_PERSP_MIN, persp))
+    return (x * ct + z * st) * persp, y * persp
+
+
+def _pix(t, R, c, item, depth=None):
+    """The painted PIXEL position of one field element (``c`` is the centre).
+
+    ``depth`` defaults to the element's own ``depth`` field; pass ``None``
+    explicitly for a trail sample that inherits its BODY's depth.
+    """
+    d = item.get("depth", 0.5) if depth is None else depth
+    tx, ty = _turned(t, R, item.get("x", 0.0), item.get("y", 0.0), d)
+    return c + tx, c + ty
+
+
+def _declared_ring_box(t, R, ring, tilt):
+    """Bounding box of one DECLARED ring as the painter's Y turn projects it.
+
+    The ring's points are sampled at the field's own ``ring_path`` angles, so
+    each point's depth follows the field's convention
+    (``0.5 + 0.5*cos(orbital angle)``, recoverable from the sample index), and
+    the whole path goes through :func:`_turned` after the camera sway is taken
+    back out. ``tilt`` is supplied by the caller so this can be asked for the
+    LAGGED follower tilt and for today's orbit tilt and the two compared.
+    """
+    from voicebridge.orb import mark_field as F
+
+    spec = dict(ring)
+    spec["tilt"] = tilt
+    dx, dy = F.camera_offset(t, R)
+    raw = F.ring_path(t, R, spec)
+    n = len(raw) - 1
+    xs, ys = [], []
+    for i, (px, py) in enumerate(raw):
+        d = 0.5 + 0.5 * math.cos(2.0 * math.pi * (i % n) / n)
+        tx, ty = _turned(t, R, px - dx, py - dy, d)
+        xs.append(tx)
+        ys.append(ty)
+    return max(xs) - min(xs), max(ys) - min(ys)
+
+
+def _thin_orbit_outlines(prims, c, tol=0.75):
+    """Centred outline paths that are neither the main stroke nor a circle.
+
+    ``tol`` bounds how far a stroke's bounding-box centre may sit off the
+    mark's axis. It has to be loosened away from sub-pixel for any clock
+    other than a whole number of Y-turn periods: under a real 3D rotation with
+    perspective, a circle's projected silhouette is genuinely not centred on
+    the axis (the far arc shrinks while the near arc grows), and the recorded
+    box centre drifts a pixel or two with it.
+    """
     return [p for p in prims
             if p.kind == "path" and p.fill is None and p.pen is not None
-            and math.hypot(p.cx - c, p.cy - c) <= 0.75
+            and math.hypot(p.cx - c, p.cy - c) <= tol
             and p.width <= 1.2 and 0.2 <= p.alpha <= 0.45
             and abs(p.w - p.h) > 4.0]
 
@@ -638,29 +717,46 @@ def _tilt_abs_deg(prim, rxs, rys):
 def test_echo_rings_are_two_thin_lagged_followers():
     from voicebridge.orb import mark_field as F
 
+    from voicebridge.orb import qt_app as Q
+
     size, c = 192, 96.0
     R = size / 2.0 - 6.0
     t = 0.37
     prims = _record(t=t, size=size)
 
-    thin = _thin_orbit_outlines(prims, c)
-    # Thin centred outlines now include the two satellite CIRCLES, so pick the
-    # echo followers by geometry: they are scaled copies of the main ellipses
-    # (same rx/ry ratio), while a satellite is a circle in the same plane.
-    rx, ry = R * F.RX_FRAC, R * F.RY_FRAC
-    rxs, rys = rx * F.ECHO_SCALE, ry * F.ECHO_SCALE
-    ratio = rys / rxs
-    thin = [p for p in thin
-            if abs(((p.h / p.w) if p.w else 0.0) - ratio) < 0.12]
-    assert len(thin) == 2, thin                 # exactly one per main orbit
-    got = sorted(_tilt_abs_deg(p, rxs, rys) for p in thin)
-    expected = sorted(abs(e["tilt"]) for e in F.echo_rings(t))
-    assert got == pytest.approx(expected, abs=2.0), (got, expected)
+    # Thin centred outlines include the two satellite CIRCLES as well as the
+    # two echo followers, so the followers are picked out the way the painter
+    # builds them: each is a DECLARED ring (``ring_geometry``) stroked through
+    # the mark's Y-turn projection, so its recorded box must equal that ring's
+    # projected box. Matching the box (rather than a ratio of its sides) is
+    # what makes this work at any clock: the projection changes the box, so a
+    # clock-independent test has to expect the projected one.
+    lagged = {str(e["orbit"]): e["tilt"] for e in F.echo_rings(t)}
+    near_tilt, far_tilt = F.orbit_tilts(t)
+    fresh = {"a": near_tilt, "b": far_tilt}
+    want, stale = [], []
+    for ring in F.ring_geometry(t):
+        if ring["layer"] != "echo":
+            continue
+        want.append(_declared_ring_box(t, R, ring, lagged[str(ring["orbit"])]))
+        stale.append(_declared_ring_box(t, R, ring, fresh[str(ring["orbit"])]))
 
-    # The lag matters: the follower tilt is the orbit tilt ECHO_LAG_S ago,
-    # not today's, so at this phase the two disagree by a visible margin.
-    unl = sorted(abs(v) for v in F.orbit_tilts(t))
-    assert max(abs(a - b) for a, b in zip(got, unl)) > 0.5, (got, unl)
+    thin = _thin_orbit_outlines(prims, c, tol=0.05 * R)
+    assert len(thin) == 2, thin                 # exactly one per main orbit
+    for p in thin:
+        assert any(abs(p.w - w) <= 0.75 and abs(p.h - h) <= 0.75
+                   for w, h in want), (p.w, p.h, want)
+
+    # The lag matters: the follower sits at the orbit tilt ECHO_LAG_S ago, not
+    # today's, and at this phase the two disagree by a visible margin. If the
+    # painter were using today's tilt, these strokes would land on `stale`.
+    assert any(abs(a[0] - b[0]) > 2.0 or abs(a[1] - b[1]) > 2.0
+               for a, b in zip(sorted(want), sorted(stale))), (want, stale)
+    for p in thin:
+        assert not any(abs(p.w - w) <= 0.75 and abs(p.h - h) <= 0.75
+                       for w, h in stale), (p.w, p.h, stale)
+    assert _tilt_abs_deg(thin[0], R * F.RX_FRAC * F.ECHO_SCALE,
+                         R * F.RY_FRAC * F.ECHO_SCALE) > 0.0
 
 
 def test_echo_rings_follow_tilt_changes_continuously():
@@ -734,7 +830,7 @@ def test_nucleus_sparks_paint_glints():
     sparks = Q.mark_nucleus_sparks(t, R)
     assert sparks
     for s in sparks:
-        px, py = c + s["x"], c + s["y"]
+        px, py = _pix(t, R, c, s)
         arms = [p for p in prims if p.kind == "line"
                 and math.hypot(p.cx - px, p.cy - py) <= 0.6]
         core = [p for p in prims if p.kind == "ellipse" and p.fill is not None
@@ -997,8 +1093,9 @@ def test_binaries_paint_as_glyphs_split_by_depth():
     assert len(seam) == 1, seam
     far, near = [], []
     for (at, p), b in zip(glyphs, bits):
+        bx, by = _pix(t, R, c, b)
         assert p.text == b["char"]
-        assert math.hypot(p.cx - (c + b["x"]), p.cy - (c + b["y"])) <= 0.01
+        assert math.hypot(p.cx - bx, p.cy - by) <= 0.01
         (far if b["depth"] < 0.5 else near).append(at)
 
     # The same z-split as every other layer: far fragments behind the
@@ -1041,8 +1138,13 @@ def test_inner_ring_is_a_thin_dim_depth_neutral_orbit():
     from voicebridge.orb import mark_field as F
     from voicebridge.orb import qt_app as Q
 
+    from voicebridge.orb import qt_app as Q
+
     size, R, c = 192, 90.0, 96.0
-    t = 0.42
+    # Whole numbers of Y-turn periods: the turn is then an exact mirror in x,
+    # so this test keeps measuring the core ring's declared radii and alpha
+    # rather than the projection laid over them.
+    t = Q.Y_SPIN_PERIOD_S * 2.0
     prims = _record(t=t, size=size)
     rings = _inner_ring(prims, c, R)
     assert len(rings) == 1, rings
@@ -1068,7 +1170,12 @@ def test_inner_ring_tilt_tracks_the_shared_field_and_freezes_when_still():
     size, c = 192, 96.0
     R = size / 2.0 - 6.0
     tilts = []
-    for t in (0.0, 0.8, 1.6):
+    # Whole numbers of Y-turn periods: the turn is an exact mirror in x at
+    # theta = pi, so it does not change a bounding box and the tilt recovered
+    # below is the field's own. There is still real ring rotation between the
+    # samples (the 4.5 s ring period does not divide the 20.5 s turn), so the
+    # core ring is genuinely turning between them.
+    for t in (0.0, Q.Y_SPIN_PERIOD_S, 2.0 * Q.Y_SPIN_PERIOD_S):
         rings = _inner_ring(_record(t=t, size=size), c, R)
         assert len(rings) == 1, (t, rings)
         irx = R * F.INNER_RING_RX_FRAC
