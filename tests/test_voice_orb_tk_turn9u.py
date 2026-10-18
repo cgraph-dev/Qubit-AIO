@@ -184,7 +184,10 @@ def test_turn_point_applies_y_before_x():
     theta, phi = F.spin_angles(t)
     ct, st, cp, sp = math.cos(theta), math.sin(theta), math.cos(phi), math.sin(phi)
     for x, y, d in ((63.0, -21.0, 1.0), (-63.0, 21.0, 0.0), (12.5, 30.0, 0.7)):
-        z = (d - 0.5) * M.Y_SPIN_Z_GAIN * R * st * st
+        # The depth offset is faded by the COMBINED turn (sin²θ+sin²φ−sin²θsin²φ),
+        # the Qt painter's polynomial — a Y-only fade collapses at an X edge-on.
+        fade = st * st + sp * sp - st * st * sp * sp
+        z = (d - 0.5) * M.Y_SPIN_Z_GAIN * R * fade
         xr = x * ct + z * st
         zr0 = -x * st + z * ct
         yr = y * cp - zr0 * sp
@@ -333,8 +336,8 @@ def test_tumble_never_thins_to_a_line(monkeypatch):
     # collapses toward a line the way the old flat ``cos`` squash did (which
     # reached roughly a fifth of the full width at the edge-on crossing and
     # looked like the orb had switched off). Sampling the full cycle matters:
-    # the sliver phases are coincidence phases (X edge-on meeting a ring near
-    # its untilted tilt), and a short window can miss them entirely.
+    # the sliver phases are coincidence phases, and a short window can miss
+    # them entirely.
     #
     # Ephemeral layers (dust, sparkles, sparks, blink dots, the comet) are
     # stripped from BOTH the face-on reference and the samples: they set the
@@ -343,18 +346,16 @@ def test_tumble_never_thins_to_a_line(monkeypatch):
     # What is measured is the durable mark: rings, riders, streaks, binaries
     # and the nucleus stack.
     #
-    # HONEST FLOOR 0.20, NOT 0.45 — a measured design finding, not a tuning
-    # choice. The full-cycle scan bottoms out at ~0.25 of face-on (t=318 s).
-    # Mechanism: the field's depth rides IN PHASE with each ring's x
-    # (``0.5+0.5*cos``), so under a Y+X turn the tumbled shape is a thin
-    # diagonal BAND rather than an opened loop wherever an X edge-on phase
-    # (which squeezes every band by ``cos(phi)``) coincides with a ring
-    # passing near-untilted through its counter-rotating tilt schedule. A
-    # rigid ring (depth in quadrature, ``sin``) would stay open under any
-    # rotation; that is a FIELD change, reported for the field lane (like the
-    # Qt lane's echo-lag reports), not something this renderer can silently
-    # re-derive — the riders must sit ON the field's own depths. Any
-    # faithful Qt port of the same math measures the same slivers.
+    # FLOOR 0.45 — the owner's "never thin" requirement, and now measured with
+    # margin (the full-cycle scan bottoms out at ~0.60 of face-on, t=66.5 s).
+    # The old 0.20 floor documented a real collapse: the projection fade was
+    # Y-only (``sin²θ``), so near Y face-on the depth vanished exactly where
+    # the X turn tipped the plane edge-on and the mark folded to a band. The
+    # Tk projection now uses the Qt painter's COMBINED fade
+    # (``sin²θ + sin²φ − sin²θ·sin²φ``), which is still exactly 0 only when
+    # BOTH phases are 0 (face-on / reduced motion stay the unturned mark) but
+    # stays open at every single-axis edge-on. Same polynomial, same result in
+    # both lanes.
     monkeypatch.setattr(M, "dust_state", lambda *a, **k: [])
     monkeypatch.setattr(M, "sparkles", lambda *a, **k: [])
     monkeypatch.setattr(M, "nucleus_sparks", lambda *a, **k: [])
@@ -375,7 +376,7 @@ def test_tumble_never_thins_to_a_line(monkeypatch):
         if w < worst:
             worst, worst_t = w, t
         t += 0.5
-    assert worst >= 0.20 * full, (
+    assert worst >= 0.45 * full, (
         f"mark thinned to {worst:.1f}px ({worst / full:.0%} of {full:.1f}px) "
         f"at t={worst_t:.2f}s")
 
@@ -595,14 +596,15 @@ def test_a_body_draws_its_wake_then_its_star(monkeypatch):
     wake = _segments(c)
     # The synthetic body sits at the field origin, which the whole-mark
     # transforms carry to the mark's own centre — PLUS the body's own rotated
-    # depth (element_depth: turn_qdepth hash-broken and flat per element, then
-    # blended with the body's z/z2 volume axes, so a turned body at the origin
-    # swings off-centre exactly as far as its volume takes it). Wake and star
-    # share that projection, so they still coincide.
+    # depth (turn_qdepth, hash-broken and flat per element) and its screen-space
+    # z/z2 volume offset, so a turned body at the origin swings off-centre
+    # exactly as far as its volume takes it. Wake and star share that
+    # projection, so they still coincide.
     import math as _m2
-    qd = M.element_depth(0.5, part.get("z"), part.get("z2"),
-                         part.get("index"), flat=True)
+    qd = M.turn_qdepth(0.5, part.get("index"), flat=True)
     _px, _py, _g = M.turn_point(1.7, R, 0.0, 0.0, qd)
+    _ox, _oy = M.volume_offset(1.7, R, part.get("z"), part.get("z2"))
+    _px, _py = _px + _ox, _py + _oy
     _a = _m2.radians(_m2.fmod(M.spin_deg(1.7), 360.0))
     star_x = CX + _px * _m2.cos(_a) - _py * _m2.sin(_a)
     star_y = CY + _px * _m2.sin(_a) + _py * _m2.cos(_a)

@@ -251,15 +251,16 @@ TURN_Z_SPREAD = 0.9
 TURN_RING_TILT = 0.35
 TURN_RING_SALT = 5.77
 #: VOLUME: the field publishes two independent 0..1 volume axes (``z`` / ``z2``)
-#: on every element, uncorrelated with its ``depth``. The projection depth is
-#: blended toward their mean, so a body no longer rides the flat plane its own
-#: x implies — a swarm genuinely fills a slab. ADDITIVE to ``turn_qdepth`` (the
-#: per-element hash that broke the original depth/x lock): where qdepth
-#: decorrelates one seeded sample, z/z2 carry the field's own volume. The blend
-#: is invisible at a face-on phase (``sin(theta)`` and ``sin(phi)`` are both 0,
-#: so the projection ignores depth entirely and reduced motion stays the
-#: unturned mark), which is why the value can be large without a start-up pop.
-VOLUME_DEPTH_BLEND = 0.45
+#: on every element (distinct ``hash01`` salts, so uncorrelated with ``depth``).
+#: ``z`` displaces an element vertically and ``z2`` horizontally, giving the
+#: cloud a genuine volume instead of one sheet riding the orbit plane. The
+#: displacement is driven by the HASH axes, never by the orbital angle, so it
+#: cannot reintroduce the depth/x lock; it is faded by the SAME combined-turn
+#: factor the projection uses (:func:`turn_fade`), so a face-on phase and
+#: reduced motion are the unturned mark bit for bit. Parity with the Qt
+#: painter's ``volume_offset`` (same constants).
+VOLUME_X_FRAC = 0.13
+VOLUME_Y_FRAC = 0.13
 #: Depth of field: how much a far element's alpha is pulled down. ``dof`` is
 #: 0.0 sharp / 1.0 far, so this softens distance WITHOUT touching brightness
 #: meaning — "far away" must not collapse into "barely visible".
@@ -507,7 +508,8 @@ def turn_project(x: float, y: float, depth: float,
     gain. The arithmetic mirrors the Qt painter's per-point placement with the
     same constants, so the two lanes put every element in the same place::
 
-        z   = (depth - 0.5) * Z_GAIN * R * sin(theta)**2
+        fade = sin(theta)**2 + sin(phi)**2 - sin(theta)**2*sin(phi)**2
+        z   = (depth - 0.5) * Z_GAIN * R * fade
         xr  = x * cos(theta) + z * sin(theta)
         zr0 = -x * sin(theta) + z * cos(theta)
         yr  = y * cos(phi) - zr0 * sin(phi)
@@ -516,15 +518,18 @@ def turn_project(x: float, y: float, depth: float,
         X, Y = xr * persp, yr * persp
         gain = 1 + DEPTH_GAIN * zr / R   (clamped)
 
-    The depth offset is faded by ``sin(theta)**2``: at ``theta = 0`` and
-    ``theta = pi`` every term collapses to ``xr = +-x``, ``persp = 1`` and
-    ``gain = 1``, so the face-on phases are the unturned mark, bit for bit.
-    ``phi = 0`` is likewise the identity for the X turn. ``y`` is untouched
-    by the Y turn and ``x`` by the X turn, which is exactly why the mark's
-    height never changes under Y alone and the turn never thins to a line:
-    the depth axis carries the quarter phases.
+    The depth offset is faded by the COMBINED turn
+    (``sin²θ + sin²φ − sin²θ·sin²φ``) rather than by the Y turn alone. The
+    Y-only fade still guaranteed a total collapse: near Y face-on the depth
+    vanishes exactly where the X turn tips the plane edge-on and the assembly
+    folds to a band (measured ~0.25 of face-on). The combined fade is 0 iff
+    BOTH phases are 0 (so ``t = 0`` and reduced motion stay the exact identity)
+    and 1 at ANY quarter turn of either axis, so the mark opens along whichever
+    axis is edge-on. Same polynomial as the Qt painter, so both lanes tumble
+    identically.
     """
-    z = (depth - 0.5) * Y_SPIN_Z_GAIN * r * st * st
+    fade = st * st + sp * sp - st * st * sp * sp
+    z = (depth - 0.5) * Y_SPIN_Z_GAIN * r * fade
     xr = x * ct + z * st
     zr0 = -x * st + z * ct
     yr = y * cp - zr0 * sp
@@ -603,25 +608,44 @@ def turn_point(t: Any, R: Any, x: Any, y: Any,
     return turn_project(xx, yy, d, ct, st, cp, sp, r)
 
 
-def element_depth(depth: Any, z: Any = None, z2: Any = None,
-                  zseed: Any = None, spread: Any = TURN_Z_SPREAD,
-                  flat: bool = False) -> float:
-    """The projection depth an element is painted at, volume axes included.
+def turn_fade(t: Any) -> float:
+    """The combined turn's depth-opening factor at ``t``, in ``[0, 1]``.
 
-    The path the renderer uses, exposed so a locator can route through the
-    exact same arithmetic instead of guessing a pixel: ``turn_qdepth`` first
-    (hash-broken per element, the thin-line fix), then a blend toward the mean
-    of the field's two independent volume axes ``z``/``z2`` when the element
-    carries them (:data:`VOLUME_DEPTH_BLEND`). Pure; ``z``/``z2`` absent is the
-    identity, so an element that predates the volume axes projects exactly as
-    before. Never raises.
+    ``sin²θ + sin²φ − sin²θ·sin²φ``: exactly 0 when BOTH tumble phases are 0
+    (face-on, and every reduced-motion frame, since both reads clamp to 0) and
+    1 when either axis is edge-on. The SAME factor :func:`turn_project`
+    multiplies the depth offset by, so anything routed through it is an exact
+    no-op at a still clock. Parity with the Qt painter's ``turn_fade``. Never
+    raises.
     """
-    d = turn_qdepth(depth, zseed, spread, flat=flat)
-    if z is None and z2 is None:
-        return d
-    v = 0.5 * (_num(z, 0.5) + _num(z2, 0.5))
-    b = VOLUME_DEPTH_BLEND
-    return max(0.0, min(1.0, d * (1.0 - b) + v * b))
+    try:
+        _ct, st, _cp, sp = turn_basis(t)
+    except Exception:  # noqa: BLE001 - a bad clock must not move the mark
+        return 0.0
+    return max(0.0, min(1.0, st * st + sp * sp - st * st * sp * sp))
+
+
+def volume_offset(t: Any, R: Any, z: Any, z2: Any = 0.5
+                  ) -> Tuple[float, float]:
+    """Screen-space 3D displacement from the field's ``z``/``z2`` volume axes.
+
+    Each axis is a 0..1 hash of the element's index, so the displacement is
+    CONSTANT per element and uncorrelated with its orbital angle — a real
+    volume, not the depth/x lock. ``z`` moves an element vertically and ``z2``
+    horizontally (independent axes, so the cloud fills a box, not a line). The
+    whole offset is faded by :func:`turn_fade`, so at a face-on phase and under
+    reduced motion it is exactly ``(0, 0)``: still frames carry the unturned
+    mark, unaltered. Mirrors the Qt painter's ``volume_offset`` with the same
+    constants. Pure, never raises.
+    """
+    f = turn_fade(t)
+    r = _num(R, 32.0)
+    if r <= 0.0:
+        r = 32.0
+    dz = min(1.0, max(0.0, _num(z, 0.5))) - 0.5
+    dz2 = min(1.0, max(0.0, _num(z2, 0.5))) - 0.5
+    return (dz2 * (2.0 * VOLUME_X_FRAC) * r * f,
+            -dz * (2.0 * VOLUME_Y_FRAC) * r * f)
 
 
 def nucleus_radius(R: Any, t: Any, level_gain: Any = 1.0) -> float:
@@ -796,6 +820,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     spin_a = math.radians(math.fmod(spin_deg(tt), 360.0))
     spin_c, spin_s = math.cos(spin_a), math.sin(spin_a)
     turn_ct, turn_st, turn_cp, turn_sp = turn_basis(tt)
+    # The combined-turn fade is a frame constant: resolve it once and reuse it
+    # for every element's volume offset (hundreds of points share it).
+    frame_fade = max(0.0, min(
+        1.0, turn_st * turn_st + turn_sp * turn_sp
+        - turn_st * turn_st * turn_sp * turn_sp))
 
     def _place(x: float, y: float, depth: Any = 0.5, zseed: Any = None,
                zspread: Any = TURN_Z_SPREAD, zflat: bool = False
@@ -826,15 +855,20 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         """Like :func:`_place`, plus the rotated-depth size/alpha gain.
 
         ``vol_z``/``vol_z2`` are the element's field volume axes; when present
-        they make the projected depth a genuine volume coordinate rather than
-        one lay on the orbit plane (:func:`element_depth`).
+        they add a screen-space displacement (:func:`volume_offset`) so the
+        body sits in a genuine volume rather than one lay on the orbit plane.
         """
         try:
-            d = element_depth(depth, vol_z, vol_z2, zseed, zspread, zflat)
+            d = turn_qdepth(depth, zseed, zspread, flat=zflat)
         except Exception:  # noqa: BLE001
             d = 0.5
         px, py, g = turn_project(_num(x), _num(y), d, turn_ct, turn_st,
                                  turn_cp, turn_sp, r)
+        if vol_z is not None or vol_z2 is not None:
+            dz = min(1.0, max(0.0, _num(vol_z, 0.5))) - 0.5
+            dz2 = min(1.0, max(0.0, _num(vol_z2, 0.5))) - 0.5
+            px += dz2 * (2.0 * VOLUME_X_FRAC) * r * frame_fade
+            py += -dz * (2.0 * VOLUME_Y_FRAC) * r * frame_fade
         sx = px * spin_c - py * spin_s
         sy = px * spin_s + py * spin_c
         return (cx_f + sx, cy_f + sy, g)
@@ -1868,9 +1902,9 @@ __all__ = [
     "Y_SPIN_PERSP_MIN", "Y_SPIN_PERSP_MAX", "Y_SPIN_DEPTH_GAIN",
     "Y_SPIN_GAIN_MIN", "Y_SPIN_GAIN_MAX",
     "horizontal_spin_deg", "horizontal_spin",
-    "turn_basis", "turn_project", "turn_point", "element_depth",
-    "VOLUME_DEPTH_BLEND", "TURN_Z_SALT", "TURN_Z_SPREAD", "TURN_RING_TILT",
-    "TURN_RING_SALT", "FILAMENT_TK_STRIDE",
+    "turn_basis", "turn_project", "turn_point", "turn_fade", "volume_offset",
+    "VOLUME_X_FRAC", "VOLUME_Y_FRAC", "TURN_Z_SALT", "TURN_Z_SPREAD",
+    "TURN_RING_TILT", "TURN_RING_SALT", "FILAMENT_TK_STRIDE",
     "DOF_ALPHA_SOFT",
     "NUCLEUS_RIM_ALPHA", "NUCLEUS_RIM_OFFSET_PX", "NUCLEUS_RIM_FRINGE_ALPHA",
     "NUCLEUS_RIM_OVALS",
