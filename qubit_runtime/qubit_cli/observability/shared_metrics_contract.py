@@ -157,7 +157,14 @@ TASK_FAILURE_CLASSES = MODEL_ERROR_CLASSES | frozenset({
 # Surfaces that are not messaging platforms keep their own execution_surface value.
 # ``relay``: a connector inbound whose platform neither the inbound nor a single-platform connector names.
 _CORE_GATEWAY_PLATFORMS = (frozenset(PLATFORMS) - {"api_server", "cli", "cron"}) | {"none", "plugin", "relay"}
-TOOL_NAMES = BUILTIN_TOOL_NAMES | {"mcp", "plugin", "unknown"}
+# The Tool Search bridge tools are not in a toolset; every hosted connector tool reads ``connector``.
+BRIDGE_TOOL_NAMES = frozenset({"tool_call", "tool_describe", "tool_search"})
+# Deleted with the old setup flow. v4 only adds values, and rows that v0.21.6/7 saved with these names
+# must still package; recording maps through the live sets (tool_metric_name, toolset_metric_name).
+RETIRED_TOOL_NAMES = frozenset({"setup_choose", "start_chat"})
+RETIRED_TOOLSET_NAMES = frozenset({"setup", "start_chat"})
+_LIVE_TOOL_NAMES = BUILTIN_TOOL_NAMES | BRIDGE_TOOL_NAMES | {"connector", "mcp", "plugin", "unknown"}
+TOOL_NAMES = _LIVE_TOOL_NAMES | RETIRED_TOOL_NAMES
 TOOL_ERROR_CLASSES = frozenset({
     "blocked", "contract_violation", "exception", "interrupted", "invalid_arguments", "none",
     "timeout", "tool_error", "unknown",
@@ -777,7 +784,14 @@ TASK_FAILURE_CLASSES = MODEL_ERROR_CLASSES | frozenset({
 # Surfaces that are not messaging platforms keep their own execution_surface value.
 # ``relay``: a connector inbound whose platform neither the inbound nor a single-platform connector names.
 _CORE_GATEWAY_PLATFORMS = (frozenset(PLATFORMS) - {"api_server", "cli", "cron"}) | {"none", "plugin", "relay"}
-TOOL_NAMES = BUILTIN_TOOL_NAMES | {"mcp", "plugin", "unknown"}
+# The Tool Search bridge tools are not in a toolset; every hosted connector tool reads ``connector``.
+BRIDGE_TOOL_NAMES = frozenset({"tool_call", "tool_describe", "tool_search"})
+# Deleted with the old setup flow. v4 only adds values, and rows that v0.21.6/7 saved with these names
+# must still package; recording maps through the live sets (tool_metric_name, toolset_metric_name).
+RETIRED_TOOL_NAMES = frozenset({"setup_choose", "start_chat"})
+RETIRED_TOOLSET_NAMES = frozenset({"setup", "start_chat"})
+_LIVE_TOOL_NAMES = BUILTIN_TOOL_NAMES | BRIDGE_TOOL_NAMES | {"connector", "mcp", "plugin", "unknown"}
+TOOL_NAMES = _LIVE_TOOL_NAMES | RETIRED_TOOL_NAMES
 TOOL_ERROR_CLASSES = frozenset({
     "blocked", "contract_violation", "exception", "interrupted", "invalid_arguments", "none",
     "timeout", "tool_error", "unknown",
@@ -2440,6 +2454,36 @@ def tool_error_class(kwargs: dict[str, Any], outcome: str | None = None) -> str:
         return "unknown"
     error_type = _norm(kwargs.get("error_type"))
     return _TOOL_ERROR_TYPES.get(error_type, "exception" if error_type else "unknown")
+
+
+# The tool gateway's execute codes (``tools.connectors.gateway.wire.EXECUTE_ERROR_CODES``) by class;
+# a code not listed here keeps ``tool_error`` unless its family is backend.
+_CONNECTOR_CODE_CLASSES = {
+    **dict.fromkeys(("CONNECTION_REQUIRED", "CONNECTION_EXPIRED"), "connection_required"),
+    "TOOL_NOT_ALLOWED": "not_allowed",
+    **dict.fromkeys(("ALIAS_REQUIRED", "ALIAS_UNKNOWN"), "alias"),
+    "INVALID_ARGUMENTS": "invalid_arguments",
+    # Agent-side file input refusals (``tools.connectors.gateway.wire.FILE_ERROR_FAMILIES``).
+    "FILE_NOT_ALLOWED": "not_allowed",
+    **dict.fromkeys(("FILE_NOT_FOUND", "FILE_TOO_LARGE"), "invalid_arguments"),
+}
+_CONNECTOR_FAMILY_CLASSES = {"backend": "connector_backend"}
+
+
+def connector_error_class(kwargs: dict[str, Any]) -> str | None:
+    """The class of a failed connector entry from its result's ``error.code``; None when the call is
+    not a connector call or its result names no code."""
+    if not _norm(kwargs.get("tool_name")).startswith(CONNECTOR_NAME_PREFIX):
+        return None
+    error = _result_error(kwargs.get("result"))
+    code = str(error.get("code") or "").strip().upper()
+    if not code:
+        return None
+    # Late import: the wire module pulls pydantic, which the contract does not need at import.
+    from tools.connectors.gateway.wire import execute_error_family
+
+    family = execute_error_family(code, error.get("family") if isinstance(error.get("family"), str) else None)
+    return _CONNECTOR_FAMILY_CLASSES.get(family or "") or _CONNECTOR_CODE_CLASSES.get(code)
 
 
 def tool_latency_bucket(value: Any, *, fallback_duration_ms: int | None = None) -> str:
