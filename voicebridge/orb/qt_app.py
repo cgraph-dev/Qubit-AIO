@@ -1307,7 +1307,20 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             if spec.get("echo") and str(spec.get("orbit") or "") in echo_tilt:
                 tilt = echo_tilt[str(spec.get("orbit") or "")]
             draw_spec = dict(spec)
-            draw_spec["tilt"] = _num(tilt, 0.0)
+            # Fluid circles (owner: "make circles animation more fluid"): the
+            # declaration now carries a per-ring PLANE PRECESSION
+            # (``tilt_spin_deg``, a bounded sway on the ring's own non-harmonic
+            # period) and a RADIUS BREATH (``ring_radius_scale``). Add both so
+            # each circle slowly tips and breathes on its own schedule instead
+            # of sitting rigid, while the declared base tilt/rx/ry the
+            # contracts assert are untouched.
+            spin = spec.get("tilt_spin_deg")
+            if spin is None:
+                spin = _field.ring_tilt_spin(tt, spec)
+            breath = _field.ring_radius_scale(tt, spec)
+            draw_spec["tilt"] = _num(tilt, 0.0) + _num(spin, 0.0)
+            draw_spec["rx_frac"] = _num(spec.get("rx_frac"), _field.RX_FRAC) * breath
+            draw_spec["ry_frac"] = _num(spec.get("ry_frac"), _field.RY_FRAC) * breath
             # ``ring_path`` carries the field's camera sway. The BODY does not
             # sway, so a circle drawn around it must not either: leaving the
             # sway in slides the mark's visual centre off its own core and the

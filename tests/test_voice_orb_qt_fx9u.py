@@ -727,7 +727,17 @@ def _declared_ring_box(t, R, ring, tilt):
     from voicebridge.orb import mark_field as F
 
     spec = dict(ring)
-    spec["tilt"] = tilt
+    # Fluid circles: the painter adds the ring's plane precession
+    # (``tilt_spin_deg``) to the supplied base tilt and multiplies the declared
+    # radii by ``ring_radius_scale``. Mirror both here so the expected box is
+    # the drawn box.
+    spin = ring.get("tilt_spin_deg")
+    if spin is None:
+        spin = F.ring_tilt_spin(t, ring)
+    breath = F.ring_radius_scale(t, ring)
+    spec["tilt"] = tilt + spin
+    spec["rx_frac"] = ring.get("rx_frac", F.RX_FRAC) * breath
+    spec["ry_frac"] = ring.get("ry_frac", F.RY_FRAC) * breath
     dx, dy = F.camera_offset(t, R)
     raw = F.ring_path(t, R, spec)
     n = len(raw) - 1

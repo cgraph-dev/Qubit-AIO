@@ -438,6 +438,16 @@ def _projected_ring_box(t, R, spec):
     from voicebridge.orb import mark_field as F
     from voicebridge.orb import qt_app as Q
 
+    spec = dict(spec)
+    # Fluid circles: mirror the painter's added plane precession and radius
+    # breath so the expected box is the drawn box.
+    spin = spec.get("tilt_spin_deg")
+    if spin is None:
+        spin = F.ring_tilt_spin(t, spec)
+    breath = F.ring_radius_scale(t, spec)
+    spec["tilt"] = float(spec.get("tilt") or 0.0) + spin
+    spec["rx_frac"] = float(spec.get("rx_frac") or F.RX_FRAC) * breath
+    spec["ry_frac"] = float(spec.get("ry_frac") or F.RY_FRAC) * breath
     dx, dy = F.camera_offset(t, R)
     pts = F.ring_path(t, R, spec, samples=Q.RING_WARP_SAMPLES)
     n = max(1, len(pts) - 1)
