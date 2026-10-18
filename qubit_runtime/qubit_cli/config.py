@@ -139,12 +139,39 @@ _ENV_VAR_NAME_DENYLIST: frozenset[str] = frozenset({
     "QUBIT_SESSION_KEY", "HERMES_SESSION_KEY",
     "QUBIT_SESSION_PLATFORM", "HERMES_SESSION_PLATFORM"})
 
+# Rebrand stems of the same variable: this fork writes QUBIT_*, an upstream install wrote HERMES_*.
+# Folding them is only meaningful for .env assignment matching (see _env_line_canonical_name); the
+# denylist above intentionally lists both spellings rather than relying on the fold.
+_CANONICAL_ENV_STEM = "QUBIT_"
+_LEGACY_ENV_STEM = "HERMES_"
+
 
 def _env_var_policy_name(key: str, *, is_windows: Optional[bool] = None) -> str:
     """Name used for env policy comparisons: Windows env names are case-insensitive, POSIX not.
-    The override keeps both semantics testable on any host."""
+    The override keeps both semantics testable on any host.
+
+    Deliberately literal — this feeds denylist/prefix membership, which must stay per-spelling.
+    The rebrand stem alias belongs in :func:`_env_line_canonical_name`, not here.
+    """
     windows = _IS_WINDOWS if is_windows is None else is_windows
     return key.upper() if windows else key
+
+
+def _env_line_canonical_name(key: str, *, is_windows: Optional[bool] = None) -> str:
+    """Comparison form for ``.env`` *assignment* matching, rebrand stem folded.
+
+    ``QUBIT_FOO`` and ``HERMES_FOO`` are one variable under two spellings, so a writer looking up
+    ``QUBIT_FOO`` must not append a duplicate line to a file that already defines ``HERMES_FOO``
+    (whichever lands later silently wins). The ``_`` is not a case difference, so this fold is
+    **not** gated on Windows: a half-rebranded POSIX install has the same duplicate risk there.
+    POSIX stays otherwise case-sensitive (``QUIBT_FOO`` is still a different variable); Windows
+    folds case too. Kept separate from ``_env_var_policy_name`` because the denylist mapping must
+    remain literal per spelling.
+    """
+    name = _env_var_policy_name(key, is_windows=is_windows)
+    if name.startswith(_LEGACY_ENV_STEM):
+        name = _CANONICAL_ENV_STEM + name[len(_LEGACY_ENV_STEM):]
+    return name
 
 
 def validate_env_var_name_for_write(key: str) -> None:
@@ -2686,6 +2713,10 @@ def _env_line_defines_key(line: str, key: str, *, is_windows: Optional[bool] = N
 
     ``load_env()`` accepts the bash-compatible ``export KEY=value`` form (#6659), so the writers must
     recognise the same shape.
+
+    The comparison folds the rebrand stem (``HERMES_FOO`` ≡ ``QUBIT_FOO``) on every platform and
+    folds case on Windows only — see :func:`_env_line_canonical_name` for why the stem fold is not
+    Windows-gated.
     """
     stripped = line.strip()
     if stripped.startswith("export "):
@@ -2696,9 +2727,9 @@ def _env_line_defines_key(line: str, key: str, *, is_windows: Optional[bool] = N
     # load_env() strips whitespace around the parsed name, so `KEY = value` IS a live assignment. The
     # writers must match the same shape, or a hand-edited spaced line is invisible to save (duplicate
     # appended) and remove (line survives -> value resurrects on next load). #67488.
-    return _env_var_policy_name(
+    return _env_line_canonical_name(
         assigned_key.strip(), is_windows=is_windows
-    ) == _env_var_policy_name(key, is_windows=is_windows)
+    ) == _env_line_canonical_name(key, is_windows=is_windows)
 
 
 def _publish_env_value(key: str, value: Optional[str]) -> None:

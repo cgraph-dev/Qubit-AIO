@@ -1486,6 +1486,28 @@ class TestEnvWriteDenylist:
 
         assert _env_line_defines_key(f"{old}=50\n", new, is_windows=True)
 
+    @pytest.mark.parametrize("is_windows", [True, False])
+    def test_save_env_value_replaces_legacy_stem_line_instead_of_duplicating(
+        self, tmp_path, is_windows
+    ):
+        """The stem fold is not a Windows-only concern: a half-rebranded POSIX install has the
+        same duplicate-line risk, so the write path is pinned on both semantics. Ungated because
+        it takes the platform as data, not because the host is believed to be another OS.
+        """
+        from unittest.mock import patch as _patch
+
+        from qubit_cli.config import save_env_value
+
+        env_path = tmp_path / ".env"
+        env_path.write_text("HERMES_MAX_ITERATIONS=50\nKEEPER=1\n", encoding="utf-8")
+        with _patch.dict(os.environ, {"QUBIT_HOME": str(tmp_path)}, clear=False), _patch(
+            "qubit_cli.config._IS_WINDOWS", is_windows
+        ):
+            save_env_value("QUBIT_MAX_ITERATIONS", "75")
+
+        lines = [ln for ln in env_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        assert lines == ["QUBIT_MAX_ITERATIONS=75", "KEEPER=1"], lines
+
     @pytest.mark.platforms("windows")
     @pytest.mark.parametrize(
         "protected_key",
