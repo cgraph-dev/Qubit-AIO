@@ -128,6 +128,8 @@ class Prim:
     #: recover an outline's tilt needs w and h separately, not just r.
     w: float = 0.0
     h: float = 0.0
+    #: Glyph drawn by ``drawText`` (empty for every other kind).
+    text: str = ""
 
     @property
     def alpha(self) -> float:
@@ -235,6 +237,23 @@ class _Recorder:
         self.prims.append(Prim("line", cx, cy, r, self._fill_rgba(),
                                self._pen_rgba(), self._width()))
         self._p.drawLine(*args)
+
+    def drawText(self, *args):
+        cx = cy = 0.0
+        text = ""
+        try:
+            if len(args) >= 2 and hasattr(args[0], "x"):
+                pt, text = args[0], args[1]
+                cx, cy = float(pt.x()), float(pt.y())
+        except Exception:
+            pass
+        try:
+            self.prims.append(Prim("text", cx, cy, 0.0,
+                                   self._pen_rgba() or self._fill_rgba(),
+                                   None, 0.0, 0.0, 0.0, str(text)))
+        except Exception:
+            pass
+        self._p.drawText(*args)
 
     def __getattr__(self, name):
         return getattr(self._p, name)
@@ -926,3 +945,125 @@ def test_reduced_motion_paint_carries_no_spin_transform():
         p.end()
     finally:
         os.environ.pop("QUBIT_REDUCED_MOTION", None)
+
+
+# --------------------------------------------------------------------------- #
+# (n) binary particles: a field of tiny 1/0 data fragments
+# --------------------------------------------------------------------------- #
+def test_binaries_are_deterministic_and_gone_under_reduced_motion():
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    R = 90.0
+    bits = Q.mark_binaries(0.7, R)
+    assert len(bits) == F.BINARY_COUNT, len(bits)
+    assert bits == Q.mark_binaries(0.7, R)
+    for b in bits:
+        assert b["char"] in ("0", "1")
+        assert 0.0 <= b["depth"] <= 1.0
+        assert b["size"] > 0.0 and b["alpha"] > 0.0
+    with monkeypatch_env("QUBIT_REDUCED_MOTION", "1"):
+        assert Q.mark_binaries(0.7, R) == []
+
+
+def test_binaries_paint_as_glyphs_split_by_depth():
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    size, R, c = 192, 90.0, 96.0
+    t = 0.42
+    prims = _record(t=t, size=size)
+    # Draw order is far fragments first, then near ones, each in field order.
+    glyphs = [(i, p) for i, p in enumerate(prims) if p.kind == "text"]
+    bits = sorted(F.binary_state(t, R), key=lambda b: b["depth"] >= 0.5)
+    assert len(glyphs) == len(bits) == F.BINARY_COUNT
+
+    seam = [i for i, p in enumerate(prims)
+            if p.kind == "ellipse" and p.fill is not None
+            and math.hypot(p.cx - c, p.cy - c) <= 0.75]
+    assert len(seam) == 1, seam
+    far, near = [], []
+    for (at, p), b in zip(glyphs, bits):
+        assert p.text == b["char"]
+        assert math.hypot(p.cx - (c + b["x"]), p.cy - (c + b["y"])) <= 0.01
+        (far if b["depth"] < 0.5 else near).append(at)
+
+    # The same z-split as every other layer: far fragments behind the
+    # nucleus, near ones in front of it.
+    assert len(far) >= 8 and len(near) >= 8, (len(far), len(near))
+    assert max(far) < seam[0] < min(near), (far, seam, near)
+
+
+def test_binaries_actually_paint_pixels(monkeypatch):
+    from voicebridge.orb import qt_app as Q
+
+    with_spark = _paint(0.42)
+    with monkeypatch.context() as m:
+        m.setattr(Q._field, "binary_state", lambda t, r: [])
+        without = _paint(0.42)
+    assert _diff(with_spark, without) > 0
+
+
+# --------------------------------------------------------------------------- #
+# (o) inner core ring: a thin third orbit around the nucleus
+# --------------------------------------------------------------------------- #
+#: Widest pen the inner core ring may be stroked with (it is a hairline).
+Q_INNER_RING_MAX_W = 1.2
+
+
+def _inner_ring(prims, c, Rf):
+    """The centred thin outline whose rx is the field's inner-ring fraction."""
+    from voicebridge.orb import mark_field as F
+
+    irx = Rf * F.INNER_RING_RX_FRAC
+    expect_r = irx * (1.0 + F.RY_FRAC / F.RX_FRAC) / 2.0
+    return [p for p in prims
+            if p.kind == "path" and p.fill is None and p.pen is not None
+            and math.hypot(p.cx - c, p.cy - c) <= 0.75
+            and p.width <= Q_INNER_RING_MAX_W
+            and abs(p.r - expect_r) <= 0.15 * expect_r]
+
+
+def test_inner_ring_is_a_thin_dim_depth_neutral_orbit():
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    size, R, c = 192, 90.0, 96.0
+    t = 0.42
+    prims = _record(t=t, size=size)
+    rings = _inner_ring(prims, c, R)
+    assert len(rings) == 1, rings
+    ring = rings[0]
+    # Thin, dim, and never brighter than the echo followers.
+    assert ring.width <= 1.2
+    assert 0.0 < ring.alpha <= Q.INNER_RING_ALPHA + 1e-6, ring.alpha
+    assert ring.alpha < F.ECHO_ALPHA, (ring.alpha, F.ECHO_ALPHA)
+
+    seam = [i for i, p in enumerate(prims)
+            if p.kind == "ellipse" and p.fill is not None
+            and math.hypot(p.cx - c, p.cy - c) <= 0.75]
+    assert len(seam) == 1
+    # Depth-neutral: drawn once, before the far pass, never a near/far pair.
+    drawn_at = [i for i, p in enumerate(prims) if p is ring]
+    assert len(drawn_at) == 1 and drawn_at[0] < seam[0]
+
+
+def test_inner_ring_tilt_tracks_the_shared_field_and_freezes_when_still():
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    size, c = 192, 96.0
+    R = size / 2.0 - 6.0
+    tilts = []
+    for t in (0.0, 0.8, 1.6):
+        rings = _inner_ring(_record(t=t, size=size), c, R)
+        assert len(rings) == 1, (t, rings)
+        irx = R * F.INNER_RING_RX_FRAC
+        iry = irx * (F.RY_FRAC / F.RX_FRAC)
+        tilts.append(_tilt_abs_deg(rings[0], irx, iry))
+        assert Q.mark_inner_ring_tilt(t) == pytest.approx(F.inner_ring_tilt(t))
+    # The core ring really turns: its tilt is not parked.
+    assert max(tilts) - min(tilts) > 5.0, tilts
+
+    with monkeypatch_env("QUBIT_REDUCED_MOTION", "1"):
+        assert Q.mark_inner_ring_tilt(9.0) == F.INNER_RING_TILT_BASE

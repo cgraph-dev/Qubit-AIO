@@ -148,6 +148,18 @@ MASTER_SPIN_PERIOD_S = 24.0
 #: Studio nucleus: the shaded body is drawn 1.25x the field's base radius. The
 #: field still owns the heartbeat breathing; this only scales the body.
 NUCLEUS_RADIUS_MULT = 1.25
+#: Inner core ring: a third, THIN orbit around the nucleus — depth-neutral
+#: (drawn once, before the far pass), dim, and never chromatically fringed so
+#: it reads as a core path instead of a third logo orbit.
+INNER_RING_ALPHA = 0.16
+INNER_RING_WIDTH = 1.0
+#: Binary particles: tiny "1"/"0" data fragments. The field's ``size`` is a
+#: radius-like unit that already scales with the orb, so the glyph is sized
+#: from it and floored: at orb size these are PINS, not a wall of text. (The Tk
+#: lane's much larger multiplier turned the same field into legible words.)
+BINARY_FONT_MIN_PX = 5
+BINARY_FONT_PX_PER_UNIT = 12.0
+BINARY_FONT_PX_OFFSET = 2.0
 #: Nucleus swirl: two counter-rotating hot lobes inside the body, so the centre
 #: has internal movement instead of a static gradient.
 NUCLEUS_SWIRL_RADIUS_FRAC = 0.22
@@ -319,6 +331,44 @@ def mark_spin_deg(t: Any) -> float:
     return 360.0 * _mark_tt(t) / MASTER_SPIN_PERIOD_S
 
 
+def mark_binaries(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """Binary "1"/"0" fragments (shared field), gone under reduced motion.
+
+    A pure pass-through to :func:`mark_field.binary_state` on the clamped mark
+    clock; a still frame carries no moving text, so reduced motion returns an
+    empty list instead of freezing a field of glyphs. Never raises.
+    """
+    if _reduced_motion():
+        return []
+    try:
+        return list(_field.binary_state(_mark_tt(t), _finite(R, 32.0)))
+    except Exception:  # noqa: BLE001 - a field fault must not blank the orb
+        return []
+
+
+def mark_inner_ring_tilt(t: Any) -> float:
+    """Tilt of the fast inner core ring; frozen at its base under reduced.
+
+    Reads the clamped clock so a still frame parks the ring on
+    :data:`mark_field.INNER_RING_TILT_BASE` rather than mid-rotation. Never
+    raises.
+    """
+    try:
+        if _reduced_motion():
+            return _field.INNER_RING_TILT_BASE
+        return _field.inner_ring_tilt(_mark_tt(t))
+    except Exception:  # noqa: BLE001
+        return _field.INNER_RING_TILT_BASE
+
+
+def _finite(v: Any, default: float = 0.0) -> float:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return default
+    return f if math.isfinite(f) else default
+
+
 def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 state: Any, brightness: float, family: Any) -> None:
     """Paint the Qubit mark from the shared rich animation field.
@@ -337,7 +387,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     reduced motion paints a completely static, sparkle-free frame.
     """
     from PySide6.QtCore import QPointF, QRectF
-    from PySide6.QtGui import (QBrush, QColor, QPainterPath, QPen,
+    from PySide6.QtGui import (QBrush, QColor, QFont, QPainterPath, QPen,
                                QRadialGradient)
 
     def _clamp8(v: Any) -> int:
@@ -684,6 +734,44 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.drawPath(ppath)
         p.setBrush(Qt.NoBrush)
 
+    def _inner_ring(tilt_deg: float) -> None:
+        """The fast inner core ring: thin, dim, depth-neutral, never fringed.
+
+        Drawn once before the far pass, so it takes part in the depth read
+        without ever splitting into a near/far pair. Deliberately fainter than
+        the echo followers so the two main orbits keep the brightest hairlines.
+        """
+        irx = Rf * _field.INNER_RING_RX_FRAC
+        iry = irx * (_field.RY_FRAC / _field.RX_FRAC)
+        _echo_ring(irx, iry, tilt_deg, INNER_RING_ALPHA, INNER_RING_WIDTH)
+
+    def _binary(bit: Dict[str, Any]) -> None:
+        """One "1"/"0" fragment as a small glyph at its field position.
+
+        Sized from the field's own ``size`` so the fragments scale with the
+        orb, and tinted by ``lift`` so they sit in the same palette as the
+        particles instead of reading as pasted-in text.
+        """
+        size = _num(bit.get("size"), 0.0)
+        alpha = _num(bit.get("alpha"), 0.0) * bright
+        if alpha <= ALPHA_EPS or size <= 0.0:
+            return
+        rgb = _lift(_num(bit.get("lift"), 0.5))
+        p.save()
+        # QPainter draws glyphs with the PEN, not the brush.
+        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
+                             _clamp8(255.0 * min(1.0, alpha)))))
+        p.setBrush(Qt.NoBrush)
+        font = QFont(p.font())
+        font.setPixelSize(max(BINARY_FONT_MIN_PX,
+                              int(size * BINARY_FONT_PX_PER_UNIT
+                                  + BINARY_FONT_PX_OFFSET)))
+        p.setFont(font)
+        p.drawText(QPointF(cx + _num(bit.get("x"), 0.0),
+                           cy + _num(bit.get("y"), 0.0)),
+                   str(bit.get("char") or "0"))
+        p.restore()
+
     tt = _mark_tt(t)
     reduced = _reduced_motion()
     near_tilt, far_tilt = _field.orbit_tilts(tt)
@@ -708,6 +796,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                   if _num(s.get("depth"), 0.0) < 0.5]
     near_sparks = [s for s in sparks
                    if _num(s.get("depth"), 0.0) >= 0.5]
+    binaries = mark_binaries(tt, Rf)
+    far_binaries = [b for b in binaries if _num(b.get("depth"), 0.0) < 0.5]
+    near_binaries = [b for b in binaries if _num(b.get("depth"), 0.0) >= 0.5]
     draw_trails = not reduced
 
     # ---- master spin -----------------------------------------------------
@@ -724,6 +815,11 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.translate(cx, cy)
         p.rotate(spin)
         p.translate(-cx, -cy)
+
+    # ---- inner core ring (depth-neutral, drawn once) ----------------------
+    # Before the far pass so the far field draws over it: it is a core path,
+    # not another orbit taking part in the z-seam.
+    _inner_ring(mark_inner_ring_tilt(tt))
 
     # ---- far field (depth < 0.5), behind the nucleus ---------------------
     _ring(far_tilt, 0.60)
@@ -744,6 +840,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     for glint in glints:
         if glint["depth"] < 0.5:
             _sparkle(glint)
+    for bit in far_binaries:
+        _binary(bit)
     for spark in far_sparks:
         _spark(spark)
     if (traveller is not None
@@ -783,6 +881,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     for glint in glints:
         if glint["depth"] >= 0.5:
             _sparkle(glint)
+    for bit in near_binaries:
+        _binary(bit)
     for spark in near_sparks:
         _spark(spark)
     if (traveller is not None
