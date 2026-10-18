@@ -42,7 +42,7 @@ from agent.conversation_compression import (
 from agent.conversation_loop import INTERRUPT_WAITING_FOR_MODEL_PREFIX
 from agent.conversation_compression_archive import MERGED_DURABLE_ROWS, RETIRED_DURABLE_ROWS, UNNAMED_DURABLE_ROWS
 from agent.interrupt_compat import request_hard_interrupt
-from agent.message_metadata import ABSORBED_MESSAGE_UIDS, MESSAGE_UID, copy_identity_fields
+from agent.message_metadata import ABSORBED_MESSAGE_UIDS, MESSAGE_UID, copy_identity_fields, is_compaction_scaffolding
 from agent.turn_context import compression_made_progress
 from agent.session_activity import ActivityProvenance
 from qubit_cli.config import _is_ssh_remote_tilde_cwd, cfg_get
@@ -4778,7 +4778,13 @@ def _start_gateway_housekeeping(
         (60, "Media cache cleanup", housekeeping_media_caches),
         (60, "Paste sweep", _housekeeping_paste_sweep)]
     # Low disk + auto-prune undecided: ask on the home channel (two syscalls; snoozed per post).
-    chores.append((1, "Auto-prune low-disk prompt", lambda: maybe_post_auto_prune_prompt(runner, loop)))
+    def _post_auto_prune_prompt():
+        # Function-local import: ``run_housekeeping_disk`` imports from this module,
+        # so a module-level import here would be circular.
+        from gateway.run_housekeeping_disk import maybe_post_auto_prune_prompt
+        return maybe_post_auto_prune_prompt(runner, loop)
+
+    chores.append((1, "Auto-prune low-disk prompt", _post_auto_prune_prompt))
     if cron_provider is not None:
         chores.append((5, "Misfire catch-up sweep", lambda: _housekeeping_misfire_catch_up(cron_provider, adapters, loop)))
     if cron_thread is not None:

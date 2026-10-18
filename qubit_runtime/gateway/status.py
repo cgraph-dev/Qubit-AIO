@@ -572,6 +572,21 @@ from gateway.status_inline_source import (  # noqa: E402
     inline_source_flag_index,
 )
 
+# Lock-dir usability lives in a leaf sibling (``status_lock_dir``); the scoped-lock
+# acquire path raises its ``ScopedLockDirUnusable`` and reports the one-time repair
+# through it, so both are bound here by name.
+from gateway.status_lock_dir import (  # noqa: E402
+    unusable_lock_dir,
+    unusable_lock_dir_recovered,
+)
+
+# Scoped-lock release moved into its own sibling; ``gateway.status`` stays the
+# public seam for callers and tests that have always patched ``status.release_*``.
+from gateway.status_scoped_locks import (  # noqa: E402
+    release_all_scoped_locks,
+    release_scoped_lock,
+)
+
 
 def _gateway_command_subcommand(command: str | None) -> str | None:
     """Qubit gateway lifecycle subcommand from a command line, or None. No loose substring matches
