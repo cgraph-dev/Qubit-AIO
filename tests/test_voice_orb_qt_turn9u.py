@@ -438,6 +438,16 @@ def _projected_ring_box(t, R, spec):
     from voicebridge.orb import mark_field as F
     from voicebridge.orb import qt_app as Q
 
+    spec = dict(spec)
+    # Fluid circles: mirror the painter's added plane precession and radius
+    # breath so the expected box is the drawn box.
+    spin = spec.get("tilt_spin_deg")
+    if spin is None:
+        spin = F.ring_tilt_spin(t, spec)
+    breath = F.ring_radius_scale(t, spec)
+    spec["tilt"] = float(spec.get("tilt") or 0.0) + spin
+    spec["rx_frac"] = float(spec.get("rx_frac") or F.RX_FRAC) * breath
+    spec["ry_frac"] = float(spec.get("ry_frac") or F.RY_FRAC) * breath
     dx, dy = F.camera_offset(t, R)
     pts = F.ring_path(t, R, spec, samples=Q.RING_WARP_SAMPLES)
     n = max(1, len(pts) - 1)
@@ -467,9 +477,11 @@ def test_every_stroked_circle_matches_the_declared_geometry():
     prims = T._record(t=t, size=size)
     # Only strokes as wide as a DECLARED circle. The core ring is the smallest,
     # and the nucleus's own halo/shockwave outlines are centre detail, not
-    # circles of the mark.
+    # circles of the mark. Strokes as thin as a glint ARM (GLINT_PEN_W) are the
+    # batched new-layer ring-particle arms, which are not circles at all.
     strokes = [p for p in prims if p.kind == "path" and p.fill is None
-               and p.pen is not None and max(p.w, p.h) >= 40.0]
+               and p.pen is not None and max(p.w, p.h) >= 40.0
+               and abs(p.width - Q.GLINT_PEN_W) > 0.05]
     echo_tilt = {str(e["orbit"]): e["tilt"] for e in F.echo_rings(t)}
     unmatched = list(strokes)
     for ring in F.ring_geometry(t):
@@ -492,7 +504,9 @@ def test_every_stroked_circle_matches_the_declared_geometry():
         assert hit is not None, (ring["id"], want, len(unmatched))
         unmatched.remove(hit)
     # The two main orbits also carry a two-stroke chromatic fringe, which is
-    # part of the logo's look and is exclusive to them.
+    # part of the logo's look and is exclusive to them. With the glint arms
+    # filtered out above, the only strokes left unidentified are the four
+    # fringe strokes.
     assert len(unmatched) == 4, [(round(p.w, 1), round(p.h, 1))
                                  for p in unmatched]
 
@@ -818,7 +832,9 @@ def test_blink_dots_paint_as_pinpricks_and_vanish_when_still():
     for d in live:
         qd = Q.turn_qdepth(d["depth"], d.get("index"), flat=True)
         X, Y, _g = Q.tumble_point(t, R, d["x"], d["y"], qd)
-        assert any(math.hypot(p.cx - (c + X), p.cy - (c + Y)) <= 1.0
+        vox, voy = Q.volume_offset(t, R, d.get("z"), d.get("z2"))
+        assert any(math.hypot(p.cx - (c + X + vox),
+                             p.cy - (c + Y + voy)) <= 1.0
                    for p in pinpricks), (d["index"], X, Y)
     # They are dots, not streaks: killing them removes no filled path.
     with_paths = {id(p) for p in prims if p.kind == "path" and p.fill is not None}

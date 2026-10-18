@@ -386,10 +386,19 @@ def test_studio_nucleus_is_bigger_than_the_field_base_radius():
     # highlight out near the body's edge, distinct from the larger static one.
     def specular_pos(t):
         prims = _record(t=t, size=size)
-        nuc_r = [p for p in _at(prims, c, c, tol=0.75)
-                 if p.kind == "ellipse" and p.fill is not None][0].r
+        # The nucleus is the LARGEST centred filled ellipse: with the field's
+        # z/z2 volume axes now displacing every element, a stray pinprick can
+        # occasionally land inside the 0.75px centre box, so "first centred
+        # ellipse" (the old locator) is no longer the body. The body itself is
+        # always centred, so taking the largest centred one is correct at every
+        # clock.
+        nuc = [p for p in _at(prims, c, c, tol=0.75)
+               if p.kind == "ellipse" and p.fill is not None]
+        assert nuc, t
+        nuc_r = max(p.r for p in nuc)
         rim = [p for p in prims if p.kind == "path" and p.fill is not None
-               and 0.3 * nuc_r <= math.hypot(p.cx - c, p.cy - c) <= 0.8 * nuc_r]
+               and 0.3 * nuc_r <= math.hypot(p.cx - c, p.cy - c) <= 0.8 * nuc_r
+               and p.r <= 0.25 * nuc_r]
         assert rim, (t, nuc_r)
         dot = min(rim, key=lambda p: p.r)
         assert dot.r < 0.25 * nuc_r, (t, dot.r, nuc_r)
@@ -449,11 +458,13 @@ def test_far_elements_draw_before_nucleus_and_near_after():
             # so the expected pixel is the projected one, not the raw field
             # coordinate. The z-split being asserted is the FIELD's, and the
             # projection takes the hash-broken depth (see ``turn_qdepth``),
-            # so the expectation routes through the same function.
+            # so the expectation routes through the same function — plus the
+            # field's z/z2 volume displacement, exactly as ``_place`` adds it.
             from voicebridge.orb import qt_app as _Q
             qd = _Q.turn_qdepth(part["depth"], part.get("index"), flat=True)
             tx, ty = _turned(t, R, part["x"], part["y"], qd)
-            px, py = c + tx, c + ty
+            vox, voy = _Q.volume_offset(t, R, part.get("z"), part.get("z2"))
+            px, py = c + tx + vox, c + ty + voy
             if math.hypot(p.cx - px, p.cy - py) <= 0.6:
                 (far_idx if part["depth"] < 0.5 else near_idx).append(i)
                 break
@@ -687,14 +698,18 @@ def _pix(t, R, c, item, depth=None, zseed="auto"):
     projection depth goes through the painter's ``turn_qdepth`` — hash-broken
     and flat per element — exactly as the renderer does: ``zseed`` defaults
     to the item's own ``index`` (pass the BODY's index explicitly for a trail
-    sample that rides its body's rigid streak).
+    sample that rides its body's rigid streak). The field's two VOLUME axes
+    (``z``/``z2``) add the painter's screen-space volume displacement
+    (:func:`qt_app.volume_offset`) on top of the projection, exactly as
+    ``_place`` does.
     """
     from voicebridge.orb import qt_app as Q
     d = item.get("depth", 0.5) if depth is None else depth
     seed = item.get("index") if zseed == "auto" else zseed
     qd = Q.turn_qdepth(d, seed, flat=True) if seed is not None else d
     tx, ty = _turned(t, R, item.get("x", 0.0), item.get("y", 0.0), qd)
-    return c + tx, c + ty
+    ox, oy = Q.volume_offset(t, R, item.get("z"), item.get("z2"))
+    return c + tx + ox, c + ty + oy
 
 
 def _declared_ring_box(t, R, ring, tilt):
@@ -712,7 +727,17 @@ def _declared_ring_box(t, R, ring, tilt):
     from voicebridge.orb import mark_field as F
 
     spec = dict(ring)
-    spec["tilt"] = tilt
+    # Fluid circles: the painter adds the ring's plane precession
+    # (``tilt_spin_deg``) to the supplied base tilt and multiplies the declared
+    # radii by ``ring_radius_scale``. Mirror both here so the expected box is
+    # the drawn box.
+    spin = ring.get("tilt_spin_deg")
+    if spin is None:
+        spin = F.ring_tilt_spin(t, ring)
+    breath = F.ring_radius_scale(t, ring)
+    spec["tilt"] = tilt + spin
+    spec["rx_frac"] = ring.get("rx_frac", F.RX_FRAC) * breath
+    spec["ry_frac"] = ring.get("ry_frac", F.RY_FRAC) * breath
     dx, dy = F.camera_offset(t, R)
     raw = F.ring_path(t, R, spec)
     n = len(raw) - 1
