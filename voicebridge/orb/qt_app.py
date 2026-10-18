@@ -427,28 +427,49 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.drawPath(path)
         p.setPen(Qt.NoPen)
 
+    def _glint_glow(gx: float, gy: float, size: float, alpha: float,
+                    rgb: Tuple[int, int, int]) -> None:
+        """A faint soft halo behind only the nearest, largest glints."""
+        sz = _num(size, 0.0)
+        a = _num(alpha, 0.0) * bright
+        if a <= ALPHA_EPS or sz <= 0.0:
+            return
+        gr = sz * GLINT_GLOW_MULT
+        grad = QRadialGradient(QPointF(gx, gy), gr)
+        grad.setColorAt(0.0, QColor(rgb[0], rgb[1], rgb[2],
+                                    _clamp8(255.0 * min(1.0, a)
+                                            * GLINT_GLOW_ALPHA)))
+        grad.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
+        path = QPainterPath()
+        path.addEllipse(QRectF(gx - gr, gy - gr, gr * 2.0, gr * 2.0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(grad))
+        p.drawPath(path)
+        p.setBrush(Qt.NoBrush)
+
     def _glint(gx: float, gy: float, size: float, alpha: float,
                rgb: Tuple[int, int, int],
                arm_frac: float = _field.GLINT_ARM_FRAC) -> None:
         """A twinkling star, never a filled orb (owner 2026-10-17).
 
-        Two thin crossing arms plus a small core read as a glint at this size
+        Two thin crossing arms plus a tiny core read as a glint at this size
         and stay crisp — a filled disc here was what made the field look like
         marbles. Shared by the nine logo particles and the nucleus sparks so
         the shower reads as the same kind of element as the field.
         """
-        sz = max(0.35, _num(size, 0.0))
+        sz = max(GLINT_MIN_SIZE, _num(size, 0.0))
         a = _num(alpha, 0.0) * bright
-        if a <= 0.0:
+        if a <= ALPHA_EPS:
             return
-        arm = sz * _field.GLINT_ARM_FRAC
+        arm = sz * arm_frac
         pen = QPen(QColor(rgb[0], rgb[1], rgb[2], int(255 * min(1.0, a))))
-        pen.setWidthF(1.0)
+        pen.setWidthF(GLINT_PEN_W)
         p.setPen(pen)
         p.setBrush(Qt.NoBrush)
         p.drawLine(QPointF(gx - arm, gy), QPointF(gx + arm, gy))
         p.drawLine(QPointF(gx, gy - arm), QPointF(gx, gy + arm))
-        _dot(gx, gy, max(0.25, sz * _field.GLINT_CORE_FRAC), a, rgb)
+        _dot(gx, gy, max(GLINT_CORE_MIN, sz * _field.GLINT_CORE_FRAC
+                         * GLINT_CORE_SCALE), a, rgb)
 
     def _particle(part: Dict[str, Any], draw_trails: bool) -> None:
         bead_lift = _num(part.get("lift"), _field.LIFT_BEAD)
@@ -462,8 +483,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 _dot(cx + smp["x"], cy + smp["y"],
                      _num(smp.get("size"), 0.0),
                      _num(smp.get("alpha"), 0.0) * bright, trail_rgb)
-        _glint(px, py, _num(part.get("size"), 0.0),
-               _num(part.get("alpha"), 0.0), _lift(bead_lift))
+        sz = _num(part.get("size"), 0.0)
+        al = _num(part.get("alpha"), 0.0)
+        rgb = _lift(bead_lift)
+        if sz >= Rf * GLINT_GLOW_MIN_FRAC:
+            # Only the nearest, largest particles carry the soft halo: it
+            # makes them pop without the whole field turning to marbles.
+            _glint_glow(px, py, sz, al, rgb)
+        _glint(px, py, sz, al, rgb)
 
     def _satellite(shell: Dict[str, Any], draw_trail: bool) -> None:
         """One satellite shell: a thin CIRCLE plus the small body on it.
