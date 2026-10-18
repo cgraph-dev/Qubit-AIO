@@ -734,15 +734,19 @@ def _declared_ring_box(t, R, ring, tilt):
     spec = dict(ring)
     # Fluid circles: the painter adds the ring's plane precession
     # (``tilt_spin_deg``) to the supplied base tilt and multiplies the declared
-    # radii by ``ring_radius_scale``. Mirror both here so the expected box is
-    # the drawn box.
+    # radii by ``ring_radius_scale`` AND the per-ring ``shimmer`` (the sub-
+    # percent accretion radius texture). Mirror all three here so the expected
+    # box is the drawn box.
     spin = ring.get("tilt_spin_deg")
     if spin is None:
         spin = F.ring_tilt_spin(t, ring)
     breath = F.ring_radius_scale(t, ring)
+    shimmer = ring.get("shimmer")
+    if shimmer is None:
+        shimmer = F.ring_shimmer(t, ring)
     spec["tilt"] = tilt + spin
-    spec["rx_frac"] = ring.get("rx_frac", F.RX_FRAC) * breath
-    spec["ry_frac"] = ring.get("ry_frac", F.RY_FRAC) * breath
+    spec["rx_frac"] = ring.get("rx_frac", F.RX_FRAC) * breath * shimmer
+    spec["ry_frac"] = ring.get("ry_frac", F.RY_FRAC) * breath * shimmer
     dx, dy = F.camera_offset(t, R)
     raw = F.ring_path(t, R, spec)
     n = len(raw) - 1
@@ -1324,60 +1328,69 @@ def test_streak_wakes_are_truncated_to_short_local_stubs(monkeypatch):
     assert worst <= 0.5 * R, worst
 
 
-def test_math_glyphs_paint_as_text_split_by_depth(monkeypatch):
+def test_volume_particles_paint_as_dots_split_by_depth(monkeypatch):
+    # Owner 2026-10-19: the math-symbol/equation TEXT glyphs read as
+    # "check marks / v lines" and are gone. The field's ``volume_particles``
+    # (real 3D bodies) is drawn INSTEAD, as round DOTS — never text, never a
+    # glyph — split like every other layer: far behind the nucleus, near in
+    # front of it.
     from voicebridge.orb import qt_app as Q
 
     size, R, c = 192, 90.0, 96.0
     t = 0.42
-    syms = [
+    bodies = [
         {"index": 0.0, "x": -30.0, "y": 12.0, "depth": 0.2, "size": 1.4,
-         "alpha": 0.9, "lift": 0.5, "hue": 0.0, "char": "\u03c0"},
+         "alpha": 0.9, "lift": 0.5, "hue": 0.0},
         {"index": 1.0, "x": -12.0, "y": -8.0, "depth": 0.3, "size": 1.4,
-         "alpha": 0.9, "lift": 0.5, "hue": 0.0, "char": "\u2211"},
+         "alpha": 0.9, "lift": 0.5, "hue": 0.0},
         {"index": 2.0, "x": 14.0, "y": 9.0, "depth": 0.8, "size": 1.4,
-         "alpha": 0.9, "lift": 0.5, "hue": 0.5, "char": "\u221a"},
+         "alpha": 0.9, "lift": 0.5, "hue": 0.5},
         {"index": 3.0, "x": 28.0, "y": -14.0, "depth": 0.7, "size": 1.4,
-         "alpha": 0.9, "lift": 0.5, "hue": 0.5, "char": "\u222b"},
+         "alpha": 0.9, "lift": 0.5, "hue": 0.5},
     ]
     with monkeypatch.context() as m:
-        m.setattr(Q._field, "math_state",
-                  lambda tt, rr: [dict(s) for s in syms], raising=False)
+        m.setattr(Q._field, "volume_particles",
+                  lambda tt, rr: [dict(s) for s in bodies], raising=False)
         m.setattr(Q._field, "binary_state", lambda *a, **k: [])
         prims = _record(t=t, size=size)
 
-    wanted = {s["char"] for s in syms}
-    glyphs = [p for p in prims if p.kind == "text" and p.text in wanted]
-    assert len(glyphs) == len(syms), len(glyphs)
-    for s in syms:
+    # No text at all: the retired math layer must stay retired.
+    assert not [p for p in prims if p.kind == "text"]
+    for s in bodies:
         px, py = _pix(t, R, c, s)
-        g = [p for p in glyphs if p.text == s["char"]][0]
-        assert math.hypot(g.cx - px, g.cy - py) <= 0.01, (s["char"], g, px, py)
+        dots = [p for p in prims if p.kind == "ellipse" and p.fill is not None
+                and math.hypot(p.cx - px, p.cy - py) <= 0.75]
+        assert dots, (s["index"], px, py)
     seam = [i for i, p in enumerate(prims)
             if p.kind == "ellipse" and p.fill is not None
             and math.hypot(p.cx - c, p.cy - c) <= 0.75]
     assert len(seam) == 1, seam
-    # Split by the FIELD's depth, not by paint order alone: far half behind
-    # the nucleus, near half in front of it.
-    far_i = [min(i for i, q in enumerate(prims) if q is p)
-             for p in glyphs
-             if min(s["depth"] for s in syms if s["char"] == p.text) < 0.5]
-    near_i = [min(i for i, q in enumerate(prims) if q is p)
-              for p in glyphs
-              if min(s["depth"] for s in syms if s["char"] == p.text) >= 0.5]
+    # Split by the FIELD's depth, not by paint order alone.
+    def _dot_index(s):
+        px, py = _pix(t, R, c, s)
+        return min(i for i, p in enumerate(prims)
+                   if p.kind == "ellipse" and p.fill is not None
+                   and math.hypot(p.cx - px, p.cy - py) <= 0.75)
+
+    far_i = [_dot_index(s) for s in bodies if s["depth"] < 0.5]
+    near_i = [_dot_index(s) for s in bodies if s["depth"] >= 0.5]
     assert len(far_i) == 2 and len(near_i) == 2, (far_i, near_i)
     assert max(far_i) < seam[0] < min(near_i), (far_i, seam, near_i)
 
 
-def test_reduced_motion_draws_no_math_glyphs(monkeypatch):
+def test_reduced_motion_draws_no_volume_particles(monkeypatch):
     from voicebridge.orb import qt_app as Q
 
+    # The layer is dropped WITHOUT even being consulted under reduced motion.
+    calls = []
     with monkeypatch.context() as m:
-        m.setattr(Q._field, "math_state",
-                  lambda tt, rr: [{"index": 0.0, "x": 0.0, "y": 0.0,
-                                   "depth": 0.8, "size": 1.5, "alpha": 0.9,
-                                   "lift": 0.5, "hue": 0.5, "char": "\u03c0"}],
+        m.setattr(Q._field, "volume_particles",
+                  lambda tt, rr: calls.append(1) or [
+                      {"index": 0.0, "x": 0.0, "y": 0.0, "depth": 0.8,
+                       "size": 1.5, "alpha": 0.9, "lift": 0.5, "hue": 0.5}],
                   raising=False)
         rec = _record(t=1.0, reduced=True)
+    assert calls == []
     assert not [p for p in rec if p.kind == "text"]
 
 
@@ -1427,7 +1440,8 @@ def test_batched_layer_colours_come_from_field_hues(monkeypatch):
                   lambda tt, rr: [dict(b) for b in bodies])
         for name in ("mark_cylinder_particles", "mark_orbiter_particles",
                      "mark_flare_dots", "mark_filament", "mark_screen_break",
-                     "mark_math_state"):
+                     "mark_volume_particles", "mark_accretion_stream",
+                     "mark_photon_ring", "mark_infall_streaks"):
             m.setattr(Q, name, lambda tt, rr: [])
         prims = _record(t=t, size=size)
     fills = [p.fill[:3] for p in prims if p.fill is not None

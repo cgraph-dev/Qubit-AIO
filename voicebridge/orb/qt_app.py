@@ -154,11 +154,11 @@ COMET_TRAIL_GAIN = 1.0
 #: Its field bead tail stays, tinted along the same hue ramp: bright
 #: motion-blur fragments sitting inside the streak read as meteor debris,
 #: where an untinted grey tail next to a rainbow wake read as two tails.
-COMET_BEAD_SAT = 0.95
+COMET_BEAD_SAT = 0.80
 #: Blink dots are pinpricks: no wake, no halo, just a dot in the dot's own
 #: spectral hue, floored so a far/small one still antialiases instead of
 #: snapping out between frames.
-BLINK_DOT_SAT = 0.9
+BLINK_DOT_SAT = 0.80
 BLINK_DOT_MIN_PX = 0.30
 # --- the new rich layers: batched draws ------------------------------------
 #: The field now returns many more bodies (ring particles on EVERY circle, a
@@ -260,8 +260,13 @@ TURN_RING_SALT = 5.77
 #: orbital angle — so it cannot reintroduce the depth/x lock that made the mark
 #: go thin, and it is faded by the same combined-turn factor the projection
 #: uses, so face-on and reduced-motion frames stay the unturned mark.
-VOLUME_X_FRAC = 0.13
-VOLUME_Y_FRAC = 0.13
+#: Raised 2026-10-19 (owner: "enhance 3d animation overall"): the field now
+#: feeds the same axes to many more layers (volume particles, accretion,
+#: infall), so a slightly wider displacement makes the interior read as a
+#: volume instead of a thin sheet. Still faded by ``turn_fade``, so face-on and
+#: reduced-motion frames are byte-identical.
+VOLUME_X_FRAC = 0.17
+VOLUME_Y_FRAC = 0.17
 #: Brightness follows the same rotated depth: a body's tint is scaled by
 #: ``TURN_TONE_BASE + TURN_TONE_SLOPE * gain``, so near bodies render hotter
 #: and far ones cooler on top of the size/alpha spread. At gain 1 the factor
@@ -380,27 +385,45 @@ RING_ALPHA_SCALE = {
 BINARY_FONT_MIN_PX = 5
 BINARY_FONT_PX_PER_UNIT = 12.0
 BINARY_FONT_PX_OFFSET = 2.0
-#: Math-symbol fragments (owner: "add math symbols equations not random lines").
-#: Same dict contract as the "1"/"0" bits, drawn as TEXT with the pen set (a
-#: glyph uses the pen, never the brush). Sized a touch larger than a binary
-#: fragment so an equation reads as a distinct, legible element of the mark
-#: rather than as one more dot. Hue comes from the FIELD (``hue_to_rgb``), never
-#: from a renderer-side ramp, so the mark stays inside the field's palette.
-MATH_FONT_MIN_PX = 6
-MATH_FONT_PX_PER_UNIT = 14.0
-MATH_FONT_PX_OFFSET = 2.0
-#: How many math glyphs are considered per frame, so the text pass stays flat.
-MATH_DRAW_LIMIT = 40
-#: Saturation for a math glyph taken from the field's hue: full colour, but the
-#: anchor blend below still pulls it toward the state's core colour so text in a
-#: hue-shifting mark never reads as a foreign object.
-MATH_GLYPH_SAT = 0.92
+# --- volume particles: the math-glyph TEXT layer's replacement -------------
+#: Owner 2026-10-19: the ``√``/``Δ``/``∇`` math glyphs read as "check marks / v
+#: lines" and are gone. The field now publishes ``volume_particles``: real 3D
+#: bodies with their own inclined orbits, two independent volume axes (``z`` /
+#: ``z2``), a per-body pulse and spin. They are drawn as round DOTS (never text,
+#: never arms that could read as a check mark), sized/alpha'd by their own
+#: depth. ``*_DRAW_LIMIT`` keeps the pass flat: the field publishes 52 bodies
+#: and the painter draws an even subset of them.
+VOLUME_DRAW_LIMIT = 18
+#: Restrained saturation for the new dot families: the FIELD's own matte band,
+#: never the old near-neon values, so the palette stays professional.
+VOLUME_PARTICLE_SAT = _field.RGB_TRAIL_SAT_BASE
+PHOTON_RING_SAT = _field.RGB_TRAIL_SAT_BASE
+#: Accretion stream / infall streaks are dense dot families, batched by hue
+#: like the ring and orbit bodies so their primitive cost is a few paths.
+ACCRETION_DRAW_LIMIT = 28
+ACCRETION_BUCKETS = 3
+INFALL_DRAW_LIMIT = 14
+INFALL_BUCKETS = 3
+#: Photon ring: the lensed arcs hug the core. Only the BRIGHT samples are
+#: drawn (its lobe profile is the point), capped so the arcs stay cheap.
+PHOTON_DRAW_LIMIT = 16
+PHOTON_MIN_ALPHA = 0.10
+#: The photon ring is a lensed overlay over the core: drawn there, its samples
+#: are enlarged and brightened in the painter, because the field's own sizes
+#: are calibrated for the field scale and disappear into the aura at orb size.
+PHOTON_SIZE_MULT = 2.4
+PHOTON_ALPHA_MULT = 1.5
+#: Screen-break bodies are pushed this much further out in the painter, on top
+#: of the field's own >1 orbit fraction, so they genuinely clear the widget
+#: edge (owner: "do more of that") instead of being drawn back in by the
+#: perspective contraction.
+SCREEN_BREAK_PUSH = 1.22
 #: Screen-break bodies (owner likes elements that "break the screen"): bodies
 #: the field deliberately places BEYOND the orb's nominal radius. Drawn as
 #: glints so they read as real bodies leaving the mark; the painter never clips
 #: them to a circle, so they genuinely run off the widget edge.
 SCREEN_BREAK_DRAW_LIMIT = 12
-SCREEN_BREAK_SAT = 0.95
+SCREEN_BREAK_SAT = 0.84
 #: Nucleus swirl: two counter-rotating hot lobes inside the body, so the centre
 #: has internal movement instead of a static gradient.
 NUCLEUS_SWIRL_RADIUS_FRAC = 0.22
@@ -435,24 +458,19 @@ NUCLEUS_CORONA_SIZE_FRAC = 1.35
 NUCLEUS_CORONA_PERIOD_S = 29.0
 NUCLEUS_CORONA_PHASE_DEG = 24.0
 NUCLEUS_CORONA_ALPHA = 0.34
-NUCLEUS_CORONA_SAT = 0.92
 #: A softer falloff than the aura's: the corona is a broad chromatic haze
 #: around the core, not another tight blob, and the long power the aura needs
 #: to kill its own rim would crush it to three dots.
 NUCLEUS_CORONA_POWER = 1.8
-#: The corona's own slow breathing, and how far its hue travels per second.
-#: The drift is deliberately small: over one full turn the whole corona stays
-#: inside the mark's own cyan-to-magenta band, so a core that radiates colour
-#: still reads as THIS mark's core instead of as a rainbow rotor.
+#: The corona's own slow breathing, and how far its hue travels.
+#: Owner 2026-10-19: "keep it professional". There is NO local hue ramp any
+#: more: the corona blends between the field's own :data:`PALETTE_HUES` (two
+#: adjacent cool tints), alternating which lobe sits on which end. The mark
+#: therefore carries the field's disciplined two-colour palette everywhere,
+#: and no renderer-side spectrum walk can reintroduce the rainbow.
 NUCLEUS_CORONA_BREATH_S = 7.3
 NUCLEUS_CORONA_BREATH_SPAN = 0.22
-NUCLEUS_CORONA_HUE_BASE = 0.50
-NUCLEUS_CORONA_HUE_TURNS = 0.018
-#: The three lobes spread across this much of the wheel — the same band the
-#: field gives its bodies — instead of an even third of the wheel each. Spread
-#: evenly they wrap (0.50, 0.84, 1.17 -> 0.17) and the third lobe lands on
-#: yellow, which reads as a different lamp rather than as this core radiating.
-NUCLEUS_CORONA_HUE_SPAN = 0.34
+NUCLEUS_CORONA_HUE_PERIOD_S = 29.0
 #: Beat-synced flare: a hot bloom over the body that fires on the thump and
 #: decays with it, so the core pulses with the audio instead of only breathing.
 #: It is a FILL path (never a hairline) precisely so it can never be mistaken
@@ -762,9 +780,10 @@ def y_turn_gain(zr: Any) -> float:
 #: out, and a frame is single-threaded so there is no race to lose.
 _TURN_BASIS: Tuple[float, float, float] = (float("nan"), 0.0, 0.0)
 
-#: Cached glyph fonts keyed by ``(family, pixel_size)``. The binary and math
-#: glyph layers draw on the order of 128 fragments a frame; building a QFont
-#: (copy + setPixelSize + setFont) for each was pure per-frame overhead.
+#: Cached glyph fonts keyed by ``(family, pixel_size)``. The binary "1"/"0"
+#: layer still draws dozens of fragments a frame; building a QFont (copy +
+#: setPixelSize + setFont) for each was pure per-frame overhead. (The math
+#: glyph layer that used this too is retired — see ``volume_particles``.)
 _GLYPH_FONT_CACHE: Dict[Any, Any] = {}
 
 
@@ -1084,16 +1103,33 @@ def mark_binaries(t: Any, R: Any) -> List[Dict[str, Any]]:
         return []
 
 
-def mark_math_state(t: Any, R: Any) -> List[Dict[str, Any]]:
-    """Math-symbol/equation fragments (shared field), gone under reduced motion.
+def mark_volume_particles(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """The 3D volume-particle field (shared field), gone under reduced motion.
 
-    Owner: "add math symbols equations not random lines". Same dict contract as
-    :func:`mark_binaries` — ``{index, x, y, depth, z, z2, size, alpha, lift,
-    hue, hue2, char, dof, skew}`` — drawn as TEXT. Read defensively through the
-    optional-layer seam so a field revision without ``math_state`` simply draws
-    no glyphs instead of blanking the orb. Never raises.
+    Replaces the retired math-glyph TEXT layer (owner 2026-10-19: the ``√`` /
+    ``Δ`` / ``∇`` symbols read as "check marks / v lines"). Each body carries
+    ``{index, x, y, depth, z, z2, vx, vy, size, alpha, lift, hue, hue2, dof,
+    skew, r, inc, pulse, spin}`` — a real 3D particle with its own pulse and
+    spin. Drawn as round dots, never text. Read defensively through the
+    optional-layer seam so a field revision without it simply draws no
+    particles instead of blanking the orb. Never raises.
     """
-    return _field_layer("math_state", t, R, reduced_empty=True)
+    return _field_layer("volume_particles", t, R, reduced_empty=True)
+
+
+def mark_accretion_stream(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """Spiral accretion-stream samples (shared field); empty when still."""
+    return _field_layer("accretion_stream", t, R, reduced_empty=True)
+
+
+def mark_photon_ring(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """The lensed photon ring hugging the core (shared field); empty when still."""
+    return _field_layer("photon_ring", t, R, reduced_empty=True)
+
+
+def mark_infall_streaks(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """Radial streaks falling toward the core (shared field); empty when still."""
+    return _field_layer("infall_streaks", t, R, reduced_empty=True)
 
 
 def mark_screen_break(t: Any, R: Any) -> List[Dict[str, Any]]:
@@ -1485,9 +1521,22 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             if spin is None:
                 spin = _field.ring_tilt_spin(tt, spec)
             breath = _field.ring_radius_scale(tt, spec)
+            # Per-ring accretion detail (owner: the circles "look like
+            # blackholes ... add more details and animations"). ``shimmer`` is
+            # a sub-percent radius texture ON TOP of the shared rigid breath,
+            # so the set stays proportional while each circle glitters;
+            # ``intensity`` is a travelling bright hot-spot along the stroke.
+            shimmer = spec.get("shimmer")
+            if shimmer is None:
+                shimmer = _field.ring_shimmer(tt, spec)
+            intensity = spec.get("intensity")
+            if intensity is None:
+                intensity = _field.ring_intensity(tt, spec)
             draw_spec["tilt"] = _num(tilt, 0.0) + _num(spin, 0.0)
-            draw_spec["rx_frac"] = _num(spec.get("rx_frac"), _field.RX_FRAC) * breath
-            draw_spec["ry_frac"] = _num(spec.get("ry_frac"), _field.RY_FRAC) * breath
+            draw_spec["rx_frac"] = (_num(spec.get("rx_frac"), _field.RX_FRAC)
+                                    * breath * _num(shimmer, 1.0))
+            draw_spec["ry_frac"] = (_num(spec.get("ry_frac"), _field.RY_FRAC)
+                                    * breath * _num(shimmer, 1.0))
             # ``ring_path`` carries the field's camera sway. The BODY does not
             # sway, so a circle drawn around it must not either: leaving the
             # sway in slides the mark's visual centre off its own core and the
@@ -1531,8 +1580,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                          else RING_ALPHA_SCALE["far_main"])
             else:
                 scale = RING_ALPHA_SCALE.get(layer, 1.0)
+            # Echo followers stay FAINT GHOSTS of their orbit (a fixed alpha
+            # band is their whole visual role and the follower contracts pin
+            # it); every real circle additionally carries the travelling
+            # accretion hot-spot, so it reads as live structure rather than a
+            # dead outline.
+            hot = 1.0 if layer == "echo" else _num(intensity, 1.0)
             _ring_stroke(warped,
-                         _field.ring_alpha(tt, spec) * scale * bright,
+                         _field.ring_alpha(tt, spec) * scale * bright * hot,
                          ring_w * _num(spec.get("width"), 1.0) * (
                              1.15 if layer == "main" else 1.0),
                          layer)
@@ -1866,14 +1921,20 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 NUCLEUS_CORONA_BREATH_SPAN * 0.5 * math.sin(
                     2.0 * math.pi * ck / NUCLEUS_CORONA_BREATH_S + i * 1.7)
             dist = r * NUCLEUS_CORONA_RADIUS_FRAC * breath
-            hue = (NUCLEUS_CORONA_HUE_BASE
-                   + ck * NUCLEUS_CORONA_HUE_TURNS
-                   + i * NUCLEUS_CORONA_HUE_SPAN
-                   / float(NUCLEUS_CORONA_COUNT)) % 1.0
+            # No local spectrum walk: blend between the FIELD's two palette
+            # hues, with each lobe phase-shifted so they alternate ends of the
+            # band. Restrained by construction — the corona can only ever be
+            # the mark's two cool tints, never a rainbow rotor.
+            shades = tuple(_field.PALETTE_HUES) or (0.54, 0.60)
+            lo, hi = shades[0], shades[-1]
+            mix = 0.5 + 0.5 * math.sin(
+                2.0 * math.pi * ck / max(0.1, NUCLEUS_CORONA_HUE_PERIOD_S)
+                + 2.1 * i)
+            hue = (lo + (hi - lo) * mix) % 1.0
             _smoke(cx + dist * math.cos(ang),
                    cy + dist * math.sin(ang) * NUCLEUS_CORONA_SQUASH,
                    max(0.6, r * NUCLEUS_CORONA_SIZE_FRAC * breath),
-                   _anchor(_spec_rgb(hue, NUCLEUS_CORONA_SAT)),
+                   _anchor(_spec_rgb(hue, VOLUME_PARTICLE_SAT)),
                    NUCLEUS_CORONA_ALPHA * breath,
                    power=NUCLEUS_CORONA_POWER)
         # Smoky aura: a wide base falloff plus slow drifting plumes, so the
@@ -2024,33 +2085,52 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                         int(size * g * BINARY_FONT_PX_PER_UNIT
                             + BINARY_FONT_PX_OFFSET)))
 
-    def _math(sym: Dict[str, Any]) -> None:
-        """One math-symbol/equation fragment as a small glyph at its position.
+    def _volume_particle(body: Dict[str, Any]) -> None:
+        """One 3D volume particle as a round dot (never text, never an arm).
 
-        Owner: "add math symbols equations not random lines". Same shape as
-        :func:`_binary` (placed and scaled through the tumble, depth-split far
-        behind / near in front of the nucleus, gone under reduced motion) but
-        coloured from the FIELD's own hue through ``hue_to_rgb`` so the glyphs
-        stay inside the palette instead of introducing a renderer ramp. A QFont
-        is set per glyph because a glyph is drawn with the PEN, not the brush.
+        The field's ``size``/``alpha`` already carry the body's own pulse, and
+        its ``z``/``z2`` axes displace it through the volume; placing it through
+        ``_place`` gives it the tumble's depth size/alpha gain too. A DOT is
+        deliberate: the retired math layer's glyph strokes (and the glint arms
+        used elsewhere) are exactly what read as "check marks / v lines", so a
+        volume body has no line at all.
         """
-        d = _num(sym.get("depth"), 0.5)
-        gx, gy, g = _place(sym.get("x"), sym.get("y"), d,
-                           zseed=_num(sym.get("index"), None),
-                           zflat=True, z=sym.get("z"), z2=sym.get("z2"))
-        size = _num(sym.get("size"), 0.0)
-        alpha = _num(sym.get("alpha"), 0.0) * bright * g
+        d = _num(body.get("depth"), 0.5)
+        vx, vy, g = _place(body.get("x"), body.get("y"), d,
+                           zseed=_num(body.get("index"), None), zflat=True,
+                           z=body.get("z"), z2=body.get("z2"))
+        size = _num(body.get("size"), 0.0)
+        alpha = _num(body.get("alpha"), 0.0) * bright * _shade(1.0, d, g)
         if alpha <= ALPHA_EPS or size <= 0.0:
             return
-        hue = sym.get("hue")
-        if hue is None:
-            rgb = _lift(_num(sym.get("lift"), 0.5))
-        else:
-            rgb = _anchor(_spec_rgb(hue, MATH_GLYPH_SAT))
-        _draw_glyph(gx, gy, str(sym.get("char") or "?"), rgb, alpha,
-                    max(MATH_FONT_MIN_PX,
-                        int(size * g * MATH_FONT_PX_PER_UNIT
-                            + MATH_FONT_PX_OFFSET)))
+        hue = body.get("hue")
+        rgb = (_anchor(_spec_rgb(hue, VOLUME_PARTICLE_SAT))
+               if hue is not None
+               else _lift(_num(body.get("lift"), 0.5)))
+        _dot(vx, vy, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
+
+    def _photon_dot(smp: Dict[str, Any]) -> None:
+        """One bright sample of the lensed photon ring, a hot bead.
+
+        The ring is a LENSED overlay hugging the core, so it is drawn over the
+        nucleus and its samples are enlarged/brightened in the painter (the
+        field's own sizes are calibrated for the field scale and would vanish
+        into the aura at orb size).
+        """
+        d = _num(smp.get("depth"), 0.5)
+        px, py, g = _place(smp.get("x"), smp.get("y"), d,
+                           zseed=_num(smp.get("index"), None), zflat=True,
+                           z=smp.get("z"), z2=smp.get("z2"))
+        size = _num(smp.get("size"), 0.0) * PHOTON_SIZE_MULT
+        alpha = (min(1.0, _num(smp.get("alpha"), 0.0) * PHOTON_ALPHA_MULT)
+                 * bright * _shade(1.0, d, g))
+        if alpha <= ALPHA_EPS or size <= 0.0:
+            return
+        hue = smp.get("hue")
+        rgb = (_anchor(_spec_rgb(hue, PHOTON_RING_SAT))
+               if hue is not None
+               else _lift(_num(smp.get("lift"), 0.5)))
+        _dot(px, py, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
 
     def _screen_break(body: Dict[str, Any]) -> None:
         """One body the field placed BEYOND the orb radius.
@@ -2067,8 +2147,15 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                if hue is not None
                else _lift(_num(body.get("lift"), 0.5)))
         # ``_glint`` places internally through ``_place`` (field coords in), so
-        # a body the field pushed past ``R`` is projected like any other.
-        _glint(_num(body.get("x"), 0.0), _num(body.get("y"), 0.0),
+        # a body the field pushed past ``R`` is projected like any other. The
+        # coords are additionally pushed OUT by ``SCREEN_BREAK_PUSH``: the
+        # tumble's perspective term pulls a far body back in, which would keep
+        # some of these bodies inside the circle. Scaling the field position
+        # keeps the deliberate overflow (owner: "do more of that") without
+        # touching the field's own declared geometry.
+        push = max(1.0, _num(SCREEN_BREAK_PUSH, 1.0))
+        _glint(_num(body.get("x"), 0.0) * push,
+               _num(body.get("y"), 0.0) * push,
                body.get("size"), body.get("alpha"), rgb,
                skew_deg=body.get("skew"), depth=depth,
                zseed=_num(body.get("index"), None), zflat=True,
@@ -2312,12 +2399,26 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     binaries = mark_binaries(tt, Rf)
     far_binaries = [b for b in binaries if _num(b.get("depth"), 0.0) < 0.5]
     near_binaries = [b for b in binaries if _num(b.get("depth"), 0.0) >= 0.5]
-    # Math-symbol/equation fragments (owner: "add math symbols equations not
-    # random lines"): drawn as GLYPHS, floor-to-ceiling behind and in front of
-    # the nucleus exactly like the "1"/"0" bits. Empty when still.
-    maths = strided(mark_math_state(tt, Rf), MATH_DRAW_LIMIT)
-    far_maths = [m for m in maths if _num(m.get("depth"), 0.0) < 0.5]
-    near_maths = [m for m in maths if _num(m.get("depth"), 0.0) >= 0.5]
+    # 3D volume particles: the math-glyph TEXT layer's replacement. Real
+    # bodies with their own pulse/spin; drawn as round dots, never glyphs.
+    # Split by field depth exactly like every other body, so the field is a
+    # genuine volume behind and in front of the nucleus.
+    volumes = strided(mark_volume_particles(tt, Rf), VOLUME_DRAW_LIMIT)
+    far_volumes = [v for v in volumes if _num(v.get("depth"), 0.0) < 0.5]
+    near_volumes = [v for v in volumes if _num(v.get("depth"), 0.0) >= 0.5]
+    # Black-hole structure (owner: the circles "look like blackholes"): a live
+    # spiral accretion stream, the lensed photon ring hugging the core, and
+    # matter falling inward. All are dot families batched by hue so they add
+    # visible structure without crossing the primitive ceiling.
+    accretion = ([] if reduced
+                 else strided(mark_accretion_stream(tt, Rf),
+                              ACCRETION_DRAW_LIMIT))
+    photons = ([] if reduced
+               else [p for p in strided(mark_photon_ring(tt, Rf),
+                                        PHOTON_DRAW_LIMIT)
+                     if _num(p.get("alpha"), 0.0) >= PHOTON_MIN_ALPHA])
+    infall = ([] if reduced
+              else strided(mark_infall_streaks(tt, Rf), INFALL_DRAW_LIMIT))
     # Screen-break bodies: the field pushes a handful of bodies past the orb's
     # radius. They are drawn, unclipped, so the mark "breaks the screen".
     sbreaks = strided(mark_screen_break(tt, Rf), SCREEN_BREAK_DRAW_LIMIT)
@@ -2375,7 +2476,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                     glints_: List[Dict[str, Any]],
                     traveller_: Optional[Dict[str, Any]],
                     blinks_: List[Dict[str, Any]],
-                    maths_: List[Dict[str, Any]],
+                    volumes_: List[Dict[str, Any]],
                     breaks_: List[Dict[str, Any]]) -> None:
         """One half of the z-seam: its circles first, then the bodies in it."""
         _ring_pass(near)
@@ -2388,6 +2489,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                      RING_PARTICLE_BUCKETS, arm_frac=_field.GLINT_ARM_FRAC * 0.8)
         _cylinder_batch([p for p in cyl_parts if _is_near(p, near)],
                         CYLINDER_BUCKETS)
+        # Accretion + infall: dense dot families riding the rings / falling in.
+        # Batched (they are dots, not wakes), so 28 + 14 samples cost a few
+        # paths while the spiral and the inward motion stay visible.
+        _layer_batch([p for p in accretion if _is_near(p, near)],
+                     ACCRETION_BUCKETS)
+        _layer_batch([p for p in infall if _is_near(p, near)], INFALL_BUCKETS)
+        for body in volumes_:
+            _volume_particle(body)
         # Orbiters circle the NUCLEUS on inclined 3D orbits, so they split by
         # their own depth: the far half passes behind the core, the near half
         # in front of it — that is what reads as orbiting the middle rather
@@ -2413,8 +2522,6 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             _sparkle(glint, draw_trails)
         for bit in bits:
             _binary(bit)
-        for sym in maths_:
-            _math(sym)
         for brk in breaks_:
             _screen_break(brk)
         for bl in blinks_:
@@ -2447,7 +2554,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 [g for g in glints if g["depth"] < 0.5],
                 traveller if (traveller is not None
                               and _num(traveller.get("depth"), 1.0) < 0.5)
-                else None, far_blinks, far_maths, far_sbreaks)
+                else None, far_blinks, far_volumes, far_sbreaks)
 
     # ---- the z-seam: shockwave, halo, nucleus ----------------------------
     beat = 0.0 if reduced else _field.heartbeat(tt)
@@ -2472,13 +2579,20 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # layered depth that turns and pulses with the rest of the mark.
     for _shell in core_shells:
         _core_body(_shell)
+    # The photon ring is the LENSED image hugging the core: it is painted OVER
+    # the nucleus (not z-split), so its bright arcs always read on top of the
+    # silhouette instead of being swallowed by the body on the far half. Drawn
+    # dot by dot so the field's lobe profile (two bright arcs, dim between)
+    # survives — a single batched path would flatten it to one alpha.
+    for _smp in photons:
+        _photon_dot(_smp)
 
     # ---- near field (depth >= 0.5), in front of the nucleus --------------
     _field_pass(True, near_shells, near_dust, near_parts, near_binaries,
                 near_sparks, [g for g in glints if g["depth"] >= 0.5],
                 traveller if (traveller is not None
                               and _num(traveller.get("depth"), 0.0) >= 0.5)
-                else None, near_blinks, near_maths, near_sbreaks)
+                else None, near_blinks, near_volumes, near_sbreaks)
     p.restore()
 
 
@@ -2708,6 +2822,12 @@ if QWidget is not None:
                 self._color_transition = None
             self._pending_rid: Optional[str] = None
             self._pending_ts = 0.0
+            # The LIVE turn's request id, learned from the state feed (see
+            # ``state.active_request``). The helper path never stages a rid
+            # locally, so without this a second press re-planned "begin" and
+            # re-triggered capture instead of stopping the in-flight turn.
+            self._active_rid: Optional[str] = None
+            self._active_ts = 0.0
             self._client_factory = client_factory or _default_client
             self._client: Any = None
             self._toggle_requested = False
@@ -3056,13 +3176,25 @@ if QWidget is not None:
         # -- voice toggle (same plan as the Tk view) -----------------------
         def toggle_voice(self) -> None:
             now = time.time()
+            # The plan now sees the LIVE turn id learned from the state feed.
+            # While Qubit is thinking/working/speaking a press is a STOP: it
+            # cancels that request. Without this the helper path always
+            # re-planned "begin" (``_pending_rid`` is only ever set on the
+            # stage-only fallback) and re-triggered capture, so the reply
+            # kept playing — the owner's "it stops too slow".
             action, rid = _state.plan_toggle(
-                self._pending_rid, self._pending_ts, now)
+                self._pending_rid, self._pending_ts, now,
+                orb_state=getattr(self, "orb_state", None),
+                active_rid=getattr(self, "_active_rid", None),
+                active_ts=getattr(self, "_active_ts", 0.0))
             try:
                 cli = self._get_client()
                 if action == "cancel" and rid:
                     cli.cancel_request(rid)
                     self._pending_rid = None
+                    if rid == getattr(self, "_active_rid", None):
+                        self._active_rid = None
+                        self._active_ts = 0.0
                     return
                 try:
                     cli.trigger_helper_capture()
@@ -3269,6 +3401,22 @@ if QWidget is not None:
                         self.orb_state = "error"
                 except Exception:
                     self.orb_state = "error"
+            # Learn the LIVE turn's request id from the same feed (no extra
+            # HTTP). Capture rows carry it; keeping it once seen means a
+            # journal window that later fills with wake noise cannot lose the
+            # id before the reply ends. A newer turn's id simply replaces it,
+            # and state.active_request clears it on a cancellation row.
+            try:
+                _live_rid, _live_ts = _state.active_request(
+                    events, time.time())
+            except Exception:
+                _live_rid, _live_ts = (None, None)
+            if _live_rid:
+                self._active_rid = _live_rid
+                try:
+                    self._active_ts = float(_live_ts)
+                except (TypeError, ValueError):
+                    self._active_ts = time.time()
             # Test override (tray/panel "Test animation"): hold the forced
             # state for its window, then release back to the live feed.
             try:

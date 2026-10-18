@@ -115,6 +115,23 @@ THINK_IDLE_WINDOW_S = 4.0
 #: recycled id).
 PENDING_TTL_S = 120.0
 
+#: How far back the state feed is scanned for the turn's live request id.
+#: A turn's begin/capture row is appended at the START of the turn, so the
+#: window must span a whole turn (brain latency + playback), not just the
+#: short speak window. Same TTL the service itself uses.
+ACTIVE_REQUEST_WINDOW_S = PENDING_TTL_S
+
+#: States in which a second orb press means STOP. While a turn is producing
+#: output (thinking/working) or its reply is playing (speaking), cancelling
+#: the live request is what stops it. ``listening`` is deliberately NOT in
+#: this set: a press there must FINISH the capture (the helper's toggle), and
+#: cancelling would throw the utterance away.
+CANCELABLE_STATES = frozenset({"thinking", "working", "speaking"})
+
+#: Request-id rows that END a turn rather than start one. If the newest
+#: request-id row is one of these, the id it carries is no longer live.
+_RID_END_EVENTS = frozenset({"stt.cancelled", "voice_edit.cancel"})
+
 #: Minimum dwell per displayed state: the visible orb state holds at
 #: least this long before switching, so the 2s poll recency windows
 #: cannot flap listening<->idle on one stale/missing event. Listening
@@ -459,27 +476,113 @@ def resolve_orb_state(status: Any, events: Any, now: float,
     return "idle"
 
 
-def plan_toggle(pending_rid: Any, pending_ts: Any, now: float) -> Tuple[str, Optional[str]]:
-    """Decide the click action for a staged voice request.
+def active_request(events: Any, now: float,
+                   window_s: float = ACTIVE_REQUEST_WINDOW_S
+                   ) -> Tuple[Optional[str], Optional[float]]:
+    """Newest live request id carried by the state feed.
+
+    The voice journal's capture rows already carry the request id
+    (``voice_edit.helper.listening``, ``.transcribe.start``, ``.transcript``,
+    the wake equivalents, ...), so the orb can learn which staged request a
+    second press must cancel WITHOUT a second HTTP call or a new status
+    field. Returns ``(rid, ts)``: the newest such id inside ``window_s``, or
+    ``(None, None)`` when there is none. A newest row that ends the turn
+    (``stt.cancelled``) clears the id instead of resurrecting it.
+
+    Pure, deterministic (newest ``ts`` wins) and never raises.
+    """
+    try:
+        now_f = float(now)
+    except (TypeError, ValueError):
+        return (None, None)
+    try:
+        window = float(window_s)
+    except (TypeError, ValueError):
+        window = ACTIVE_REQUEST_WINDOW_S
+    if not isinstance(events, (list, tuple)):
+        return (None, None)
+    best_ts: Optional[float] = None
+    best: Optional[str] = None
+    best_event = ""
+    for event in events:
+        try:
+            rid = str(event.get("request_id") or "").strip()
+            if not rid:
+                continue
+            ts = float(event.get("ts"))
+        except (TypeError, ValueError):
+            continue
+        except Exception:
+            continue
+        try:
+            age = now_f - ts
+        except Exception:
+            continue
+        if not (0.0 <= age <= window):
+            continue
+        if best_ts is None or ts >= best_ts:
+            best_ts = ts
+            best = rid
+            try:
+                best_event = str(event.get("event") or "")
+            except Exception:
+                best_event = ""
+    if best_ts is None:
+        return (None, None)
+    if best_event in _RID_END_EVENTS:
+        return (None, best_ts)
+    return (best, best_ts)
+
+
+def _fresh_request(rid: Any, ts: Any, now_f: float) -> Optional[str]:
+    """``rid`` when it is a well-formed id inside the pending TTL, else None."""
+    try:
+        clean = str(rid or "").strip()
+        ts_f = float(ts)
+    except (TypeError, ValueError):
+        return None
+    age = now_f - ts_f
+    if not clean or age > PENDING_TTL_S or age < 0:
+        return None
+    return clean
+
+
+def plan_toggle(pending_rid: Any, pending_ts: Any, now: float,
+                *, orb_state: Any = None, active_rid: Any = None,
+                active_ts: Any = None
+                ) -> Tuple[str, Optional[str]]:
+    """Decide the click action for an orb press.
 
     Returns ``("begin", None)`` when idle (or the staged request is
-    missing/expired) and ``("cancel", rid)`` while a staged request is
-    still fresh. Never raises; malformed pending state plans ``begin``.
+    missing/expired) and ``("cancel", rid)`` while a request is live.
+
+    A LIVE turn wins over the staged fallback. When ``orb_state`` is one of
+    :data:`CANCELABLE_STATES` (thinking/working/speaking) and the state feed
+    reported a fresh ``active_rid``, a press must CANCEL that request — the
+    second press used to re-plan ``begin`` and re-trigger capture, so the
+    reply kept playing. ``listening`` is excluded: there a press finishes
+    the capture. When no live turn is known, the original staged-request
+    behavior is unchanged (so the three-argument call still plans exactly as
+    before). Never raises; malformed state plans ``begin``.
     """
     try:
         now_f = float(now)
     except (TypeError, ValueError):
         return ("begin", None)
+    # 1. A live, cancelable turn: STOP it.
     try:
-        rid = str(pending_rid or "").strip()
-        ts_f = float(pending_ts)
-    except (TypeError, ValueError):
-        return ("begin", None)
-    if not rid:
-        return ("begin", None)
-    if now_f - ts_f > PENDING_TTL_S or now_f - ts_f < 0:
-        return ("begin", None)
-    return ("cancel", rid)
+        state_key = str(orb_state or "").strip().lower()
+    except Exception:
+        state_key = ""
+    if state_key in CANCELABLE_STATES:
+        live = _fresh_request(active_rid, active_ts, now_f)
+        if live:
+            return ("cancel", live)
+    # 2. A staged (stage-only) request: cancel it while it is fresh.
+    rid = _fresh_request(pending_rid, pending_ts, now_f)
+    if rid:
+        return ("cancel", rid)
+    return ("begin", None)
 
 
 __all__ = [
@@ -489,9 +592,12 @@ __all__ = [
     "THINK_IDLE_WINDOW_S",
     "SPEAK_WINDOW_S",
     "PENDING_TTL_S",
+    "ACTIVE_REQUEST_WINDOW_S",
+    "CANCELABLE_STATES",
     "MIN_DWELL_S",
     "DisplayState",
     "resolve_orb_state",
     "speaking_markers",
+    "active_request",
     "plan_toggle",
 ]
