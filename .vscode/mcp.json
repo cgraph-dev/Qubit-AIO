@@ -4,7 +4,10 @@
       "type": "stdio",
       "command": "graft",
       "args": ["mcp"],
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "GRAFT_NO_REFRESH": "1"
+      }
     }
   }
 }

@@ -4,7 +4,10 @@
       "command": "graft",
       "args": [
         "mcp"
-      ]
+      ],
+      "env": {
+        "GRAFT_NO_REFRESH": "1"
+      }
     }
   }
 }

@@ -7,6 +7,9 @@
         "graft",
         "mcp"
       ],
+      "environment": {
+        "GRAFT_NO_REFRESH": "1"
+      },
       "enabled": true
     }
   },

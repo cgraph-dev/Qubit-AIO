@@ -5,7 +5,10 @@
       "args": [
         "mcp",
         "/home/trick/Projects/Repos/qubit-voicebridge"
-      ]
+      ],
+      "env": {
+        "GRAFT_NO_REFRESH": "1"
+      }
     },
     "horizon": {
       "command": "/home/trick/.agents/horizon/.venv/bin/horizon-mcp",
