@@ -462,14 +462,11 @@ async def _matrix_send_core(adapter, chat_id, message, media_files, metadata):
     return {"error": _NO_DELIVERABLE} if last_result is None else _success("matrix", chat_id, message_id=last_result.message_id)
 
 
-# Signal's standalone sender moved into the plugin (upstream "drop core wiring",
-# 43faacfb8de7..origin/main) and now plumbs through _plugin_standalone_sender.
-# Re-export the plugin's function under its pre-migration name so callers and
-# tests that import ``_send_signal`` from here keep working -- same shim
-# approach the Discord migration used.
 def _send_signal(extra, chat_id, message, media_files=None):
-    """Lazy proxy: the plugin's standalone module imports this one for ``_error``/
-    ``_success``, so a module-level import here would close the cycle."""
+    """Signal's standalone sender lives in the plugin (upstream "drop core wiring",
+    43faacfb8de7..origin/main; attachments ride the final chunk via the plugin's
+    ``StandaloneSendPolicy``). Re-exported here under its pre-migration name so cron/CLI
+    callers and tests that patch ``send_message_senders._send_signal`` keep working."""
     from plugins.platforms.signal.standalone import _send_signal as _impl
     return _impl(extra, chat_id, message, media_files)
 

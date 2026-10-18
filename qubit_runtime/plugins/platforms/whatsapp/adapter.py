@@ -216,7 +216,7 @@ from gateway.platforms.base import (
 from gateway.platforms.helpers import cancel_task
 from gateway.platforms.event import MessageEvent, MessageType
 from utils import env_int
-from gateway.platforms.send_targets import regex_stripped_parser
+from gateway.platforms.send_targets import StandaloneSendPolicy, regex_stripped_parser
 
 
 def _cache_dirs() -> tuple:
@@ -1157,6 +1157,9 @@ _SEND_JID_RE = re.compile(r"^\s*[\w-]+@(?:g\.us|s\.whatsapp\.net|lid|broadcast|n
 def register(ctx) -> None:
     ctx.register_platform(
         target_ref_syntax_fn=regex_stripped_parser(_SEND_JID_RE),
+        # Baileys /send-media: native JID media rides the standalone sender, not the live adapter.
+        standalone_send=StandaloneSendPolicy(label="WhatsApp", media=True, captionable=True,
+                                             forward_force_document=True, mentions=True, text_direct=True),
         name="whatsapp", label="WhatsApp", adapter_factory=WhatsAppAdapter, check_fn=check_whatsapp_requirements,
         is_connected=_is_connected, required_env=["WHATSAPP_ENABLED"],
         install_hint="WhatsApp requires a Node.js bridge — see the WhatsApp messaging docs",
