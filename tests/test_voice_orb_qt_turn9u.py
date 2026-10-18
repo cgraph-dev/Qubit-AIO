@@ -439,15 +439,18 @@ def _projected_ring_box(t, R, spec):
     from voicebridge.orb import qt_app as Q
 
     spec = dict(spec)
-    # Fluid circles: mirror the painter's added plane precession and radius
-    # breath so the expected box is the drawn box.
+    # Fluid circles: mirror the painter's added plane precession, shared radius
+    # breath AND per-ring shimmer so the expected box is the drawn box.
     spin = spec.get("tilt_spin_deg")
     if spin is None:
         spin = F.ring_tilt_spin(t, spec)
     breath = F.ring_radius_scale(t, spec)
+    shimmer = spec.get("shimmer")
+    if shimmer is None:
+        shimmer = F.ring_shimmer(t, spec)
     spec["tilt"] = float(spec.get("tilt") or 0.0) + spin
-    spec["rx_frac"] = float(spec.get("rx_frac") or F.RX_FRAC) * breath
-    spec["ry_frac"] = float(spec.get("ry_frac") or F.RY_FRAC) * breath
+    spec["rx_frac"] = float(spec.get("rx_frac") or F.RX_FRAC) * breath * shimmer
+    spec["ry_frac"] = float(spec.get("ry_frac") or F.RY_FRAC) * breath * shimmer
     dx, dy = F.camera_offset(t, R)
     pts = F.ring_path(t, R, spec, samples=Q.RING_WARP_SAMPLES)
     n = max(1, len(pts) - 1)
