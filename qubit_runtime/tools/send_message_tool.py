@@ -18,7 +18,7 @@ from tools.send_message_senders import (
     _AUDIO_EXTS, _DEFAULT_CAPTION_LIMIT, _IMAGE_EXTS, _NO_DELIVERABLE, _VIDEO_EXTS, _VOICE_EXTS,
     _adapter_media_method, _error, _live_adapter, _media_caption_split, _plugin_standalone_sender,
     _registry_standalone_send, _resolve_slack_user_target, _sanitize_error_text, _send_signal,
-    _send_matrix_via_adapter, _send_telegram)
+    _send_matrix_via_adapter, _send_qqbot, _send_telegram)
 from tools.registry import tool_error
 
 # A bare Slack user id (session metadata / home-channel config) is opened as a DM; same shape the

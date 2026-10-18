@@ -472,3 +472,21 @@ def _send_signal(extra, chat_id, message, media_files=None):
     ``_success``, so a module-level import here would close the cycle."""
     from plugins.platforms.signal.standalone import _send_signal as _impl
     return _impl(extra, chat_id, message, media_files)
+
+
+# QQBot's senders moved into the plugin alongside Signal's. Re-export the
+# pre-migration names so callers/tests that import them from here keep working.
+# send_qqbot is the renamed _send_qqbot: same signature, same semantics.
+def _qqbot_media_file_type(media_path: str, is_voice: bool) -> int:
+    from plugins.platforms.qqbot.send import _qqbot_media_file_type as _impl
+    return _impl(media_path, is_voice)
+
+
+async def _qqbot_deliver_one_media(*args, **kwargs):
+    from plugins.platforms.qqbot.send import _qqbot_deliver_one_media as _impl
+    return await _impl(*args, **kwargs)
+
+
+async def _send_qqbot(pconfig, chat_id, message, media_files=None, caption=None):
+    from plugins.platforms.qqbot.send import send_qqbot as _impl
+    return await _impl(pconfig, chat_id, message, media_files, caption)
