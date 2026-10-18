@@ -606,6 +606,9 @@ class PluginContext:
     ) -> bool:
         """Queue *content* for a session (``session_key``) or a chat in this plugin's own profile
         (``origin``); ``True`` means a host accepted it. Contract: plugins_injection.py, plugin docs."""
+        from qubit_cli.plugins_injection import inject_plugin_message
+        return inject_plugin_message(self, content, role, session_key=session_key, origin=origin)
+
     def session_cwd(self) -> str:
         """The calling session's recorded cwd, never the gateway's own (``plugin_session``)."""
         from qubit_cli.plugin_session import context_cwd
@@ -615,8 +618,6 @@ class PluginContext:
         """The calling session's client (``cli``/``tui``/``desktop``/``acp``) or messaging platform."""
         from qubit_cli.plugin_session import context_surface
         return context_surface(self._manager)
-        from qubit_cli.plugins_injection import inject_plugin_message
-        return inject_plugin_message(self, content, role, session_key=session_key, origin=origin)
 
     def _gateway_injection_allowed(self) -> bool:
         """Return whether this plugin may trigger gateway session turns (read from the plugin's
