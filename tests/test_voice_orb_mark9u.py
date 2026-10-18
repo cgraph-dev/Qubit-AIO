@@ -1358,34 +1358,42 @@ def _harmonically_locked(a, b, rel=0.02, max_den=3):
                for q in range(1, max_den + 1) for p in range(1, max_den + 1))
 
 
-def test_ring_precession_and_radius_breath_are_non_harmonic():
+def test_ring_set_moves_as_one_rigid_body():
+    # Owner 2026-10-18: "shouldn't they all be on same axis, sometime one
+    # becomes smaller or bigger than the other". The rings must stay ONE
+    # concentric set: at any instant every ring shares the SAME radius scale
+    # and the SAME tilt offset, so each circle keeps its declared size and
+    # plane RELATIVE to the others. (The old per-ring periods made one ring
+    # drift to +1.7% while another sat at -1.7%.)
     from voicebridge.orb import mark_field as F
-    R, t = 64.0, 5.0
-    rings = F.ring_geometry(t)
-    for ring in rings:
-        assert "tilt_spin_deg" in ring and "precess_period_s" in ring
+    for t in (0.0, 1.3, 5.0, 7.7, 13.7, 31.0):
+        rings = F.ring_geometry(t)
+        scales = {round(F.ring_radius_scale(t, r), 12) for r in rings}
+        spins = {round(F.ring_tilt_spin(t, r), 12) for r in rings}
+        assert len(scales) == 1, (t, scales)
+        assert len(spins) == 1, (t, spins)
+    # Bounded, and always positive (a ring never inverts or vanishes).
+    for t in (0.0, 2.0, 9.0, 20.0):
+        ring = F.ring_geometry(t)[0]
         assert abs(F.ring_tilt_spin(t, ring)) <= F.RING_PRECESS_AMP_DEG + 1e-9
         scale = F.ring_radius_scale(t, ring)
-        assert (1.0 - F.RING_RADIUS_BREATH_SPAN
-                <= scale <= 1.0 + F.RING_RADIUS_BREATH_SPAN)
+        assert 1.0 - F.RING_RADIUS_BREATH_SPAN <= scale <= \
+            1.0 + F.RING_RADIUS_BREATH_SPAN
         assert scale > 0.9
         assert ring["precess_period_s"] == pytest.approx(
             F.ring_precess_period(ring))
-    # Continuous: a ring's plane never jumps between adjacent frames.
-    prev = {r["id"]: F.ring_tilt_spin(0.0, r) for r in rings}
-    for k in range(1, 121):
-        cur = {r["id"]: F.ring_tilt_spin(k / 60.0, r) for r in rings}
-        for rid, val in cur.items():
-            assert abs(val - prev[rid]) < 1.0
-        prev = cur
 
-    # Non-harmonic periods: no two ring motion periods are locked, and none is
-    # a near-multiple of the ring turns or the whole-mark spins.
+    # Continuous: the shared motion never jumps between adjacent frames.
+    prev = F.ring_tilt_spin(0.0)
+    for k in range(1, 241):
+        val = F.ring_tilt_spin(k / 60.0)
+        assert abs(val - prev) < 1.0
+        prev = val
+
+    # One shared period, non-harmonic with the ring turns and the spins, so
+    # the set breathes fluidly instead of pulsing in lock-step with a spin.
     periods = list(F.RING_MOTION_PERIODS_S)
-    assert len(periods) >= 8
-    for i, a in enumerate(periods):
-        for b in periods[i + 1:]:
-            assert not _harmonically_locked(a, b), (a, b)
+    assert periods == [F.RING_MOTION_PERIOD_S]
     fixed = ([F.RING_PERIOD_NEAR, F.RING_PERIOD_FAR, F.Y_SPIN_PERIOD_S,
               F.X_SPIN_PERIOD_S, F.INNER_RING_PERIOD_S]
              + [sh[2] for sh in F.SATELLITE_SHELLS])

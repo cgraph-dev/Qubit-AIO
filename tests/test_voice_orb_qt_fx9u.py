@@ -826,8 +826,13 @@ def test_echo_rings_are_two_thin_lagged_followers():
     for p in thin:
         assert not any(abs(p.w - w) <= 0.75 and abs(p.h - h) <= 0.75
                        for w, h in stale), (p.w, p.h, stale)
-    assert _tilt_abs_deg(thin[0], R * F.RX_FRAC * F.ECHO_SCALE,
-                         R * F.RY_FRAC * F.ECHO_SCALE) > 0.0
+    # The lag is real at this clock: the follower's tilt genuinely differs from
+    # its own orbit's base tilt. (The old trailing check recovered an in-plane
+    # tilt from the 3-D-projected bounding box, which is not a valid recovery
+    # under the X+Y tumble and read 0 spuriously; the box matches above are the
+    # actual contract.)
+    assert all(abs(lagged[o] - fresh[o]) > 1.0 for o in ("a", "b")), \
+        (lagged, fresh)
 
 
 def test_echo_rings_follow_tilt_changes_continuously():

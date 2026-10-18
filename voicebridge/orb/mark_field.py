@@ -1525,79 +1525,68 @@ RING_BREATH_PERIOD_INNER = 6.5
 RING_BREATH_PERIOD_ECHO = 17.0
 #: Points in :func:`ring_path`; enough that a 300px ring shows no facets.
 RING_PATH_SAMPLES = 72
-#: Per-ring plane PRECESSION and radius BREATH. Each ring tips and breathes on
-#: its OWN period, and every period is non-harmonic against the ring turns
-#: (9.5/13.5), the spins (20.5/27) and every other ring period, so the set never
-#: pulses or tips in unison. Exposed additively: ``tilt`` stays the base tilt
-#: the contracts assert; ``tilt_spin_deg`` is the offset a renderer ADDS to it,
-#: and :func:`ring_radius_scale` is a gentle multiplier on the radii.
-RING_PRECESS_PERIODS_S = {
-    "orbit_a": 15.5, "orbit_b": 18.5, "echo_a": 22.5, "echo_b": 24.5,
-    "inner": 30.0,
-}
-RING_PRECESS_PERIOD_SAT = (16.0, 17.5, 21.0)
+#: Ring-set PRECESSION and radius BREATH.
+#:
+#: Owner 2026-10-18: "shouldn't they all be on same axis, sometime one becomes
+#: smaller or bigger than the other". The rings previously tipped and breathed
+#: on their OWN periods, so at any instant one circle sat at +1.7% and another
+#: at -1.7% — a visible size/axis mismatch between rings that are meant to be
+#: one concentric set. The whole set now moves as ONE rigid body: a single
+#: shared phase drives both the plane sway and the radius breath, so every
+#: ring's radius and plane stay EXACTLY proportional to its declaration at all
+#: times, while the set still breathes and sways fluidly. Exposed additively:
+#: ``tilt`` stays the base tilt the contracts assert; ``tilt_spin_deg`` is the
+#: offset a renderer ADDS to it, and :func:`ring_radius_scale` multiplies the
+#: radii.
+RING_MOTION_PERIOD_S = 23.3
+RING_MOTION_PHASE = 0.0
 RING_PRECESS_AMP_DEG = 5.0
 #: Radius breath: a fraction of the ring radius, never enough to disturb the
-#: composition (always > 0.95). Same per-ring period as the precession, with a
-#: different phase so tilt and radius do not move together.
+#: composition (always > 0.95). Same shared period as the sway, with a
+#: different phase so the tilt and the radius do not move together.
 RING_RADIUS_BREATH_SPAN = 0.035
 RING_RADIUS_BREATH_PHASE = 1.9
 
 
-def ring_precess_period(ring: Dict[str, Any]) -> float:
-    """The ring's own non-harmonic precession/breath period (seconds).
+def ring_precess_period(ring: Any = None) -> float:
+    """The shared ring-set motion period (seconds).
 
-    Looks the period up by ``id``, then by satellite-shell index, then falls
-    back on the ring's ``seed`` so a hand-built ring still gets a stable period.
+    Kept as a function (and kept in each ``ring_geometry`` entry as
+    ``precess_period_s``) for API compatibility, but it is now ONE period for
+    the whole set: the rings move together so no circle drifts out of
+    proportion with the rest.
     """
-    ring = ring if isinstance(ring, dict) else {}
-    rid = str(ring.get("id") or "")
-    if rid in RING_PRECESS_PERIODS_S:
-        return RING_PRECESS_PERIODS_S[rid]
-    if rid.startswith("shell_"):
-        try:
-            idx = int(rid.split("_", 1)[1])
-        except (ValueError, IndexError):
-            idx = 0
-        return RING_PRECESS_PERIOD_SAT[idx % len(RING_PRECESS_PERIOD_SAT)]
-    seed = int(_finite(ring.get("seed")))
-    return RING_PRECESS_PERIOD_SAT[seed % len(RING_PRECESS_PERIOD_SAT)]
+    return RING_MOTION_PERIOD_S
 
 
-def ring_tilt_spin(t: Any, ring: Dict[str, Any]) -> float:
-    """The ring's plane-precession offset in DEGREES at clock ``t``.
+def ring_tilt_spin(t: Any, ring: Any = None) -> float:
+    """The shared plane-sway offset in DEGREES at clock ``t``.
 
-    ADDITIVE: a renderer adds this to the entry's ``tilt`` to get the ring's
-    live plane. A bounded, continuous sway (zero at the phase wrap is not
-    needed because a sine is smooth everywhere), so the circle's plane evolves
-    fluidly instead of snapping to a new tilt each turn.
+    ADDITIVE: a renderer adds this to the entry's ``tilt``. Identical for every
+    ring, so the set sways as one rigid body and each ring keeps its declared
+    tilt RELATIVE to the others. A bounded, smooth sine, so the plane evolves
+    fluidly instead of snapping.
     """
-    ring = ring if isinstance(ring, dict) else {}
-    period = ring_precess_period(ring)
-    seed = _finite(ring.get("seed"))
-    phase = 2.0 * math.pi * _finite(t) / max(0.1, period) + seed * 0.9
+    phase = (2.0 * math.pi * _finite(t) / RING_MOTION_PERIOD_S
+             + RING_MOTION_PHASE)
     return RING_PRECESS_AMP_DEG * math.sin(phase)
 
 
-def ring_radius_scale(t: Any, ring: Dict[str, Any]) -> float:
-    """A gentle per-ring radius breath, ``~1.0`` and always positive.
+def ring_radius_scale(t: Any, ring: Any = None) -> float:
+    """The shared radius breath, ``~1.0`` and always positive.
 
-    Same non-harmonic period as the ring's precession but phase-shifted, so a
-    ring's radius and its plane do not move together. A renderer multiplies the
+    Identical for every ring, so all circles scale by the same factor and stay
+    exactly proportional to their declared radii. A renderer multiplies the
     declared ``rx``/``ry`` by this; the declared fractions are untouched.
     """
-    ring = ring if isinstance(ring, dict) else {}
-    period = ring_precess_period(ring)
-    seed = _finite(ring.get("seed"))
-    phase = (2.0 * math.pi * _finite(t) / max(0.1, period)
-             + seed * 0.9 + RING_RADIUS_BREATH_PHASE)
+    phase = (2.0 * math.pi * _finite(t) / RING_MOTION_PERIOD_S
+             + RING_RADIUS_BREATH_PHASE)
     return 1.0 + RING_RADIUS_BREATH_SPAN * 0.5 * math.sin(phase)
 
 
 #: Every per-ring motion period the field declares (the ring's own evolution).
 #: The contract test checks no two of these are harmonically locked.
-RING_MOTION_PERIODS_S = (
-    tuple(RING_PRECESS_PERIODS_S.values()) + RING_PRECESS_PERIOD_SAT)
+RING_MOTION_PERIODS_S = (RING_MOTION_PERIOD_S,)
 
 
 def ring_geometry(t: Any) -> List[Dict[str, Any]]:
@@ -2070,7 +2059,7 @@ __all__ = [
     "FILAMENT_ALPHA_PEAK", "FILAMENT_SIZE_BASE", "FILAMENT_SIZE_PEAK",
     "FILAMENT_LIFT",
     "ring_precess_period", "ring_tilt_spin", "ring_radius_scale",
-    "RING_PRECESS_PERIODS_S", "RING_PRECESS_PERIOD_SAT",
+    "RING_MOTION_PERIOD_S", "RING_MOTION_PHASE",
     "RING_PRECESS_AMP_DEG", "RING_RADIUS_BREATH_SPAN",
     "RING_RADIUS_BREATH_PHASE", "RING_MOTION_PERIODS_S",
     "ring_particles", "RING_PARTICLE_COUNTS", "RING_PARTICLE_DEFAULT",
