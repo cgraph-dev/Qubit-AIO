@@ -30,6 +30,20 @@ _OWNER_KEYS = ("profile_home", "session_id", "lease_id", "live_session_id")
 _TERMINAL = frozenset({"settled", "failed", "cancelled", "ambiguous"})
 
 
+def _bot_chat_tip(home: Path) -> str | None:
+    """Current Bot Chat tip id, or None when the profile has no store or no Bot Chat yet."""
+    from qubit_state import SessionDB
+
+    if not (home / 'state.db').is_file():
+        return None
+    db = SessionDB(db_path=home / 'state.db', read_only=True)
+    try:
+        row = db.get_session_by_title('Bot Chat')
+        return db.get_compression_tip(row['id']) if row else None
+    finally:
+        db.close()
+
+
 def find_canonical_owner(profile_home: Path | str) -> dict[str, Any] | None:
     """Return the exact Bot Chat tip's lease, including unsupported CLI owners."""
     from qubit_cli.active_sessions import active_session_registry_snapshot
@@ -449,6 +463,17 @@ def read_delivery_result(profile_home: Path | str, delivery_id: str) -> dict[str
 
 _PENDING = ("queued", "claimed")
 _POLL_SECONDS = 0.5
+
+
+def _poll_receipt(profile_home: Path | str, delivery_id: str) -> dict[str, Any] | None:
+    """A waiter's read: the receipt file the owner republishes when the admission settles (and on
+    restart recovery). Never an authority RPC: a wait outlives owner restarts, and replaying the
+    envelope (``read_delivery_result``) is for producers re-confirming their admission."""
+    record = _read(_root(profile_home) / f"{_delivery_id(delivery_id)}.json")
+    if record is not None and record.get("status") == "canonical":
+        # Admitted with its outcome not yet published (an older owner's last write): pending.
+        return {**record, "status": "queued"}
+    return record
 
 
 def await_delivery(

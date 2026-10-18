@@ -909,6 +909,23 @@ _CREATIVE_CONTROL_PARAMS = {
     },
 }
 
+_STYLE_PROMPT_PARAM = {
+    "type": "string",
+    "description": (
+        "The subject and scene to generate. Be detailed and descriptive; "
+        "reference images supply only the look."
+    ),
+}
+
+_STYLE_IMAGE_URL_PARAM = {
+    "type": "string",
+    "description": (
+        "Style reference: its look is copied, the image itself is not edited. "
+        "A public URL or an absolute local file path. Describe the subject in "
+        "the prompt. Omit for text-to-image."
+    ),
+}
+
 _UPSCALE_PARAM = {
     "type": "boolean",
     "description": (

@@ -372,6 +372,61 @@ def claim_pending_envelopes(root: Path | str) -> list[dict]:
     return out
 
 
+def _replay_unanswered(root: Path | str, base: Path, seen: set, now: float) -> list[tuple[tuple[float, str], dict]]:
+    """``claimed/`` canonical envelopes whose reply has not landed yet, replayed on EVERY drain.
+
+    A drained envelope is not "delivered": its stable id is handed out again until the target's
+    terminal reply is written under that id, so a Desktop that disconnects between ``outbox.drain``
+    and ``bot_relay.deliver`` (#111021, #111207) or loses the drain result cannot drop the DM. The
+    replay is safe because ``bot_relay.deliver`` forwards the SAME id to the target profile's
+    authority, which admits one turn per id and answers a retry with the existing record — never a
+    second turn. Once ``created_at + REPLY_WAIT_SECONDS`` passes with no reply the waiter is gone
+    (or about to be): a ``delivery_timeout`` reply is written so it learns, and the envelope is
+    never handed out again. Each envelope comes back with its ``_queued_at`` enqueue key so the
+    drain can merge it with fresh outbox rows in send order.
+    """
+    out: list[tuple[tuple[float, str], dict]] = []
+    for path in sorted((base / CLAIMED_DIR).glob("*.json"), key=_queued_at):
+        if (base / REPLIES_DIR / path.name).exists():
+            continue
+        with contextlib.suppress(OSError, ValueError):
+            envelope = json.loads(path.read_text(encoding="utf-8-sig"))
+            if not isinstance(envelope, dict):
+                raise ValueError(f"expected a JSON object, got {type(envelope).__name__}")
+            if envelope.get("id") in seen:
+                continue
+            env_id = str(envelope.get("id") or "")
+            label = f"@{envelope.get('target_handle') or '?'} on {envelope.get('target_connection') or '?'}"
+            if envelope.get("canonical_delivery_v1") is not True:
+                _settle_pre_upgrade_claim(root, path, env_id, label, now)
+                continue
+            created = float(envelope.get("created_at") or path.stat().st_mtime)
+            if now - created > REPLY_WAIT_SECONDS:
+                write_reply(root, env_id, reason="delivery_timeout", error=(
+                    f"no reply from {label} within {REPLY_WAIT_SECONDS}s of sending — the Desktop picked "
+                    "the message up but never reported a delivery. It will not be retried; resend if it matters."))
+                continue
+            out.append((_queued_at(path), envelope))
+    return out
+
+
+def _settle_pre_upgrade_claim(root: Path | str, path: Path, env_id: str, label: str, now: float) -> None:
+    """A ``claimed/`` envelope from before canonical delivery (no ``canonical_delivery_v1``) is never
+    replayed: its old lane ran a CLI turn the authority has no record of, so re-admitting the id could
+    run the DM twice. Left alone, though, its sender's waiter watched a reply that never came. Once the
+    old drain's own re-offer point passes (``REOFFER_AFTER_SECONDS`` after its claim — the claim mtime
+    — by which time a live delivery has posted the Desktop's timeout reply) the outcome is settled as
+    ``unknown``: the waiter resolves, the envelope is never offered again, and nothing auto-resends."""
+    from tools.bot_failure_reasons import UNKNOWN
+
+    if now - path.stat().st_mtime < REOFFER_AFTER_SECONDS:
+        return
+    write_reply(root, env_id, reason=UNKNOWN, error=(
+        f"the message to {label} was picked up before this gateway was upgraded and its delivery was "
+        "never reported — it may or may not have been delivered. It will not be retried; check with "
+        "the recipient before resending."))
+
+
 def _reoffer_unanswered(root: Path | str, base: Path, ttl: float, now: float) -> list[dict]:
     """``claimed/`` envelopes unanswered ``REOFFER_AFTER_SECONDS`` after their claim, at most once each.
 
