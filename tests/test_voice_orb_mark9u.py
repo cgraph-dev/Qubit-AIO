@@ -637,3 +637,23 @@ def test_satellite_shells_are_drawn_and_vanish_when_frozen():
     # A shell adds a thin circle (a line) plus a body/trail glints (lines+ovals).
     assert len(live.lines) > len(frozen.lines)
     assert len(live.ovals) > len(frozen.ovals)
+
+
+def test_binary_state_determinism_and_count():
+    from voicebridge.orb import mark_field as F
+    a = F.binary_state(1.23, 32.0)
+    b = F.binary_state(1.23, 32.0)
+    assert a == b
+    assert 48 <= len(a) <= 64
+    for d in a:
+        assert set(d) >= {"x", "y", "depth", "size", "alpha", "lift", "char"}
+        assert d["char"] in ("0", "1")
+
+
+def test_inner_ring_tilt_continuity():
+    from voicebridge.orb import mark_field as F
+    prev = F.inner_ring_tilt(1.0)
+    for k in range(1, 61):
+        cur = F.inner_ring_tilt(1.0 + k / 60.0)
+        assert abs(cur - prev) < 5.0  # no step discontinuity per frame
+        prev = cur
