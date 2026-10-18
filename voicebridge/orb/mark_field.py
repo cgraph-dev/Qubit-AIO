@@ -27,6 +27,10 @@ Layers, back to front:
   * ``core_shells``     — the nucleus's INTERIOR structure: nested bodies at
     different radii and tilts, each turning at its own period.
   * ``filament_state``  — a travelling standing wave running around a ring.
+  * ``volume_particles`` — a real 3D particle field of bodies on their own
+    inclined orbits, each with a per-body twinkle (``pulse``) and rotation
+    (``spin``) animation. It REPLACES the retired math-glyph text layer
+    (``math_state``, now a no-op) — no ``char`` anywhere.
 
 Depth convention: ``depth = 0.5 + 0.5*cos(radians(angle))`` on a particle's
 orbit — 1.0 is nearest the viewer. Renderers draw every ``depth < 0.5`` element
@@ -1297,112 +1301,145 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
     return out
 
 
-# -------------------------------------------------------------- math glyphs
-#: Owner: "add math symbols equations not random lines". A field of mathematical
-#: glyphs drifting around the nucleus. It is the MATH sibling of
-#: :func:`binary_state` — the SAME dict shape, so a renderer draws it with the
-#: same text machinery — but instead of fragments riding the flat declared rings
-#: each glyph orbits the MIDDLE on its own inclined plane, so the symbols form a
-#: genuine volume around the core rather than a decal on the circles.
-MATH_SYMBOLS: Tuple[str, ...] = (
-    "∑", "∫", "π", "√", "∞", "∂", "Δ", "θ", "λ", "μ", "±", "≈",
-    "≠", "≤", "≥", "×", "÷", "∇", "φ", "ψ", "Ω", "Γ", "Σ", "Π",
-)
-#: A rarer, larger family: every ``MATH_EQUATION_EVERY``-th glyph is a short
-#: equation instead of a single symbol, so the field reads as real mathematics
-#: rather than a scatter of isolated marks.
-MATH_EQUATIONS: Tuple[str, ...] = (
-    "e=mc²", "E=hf", "∇·B=0", "∫dx", "U=IR", "Σn²", "λ=hc/E",
-)
-MATH_COUNT = 40
-MATH_EQUATION_EVERY = 10
-MATH_EQUATION_SCALE = 1.7
-MATH_SIZE_BASE = 0.085
-MATH_SIZE_SPAN = 0.06
-MATH_PERIOD_BASE = 6.2
-MATH_PERIOD_SPAN = 11.5
-MATH_R_FRAC_MIN = 0.16
-MATH_R_FRAC_SPAN = 0.62
-#: Inclinations 18..162 deg: ``|sin|`` stays >= 0.31 across the whole range, so
-#: even the flattest glyph's depth sweeps ~0.35..0.65 across a revolution — it
-#: genuinely circles the middle (in front of and behind the core) instead of
-#: sliding on one plane. (Past 162 deg ``|sin|`` collapses and the glyph would
-#: read as in-plane again, so the span stops there.)
-MATH_INC_MIN_DEG = 18.0
-MATH_INC_SPAN_DEG = 144.0
-MATH_ALPHA_BASE = 0.24
-MATH_ALPHA_GAIN = 0.42
-MATH_LIFT_BASE = 0.52
-MATH_LIFT_GAIN = 0.30
+# ------------------------------------------------------------ volume particles
+#: Owner: "there are some check marks that I don't like, replace the checkmark
+#: or v lines or whatever those are with real particles that are like 3d and
+#: have animations." The old MATH-GLYPH TEXT layer (the ``√``/``Δ``/``∇``
+#: symbols and equations, drawn as ``char`` text) is what read as checkmarks,
+#: so it is RETIRED. Its visual role is taken by this: a genuine 3D PARTICLE
+#: field — no text at all.
+#:
+#: Each particle revolves a full 360 in its OWN inclined circular orbit around
+#: the nucleus, so its depth crosses both sides of the core every revolution
+#: (near half in front, far half behind). Every body carries two independent
+#: volume axes (``z``/``z2``), its own screen velocity, and TWO per-body
+#: animations: ``pulse`` (a twinkle that scales the body's size and alpha on
+#: its own non-harmonic period) and ``spin`` (a body-rotation angle a renderer
+#: can apply to a 3D geometry). Size and alpha both derive from ``depth``
+#: through the shared :func:`_depth_size`/:func:`_depth_alpha` mapping, so the
+#: field reads as volume, not a flat scatter.
+#:
+#: The dict shape is ADDITIVE and documented on :func:`volume_particles`.
+VOLUME_COUNT = 52
+VOLUME_R_FRAC_MIN = 0.12
+VOLUME_R_FRAC_SPAN = 0.70
+VOLUME_PERIOD_BASE = 5.4
+VOLUME_PERIOD_SPAN = 9.6
+#: Inclinations 18..162 deg keep ``|sin|`` >= 0.31, so even the flattest
+#: particle's depth sweeps the ~0.35..0.65 band across a revolution — it
+#: genuinely circles the middle rather than sliding on one plane.
+VOLUME_INC_MIN_DEG = 18.0
+VOLUME_INC_SPAN_DEG = 144.0
+VOLUME_SIZE_BASE = 0.20
+VOLUME_SIZE_SPAN = 0.14
+VOLUME_ALPHA_BASE = 0.26
+VOLUME_ALPHA_GAIN = 0.46
+VOLUME_LIFT_BASE = 0.30
+VOLUME_LIFT_GAIN = 0.46
+#: Per-body twinkle periods (non-harmonic with the orbit periods and each
+#: other) so the field shimmers instead of pulsing in unison.
+VOLUME_PULSE_PERIOD_BASE = 1.4
+VOLUME_PULSE_PERIOD_SPAN = 2.4
+VOLUME_SPIN_PERIOD_BASE = 3.0
+VOLUME_SPIN_PERIOD_SPAN = 5.0
 
 
-def math_state(t: Any, R: float) -> List[Dict[str, Any]]:
-    """Math-symbol (and equation) glyphs orbiting the nucleus.
+def volume_particles(t: Any, R: float) -> List[Dict[str, Any]]:
+    """A deterministic 3D particle field orbiting the nucleus (no text).
 
-    One dict per glyph: ``{"index", "x", "y", "depth", "z", "z2", "size",
-    "alpha", "lift", "hue", "hue2", "char", "dof", "skew"}`` — the EXACT shape
-    :func:`binary_state` emits, so a renderer draws it with the same text
-    machinery (only ``char`` differs; ``binary_state`` is untouched). Each of
-    the ``MATH_COUNT`` glyphs makes a full 360 on its own inclined plane at its
-    own non-harmonic period, direction and radius (a fraction of R), so the
-    symbols drift and orbit the MIDDLE. Every ``MATH_EQUATION_EVERY``-th glyph
-    is a short equation from :data:`MATH_EQUATIONS`, drawn larger. Pure in
-    ``(t, R)``: ``hash01`` and trig only, no ``random``, no state, no I/O.
+    One dict per particle:
+    ``{"index", "x", "y", "depth", "z", "z2", "vx", "vy", "size", "alpha",
+    "lift", "hue", "hue2", "dof", "skew", "r", "inc", "pulse", "spin"}``.
+
+    * ``depth`` is the shared shading / z-split scalar; ``z``/``z2`` are two
+      INDEPENDENT volume axes (see :func:`depth_axes`), so a renderer can build
+      a true 3D cloud instead of one scalar.
+    * ``vx``/``vy`` are the screen velocity per second, so a renderer can streak
+      the particle through :func:`rgb_trail`.
+    * ``pulse`` in 0..1 is the body's own twinkle animation (size and alpha
+      already carry it); ``spin`` in 0..360 is its own rotation angle for a 3D
+      body. Both are per-body, deterministic and non-harmonic.
+    * No ``char`` — this layer is never drawn as text.
+
+    Radii, inclinations, periods, directions, phases, pulse and spin periods
+    are all derived by ``hash01`` of the index, so the field is varied but
+    perfectly reproducible. Pure in ``(t, R)``: no ``random``, no state, no
+    I/O, junk-safe and reduced-motion-safe (the renderer decides to drop it).
     """
     tt = _finite(t)
     r = _finite(R, 32.0) or 32.0
     dx, dy = camera_offset(tt, r)
     scale = r / 32.0
-    n_sym = len(MATH_SYMBOLS)
     out: List[Dict[str, Any]] = []
-    for i in range(MATH_COUNT):
+    for i in range(VOLUME_COUNT):
         idx = i + 1
-        rad = r * (MATH_R_FRAC_MIN + MATH_R_FRAC_SPAN * hash01(idx, 501.3))
-        inc = math.radians(MATH_INC_MIN_DEG
-                           + MATH_INC_SPAN_DEG * hash01(idx, 503.7))
-        period = MATH_PERIOD_BASE + MATH_PERIOD_SPAN * hash01(idx, 509.1)
-        direction = 1.0 if hash01(idx, 511.7) >= 0.5 else -1.0
-        phase0 = 360.0 * hash01(idx, 519.3)
-        ang = (phase0 + direction * 360.0 * tt / max(0.1, period)
-               + _phase_wobble(tt, phase0))
+        rad = r * (VOLUME_R_FRAC_MIN
+                   + VOLUME_R_FRAC_SPAN * hash01(idx, 701.3))
+        inc = math.radians(VOLUME_INC_MIN_DEG
+                           + VOLUME_INC_SPAN_DEG * hash01(idx, 703.7))
+        period = (VOLUME_PERIOD_BASE
+                  + VOLUME_PERIOD_SPAN * hash01(idx, 709.1))
+        direction = 1.0 if hash01(idx, 711.7) >= 0.5 else -1.0
+        phase0 = 360.0 * hash01(idx, 719.3)
+        rate = direction * 360.0 / max(0.1, period)
+        ang = phase0 + rate * tt + _phase_wobble(tt, phase0)
         ar = math.radians(ang)
         u, v = math.cos(ar), math.sin(ar)
-        # The glyph's own inclined plane: y is foreshortened by the
-        # inclination, the out-of-plane component becomes depth (the near half
-        # sits in front of the core, the far half behind it).
+        # The particle's own inclined plane: y is foreshortened by the
+        # inclination, the out-of-plane component becomes depth (near half in
+        # front of the core, far half behind it).
         x = rad * u
         y = rad * v * math.cos(inc)
         zunit = v * math.sin(inc)
         depth = min(1.0, max(0.0, 0.5 + 0.5 * zunit))
-        is_eq = MATH_EQUATION_EVERY > 0 and i % MATH_EQUATION_EVERY == 0
-        if is_eq and MATH_EQUATIONS:
-            char = MATH_EQUATIONS[(i // MATH_EQUATION_EVERY)
-                                  % len(MATH_EQUATIONS)]
-            char_scale = MATH_EQUATION_SCALE
-        elif n_sym:
-            pick = int(hash01(idx, 521.9) * n_sym) % n_sym
-            char = MATH_SYMBOLS[pick]
-            char_scale = 1.0
-        else:
-            char = ""
-            char_scale = 1.0
-        cz, cz2 = depth_axes(idx, 523.1)
-        hue = _hue_for(idx, 529.7)
+        # Per-body animation, both non-harmonic and deterministic.
+        pulse_period = (VOLUME_PULSE_PERIOD_BASE
+                        + VOLUME_PULSE_PERIOD_SPAN * hash01(idx, 731.9))
+        pulse = 0.5 + 0.5 * math.sin(
+            2.0 * math.pi * tt / max(0.1, pulse_period)
+            + phase0 * math.pi / 180.0)
+        spin_period = (VOLUME_SPIN_PERIOD_BASE
+                       + VOLUME_SPIN_PERIOD_SPAN * hash01(idx, 733.3))
+        spin = (360.0 * tt / max(0.1, spin_period) + phase0) % 360.0
+        # Screen velocity per second (the dt of the orbit), for streaking.
+        vx = -rad * v * rate
+        vy = rad * u * math.cos(inc) * rate
+        cz, cz2 = depth_axes(idx, 723.9)
+        hue = _hue_for(idx, 729.1)
         out.append({
             "index": float(idx),
             "x": x + dx, "y": y + dy,
             "depth": depth,
             "z": cz, "z2": cz2,
-            "size": (_depth_size(depth, MATH_SIZE_BASE * char_scale * scale)
-                     * (1.0 + MATH_SIZE_SPAN * hash01(idx, 531.3))),
-            "alpha": _depth_alpha(depth, MATH_ALPHA_BASE
-                                  + MATH_ALPHA_GAIN * hash01(idx, 537.1)),
-            "lift": MATH_LIFT_BASE + MATH_LIFT_GAIN * depth,
+            "vx": vx, "vy": vy,
+            "size": (_depth_size(
+                depth,
+                (VOLUME_SIZE_BASE
+                 + VOLUME_SIZE_SPAN * hash01(idx, 731.3)) * scale)
+                * (0.72 + 0.56 * pulse)),
+            "alpha": (_depth_alpha(depth, VOLUME_ALPHA_BASE
+                                   + VOLUME_ALPHA_GAIN * hash01(idx, 737.1))
+                      * (0.55 + 0.45 * pulse)),
+            "lift": VOLUME_LIFT_BASE + VOLUME_LIFT_GAIN * depth,
             "hue": hue, "hue2": _hue_pair(hue),
-            "char": char,
             "dof": dof(depth), "skew": skew(depth),
+            "r": rad, "inc": inc,
+            "pulse": min(1.0, max(0.0, pulse)), "spin": spin,
         })
     return out
+
+
+def math_state(t: Any, R: float) -> List[Dict[str, Any]]:
+    """RETIRED no-op — the math-glyph TEXT layer is gone.
+
+    Owner 2026-10-19: the ``√``/``Δ``/``∇`` math symbols and equations read as
+    "check marks / v lines"; they are replaced by :func:`volume_particles`, a
+    real 3D particle field with no ``char`` at all. This name is kept ONLY so
+    anything built against the old field stays importable and fail-soft: it
+    returns an empty list and never raises, so a renderer draws no glyphs
+    instead of blanking. New work must call :func:`volume_particles`.
+    """
+    return []
 
 
 # ---------------------------------------------------------------- core shells
@@ -2065,12 +2102,14 @@ __all__ = [
     "INNER_RING_RX_FRAC", "INNER_RING_PERIOD_S", "INNER_RING_DIRECTION",
     "INNER_RING_TILT_BASE", "inner_ring_tilt",
     "BINARY_COUNT", "BINARY_SIZE_BASE", "BINARY_PERIOD_BASE", "binary_state",
-    "math_state", "MATH_SYMBOLS", "MATH_EQUATIONS", "MATH_COUNT",
-    "MATH_EQUATION_EVERY", "MATH_EQUATION_SCALE", "MATH_SIZE_BASE",
-    "MATH_SIZE_SPAN", "MATH_PERIOD_BASE", "MATH_PERIOD_SPAN",
-    "MATH_R_FRAC_MIN", "MATH_R_FRAC_SPAN", "MATH_INC_MIN_DEG",
-    "MATH_INC_SPAN_DEG", "MATH_ALPHA_BASE", "MATH_ALPHA_GAIN",
-    "MATH_LIFT_BASE", "MATH_LIFT_GAIN",
+    "math_state",
+    "volume_particles", "VOLUME_COUNT", "VOLUME_R_FRAC_MIN",
+    "VOLUME_R_FRAC_SPAN", "VOLUME_PERIOD_BASE", "VOLUME_PERIOD_SPAN",
+    "VOLUME_INC_MIN_DEG", "VOLUME_INC_SPAN_DEG", "VOLUME_SIZE_BASE",
+    "VOLUME_SIZE_SPAN", "VOLUME_ALPHA_BASE", "VOLUME_ALPHA_GAIN",
+    "VOLUME_LIFT_BASE", "VOLUME_LIFT_GAIN", "VOLUME_PULSE_PERIOD_BASE",
+    "VOLUME_PULSE_PERIOD_SPAN", "VOLUME_SPIN_PERIOD_BASE",
+    "VOLUME_SPIN_PERIOD_SPAN",
     "hue_to_rgb", "rgb_trail", "dust_trail", "RGB_TRAIL_SAMPLES",
     "RGB_TRAIL_HUE_STEP", "RGB_TRAIL_HUE_DRIFT", "RGB_TRAIL_ALPHA_BASE",
     "RGB_TRAIL_WHITE_FRAC", "RGB_TRAIL_SAT_BASE", "RGB_TRAIL_SAT_SPAN",

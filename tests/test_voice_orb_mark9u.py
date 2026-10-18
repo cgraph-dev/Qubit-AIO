@@ -1669,71 +1669,78 @@ def test_palette_is_disciplined_to_a_few_hues():
 
 
 # --------------------------------------------------------------------------- #
-# MATH GLYPHS — owner: "add math symbols equations not random lines". A field
-# of math glyphs orbiting the middle, the SAME dict shape as binary_state.
+# VOLUME PARTICLES — owner: "replace the checkmark / v lines ... with real
+# particles that are like 3d and have animations". The retired math-glyph TEXT
+# layer became this: bodies on their own inclined orbits, no ``char`` at all.
 # --------------------------------------------------------------------------- #
-def test_math_state_is_deterministic_math_glyphs_orbiting_the_middle():
+def test_volume_particles_are_animated_3d_bodies_not_text():
     from voicebridge.orb import mark_field as F
     R, t = 64.0, 2.1
-    a = F.math_state(t, R)
-    assert a == F.math_state(t, R)  # deterministic
-    assert len(a) == F.MATH_COUNT
-    assert len(F.MATH_SYMBOLS) >= 20
+    a = F.volume_particles(t, R)
+    assert a == F.volume_particles(t, R)  # deterministic
+    assert len(a) == F.VOLUME_COUNT
 
-    allowed = set(F.MATH_SYMBOLS) | set(F.MATH_EQUATIONS)
-    r_max = (F.MATH_R_FRAC_MIN + F.MATH_R_FRAC_SPAN) * R
+    r_max = (F.VOLUME_R_FRAC_MIN + F.VOLUME_R_FRAC_SPAN) * R
     dx, dy = F.camera_offset(t, R)
-    saw_symbol = saw_equation = False
     for d in a:
-        assert set(d) >= {"index", "x", "y", "depth", "z", "z2", "size",
-                          "alpha", "lift", "hue", "hue2", "char", "dof",
-                          "skew"}, d
+        assert set(d) >= {"index", "x", "y", "depth", "z", "z2", "vx", "vy",
+                          "size", "alpha", "lift", "hue", "hue2", "dof",
+                          "skew", "r", "inc", "pulse", "spin"}, d
+        # A real particle, never a text glyph.
+        assert "char" not in d, d
         assert 0.0 <= d["depth"] <= 1.0
         assert 0.0 <= d["z"] <= 1.0 and 0.0 <= d["z2"] <= 1.0
+        assert 0.0 <= d["pulse"] <= 1.0
+        assert 0.0 <= d["spin"] < 360.0
         assert 0.0 <= d["hue"] < 1.0
         assert d["hue2"] == pytest.approx((d["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
-        # Every char is a math symbol or a short equation — NEVER a binary
-        # digit nor arbitrary text.
-        assert d["char"] in allowed, d["char"]
-        assert d["char"] not in ("0", "1")
-        assert d["char"] != ""
-        saw_symbol = saw_symbol or d["char"] in set(F.MATH_SYMBOLS)
-        saw_equation = saw_equation or d["char"] in set(F.MATH_EQUATIONS)
-        # Positions are bounded around the middle at its declared radius.
+        # Positions bounded around the middle at the declared radius; every
+        # body carries a screen velocity so a renderer can streak it.
         assert math.hypot(d["x"] - dx, d["y"] - dy) <= r_max + 1e-6, d
-    assert saw_symbol and saw_equation, "both families must appear"
+        assert math.isfinite(d["vx"]) and math.isfinite(d["vy"])
 
-    # Each glyph ORBITS the middle: over a revolution its depth crosses both
-    # sides of the core (in front of and behind it), not one flat plane.
-    span = F.MATH_PERIOD_BASE + F.MATH_PERIOD_SPAN
+    # Depth drives size and alpha: the near bodies are larger and more opaque
+    # than the far ones (the volume cue, not a flat scatter).
+    near = max(a, key=lambda d: d["depth"])
+    far = min(a, key=lambda d: d["depth"])
+    assert near["size"] > far["size"]
+    assert near["alpha"] > far["alpha"]
+
+    # Each body ORBITS the middle: over a revolution its depth crosses both
+    # sides of the core (in front of and behind it).
+    span = F.VOLUME_PERIOD_BASE + F.VOLUME_PERIOD_SPAN
     for i in range(len(a)):
-        deps = [F.math_state(span * k / 72.0, R)[i]["depth"]
+        deps = [F.volume_particles(span * k / 72.0, R)[i]["depth"]
                 for k in range(72)]
         assert min(deps) < 0.35 and max(deps) > 0.65, (i, min(deps), max(deps))
-    # Depth spread across the set fills the volume.
     deps = [d["depth"] for d in a]
     assert min(deps) < 0.2 and max(deps) > 0.8
 
-    # Continuous: no glyph jumps between adjacent frames.
+    # The per-body animations actually move across the clock.
+    assert F.volume_particles(t + 0.37, R)[0]["pulse"] != pytest.approx(
+        a[0]["pulse"])
+    assert F.volume_particles(t + 0.37, R)[0]["spin"] != pytest.approx(
+        a[0]["spin"])
+
+    # Continuous: no body jumps between adjacent frames.
     prev = [(d["x"], d["y"]) for d in a]
     for k in range(1, 120):
-        cur = [(d["x"], d["y"]) for d in F.math_state(t + k / 60.0, R)]
+        cur = [(d["x"], d["y"]) for d in F.volume_particles(t + k / 60.0, R)]
         for (x, y), (px, py) in zip(cur, prev):
             assert math.hypot(x - px, y - py) < 3.0, k
         prev = cur
 
 
-def test_math_state_equations_are_rarer_and_larger():
+def test_math_state_is_retired_and_never_raises():
+    # The math-glyph text layer is retired: the name stays importable (so an
+    # older renderer degrades cleanly) but emits nothing, and the MATH_*
+    # constants are gone so no code can build a v-shaped checkmark again.
     from voicebridge.orb import mark_field as F
-    R, t = 64.0, 2.1
-    glyphs = F.math_state(t, R)
-    eq = [d for d in glyphs if d["char"] in set(F.MATH_EQUATIONS)]
-    sym = [d for d in glyphs if d["char"] in set(F.MATH_SYMBOLS)]
-    assert eq and sym
-    # The equation family is the rarer one...
-    assert len(eq) <= len(glyphs) // 4
-    # ...and every equation is drawn larger than the symbol baseline.
-    assert min(d["size"] for d in eq) > F.MATH_SIZE_BASE
+    assert F.math_state(1.0, 64.0) == []
+    assert F.math_state("bad", None) == []
+    for gone in ("MATH_SYMBOLS", "MATH_EQUATIONS", "MATH_COUNT",
+                 "MATH_EQUATION_EVERY", "MATH_SIZE_BASE"):
+        assert not hasattr(F, gone), gone
 
 
 # --------------------------------------------------------------------------- #
@@ -1776,14 +1783,16 @@ def test_screen_break_reaches_beyond_the_mark_radius():
         prev = cur
 
 
-def test_math_and_screen_break_layers_are_exported():
+def test_volume_and_screen_break_layers_are_exported():
     from voicebridge.orb import mark_field as F
-    for name in ("math_state", "MATH_SYMBOLS", "MATH_EQUATIONS", "MATH_COUNT",
-                 "MATH_EQUATION_EVERY", "MATH_EQUATION_SCALE",
-                 "MATH_SIZE_BASE", "MATH_SIZE_SPAN", "MATH_PERIOD_BASE",
-                 "MATH_PERIOD_SPAN", "MATH_R_FRAC_MIN", "MATH_R_FRAC_SPAN",
-                 "MATH_INC_MIN_DEG", "MATH_INC_SPAN_DEG", "MATH_ALPHA_BASE",
-                 "MATH_ALPHA_GAIN", "MATH_LIFT_BASE", "MATH_LIFT_GAIN",
+    for name in ("volume_particles", "VOLUME_COUNT", "VOLUME_R_FRAC_MIN",
+                 "VOLUME_R_FRAC_SPAN", "VOLUME_PERIOD_BASE",
+                 "VOLUME_PERIOD_SPAN", "VOLUME_INC_MIN_DEG",
+                 "VOLUME_INC_SPAN_DEG", "VOLUME_SIZE_BASE", "VOLUME_SIZE_SPAN",
+                 "VOLUME_ALPHA_BASE", "VOLUME_ALPHA_GAIN", "VOLUME_LIFT_BASE",
+                 "VOLUME_LIFT_GAIN", "VOLUME_PULSE_PERIOD_BASE",
+                 "VOLUME_PULSE_PERIOD_SPAN", "VOLUME_SPIN_PERIOD_BASE",
+                 "VOLUME_SPIN_PERIOD_SPAN", "math_state",
                  "screen_break", "SCREEN_BREAK_COUNT", "SCREEN_BREAK_FRAC",
                  "SCREEN_BREAK_R_FRAC_MIN", "SCREEN_BREAK_R_FRAC_SPAN",
                  "SCREEN_BREAK_PERIOD_BASE", "SCREEN_BREAK_PERIOD_SPAN",
