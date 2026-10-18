@@ -54,6 +54,31 @@ def _looks_like_brain_refusal(text: str) -> bool:
     return any(rx.search(t) for rx in _BRAIN_REFUSAL_RES)
 
 
+def _signal_helper_stop() -> bool:
+    """Best-effort: tell a live desktop helper to stop its spoken reply.
+
+    A cancel (orb STOP or ``/cancel``) must never be a no-op for audio: the
+    helper owns TTS playback, so the service sends it SIGUSR2 (the helper's
+    ``on_orb_stop`` -> ``stop_speaking`` handler). Only a heartbeat pid that
+    is fresh AND cmdline-validated by
+    :mod:`voicebridge.voice_edit.heartbeat` is ever signalled, so a recycled
+    pid belonging to another process is never touched. Returns True when a
+    signal was sent. Never raises; no helper / no ``/proc`` is a quiet
+    ``False``.
+    """
+    try:
+        import os
+        import signal
+        from . import heartbeat as _hb
+        pid = _hb.other_live_pid(exclude=os.getpid())
+        if not pid:
+            return False
+        os.kill(pid, signal.SIGUSR2)
+        return True
+    except Exception:
+        return False
+
+
 #: Worker narration shapes (Lane 2, 2026-10-03, journal test-4 09:54:53):
 #: the headless worker ran an irrelevant tool (``local.open_app`` for a
 #: create-file task) and summarized with assistant chatter
@@ -1192,6 +1217,11 @@ class VoiceEditService:
                 "insertion": ins.public()}
 
     def cancel(self, request_id: str) -> Dict[str, Any]:
+        # A cancel is never a no-op for audio (2026-10-19): the helper owns
+        # the spoken reply, so best-effort stop it before dropping the
+        # staged request. Junk-safe and signature-stable — the request
+        # bookkeeping below is unchanged.
+        _signal_helper_stop()
         with self._lock:
             req = self._reqs.pop(request_id, None)
         if req is None:
