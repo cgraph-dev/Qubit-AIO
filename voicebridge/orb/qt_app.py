@@ -827,6 +827,26 @@ def tumble_point(t: Any, R: Any, x: Any, y: Any, depth: Any = 0.5
                            cy, sy, cx, sx, r)
 
 
+def turn_tone(rgb: Tuple[int, int, int], gain: Any = 1.0) -> Tuple[int, int, int]:
+    """Brightness after the tumble's rotated-depth gain.
+
+    A body swinging toward the viewer renders hotter, one tucking away cooler
+    — on top of the size spread (the painter scales radii by the gain) and the
+    alpha spread (:func:`y_turn_gain` feeding ``_shade``). Pure: at gain 1 the
+    factor is exactly 1.0, so face-on and reduced-motion frames are untouched.
+    Never raises.
+    """
+    try:
+        g = float(gain)
+    except (TypeError, ValueError):
+        g = 1.0
+    if not math.isfinite(g):
+        g = 1.0
+    g = min(Y_SPIN_GAIN_MAX, max(Y_SPIN_GAIN_MIN, g))
+    k = TURN_TONE_BASE + TURN_TONE_SLOPE * g
+    return tuple(max(0, min(255, int(c * k))) for c in rgb)  # type: ignore[return-value]
+
+
 def mark_blink_dots(t: Any, R: Any) -> List[Dict[str, Any]]:
     """Blink dots (shared field), gone under reduced motion.
 
@@ -998,9 +1018,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         gain) and the alpha spread (:func:`_shade`). At gain 1 the factor is
         exactly 1.0, so face-on and reduced-motion frames are untouched.
         """
-        g = min(Y_SPIN_GAIN_MAX, max(Y_SPIN_GAIN_MIN, _num(gain, 1.0)))
-        k = TURN_TONE_BASE + TURN_TONE_SLOPE * g
-        return (_clamp8(rgb[0] * k), _clamp8(rgb[1] * k), _clamp8(rgb[2] * k))
+        return turn_tone(rgb, gain)
 
     # ---- the mark's spectrum ------------------------------------------------
     # The field owns the colour wheel (``mark_field.hue_to_rgb``, hue in TURNS
