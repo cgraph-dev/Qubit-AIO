@@ -1602,3 +1602,156 @@ def test_ring_and_cylinder_layers_are_exported():
                  "CYLINDER_LIFT_GAIN"):
         assert name in F.__all__, name
         assert hasattr(F, name), name
+
+
+# --------------------------------------------------------------------------- #
+# TIGHTENED PALETTE — owner: "its still too colored". Every body hue now comes
+# from a small fixed set instead of a wheel spray, so the whole mark carries a
+# few colours; the duotone partner semantics are untouched.
+# --------------------------------------------------------------------------- #
+def test_palette_is_disciplined_to_a_few_hues():
+    from voicebridge.orb import mark_field as F
+    assert 2 <= len(F.PALETTE_HUES) <= 3
+    assert len(set(F.PALETTE_HUES)) == len(F.PALETTE_HUES)
+    # Across every layer's salt and hundreds of indices, the set of body hues
+    # is exactly the palette — never a continuum, never more than 3.
+    hues = set()
+    for i in range(600):
+        for salt in (31.7, 53.9, 67.1, 71.5, 91.7, 107.3, 227.1, 529.7):
+            hues.add(F._hue_for(i, salt))
+    assert hues <= set(F.PALETTE_HUES)
+    assert len(hues) <= len(F.PALETTE_HUES)
+    # Deterministic and junk-safe, like every field helper.
+    assert F.palette_hue(7, 1.0) == F.palette_hue(7, 1.0)
+    for bad in ("x", None, float("nan"), float("inf")):
+        assert F.palette_hue(bad) in set(F.PALETTE_HUES)
+    # Duotone streaks stay duotone: the partner is still +0.5 of a turn.
+    for h in hues:
+        assert F._hue_pair(h) == pytest.approx((h + F.HUE_PAIR_OFFSET) % 1.0)
+
+
+# --------------------------------------------------------------------------- #
+# MATH GLYPHS — owner: "add math symbols equations not random lines". A field
+# of math glyphs orbiting the middle, the SAME dict shape as binary_state.
+# --------------------------------------------------------------------------- #
+def test_math_state_is_deterministic_math_glyphs_orbiting_the_middle():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 2.1
+    a = F.math_state(t, R)
+    assert a == F.math_state(t, R)  # deterministic
+    assert len(a) == F.MATH_COUNT
+    assert len(F.MATH_SYMBOLS) >= 20
+
+    allowed = set(F.MATH_SYMBOLS) | set(F.MATH_EQUATIONS)
+    r_max = (F.MATH_R_FRAC_MIN + F.MATH_R_FRAC_SPAN) * R
+    dx, dy = F.camera_offset(t, R)
+    saw_symbol = saw_equation = False
+    for d in a:
+        assert set(d) >= {"index", "x", "y", "depth", "z", "z2", "size",
+                          "alpha", "lift", "hue", "hue2", "char", "dof",
+                          "skew"}, d
+        assert 0.0 <= d["depth"] <= 1.0
+        assert 0.0 <= d["z"] <= 1.0 and 0.0 <= d["z2"] <= 1.0
+        assert 0.0 <= d["hue"] < 1.0
+        assert d["hue2"] == pytest.approx((d["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+        # Every char is a math symbol or a short equation — NEVER a binary
+        # digit nor arbitrary text.
+        assert d["char"] in allowed, d["char"]
+        assert d["char"] not in ("0", "1")
+        assert d["char"] != ""
+        saw_symbol = saw_symbol or d["char"] in set(F.MATH_SYMBOLS)
+        saw_equation = saw_equation or d["char"] in set(F.MATH_EQUATIONS)
+        # Positions are bounded around the middle at its declared radius.
+        assert math.hypot(d["x"] - dx, d["y"] - dy) <= r_max + 1e-6, d
+    assert saw_symbol and saw_equation, "both families must appear"
+
+    # Each glyph ORBITS the middle: over a revolution its depth crosses both
+    # sides of the core (in front of and behind it), not one flat plane.
+    span = F.MATH_PERIOD_BASE + F.MATH_PERIOD_SPAN
+    for i in range(len(a)):
+        deps = [F.math_state(span * k / 72.0, R)[i]["depth"]
+                for k in range(72)]
+        assert min(deps) < 0.35 and max(deps) > 0.65, (i, min(deps), max(deps))
+    # Depth spread across the set fills the volume.
+    deps = [d["depth"] for d in a]
+    assert min(deps) < 0.2 and max(deps) > 0.8
+
+    # Continuous: no glyph jumps between adjacent frames.
+    prev = [(d["x"], d["y"]) for d in a]
+    for k in range(1, 120):
+        cur = [(d["x"], d["y"]) for d in F.math_state(t + k / 60.0, R)]
+        for (x, y), (px, py) in zip(cur, prev):
+            assert math.hypot(x - px, y - py) < 3.0, k
+        prev = cur
+
+
+def test_math_state_equations_are_rarer_and_larger():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 2.1
+    glyphs = F.math_state(t, R)
+    eq = [d for d in glyphs if d["char"] in set(F.MATH_EQUATIONS)]
+    sym = [d for d in glyphs if d["char"] in set(F.MATH_SYMBOLS)]
+    assert eq and sym
+    # The equation family is the rarer one...
+    assert len(eq) <= len(glyphs) // 4
+    # ...and every equation is drawn larger than the symbol baseline.
+    assert min(d["size"] for d in eq) > F.MATH_SIZE_BASE
+
+
+# --------------------------------------------------------------------------- #
+# SCREEN BREAK — owner: "I like it how it tries to 'break' the screen".
+# --------------------------------------------------------------------------- #
+def test_screen_break_reaches_beyond_the_mark_radius():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 2.1
+    a = F.screen_break(t, R)
+    assert a == F.screen_break(t, R)  # deterministic
+    assert len(a) == F.SCREEN_BREAK_COUNT
+    assert F.SCREEN_BREAK_FRAC > 1.0
+    # The declared ceiling and the reachable radius cannot drift apart.
+    r_max = (F.SCREEN_BREAK_R_FRAC_MIN + F.SCREEN_BREAK_R_FRAC_SPAN) * R
+    assert r_max == pytest.approx(F.SCREEN_BREAK_FRAC * R)
+
+    for p in a:
+        assert set(p) >= {"index", "x", "y", "depth", "z", "z2", "vx", "vy",
+                          "size", "alpha", "lift", "hue", "hue2", "dof",
+                          "skew", "r", "inc"}, p
+        assert p["r"] <= r_max + 1e-9
+        assert 0.0 <= p["depth"] <= 1.0
+        assert 0.0 <= p["z"] <= 1.0 and 0.0 <= p["z2"] <= 1.0
+        assert p["hue2"] == pytest.approx((p["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+
+    # Some body actually leaves the widget's nominal radius across a cycle,
+    # and never by more than the declared ceiling.
+    best = 0.0
+    for k in range(600):
+        for p in F.screen_break(k / 30.0, R):
+            best = max(best, math.hypot(p["x"], p["y"]))
+    assert best > R, f"screen_break never exits the widget (reach={best:.1f}px)"
+    assert best <= F.SCREEN_BREAK_FRAC * R * 1.05
+    # Continuous: no body teleports between adjacent frames.
+    prev = [(p["x"], p["y"]) for p in a]
+    for k in range(1, 120):
+        cur = [(p["x"], p["y"]) for p in F.screen_break(t + k / 60.0, R)]
+        for (x, y), (px, py) in zip(cur, prev):
+            assert math.hypot(x - px, y - py) < 4.0, k
+        prev = cur
+
+
+def test_math_and_screen_break_layers_are_exported():
+    from voicebridge.orb import mark_field as F
+    for name in ("math_state", "MATH_SYMBOLS", "MATH_EQUATIONS", "MATH_COUNT",
+                 "MATH_EQUATION_EVERY", "MATH_EQUATION_SCALE",
+                 "MATH_SIZE_BASE", "MATH_SIZE_SPAN", "MATH_PERIOD_BASE",
+                 "MATH_PERIOD_SPAN", "MATH_R_FRAC_MIN", "MATH_R_FRAC_SPAN",
+                 "MATH_INC_MIN_DEG", "MATH_INC_SPAN_DEG", "MATH_ALPHA_BASE",
+                 "MATH_ALPHA_GAIN", "MATH_LIFT_BASE", "MATH_LIFT_GAIN",
+                 "screen_break", "SCREEN_BREAK_COUNT", "SCREEN_BREAK_FRAC",
+                 "SCREEN_BREAK_R_FRAC_MIN", "SCREEN_BREAK_R_FRAC_SPAN",
+                 "SCREEN_BREAK_PERIOD_BASE", "SCREEN_BREAK_PERIOD_SPAN",
+                 "SCREEN_BREAK_INC_MIN_DEG", "SCREEN_BREAK_INC_SPAN_DEG",
+                 "SCREEN_BREAK_SIZE_BASE", "SCREEN_BREAK_ALPHA_BASE",
+                 "SCREEN_BREAK_LIFT_BASE", "SCREEN_BREAK_LIFT_GAIN",
+                 "PALETTE_HUES", "palette_hue"):
+        assert name in F.__all__, name
+        assert hasattr(F, name), name

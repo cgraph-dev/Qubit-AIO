@@ -306,6 +306,15 @@ RGB_TRAIL_VAL_BASE = 1.00
 PARTICLE_HUE_BASE = 0.52
 PARTICLE_HUE_SPAN = 0.34
 
+#: Owner: the mark is "still too colored". Every body used to draw its own
+#: wheel position across ``PARTICLE_HUE_BASE..+SPAN`` (0.52 -> 0.86, i.e. six-
+#: plus distinct colours). ``PALETTE_HUES`` collapses that spray to a small,
+#: fixed set — the mark's own cyan with two adjacent neighbours — and
+#: :func:`palette_hue` is the ONE place a body hue is chosen, so the whole
+#: field carries at most ``len(PALETTE_HUES)`` colours. The duotone partner
+#: still comes from :func:`_hue_pair` (+0.5 turn), so streaks stay two-colour.
+PALETTE_HUES: Tuple[float, ...] = (0.52, 0.61, 0.70)
+
 #: The short version for the dense field (dust and glints): fewer samples,
 #: dimmer and shorter, so 30 motes do not turn into 30 comets.
 DUST_TRAIL_SAMPLES = 4
@@ -344,10 +353,33 @@ def hue_to_rgb(h: Any, s: Any = 1.0, v: Any = 1.0) -> Tuple[float, float, float]
             (p, q, val), (u, p, val), (val, p, q))[i % 6]
 
 
+def palette_hue(index: Any, salt: float = 0.0) -> float:
+    """One of :data:`PALETTE_HUES`, chosen deterministically for ``index``.
+
+    The single entry point for a body hue: ``hash01`` of the index (and an
+    optional per-layer ``salt`` so different layers spread across the few
+    entries) picks the palette slot. Junk-safe like every field helper — a bad
+    index or salt still returns a real palette hue, never raises.
+    """
+    n = len(PALETTE_HUES)
+    if n <= 0:
+        return 0.0
+    pick = int(hash01(int(_finite(index)) + 1, 7.7 + _finite(salt)) * n)
+    if pick < 0:
+        pick = 0
+    elif pick >= n:
+        pick = n - 1
+    return PALETTE_HUES[pick]
+
+
 def _hue_for(index: Any, seed: float = 0.0) -> float:
-    """A body hue in the mark's band, deterministic in its index."""
-    return (PARTICLE_HUE_BASE
-            + PARTICLE_HUE_SPAN * hash01(int(_finite(index)) + 1, seed)) % 1.0
+    """A body hue drawn from the small fixed palette, deterministic in index.
+
+    Routed through :func:`palette_hue` so every layer shares the same
+    disciplined set instead of each body spraying the wheel; ``seed`` still
+    selects which palette entry, so the layers spread across the few hues.
+    """
+    return palette_hue(index, seed)
 
 
 def _hue_pair(hue: Any) -> float:
@@ -1223,6 +1255,114 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
     return out
 
 
+# -------------------------------------------------------------- math glyphs
+#: Owner: "add math symbols equations not random lines". A field of mathematical
+#: glyphs drifting around the nucleus. It is the MATH sibling of
+#: :func:`binary_state` — the SAME dict shape, so a renderer draws it with the
+#: same text machinery — but instead of fragments riding the flat declared rings
+#: each glyph orbits the MIDDLE on its own inclined plane, so the symbols form a
+#: genuine volume around the core rather than a decal on the circles.
+MATH_SYMBOLS: Tuple[str, ...] = (
+    "∑", "∫", "π", "√", "∞", "∂", "Δ", "θ", "λ", "μ", "±", "≈",
+    "≠", "≤", "≥", "×", "÷", "∇", "φ", "ψ", "Ω", "Γ", "Σ", "Π",
+)
+#: A rarer, larger family: every ``MATH_EQUATION_EVERY``-th glyph is a short
+#: equation instead of a single symbol, so the field reads as real mathematics
+#: rather than a scatter of isolated marks.
+MATH_EQUATIONS: Tuple[str, ...] = (
+    "e=mc²", "E=hf", "∇·B=0", "∫dx", "U=IR", "Σn²", "λ=hc/E",
+)
+MATH_COUNT = 40
+MATH_EQUATION_EVERY = 10
+MATH_EQUATION_SCALE = 1.7
+MATH_SIZE_BASE = 0.085
+MATH_SIZE_SPAN = 0.06
+MATH_PERIOD_BASE = 6.2
+MATH_PERIOD_SPAN = 11.5
+MATH_R_FRAC_MIN = 0.16
+MATH_R_FRAC_SPAN = 0.62
+#: Inclinations 18..162 deg: ``|sin|`` stays >= 0.31 across the whole range, so
+#: even the flattest glyph's depth sweeps ~0.35..0.65 across a revolution — it
+#: genuinely circles the middle (in front of and behind the core) instead of
+#: sliding on one plane. (Past 162 deg ``|sin|`` collapses and the glyph would
+#: read as in-plane again, so the span stops there.)
+MATH_INC_MIN_DEG = 18.0
+MATH_INC_SPAN_DEG = 144.0
+MATH_ALPHA_BASE = 0.24
+MATH_ALPHA_GAIN = 0.42
+MATH_LIFT_BASE = 0.52
+MATH_LIFT_GAIN = 0.30
+
+
+def math_state(t: Any, R: float) -> List[Dict[str, Any]]:
+    """Math-symbol (and equation) glyphs orbiting the nucleus.
+
+    One dict per glyph: ``{"index", "x", "y", "depth", "z", "z2", "size",
+    "alpha", "lift", "hue", "hue2", "char", "dof", "skew"}`` — the EXACT shape
+    :func:`binary_state` emits, so a renderer draws it with the same text
+    machinery (only ``char`` differs; ``binary_state`` is untouched). Each of
+    the ``MATH_COUNT`` glyphs makes a full 360 on its own inclined plane at its
+    own non-harmonic period, direction and radius (a fraction of R), so the
+    symbols drift and orbit the MIDDLE. Every ``MATH_EQUATION_EVERY``-th glyph
+    is a short equation from :data:`MATH_EQUATIONS`, drawn larger. Pure in
+    ``(t, R)``: ``hash01`` and trig only, no ``random``, no state, no I/O.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    n_sym = len(MATH_SYMBOLS)
+    out: List[Dict[str, Any]] = []
+    for i in range(MATH_COUNT):
+        idx = i + 1
+        rad = r * (MATH_R_FRAC_MIN + MATH_R_FRAC_SPAN * hash01(idx, 501.3))
+        inc = math.radians(MATH_INC_MIN_DEG
+                           + MATH_INC_SPAN_DEG * hash01(idx, 503.7))
+        period = MATH_PERIOD_BASE + MATH_PERIOD_SPAN * hash01(idx, 509.1)
+        direction = 1.0 if hash01(idx, 511.7) >= 0.5 else -1.0
+        phase0 = 360.0 * hash01(idx, 519.3)
+        ang = (phase0 + direction * 360.0 * tt / max(0.1, period)
+               + _phase_wobble(tt, phase0))
+        ar = math.radians(ang)
+        u, v = math.cos(ar), math.sin(ar)
+        # The glyph's own inclined plane: y is foreshortened by the
+        # inclination, the out-of-plane component becomes depth (the near half
+        # sits in front of the core, the far half behind it).
+        x = rad * u
+        y = rad * v * math.cos(inc)
+        zunit = v * math.sin(inc)
+        depth = min(1.0, max(0.0, 0.5 + 0.5 * zunit))
+        is_eq = MATH_EQUATION_EVERY > 0 and i % MATH_EQUATION_EVERY == 0
+        if is_eq and MATH_EQUATIONS:
+            char = MATH_EQUATIONS[(i // MATH_EQUATION_EVERY)
+                                  % len(MATH_EQUATIONS)]
+            char_scale = MATH_EQUATION_SCALE
+        elif n_sym:
+            pick = int(hash01(idx, 521.9) * n_sym) % n_sym
+            char = MATH_SYMBOLS[pick]
+            char_scale = 1.0
+        else:
+            char = ""
+            char_scale = 1.0
+        cz, cz2 = depth_axes(idx, 523.1)
+        hue = _hue_for(idx, 529.7)
+        out.append({
+            "index": float(idx),
+            "x": x + dx, "y": y + dy,
+            "depth": depth,
+            "z": cz, "z2": cz2,
+            "size": (_depth_size(depth, MATH_SIZE_BASE * char_scale * scale)
+                     * (1.0 + MATH_SIZE_SPAN * hash01(idx, 531.3))),
+            "alpha": _depth_alpha(depth, MATH_ALPHA_BASE
+                                  + MATH_ALPHA_GAIN * hash01(idx, 537.1)),
+            "lift": MATH_LIFT_BASE + MATH_LIFT_GAIN * depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "char": char,
+            "dof": dof(depth), "skew": skew(depth),
+        })
+    return out
+
+
 # ---------------------------------------------------------------- core shells
 #: The nucleus is not a flat disc: it has INTERIOR structure. ``core_shells``
 #: declares a few nested bodies at different radii and plane tilts, each
@@ -1787,6 +1927,88 @@ def cylinder_particles(t: Any, R: float) -> List[Dict[str, Any]]:
     return out
 
 
+# --------------------------------------------------------------- screen break
+#: Owner: "I like it how it tries to 'break' the screen, do more of that". A
+#: handful of fast bodies on WIDE, steeply-inclined orbits whose radius grows
+#: past the mark's own envelope, so they visibly sweep out of the widget. The
+#: orbit radius fraction reaches :data:`SCREEN_BREAK_FRAC` (``> 1`` = beyond
+#: R); the excursion is a continuous full turn, never a pop. The set is small
+#: so the primitive budget barely moves. ``R_FRAC_MIN + R_FRAC_SPAN`` equals
+#: ``SCREEN_BREAK_FRAC`` on purpose, so the declared ceiling and the reachable
+#: maximum cannot drift apart.
+SCREEN_BREAK_COUNT = 8
+SCREEN_BREAK_FRAC = 1.18
+SCREEN_BREAK_R_FRAC_MIN = 0.88
+SCREEN_BREAK_R_FRAC_SPAN = 0.30
+SCREEN_BREAK_PERIOD_BASE = 3.2
+SCREEN_BREAK_PERIOD_SPAN = 3.4
+SCREEN_BREAK_INC_MIN_DEG = 26.0
+SCREEN_BREAK_INC_SPAN_DEG = 116.0
+SCREEN_BREAK_SIZE_BASE = 0.24
+SCREEN_BREAK_ALPHA_BASE = 0.72
+SCREEN_BREAK_LIFT_BASE = 0.35
+SCREEN_BREAK_LIFT_GAIN = 0.40
+
+
+def screen_break(t: Any, R: float) -> List[Dict[str, Any]]:
+    """Fast bodies on wide inclined orbits that reach BEYOND the mark radius.
+
+    One dict per body: ``{"index", "x", "y", "depth", "z", "z2", "vx", "vy",
+    "size", "alpha", "lift", "hue", "hue2", "dof", "skew", "r", "inc"}``. Each
+    sweeps a full 360 at its own fast, non-harmonic period on a plane inclined
+    by ``inc``; its orbit radius fraction grows up to :data:`SCREEN_BREAK_FRAC`
+    (``> 1``), so at the widest phase a body is outside the widget's nominal
+    radius — the deliberate overflow the owner asked for. NO perspective
+    contraction is applied here: the layer exists to leave the mark, so pulling
+    the far points in would fight its whole purpose. Continuous by
+    construction (a body rides its circle, it never jumps out and back), and
+    pure in ``(t, R)``: ``hash01`` and trig only, no ``random`` anywhere.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    out: List[Dict[str, Any]] = []
+    for i in range(SCREEN_BREAK_COUNT):
+        idx = i + 1
+        rad = r * (SCREEN_BREAK_R_FRAC_MIN
+                   + SCREEN_BREAK_R_FRAC_SPAN * hash01(idx, 601.3))
+        inc = math.radians(SCREEN_BREAK_INC_MIN_DEG
+                           + SCREEN_BREAK_INC_SPAN_DEG * hash01(idx, 603.7))
+        period = (SCREEN_BREAK_PERIOD_BASE
+                  + SCREEN_BREAK_PERIOD_SPAN * hash01(idx, 609.1))
+        direction = 1.0 if hash01(idx, 611.7) >= 0.5 else -1.0
+        phase0 = 360.0 * hash01(idx, 619.3)
+        rate = direction * 360.0 / max(0.1, period)
+        ang = phase0 + rate * tt + _phase_wobble(tt, phase0)
+        ar = math.radians(ang)
+        u, v = math.cos(ar), math.sin(ar)
+        x = rad * u
+        y = rad * v * math.cos(inc)
+        zunit = v * math.sin(inc)
+        depth = min(1.0, max(0.0, 0.5 + 0.5 * zunit))
+        # Screen velocity per second (the dt of the orbit), so a renderer can
+        # streak the body through :func:`_rgb_trail`.
+        vx = -rad * v * rate
+        vy = rad * u * math.cos(inc) * rate
+        bz, bz2 = depth_axes(idx, 623.7)
+        hue = _hue_for(idx, 629.1)
+        out.append({
+            "index": float(idx),
+            "x": x + dx, "y": y + dy,
+            "depth": depth,
+            "z": bz, "z2": bz2,
+            "vx": vx, "vy": vy,
+            "size": _depth_size(depth, SCREEN_BREAK_SIZE_BASE * scale),
+            "alpha": _depth_alpha(depth, SCREEN_BREAK_ALPHA_BASE),
+            "lift": SCREEN_BREAK_LIFT_BASE + SCREEN_BREAK_LIFT_GAIN * depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "dof": dof(depth), "skew": skew(depth),
+            "r": rad, "inc": inc,
+        })
+    return out
+
+
 __all__ = [
     "PARTICLES", "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
     "FRINGE_PX", "LIFT_RING", "LIFT_BEAD", "LIFT_NUCLEUS",
@@ -1812,9 +2034,16 @@ __all__ = [
     "INNER_RING_RX_FRAC", "INNER_RING_PERIOD_S", "INNER_RING_DIRECTION",
     "INNER_RING_TILT_BASE", "inner_ring_tilt",
     "BINARY_COUNT", "BINARY_SIZE_BASE", "BINARY_PERIOD_BASE", "binary_state",
+    "math_state", "MATH_SYMBOLS", "MATH_EQUATIONS", "MATH_COUNT",
+    "MATH_EQUATION_EVERY", "MATH_EQUATION_SCALE", "MATH_SIZE_BASE",
+    "MATH_SIZE_SPAN", "MATH_PERIOD_BASE", "MATH_PERIOD_SPAN",
+    "MATH_R_FRAC_MIN", "MATH_R_FRAC_SPAN", "MATH_INC_MIN_DEG",
+    "MATH_INC_SPAN_DEG", "MATH_ALPHA_BASE", "MATH_ALPHA_GAIN",
+    "MATH_LIFT_BASE", "MATH_LIFT_GAIN",
     "hue_to_rgb", "rgb_trail", "dust_trail", "RGB_TRAIL_SAMPLES",
     "RGB_TRAIL_HUE_STEP", "RGB_TRAIL_HUE_DRIFT", "RGB_TRAIL_ALPHA_BASE",
     "DUST_TRAIL_SAMPLES", "PARTICLE_HUE_BASE", "PARTICLE_HUE_SPAN",
+    "PALETTE_HUES", "palette_hue", "_hue_for",
     "HUE_PAIR_OFFSET", "_hue_pair",
     "dof", "DOF_NEAR", "DOF_FAR", "DOF_GAMMA", "skew", "SKEW_GAIN_DEG",
     "RING_PERIOD_NEAR", "RING_PERIOD_FAR",
@@ -1857,4 +2086,10 @@ __all__ = [
     "ORBITER_R_FRAC_SPAN", "ORBITER_PERIOD_BASE", "ORBITER_PERIOD_SPAN",
     "ORBITER_INC_MIN_DEG", "ORBITER_INC_SPAN_DEG", "ORBITER_SIZE_BASE",
     "ORBITER_ALPHA_BASE", "ORBITER_LIFT_BASE", "ORBITER_LIFT_GAIN",
+    "screen_break", "SCREEN_BREAK_COUNT", "SCREEN_BREAK_FRAC",
+    "SCREEN_BREAK_R_FRAC_MIN", "SCREEN_BREAK_R_FRAC_SPAN",
+    "SCREEN_BREAK_PERIOD_BASE", "SCREEN_BREAK_PERIOD_SPAN",
+    "SCREEN_BREAK_INC_MIN_DEG", "SCREEN_BREAK_INC_SPAN_DEG",
+    "SCREEN_BREAK_SIZE_BASE", "SCREEN_BREAK_ALPHA_BASE",
+    "SCREEN_BREAK_LIFT_BASE", "SCREEN_BREAK_LIFT_GAIN",
 ]
