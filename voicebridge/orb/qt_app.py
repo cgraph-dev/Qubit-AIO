@@ -447,7 +447,9 @@ NUCLEUS_SWIRL_BEAT_GAIN = 0.55
 CORE_SHELL_MIN_PX = 0.4
 CORE_SHELL_SAT = 0.88
 CORE_SHELL_CORE_LIFT = 0.55
-CORE_SHELL_DRAW_LIMIT = 5
+CORE_SHELL_SIZE_MULT = 1.3
+CORE_SHELL_RIM_W = 0.9
+CORE_SHELL_DRAW_LIMIT = 4
 #: Below this alpha a primitive is imperceptible: skip it rather than let the
 #: 8-bit quantisation snap it to zero in one frame (a tiny hard pop).
 ALPHA_EPS = 0.004
@@ -1939,37 +1941,50 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         _dot(bx, by, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
 
     def _core_body(shell: Dict[str, Any]) -> None:
-        """One nested interior body of the nucleus, as a shaded gradient path.
+        """One nested interior body of the nucleus, as a tilted shaded disc.
 
         Sized and brightened by its rotated depth (a shell swinging toward the
         viewer swells and brightens), tinted by its own spectral hue and pulled
-        toward the core's hot colour at the centre, so a stack of them reads as
-        layered depth INSIDE the sphere. Drawn as a ``drawPath`` gradient, never
-        a ``drawEllipse``: the nucleus body must remain the mark's only solid
+        toward the core's hot colour at the centre. The shell's own plane tilt is
+        folded into the drawn ellipse's minor axis and a thin bright rim, so a
+        stack of them reads as layered, angled discs INSIDE the sphere — depth
+        you look INTO. Drawn as ``drawPath`` gradients + rims, never a
+        ``drawEllipse``: the nucleus body must remain the mark's only solid
         ellipse.
         """
         d = _num(shell.get("depth"), 0.5)
         gx, gy, g = _place(shell.get("x"), shell.get("y"), d,
                            zseed=_num(shell.get("index"), None),
                            zflat=True, z=shell.get("z"), z2=shell.get("z2"))
-        rr = max(CORE_SHELL_MIN_PX, _num(shell.get("size"), 0.0) * g)
+        rr = max(CORE_SHELL_MIN_PX, _num(shell.get("size"), 0.0) * g
+                 * CORE_SHELL_SIZE_MULT)
         a = _shade(_num(shell.get("alpha"), 0.0), d, g) * bright
         if a <= ALPHA_EPS or rr <= 0.0:
             return
+        tilt = math.radians(_num(shell.get("tilt"), 0.0)
+                            + _num(shell.get("spin_deg"), 0.0))
+        ry = max(CORE_SHELL_MIN_PX, rr * (0.30 + 0.70 * abs(math.cos(tilt))))
         rgb = _anchor(_spec_rgb(_num(shell.get("hue"), 0.0), CORE_SHELL_SAT))
         hot = _lift(CORE_SHELL_CORE_LIFT)
-        grad = QRadialGradient(QPointF(gx, gy), rr)
+        grad = QRadialGradient(QPointF(gx, gy), max(rr, ry))
         grad.setColorAt(0.0, QColor(hot[0], hot[1], hot[2],
                                     _clamp8(255.0 * min(1.0, a))))
         grad.setColorAt(0.42, QColor(rgb[0], rgb[1], rgb[2],
                                      _clamp8(255.0 * min(1.0, a) * 0.9)))
         grad.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
         path = QPainterPath()
-        path.addEllipse(QRectF(gx - rr, gy - rr, rr * 2.0, rr * 2.0))
+        path.addEllipse(QRectF(gx - rr, gy - ry, rr * 2.0, ry * 2.0))
         p.setPen(Qt.NoPen)
         p.setBrush(QBrush(grad))
         p.drawPath(path)
+        # A thin bright limb: the shell reads as a BODY with an edge, which is
+        # what makes the stack of them read as layered depth rather than haze.
         p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
+                             _clamp8(255.0 * min(1.0, a) * 0.8)),
+                      CORE_SHELL_RIM_W))
+        p.drawPath(path)
+        p.setPen(Qt.NoPen)
 
     def _ring_particle(body: Dict[str, Any]) -> None:
         """Unused per-body path; the ring bodies are drawn batched below."""
