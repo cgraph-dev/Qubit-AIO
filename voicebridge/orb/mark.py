@@ -692,13 +692,21 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         if total < STREAK_MIN_LEN_PX:
             return
         for i in range(len(pts) - 1):
-            smp = smps[i]
-            a = _shade(_num(smp.get("alpha")) * gain, smp.get("depth"))
+            here, nxt = smps[i], smps[i + 1]
+            a = _shade(_num(here.get("alpha")) * gain, here.get("depth"))
             if a <= ALPHA_EPS:
                 continue
-            colour = _anchor(_spec(smp.get("hue"), smp.get("sat", 1.0),
-                                   smp.get("val", 1.0)))
-            w = 2.0 * max(STREAK_MIN_HALF_PX, _num(smp.get("size")) * half)
+            # Each segment takes the MEAN of its two endpoints' converted
+            # colours — the same thing the Qt painter's gradient does between
+            # two stops, and the only way every sample's hue reaches the frame
+            # in a stroke-per-segment translation.
+            colour = _anchor(tuple(
+                (c0 + c1) / 2.0 for c0, c1 in zip(
+                    _spec(here.get("hue"), here.get("sat", 1.0),
+                          here.get("val", 1.0)),
+                    _spec(nxt.get("hue"), nxt.get("sat", 1.0),
+                          nxt.get("val", 1.0)))))
+            w = 2.0 * max(STREAK_MIN_HALF_PX, _num(here.get("size")) * half)
             width = max(1, min(STREAK_MAX_WIDTH, int(round(w))))
             _line([pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]],
                   _dim(colour, a * bright), width)
