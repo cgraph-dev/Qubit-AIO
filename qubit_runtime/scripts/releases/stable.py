@@ -29,6 +29,26 @@ SMOKE_JOBS = {
 }
 
 
+# Stable releases are cut from ``main`` or from a ``release/*`` maintenance branch.
+RELEASE_LINE_BRANCHES = ("main", "release/*")
+
+
+def release_line_refspecs(remote_prefix: str) -> list[str]:
+    """Fetch refspecs that mirror every release-line branch under ``refs/remotes/<remote_prefix>/``."""
+    return [f"+refs/heads/{branch}:refs/remotes/{remote_prefix}/{branch}"
+            for branch in RELEASE_LINE_BRANCHES]
+
+
+def release_line_contains(commit: str, remote_prefix: str) -> list[str]:
+    """The git command that lists the fetched release-line branches holding ``commit``.
+
+    Empty output means the commit is on no release line. Git matches the
+    ``release/*`` pattern across the slash, so ``release/0.22.1`` qualifies.
+    """
+    return ["git", "for-each-ref", "--contains", commit, "--format=%(refname)",
+            *(f"refs/remotes/{remote_prefix}/{branch}" for branch in RELEASE_LINE_BRANCHES)]
+
+
 def admit_claim(tag: str, commit: str, *, on_main) -> dict:
     """Admit a release from its attempt ref. The checkout version is not read.
 
@@ -448,6 +468,22 @@ def tagger_epoch(tag_object: str, run=output) -> int:
     if epoch <= 0:
         raise ValueError("Stable claim tagger timestamp is invalid")
     return epoch
+
+
+CONTROLLER_BRANCH = "main"
+CONTROLLER_REF = f"refs/heads/{CONTROLLER_BRANCH}"
+CONTROLLER_WORKFLOW = "stable-release.yml"
+
+
+def claim_run_title(claim_tag: str) -> str:
+    """The run-name stable-release.yml sets. Every run is on the default branch, so this names the claim."""
+    return f"Stable release {claim_tag}"
+
+
+def is_claim_run(*, title: str | None, head_branch: str | None, head_sha: str | None,
+                 claim_tag: str, commit: str) -> bool:
+    """A Stable Release run for this claim. Runs started before the controller moved sat on the tag."""
+    return title == claim_run_title(claim_tag) or (head_branch == claim_tag and head_sha == commit)
 
 
 def check_claim(env: dict, run=output) -> dict:
