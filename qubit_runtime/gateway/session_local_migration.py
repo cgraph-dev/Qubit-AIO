@@ -86,6 +86,25 @@ def legacy_launch_params(row):
     return params, route.get('api_mode')
 
 
+def _endpoint_owner(saved, config):
+    """The provider whose credential may serve the saved endpoint. A named entry that now points
+    elsewhere owns a credential for THAT host: rebind to the entry still serving the saved URL, or
+    refuse by name rather than send the moved entry's key to the old host."""
+    from gateway.session_route_identity import resolved_route, same_route
+    identity, entry_url = resolved_route({'provider': saved['provider']}, config)
+    if not entry_url or same_route(saved, {'provider': identity, 'base_url': entry_url}, config):
+        return saved['provider']
+    names = list(config.get('providers') or {}) if isinstance(config.get('providers'), dict) else []
+    legacy = config.get('custom_providers')
+    names += [e.get('name') for e in legacy if isinstance(e, dict)] if isinstance(legacy, list) else []
+    for name in names:
+        owner, url = resolved_route({'provider': str(name or '')}, config)
+        if url and same_route(saved, {'provider': owner, 'base_url': url}, config):
+            return owner
+    raise RuntimeStoreError('launch_credentials_unavailable', field='provider',
+                            detail=f'{identity} no longer serves the saved endpoint; select a model to continue')
+
+
 def adopt_legacy_session(authority, actor, row):
     if actor.profile_id != authority.profile_id:
         raise RuntimeStoreError('profile_mismatch')
