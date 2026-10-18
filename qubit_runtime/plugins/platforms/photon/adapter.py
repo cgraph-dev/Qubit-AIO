@@ -1693,7 +1693,7 @@ async def _standalone_send(
 
 # -- Plugin entry point ----------------------------------------------------------
 
-_SEND_DM_GUID_RE = re.compile("^any;-;\+\d{6,}$", re.IGNORECASE)
+_SEND_DM_GUID_RE = re.compile(r"^any;-;\+\d{6,}$")
 
 
 def register(ctx) -> None:
