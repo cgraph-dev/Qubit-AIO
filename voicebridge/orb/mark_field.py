@@ -10,6 +10,8 @@ Layers, back to front:
 
   * ``camera_offset``   — slow floating sway of the whole mark (fakes depth).
   * ``orbit_tilts``     — the two orbit tilts, plus a slow precession sway.
+  * ``ring_geometry``   — every circle of the mark as one stroke description,
+    with ``ring_path``/``ring_alpha`` for the points and the breathing alpha.
   * ``heartbeat``       — the nucleus lub-dub envelope (0..1 beat strength).
   * ``shockwave``       — one thin ring expanding out of the nucleus per beat.
   * ``particle_state``  — the nine logo particles with depth (size/alpha/lift).
@@ -967,6 +969,115 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
     return out
 
 
+# ------------------------------------------------------------- ring geometry
+#: Owner: "refine circles more". Every circle in the mark — the two orbits,
+#: their echo followers, the inner core ring and the satellite shells — is
+#: declared ONCE here, as a stroke description in the tilted plane, so the Qt
+#: and Tk renderers cannot drift into two slightly different sets of circles.
+RING_ALPHA_MAIN = 0.34
+RING_ALPHA_ECHO = 0.20
+RING_ALPHA_INNER = 0.24
+RING_ALPHA_SAT = 0.14
+RING_WIDTH_MAIN = 1.0
+RING_WIDTH_ECHO = 1.0
+RING_WIDTH_INNER = 0.8
+RING_WIDTH_SAT = 1.0
+#: Alpha breathing, per ring: a ring that never changes reads as printed on the
+#: glass. The periods are non-harmonic so the set never pulses in unison.
+RING_BREATH_SPAN = 0.14
+RING_BREATH_PERIOD_NEAR = 11.0
+RING_BREATH_PERIOD_FAR = 14.5
+RING_BREATH_PERIOD_INNER = 6.5
+RING_BREATH_PERIOD_ECHO = 17.0
+#: Points in :func:`ring_path`; enough that a 300px ring shows no facets.
+RING_PATH_SAMPLES = 72
+
+
+def ring_geometry(t: Any) -> List[Dict[str, Any]]:
+    """Every circle of the mark as a stroke description, back to front.
+
+    Each entry: ``{"id", "layer", "orbit", "tilt", "rx_frac", "ry_frac",
+    "alpha", "width", "echo", "seed"}``. Radii are FRACTIONS of the mark
+    radius and the tilt is in degrees, so the same entry scales to any size;
+    :func:`ring_path` turns one into points. ``layer`` is ``main``, ``echo``,
+    ``inner`` or ``satellite``; the list is ordered so a renderer can paint it
+    in order and get the near rings on top.
+    """
+    tt = _finite(t)
+    near_tilt, far_tilt = orbit_tilts(tt)
+    lag_near, lag_far = (e["tilt"] for e in echo_rings(tt - ECHO_LAG_S))
+    out: List[Dict[str, Any]] = [
+        {"id": "orbit_b", "layer": "main", "orbit": "b", "tilt": far_tilt,
+         "rx_frac": RX_FRAC, "ry_frac": RY_FRAC, "alpha": RING_ALPHA_MAIN,
+         "width": RING_WIDTH_MAIN, "echo": False, "seed": 0.0},
+        {"id": "echo_b", "layer": "echo", "orbit": "b", "tilt": lag_far,
+         "rx_frac": RX_FRAC * ECHO_SCALE, "ry_frac": RY_FRAC * ECHO_SCALE,
+         "alpha": RING_ALPHA_ECHO, "width": RING_WIDTH_ECHO, "echo": True,
+         "seed": 1.0},
+    ]
+    for idx, (rx_frac, ratio, _p, _d, _s, _a, _l) in enumerate(
+            SATELLITE_SHELLS):
+        out.append({
+            "id": f"shell_{idx}", "layer": "satellite", "orbit": "",
+            # Mirrors satellites(): the first shell rides the near plane, the
+            # rest the far one, so the declared circle is the drawn circle.
+            "tilt": near_tilt if idx == 0 else far_tilt,
+            "rx_frac": rx_frac,
+            "ry_frac": rx_frac * (RY_FRAC / RX_FRAC) * ratio,
+            "alpha": RING_ALPHA_SAT, "width": RING_WIDTH_SAT, "echo": False,
+            "seed": 2.0 + idx})
+    out.append({
+        "id": "inner", "layer": "inner", "orbit": "", "tilt": inner_ring_tilt(tt),
+        "rx_frac": INNER_RING_RX_FRAC,
+        "ry_frac": INNER_RING_RX_FRAC * (RY_FRAC / RX_FRAC),
+        "alpha": RING_ALPHA_INNER, "width": RING_WIDTH_INNER, "echo": False,
+        "seed": 5.0})
+    out.append({
+        "id": "echo_a", "layer": "echo", "orbit": "a", "tilt": lag_near,
+        "rx_frac": RX_FRAC * ECHO_SCALE, "ry_frac": RY_FRAC * ECHO_SCALE,
+        "alpha": RING_ALPHA_ECHO, "width": RING_WIDTH_ECHO, "echo": True,
+        "seed": 6.0})
+    out.append({
+        "id": "orbit_a", "layer": "main", "orbit": "a", "tilt": near_tilt,
+        "rx_frac": RX_FRAC, "ry_frac": RY_FRAC, "alpha": RING_ALPHA_MAIN,
+        "width": RING_WIDTH_MAIN, "echo": False, "seed": 7.0})
+    return out
+
+
+def ring_path(t: Any, R: Any, ring: Dict[str, Any],
+              samples: int = RING_PATH_SAMPLES) -> List[Tuple[float, float]]:
+    """Points around one :func:`ring_geometry` ring, in field coordinates.
+
+    Camera sway included, closed (the last point repeats the first) so a
+    renderer can stroke it directly with no special case. Both backends run
+    the same points, which is what makes the circles identical.
+    """
+    r = _finite(R, 32.0) or 32.0
+    n = max(3, int(samples))
+    ring = ring if isinstance(ring, dict) else {}
+    dx, dy = camera_offset(t, r)
+    rx = r * _finite(ring.get("rx_frac"), RX_FRAC)
+    ry = r * _finite(ring.get("ry_frac"), RY_FRAC)
+    tilt = _finite(ring.get("tilt"), 0.0)
+    pts = [orbit_point(dx, dy, rx, ry, tilt, 360.0 * i / float(n))
+           for i in range(n)]
+    pts.append(pts[0])  # exactly closed, not closed to within a float epsilon
+    return pts
+
+
+def ring_alpha(t: Any, ring: Dict[str, Any]) -> float:
+    """The ring's breathing alpha for clock ``t`` — never zero, never 1."""
+    ring = ring if isinstance(ring, dict) else {}
+    period = {0: RING_BREATH_PERIOD_NEAR, 1: RING_BREATH_PERIOD_FAR,
+              5: RING_BREATH_PERIOD_INNER}.get(
+                  int(_finite(ring.get("seed"))), RING_BREATH_PERIOD_ECHO)
+    phase = 2.0 * math.pi * _finite(t) / max(0.1, period)
+    phase += _finite(ring.get("seed")) * 0.7
+    return _finite(ring.get("alpha"), RING_ALPHA_MAIN) * (
+        1.0 - RING_BREATH_SPAN * 0.5
+        + RING_BREATH_SPAN * 0.5 * math.sin(phase))
+
+
 __all__ = [
     "PARTICLES", "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
     "FRINGE_PX", "LIFT_RING", "LIFT_BEAD", "LIFT_NUCLEUS",
@@ -997,4 +1108,8 @@ __all__ = [
     "DUST_TRAIL_SAMPLES", "PARTICLE_HUE_BASE", "PARTICLE_HUE_SPAN",
     "dof", "DOF_NEAR", "DOF_FAR", "DOF_GAMMA", "skew", "SKEW_GAIN_DEG",
     "RING_PERIOD_NEAR", "RING_PERIOD_FAR",
+    "ring_geometry", "ring_path", "ring_alpha", "RING_PATH_SAMPLES",
+    "RING_ALPHA_MAIN", "RING_ALPHA_ECHO", "RING_ALPHA_INNER",
+    "RING_ALPHA_SAT", "RING_WIDTH_MAIN", "RING_WIDTH_INNER",
+    "RING_BREATH_SPAN",
 ]

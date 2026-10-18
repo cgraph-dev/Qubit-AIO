@@ -842,3 +842,84 @@ def test_skew_is_a_bounded_per_depth_shear():
         assert "skew" in m
     for shell in F.satellites(1.3, 64.0):
         assert "skew" in shell["body"]
+
+
+# --------------------------------------------------------------------------- #
+# RING GEOMETRY — owner 2026-10-18: "refine circles more". The whole set of
+# circles is declared once, so the two renderers stroke the same set instead
+# of each approximating it.
+# --------------------------------------------------------------------------- #
+def test_ring_geometry_declares_every_circle_back_to_front():
+    from voicebridge.orb import mark_field as F
+    t, R = 2.3, 90.0
+    rings = F.ring_geometry(t)
+    assert rings == F.ring_geometry(t)
+    assert [r["id"] for r in rings] == [r["id"] for r in rings]
+    ids = [r["id"] for r in rings]
+    assert len(set(ids)) == len(ids), "one entry per circle"
+    for r in rings:
+        assert set(r) >= {"id", "layer", "orbit", "tilt", "rx_frac",
+                          "ry_frac", "alpha", "width", "echo", "seed"}
+        assert r["layer"] in ("main", "echo", "inner", "satellite")
+        assert 0.0 < r["rx_frac"] <= 1.0 and 0.0 < r["ry_frac"] <= 1.0
+        assert 0.0 < r["alpha"] < 1.0 and r["width"] > 0.0
+        assert isinstance(r["echo"], bool)
+    # Both orbits, both followers, the inner ring and every satellite shell.
+    near, far = F.orbit_tilts(t)
+    lags = [e["tilt"] for e in F.echo_rings(t - F.ECHO_LAG_S)]
+    main = {r["orbit"]: r for r in rings if r["layer"] == "main"}
+    assert main["a"]["tilt"] == pytest.approx(near)
+    assert main["b"]["tilt"] == pytest.approx(far)
+    assert main["a"]["rx_frac"] == pytest.approx(F.RX_FRAC)
+    assert main["a"]["ry_frac"] == pytest.approx(F.RY_FRAC)
+    assert sorted(r["tilt"] for r in rings if r["layer"] == "echo") == \
+        pytest.approx(sorted(lags), abs=1e-9)
+    assert sum(1 for r in rings if r["layer"] == "inner") == 1
+    shells = [r for r in rings if r["layer"] == "satellite"]
+    assert len(shells) == len(F.SATELLITE_SHELLS)
+    for ring, shell in zip(shells, F.satellites(t, R)):
+        assert ring["rx_frac"] == pytest.approx(shell["ring"]["rx_frac"])
+        assert ring["ry_frac"] == pytest.approx(shell["ring"]["ry_frac"])
+        assert ring["tilt"] == pytest.approx(shell["ring"]["tilt"])
+    inner = next(r for r in rings if r["layer"] == "inner")
+    assert inner["tilt"] == pytest.approx(F.inner_ring_tilt(t))
+    assert inner["rx_frac"] == pytest.approx(F.INNER_RING_RX_FRAC)
+    # Near rings come last, so a painter can walk the list top to bottom.
+    assert rings[-1]["orbit"] == "a" and rings[0]["orbit"] == "b"
+
+
+def test_ring_path_is_a_closed_smooth_ellipse_at_any_scale():
+    from voicebridge.orb import mark_field as F
+    t = 2.3
+    ring = F.ring_geometry(t)[-1]
+    for R in (24.0, 96.0):
+        pts = F.ring_path(t, R, ring)
+        assert len(pts) == F.RING_PATH_SAMPLES + 1
+        assert pts[0] == pts[-1], "closed for a plain stroke"
+        dx, dy = F.camera_offset(t, R)
+        radii = [math.hypot(x - dx, y - dy) for x, y in pts]
+        assert min(radii) == pytest.approx(R * ring["ry_frac"], abs=0.35)
+        assert max(radii) == pytest.approx(R * ring["rx_frac"], abs=0.35)
+        # No facets: the step grows with the axis exactly as the ellipse
+        # does (an ellipse's long side is, correctly, the coarser one).
+        steps = [math.dist(a, b) for a, b in zip(pts, pts[1:])]
+        assert max(steps) / min(steps) == pytest.approx(
+            ring["rx_frac"] / ring["ry_frac"], rel=0.2)
+        assert max(steps) < 0.2 * R
+    # Junk in, points out.
+    assert len(F.ring_path("bad", "bad", None, samples=8)) == 9
+
+
+def test_ring_alpha_breathes_without_ever_vanishing_or_saturating():
+    from voicebridge.orb import mark_field as F
+    for ring in F.ring_geometry(0.0):
+        base = ring["alpha"]
+        prev = F.ring_alpha(0.0, ring)
+        for k in range(1, 601):
+            cur = F.ring_alpha(k / 100.0, ring)
+            assert 0.0 < cur <= base * (1.0 + 1e-9)
+            assert cur > base * (1.0 - F.RING_BREATH_SPAN) - 1e-9
+            assert abs(cur - prev) < 0.01, (ring["id"], k)
+            prev = cur
+        # The two orbits breathe on different periods: the set never pulses.
+        assert 0.0 < F.ring_alpha(0.0, ring) <= 1.0
