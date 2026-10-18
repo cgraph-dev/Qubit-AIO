@@ -39,6 +39,80 @@ def _physical_target(authority, session_id):
         return authority.db.get_compression_tip(session_id) or session_id
 
 
+# --- Persisted pending close -------------------------------------------------
+# The in-memory ``authority.pending_closes`` entry dies with the process; a gateway stop before the
+# FIFO reaches its idle point would drop the close and NOTHING else ends a local row. The record is
+# therefore mirrored into ``state_meta`` under ``CLOSE_PREFIX + session_id`` carrying its own op id,
+# and every removal is compare-and-delete on that exact record: a reattach, a cancelled older close
+# or a stale owner can only delete the record it observed, never a newer close stored since.
+
+
+def _close_record(close):
+    """The stored form of *close* — its op id plus the reason to stamp on the row."""
+    record = getattr(close, "record", None)
+    if record is None:
+        record = {"op": uuid.uuid4().hex, "reason": close.reason}
+    return record
+
+
+def _persist_close(authority, session_id, record) -> None:
+    authority.db._write_sql('INSERT OR REPLACE INTO state_meta(key,value) VALUES(?,?)',
+                            (CLOSE_PREFIX + session_id, json.dumps(record)))
+
+
+def forget_persisted_close(authority, session_id, record=None) -> bool:
+    """Drop the stored close for *session_id*, but only the exact *record* the caller saw.
+
+    Compare-and-delete on the record's op id: a newer close stored after this one was read survives
+    (the reattach/cancel that raced us only cancels what it saw). ``True`` when a row was removed.
+    """
+    if record is not None:
+        row = authority.db._read_one('SELECT value FROM state_meta WHERE key=?',
+                                     (CLOSE_PREFIX + session_id,))
+        if row is not None and _op_of(row['value']) != record.get("op"):
+            return False
+    return authority.db._write_rowcount('DELETE FROM state_meta WHERE key=?',
+                                        (CLOSE_PREFIX + session_id,)) > 0
+
+
+def _op_of(raw):
+    try:
+        return json.loads(raw).get("op")
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def cancel_persisted_close(authority, session_id) -> bool:
+    """A viewer re-attached: the stored close is no longer wanted. Unconditional delete (the
+    attach itself supersedes any record), reporting whether one was there."""
+    return authority.db._write_rowcount('DELETE FROM state_meta WHERE key=?',
+                                        (CLOSE_PREFIX + session_id,)) > 0
+
+
+def rearm_persisted_closes(authority) -> tuple:
+    """Boot recovery: session ids whose close a previous owner stored but never completed.
+
+    The record is re-seeded into ``pending_closes`` so the restarted owner's first idle point runs
+    it. A session whose record cannot be read is dropped rather than left to re-arm forever.
+    """
+    rows = authority.db._read_all('SELECT key,value FROM state_meta WHERE key GLOB ?',
+                                  (CLOSE_PREFIX + '*',))
+    armed = []
+    for row in rows:
+        session_id = row['key'][len(CLOSE_PREFIX):]
+        try:
+            record = json.loads(row['value'])
+        except (ValueError, TypeError):
+            forget_persisted_close(authority, session_id)
+            continue
+        skip = authority.sessions.get(session_id)
+        if skip is not None and skip.subscribers:
+            continue  # someone is watching again; the close is moot
+        authority.pending_closes[session_id] = _PendingClose(record.get("reason", ""), record=record)
+        armed.append(session_id)
+    return tuple(armed)
+
+
 def _busy(authority, session_id, target):
     with authority.db._read_ctx() as conn:
         return conn.execute(_BUSY_SQL, (session_id, session_id, target)).fetchone() is not None
@@ -50,11 +124,16 @@ _RESET_REASONS = frozenset({'new_session', 'tui_close'})
 
 
 class _PendingClose:
-    """One viewer close; identity, not the reason, tells a settler its close is still the pending one."""
-    __slots__ = ('reason',)
+    """One viewer close; identity, not the reason, tells a settler its close is still the pending one.
 
-    def __init__(self, reason):
+    ``record`` is the durable form (``{"op": ..., "reason": ...}``) mirrored into ``state_meta`` so a
+    restart can re-arm the close; its op id is what makes every removal compare-and-delete.
+    """
+    __slots__ = ('reason', 'record')
+
+    def __init__(self, reason, record=None):
         self.reason = reason
+        self.record = record or {"op": uuid.uuid4().hex, "reason": reason}
 
 
 async def close_viewer_session(authority, session_id, reason):
@@ -74,6 +153,8 @@ async def close_viewer_session(authority, session_id, reason):
     for parent in parents:
         interrupt_for_session(session_key=route, parent_session_id=parent, reason=f'viewer_close:{reason}')
     authority.pending_closes[session_id] = _PendingClose(reason)
+    await asyncio.to_thread(_persist_close, authority, session_id,
+                            authority.pending_closes[session_id].record)
     await settle_viewer_close(authority, session_id)
 
 

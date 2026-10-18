@@ -147,6 +147,50 @@ class GatewaySessionCommandsMixin:
         """
         return None
 
+    async def _retry_in_admission(self, event, session_entry, owned, pinned, truncated,
+                                  last_user_msg, has_carrier):
+        """Plan the /retry rewrite and let the re-send's OWN admission commit it.
+
+        Rewriting first and admitting afterwards loses the turn when admission refuses (a drain or
+        retirement that starts after the pre-check, a full FIFO). ``session_retry_admission`` is the
+        mechanism: the handler only PLANS the rewrite — pinning the active row ids it read — and
+        binds it to the re-send, so ``SessionAuthority._admit_native`` runs it as a write guard
+        inside the same BEGIN IMMEDIATE that inserts the row. A refusal rolls both back; a transcript
+        that changed since the read refuses both (``RetryRewriteRefused``).
+        """
+        from gateway import session_retry_admission as sra
+
+        def _write(conn):
+            """The rewrite the plain path performs, against the admission's own transaction."""
+            if pinned is not None:
+                # Fence on the rows read before the plan: a concurrent newer turn then invalidates
+                # the plan instead of being removed for stale text.
+                rows = {r[0] for r in conn.execute(
+                    "SELECT id FROM session_messages WHERE session_id=? AND active=1",
+                    (session_entry.session_id,)).fetchall()}
+                if rows - set(pinned):
+                    raise ValueError("a newer turn outran the retry")
+            conn.execute(
+                "UPDATE session_messages SET active=0 WHERE id IN "
+                "(SELECT id FROM session_messages WHERE session_id=? AND active=1 "
+                " ORDER BY id DESC LIMIT 1)",
+                (session_entry.session_id,))
+
+        def _on_commit():
+            session_entry.last_prompt_tokens = 0  # transcript was truncated
+
+        rewrite = sra.RetryRewrite(
+            db=owned, session_id=session_entry.session_id, source=event.source,
+            write=_write, on_commit=_on_commit,
+        )
+        token = sra.bind(rewrite)
+        try:
+            return await self._handle_message(MessageEvent(
+                text=last_user_msg, message_type=MessageType.TEXT, source=event.source,
+                raw_message=event.raw_message, channel_prompt=event.channel_prompt))
+        finally:
+            sra.unbind(token)
+
     # ------------------------------------------------------------------ /new, /reset
 
     async def _cleanup_old_agent_for_reset(self, session_key: str) -> None:
@@ -451,11 +495,9 @@ class GatewaySessionCommandsMixin:
         if readmission_reply is not None:
             return readmission_reply
 
-        # The authority-fenced rewrite (an admission-scoped commit that the plain store path
-        # below cannot express) is NOT implemented. Rather than call a method that does not
-        # exist, fall through to the normal rewrite, which is correct but unfenced: a concurrent
-        # newer turn can be removed for stale text. Tracked as a known gap; no test covers the
-        # authority path, so an implementation here would be unverified.
+        if owned:
+            return await self._retry_in_admission(
+                event, session_entry, owned, pinned, truncated, last_user_msg, handoff is not None)
         if handoff is not None:
             # Composite carrier (one row = retained summary + live ask): the carrier-aware rewind
             # archives it and inserts the pure scaffold atomically, reselecting the latest carrier
