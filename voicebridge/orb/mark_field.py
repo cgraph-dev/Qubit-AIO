@@ -83,7 +83,7 @@ RING_PERIOD_FAR = 17.0
 #: Per-particle wobble: a bounded PHASE offset in degrees, never a clock
 #: multiplier (a multiplier makes the field accelerate with uptime).
 SPEED_MOD_AMP = 0.10
-SPEED_MOD_DEG = 7.0
+SPEED_MOD_DEG = 3.0
 SPEED_MOD_HZ = 0.7
 
 # ------------------------------------------------------------------ trails
@@ -104,7 +104,7 @@ SHOCKWAVE_WIDTH = 1.0
 #: the nucleus is the mark's only solid body. ``GLINT_ARM_FRAC`` is the star
 #: arm length as a multiple of the particle radius, and the twinkle period is
 #: per-particle so the field shimmers instead of pulsing in unison.
-GLINT_ARM_FRAC = 1.45
+GLINT_ARM_FRAC = 0.72
 GLINT_CORE_FRAC = 0.5
 GLINT_TWINKLE_BASE_S = 1.6
 GLINT_TWINKLE_SPAN_S = 1.9
@@ -127,8 +127,8 @@ PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
 DUST_COUNT = 30
 DUST_R_FRAC_MIN = 0.86
 DUST_R_FRAC_SPAN = 0.30
-DUST_SIZE_BASE = 0.20
-DUST_SIZE_SPAN = 0.26
+DUST_SIZE_BASE = 0.10
+DUST_SIZE_SPAN = 0.13
 DUST_PERIOD_BASE = 5.0
 DUST_PERIOD_SPAN = 9.0
 DUST_ALPHA_BASE = 0.16
@@ -141,7 +141,7 @@ COMET_PERIOD_S = 7.0
 COMET_SPEED_MULT = 1.9
 COMET_TRAIL_SAMPLES = 12
 COMET_STEP_DEG = 3.2
-COMET_SIZE = 1.5
+COMET_SIZE = 0.75
 COMET_ALPHA = 0.95
 COMET_LIFT = 0.80
 
@@ -150,8 +150,8 @@ COMET_LIFT = 0.80
 #: phase and slightly scaled, so each orbit trails a ghost of itself. The lag
 #: is what makes the pair read as one connected system rather than two decals.
 ECHO_LAG_S = 1.15
-ECHO_SCALE = 1.14
-ECHO_ALPHA = 0.30
+ECHO_SCALE = 1.06
+ECHO_ALPHA = 0.20
 ECHO_WIDTH = 1.0
 
 # ------------------------------------------------------ nucleus spark shower
@@ -161,7 +161,7 @@ ECHO_WIDTH = 1.0
 #: breathing rather than a separate effect.
 #: Spark arms are SHORTER than a particle glint's: at the nucleus they must
 #: read as pinpricks, not stars the size of the nucleus itself.
-SPARK_ARM_FRAC = 1.30
+SPARK_ARM_FRAC = 0.65
 NUCLEUS_SPARK_COUNT = 18
 NUCLEUS_SPARK_LIFE_BASE = 1.30
 NUCLEUS_SPARK_LIFE_SPAN = 0.90
@@ -180,7 +180,7 @@ SATELLITE_SHELLS = (
     (0.50, 1.0, 5.5, 1.0, 1.05, 0.95, 0.85),
     (0.93, 1.0, 9.0, -1.0, 0.85, 0.90, 0.75),
 )
-SATELLITE_RING_ALPHA = 0.22
+SATELLITE_RING_ALPHA = 0.14
 SATELLITE_RING_WIDTH = 1.0
 SATELLITE_TRAIL_SAMPLES = 5
 SATELLITE_TRAIL_STEP_DEG = 7.0
@@ -194,8 +194,8 @@ SPARKLE_LIFE_BASE = 1.1
 SPARKLE_LIFE_STEP = 0.35
 SPARKLE_VISIBLE_FRAC = 0.45
 SPARKLE_MAX_ALPHA = 0.60
-SPARKLE_SIZE_BASE = 0.18
-SPARKLE_SIZE_PEAK = 0.36
+SPARKLE_SIZE_BASE = 0.09
+SPARKLE_SIZE_PEAK = 0.18
 SPARKLE_LIFT = 0.60
 
 
@@ -252,18 +252,22 @@ def orbit_point(cx: float, cy: float, rx: float, ry: float,
 
 
 def heartbeat(t: Any) -> float:
-    """Lub-dub envelope in 0..1 (1 at the primary thump, flat between beats)."""
+    """Lub-dub envelope in 0..1, zero between beats.
+
+    Each thump is a raised-cosine pulse CENTRED on its time, so the envelope
+    rises smoothly from zero and returns to zero: it no longer starts at full
+    amplitude and jumps at the phase wrap (the old source of the beat jerk).
+    """
     tt = _finite(t)
     if HEART_PERIOD_S <= 0:
         return 0.0
     phase = (tt % HEART_PERIOD_S) / HEART_PERIOD_S
+    width = HEART_THUMP_S / HEART_PERIOD_S
     out = 0.0
     for at, amp in ((0.0, 1.0), (HEART_SECOND_PHASE, HEART_SECOND_AMP)):
         d = phase - at
-        if d < 0:
-            d += 1.0
-        width = HEART_THUMP_S / HEART_PERIOD_S
-        if d < width:
+        d -= round(d)
+        if abs(d) < width:
             out = max(out, amp * 0.5 * (1.0 + math.cos(math.pi * d / width)))
     return out
 
