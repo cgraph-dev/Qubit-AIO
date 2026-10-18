@@ -488,7 +488,7 @@ def test_dust_and_comet_paint_and_vanish_under_reduced_motion():
     from voicebridge.orb import mark_field as F
 
     size, R, c = 192, 90.0, 96.0
-    t = 4.2  # inside the comet's sweep window (0.45..1.0 of a 7s period)
+    t = 5.0  # mid comet sweep (0.45..1.0 of a 7s period), at full brightness
     traveller = F.comet(t, R)
     assert traveller["alpha"] > 0.2 and traveller["trail"]
 

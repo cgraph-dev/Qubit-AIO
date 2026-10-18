@@ -169,6 +169,15 @@ NUCLEUS_SPARK_REACH = 1.28
 NUCLEUS_SPARK_SIZE = 0.34
 NUCLEUS_SPARK_ALPHA = 0.70
 NUCLEUS_SPARK_LIFT = 0.70
+#: Fraction of a spark's life it is actually drawn for. The remaining tail is
+#: dead time, so the fade is normalised over THIS window and reaches exactly
+#: zero here: with the raw phase the spark vanished at a finite alpha and the
+#: skip below read as a pop at the edge of the shower.
+NUCLEUS_SPARK_VISIBLE = 0.92
+#: Absolute alpha below which a spark is not emitted at all. The fade reaches
+#: zero smoothly, but emitting sparks the renderer then drops on its own alpha
+#: floor only widens the lifecycle gap the renderers have to tolerate.
+NUCLEUS_SPARK_MIN_ALPHA = 0.010
 
 # ------------------------------------------------------ satellite shells
 #: Two extra CIRCULAR paths in the mark's plane, each carrying one small body
@@ -212,6 +221,29 @@ def hash01(i: int, salt: float = 0.0) -> float:
     """Deterministic 0..1 hash of an index — the field's only 'randomness'."""
     x = math.sin((i + 1) * 12.9898 + salt * 78.233) * 43758.5453
     return x - math.floor(x)
+
+
+def smoothstep(x: Any) -> float:
+    """Clamped 0..1 ramp whose slope is ZERO at both ends.
+
+    Every envelope in the field fades through this (or :func:`ease`), so a
+    birth or a death has no velocity step: that is what keeps the motion
+    continuous rather than merely bounded.
+    """
+    u = _finite(x)
+    u = 0.0 if u < 0.0 else (1.0 if u > 1.0 else u)
+    return u * u * (3.0 - 2.0 * u)
+
+
+def ease(x: Any) -> float:
+    """Raised-cosine 0..1 ease, clamped, C1 at both ends.
+
+    Preferable to a fractional power fade (``x ** 0.6``), whose derivative is
+    unbounded at 0: the element fades in, but it also ARRIVES at full speed.
+    """
+    u = _finite(x)
+    u = 0.0 if u < 0.0 else (1.0 if u > 1.0 else u)
+    return 0.5 * (1.0 - math.cos(math.pi * u))
 
 
 def camera_offset(t: Any, R: float) -> Tuple[float, float]:
@@ -407,15 +439,20 @@ def nucleus_sparks(t: Any, R: float) -> List[Dict[str, float]]:
             NUCLEUS_SPARK_LIFE_SPAN / 4.0)
         # Births are tied to the heartbeat: a spark leaves on the thump.
         phase = ((tt - HEART_PERIOD_S * hash01(i, 23.7)) / max(0.1, life)) % 1.0
-        if phase >= 0.92:
+        if phase >= NUCLEUS_SPARK_VISIBLE:
             continue
-        grow = phase ** 0.65
+        f = phase / NUCLEUS_SPARK_VISIBLE
+        grow = f ** 0.65
         dist = r * NUCLEUS_SPARK_REACH * grow
         ang = math.radians(seed + 40.0 * phase)
         x = math.cos(ang) * dist
         y = math.sin(ang) * dist * 0.72  # squash: the plane is tilted
-        fade = (1.0 - phase) ** 1.5
+        # Reaches exactly zero, with zero slope, at the skip boundary above.
+        fade = (1.0 - f) ** 1.5
+        if NUCLEUS_SPARK_ALPHA * fade < NUCLEUS_SPARK_MIN_ALPHA:
+            continue
         out.append({
+            "index": float(i),
             "x": x + dx, "y": y + dy, "depth": 0.5 + 0.5 * math.cos(ang),
             "size": max(0.30, NUCLEUS_SPARK_SIZE * (r / 32.0)
                         * (1.0 - 0.72 * grow)),
@@ -552,9 +589,10 @@ def comet(t: Any, R: float) -> Dict[str, Any]:
         return {"alpha": 0.0, "trail": []}
     f = (phase - 0.45) / 0.55
     ang = 360.0 * f * COMET_SPEED_MULT
-    # Eased in and out (smoothstep-ish) so the traveller never pops
-    # into or out of existence at its sweep boundary.
-    fade = math.sin(math.pi * f) ** 1.1
+    # Raised-cosine ease in and out (zero slope at both sweep boundaries) so
+    # the traveller never pops into or out of existence; a fractional power
+    # fade arrives at full speed.
+    fade = ease(f)
     depth = _depth(ang)
     pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
     x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, near_tilt, ang)
@@ -705,6 +743,7 @@ __all__ = [
     "satellites", "SATELLITE_SHELLS", "SATELLITE_RING_ALPHA",
     "DEPTH_POPOUT",
     "nucleus_sparks", "NUCLEUS_SPARK_COUNT", "NUCLEUS_SPARK_REACH",
+    "NUCLEUS_SPARK_VISIBLE", "smoothstep", "ease",
     "trails", "dust_state", "comet", "sparkles",
     "INNER_RING_RX_FRAC", "INNER_RING_PERIOD_S", "INNER_RING_DIRECTION",
     "INNER_RING_TILT_BASE", "inner_ring_tilt",

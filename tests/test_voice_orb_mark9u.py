@@ -408,11 +408,13 @@ def _continuity_snapshot(t, R):
         "glints": {},
     }
     # Sparks and glints are drawn in generation order but skip indices as their
-    # phases advance; key them by their stable index so a birth/death is not
-    # mistaken for a jump (the skip mask mirrors mark_field.nucleus_sparks /
-    # mark_field.sparkles — the field is the fixed contract).
-    for (i, phase), s in zip(_spark_index_phase(t), F.nucleus_sparks(t, R)):
-        snap["sparks"][i] = (s["x"], s["y"], phase)
+    # phases advance; key them by the field's own stable index so a birth/death
+    # is not mistaken for a jump. The phase is recovered from alpha (the field
+    # documents alpha = SPARK_ALPHA * (1 - phase/VISIBLE) ** 1.5), so no test
+    # has to mirror the field's lifecycle mask.
+    for s in F.nucleus_sparks(t, R):
+        f = 1.0 - (s["alpha"] / F.NUCLEUS_SPARK_ALPHA) ** (2.0 / 3.0)
+        snap["sparks"][int(s["index"])] = (s["x"], s["y"], f)
     for (i, phase), g in zip(_glint_index_phase(t), F.sparkles(t, R)):
         snap["glints"][i] = (g["x"], g["y"], phase)
     trails = {}
@@ -424,17 +426,6 @@ def _continuity_snapshot(t, R):
     if c.get("alpha", 0.0) > 0.0:
         snap["comet"] = {0: (c["x"], c["y"])}
     return snap
-
-
-def _spark_index_phase(t):
-    """(index, phase) for every spark the field will return at ``t``."""
-    for i in range(F.NUCLEUS_SPARK_COUNT):
-        life = F.NUCLEUS_SPARK_LIFE_BASE + (i % 5) * (
-            F.NUCLEUS_SPARK_LIFE_SPAN / 4.0)
-        phase = ((t - F.HEART_PERIOD_S * F.hash01(i, 23.7))
-                 / max(0.1, life)) % 1.0
-        if phase < 0.92:  # mirrors nucleus_sparks' skip
-            yield i, phase
 
 
 def _glint_index_phase(t):
