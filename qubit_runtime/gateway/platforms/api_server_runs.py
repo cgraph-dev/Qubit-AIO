@@ -660,8 +660,8 @@ async def _handle_runs(self, request: "web.Request", *, _api_server) -> "web.Res
         turn_author = _api_server._request_turn_author(body)
     except ValueError as exc:
         return _json_error(_openai_error, str(exc), code="invalid_author", status=400)
-    conversation_history, instructions, stored_session_id, history_err = await _resolve_chained_history(
-        self, body, raw_input, _openai_error=_openai_error)
+    conversation_history, instructions, stored_session_id, history_err = (
+        _resolve_conversation_history(self, body, raw_input, _openai_error=_openai_error))
     if history_err is not None:
         return history_err
     previous_response_id = body.get("previous_response_id")
