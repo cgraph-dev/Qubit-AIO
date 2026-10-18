@@ -289,6 +289,27 @@ def _broadcast(record: SetupRecord) -> None:
         logger.debug("setup.ready not broadcast: %s", exc)
 
 
+def _due_changed() -> None:
+    from qubit_cli import onboarding_due
+
+    onboarding_due.invalidate()
+
+
+def refresh_record(*, announce: bool = True) -> Optional[SetupRecord]:
+    """Rebuild the launch profile's record after the identity changed (a trial claim), so
+    ``setup.status`` and the ``setup.ready`` listeners move with it. None before the first bootstrap."""
+    global _record
+    if _record is None:
+        return None
+    record = _build_record(other=_inventory_other_providers(), force=False)
+    with _lock:
+        _record = record
+    _due_changed()
+    if announce:
+        _broadcast(record)
+    return record
+
+
 def start_background_bootstrap() -> threading.Thread:
     """``qubit serve`` entry: run on a daemon thread so a slow portal never delays the socket."""
     thread = threading.Thread(target=_bootstrap_then_retry, daemon=True, name="free-tier-bootstrap")

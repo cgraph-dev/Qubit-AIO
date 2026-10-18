@@ -118,11 +118,21 @@ _NOT_DELEGATE = (
     r'(?!(?:(?:the|your|each|every|all|to|a)\s+)?(?:sub-?agents?|sub-?tasks?)\b'
     r'|(?:(?:the|your|each|every|all|to|a)\s+)(?:workers?|delegates?|children|child)\b)'
 )
+# DATIVE (``send delegates the context``: ``<recipient>s the/a context``). Disclosure/feature prose
+# describing a NARROWER, plugin-scoped context (``send additional context``, ``send only the narrow
+# context``, ``plugin-send context``) names no conversation scope, destination or recipient-dative, so it
+# does not match. ``_NOT_DELEGATE`` still excludes the agent's OWN subagents/workers/delegates.
+_CTX_SCOPE = (
+    r'(?:your|their|our|its|the\s+(?:full|entire|whole|complete|current)'
+    r'|full|entire|whole|complete|current|conversation|session|chat)\s+')
+_CTX_DEST = r'(?:\s+(?:to|at|with)\b)'
+_CTX_DATIVE = r'(?:[a-z]+s\s+)(?:the|a|an)\s+context\b'
 
 # POSIX shell names as one shared alternation, so every pipe-to-shell pattern below flags the
 # same set (the narrower `(ba)?sh` let `curl url | zsh` through while bash/sh were caught).
 # Word-bounded: `| sha256sum -c` / `| shasum` / `| dashboard` are not `| sh` / `| dash`.
 _SHELL_NAMES_RE = r'(?:bash|sh|zsh|ksh|dash)\b'
+_SUDO_PREFIX = r'(?:sudo\s+(?:-\S+\s+)*)?'
 
 # Known credential-file paths as one shared alternation for the JavaScript and Python
 # read-secrets patterns (a private key, .env, credentials, .netrc, .pgpass, .npmrc, .pypirc;
@@ -647,6 +657,22 @@ def scan_file(file_path: Path, rel_path: str = "") -> List[Finding]:
     return findings
 
 
+# Findings that only inform on a COMMUNITY skill install, where the matched text cannot act:
+# ``sudo_usage`` / ``bind_all_interfaces`` in Markdown — setup docs (`sudo apt install`,
+# `runserver 0.0.0.0:8000` in a Dockerfile CMD) are not executed by installing; running them goes
+# through the terminal tool and its approval gate. Scripts keep the full severity.
+# ``inline_shell_exec`` stays high: the runtime's community gate keys on the hub lock entry's own
+# directory, so a nested SKILL.md, an external_dirs view or an unreadable lock still expands it.
+_DOC_NOTE_IDS = frozenset({"sudo_usage", "bind_all_interfaces"})
+
+
+def _community_note(f: Finding) -> Finding:
+    if f.severity in ("critical", "high") and (
+            f.pattern_id in _DOC_NOTE_IDS and f.file.lower().endswith(".md")):
+        f.severity, f.description = "medium", f"{f.description} (not executed on install; informational)"
+    return f
+
+
 def scan_skill(skill_path: Path, source: str = "community") -> ScanResult:
     """Structural checks + pattern scan of every text file in a skill dir (or a single file). A gitignore-style
     `.skillignore` / `.clawhubignore` excludes dev/docs artifacts from BOTH passes; the ignore file itself is
@@ -661,6 +687,8 @@ def scan_skill(skill_path: Path, source: str = "community") -> ScanResult:
                 findings.extend(scan_file(f, rel))
     elif skill_path.is_file():
         findings.extend(scan_file(skill_path, skill_path.name))
+    if trust == "community":
+        findings = [_community_note(f) for f in findings]
     verdict = _determine_verdict(findings)
     return ScanResult(name, source, trust, verdict, findings, datetime.now(UTC).isoformat(),
                       _build_summary(name, source, trust, verdict, findings))

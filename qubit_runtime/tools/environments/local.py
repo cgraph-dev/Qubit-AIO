@@ -327,6 +327,14 @@ def _scrubbed_env(parts, plugin_strip: frozenset, fix_path) -> dict:
     return _finalize_child_env(out)
 
 
+def _terminal_env(env: dict) -> dict:
+    """*env* with the user's tools first on PATH (``_user_tools_first``), for background commands."""
+    path_key = _path_env_key(env)
+    if path_key is not None:
+        env[path_key] = _user_tools_first(env[path_key])
+    return env
+
+
 def _sanitize_subprocess_env(base_env: dict | None, extra_env: dict | None = None) -> dict:
     """Filter Qubit-managed secrets from a subprocess environment (background/PTY
     spawn path, search workers, computer-use driver, user-script runners)."""
@@ -585,6 +593,20 @@ def _prepend_git_bash_dirs(existing_path: str) -> str:
     """Prepend Git Bash's binary dirs if missing (no-op off Windows), so the
     non-login ``bash -c`` fallback can find coreutils."""
     return _prepend_missing_path_entries(existing_path, _git_bash_bin_dirs())
+
+
+def _user_tools_first(existing_path: str) -> str:
+    """*existing_path* with the user's tools before Hermes's (``pm.user_facing``) and, on
+    Windows, Git Bash's dirs first. They go first even when already listed: they are store
+    dirs that now sit behind the user's entries, and a non-login ``bash -c`` needs its
+    coreutils ahead of System32's lookalikes."""
+    from pm.user_facing import user_facing_path
+
+    path = user_facing_path(existing_path)
+    bash_dirs = _git_bash_bin_dirs()
+    keys = {os.path.normcase(d) for d in bash_dirs}
+    rest = [p for p in path.split(os.pathsep) if p and os.path.normcase(p) not in keys]
+    return os.pathsep.join([*bash_dirs, *rest]) if bash_dirs else path
 
 
 # POSIX-sh-family shells that understand spawn_local's ``[shell, "-lic", "set +m; …"]``

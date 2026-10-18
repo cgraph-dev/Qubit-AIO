@@ -155,6 +155,11 @@ def _validate_single_op(store, action, target, content, old_text) -> Optional[st
 
 
 _BG_DELETE_ACTIONS = ("replace", "remove")
+# 'replace' is no longer offered to the model; it stays here so writes staged before its
+# removal still pin, display and replay.
+_REPLACE_REMOVED = ("'replace' is not available; use 'patch'. old_text is the exact span to change and "
+                    "content is its new text; the rest of the entry is kept. To rewrite a whole entry, "
+                    "set old_text to the whole entry. Nothing was written.")
 
 
 def destructive_ops(payload: Dict[str, Any]) -> List[Dict[str, Any]]:

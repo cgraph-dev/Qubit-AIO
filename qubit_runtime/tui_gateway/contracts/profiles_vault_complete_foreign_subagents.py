@@ -353,6 +353,94 @@ method("profiles.get_asset", params=ProfilesGetAssetParams, result=ProfilesGetAs
        doc="A profile asset as a data URL.")
 
 
+# ── onboarding (methods_onboarding) ───────────────────────────────────────────────────────────
+
+
+class OnboardingStateParams(Params):
+    """``assume_fresh``: the unpackaged desktop's ``--fresh-install`` launch; the backend treats this
+    machine as one that never used Hermes. Packaged builds never send it."""
+
+    assume_fresh: bool = False
+
+
+class OnboardingRunStateResult(Result):
+    """``run``: onboarding opens on this launch (root config ``onboarding.run``, else a machine that
+    never used Hermes). ``eligible``: this is the desktop's local backend and the welcome trial or a
+    configured provider can carry the first chat.
+    ``session_id``: the stored id of the onboarding chat still in progress, so a relaunch reopens it;
+    ``run_id``: that run's id, which ``onboarding.ended`` names."""
+
+    run: bool
+    eligible: bool
+    session_id: str | None = None
+    run_id: str | None = None
+
+
+# Moved to the fork's own state enum (below): upstream's OnboardingStateParams/OnboardingRunStateResult
+# shape was replaced by Qubit's setup-profile state, which already carries onboarding.state here.
+# The upstream classes stay declared above for the frozen contract surface; only the registry entry
+# moves, so this file keeps exactly one onboarding.state contract.
+class OnboardingSetRunParams(Params):
+    """``mark_profile_offered`` also latches ``onboarding.seen.profile_build_offered`` in the root config,
+    so the first chat after onboarding gets the plain intro instead of the profile offer."""
+
+    run: bool
+    mark_profile_offered: bool = False
+
+
+method("onboarding.set_run", params=OnboardingSetRunParams, result=OnboardingRunStateResult,
+       doc="Write onboarding.run in the root profile's config.yaml; answers the new state.")
+
+
+class OnboardingFactsSource(WireEnum):
+    local = "local"
+    remote = "remote"
+
+
+class OnboardingStartParams(Params):
+    """``rerun``: start a new onboarding chat even when one is in progress (Settings, Run onboarding
+    again; it never claims the welcome trial). ``fresh_launch``: the app's once-per-launch start; a run
+    the app was closed on does not count, so its chat is deleted and the run starts over.
+    ``facts_source``: whether the backend runs on the user's own computer. ``locale``: the desktop's UI
+    language, preferred over the backend OS locale. ``assume_fresh``: as on ``onboarding.state``. A new
+    run on a first install claims the welcome trial before its chat exists; a failed claim is error
+    5079 and leaves no guest and no chat. A claim that is blocked (another install took the trial) with
+    no trial or provider to run on is error 5080 and opens no chat."""
+
+    rerun: bool = False
+    fresh_launch: bool = False
+    assume_fresh: bool = False
+    facts_source: OnboardingFactsSource = OnboardingFactsSource.local
+    locale: str | None = None
+
+
+class OnboardingStartResult(Result):
+    """``session_id`` is the runtime id the client attaches to; ``resumed`` is true when an onboarding
+    chat already in progress was reopened instead of a new one started. ``run_id`` names the run in
+    ``onboarding.ended``."""
+
+    session_id: str
+    stored_session_id: str
+    resumed: bool
+    run_id: str
+
+
+method("onboarding.start", params=OnboardingStartParams, result=OnboardingStartResult,
+       doc="Open the onboarding chat in the default profile: create it, write its run record and play the opening.")
+
+
+class OnboardingSkipParams(SessionParams):
+    pass
+
+
+class OnboardingSkipResult(Result):
+    skipped: bool
+
+
+method("onboarding.skip", params=OnboardingSkipParams, result=OnboardingSkipResult,
+       doc="Skip setup: end the session's onboarding run and close the card that waits.")
+
+
 class OnboardingAnswers(Params):
     """``tui_gateway/onboarding_personalization.py`` — the facts agreed during onboarding."""
 
@@ -419,6 +507,10 @@ class OnboardingIntro(WireEnum):
 
 
 class OnboardingStateResult(Result):
+    """Qubit's onboarding state: ``qubit_cli.setup_profile`` is the authority (the setup profile's
+    marker), not upstream's saved-run model. ``eligible`` is answered liveness-aware;
+    ``profile`` names the resumable setup profile when there is one."""
+
     eligible: bool
     intro: OnboardingIntro
     failed_starts: int

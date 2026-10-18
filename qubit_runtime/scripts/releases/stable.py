@@ -13,20 +13,65 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Iterable
 from urllib.parse import unquote, urlsplit
 
 from qubit_cli.update_channel import STABLE_TAG_RE
+from scripts.releases import lanes as lane_set
 from scripts.releases.draft_warning import strip_draft_warning
 from scripts.releases.versioning import tag_record
 SHA = re.compile(r"[a-f0-9]{40}")
 DIGEST = re.compile(r"[a-f0-9]{64}")
 DESKTOP_TARGETS = ("windows/x64", "windows/arm64", "macos/x64", "macos/arm64")
+ALL_TARGETS = tuple(lane_set.TARGET_LANE)
 SMOKE_JOBS = {
     "smoke-darwin-arm64": "macOS DMG + ZIP (arm64)",
     "smoke-darwin-x64": "macOS DMG + ZIP (x64)",
     "smoke-win32-arm64": "Windows MSIX (arm64)",
     "smoke-win32-x64": "Windows MSIX (x64)",
 }
+SMOKE_TARGETS = {"smoke-darwin-arm64": "macos/arm64", "smoke-darwin-x64": "macos/x64",
+                 "smoke-win32-arm64": "windows/arm64", "smoke-win32-x64": "windows/x64"}
+
+
+# Stable releases are cut from ``main`` or from a ``release/*`` maintenance branch.
+RELEASE_LINE_BRANCHES = ("main", "release/*")
+
+
+def release_line_refspecs(remote_prefix: str) -> list[str]:
+    """Fetch refspecs that mirror every release-line branch under ``refs/remotes/<remote_prefix>/``."""
+    return [f"+refs/heads/{branch}:refs/remotes/{remote_prefix}/{branch}"
+            for branch in RELEASE_LINE_BRANCHES]
+
+
+def release_line_contains(commit: str, remote_prefix: str) -> list[str]:
+    """The git command that lists the fetched release-line branches holding ``commit``.
+
+    Empty output means the commit is on no release line. Git matches the
+    ``release/*`` pattern across the slash, so ``release/0.22.1`` qualifies.
+    """
+    return ["git", "for-each-ref", "--contains", commit, "--format=%(refname)",
+            *(f"refs/remotes/{remote_prefix}/{branch}" for branch in RELEASE_LINE_BRANCHES)]
+
+
+# Stable releases are cut from ``main`` or from a ``release/*`` maintenance branch.
+RELEASE_LINE_BRANCHES = ("main", "release/*")
+
+
+def release_line_refspecs(remote_prefix: str) -> list[str]:
+    """Fetch refspecs that mirror every release-line branch under ``refs/remotes/<remote_prefix>/``."""
+    return [f"+refs/heads/{branch}:refs/remotes/{remote_prefix}/{branch}"
+            for branch in RELEASE_LINE_BRANCHES]
+
+
+def release_line_contains(commit: str, remote_prefix: str) -> list[str]:
+    """The git command that lists the fetched release-line branches holding ``commit``.
+
+    Empty output means the commit is on no release line. Git matches the
+    ``release/*`` pattern across the slash, so ``release/0.22.1`` qualifies.
+    """
+    return ["git", "for-each-ref", "--contains", commit, "--format=%(refname)",
+            *(f"refs/remotes/{remote_prefix}/{branch}" for branch in RELEASE_LINE_BRANCHES)]
 
 
 def admit_claim(tag: str, commit: str, *, on_main) -> dict:
@@ -83,6 +128,12 @@ SKIPPED_BY = {
 }
 
 
+# Each signed-package upgrade arm and the transitions job that plans it.
+PACKAGED_BY = {"macos-packaged-arm64": "transitions-darwin-arm64",
+               "macos-packaged-x64": "transitions-darwin-x64",
+               "windows-packaged": "transitions-win32"}
+
+
 def gate_expectations(required: list[str], *, skip_bundles: bool, skip_tests: bool) -> dict:
     """Each gated job's required result under the claim's flags."""
     active = {flag for flag, on in (("skipBundles", skip_bundles), ("skipTests", skip_tests)) if on}
@@ -127,6 +178,14 @@ def smokes_skipped(manifest: dict) -> bool:
 def require_smokes_match_claim(manifest: dict, *, skip_tests: bool) -> None:
     if smokes_skipped(manifest) != skip_tests:
         raise ValueError("Candidate smoke results differ from the claim's test policy")
+
+
+def require_targets_match_claim(manifest: dict, lanes: Iterable[str]) -> None:
+    """The manifest carries exactly the targets the claim's build lanes produce."""
+    present = {f"{row.get('platform')}/{row.get('arch')}" for row in manifest.get("packages", [])}
+    wanted = lane_set.targets(lanes)
+    if present != wanted:
+        raise ValueError(f"Candidate manifest targets {sorted(present)} differ from the claim's {sorted(wanted)}")
 
 
 def stable_windows_version(epoch: object) -> str:
@@ -266,6 +325,17 @@ def plan_transitions(previous: dict, candidate: dict, public_base: str) -> list[
     new = validate_candidates(candidate, candidate.get("tag"), candidate.get("commit"), public_base,
                               archive=candidate.get("archive"))
     return [_transition_row(target, old[target], new[target]) for target in DESKTOP_TARGETS]
+
+
+def baseline_covers(previous: dict, receipt: str, public_base: str) -> bool:
+    """Whether the published baseline built every target of this receipt.
+
+    A release that left a target out has no OLD package for it, so the next
+    release that builds it has nothing to upgrade from on that arch.
+    """
+    old = validate_candidates(previous, previous.get("tag"), previous.get("commit"), public_base,
+                              archive=previous.get("archive"))
+    return all(target in old for target in RECEIPT_TARGETS[receipt])
 
 
 def plan_receipt_transitions(previous: dict, receipt_manifest: dict, receipt: str,
@@ -448,6 +518,36 @@ def tagger_epoch(tag_object: str, run=output) -> int:
     if epoch <= 0:
         raise ValueError("Stable claim tagger timestamp is invalid")
     return epoch
+
+
+CONTROLLER_BRANCH = "main"
+CONTROLLER_REF = f"refs/heads/{CONTROLLER_BRANCH}"
+CONTROLLER_WORKFLOW = "stable-release.yml"
+
+
+def claim_run_title(claim_tag: str) -> str:
+    """The run-name stable-release.yml sets. Every run is on the default branch, so this names the claim."""
+    return f"Stable release {claim_tag}"
+
+
+def is_claim_run(*, title: str | None, head_branch: str | None, head_sha: str | None,
+                 claim_tag: str, commit: str) -> bool:
+    """A Stable Release run for this claim. Runs started before the controller moved sat on the tag."""
+    return title == claim_run_title(claim_tag) or (head_branch == claim_tag and head_sha == commit)
+
+
+def check_controller(env: dict) -> None:
+    """Require the default-branch dispatch of Stable Release.
+
+    Reusable workflows keep the top-level caller's identity, so the same check holds
+    inside every called workflow. The commit under test comes from the claim tag, not
+    from GITHUB_SHA, which is the default branch tip here.
+    """
+    repository = env.get("GITHUB_REPOSITORY", "")
+    expected = f"{repository}/.github/workflows/{CONTROLLER_WORKFLOW}@{CONTROLLER_REF}"
+    if (not repository or env.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
+            or env.get("GITHUB_REF") != CONTROLLER_REF or env.get("GITHUB_WORKFLOW_REF") != expected):
+        raise ValueError("Stable release must run from the default-branch controller workflow")
 
 
 def check_claim(env: dict, run=output) -> dict:
@@ -694,6 +794,17 @@ CALL_SMOKE_JOBS = {
     "candidates-win32-arm64": "smoke-win32-arm64",
     "candidates-win32-x64": "smoke-win32-x64",
 }
+# The candidate manifest is written after the smokes (decision 23): the smoke
+# results it records are the candidate calls' own workflow results — each
+# call's stable-phase-result only succeeds when its selected groups' smokes
+# did, so a failed smoke leaves no accepted manifest behind. The Windows MSIX
+# smokes run in the bundle call, beside assembly, not after each per-arch build.
+SMOKE_CALLS = {
+    "smoke-darwin-arm64": "candidates-darwin-arm64",
+    "smoke-darwin-x64": "candidates-darwin-x64",
+    "smoke-win32-arm64": "candidates-win32-bundle",
+    "smoke-win32-x64": "candidates-win32-bundle",
+}
 CANDIDATE_HANDOFFS = ("win32-x64", "win32-arm64", "darwin-x64", "darwin-arm64",
                       "termux", "windows-universal")
 CANDIDATE_INCLUDES = ("metadata-*.json", "*.msixbundle")
@@ -754,6 +865,19 @@ def _final_metadata(tag: str, commit: str, claim: dict, candidate_manifest_sha25
         "dockerManifestDigest": docker_manifest_digest,
         "archive": f"releases/tag/{claim['claim_tag']}/",
     }
+
+
+def authenticated_push(ref: str, env: dict | None = None) -> list[str]:
+    """``git push origin <ref>`` that authenticates with GH_TOKEN when it is set.
+
+    The publication checkout runs with persist-credentials: false, so git has
+    no token of its own; gh hands GH_TOKEN to this one push as a credential
+    helper, keeping the token out of argv and out of .git/config.
+    """
+    env = os.environ if env is None else env
+    auth = (["-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential"]
+            if env.get("GH_TOKEN") else [])
+    return ["git", *auth, "push", "origin", ref]
 
 
 def ensure_final_tag(tag: str, commit: str, claim: dict, *, candidate_manifest_sha256: str | None,

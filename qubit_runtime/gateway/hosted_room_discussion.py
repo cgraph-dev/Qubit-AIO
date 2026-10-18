@@ -203,6 +203,15 @@ def validate_user_payload(value: Any) -> dict[str, Any]:
         "thread_id": _identifier(payload["thread_id"], label="thread_id")}
 
 
+def _message_manifest(value: Any) -> list[dict[str, Any]]:
+    from gateway.hosted_room_attachments import validate_manifest
+
+    try:
+        return validate_manifest(value)
+    except ValueError as exc:
+        raise DiscussionValidationError(str(exc)) from exc
+
+
 def _validate_member_target(value: Any, *, profile: str, known_profiles: set[str], index: int) -> dict[str, Any]:
     if value is None:
         if profile not in known_profiles:
@@ -614,6 +623,36 @@ def _effective_watermarks(
     for key, value in _derive_member_watermarks(validated).items():
         watermarks[key] = max(watermarks.get(key, 0), value)
     return watermarks
+
+
+def _event_attachments(event: _ValidatedEvent, member: DiscussionMember) -> list[dict[str, Any]]:
+    if event.kind == "message.member":
+        if event.payload["member_id"] == member.member_id:
+            return []
+        recipients = event.payload.get("recipient_member_ids")
+        if recipients is not None and member.member_id not in recipients:
+            return []
+    return [{**attachment, "event_id": event.event_id} for attachment in event.payload.get("attachments", [])]
+
+
+def _bounded_task_delta(messages: Sequence[_ValidatedEvent], *, watermark: int,
+                        member: DiscussionMember) -> tuple[list[_ValidatedEvent], list[dict[str, Any]]]:
+    from gateway.hosted_room_attachments import MAX_TASK_ATTACHMENTS, MAX_TASK_ATTACHMENT_BYTES
+
+    selected: list[_ValidatedEvent] = []
+    attachments: list[dict[str, Any]] = []
+    size = 0
+    for event in messages:
+        if event.seq <= watermark:
+            continue
+        entries = _event_attachments(event, member)
+        next_size = size + sum(item["size"] for item in entries)
+        if len(attachments) + len(entries) > MAX_TASK_ATTACHMENTS or next_size > MAX_TASK_ATTACHMENT_BYTES:
+            break  # Each validated message fits; consume only whole event prefixes.
+        selected.append(event)
+        attachments.extend(entries)
+        size = next_size
+    return selected, attachments
 
 
 def plan_next_task(

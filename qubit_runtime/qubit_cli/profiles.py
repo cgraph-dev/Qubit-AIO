@@ -329,6 +329,12 @@ def _is_our_wrapper(path: Path) -> bool:
         return False
 
 
+def _find_our_wrapper(alias: str) -> Optional[Path]:
+    """The Qubit wrapper for *alias*: :func:`_wrapper_path`, else a pre-``.bat`` bare Windows one."""
+    candidates = [_wrapper_path(alias), _get_wrapper_dir() / alias] if sys.platform == "win32" else [_wrapper_path(alias)]
+    return next((p for p in candidates if _is_our_wrapper(p)), None)
+
+
 def _missing_profile_error(canon: str) -> FileNotFoundError:
     return FileNotFoundError(f"Profile '{canon}' does not exist. Create it with: qubit profile create {canon}")
 

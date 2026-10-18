@@ -489,3 +489,27 @@ def default_snapshot(store: Store) -> Optional[str]:
     except Exception as exc:
         logger.warning("repair-profiles: snapshot of %s failed: %s", store.home, exc)
         return None
+
+
+def _ledgered_lineages(foreign: list[dict[str, Any]]) -> dict[str, str]:
+    """Stray rows that must stay put, each with the reason. A row the gateway ledger references
+    (admissions/workers, ``ON DELETE RESTRICT``) cannot be deleted from its store, so copying it
+    would leave the session in both; the stray rows linked to it by ``parent_session_id`` stay
+    with it, since moving a parent detaches the child left behind and a moved child loses its
+    parent. Whether a move should carry the ledger is a separate policy decision."""
+    by_id = {row["id"]: row for row in foreign}
+    groups: dict[str, set[str]] = {sid: {sid} for sid in by_id}
+    for row in foreign:
+        parent = row.get("parent_session_id")
+        if parent in by_id and groups[parent] is not groups[row["id"]]:
+            merged = groups[parent] | groups[row["id"]]
+            for sid in merged:
+                groups[sid] = merged
+    held: dict[str, str] = {}
+    for sid, row in by_id.items():
+        anchors = sorted(m for m in groups[sid] if by_id[m].get("ledgered"))
+        if row.get("ledgered"):
+            held[sid] = "has gateway admission/worker history, which a move cannot carry"
+        elif anchors:
+            held[sid] = f"its lineage holds {anchors[0]}, which has gateway admission/worker history"
+    return held

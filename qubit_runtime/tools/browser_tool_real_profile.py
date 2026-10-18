@@ -150,6 +150,14 @@ _REAL_PROFILE_CHROME_FLAGS = (
 )
 
 
+def real_profile_fallback_note(err: str) -> str:
+    """Tool-result note when the real profile can't load and a fresh browser serves instead: the
+    browser keeps working (a consented user is never left with no browser), and the model is told
+    it is signed out so it can say so rather than act as if the user's accounts were there."""
+    return (f"{err} Using a fresh browser without the user's logins for this session instead; "
+            "tell the user if the task needs their accounts.")
+
+
 def _real_profile_unsupported_reason(browser) -> Optional[str]:
     """Fail-closed message when the default browser can't be used, else None.
 

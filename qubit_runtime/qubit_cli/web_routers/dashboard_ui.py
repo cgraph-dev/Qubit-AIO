@@ -143,6 +143,28 @@ async def get_plugins_hub(request: Request, profile: Optional[str] = None):
         raise HTTPException(status_code=500, detail="Failed to build plugins hub.") from exc
 
 
+def _plugin_enable_sets() -> tuple[set, set]:
+    """(enabled, disabled) plugin name sets; empty on any failure."""
+    try:
+        from qubit_cli.plugins_cmd import _get_enabled_set, _get_disabled_set
+        return _get_enabled_set(), _get_disabled_set()
+    except Exception:
+        return set(), set()
+
+
+def _plugin_activated(plugin: dict, enabled_set: set, disabled_set: set) -> bool:
+    """Gate: user plugins must be in plugins.enabled and not in plugins.disabled; bundled
+    plugins must not be explicitly disabled — the frontend must never load JS/CSS from
+    plugins the user never activated."""
+    name = plugin.get("name", "")
+    source = plugin.get("source")
+    if source == "user":
+        return name not in disabled_set and name in enabled_set
+    if source == "bundled":
+        return name not in disabled_set
+    return True
+
+
 def _plugin_action(result: dict, fallback_error: str, *, rescan: bool) -> dict:
     """Common tail of agent-plugin mutations: 400 on ``ok=False``, then invalidate caches
     (rescanning discovery when files changed on disk). A ``consent_required`` answer is not a failure:

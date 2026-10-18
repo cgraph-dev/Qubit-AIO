@@ -13,8 +13,10 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
 
+from scripts.releases import lanes as lane_set, stable
 from scripts.releases.draft_warning import draft_body
 from scripts.releases.versioning import (
     SEED, attempt_ref, derive_next_version, marker_ref, next_attempt,
@@ -24,6 +26,8 @@ from scripts.releases.versioning import (
 WORKFLOW = "stable-release.yml"
 # A fetch refspec may hold one ``*``; the parsers filter what the globs over-match.
 _ATTEMPT_GLOBS = ("rc.*", "abandoned-rc.*")
+# Local namespace for the remote's release-line branches, kept apart from the user's own remotes.
+_RELEASE_LINE_PREFIX = "hermes-release"
 
 
 class ReleaseRefused(RuntimeError):
@@ -74,6 +78,12 @@ def _require_remote_main(repo: Path, commit: str) -> None:
         raise ReleaseRefused(f"{commit} is not on origin/main")
 
 
+def _require_release_line(repo: Path, commit: str) -> None:
+    """The commit must be on the remote's ``main`` or a ``release/*`` branch."""
+    if not _git(repo, *stable.release_line_contains(commit, _RELEASE_LINE_PREFIX)[1:]):
+        raise ReleaseRefused(f"{commit} is not on the remote's main or a release/* branch")
+
+
 def _claim_collision(repo: Path, remote: str, tag: str, error: Exception) -> ReleaseRefused:
     subprocess.run(["git", "tag", "--delete", tag], cwd=repo, capture_output=True)
     try:
@@ -112,6 +122,15 @@ def _outstanding_attempt(repo: Path, remote: str) -> tuple[str, int, str] | None
         raise ReleaseRefused(
             f"more than one outstanding attempt ({refs}) — abandon all but one before releasing")
     return outstanding[0] if outstanding else None
+
+
+RUN_FIELDS = "databaseId,url,headBranch,headSha,displayTitle,status"
+
+
+def _is_claim_run(row: dict, claim_tag: str, commit: str) -> bool:
+    return stable.is_claim_run(
+        title=row.get("displayTitle"), head_branch=row.get("headBranch"),
+        head_sha=row.get("headSha"), claim_tag=claim_tag, commit=commit)
 
 
 def _attempt_run(execute, repository: str, ref: str, commit: str) -> dict | None:
@@ -188,6 +207,26 @@ def _changelog(repo: Path, repository: str, *, commit: str, tag: str, version: s
         commits, tag, version, repo_url=f"https://github.com/{repository}",
         prev_tag=receipt if base else None, no_changelog=no_changelog,
     )
+
+
+def _abandon_confirmed(outstanding: tuple[str, int, str], confirm_abandon: Callable[[str], bool],
+                       refusal: ReleaseRefused, *, repo: Path, remote: str, repository: str,
+                       execute, inspect) -> None:
+    """Abandon exactly the attempt the person approved, or raise ``refusal``.
+
+    The prompt can sit open while another operator abandons it and cuts the
+    next one; ``abandon`` would then clear that new attempt too. So the remote
+    is read again after the answer and anything but the same single attempt
+    is refused.
+    """
+    version, attempt, ref = outstanding
+    if not confirm_abandon(ref):
+        raise refusal
+    if _outstanding_attempt(repo, remote) != outstanding:
+        raise ReleaseRefused(f"{ref} changed while waiting for an answer — nothing was abandoned")
+    print(abandon_steps([_abandon_attempt(version, attempt, ref, repo=repo, remote=remote,
+                                          repository=repository, execute=execute, inspect=inspect)]),
+          file=sys.stderr)
 
 
 def release(commit: str, *, bump: str, repo: Path, remote: str, repository: str,
@@ -584,6 +623,25 @@ def cmd_publish(args) -> None:
         "--json", "databaseId,url,headBranch,status", "--limit", "1",
     ])
     print(publish_steps({**result, "run_url": _latest_run(listed)}))
+
+
+def _abandon_prompt() -> Callable[[str], bool] | None:
+    """A y/N prompt, N by default, when a person can answer it; None otherwise.
+
+    ``input`` writes its prompt to stdout when either stream is redirected, so
+    both must be terminals for the question to reach a person.
+    """
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return None
+
+    def confirm(ref: str) -> bool:
+        try:
+            answer = input(f"Abandon {ref} and cut a new attempt? [y/N] ")
+        except EOFError:
+            return False
+        return answer.strip().lower() in {"y", "yes"}
+
+    return confirm
 
 
 def cmd_abandon(args) -> None:

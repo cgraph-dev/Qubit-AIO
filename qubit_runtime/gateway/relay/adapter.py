@@ -38,6 +38,9 @@ from gateway.relay.transport import RelayTransport
 from gateway.session import SessionSource
 
 logger = logging.getLogger(__name__)
+# Native admission refusals a redelivery cannot change (sender, route or payload).
+_PERMANENT_REFUSALS = frozenset({'permission_denied', 'invalid_params', 'admission_conflict',
+                                 'profile_mismatch', 'not_found'})
 
 # The drain-path going-idle ACK budget must stay strictly under the runner's
 # default adapter disconnect timeout (5s) or cancellation fires before
