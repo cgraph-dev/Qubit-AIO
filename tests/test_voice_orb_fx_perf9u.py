@@ -39,9 +39,11 @@ FRAMES = 120
 #: for a heavily loaded host while still failing on an accidental O(n^2) blowup.
 MEAN_FRAME_CAP_S = 0.025
 #: Fixed upper bound on primitives per frame. The pre-FX mark is ~16; the full
-#: FX stack (trails + sparkles) is well under 100. 300 is a hard ceiling that
-#: only an unbounded per-frame allocation can cross.
-PRIM_CAP = 300
+#: FX stack (trails + sparkles + three satellite shells + the binary field)
+#: measures 195..239 at R=70 with three shells orbiting. The RGB streak field
+#: adds at most one stroke per body (~80), so 420 still leaves headroom while
+#: remaining a ceiling only an unbounded per-frame allocation can cross.
+PRIM_CAP = 420
 #: How much the per-frame primitive count may OSCILLATE. Density is periodic —
 #: the 7 s comet sweep adds a 12-sample tail and glints pulse in and out — so a
 #: "second half must not out-allocate the first" comparison is a phase lottery,

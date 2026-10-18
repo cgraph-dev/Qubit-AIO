@@ -488,7 +488,7 @@ def test_dust_and_comet_paint_and_vanish_under_reduced_motion():
     from voicebridge.orb import mark_field as F
 
     size, R, c = 192, 90.0, 96.0
-    t = 4.2  # inside the comet's sweep window (0.45..1.0 of a 7s period)
+    t = 5.0  # mid comet sweep (0.45..1.0 of a 7s period), at full brightness
     traveller = F.comet(t, R)
     assert traveller["alpha"] > 0.2 and traveller["trail"]
 
@@ -740,7 +740,10 @@ def test_nucleus_sparks_paint_glints():
         core = [p for p in prims if p.kind == "ellipse" and p.fill is not None
                 and math.hypot(p.cx - px, p.cy - py) <= 0.6]
         assert len(arms) == 2, (s, arms)   # two crossing arms
-        assert len(core) == 1, (s, core)   # plus a small core
+        # A core lands here too, but now that the shells are denser another
+        # body can share the pixel: what the spark must guarantee is that its
+        # own core is painted, not that it is the only thing at this spot.
+        assert core, (s, core)
 
 
 # --------------------------------------------------------------------------- #

@@ -408,11 +408,13 @@ def _continuity_snapshot(t, R):
         "glints": {},
     }
     # Sparks and glints are drawn in generation order but skip indices as their
-    # phases advance; key them by their stable index so a birth/death is not
-    # mistaken for a jump (the skip mask mirrors mark_field.nucleus_sparks /
-    # mark_field.sparkles — the field is the fixed contract).
-    for (i, phase), s in zip(_spark_index_phase(t), F.nucleus_sparks(t, R)):
-        snap["sparks"][i] = (s["x"], s["y"], phase)
+    # phases advance; key them by the field's own stable index so a birth/death
+    # is not mistaken for a jump. The phase is recovered from alpha (the field
+    # documents alpha = SPARK_ALPHA * (1 - phase/VISIBLE) ** 1.5), so no test
+    # has to mirror the field's lifecycle mask.
+    for s in F.nucleus_sparks(t, R):
+        f = 1.0 - (s["alpha"] / F.NUCLEUS_SPARK_ALPHA) ** (2.0 / 3.0)
+        snap["sparks"][int(s["index"])] = (s["x"], s["y"], f)
     for (i, phase), g in zip(_glint_index_phase(t), F.sparkles(t, R)):
         snap["glints"][i] = (g["x"], g["y"], phase)
     trails = {}
@@ -424,17 +426,6 @@ def _continuity_snapshot(t, R):
     if c.get("alpha", 0.0) > 0.0:
         snap["comet"] = {0: (c["x"], c["y"])}
     return snap
-
-
-def _spark_index_phase(t):
-    """(index, phase) for every spark the field will return at ``t``."""
-    for i in range(F.NUCLEUS_SPARK_COUNT):
-        life = F.NUCLEUS_SPARK_LIFE_BASE + (i % 5) * (
-            F.NUCLEUS_SPARK_LIFE_SPAN / 4.0)
-        phase = ((t - F.HEART_PERIOD_S * F.hash01(i, 23.7))
-                 / max(0.1, life)) % 1.0
-        if phase < 0.92:  # mirrors nucleus_sparks' skip
-            yield i, phase
 
 
 def _glint_index_phase(t):
@@ -608,18 +599,20 @@ def test_unknown_style_falls_back_to_ember(monkeypatch):
     assert stats["lines"] >= 4  # ember bands still drew; a typo never blanks the orb
 
 
-def test_two_satellite_shells_travel_their_own_circles():
+def test_satellite_shells_travel_their_own_circles():
     # Owner ask: "2 more rotating orbs that follow circle line on different
-    # circles with different timing". Contract: two shells, circular paths in
-    # the mark's plane, bodies travelling in OPPOSITE directions at different
-    # periods, each body's distance matching its own circle.
+    # circles with different timing". Contract: a set of counter-rotating
+    # shells, circular paths in the mark's plane, bodies travelling in
+    # OPPOSITE directions at different periods, each body's distance matching
+    # its own circle. The set may grow; what must hold is that every shell
+    # keeps its own radius, spin sense and timing.
     from voicebridge.orb import mark_field as F
 
     sats = F.satellites(2.0, 106.0)
-    assert len(sats) == 2
-    r0 = sats[0]["ring"]["rx_frac"]
-    r1 = sats[1]["ring"]["rx_frac"]
-    assert r0 != r1, "the two shells must ride different circles"
+    assert len(sats) >= 2, "the shell set must not shrink"
+    radii = [s["ring"]["rx_frac"] for s in sats]
+    assert len(set(radii)) == len(radii), \
+        "the shells must ride different circles"
     # Circular in-plane: same squash ratio as the mark's ellipses.
     for s in sats:
         assert s["ring"]["ry_frac"] / s["ring"]["rx_frac"] == pytest.approx(
@@ -631,8 +624,11 @@ def test_two_satellite_shells_travel_their_own_circles():
     b = [((s["body"]["x"] ** 2 + s["body"]["y"] ** 2) ** 0.5) for s in
          F.satellites(3.7, 106.0)]
     assert a != b, "the bodies must move"
-    assert F.SATELLITE_SHELLS[0][3] != F.SATELLITE_SHELLS[1][3], "opposite spins"
-    assert F.SATELLITE_SHELLS[0][2] != F.SATELLITE_SHELLS[1][2], "different timing"
+    spins = [shell[3] for shell in F.SATELLITE_SHELLS]
+    periods = [shell[2] for shell in F.SATELLITE_SHELLS]
+    assert len(set(spins)) > 1, "the shells must counter-rotate"
+    assert len(set(periods)) == len(periods), "different timing"
+    assert any(a != b for a in spins for b in spins), "an opposing pair"
 
 
 def test_satellite_shells_are_drawn_and_vanish_when_frozen():
@@ -663,3 +659,321 @@ def test_inner_ring_tilt_continuity():
         cur = F.inner_ring_tilt(1.0 + k / 60.0)
         assert abs(cur - prev) < 5.0  # no step discontinuity per frame
         prev = cur
+
+
+# --------------------------------------------------------------------------- #
+# RGB TRAILS — owner 2026-10-18: "the stars still have old aura, we need them
+# to leave a RGB trail not an outer glow". The field owns the streak: a
+# computable list of samples from (t, R, body) whose hue walks the colour
+# wheel along the tail. Renderers only stroke them.
+# --------------------------------------------------------------------------- #
+def test_hue_to_rgb_is_a_deterministic_standard_wheel():
+    assert F.hue_to_rgb(0.0) == pytest.approx((1.0, 0.0, 0.0))
+    assert F.hue_to_rgb(1.0) == pytest.approx(F.hue_to_rgb(0.0))
+    assert F.hue_to_rgb(1.0 / 3.0) == pytest.approx((0.0, 1.0, 0.0))
+    assert F.hue_to_rgb(2.0 / 3.0) == pytest.approx((0.0, 0.0, 1.0))
+    assert F.hue_to_rgb(0.5) == pytest.approx((0.0, 1.0, 1.0))
+    # Wraps instead of clamping, stays in range, and never raises on junk.
+    assert F.hue_to_rgb(-0.25) == pytest.approx(F.hue_to_rgb(0.75))
+    for bad in ("x", None, float("nan"), float("inf")):
+        assert all(0.0 <= c <= 1.0 for c in F.hue_to_rgb(bad))
+    # Saturation/value scale the result monotonically.
+    full = F.hue_to_rgb(0.08)
+    assert F.hue_to_rgb(0.08, 0.0, 1.0) == pytest.approx((1.0, 1.0, 1.0))
+    assert F.hue_to_rgb(0.08, 1.0, 0.5) == pytest.approx(
+        tuple(c * 0.5 for c in full))
+
+
+def test_rgb_trail_is_pure_deterministic_and_starts_on_the_star():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    part = F.particle_state(t, R)[3]
+    a = F.rgb_trail(t, R, part)
+    assert a == F.rgb_trail(t, R, F.particle_state(t, R)[3])
+    assert len(a) == F.RGB_TRAIL_SAMPLES
+    for s in a:
+        assert set(s) >= {"x", "y", "hue", "sat", "val", "alpha", "size",
+                          "depth", "dof", "k"}
+        assert 0.0 <= s["hue"] < 1.0 and 0.0 <= s["sat"] <= 1.0
+        assert 0.0 <= s["val"] <= 1.0 and s["alpha"] >= 0.0
+    # Head sits exactly on the rendered star; the tail trails away from it.
+    assert (a[0]["x"], a[0]["y"]) == pytest.approx((part["x"], part["y"]))
+    assert math.dist((a[-1]["x"], a[-1]["y"]),
+                     (a[0]["x"], a[0]["y"])) > 1e-6
+
+
+def test_rgb_trail_hue_rotates_along_its_length_and_with_the_clock():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    part = F.particle_state(t, R)[0]
+    samples = F.rgb_trail(t, R, part)
+    steps = [(b["hue"] - a["hue"]) % 1.0 for a, b in zip(samples, samples[1:])]
+    assert all(s > 0.0 for s in steps), steps
+    assert all(s == pytest.approx(F.RGB_TRAIL_HUE_STEP, abs=1e-9) for s in steps)
+    # Total spread along the tail stays well inside a visible spectrum.
+    span = (samples[-1]["hue"] - samples[0]["hue"]) % 1.0
+    assert 0.05 < span < 0.9, span
+    # The wheel also drifts with time, so no two moments share a streak.
+    later = F.rgb_trail(t + 1.0, R, part)
+    assert later[0]["hue"] != pytest.approx(samples[0]["hue"], abs=1e-6)
+
+
+def test_rgb_trail_tapers_fades_and_follows_the_orbit_path():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 4.2
+    part = F.particle_state(t, R)[1]
+    a = F.rgb_trail(t, R, part)
+    assert all(b["alpha"] < p["alpha"] for p, b in zip(a, a[1:]))
+    assert all(b["size"] < p["size"] for p, b in zip(a, a[1:]))
+    # Samples stay on the mark's own orbit envelope (no teleporting tail).
+    dx, dy = F.camera_offset(t, R)
+    near, far = F.orbit_tilts(t)
+    for s in a:
+        lx, ly = s["x"] - dx, s["y"] - dy
+        assert abs(lx) <= R * F.RX_FRAC * 1.05 + 1e-6, s
+        assert abs(ly) <= R * F.RY_FRAC * 1.6 + 1e-6, s
+    # Consecutive samples never jump: the tail is a stroke, not a scatter.
+    for p, b in zip(a, a[1:]):
+        assert math.dist((p["x"], p["y"]), (b["x"], b["y"])) < 0.35 * R
+
+
+def test_rgb_trail_streaks_a_free_body_along_its_own_velocity():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 5.0
+    comet = F.comet(t, R)
+    assert comet["alpha"] > 0.0
+    a = F.rgb_trail(t, R, comet)
+    assert len(a) == F.RGB_TRAIL_SAMPLES
+    # The streak runs OPPOSITE the direction of travel.
+    head = (a[0]["x"], a[0]["y"])
+    tail = (a[-1]["x"], a[-1]["y"])
+    assert (tail[0] - head[0]) * comet["vx"] + (tail[1] - head[1]) * comet["vy"] < 0
+    body = F.satellites(t, R)[0]["body"]
+    b = F.rgb_trail(t, R, body)
+    assert len(b) == F.RGB_TRAIL_SAMPLES
+    assert (b[0]["x"], b[0]["y"]) == pytest.approx((body["x"], body["y"]))
+
+
+def test_rgb_trail_survives_a_body_with_no_path_and_no_velocity():
+    from voicebridge.orb import mark_field as F
+    a = F.rgb_trail(0.5, 32.0, {"x": 1.0, "y": 2.0})
+    assert len(a) == F.RGB_TRAIL_SAMPLES
+    assert all(math.isfinite(s["x"]) and math.isfinite(s["y"]) for s in a)
+    assert F.rgb_trail("bad", "bad", None)[0]["alpha"] >= 0.0
+
+
+def test_dust_trail_is_the_short_cheap_variant():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    mote = F.dust_state(t, R)[0]
+    a = F.dust_trail(t, R, mote)
+    assert len(a) == F.DUST_TRAIL_SAMPLES
+    assert F.DUST_TRAIL_SAMPLES < F.RGB_TRAIL_SAMPLES
+    # Every dense element can carry one, and they all move with the field.
+    for m in F.dust_state(t, R):
+        s = F.dust_trail(t, R, m)
+        assert s[0]["x"] == pytest.approx(m["x"])
+        assert math.dist((s[0]["x"], s[0]["y"]),
+                         (s[-1]["x"], s[-1]["y"])) > 0.0
+    # Sparkles and binary fragments take the same variant.
+    assert F.dust_trail(t, R, F.sparkles(3.3, R)[0])
+    assert F.dust_trail(t, R, F.binary_state(t, R)[3])
+
+
+def test_every_element_carries_a_hue_and_a_dof_value():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    layers = {
+        "particle": F.particle_state(t, R),
+        "dust": F.dust_state(t, R),
+        "binary": F.binary_state(t, R),
+        "sparkle": F.sparkles(3.3, R),
+        "spark": F.nucleus_sparks(0.4, R),
+    }
+    for name, items in layers.items():
+        assert items, name
+        for d in items:
+            assert set(d) >= {"x", "y", "depth", "hue", "dof"}, (name, d)
+            assert 0.0 <= d["hue"] < 1.0, (name, d)
+            assert 0.0 <= d["dof"] <= 1.0, (name, d)
+    for shell in F.satellites(t, R):
+        assert 0.0 <= shell["body"]["dof"] <= 1.0
+    # dof() is the shared mapping: sharp in front, fully soft at the back.
+    assert F.dof(1.0) == pytest.approx(0.0)
+    assert F.dof(0.0) == pytest.approx(1.0)
+    assert 0.0 < F.dof(0.5) < 1.0
+    assert F.dof(0.2) > F.dof(0.8)
+
+
+def test_shells_counter_rotate_at_full_turn_rates():
+    # Owner 2026-10-18: "spin 360 degree ... more 360 to give 3d effect".
+    # The shells are not sways: each completes whole turns about the nucleus,
+    # the pair keeps crossing, and no two share a period.
+    from voicebridge.orb import mark_field as F
+    assert F.RING_PERIOD_NEAR > 0 and F.RING_PERIOD_FAR > 0
+    near0, far0 = F.orbit_tilts(0.0)
+    # One period on, each shell has turned a whole turn (the sway term is the
+    # only residue, so the tolerance covers a few degrees of precession).
+    assert F.orbit_tilts(F.RING_PERIOD_NEAR)[0] == pytest.approx(
+        near0 + 360.0, abs=3.0)
+    assert F.orbit_tilts(F.RING_PERIOD_FAR)[1] == pytest.approx(
+        far0 - 360.0, abs=3.0)
+    # Counter-rotation: near turns one way, far the other.
+    assert F.orbit_tilts(2.0)[0] > F.orbit_tilts(0.0)[0]
+    assert F.orbit_tilts(2.0)[1] < F.orbit_tilts(0.0)[1]
+    shells = F.satellites(0.0, 64.0)
+    assert len(shells) >= 3
+    assert len({s["ring"]["rx_frac"] for s in shells}) == len(shells)
+    assert len({sh[3] for sh in F.SATELLITE_SHELLS}) > 1
+
+
+def test_skew_is_a_bounded_per_depth_shear():
+    from voicebridge.orb import mark_field as F
+    assert F.skew(1.0) == pytest.approx(-F.SKEW_GAIN_DEG)
+    assert F.skew(0.0) == pytest.approx(F.SKEW_GAIN_DEG)
+    assert abs(F.skew(0.5)) < 1e-9
+    for d in (0.0, 0.25, 0.5, 0.75, 1.0):
+        assert abs(F.skew(d)) <= F.SKEW_GAIN_DEG + 1e-9
+        assert abs(F.skew("junk")) <= F.SKEW_GAIN_DEG + 1e-9
+    # Every drawn body offers one, so a renderer can shear consistently.
+    for p in F.particle_state(1.3, 64.0):
+        assert "skew" in p and abs(p["skew"]) <= F.SKEW_GAIN_DEG + 1e-9
+    for m in F.dust_state(1.3, 64.0):
+        assert "skew" in m
+    for shell in F.satellites(1.3, 64.0):
+        assert "skew" in shell["body"]
+
+
+# --------------------------------------------------------------------------- #
+# RING GEOMETRY — owner 2026-10-18: "refine circles more". The whole set of
+# circles is declared once, so the two renderers stroke the same set instead
+# of each approximating it.
+# --------------------------------------------------------------------------- #
+def test_ring_geometry_declares_every_circle_back_to_front():
+    from voicebridge.orb import mark_field as F
+    t, R = 2.3, 90.0
+    rings = F.ring_geometry(t)
+    assert rings == F.ring_geometry(t)
+    assert [r["id"] for r in rings] == [r["id"] for r in rings]
+    ids = [r["id"] for r in rings]
+    assert len(set(ids)) == len(ids), "one entry per circle"
+    for r in rings:
+        assert set(r) >= {"id", "layer", "orbit", "tilt", "rx_frac",
+                          "ry_frac", "alpha", "width", "echo", "seed"}
+        assert r["layer"] in ("main", "echo", "inner", "satellite")
+        assert 0.0 < r["rx_frac"] <= 1.0 and 0.0 < r["ry_frac"] <= 1.0
+        assert 0.0 < r["alpha"] < 1.0 and r["width"] > 0.0
+        assert isinstance(r["echo"], bool)
+    # Both orbits, both followers, the inner ring and every satellite shell.
+    near, far = F.orbit_tilts(t)
+    lags = [e["tilt"] for e in F.echo_rings(t - F.ECHO_LAG_S)]
+    main = {r["orbit"]: r for r in rings if r["layer"] == "main"}
+    assert main["a"]["tilt"] == pytest.approx(near)
+    assert main["b"]["tilt"] == pytest.approx(far)
+    assert main["a"]["rx_frac"] == pytest.approx(F.RX_FRAC)
+    assert main["a"]["ry_frac"] == pytest.approx(F.RY_FRAC)
+    assert sorted(r["tilt"] for r in rings if r["layer"] == "echo") == \
+        pytest.approx(sorted(lags), abs=1e-9)
+    assert sum(1 for r in rings if r["layer"] == "inner") == 1
+    shells = [r for r in rings if r["layer"] == "satellite"]
+    assert len(shells) == len(F.SATELLITE_SHELLS)
+    for ring, shell in zip(shells, F.satellites(t, R)):
+        assert ring["rx_frac"] == pytest.approx(shell["ring"]["rx_frac"])
+        assert ring["ry_frac"] == pytest.approx(shell["ring"]["ry_frac"])
+        assert ring["tilt"] == pytest.approx(shell["ring"]["tilt"])
+    inner = next(r for r in rings if r["layer"] == "inner")
+    assert inner["tilt"] == pytest.approx(F.inner_ring_tilt(t))
+    assert inner["rx_frac"] == pytest.approx(F.INNER_RING_RX_FRAC)
+    # Near rings come last, so a painter can walk the list top to bottom.
+    assert rings[-1]["orbit"] == "a" and rings[0]["orbit"] == "b"
+
+
+def test_ring_path_is_a_closed_smooth_ellipse_at_any_scale():
+    from voicebridge.orb import mark_field as F
+    t = 2.3
+    ring = F.ring_geometry(t)[-1]
+    for R in (24.0, 96.0):
+        pts = F.ring_path(t, R, ring)
+        assert len(pts) == F.RING_PATH_SAMPLES + 1
+        assert pts[0] == pts[-1], "closed for a plain stroke"
+        dx, dy = F.camera_offset(t, R)
+        radii = [math.hypot(x - dx, y - dy) for x, y in pts]
+        assert min(radii) == pytest.approx(R * ring["ry_frac"], abs=0.35)
+        assert max(radii) == pytest.approx(R * ring["rx_frac"], abs=0.35)
+        # No facets: the step grows with the axis exactly as the ellipse
+        # does (an ellipse's long side is, correctly, the coarser one).
+        steps = [math.dist(a, b) for a, b in zip(pts, pts[1:])]
+        assert max(steps) / min(steps) == pytest.approx(
+            ring["rx_frac"] / ring["ry_frac"], rel=0.2)
+        assert max(steps) < 0.2 * R
+    # Junk in, points out.
+    assert len(F.ring_path("bad", "bad", None, samples=8)) == 9
+
+
+def test_ring_alpha_breathes_without_ever_vanishing_or_saturating():
+    from voicebridge.orb import mark_field as F
+    for ring in F.ring_geometry(0.0):
+        base = ring["alpha"]
+        prev = F.ring_alpha(0.0, ring)
+        for k in range(1, 601):
+            cur = F.ring_alpha(k / 100.0, ring)
+            assert 0.0 < cur <= base * (1.0 + 1e-9)
+            assert cur > base * (1.0 - F.RING_BREATH_SPAN) - 1e-9
+            assert abs(cur - prev) < 0.01, (ring["id"], k)
+            prev = cur
+        # The two orbits breathe on different periods: the set never pulses.
+        assert 0.0 < F.ring_alpha(0.0, ring) <= 1.0
+
+
+def test_rgb_trails_and_shells_stay_continuous_between_adjacent_frames():
+    # The same fluid contract as the drawn elements, extended to the layers
+    # added for the 3D/rgb round: the streaks behind every star, the three
+    # satellite bodies and the declared ring paths. Measured worst case over
+    # four windows is ~0.72 px/frame at R=32 against a 1.92 px budget.
+    R, dt, eps = 32.0, 1.0 / 60.0, CONTINUITY_EPS_FRAC * 32.0
+    for start in (0.0, 3.0, 5.1, 9.7):
+        prev = _streak_snapshot(start, R)
+        for k in range(1, 61):
+            cur = _streak_snapshot(start + k * dt, R)
+            for layer in cur:
+                for a, b in zip(prev[layer], cur[layer]):
+                    assert _worst_step(a, b) <= eps, (
+                        layer, start + k * dt, a, b)
+            prev = cur
+
+
+def _worst_step(a, b):
+    """Largest point-to-point step between two (possibly nested) samples."""
+    if isinstance(a[0], tuple):
+        return max(_worst_step(x, y) for x, y in zip(a, b))
+    return math.dist(a, b)
+
+
+def _streak_snapshot(t, R):
+    """Per-index point for every new layer: streaks, shell bodies, ring tips."""
+    return {
+        "rgb": [tuple((s["x"], s["y"]) for s in F.rgb_trail(t, R, p))
+                for p in F.particle_state(t, R)],
+        "dust": [tuple((s["x"], s["y"]) for s in F.dust_trail(t, R, m))
+                 for m in F.dust_state(t, R)],
+        "sat": [(s["body"]["x"], s["body"]["y"])
+                for s in F.satellites(t, R)],
+        "ring": [F.ring_path(t, R, r)[F.RING_PATH_SAMPLES // 2]
+                 for r in F.ring_geometry(t)],
+    }
+
+
+def test_rgb_trail_alpha_never_steps_between_frames():
+    # A streak that flickers between two alphas at the same sample index is a
+    # visible strobe even when its geometry is perfectly continuous.
+    R, dt = 64.0, 1.0 / 60.0
+    for idx in range(len(F.particle_state(0.0, R))):
+        prev = [(s["alpha"], s["size"]) for s in
+                F.rgb_trail(0.0, R, F.particle_state(0.0, R)[idx])]
+        for k in range(1, 181):
+            part = F.particle_state(k * dt, R)[idx]
+            cur = [(s["alpha"], s["size"]) for s in F.rgb_trail(k * dt, R, part)]
+            for (pa, ps), (ca, cs) in zip(prev, cur):
+                assert abs(ca - pa) < 0.02, (idx, k, pa, ca)
+                assert abs(cs - ps) < 0.1, (idx, k, ps, cs)
+            prev = cur
