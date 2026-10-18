@@ -273,6 +273,10 @@ DOF_ALPHA_SOFT = 0.22
 FILAMENT_TK_STRIDE = 2
 FILAMENT_TK_SAT = 0.90
 FILAMENT_TK_VAL = 0.98
+#: Ring-rider star colour: the field's own hue, kept bright but anchored to the
+#: state core like every other spectral stroke.
+RING_PARTICLE_SAT = 0.92
+RING_PARTICLE_VAL = 1.00
 
 # --- one declared geometry, every circle's art direction ---------------------
 #: ``mark_field.ring_geometry`` declares EVERY circle of the mark once (the two
@@ -1396,14 +1400,44 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                   _dim(col, a), 1)
 
     def _rider(item: Dict[str, Any]) -> None:
-        """One body riding a declared ring, or one cylinder-column mote."""
+        """One cylinder-column mote: a plain dot, shaded by its height.
+
+        The column's own ``h`` (signed height, fraction of R) is used only for
+        shading: a mote higher in the column reads a touch brighter than one at
+        the base, which is the cue that sells the vertical extent. Plain dots,
+        not glints — 32 of them must stay cheap.
+        """
         depth = _num(item.get("depth"), 0.5)
         x, y, g = _place3(_num(item.get("x")), _num(item.get("y")),
                            depth, zseed=_num(item.get("index"), None),
                            zflat=True, vol_z=item.get("z"),
                            vol_z2=item.get("z2"))
-        _dot(x, y, max(0.25, _num(item.get("size"))), item.get("alpha"),
+        hb = _num(item.get("h")) / max(1.0, r)
+        shade = 0.75 + 0.25 * max(-1.0, min(1.0, hb * 2.0))
+        a = _num(item.get("alpha")) * shade
+        _dot(x, y, max(0.25, _num(item.get("size"))), a,
              _lift(_num(item.get("lift"), LIFT_BEAD)), depth=depth, gain=g)
+
+    def _ring_particle(item: Dict[str, Any]) -> None:
+        """One star riding a declared ring: a glint that leaves no long wake.
+
+        The bodies populate EVERY circle, so each is drawn as the same pinprick
+        glint as a main particle (two crossed arms plus a core) but WITHOUT the
+        spectral streak: 22 ring bodies each dragging a nine-sample RGB trail
+        would be the field's whole particle count again, and the owner asked
+        for populated rings, not a second comet storm.
+        """
+        depth = _num(item.get("depth"), 0.5)
+        x, y, g = _place3(_num(item.get("x")), _num(item.get("y")),
+                           depth, zseed=_num(item.get("index"), None),
+                           zflat=True, vol_z=item.get("z"),
+                           vol_z2=item.get("z2"))
+        hue = item.get("hue")
+        rgb = _anchor(_spec(_num(hue), RING_PARTICLE_SAT,
+                            RING_PARTICLE_VAL)) if hue is not None else \
+            _lift(_num(item.get("lift"), LIFT_BEAD))
+        _glint(x, y, item.get("size"), item.get("alpha"), rgb,
+               skew_deg=item.get("skew"), depth=depth, gain=g)
 
     def _binary(bit: Dict[str, Any]) -> None:
         """One "1"/"0" fragment as a small glyph at its field position."""
@@ -1702,7 +1736,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     for _f in far_flares:
         _flare(_f)
     for _rd in far_riders:
-        _rider(_rd)
+        _ring_particle(_rd)
     for _cy in far_cyl:
         _rider(_cy)
     # The energy filament is a whole RING: it is stroked once, in the far pass,
@@ -1809,7 +1843,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     for _f in near_flares:
         _flare(_f)
     for _rd in near_riders:
-        _rider(_rd)
+        _ring_particle(_rd)
     for _cy in near_cyl:
         _rider(_cy)
     if comet_on and _num(comet_info.get("depth"), 0.0) >= 0.5:
