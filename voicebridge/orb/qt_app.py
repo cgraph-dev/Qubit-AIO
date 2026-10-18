@@ -370,9 +370,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # translucent one reads as the soft chromatic halo the logo has.
         for dx, col in ((fringe, QColor(255, 45, 85)),
                         (-fringe, QColor(45, 130, 255))):
-            pen = QPen(col, ring_w * 2.6)
+            pen = QPen(col, ring_w * FRINGE_WIDTH_MULT)
             pen.setColor(QColor(col.red(), col.green(), col.blue(),
-                                int(255 * min(1.0, alpha * bright * 0.16))))
+                                int(255 * min(1.0, alpha * bright
+                                              * FRINGE_ALPHA_MULT))))
             p.setPen(pen)
             p.translate(dx, 0.0)
             p.drawPath(rotated)
