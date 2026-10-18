@@ -347,6 +347,12 @@ def recover_authority_api_turns(adapter, authority):
             logging.getLogger(__name__).warning('API session %s paused: %s', sid, exc.reason)
 
 
+# Upstream's name for recover_authority_api_turns. The fork renamed the function and its call
+# site; the name is kept as a delegating alias so the symbol is present at the pin and any
+# caller still using the upstream spelling resolves. Not a second implementation.
+_recover_api_turns = recover_authority_api_turns
+
+
 async def run_api_turn(adapter, *, approval_notify_callback=None, approval_session_key=None, **kwargs):
     admitted = await admit_api_turn_async(adapter, **kwargs)
     if approval_notify_callback is None or not approval_session_key:
