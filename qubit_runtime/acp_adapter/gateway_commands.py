@@ -13,6 +13,11 @@ from __future__ import annotations
 
 from qubit_cli.gateway_client import GatewayClientError, GatewayRPCError
 
+# Reports the owner answers for a local session (``gateway/session_commands.py::_READ_COMMANDS``).
+_READS = frozenset({'context', 'usage', 'status', 'version'})
+_MUTATIONS = frozenset({'model', 'compress', 'new', 'branch'})
+_PROMPTS = frozenset({'steer', 'queue'})
+
 
 class CommandRefused(GatewayClientError):
     """A refusal the editor shows as the command's reply (the prompt itself ends normally)."""
