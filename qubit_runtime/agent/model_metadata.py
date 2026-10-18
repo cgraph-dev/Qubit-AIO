@@ -1619,6 +1619,23 @@ def _lmstudio_context(client, lmstudio_url: str, model: str) -> Optional[int]:
     return None
 
 
+def _llamacpp_context(client, server_url: str, model: str) -> Optional[int]:
+    """llama.cpp /props: the RUNTIME n_ctx, answered by the router even for a not-yet-loaded model
+    (while /v1/models has meta=null), so a lazily-loaded model doesn't fall to a family catch-all."""
+    import httpx
+    for props_path in (f"/props?model={model}", "/props"):
+        try:
+            resp = client.get(f"{server_url}{props_path}")
+        except httpx.HTTPError:
+            return None
+        if resp.status_code != 200:
+            continue
+        n_ctx = _positive_int((resp.json().get("default_generation_settings") or {}).get("n_ctx"))
+        if n_ctx is not None:
+            return n_ctx
+    return None
+
+
 def _openai_models_list_context(client, server_url: str, model: str) -> Optional[int]:
     """/v1/models list: match by id, else the sole model on single-model servers (llama.cpp reports a GGUF path as id)."""
     resp = client.get(f"{server_url}/v1/models")
