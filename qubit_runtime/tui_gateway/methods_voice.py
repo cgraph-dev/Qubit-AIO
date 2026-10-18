@@ -724,11 +724,12 @@ def _(rid, params: dict) -> dict:
     if wake_owner is not None and wake_owner is not transport:
         return _ok(rid, {"status": "busy", "reason": "wake_owned"})
     try:
-        global _voice_event_sid, _voice_wake_owner
+        global _voice_event_sid, _voice_event_transport, _voice_wake_owner
         if action == "start" and not _voice_mode_enabled():
             return _err(rid, 4015, "voice mode is off — enable with /voice on")
         with _voice_sid_lock:
             _voice_event_sid = params.get("session_id") or _voice_event_sid
+            _voice_event_transport = transport
         if action == "stop":
             from qubit_cli.voice import stop_continuous
             stop_continuous(force_transcribe=True)
