@@ -305,9 +305,11 @@ def test_qt_orb_position_lock_blocks_drag(monkeypatch, tmp_path):
 class _FakeToggleClient:
     """Records the orb's voice IPC without any HTTP or a live helper."""
 
-    def __init__(self, helper_running=True):
+    def __init__(self, helper_running=True, stop_speaking=False):
         self.calls = []
         self._helper_running = helper_running
+        if stop_speaking:
+            self.stop_speaking = lambda: self.calls.append(("stop",))
 
     def cancel_request(self, rid):
         self.calls.append(("cancel", rid))
@@ -404,3 +406,17 @@ def test_stage_only_fallback_still_stages_and_cancels():
     # A second press with no live turn cancels the staged request.
     qa.QtVoiceOrb.toggle_voice(orb)
     assert cli.calls == [("begin",), ("cancel", "staged-1")], cli.calls
+
+
+def test_qt_stop_speaking_preferred_over_cancel_request():
+    import time
+
+    from voicebridge.orb import qt_app as qa
+
+    cli = _FakeToggleClient(stop_speaking=True)
+    orb = _bare_qt_orb(cli, orb_state="speaking", active_rid="live-rid",
+                       active_ts=time.time() - 1.0)
+    qa.QtVoiceOrb.toggle_voice(orb)
+    # One IPC call: stop_speaking halts the reply AND ends the turn.
+    assert cli.calls == [("stop",)], cli.calls
+    assert orb._active_rid is None
