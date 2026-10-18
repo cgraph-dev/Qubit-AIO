@@ -1986,18 +1986,6 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.drawPath(path)
         p.setPen(Qt.NoPen)
 
-    def _ring_particle(body: Dict[str, Any]) -> None:
-        """Unused per-body path; the ring bodies are drawn batched below."""
-        _glint(_num(body.get("x"), 0.0), _num(body.get("y"), 0.0),
-               _num(body.get("size"), 0.0),
-               _shade(_num(body.get("alpha"), 0.0),
-                      _num(body.get("depth"), 0.5)),
-               _lift(_num(body.get("lift"), _field.LIFT_BEAD)),
-               arm_frac=_field.GLINT_ARM_FRAC * 0.8,
-               skew_deg=body.get("skew"), depth=_num(body.get("depth"), 0.5),
-               zseed=_num(body.get("index"), None),
-               z=body.get("z"), z2=body.get("z2"))
-
     def _project_body(body: Dict[str, Any]) -> Tuple[float, float, float]:
         """``(px, py, size_px)`` of one body through place + rotated depth."""
         d = _num(body.get("depth"), 0.5)
@@ -2061,21 +2049,6 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             p.drawPath(path)
             p.setBrush(Qt.NoBrush)
 
-    def _cylinder(body: Dict[str, Any]) -> None:
-        """Unused per-body path; the column is drawn batched by height band."""
-        depth = _num(body.get("depth"), 0.5)
-        cx_, cy_, g = _place(body.get("x"), body.get("y"), depth,
-                             zseed=_num(body.get("index"), None), zflat=True,
-                             z=body.get("z"), z2=body.get("z2"))
-        hh = abs(_num(body.get("h"), 0.0)) / (Rf if Rf > 0.0 else 1.0)
-        dim = 1.0 - CYLINDER_HEIGHT_DIM * min(1.0, hh)
-        alpha = _shade(_num(body.get("alpha"), 0.0) * dim, depth, g) * bright
-        size = _num(body.get("size"), 0.0)
-        if alpha <= ALPHA_EPS or size <= 0.0:
-            return
-        rgb = _anchor(_spec_rgb(_num(body.get("hue"), 0.0), BLINK_DOT_SAT))
-        _dot(cx_, cy_, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
-
     def _cylinder_batch(items: Any, buckets: int) -> None:
         """The vertical column, batched; bodies dim toward the column ends."""
         n = max(1, int(buckets))
@@ -2106,19 +2079,6 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
             p.drawPath(path)
             p.setBrush(Qt.NoBrush)
-
-    def _flare(fl: Dict[str, Any]) -> None:
-        """Unused per-body path; the flare family is drawn batched."""
-        d = _num(fl.get("depth"), 0.5)
-        fx, fy, g = _place(fl.get("x"), fl.get("y"), d,
-                           zseed=_num(fl.get("index"), None), zflat=True,
-                           z=fl.get("z"), z2=fl.get("z2"))
-        size = _num(fl.get("size"), 0.0)
-        alpha = _num(fl.get("alpha"), 0.0) * bright * g
-        if alpha <= ALPHA_EPS or size <= 0.0:
-            return
-        rgb = _anchor(_spec_rgb(_num(fl.get("hue"), 0.0), BLINK_DOT_SAT))
-        _dot(fx, fy, max(BLINK_DOT_MIN_PX, size), alpha, rgb, g)
 
     def _filament(smp: Dict[str, Any]) -> None:
         """One sample of the travelling energy filament, a pulsing dot."""
