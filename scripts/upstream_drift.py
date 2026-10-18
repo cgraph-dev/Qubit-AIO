@@ -15,6 +15,7 @@ hermes home was retired (the clone now lives at ~/upstream/hermes-agent).
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import subprocess
 import sys
@@ -124,9 +125,47 @@ def main() -> int:
     else:
         print("recent_subjects: (none — we are at upstream HEAD)")
 
+    # ── Our side of the ledger ────────────────────────────────────────────
+    # `commits_behind` above counts UPSTREAM's commits since the pin. It is a clock on
+    # someone else's repository: it grows while we work and never reflects our progress.
+    # Reporting it alone is why a burndown reads "920+ ahead" forever, straight through a
+    # session that closed a dozen real defects. These lines are the part that can move.
+    repo = Path(__file__).resolve().parent.parent
+    ours = {}
+    with contextlib.suppress(Exception):
+        branch = git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+        # Files the pin has that our tree has not yet ported: the port target, measured
+        # against what WE ship rather than against upstream's moving head.
+        # Our runtime tree mirrors upstream's ROOT but lives under qubit_runtime/, so paths
+        # must be rebased before diffing. Skipping this reported every file as missing.
+        ported = set()
+        for path in git(repo, "ls-tree", "-r", "--name-only", "HEAD:qubit_runtime").splitlines():
+            ported.add(path)
+        if not ported:
+            raise SystemExit("qubit_runtime/ missing from HEAD -- cannot measure our side")
+        pinned = set(git(clone, "ls-tree", "-r", "--name-only", pin).splitlines())
+        missing = sorted(pinned - ported)
+        missing_py = [f for f in missing if f.endswith(".py")]
+        missing_tests = [f for f in missing_py
+                         if f.startswith("tests/") or "/tests/" in f]
+        ours = {
+            "branch": branch,
+            "pin_files": len(pinned),
+            "pin_files_missing_here": len(missing),
+            "pin_py_production_missing": len(missing_py) - len(missing_tests),
+            "pin_py_tests_missing": len(missing_tests),
+        }
+        print(f"OUR PORT  branch={branch}  vs pin={pin_short}")
+        print(f"pin_files={ours['pin_files']}  missing_here={ours['pin_files_missing_here']}  "
+              f"py_production_missing={ours['pin_py_production_missing']}  "
+              f"py_tests_missing={ours['pin_py_tests_missing']}")
+        print("  (missing = files the pin has that this branch does not -- the number that "
+              "should FALL as the port lands)")
+
     if args.json:
         Path(args.json).write_text(json.dumps({
             "pin": pin, "head": head, "commits_behind": behind,
+            **ours,
             "files_changed": len(files), "py_production": len(py) - len(tests),
             "py_tests": len(tests), "plugin_catalog": len(catalog),
         }, indent=2))
