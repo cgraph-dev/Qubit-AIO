@@ -456,12 +456,16 @@ def test_nucleus_sparks_leave_glints_that_travel_shrink_and_fade(monkeypatch):
 # field element identified by (layer, index); the renderer only adds a constant
 # (cx, cy) offset, so a per-index field delta IS the drawn-element delta.
 #
-# epsilon: 0.06 * R per 1/60 s frame. Measured worst case at R=32 over the two
-# windows below is ~1.56 px (a just-born nucleus spark mid-launch); the fast
-# comet sweep is ~1.44 px. 0.06*32 = 1.92 px leaves ~20% headroom over the
-# designed fastest motion while still failing on any pop/teleport.
+# epsilon: 0.065 * R per 1/60 s frame. Measured worst case at R=32 over the two
+# windows below is ~1.93 px (a just-born nucleus spark mid-launch, sampled one
+# frame after birth now the shower is 32 strong); the fast comet sweep is
+# ~1.44 px. The nucleus spark launches on ``f**0.65``, whose slope is unbounded
+# at birth, so the worst sampled launch frame moves with the count: at 0.065*32
+# = 2.08 px the budget still clears the measured designed maximum by ~8% while
+# remaining far below any pop/teleport (a dropped or wrapped element jumps many
+# pixels, not fractions of one).
 # --------------------------------------------------------------------------- #
-CONTINUITY_EPS_FRAC = 0.06
+CONTINUITY_EPS_FRAC = 0.065
 
 
 def _continuity_snapshot(t, R):
@@ -1182,3 +1186,205 @@ def test_circles_stay_outside_with_the_orb_in_the_middle():
         for ring in rings:
             assert ring["rx_frac"] > body, (ring["id"], t)
             assert ring["ry_frac"] > body, (ring["id"], t)
+
+
+# --------------------------------------------------------------------------- #
+# VOLUME AXES (z/z2) — additive depth the renderers can project, so the mark
+# reads as a cloud rather than one flat plane. ``depth`` is unchanged.
+# --------------------------------------------------------------------------- #
+def test_depth_axes_are_two_independent_deterministic_volume_axes():
+    from voicebridge.orb import mark_field as F
+    for i in range(32):
+        z, z2 = F.depth_axes(i)
+        assert 0.0 <= z <= 1.0 and 0.0 <= z2 <= 1.0
+        assert F.depth_axes(i) == (z, z2)
+        # Two independent axes: they never collapse onto one value.
+        assert z != z2
+    # Distinct salts -> independent streams.
+    assert F.depth_axes(3) != F.depth_axes(3, 5.0)
+    # Junk-safe, like every field helper.
+    for bad in ("x", None, float("nan"), float("inf")):
+        assert all(0.0 <= v <= 1.0 for v in F.depth_axes(bad))
+
+
+def test_every_element_dict_carries_volume_axes():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    layers = {
+        "particle": F.particle_state(t, R),
+        "dust": F.dust_state(t, R),
+        "binary": F.binary_state(t, R),
+        "sparkle": F.sparkles(3.3, R),
+        "spark": F.nucleus_sparks(0.4, R),
+        "blink": F.blink_dots(t, R),
+        "flare": F.flare_dots(t, R),
+        "core": F.core_shells(t, R),
+        "filament": F.filament_state(t, R),
+    }
+    for name, items in layers.items():
+        assert items, name
+        for d in items:
+            assert "z" in d and "z2" in d, (name, d)
+            assert 0.0 <= d["z"] <= 1.0 and 0.0 <= d["z2"] <= 1.0, (name, d)
+    # Bodies that live inside nesting also carry them.
+    for shell in F.satellites(t, R):
+        body = shell["body"]
+        assert 0.0 <= body["z"] <= 1.0 and 0.0 <= body["z2"] <= 1.0
+        for s in shell["trail"]:
+            assert 0.0 <= s["z"] <= 1.0 and 0.0 <= s["z2"] <= 1.0
+    comet = F.comet(t, R)
+    if comet.get("alpha", 0.0) > 0.0:
+        assert 0.0 <= comet["z"] <= 1.0 and 0.0 <= comet["z2"] <= 1.0
+        for s in comet["trail"]:
+            assert 0.0 <= s["z"] <= 1.0 and 0.0 <= s["z2"] <= 1.0
+    # Every trail sample, too.
+    for p in F.particle_state(t, R):
+        for s in F.rgb_trail(t, R, p) + F.trails(t, R, p):
+            assert "z" in s and "z2" in s
+    for m in F.dust_state(t, R):
+        for s in F.dust_trail(t, R, m):
+            assert "z" in s and "z2" in s
+
+
+# --------------------------------------------------------------------------- #
+# CORE SHELLS — the nucleus's interior structure: nested bodies at different
+# radii and tilts, each turning at its own period.
+# --------------------------------------------------------------------------- #
+def test_core_shells_are_nested_deterministic_interior_depth():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 2.3
+    shells = F.core_shells(t, R)
+    assert len(shells) == F.CORE_SHELL_COUNT
+    assert shells == F.core_shells(t, R)
+    assert len({s["index"] for s in shells}) == len(shells)
+    nucleus_r = R * F.NUCLEUS_FRAC
+    for s in shells:
+        assert set(s) >= {"x", "y", "depth", "z", "z2", "size", "alpha",
+                          "hue", "hue2", "tilt", "spin_deg"}
+        assert 0.0 <= s["depth"] <= 1.0
+        assert 0.0 < s["r_frac"] < F.NUCLEUS_FRAC
+        assert s["size"] > 0.0
+        assert math.hypot(s["x"], s["y"]) < nucleus_r * 1.6
+        assert s["hue2"] == pytest.approx((s["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+        assert 0.0 <= s["spin_deg"] < 360.0
+    # Nested at distinct radii and plane tilts: real interior structure.
+    assert len({round(s["r_frac"], 6) for s in shells}) == len(shells)
+    assert len({s["tilt"] for s in shells}) == len(shells)
+    # Continuous: a shell never jumps between adjacent frames.
+    prev = {s["index"]: (s["x"], s["y"]) for s in shells}
+    for k in range(1, 90):
+        cur = {s["index"]: (s["x"], s["y"])
+               for s in F.core_shells(t + k / 60.0, R)}
+        for idx, (x, y) in cur.items():
+            px, py = prev[idx]
+            assert math.hypot(x - px, y - py) < 2.0, (idx, k)
+        prev = cur
+
+
+# --------------------------------------------------------------------------- #
+# FLARE DOTS — a second, rarer, larger blink family.
+# --------------------------------------------------------------------------- #
+def test_flare_dots_are_a_second_slower_larger_blink_family():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.0
+    flares = F.flare_dots(t, R)
+    assert len(flares) == F.FLARE_COUNT
+    assert flares == F.flare_dots(t, R)
+    assert 0 < F.FLARE_COUNT < F.BLINK_COUNT, "rare: fewer than the pinpricks"
+    assert F.FLARE_SIZE_BASE > F.BLINK_SIZE_BASE, "larger than the pinpricks"
+    for f in flares:
+        assert set(f) >= {"x", "y", "depth", "size", "alpha", "lift",
+                          "hue", "hue2", "z", "z2"}
+        assert f["size"] > 0.0
+        assert 0.0 <= f["alpha"] <= F.FLARE_ALPHA_PEAK + 1e-9
+        assert f["hue2"] == pytest.approx((f["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+    # The envelope visits both ends: births and deaths are fades, not pops.
+    alphas = [[f["alpha"] for f in F.flare_dots(k * 0.3, R)]
+              for k in range(80)]
+    per_max = [max(col) for col in zip(*alphas)]
+    per_min = [min(col) for col in zip(*alphas)]
+    for f, mx in zip(flares, per_max):
+        ceiling = F.FLARE_ALPHA_PEAK * (0.30 + 0.70 * f["depth"])
+        assert mx > ceiling * 0.5
+    assert all(mn < 0.05 for mn in per_min)
+
+
+# --------------------------------------------------------------------------- #
+# ENERGY FILAMENT — a travelling standing wave around a ring.
+# --------------------------------------------------------------------------- #
+def test_filament_is_a_deterministic_travelling_wave():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 2.0
+    fil = F.filament_state(t, R)
+    assert len(fil) == F.FILAMENT_SAMPLES
+    assert fil == F.filament_state(t, R)
+    for d in fil:
+        assert set(d) >= {"x", "y", "depth", "z", "z2", "size", "alpha",
+                          "hue", "hue2", "lift"}
+        assert 0.0 < d["alpha"] <= 1.0
+        assert d["size"] > 0.0
+        assert d["hue2"] == pytest.approx((d["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+    # The wave TRAVELS: the alpha profile moves with the clock.
+    a0 = [d["alpha"] for d in F.filament_state(0.0, R)]
+    a1 = [d["alpha"] for d in F.filament_state(0.4, R)]
+    assert a0 != a1
+    assert max(a0) - min(a0) > 0.05
+    # More than one crest around the ring: it is a wave, not a fading circle.
+    n = len(a0)
+    crests = sum(1 for i in range(n)
+                 if a0[i] >= a0[(i - 1) % n] and a0[i] > a0[(i + 1) % n])
+    assert crests >= 2
+    # Positions ride ONE tilted ring of the declared radii: the long axis is
+    # exactly the declared rx, the short axis the declared ry (minus the
+    # far-side perspective pull).
+    dx, dy = F.camera_offset(t, R)
+    rad = [math.hypot(d["x"] - dx, d["y"] - dy) for d in fil]
+    assert max(rad) == pytest.approx(R * F.FILAMENT_RX_FRAC, abs=1.0)
+    assert min(rad) < max(rad)
+    assert min(rad) >= (R * F.FILAMENT_RX_FRAC * (F.RY_FRAC / F.RX_FRAC)
+                        * 0.85)
+
+
+# --------------------------------------------------------------------------- #
+# RING PRECESSION + RADIUS BREATH — fluid circles on non-harmonic periods.
+# --------------------------------------------------------------------------- #
+def _harmonically_locked(a, b, rel=0.02, max_den=3):
+    r = a / b
+    return any(abs(r - p / q) <= rel * (p / q)
+               for q in range(1, max_den + 1) for p in range(1, max_den + 1))
+
+
+def test_ring_precession_and_radius_breath_are_non_harmonic():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 5.0
+    rings = F.ring_geometry(t)
+    for ring in rings:
+        assert "tilt_spin_deg" in ring and "precess_period_s" in ring
+        assert abs(F.ring_tilt_spin(t, ring)) <= F.RING_PRECESS_AMP_DEG + 1e-9
+        scale = F.ring_radius_scale(t, ring)
+        assert (1.0 - F.RING_RADIUS_BREATH_SPAN
+                <= scale <= 1.0 + F.RING_RADIUS_BREATH_SPAN)
+        assert scale > 0.9
+        assert ring["precess_period_s"] == pytest.approx(
+            F.ring_precess_period(ring))
+    # Continuous: a ring's plane never jumps between adjacent frames.
+    prev = {r["id"]: F.ring_tilt_spin(0.0, r) for r in rings}
+    for k in range(1, 121):
+        cur = {r["id"]: F.ring_tilt_spin(k / 60.0, r) for r in rings}
+        for rid, val in cur.items():
+            assert abs(val - prev[rid]) < 1.0
+        prev = cur
+
+    # Non-harmonic periods: no two ring motion periods are locked, and none is
+    # a near-multiple of the ring turns or the whole-mark spins.
+    periods = list(F.RING_MOTION_PERIODS_S)
+    assert len(periods) >= 8
+    for i, a in enumerate(periods):
+        for b in periods[i + 1:]:
+            assert not _harmonically_locked(a, b), (a, b)
+    fixed = ([F.RING_PERIOD_NEAR, F.RING_PERIOD_FAR, F.Y_SPIN_PERIOD_S,
+              F.X_SPIN_PERIOD_S, F.INNER_RING_PERIOD_S]
+             + [sh[2] for sh in F.SATELLITE_SHELLS])
+    for a in periods:
+        for b in fixed:
+            assert not _harmonically_locked(a, b), (a, b)
