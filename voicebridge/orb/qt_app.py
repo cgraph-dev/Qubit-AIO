@@ -130,8 +130,20 @@ GLINT_GLOW_ALPHA = 0.13
 #: ONE solid ellipse; glow and highlight are gradient paths beside it. All of
 #: it is static, so reduced motion is a valid still frame.
 NUCLEUS_CORE_LIFT = 0.78
-NUCLEUS_GLOW_MULT = 3.4
-NUCLEUS_GLOW_ALPHA = 0.22
+NUCLEUS_GLOW_MULT = 3.15
+NUCLEUS_GLOW_ALPHA = 0.135
+#: The aura is SMOKE, not a disc: a long power falloff sampled at many stops so
+#: there is no alpha plateau and no visible rim, plus a few slow drifting
+#: plumes that break the perfect circle. A 3-stop gradient at this radius read
+#: as a flat grey disc — the plateau beside the opaque body was the hard edge.
+NUCLEUS_AURA_POWER = 3.9
+NUCLEUS_AURA_STOPS = 24
+#: (orbit_frac, size_frac, period_s, phase_deg, alpha_scale) per smoke plume.
+NUCLEUS_SMOKE = (
+    (0.34, 0.92, 17.0, 0.0, 0.55),
+    (0.52, 0.74, 23.0, 137.0, 0.40),
+    (0.24, 0.58, 29.0, 251.0, 0.32),
+)
 NUCLEUS_SPEC_OFFSET_FRAC = 0.38
 NUCLEUS_SPEC_RADIUS_FRAC = 0.36
 NUCLEUS_SPEC_ALPHA = 0.90
@@ -644,15 +656,36 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
              max(0.4, _num(traveller.get("size"), 0.0)),
              _num(traveller.get("alpha"), 0.0) * bright, rgb)
 
+    def _smoke(ox: float, oy: float, rad: float, rgb: Tuple[int, int, int],
+               peak: float, power: float = NUCLEUS_AURA_POWER) -> None:
+        """One soft smoke blob: a long power falloff, so it has no rim.
+
+        Sampling the falloff at many stops is what removes the visible edge a
+        3-stop gradient leaves: the alpha decays smoothly to zero instead of
+        holding a plateau beside the body and then dropping.
+        """
+        rr = max(0.5, rad)
+        g = QRadialGradient(QPointF(ox, oy), rr)
+        for i in range(NUCLEUS_AURA_STOPS + 1):
+            f = i / float(NUCLEUS_AURA_STOPS)
+            a = peak * (1.0 - f) ** power
+            g.setColorAt(f, QColor(rgb[0], rgb[1], rgb[2],
+                                   _clamp8(255.0 * a)))
+        path = QPainterPath()
+        path.addEllipse(QRectF(ox - rr, oy - rr, rr * 2.0, rr * 2.0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(g))
+        p.drawPath(path)
+
     def _nucleus(radius: float, rgb: Tuple[int, int, int], tt: float) -> None:
         """The mark's ONE solid body, shaded instead of a flat disc.
 
         A near-white hot core falls through the state hue to a transparent
-        rim, drawn over a wide low-alpha glow, with a small off-centre
-        specular highlight. The body is the only filled ellipse at the
-        centre; the glow, the swirl lobes and the highlight are gradient paths
-        beside it. On top of the heartbeat breathing (the caller's radius) the
-        body carries two counter-rotating inner swirl lobes and a slowly
+        rim, wrapped in a smoky aura, with a small off-centre specular
+        highlight. The body is the only filled ellipse at the centre; the aura,
+        the swirl lobes and the highlight are gradient paths beside it. On top
+        of the heartbeat breathing (the caller's radius) the body carries two
+        counter-rotating inner swirl lobes and a slowly
         orbiting specular dot, so the nucleus reads as a turning, living body
         rather than a static gradient. Every term is a pure function of the
         clamped clock, so reduced motion paints the identical still body.
@@ -661,18 +694,15 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         if r <= 0.0:
             return
         hot = _lift(NUCLEUS_CORE_LIFT)
-        gr = r * NUCLEUS_GLOW_MULT
-        glow = QRadialGradient(QPointF(cx, cy), gr)
-        glow.setColorAt(0.0, QColor(rgb[0], rgb[1], rgb[2],
-                                    _clamp8(255.0 * NUCLEUS_GLOW_ALPHA)))
-        glow.setColorAt(0.5, QColor(hot[0], hot[1], hot[2],
-                                    _clamp8(255.0 * NUCLEUS_GLOW_ALPHA * 0.30)))
-        glow.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
-        gpath = QPainterPath()
-        gpath.addEllipse(QRectF(cx - gr, cy - gr, gr * 2.0, gr * 2.0))
-        p.setPen(Qt.NoPen)
-        p.setBrush(QBrush(glow))
-        p.drawPath(gpath)
+        # Smoky aura: a wide base falloff plus slow drifting plumes, so the
+        # surround is soft and irregular instead of a hard-edged disc.
+        _smoke(cx, cy, r * NUCLEUS_GLOW_MULT, rgb, NUCLEUS_GLOW_ALPHA)
+        for orbit_frac, size_frac, period, phase, scale in NUCLEUS_SMOKE:
+            ang = math.radians(360.0 * _num(tt, 0.0) / period + phase)
+            _smoke(cx + r * orbit_frac * math.cos(ang),
+                   cy + r * orbit_frac * math.sin(ang) * 0.72,
+                   r * NUCLEUS_GLOW_MULT * size_frac,
+                   hot, NUCLEUS_GLOW_ALPHA * scale)
         body = QRadialGradient(QPointF(cx, cy), r)
         body.setColorAt(0.0, QColor(hot[0], hot[1], hot[2], 255))
         body.setColorAt(0.34, QColor(rgb[0], rgb[1], rgb[2], 250))
