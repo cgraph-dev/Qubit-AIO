@@ -21,6 +21,7 @@ request-size limit usually binds first, which the byte budget guards with headro
 
 from __future__ import annotations
 
+import struct
 from typing import Optional, Sequence
 
 OUTBOUND_IMAGE_LIMIT = 20
@@ -28,6 +29,37 @@ OUTBOUND_IMAGE_BUDGET_BYTES = 24_000_000
 IMAGE_EVICTION_BATCH = 8
 # Satisfiability floor — see outbound_image_retire_count.
 OUTBOUND_IMAGE_FLOOR = 3
+
+_JPEG_SOF_MARKERS = frozenset({0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF})
+
+
+def image_dimensions_from_bytes(raw: bytes) -> Optional[tuple[int, int]]:
+    """(width, height) for PNG / JPEG bytes, or None when unreadable. PNG: IHDR. JPEG: walk
+    segments (skipping 0xFF fill bytes) to the first SOF marker; stop at SOS. Lives here so both
+    the send-path passes and the tool layer share one header-only reader."""
+    if raw.startswith(b"\x89PNG\r\n\x1a\n") and len(raw) >= 24:
+        width, height = struct.unpack(">II", raw[16:24])  # cannot fail: 8 bytes are guaranteed present
+        return int(width), int(height)
+    if raw.startswith(b"\xff\xd8") and len(raw) > 4:
+        i = 2
+        while i + 9 < len(raw):
+            if raw[i] != 0xFF:
+                i += 1
+                continue
+            marker, i = raw[i + 1], i + 2
+            while marker == 0xFF and i < len(raw):
+                marker, i = raw[i], i + 1
+            if marker in {0xD8, 0xD9}:
+                continue
+            if marker == 0xDA or i + 2 > len(raw):
+                break
+            segment_len = int.from_bytes(raw[i:i + 2], "big")
+            if segment_len < 2 or i + segment_len > len(raw):
+                break
+            if marker in _JPEG_SOF_MARKERS and segment_len >= 7:
+                return int.from_bytes(raw[i + 5:i + 7], "big"), int.from_bytes(raw[i + 3:i + 5], "big")
+            i += segment_len
+    return None
 
 
 def outbound_image_retire_count(
