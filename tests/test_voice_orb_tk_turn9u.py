@@ -556,6 +556,13 @@ def _strip_moving_layers(monkeypatch):
     monkeypatch.setattr(M, "blink_dots", lambda *a, **k: [])
     monkeypatch.setattr(M, "comet",
                         lambda *a, **k: {"alpha": 0.0, "trail": []})
+    # The studio-round life layers: a flare, the travelling filament and the
+    # two concurrent field riders are their own layers, so an isolated-body
+    # frame must suppress them too or their primitives pose as the body's.
+    monkeypatch.setattr(M, "flare_dots", lambda *a, **k: [])
+    monkeypatch.setattr(M, "filament_state", lambda *a, **k: [])
+    monkeypatch.setattr(M, "_field_ring_particles", None)
+    monkeypatch.setattr(M, "_field_cylinder_particles", None)
     return part
 
 
@@ -588,11 +595,13 @@ def test_a_body_draws_its_wake_then_its_star(monkeypatch):
     wake = _segments(c)
     # The synthetic body sits at the field origin, which the whole-mark
     # transforms carry to the mark's own centre — PLUS the body's own rotated
-    # depth (turn_qdepth, hash-broken and flat per element, so a turned body
-    # at the origin swings off-centre exactly as far as its z takes it).
-    # Wake and star share that projection, so they still coincide.
+    # depth (element_depth: turn_qdepth hash-broken and flat per element, then
+    # blended with the body's z/z2 volume axes, so a turned body at the origin
+    # swings off-centre exactly as far as its volume takes it). Wake and star
+    # share that projection, so they still coincide.
     import math as _m2
-    qd = M.turn_qdepth(0.5, part.get("index"), flat=True)
+    qd = M.element_depth(0.5, part.get("z"), part.get("z2"),
+                         part.get("index"), flat=True)
     _px, _py, _g = M.turn_point(1.7, R, 0.0, 0.0, qd)
     _a = _m2.radians(_m2.fmod(M.spin_deg(1.7), 360.0))
     star_x = CX + _px * _m2.cos(_a) - _py * _m2.sin(_a)
@@ -729,11 +738,14 @@ def test_every_circle_is_stroked_from_the_declared_ring_set(monkeypatch):
     assert at_zero.lines == zero.lines, "the baseline really is empty"
     assert len(added) == 1
     pts = added[0][0]
-    # No camera sway: the circles belong to the body, which does not sway.
+    # No camera sway: the circles belong to the body, which does not sway. The
+    # reserved radii carry the field's gentle per-ring radius breath, so the
+    # expectation reads the same additive scale the renderer applies.
+    rscale = F.ring_radius_scale(0.0, probe)
     assert max(abs(p - CX) for p in pts[0::2]) == pytest.approx(
-        R * probe["rx_frac"], abs=1e-6)
+        R * probe["rx_frac"] * rscale, abs=1e-6)
     assert max(abs(p - CY) for p in pts[1::2]) == pytest.approx(
-        R * probe["ry_frac"], abs=1e-6)
+        R * probe["ry_frac"] * rscale, abs=1e-6)
 
 
 def test_only_the_two_main_orbits_carry_the_chromatic_fringe(monkeypatch):
