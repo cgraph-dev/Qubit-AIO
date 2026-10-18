@@ -17,6 +17,9 @@ Layers, back to front:
   * ``dust_state``      — a denser field of tiny, slow motes on the orbits.
   * ``comet``           — one fast traveller with a long tail, periodic.
   * ``sparkles``        — short-lived deterministic glints across the plane.
+  * ``rgb_trail``       — the spectrum streak each star LEAVES instead of an
+    outer glow: hue walks the wheel along the tail and with the clock, and
+    ``hue_to_rgb`` is the one colour conversion both renderers use.
 
 Depth convention: ``depth = 0.5 + 0.5*cos(radians(angle))`` on a particle's
 orbit — 1.0 is nearest the viewer. Renderers draw every ``depth < 0.5`` element
@@ -63,6 +66,10 @@ DEPTH_PERSPECTIVE = 0.20
 #: Elements nearest the viewer grow past their plane's size so the field reads
 #: as coming OUT of the screen (and the nearest can cross the orbit envelope).
 DEPTH_POPOUT = 0.70
+#: Depth of field: ``dof()`` maps a particle's depth to an out-of-focus amount.
+DOF_NEAR = 0.0
+DOF_FAR = 1.0
+DOF_GAMMA = 1.7
 
 # ------------------------------------------------------------ camera drift
 CAMERA_SWAY_FRAC = 0.016
@@ -208,6 +215,41 @@ SPARKLE_SIZE_PEAK = 0.18
 SPARKLE_LIFT = 0.60
 
 
+# ------------------------------------------------------------- RGB streaks
+#: Owner: the stars carried a soft OUTER AURA; they should leave a TRAIL
+#: instead. A trail is a polyline whose hue ROTATES along its own length and
+#: with the clock, so one star leaves a spectrum streak rather than sitting
+#: inside a halo. The field emits the samples; a renderer strokes them in
+#: order with :func:`hue_to_rgb` per sample.
+RGB_TRAIL_SAMPLES = 9
+RGB_TRAIL_STEP_NEAR_DEG = 5.5
+RGB_TRAIL_STEP_FAR_DEG = 3.6
+RGB_TRAIL_STEP_PX = 2.8          # per sample, for bodies that carry a velocity
+RGB_TRAIL_ALPHA_BASE = 0.62
+RGB_TRAIL_SIZE_BASE = 0.85
+RGB_TRAIL_TAPER = 0.78
+RGB_TRAIL_FALLOFF = 1.25
+#: Hue turns along the trail (one turn = the full spectrum) and per second of
+#: clock, so the streak is never a static painted gradient.
+RGB_TRAIL_HUE_STEP = 0.055
+RGB_TRAIL_HUE_DRIFT = 0.018
+RGB_TRAIL_SAT_BASE = 0.90
+RGB_TRAIL_SAT_SPAN = 0.10
+RGB_TRAIL_VAL_BASE = 1.00
+#: Body hues live in a band around the mark's own cyan/violet so a field of
+#: them still reads as ONE mark; the trail then walks the wheel away from it.
+PARTICLE_HUE_BASE = 0.52
+PARTICLE_HUE_SPAN = 0.34
+
+#: The short version for the dense field (dust and glints): fewer samples,
+#: dimmer and shorter, so 30 motes do not turn into 30 comets.
+DUST_TRAIL_SAMPLES = 4
+DUST_TRAIL_STEP_PX = 1.5
+DUST_TRAIL_ALPHA_BASE = 0.22
+DUST_TRAIL_SIZE_BASE = 0.70
+DUST_TRAIL_HUE_STEP = 0.09
+
+
 # ------------------------------------------------------------------ helpers
 def _finite(value: Any, default: float = 0.0) -> float:
     try:
@@ -215,6 +257,148 @@ def _finite(value: Any, default: float = 0.0) -> float:
     except (TypeError, ValueError):
         return default
     return out if math.isfinite(out) else default
+
+
+def hue_to_rgb(h: Any, s: Any = 1.0, v: Any = 1.0) -> Tuple[float, float, float]:
+    """Standard HSV -> RGB, all channels 0..1. ``h`` is in TURNS and wraps.
+
+    Renderers call this on a trail sample's ``hue`` instead of carrying their
+    own colour wheel, so the Qt and Tk streaks are the same spectrum. The
+    conversion is the textbook six-sector one: no dithering, no state, no
+    dependence on anything but ``(h, s, v)``.
+    """
+    hu = (_finite(h) % 1.0) * 6.0
+    sat = min(1.0, max(0.0, _finite(s, 1.0)))
+    val = min(1.0, max(0.0, _finite(v, 1.0)))
+    i = int(hu)
+    f = hu - i
+    p = val * (1.0 - sat)
+    q = val * (1.0 - sat * f)
+    u = val * (1.0 - sat * (1.0 - f))
+    return ((val, u, p), (q, val, p), (p, val, u),
+            (p, q, val), (u, p, val), (val, p, q))[i % 6]
+
+
+def _hue_for(index: Any, seed: float = 0.0) -> float:
+    """A body hue in the mark's band, deterministic in its index."""
+    return (PARTICLE_HUE_BASE
+            + PARTICLE_HUE_SPAN * hash01(int(_finite(index)) + 1, seed)) % 1.0
+
+
+def _orbit_velocity(rx: float, ry: float, tilt_deg: float,
+                    ang_deg: float) -> Tuple[float, float]:
+    """Screen velocity of an orbit point, per degree of orbital parameter.
+
+    Central difference over a small fixed step: analytic derivatives of the
+    tilted ellipse are correct but unreadable, and this stays pure.
+    """
+    h = 0.05
+    x0, y0 = orbit_point(0.0, 0.0, rx, ry, tilt_deg, ang_deg - h)
+    x1, y1 = orbit_point(0.0, 0.0, rx, ry, tilt_deg, ang_deg + h)
+    return ((x1 - x0) / (2.0 * h), (y1 - y0) / (2.0 * h))
+
+
+def _rgb_trail(t: Any, R: float, body: Dict[str, Any], samples: int,
+               step_deg: float, step_px: float, alpha_base: float,
+               size_base: float, hue_step: float) -> List[Dict[str, float]]:
+    """Shared streak builder behind :func:`rgb_trail` and :func:`dust_trail`.
+
+    Sample 0 sits ON the body, the rest trail behind it. A body that carries an
+    orbit angle is sampled back along the orbit (the streak stays on the path);
+    any other body is back-projected along its own ``vx``/``vy``.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    n = max(1, int(samples))
+    body = body if isinstance(body, dict) else {}
+    dx, dy = camera_offset(tt, r)
+    idx = body.get("index", 0.0)
+    base_hue = _finite(body.get("hue"), -1.0)
+    if not 0.0 <= base_hue <= 1.0:
+        base_hue = _hue_for(idx, 31.7)
+    sat = RGB_TRAIL_SAT_BASE + RGB_TRAIL_SAT_SPAN * hash01(
+        int(_finite(idx)) + 1, 43.1)
+    # The streak breathes with its body: a twinkling star's trail dims with it.
+    strength = _finite(body.get("glint_alpha"), 1.0)
+    strength = min(1.0, max(0.0, strength))
+    size = abs(_finite(body.get("size"), 1.0))
+    ang0 = body.get("angle")
+    orbit = str(body.get("orbit") or "") if ang0 is not None else ""
+    bx, by = _finite(body.get("x")), _finite(body.get("y"))
+    vx = _finite(body.get("vx"), 0.0)
+    vy = _finite(body.get("vy"), 0.0)
+    speed = math.hypot(vx, vy)
+    if speed > 1e-9:
+        vx, vy = vx / speed, vy / speed
+    else:
+        vx = vy = 0.0
+    near_tilt, far_tilt = orbit_tilts(tt)
+    out: List[Dict[str, float]] = []
+    for k in range(n):
+        f = k / float(n)
+        if k == 0:
+            # The head rides ON the body, so the streak starts exactly at the
+            # rendered star and inherits its camera sway and parallax.
+            x, y, depth = bx, by, _finite(body.get("depth"), 0.5)
+        elif orbit:
+            tilt = near_tilt if orbit == "a" else far_tilt
+            ang = _finite(ang0) - k * step_deg
+            depth = _depth(ang)
+            pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+            x, y = orbit_point(0.0, 0.0, r * RX_FRAC * pull,
+                               r * RY_FRAC * pull, tilt, ang)
+            x += dx
+            y += dy
+        elif vx or vy:
+            dist = k * step_px * (r / 32.0)
+            depth = _finite(body.get("depth"), 0.5)
+            x, y = bx - vx * dist, by - vy * dist
+        else:
+            # No path and no velocity: hold the body's place rather than invent
+            # a direction, so a hand-built dict still yields a usable streak.
+            x, y, depth = bx, by, _finite(body.get("depth"), 0.5)
+        out.append({
+            "k": float(k),
+            "x": x, "y": y,
+            "hue": (base_hue + k * hue_step + tt * RGB_TRAIL_HUE_DRIFT) % 1.0,
+            "sat": sat,
+            "val": RGB_TRAIL_VAL_BASE * (1.0 - 0.25 * f),
+            "alpha": alpha_base * strength * ((1.0 - f) ** RGB_TRAIL_FALLOFF),
+            "size": size * size_base * (1.0 - RGB_TRAIL_TAPER * f),
+            "depth": depth,
+            "dof": dof(depth),
+        })
+    return out
+
+
+def rgb_trail(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, float]]:
+    """The RGB streak behind one orbiting star.
+
+    ``RGB_TRAIL_SAMPLES`` samples, head first: ``{"x", "y", "hue", "sat",
+    "val", "alpha", "size", "depth", "dof", "k"}``. Hue is in TURNS (feed it
+    to :func:`hue_to_rgb`) and advances by ``RGB_TRAIL_HUE_STEP`` per sample
+    and ``RGB_TRAIL_HUE_DRIFT`` per second, so the tail is a live spectrum
+    ramp. A particle dict from :func:`particle_state` works as-is; any dict
+    with ``x``/``y``/``vx``/``vy`` streaks along its own velocity.
+    """
+    body = particle if isinstance(particle, dict) else {}
+    orbit = str(body.get("orbit") or "a")
+    return _rgb_trail(t, R, particle, RGB_TRAIL_SAMPLES,
+                      RGB_TRAIL_STEP_NEAR_DEG if orbit == "a"
+                      else RGB_TRAIL_STEP_FAR_DEG,
+                      RGB_TRAIL_STEP_PX, RGB_TRAIL_ALPHA_BASE,
+                      RGB_TRAIL_SIZE_BASE, RGB_TRAIL_HUE_STEP)
+
+
+def dust_trail(t: Any, R: float, mote: Dict[str, Any]) -> List[Dict[str, float]]:
+    """The short RGB streak for a dust mote or a sparkle.
+
+    Same sample dict as :func:`rgb_trail`, four samples and much dimmer, so a
+    dense field gains spectrum without gaining a comet per mote.
+    """
+    return _rgb_trail(t, R, mote, DUST_TRAIL_SAMPLES, 0.0,
+                      DUST_TRAIL_STEP_PX, DUST_TRAIL_ALPHA_BASE,
+                      DUST_TRAIL_SIZE_BASE, DUST_TRAIL_HUE_STEP)
 
 
 def hash01(i: int, salt: float = 0.0) -> float:
@@ -362,6 +546,17 @@ def _depth_lift(depth: float) -> float:
     return DEPTH_LIFT_BASE + DEPTH_LIFT_GAIN * depth
 
 
+def dof(depth: Any) -> float:
+    """How far out of focus an element at ``depth`` is: 0.0 sharp, 1.0 far.
+
+    A depth-of-FIELD value, not a brightness one: a renderer softens or blurs
+    a sample by this much and keeps its alpha, which is what separates "far
+    away" from "barely visible".
+    """
+    d = min(1.0, max(0.0, _finite(depth, 0.5)))
+    return DOF_NEAR + (DOF_FAR - DOF_NEAR) * (1.0 - d) ** DOF_GAMMA
+
+
 def particle_state(t: Any, R: float) -> List[Dict[str, float]]:
     """The nine logo particles: position, depth, size, alpha, white-lift."""
     tt = _finite(t)
@@ -390,6 +585,7 @@ def particle_state(t: Any, R: float) -> List[Dict[str, float]]:
             "alpha": _depth_alpha(depth) * tw["alpha"],
             "lift": _depth_lift(depth),
             "glint_scale": tw["scale"], "glint_alpha": tw["alpha"],
+            "hue": _hue_for(idx, 31.7), "dof": dof(depth),
         })
     return out
 
@@ -454,6 +650,7 @@ def nucleus_sparks(t: Any, R: float) -> List[Dict[str, float]]:
         out.append({
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": 0.5 + 0.5 * math.cos(ang),
+            "hue": _hue_for(i, 97.1), "dof": dof(0.5 + 0.5 * math.cos(ang)),
             "size": max(0.30, NUCLEUS_SPARK_SIZE * (r / 32.0)
                         * (1.0 - 0.72 * grow)),
             "alpha": NUCLEUS_SPARK_ALPHA * fade,
@@ -496,12 +693,16 @@ def satellites(t: Any, R: float) -> List[Dict[str, Any]]:
                           "size": _depth_size(d, size96 * scale) * 0.5,
                           "alpha": 0.30 * alpha * (1.0 - k / (SATELLITE_TRAIL_SAMPLES + 1.0)),
                           "lift": lift})
+        bvx, bvy = _orbit_velocity(rx, ry, tilt, ang)
         out.append({
             "index": float(idx),
             "ring": {"tilt": tilt, "rx_frac": rx_frac,
                      "ry_frac": rx_frac * (RY_FRAC / RX_FRAC) * ratio,
                      "alpha": SATELLITE_RING_ALPHA, "width": SATELLITE_RING_WIDTH},
-            "body": {"x": bx + dx, "y": by + dy, "depth": depth,
+            "body": {"index": float(idx), "x": bx + dx, "y": by + dy,
+                     "depth": depth, "hue": _hue_for(idx, 89.3),
+                     "vx": bvx * direction, "vy": bvy * direction,
+                     "dof": dof(depth),
                      "size": _depth_size(depth, size96 * scale),
                      "alpha": _depth_alpha(depth, alpha), "lift": lift},
             "trail": trail,
@@ -529,6 +730,8 @@ def trails(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, float]]
         x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
         out.append({
             "x": x + dx, "y": y + dy,
+            "hue": _hue_for(particle.get("index", 0.0), 31.7),
+            "dof": dof(depth),
             "size": base_size * TRAIL_RADIUS_BASE * (1.0 - 0.10 * k),
             "alpha": TRAIL_ALPHA_BASE * ((1.0 - k / (TRAIL_SAMPLES + 1.0))
                                          ** TRAIL_FALLOFF),
@@ -558,8 +761,13 @@ def dust_state(t: Any, R: float) -> List[Dict[str, float]]:
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
         grow = DUST_R_FRAC_MIN + DUST_R_FRAC_SPAN * hash01(i, 5.9)
         x, y = orbit_point(0.0, 0.0, rx * pull * grow, ry * pull * grow, tilt, ang)
+        vx, vy = _orbit_velocity(rx * pull * grow, ry * pull * grow, tilt, ang)
         out.append({
+            "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
+            "vx": vx * 360.0 / max(0.1, period),
+            "vy": vy * 360.0 / max(0.1, period),
+            "hue": _hue_for(i, 53.9), "dof": dof(depth),
             "size": (DUST_SIZE_BASE + DUST_SIZE_SPAN * hash01(i, 7.3)) * scale
                     * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth),
             "alpha": _depth_alpha(depth, DUST_ALPHA_BASE + DUST_ALPHA_GAIN
@@ -606,7 +814,11 @@ def comet(t: Any, R: float) -> Dict[str, Any]:
                      "size": COMET_SIZE * scale * 0.62 * (1.0 - k / 14.0),
                      "alpha": COMET_ALPHA * fade * (1.0 - k / (COMET_TRAIL_SAMPLES + 1.0)) ** 1.3,
                      "lift": COMET_LIFT})
+    cvx, cvy = _orbit_velocity(rx * pull, ry * pull, near_tilt, ang)
     return {"x": x + dx, "y": y + dy, "depth": depth,
+            "index": 0.0, "hue": _hue_for(0, 101.3),
+            "vx": cvx * COMET_SPEED_MULT, "vy": cvy * COMET_SPEED_MULT,
+            "dof": dof(depth),
             "size": COMET_SIZE * scale * (0.8 + 0.4 * depth),
             "alpha": COMET_ALPHA * fade, "lift": COMET_LIFT, "trail": tail}
 
@@ -626,13 +838,17 @@ def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
             continue
         f = phase / SPARKLE_VISIBLE_FRAC
         peak = 0.5 * (1.0 - math.cos(2.0 * math.pi * f))
-        ang = seed + tt * (18.0 + (i % 5) * 6.0)
+        rate = 18.0 + (i % 5) * 6.0
+        ang = seed + tt * rate
         rfrac = SPARKLE_R_MIN_FRAC + SPARKLE_R_SPAN_FRAC * hash01(i, 13.7)
         depth = _depth(ang)
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
-        x, y = orbit_point(0.0, 0.0, r * rfrac * RX_FRAC * pull,
-                           r * rfrac * RY_FRAC * pull, near_tilt, ang)
-        out.append({"x": x + dx, "y": y + dy, "depth": depth,
+        sx, sy = r * rfrac * RX_FRAC * pull, r * rfrac * RY_FRAC * pull
+        x, y = orbit_point(0.0, 0.0, sx, sy, near_tilt, ang)
+        vx, vy = _orbit_velocity(sx, sy, near_tilt, ang)
+        out.append({"index": float(i), "x": x + dx, "y": y + dy,
+                    "depth": depth, "hue": _hue_for(i, 67.1),
+                    "dof": dof(depth), "vx": vx * rate, "vy": vy * rate,
                     "size": (SPARKLE_SIZE_BASE + SPARKLE_SIZE_PEAK * peak)
                             * (r / 32.0),
                     "alpha": SPARKLE_MAX_ALPHA * peak,
@@ -691,8 +907,13 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
         grow = BINARY_R_FRAC_MIN + BINARY_R_FRAC_SPAN * hash01(i, 5.9)
         x, y = orbit_point(0.0, 0.0, rx * pull * grow, ry * pull * grow,
                            tilt, ang)
+        vx, vy = _orbit_velocity(rx * pull * grow, ry * pull * grow, tilt, ang)
         out.append({
+            "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
+            "vx": vx * 360.0 / max(0.1, period),
+            "vy": vy * 360.0 / max(0.1, period),
+            "hue": _hue_for(i, 71.5), "dof": dof(depth),
             "size": (BINARY_SIZE_BASE + BINARY_SIZE_SPAN * hash01(i, 7.3))
                     * scale * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth),
             "alpha": _depth_alpha(depth, BINARY_ALPHA_BASE
@@ -712,9 +933,14 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
         depth = _depth(ang)
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
         x, y = orbit_point(0.0, 0.0, rx_s * pull, ry_s * pull, tilt, ang)
+        vx, vy = _orbit_velocity(rx_s * pull, ry_s * pull, tilt, ang)
         i = main_n + j
         out.append({
+            "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
+            "vx": vx * direction * 360.0 / max(0.1, period),
+            "vy": vy * direction * 360.0 / max(0.1, period),
+            "hue": _hue_for(i, 83.9), "dof": dof(depth),
             "size": (BINARY_SIZE_BASE * 1.1) * scale,
             "alpha": _depth_alpha(depth, BINARY_ALPHA_BASE),
             "lift": BINARY_LIFT_BASE,
@@ -748,4 +974,8 @@ __all__ = [
     "INNER_RING_RX_FRAC", "INNER_RING_PERIOD_S", "INNER_RING_DIRECTION",
     "INNER_RING_TILT_BASE", "inner_ring_tilt",
     "BINARY_COUNT", "BINARY_SIZE_BASE", "BINARY_PERIOD_BASE", "binary_state",
+    "hue_to_rgb", "rgb_trail", "dust_trail", "RGB_TRAIL_SAMPLES",
+    "RGB_TRAIL_HUE_STEP", "RGB_TRAIL_HUE_DRIFT", "RGB_TRAIL_ALPHA_BASE",
+    "DUST_TRAIL_SAMPLES", "PARTICLE_HUE_BASE", "PARTICLE_HUE_SPAN",
+    "dof", "DOF_NEAR", "DOF_FAR", "DOF_GAMMA",
 ]

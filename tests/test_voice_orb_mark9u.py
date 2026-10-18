@@ -654,3 +654,147 @@ def test_inner_ring_tilt_continuity():
         cur = F.inner_ring_tilt(1.0 + k / 60.0)
         assert abs(cur - prev) < 5.0  # no step discontinuity per frame
         prev = cur
+
+
+# --------------------------------------------------------------------------- #
+# RGB TRAILS — owner 2026-10-18: "the stars still have old aura, we need them
+# to leave a RGB trail not an outer glow". The field owns the streak: a
+# computable list of samples from (t, R, body) whose hue walks the colour
+# wheel along the tail. Renderers only stroke them.
+# --------------------------------------------------------------------------- #
+def test_hue_to_rgb_is_a_deterministic_standard_wheel():
+    assert F.hue_to_rgb(0.0) == pytest.approx((1.0, 0.0, 0.0))
+    assert F.hue_to_rgb(1.0) == pytest.approx(F.hue_to_rgb(0.0))
+    assert F.hue_to_rgb(1.0 / 3.0) == pytest.approx((0.0, 1.0, 0.0))
+    assert F.hue_to_rgb(2.0 / 3.0) == pytest.approx((0.0, 0.0, 1.0))
+    assert F.hue_to_rgb(0.5) == pytest.approx((0.0, 1.0, 1.0))
+    # Wraps instead of clamping, stays in range, and never raises on junk.
+    assert F.hue_to_rgb(-0.25) == pytest.approx(F.hue_to_rgb(0.75))
+    for bad in ("x", None, float("nan"), float("inf")):
+        assert all(0.0 <= c <= 1.0 for c in F.hue_to_rgb(bad))
+    # Saturation/value scale the result monotonically.
+    full = F.hue_to_rgb(0.08)
+    assert F.hue_to_rgb(0.08, 0.0, 1.0) == pytest.approx((1.0, 1.0, 1.0))
+    assert F.hue_to_rgb(0.08, 1.0, 0.5) == pytest.approx(
+        tuple(c * 0.5 for c in full))
+
+
+def test_rgb_trail_is_pure_deterministic_and_starts_on_the_star():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    part = F.particle_state(t, R)[3]
+    a = F.rgb_trail(t, R, part)
+    assert a == F.rgb_trail(t, R, F.particle_state(t, R)[3])
+    assert len(a) == F.RGB_TRAIL_SAMPLES
+    for s in a:
+        assert set(s) >= {"x", "y", "hue", "sat", "val", "alpha", "size",
+                          "depth", "dof", "k"}
+        assert 0.0 <= s["hue"] < 1.0 and 0.0 <= s["sat"] <= 1.0
+        assert 0.0 <= s["val"] <= 1.0 and s["alpha"] >= 0.0
+    # Head sits exactly on the rendered star; the tail trails away from it.
+    assert (a[0]["x"], a[0]["y"]) == pytest.approx((part["x"], part["y"]))
+    assert math.dist((a[-1]["x"], a[-1]["y"]),
+                     (a[0]["x"], a[0]["y"])) > 1e-6
+
+
+def test_rgb_trail_hue_rotates_along_its_length_and_with_the_clock():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    part = F.particle_state(t, R)[0]
+    samples = F.rgb_trail(t, R, part)
+    steps = [(b["hue"] - a["hue"]) % 1.0 for a, b in zip(samples, samples[1:])]
+    assert all(s > 0.0 for s in steps), steps
+    assert all(s == pytest.approx(F.RGB_TRAIL_HUE_STEP, abs=1e-9) for s in steps)
+    # Total spread along the tail stays well inside a visible spectrum.
+    span = (samples[-1]["hue"] - samples[0]["hue"]) % 1.0
+    assert 0.05 < span < 0.9, span
+    # The wheel also drifts with time, so no two moments share a streak.
+    later = F.rgb_trail(t + 1.0, R, part)
+    assert later[0]["hue"] != pytest.approx(samples[0]["hue"], abs=1e-6)
+
+
+def test_rgb_trail_tapers_fades_and_follows_the_orbit_path():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 4.2
+    part = F.particle_state(t, R)[1]
+    a = F.rgb_trail(t, R, part)
+    assert all(b["alpha"] < p["alpha"] for p, b in zip(a, a[1:]))
+    assert all(b["size"] < p["size"] for p, b in zip(a, a[1:]))
+    # Samples stay on the mark's own orbit envelope (no teleporting tail).
+    dx, dy = F.camera_offset(t, R)
+    near, far = F.orbit_tilts(t)
+    for s in a:
+        lx, ly = s["x"] - dx, s["y"] - dy
+        assert abs(lx) <= R * F.RX_FRAC * 1.05 + 1e-6, s
+        assert abs(ly) <= R * F.RY_FRAC * 1.6 + 1e-6, s
+    # Consecutive samples never jump: the tail is a stroke, not a scatter.
+    for p, b in zip(a, a[1:]):
+        assert math.dist((p["x"], p["y"]), (b["x"], b["y"])) < 0.35 * R
+
+
+def test_rgb_trail_streaks_a_free_body_along_its_own_velocity():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 5.0
+    comet = F.comet(t, R)
+    assert comet["alpha"] > 0.0
+    a = F.rgb_trail(t, R, comet)
+    assert len(a) == F.RGB_TRAIL_SAMPLES
+    # The streak runs OPPOSITE the direction of travel.
+    head = (a[0]["x"], a[0]["y"])
+    tail = (a[-1]["x"], a[-1]["y"])
+    assert (tail[0] - head[0]) * comet["vx"] + (tail[1] - head[1]) * comet["vy"] < 0
+    body = F.satellites(t, R)[0]["body"]
+    b = F.rgb_trail(t, R, body)
+    assert len(b) == F.RGB_TRAIL_SAMPLES
+    assert (b[0]["x"], b[0]["y"]) == pytest.approx((body["x"], body["y"]))
+
+
+def test_rgb_trail_survives_a_body_with_no_path_and_no_velocity():
+    from voicebridge.orb import mark_field as F
+    a = F.rgb_trail(0.5, 32.0, {"x": 1.0, "y": 2.0})
+    assert len(a) == F.RGB_TRAIL_SAMPLES
+    assert all(math.isfinite(s["x"]) and math.isfinite(s["y"]) for s in a)
+    assert F.rgb_trail("bad", "bad", None)[0]["alpha"] >= 0.0
+
+
+def test_dust_trail_is_the_short_cheap_variant():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    mote = F.dust_state(t, R)[0]
+    a = F.dust_trail(t, R, mote)
+    assert len(a) == F.DUST_TRAIL_SAMPLES
+    assert F.DUST_TRAIL_SAMPLES < F.RGB_TRAIL_SAMPLES
+    # Every dense element can carry one, and they all move with the field.
+    for m in F.dust_state(t, R):
+        s = F.dust_trail(t, R, m)
+        assert s[0]["x"] == pytest.approx(m["x"])
+        assert math.dist((s[0]["x"], s[0]["y"]),
+                         (s[-1]["x"], s[-1]["y"])) > 0.0
+    # Sparkles and binary fragments take the same variant.
+    assert F.dust_trail(t, R, F.sparkles(3.3, R)[0])
+    assert F.dust_trail(t, R, F.binary_state(t, R)[3])
+
+
+def test_every_element_carries_a_hue_and_a_dof_value():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    layers = {
+        "particle": F.particle_state(t, R),
+        "dust": F.dust_state(t, R),
+        "binary": F.binary_state(t, R),
+        "sparkle": F.sparkles(3.3, R),
+        "spark": F.nucleus_sparks(0.4, R),
+    }
+    for name, items in layers.items():
+        assert items, name
+        for d in items:
+            assert set(d) >= {"x", "y", "depth", "hue", "dof"}, (name, d)
+            assert 0.0 <= d["hue"] < 1.0, (name, d)
+            assert 0.0 <= d["dof"] <= 1.0, (name, d)
+    for shell in F.satellites(t, R):
+        assert 0.0 <= shell["body"]["dof"] <= 1.0
+    # dof() is the shared mapping: sharp in front, fully soft at the back.
+    assert F.dof(1.0) == pytest.approx(0.0)
+    assert F.dof(0.0) == pytest.approx(1.0)
+    assert 0.0 < F.dof(0.5) < 1.0
+    assert F.dof(0.2) > F.dof(0.8)
