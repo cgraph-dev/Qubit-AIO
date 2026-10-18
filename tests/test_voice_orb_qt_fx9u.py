@@ -773,7 +773,17 @@ def test_reduced_motion_has_no_echo_or_sparks(monkeypatch):
 
     a = _record(t=0.31, reduced=True)
     b = _record(t=3.77, reduced=True)
-    assert calls == [], calls
+    # Painting a still frame must not consult ANY field layer that carries
+    # motion. The one name that can still appear is ``echo_rings``, and only
+    # because the painter now reads its circles from the field's SINGLE
+    # declared geometry (``ring_geometry``), which composes ``echo_rings``
+    # internally — at the frozen clock, and with every ``echo`` entry then
+    # dropped from the still frame. The behavioural guarantees are asserted
+    # below regardless: identical still frames and no follower outlines.
+    assert set(calls) <= {"echo_rings"}, calls
+    assert "nucleus_sparks" not in calls and "dust_state" not in calls
+    assert "sparkles" not in calls and "comet" not in calls
+    assert "trails" not in calls
     assert _dump(a) == _dump(b)
     # No thin follower outline can survive into the still frame.
     assert _thin_orbit_outlines(a, 96.0) == []
