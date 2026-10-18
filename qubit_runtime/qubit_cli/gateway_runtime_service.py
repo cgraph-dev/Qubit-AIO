@@ -219,9 +219,10 @@ def _launchd(home: Path, deadline: float) -> ExistingService | None:
 
 
 def _windows(home: Path, deadline: float) -> ExistingService | None:
-    from qubit_cli.gateway_windows import _TASK_NAME_DEFAULT, _TASK_NAME_LEGACY, _decode_schtasks_output
+    from qubit_cli.gateway_windows import _TASK_NAME_LEGACY, _decode_schtasks_output, _task_name_for_suffix
     suffix = service_suffix(home)
-    name = f"{_TASK_NAME_DEFAULT}{'_' + suffix if suffix else ''}"
+    # Same derivation install() uses: one writer, so a reader cannot drift from it.
+    name = _task_name_for_suffix(suffix)
 
     def query(refusal: str, *argv: str) -> str:
         # schtasks/whoami write the console code page, and /XML declares UTF-16 over those bytes:

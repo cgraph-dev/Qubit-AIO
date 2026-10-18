@@ -1810,13 +1810,14 @@ def _reap_unsupervised_gateway_orphans(
     # treating only Running as supervised still kills the detached gateway on every desktop serve start
     # (#86098, #87001).
     if is_windows():
+        # Never fall back to a literal: a renamed task would silently stop counting as supervised here and
+        # the orphan reaper would kill a live Scheduled-Task gateway (#86098, #87001).
         try:
-            from qubit_cli.gateway_windows import get_task_name  # profile-aware task name
+            from qubit_cli.gateway_windows import get_task_name  # profile-aware, single source of truth
             _task_name = get_task_name()
         except Exception:
-            from qubit_cli.gateway_windows import _TASK_NAME_DEFAULT
-            _task_name = _TASK_NAME_DEFAULT
-        if _windows_scheduled_task_supervises(_task_name):
+            _task_name = None
+        if _task_name and _windows_scheduled_task_supervises(_task_name):
             return False
 
     from gateway.status import _pid_exists, get_process_start_time, write_planned_stop_marker
@@ -2149,7 +2150,9 @@ def _windows_scheduled_task_supervises(task_name: str) -> bool:
 
 
 def _gateway_detached_env() -> bool:
-    return _truthy_env(os.getenv("HERMES_GATEWAY_DETACHED"))
+    # Writer emits the QUBIT_ spelling; HERMES_ is kept so a launcher installed before the rename
+    # (and older wrappers) still mark the run detached.
+    return _truthy_env(os.getenv("QUBIT_GATEWAY_DETACHED") or os.getenv("HERMES_GATEWAY_DETACHED"))
 
 
 def _stdin_is_tty() -> bool | None:

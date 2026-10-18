@@ -3,10 +3,11 @@
 Before task/launcher names carried ``_profile_suffix()``, an install wrote the Scheduled Task
 ``Hermes_Gateway``, the Startup entry ``Hermes_Gateway.vbs``/``.cmd`` and the launcher pair
 ``gateway-service\\Hermes_Gateway.{vbs,cmd}``. Every operation in ``gateway_windows`` is keyed on
-``get_task_name()`` → ``Qubit_Gateway[_<suffix>]``, so those strays are never queried, rewritten,
-reported or removed: they keep launching a second gateway at logon, never pick up launcher
-fixes, and ``qubit gateway status`` prints ✓ while they do (#116157). This module enumerates
-them once; ``status`` warns, ``uninstall`` and ``install --force`` remove.
+``get_task_name()`` → ``Qubit_Gateway[_<suffix>]`` (and, for a pre-rename install, its pre-suffix
+strays), so a *suffixed* profile never queries, rewrites, reports or removes those bare-named
+objects: they keep launching a second gateway at logon, never pick up launcher fixes, and
+``qubit gateway status`` prints ✓ while they do (#116157). This module enumerates them once;
+``status`` warns, ``uninstall`` and ``install --force`` remove.
 """
 
 from __future__ import annotations
@@ -32,8 +33,10 @@ def _targets_this_home(text: str) -> bool:
 
 def legacy_launcher_artifacts() -> list[tuple[str, str, Path | str]]:
     """``(kind, label, target)`` for every pre-suffix launcher of THIS home still present; ``kind`` is
-    ``"file"`` or ``"task"``. Empty when this home owns the bare name (its current objects ARE the bare
-    ones). Bare-named objects belonging to another home (a sibling install) are left alone."""
+    ``"file"`` or ``"task"``. Pre-suffix means ``_TASK_NAME_LEGACY`` — the name a build before the rebrand
+    wrote. A suffixed profile never owns that bare name (this home's own objects are
+    ``Qubit_Gateway_<suffix>``), so anything bare that targets this home is a stray. Bare-named objects
+    belonging to another home (a sibling install) are left alone."""
     w = _w()
     # The pre-suffix name is the one a build BEFORE per-profile suffixes wrote — i.e. the upstream
     # ``Hermes_Gateway``. After the rename that is no longer ``_TASK_NAME_DEFAULT`` (which is now the

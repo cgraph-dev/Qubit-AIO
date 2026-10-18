@@ -52,9 +52,12 @@ _ACCESS_DENIED_PATTERN = re.compile(rf"({_ACCESS_DENIED_WORDS})", re.IGNORECASE)
 # shell exits. Dict (not bare bool) so the flag is mutable without ``global``.
 _LAST_SPAWN_BREAKAWAY_FALLBACK: dict = {"fallback": False}
 
+# The single source of truth for the LIVE Scheduled Task / Startup launcher name. Every writer and
+# every reader that means "the gateway autostart of THIS profile" derives from this constant
+# (``get_task_name()`` / ``_task_name_for_suffix()``); nothing restates the literal.
 _TASK_NAME_DEFAULT = "Qubit_Gateway"
-# The upstream Scheduled Task name, kept ONLY so installs predating the rename stay reachable: migration
-# reads it, nothing writes it. Every pre-suffix stray is still created under this name on such a host.
+# The upstream name a build predating the rename wrote. READ ONLY: migration looks it up so an old
+# install stays reachable and removable (#116157). Never write, install or reconciling-create under it.
 _TASK_NAME_LEGACY = "Hermes_Gateway"
 _TASK_DESCRIPTION = "Qubit Agent Gateway - Messaging Platform Integration"
 _TASK_LOGON_DELAY = "PT30S"
@@ -293,6 +296,12 @@ def get_task_name() -> str:
     from qubit_cli.gateway import _profile_suffix  # local: avoids circular init during boot
 
     suffix = _profile_suffix()
+    return f"{_TASK_NAME_DEFAULT}_{suffix}" if suffix else _TASK_NAME_DEFAULT
+
+
+def _task_name_for_suffix(suffix: str) -> str:
+    """``get_task_name()`` without ``_assert_windows()``/``_profile_suffix()``, so readers that are
+    handed a home directory name the same task that ``install()`` writes for that home."""
     return f"{_TASK_NAME_DEFAULT}_{suffix}" if suffix else _TASK_NAME_DEFAULT
 
 
@@ -947,7 +956,7 @@ def install(
 
     task_name = get_task_name()
     script_path = _write_task_script()
-    # A pre-fix install that failed its Startup-folder swap left `Qubit_Gateway.tmp` there, and the
+    # A pre-fix install that failed its Startup-folder swap left `<task-name>.tmp` there, and the
     # Scheduled Task path below never touches that folder — sweep it so a re-run clears the debris.
     try:
         _startup_staging_path().unlink(missing_ok=True)
@@ -1397,16 +1406,20 @@ _TASK_PROBE_TIMEOUT_S = 5
 
 
 def registered_task_launchers() -> list[str]:
-    """The scripts this OS user's ``Qubit_Gateway*`` Scheduled Tasks start (``install_state``). A task
-    install removes the Startup-folder entries, so for a custom home the task is all that still names
-    it. Empty off Windows, and when Task Scheduler does not answer, as for an unreadable Startup entry."""
+    """The scripts this OS user's gateway Scheduled Tasks start (``install_state``): the live
+    ``get_task_name()`` plus any pre-rename strays, so neither a current nor an old install reads as
+    uninstalled. A task install removes the Startup-folder entries, so for a custom home the task is
+    all that still names it. Empty off Windows, and when Task Scheduler does not answer, as for an
+    unreadable Startup entry."""
     if sys.platform != "win32":
         return []
     from qubit_cli.gateway_service_owner import service_definition_launchers
 
     code, listing, _err = _exec_schtasks(["/Query", "/FO", "CSV", "/NH"], timeout=_TASK_PROBE_TIMEOUT_S)
-    # ``Hermes_`` too: a task registered before the rename still starts a live gateway (read-only).
-    names = re.findall(rf'^"\\\({_TASK_NAME_DEFAULT}|{_TASK_NAME_LEGACY}[^"\\]*)"', listing,
+    # ``_TASK_NAME_LEGACY`` too: a task registered before the rename still starts a live gateway
+    # (read-only). The trailing class excludes ``.`` so a sibling login item (``Qubit_Gateway_x.vbs``
+    # in the Startup folder, exported to CSV) is not queried as a Scheduled Task.
+    names = re.findall(rf'^"\\\\({_TASK_NAME_DEFAULT}|{_TASK_NAME_LEGACY})(?![^"\\\\.])[^"\\\\]*"', listing,
                        flags=re.MULTILINE) if code == 0 else []
     launchers: list[str] = []
     for name in dict.fromkeys(names):
