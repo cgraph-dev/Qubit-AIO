@@ -1,24 +1,27 @@
 """Move a home onto the catalog plugin of a feature that left core.
 
-A feature (gateway platform, toolset) that moves from core into a standalone catalog plugin keeps its
-names, config keys and env vars, so migrating is only "install the plugin". Each row of
+A feature (gateway platform, toolset, bundled plugin) that moves from core into a standalone catalog
+plugin keeps its names, config keys and env vars, so migrating is only "install the plugin". Each row of
 :data:`LEFT_CORE` names the catalog plugin and a read-only predicate "does this home use it". The
 contract is the one memory providers established (``memory_provider_migration``, whose helpers this
 reuses; memory is not a row because its plugin name comes from ``memory.provider``, not a table):
 
-* ``qubit update`` installs the plugin for every profile home sharing the venv that uses the feature.
+* ``hermes update`` installs the plugin for every profile home sharing the venv that uses the feature.
 * Agent start and gateway start retry once per process for the active home (Desktop users update
-  through the app and never run ``qubit update``), honouring ``security.allow_lazy_installs``.
+  through the app and never run ``hermes update``), honouring ``security.allow_lazy_installs``.
 * After a failed attempt (catalog miss or unreachable, failed install) starts skip the row for
-  :data:`STARTUP_RETRY_SECONDS`, so an offline machine pays the network round trip once, not on every
-  ``qubit chat``; ``qubit update`` always retries.
+  an hour, doubling with each further failure up to a week, so an offline
+  machine pays the network round trip once, not on every ``hermes chat``, and a home whose install
+  cannot succeed stops failing every hour; ``hermes update`` always retries.
 * A home gets the plugin automatically at most once (``_left_core_installed`` in its config.yaml):
-  ``qubit plugins remove`` afterwards is the user's choice and sticks.
+  ``hermes plugins remove`` afterwards is the user's choice and sticks.
 
 Installs go through the normal catalog install path at the reviewed pin (kill list, dependency
 constraints, enable). Unattended dependency consent covers only these rows: the feature shipped in
-core, so its users already accepted its dependencies. Every outcome reaches the user (terminal,
-Desktop, chat); a gateway-start outcome waits for the home's first agent to deliver it.
+core, so its users already accepted its dependencies. Agent/gateway start always installs with it
+(nothing can answer a prompt there); ``hermes update`` in a terminal still asks. Every outcome
+reaches the user (terminal, Desktop, chat); a gateway-start outcome waits for the home's first agent
+to deliver it.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from qubit_cli.memory_provider_migration import (
-    STARTUP_RETRY_SECONDS, _failed_recently, _home_consent, _home_label, _install_command, _interactive,
+    _failed_recently, _home_consent, _home_label, _install_command, _interactive,
     _note_failure, _unattended_consent,
 )
 
@@ -68,10 +71,15 @@ def platform_configured_on(home: Path, name: str) -> bool:
     return platform.enabled or ("enabled" not in block and bool(str(platform.token or "").strip()))
 
 
-def _toolset_listed(config: dict, names: frozenset[str]) -> bool:
-    """A toolset in *names* is selected in ``platform_toolsets`` or the top-level ``toolsets`` list."""
-    selections = list((config.get("platform_toolsets") or {}).values()) if isinstance(
-        config.get("platform_toolsets"), dict) else []
+def _toolset_listed(config: dict, names: frozenset[str], *, own_platform: str = "") -> bool:
+    """A toolset in *names* is selected in ``platform_toolsets`` or the top-level ``toolsets`` list.
+
+    *own_platform*'s row is skipped: it scopes that platform's own sessions, which only exist once the
+    platform is on (:func:`platform_configured_on`). The installers copy cli-config.yaml.example into
+    config.yaml, and it carried ``homeassistant: [hermes-homeassistant]`` until Home Assistant left core,
+    so that row alone is not use."""
+    rows = config.get("platform_toolsets")
+    selections = [sel for platform, sel in rows.items() if platform != own_platform] if isinstance(rows, dict) else []
     selections.append(config.get("toolsets"))
     return any(isinstance(sel, list) and any(str(item) in names for item in sel) for sel in selections)
 
@@ -79,10 +87,9 @@ def _toolset_listed(config: dict, names: frozenset[str]) -> bool:
 def homeassistant_in_use(home: Path, *, process_env: bool = False) -> bool:
     """What made core run Home Assistant for *home*: ``HASS_TOKEN`` in its ``.env`` (it enabled both
     the gateway platform and the tools), the platform on in its gateway config
-    (:func:`platform_configured_on`), or the ``homeassistant`` / ``qubit-homeassistant`` toolset (or
-    its read-old ``hermes-homeassistant`` spelling) selected for a
-    platform. *process_env* (the active home at startup only) also counts a ``HASS_TOKEN`` the
-    process received from its environment (systemd unit, Docker, shell export)."""
+    (:func:`platform_configured_on`), or the ``homeassistant`` / ``hermes-homeassistant`` toolset selected for
+    another platform or in the top-level ``toolsets`` list. *process_env* (the active home at startup only)
+    also counts a ``HASS_TOKEN`` the process received from its environment (systemd unit, Docker, shell export)."""
     from agent.secret_scope import load_env_file
     if (load_env_file(home / ".env").get("HASS_TOKEN") or "").strip():
         return True
@@ -95,22 +102,49 @@ def homeassistant_in_use(home: Path, *, process_env: bool = False) -> bool:
             pass
     if platform_configured_on(home, "homeassistant"):
         return True
-    return _toolset_listed(_read_config(home), frozenset({"homeassistant", "qubit-homeassistant", "hermes-homeassistant"}))
+    return _toolset_listed(
+        _read_config(home), frozenset({"homeassistant", "hermes-homeassistant"}), own_platform="homeassistant")
 
 
-# NOTE (spotify deliberately absent from LEFT_CORE): upstream moved Spotify out of core into the
-# standalone ``spotify`` catalog plugin (upstream 71704ffb498, "move Spotify out of core into the
-# spotify catalog plugin"), which is why upstream added ``spotify_in_use`` and the LEFT_CORE row
-# alongside it. Qubit does NOT ship that move: the loopback-PKCE login (``qubit_cli.auth_spotify``),
-# the ``spotify`` toolset in ``qubit_cli.tools_config`` / ``auth_constants`` (SERVICE_PROVIDER_NAMES)
-# and the bundled backend plugin (``plugins/spotify``, ``name: spotify``, 7 tools) are all still in
-# our tree, and there is NO catalog entry named ``spotify`` to migrate a home TO (the catalog only
-# carries ``spotify-desktop``, an unrelated community Desktop player with no agent tools). A
-# LEFT_CORE row installs the catalog plugin for homes that used a core feature, so a row here would
-# name a plugin that does not exist: the feature never left core, nothing needs migrating, and the
-# ``spotify_in_use`` predicate has no caller. It is therefore deleted rather than left defined-but-
-# unreferenced. Restore this row only in the same change that removes spotify from core and adds the
-# ``spotify`` catalog entry (mirroring upstream 71704ffb498).
+def spotify_in_use(home: Path, *, process_env: bool = False) -> bool:
+    """What made core's Spotify tools usable for *home*: a login stored in its ``auth.json``
+    (``providers.spotify``, written by ``hermes auth spotify``) or the ``spotify`` toolset selected
+    for a platform. The tools were opt-in and login-gated, so a client id alone is not use."""
+    import json
+    try:
+        store = json.loads((home / "auth.json").read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):  # missing/unreadable/invalid JSON: no login we can see
+        store = {}
+    providers = store.get("providers") if isinstance(store, dict) else None
+    state = providers.get("spotify") if isinstance(providers, dict) else None
+    if isinstance(state, dict) and (state.get("access_token") or state.get("refresh_token")):
+        return True
+    return _toolset_listed(_read_config(home), frozenset({"spotify"}))
+
+
+def _bundled_plugin_selected(home: Path, plugin: str) -> bool:
+    """*plugin*'s bundled copy was on for *home*: its key or name in ``plugins.enabled`` and neither in
+    ``plugins.disabled`` (which wins, as in the loader), read with the managed overlay applied like the
+    loader's config, so an administrator's pinned list counts."""
+    from gateway import config_loader
+    feature = next(f for f in LEFT_CORE if f.plugin == plugin)
+    try:
+        plugins = config_loader.read_yaml_layers(home).get("plugins")
+    except Exception:  # malformed config.yaml: the loader enables nothing from it either
+        logger.debug("left-core: unreadable config for %s", home, exc_info=True)
+        return False
+    plugins = plugins if isinstance(plugins, dict) else {}
+
+    def listed(key: str) -> bool:
+        names = plugins.get(key)
+        return isinstance(names, list) and any(str(n) in (feature.plugin_key, feature.plugin) for n in names)
+    return listed("enabled") and not listed("disabled")
+
+
+def langfuse_in_use(home: Path, *, process_env: bool = False) -> bool:
+    """What made core trace to Langfuse for *home*: the bundled ``observability/langfuse`` selected
+    (:func:`_bundled_plugin_selected`). The plugin was opt-in, so keys in ``.env`` alone are not use."""
+    return _bundled_plugin_selected(home, "langfuse")
 
 
 @dataclass(frozen=True)
@@ -130,7 +164,7 @@ class LeftCoreFeature:
     # platform whose known_plugin_toolsets does not name it, so :func:`_record_migration` records
     # them there wherever core had them off.
     toolsets: tuple[str, ...] = ()
-    # Platforms whose core default composite (``qubit-<platform>``) never carried those toolsets.
+    # Platforms whose core default composite (``hermes-<platform>``) never carried those toolsets.
     off_platforms: tuple[str, ...] = ()
     # Gateway platform the plugin ships: a running gateway serves it only after a restart.
     platform: str = ""
@@ -140,9 +174,13 @@ class LeftCoreFeature:
     # prefixes it shared with the feature's tools (stripped only when the source runs the adapter).
     enable_env: tuple[str, ...] = ()
     channel_env_prefixes: tuple[str, ...] = ()
-    # Top-level command the plugin registers in place of core's ``qubit auth <cli>`` login
-    # (``qubit <cli> login|status|logout``); :func:`moved_command_hint` points the old spelling at it.
+    # Top-level command the plugin registers in place of core's ``hermes auth <cli>`` login
+    # (``hermes <cli> login|status|logout``); :func:`moved_command_hint` points the old spelling at it.
     cli: str = ""
+    # Key of the bundled plugin core shipped (``observability/langfuse``). It stays an alias of the
+    # catalog plugin in ``plugins.enabled`` / ``plugins.disabled`` (the loader's gate, an
+    # administrator's pinned list) and for every `hermes plugins <verb>` (:func:`legacy_plugin_alias`).
+    plugin_key: str = ""
 
 
 LEFT_CORE: tuple[LeftCoreFeature, ...] = (
@@ -152,6 +190,20 @@ LEFT_CORE: tuple[LeftCoreFeature, ...] = (
         secret_env=("HASS_TOKEN",), private_env=("HASS_URL",),
         toolsets=("homeassistant",), off_platforms=("acp", "webhook"), platform="homeassistant",
         enable_env=("HASS_TOKEN",), channel_env_prefixes=("HASS_",),
+    ),
+    LeftCoreFeature(
+        plugin="spotify", label="Spotify", in_use=spotify_in_use,
+        unchanged="your Spotify login, the spotify toolset and the spotify_* tools are unchanged; "
+                  "`hermes auth spotify` is now `hermes spotify login`",
+        cli="spotify",
+    ),
+    LeftCoreFeature(
+        plugin="langfuse", label="Langfuse", in_use=langfuse_in_use,
+        unchanged="your Langfuse keys and HERMES_LANGFUSE_* settings are unchanged; the plugin is now "
+                  "`langfuse` (was observability/langfuse)",
+        secret_env=("HERMES_LANGFUSE_SECRET_KEY",),
+        private_env=("HERMES_LANGFUSE_PUBLIC_KEY", "HERMES_LANGFUSE_BASE_URL"),
+        plugin_key="observability/langfuse",
     ),
 )
 
@@ -165,18 +217,27 @@ def platform_install_hint(platform: str) -> str:
     """For an unknown platform name that left core: the sentence that names its install command for
     the active home, else ``""``. Appended to "unknown platform" errors (``send_message``)."""
     feature = next((f for f in LEFT_CORE if f.platform and f.platform == platform), None)
-    if feature is None:
-        return ""
-    return f". {_install_sentence(feature)}"
+    return f". {_install_sentence(feature)}" if feature else ""
+
+
+def legacy_plugin_alias(name: str) -> str:
+    """The catalog plugin a bundled key that left core now names (``observability/langfuse`` ->
+    ``langfuse``), else ``""``."""
+    return next((f.plugin for f in LEFT_CORE if f.plugin_key and f.plugin_key == name), "")
+
+
+def legacy_plugin_keys(plugin: str) -> set[str]:
+    """Bundled keys that now name catalog *plugin* (inverse of :func:`legacy_plugin_alias`)."""
+    return {f.plugin_key for f in LEFT_CORE if f.plugin_key and f.plugin == plugin}
 
 
 def moved_command_hint(prog: str, value: str, action: str = "") -> str:
-    """For a command a left-core plugin took over: ``qubit auth [<action>] <cli>`` (core's old login
-    spelling) or ``qubit <cli>`` while the plugin is not loaded, the line saying where it went and
+    """For a command a left-core plugin took over: ``hermes auth [<action>] <cli>`` (core's old login
+    spelling) or ``hermes <cli>`` while the plugin is not loaded, the line saying where it went and
     how to get it for the active home, else ``""``."""
     from qubit_constants import get_qubit_home
     feature = next((f for f in LEFT_CORE if f.cli and f.cli == value), None)
-    if feature is None or prog not in {"hermes", "qubit auth"}:
+    if feature is None or prog not in {"hermes", "hermes auth"}:
         return ""
     home = Path(get_qubit_home())
     install = _install_command(feature.plugin, home)
@@ -184,11 +245,19 @@ def moved_command_hint(prog: str, value: str, action: str = "") -> str:
         get = f" Install it with: `{install}`."
     else:
         get = f" Enable it with: `{install.replace(' install ', ' enable ')}`." if prog == "hermes" else ""
-    if prog == "qubit auth":
-        old = " ".join(p for p in ("qubit auth", action, value) if p)
+    if prog == "hermes auth":
+        old = " ".join(p for p in ("hermes auth", action, value) if p)
         return (f"{feature.label} moved out of core into the '{feature.plugin}' plugin: `{old}` is now "
-                f"`qubit {value} {action or 'login'}`.{get}")
+                f"`hermes {value} {action or 'login'}`.{get}")
     return f"{feature.label} moved out of core into the '{feature.plugin}' plugin, which is not loaded.{get}"
+
+
+def moved_plugin_hint(name: str) -> str:
+    """For a plugin name nothing resolves to (so the plugin is not installed): the bundled key of a
+    plugin that left core (``observability/langfuse``) or its catalog name, the line naming the install
+    command for the active home, else ``""``. Appended to "No plugin named ..." errors."""
+    feature = next((f for f in LEFT_CORE if f.plugin_key and name in (f.plugin_key, f.plugin)), None)
+    return f"{_install_sentence(feature)}." if feature else ""
 
 
 _attempted: set[str] = set()
@@ -202,15 +271,11 @@ def plugin_present(plugin: str, home: Path) -> bool:
 
 def _core_carried(feature: LeftCoreFeature, selection: list) -> bool:
     """Whether core resolved *feature*'s toolsets on for a platform selecting *selection*: named
-    directly, or through a ``qubit`` / ``qubit-<platform>`` composite (or its read-old ``hermes``
-    spelling) that included them."""
+    directly, or through a ``hermes`` / ``hermes-<platform>`` composite that included them."""
     def carries(name: str) -> bool:
-        if name in feature.toolsets or name in {"hermes", "qubit"}:
+        if name in feature.toolsets or name == "hermes":
             return True
-        for prefix in ("qubit-", "hermes-"):
-            if name.startswith(prefix):
-                return name[len(prefix):].replace("-", "_") not in feature.off_platforms
-        return False
+        return name.startswith("hermes-") and name[len("hermes-"):].replace("-", "_") not in feature.off_platforms
     return any(carries(str(name)) for name in selection)
 
 
@@ -244,7 +309,7 @@ def _record_migration(home: Path, feature: LeftCoreFeature) -> None:
     conversion per home and row, independent of installation: a plugin installed before the update
     (it stays inert on a core that still ships the feature) still needs it. Completion is marked
     under ``_left_core_scoped`` so a later run never undoes a choice the user made since
-    (``qubit tools``). Raises when config.yaml cannot be read or written."""
+    (``hermes tools``). Raises when config.yaml cannot be read or written."""
     from qubit_cli.config import atomic_config_write, read_user_config_raw
     from qubit_cli.toolset_validation import parse_platform_toolsets_value
     path = home / "config.yaml"
@@ -295,14 +360,14 @@ def _pending(home: Path, *, say: Callable[[str], None], process_env: bool = Fals
             _record_migration(home, feature)
         except Exception as exc:
             say(f"  ⚠ {feature.label} moved out of core into the '{feature.plugin}' plugin: its per-platform "
-                f"toolset selection could not be kept ({exc}). Check `qubit tools`"
+                f"toolset selection could not be kept ({exc}). Check `hermes tools`"
                 + ("." if present else f" and run `{_install_command(feature.plugin, home)}`."))
             continue
         if present:
             continue
         if backoff and _failed_recently(home, feature.plugin):
-            logger.info("%s plugin install failed recently for %s; retrying after %ds or on `qubit update`",
-                        feature.label, home, STARTUP_RETRY_SECONDS)
+            logger.info("%s plugin install failed recently for %s; retrying later or on `hermes update`",
+                        feature.label, home)
             continue
         if catalog_source(feature.plugin) is None:
             _note_failure(home, feature.plugin)
@@ -314,14 +379,15 @@ def _pending(home: Path, *, say: Callable[[str], None], process_env: bool = Fals
     return out
 
 
-def _install_into(home: Path) -> Callable[[str], dict]:
+def _install_into(home: Path, *, consent: Optional[bool] = None) -> Callable[[str], dict]:
     def _install(name: str) -> dict:
         from qubit_cli.plugins_cmd import dashboard_install_plugin
         from qubit_constants import reset_qubit_home_override, set_qubit_home_override
         token = set_qubit_home_override(home)
         try:
             return dashboard_install_plugin("", force=False, enable=True, catalog_name=name,
-                                            assume_deps_consent=_unattended_consent())
+                                            assume_deps_consent=_unattended_consent() if consent is None
+                                            else consent)
         finally:
             reset_qubit_home_override(token)
     return _install
@@ -367,7 +433,7 @@ def migrate_home(home: Path, *, install: Callable[[str], dict], say: Callable[[s
 
 
 def migrate_all_homes(*, say: Callable[[str], None] = print) -> list[str]:
-    """``qubit update`` hook: every profile home sharing this venv. Grouped by plugin and each home's
+    """``hermes update`` hook: every profile home sharing this venv. Grouped by plugin and each home's
     unattended consent like the memory migration: homes of one group share dependency answers, and a
     failure names the rest of its group in one line instead of failing them one by one."""
     from qubit_cli.plugins_cmd_install import shared_dependency_answers
@@ -407,7 +473,7 @@ def migrate_all_homes(*, say: Callable[[str], None] = print) -> list[str]:
                     break
     except KeyboardInterrupt:
         say("  ⚠ Plugin migration cancelled. Profiles already migrated keep their plugin; run "
-            "`qubit plugins install <name>` (with `-p <profile>`) for the rest.")
+            "`hermes plugins install <name>` (with `-p <profile>`) for the rest.")
     return installed
 
 
@@ -425,6 +491,11 @@ def recover_at_startup(*, say: Optional[Callable[[str], None]] = None) -> list[s
     (an agent's startup-warning sink) outcomes are delivered now, together with any a gateway-start
     attempt queued for this home; without it they are logged and queued for the home's first agent.
     Returns installed plugin names."""
+    from agent.safe_worker_policy import worker_config_snapshot
+    if worker_config_snapshot() is not None:
+        # A frozen safe/ignore-user-config worker never reads the profile's config.yaml and never
+        # installs customizations; the owner process runs this migration for the home.
+        return []
     from qubit_constants import get_qubit_home, qubit_home_key
 
     home = Path(get_qubit_home())
@@ -463,11 +534,14 @@ def recover_at_startup(*, say: Optional[Callable[[str], None]] = None) -> list[s
                        f"fetch it: run `{_install_command(feature.plugin, home)}`.")
             return []
         installed = []
+        # Agent init cannot answer a dependency prompt: under the CLI the chat input owns the terminal,
+        # so the question hangs at "Initializing agent...". Every row shipped in core, so its users
+        # already accepted its dependencies (as memory_provider_migration.recover_at_startup does).
         for feature in features:
-            if _install_one(home, feature, install=_install_into(home), say=report):
+            if _install_one(home, feature, install=_install_into(home, consent=True), say=report):
                 installed.append(feature.plugin)
                 if say is not None and feature.platform and _gateway_serves(home):
-                    report(f"Restart the gateway (`qubit gateway restart`) so it serves {feature.label}.")
+                    report(f"Restart the gateway (`hermes gateway restart`) so it serves {feature.label}.")
         return installed
     except Exception as exc:  # never take agent/gateway start down
         logger.warning("left-core plugin migration failed: %s", exc, exc_info=True)
