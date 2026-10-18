@@ -818,7 +818,9 @@ def test_blink_dots_paint_as_pinpricks_and_vanish_when_still():
     for d in live:
         qd = Q.turn_qdepth(d["depth"], d.get("index"), flat=True)
         X, Y, _g = Q.tumble_point(t, R, d["x"], d["y"], qd)
-        assert any(math.hypot(p.cx - (c + X), p.cy - (c + Y)) <= 1.0
+        vox, voy = Q.volume_offset(t, R, d.get("z"), d.get("z2"))
+        assert any(math.hypot(p.cx - (c + X + vox),
+                             p.cy - (c + Y + voy)) <= 1.0
                    for p in pinpricks), (d["index"], X, Y)
     # They are dots, not streaks: killing them removes no filled path.
     with_paths = {id(p) for p in prims if p.kind == "path" and p.fill is not None}

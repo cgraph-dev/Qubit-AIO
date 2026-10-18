@@ -219,6 +219,18 @@ TURN_Z_SPREAD = 0.9
 TURN_RING_WARP = 0.14
 TURN_RING_TILT = 0.35
 TURN_RING_SALT = 5.77
+#: The second half of the "more 3d" fix: the field now gives EVERY element two
+#: independent volume axes, ``z`` and ``z2`` (uncorrelated ``hash01`` of the
+#: element index, distinct salts). ``turn_qdepth`` still drives the projection
+#: depth (the x/z rotation), but a single depth only makes the mark one SHEET
+#: with a thickness. These two axes give each element a genuine 3D offset along
+#: two ORTHOGONAL screen directions, so the cloud occupies a volume instead of
+#: riding one plane. The offset is driven by the hash axes — NEVER by the
+#: orbital angle — so it cannot reintroduce the depth/x lock that made the mark
+#: go thin, and it is faded by the same combined-turn factor the projection
+#: uses, so face-on and reduced-motion frames stay the unturned mark.
+VOLUME_X_FRAC = 0.13
+VOLUME_Y_FRAC = 0.13
 #: Brightness follows the same rotated depth: a body's tint is scaled by
 #: ``TURN_TONE_BASE + TURN_TONE_SLOPE * gain``, so near bodies render hotter
 #: and far ones cooler on top of the size/alpha spread. At gain 1 the factor
@@ -920,6 +932,45 @@ def turn_tone(rgb: Tuple[int, int, int], gain: Any = 1.0) -> Tuple[int, int, int
     return tuple(max(0, min(255, int(c * k))) for c in rgb)  # type: ignore[return-value]
 
 
+def turn_fade(t: Any) -> float:
+    """The combined turn's depth-opening factor at clock ``t`` in ``[0, 1]``.
+
+    ``sin²θy + sin²φx − sin²θy·sin²φx``: exactly 0 when BOTH tumble phases are
+    zero (face-on, and every reduced-motion frame, since both reads clamp to 0)
+    and 1 when an element's depth axis is fully edge-on. This is the SAME factor
+    :func:`_tumble_project` multiplies the depth offset by, so anything routed
+    through it is an exact no-op at a still clock. Never raises.
+    """
+    try:
+        cy, sy, cx, sx = _tumble_basis(t)
+    except Exception:  # noqa: BLE001 - a bad clock must not blank the orb
+        return 0.0
+    return max(0.0, min(1.0, sy * sy + sx * sx - sy * sy * sx * sx))
+
+
+def volume_offset(t: Any, R: Any, z: Any, z2: Any = 0.5
+                  ) -> Tuple[float, float]:
+    """Screen-space 3D displacement from the field's ``z``/``z2`` volume axes.
+
+    Each axis is a ``0..1`` hash of the element's index, so the displacement is
+    CONSTANT per element and uncorrelated with its orbital angle — a real
+    volume, not the depth/x lock that flattened the mark. ``z`` moves an element
+    vertically and ``z2`` horizontally (the two axes are independent, so the
+    cloud fills a box, not a line). The whole offset is faded by
+    :func:`turn_fade`, so at a face-on phase and under reduced motion it is
+    exactly ``(0, 0)``: still frames carry the unturned mark, unaltered. Pure,
+    never raises.
+    """
+    f = turn_fade(t)
+    r = _finite(R, 32.0)
+    if r <= 0.0:
+        r = 32.0
+    dz = min(1.0, max(0.0, _finite(z, 0.5))) - 0.5
+    dz2 = min(1.0, max(0.0, _finite(z2, 0.5))) - 0.5
+    return (dz2 * (2.0 * VOLUME_X_FRAC) * r * f,
+            -dz * (2.0 * VOLUME_Y_FRAC) * r * f)
+
+
 def mark_blink_dots(t: Any, R: Any) -> List[Dict[str, Any]]:
     """Blink dots (shared field), gone under reduced motion.
 
@@ -962,6 +1013,58 @@ def mark_inner_ring_tilt(t: Any) -> float:
         return _field.inner_ring_tilt(_mark_tt(t))
     except Exception:  # noqa: BLE001
         return _field.INNER_RING_TILT_BASE
+
+
+def _field_layer(name: str, t: Any, R: Any, reduced_empty: bool = True
+                 ) -> List[Dict[str, Any]]:
+    """Read one optional field layer defensively (never raise, never blank).
+
+    The new rich layers (``core_shells``, ``flare_dots``, ``filament_state``,
+    ``ring_particles``, ``cylinder_particles``) are consumed through here so a
+    field that has not landed a layer yet — or raises part-way — degrades to a
+    missing layer instead of a crash mid-frame. ``reduced_empty`` drops live
+    layers under reduced motion so a still frame stays clean; the nucleus
+    interior passes ``False`` (interior depth survives at rest). Never raises.
+    """
+    if reduced_empty and _reduced_motion():
+        return []
+    fn = getattr(_field, name, None)
+    if not callable(fn):
+        return []
+    try:
+        return [e for e in fn(_mark_tt(t), _finite(R, 32.0)) if isinstance(e, dict)]
+    except Exception:  # noqa: BLE001 - a field fault must not blank the orb
+        return []
+
+
+def mark_core_shells(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """Nested interior bodies of the nucleus (shared field).
+
+    Kept alive under reduced motion — the interior of the sphere is part of the
+    still mark, and the field clamps its own clock — so a resting frame still
+    reads as a layered core. Never raises.
+    """
+    return _field_layer("core_shells", t, R, reduced_empty=False)
+
+
+def mark_flare_dots(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """The rare, larger blink-flare family; empty under reduced motion."""
+    return _field_layer("flare_dots", t, R, reduced_empty=True)
+
+
+def mark_filament(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """The travelling energy filament's samples; empty under reduced motion."""
+    return _field_layer("filament_state", t, R, reduced_empty=True)
+
+
+def mark_ring_particles(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """Bodies riding every declared ring; empty under reduced motion."""
+    return _field_layer("ring_particles", t, R, reduced_empty=True)
+
+
+def mark_cylinder_particles(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """Bodies forming a vertical column around the nucleus; empty when still."""
+    return _field_layer("cylinder_particles", t, R, reduced_empty=True)
 
 
 def _finite(v: Any, default: float = 0.0) -> float:
@@ -1055,7 +1158,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # the unturned mark, unaltered and with no transform pushed on the painter.
 
     def _place(x: Any, y: Any, depth: Any = 0.5, zseed: Any = None,
-                 zspread: Any = TURN_Z_SPREAD, zflat: bool = False
+                 zspread: Any = TURN_Z_SPREAD, zflat: bool = False,
+                 z: Any = None, z2: Any = None
                  ) -> Tuple[float, float, float]:
         """A field point's painted position and rotated-depth gain.
 
@@ -1064,11 +1168,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         not repeated per point. ``zseed`` breaks the depth/x lock per element
         (see ``turn_qdepth``); ``None`` keeps the raw field depth. Points pass
         ``zflat=True`` (full volume); ring vertices pass a small spread.
+
+        ``z``/``z2`` are the field's two independent VOLUME axes: when given,
+        an element also receives a screen-space displacement along two
+        orthogonal directions (:func:`volume_offset`), so the cloud occupies a
+        genuine volume instead of one sheet. The displacement is faded by the
+        combined turn, so it is exactly zero face-on and under reduced motion.
         """
         px, py, g = _tumble_project(_num(x, 0.0), _num(y, 0.0),
                                     turn_qdepth(depth, zseed, zspread,
                                                 flat=zflat),
                                     turn_cy, turn_sy, turn_cx, turn_sx, Rf)
+        if z is not None or z2 is not None:
+            ox, oy = volume_offset(tt, Rf, z, z2)
+            px += ox
+            py += oy
         return cx + px, cy + py, g
 
     def _shade(alpha: Any, depth: Any = 0.5, gain: Any = 1.0) -> float:
@@ -1298,7 +1412,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         for s in smps:
             d = _num(s.get("depth"), depth)
             X, Y, g = _place(s.get("x"), s.get("y"), d, zseed=zseed,
-                             zflat=True)
+                             zflat=True, z=s.get("z"), z2=s.get("z2"))
             placed.append((X, Y, d, g))
         pts = [(px, py) for px, py, _d, _g in placed]
         run = [0.0]
@@ -1352,7 +1466,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                rgb: Tuple[int, int, int],
                arm_frac: float = _field.GLINT_ARM_FRAC,
                skew_deg: Any = 0.0, depth: Any = 0.5,
-               zseed: Any = None, zflat: bool = True) -> None:
+               zseed: Any = None, zflat: bool = True,
+               z: Any = None, z2: Any = None) -> None:
         """A twinkling star, never a filled orb (owner 2026-10-17).
 
         Two thin crossing arms plus a tiny core read as a glint at this size
@@ -1374,7 +1489,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         surface catching light from an angle instead of a flat cross.
         """
         d = _num(depth, 0.5)
-        gx, gy, g = _place(fx, fy, d, zseed=zseed, zflat=zflat)
+        gx, gy, g = _place(fx, fy, d, zseed=zseed, zflat=zflat, z=z, z2=z2)
         sz = max(GLINT_MIN_SIZE, _num(size, 0.0) * g)
         a = _num(alpha, 0.0) * bright * _shade(1.0, d, g)
         if a <= ALPHA_EPS:
@@ -1401,7 +1516,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                _num(part.get("size"), 0.0),
                _shade(_num(part.get("alpha"), 0.0), depth),
                _lift(_num(part.get("lift"), _field.LIFT_BEAD)),
-               skew_deg=part.get("skew"), depth=depth, zseed=pseed)
+               skew_deg=part.get("skew"), depth=depth, zseed=pseed,
+               z=part.get("z"), z2=part.get("z2"))
 
 
     def _satellite(shell: Dict[str, Any], draw_trail: bool) -> None:
@@ -1429,7 +1545,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                max(0.3, _num(body.get("size"), 0.0)),
                _shade(_num(body.get("alpha"), 0.0), depth),
                _lift(_num(body.get("lift"), _field.LIFT_BEAD)),
-               skew_deg=body.get("skew"), depth=depth, zseed=bseed)
+               skew_deg=body.get("skew"), depth=depth, zseed=bseed,
+               z=body.get("z"), z2=body.get("z2"))
 
     def _spark(spark: Dict[str, Any]) -> None:
         """One nucleus spark: the same glint shape, thrown out past the orbits."""
@@ -1440,7 +1557,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                _lift(_num(spark.get("lift"), _field.LIFT_NUCLEUS)),
                arm_frac=_field.SPARK_ARM_FRAC,
                skew_deg=spark.get("skew"), depth=depth,
-               zseed=_num(spark.get("index"), None))
+               zseed=_num(spark.get("index"), None),
+               z=spark.get("z"), z2=spark.get("z2"))
 
     def _dust(mote: Dict[str, Any]) -> None:
         # No wake for the dense field: 30 motes each dragging a streak turns
@@ -1449,7 +1567,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         d = _num(mote.get("depth"), 0.5)
         mx, my, g = _place(mote.get("x"), mote.get("y"), d,
                            zseed=_num(mote.get("index"), None),
-                           zflat=True)
+                           zflat=True, z=mote.get("z"), z2=mote.get("z2"))
         _dot(mx, my,
              max(0.25, _num(mote.get("size"), 0.0) * g),
              _shade(_num(mote.get("alpha"), 0.0) * bright, d, g),
@@ -1464,7 +1582,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                     zseed=_num(glint.get("index"), None))
         gx, gy, g = _place(glint.get("x"), glint.get("y"), depth,
                            zseed=_num(glint.get("index"), None),
-                           zflat=True)
+                           zflat=True, z=glint.get("z"), z2=glint.get("z2"))
         _dot(gx, gy,
              max(0.3, _num(glint.get("size"), 0.0) * g),
              _shade(_num(glint.get("alpha"), 0.0) * bright, depth, g),
@@ -1497,13 +1615,15 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         for k, smp in enumerate(trail):
             hue = (head_hue + ((k + 1) / float(n_beads)) * pair_span) % 1.0
             bx, by, bg = _place(smp.get("x"), smp.get("y"), depth,
-                                zseed=tseed, zflat=True)
+                                zseed=tseed, zflat=True,
+                                z=smp.get("z"), z2=smp.get("z2"))
             _dot(bx, by,
                  _num(smp.get("size"), 0.0) * bg,
                  _shade(_num(smp.get("alpha"), 0.0) * bright, depth, bg),
                  _anchor(_spec_rgb(hue, COMET_BEAD_SAT)), bg)
         hx, hy, hg = _place(traveller.get("x"), traveller.get("y"), depth,
-                            zseed=tseed, zflat=True)
+                            zseed=tseed, zflat=True,
+                            z=traveller.get("z"), z2=traveller.get("z2"))
         _dot(hx, hy,
              max(0.4, _num(traveller.get("size"), 0.0) * hg),
              _shade(_num(traveller.get("alpha"), 0.0) * bright, depth, hg),
@@ -1711,7 +1831,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         d = _num(bit.get("depth"), 0.5)
         gx, gy, g = _place(bit.get("x"), bit.get("y"), d,
                            zseed=_num(bit.get("index"), None),
-                           zflat=True)
+                           zflat=True, z=bit.get("z"), z2=bit.get("z2"))
         size = _num(bit.get("size"), 0.0)
         alpha = _num(bit.get("alpha"), 0.0) * bright * g
         if alpha <= ALPHA_EPS or size <= 0.0:
@@ -1741,7 +1861,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         d = _num(bl.get("depth"), 0.5)
         bx, by, g = _place(bl.get("x"), bl.get("y"), d,
                            zseed=_num(bl.get("index"), None),
-                           zflat=True)
+                           zflat=True, z=bl.get("z"), z2=bl.get("z2"))
         size = _num(bl.get("size"), 0.0)
         alpha = _num(bl.get("alpha"), 0.0) * bright * g
         if alpha <= ALPHA_EPS or size <= 0.0:
