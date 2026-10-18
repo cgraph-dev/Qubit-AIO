@@ -599,18 +599,20 @@ def test_unknown_style_falls_back_to_ember(monkeypatch):
     assert stats["lines"] >= 4  # ember bands still drew; a typo never blanks the orb
 
 
-def test_two_satellite_shells_travel_their_own_circles():
+def test_satellite_shells_travel_their_own_circles():
     # Owner ask: "2 more rotating orbs that follow circle line on different
-    # circles with different timing". Contract: two shells, circular paths in
-    # the mark's plane, bodies travelling in OPPOSITE directions at different
-    # periods, each body's distance matching its own circle.
+    # circles with different timing". Contract: a set of counter-rotating
+    # shells, circular paths in the mark's plane, bodies travelling in
+    # OPPOSITE directions at different periods, each body's distance matching
+    # its own circle. The set may grow; what must hold is that every shell
+    # keeps its own radius, spin sense and timing.
     from voicebridge.orb import mark_field as F
 
     sats = F.satellites(2.0, 106.0)
-    assert len(sats) == 2
-    r0 = sats[0]["ring"]["rx_frac"]
-    r1 = sats[1]["ring"]["rx_frac"]
-    assert r0 != r1, "the two shells must ride different circles"
+    assert len(sats) >= 2, "the shell set must not shrink"
+    radii = [s["ring"]["rx_frac"] for s in sats]
+    assert len(set(radii)) == len(radii), \
+        "the shells must ride different circles"
     # Circular in-plane: same squash ratio as the mark's ellipses.
     for s in sats:
         assert s["ring"]["ry_frac"] / s["ring"]["rx_frac"] == pytest.approx(
@@ -622,8 +624,11 @@ def test_two_satellite_shells_travel_their_own_circles():
     b = [((s["body"]["x"] ** 2 + s["body"]["y"] ** 2) ** 0.5) for s in
          F.satellites(3.7, 106.0)]
     assert a != b, "the bodies must move"
-    assert F.SATELLITE_SHELLS[0][3] != F.SATELLITE_SHELLS[1][3], "opposite spins"
-    assert F.SATELLITE_SHELLS[0][2] != F.SATELLITE_SHELLS[1][2], "different timing"
+    spins = [shell[3] for shell in F.SATELLITE_SHELLS]
+    periods = [shell[2] for shell in F.SATELLITE_SHELLS]
+    assert len(set(spins)) > 1, "the shells must counter-rotate"
+    assert len(set(periods)) == len(periods), "different timing"
+    assert any(a != b for a in spins for b in spins), "an opposing pair"
 
 
 def test_satellite_shells_are_drawn_and_vanish_when_frozen():
@@ -798,3 +803,42 @@ def test_every_element_carries_a_hue_and_a_dof_value():
     assert F.dof(0.0) == pytest.approx(1.0)
     assert 0.0 < F.dof(0.5) < 1.0
     assert F.dof(0.2) > F.dof(0.8)
+
+
+def test_shells_counter_rotate_at_full_turn_rates():
+    # Owner 2026-10-18: "spin 360 degree ... more 360 to give 3d effect".
+    # The shells are not sways: each completes whole turns about the nucleus,
+    # the pair keeps crossing, and no two share a period.
+    from voicebridge.orb import mark_field as F
+    assert F.RING_PERIOD_NEAR > 0 and F.RING_PERIOD_FAR > 0
+    near0, far0 = F.orbit_tilts(0.0)
+    # One period on, each shell has turned a whole turn (the sway term is the
+    # only residue, so the tolerance covers a few degrees of precession).
+    assert F.orbit_tilts(F.RING_PERIOD_NEAR)[0] == pytest.approx(
+        near0 + 360.0, abs=3.0)
+    assert F.orbit_tilts(F.RING_PERIOD_FAR)[1] == pytest.approx(
+        far0 - 360.0, abs=3.0)
+    # Counter-rotation: near turns one way, far the other.
+    assert F.orbit_tilts(2.0)[0] > F.orbit_tilts(0.0)[0]
+    assert F.orbit_tilts(2.0)[1] < F.orbit_tilts(0.0)[1]
+    shells = F.satellites(0.0, 64.0)
+    assert len(shells) >= 3
+    assert len({s["ring"]["rx_frac"] for s in shells}) == len(shells)
+    assert len({sh[3] for sh in F.SATELLITE_SHELLS}) > 1
+
+
+def test_skew_is_a_bounded_per_depth_shear():
+    from voicebridge.orb import mark_field as F
+    assert F.skew(1.0) == pytest.approx(-F.SKEW_GAIN_DEG)
+    assert F.skew(0.0) == pytest.approx(F.SKEW_GAIN_DEG)
+    assert abs(F.skew(0.5)) < 1e-9
+    for d in (0.0, 0.25, 0.5, 0.75, 1.0):
+        assert abs(F.skew(d)) <= F.SKEW_GAIN_DEG + 1e-9
+        assert abs(F.skew("junk")) <= F.SKEW_GAIN_DEG + 1e-9
+    # Every drawn body offers one, so a renderer can shear consistently.
+    for p in F.particle_state(1.3, 64.0):
+        assert "skew" in p and abs(p["skew"]) <= F.SKEW_GAIN_DEG + 1e-9
+    for m in F.dust_state(1.3, 64.0):
+        assert "skew" in m
+    for shell in F.satellites(1.3, 64.0):
+        assert "skew" in shell["body"]

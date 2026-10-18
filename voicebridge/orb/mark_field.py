@@ -70,6 +70,10 @@ DEPTH_POPOUT = 0.70
 DOF_NEAR = 0.0
 DOF_FAR = 1.0
 DOF_GAMMA = 1.7
+#: Per-depth shear (degrees) a renderer may rotate a body by. A point on a
+#: tilted plane is foreshortened along one axis; a few degrees of skew is what
+#: stops a glint from reading as a flat sticker pasted on the orbit.
+SKEW_GAIN_DEG = 7.0
 
 # ------------------------------------------------------------ camera drift
 CAMERA_SWAY_FRAC = 0.016
@@ -85,8 +89,8 @@ RING_SWAY_DEG = 3.0
 #: like a pendulum: a sine precession swings back and forth and reads as
 #: pendulum motion. Counter-rotating (near +, far -) at non-harmonic periods,
 #: so the pair keeps crossing in new places without ever locking.
-RING_PERIOD_NEAR = 12.0
-RING_PERIOD_FAR = 17.0
+RING_PERIOD_NEAR = 9.5
+RING_PERIOD_FAR = 13.5
 #: Per-particle wobble: a bounded PHASE offset in degrees, never a clock
 #: multiplier (a multiplier makes the field accelerate with uptime).
 SPEED_MOD_AMP = 0.10
@@ -195,6 +199,10 @@ SATELLITE_SHELLS = (
     # (rx_frac, ry_frac_ratio, period_s, direction, size_px, alpha, lift)
     (0.50, 1.0, 5.5, 1.0, 1.05, 0.95, 0.85),
     (0.93, 1.0, 9.0, -1.0, 0.85, 0.90, 0.75),
+    # A third shell, turning WITH the first and between the two radii: three
+    # counter-rotating bodies at non-harmonic periods cross in new places
+    # continuously, which is what makes the mark read as 3D rather than flat.
+    (0.70, 1.0, 13.5, 1.0, 0.72, 0.88, 0.72),
 )
 SATELLITE_RING_ALPHA = 0.14
 SATELLITE_RING_WIDTH = 1.0
@@ -546,6 +554,12 @@ def _depth_lift(depth: float) -> float:
     return DEPTH_LIFT_BASE + DEPTH_LIFT_GAIN * depth
 
 
+def skew(depth: Any) -> float:
+    """Per-depth shear in degrees: +ve one way, -ve the other, 0 at the rim."""
+    d = min(1.0, max(0.0, _finite(depth, 0.5)))
+    return SKEW_GAIN_DEG * math.cos(math.pi * d)
+
+
 def dof(depth: Any) -> float:
     """How far out of focus an element at ``depth`` is: 0.0 sharp, 1.0 far.
 
@@ -586,6 +600,7 @@ def particle_state(t: Any, R: float) -> List[Dict[str, float]]:
             "lift": _depth_lift(depth),
             "glint_scale": tw["scale"], "glint_alpha": tw["alpha"],
             "hue": _hue_for(idx, 31.7), "dof": dof(depth),
+            "skew": skew(depth),
         })
     return out
 
@@ -702,7 +717,7 @@ def satellites(t: Any, R: float) -> List[Dict[str, Any]]:
             "body": {"index": float(idx), "x": bx + dx, "y": by + dy,
                      "depth": depth, "hue": _hue_for(idx, 89.3),
                      "vx": bvx * direction, "vy": bvy * direction,
-                     "dof": dof(depth),
+                     "dof": dof(depth), "skew": skew(depth),
                      "size": _depth_size(depth, size96 * scale),
                      "alpha": _depth_alpha(depth, alpha), "lift": lift},
             "trail": trail,
@@ -768,6 +783,7 @@ def dust_state(t: Any, R: float) -> List[Dict[str, float]]:
             "vx": vx * 360.0 / max(0.1, period),
             "vy": vy * 360.0 / max(0.1, period),
             "hue": _hue_for(i, 53.9), "dof": dof(depth),
+            "skew": skew(depth),
             "size": (DUST_SIZE_BASE + DUST_SIZE_SPAN * hash01(i, 7.3)) * scale
                     * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth),
             "alpha": _depth_alpha(depth, DUST_ALPHA_BASE + DUST_ALPHA_GAIN
@@ -818,7 +834,7 @@ def comet(t: Any, R: float) -> Dict[str, Any]:
     return {"x": x + dx, "y": y + dy, "depth": depth,
             "index": 0.0, "hue": _hue_for(0, 101.3),
             "vx": cvx * COMET_SPEED_MULT, "vy": cvy * COMET_SPEED_MULT,
-            "dof": dof(depth),
+            "dof": dof(depth), "skew": skew(depth),
             "size": COMET_SIZE * scale * (0.8 + 0.4 * depth),
             "alpha": COMET_ALPHA * fade, "lift": COMET_LIFT, "trail": tail}
 
@@ -848,7 +864,8 @@ def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
         vx, vy = _orbit_velocity(sx, sy, near_tilt, ang)
         out.append({"index": float(i), "x": x + dx, "y": y + dy,
                     "depth": depth, "hue": _hue_for(i, 67.1),
-                    "dof": dof(depth), "vx": vx * rate, "vy": vy * rate,
+                    "dof": dof(depth), "skew": skew(depth),
+                    "vx": vx * rate, "vy": vy * rate,
                     "size": (SPARKLE_SIZE_BASE + SPARKLE_SIZE_PEAK * peak)
                             * (r / 32.0),
                     "alpha": SPARKLE_MAX_ALPHA * peak,
@@ -894,7 +911,8 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
     rx, ry = r * RX_FRAC, r * RY_FRAC
     scale = r / 32.0
     out: List[Dict[str, Any]] = []
-    main_n = BINARY_COUNT - 8
+    per_shell = 4
+    main_n = BINARY_COUNT - per_shell * len(SATELLITE_SHELLS)
     for i in range(main_n):
         orbit = "a" if (i % 3) != 0 else "b"
         tilt = near_tilt if orbit == "a" else far_tilt
@@ -922,8 +940,8 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
             "char": "1" if (i % 2 == 0) else "0",
         })
     # A few fragments on each satellite shell.
-    for j in range(8):
-        idx = 0 if j < 4 else 1
+    for j in range(per_shell * len(SATELLITE_SHELLS)):
+        idx = min(len(SATELLITE_SHELLS) - 1, j // per_shell)
         (rx_frac, ratio, period, direction, _size, _alpha, _lift) = SATELLITE_SHELLS[idx]
         tilt = near_tilt if idx == 0 else far_tilt
         rx_s = r * rx_frac
@@ -977,5 +995,6 @@ __all__ = [
     "hue_to_rgb", "rgb_trail", "dust_trail", "RGB_TRAIL_SAMPLES",
     "RGB_TRAIL_HUE_STEP", "RGB_TRAIL_HUE_DRIFT", "RGB_TRAIL_ALPHA_BASE",
     "DUST_TRAIL_SAMPLES", "PARTICLE_HUE_BASE", "PARTICLE_HUE_SPAN",
-    "dof", "DOF_NEAR", "DOF_FAR", "DOF_GAMMA",
+    "dof", "DOF_NEAR", "DOF_FAR", "DOF_GAMMA", "skew", "SKEW_GAIN_DEG",
+    "RING_PERIOD_NEAR", "RING_PERIOD_FAR",
 ]
