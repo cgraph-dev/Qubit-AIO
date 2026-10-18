@@ -206,8 +206,12 @@ def test_qt_widget_paints_frame():
         pix = w.grab()
         assert not pix.isNull()
         img = pix.toImage().convertToFormat(QImage.Format_RGBA8888)
+        # Sample the REAL centre: the orb's size is configurable, so a
+        # hardcoded pixel walked off the nucleus once the default size moved
+        # off 154 and the probe landed on the (correctly faint) aura.
+        cx, cy = (img.width() - 1) // 2, (img.height() - 1) // 2
         assert img.pixelColor(0, 0).alpha() == 0  # corner transparent
-        assert img.pixelColor(77, 77).alpha() > 200  # core solid (154px orb)
+        assert img.pixelColor(cx, cy).alpha() > 200  # nucleus core solid
     finally:
         w.close()
 
