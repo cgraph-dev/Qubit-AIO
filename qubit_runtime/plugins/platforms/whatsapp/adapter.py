@@ -216,6 +216,7 @@ from gateway.platforms.base import (
 from gateway.platforms.helpers import cancel_task
 from gateway.platforms.event import MessageEvent, MessageType
 from utils import env_int
+from gateway.platforms.send_targets import regex_stripped_parser
 
 
 def _cache_dirs() -> tuple:
@@ -1150,8 +1151,12 @@ PLATFORM_HINT = (
     "documents; image URLs via ![alt](url) send as photos."
 )
 
+_SEND_JID_RE = re.compile("^\s*[\w-]+@(?:g\.us|s\.whatsapp\.net|lid|broadcast|newsletter)\s*$", re.IGNORECASE)
+
+
 def register(ctx) -> None:
     ctx.register_platform(
+        target_ref_syntax_fn=regex_stripped_parser(_SEND_JID_RE),
         name="whatsapp", label="WhatsApp", adapter_factory=WhatsAppAdapter, check_fn=check_whatsapp_requirements,
         is_connected=_is_connected, required_env=["WHATSAPP_ENABLED"],
         install_hint="WhatsApp requires a Node.js bridge — see the WhatsApp messaging docs",

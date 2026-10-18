@@ -29,6 +29,7 @@ from gateway.platforms.base import BasePlatformAdapter, SendResult
 from gateway.platforms.event import MessageEvent, MessageType
 from gateway.platforms._shared import get_scoped_secret as _get_scoped_secret, send_error
 from gateway.platforms.helpers import MessageDeduplicator
+from gateway.platforms.send_targets import parse_nonempty
 from gateway.platforms._shared import (
     extra_or_secret as _extra_or_secret, seed_extra_from_env as _seed_extra_from_env
 )
@@ -357,6 +358,7 @@ async def _standalone_send(
 def register(ctx) -> None:
     """Plugin entry point — called by the Qubit plugin system at startup."""
     ctx.register_platform(
+        target_ref_syntax_fn=parse_nonempty,
         name="ntfy", label="ntfy", adapter_factory=lambda cfg: NtfyAdapter(cfg),
         check_fn=check_requirements, validate_config=validate_config, is_connected=is_connected,
         required_env=["NTFY_TOPIC"], install_hint="pip install httpx   # already a Qubit dependency",

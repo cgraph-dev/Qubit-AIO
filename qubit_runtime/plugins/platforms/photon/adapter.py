@@ -53,6 +53,7 @@ from .sidecar_paths import _NPM_ERROR_LOG_MAX_CHARS, _lock_newer_than_install, _
 from .sidecar_paths import dir_writable as _dir_writable
 from qubit_constants import find_node_executable, with_qubit_node_path
 import contextlib
+from gateway.platforms.send_targets import regex_stripped_parser
 
 logger = logging.getLogger(__name__)
 
@@ -1692,10 +1693,14 @@ async def _standalone_send(
 
 # -- Plugin entry point ----------------------------------------------------------
 
+_SEND_DM_GUID_RE = re.compile("^any;-;\+\d{6,}$", re.IGNORECASE)
+
+
 def register(ctx) -> None:
     """Called by the Qubit plugin loader at startup."""
     from . import cli as _cli  # local: avoid argparse work at module load
     ctx.register_platform(
+        target_ref_syntax_fn=regex_stripped_parser(_SEND_DM_GUID_RE),
         name="photon", label="iMessage via Photon", adapter_factory=lambda cfg: PhotonAdapter(cfg),
         check_fn=check_requirements, validate_config=validate_config, is_connected=is_connected,
         required_env=["PHOTON_PROJECT_ID", "PHOTON_PROJECT_SECRET"],
