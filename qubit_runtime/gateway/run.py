@@ -4773,9 +4773,15 @@ def _start_gateway_housekeeping(
         # Restart-safe cron workers run outside the gateway cgroup and queue their final send for
         # whichever gateway is live; drained here (not the scheduler tick) so external providers get it too.
         chores.append((1, DRAIN_LABEL, lambda: _drain_restart_safe_cron_deliveries(adapters, loop, runner)))
+
+    def _media_cache_chore():
+        # Function-local import: ``run_housekeeping_disk`` imports from this module,
+        # so a module-level import here would be circular.
+        from gateway.run_housekeeping_disk import housekeeping_media_caches
+        return housekeeping_media_caches()
     chores += [
         (5, "Channel directory refresh", lambda: adapters and _housekeeping_channel_directory(adapters, loop)),
-        (60, "Media cache cleanup", housekeeping_media_caches),
+        (60, "Media cache cleanup", _media_cache_chore),
         (60, "Paste sweep", _housekeeping_paste_sweep)]
     # Low disk + auto-prune undecided: ask on the home channel (two syscalls; snoozed per post).
     def _post_auto_prune_prompt():
@@ -4783,7 +4789,6 @@ def _start_gateway_housekeeping(
         # so a module-level import here would be circular.
         from gateway.run_housekeeping_disk import maybe_post_auto_prune_prompt
         return maybe_post_auto_prune_prompt(runner, loop)
-
     chores.append((1, "Auto-prune low-disk prompt", _post_auto_prune_prompt))
     if cron_provider is not None:
         chores.append((5, "Misfire catch-up sweep", lambda: _housekeeping_misfire_catch_up(cron_provider, adapters, loop)))
