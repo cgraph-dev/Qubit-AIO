@@ -11913,8 +11913,8 @@ def resolve_plugin_asset(plugin_name: str, file_path: str, cfg: Any = None
     # plugin-asset call wins the import race.
     _vendored_runtime(cfg)
     from qubit_cli.web_server import _get_dashboard_plugins
-    from qubit_cli.web_routers.dashboard_ui import (
-        _PLUGIN_ASSET_CONTENT_TYPES, _plugin_activated, _plugin_enable_sets)
+    from qubit_cli.web_server_dashboard import _plugin_consent_withheld
+    from qubit_cli.web_routers.dashboard_ui import _PLUGIN_ASSET_CONTENT_TYPES
 
     name = str(plugin_name or "").strip()
     plugin = next((p for p in _get_dashboard_plugins()
@@ -11928,7 +11928,10 @@ def resolve_plugin_asset(plugin_name: str, file_path: str, cfg: Any = None
                 force_rescan=True) if p.get("name") == name), None)
         except Exception:
             plugin = None
-    if not plugin or not _plugin_activated(plugin, *_plugin_enable_sets()):
+    # PLG-3 replaced _plugin_activated(plugin, *sets) with the shared consent gate.
+    # This compat path was missed by that port, so every dashboard plugin asset
+    # raised ImportError here and the connection dropped (HTTP 000, empty log).
+    if not plugin or _plugin_consent_withheld(plugin):
         return 404, "application/json", None, {
             "ok": False, "code": "PLUGIN_NOT_FOUND",
             "detail": f"dashboard plugin {name!r} is not installed or not enabled",
