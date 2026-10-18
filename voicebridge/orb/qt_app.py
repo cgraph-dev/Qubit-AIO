@@ -3190,7 +3190,16 @@ if QWidget is not None:
             try:
                 cli = self._get_client()
                 if action == "cancel" and rid:
-                    cli.cancel_request(rid)
+                    # Halt the spoken reply, not just the state machine. The
+                    # helper owns the audio, so cancel_request alone only pops
+                    # the voice-edit request; stop_speaking() also ends
+                    # playback. Fall back to cancel_request while the sibling's
+                    # method is absent.
+                    stop = getattr(cli, "stop_speaking", None)
+                    if callable(stop):
+                        stop()
+                    else:
+                        cli.cancel_request(rid)
                     self._pending_rid = None
                     if rid == getattr(self, "_active_rid", None):
                         self._active_rid = None

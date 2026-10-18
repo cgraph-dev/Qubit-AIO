@@ -234,6 +234,11 @@ class VoiceOrb:
         self.ingame_override = False
         self._pending_rid: Optional[str] = None
         self._pending_ts = 0.0
+        # Live turn id learned from the state feed (``state.active_request``).
+        # The helper path never stages a rid, so without this a second press
+        # re-planned "begin" and re-triggered capture instead of stopping.
+        self._active_rid: Optional[str] = None
+        self._active_ts = 0.0
         self._client_factory = client_factory or _default_client
         self._client: Any = None
         # Talk-meter render state (additive): the smoothed 0..1 level the
@@ -519,12 +524,31 @@ class VoiceOrb:
     # -- voice toggle (helper start-capture; stage-only fallback) ---------------
     def toggle_voice(self) -> None:
         now = time.time()
-        action, rid = _state.plan_toggle(self._pending_rid, self._pending_ts, now)
+        # The plan sees the LIVE turn id learned from the state feed (mirrors
+        # the Qt view): while Qubit is thinking/working/speaking a press is a
+        # STOP that cancels the live turn; while listening it finishes the
+        # capture. The three-argument call path stays byte-compatible.
+        action, rid = _state.plan_toggle(
+            self._pending_rid, self._pending_ts, now,
+            orb_state=getattr(self, "state", None),
+            active_rid=getattr(self, "_active_rid", None),
+            active_ts=getattr(self, "_active_ts", 0.0))
         try:
             cli = self._get_client()
             if action == "cancel" and rid:
-                cli.cancel_request(rid)
+                # Halt the spoken reply, not just the state machine. The
+                # helper owns the audio, so cancel_request alone only pops the
+                # voice-edit request; stop_speaking() also ends playback. Fall
+                # back to cancel_request while the sibling's method is absent.
+                stop = getattr(cli, "stop_speaking", None)
+                if callable(stop):
+                    stop()
+                else:
+                    cli.cancel_request(rid)
                 self._pending_rid = None
+                if rid == getattr(self, "_active_rid", None):
+                    self._active_rid = None
+                    self._active_ts = 0.0
                 return
             # Click-to-talk: the helper owns the mic, so the click only
             # TRIGGERS its existing PTT path (start when idle, finish while
@@ -672,6 +696,21 @@ class VoiceOrb:
                     self.state = "error"
             except Exception:
                 self.state = "error"
+        # Learn the LIVE turn's request id from the same feed (no extra HTTP),
+        # exactly like the Qt view: capture rows carry it, and keeping it once
+        # seen means a journal window that later fills with wake noise cannot
+        # lose the id before the reply ends. A newer turn's id replaces it and
+        # ``state.active_request`` clears it on a cancellation row.
+        try:
+            _live_rid, _live_ts = _state.active_request(events, time.time())
+        except Exception:
+            _live_rid, _live_ts = (None, None)
+        if _live_rid:
+            self._active_rid = _live_rid
+            try:
+                self._active_ts = float(_live_ts)
+            except (TypeError, ValueError):
+                self._active_ts = time.time()
         # Transition-only journal row (same rule as the Qt view): runs on
         # every apply, live or offline, so idle->speaking->idle always
         # leaves its rows.
