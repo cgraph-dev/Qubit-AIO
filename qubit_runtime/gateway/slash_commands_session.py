@@ -400,9 +400,16 @@ class GatewaySessionCommandsMixin:
 
         source = event.source
         session_entry = await self.async_session_store.get_or_create_session(source)
+        # Under a session authority the rewrite commits in the re-send's own admission, fenced on
+        # the active rows read here (before the transcript, so any later write fails the fence).
+        owned = self._retry_owned_store(session_entry.session_id)
         try:
+            pinned = owned and await asyncio.to_thread(owned.get_active_message_ids, session_entry.session_id)
             history = await self.async_session_store.load_transcript(session_entry.session_id)
         except TranscriptReadError:
+            return history_unreadable()
+        except Exception:
+            logger.debug("/retry could not read the active rows of %s", session_entry.session_id, exc_info=True)
             return history_unreadable()
         last_user_idx = next((i for i in range(len(history) - 1, -1, -1)
                               if user_originated_turn_view(history[i]) is not None), None)
@@ -416,7 +423,16 @@ class GatewaySessionCommandsMixin:
             handoff, _ = split_user_originated_turn(history[last_user_idx])
         except ValueError as exc:
             return t("gateway.retry.unsafe", error=exc)
+        # Answer the refusals the re-sent turn would hit BEFORE the transcript rewrite: /retry
+        # passes the post-command gates as a canonical command, the plain-text re-send does not,
+        # and a refusal after the rewrite leaves the transcript shorter and loses the user's turn.
+        readmission_reply = self._retry_readmission_reply(source, last_user_msg)
+        if readmission_reply is not None:
+            return readmission_reply
 
+        if owned:
+            return await self._retry_in_admission(
+                event, session_entry, owned, pinned, truncated, last_user_msg, handoff is not None)
         if handoff is not None:
             # Composite carrier (one row = retained summary + live ask): the carrier-aware rewind
             # archives it and inserts the pure scaffold atomically, reselecting the latest carrier
