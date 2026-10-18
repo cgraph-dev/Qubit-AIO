@@ -715,7 +715,14 @@ async def _send_to_platform(platform, pconfig, chat_id, message, thread_id=None,
                    f"native send_message media delivery is currently only supported for {_MEDIA_PLATFORMS_NOTE}")
     if policy is not None and policy.text_direct:
         # Text-only straight to the plugin's standalone sender (media dropped with the warning above).
-        send_one = lambda chunk, is_last: _registry_standalone_send(platform_name, pconfig, chat_id, chunk, thread_id)
+        # Signal goes through the module-level ``_send_signal`` (resolved at call time) so the
+        # import-time binding above stays honest and monkeypatching it takes effect.
+        if platform_name == "signal":
+            send_one = lambda chunk, is_last: _send_signal(  # noqa: E731
+                getattr(pconfig, "extra", None) or {}, chat_id, chunk,
+                media_files=media_files if is_last else None)
+        else:
+            send_one = lambda chunk, is_last: _registry_standalone_send(platform_name, pconfig, chat_id, chunk, thread_id)
     else:
         from gateway.platform_registry import platform_registry
         entry = platform_registry.get(platform_name)

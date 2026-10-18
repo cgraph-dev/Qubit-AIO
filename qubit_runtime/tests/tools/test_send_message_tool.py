@@ -542,6 +542,9 @@ class TestSendToPlatformChunking:
             sent.append(chunk)
             return {"success": True, "platform": "signal", "chat_id": chat_id}
 
+        # discover_plugins() REPLACES the "signal" registry entry, so resolve the real send
+        # limit and patch only after discovery has run (otherwise a stale entry answers).
+        smt.prepare_send_message_platforms()
         monkeypatch.setattr(smt, "_send_signal", fake_send_signal)
 
         long_msg = "word " * ((SIGNAL_MAX // 5) + 500)  # comfortably over limit

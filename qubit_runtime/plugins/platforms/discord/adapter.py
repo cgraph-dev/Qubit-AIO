@@ -7722,7 +7722,9 @@ PLATFORM_HINT = (
 
 def register(ctx) -> None:
     """Plugin entry point — called by the Qubit plugin system."""
+    from .send_targets import SEND_ENTRY_KWARGS
     ctx.register_platform(
+        **SEND_ENTRY_KWARGS,  # send_message target syntax + routing
         name="discord",
         label="Discord",
         adapter_factory=DiscordAdapter,
