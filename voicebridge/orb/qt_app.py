@@ -3442,6 +3442,22 @@ if QWidget is not None:
                 self._advance_anim(time.monotonic())
                 if self.visible and _ember.needs_frame(
                         True, self._pos.collapsed):
+                    # ADAPTIVE frame budget. One frame of this mark costs tens
+                    # of ms of CPU, so a fixed interval that is shorter than the
+                    # paint just makes the loop repaint back-to-back and peg a
+                    # core. Size the next interval from the last frame's real
+                    # paint cost, leaving slack, so the orb always yields CPU
+                    # between frames. On a fast host this is just FRAME_MS
+                    # (full smoothness); on a loaded one it stretches to keep
+                    # headroom instead of spinning. Never changes what is drawn.
+                    try:
+                        paint_ms = float(getattr(self, "_last_paint_ms", 0.0) or 0.0)
+                    except (TypeError, ValueError):
+                        paint_ms = 0.0
+                    want = int(paint_ms * _ember.FRAME_SLACK)
+                    interval = want if want > FRAME_MS else FRAME_MS
+                    if interval != self._frame_timer.interval():
+                        self._frame_timer.setInterval(interval)
                     self.update()
             except Exception:
                 pass
@@ -3495,8 +3511,9 @@ if QWidget is not None:
 
         # -- painting (Qt-native ember; same params as ember.render) -------
         def paintEvent(self, ev: Any) -> None:
+            _paint_t0 = time.monotonic()
             try:
-                now_mono = time.monotonic()
+                now_mono = _paint_t0
                 try:
                     last = self._paint_last_mono
                     if last is None:
@@ -3709,6 +3726,15 @@ if QWidget is not None:
                 self.frames += 1
             except Exception:
                 pass
+            finally:
+                # Record how long this frame's paint ACTUALLY took, on every
+                # exit path (paintEvent has several early branches), so the tick
+                # can size the next interval to leave the loop real idle time
+                # instead of repainting back-to-back. See ``_frame_tick``.
+                try:
+                    self._last_paint_ms = (time.monotonic() - _paint_t0) * 1000.0
+                except Exception:
+                    pass
 
         def close(self) -> None:
             try:

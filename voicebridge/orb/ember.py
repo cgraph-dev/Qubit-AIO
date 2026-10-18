@@ -56,6 +56,11 @@ def frame_budget_ms() -> int:
 #: two backends stay in step.
 FRAME_MS = frame_budget_ms()
 
+#: Slack multiplier for the ADAPTIVE interval: the next repaint is scheduled
+#: ``FRAME_SLACK`` times the last frame's real paint cost after it finished, so
+#: the loop always has idle time and cannot peg a core. Must be > 1.0.
+FRAME_SLACK = 1.4
+
 #: Ember-orange family on near-black (own palette values in that family).
 EMBER_CORE = (255, 84, 0)
 EMBER_MID = (255, 100, 30)
