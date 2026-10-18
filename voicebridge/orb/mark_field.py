@@ -908,6 +908,62 @@ def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
     return out
 
 
+# ------------------------------------------------------------- blink dots
+#: Tiny dots that materialise out of nowhere: fixed deterministic positions
+#: with NO travel — only a raised-cosine alpha envelope 0 -> peak -> 0, so
+#: each dot fades in from nothing and vanishes the same way, like data
+#: materialising. The full count is always returned (stable frame to frame);
+#: the envelope decides which dots are visible.
+BLINK_COUNT = 24
+BLINK_SIZE_BASE = 0.10
+BLINK_SIZE_SPAN = 0.12
+BLINK_ALPHA_PEAK = 0.75
+BLINK_LIFE_BASE = 2.2
+BLINK_LIFE_SPAN = 2.6
+BLINK_LIFT = 0.65
+BLINK_R_FRAC_MIN = 0.35
+BLINK_R_FRAC_SPAN = 0.60
+
+
+def blink_dots(t: Any, R: float) -> List[Dict[str, float]]:
+    """Dots that appear out of nowhere and vanish, travelling nowhere.
+
+    One dict per dot: ``{"index", "x", "y", "depth", "size", "alpha",
+    "lift", "hue", "hue2", "dof", "skew"}``. Positions are fixed orbit
+    points from ``hash01``; only ``alpha`` moves, through a raised-cosine
+    envelope with zero slope at both ends, so a birth and a death are both
+    fades rather than pops.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    near_tilt, far_tilt = orbit_tilts(tt)
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    out: List[Dict[str, float]] = []
+    for i in range(BLINK_COUNT):
+        tilt = near_tilt if i % 2 else far_tilt
+        ang = 360.0 * hash01(i, 31.9)
+        life = BLINK_LIFE_BASE + BLINK_LIFE_SPAN * hash01(i, 33.3)
+        phase = (tt / max(0.1, life) + hash01(i, 35.7)) % 1.0
+        env = 0.5 * (1.0 - math.cos(2.0 * math.pi * phase))
+        depth = _depth(ang)
+        pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+        grow = BLINK_R_FRAC_MIN + BLINK_R_FRAC_SPAN * hash01(i, 37.1)
+        x, y = orbit_point(0.0, 0.0, r * RX_FRAC * pull * grow,
+                           r * RY_FRAC * pull * grow, tilt, ang)
+        hue = _hue_for(i, 91.7)
+        out.append({
+            "index": float(i), "x": x + dx, "y": y + dy, "depth": depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "dof": dof(depth), "skew": skew(depth),
+            "size": ((BLINK_SIZE_BASE + BLINK_SIZE_SPAN * hash01(i, 39.3))
+                     * scale * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth)),
+            "alpha": BLINK_ALPHA_PEAK * env * (0.35 + 0.65 * depth),
+            "lift": BLINK_LIFT,
+        })
+    return out
+
+
 # ------------------------------------------------------------- inner core ring
 INNER_RING_RX_FRAC = 0.32
 INNER_RING_PERIOD_S = 4.5

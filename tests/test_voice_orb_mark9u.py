@@ -1081,3 +1081,49 @@ def test_every_element_dict_carries_its_duotone_partner():
 
 
 # --------------------------------------------------------------------------- #
+# BLINK DOTS — tiny dots that appear out of nowhere: fixed positions, only
+# the alpha envelope moves (0 -> peak -> 0), so they materialise and vanish.
+# --------------------------------------------------------------------------- #
+def test_blink_dots_materialise_in_place_and_vanish():
+    from voicebridge.orb import mark_field as F
+    R = 64.0
+    dots = F.blink_dots(1.0, R)
+    assert len(dots) == F.BLINK_COUNT
+    for d in dots:
+        assert set(d) >= {"x", "y", "depth", "size", "alpha", "lift",
+                          "hue", "hue2"}
+        assert 0.0 <= d["alpha"] <= F.BLINK_ALPHA_PEAK + 1e-9
+        assert d["size"] > 0.0
+        assert d["hue2"] == pytest.approx(
+            (d["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+    # Deterministic: same clock, identical dots.
+    assert F.blink_dots(1.0, R) == dots
+    # No travel: each dot keeps its fixed orbit angle — depth is constant
+    # across clocks and the position re-derives from that angle alone (the
+    # dot rides the turning plane and the camera sway, but never advances).
+    for t in (0.0, 2.5, 7.0):
+        now = F.blink_dots(t, R)
+        near, far = F.orbit_tilts(t)
+        dx, dy = F.camera_offset(t, R)
+        for i, d in enumerate(now):
+            ang = 360.0 * F.hash01(i, 31.9)
+            assert d["depth"] == pytest.approx(dots[i]["depth"])
+            tilt = near if i % 2 else far
+            pull = 1.0 - F.DEPTH_PERSPECTIVE * (1.0 - d["depth"])
+            grow = (F.BLINK_R_FRAC_MIN
+                    + F.BLINK_R_FRAC_SPAN * F.hash01(i, 37.1))
+            ex, ey = F.orbit_point(0.0, 0.0, R * F.RX_FRAC * pull * grow,
+                                   R * F.RY_FRAC * pull * grow, tilt, ang)
+            assert (d["x"], d["y"]) == pytest.approx((ex + dx, ey + dy))
+    # The envelope visits both ends: dots fade in from nothing and vanish.
+    alphas = [[d["alpha"] for d in F.blink_dots(k * 0.25, R)]
+              for k in range(80)]
+    per_dot_max = [max(col) for col in zip(*alphas)]
+    per_dot_min = [min(col) for col in zip(*alphas)]
+    for d, mx in zip(F.blink_dots(0.0, R), per_dot_max):
+        ceiling = F.BLINK_ALPHA_PEAK * (0.35 + 0.65 * d["depth"])
+        assert mx > ceiling * 0.5
+    assert all(mn < 0.05 for mn in per_dot_min)
+
+
+# --------------------------------------------------------------------------- #
