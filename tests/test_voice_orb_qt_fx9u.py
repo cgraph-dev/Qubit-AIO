@@ -445,7 +445,7 @@ def test_far_elements_draw_before_nucleus_and_near_after():
         if p.fill is None or i == seam:
             continue
         for part in parts:
-            # The painter places each particle through the mark's Y-axis turn,
+            # The painter places each particle through the mark's X+Y tumble,
             # so the expected pixel is the projected one, not the raw field
             # coordinate. The z-split being asserted is the FIELD's, and it is
             # the field's depth that feeds the projection too.
@@ -474,11 +474,19 @@ def test_shockwave_ring_appears_near_beat_and_not_between():
 
     def shock_rings(t):
         prims = _record(t=t, size=size)
+        scale, alpha = F.shockwave(t)
         nuc_r = R * F.NUCLEUS_FRAC * F.nucleus_scale(t) * Q.NUCLEUS_RADIUS_MULT
+        # The shockwave is the EXPANDING ring: match its radius (the field's
+        # own scale at this clock) and its alpha, not just "a centred
+        # outline". The nucleus now carries its own centred strokes — the
+        # Fresnel limb at the body edge and the chromatic split — which a
+        # bare radius ceiling would sweep in.
+        want_r = nuc_r * scale
         return [p for p in prims
                 if p.kind == "path" and p.fill is None and p.pen is not None
                 and math.hypot(p.cx - c, p.cy - c) <= 0.75
-                and p.r <= nuc_r * 1.45]
+                and abs(p.r - want_r) <= 0.25 * want_r
+                and abs(p.alpha - alpha) <= 0.05]
 
     rings = shock_rings(beat_t)
     assert len(rings) == 1, rings
@@ -564,8 +572,13 @@ def test_primitive_count_is_bounded_and_richer_than_pre_field():
     pre_field_max = 2 * 3 + 9 + 9 * 4 + 14 + 2
     counts = [len(_record(t=0.31 + k * 0.17)) for k in range(10)]
     assert max(counts) > pre_field_max
-    assert max(counts) <= 300
-    assert max(counts) - min(counts) < 60
+    # The holo budget: the field lane densified the frame (dust 48, sparkles
+    # 40, binary 72, sparks 26) and the Qt lane adds blink dots plus the
+    # nucleus rim pair, so the old 300 ceiling is stale (it was already 312
+    # at the field lane's merge base). The binding cap is the 420 of the perf
+    # contract, which this stays under with headroom.
+    assert max(counts) <= 420
+    assert max(counts) - min(counts) < 80
 
 
 # -- (g) reduced motion is a still frame -----------------------------------
@@ -620,33 +633,42 @@ def test_mark_effects_never_raise_under_reduced_motion():
 # (i) echo follower rings
 # --------------------------------------------------------------------------- #
 def _turned(t, R, x, y, depth=0.5):
-    """Where the painter puts a field point: the Y-axis 360 turn's projection.
+    """Where the painter puts a field point: the combined X+Y tumble.
 
-    Re-derived HERE from ``qt_app.y_turn_point``'s documented formula rather
-    than by calling it, so the tests below pin the geometry the renderer claims
-    to draw rather than agreeing with it by construction::
+    Re-derived HERE from the painter's documented formula rather than by
+    calling it, so the tests below pin the geometry the renderer claims to
+    draw rather than agreeing with it by construction. Rotation order Y
+    first, then X — the painter's order::
 
-        z     = (depth - 0.5) * Z_GAIN * R * sin(theta)**2
-        xr    = x*cos(theta) + z*sin(theta)
-        zr    = -x*sin(theta) + z*cos(theta)
-        X, Y  = xr*(1 + PERSP*zr/R), y*(1 + PERSP*zr/R)
+        z     = (depth - 0.5) * Z_GAIN * R * sin(theta_y)**2
+        xr    = x*cos_y + z*sin_y
+        zr    = -x*sin_y + z*cos_y
+        yr    = y*cos_x - zr*sin_x
+        zr2   = y*sin_x + zr*cos_x
+        X, Y  = xr*(1 + PERSP*zr2/R), yr*(1 + PERSP*zr2/R)
 
-    ``theta = 0`` and ``theta = pi`` are exact: an identity and a pure mirror
-    in x. That is why several tests below probe at a whole number of
-    :data:`qt_app.Y_SPIN_PERIOD_S`: at those clocks the turn contributes
-    nothing to a bounding box, so a box-based assertion (an orbit's recovered
-    tilt, say) measures the FIELD and not the projection on top of it.
+    The two phases come from the painter's own public reads
+    (``mark_horizontal_spin_deg`` / ``mark_vertical_spin_deg``) while the
+    mixing above stays local. ``t = 0`` (and a still clock, which both reads
+    clamp to) is an exact identity. No clock makes the tumble "contribute
+    nothing" any more — the two axes only complete together every 1107 s —
+    so box-based assertions below always expect the PROJECTED box, never the
+    flat one.
     """
     from voicebridge.orb import qt_app as Q
 
-    theta = Q.mark_horizontal_theta(t)
-    ct, st = math.cos(theta), math.sin(theta)
+    ty = math.radians(Q.mark_horizontal_spin_deg(t))
+    px = math.radians(Q.mark_vertical_spin_deg(t))
+    cy, sy, cx, sx = math.cos(ty), math.sin(ty), math.cos(px), math.sin(px)
     d = min(1.0, max(0.0, float(depth)))
-    z = (d - 0.5) * Q.Y_SPIN_Z_GAIN * R * st * st
-    zr = -x * st + z * ct
-    persp = 1.0 + Q.Y_SPIN_PERSP * zr / R
+    z = (d - 0.5) * Q.Y_SPIN_Z_GAIN * R * sy * sy
+    xr = x * cy + z * sy
+    zr = -x * sy + z * cy
+    yr = y * cx - zr * sx
+    zr2 = y * sx + zr * cx
+    persp = 1.0 + Q.Y_SPIN_PERSP * zr2 / R
     persp = min(Q.Y_SPIN_PERSP_MAX, max(Q.Y_SPIN_PERSP_MIN, persp))
-    return (x * ct + z * st) * persp, y * persp
+    return xr * persp, yr * persp
 
 
 def _pix(t, R, c, item, depth=None):
@@ -661,7 +683,7 @@ def _pix(t, R, c, item, depth=None):
 
 
 def _declared_ring_box(t, R, ring, tilt):
-    """Bounding box of one DECLARED ring as the painter's Y turn projects it.
+    """Bounding box of one DECLARED ring as the painter's tumble projects it.
 
     The ring's points are sampled at the field's own ``ring_path`` angles, so
     each point's depth follows the field's convention
@@ -690,11 +712,10 @@ def _thin_orbit_outlines(prims, c, tol=0.75):
     """Centred outline paths that are neither the main stroke nor a circle.
 
     ``tol`` bounds how far a stroke's bounding-box centre may sit off the
-    mark's axis. It has to be loosened away from sub-pixel for any clock
-    other than a whole number of Y-turn periods: under a real 3D rotation with
-    perspective, a circle's projected silhouette is genuinely not centred on
-    the axis (the far arc shrinks while the near arc grows), and the recorded
-    box centre drifts a pixel or two with it.
+    mark's axis. It has to be loosened away from sub-pixel: under a real 3D
+    tumble with perspective, a circle's projected silhouette is genuinely not
+    centred on the axis (the far arc shrinks while the near arc grows), and
+    the recorded box centre drifts a pixel or two with it.
     """
     return [p for p in prims
             if p.kind == "path" and p.fill is None and p.pen is not None
@@ -727,8 +748,8 @@ def test_echo_rings_are_two_thin_lagged_followers():
     # Thin centred outlines include the two satellite CIRCLES as well as the
     # two echo followers, so the followers are picked out the way the painter
     # builds them: each is a DECLARED ring (``ring_geometry``) stroked through
-    # the mark's Y-turn projection, so its recorded box must equal that ring's
-    # projected box. Matching the box (rather than a ratio of its sides) is
+    # the mark's combined-tumble projection, so its recorded box must equal
+    # that ring's projected box. Matching the box (rather than a ratio of its sides) is
     # what makes this work at any clock: the projection changes the box, so a
     # clock-independent test has to expect the projected one.
     lagged = {str(e["orbit"]): e["tilt"] for e in F.echo_rings(t)}
@@ -1121,32 +1142,46 @@ def test_binaries_actually_paint_pixels(monkeypatch):
 Q_INNER_RING_MAX_W = 1.2
 
 
-def _inner_ring(prims, c, Rf):
-    """The centred thin outline whose rx is the field's inner-ring fraction."""
+def _inner_ring_declared(t, R):
+    """The single DECLARED inner core ring at clock ``t``."""
     from voicebridge.orb import mark_field as F
 
-    irx = Rf * F.INNER_RING_RX_FRAC
-    expect_r = irx * (1.0 + F.RY_FRAC / F.RX_FRAC) / 2.0
-    return [p for p in prims
-            if p.kind == "path" and p.fill is None and p.pen is not None
-            and math.hypot(p.cx - c, p.cy - c) <= 0.75
-            and p.width <= Q_INNER_RING_MAX_W
-            and abs(p.r - expect_r) <= 0.15 * expect_r]
+    inner = [r for r in F.ring_geometry(t) if r["layer"] == "inner"]
+    assert len(inner) == 1
+    return inner[0]
+
+
+def _match_inner_ring(prims, c, R, t):
+    """The recorded stroke matching the inner ring's projected declared box.
+
+    Same matching as the echo followers above: the ring is a DECLARED circle
+    stroked through the combined tumble, so its recorded box must equal its
+    declared path's box AFTER that projection (``_declared_ring_box``), not
+    the flat one. The centre bound is the echo one: the projected silhouette
+    is genuinely off-centre by a pixel or two.
+    """
+    from voicebridge.orb import qt_app as Q
+
+    want = _declared_ring_box(t, R, _inner_ring_declared(t, R),
+                              Q.mark_inner_ring_tilt(t))
+    return [p for p in prims if p.kind == "path" and p.fill is None
+            and p.pen is not None
+            and abs(p.w - want[0]) <= 0.75 and abs(p.h - want[1]) <= 0.75
+            and math.hypot(p.cx - c, p.cy - c) <= 0.05 * R
+            and p.width <= Q_INNER_RING_MAX_W]
 
 
 def test_inner_ring_is_a_thin_dim_depth_neutral_orbit():
     from voicebridge.orb import mark_field as F
     from voicebridge.orb import qt_app as Q
 
-    from voicebridge.orb import qt_app as Q
-
     size, R, c = 192, 90.0, 96.0
-    # Whole numbers of Y-turn periods: the turn is then an exact mirror in x,
-    # so this test keeps measuring the core ring's declared radii and alpha
-    # rather than the projection laid over them.
-    t = Q.Y_SPIN_PERIOD_S * 2.0
+    # No clock makes the tumble "contribute nothing" any more, so — like the
+    # echo followers above — this measures the core ring's declared geometry
+    # THROUGH the projection rather than the flat one.
+    t = 0.37
     prims = _record(t=t, size=size)
-    rings = _inner_ring(prims, c, R)
+    rings = _match_inner_ring(prims, c, R, t)
     assert len(rings) == 1, rings
     ring = rings[0]
     # Thin, dim, and never brighter than the echo followers.
@@ -1169,21 +1204,20 @@ def test_inner_ring_tilt_tracks_the_shared_field_and_freezes_when_still():
 
     size, c = 192, 96.0
     R = size / 2.0 - 6.0
-    tilts = []
-    # Whole numbers of Y-turn periods: the turn is an exact mirror in x at
-    # theta = pi, so it does not change a bounding box and the tilt recovered
-    # below is the field's own. There is still real ring rotation between the
-    # samples (the 4.5 s ring period does not divide the 20.5 s turn), so the
-    # core ring is genuinely turning between them.
-    for t in (0.0, Q.Y_SPIN_PERIOD_S, 2.0 * Q.Y_SPIN_PERIOD_S):
-        rings = _inner_ring(_record(t=t, size=size), c, R)
+    # The flat-ellipse tilt recovery (``_tilt_abs_deg``) assumed a single-axis
+    # turn; under the combined tumble a box width mixes the tilt with the X
+    # compression, so the recovery is invalid. Instead each clock's recorded
+    # stroke must equal that clock's PROJECTED declared box with that clock's
+    # field tilt — and the two clocks' boxes must differ, because the 4.5 s
+    # core ring genuinely turns between them.
+    boxes = []
+    for t in (0.37, 2.0):
+        rings = _match_inner_ring(_record(t=t, size=size), c, R, t)
         assert len(rings) == 1, (t, rings)
-        irx = R * F.INNER_RING_RX_FRAC
-        iry = irx * (F.RY_FRAC / F.RX_FRAC)
-        tilts.append(_tilt_abs_deg(rings[0], irx, iry))
         assert Q.mark_inner_ring_tilt(t) == pytest.approx(F.inner_ring_tilt(t))
-    # The core ring really turns: its tilt is not parked.
-    assert max(tilts) - min(tilts) > 5.0, tilts
+        boxes.append((rings[0].w, rings[0].h))
+    assert (abs(boxes[0][0] - boxes[1][0]) > 2.0
+            or abs(boxes[0][1] - boxes[1][1]) > 2.0), boxes
 
     with monkeypatch_env("QUBIT_REDUCED_MOTION", "1"):
         assert Q.mark_inner_ring_tilt(9.0) == F.INNER_RING_TILT_BASE
