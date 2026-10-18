@@ -10,6 +10,12 @@ Same visual language as ``frontend/qubit-web/src/components/QubitMark.tsx`` +
     chromatic corona,
   * nine particles riding each ellipse plus a dense dust field, a comet and a
     binary data-fragment field,
+  * a 3D ``volume_particles`` field (per-body depth, twinkle and spin) that
+    REPLACES the retired math-glyph text layer — no symbol text is ever drawn,
+  * the black-hole structure the owner asked for: the field's
+    ``accretion_stream``, ``photon_ring`` and ``infall_streaks`` layers, plus
+    each circle's per-ring ``intensity``/``shimmer`` detail, so the rings read
+    as live accretion rather than dead outlines,
   * a chromatic fringe faked on the two MAIN hairline orbits only (Tk has no
     blend modes, so the fringe is two extra offset strokes in dark red / blue
     on near-black).
@@ -122,11 +128,14 @@ from .mark_field import (
     inner_ring_tilt,
     binary_state,
     hue_to_rgb,
+    palette_hue,
     rgb_trail,
     dust_trail,
     ring_geometry,
     ring_path,
     ring_alpha,
+    ring_intensity,
+    ring_shimmer,
     ring_tilt_spin,
     ring_radius_scale,
     core_shells,
@@ -157,13 +166,27 @@ try:  # pragma: no cover
     from .mark_field import orbiter_particles as _field_orbiter_particles
 except Exception:  # noqa: BLE001
     _field_orbiter_particles = None
-#: The math-symbol layer and the screen-break bodies land in a sibling field
-#: commit. Import them the same defensive way: a field revision without them
-#: simply draws nothing for that layer until the re-merge.
+#: The 3D volume-particle field (which REPLACES the retired math-glyph text
+#: layer), the accretion / photon / infall black-hole structure and the
+#: screen-break bodies all land across sibling field commits. Import them
+#: defensively so this renderer runs against any field revision; a lane that
+#: lacks them simply draws nothing for that layer until the re-merge.
 try:  # pragma: no cover - exercised by whichever field revision is checked out
-    from .mark_field import math_state as _field_math_state
+    from .mark_field import volume_particles as _field_volume_particles
 except Exception:  # noqa: BLE001
-    _field_math_state = None
+    _field_volume_particles = None
+try:  # pragma: no cover
+    from .mark_field import accretion_stream as _field_accretion_stream
+except Exception:  # noqa: BLE001
+    _field_accretion_stream = None
+try:  # pragma: no cover
+    from .mark_field import photon_ring as _field_photon_ring
+except Exception:  # noqa: BLE001
+    _field_photon_ring = None
+try:  # pragma: no cover
+    from .mark_field import infall_streaks as _field_infall_streaks
+except Exception:  # noqa: BLE001
+    _field_infall_streaks = None
 try:  # pragma: no cover
     from .mark_field import screen_break as _field_screen_break
 except Exception:  # noqa: BLE001
@@ -409,9 +432,13 @@ NUCLEUS_CORONA_SAT = 0.92
 NUCLEUS_CORONA_POWER = 1.3
 NUCLEUS_CORONA_BREATH_S = 7.3
 NUCLEUS_CORONA_BREATH_SPAN = 0.22
-NUCLEUS_CORONA_HUE_BASE = 0.50
+#: The corona hue comes from the FIELD's tightened palette, not a local ramp
+#: (owner: "its still too colored"). ``palette_hue`` picks one of the few
+#: disciplined hues per lobe; only a tiny shared drift moves it with the clock,
+#: so the corona can never spray the wheel the way the old ``base + span*i``
+#: ramp did.
 NUCLEUS_CORONA_HUE_TURNS = 0.018
-NUCLEUS_CORONA_HUE_SPAN = 0.34
+NUCLEUS_CORONA_HUE_SALT = 97.3
 #: Fringe: a faint, softened split on the two MAIN orbits only, so the crisp
 #: hairline stays the dominant stroke and the quiet circles stay quiet.
 #: A hard-edged Tk stroke cannot be a sub-pixel alpha nudge the way the Qt
@@ -431,15 +458,32 @@ NUCLEUS_RIM_OVALS = 3
 BINARY_FONT_MIN_PX = 5
 BINARY_FONT_PX_PER_UNIT = 12.0
 BINARY_FONT_PX_OFFSET = 2.0
-#: Math-symbol fragments (owner: "add math symbols equations not random lines"),
-#: parity with the Qt painter. Same dict contract as the "1"/"0" bits, drawn
-#: with ``create_text``. Sized a touch larger so an equation reads distinctly.
-MATH_FONT_MIN_PX = 6
-MATH_FONT_PX_PER_UNIT = 14.0
-MATH_FONT_PX_OFFSET = 2.0
-#: How many math glyphs are considered per frame (flat text cost).
-MATH_DRAW_LIMIT = 40
-MATH_GLYPH_SAT = 0.92
+
+# --- 3D volume particles (the retired math-glyph layer's replacement) --------
+#: The field owns the bodies, their orbits, depth, twinkle (``pulse``) and
+#: rotation (``spin``). Tk draws each as a pinprick glint whose CROSSED ARMS are
+#: raked by the body's own ``spin`` angle, so every body visibly turns on its
+#: own axis — the per-body animation the text glyphs never had. Saturation is
+#: kept inside the field's restrained palette.
+VOLUME_SAT = 0.74
+VOLUME_VAL = 1.00
+
+# --- accretion / photon / infall: the black-hole structure -------------------
+#: Owner: "the spirals or circles make them look like blackholes add more
+#: details and animations". These three field layers give the plain circles
+#: structure; Tk draws the samples cheaply (dots and short streaks) so a dense
+#: layer does not blow the primitive budget. Saturation stays near the field's
+#: own palette (no renderer-side rainbow).
+ACCRETION_SAT = 0.70
+ACCRETION_VAL = 1.00
+PHOTON_SAT = 0.55
+PHOTON_VAL = 1.00
+INFALL_SAT = 0.72
+INFALL_VAL = 1.00
+#: How much of the field's recommended ``tail_len`` the infall streak is drawn
+#: with (a fraction, so the streak reads as falling matter without spanning the
+#: mark). The head keeps a small dot so the streak has an origin.
+INFALL_TAIL_GAIN = 0.85
 #: Screen-break bodies (owner likes the mark "breaking the screen"): bodies the
 #: field places BEYOND the orb radius. Drawn as glints; nothing clips to a
 #: circle, so they run off the widget edge.
@@ -1174,6 +1218,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 rscale = _num(ring_radius_scale(tt, spec), 1.0)
             except Exception:  # noqa: BLE001 - a field fault keeps the base radii
                 rscale = 1.0
+            # Per-ring SHIMMER: a sub-percent radius detail on its own
+            # non-harmonic period. The rigid ``ring_radius_scale`` above keeps
+            # every ring proportional to the others; this sits on top so each
+            # circle's edge glitters without ever disturbing the set.
+            try:
+                rscale *= _num(ring_shimmer(tt, spec), 1.0)
+            except Exception:  # noqa: BLE001 - a field fault keeps the dry radius
+                pass
             draw_spec["rx_frac"] = _num(spec.get("rx_frac"), RX_FRAC) * rscale
             draw_spec["ry_frac"] = _num(spec.get("ry_frac"), RY_FRAC) * rscale
             # ``ring_path`` carries the field's camera sway. The BODY does not
@@ -1203,8 +1255,16 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                          else RING_ALPHA_SCALE["far_main"])
             else:
                 scale = RING_ALPHA_SCALE.get(layer, 1.0)
+            # Per-ring INTENSITY: the field's accretion hot-spot modulation
+            # (0.55..1.0). Multiplying the breathing alpha by it makes each
+            # circle brighten and dim as an accretion structure instead of a
+            # dead outline, while the shared rigid motion keeps the set whole.
+            try:
+                intensity = _num(ring_intensity(tt, spec), 1.0)
+            except Exception:  # noqa: BLE001 - a field fault keeps the dry alpha
+                intensity = 1.0
             _ring_stroke(pts,
-                         ring_alpha(tt, spec) * scale * bright,
+                         ring_alpha(tt, spec) * scale * intensity * bright,
                          ring_w * _num(spec.get("width"), 1.0)
                          * (1.15 if layer == "main" else 1.0),
                          layer)
@@ -1306,18 +1366,45 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             orbiters = []
     if not isinstance(orbiters, list):
         orbiters = []
-    # Math-symbol/equation fragments and the screen-break bodies: the sibling
-    # field commit's two new layers. Drawn defensively when present, nothing
-    # before the re-merge.
-    maths = []
-    if _field_math_state is not None and not reduced_motion:
+    # The 3D volume-particle field, the accretion / photon / infall structure
+    # and the screen-break bodies: the sibling field commits' layers. Drawn
+    # defensively when present, nothing before the re-merge.
+    volume = []
+    if _field_volume_particles is not None and not reduced_motion:
         try:
-            maths = [m for m in _field_math_state(tt, r) if isinstance(m, dict)]
+            volume = [v for v in _field_volume_particles(tt, r)
+                      if isinstance(v, dict)]
         except Exception:  # noqa: BLE001
-            maths = []
-    if not isinstance(maths, list):
-        maths = []
-    maths = maths[:MATH_DRAW_LIMIT]
+            volume = []
+    if not isinstance(volume, list):
+        volume = []
+    accretion = []
+    if _field_accretion_stream is not None and not reduced_motion:
+        try:
+            accretion = [a for a in _field_accretion_stream(tt, r)
+                         if isinstance(a, dict)]
+        except Exception:  # noqa: BLE001
+            accretion = []
+    if not isinstance(accretion, list):
+        accretion = []
+    photon = []
+    if _field_photon_ring is not None and not reduced_motion:
+        try:
+            photon = [p for p in _field_photon_ring(tt, r)
+                      if isinstance(p, dict)]
+        except Exception:  # noqa: BLE001
+            photon = []
+    if not isinstance(photon, list):
+        photon = []
+    infall = []
+    if _field_infall_streaks is not None and not reduced_motion:
+        try:
+            infall = [s for s in _field_infall_streaks(tt, r)
+                      if isinstance(s, dict)]
+        except Exception:  # noqa: BLE001
+            infall = []
+    if not isinstance(infall, list):
+        infall = []
     sbreaks = []
     if _field_screen_break is not None and not reduced_motion:
         try:
@@ -1344,8 +1431,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     near_glints = [g for g in glints if _num(g.get("depth"), 0.5) >= 0.5]
     far_binaries = [b for b in binaries if _num(b.get("depth"), 0.5) < 0.5]
     near_binaries = [b for b in binaries if _num(b.get("depth"), 0.5) >= 0.5]
-    far_maths = [m for m in maths if _num(m.get("depth"), 0.5) < 0.5]
-    near_maths = [m for m in maths if _num(m.get("depth"), 0.5) >= 0.5]
+    far_volume = [v for v in volume if _num(v.get("depth"), 0.5) < 0.5]
+    near_volume = [v for v in volume if _num(v.get("depth"), 0.5) >= 0.5]
+    far_accretion = [a for a in accretion if _num(a.get("depth"), 0.5) < 0.5]
+    near_accretion = [a for a in accretion if _num(a.get("depth"), 0.5) >= 0.5]
+    far_photon = [p for p in photon if _num(p.get("depth"), 0.5) < 0.5]
+    near_photon = [p for p in photon if _num(p.get("depth"), 0.5) >= 0.5]
+    far_infall = [s for s in infall if _num(s.get("depth"), 0.5) < 0.5]
+    near_infall = [s for s in infall if _num(s.get("depth"), 0.5) >= 0.5]
     far_sbreaks = [b for b in sbreaks if _num(b.get("depth"), 0.5) < 0.5]
     near_sbreaks = [b for b in sbreaks if _num(b.get("depth"), 0.5) >= 0.5]
     far_shells = [s for s in shells
@@ -1580,43 +1673,93 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         except Exception:
             pass
 
-    def _math(sym: Dict[str, Any]) -> None:
-        """One math-symbol/equation fragment as a small glyph, parity with Qt.
+    def _volume(item: Dict[str, Any]) -> None:
+        """One 3D volume particle as a glint that turns on its own axis.
 
-        Owner: "add math symbols equations not random lines". Same shape as
-        :func:`_binary` (placed/scaled through the whole-mark tumble,
-        depth-split, gone under reduced motion) but coloured from the FIELD's
-        own hue via ``hue_to_rgb``, never a renderer-side ramp, so the glyphs
-        stay inside the palette.
+        The owner retired the math-glyph TEXT layer ("they read as check
+        marks / v lines") in favour of real bodies. The field gives each body a
+        ``spin`` angle and a ``pulse`` twinkle (already folded into size/alpha);
+        Tk consumes the spin as the glint's arm rake, so a particle visibly
+        rotates instead of sitting still. Depth is carried through the same
+        tumble/volume path as every other body.
         """
-        nonlocal texts, min_y, max_y
-        size = _num(sym.get("size"))
-        depth = _num(sym.get("depth"), 0.5)
-        if size <= 0.0 or _num(sym.get("alpha")) <= FIELD_ALPHA_FLOOR:
-            return
-        try:
-            x, y, g = _place3(_num(sym.get("x")), _num(sym.get("y")), depth,
-                               zseed=_num(sym.get("index"), None), zflat=True,
-                               vol_z=sym.get("z"), vol_z2=sym.get("z2"))
-            alpha = _shade(sym.get("alpha"), depth, g) * bright
-            if alpha <= ALPHA_EPS:
-                return
-            hue = sym.get("hue")
-            rgb = (_anchor(_spec(hue, MATH_GLYPH_SAT)) if hue is not None
-                   else _lift(_num(sym.get("lift"), 0.5)))
-            fs = max(MATH_FONT_MIN_PX,
-                     int(size * g * MATH_FONT_PX_PER_UNIT
-                         + MATH_FONT_PX_OFFSET))
-            canvas.create_text(x, y, text=str(sym.get("char") or "?"),
-                               fill=_dim(rgb, alpha),
-                               font=("TkDefaultFont", fs))
-            texts += 1
-            if y < min_y:
-                min_y = y
-            if y > max_y:
-                max_y = y
-        except Exception:
-            pass
+        depth = _num(item.get("depth"), 0.5)
+        x, y, g = _place3(_num(item.get("x")), _num(item.get("y")), depth,
+                           zseed=_num(item.get("index"), None), zflat=True,
+                           vol_z=item.get("z"), vol_z2=item.get("z2"))
+        hue = item.get("hue")
+        rgb = (_anchor(_spec(_num(hue), VOLUME_SAT, VOLUME_VAL))
+               if hue is not None
+               else _lift(_num(item.get("lift"), LIFT_BEAD)))
+        _glint(x, y, item.get("size"), item.get("alpha"), rgb,
+               skew_deg=item.get("spin"), depth=depth, gain=g)
+
+    def _accretion(item: Dict[str, Any]) -> None:
+        """One accretion-stream sample: a depth-shaded dot, never text.
+
+        The sample winds around the nucleus (the field owns the spiral), so a
+        plain dot at its position reads as matter in the stream; hue comes from
+        the field's tightened palette.
+        """
+        depth = _num(item.get("depth"), 0.5)
+        x, y, g = _place3(_num(item.get("x")), _num(item.get("y")), depth,
+                           zseed=_num(item.get("index"), None), zflat=True,
+                           vol_z=item.get("z"), vol_z2=item.get("z2"))
+        hue = item.get("hue")
+        rgb = (_anchor(_spec(_num(hue), ACCRETION_SAT, ACCRETION_VAL))
+               if hue is not None
+               else _lift(_num(item.get("lift"), LIFT_BEAD)))
+        _dot(x, y, max(0.22, _num(item.get("size"))), item.get("alpha"),
+             rgb, depth=depth, gain=g)
+
+    def _photon(item: Dict[str, Any]) -> None:
+        """One photon-ring sample: a small lensed-light pinprick.
+
+        The field owns the two-lobe alpha/size profile (the bright lensed arcs
+        and the dim between them), so this only places and shades the sample.
+        """
+        depth = _num(item.get("depth"), 0.5)
+        x, y, g = _place3(_num(item.get("x")), _num(item.get("y")), depth,
+                           zseed=_num(item.get("index"), None), zflat=True,
+                           vol_z=item.get("z"), vol_z2=item.get("z2"))
+        hue = item.get("hue")
+        rgb = (_anchor(_spec(_num(hue), PHOTON_SAT, PHOTON_VAL))
+               if hue is not None
+               else _lift(_num(item.get("lift"), 0.5)))
+        _dot(x, y, max(0.18, _num(item.get("size"))), item.get("alpha"),
+             rgb, depth=depth, gain=g)
+
+    def _infall(item: Dict[str, Any]) -> None:
+        """One infalling streak: a tapering radial tail plus a head dot.
+
+        Owner: the mark should read like matter falling IN. The field carries a
+        screen velocity and a recommended ``tail_len``; the tail is drawn BACK
+        along that velocity (so it trails the falling body), then the head dot
+        lands on top. Both share the body's volume offset, so the streak is
+        rigid.
+        """
+        depth = _num(item.get("depth"), 0.5)
+        zseed = _num(item.get("index"), None)
+        vx, vy = _num(item.get("vx")), _num(item.get("vy"))
+        speed = math.hypot(vx, vy)
+        x, y, g = _place3(_num(item.get("x")), _num(item.get("y")), depth,
+                           zseed=zseed, zflat=True, vol_z=item.get("z"),
+                           vol_z2=item.get("z2"))
+        hue = item.get("hue")
+        rgb = (_anchor(_spec(_num(hue), INFALL_SAT, INFALL_VAL))
+               if hue is not None
+               else _lift(_num(item.get("lift"), LIFT_BEAD)))
+        if speed > 1e-9:
+            tail = _num(item.get("tail_len")) * INFALL_TAIL_GAIN
+            tx = _num(item.get("x")) - vx / speed * tail
+            ty = _num(item.get("y")) - vy / speed * tail
+            hx, hy, _hg = _place3(tx, ty, depth, zseed=zseed, zflat=True,
+                                  vol_z=item.get("z"), vol_z2=item.get("z2"))
+            a = _shade(_num(item.get("alpha")) * 0.55, depth, g)
+            if a > ALPHA_EPS:
+                _line([hx, hy, x, y], _dim(rgb, a * bright), 1)
+        _dot(x, y, max(0.18, _num(item.get("size"))), item.get("alpha"),
+             rgb, depth=depth, gain=g)
 
     def _screen_break(body: Dict[str, Any]) -> None:
         """One body the field placed BEYOND the orb radius, as a glint.
@@ -1842,10 +1985,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                           2.0 * math.pi * tt / NUCLEUS_CORONA_BREATH_S
                           + i * 1.7))
             dist = n_r * NUCLEUS_CORONA_RADIUS_FRAC * breath
-            hue = (NUCLEUS_CORONA_HUE_BASE
-                   + tt * NUCLEUS_CORONA_HUE_TURNS
-                   + i * NUCLEUS_CORONA_HUE_SPAN
-                   / float(NUCLEUS_CORONA_COUNT)) % 1.0
+            # Colour from the FIELD's disciplined palette (one of the few
+            # shared hues per lobe), plus a tiny clock drift, so the corona is
+            # never a local spectrum ramp.
+            hue = (palette_hue(i, NUCLEUS_CORONA_HUE_SALT)
+                   + tt * NUCLEUS_CORONA_HUE_TURNS) % 1.0
             _soft_oval(cx_f + dist * math.cos(ang),
                        cy_f + dist * math.sin(ang) * NUCLEUS_CORONA_SQUASH,
                        max(0.6, n_r * NUCLEUS_CORONA_SIZE_FRAC * breath),
@@ -1895,8 +2039,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _blink(_d)
     for _b in far_binaries:
         _binary(_b)
-    for _m in far_maths:
-        _math(_m)
+    for _v in far_volume:
+        _volume(_v)
+    for _a in far_accretion:
+        _accretion(_a)
+    for _ph in far_photon:
+        _photon(_ph)
+    for _if in far_infall:
+        _infall(_if)
     for _sb in far_sbreaks:
         _screen_break(_sb)
     for _s in far_sparks:
@@ -2008,8 +2158,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _blink(_d)
     for _b in near_binaries:
         _binary(_b)
-    for _m in near_maths:
-        _math(_m)
+    for _v in near_volume:
+        _volume(_v)
+    for _a in near_accretion:
+        _accretion(_a)
+    for _ph in near_photon:
+        _photon(_ph)
+    for _if in near_infall:
+        _infall(_if)
     for _sb in near_sbreaks:
         _screen_break(_sb)
     for _s in near_sparks:
@@ -2053,8 +2209,11 @@ __all__ = [
     "NUCLEUS_RIM_ALPHA", "NUCLEUS_RIM_OFFSET_PX", "NUCLEUS_RIM_FRINGE_ALPHA",
     "NUCLEUS_RIM_OVALS",
     "STREAK_HALF_WIDTH", "STREAK_MIN_LEN_PX", "ALPHA_EPS",
-    "STREAK_DRAW_SAMPLES", "MATH_FONT_MIN_PX", "MATH_FONT_PX_PER_UNIT",
-    "MATH_FONT_PX_OFFSET", "MATH_DRAW_LIMIT", "MATH_GLYPH_SAT",
+    "STREAK_DRAW_SAMPLES",
+    "VOLUME_SAT", "VOLUME_VAL",
+    "ACCRETION_SAT", "ACCRETION_VAL", "PHOTON_SAT", "PHOTON_VAL",
+    "INFALL_SAT", "INFALL_VAL", "INFALL_TAIL_GAIN",
+    "NUCLEUS_CORONA_HUE_TURNS", "NUCLEUS_CORONA_HUE_SALT",
     "SCREEN_BREAK_DRAW_LIMIT", "SCREEN_BREAK_SAT",
     "echo_follower_tilt", "nucleus_radius", "NUCLEUS_RADIUS_MULT",
     "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
