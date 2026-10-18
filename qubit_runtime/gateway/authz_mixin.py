@@ -59,6 +59,13 @@ def authz_field(name, field, entry):
     return _field(name, field, entry)
 
 
+def _group_chat_env(platform, entry=None) -> str:
+    """The platform's group-chat allowlist env name (``PlatformEntry.group_allowed_chats_env``), or ""."""
+    if platform is None:
+        return ""
+    return authz_field(platform.value, "group_allowed_chats_env", entry or _registry_entry(platform)) or ""
+
+
 def _registry_entry(platform):
     """Platform-registry entry for a (plugin) platform, or None. Discovers first (idempotent): the
     allowlist env names live only on the entry, so an undiscovered process must not read "no list"."""
@@ -548,7 +555,7 @@ class GatewayAuthorizationMixin:
         # Chat-scoped group allowlists must work with ``user_id is None`` (anonymous admins,
         # sender_chat posts, channel broadcasts).
         if is_group and source.chat_id:
-            chat_allowlist_env = _GROUP_CHAT_ENV.get(source.platform, "")
+            chat_allowlist_env = _group_chat_env(source.platform)
             if chat_allowlist_env and _allows(_coerce_allow_set(_auth_env(chat_allowlist_env)), source.chat_id):
                 return True
             # config.yaml fallback (``extra.group_allowed_chats``): Telegram observe-unmentioned mode
@@ -641,6 +648,11 @@ class GatewayAuthorizationMixin:
 
     def _principal_authorized(self, source: SessionSource, *, allow_adapter_delegation: bool) -> bool:
         """The allowlist verdict alone, before the bot loop guard."""
+        from gateway.session_local import authorize_local_source
+        local_verdict = authorize_local_source(self, source)
+        if local_verdict is not None:
+            return local_verdict
+
         # Webhook events are HMAC-verified; a ``trusted_inbound`` platform's events come from the
         # service its adapter authenticated to (no human sender to allowlist). HA events are
         # system-generated (HASS_TOKEN) and the homeassistant plugin declares the flag.
@@ -672,7 +684,7 @@ class GatewayAuthorizationMixin:
 
         platform_allowlist = _auth_env(platform_allow_env)
         group_user_allowlist = _auth_env(_GROUP_USER_ENV.get(source.platform, "")) if is_group_or_forum else ""
-        group_chat_allowlist = _auth_env(_GROUP_CHAT_ENV.get(source.platform, "")) if is_group_or_forum else ""
+        group_chat_allowlist = _auth_env(_group_chat_env(source.platform, entry)) if is_group_or_forum else ""
         global_allowlist = _auth_env("GATEWAY_ALLOWED_USERS")
 
         if not (platform_allowlist or group_user_allowlist or group_chat_allowlist or global_allowlist):
