@@ -85,6 +85,10 @@ from .mark_field import (
     nucleus_sparks,
     NUCLEUS_SPARK_COUNT,
     NUCLEUS_SPARK_REACH,
+    inner_ring_tilt,
+    binary_state,
+    INNER_RING_RX_FRAC,
+    BINARY_COUNT,
 )
 
 #: Fringe offset in DEVICE pixels at 96px. A lens fringe is a pixel-level
@@ -108,9 +112,30 @@ GLINT_CORE_MIN = 0.08
 #: cannot draw (hot near-white core -> state hue -> fading rim), wrapped in a
 #: soft outline halo. All layers are pure functions of the frame, so reduced
 #: motion paints the identical static body.
-NUCLEUS_LAYERS = 5
-HALO_LAYERS = 2
-NUCLEUS_OVAL_COUNT = HALO_LAYERS + NUCLEUS_LAYERS
+NUCLEUS_LAYERS = 9
+HALO_LAYERS = 3
+NUCLEUS_OVAL_COUNT = HALO_LAYERS + NUCLEUS_LAYERS + 2
+
+#: Master spin: a slow 360 deg rotation of the whole mark (period ~24s).
+MASTER_SPIN_PERIOD_S = 24.0
+
+
+def spin_deg(t: Any) -> float:
+    try:
+        tt = float(t)
+    except (TypeError, ValueError):
+        tt = 0.0
+    if not math.isfinite(tt):
+        tt = 0.0
+    return 360.0 * tt / MASTER_SPIN_PERIOD_S
+
+
+def _spin_pt(x: float, y: float, t: float = 0.0,
+             cx: float = 0.0, cy: float = 0.0) -> Tuple[float, float]:
+    a = math.radians(spin_deg(t))
+    dx, dy = float(x) - float(cx), float(y) - float(cy)
+    return (float(cx) + dx * math.cos(a) - dy * math.sin(a),
+            float(cy) + dx * math.sin(a) + dy * math.cos(a))
 
 #: Fringe channel colors, mixed toward the background (Tk alpha substitute).
 _FRINGE_RED = (150, 30, 55)
@@ -176,6 +201,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     ovals = 0
     lines = 0
     points = 0
+    texts = 0
     fills: List[Tuple[int, int, int]] = []
     min_y = float("inf")
     max_y = float("-inf")
@@ -285,6 +311,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     def _bead(x: float, y: float, rad: float, lift: float, alpha: float,
               arm_frac: float = GLINT_ARM_FRAC) -> None:
+        x, y = _spin_pt(x, y, tt, cx_f, cy_f)
         """A GLINT (four-point star), never an orb: the nucleus is the mark's
         only solid body. Two thin crossing arms + a small core read as a
         twinkle at orb size; a filled disc here looked like a marble."""
@@ -304,10 +331,33 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         for b in group:
             _bead(cx_f + b["x"], cy_f + b["y"], b["size"], b["lift"], b["alpha"])
 
+    def _text(x: float, y: float, char: str, size: float, lift: float,
+              alpha: float) -> None:
+        nonlocal texts, min_y, max_y
+        try:
+            xr, yr = _spin_pt(x, y, tt, cx_f, cy_f)
+            colour = _mix(fam["core"], (255, 255, 255), lift)
+            shown = _dim(colour, float(alpha) * bright)
+            fs = max(6, int(float(size) * 28 + 4))
+            canvas.create_text(xr, yr, text=str(char), fill=shown,
+                               font=("TkDefaultFont", fs))
+            texts += 1
+            if yr < min_y:
+                min_y = yr
+            if yr > max_y:
+                max_y = yr
+        except Exception:
+            pass
+
     def _ring(ccx: float, ccy: float, tilt: float,
               colour: Tuple[int, int, int], fringe_mix: float) -> None:
         """Three strokes: blue fringe, red fringe, then the hairline."""
         pts = _ellipse_points(ccx, ccy, rx, ry, tilt)
+        _rot = []
+        for _i in range(0, len(pts), 2):
+            _rx, _ry = _spin_pt(pts[_i], pts[_i + 1], tt, cx_f, cy_f)
+            _rot += [_rx, _ry]
+        pts = _rot
         blue = _hex(_mix(_FRINGE_BLUE, _ember.NEAR_BLACK, fringe_mix))
         red = _hex(_mix(_FRINGE_RED, _ember.NEAR_BLACK, fringe_mix))
         _line([p + (fringe if i % 2 == 0 else 0.0)
@@ -353,6 +403,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         comet_info = {"alpha": 0.0, "trail": []}
     if not isinstance(comet_info, dict):
         comet_info = {"alpha": 0.0, "trail": []}
+    try:
+        binaries = binary_state(tt, r)
+    except Exception:  # noqa: BLE001
+        binaries = []
+    if not isinstance(binaries, list):
+        binaries = []
     if reduced_motion:
         # A clean static frame: no dust, no glints, no comet, no trails, no
         # follower rings and no nucleus sparks.
@@ -368,6 +424,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     near_dust = [d for d in dust if float(d.get("depth", 0.0)) >= 0.5]
     far_glints = [g for g in glints if float(g.get("depth", 0.0)) < 0.5]
     near_glints = [g for g in glints if float(g.get("depth", 0.0)) >= 0.5]
+    far_binaries = [b for b in binaries if float(b.get("depth", 0.0)) < 0.5]
+    near_binaries = [b for b in binaries if float(b.get("depth", 0.0)) >= 0.5]
     # Follower rings: orbit "a" rides the NEAR ring, orbit "b" the FAR one —
     # the same z-split the main orbits use, so the echo takes part in the
     # three-dimensional read instead of floating on top of it.
@@ -462,6 +520,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     for _p in far_beads:
         _draw_particle(_p)
     _beads(far_glints)
+    for _b in far_binaries:
+        _text(cx_f + float(_b.get("x") or 0.0), cy_f + float(_b.get("y") or 0.0),
+              _b.get("char", "0"), float(_b.get("size") or 0.1),
+              float(_b.get("lift") or 0.5), float(_b.get("alpha") or 0.2))
     for _s in far_sparks:
         _draw_spark(_s)
     if comet_on:
@@ -539,8 +601,22 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             nscale, beat = nucleus_scale(tt), heartbeat(tt)
         except Exception:  # noqa: BLE001
             nscale, beat = 1.0, 0.0
-    nuc_rad = max(1.1, r * NUCLEUS_FRAC) * nscale * (0.95 + 0.05 * gain)
+    nuc_rad = max(1.1, r * NUCLEUS_FRAC) * 1.25 * nscale * (0.95 + 0.05 * gain)
+    nuc_rad = nuc_rad * (1.0 + 0.08 * beat)
     halo_a = min(1.0, (HALO_BASE + (1.0 - HALO_BASE) * beat) * bright)
+    # Inner ring: thin third orbit, low alpha, no fringe.
+    try:
+        _itilt = inner_ring_tilt(tt)
+        _irx = r * INNER_RING_RX_FRAC
+        _iry = _irx * (RY_FRAC / RX_FRAC)
+        _ipts = _ellipse_points(ccx, ccy, _irx, _iry, _itilt)
+        _irot = []
+        for _i in range(0, len(_ipts), 2):
+            _ix, _iy = _spin_pt(_ipts[_i], _ipts[_i + 1], tt, cx_f, cy_f)
+            _irot += [_ix, _iy]
+        _line(_irot, _dim(ring_rgb, 0.22 * bright), 1)
+    except Exception:  # noqa: BLE001
+        pass
     # Soft halo: dim outline rings (outline-only, never a disc), strongest on
     # the beat so the body reads as living even while the gradient stays still.
     halo_w = max(1, int(HALO_WIDTH))
@@ -559,6 +635,19 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         else:
             layer_rgb = _mix(nuc_rgb, hot_rgb, (frac - 0.5) / 0.5)
         _oval(ccx, ccy, nuc_rad * (1.0 - 0.70 * frac), _hex(layer_rgb))
+    # animated inner swirl highlight
+    _sa = math.radians(tt * 360.0 / 6.0)
+    _sx, _sy = _spin_pt(ccx + nuc_rad * 0.22 * math.cos(_sa),
+                        ccy + nuc_rad * 0.22 * math.sin(_sa),
+                        tt, cx_f, cy_f)
+    _oval(_sx, _sy, max(0.6, nuc_rad * 0.30),
+          _hex(_mix(hot_rgb, (255, 255, 255), 0.5)))
+    # slowly orbiting specular dot
+    _pa = math.radians(tt * 360.0 / 12.0 + 90.0)
+    _px, _py = _spin_pt(ccx + nuc_rad * 0.50 * math.cos(_pa),
+                        ccy + nuc_rad * 0.50 * math.sin(_pa),
+                        tt, cx_f, cy_f)
+    _oval(_px, _py, max(0.5, nuc_rad * 0.07), "#ffffff")
     fills.append(nuc_rgb)
 
     # ------------------------------------------------------------ near field
@@ -573,6 +662,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     for _p in near_beads:
         _draw_particle(_p)
     _beads(near_glints)
+    for _b in near_binaries:
+        _text(cx_f + float(_b.get("x") or 0.0), cy_f + float(_b.get("y") or 0.0),
+              _b.get("char", "0"), float(_b.get("size") or 0.1),
+              float(_b.get("lift") or 0.5), float(_b.get("alpha") or 0.2))
     for _s in near_sparks:
         _draw_spark(_s)
     if comet_on:
@@ -584,7 +677,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     if max_y == float("-inf"):
         max_y = cy_f + r
 
-    return {"ovals": ovals, "lines": lines, "points": points,
+    return {"ovals": ovals, "lines": lines, "points": points, "texts": texts,
             "min_y": min_y, "max_y": max_y, "fills": fills,
             "bars": bars_on}
 
@@ -593,6 +686,7 @@ __all__ = [
     "render", "resolve_core", "PARTICLES", "RING_SEGMENTS",
     "GLINT_MIN_SIZE", "GLINT_CORE_SCALE", "GLINT_CORE_MIN",
     "NUCLEUS_LAYERS", "HALO_LAYERS", "NUCLEUS_OVAL_COUNT",
+    "MASTER_SPIN_PERIOD_S", "spin_deg", "_spin_pt",
     "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
     "FRINGE_PX", "FRINGE_PX_AT_96", "LIFT_RING", "LIFT_BEAD",
     "LIFT_NUCLEUS", "MIN_MARK_BRIGHTNESS", "HALO_SCALE", "HALO_BASE",
@@ -603,4 +697,5 @@ __all__ = [
     "dust_state", "comet", "sparkles",
     "echo_rings", "satellites", "ECHO_LAG_S", "ECHO_SCALE", "ECHO_ALPHA", "ECHO_WIDTH",
     "nucleus_sparks", "NUCLEUS_SPARK_COUNT", "NUCLEUS_SPARK_REACH",
+    "inner_ring_tilt", "binary_state", "INNER_RING_RX_FRAC", "BINARY_COUNT",
 ]
