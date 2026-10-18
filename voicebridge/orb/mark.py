@@ -42,15 +42,19 @@ Tk has no rotated ellipse, no per-item alpha and no gradient, so:
 Two whole-mark transforms are layered on every element:
 
   1. the master spin — a slow 360 deg turn in the screen plane (24 s), and
-  2. the horizontal tumble — an independent 360 deg turn about a VERTICAL axis
-     through the mark's centre (20.5 s), so the flat orbital plane foreshortens
-     by ``cos(theta)`` and MIRRORS past 90 degrees while everything dims toward
-     the background as it turns edge-on.
+  2. the true-3D tumble — full 360 deg turns about the mark's vertical (Y,
+     20.5 s) AND horizontal (X, 27.0 s) axes, Y first then X, exactly like the
+     Qt painter. Every element carries the field's ``depth``, so the rotation
+     mixes each point's x with its depth instead of foreshortening the flat
+     plane by ``cos(theta)``: the near and far halves SEPARATE across x where
+     the old squash collapsed to a line, and a perspective term plus a
+     rotated-depth size/alpha gain sell the turn. ``spin_angles`` is the
+     field's one phase source, so both lanes tumble the same way.
 
-Both read the clamped clock, so under reduced motion neither is applied and the
-frame is byte-identical for any ``t``. The NUCLEUS is deliberately outside both
-transforms: a sphere keeps its circular silhouette under a rotation about its
-own vertical axis, and squashing the core into a lens would read as a bug rather
+Both read the clamped clock, so under reduced motion neither is applied and
+the frame is byte-identical for any ``t``. The NUCLEUS is deliberately outside
+both 3-D turns: a sphere keeps its circular silhouette under a rotation about
+its own axes, and squashing the core into a lens would read as a bug rather
 than as depth.
 
 Depth is the 3-D read: the field splits every element at ``depth = 0.5`` and
@@ -87,8 +91,11 @@ from .mark_field import (
     RING_SWAY_DEG,
     RING_PERIOD_NEAR,
     RING_PERIOD_FAR,
-    RGB_TRAIL_HUE_STEP,
     RGB_TRAIL_HUE_DRIFT,
+    X_SPIN_PERIOD_S,
+    spin_angles,
+    blink_dots,
+    BLINK_COUNT,
     RING_ALPHA_MAIN,
     RING_ALPHA_INNER,
     heartbeat,
@@ -165,8 +172,8 @@ STREAK_MAX_WIDTH = 6
 #: is one 8-bit step from appearing, which is exactly the hard pop the field's
 #: C1 envelopes exist to avoid.
 STREAK_MIN_LEN_PX = 0.75
-#: Sparkles and satellite bodies take the SHORT streak: 26 glints and three
-#: shells must gain spectrum without turning the field into 26 comets.
+#: Sparkles and satellite bodies take the SHORT streak: 40 glints and three
+#: shells must gain spectrum without turning the field into 40 comets.
 SHORT_STREAK_HALF_WIDTH = 0.34
 SATELLITE_STREAK_GAIN = 1.1
 SPARKLE_STREAK_GAIN = 1.0
@@ -180,30 +187,36 @@ STREAK_HUE_ANCHOR_BLEND = 0.10
 #: bright motion-blur debris inside the streak instead of a second grey tail.
 COMET_BEAD_SAT = 0.95
 
-# --- two whole-mark transforms ----------------------------------------------
+# --- true-3D whole-mark tumble (parity with the Qt painter) ------------------
 #: Master spin: a slow 360 deg rotation of the whole mark in the screen plane.
 MASTER_SPIN_PERIOD_S = 24.0
 #: Owner: "add one more spinning animation from left to right horizontal spin
-#: that spins 360". An INDEPENDENT full turn about a vertical axis through the
-#: mark's centre, so the flat orbital plane foreshortens to ``cos(theta)`` —
-#: mirroring past 90 degrees, which is what a Y rotation actually looks like and
-#: what sells the depth. Purely additive: the master spin is untouched. 20.5 s
-#: is deliberately non-harmonic with the 24 s master spin and with the 9.5 s
-#: near-ring period (19 s would be exactly twice it, and the two motions would
-#: lock into one pattern every half turn).
+#: that spins 360". The mark is NOT flat — every element carries the field's
+#: ``depth`` — so the turn is a real rotation about the mark's vertical (Y)
+#: axis layered with a second full turn about its horizontal (X) axis, Y first
+#: then X, exactly like the Qt painter's per-point placement. The near and far
+#: halves SEPARATE instead of piling onto one line, which is what killed the
+#: old flat ``cos`` squash ("i dont what that thin"). 20.5 s is deliberately
+#: non-harmonic with the 24 s master spin and with the 9.5 s near-ring period
+#: (19 s would be exactly twice it, and the two motions would lock into one
+#: pattern every half turn); 27.0 s is non-harmonic with both.
 Y_SPIN_PERIOD_S = 20.5
-#: The mark dims as it turns edge-on and brightens face-on, by this much.
-Y_SPIN_DIM = 0.15
-#: Phase warp applied to the turn, ``psi = theta + k*sin(2*theta)``. A flat plane
-#: seen edge-on really does vanish to a line, and that vanishing is the point —
-#: but a LINEAR turn spends as long in the awkward part as in the comfortable
-#: part, so the orb would blank to its nucleus twice per turn. The warp is
-#: monotone (``1 + 2k*cos(2*theta) >= 0``) and smooth, so it cannot snap; it
-#: simply makes the turn DAWL face-on and whip through the edge-on crossing.
-Y_SPIN_WARP = -0.5
-#: On top of that, the FAR side of the plane darkens more than the near side:
-#: the two halves swap over the turn, which is the depth cue.
-Y_SPIN_FAR_DIM = 0.12
+X_SPIN_PERIOD_S = 27.0
+#: Depth-axis gain: how far a point's ``depth`` reaches along the rotation
+#: axis, in mark radii. What keeps the quarter turn OPEN: at theta = 90 deg a
+#: ring's x-width is this times its depth spread, not zero.
+Y_SPIN_Z_GAIN = 1.25
+#: Perspective: ``1 + PERSP * zr / R``. Points that swing toward the viewer
+#: grow apart; points tucking away contract — the cheap cue that reads as
+#: volume rather than as a wobble.
+Y_SPIN_PERSP = 0.35
+Y_SPIN_PERSP_MIN = 0.55
+Y_SPIN_PERSP_MAX = 1.70
+#: Size/alpha gain on the rotated depth: a body swinging TOWARD the viewer
+#: grows and brightens, one tucking away shrinks and dims.
+Y_SPIN_DEPTH_GAIN = 0.55
+Y_SPIN_GAIN_MIN = 0.35
+Y_SPIN_GAIN_MAX = 1.90
 #: Depth of field: how much a far element's alpha is pulled down. ``dof`` is
 #: 0.0 sharp / 1.0 far, so this softens distance WITHOUT touching brightness
 #: meaning — "far away" must not collapse into "barely visible".
@@ -327,8 +340,15 @@ NUCLEUS_CORONA_HUE_SPAN = 0.34
 #: chromatic hint on one hairline and becomes a second coloured line beside it.
 #: Kept faint, it stays what the CSS mark's blurred drop shadow is — an edge.
 FRINGE_ALPHA_MULT = 0.30
+#: Hologram rim: a bright thin edge on the body plus a faint red/blue split
+#: offset by a pixel — the lens-fringe cue, drawn as OUTLINES so the edge
+#: stays a hairline and never a disc. Static (no time phase), so the still
+#: frame keeps it.
+NUCLEUS_RIM_ALPHA = 0.85
+NUCLEUS_RIM_OFFSET_PX = 0.6
+NUCLEUS_RIM_FRINGE_ALPHA = 0.35
+NUCLEUS_RIM_OVALS = 3
 #: Binary particles: tiny "1"/"0" data fragments. Sized from the field's own
-#: ``size`` and floored: at orb size these are PINS, not a wall of text.
 BINARY_FONT_MIN_PX = 5
 BINARY_FONT_PX_PER_UNIT = 12.0
 BINARY_FONT_PX_OFFSET = 2.0
@@ -347,6 +367,7 @@ NUCLEUS_OVAL_COUNT = (
     + 2 * (NUCLEUS_SWIRL_LAYERS - 1)
     + (NUCLEUS_SPEC_LAYERS - 1)
     + 1                                             # the orbiting specular
+    + NUCLEUS_RIM_OVALS  # hologram rim: bright edge + red/blue split
 )
 
 #: Fringe channel colors, mixed toward the background (Tk alpha substitute).
@@ -394,16 +415,99 @@ def horizontal_spin_deg(t: Any) -> float:
 
 
 def horizontal_spin(t: Any) -> float:
-    """Foreshortening factor ``cos(theta)`` in ``[-1, 1]`` of the Y-axis turn.
+    """The Y turn's ``cos(theta)``: the phase read of the horizontal 360.
 
-    Positive squashes the mark's flat orbital plane, negative MIRRORS it — which
-    is what a real rotation about a vertical axis does past 90 degrees. The turn
-    is warped by :data:`Y_SPIN_WARP` first (monotone and smooth, so the warp
-    itself cannot snap) purely to change the PACE. Exactly ``1.0`` at a still
-    clock, so reduced motion is untouched.
+    The mark is no longer flat, so this is no longer what the renderer scales
+    the assembly by (that flat squash degenerated to a line twice per turn —
+    the "thin" the owner rejected). It stays as the public read of the turn's
+    phase: +1 face-on, -1 mirrored at the half turn. The renderer projects
+    through :func:`turn_point` instead. Exactly ``1.0`` at a still clock.
     """
     theta = math.radians(math.fmod(horizontal_spin_deg(t), 360.0))
-    return math.cos(theta + Y_SPIN_WARP * math.sin(2.0 * theta))
+    return math.cos(theta)
+
+
+def turn_basis(t: Any) -> Tuple[float, float, float, float]:
+    """``(cos theta, sin theta, cos phi, sin phi)`` of the tumble at ``t``.
+
+    ``theta`` is the Y turn (20.5 s), ``phi`` the X turn (27.0 s), both from
+    the field's :func:`spin_angles` so the Tk and Qt lanes share one phase.
+    Resolved once per frame; every point in the frame shares it.
+    """
+    try:
+        theta, phi = spin_angles(t)
+    except Exception:  # noqa: BLE001 - a field fault rests the unturned mark
+        theta, phi = 0.0, 0.0
+    return (math.cos(theta), math.sin(theta), math.cos(phi), math.sin(phi))
+
+
+def turn_project(x: float, y: float, depth: float,
+                 ct: float, st: float, cp: float, sp: float,
+                 r: float) -> Tuple[float, float, float]:
+    """Project one centre-relative field point: Y turn first, then X.
+
+    Returns ``(X, Y, gain)`` in field units plus the rotated-depth size/alpha
+    gain. The arithmetic mirrors the Qt painter's per-point placement with the
+    same constants, so the two lanes put every element in the same place::
+
+        z   = (depth - 0.5) * Z_GAIN * R * sin(theta)**2
+        xr  = x * cos(theta) + z * sin(theta)
+        zr0 = -x * sin(theta) + z * cos(theta)
+        yr  = y * cos(phi) - zr0 * sin(phi)
+        zr  = y * sin(phi) + zr0 * cos(phi)
+        persp = 1 + PERSP * zr / R
+        X, Y = xr * persp, yr * persp
+        gain = 1 + DEPTH_GAIN * zr / R   (clamped)
+
+    The depth offset is faded by ``sin(theta)**2``: at ``theta = 0`` and
+    ``theta = pi`` every term collapses to ``xr = +-x``, ``persp = 1`` and
+    ``gain = 1``, so the face-on phases are the unturned mark, bit for bit.
+    ``phi = 0`` is likewise the identity for the X turn. ``y`` is untouched
+    by the Y turn and ``x`` by the X turn, which is exactly why the mark's
+    height never changes under Y alone and the turn never thins to a line:
+    the depth axis carries the quarter phases.
+    """
+    z = (depth - 0.5) * Y_SPIN_Z_GAIN * r * st * st
+    xr = x * ct + z * st
+    zr0 = -x * st + z * ct
+    yr = y * cp - zr0 * sp
+    zr = y * sp + zr0 * cp
+    persp = 1.0 + Y_SPIN_PERSP * zr / r
+    if persp < Y_SPIN_PERSP_MIN:
+        persp = Y_SPIN_PERSP_MIN
+    elif persp > Y_SPIN_PERSP_MAX:
+        persp = Y_SPIN_PERSP_MAX
+    nz = zr / r
+    gain = 1.0 + Y_SPIN_DEPTH_GAIN * nz
+    if gain < Y_SPIN_GAIN_MIN:
+        gain = Y_SPIN_GAIN_MIN
+    elif gain > Y_SPIN_GAIN_MAX:
+        gain = Y_SPIN_GAIN_MAX
+    return (xr * persp, yr * persp, gain)
+
+
+def turn_point(t: Any, R: Any, x: Any, y: Any,
+               depth: Any = 0.5) -> Tuple[float, float, float]:
+    """Project one centre-relative field point through the Y+X tumble.
+
+    Module level (like the Qt painter's ``y_turn_point``) so tests read the
+    same projection the renderer paints. ``(X, Y, gain)`` in field units,
+    relative to the mark's centre; the caller adds the centre. The identity
+    at ``t = 0`` for every ``(x, y, depth)``. Never raises.
+    """
+    try:
+        r = _num(R, 32.0)
+    except Exception:  # noqa: BLE001
+        r = 32.0
+    if r <= 0.0:
+        r = 32.0
+    try:
+        d = min(1.0, max(0.0, _num(depth, 0.5)))
+        xx, yy = _num(x), _num(y)
+    except Exception:  # noqa: BLE001
+        return (0.0, 0.0, 1.0)
+    ct, st, cp, sp = turn_basis(t)
+    return turn_project(xx, yy, d, ct, st, cp, sp, r)
 
 
 def nucleus_radius(R: Any, t: Any, level_gain: Any = 1.0) -> float:
@@ -427,17 +531,26 @@ def nucleus_radius(R: Any, t: Any, level_gain: Any = 1.0) -> float:
 
 
 def _spin_pt(x: float, y: float, t: float = 0.0,
-             cx: float = 0.0, cy: float = 0.0) -> Tuple[float, float]:
-    """Place a field point on screen: master spin, then the Y-axis tumble.
+              cx: float = 0.0, cy: float = 0.0) -> Tuple[float, float]:
+    """Place a field point on screen: the Y+X tumble, then the master spin.
 
-    Both transforms are about ``(cx, cy)``. At a still clock this is the
-    identity, which is what makes reduced motion a true no-op.
+    The tumble projects the point at neutral depth (a bare point carries no
+    depth of its own) in the mark's own frame; the master spin rotates the
+    result in the screen plane about ``(cx, cy)`` — the Qt painter's
+    composition. At a still clock this is the identity, which is what makes
+    reduced motion a true no-op. Kept for callers that place depth-free
+    points; the renderer itself threads each element's own depth through
+    :func:`turn_point`.
     """
+    ct, st, cp, sp = turn_basis(t)
+    # NOTE: neutral-depth projection of a bare point; ``r`` only scales the
+    # (zero) depth offset and the perspective of the rotated position, so any
+    # sane radius does — 32.0 is the field's own unit.
+    px, py, _g = turn_project(float(x) - float(cx), float(y) - float(cy),
+                              0.5, ct, st, cp, sp, 32.0)
     a = math.radians(math.fmod(spin_deg(t), 360.0))
-    dx, dy = float(x) - float(cx), float(y) - float(cy)
-    rx = float(cx) + dx * math.cos(a) - dy * math.sin(a)
-    ry = float(cy) + dx * math.sin(a) + dy * math.cos(a)
-    return (float(cx) + (rx - float(cx)) * horizontal_spin(t), ry)
+    return (float(cx) + px * math.cos(a) - py * math.sin(a),
+            float(cy) + px * math.sin(a) + py * math.cos(a))
 
 
 def echo_follower_tilt(t: Any, orbit: Any = "a") -> float:
@@ -559,35 +672,62 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     nuc_rgb = _mix(fam["core"], (255, 255, 255), LIFT_NUCLEUS)
 
     # ------------------------------------------------------- the two spins
+    # Master spin in the screen plane, outermost, then the Y+X tumble in the
+    # mark's own frame — the Qt painter's composition (it rotates the painter
+    # before drawing the tumbled points). The tumble's phase is resolved once
+    # per frame: hundreds of points share it. This order is also what keeps
+    # the mark open: where the tumble momentarily collapses one ring toward
+    # a line in the mark's frame, the master spin has already turned that
+    # line diagonal on screen, so the frame never thins to it.
     spin_a = math.radians(math.fmod(spin_deg(tt), 360.0))
     spin_c, spin_s = math.cos(spin_a), math.sin(spin_a)
-    cos_y = horizontal_spin(tt)
-    edge = 1.0 - abs(cos_y)
-    tumble_gain = 1.0 - Y_SPIN_DIM * edge
+    turn_ct, turn_st, turn_cp, turn_sp = turn_basis(tt)
 
-    def _place(x: float, y: float) -> Tuple[float, float]:
+    def _place(x: float, y: float, depth: Any = 0.5) -> Tuple[float, float]:
         """A centre-relative FIELD point -> its screen position.
 
-        Master spin first, then the horizontal foreshortening about ``(cx, cy)``
-        — the same order as the Qt painter's two transforms, so the two lanes
-        put every element in the same place.
+        The Y+X tumble at the element's own depth first, then the master
+        spin — the same order and arithmetic as the Qt painter's per-point
+        placement, so the two lanes put every element in the same place.
         """
-        sx = cx_f + x * spin_c - y * spin_s
-        sy = cy_f + x * spin_s + y * spin_c
-        return (cx_f + (sx - cx_f) * cos_y, sy)
+        try:
+            d = min(1.0, max(0.0, _num(depth, 0.5)))
+        except Exception:  # noqa: BLE001
+            d = 0.5
+        px, py, _g = turn_project(_num(x), _num(y), d, turn_ct, turn_st,
+                                  turn_cp, turn_sp, r)
+        sx = px * spin_c - py * spin_s
+        sy = px * spin_s + py * spin_c
+        return (cx_f + sx, cy_f + sy)
 
-    def _shade(alpha: Any, depth: Any = 0.5) -> float:
-        """Alpha after the tumble dim and the depth-of-field softening.
+    def _place3(x: float, y: float,
+                depth: Any = 0.5) -> Tuple[float, float, float]:
+        """Like :func:`_place`, plus the rotated-depth size/alpha gain."""
+        try:
+            d = min(1.0, max(0.0, _num(depth, 0.5)))
+        except Exception:  # noqa: BLE001
+            d = 0.5
+        px, py, g = turn_project(_num(x), _num(y), d, turn_ct, turn_st,
+                                 turn_cp, turn_sp, r)
+        sx = px * spin_c - py * spin_s
+        sy = px * spin_s + py * spin_c
+        return (cx_f + sx, cy_f + sy, g)
 
-        ``bright`` is deliberately NOT folded in here: several callers already
-        apply it and a second application would flatten the mark's brightness
-        ladder.
+    def _shade(alpha: Any, depth: Any = 0.5, gain: Any = 1.0) -> float:
+        """Alpha after the turn's depth gain and the depth-of-field softening.
+
+        ``gain`` is the element's own rotated-depth gain from :func:`_place3`
+        (bigger and brighter as it swings toward the viewer); ``depth`` is its
+        FIELD depth, which drives the focus term. ``bright`` is deliberately
+        NOT folded in here: several callers already apply it and a second
+        application would flatten the mark's brightness ladder.
         """
         a = _num(alpha, 0.0)
         d = max(0.0, min(1.0, _num(depth, 0.5)))
-        if d < 0.5:
-            a *= 1.0 - Y_SPIN_FAR_DIM * edge
-        a *= tumble_gain
+        try:
+            a *= max(0.0, min(2.0, float(gain)))
+        except (TypeError, ValueError):
+            pass
         a *= 1.0 - DOF_ALPHA_SOFT * dof(d)
         return a
 
@@ -684,15 +824,18 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         smps = [s for s in (samples or []) if isinstance(s, dict)]
         if len(smps) < 2:
             return
-        pts = [_place(_num(s.get("x")), _num(s.get("y"))) for s in smps]
+        pts = [_place3(_num(s.get("x")), _num(s.get("y")),
+                       _num(s.get("depth"), 0.5)) for s in smps]
         total = 0.0
         for i in range(1, len(pts)):
-            total += math.dist(pts[i], pts[i - 1])
+            total += math.dist(pts[i][:2], pts[i - 1][:2])
         if total < STREAK_MIN_LEN_PX:
             return
         for i in range(len(pts) - 1):
             here, nxt = smps[i], smps[i + 1]
-            a = _shade(_num(here.get("alpha")) * gain, here.get("depth"))
+            g = pts[i][2]
+            a = _shade(_num(here.get("alpha")) * gain, here.get("depth"),
+                       g)
             if a <= ALPHA_EPS:
                 continue
             # Each segment takes the MEAN of its two endpoints' converted
@@ -705,7 +848,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                           here.get("val", 1.0)),
                     _spec(nxt.get("hue"), nxt.get("sat", 1.0),
                           nxt.get("val", 1.0)))))
-            w = 2.0 * max(STREAK_MIN_HALF_PX, _num(here.get("size")) * half)
+            w = (2.0 * max(STREAK_MIN_HALF_PX, _num(here.get("size")) * half)
+                 * g)
             width = max(1, min(STREAK_MAX_WIDTH, int(round(w))))
             _line([pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]],
                   _dim(colour, a * bright), width)
@@ -714,7 +858,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     def _glint(x: float, y: float, size: Any, alpha: Any,
                rgb: Tuple[int, int, int],
                arm_frac: float = GLINT_ARM_FRAC, skew_deg: Any = 0.0,
-               depth: Any = 0.5) -> None:
+               depth: Any = 0.5, gain: Any = 1.0) -> None:
         """A twinkling star, never a filled orb (owner 2026-10-17) — and never
         a halo: the star's effect is the spectral streak it leaves.
 
@@ -723,13 +867,19 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         marbles. ``skew_deg`` is the field's per-depth shear: a star near the
         front of the orbital plane is raked one way, one near the back the other,
         and level at the rim, so it reads as a surface catching light from an
-        angle instead of a flat cross pasted on the orbit.
+        angle instead of a flat cross pasted on the orbit. ``gain`` is the
+        tumble's rotated-depth gain: a body swinging toward the viewer grows
+        and brightens, one tucking away shrinks and dims.
         """
-        sz = max(GLINT_MIN_SIZE, _num(size))
+        try:
+            g = max(0.0, min(2.0, float(gain)))
+        except (TypeError, ValueError):
+            g = 1.0
+        sz = max(GLINT_MIN_SIZE, _num(size)) * g
         raw = _num(alpha)
         if raw <= FIELD_ALPHA_FLOOR or sz <= 0.0:
             return
-        shown = _dim(rgb, _shade(raw, depth) * bright)
+        shown = _dim(rgb, _shade(raw, depth, g) * bright)
         arm = sz * arm_frac
         sk = math.radians(_num(skew_deg))
         ax, ay = math.cos(sk) * arm, math.sin(sk) * arm
@@ -740,28 +890,40 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         fills.append(rgb)
 
     def _dot(x: float, y: float, rad: Any, alpha: Any,
-             rgb: Tuple[int, int, int], depth: Any = 0.5) -> None:
+              rgb: Tuple[int, int, int], depth: Any = 0.5,
+              gain: Any = 1.0) -> None:
         """One filled dot — the dense field's mote, and the comet's head.
 
         Existence is decided by the FIELD's alpha (:data:`FIELD_ALPHA_FLOOR`);
-        only the colour sees this renderer's tumble and depth shading.
+        only the colour sees this renderer's tumble and depth shading. ``gain``
+        is the tumble's rotated-depth gain: near bodies read bigger and
+        brighter than far ones, which is the stronger near/far separation the
+        hologram pass asks for.
         """
+        try:
+            g = max(0.0, min(2.0, float(gain)))
+        except (TypeError, ValueError):
+            g = 1.0
         raw = _num(alpha)
-        r_ = max(GLINT_CORE_MIN, _num(rad))
+        r_ = max(GLINT_CORE_MIN, _num(rad)) * g
         if raw <= FIELD_ALPHA_FLOOR or r_ <= 0.0:
             return
-        _oval(x, y, r_, _dim(rgb, _shade(raw, depth) * bright))
+        _oval(x, y, r_, _dim(rgb, _shade(raw, depth, g) * bright))
 
     # ---- one declared circle ----------------------------------------------
     def _ring_stroke(points: List[Tuple[float, float]], alpha: float,
                      width: float, layer: str) -> None:
-        """Stroke one declared circle: fringe on the main orbits, nothing else."""
+        """Stroke one declared circle: fringe on the main orbits, nothing else.
+
+        ``points`` are SCREEN positions — the caller projects each vertex at
+        its own depth through the Y+X tumble first, so the circle bends with
+        the turn instead of cutting a straight chord across the mark.
+        """
         a = _shade(alpha)
         if a <= ALPHA_EPS or len(points) < 3:
             return
         flat: List[float] = []
-        for px, py in points:
-            sx, sy = _place(px, py)
+        for sx, sy in points:
             flat += [sx, sy]
         w = max(1, int(round(width)))
         if layer == "main":
@@ -797,8 +959,19 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             # ``ring_path`` carries the field's camera sway. The BODY does not
             # sway, so a circle drawn around it must not either: leaving the
             # sway in slides the mark's visual centre off its own core.
-            pts = [(px - sway_dx, py - sway_dy)
+            raw = [(px - sway_dx, py - sway_dy)
                    for px, py in ring_path(tt, r, draw_spec)]
+            # A circle is a STROKED PATH, not a set of field points, so each
+            # vertex's depth comes from where it sits on the circle. The
+            # field's convention is ``0.5 + 0.5*cos(orbital angle)`` — the same
+            # one it gives every particle — and ``ring_path`` samples at
+            # ``360*i/n``, so the orbital angle is recoverable EXACTLY from the
+            # index. The closing vertex repeats vertex 0, and ``cos(360 deg)``
+            # is ``cos(0)``, so the join matches too.
+            n = max(1, len(raw) - 1)
+            pts = [_place(px, py, 0.5 + 0.5 * math.cos(
+                2.0 * math.pi * (i % n) / float(n)))
+                for i, (px, py) in enumerate(raw)]
             if layer == "main":
                 scale = (RING_ALPHA_SCALE["near_main"] if near
                          else RING_ALPHA_SCALE["far_main"])
@@ -836,6 +1009,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         glints = sparkles(tt, r)
     except Exception:  # noqa: BLE001
         glints = []
+    try:
+        # Pinprick dots that materialise out of nowhere: fixed positions, only
+        # the alpha envelope moves. LIFE, so a still frame carries none.
+        dots = [] if reduced_motion else blink_dots(tt, r)
+    except Exception:  # noqa: BLE001
+        dots = []
     try:
         shells = [] if reduced_motion else satellites(tt, r)
     except Exception:  # noqa: BLE001
@@ -878,6 +1057,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                    if _num((s.get("body") or {}).get("depth"), 0.5) >= 0.5]
     far_sparks = [s for s in sparks if _num(s.get("depth"), 0.5) < 0.5]
     near_sparks = [s for s in sparks if _num(s.get("depth"), 0.5) >= 0.5]
+    far_dots = [d for d in dots if _num(d.get("depth"), 0.5) < 0.5]
+    near_dots = [d for d in dots if _num(d.get("depth"), 0.5) >= 0.5]
     comet_on = (not reduced_motion) and _num(comet_info.get("alpha")) > 0.0
 
     # ------------------------------------------------------------- the bodies
@@ -886,10 +1067,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         depth = _num(part.get("depth"), 0.5)
         if not reduced_motion:
             _streak(rgb_trail(tt, r, part))
-        x, y = _place(_num(part.get("x")), _num(part.get("y")))
+        x, y, g = _place3(_num(part.get("x")), _num(part.get("y")), depth)
         _glint(x, y, part.get("size"), part.get("alpha"),
                _lift(_num(part.get("lift"), LIFT_BEAD)),
-               skew_deg=part.get("skew"), depth=depth)
+               skew_deg=part.get("skew"), depth=depth, gain=g)
 
     def _satellite(shell: Dict[str, Any]) -> None:
         """One satellite BODY riding its declared shell circle.
@@ -905,53 +1086,71 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         if not reduced_motion:
             _streak(dust_trail(tt, r, body), gain=SATELLITE_STREAK_GAIN,
                     half=SHORT_STREAK_HALF_WIDTH)
-        x, y = _place(_num(body.get("x")), _num(body.get("y")))
+        x, y, g = _place3(_num(body.get("x")), _num(body.get("y")), depth)
         _glint(x, y, max(GLINT_MIN_SIZE, _num(body.get("size"))),
                body.get("alpha"),
                _lift(_num(body.get("lift"), LIFT_BEAD)),
-               skew_deg=body.get("skew"), depth=depth)
+               skew_deg=body.get("skew"), depth=depth, gain=g)
 
     def _spark(spark: Dict[str, Any]) -> None:
         """One nucleus spark: the same glint, thrown out past the orbits."""
         depth = _num(spark.get("depth"), 0.5)
-        x, y = _place(_num(spark.get("x")), _num(spark.get("y")))
+        x, y, g = _place3(_num(spark.get("x")), _num(spark.get("y")), depth)
         _glint(x, y, spark.get("size"), spark.get("alpha"),
                _lift(_num(spark.get("lift"), LIFT_NUCLEUS)),
                arm_frac=SPARK_ARM_FRAC,
-               skew_deg=spark.get("skew"), depth=depth)
+               skew_deg=spark.get("skew"), depth=depth, gain=g)
 
     def _dust_mote(mote: Dict[str, Any]) -> None:
         """One dense mote: a plain dot, no wake.
 
-        Thirty motes each dragging a streak would turn the field into thirty
-        comets; the motes exist to keep the orbits from looking bare, and their
-        depth read comes from size and alpha.
+        Dust motes (48 of them) each dragging a streak would turn the field
+        into a wall of comets; the motes exist to keep the orbits from looking
+        bare, and their depth read comes from size and alpha (plus the
+        tumble's own rotated-depth gain now).
         """
         depth = _num(mote.get("depth"), 0.5)
-        x, y = _place(_num(mote.get("x")), _num(mote.get("y")))
+        x, y, g = _place3(_num(mote.get("x")), _num(mote.get("y")), depth)
         _dot(x, y, max(0.25, _num(mote.get("size"))), mote.get("alpha"),
-             _lift(mote.get("lift")), depth=depth)
+             _lift(mote.get("lift")), depth=depth, gain=g)
 
     def _sparkle(glint: Dict[str, Any]) -> None:
         depth = _num(glint.get("depth"), 0.5)
         if not reduced_motion:
             _streak(dust_trail(tt, r, glint), gain=SPARKLE_STREAK_GAIN,
                     half=SHORT_STREAK_HALF_WIDTH)
-        x, y = _place(_num(glint.get("x")), _num(glint.get("y")))
+        x, y, g = _place3(_num(glint.get("x")), _num(glint.get("y")), depth)
         _dot(x, y, max(0.3, _num(glint.get("size"))), glint.get("alpha"),
-             _lift(glint.get("lift")), depth=depth)
+             _lift(glint.get("lift")), depth=depth, gain=g)
+
+    def _blink(dot: Dict[str, Any]) -> None:
+        """One materialising dot: a pinprick oval, text-free, depth-split.
+
+        Fixed field position, alpha-only envelope (0 -> peak -> 0), so each
+        dot fades in from nothing and vanishes the same way instead of
+        travelling. Drawn as an oval, never text: at orb size these are pins,
+        not a wall of glyphs.
+        """
+        depth = _num(dot.get("depth"), 0.5)
+        x, y, g = _place3(_num(dot.get("x")), _num(dot.get("y")), depth)
+        _dot(x, y, max(0.2, _num(dot.get("size"))), dot.get("alpha"),
+             _lift(_num(dot.get("lift"), 0.5)), depth=depth, gain=g)
 
     def _binary(bit: Dict[str, Any]) -> None:
         """One "1"/"0" fragment as a small glyph at its field position."""
         nonlocal texts, min_y, max_y
         size = _num(bit.get("size"))
-        alpha = _shade(bit.get("alpha"), bit.get("depth")) * bright
-        if alpha <= ALPHA_EPS or size <= 0.0:
+        depth = _num(bit.get("depth"), 0.5)
+        if size <= 0.0 or _num(bit.get("alpha")) <= FIELD_ALPHA_FLOOR:
             return
         try:
-            x, y = _place(_num(bit.get("x")), _num(bit.get("y")))
+            x, y, g = _place3(_num(bit.get("x")), _num(bit.get("y")), depth)
+            alpha = _shade(bit.get("alpha"), depth, g) * bright
+            if alpha <= ALPHA_EPS:
+                return
             fs = max(BINARY_FONT_MIN_PX,
-                     int(size * BINARY_FONT_PX_PER_UNIT + BINARY_FONT_PX_OFFSET))
+                     int(size * g * BINARY_FONT_PX_PER_UNIT
+                         + BINARY_FONT_PX_OFFSET))
             canvas.create_text(x, y, text=str(bit.get("char") or "0"),
                                fill=_dim(_lift(_num(bit.get("lift"), 0.5)),
                                          alpha),
@@ -968,23 +1167,40 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         """The one fast traveller: a wake, its own debris tail, and a head.
 
         The field's bead tail rides the SAME hue ramp as the wake: left
-        untinted it read as a second, grey tail beside a rainbow one.
+        untinted it read as a second, grey tail beside a rainbow one. The
+        beads walk the streak's duotone pair — head hue to ``hue2``, half a
+        turn away — so the whole tail is exactly two colours, never a hue
+        ramp of its own (the old ``HUE_STEP`` bead ramp is gone).
         """
         depth = _num(comet_info.get("depth"), 0.5)
         hue0 = _num(comet_info.get("hue"))
+        # The drifted head hue and its half-turn partner: the pair the field's
+        # own streak builder lerps between, read defensively so a hand-built
+        # comet dict still yields a usable tail.
+        head = (hue0 + tt * RGB_TRAIL_HUE_DRIFT) % 1.0
+        try:
+            tail_hue = float(comet_info.get("hue2"))
+            if not 0.0 <= tail_hue <= 1.0:
+                raise ValueError
+        except (TypeError, ValueError):
+            tail_hue = (head + 0.5) % 1.0
         if comet_on:
             _streak(rgb_trail(tt, r, comet_info), gain=COMET_STREAK_GAIN,
                     half=COMET_STREAK_HALF_WIDTH)
-            for k, smp in enumerate(comet_info.get("trail") or []):
-                hue = (hue0 + (k + 1) * RGB_TRAIL_HUE_STEP
-                       + tt * RGB_TRAIL_HUE_DRIFT) % 1.0
-                x, y = _place(_num(smp.get("x")), _num(smp.get("y")))
+            trail = list(comet_info.get("trail") or [])
+            for k, smp in enumerate(trail):
+                f = (k + 1.0) / (len(trail) + 1.0)
+                hue = (head + f * 0.5) % 1.0
+                x, y, g = _place3(_num(smp.get("x")), _num(smp.get("y")),
+                                  depth)
                 _dot(x, y, _num(smp.get("size")), smp.get("alpha"),
-                     _anchor(_spec(hue, COMET_BEAD_SAT)), depth=depth)
-        x, y = _place(_num(comet_info.get("x")), _num(comet_info.get("y")))
+                     _anchor(_spec(hue, COMET_BEAD_SAT)), depth=depth,
+                     gain=g)
+        x, y, g = _place3(_num(comet_info.get("x")),
+                          _num(comet_info.get("y")), depth)
         _dot(x, y, max(0.4, _num(comet_info.get("size"))),
              comet_info.get("alpha"),
-             _anchor(_spec(hue0, COMET_BEAD_SAT)), depth=depth)
+             _anchor(_spec(hue0, COMET_BEAD_SAT)), depth=depth, gain=g)
 
     # ---- the studio nucleus (outside BOTH transforms: a sphere) ------------
     def _soft_oval(x: float, y: float, rad: float,
@@ -1044,6 +1260,20 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             else:
                 layer_rgb = _mix(nuc_rgb, hot, (frac - 0.5) / 0.5)
             _oval(cx_f, cy_f, n_r * (1.0 - 0.70 * frac), _hex(layer_rgb))
+
+        # Hologram rim: a bright thin edge on the body plus a faint red/blue
+        # split offset by a pixel — the lens-fringe cue. OUTLINES, so the edge
+        # stays a hairline and never a disc; drawn glow-first-order-safe (all
+        # glow was painted before the seam) and static, so the still frame
+        # keeps it.
+        _ring_oval(cx_f, cy_f, n_r,
+                   _dim(hot, NUCLEUS_RIM_ALPHA * bright), 1)
+        _ring_oval(cx_f + NUCLEUS_RIM_OFFSET_PX, cy_f, n_r,
+                   _dim(_FRINGE_RED,
+                        NUCLEUS_RIM_FRINGE_ALPHA * bright), 1)
+        _ring_oval(cx_f - NUCLEUS_RIM_OFFSET_PX, cy_f, n_r,
+                   _dim(_FRINGE_BLUE,
+                        NUCLEUS_RIM_FRINGE_ALPHA * bright), 1)
 
         # Caustic: the boiling highlight inside the core, on its own slow turn
         # and louder on the thump, but never fully gone between beats.
@@ -1154,6 +1384,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _particle(_p)
     for _g in far_glints:
         _sparkle(_g)
+    for _d in far_dots:
+        _blink(_d)
     for _b in far_binaries:
         _binary(_b)
     for _s in far_sparks:
@@ -1173,11 +1405,17 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             sw_scale, sw_alpha = 0.0, 0.0
         if sw_scale > 0.0 and sw_alpha > 0.0:
             sw_r = max(1.1, r * NUCLEUS_FRAC) * sw_scale
-            sw_pts = _ellipse_points(cx_f, cy_f, sw_r,
+            # Sampled about the ORIGIN (centre-relative, like every other
+            # field point) and projected per vertex at its own depth, so the
+            # ring turns with the mark instead of cutting across it.
+            sw_pts = _ellipse_points(0.0, 0.0, sw_r,
                                      sw_r * (RY_FRAC / RX_FRAC), near_tilt)
-            flat: List[float] = []
+            flat = []
             for i in range(0, len(sw_pts), 2):
-                flat += list(_place(sw_pts[i], sw_pts[i + 1]))
+                k = (i // 2) % RING_SEGMENTS
+                d = 0.5 + 0.5 * math.cos(2.0 * math.pi * k / RING_SEGMENTS)
+                sx, sy = _place(sw_pts[i], sw_pts[i + 1], d)
+                flat += [sx, sy]
             _line(flat, _dim(ring_rgb, _shade(sw_alpha * bright, 0.5)),
                   max(1, int(round(SHOCKWAVE_WIDTH))))
 
@@ -1209,7 +1447,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                     bottom = rc["bottom"]
                     span = bottom - top
                     steps = 1 if span < 2.0 else _ember.BAR_GRADIENT_STEPS
-                    bx = cx_f + (rc["x"] - cx_f) * cos_y
+                    # The seam rides the tumble at neutral depth, like any
+                    # other depth-free element; the bars stay vertical (a UI
+                    # overlay at the seam, not field geometry).
+                    bx, _, bg = _place3(rc["x"] - cx_f, 0.0, 0.5)
                     for si in range(steps):
                         f0 = si / steps
                         f1 = (si + 1) / steps
@@ -1220,7 +1461,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                                     * shade * bright)
                         _line([bx, y_hi, bx, y_lo],
                               _hex(_mix(base, _ember.NEAR_BLACK, alpha)), 2)
-                    hw = rc["half_w"] * abs(cos_y)
+                    hw = rc["half_w"] * max(0.35, min(1.6, bg))
                     cap_fill = _hex(_mix(base, _ember.NEAR_BLACK,
                                          min(1.0, 0.35 + 0.65 * bright)))
                     _line([bx - hw, rc["peak_top"], bx + hw, rc["peak_top"]],
@@ -1240,6 +1481,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _particle(_p)
     for _g in near_glints:
         _sparkle(_g)
+    for _d in near_dots:
+        _blink(_d)
     for _b in near_binaries:
         _binary(_b)
     for _s in near_sparks:
@@ -1264,8 +1507,14 @@ __all__ = [
     "GLINT_MIN_SIZE", "GLINT_CORE_SCALE", "GLINT_CORE_MIN",
     "NUCLEUS_LAYERS", "HALO_LAYERS", "NUCLEUS_OVAL_COUNT",
     "MASTER_SPIN_PERIOD_S", "spin_deg", "_spin_pt",
-    "Y_SPIN_PERIOD_S", "horizontal_spin_deg", "horizontal_spin",
-    "Y_SPIN_DIM", "Y_SPIN_WARP", "Y_SPIN_FAR_DIM", "DOF_ALPHA_SOFT",
+    "Y_SPIN_PERIOD_S", "X_SPIN_PERIOD_S", "Y_SPIN_Z_GAIN", "Y_SPIN_PERSP",
+    "Y_SPIN_PERSP_MIN", "Y_SPIN_PERSP_MAX", "Y_SPIN_DEPTH_GAIN",
+    "Y_SPIN_GAIN_MIN", "Y_SPIN_GAIN_MAX",
+    "horizontal_spin_deg", "horizontal_spin",
+    "turn_basis", "turn_project", "turn_point",
+    "DOF_ALPHA_SOFT",
+    "NUCLEUS_RIM_ALPHA", "NUCLEUS_RIM_OFFSET_PX", "NUCLEUS_RIM_FRINGE_ALPHA",
+    "NUCLEUS_RIM_OVALS",
     "STREAK_HALF_WIDTH", "STREAK_MIN_LEN_PX", "ALPHA_EPS",
     "echo_follower_tilt", "nucleus_radius", "NUCLEUS_RADIUS_MULT",
     "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
@@ -1279,6 +1528,7 @@ __all__ = [
     "echo_rings", "satellites", "ECHO_LAG_S", "ECHO_SCALE", "ECHO_ALPHA", "ECHO_WIDTH",
     "nucleus_sparks", "NUCLEUS_SPARK_COUNT", "NUCLEUS_SPARK_REACH",
     "inner_ring_tilt", "binary_state", "INNER_RING_RX_FRAC", "BINARY_COUNT",
+    "blink_dots", "BLINK_COUNT", "spin_angles",
     "hue_to_rgb", "rgb_trail", "dust_trail", "ring_geometry", "ring_path",
     "ring_alpha", "dof", "skew",
 ]

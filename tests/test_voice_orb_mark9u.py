@@ -182,10 +182,21 @@ def test_far_beads_draw_behind_and_near_beads_in_front():
 
         nuc = _nucleus(c, R=32.0, t=t)
         nuc_idx = c.ovals.index(nuc)
-        far_idx = [_idx(*M._spin_pt(f["x"] + 34.0, f["y"] + 34.0, t, 34.0, 34.0))
-                   for f in frames if f["depth"] < 0.5]
-        near_idx = [_idx(*M._spin_pt(f["x"] + 34.0, f["y"] + 34.0, t, 34.0, 34.0))
-                    for f in frames if f["depth"] >= 0.5]
+
+        def _locate(f):
+            # The renderer threads each element's own depth through the Y+X
+            # tumble, so the locator must too: a depth-free helper lands on
+            # the wrong pixel once the turn is a real 3-D rotation. Tumble
+            # first, then the master spin — the renderer's own order.
+            px, py, _g = M.turn_point(t, 32.0, f["x"], f["y"],
+                                      f.get("depth", 0.5))
+            a = math.radians(math.fmod(M.spin_deg(t), 360.0))
+            rx = px * math.cos(a) - py * math.sin(a)
+            ry = px * math.sin(a) + py * math.cos(a)
+            return (34.0 + rx, 34.0 + ry)
+
+        far_idx = [_idx(*_locate(f)) for f in frames if f["depth"] < 0.5]
+        near_idx = [_idx(*_locate(f)) for f in frames if f["depth"] >= 0.5]
         # Both halves are populated at these phases.
         assert far_idx and near_idx
         assert all(i is not None and i < nuc_idx for i in far_idx)
@@ -246,7 +257,13 @@ def test_comet_head_drawn_during_sweep_and_not_outside(monkeypatch):
     assert F.comet(hidden_t, 32.0)["alpha"] == 0.0
 
     info = F.comet(visible_t, 32.0)
-    head = M._spin_pt(info["x"] + 34.0, info["y"] + 34.0, visible_t, 34.0, 34.0)
+    # Depth-aware locator: the head rides the Y+X tumble at its own depth
+    # (tumble first, then the master spin — the renderer's own order).
+    _px, _py, _g = M.turn_point(visible_t, 32.0, info["x"], info["y"],
+                                info.get("depth", 0.5))
+    _a = math.radians(math.fmod(M.spin_deg(visible_t), 360.0))
+    head = (34.0 + _px * math.cos(_a) - _py * math.sin(_a),
+            34.0 + _px * math.sin(_a) + _py * math.cos(_a))
     live = FakeCanvas()
     M.render(live, 34.0, 34.0, 32.0, visible_t, "idle")
     assert any(abs((o[0] + o[2]) / 2 - head[0]) < 1e-6
