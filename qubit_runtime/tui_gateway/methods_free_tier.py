@@ -55,6 +55,11 @@ def _(rid, params: dict) -> dict:
         return _err(rid, 5090, str(e))
 
 
+def _trial_claimable() -> bool:
+    from qubit_cli.welcome_trial import claim_blocker
+    return claim_blocker() is None
+
+
 @method("free_tier.provision")
 @_profile_scoped
 def _(rid, params: dict) -> dict:

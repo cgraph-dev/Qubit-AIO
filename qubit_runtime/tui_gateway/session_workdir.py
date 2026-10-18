@@ -166,6 +166,17 @@ def _profile_workspace_cwd(profile_home) -> str | None:
             or (_sandbox_workspace_cwd(profile_home) if profile_home else None))
 
 
+def _profile_default_cwd(profile_home) -> str | None:
+    """Where a session for ``profile_home`` lands when nothing else is known: its configured workspace, else a NAMED
+    local profile's own home. Never the LAUNCH profile's ``terminal.cwd``/``TERMINAL_CWD`` (#87584): those name
+    another profile's workspace (``/opt/data`` in the Docker image). Its home is what its standalone gateway uses."""
+    if workspace := _profile_workspace_cwd(profile_home):
+        return workspace
+    if profile_home is not None and _bound_terminal_backend(profile_home) == "local":
+        return str(profile_home)
+    return None
+
+
 def _workspace_cwd(profile_home, raw: str) -> str:
     """A picked workspace for a session bound to ``profile_home``: an ssh dir raw, else an existing host dir.
     Raises ValueError when a host dir does not exist."""
@@ -286,6 +297,26 @@ def _is_qubit_owned_cwd(cwd: str, profile_home) -> bool:
     except (OSError, RuntimeError):
         return False
     return any(path == root or root in path.parents for root in roots) or _is_install_tree(path)
+
+
+def _is_other_profiles_cwd(cwd: str, profile_home) -> bool:
+    """Whether a NAMED local profile's stored cwd is a directory that belongs to another profile or to Qubit itself:
+    the root (``/opt/data``), its subprocess home (``/opt/data/home``), a sibling profile's tree, or the install tree.
+    Those are launch-profile workspaces that leaked into this profile's row before #87584, never a folder chosen for
+    it. Other folders under the root stay: a user may keep a workspace there."""
+    if profile_home is None or _cwd_is_remote(profile_home) or not os.path.isabs(cwd):
+        return False
+    from agent.runtime_cwd import _is_install_tree
+    from qubit_constants import get_default_qubit_root
+
+    try:
+        path, own = Path(cwd).resolve(), Path(profile_home).expanduser().resolve()
+        root = get_default_qubit_root(home=own).resolve()
+    except (OSError, RuntimeError):
+        return False
+    if path == own or own in path.parents:
+        return False
+    return path in (root, root / "home") or (root / "profiles") in path.parents or _is_install_tree(path)
 
 
 def _resumable_stored_cwd(cwd, profile_home) -> str:
