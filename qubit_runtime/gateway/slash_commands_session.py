@@ -126,6 +126,16 @@ def _strip_resume_name(parts: list[str]) -> str:
 class GatewaySessionCommandsMixin:
     """Session-transcript slash commands (/new, /resume, /sessions, /branch, /title, /save, /undo, /retry, /topic, /compress)."""
 
+    def _retry_owned_store(self, session_id: str):
+        """The session store a /retry rewrite must fence against, or None without a session authority.
+
+        Under an authority the durable rows live on ``SessionAuthority.db``; outside one the
+        caller falls back to the plain transcript path.
+        """
+        from gateway.session_authorities import active_authority
+        authority = active_authority(self)
+        return getattr(authority, "db", None) if authority is not None else None
+
     # ------------------------------------------------------------------ /new, /reset
 
     async def _cleanup_old_agent_for_reset(self, session_key: str) -> None:
