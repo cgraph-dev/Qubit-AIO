@@ -16,6 +16,7 @@ from typing import Optional
 
 from gateway.bot_loop_guard import BotLoopGuard
 from gateway.config import Platform
+from gateway.pairing import _PLATFORM_ALLOWLIST_ENV
 from gateway.session import SessionSource
 from gateway.whatsapp_identity import (
     expand_whatsapp_aliases as _expand_whatsapp_auth_aliases,
@@ -28,8 +29,10 @@ _TRUTHY = frozenset({"true", "1", "yes"})
 _BOT_LOOP_GUARD_INIT_LOCK = threading.Lock()
 logger = logging.getLogger(__name__)
 
-# ``<PLATFORM>_ALLOWED_USERS`` / ``<PLATFORM>_ALLOW_ALL_USERS`` come from each platform's
-# ``PlatformEntry.allowed_users_env`` / ``allow_all_env`` (shared with the pairing allowlist mirror).
+# Platform -> ``<PLATFORM>_ALLOWED_USERS`` / ``<PLATFORM>_ALLOW_ALL_USERS``. Shared with the pairing
+# store's allowlist mirror (single source of truth); plugin platforms are added per-call from the registry.
+_ALLOWED_USERS_ENV = {Platform(k): v for k, v in _PLATFORM_ALLOWLIST_ENV.items()}
+_ALLOW_ALL_ENV = {p: v.replace("_ALLOWED_USERS", "_ALLOW_ALL_USERS") for p, v in _ALLOWED_USERS_ENV.items()}
 # Platforms whose env allowlist turns the unauthorized-DM default from "pair" into "ignore". Names
 # only (the env var is still the plugin's): this is the historical set the allowlist-aware default
 # covered, so adding a platform here is a behaviour change (Yuanbao was never in it).
@@ -41,6 +44,16 @@ _ALLOWLIST_SUPPRESSES_PAIRING = frozenset({
 })
 _GROUP_USER_ENV = {Platform.TELEGRAM: "TELEGRAM_GROUP_ALLOWED_USERS"}
 _GROUP_CHAT_ENV = {Platform.TELEGRAM: "TELEGRAM_GROUP_ALLOWED_CHATS", Platform.QQBOT: "QQ_GROUP_ALLOWED_USERS"}
+_ALLOW_BOTS_ENV = {
+    # Bots admitted by {PLATFORM}_ALLOW_BOTS bypass the human allowlist (#4466). Checked before the
+    # no-user-id guard below: some platforms deliver bot/automation traffic with no user_id at all -- e.g.
+    # Slack Workflow Builder posts arrive as subtype=bot_message with user=None -- so deferring past the
+    # guard would reject them outright (the same reason the chat-scoped allowlist above runs early).
+    Platform.DISCORD: "DISCORD_ALLOW_BOTS",
+    Platform.FEISHU: "FEISHU_ALLOW_BOTS",
+    Platform.TELEGRAM: "TELEGRAM_ALLOW_BOTS",
+    Platform.SLACK: "SLACK_ALLOW_BOTS",
+}
 
 
 # Gate reads use the shared per-profile isolated reader (allowlist leak under multiplex, #72348).
