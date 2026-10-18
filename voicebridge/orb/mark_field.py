@@ -104,7 +104,7 @@ SHOCKWAVE_WIDTH = 1.0
 #: the nucleus is the mark's only solid body. ``GLINT_ARM_FRAC`` is the star
 #: arm length as a multiple of the particle radius, and the twinkle period is
 #: per-particle so the field shimmers instead of pulsing in unison.
-GLINT_ARM_FRAC = 1.45
+GLINT_ARM_FRAC = 0.72
 GLINT_CORE_FRAC = 0.5
 GLINT_TWINKLE_BASE_S = 1.6
 GLINT_TWINKLE_SPAN_S = 1.9
@@ -127,8 +127,8 @@ PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
 DUST_COUNT = 30
 DUST_R_FRAC_MIN = 0.86
 DUST_R_FRAC_SPAN = 0.30
-DUST_SIZE_BASE = 0.20
-DUST_SIZE_SPAN = 0.26
+DUST_SIZE_BASE = 0.10
+DUST_SIZE_SPAN = 0.13
 DUST_PERIOD_BASE = 5.0
 DUST_PERIOD_SPAN = 9.0
 DUST_ALPHA_BASE = 0.16
@@ -141,7 +141,7 @@ COMET_PERIOD_S = 7.0
 COMET_SPEED_MULT = 1.9
 COMET_TRAIL_SAMPLES = 12
 COMET_STEP_DEG = 3.2
-COMET_SIZE = 1.5
+COMET_SIZE = 0.75
 COMET_ALPHA = 0.95
 COMET_LIFT = 0.80
 
@@ -161,7 +161,7 @@ ECHO_WIDTH = 1.0
 #: breathing rather than a separate effect.
 #: Spark arms are SHORTER than a particle glint's: at the nucleus they must
 #: read as pinpricks, not stars the size of the nucleus itself.
-SPARK_ARM_FRAC = 1.30
+SPARK_ARM_FRAC = 0.65
 NUCLEUS_SPARK_COUNT = 18
 NUCLEUS_SPARK_LIFE_BASE = 1.30
 NUCLEUS_SPARK_LIFE_SPAN = 0.90
@@ -194,8 +194,8 @@ SPARKLE_LIFE_BASE = 1.1
 SPARKLE_LIFE_STEP = 0.35
 SPARKLE_VISIBLE_FRAC = 0.45
 SPARKLE_MAX_ALPHA = 0.60
-SPARKLE_SIZE_BASE = 0.18
-SPARKLE_SIZE_PEAK = 0.36
+SPARKLE_SIZE_BASE = 0.09
+SPARKLE_SIZE_PEAK = 0.18
 SPARKLE_LIFT = 0.60
 
 
