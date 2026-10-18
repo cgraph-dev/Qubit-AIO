@@ -54,6 +54,9 @@ class PendingEvent:
     first_at: float
     count: int
     dispatch_kwargs: Dict[str, Any]
+    # Delivery ids this group has already swallowed, oldest first, so the dispatcher can report
+    # what the newest event superseded (#92066). Empty for an event that coalesced nothing.
+    superseded: tuple = ()
 
     def prompt_with_note(self) -> str:
         if self.count <= 1:
@@ -130,8 +133,11 @@ class WebhookCoalescer:
     def _settle(self, group_key: str, entry: PendingEvent) -> Any:
         logger.info("[webhook] coalesce settled group=%s events=%d delivery=%s", group_key, entry.count,
                     entry.delivery_id)
+        # ``entry.superseded`` is the coalescer's own bookkeeping and is reported to the model
+        # through prompt_with_note(); _spawn_agent_run has no parameter for it, and passing one
+        # raised TypeError inside the dispatch task (silently dropping every coalesced group).
         return self._dispatch(entry.payload, entry.prompt_with_note(), entry.delivery_id, time.time(),
-                              **entry.dispatch_kwargs, superseded=entry.superseded)
+                              **entry.dispatch_kwargs)
 
     async def flush(self) -> None:
         """Dispatch every pending group now and wait until each run is handed to the runner, so an adapter
