@@ -29,11 +29,13 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone, UTC
+from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 from agent.retry_utils import parse_retry_after_seconds
 from qubit_cli.auth_constants import (
-    AuthError, DEFAULT_NOUS_PORTAL_URL, DEFAULT_NOUS_WELCOME_URL, _decode_jwt_claims, httpx)
+    AuthError, DEFAULT_NOUS_PORTAL_URL, DEFAULT_NOUS_WELCOME_URL, NOUS_INFERENCE_INVOKE_SCOPE,
+    WELCOME_CLAIM_FLAG, _decode_jwt_claims, httpx)
 
 logger = logging.getLogger("qubit_cli.auth")
 
@@ -172,6 +174,19 @@ def is_guest_state(state: Any) -> bool:
     return isinstance(state, dict) and state.get("auth_method") == ANON_AUTH_METHOD
 
 
+def guest_allowed() -> bool:
+    """``nous.guest`` (default True) has not switched guests off: no connector guest, no trial."""
+    try:
+        from qubit_cli.config import load_config_readonly
+        nous_cfg = load_config_readonly().get("nous")
+    except Exception:  # config unreadable: keep today's behaviour (no guest) rather than mint
+        logger.debug("guest: config unreadable, treating nous.guest as false", exc_info=True)
+        return False
+    if not isinstance(nous_cfg, dict):
+        return True
+    return bool(nous_cfg.get("guest", True))
+
+
 def is_anonymous_request(provider: Any, api_key: Any) -> bool:
     """Select anonymous error UX from the credential actually sent, never the saved profile or URL.
 
@@ -224,6 +239,22 @@ def has_free_tier_account() -> bool:
 def free_tier_route() -> bool:
     from qubit_cli.auth import resolve_provider
     return has_free_tier_account() and resolve_provider("auto") == "nous"
+
+
+def on_local_desktop_backend() -> bool:
+    """This process is the backend the desktop app spawned on this machine: never an SSH, URL or
+    cloud backend, and never a gateway or shell the desktop merely launched."""
+    from qubit_cli.anon_challenge import client_surface
+    from qubit_cli.process_identity import is_local_desktop_backend
+    return client_surface() == "desktop" and is_local_desktop_backend()
+
+
+def free_inference_active(state: Any = None) -> bool:
+    """The welcome trial carries inference here: a guest that claimed it (or was grandfathered),
+    guests still allowed, and this is the desktop's local backend. *state* defaults to the profile's."""
+    state = current_nous_state() if state is None else state
+    return (is_guest_state(state) and state.get(WELCOME_CLAIM_FLAG) is True and guest_allowed()
+            and on_local_desktop_backend())
 
 
 WELCOME_HOSTS = frozenset({"welcome-api.nousresearch.com"})
@@ -440,6 +471,34 @@ def _shared_identity_key(state: Any) -> Optional[str]:
     if not isinstance(state, dict):
         return None
     return state.get("anon_token") if is_guest_state(state) else state.get("refresh_token")
+
+
+def is_connectors_only(token: Any) -> bool:
+    """*token* carries a scope claim and it lacks ``inference:invoke`` (a scopeless JWT reads as today's)."""
+    from qubit_cli.auth_nous import _scope_values
+    claims = _decode_jwt_claims(token)
+    scopes = _scope_values(claims.get("scope")) | _scope_values(claims.get("scp"))
+    return bool(scopes) and NOUS_INFERENCE_INVOKE_SCOPE not in scopes
+
+
+def held_connectors_token(state: Any, *, skew_seconds: Optional[int] = None) -> Optional[str]:
+    """The bearer a connectors / managed-tools call sends: the profile's token (for a guest the
+    inference one, a superset), else a guest's connectors-only token, preferring one that outlives
+    *skew_seconds*. ``None`` also accepts an expiring token (availability probes)."""
+    from qubit_cli.auth import _is_expiring
+    if not isinstance(state, dict):
+        return None
+    slots = (state, state.get("connectors_token") if is_guest_state(state) else None)
+    held = [(s["access_token"], s.get("expires_at")) for s in slots
+            if isinstance(s, dict) and isinstance(s.get("access_token"), str) and s["access_token"]]
+    live = next((token for token, exp in held if not _is_expiring(exp, skew_seconds or 0)), None)
+    return live or (held[0][0] if held and skew_seconds is None else None)
+
+
+def guest_without_free_tier(state: Any) -> bool:
+    """A guest that does not carry inference here: it serves connectors and managed tools only, so
+    inference, account and status readers treat the profile as not signed in."""
+    return is_guest_state(state) and not free_inference_active(state)
 
 
 def _mint_locked(client: httpx.Client, portal: str, auth_store: Dict[str, Any]) -> Dict[str, Any]:
@@ -914,6 +973,51 @@ def mark_guest_notice_shown() -> bool:
             _store_section(source_store, "providers")["nous"] = state
             _save_auth_store(source_store, target_path=source_path)
     return True
+
+
+def set_guest_flag(flag: str) -> Optional[dict[str, Any]]:
+    """Set *flag* on the guest's ``providers.nous`` state in whichever store holds it, and return the
+    updated state; None when there is no guest."""
+    from qubit_cli.auth import _provider_state_transaction
+    with _provider_state_transaction("nous") as (auth_store, state, source_path):
+        if not is_guest_state(state) or source_path is None:
+            return None
+        if state.get(flag):
+            return state
+        state = {**state, flag: True}
+        _save_guest_state(auth_store, state, source_path)
+    return state
+
+
+def stamp_legacy_guest_claim() -> Optional[dict[str, Any]]:
+    """Grandfathering's write (``welcome_trial.grandfather_existing_guest``): stamp the welcome claim on
+    a guest minted before the key existed and publish it to the shared store, in one transaction under
+    the auth-then-shared locks. Nothing is written (None) unless, inside the locks, the guest still has
+    no key and the shared store is empty or holds that same guest: a sign-in another profile made is
+    never overwritten, whenever it landed."""
+    from qubit_cli.auth import _provider_state_transaction
+    from qubit_cli.auth_nous import _nous_shared_store_lock, _read_shared_nous_state, _write_shared_nous_state
+    with _provider_state_transaction("nous") as (auth_store, state, source_path), _nous_shared_store_lock():
+        shared = _read_shared_nous_state()
+        if (not is_guest_state(state) or source_path is None or WELCOME_CLAIM_FLAG in state
+                or (shared and _shared_identity_key(shared) != _shared_identity_key(state))):
+            return None
+        state = {**state, WELCOME_CLAIM_FLAG: True}
+        _save_guest_state(auth_store, state, source_path)
+        _write_shared_nous_state(state)
+    return state
+
+
+def _save_guest_state(auth_store: dict[str, Any], state: dict[str, Any], source_path: Path) -> None:
+    """Write the guest's ``providers.nous`` back to the store it was read from (the caller holds its lock)."""
+    from qubit_cli.auth import _auth_file_path, _load_auth_store, _same_path, _save_auth_store, _store_section
+    if _same_path(source_path, _auth_file_path()):
+        _store_section(auth_store, "providers")["nous"] = state
+        _save_auth_store(auth_store)
+    else:
+        source_store = _load_auth_store(source_path)
+        _store_section(source_store, "providers")["nous"] = state
+        _save_auth_store(source_store, target_path=source_path)
 
 
 # --- ``qubit auth upgrade``: sign the guest into a real Qubit account, keeping its connectors ---------
