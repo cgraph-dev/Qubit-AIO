@@ -1005,7 +1005,7 @@ class TestScopedLocks:
             "kind": "hermes-gateway",
         }))
 
-        removed = status.release_all_scoped_locks(
+        removed = release_all_scoped_locks(
             owner_pid=111,
             owner_start_time=222,
         )
