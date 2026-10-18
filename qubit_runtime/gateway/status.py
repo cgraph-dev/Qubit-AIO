@@ -23,6 +23,7 @@ from typing import Any, Callable, NamedTuple, Optional
 
 from qubit_constants import _get_platform_default_qubit_home, get_qubit_home, get_process_qubit_home
 from qubit_cli._subprocess_compat import pid_exists_stdlib
+from qubit_dir_acl import make_user_dir
 from utils import atomic_json_write
 
 if sys.platform == "win32":
