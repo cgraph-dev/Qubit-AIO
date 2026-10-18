@@ -859,3 +859,13 @@ def register(ctx) -> None:
         is_connected=_is_connected, validate_config=_is_connected, required_env=["WECOM_BOT_ID", "WECOM_SECRET"],
         setup_fn=interactive_setup, allowed_users_env="WECOM_ALLOWED_USERS", allow_all_env="WECOM_ALLOW_ALL_USERS",
         cron_deliver_env_var="WECOM_HOME_CHANNEL", standalone_sender_fn=_standalone_send, max_message_length=4000, **common, platform_hint=PLATFORM_HINT,)
+    # The manifest ships BOTH transports: the Smart Robot (above) and self-built apps over an HTTP
+    # callback with AES message crypto. Dropping this registration left wecom_callback in the
+    # LAZY_DEPS table with nothing that could ever reach it.
+    from plugins.platforms.wecom.callback_adapter import check_wecom_callback_requirements, ensure_wecom_callback_requirements
+    ctx.register_platform(
+        name="wecom_callback", label="WeCom Callback (self-built apps)", adapter_factory=_build_callback_adapter,
+        check_fn=check_wecom_callback_requirements, ensure_deps_fn=ensure_wecom_callback_requirements,
+        is_connected=_callback_is_connected, validate_config=_callback_is_connected,
+        required_env=["WECOM_CALLBACK_CORP_ID", "WECOM_CALLBACK_CORP_SECRET"],
+        allowed_users_env="WECOM_CALLBACK_ALLOWED_USERS", allow_all_env="WECOM_CALLBACK_ALLOW_ALL_USERS", **common)
