@@ -127,18 +127,20 @@ GLINT_CORE_MIN = 0.08
 #: A streak's half-width is the body's field ``size`` times this, floored so a
 #: far/small body still antialiases to a visible hairline instead of snapping
 #: out of existence between frames.
-TRAIL_HALF_WIDTH = 0.16
-TRAIL_MIN_HALF_PX = 0.26
+TRAIL_HALF_WIDTH = 0.30
+TRAIL_MIN_HALF_PX = 0.34
 #: Below this total arc length a streak is not drawn at all: a sub-pixel
 #: ribbon is one 8-bit step from appearing, which is exactly the hard pop the
 #: field's C1 envelopes exist to avoid.
 TRAIL_MIN_LEN_PX = 0.75
 #: Sparkles carry the short ``dust_trail``: four samples and a thinner ribbon,
 #: so 26 of them gain spectrum without turning the field into 26 comets.
-SPARKLE_TRAIL_HALF_WIDTH = 0.20
+SPARKLE_TRAIL_HALF_WIDTH = 0.34
 SPARKLE_TRAIL_GAIN = 1.0
+#: A shell body is dimmer than a logo particle, so its streak starts dimmer too.
+SATELLITE_TRAIL_GAIN = 1.1
 #: The comet is the one body loud enough to earn the full streak.
-COMET_TRAIL_HALF_WIDTH = 0.20
+COMET_TRAIL_HALF_WIDTH = 0.36
 COMET_TRAIL_GAIN = 1.0
 #: Its field bead tail stays, tinted along the same hue ramp: bright
 #: motion-blur fragments sitting inside the streak read as meteor debris,
@@ -161,6 +163,15 @@ TRAIL_HUE_ANCHOR_BLEND = 0.10
 Y_SPIN_PERIOD_S = 19.0
 #: The mark dims as it turns edge-on and brightens face-on, by this much.
 Y_SPIN_DIM = 0.15
+#: Phase warp applied to the horizontal turn, ``psi = theta + k*sin(2*theta)``.
+#: A flat plane seen edge-on really does vanish to a line, and that vanishing
+#: is what reads as 3D — but a LINEAR turn spends as long in the awkward part
+#: as in the comfortable part, so the orb would blank to its nucleus twice per
+#: turn. The warp is monotone (``1 + 2k*cos(2*theta) >= 0``) and smooth, so it
+#: cannot snap; it simply makes the turn DAWDL at face-on and mirrored-back-on
+#: and whip through the edge-on crossing at twice the rate. The mark still
+#: goes fully edge-on — that moment is the point — it just passes through.
+Y_SPIN_WARP = -0.5
 #: On top of that, the FAR side of the plane darkens more than the near side:
 #: the two halves swap over the turn, which is the depth cue.
 Y_SPIN_FAR_DIM = 0.12
@@ -262,19 +273,34 @@ NUCLEUS_SPECULAR_ALPHA = 0.90
 #: OUTSIDE the body and slowly turn through the spectrum, so the core reads as
 #: radiating rather than merely glowing.
 NUCLEUS_CORONA_COUNT = 3
-NUCLEUS_CORONA_RADIUS_FRAC = 1.62
-NUCLEUS_CORONA_SQUASH = 0.86
-NUCLEUS_CORONA_SIZE_FRAC = 0.62
+#: The corona has to sit OUTSIDE the white aura to read as chromatic at all:
+#: tucked inside the core it only tints an already-white blob. The aura falls
+#: to nothing by r*NUCLEUS_GLOW_MULT and the core ring starts at
+#: INNER_RING_RX_FRAC, so the corona lives in the gap between them.
+NUCLEUS_CORONA_RADIUS_FRAC = 2.95
+NUCLEUS_CORONA_SQUASH = 0.88
+NUCLEUS_CORONA_SIZE_FRAC = 1.35
 NUCLEUS_CORONA_PERIOD_S = 29.0
 NUCLEUS_CORONA_PHASE_DEG = 24.0
-NUCLEUS_CORONA_ALPHA = 0.30
-NUCLEUS_CORONA_SAT = 0.85
-#: The corona's own slow breathing, and how far its hue travels per second —
-#: slow enough that the colour reads as one field, not a rainbow rotor.
+NUCLEUS_CORONA_ALPHA = 0.34
+NUCLEUS_CORONA_SAT = 0.92
+#: A softer falloff than the aura's: the corona is a broad chromatic haze
+#: around the core, not another tight blob, and the long power the aura needs
+#: to kill its own rim would crush it to three dots.
+NUCLEUS_CORONA_POWER = 1.8
+#: The corona's own slow breathing, and how far its hue travels per second.
+#: The drift is deliberately small: over one full turn the whole corona stays
+#: inside the mark's own cyan-to-magenta band, so a core that radiates colour
+#: still reads as THIS mark's core instead of as a rainbow rotor.
 NUCLEUS_CORONA_BREATH_S = 7.3
 NUCLEUS_CORONA_BREATH_SPAN = 0.22
 NUCLEUS_CORONA_HUE_BASE = 0.50
-NUCLEUS_CORONA_HUE_TURNS = 0.055
+NUCLEUS_CORONA_HUE_TURNS = 0.018
+#: The three lobes spread across this much of the wheel — the same band the
+#: field gives its bodies — instead of an even third of the wheel each. Spread
+#: evenly they wrap (0.50, 0.84, 1.17 -> 0.17) and the third lobe lands on
+#: yellow, which reads as a different lamp rather than as this core radiating.
+NUCLEUS_CORONA_HUE_SPAN = 0.34
 #: Beat-synced flare: a hot bloom over the body that fires on the thump and
 #: decays with it, so the core pulses with the audio instead of only breathing.
 #: It is a FILL path (never a hairline) precisely so it can never be mistaken
@@ -485,10 +511,17 @@ def mark_horizontal_spin(t: Any) -> float:
     This is the multiplier the painter applies about ``(cx, cy)``: a positive
     value squashes the mark's flat orbital plane, a negative one MIRRORS it,
     which is what a real rotation about a vertical axis does past 90 degrees.
-    Exactly ``1.0`` under reduced motion, so the transform is never pushed on
-    a still frame. Never raises.
+    The turn is warped by :data:`Y_SPIN_WARP` first (monotone and smooth, so
+    the warp itself cannot snap) purely to change the PACE: face-on and
+    mirrored-back-on are dwelt on, the edge-on crossing is crossed at twice
+    the rate.
+
+    Exactly ``1.0`` under reduced motion, so the transform is never pushed on a
+    still frame. Never raises.
     """
-    return math.cos(math.radians(math.fmod(mark_horizontal_spin_deg(t), 360.0)))
+    theta = math.radians(math.fmod(mark_horizontal_spin_deg(t), 360.0))
+    warped = theta + Y_SPIN_WARP * math.sin(2.0 * theta)
+    return math.cos(warped)
 
 
 def mark_binaries(t: Any, R: Any) -> List[Dict[str, Any]]:
@@ -865,7 +898,13 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         body = shell.get("body") or {}
         depth = _num(body.get("depth"), 0.5)
         if draw_trail:
-            _streak(_field.rgb_trail(tt, Rf, body), depth)
+            # The SHORT streak here, not the full ``rgb_trail``: a shell body
+            # turns its shell once in 5.5-13.5 s, and the long streak's step is
+            # sized for the comet, so the full one drew a ~70px near-straight
+            # scratch right across the mark. The field's own ``vx``/``vy`` put
+            # even the short one on the body's real path, tangent to the shell.
+            _streak(_field.dust_trail(tt, Rf, body), depth,
+                    half=SPARKLE_TRAIL_HALF_WIDTH, gain=SATELLITE_TRAIL_GAIN)
         _glint(cx + _num(body.get("x"), 0.0), cy + _num(body.get("y"), 0.0),
                max(0.3, _num(body.get("size"), 0.0)),
                _shade(_num(body.get("alpha"), 0.0), depth),
@@ -986,12 +1025,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             dist = r * NUCLEUS_CORONA_RADIUS_FRAC * breath
             hue = (NUCLEUS_CORONA_HUE_BASE
                    + ck * NUCLEUS_CORONA_HUE_TURNS
-                   + i / float(NUCLEUS_CORONA_COUNT)) % 1.0
+                   + i * NUCLEUS_CORONA_HUE_SPAN
+                   / float(NUCLEUS_CORONA_COUNT)) % 1.0
             _smoke(cx + dist * math.cos(ang),
                    cy + dist * math.sin(ang) * NUCLEUS_CORONA_SQUASH,
                    max(0.6, r * NUCLEUS_CORONA_SIZE_FRAC * breath),
                    _anchor(_spec_rgb(hue, NUCLEUS_CORONA_SAT)),
-                   NUCLEUS_CORONA_ALPHA * breath)
+                   NUCLEUS_CORONA_ALPHA * breath,
+                   power=NUCLEUS_CORONA_POWER)
         # Smoky aura: a wide base falloff plus slow drifting plumes, so the
         # surround is soft and irregular instead of a hard-edged disc.
         _smoke(cx, cy, r * NUCLEUS_GLOW_MULT, rgb, NUCLEUS_GLOW_ALPHA)
