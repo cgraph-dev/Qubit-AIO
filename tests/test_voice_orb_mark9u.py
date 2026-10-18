@@ -71,8 +71,8 @@ def test_draws_two_fringed_rings_and_every_particle():
 def _centered(canvas, cx=34.0, cy=34.0, filled=None):
     """The oval nearest (cx, cy); optionally filtered by fill.
 
-    The whole mark sways with the field's camera offset, so the nucleus is
-    within a couple of pixels of the geometric centre, not exactly on it.
+    Used for the SEAM rings: the body does not sway with the field's camera
+    offset, so the halo stack sits exactly on the geometric centre.
     """
     best, best_d = None, 4.0
     for o in canvas.ovals:
@@ -88,12 +88,30 @@ def _centered(canvas, cx=34.0, cy=34.0, filled=None):
     return best
 
 
-def _nucleus(canvas):
-    return _centered(canvas, filled=True)
+def _nucleus(canvas, cx=34.0, cy=34.0, R=32.0, t=0.0, tol=1e-6):
+    """The nucleus BODY: the concentric filled oval at its own declared radius.
+
+    "The nearest oval" no longer identifies it — the studio nucleus shares its
+    centre with the beat bloom, and a caustic and two swirl lobes orbit inside
+    it — so the body's own radius law (``mark.nucleus_radius``) does. Pinning
+    it that way also checks the size law, not just a position.
+    """
+    want = M.nucleus_radius(R, t)
+    for o in canvas.ovals:
+        ox, oy = (o[0] + o[2]) / 2, (o[1] + o[3]) / 2
+        if abs(ox - cx) > tol or abs(oy - cy) > tol:
+            continue
+        if abs(abs((o[2] - o[0]) / 2) - want) <= tol:
+            return o
+    return None
 
 
 def _halo(canvas):
-    return _centered(canvas, filled=False)
+    """The FIRST outline-only oval: the outermost soft halo ring."""
+    for o in canvas.ovals:
+        if not o[4].get("fill"):
+            return o
+    return None
 
 
 def _lum(hex_colour):
@@ -118,7 +136,8 @@ def test_heartbeat_pulses_nucleus_size_and_halo_opacity():
     beat, rest = FakeCanvas(), FakeCanvas()
     M.render(beat, 34.0, 34.0, 32.0, 0.0, "idle")     # primary thump
     M.render(rest, 34.0, 34.0, 32.0, 0.475, "idle")   # between beats
-    nb, nr = _nucleus(beat), _nucleus(rest)
+    nb = _nucleus(beat, R=32.0, t=0.0)
+    nr = _nucleus(rest, R=32.0, t=0.475)
     assert nb is not None and nr is not None
     # Scale envelope is larger on the primary beat than at rest.
     assert (nb[2] - nb[0]) > (nr[2] - nr[0])
@@ -161,7 +180,7 @@ def test_far_beads_draw_behind_and_near_beads_in_front():
                     return i
             return None
 
-        nuc = _nucleus(c)
+        nuc = _nucleus(c, R=32.0, t=t)
         nuc_idx = c.ovals.index(nuc)
         far_idx = [_idx(*M._spin_pt(f["x"] + 34.0, f["y"] + 34.0, t, 34.0, 34.0))
                    for f in frames if f["depth"] < 0.5]
@@ -189,8 +208,8 @@ def test_depth_z_split_orders_far_seam_near():
                 return i
         return None
 
-    halo_idx = c.ovals.index(_centered(c, 40.0, 40.0, filled=False))
-    nuc_idx = c.ovals.index(_centered(c, 40.0, 40.0, filled=True))
+    halo_idx = c.ovals.index(_halo(c))
+    nuc_idx = c.ovals.index(_nucleus(c, 40.0, 40.0, R=40.0, t=0.0))
     far_idx = [_idx(f["x"] + 40.0, f["y"] + 40.0)
                for f in frames if f["depth"] < 0.5]
     near_idx = [_idx(f["x"] + 40.0, f["y"] + 40.0)
@@ -294,7 +313,10 @@ def _call_pos(canvas, kind, idx):
     return None
 
 
-def test_echo_rings_are_two_outline_rings_that_lag_the_orbits(monkeypatch):
+def test_echo_rings_are_two_declared_follower_strokes(monkeypatch):
+    # The circles are DECLARED once by the field now, so a follower is no
+    # longer an ad-hoc ellipse assembled beside the orbits: it is one of the
+    # declared entries, and the renderer only chooses its look.
     R, t = 32.0, 3.0
     near_lag, far_lag = F.orbit_tilts(t - F.ECHO_LAG_S)
     near_now, far_now = F.orbit_tilts(t)
@@ -302,9 +324,28 @@ def test_echo_rings_are_two_outline_rings_that_lag_the_orbits(monkeypatch):
     assert abs(near_lag - near_now) > 0.5
     assert abs(far_lag - far_now) > 0.5
 
+    specs = F.ring_geometry(t)
+    echoes = [sp for sp in specs if sp["layer"] == "echo"]
+    assert len(echoes) == 2, "one declared follower per main orbit"
+    assert {str(sp["orbit"]) for sp in echoes} == {"a", "b"}
+    for sp in echoes:
+        assert sp["rx_frac"] == pytest.approx(F.RX_FRAC * F.ECHO_SCALE)
+        assert sp["ry_frac"] == pytest.approx(F.RY_FRAC * F.ECHO_SCALE)
+        # The declaration composes its own (second) lag, which is NOT the
+        # single-lag follower the shared echo contract uses everywhere else.
+        assert sp["tilt"] != pytest.approx(
+            near_lag if str(sp["orbit"]) == "a" else far_lag, abs=1e-6)
+    assert M.echo_follower_tilt(t, "a") == pytest.approx(near_lag)
+    assert M.echo_follower_tilt(t, "b") == pytest.approx(far_lag)
+    # The LIVE tilt is never what a follower sits at — the lag is real.
+    assert abs(M.echo_follower_tilt(t, "a") - near_now) > 0.5
+    assert abs(M.echo_follower_tilt(t, "b") - far_now) > 0.5
+
     full = FakeCanvas()
     M.render(full, 34.0, 34.0, R, t, "idle")
-    monkeypatch.setattr(M, "echo_rings", lambda tt: [])
+    monkeypatch.setattr(
+        M, "ring_geometry",
+        lambda tt: [sp for sp in specs if sp["layer"] != "echo"])
     bare = FakeCanvas()
     M.render(bare, 34.0, 34.0, R, t, "idle")
     monkeypatch.undo()
@@ -312,30 +353,25 @@ def test_echo_rings_are_two_outline_rings_that_lag_the_orbits(monkeypatch):
     # Exactly the two follower rings, one outline stroke each.
     assert len(full.lines) - len(bare.lines) == 2
 
-    rx, ry = R * F.RX_FRAC, R * F.RY_FRAC
-    ox, oy = F.camera_offset(t, R)
-    ccx, ccy = 34.0 + ox, 34.0 + oy
-
-    def _match(tilt):
-        expected = M._ellipse_points(ccx, ccy, rx * F.ECHO_SCALE,
-                                     ry * F.ECHO_SCALE, tilt)
-        for idx, (pts, _kw) in enumerate(full.lines):
-            if _line_matches(pts, expected):
-                return idx
-        return None
-
-    near_idx = _match(near_lag)
-    far_idx = _match(far_lag)
-    assert near_idx is not None, "near follower ring not at the lagged tilt"
-    assert far_idx is not None, "far follower ring not at the lagged tilt"
-    # The LIVE tilt is never what was drawn — the lag is real.
-    assert _match(near_now) is None and _match(far_now) is None
-
-    # Depth: the far follower sits behind the nucleus, the near one in front.
-    nuc_i = full.ovals.index(_nucleus(full))
-    assert (_call_pos(full, "line", far_idx)
-            < _call_pos(full, "oval", nuc_i)
-            < _call_pos(full, "line", near_idx))
+    # Depth: drawn one at a time, the far follower sits behind the nucleus and
+    # the near one in front, so the pair takes part in the z-seam.
+    for orbit, behind in (("b", True), ("a", False)):
+        only = [sp for sp in echoes if str(sp["orbit"]) == orbit]
+        zero = FakeCanvas()
+        monkeypatch.setattr(M, "ring_geometry", lambda tt: [])
+        M.render(zero, 34.0, 34.0, R, t, "idle")
+        c = FakeCanvas()
+        monkeypatch.setattr(M, "ring_geometry", lambda tt, o=only: o)
+        M.render(c, 34.0, 34.0, R, t, "idle")
+        monkeypatch.undo()
+        # One follower is exactly one plain stroke: never fringed, because the
+        # fringe is the logo's signature on the two MAIN orbits only.
+        assert len(c.lines) - len(zero.lines) == 1
+        nuc_pos = _call_pos(c, "oval", c.ovals.index(_nucleus(c, R=R, t=t)))
+        # Each half of the z-seam opens with its circles, so the follower's
+        # stroke is the first of its pass.
+        pos = _call_pos(c, "line", 0 if behind else len(zero.lines))
+        assert (pos < nuc_pos) if behind else (pos > nuc_pos)
 
 
 # --------------------------------------------------------------------------- #
