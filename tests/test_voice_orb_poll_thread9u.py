@@ -24,12 +24,14 @@ from __future__ import annotations
 import inspect
 import queue
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from voicebridge.orb import app as orb_app  # noqa: E402
 from voicebridge.orb import client as orb_client  # noqa: E402
+from voicebridge.orb import state as orb_state  # noqa: E402
 from voicebridge.voice_edit import logview  # noqa: E402
 
 
@@ -190,6 +192,83 @@ def test_poll_tick_without_worker_still_fetches_synchronously():
     orb_app.VoiceOrb._poll_tick(orb)
     assert orb.state == "idle", orb.state
     assert cli.status_calls == 1, cli.status_calls
+
+
+# -- live request id: the feed lets a second press STOP ----------------------
+
+def _ev(name, ts, **fields):
+    d = {"event": name, "ts": ts}
+    d.update(fields)
+    return d
+
+
+def test_active_request_picks_the_newest_live_id():
+    now = time.time()
+    events = [
+        _ev("voice_edit.helper.listening", now - 6.0, request_id="old"),
+        _ev("voice_edit.helper.speak", now - 3.0),
+        _ev("voice_edit.helper.transcribe.start", now - 5.0,
+            request_id="old"),
+        _ev("voice_edit.helper.transcript", now - 1.5, request_id="new"),
+    ]
+    assert orb_state.active_request(events, now) == ("new", now - 1.5)
+    # Stale ids are ignored; no rid rows -> nothing live.
+    assert orb_state.active_request(
+        [_ev("voice_edit.helper.listening", now - 600.0,
+             request_id="ancient")], now) == (None, None)
+    assert orb_state.active_request([_ev("tts.speak", now)], now) == (
+        None, None)
+    assert orb_state.active_request([], now) == (None, None)
+
+
+def test_active_request_cleared_by_a_cancellation_row():
+    now = time.time()
+    events = [
+        _ev("voice_edit.helper.listening", now - 4.0, request_id="rid"),
+        _ev("stt.cancelled", now - 0.5, request_id="rid"),
+    ]
+    rid, ts = orb_state.active_request(events, now)
+    assert rid is None and ts == now - 0.5
+    # ...but a NEWER capture row wins over the cancellation.
+    events.append(_ev("voice_edit.helper.listening", now - 0.1,
+                      request_id="rid2"))
+    assert orb_state.active_request(events, now)[0] == "rid2"
+
+
+def test_plan_toggle_cancels_a_live_turn_not_starts_a_capture():
+    now = time.time()
+    # The bug: on the helper path ``pending_rid`` is always None, so a press
+    # re-planned "begin" and re-triggered capture. With the live id from the
+    # feed, a press is a STOP.
+    assert orb_state.plan_toggle(
+        None, 0.0, now, orb_state="speaking",
+        active_rid="live", active_ts=now - 2.0) == ("cancel", "live")
+    assert orb_state.plan_toggle(
+        None, 0.0, now, orb_state="thinking",
+        active_rid="live", active_ts=now - 2.0) == ("cancel", "live")
+    assert orb_state.plan_toggle(
+        None, 0.0, now, orb_state="working",
+        active_rid="live", active_ts=now - 2.0) == ("cancel", "live")
+
+
+def test_plan_toggle_listening_finishes_never_cancels():
+    now = time.time()
+    # While listening a press finishes the capture (helper toggle): cancelling
+    # would discard the utterance.
+    assert orb_state.plan_toggle(
+        None, 0.0, now, orb_state="listening",
+        active_rid="live", active_ts=now - 1.0) == ("begin", None)
+    # A stale live id is not a turn either.
+    assert orb_state.plan_toggle(
+        None, 0.0, now, orb_state="speaking",
+        active_rid="live", active_ts=now - 600.0) == ("begin", None)
+
+
+def test_plan_toggle_three_arg_call_is_backward_compatible():
+    now = time.time()
+    assert orb_state.plan_toggle(None, 0.0, now) == ("begin", None)
+    assert orb_state.plan_toggle("abc", now - 5.0, now) == ("cancel", "abc")
+    assert orb_state.plan_toggle("abc", now - 600.0, now) == ("begin", None)
 
 
 def test_poll_worker_never_touches_widgets():

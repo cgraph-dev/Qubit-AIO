@@ -297,3 +297,110 @@ def test_qt_orb_position_lock_blocks_drag(monkeypatch, tmp_path):
     finally:
         w.close()
         G.ORB_PX = saved_px
+
+
+# --------------------------------------------------------------------------- #
+# instant stop: the second press must cancel the live turn, never start one
+# --------------------------------------------------------------------------- #
+class _FakeToggleClient:
+    """Records the orb's voice IPC without any HTTP or a live helper."""
+
+    def __init__(self, helper_running=True):
+        self.calls = []
+        self._helper_running = helper_running
+
+    def cancel_request(self, rid):
+        self.calls.append(("cancel", rid))
+        return {"ok": True}
+
+    def trigger_helper_capture(self):
+        if not self._helper_running:
+            from voicebridge.orb.client import OrbError
+            raise OrbError("ORB_HELPER_NOT_RUNNING", "no helper")
+        self.calls.append(("trigger",))
+        return {"ok": True}
+
+    def begin_session(self):
+        self.calls.append(("begin",))
+        return {"ok": True, "request_id": "staged-1"}
+
+
+class _OrbStub:
+    """Attribute-only stand-in: ``QtVoiceOrb.toggle_voice`` needs no widget.
+
+    A real ``QtVoiceOrb`` is a QWidget and cannot be instantiated without a
+    display; calling the UNBOUND method on a plain object with the same
+    attributes exercises the exact code path hermetically.
+    """
+
+    def __init__(self, client, **attrs):
+        self._client = client
+        self._client_factory = lambda: client
+        self.__dict__.update(attrs)
+
+    def _get_client(self):
+        # Mirrors QtVoiceOrb._get_client (the method the real widget uses).
+        if self._client is None:
+            self._client = self._client_factory()
+        return self._client
+
+
+def _bare_qt_orb(client, *, orb_state, active_rid=None, active_ts=0.0,
+                 pending_rid=None, pending_ts=0.0):
+    pytest.importorskip("PySide6.QtWidgets", reason="Qt-less env")
+    from voicebridge.orb import qt_app as qa
+
+    if not hasattr(qa, "QtVoiceOrb"):  # Qt importable but disabled
+        pytest.skip("QtVoiceOrb unavailable")
+    return _OrbStub(
+        client, orb_state=orb_state, _pending_rid=pending_rid,
+        _pending_ts=pending_ts, _active_rid=active_rid, _active_ts=active_ts,
+        notice_until=0.0)
+
+
+def test_second_press_during_speaking_cancels_and_never_recaptures():
+    import time
+
+    from voicebridge.orb import qt_app as qa
+
+    cli = _FakeToggleClient()
+    orb = _bare_qt_orb(cli, orb_state="speaking", active_rid="live-rid",
+                       active_ts=time.time() - 1.0)
+    qa.QtVoiceOrb.toggle_voice(orb)
+    assert cli.calls == [("cancel", "live-rid")], cli.calls
+    # The live id is consumed; the next press starts fresh.
+    assert orb._active_rid is None
+
+
+def test_second_press_while_listening_finishes_the_capture():
+    import time
+
+    from voicebridge.orb import qt_app as qa
+
+    cli = _FakeToggleClient()
+    orb = _bare_qt_orb(cli, orb_state="listening", active_rid="live-rid",
+                       active_ts=time.time() - 1.0)
+    qa.QtVoiceOrb.toggle_voice(orb)
+    assert cli.calls == [("trigger",)], cli.calls
+
+
+def test_press_while_idle_triggers_capture():
+    from voicebridge.orb import qt_app as qa
+
+    cli = _FakeToggleClient()
+    orb = _bare_qt_orb(cli, orb_state="idle")
+    qa.QtVoiceOrb.toggle_voice(orb)
+    assert cli.calls == [("trigger",)], cli.calls
+
+
+def test_stage_only_fallback_still_stages_and_cancels():
+    from voicebridge.orb import qt_app as qa
+
+    cli = _FakeToggleClient(helper_running=False)
+    orb = _bare_qt_orb(cli, orb_state="idle")
+    qa.QtVoiceOrb.toggle_voice(orb)
+    assert cli.calls == [("begin",)], cli.calls
+    assert orb._pending_rid == "staged-1"
+    # A second press with no live turn cancels the staged request.
+    qa.QtVoiceOrb.toggle_voice(orb)
+    assert cli.calls == [("begin",), ("cancel", "staged-1")], cli.calls

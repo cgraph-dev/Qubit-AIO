@@ -2822,6 +2822,12 @@ if QWidget is not None:
                 self._color_transition = None
             self._pending_rid: Optional[str] = None
             self._pending_ts = 0.0
+            # The LIVE turn's request id, learned from the state feed (see
+            # ``state.active_request``). The helper path never stages a rid
+            # locally, so without this a second press re-planned "begin" and
+            # re-triggered capture instead of stopping the in-flight turn.
+            self._active_rid: Optional[str] = None
+            self._active_ts = 0.0
             self._client_factory = client_factory or _default_client
             self._client: Any = None
             self._toggle_requested = False
@@ -3170,13 +3176,25 @@ if QWidget is not None:
         # -- voice toggle (same plan as the Tk view) -----------------------
         def toggle_voice(self) -> None:
             now = time.time()
+            # The plan now sees the LIVE turn id learned from the state feed.
+            # While Qubit is thinking/working/speaking a press is a STOP: it
+            # cancels that request. Without this the helper path always
+            # re-planned "begin" (``_pending_rid`` is only ever set on the
+            # stage-only fallback) and re-triggered capture, so the reply
+            # kept playing — the owner's "it stops too slow".
             action, rid = _state.plan_toggle(
-                self._pending_rid, self._pending_ts, now)
+                self._pending_rid, self._pending_ts, now,
+                orb_state=getattr(self, "orb_state", None),
+                active_rid=getattr(self, "_active_rid", None),
+                active_ts=getattr(self, "_active_ts", 0.0))
             try:
                 cli = self._get_client()
                 if action == "cancel" and rid:
                     cli.cancel_request(rid)
                     self._pending_rid = None
+                    if rid == getattr(self, "_active_rid", None):
+                        self._active_rid = None
+                        self._active_ts = 0.0
                     return
                 try:
                     cli.trigger_helper_capture()
@@ -3383,6 +3401,22 @@ if QWidget is not None:
                         self.orb_state = "error"
                 except Exception:
                     self.orb_state = "error"
+            # Learn the LIVE turn's request id from the same feed (no extra
+            # HTTP). Capture rows carry it; keeping it once seen means a
+            # journal window that later fills with wake noise cannot lose the
+            # id before the reply ends. A newer turn's id simply replaces it,
+            # and state.active_request clears it on a cancellation row.
+            try:
+                _live_rid, _live_ts = _state.active_request(
+                    events, time.time())
+            except Exception:
+                _live_rid, _live_ts = (None, None)
+            if _live_rid:
+                self._active_rid = _live_rid
+                try:
+                    self._active_ts = float(_live_ts)
+                except (TypeError, ValueError):
+                    self._active_ts = time.time()
             # Test override (tray/panel "Test animation"): hold the forced
             # state for its window, then release back to the live feed.
             try:
