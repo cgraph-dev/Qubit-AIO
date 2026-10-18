@@ -19,6 +19,7 @@ from tui_gateway import server
 from agent.message_sanitization import _sanitize_surrogates
 from tui_gateway.event_replay import replay_epoch
 from tui_gateway.transport import serialize_frame
+from tui_gateway.ws_legacy_fallback import dispatch_legacy, legacy_fallback_allowed
 
 _log = logging.getLogger(__name__)
 
@@ -28,20 +29,42 @@ _log = logging.getLogger(__name__)
 _DASHBOARD_CLIENT_TOUCH_MIN_INTERVAL_S = 5.0
 _dashboard_client_touched_at = 0.0
 _dashboard_client_touch_lock = threading.Lock()
+# The touch is file I/O and every caller sits on the event loop, where a slow disk stalls every
+# connection, managed-worker RPCs included (#139011). It runs on its own single worker so it never
+# ties up the pool asyncio.to_thread shares, and at most one write per path waits behind a slow one.
+_dashboard_client_touch_pool = concurrent.futures.ThreadPoolExecutor(
+    max_workers=1, thread_name_prefix="dashboard-client-touch")
+_dashboard_client_touch_pending: set = set()
+
+
+def _touch_dashboard_client_marker(path) -> None:
+    with _dashboard_client_touch_lock:
+        # Cleared before the write: activity during a slow write queues exactly one follow-up.
+        _dashboard_client_touch_pending.discard(path)
+    from gateway.scale_to_zero import touch_dashboard_client_heartbeat
+    touch_dashboard_client_heartbeat(path)  # best-effort, never raises
 
 
 def _note_dashboard_client_activity(*, force: bool = False) -> None:
-    """Refresh the dashboard-client liveness marker (throttled, best-effort)."""
+    """Refresh the dashboard-client liveness marker (throttled, best-effort, never blocks the caller)."""
     global _dashboard_client_touched_at
     now = time.monotonic()
     with _dashboard_client_touch_lock:
         if not force and now - _dashboard_client_touched_at < _DASHBOARD_CLIENT_TOUCH_MIN_INTERVAL_S:
             return
         _dashboard_client_touched_at = now
+    path = None
     try:
-        from gateway.scale_to_zero import touch_dashboard_client_heartbeat
-        touch_dashboard_client_heartbeat()
-    except Exception:  # noqa: BLE001 - liveness garnish must never break the WS
+        from gateway.scale_to_zero import dashboard_client_heartbeat_path
+        # Resolved here: the worker thread does not carry the caller's profile scope.
+        path = dashboard_client_heartbeat_path()
+        with _dashboard_client_touch_lock:
+            if path in _dashboard_client_touch_pending:
+                return
+            _dashboard_client_touch_pending.add(path)
+        _dashboard_client_touch_pool.submit(_touch_dashboard_client_marker, path)
+    except Exception:
+        _dashboard_client_touch_pending.discard(path)  # a refused submit (shutdown) must not wedge it
         _log.debug("dashboard client heartbeat touch failed", exc_info=True)
 
 
@@ -288,15 +311,63 @@ def _disable_nagle(ws: Any) -> None:
         _log.debug("ws TCP_NODELAY skip: %s", exc)
 
 
+def _is_unknown_method(resp) -> bool:
+    error = resp.get("error") if isinstance(resp, dict) else None
+    return isinstance(error, dict) and error.get("code") == -32601
+
+
+def _authority_connection(ws: Any, transport: WSTransport, auth_identity: dict | None, operator: bool):
+    """The session-authority connection for this socket (route scope, else app state), or None
+    when this backend has no authority and requests go to the legacy ``server.dispatch``."""
+    authority = (getattr(ws, 'scope', None) or {}).get('qubit.session_authority') or getattr(
+        getattr(getattr(ws, 'app', None), 'state', None), 'session_authority', None)
+    if authority is None:
+        return None
+    from gateway.session_controls import AuthorityConnection
+    return AuthorityConnection(authority, transport, auth_identity or {}, operator=operator)
+
+
+async def _dispatch_request(authority_connection: Any, req: Any, req_method: Any, transport: WSTransport) -> Any:
+    """One request through the authority when attached, else the legacy dispatcher."""
+    if authority_connection is None:
+        return await asyncio.to_thread(server.dispatch, req, transport)
+    resp = await authority_connection.dispatch(req)
+    actor = authority_connection.actor
+    if (_is_unknown_method(resp) and req_method in server._methods
+            and legacy_fallback_allowed(actor, req_method)):
+        # Session verbs live on the authority; everything else the sidecar still
+        # registers (pet, wake word, connectors) keeps its legacy handler. A legacy
+        # session writer keeps the authority's -32601 (ws_legacy_fallback), as does a
+        # method neither side knows, which is what the client's version-skew notice keys on.
+        resp = await asyncio.to_thread(dispatch_legacy, server, req, transport, actor)
+    return resp
+
+
+def _start_backend_liveness() -> None:
+    """Backend heartbeat refresher + startup orphan sweep (idempotent, once per process); a
+    failure of either is logged and never blocks the connection."""
+    for start, what in (
+        (server._start_backend_heartbeat_refresher, "backend heartbeat refresher start"),
+        (server._schedule_startup_orphan_sweep, "startup orphan sweep scheduling"),
+    ):
+        try:
+            start()
+        # health: allow BLE001 -- liveness boundary; logs the traceback (exc_info) via _log, a name ruff does not treat as a logger
+        except Exception:
+            _log.warning("%s failed", what, exc_info=True)
+
+
 class _SendFailed(Exception):
     """Raised by handle_ws._reply when a reply could not be written: ends the read loop."""
 
 
-async def handle_ws(ws: Any, *, auth_identity: dict | None = None, subprotocol: str | None = None) -> None:
+async def handle_ws(ws: Any, *, auth_identity: dict | None = None, subprotocol: str | None = None,
+                    operator: bool = False) -> None:
     """Run one WebSocket session. Wire-compatible with ``tui_gateway.entry``. *auth_identity* is the server-minted
     ``{user_id, provider}`` recorded at WS-upgrade auth, stored as ``WSTransport.auth_identity`` (the only identity
     authority for browser-controller registration); callers that omit it (harnesses, embedded TUI child) get None."""
     peer, transport = _ws_peer_label(ws), None
+    authority_connection = None
     messages = parse_errors = dispatch_crashes = send_failures = 0
     disconnect_reason = "not_connected"
 
@@ -326,7 +397,7 @@ async def handle_ws(ws: Any, *, auth_identity: dict | None = None, subprotocol: 
             # writes the response itself via transport.write (a separate thread, so that is the safe
             # path). Inline handlers return the response dict, written here from the loop.
             try:
-                resp = await asyncio.to_thread(server.dispatch, req, transport)
+                resp = await _dispatch_request(authority_connection, req, req_method, transport)
             except Exception:
                 dispatch_crashes += 1
                 _log.exception("ws dispatch crash peer=%s id=%s method=%s", peer, req_id, req_method)
@@ -357,6 +428,7 @@ async def handle_ws(ws: Any, *, auth_identity: dict | None = None, subprotocol: 
         _disable_nagle(ws)
         _log.info("ws accepted peer=%s", peer)
         transport = WSTransport(ws, asyncio.get_running_loop(), peer=peer, auth_identity=auth_identity)
+        authority_connection = _authority_connection(ws, transport, auth_identity, operator)
         # resolve_skin() is sync I/O + CPU; pooled so the read loop can drain the frontend's initial RPC burst.
         skin_payload = await asyncio.to_thread(server.resolve_skin)
         # change_events: this backend broadcasts pet/cron/sessions.changed, so clients can demote legacy
@@ -366,6 +438,7 @@ async def handle_ws(ws: Any, *, auth_identity: dict | None = None, subprotocol: 
             "jsonrpc": "2.0", "method": "event",
             "params": {"type": "gateway.ready", "payload": {
                 "skin": skin_payload, "change_events": True, "heartbeat": True, "replay_epoch": replay_epoch(),
+                **({"session_authority": True} if authority_connection is not None else {}),
             }},
         })
         if ready_ok:
@@ -377,14 +450,7 @@ async def handle_ws(ws: Any, *, auth_identity: dict | None = None, subprotocol: 
         # Cross-backend liveness: a heartbeat row lets the startup orphan sweep tell "live but idle
         # backend" from "truly orphaned". Idempotent and once-per-process, like the orphan sweep (the
         # desktop app and web dashboard reach the agent via this sidecar, not entry.main()).
-        for start, what in (
-            (server._start_backend_heartbeat_refresher, "backend heartbeat refresher start"),
-            (server._schedule_startup_orphan_sweep, "startup orphan sweep scheduling"),
-        ):
-            try:
-                start()
-            except Exception:
-                _log.warning("%s failed", what, exc_info=True)
+        _start_backend_liveness()
         if not ready_ok:
             disconnect_reason = "ready_send_failed"
             send_failures += 1
