@@ -586,13 +586,17 @@ def test_primitive_count_is_bounded_and_richer_than_pre_field():
     # Pre-field ceiling: 2 rings * 3 fringe strokes + 9 beads + 9*4 trails
     # + 14 glints + nucleus + halo = 67 primitives.
     pre_field_max = 2 * 3 + 9 + 9 * 4 + 14 + 2
-    counts = [len(_record(t=0.31 + k * 0.17)) for k in range(10)]
+    # Count SHAPE primitives only, matching the binding perf contract
+    # (``test_voice_orb_fx_perf9u`` counts drawEllipse/drawPath/drawLine, never
+    # drawText). The math-symbol and "1"/"0" glyph layers are text, so they are
+    # outside the shape budget by the same rule the perf cap uses.
+    counts = [len([p for p in _record(t=0.31 + k * 0.17)
+                   if p.kind != "text"]) for k in range(10)]
     assert max(counts) > pre_field_max
     # The holo budget: the field lane densified the frame (dust 48, sparkles
-    # 40, binary 72, sparks 26) and the Qt lane adds blink dots plus the
-    # nucleus rim pair, so the old 300 ceiling is stale (it was already 312
-    # at the field lane's merge base). The binding cap is the 420 of the perf
-    # contract, which this stays under with headroom.
+    # 40, binary 72, sparks 26) and the Qt lane adds blink dots, the screen-break
+    # bodies and the nucleus rim pair, so the old 300 ceiling is stale. The
+    # binding cap is the 420 of the perf contract, which this stays under.
     assert max(counts) <= 420
     assert max(counts) - min(counts) < 80
 
