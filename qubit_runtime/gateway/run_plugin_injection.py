@@ -239,6 +239,32 @@ class GatewayPluginInjectionMixin:
                 self._adapter_for_source(live.source), live.source, session_key=entry.session_key,
                 session_id=entry.session_id, content=content, plugin_id=plugin_id))
 
+    def _adapter_for_source(self, source: SessionSource):
+        """The live adapter that may answer *source*: the bot that RECEIVED it where known, else the
+        unique owner of ``(platform, runtime_profile)``. Never ``self.adapters[platform]`` — under
+        multiplexing that is the wrong profile's bot."""
+        return self._delivery_adapter_for(source)
+
+    async def _admit_plugin_injection(self, adapter, source: SessionSource, *, session_key: str,
+                                      session_id: str, content: str, plugin_id: str) -> bool:
+        """Hand a plugin-triggered turn to *adapter* on the live session's own source.
+
+        Commits through ``adapter.handle_message`` exactly as the messaging path does; ``internal``
+        marks it as agent-originated so the two gateway guards do not treat it as a user message.
+        """
+        if adapter is None:
+            return False
+        await adapter.handle_message(MessageEvent(
+            text=content, message_type=MessageType.TEXT, source=source, internal=True,
+            allow_gateway_control=False,
+            metadata={
+                "qubit_plugin_id": plugin_id, "qubit_plugin_injection": True,
+                "gateway_session_key": session_key, "gateway_session_id": session_id,
+                "gateway_session_strict": True,
+            },
+        ))
+        return True
+
     def _served_profile_for_home(self, home: Optional[Path]) -> Optional[str]:
         """Name of the profile this gateway serves at *home* (a plugin manager's immutable home), or
         ``None`` when this gateway does not serve it."""
