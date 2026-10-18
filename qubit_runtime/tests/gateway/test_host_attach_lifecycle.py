@@ -18,6 +18,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -45,9 +46,29 @@ def _no_memo():
 
 @pytest.fixture
 def owner_pid(tmp_path, monkeypatch):
-    """A REAL live process standing in for the host gateway (liveness is proved, not stubbed)."""
-    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
-    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    """A REAL live process standing in for the host gateway (liveness is proved, not stubbed).
+
+    The child holds the ROLE_GATEWAY host lock for its whole life: ``record_names_live_owner``
+    treats a free lock as falsifying the record (a recycled PID must not read as a live owner),
+    and an flock belongs to the process that took it, so the parent cannot stand in for it.
+    """
+    locks = tmp_path / "locks"
+    locks.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(locks))
+    from gateway import host_rendezvous as _hr
+    child = subprocess.Popen([
+        sys.executable, "-c",
+        "import sys,time;sys.path.insert(0,r'%s');"
+        "from gateway import host_rendezvous as hr;"
+        "hr.claim_host_lock(hr.ROLE_GATEWAY);time.sleep(60)"
+        % str(Path(__file__).resolve().parents[2]),
+    ])
+    # Wait for the child to actually take the lock before any test probes it.
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline:
+        if _hr.host_lock_is_held(_hr.ROLE_GATEWAY):
+            break
+        time.sleep(0.05)
     try:
         yield child.pid
     finally:

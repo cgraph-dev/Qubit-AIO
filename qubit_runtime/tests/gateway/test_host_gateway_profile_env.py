@@ -162,6 +162,11 @@ class TestSettledHostRecordDecidesRestart:
         lock_dir = tmp_path / "locks"
         lock_dir.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv("QUBIT_GATEWAY_LOCK_DIR", str(lock_dir))
+        # A record only names a live owner while its role's host lock is held
+        # (``record_names_live_owner`` treats a free flock as falsifying the record). A real
+        # publishing gateway claims first; this fixture must model that to stay "live".
+        outcome, exc = hr.claim_host_lock(hr.ROLE_GATEWAY)
+        assert exc is None, f"claim_host_lock failed: {exc}"
         record = hr.publish_record(
             hr.ROLE_GATEWAY, profiles=tuple(profiles), home=str(home),
         )
@@ -172,6 +177,9 @@ class TestSettledHostRecordDecidesRestart:
         assert published is not None
         monkeypatch.setattr(
             hr, "_pid_incarnation_matches", lambda pid, create_time: True,
+        )
+        monkeypatch.setattr(
+            hr, "record_names_live_owner", lambda rec: hr.liveness_is_proven(rec),
         )
 
     def test_selectorless_replay_of_a_live_host_is_host_even_from_named_home(
