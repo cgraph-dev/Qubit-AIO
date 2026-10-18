@@ -30,6 +30,7 @@ class FakeCanvas:
     def __init__(self) -> None:
         self.ovals = []
         self.lines = []
+        self.texts = []
         #: Global draw order across BOTH primitives, so the depth z-order of
         #: rings (lines) against the nucleus (an oval) is checkable.
         self.calls = []
@@ -43,6 +44,11 @@ class FakeCanvas:
         self.lines.append((pts, kw))
         self.calls.append(("line", len(self.lines) - 1))
         return len(self.lines)
+
+    def create_text(self, x, y, **kw):
+        self.texts = getattr(self, "texts", [])
+        self.texts.append((x, y, kw))
+        return len(self.texts)
 
 
 def test_draws_two_fringed_rings_and_every_particle():
@@ -157,9 +163,9 @@ def test_far_beads_draw_behind_and_near_beads_in_front():
 
         nuc = _nucleus(c)
         nuc_idx = c.ovals.index(nuc)
-        far_idx = [_idx(f["x"] + 34.0, f["y"] + 34.0)
+        far_idx = [_idx(*M._spin_pt(f["x"] + 34.0, f["y"] + 34.0, t, 34.0, 34.0))
                    for f in frames if f["depth"] < 0.5]
-        near_idx = [_idx(f["x"] + 34.0, f["y"] + 34.0)
+        near_idx = [_idx(*M._spin_pt(f["x"] + 34.0, f["y"] + 34.0, t, 34.0, 34.0))
                     for f in frames if f["depth"] >= 0.5]
         # Both halves are populated at these phases.
         assert far_idx and near_idx
@@ -221,7 +227,7 @@ def test_comet_head_drawn_during_sweep_and_not_outside(monkeypatch):
     assert F.comet(hidden_t, 32.0)["alpha"] == 0.0
 
     info = F.comet(visible_t, 32.0)
-    head = (info["x"] + 34.0, info["y"] + 34.0)
+    head = M._spin_pt(info["x"] + 34.0, info["y"] + 34.0, visible_t, 34.0, 34.0)
     live = FakeCanvas()
     M.render(live, 34.0, 34.0, 32.0, visible_t, "idle")
     assert any(abs((o[0] + o[2]) / 2 - head[0]) < 1e-6
@@ -486,7 +492,7 @@ def test_reduced_motion_is_free_of_the_moving_layers():
         # no trails, dust, sparkles, comet, follower rings or nucleus sparks.
         # Ovals = 9 particle cores + the static nucleus stack (halo + gradient).
         assert len(c.ovals) == len(M.PARTICLES) + M.NUCLEUS_OVAL_COUNT
-        assert len(c.lines) == 2 * len(M.PARTICLES) + 6   # 18 arms + 6 ring strokes
+        assert len(c.lines) == 2 * len(M.PARTICLES) + 7   # 18 arms + 6 ring strokes + inner ring
 
 
 def test_speed_scale_drives_every_layer_on_one_clock():

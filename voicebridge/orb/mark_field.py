@@ -59,10 +59,10 @@ DEPTH_LIFT_BASE = 0.04
 DEPTH_LIFT_GAIN = 0.42
 DEPTH_PARALLAX = 0.20
 #: Far points contract slightly toward the centre: a cheap perspective cue.
-DEPTH_PERSPECTIVE = 0.15
+DEPTH_PERSPECTIVE = 0.20
 #: Elements nearest the viewer grow past their plane's size so the field reads
 #: as coming OUT of the screen (and the nearest can cross the orbit envelope).
-DEPTH_POPOUT = 0.55
+DEPTH_POPOUT = 0.70
 
 # ------------------------------------------------------------ camera drift
 CAMERA_SWAY_FRAC = 0.016
@@ -84,7 +84,7 @@ RING_PERIOD_FAR = 17.0
 #: multiplier (a multiplier makes the field accelerate with uptime).
 SPEED_MOD_AMP = 0.10
 SPEED_MOD_DEG = 3.0
-SPEED_MOD_HZ = 0.7
+SPEED_MOD_HZ = 0.45
 
 # ------------------------------------------------------------------ trails
 TRAIL_SAMPLES = 6
@@ -129,8 +129,8 @@ DUST_R_FRAC_MIN = 0.86
 DUST_R_FRAC_SPAN = 0.30
 DUST_SIZE_BASE = 0.10
 DUST_SIZE_SPAN = 0.13
-DUST_PERIOD_BASE = 5.0
-DUST_PERIOD_SPAN = 9.0
+DUST_PERIOD_BASE = 4.0
+DUST_PERIOD_SPAN = 10.0
 DUST_ALPHA_BASE = 0.16
 DUST_ALPHA_GAIN = 0.40
 DUST_LIFT_BASE = 0.45
@@ -602,6 +602,89 @@ def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
     return out
 
 
+# ------------------------------------------------------------- inner core ring
+INNER_RING_RX_FRAC = 0.32
+INNER_RING_PERIOD_S = 4.5
+INNER_RING_DIRECTION = 1.0
+INNER_RING_TILT_BASE = 0.0
+
+# ------------------------------------------------------------- binary particle field
+BINARY_COUNT = 56
+BINARY_SIZE_BASE = 0.07
+BINARY_SIZE_SPAN = 0.06
+BINARY_PERIOD_BASE = 6.0
+BINARY_PERIOD_SPAN = 12.0
+BINARY_ALPHA_BASE = 0.20
+BINARY_ALPHA_GAIN = 0.35
+BINARY_LIFT_BASE = 0.50
+BINARY_LIFT_GAIN = 0.30
+BINARY_R_FRAC_MIN = 0.80
+BINARY_R_FRAC_SPAN = 0.25
+
+
+def inner_ring_tilt(t: Any) -> float:
+    """Tilt of the fast inner counter-rotating core ring."""
+    tt = _finite(t)
+    return (INNER_RING_TILT_BASE
+            + INNER_RING_DIRECTION * 360.0 * tt / max(0.1, INNER_RING_PERIOD_S)
+            + RING_SWAY_DEG * math.sin(tt * 2.0 * math.pi
+                                       / PRECESSION_PERIOD_NEAR))
+
+
+def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
+    """A field of tiny 1/0 data-fragments on the orbits and satellite shells."""
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    near_tilt, far_tilt = orbit_tilts(tt)
+    dx, dy = camera_offset(tt, r)
+    rx, ry = r * RX_FRAC, r * RY_FRAC
+    scale = r / 32.0
+    out: List[Dict[str, Any]] = []
+    main_n = BINARY_COUNT - 8
+    for i in range(main_n):
+        orbit = "a" if (i % 3) != 0 else "b"
+        tilt = near_tilt if orbit == "a" else far_tilt
+        seed = 360.0 * hash01(i, 2.7)
+        period = BINARY_PERIOD_BASE + BINARY_PERIOD_SPAN * hash01(i, 4.1)
+        ang = (seed + tt * 360.0 / max(0.1, period)
+               + _phase_wobble(tt, seed))
+        depth = _depth(ang)
+        pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+        grow = BINARY_R_FRAC_MIN + BINARY_R_FRAC_SPAN * hash01(i, 5.9)
+        x, y = orbit_point(0.0, 0.0, rx * pull * grow, ry * pull * grow,
+                           tilt, ang)
+        out.append({
+            "x": x + dx, "y": y + dy, "depth": depth,
+            "size": (BINARY_SIZE_BASE + BINARY_SIZE_SPAN * hash01(i, 7.3))
+                    * scale * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth),
+            "alpha": _depth_alpha(depth, BINARY_ALPHA_BASE
+                                  + BINARY_ALPHA_GAIN * hash01(i, 9.1)),
+            "lift": BINARY_LIFT_BASE + BINARY_LIFT_GAIN * hash01(i, 11.3),
+            "char": "1" if (i % 2 == 0) else "0",
+        })
+    # A few fragments on each satellite shell.
+    for j in range(8):
+        idx = 0 if j < 4 else 1
+        (rx_frac, ratio, period, direction, _size, _alpha, _lift) = SATELLITE_SHELLS[idx]
+        tilt = near_tilt if idx == 0 else far_tilt
+        rx_s = r * rx_frac
+        ry_s = rx_s * (RY_FRAC / RX_FRAC) * ratio
+        seed = 137.0 * idx + 47.0 * j
+        ang = (seed + 360.0 * direction * tt / max(0.1, period))
+        depth = _depth(ang)
+        pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+        x, y = orbit_point(0.0, 0.0, rx_s * pull, ry_s * pull, tilt, ang)
+        i = main_n + j
+        out.append({
+            "x": x + dx, "y": y + dy, "depth": depth,
+            "size": (BINARY_SIZE_BASE * 1.1) * scale,
+            "alpha": _depth_alpha(depth, BINARY_ALPHA_BASE),
+            "lift": BINARY_LIFT_BASE,
+            "char": "1" if (i % 2 == 0) else "0",
+        })
+    return out
+
+
 __all__ = [
     "PARTICLES", "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
     "FRINGE_PX", "LIFT_RING", "LIFT_BEAD", "LIFT_NUCLEUS",
@@ -623,4 +706,7 @@ __all__ = [
     "DEPTH_POPOUT",
     "nucleus_sparks", "NUCLEUS_SPARK_COUNT", "NUCLEUS_SPARK_REACH",
     "trails", "dust_state", "comet", "sparkles",
+    "INNER_RING_RX_FRAC", "INNER_RING_PERIOD_S", "INNER_RING_DIRECTION",
+    "INNER_RING_TILT_BASE", "inner_ring_tilt",
+    "BINARY_COUNT", "BINARY_SIZE_BASE", "BINARY_PERIOD_BASE", "binary_state",
 ]
