@@ -1472,6 +1472,21 @@ class TestEnvWriteDenylist:
         assert not _env_line_defines_key(line, "PATH", is_windows=False)
 
     @pytest.mark.platforms("windows")
+    @pytest.mark.parametrize("old, new", [("QUBIT_MAX_ITERATIONS", "HERMES_MAX_ITERATIONS"),
+                                          ("HERMES_MAX_ITERATIONS", "QUBIT_MAX_ITERATIONS")])
+    def test_windows_env_assignment_matching_is_case_insensitive_across_rebrand(self, old, new):
+        """Windows env names are case-insensitive, and `_` is not a case difference.
+
+        A half-rebranded install can have either spelling written in .env (this
+        fork writes QUBIT_*, an upstream one wrote HERMES_*). Both must be
+        recognised as the same variable on Windows, so a rewrite does not append
+        a duplicate `KEY=...` line for a key the file already defines.
+        """
+        from qubit_cli.config import _env_line_defines_key
+
+        assert _env_line_defines_key(f"{old}=50\n", new, is_windows=True)
+
+    @pytest.mark.platforms("windows")
     @pytest.mark.parametrize(
         "protected_key",
         [
