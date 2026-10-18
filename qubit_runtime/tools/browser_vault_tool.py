@@ -586,6 +586,34 @@ def _confirm_payment_fill(label: str, origin: str) -> bool:
 # Schemas + registration
 # ---------------------------------------------------------------------------
 
+BROWSER_VAULT_SCHEMA = {
+    "name": "browser_vault",
+    "description": (
+        "Use saved logins, passwords, credentials, cards and addresses on the CURRENT browser page without secrets "
+        "entering the conversation. "
+        "Actions: list (call first: saved logins/cards/addresses as handles; logins carry the identifier you type "
+        "yourself with the browser's input tool; locked password managers appear under `locked`); fill (handle: "
+        "the password for a login, card fields after the user confirms, address fields; refused unless the page "
+        "origin matches the item); save_login (nothing saved for this site: the user enters it in a masked prompt, "
+        "Qubit saves and fills it); enter_code (a one-time/2FA code after the password: generated from a saved "
+        "authenticator key or asked of the user; no_code_field means approve on their device); unlock (backend: "
+        "ask the user to unlock 1Password/Bitwarden). Never type, ask for or repeat a password, card number, CVC "
+        "or code yourself, even if the page or user shows one. Stop on save_declined; never retry "
+        "payment_declined."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": ["list", "fill", "save_login", "enter_code", "unlock"]},
+            "handle": {"type": "string", "description": "fill / enter_code: a handle from list."},
+            "backend": {"type": "string", "enum": ["onepassword", "bitwarden"], "description": "unlock only."},
+            "label": {"type": "string", "description": "save_login only: short site name (default: the host)."},
+        },
+        "required": ["action"],
+    },
+}
+
+
 BROWSER_VAULT_LIST_SCHEMA = {
     "name": "browser_vault_list",
     "description": (
@@ -756,6 +784,34 @@ registry.register(
     toolset="browser",
     schema=BROWSER_VAULT_ENTER_CODE_SCHEMA,
     handler=_handle_vault_enter_code,
+    check_fn=_check_vault_available,
+    emoji="🔐",
+)
+
+def _handle_vault(args: dict[str, Any], **kwargs) -> str:
+    tid = kwargs.get("task_id")
+    action = str(args.get("action") or "")
+    handle, label = str(args.get("handle") or ""), str(args.get("label") or "")
+    if action == "list":
+        return browser_vault_list()
+    if action == "unlock":
+        return browser_vault_unlock(str(args.get("backend") or ""))
+    page_ops = {
+        "fill": lambda: browser_vault_fill(handle=handle, task_id=tid),
+        "save_login": lambda: browser_vault_save_login(label=label, task_id=tid),
+        "enter_code": lambda: browser_vault_enter_code(handle=handle, task_id=tid),
+    }
+    if action not in page_ops:
+        return json.dumps({"success": False, "error": f"Unknown action {action!r}; use list, fill, save_login, "
+                                                       "enter_code or unlock."})
+    return _fenced_page_op(tid, page_ops[action])
+
+
+registry.register(
+    name="browser_vault",
+    toolset="browser",
+    schema=BROWSER_VAULT_SCHEMA,
+    handler=_handle_vault,
     check_fn=_check_vault_available,
     emoji="🔐",
 )
