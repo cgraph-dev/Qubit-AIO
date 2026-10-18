@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from gateway import status
+from gateway.status_scoped_locks import release_all_scoped_locks, release_scoped_lock
 
 
 class TestGatewayPidState:
@@ -886,7 +887,7 @@ class TestScopedLocks:
         }))
         monkeypatch.setattr(status, "_get_process_start_time", lambda pid: 987654321)
 
-        status.release_scoped_lock("discord-bot-token", "secret")
+        release_scoped_lock("discord-bot-token", "secret")
 
         assert not lock_path.exists()
 

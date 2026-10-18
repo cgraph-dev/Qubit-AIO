@@ -104,8 +104,8 @@ WINDOWS_BIN_LAUNCHERS = ("hermes", "hermes-acp")
 #: command name -> (entry module, callable) — mirrors pyproject.toml
 #: [project.scripts].
 ENTRY_POINTS = {
-    "hermes": ("qubit_cli.main", "main"),
-    "hermes-acp": ("acp_adapter.entry", "main"),
+    "qubit": ("qubit_cli.main", "main"),
+    "qubit-acp": ("acp_adapter.entry", "main"),
 }
 
 
