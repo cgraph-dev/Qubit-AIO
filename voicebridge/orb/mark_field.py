@@ -252,18 +252,22 @@ def orbit_point(cx: float, cy: float, rx: float, ry: float,
 
 
 def heartbeat(t: Any) -> float:
-    """Lub-dub envelope in 0..1 (1 at the primary thump, flat between beats)."""
+    """Lub-dub envelope in 0..1, zero between beats.
+
+    Each thump is a raised-cosine pulse CENTRED on its time, so the envelope
+    rises smoothly from zero and returns to zero: it no longer starts at full
+    amplitude and jumps at the phase wrap (the old source of the beat jerk).
+    """
     tt = _finite(t)
     if HEART_PERIOD_S <= 0:
         return 0.0
     phase = (tt % HEART_PERIOD_S) / HEART_PERIOD_S
+    width = HEART_THUMP_S / HEART_PERIOD_S
     out = 0.0
     for at, amp in ((0.0, 1.0), (HEART_SECOND_PHASE, HEART_SECOND_AMP)):
         d = phase - at
-        if d < 0:
-            d += 1.0
-        width = HEART_THUMP_S / HEART_PERIOD_S
-        if d < width:
+        d -= round(d)
+        if abs(d) < width:
             out = max(out, amp * 0.5 * (1.0 + math.cos(math.pi * d / width)))
     return out
 
