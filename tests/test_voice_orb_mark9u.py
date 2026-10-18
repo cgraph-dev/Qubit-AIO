@@ -1127,3 +1127,34 @@ def test_blink_dots_materialise_in_place_and_vanish():
 
 
 # --------------------------------------------------------------------------- #
+# WHOLE-MARK TURNS — combined X+Y spin, orb in the middle, circles outside.
+# The field publishes the angles; renderers apply Y first, then X.
+# --------------------------------------------------------------------------- #
+def test_spin_angles_turn_full_circles_on_non_harmonic_periods():
+    from voicebridge.orb import mark_field as F
+    assert F.X_SPIN_PERIOD_S == pytest.approx(27.0)
+    assert F.Y_SPIN_PERIOD_S == pytest.approx(20.5)
+    assert F.spin_angles(0.0) == (pytest.approx(0.0), pytest.approx(0.0))
+    ty, px = F.spin_angles(F.Y_SPIN_PERIOD_S)
+    assert ty == pytest.approx(2.0 * math.pi)
+    assert 0.0 < px < 2.0 * math.pi  # Y's turn is not X's turn
+    ty2, px2 = F.spin_angles(F.X_SPIN_PERIOD_S)
+    assert px2 == pytest.approx(2.0 * math.pi)
+    assert 0.0 < (ty2 % (2.0 * math.pi)) < 2.0 * math.pi
+    # Linear ramps, deterministic, finite on junk.
+    assert F.spin_angles(3.0) == F.spin_angles(3.0)
+    assert all(math.isfinite(a) for a in F.spin_angles("bad"))
+
+
+def test_circles_stay_outside_with_the_orb_in_the_middle():
+    # Locks the composition: every ring's radius is an order of magnitude
+    # beyond the nucleus body, so the orb always sits in the middle with
+    # the circles outside it — no drift can pull a ring onto the nucleus.
+    from voicebridge.orb import mark_field as F
+    body = F.NUCLEUS_FRAC * 1.25
+    for t in (0.0, 1.7, 5.0, 11.0):
+        rings = F.ring_geometry(t)
+        assert rings, t
+        for ring in rings:
+            assert ring["rx_frac"] > body, (ring["id"], t)
+            assert ring["ry_frac"] > body, (ring["id"], t)

@@ -93,6 +93,29 @@ RING_SWAY_DEG = 3.0
 #: so the pair keeps crossing in new places without ever locking.
 RING_PERIOD_NEAR = 9.5
 RING_PERIOD_FAR = 13.5
+
+# ------------------------------------------------------- whole-mark turns
+#: The combined X+Y tumble of the whole assembly — orb in the middle, circles
+#: outside it, full 360s on both axes. The field publishes only the ANGLES;
+#: both renderers apply them, Y first then X, identically, or Tk and Qt tumble
+#: in different directions. The periods are non-harmonic against each other
+#: and the ring periods, so the tumble never locks to the shells.
+Y_SPIN_PERIOD_S = 20.5
+X_SPIN_PERIOD_S = 27.0
+
+
+def spin_angles(t: Any) -> Tuple[float, float]:
+    """(theta_y, phi_x) whole-mark turns in RADIANS at clock ``t``.
+
+    ``theta_y = 2*pi*t/20.5`` about the vertical axis FIRST, then
+    ``phi_x = 2*pi*t/27.0`` about the horizontal one. Both are linear ramps
+    from zero, so the tumble is continuous and deterministic — and never a
+    thin line, because neither axis holds the edge-on pose: the two turns
+    keep pulling each other off it.
+    """
+    tt = _finite(t)
+    return (2.0 * math.pi * tt / Y_SPIN_PERIOD_S,
+            2.0 * math.pi * tt / X_SPIN_PERIOD_S)
 #: Per-particle wobble: a bounded PHASE offset in degrees, never a clock
 #: multiplier (a multiplier makes the field accelerate with uptime).
 SPEED_MOD_AMP = 0.10
@@ -1197,10 +1220,15 @@ __all__ = [
     "hue_to_rgb", "rgb_trail", "dust_trail", "RGB_TRAIL_SAMPLES",
     "RGB_TRAIL_HUE_STEP", "RGB_TRAIL_HUE_DRIFT", "RGB_TRAIL_ALPHA_BASE",
     "DUST_TRAIL_SAMPLES", "PARTICLE_HUE_BASE", "PARTICLE_HUE_SPAN",
+    "HUE_PAIR_OFFSET", "_hue_pair",
     "dof", "DOF_NEAR", "DOF_FAR", "DOF_GAMMA", "skew", "SKEW_GAIN_DEG",
     "RING_PERIOD_NEAR", "RING_PERIOD_FAR",
     "ring_geometry", "ring_path", "ring_alpha", "RING_PATH_SAMPLES",
     "RING_ALPHA_MAIN", "RING_ALPHA_ECHO", "RING_ALPHA_INNER",
     "RING_ALPHA_SAT", "RING_WIDTH_MAIN", "RING_WIDTH_INNER",
     "RING_BREATH_SPAN",
+    "blink_dots", "BLINK_COUNT", "BLINK_SIZE_BASE", "BLINK_ALPHA_PEAK",
+    "BLINK_LIFE_BASE", "BLINK_LIFE_SPAN", "BLINK_LIFT",
+    "BLINK_R_FRAC_MIN", "BLINK_R_FRAC_SPAN",
+    "spin_angles", "X_SPIN_PERIOD_S", "Y_SPIN_PERIOD_S",
 ]
