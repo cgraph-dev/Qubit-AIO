@@ -19,8 +19,15 @@ def host_gateway(tmp_path, monkeypatch):
     locks.mkdir()
     monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(locks))
     monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda: root)
+    # A real publishing gateway CLAIMS the host lock before it publishes its record, and
+    # ``record_names_live_owner`` treats a free lock as falsifying the record (a recycled PID must
+    # not read as a live owner). Publishing without the claim therefore models a state the runtime
+    # can never reach.
+    outcome, exc = hr.claim_host_lock(hr.ROLE_GATEWAY)
+    assert exc is None, f"claim_host_lock failed: {exc}"
     hr.publish_record(hr.ROLE_GATEWAY, profiles=("default", "coder"))
-    return root
+    yield root
+    hr.release_host_lock(hr.ROLE_GATEWAY)
 
 
 def test_default_home_is_reported_as_served_by_the_host_gateway(host_gateway):
@@ -90,6 +97,11 @@ def test_topology_ignores_another_tenants_record_and_reads_the_launch_homes_stat
     monkeypatch.setenv("QUBIT_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     monkeypatch.setenv("QUBIT_HOME", str(root_b))
     monkeypatch.setattr("qubit_constants._default_qubit_root_memo", None)
+
+    # Same reason as the host_gateway fixture: a record only names a live owner while its role's
+    # host lock is held, and claiming is what the real publishing gateway does first.
+    outcome, exc = hr.claim_host_lock(hr.ROLE_GATEWAY)
+    assert exc is None, f"claim_host_lock failed: {exc}"
 
     hr.publish_record(hr.ROLE_GATEWAY, profiles=("default", "coder"), home=str(root_a))
     assert host_topology.host_gateway_topology() is None
