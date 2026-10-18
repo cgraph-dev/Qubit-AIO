@@ -97,10 +97,13 @@ def test_all_known_states_resolve():
 
 # -- fps cap + pause + reduced motion ------------------------------------------
 
-def test_fps_cap_is_16ms():
-    assert E.FRAME_MS == 16
-    assert E.should_advance(0.0, 15.9) is False
-    assert E.should_advance(0.0, 16.0) is True
+def test_fps_cap_is_the_frame_budget():
+    # The orb caps its repaint rate to a frame budget so the rich mark cannot
+    # peg a core. The default is 25 fps and it is overridable for smoothness.
+    assert E.FRAME_MS == E.frame_budget_ms()
+    assert 8 <= E.FRAME_MS <= 200
+    assert E.should_advance(0.0, E.FRAME_MS - 0.1) is False
+    assert E.should_advance(0.0, float(E.FRAME_MS)) is True
     assert E.should_advance(100.0, 200.0) is True
 
 

@@ -333,6 +333,9 @@ DUST_TRAIL_HUE_STEP = 0.09
 
 # ------------------------------------------------------------------ helpers
 def _finite(value: Any, default: float = 0.0) -> float:
+    # Fast path: callers hand us floats almost every time; skip float()/try.
+    if type(value) is float:
+        return value if math.isfinite(value) else default
     try:
         out = float(value)
     except (TypeError, ValueError):
@@ -528,10 +531,25 @@ def dust_trail(t: Any, R: float, mote: Dict[str, Any]) -> List[Dict[str, float]]
                       DUST_TRAIL_SIZE_BASE, DUST_TRAIL_HUE_STEP)
 
 
+#: Memo for ``hash01``. Every field layer hashes each element's INDEX with a
+#: fixed salt to derive its constant per-element data (radius, period, phase,
+#: hue, volume axes). Those values do NOT depend on the clock, yet the whole
+#: set was re-hashed every frame — thousands of ``math.sin`` calls a frame for
+#: numbers that never change. Caching by ``(index, salt)`` removes that cost
+#: entirely after the first frame; the salt set is a fixed list of literals, so
+#: the cache is bounded. Same values, just computed once.
+_HASH01_CACHE: Dict[Any, float] = {}
+
+
 def hash01(i: int, salt: float = 0.0) -> float:
     """Deterministic 0..1 hash of an index — the field's only 'randomness'."""
-    x = math.sin((i + 1) * 12.9898 + salt * 78.233) * 43758.5453
-    return x - math.floor(x)
+    key = (i, salt)
+    got = _HASH01_CACHE.get(key)
+    if got is None:
+        x = math.sin((i + 1) * 12.9898 + salt * 78.233) * 43758.5453
+        got = x - math.floor(x)
+        _HASH01_CACHE[key] = got
+    return got
 
 
 def depth_axes(index: Any, salt: float = 0.0) -> Tuple[float, float]:

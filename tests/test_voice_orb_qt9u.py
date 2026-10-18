@@ -69,8 +69,10 @@ def test_zone_at_matches_tk_rule():
 
 def test_cadence_matches_tk_view():
     from voicebridge.orb import app as tk_app
+    from voicebridge.orb import ember as _ember
     from voicebridge.orb import qt_app as qa
-    assert qa.FRAME_MS == tk_app.FRAME_MS == 16
+    # One shared frame budget across both backends (see ember.frame_budget_ms).
+    assert qa.FRAME_MS == tk_app.FRAME_MS == _ember.FRAME_MS
     assert qa.POLL_MS == tk_app.POLL_MS == 500
     assert qa.NOTICE_S == tk_app.NOTICE_S
 

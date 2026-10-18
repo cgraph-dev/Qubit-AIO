@@ -57,7 +57,7 @@ except Exception as exc:  # headless / Qt-less: pure helpers still work
 
 #: Same cadence as the Tk view (single source of truth lives here too;
 #: values match ``app.FRAME_MS``/``app.POLL_MS`` and are pinned by test).
-FRAME_MS = 16
+FRAME_MS = _ember.FRAME_MS
 POLL_MS = 500
 NOTICE_S = 5.0
 
@@ -762,6 +762,11 @@ def y_turn_gain(zr: Any) -> float:
 #: out, and a frame is single-threaded so there is no race to lose.
 _TURN_BASIS: Tuple[float, float, float] = (float("nan"), 0.0, 0.0)
 
+#: Cached glyph fonts keyed by ``(family, pixel_size)``. The binary and math
+#: glyph layers draw on the order of 128 fragments a frame; building a QFont
+#: (copy + setPixelSize + setFont) for each was pure per-frame overhead.
+_GLYPH_FONT_CACHE: Dict[Any, Any] = {}
+
 
 def _turn_basis(t: Any) -> Tuple[float, float]:
     """``(cos(theta), sin(theta))`` of the turn at clock ``t``, memoised."""
@@ -998,6 +1003,11 @@ def turn_tone(rgb: Tuple[int, int, int], gain: Any = 1.0) -> Tuple[int, int, int
     return tuple(max(0, min(255, int(c * k))) for c in rgb)  # type: ignore[return-value]
 
 
+#: Memo for ``turn_fade`` — it is consulted once per element through
+#: ``volume_offset`` (500+ times a frame) and depends only on the frame clock.
+_TURN_FADE_CACHE: Tuple[float, float] = (float("nan"), 0.0)
+
+
 def turn_fade(t: Any) -> float:
     """The combined turn's depth-opening factor at clock ``t`` in ``[0, 1]``.
 
@@ -1007,11 +1017,19 @@ def turn_fade(t: Any) -> float:
     :func:`_tumble_project` multiplies the depth offset by, so anything routed
     through it is an exact no-op at a still clock. Never raises.
     """
+    global _TURN_FADE_CACHE
+    tt = _mark_tt(t)
+    cached_t, cached_f = _TURN_FADE_CACHE
+    if cached_t == tt:
+        return cached_f
     try:
-        cy, sy, cx, sx = _tumble_basis(t)
+        cy, sy, cx, sx = _tumble_basis(tt)
+        f = sy * sy + sx * sx - sy * sy * sx * sx
+        f = 0.0 if f < 0.0 else (1.0 if f > 1.0 else f)
     except Exception:  # noqa: BLE001 - a bad clock must not blank the orb
-        return 0.0
-    return max(0.0, min(1.0, sy * sy + sx * sx - sy * sy * sx * sx))
+        f = 0.0
+    _TURN_FADE_CACHE = (tt, f)
+    return f
 
 
 def volume_offset(t: Any, R: Any, z: Any, z2: Any = 0.5
@@ -1218,6 +1236,30 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     from PySide6.QtGui import (QBrush, QColor, QFont, QLinearGradient,
                                QPainterPath, QPen, QRadialGradient)
 
+    # A cached QFont per (family, pixel size). The glyph layers draw ~128
+    # fragments a frame and each was constructing a fresh QFont (copy +
+    # setPixelSize + setFont) AND pushing/popping the painter state — pure
+    # overhead, since the font only depends on the size. The base family is
+    # captured once from the painter, so the drawn glyphs are unchanged.
+    _base_family = p.font().family()
+
+    def _glyph_font(px: int) -> Any:
+        key = (_base_family, px)
+        got = _GLYPH_FONT_CACHE.get(key)
+        if got is None:
+            got = QFont(p.font())
+            got.setPixelSize(px)
+            _GLYPH_FONT_CACHE[key] = got
+        return got
+
+    def _draw_glyph(gx: float, gy: float, ch: str, rgb: Any,
+                    alpha: float, px: int) -> None:
+        """One text glyph, no per-call state push (brush is set by the caller)."""
+        p.setPen(QColor(rgb[0], rgb[1], rgb[2],
+                        _clamp8(255.0 * min(1.0, alpha))))
+        p.setFont(_glyph_font(px))
+        p.drawText(QPointF(gx, gy), ch)
+
     def _clamp8(v: Any) -> int:
         try:
             return max(0, min(255, int(v)))
@@ -1225,6 +1267,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             return 0
 
     def _num(v: Any, default: float) -> float:
+        # Fast path: the field hands us floats almost every call, so skip the
+        # float()/try entirely for the common case. Behaviour is identical.
+        if type(v) is float:
+            return v if math.isfinite(v) else default
         try:
             f = float(v)
         except (TypeError, ValueError):
@@ -1972,18 +2018,11 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         if alpha <= ALPHA_EPS or size <= 0.0:
             return
         rgb = _lift(_num(bit.get("lift"), 0.5))
-        p.save()
-        # QPainter draws glyphs with the PEN, not the brush.
-        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
-                             _clamp8(255.0 * min(1.0, alpha)))))
-        p.setBrush(Qt.NoBrush)
-        font = QFont(p.font())
-        font.setPixelSize(max(BINARY_FONT_MIN_PX,
-                              int(size * g * BINARY_FONT_PX_PER_UNIT
-                                  + BINARY_FONT_PX_OFFSET)))
-        p.setFont(font)
-        p.drawText(QPointF(gx, gy), str(bit.get("char") or "0"))
-        p.restore()
+        # Glyphs use the PEN, not the brush; the brush is already NoBrush here.
+        _draw_glyph(gx, gy, str(bit.get("char") or "0"), rgb, alpha,
+                    max(BINARY_FONT_MIN_PX,
+                        int(size * g * BINARY_FONT_PX_PER_UNIT
+                            + BINARY_FONT_PX_OFFSET)))
 
     def _math(sym: Dict[str, Any]) -> None:
         """One math-symbol/equation fragment as a small glyph at its position.
@@ -2008,17 +2047,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             rgb = _lift(_num(sym.get("lift"), 0.5))
         else:
             rgb = _anchor(_spec_rgb(hue, MATH_GLYPH_SAT))
-        p.save()
-        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
-                             _clamp8(255.0 * min(1.0, alpha)))))
-        p.setBrush(Qt.NoBrush)
-        font = QFont(p.font())
-        font.setPixelSize(max(MATH_FONT_MIN_PX,
-                              int(size * g * MATH_FONT_PX_PER_UNIT
-                                  + MATH_FONT_PX_OFFSET)))
-        p.setFont(font)
-        p.drawText(QPointF(gx, gy), str(sym.get("char") or "?"))
-        p.restore()
+        _draw_glyph(gx, gy, str(sym.get("char") or "?"), rgb, alpha,
+                    max(MATH_FONT_MIN_PX,
+                        int(size * g * MATH_FONT_PX_PER_UNIT
+                            + MATH_FONT_PX_OFFSET)))
 
     def _screen_break(body: Dict[str, Any]) -> None:
         """One body the field placed BEYOND the orb radius.

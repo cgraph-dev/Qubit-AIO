@@ -11,7 +11,8 @@ Adapted for Tk (which has no gradients, no per-item alpha, no blur):
   reads as a falloff instead of a hard disc.
 - "Opacity" is faked by mixing the ember color toward the near-black
   background at draw time (precomputed per state, no per-frame churn).
-- Frame discipline: ~30fps cap (``FRAME_MS = 33``), pause when
+- Frame discipline: a frame BUDGET caps the repaint rate (``frame_budget_ms``,
+  default 25fps, ``QUBIT_ORB_FRAME_MS`` overrides), pause when
   collapsed/hidden (``needs_frame``), reduced-motion freezes time,
   and the hot loop allocates only the point lists Tk needs.
 
@@ -29,10 +30,31 @@ elsewhere and untouched here.
 from __future__ import annotations
 
 import math
+import os as _os
 from typing import Any, Dict, List, Tuple
 
-#: Frame budget: ~30fps cap for Tk (``after(33)`` in the host).
-FRAME_MS = 16
+
+def frame_budget_ms() -> int:
+    """The orb's frame interval in ms, overridable by ``QUBIT_ORB_FRAME_MS``.
+
+    One frame of the rich mark costs ~20-35 ms of CPU (it draws ~1200 Qt calls:
+    rings, streaks, hundreds of particles and ~128 text glyphs), so asking for
+    60 fps pegs a core for a decorative overlay. The default is a 25 fps budget,
+    which leaves the loop idle time between frames instead of repainting
+    continuously. Raise it (e.g. ``QUBIT_ORB_FRAME_MS=16``) for maximum
+    smoothness, lower it to spend less. Clamped to a sane range. Never raises.
+    """
+    try:
+        v = int(float(_os.environ.get("QUBIT_ORB_FRAME_MS", "") or 40))
+    except (TypeError, ValueError):
+        v = 40
+    return max(8, min(200, v))
+
+
+#: Frame budget: the animation repaints at most once per this interval. The Tk
+#: host uses ``after(FRAME_MS)`` and the Qt host a QTimer; both read this so the
+#: two backends stay in step.
+FRAME_MS = frame_budget_ms()
 
 #: Ember-orange family on near-black (own palette values in that family).
 EMBER_CORE = (255, 84, 0)
