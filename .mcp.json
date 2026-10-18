@@ -6,6 +6,20 @@
         "mcp",
         "/home/trick/Projects/Repos/qubit-voicebridge"
       ]
+    },
+    "horizon": {
+      "command": "/home/trick/.agents/horizon/.venv/bin/horizon-mcp",
+      "args": [],
+      "env": {
+        "HORIZON_PATH": "/home/trick/.agents/horizon",
+        "CHEAPVIBECODE_API_KEY": "${CHEAPVIBECODE_API_KEY}"
+      }
+    },
+    "coop-anything": {
+      "command": "/usr/bin/python3",
+      "args": [
+        "/home/trick/.agents/coop-anything/tools/mcp/coop_mcp.py"
+      ]
     }
   }
 }
