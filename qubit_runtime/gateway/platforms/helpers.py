@@ -688,3 +688,25 @@ def is_discord_channel_obfuscated(channel) -> bool:
     if isinstance(flag_value, int) and flag_value & DISCORD_CHANNEL_OBFUSCATED_FLAG:
         return True
     return getattr(channel, "name", None) == DISCORD_OBFUSCATED_CHANNEL_NAME
+
+
+def platform_http_client(**kwargs: Any) -> Any:
+    """``httpx.AsyncClient`` for a platform adapter: connect-time SSRF validation,
+    every redirect hop re-checked, and the shared keepalive pool limits
+    (``platform_httpx_limits()``; pass ``limits=None`` for httpx's defaults).
+    Defaults ``timeout=30.0`` and ``follow_redirects=True``; other kwargs go to httpx.
+
+    Ported from upstream ``gateway.platforms.helpers``. Platform plugins import it
+    by this name, so a missing definition breaks their registration outright."""
+    from gateway.platforms._http_client_limits import platform_httpx_limits
+    from gateway.platforms.base import ssrf_redirect_guard
+    from tools.url_safety import create_ssrf_safe_async_client
+    hooks = dict(kwargs.pop("event_hooks", None) or {})
+    hooks["response"] = [ssrf_redirect_guard, *hooks.get("response", ())]
+    kwargs.setdefault("timeout", 30.0)
+    kwargs.setdefault("follow_redirects", True)
+    if "limits" not in kwargs:
+        kwargs["limits"] = platform_httpx_limits()
+    elif kwargs["limits"] is None:
+        del kwargs["limits"]
+    return create_ssrf_safe_async_client(event_hooks=hooks, **kwargs)

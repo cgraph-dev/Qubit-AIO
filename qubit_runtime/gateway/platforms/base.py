@@ -4926,3 +4926,8 @@ class BasePlatformAdapter(ABC):
         if len(chunks) > 1:
             chunks = [f"{chunk} ({i + 1}/{len(chunks)})" for i, chunk in enumerate(chunks)]
         return chunks
+
+
+# Public alias: upstream platform plugins import ``ssrf_redirect_guard`` by this
+# name while the local implementation kept it private.
+ssrf_redirect_guard = _ssrf_redirect_guard

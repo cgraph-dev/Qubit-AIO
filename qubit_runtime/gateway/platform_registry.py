@@ -144,6 +144,13 @@ class PlatformEntry:
     # ``<PLATFORM>_ALLOW_BOTS`` (YAML ``allow_bots`` wins): bot senders it admits ("mentions"/"all")
     # bypass the human allowlist, checked before the no-user-id guard. "" = bots get no bypass.
     allow_bots_env: str = ""
+    # Group allowlist env var (comma-separated chat ids). Platforms with group
+    # support declare it so setup can prompt for it and the gateway can scope it.
+    group_allowed_chats_env: str = ""
+    # True when the user allowlist is the ONLY pairing path: a platform whose
+    # admins are enumerated by env has nobody to pair with, so the pairing flow
+    # is suppressed rather than offered and then refused.
+    allowlist_suppresses_pairing: bool = False
     # (dm_policy_env, group_policy_env) of a platform with its own dm/group policy: when enabled and
     # either resolves "open" without ``allow_all_env`` / GATEWAY_ALLOW_ALL_USERS, startup is refused.
     # A "" member = that policy is YAML-only (QQ Bot). None = no own policy, never checked.
