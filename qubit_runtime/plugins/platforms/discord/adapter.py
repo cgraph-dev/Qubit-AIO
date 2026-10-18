@@ -7709,6 +7709,17 @@ _is_connected = _env_is_connected("DISCORD_BOT_TOKEN")
 
 
 
+
+
+# System-prompt platform hint (PlatformEntry.platform_hint); cached-prompt bytes, keep stable.
+PLATFORM_HINT = (
+    "You are in a Discord server or group chat communicating with your user. Discord renders standard "
+    "markdown natively (bold, italic, code blocks, links); tables are NOT supported \\u2014 use bullet "
+    "lists or labeled lines. You can send media files natively: include MEDIA:/absolute/path/to/file in "
+    "your response. Images (.png, .jpg, .webp) are sent as photo attachments, audio as file attachments. "
+    "You can also include image URLs in markdown format ![alt](url) and they will be sent as attachments."
+)
+
 def register(ctx) -> None:
     """Plugin entry point — called by the Qubit plugin system."""
     ctx.register_platform(
@@ -7736,5 +7747,4 @@ def register(ctx) -> None:
         standalone_sender_fn=_standalone_send,
         max_message_length=2000,
         emoji="🎮",
-        allow_update_command=True,
-    )
+        allow_update_command=True, platform_hint=PLATFORM_HINT,)

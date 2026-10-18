@@ -3291,6 +3291,24 @@ def _is_connected(config) -> bool:
 
 
 
+
+
+_MEDIA_NATIVE = (
+    "You can send files natively: write MEDIA:/absolute/path/to/file in your response. "
+)
+
+# System-prompt platform hint (PlatformEntry.platform_hint); cached-prompt bytes, keep stable.
+PLATFORM_HINT = (
+    "You are in a Matrix room. Your markdown converts to HTML \\u2014 bold, italic, code, headings, lists,"
+    " blockquotes, and links render. Do NOT use tables (popular clients like Element X collapse them into"
+    " run-on text \\u2014 use '**Label:** value' lines or bullets), and avoid ||spoilers||, "
+    "~~strikethrough~~, and checkboxes (they appear as literal characters). Prefer [descriptive "
+    "text](url) over bare URLs. "
+    "You can send files natively: write MEDIA:/absolute/path/to/file in your response. "
+    "Images send as inline photos, audio (.ogg, .mp3) as voice/audio messages, video (.mp4) inline, other"
+    " files as attachments."
+)
+
 def register(ctx) -> None:
     ctx.register_platform(
         name="matrix", label="Matrix", adapter_factory=MatrixAdapter, check_fn=matrix_deps_present,
@@ -3299,4 +3317,4 @@ def register(ctx) -> None:
         setup_fn=interactive_setup, apply_yaml_config_fn=_apply_yaml_config, allowed_users_env="MATRIX_ALLOWED_USERS",
         allow_all_env="MATRIX_ALLOW_ALL_USERS", cron_deliver_env_var="MATRIX_HOME_ROOM",
         standalone_sender_fn=_standalone_send, max_message_length=DEFAULT_MAX_MESSAGE_LENGTH, emoji="🔐",
-        allow_update_command=True)
+        allow_update_command=True, platform_hint=PLATFORM_HINT)

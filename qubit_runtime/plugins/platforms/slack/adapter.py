@@ -6911,6 +6911,18 @@ _is_connected = _env_is_connected("SLACK_BOT_TOKEN")
 
 
 
+
+
+# System-prompt platform hint (PlatformEntry.platform_hint); cached-prompt bytes, keep stable.
+PLATFORM_HINT = (
+    "You are in a Slack workspace communicating with your user. Standard markdown is auto-converted to "
+    "Slack formatting (bold, headers, links, code); tables are NOT supported \\u2014 use bullet lists or "
+    "labeled lines. You can send media files natively: include MEDIA:/absolute/path/to/file in your "
+    "response. Images (.png, .jpg, .webp) are uploaded as photo attachments, audio as file attachments. "
+    "You can also include image URLs in markdown format ![alt](url) and they will be uploaded as "
+    "attachments."
+)
+
 def register(ctx) -> None:
     """Plugin entry point — called by the Qubit plugin system."""
     ctx.register_platform(
@@ -6939,4 +6951,4 @@ def register(ctx) -> None:
         # Slack allows 40,000 chars; leave margin.
         max_message_length=39000,
         emoji="💼",
-        allow_update_command=True)
+        allow_update_command=True, platform_hint=PLATFORM_HINT)
