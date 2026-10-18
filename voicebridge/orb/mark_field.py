@@ -303,24 +303,40 @@ RGB_TRAIL_HUE_DRIFT = 0.018
 #: sweep straight through the whole wheel — cyan -> green -> yellow -> red — so
 #: every streak was a full rainbow and the mark read "too coloured" (owner
 #: 2026-10-18). A small offset keeps the streak two neighbouring tints of ONE
-#: colour family, so the mark stays 2-3 colours total.
-HUE_PAIR_OFFSET = 0.07
-RGB_TRAIL_SAT_BASE = 0.90
-RGB_TRAIL_SAT_SPAN = 0.10
+#: colour family, so the mark stays a couple of colours total. Owner follow-up
+#: ("more professional"): the offset is tightened again so even the two-tone
+#: walk stays inside one hue family rather than crossing into a neighbour.
+HUE_PAIR_OFFSET = 0.045
+#: Saturation of a streak. Lowered from the neon 0.90 the owner called "too
+#: colored": most bodies now sit in the 0.62..0.82 band, a restrained, matte
+#: look rather than a saturated glow. The HEAD of every streak is pulled
+#: further toward white (see ``RGB_TRAIL_WHITE_FRAC``) so each body carries a
+#: neutral highlight and only its tail keeps colour — the "professional"
+#: highlight/lowlight split rather than a coloured blob.
+RGB_TRAIL_SAT_BASE = 0.62
+RGB_TRAIL_SAT_SPAN = 0.20
+#: How far toward white (zero saturation) the HEAD of a streak is pulled;
+#: 0.0 = fully coloured head, 1.0 = white head. Falls off along the tail, so
+#: only the leading edge reads as a neutral specular highlight.
+RGB_TRAIL_WHITE_FRAC = 0.55
 RGB_TRAIL_VAL_BASE = 1.00
 #: Body hues live in a band around the mark's own cyan/violet so a field of
 #: them still reads as ONE mark; the trail then walks the wheel away from it.
+#: Kept for API compatibility; body hues now come from :data:`PALETTE_HUES`
+#: through :func:`palette_hue`, not from this band.
 PARTICLE_HUE_BASE = 0.52
 PARTICLE_HUE_SPAN = 0.34
 
 #: Owner: the mark is "still too colored". Every body used to draw its own
 #: wheel position across ``PARTICLE_HUE_BASE..+SPAN`` (0.52 -> 0.86, i.e. six-
 #: plus distinct colours). ``PALETTE_HUES`` collapses that spray to a small,
-#: fixed set — the mark's own cyan with two adjacent neighbours — and
-#: :func:`palette_hue` is the ONE place a body hue is chosen, so the whole
-#: field carries at most ``len(PALETTE_HUES)`` colours. The duotone partner
-#: still comes from :func:`_hue_pair` (+0.5 turn), so streaks stay two-colour.
-PALETTE_HUES: Tuple[float, ...] = (0.52, 0.61, 0.70)
+#: fixed set — now just TWO adjacent cool hues, the mark's own cyan and the
+#: azure next to it — and :func:`palette_hue` is the ONE place a body hue is
+#: chosen, so the whole field carries at most two colours. The duotone partner
+#: still comes from :func:`_hue_pair` (a small nearby offset), so streaks stay
+#: two-colour. The breadth moved OUT of the hue axis and INTO value/warmth:
+#: the neutral white heads carry the highlights the extra hues used to.
+PALETTE_HUES: Tuple[float, ...] = (0.54, 0.60)
 
 #: The short version for the dense field (dust and glints): fewer samples,
 #: dimmer and shorter, so 30 motes do not turn into 30 comets.
@@ -485,7 +501,8 @@ def _rgb_trail(t: Any, R: float, body: Dict[str, Any], samples: int,
             "hue": (head + (k / float(n - 1) if n > 1 else 0.0)
                     * HUE_PAIR_OFFSET) % 1.0,
             "hue2": tail,
-            "sat": sat,
+            "sat": max(0.0, min(1.0,
+                               sat * (1.0 - RGB_TRAIL_WHITE_FRAC * (1.0 - f)))),
             "val": RGB_TRAIL_VAL_BASE * (1.0 - 0.25 * f),
             "alpha": alpha_base * strength * ((1.0 - f) ** RGB_TRAIL_FALLOFF),
             "size": size * size_base * (1.0 - RGB_TRAIL_TAPER * f),
@@ -2056,6 +2073,7 @@ __all__ = [
     "MATH_LIFT_BASE", "MATH_LIFT_GAIN",
     "hue_to_rgb", "rgb_trail", "dust_trail", "RGB_TRAIL_SAMPLES",
     "RGB_TRAIL_HUE_STEP", "RGB_TRAIL_HUE_DRIFT", "RGB_TRAIL_ALPHA_BASE",
+    "RGB_TRAIL_WHITE_FRAC", "RGB_TRAIL_SAT_BASE", "RGB_TRAIL_SAT_SPAN",
     "DUST_TRAIL_SAMPLES", "PARTICLE_HUE_BASE", "PARTICLE_HUE_SPAN",
     "PALETTE_HUES", "palette_hue", "_hue_for",
     "HUE_PAIR_OFFSET", "_hue_pair",

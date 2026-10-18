@@ -821,6 +821,24 @@ def test_rgb_trail_is_a_duotone_pair_lerp_that_drifts_with_the_clock():
         F.HUE_PAIR_OFFSET)
 
 
+def test_rgb_trail_head_is_a_neutral_highlight_tail_keeps_colour():
+    # Owner: restrained, professional. The leading edge of every streak is
+    # pulled toward white (low saturation) and the tail recovers colour, so a
+    # body reads as a specular highlight with a coloured wake rather than a
+    # saturated blob.
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    part = F.particle_state(t, R)[0]
+    samples = F.rgb_trail(t, R, part)
+    assert F.RGB_TRAIL_WHITE_FRAC > 0.0
+    assert samples[0]["sat"] < samples[-1]["sat"], samples
+    assert samples[0]["sat"] <= 1.0 and samples[-1]["sat"] <= 1.0
+    # The tail keeps the body's colour family, never a white wash.
+    assert samples[-1]["sat"] > 0.3
+    # Still deterministic and junk-safe.
+    assert samples == F.rgb_trail(t, R, F.particle_state(t, R)[0])
+
+
 def test_rgb_trail_tapers_fades_and_follows_the_orbit_path():
     from voicebridge.orb import mark_field as F
     R, t = 64.0, 4.2
@@ -1626,6 +1644,13 @@ def test_palette_is_disciplined_to_a_few_hues():
     from voicebridge.orb import mark_field as F
     assert 2 <= len(F.PALETTE_HUES) <= 3
     assert len(set(F.PALETTE_HUES)) == len(F.PALETTE_HUES)
+    # Owner follow-up: "more professional". The two hues must be ADJACENT
+    # (one narrow colour family), not spread across the wheel, and the streak
+    # saturation must be restrained rather than neon.
+    spread = max(F.PALETTE_HUES) - min(F.PALETTE_HUES)
+    assert spread <= 0.12, spread
+    assert F.RGB_TRAIL_SAT_BASE <= 0.75
+    assert 0.0 < F.RGB_TRAIL_WHITE_FRAC <= 1.0
     # Across every layer's salt and hundreds of indices, the set of body hues
     # is exactly the palette — never a continuum, never more than 3.
     hues = set()
