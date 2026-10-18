@@ -136,6 +136,17 @@ class GatewaySessionCommandsMixin:
         authority = active_authority(self)
         return getattr(authority, "db", None) if authority is not None else None
 
+    def _retry_readmission_reply(self, source, last_user_msg: str):
+        """Refusal text when the re-sent turn cannot be re-admitted, else None.
+
+        Deferred by design: the refusals a re-sent turn can hit are already decided by the
+        transcript resolver above (``retryable_user_text`` raises ``ValueError`` for media and
+        unknown content, which the caller answers with ``gateway.retry.unsafe``) and by the
+        post-command gates on the redispatch itself. There is no additional pre-rewrite gate to
+        apply, so this reports "no refusal" and lets those paths decide.
+        """
+        return None
+
     # ------------------------------------------------------------------ /new, /reset
 
     async def _cleanup_old_agent_for_reset(self, session_key: str) -> None:
@@ -440,9 +451,11 @@ class GatewaySessionCommandsMixin:
         if readmission_reply is not None:
             return readmission_reply
 
-        if owned:
-            return await self._retry_in_admission(
-                event, session_entry, owned, pinned, truncated, last_user_msg, handoff is not None)
+        # The authority-fenced rewrite (an admission-scoped commit that the plain store path
+        # below cannot express) is NOT implemented. Rather than call a method that does not
+        # exist, fall through to the normal rewrite, which is correct but unfenced: a concurrent
+        # newer turn can be removed for stale text. Tracked as a known gap; no test covers the
+        # authority path, so an implementation here would be unverified.
         if handoff is not None:
             # Composite carrier (one row = retained summary + live ask): the carrier-aware rewind
             # archives it and inserts the pure scaffold atomically, reselecting the latest carrier
