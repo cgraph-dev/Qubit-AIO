@@ -9,7 +9,7 @@ import re
 import shutil
 import stat
 import sys
-from collections.abc import MutableMapping
+from collections.abc import Callable, Mapping, MutableMapping
 from contextvars import ContextVar, Token
 from pathlib import Path
 
@@ -70,6 +70,61 @@ def _platform_default_home_for(dir_name: str) -> Path:
         base = Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
         return base / (dir_name.lstrip(".") + suffix)
     return Path.home() / (dir_name + suffix)
+
+
+def _platform_default_qubit_home(environ: Mapping[str, str], user_home: Callable[[], Path]) -> Path:
+    """The platform default that *environ* names, with the literal data-directory suffix."""
+    suffix = environ.get("HERMES_DATA_DIR_SUFFIX", "")
+    if sys.platform == "win32":
+        local_appdata = environ.get("LOCALAPPDATA", "").strip()
+        base = Path(local_appdata) if local_appdata else user_home() / "AppData" / "Local"
+        return base / ("qubit" + suffix)
+    return user_home() / (".qubit" + suffix)
+
+
+def _qubit_root_of(native_home: Path, env_path: Path | None) -> Path:
+    """The root that holds *env_path*: the native home, a custom root, or *env_path* itself."""
+    if env_path is None:
+        return native_home
+    try:
+        env_path.resolve().relative_to(native_home.resolve())  # under ~/.qubit (normal or profile mode)
+    except ValueError:  # Docker/custom root: <root>/profiles/<name> -> <root>, else QUBIT_HOME itself
+        return env_path.parent.parent if env_path.parent.name == "profiles" else env_path
+    return native_home
+
+
+_ENV_REFERENCE = re.compile(r"%([^%]+)%|\$\{([^}]+)\}|\$([A-Za-z0-9_-]+)")
+
+
+def qubit_root_for_environment(environ: Mapping[str, str]) -> Path | None:
+    """The Qubit root that a process started with *environ* resolves, or None.
+
+    Applies the root rules of ``get_default_qubit_root`` to another process's
+    environment. ``%NAME%``, ``${NAME}`` and ``$NAME`` references and a leading
+    ``~`` expand from *environ* alone, never from this process. Returns None
+    when the answer depends on anything outside *environ*: a relative
+    QUBIT_HOME, an undefined variable, or a missing user profile folder.
+    """
+    names = {key.upper(): value for key, value in environ.items()}
+    profile = names.get("USERPROFILE" if sys.platform == "win32" else "HOME", "").strip()
+
+    def user_home() -> Path:
+        if not profile:
+            raise LookupError("no user profile folder")
+        return Path(profile)
+
+    raw = names.get("QUBIT_HOME", "").strip()
+    try:
+        native_home = _platform_default_qubit_home(names, user_home)
+        if not raw:
+            return native_home
+        expanded = _ENV_REFERENCE.sub(lambda match: names[match.group(match.lastindex).upper()], raw)
+        if expanded == "~" or expanded.startswith(("~/", "~\\")):
+            expanded = str(user_home()) + expanded[1:]
+    except LookupError:
+        return None
+    env_path = Path(expanded)
+    return _qubit_root_of(native_home, env_path) if env_path.is_absolute() else None
 
 
 def _get_platform_default_qubit_home() -> Path:
