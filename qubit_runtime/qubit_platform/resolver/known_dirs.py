@@ -57,7 +57,10 @@ def qubit_home_globs() -> tuple[str, ...]:
 def gateway_service_definition_globs() -> tuple[str, ...]:
     """This OS user's gateway service definitions, each naming the QUBIT_HOME it serves."""
     if _WIN:
-        return ("%APPDATA%/Microsoft/Windows/Start Menu/Programs/Startup/Qubit_Gateway*",)
+        return ("%APPDATA%/Microsoft/Windows/Start Menu/Programs/Startup/Qubit_Gateway*",
+                # Written by builds that still registered the upstream task name; kept so a service
+                # installed before the rename is still enumerated, never deleted by the writer.
+                "%APPDATA%/Microsoft/Windows/Start Menu/Programs/Startup/Hermes_Gateway*")
     if sys.platform == "darwin":
         return ("~/Library/LaunchAgents/ai.qubit.gateway*.plist",)
     return ("$XDG_CONFIG_HOME/systemd/user/qubit-gateway*.service", "~/.config/systemd/user/qubit-gateway*.service")

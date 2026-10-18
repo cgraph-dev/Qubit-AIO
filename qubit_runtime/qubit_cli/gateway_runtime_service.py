@@ -219,9 +219,9 @@ def _launchd(home: Path, deadline: float) -> ExistingService | None:
 
 
 def _windows(home: Path, deadline: float) -> ExistingService | None:
-    from qubit_cli.gateway_windows import _decode_schtasks_output
+    from qubit_cli.gateway_windows import _TASK_NAME_DEFAULT, _TASK_NAME_LEGACY, _decode_schtasks_output
     suffix = service_suffix(home)
-    name = f"Hermes_Gateway{'_' + suffix if suffix else ''}"
+    name = f"{_TASK_NAME_DEFAULT}{'_' + suffix if suffix else ''}"
 
     def query(refusal: str, *argv: str) -> str:
         # schtasks/whoami write the console code page, and /XML declares UTF-16 over those bytes:
@@ -234,6 +234,13 @@ def _windows(home: Path, deadline: float) -> ExistingService | None:
     rows = list(csv.reader(io.StringIO(query("service_manager_unavailable", "schtasks.exe", "/Query", "/FO", "CSV", "/NH"))))
     if any(len(row) != 3 for row in rows if row):
         raise RuntimeStartError("service_state_unknown")
+    # A task registered before the rename (``Hermes_Gateway[_<suffix>]``) is the same service under the
+    # old name: read it, never write it. The current name wins when both exist.
+    legacy = f"{_TASK_NAME_LEGACY}{'_' + suffix if suffix else ''}"
+    if not any(row and row[0].lstrip("\\") == name for row in rows) and any(
+        row and row[0].lstrip("\\") == legacy for row in rows
+    ):
+        name = legacy
     if any(row and row[0].lstrip("\\") == name for row in rows):
         from qubit_cli.gateway_runtime_service_identity import verify_windows_task
         unverified = "service_identity_unverified"

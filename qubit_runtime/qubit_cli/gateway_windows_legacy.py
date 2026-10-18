@@ -3,7 +3,7 @@
 Before task/launcher names carried ``_profile_suffix()``, an install wrote the Scheduled Task
 ``Hermes_Gateway``, the Startup entry ``Hermes_Gateway.vbs``/``.cmd`` and the launcher pair
 ``gateway-service\\Hermes_Gateway.{vbs,cmd}``. Every operation in ``gateway_windows`` is keyed on
-``get_task_name()`` → ``Hermes_Gateway_<suffix>``, so those strays are never queried, rewritten,
+``get_task_name()`` → ``Qubit_Gateway[_<suffix>]``, so those strays are never queried, rewritten,
 reported or removed: they keep launching a second gateway at logon, never pick up launcher
 fixes, and ``qubit gateway status`` prints ✓ while they do (#116157). This module enumerates
 them once; ``status`` warns, ``uninstall`` and ``install --force`` remove.
@@ -22,9 +22,9 @@ def _w():
 
 def _targets_this_home(text: str) -> bool:
     """A bare-named launcher is OURS only when its action points into THIS home's ``gateway-service``
-    dir. The bare name is also the live identity of the default ``~/.hermes`` profile, so a secondary
-    profile that classified every ``Hermes_Gateway`` object as its own stray would delete the default
-    profile's gateway autostart on ``uninstall`` / ``install --force``."""
+    dir. The bare name is also the live identity of the default profile's ``gateway-service`` launcher,
+    so a secondary profile that classified every ``Hermes_Gateway`` object as its own stray would
+    delete the default profile's gateway autostart on ``uninstall`` / ``install --force``."""
     w = _w()
     marker = w._normalize_windows_path(str(w._qubit_home() / "gateway-service"))
     return marker in w._normalize_windows_path(text)
@@ -35,7 +35,10 @@ def legacy_launcher_artifacts() -> list[tuple[str, str, Path | str]]:
     ``"file"`` or ``"task"``. Empty when this home owns the bare name (its current objects ARE the bare
     ones). Bare-named objects belonging to another home (a sibling install) are left alone."""
     w = _w()
-    bare = w._TASK_NAME_DEFAULT
+    # The pre-suffix name is the one a build BEFORE per-profile suffixes wrote — i.e. the upstream
+    # ``Hermes_Gateway``. After the rename that is no longer ``_TASK_NAME_DEFAULT`` (which is now the
+    # live, suffixed-capable name), so it must come from ``_TASK_NAME_LEGACY`` or nothing is ever found.
+    bare = w._TASK_NAME_LEGACY
     if w.get_task_name() == bare:
         return []
     found: list[tuple[str, str, Path | str]] = []

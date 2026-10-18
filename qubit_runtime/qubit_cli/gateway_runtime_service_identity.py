@@ -323,7 +323,11 @@ def _vbs_identity(script: str) -> tuple[str, list[str]]:
         match = re.fullmatch(r'env.Item\("([A-Z_]+)"\) = (' + literal + ')', lines[index])
         if not match:
             break
-        if match[1] not in {"QUBIT_HOME", "HERMES_SUPERVISED_CHILD", "HERMES_GATEWAY_DETACHED", "PYTHONIOENCODING", "VIRTUAL_ENV"} or match[1] in env:
+        # Our own writers emit the QUBIT_ spellings; the HERMES_ ones are only what a build predating the
+        # rename wrote, so an already-installed task still verifies instead of failing identity.
+        if match[1] not in {"QUBIT_HOME", "QUBIT_SUPERVISED_CHILD", "HERMES_SUPERVISED_CHILD",
+                            "QUBIT_GATEWAY_DETACHED", "HERMES_GATEWAY_DETACHED",
+                            "PYTHONIOENCODING", "VIRTUAL_ENV"} or match[1] in env:
             _unverified()
         env[match[1]] = match[2][1:-1].replace('""', '"')
         index += 1
@@ -335,7 +339,7 @@ def _vbs_identity(script: str) -> tuple[str, list[str]]:
     if not re.fullmatch(r'sh.CurrentDirectory = ' + literal, tail[6]):
         _unverified()
     run = re.fullmatch(r'sh.Run (' + literal + r'), 0, False', tail[7])
-    if not run or not env.get("HERMES_SUPERVISED_CHILD"):
+    if not run or not (env.get("QUBIT_SUPERVISED_CHILD") or env.get("HERMES_SUPERVISED_CHILD")):
         _unverified()
     command = run[1][1:-1].replace('""', '"')
     if "%" in command or "%" in env.get("QUBIT_HOME", ""):

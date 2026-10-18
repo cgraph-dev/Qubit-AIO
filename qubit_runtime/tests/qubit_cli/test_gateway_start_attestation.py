@@ -86,13 +86,13 @@ def test_report_gateway_start_failure_is_loud_not_checkmark(monkeypatch, tmp_pat
         "qubit_cli.config.get_qubit_home", lambda: str(tmp_path)
     )
     monkeypatch.setattr(gateway_windows, "is_task_registered", lambda: True)
-    monkeypatch.setattr(gateway_windows, "get_task_name", lambda: "Hermes_Gateway_x")
+    monkeypatch.setattr(gateway_windows, "get_task_name", lambda: "Qubit_Gateway_x")
 
     gateway_windows._report_gateway_start("direct spawn (PID 7)")
     out = capsys.readouterr().out
     assert "✓" not in out
     assert "FAILED" in out
-    assert "schtasks /Run /TN Hermes_Gateway_x" in out
+    assert "schtasks /Run /TN Qubit_Gateway_x" in out
 
 
 # ---------------------------------------------------------------------------

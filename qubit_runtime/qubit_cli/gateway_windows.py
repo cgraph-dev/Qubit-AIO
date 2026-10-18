@@ -52,13 +52,16 @@ _ACCESS_DENIED_PATTERN = re.compile(rf"({_ACCESS_DENIED_WORDS})", re.IGNORECASE)
 # shell exits. Dict (not bare bool) so the flag is mutable without ``global``.
 _LAST_SPAWN_BREAKAWAY_FALLBACK: dict = {"fallback": False}
 
-_TASK_NAME_DEFAULT = "Hermes_Gateway"
+_TASK_NAME_DEFAULT = "Qubit_Gateway"
+# The upstream Scheduled Task name, kept ONLY so installs predating the rename stay reachable: migration
+# reads it, nothing writes it. Every pre-suffix stray is still created under this name on such a host.
+_TASK_NAME_LEGACY = "Hermes_Gateway"
 _TASK_DESCRIPTION = "Qubit Agent Gateway - Messaging Platform Integration"
 _TASK_LOGON_DELAY = "PT30S"
 _TASK_RESTART_INTERVAL = "PT1M"
 _TASK_RESTART_COUNT = 999
 
-_GATEWAY_ENV = (("PYTHONIOENCODING", "utf-8"), ("HERMES_GATEWAY_DETACHED", "1"), ("QUBIT_SUPERVISED_CHILD", "1"))
+_GATEWAY_ENV = (("PYTHONIOENCODING", "utf-8"), ("HERMES_GATEWAY_DETACHED", "1"), ("QUBIT_GATEWAY_DETACHED", "1"), ("QUBIT_SUPERVISED_CHILD", "1"))
 
 
 def _schtasks_encoding() -> str:
@@ -264,8 +267,8 @@ def _launch_elevated_install(force: bool = False, *, start_now: bool | None = No
     if force:
         extra_args.append("--force")
     for choice, env_key, flag in (
-        (start_now, "HERMES_GATEWAY_INSTALL_START_NOW", "start-now"),
-        (start_on_login, "HERMES_GATEWAY_INSTALL_START_ON_LOGIN", "start-on-login"),
+        (start_now, "QUBIT_GATEWAY_INSTALL_START_NOW", "start-now"),
+        (start_on_login, "QUBIT_GATEWAY_INSTALL_START_ON_LOGIN", "start-on-login"),
     ):
         if choice is not None:
             overrides[env_key] = "1" if choice else "0"
@@ -746,7 +749,8 @@ def windowless_gateway_restart_spec(run_argv: list[str], home: str | None = None
         qubit_home = str(Path(home or _qubit_home()).resolve())
     except Exception:
         qubit_home = ""
-    env_overlay: dict[str, str] = {"PYTHONIOENCODING": "utf-8", "HERMES_GATEWAY_DETACHED": "1", "VIRTUAL_ENV": str(venv_dir)}
+    env_overlay: dict[str, str] = {"PYTHONIOENCODING": "utf-8", "HERMES_GATEWAY_DETACHED": "1",
+                                   "QUBIT_GATEWAY_DETACHED": "1", "VIRTUAL_ENV": str(venv_dir)}
     if qubit_home:
         env_overlay["QUBIT_HOME"] = qubit_home
     _prepend_pythonpath(env_overlay, [str(PROJECT_ROOT), *extra_pythonpath])
@@ -827,24 +831,27 @@ def _stdin_console_mode_ok() -> bool | None:
     return bool(kernel32.GetConsoleMode(handle, ctypes.byref(ctypes.c_ulong())))
 
 
-def _install_choice_from_env(name: str) -> bool | None:
-    raw = os.environ.get(name)
-    if raw is None:
-        return None
-    value = raw.strip().lower()
-    if value in {"1", "true", "yes", "y", "on"}:
-        return True
-    if value in {"0", "false", "no", "n", "off"}:
-        return False
+def _install_choice_from_env(name: str, *legacy_names: str) -> bool | None:
+    """Answer from ``name``, else any read-only ``legacy_names`` (a pre-rename spelling a wrapper may
+    still export). Writers only ever emit ``name``."""
+    for key in (name, *legacy_names):
+        raw = os.environ.get(key)
+        if raw is None:
+            continue
+        value = raw.strip().lower()
+        if value in {"1", "true", "yes", "y", "on"}:
+            return True
+        if value in {"0", "false", "no", "n", "off"}:
+            return False
     return None
 
 
 def _prompt_install_choices(start_now: bool | None = None, start_on_login: bool | None = None) -> tuple[bool, bool]:
     """Return (start_now, start_on_login), asking before any UAC escalation."""
     if start_now is None:
-        start_now = _install_choice_from_env("HERMES_GATEWAY_INSTALL_START_NOW")
+        start_now = _install_choice_from_env("QUBIT_GATEWAY_INSTALL_START_NOW", "HERMES_GATEWAY_INSTALL_START_NOW")
     if start_on_login is None:
-        start_on_login = _install_choice_from_env("HERMES_GATEWAY_INSTALL_START_ON_LOGIN")
+        start_on_login = _install_choice_from_env("QUBIT_GATEWAY_INSTALL_START_ON_LOGIN", "HERMES_GATEWAY_INSTALL_START_ON_LOGIN")
     if start_now is not None and start_on_login is not None:
         return start_now, start_on_login
 
@@ -940,7 +947,7 @@ def install(
 
     task_name = get_task_name()
     script_path = _write_task_script()
-    # A pre-fix install that failed its Startup-folder swap left `Hermes_Gateway.tmp` there, and the
+    # A pre-fix install that failed its Startup-folder swap left `Qubit_Gateway.tmp` there, and the
     # Scheduled Task path below never touches that folder — sweep it so a re-run clears the debris.
     try:
         _startup_staging_path().unlink(missing_ok=True)
@@ -948,7 +955,8 @@ def install(
         pass
     if force:
         # Pre-suffix strays (task ``Hermes_Gateway``, Startup ``Hermes_Gateway.vbs``) are unreachable by
-        # the current names, so a plain reconcile never heals them (#116157).
+        # the current names, so a plain reconcile never heals them (#116157). These are the UPSTREAM
+        # names a pre-rename install wrote — deliberately not ``_TASK_NAME_DEFAULT``.
         from qubit_cli.gateway_windows_legacy import remove_legacy_launchers
         remove_legacy_launchers()
 
@@ -1389,7 +1397,7 @@ _TASK_PROBE_TIMEOUT_S = 5
 
 
 def registered_task_launchers() -> list[str]:
-    """The scripts this OS user's ``Hermes_Gateway*`` Scheduled Tasks start (``install_state``). A task
+    """The scripts this OS user's ``Qubit_Gateway*`` Scheduled Tasks start (``install_state``). A task
     install removes the Startup-folder entries, so for a custom home the task is all that still names
     it. Empty off Windows, and when Task Scheduler does not answer, as for an unreadable Startup entry."""
     if sys.platform != "win32":
@@ -1397,7 +1405,9 @@ def registered_task_launchers() -> list[str]:
     from qubit_cli.gateway_service_owner import service_definition_launchers
 
     code, listing, _err = _exec_schtasks(["/Query", "/FO", "CSV", "/NH"], timeout=_TASK_PROBE_TIMEOUT_S)
-    names = re.findall(rf'^"\\({_TASK_NAME_DEFAULT}[^"\\]*)"', listing, flags=re.MULTILINE) if code == 0 else []
+    # ``Hermes_`` too: a task registered before the rename still starts a live gateway (read-only).
+    names = re.findall(rf'^"\\\({_TASK_NAME_DEFAULT}|{_TASK_NAME_LEGACY}[^"\\]*)"', listing,
+                       flags=re.MULTILINE) if code == 0 else []
     launchers: list[str] = []
     for name in dict.fromkeys(names):
         code, xml, _err = _exec_schtasks(["/Query", "/TN", name, "/XML"], timeout=_TASK_PROBE_TIMEOUT_S)
@@ -1689,9 +1699,10 @@ def start() -> None:
 
     if not is_task_registered() and not is_startup_entry_installed():
         # Login persistence is a lasting system change: a bare ``start`` installs it only on an explicit
-        # answer — the HERMES_GATEWAY_INSTALL_START_ON_LOGIN override or a real TTY prompt — never on a
+        # answer — the QUBIT_GATEWAY_INSTALL_START_ON_LOGIN override or a real TTY prompt — never on a
         # non-TTY default (#113977). Declining still starts the gateway; the command is ``start``.
-        start_on_login = _install_choice_from_env("HERMES_GATEWAY_INSTALL_START_ON_LOGIN")
+        start_on_login = _install_choice_from_env(
+            "QUBIT_GATEWAY_INSTALL_START_ON_LOGIN", "HERMES_GATEWAY_INSTALL_START_ON_LOGIN")
         if start_on_login is None:
             from qubit_cli.setup import is_interactive_stdin, is_noninteractive, prompt_yes_no
 

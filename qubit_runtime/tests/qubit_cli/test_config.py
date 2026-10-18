@@ -1447,10 +1447,10 @@ class TestEnvWriteDenylist:
         ("key", "expected"),
         [
             ("Path", "PATH"),
-            ("Qubit_Yolo_Mode", "HERMES_YOLO_MODE"),
-            ("Qubit_Optional_Mcps", "HERMES_OPTIONAL_MCPS"),
-            ("Qubit_Copilot_Acp_Command", "HERMES_COPILOT_ACP_COMMAND"),
-            ("Qubit_Copilot_Acp_Args", "HERMES_COPILOT_ACP_ARGS"),
+            ("Qubit_Yolo_Mode", "QUBIT_YOLO_MODE"),
+            ("Qubit_Optional_Mcps", "QUBIT_OPTIONAL_MCPS"),
+            ("Qubit_Copilot_Acp_Command", "QUBIT_COPILOT_ACP_COMMAND"),
+            ("Qubit_Copilot_Acp_Args", "QUBIT_COPILOT_ACP_ARGS"),
         ],
     )
     def test_windows_policy_names_are_case_insensitive(self, key, expected):

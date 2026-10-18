@@ -504,19 +504,22 @@ def test_reconcile_warns_when_legacy_entry_cannot_be_removed(monkeypatch, tmp_pa
 
 
 def test_status_names_and_uninstall_removes_pre_suffix_launchers(monkeypatch, tmp_path, capsys):
-    """#116157: a Scheduled Task ``Qubit_Gateway`` and a Startup ``Qubit_Gateway.vbs`` left from before
+    """#116157: a Scheduled Task ``Hermes_Gateway`` and a Startup ``Hermes_Gateway.vbs`` left from before
     per-profile suffixes are invisible to every ``get_task_name()``-keyed operation. ``status`` must name
-    them and ``uninstall`` must remove them (files unlinked, ``schtasks /Delete`` issued for the task)."""
+    them and ``uninstall`` must remove them (files unlinked, ``schtasks /Delete`` issued for the task).
+
+    These are the UPSTREAM names a pre-rename build wrote — deliberately not ``_TASK_NAME_DEFAULT``,
+    which is the live name now and must never be swept as a stray."""
     startup, home = tmp_path / "Startup", tmp_path / "home"
     (home / "gateway-service").mkdir(parents=True)
     startup.mkdir()
-    legacy_vbs = startup / "Qubit_Gateway.vbs"
-    legacy_vbs.write_text(gateway_windows._build_startup_launcher(home / "gateway-service" / "Qubit_Gateway.cmd"), encoding="utf-8")
-    legacy_pair = home / "gateway-service" / "Qubit_Gateway.cmd"
+    legacy_vbs = startup / "Hermes_Gateway.vbs"
+    legacy_vbs.write_text(gateway_windows._build_startup_launcher(home / "gateway-service" / "Hermes_Gateway.cmd"), encoding="utf-8")
+    legacy_pair = home / "gateway-service" / "Hermes_Gateway.cmd"
     legacy_pair.write_text("legacy", encoding="utf-8")
     schtasks_calls = []
-    registered = {"Qubit_Gateway"}
-    task_xml = gateway_windows._build_scheduled_task_xml("Qubit_Gateway", home / "gateway-service" / "Qubit_Gateway.vbs", None)
+    registered = {"Hermes_Gateway"}
+    task_xml = gateway_windows._build_scheduled_task_xml("Hermes_Gateway", home / "gateway-service" / "Hermes_Gateway.vbs", None)
 
     def fake_schtasks(args):
         schtasks_calls.append(args)
@@ -541,13 +544,13 @@ def test_status_names_and_uninstall_removes_pre_suffix_launchers(monkeypatch, tm
     out = capsys.readouterr().out
     assert f"legacy pre-suffix Windows login item still installed: {legacy_vbs}" in out
     assert f"legacy pre-suffix task script still installed: {legacy_pair}" in out
-    assert "legacy pre-suffix Scheduled Task still installed: Qubit_Gateway" in out
+    assert "legacy pre-suffix Scheduled Task still installed: Hermes_Gateway" in out
 
     gateway_windows.uninstall()
     out = capsys.readouterr().out
-    assert "Removed legacy pre-suffix Scheduled Task 'Qubit_Gateway'" in out
+    assert "Removed legacy pre-suffix Scheduled Task 'Hermes_Gateway'" in out
     assert not legacy_vbs.exists() and not legacy_pair.exists()
-    assert ["/Delete", "/F", "/TN", "Qubit_Gateway"] in schtasks_calls
+    assert ["/Delete", "/F", "/TN", "Hermes_Gateway"] in schtasks_calls
     gateway_windows.status()
     assert "legacy pre-suffix" not in capsys.readouterr().out
 
@@ -817,7 +820,7 @@ def test_qubit_owns_windows_service_requires_name_or_binary_under_a_qubit_root()
     assert not owns("BITS", r"C:\Windows\System32\svchost.exe -k netsvcs -p -s BITS", roots)
     assert not owns("Other", r"C:\Users\kaize\AppData\Local\qubit\qubit-fork\run.exe", roots)
 
-    assert owns("QubitGateway", r"C:\nssm\nssm.exe", roots)
+    assert owns("Qubit_Gateway", r"C:\nssm\nssm.exe", roots)
     assert owns("Qubit_Gateway_derek", "", roots)
     assert owns("gw", r'"C:\Users\KAIZE\AppData\Local\qubit\qubit\venv\Scripts\qubit.exe" gateway run', roots)
     assert owns("gw", r"C:\Users\kaize\AppData\Local\qubit\gateway-service\Qubit_Gateway.cmd", roots)

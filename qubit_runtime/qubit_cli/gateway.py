@@ -1814,7 +1814,8 @@ def _reap_unsupervised_gateway_orphans(
             from qubit_cli.gateway_windows import get_task_name  # profile-aware task name
             _task_name = get_task_name()
         except Exception:
-            _task_name = "Hermes_Gateway"
+            from qubit_cli.gateway_windows import _TASK_NAME_DEFAULT
+            _task_name = _TASK_NAME_DEFAULT
         if _windows_scheduled_task_supervises(_task_name):
             return False
 
