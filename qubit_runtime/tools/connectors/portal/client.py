@@ -173,6 +173,9 @@ class PortalConnectorClient:
             raise error_type(message, code="INVALID_RESPONSE", status=status) from exc
 
 
+_PORTAL_ROUTE_WORDS = frozenset({"connectors", "tools", "catalog", "accounts", "policy"})
+
+
 def _safe_json(response: Any) -> Any:
     try:
         return response.json()

@@ -83,6 +83,11 @@ def _ssh_config_from_config(config: Dict[str, Any]) -> dict:
     return {out: config.get(key, default) for out, key, default in _SSH_KEYS}
 
 
+def _local_config_from_config(config: Dict[str, Any]) -> dict:
+    """``local_config`` for :func:`_create_environment` (TERMINAL_LOCAL_PERSISTENT, default on)."""
+    return {"persistent": config.get("local_persistent", True)}
+
+
 def _container_config_from_config(config: Dict[str, Any]) -> dict:
     """``container_config`` for :func:`_create_environment` (shared with the lazy ``ensure_task_env``)."""
     return {k: config.get(k, d) for k, d in _CONTAINER_KEYS}
