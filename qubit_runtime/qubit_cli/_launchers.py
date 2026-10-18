@@ -936,10 +936,10 @@ def _read_environment_block(address: int) -> dict[str, str]:
 
 def new_console_qubit_root() -> Path | None:
     """The Qubit root that a newly opened console resolves, or None when Windows cannot say."""
-    from qubit_constants import hermes_root_for_environment
+    from qubit_constants import qubit_root_for_environment
 
     environ = _new_console_environment()
-    return None if environ is None else hermes_root_for_environment(environ)
+    return None if environ is None else qubit_root_for_environment(environ)
 
 
 def owns_user_path(root: Path) -> bool:

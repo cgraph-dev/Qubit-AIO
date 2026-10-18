@@ -54,26 +54,6 @@ def release_line_contains(commit: str, remote_prefix: str) -> list[str]:
             *(f"refs/remotes/{remote_prefix}/{branch}" for branch in RELEASE_LINE_BRANCHES)]
 
 
-# Stable releases are cut from ``main`` or from a ``release/*`` maintenance branch.
-RELEASE_LINE_BRANCHES = ("main", "release/*")
-
-
-def release_line_refspecs(remote_prefix: str) -> list[str]:
-    """Fetch refspecs that mirror every release-line branch under ``refs/remotes/<remote_prefix>/``."""
-    return [f"+refs/heads/{branch}:refs/remotes/{remote_prefix}/{branch}"
-            for branch in RELEASE_LINE_BRANCHES]
-
-
-def release_line_contains(commit: str, remote_prefix: str) -> list[str]:
-    """The git command that lists the fetched release-line branches holding ``commit``.
-
-    Empty output means the commit is on no release line. Git matches the
-    ``release/*`` pattern across the slash, so ``release/0.22.1`` qualifies.
-    """
-    return ["git", "for-each-ref", "--contains", commit, "--format=%(refname)",
-            *(f"refs/remotes/{remote_prefix}/{branch}" for branch in RELEASE_LINE_BRANCHES)]
-
-
 def admit_claim(tag: str, commit: str, *, on_main) -> dict:
     """Admit a release from its attempt ref. The checkout version is not read.
 
