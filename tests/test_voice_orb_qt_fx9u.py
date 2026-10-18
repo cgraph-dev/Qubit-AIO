@@ -17,6 +17,7 @@ import contextlib
 import math
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -585,13 +586,17 @@ def test_primitive_count_is_bounded_and_richer_than_pre_field():
     # Pre-field ceiling: 2 rings * 3 fringe strokes + 9 beads + 9*4 trails
     # + 14 glints + nucleus + halo = 67 primitives.
     pre_field_max = 2 * 3 + 9 + 9 * 4 + 14 + 2
-    counts = [len(_record(t=0.31 + k * 0.17)) for k in range(10)]
+    # Count SHAPE primitives only, matching the binding perf contract
+    # (``test_voice_orb_fx_perf9u`` counts drawEllipse/drawPath/drawLine, never
+    # drawText). The math-symbol and "1"/"0" glyph layers are text, so they are
+    # outside the shape budget by the same rule the perf cap uses.
+    counts = [len([p for p in _record(t=0.31 + k * 0.17)
+                   if p.kind != "text"]) for k in range(10)]
     assert max(counts) > pre_field_max
     # The holo budget: the field lane densified the frame (dust 48, sparkles
-    # 40, binary 72, sparks 26) and the Qt lane adds blink dots plus the
-    # nucleus rim pair, so the old 300 ceiling is stale (it was already 312
-    # at the field lane's merge base). The binding cap is the 420 of the perf
-    # contract, which this stays under with headroom.
+    # 40, binary 72, sparks 26) and the Qt lane adds blink dots, the screen-break
+    # bodies and the nucleus rim pair, so the old 300 ceiling is stale. The
+    # binding cap is the 420 of the perf contract, which this stays under.
     assert max(counts) <= 420
     assert max(counts) - min(counts) < 80
 
@@ -1148,8 +1153,11 @@ def test_binaries_paint_as_glyphs_split_by_depth():
     size, R, c = 192, 90.0, 96.0
     t = 0.42
     prims = _record(t=t, size=size)
-    # Draw order is far fragments first, then near ones, each in field order.
-    glyphs = [(i, p) for i, p in enumerate(prims) if p.kind == "text"]
+    # Binary fragments are the "1"/"0" glyphs; math-symbol/equation glyphs are
+    # drawn as text too (see the math cases below), so select by char. Draw
+    # order is far fragments first, then near ones, each in field order.
+    glyphs = [(i, p) for i, p in enumerate(prims)
+              if p.kind == "text" and p.text in ("0", "1")]
     bits = sorted(F.binary_state(t, R), key=lambda b: b["depth"] >= 0.5)
     assert len(glyphs) == len(bits) == F.BINARY_COUNT
 
@@ -1266,3 +1274,158 @@ def test_inner_ring_tilt_tracks_the_shared_field_and_freezes_when_still():
 
     with monkeypatch_env("QUBIT_REDUCED_MOTION", "1"):
         assert Q.mark_inner_ring_tilt(9.0) == F.INNER_RING_TILT_BASE
+
+
+# --------------------------------------------------------------------------- #
+# (p) refine round: short wakes, math glyphs, screen-break bodies
+# --------------------------------------------------------------------------- #
+def _counter_diff(a, b):
+    diff = Counter(a)
+    diff.subtract(Counter(b))
+    return list(diff.elements())
+
+
+def test_streak_wakes_are_truncated_to_short_local_stubs(monkeypatch):
+    # Owner 2026-10-18: "the curved lines what are those? ... refine even
+    # more". A wake follows the body's ORBITAL velocity, so at full length it
+    # curves along the orbit and reads as an unexplained coloured line cutting
+    # across the mark. The renderer keeps only the head samples, so even a
+    # field trail with MANY samples spread across a wide span is drawn short.
+    from voicebridge.orb import qt_app as Q
+
+    size, R = 192, 90.0
+    t = 1.234
+
+    def _wide(tt, rr, body):
+        return [{"x": 10.0 * k, "y": 0.0, "hue": 0.5, "sat": 1.0, "val": 1.0,
+                 "alpha": 0.6, "size": 1.2, "depth": 0.5, "dof": 0.0,
+                 "k": float(k)} for k in range(9)]
+
+    with monkeypatch.context() as m:
+        m.setattr(Q._field, "rgb_trail", _wide)
+        m.setattr(Q._field, "dust_trail", _wide)
+        wide = _record(t=t, size=size)
+    with monkeypatch.context() as m:
+        m.setattr(Q._field, "rgb_trail", lambda *a, **k: [])
+        m.setattr(Q._field, "dust_trail", lambda *a, **k: [])
+        bare = _record(t=t, size=size)
+
+    wakes = [p for p in _counter_diff(wide, bare)
+             if p.kind == "path" and p.fill is not None]
+    assert wakes, "no wakes drawn"
+    # Only 3 samples are kept (2 steps of 10 field units), so every drawn wake
+    # is far shorter than the orb: a local stub, never a crossing line.
+    worst = max(math.hypot(p.w, p.h) for p in wakes)
+    assert worst <= 0.5 * R, worst
+
+
+def test_math_glyphs_paint_as_text_split_by_depth(monkeypatch):
+    from voicebridge.orb import qt_app as Q
+
+    size, R, c = 192, 90.0, 96.0
+    t = 0.42
+    syms = [
+        {"index": 0.0, "x": -30.0, "y": 12.0, "depth": 0.2, "size": 1.4,
+         "alpha": 0.9, "lift": 0.5, "hue": 0.0, "char": "\u03c0"},
+        {"index": 1.0, "x": -12.0, "y": -8.0, "depth": 0.3, "size": 1.4,
+         "alpha": 0.9, "lift": 0.5, "hue": 0.0, "char": "\u2211"},
+        {"index": 2.0, "x": 14.0, "y": 9.0, "depth": 0.8, "size": 1.4,
+         "alpha": 0.9, "lift": 0.5, "hue": 0.5, "char": "\u221a"},
+        {"index": 3.0, "x": 28.0, "y": -14.0, "depth": 0.7, "size": 1.4,
+         "alpha": 0.9, "lift": 0.5, "hue": 0.5, "char": "\u222b"},
+    ]
+    with monkeypatch.context() as m:
+        m.setattr(Q._field, "math_state",
+                  lambda tt, rr: [dict(s) for s in syms], raising=False)
+        m.setattr(Q._field, "binary_state", lambda *a, **k: [])
+        prims = _record(t=t, size=size)
+
+    wanted = {s["char"] for s in syms}
+    glyphs = [p for p in prims if p.kind == "text" and p.text in wanted]
+    assert len(glyphs) == len(syms), len(glyphs)
+    for s in syms:
+        px, py = _pix(t, R, c, s)
+        g = [p for p in glyphs if p.text == s["char"]][0]
+        assert math.hypot(g.cx - px, g.cy - py) <= 0.01, (s["char"], g, px, py)
+    seam = [i for i, p in enumerate(prims)
+            if p.kind == "ellipse" and p.fill is not None
+            and math.hypot(p.cx - c, p.cy - c) <= 0.75]
+    assert len(seam) == 1, seam
+    # Split by the FIELD's depth, not by paint order alone: far half behind
+    # the nucleus, near half in front of it.
+    far_i = [min(i for i, q in enumerate(prims) if q is p)
+             for p in glyphs
+             if min(s["depth"] for s in syms if s["char"] == p.text) < 0.5]
+    near_i = [min(i for i, q in enumerate(prims) if q is p)
+              for p in glyphs
+              if min(s["depth"] for s in syms if s["char"] == p.text) >= 0.5]
+    assert len(far_i) == 2 and len(near_i) == 2, (far_i, near_i)
+    assert max(far_i) < seam[0] < min(near_i), (far_i, seam, near_i)
+
+
+def test_reduced_motion_draws_no_math_glyphs(monkeypatch):
+    from voicebridge.orb import qt_app as Q
+
+    with monkeypatch.context() as m:
+        m.setattr(Q._field, "math_state",
+                  lambda tt, rr: [{"index": 0.0, "x": 0.0, "y": 0.0,
+                                   "depth": 0.8, "size": 1.5, "alpha": 0.9,
+                                   "lift": 0.5, "hue": 0.5, "char": "\u03c0"}],
+                  raising=False)
+        rec = _record(t=1.0, reduced=True)
+    assert not [p for p in rec if p.kind == "text"]
+
+
+def test_screen_break_bodies_paint_beyond_the_orb_radius(monkeypatch):
+    from voicebridge.orb import qt_app as Q
+
+    size, R, c = 192, 90.0, 96.0
+    t = 0.0
+    outside = [
+        {"index": 0.0, "x": 1.35 * R, "y": 0.0, "depth": 0.5, "size": 1.6,
+         "alpha": 0.95, "lift": 0.5, "hue": 0.0},
+        {"index": 1.0, "x": -1.30 * R, "y": 0.0, "depth": 0.5, "size": 1.6,
+         "alpha": 0.95, "lift": 0.5, "hue": 1.0 / 3.0},
+    ]
+    with monkeypatch.context() as m:
+        m.setattr(Q._field, "screen_break",
+                  lambda tt, rr: [dict(s) for s in outside], raising=False)
+        with_break = _record(t=t, size=size)
+    with monkeypatch.context() as m:
+        m.setattr(Q._field, "screen_break", lambda *a, **k: [], raising=False)
+        bare = _record(t=t, size=size)
+    extra = _counter_diff(with_break, bare)
+    assert extra, "screen-break bodies were not drawn at all"
+    # Nothing clips to the orb's circle: the bodies genuinely exit it.
+    reach = max(math.hypot(p.cx - c, p.cy - c) for p in extra)
+    assert reach > R, reach
+
+
+def test_batched_layer_colours_come_from_field_hues(monkeypatch):
+    # Palette discipline: the batched dot layers must paint a hue the FIELD
+    # emitted, never a renderer-invented ``(k + 0.5) / n`` spread across the
+    # whole wheel. With two bodies at red (0.0) and green (1/3) the frame must
+    # carry BOTH colours; a spread would have painted orange/cyan/magenta, none
+    # of them green-dominant.
+    from voicebridge.orb import qt_app as Q
+
+    size = 192
+    t = 0.0
+    bodies = [
+        {"index": 0.0, "x": -20.0, "y": 0.0, "depth": 0.5, "size": 1.4,
+         "alpha": 0.9, "hue": 0.0, "lift": 0.5},
+        {"index": 1.0, "x": 20.0, "y": 0.0, "depth": 0.5, "size": 1.4,
+         "alpha": 0.9, "hue": 1.0 / 3.0, "lift": 0.5},
+    ]
+    with monkeypatch.context() as m:
+        m.setattr(Q, "mark_ring_particles",
+                  lambda tt, rr: [dict(b) for b in bodies])
+        for name in ("mark_cylinder_particles", "mark_orbiter_particles",
+                     "mark_flare_dots", "mark_filament", "mark_screen_break",
+                     "mark_math_state"):
+            m.setattr(Q, name, lambda tt, rr: [])
+        prims = _record(t=t, size=size)
+    fills = [p.fill[:3] for p in prims if p.fill is not None
+             and p.kind == "path"]
+    assert any(g > r + 40 and g > b + 40 for r, g, b in fills), fills
+

@@ -565,6 +565,11 @@ def _strip_moving_layers(monkeypatch):
     monkeypatch.setattr(M, "_field_ring_particles", None)
     monkeypatch.setattr(M, "_field_cylinder_particles", None)
     monkeypatch.setattr(M, "_field_orbiter_particles", None)
+    # The math-symbol layer and the screen-break bodies are their own layers
+    # too, so an isolated-body frame must suppress them or their glyphs/bodies
+    # pose as the body's.
+    monkeypatch.setattr(M, "_field_math_state", None)
+    monkeypatch.setattr(M, "_field_screen_break", None)
     return part
 
 
@@ -819,3 +824,69 @@ def test_on_body_detail_never_paints_a_flat_background_disc():
              and abs((o[1] + o[3]) / 2 - CY) < body
              and kw.get("fill") == BG_HEX]
     assert not holes, f"{len(holes)} primitives punched the body to background"
+
+
+# --------------------------------------------------------------------------- #
+# refine round: short wakes, math glyphs, screen-break bodies
+# --------------------------------------------------------------------------- #
+def test_a_long_field_trail_is_drawn_as_a_short_stub(monkeypatch):
+    # Owner: "the curved lines what are those? ... refine even more". The field
+    # trail follows the body's ORBITAL velocity, so at full length it curved
+    # along the orbit. Only the head samples are stroked now, so a NINE-sample
+    # trail still draws a single two-segment stub.
+    _strip_moving_layers(monkeypatch)
+    monkeypatch.setattr(M, "rgb_trail",
+                        lambda tt, rr, body: [_sample(k, 0.5)
+                                              for k in range(9)])
+    c, _ = render(1.7)
+    wake = _segments(c)
+    assert len(wake) == 2, "only the first 3 samples are kept"
+
+
+def test_math_glyphs_paint_as_text(monkeypatch):
+    # Owner: "add math symbols equations not random lines". Same glyph
+    # machinery as the "1"/"0" bits, drawn with create_text.
+    _strip_moving_layers(monkeypatch)
+    syms = [
+        {"index": 0.0, "x": -20.0, "y": 0.0, "depth": 0.2, "size": 1.4,
+         "alpha": 0.9, "lift": 0.5, "hue": 0.0, "char": "\u03c0"},
+        {"index": 1.0, "x": 18.0, "y": 0.0, "depth": 0.8, "size": 1.4,
+         "alpha": 0.9, "lift": 0.5, "hue": 0.5, "char": "\u2211"},
+    ]
+    monkeypatch.setattr(M, "_field_math_state",
+                        lambda tt, rr: [dict(s) for s in syms])
+    c, stats = render(1.7)
+    texts = [kw.get("text") for (_x, _y), kw in c.texts]
+    assert "\u03c0" in texts and "\u2211" in texts, texts
+    assert stats["texts"] >= 2
+
+
+def test_screen_break_bodies_are_drawn_outside_the_radius(monkeypatch):
+    # Owner likes the mark "breaking the screen": a body the field pushes past
+    # the radius is painted where it is, never clipped back inside.
+    _strip_moving_layers(monkeypatch)
+    bodies = [
+        {"index": 0.0, "x": 1.4 * R, "y": 0.0, "depth": 0.5, "size": 1.6,
+         "alpha": 0.95, "lift": 0.5, "hue": 0.0},
+        {"index": 1.0, "x": -1.4 * R, "y": 0.0, "depth": 0.5, "size": 1.6,
+         "alpha": 0.95, "lift": 0.5, "hue": 1.0 / 3.0},
+    ]
+    monkeypatch.setattr(M, "_field_screen_break",
+                        lambda tt, rr: [dict(b) for b in bodies])
+    c, _ = render(0.0)
+    reach = max(abs((o[0] + o[2]) / 2.0 - CX) for o, _kw in c.ovals)
+    assert reach > R, reach
+
+
+def test_reduced_motion_draws_no_math_or_screen_break(monkeypatch):
+    monkeypatch.setattr(M, "_field_math_state", lambda tt, rr: [
+        {"index": 0.0, "x": 0.0, "y": 0.0, "depth": 0.8, "size": 1.5,
+         "alpha": 0.9, "lift": 0.5, "hue": 0.5, "char": "\u03c0"}])
+    monkeypatch.setattr(M, "_field_screen_break", lambda tt, rr: [
+        {"index": 0.0, "x": 1.5 * R, "y": 0.0, "depth": 0.8, "size": 1.5,
+         "alpha": 0.9, "lift": 0.5, "hue": 0.5}])
+    c, stats = render(1.7, reduced=True)
+    # (Binary "1"/"0" fragments are a pre-existing still-frame layer; only the
+    # math glyphs and screen-break bodies must be absent.)
+    assert all(kw.get("text") in ("0", "1") for (_x, _y), kw in c.texts)
+    assert stats["ovals"] == len(M.PARTICLES) + M.NUCLEUS_OVAL_COUNT

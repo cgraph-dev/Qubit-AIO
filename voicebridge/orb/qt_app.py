@@ -133,6 +133,15 @@ TRAIL_MIN_HALF_PX = 0.34
 #: ribbon is one 8-bit step from appearing, which is exactly the hard pop the
 #: field's C1 envelopes exist to avoid.
 TRAIL_MIN_LEN_PX = 0.75
+#: Owner 2026-10-18: "the curved lines what are those? ... refine even more".
+#: The full field ``rgb_trail``/``dust_trail`` wake is a chain of samples
+#: following the body's ORBITAL velocity, so it curves along the orbit and,
+#: drawn at full length, read as an unexplained coloured curved line cutting
+#: across the mark. The RGB-trail IDEA stays — a short local motion blur behind
+#: a moving body — but only the brightest head samples are drawn, so a wake can
+#: never span the mark. This is a hard ceiling on the sample chain, applied to
+#: EVERY caller, so the field may keep publishing its full trail.
+TRAIL_DRAW_SAMPLES = 3
 #: Sparkles carry the short ``dust_trail``: four samples and a thinner ribbon,
 #: so 26 of them gain spectrum without turning the field into 26 comets.
 SPARKLE_TRAIL_HALF_WIDTH = 0.34
@@ -371,6 +380,27 @@ RING_ALPHA_SCALE = {
 BINARY_FONT_MIN_PX = 5
 BINARY_FONT_PX_PER_UNIT = 12.0
 BINARY_FONT_PX_OFFSET = 2.0
+#: Math-symbol fragments (owner: "add math symbols equations not random lines").
+#: Same dict contract as the "1"/"0" bits, drawn as TEXT with the pen set (a
+#: glyph uses the pen, never the brush). Sized a touch larger than a binary
+#: fragment so an equation reads as a distinct, legible element of the mark
+#: rather than as one more dot. Hue comes from the FIELD (``hue_to_rgb``), never
+#: from a renderer-side ramp, so the mark stays inside the field's palette.
+MATH_FONT_MIN_PX = 6
+MATH_FONT_PX_PER_UNIT = 14.0
+MATH_FONT_PX_OFFSET = 2.0
+#: How many math glyphs are considered per frame, so the text pass stays flat.
+MATH_DRAW_LIMIT = 40
+#: Saturation for a math glyph taken from the field's hue: full colour, but the
+#: anchor blend below still pulls it toward the state's core colour so text in a
+#: hue-shifting mark never reads as a foreign object.
+MATH_GLYPH_SAT = 0.92
+#: Screen-break bodies (owner likes elements that "break the screen"): bodies
+#: the field deliberately places BEYOND the orb's nominal radius. Drawn as
+#: glints so they read as real bodies leaving the mark; the painter never clips
+#: them to a circle, so they genuinely run off the widget edge.
+SCREEN_BREAK_DRAW_LIMIT = 12
+SCREEN_BREAK_SAT = 0.95
 #: Nucleus swirl: two counter-rotating hot lobes inside the body, so the centre
 #: has internal movement instead of a static gradient.
 NUCLEUS_SWIRL_RADIUS_FRAC = 0.22
@@ -1036,6 +1066,30 @@ def mark_binaries(t: Any, R: Any) -> List[Dict[str, Any]]:
         return []
 
 
+def mark_math_state(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """Math-symbol/equation fragments (shared field), gone under reduced motion.
+
+    Owner: "add math symbols equations not random lines". Same dict contract as
+    :func:`mark_binaries` — ``{index, x, y, depth, z, z2, size, alpha, lift,
+    hue, hue2, char, dof, skew}`` — drawn as TEXT. Read defensively through the
+    optional-layer seam so a field revision without ``math_state`` simply draws
+    no glyphs instead of blanking the orb. Never raises.
+    """
+    return _field_layer("math_state", t, R, reduced_empty=True)
+
+
+def mark_screen_break(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """Bodies deliberately reaching BEYOND the orb radius (shared field).
+
+    Owner likes the mark "breaking the screen", so the field declares a handful
+    of bodies whose projected position leaves the orb's nominal radius; the
+    painter draws them like any other body, and because nothing clips to a
+    circle they visibly exit the widget. Empty under reduced motion. Never
+    raises.
+    """
+    return _field_layer("screen_break", t, R, reduced_empty=True)
+
+
 def mark_inner_ring_tilt(t: Any) -> float:
     """Tilt of the fast inner core ring; frozen at its base under reduced.
 
@@ -1486,6 +1540,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         has swung toward or away from the viewer.
         """
         smps = [s for s in (samples or []) if isinstance(s, dict)]
+        # A wake is a SHORT local motion blur, never a curved line crossing the
+        # mark: only the head samples of the field's trail are drawn (owner
+        # 2026-10-18). The head rides the body, so the stub stays glued to it.
+        smps = smps[:TRAIL_DRAW_SAMPLES]
         if len(smps) < 2:
             return
         placed = []
@@ -1927,6 +1985,63 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.drawText(QPointF(gx, gy), str(bit.get("char") or "0"))
         p.restore()
 
+    def _math(sym: Dict[str, Any]) -> None:
+        """One math-symbol/equation fragment as a small glyph at its position.
+
+        Owner: "add math symbols equations not random lines". Same shape as
+        :func:`_binary` (placed and scaled through the tumble, depth-split far
+        behind / near in front of the nucleus, gone under reduced motion) but
+        coloured from the FIELD's own hue through ``hue_to_rgb`` so the glyphs
+        stay inside the palette instead of introducing a renderer ramp. A QFont
+        is set per glyph because a glyph is drawn with the PEN, not the brush.
+        """
+        d = _num(sym.get("depth"), 0.5)
+        gx, gy, g = _place(sym.get("x"), sym.get("y"), d,
+                           zseed=_num(sym.get("index"), None),
+                           zflat=True, z=sym.get("z"), z2=sym.get("z2"))
+        size = _num(sym.get("size"), 0.0)
+        alpha = _num(sym.get("alpha"), 0.0) * bright * g
+        if alpha <= ALPHA_EPS or size <= 0.0:
+            return
+        hue = sym.get("hue")
+        if hue is None:
+            rgb = _lift(_num(sym.get("lift"), 0.5))
+        else:
+            rgb = _anchor(_spec_rgb(hue, MATH_GLYPH_SAT))
+        p.save()
+        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
+                             _clamp8(255.0 * min(1.0, alpha)))))
+        p.setBrush(Qt.NoBrush)
+        font = QFont(p.font())
+        font.setPixelSize(max(MATH_FONT_MIN_PX,
+                              int(size * g * MATH_FONT_PX_PER_UNIT
+                                  + MATH_FONT_PX_OFFSET)))
+        p.setFont(font)
+        p.drawText(QPointF(gx, gy), str(sym.get("char") or "?"))
+        p.restore()
+
+    def _screen_break(body: Dict[str, Any]) -> None:
+        """One body the field placed BEYOND the orb radius.
+
+        Owner: "i like it how it tries to break the screen, do more of that".
+        Drawn as a glint (two pinprick arms plus a core) at its own field
+        position, through the same tumble as every other body. Nothing here
+        clips to the orb's circle, so a body the field pushes past ``R`` — or
+        even past the widget edge — is still painted; the overflow is the look.
+        """
+        depth = _num(body.get("depth"), 0.5)
+        hue = body.get("hue")
+        rgb = (_anchor(_spec_rgb(hue, SCREEN_BREAK_SAT))
+               if hue is not None
+               else _lift(_num(body.get("lift"), 0.5)))
+        # ``_glint`` places internally through ``_place`` (field coords in), so
+        # a body the field pushed past ``R`` is projected like any other.
+        _glint(_num(body.get("x"), 0.0), _num(body.get("y"), 0.0),
+               body.get("size"), body.get("alpha"), rgb,
+               skew_deg=body.get("skew"), depth=depth,
+               zseed=_num(body.get("index"), None), zflat=True,
+               z=body.get("z"), z2=body.get("z2"))
+
     def _blink(bl: Dict[str, Any]) -> None:
         """One blink dot: a pinprick that materialises out of nowhere.
 
@@ -2014,7 +2129,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         while the per-frame primitive cost stays flat.
         """
         n = max(1, int(buckets))
-        groups: List[List[Tuple[float, float, float, float]]] = [
+        groups: List[List[Tuple[float, float, float, float, float]]] = [
             [] for _ in range(n)]
         for b in items:
             if not isinstance(b, dict):
@@ -2024,15 +2139,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             px, py, size = _project_body(b)
             if alpha <= ALPHA_EPS or size <= 0.0:
                 continue
-            k = int(max(0.0, min(0.999, _num(b.get("hue"), 0.0))) * n) % n
-            groups[k].append((px, py, max(BLINK_DOT_MIN_PX, size), alpha))
+            hue = max(0.0, min(0.999, _num(b.get("hue"), 0.0)))
+            k = int(hue * n) % n
+            groups[k].append((px, py, max(BLINK_DOT_MIN_PX, size), alpha,
+                              hue))
         for k, pts in enumerate(groups):
             if not pts:
                 continue
-            rgb = _anchor(_spec_rgb((k + 0.5) / float(n), BLINK_DOT_SAT))
+            # The bucket's colour is a REAL hue the field emitted (its first
+            # member's), never a renderer-invented ``(k + 0.5) / n`` spread:
+            # the field owns the palette now, so the painter must not paint a
+            # hue the field never declared.
+            rgb = _anchor(_spec_rgb(pts[0][4], BLINK_DOT_SAT))
             if arm_frac > 0.0:
                 stroke = QPainterPath()
-                for px, py, size, _a in pts:
+                for px, py, size, _a, _h in pts:
                     arm = size * arm_frac
                     stroke.moveTo(px - arm, py - arm)
                     stroke.lineTo(px + arm, py + arm)
@@ -2041,16 +2162,16 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 p.setBrush(Qt.NoBrush)
                 p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
                                      _clamp8(255.0 * max(
-                                         a for _x, _y, _s, a in pts))),
+                                         a for _x, _y, _s, a, _h in pts))),
                               GLINT_PEN_W))
                 p.drawPath(stroke)
                 p.setPen(Qt.NoPen)
             path = QPainterPath()
-            for px, py, size, _a in pts:
+            for px, py, size, _a, _h in pts:
                 rr = size * (GLINT_CORE_SCALE if arm_frac > 0.0 else 1.0)
                 rr = max(GLINT_CORE_MIN, rr)
                 path.addEllipse(QRectF(px - rr, py - rr, rr * 2.0, rr * 2.0))
-            peak = max(a for _x, _y, _s, a in pts)
+            peak = max(a for _x, _y, _s, a, _h in pts)
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
             p.drawPath(path)
@@ -2059,7 +2180,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     def _cylinder_batch(items: Any, buckets: int) -> None:
         """The vertical column, batched; bodies dim toward the column ends."""
         n = max(1, int(buckets))
-        groups: List[List[Tuple[float, float, float, float]]] = [
+        groups: List[List[Tuple[float, float, float, float, float]]] = [
             [] for _ in range(n)]
         for b in items:
             if not isinstance(b, dict):
@@ -2071,17 +2192,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             px, py, size = _project_body(b)
             if alpha <= ALPHA_EPS or size <= 0.0:
                 continue
-            k = int(max(0.0, min(0.999, _num(b.get("hue"), 0.0))) * n) % n
-            groups[k].append((px, py, max(BLINK_DOT_MIN_PX, size), alpha))
+            hue = max(0.0, min(0.999, _num(b.get("hue"), 0.0)))
+            k = int(hue * n) % n
+            groups[k].append((px, py, max(BLINK_DOT_MIN_PX, size), alpha,
+                              hue))
         for k, pts in enumerate(groups):
             if not pts:
                 continue
-            rgb = _anchor(_spec_rgb((k + 0.5) / float(n), BLINK_DOT_SAT))
+            # A real field hue (its first member's), never a spread the field
+            # did not declare.
+            rgb = _anchor(_spec_rgb(pts[0][4], BLINK_DOT_SAT))
             path = QPainterPath()
-            for px, py, size, _a in pts:
+            for px, py, size, _a, _h in pts:
                 path.addEllipse(QRectF(px - size, py - size,
                                        size * 2.0, size * 2.0))
-            peak = max(a for _x, _y, _s, a in pts)
+            peak = max(a for _x, _y, _s, a, _h in pts)
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
             p.drawPath(path)
@@ -2155,6 +2280,17 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     binaries = mark_binaries(tt, Rf)
     far_binaries = [b for b in binaries if _num(b.get("depth"), 0.0) < 0.5]
     near_binaries = [b for b in binaries if _num(b.get("depth"), 0.0) >= 0.5]
+    # Math-symbol/equation fragments (owner: "add math symbols equations not
+    # random lines"): drawn as GLYPHS, floor-to-ceiling behind and in front of
+    # the nucleus exactly like the "1"/"0" bits. Empty when still.
+    maths = strided(mark_math_state(tt, Rf), MATH_DRAW_LIMIT)
+    far_maths = [m for m in maths if _num(m.get("depth"), 0.0) < 0.5]
+    near_maths = [m for m in maths if _num(m.get("depth"), 0.0) >= 0.5]
+    # Screen-break bodies: the field pushes a handful of bodies past the orb's
+    # radius. They are drawn, unclipped, so the mark "breaks the screen".
+    sbreaks = strided(mark_screen_break(tt, Rf), SCREEN_BREAK_DRAW_LIMIT)
+    far_sbreaks = [b for b in sbreaks if _num(b.get("depth"), 0.0) < 0.5]
+    near_sbreaks = [b for b in sbreaks if _num(b.get("depth"), 0.0) >= 0.5]
     blinks = mark_blink_dots(tt, Rf)
     far_blinks = [b for b in blinks if _num(b.get("depth"), 0.0) < 0.5]
     near_blinks = [b for b in blinks if _num(b.get("depth"), 0.0) >= 0.5]
@@ -2206,7 +2342,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                     bits: List[Dict[str, Any]], sparks_: List[Dict[str, Any]],
                     glints_: List[Dict[str, Any]],
                     traveller_: Optional[Dict[str, Any]],
-                    blinks_: List[Dict[str, Any]]) -> None:
+                    blinks_: List[Dict[str, Any]],
+                    maths_: List[Dict[str, Any]],
+                    breaks_: List[Dict[str, Any]]) -> None:
         """One half of the z-seam: its circles first, then the bodies in it."""
         _ring_pass(near)
         # The dense new layers, batched into a few spectral paths per half:
@@ -2243,6 +2381,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             _sparkle(glint, draw_trails)
         for bit in bits:
             _binary(bit)
+        for sym in maths_:
+            _math(sym)
+        for brk in breaks_:
+            _screen_break(brk)
         for bl in blinks_:
             _blink(bl)
         if traveller_ is not None:
@@ -2273,7 +2415,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 [g for g in glints if g["depth"] < 0.5],
                 traveller if (traveller is not None
                               and _num(traveller.get("depth"), 1.0) < 0.5)
-                else None, far_blinks)
+                else None, far_blinks, far_maths, far_sbreaks)
 
     # ---- the z-seam: shockwave, halo, nucleus ----------------------------
     beat = 0.0 if reduced else _field.heartbeat(tt)
@@ -2304,7 +2446,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 near_sparks, [g for g in glints if g["depth"] >= 0.5],
                 traveller if (traveller is not None
                               and _num(traveller.get("depth"), 0.0) >= 0.5)
-                else None, near_blinks)
+                else None, near_blinks, near_maths, near_sbreaks)
     p.restore()
 
 
