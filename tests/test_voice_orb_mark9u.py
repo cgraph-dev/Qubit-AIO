@@ -821,6 +821,24 @@ def test_rgb_trail_is_a_duotone_pair_lerp_that_drifts_with_the_clock():
         F.HUE_PAIR_OFFSET)
 
 
+def test_rgb_trail_head_is_a_neutral_highlight_tail_keeps_colour():
+    # Owner: restrained, professional. The leading edge of every streak is
+    # pulled toward white (low saturation) and the tail recovers colour, so a
+    # body reads as a specular highlight with a coloured wake rather than a
+    # saturated blob.
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    part = F.particle_state(t, R)[0]
+    samples = F.rgb_trail(t, R, part)
+    assert F.RGB_TRAIL_WHITE_FRAC > 0.0
+    assert samples[0]["sat"] < samples[-1]["sat"], samples
+    assert samples[0]["sat"] <= 1.0 and samples[-1]["sat"] <= 1.0
+    # The tail keeps the body's colour family, never a white wash.
+    assert samples[-1]["sat"] > 0.3
+    # Still deterministic and junk-safe.
+    assert samples == F.rgb_trail(t, R, F.particle_state(t, R)[0])
+
+
 def test_rgb_trail_tapers_fades_and_follows_the_orbit_path():
     from voicebridge.orb import mark_field as F
     R, t = 64.0, 4.2
@@ -1377,6 +1395,10 @@ def test_ring_set_moves_as_one_rigid_body():
         spins = {round(F.ring_tilt_spin(t, r), 12) for r in rings}
         assert len(scales) == 1, (t, scales)
         assert len(spins) == 1, (t, spins)
+        # The rigid offset reaches the geometry entries too, so a renderer that
+        # reads ``tilt_spin_deg`` straight off an entry moves with the set.
+        assert {round(r["tilt_spin_deg"], 12) for r in rings} == {*spins}, t
+        assert {r["precess_period_s"] for r in rings} == {F.RING_MOTION_PERIOD_S}
     # Bounded, and always positive (a ring never inverts or vanishes).
     for t in (0.0, 2.0, 9.0, 20.0):
         ring = F.ring_geometry(t)[0]
@@ -1388,6 +1410,19 @@ def test_ring_set_moves_as_one_rigid_body():
         assert ring["precess_period_s"] == pytest.approx(
             F.ring_precess_period(ring))
 
+    # Proportionality is the rigidity property that must never regress: the
+    # RATIO of any two rings' effective radii is identical at every clock, so
+    # the set scales as ONE body and no circle can drift out of proportion. The
+    # per-ring ``shimmer`` is deliberately sub-percent and does NOT enter here.
+    def _ratios(t):
+        rings = F.ring_geometry(t)
+        eff = [r["rx_frac"] * F.ring_radius_scale(t, r) for r in rings]
+        return [e / eff[0] for e in eff]
+
+    base_ratios = _ratios(0.0)
+    for t in (3.3, 12.1, 40.0):
+        assert _ratios(t) == pytest.approx(base_ratios), t
+
     # Continuous: the shared motion never jumps between adjacent frames.
     prev = F.ring_tilt_spin(0.0)
     for k in range(1, 241):
@@ -1395,14 +1430,23 @@ def test_ring_set_moves_as_one_rigid_body():
         assert abs(val - prev) < 1.0
         prev = val
 
-    # One shared period, non-harmonic with the ring turns and the spins, so
-    # the set breathes fluidly instead of pulsing in lock-step with a spin.
+    # New contract (owner 2026-10-19 "refine circles animation more"): the
+    # rigid set is no longer one bare sine but a SUM of three weighted sines on
+    # a non-harmonic period FAMILY — fluid, but still ONE shared offset. The
+    # family must be non-harmonic against itself, the ring turns (9.5/13.5) and
+    # the whole-mark spins (20.5/27), or the set could pulse in lock-step with a
+    # spin. Rigidity (above) is unchanged and is the property under test.
     periods = list(F.RING_MOTION_PERIODS_S)
-    assert periods == [F.RING_MOTION_PERIOD_S]
+    assert periods == [F.RING_MOTION_PERIOD_S, F.RING_MOTION_PERIOD_2_S,
+                       F.RING_MOTION_PERIOD_3_S]
+    assert len(set(periods)) == len(periods)
+    assert len(periods) == len(F.RING_PRECESS_WEIGHTS)
     fixed = ([F.RING_PERIOD_NEAR, F.RING_PERIOD_FAR, F.Y_SPIN_PERIOD_S,
               F.X_SPIN_PERIOD_S, F.INNER_RING_PERIOD_S]
              + [sh[2] for sh in F.SATELLITE_SHELLS])
-    for a in periods:
+    for i, a in enumerate(periods):
+        for b in periods[i + 1:]:
+            assert not _harmonically_locked(a, b), (a, b)
         for b in fixed:
             assert not _harmonically_locked(a, b), (a, b)
 
@@ -1626,6 +1670,13 @@ def test_palette_is_disciplined_to_a_few_hues():
     from voicebridge.orb import mark_field as F
     assert 2 <= len(F.PALETTE_HUES) <= 3
     assert len(set(F.PALETTE_HUES)) == len(F.PALETTE_HUES)
+    # Owner follow-up: "more professional". The two hues must be ADJACENT
+    # (one narrow colour family), not spread across the wheel, and the streak
+    # saturation must be restrained rather than neon.
+    spread = max(F.PALETTE_HUES) - min(F.PALETTE_HUES)
+    assert spread <= 0.12, spread
+    assert F.RGB_TRAIL_SAT_BASE <= 0.75
+    assert 0.0 < F.RGB_TRAIL_WHITE_FRAC <= 1.0
     # Across every layer's salt and hundreds of indices, the set of body hues
     # is exactly the palette — never a continuum, never more than 3.
     hues = set()
@@ -1644,71 +1695,78 @@ def test_palette_is_disciplined_to_a_few_hues():
 
 
 # --------------------------------------------------------------------------- #
-# MATH GLYPHS — owner: "add math symbols equations not random lines". A field
-# of math glyphs orbiting the middle, the SAME dict shape as binary_state.
+# VOLUME PARTICLES — owner: "replace the checkmark / v lines ... with real
+# particles that are like 3d and have animations". The retired math-glyph TEXT
+# layer became this: bodies on their own inclined orbits, no ``char`` at all.
 # --------------------------------------------------------------------------- #
-def test_math_state_is_deterministic_math_glyphs_orbiting_the_middle():
+def test_volume_particles_are_animated_3d_bodies_not_text():
     from voicebridge.orb import mark_field as F
     R, t = 64.0, 2.1
-    a = F.math_state(t, R)
-    assert a == F.math_state(t, R)  # deterministic
-    assert len(a) == F.MATH_COUNT
-    assert len(F.MATH_SYMBOLS) >= 20
+    a = F.volume_particles(t, R)
+    assert a == F.volume_particles(t, R)  # deterministic
+    assert len(a) == F.VOLUME_COUNT
 
-    allowed = set(F.MATH_SYMBOLS) | set(F.MATH_EQUATIONS)
-    r_max = (F.MATH_R_FRAC_MIN + F.MATH_R_FRAC_SPAN) * R
+    r_max = (F.VOLUME_R_FRAC_MIN + F.VOLUME_R_FRAC_SPAN) * R
     dx, dy = F.camera_offset(t, R)
-    saw_symbol = saw_equation = False
     for d in a:
-        assert set(d) >= {"index", "x", "y", "depth", "z", "z2", "size",
-                          "alpha", "lift", "hue", "hue2", "char", "dof",
-                          "skew"}, d
+        assert set(d) >= {"index", "x", "y", "depth", "z", "z2", "vx", "vy",
+                          "size", "alpha", "lift", "hue", "hue2", "dof",
+                          "skew", "r", "inc", "pulse", "spin"}, d
+        # A real particle, never a text glyph.
+        assert "char" not in d, d
         assert 0.0 <= d["depth"] <= 1.0
         assert 0.0 <= d["z"] <= 1.0 and 0.0 <= d["z2"] <= 1.0
+        assert 0.0 <= d["pulse"] <= 1.0
+        assert 0.0 <= d["spin"] < 360.0
         assert 0.0 <= d["hue"] < 1.0
         assert d["hue2"] == pytest.approx((d["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
-        # Every char is a math symbol or a short equation — NEVER a binary
-        # digit nor arbitrary text.
-        assert d["char"] in allowed, d["char"]
-        assert d["char"] not in ("0", "1")
-        assert d["char"] != ""
-        saw_symbol = saw_symbol or d["char"] in set(F.MATH_SYMBOLS)
-        saw_equation = saw_equation or d["char"] in set(F.MATH_EQUATIONS)
-        # Positions are bounded around the middle at its declared radius.
+        # Positions bounded around the middle at the declared radius; every
+        # body carries a screen velocity so a renderer can streak it.
         assert math.hypot(d["x"] - dx, d["y"] - dy) <= r_max + 1e-6, d
-    assert saw_symbol and saw_equation, "both families must appear"
+        assert math.isfinite(d["vx"]) and math.isfinite(d["vy"])
 
-    # Each glyph ORBITS the middle: over a revolution its depth crosses both
-    # sides of the core (in front of and behind it), not one flat plane.
-    span = F.MATH_PERIOD_BASE + F.MATH_PERIOD_SPAN
+    # Depth drives size and alpha: the near bodies are larger and more opaque
+    # than the far ones (the volume cue, not a flat scatter).
+    near = max(a, key=lambda d: d["depth"])
+    far = min(a, key=lambda d: d["depth"])
+    assert near["size"] > far["size"]
+    assert near["alpha"] > far["alpha"]
+
+    # Each body ORBITS the middle: over a revolution its depth crosses both
+    # sides of the core (in front of and behind it).
+    span = F.VOLUME_PERIOD_BASE + F.VOLUME_PERIOD_SPAN
     for i in range(len(a)):
-        deps = [F.math_state(span * k / 72.0, R)[i]["depth"]
+        deps = [F.volume_particles(span * k / 72.0, R)[i]["depth"]
                 for k in range(72)]
         assert min(deps) < 0.35 and max(deps) > 0.65, (i, min(deps), max(deps))
-    # Depth spread across the set fills the volume.
     deps = [d["depth"] for d in a]
     assert min(deps) < 0.2 and max(deps) > 0.8
 
-    # Continuous: no glyph jumps between adjacent frames.
+    # The per-body animations actually move across the clock.
+    assert F.volume_particles(t + 0.37, R)[0]["pulse"] != pytest.approx(
+        a[0]["pulse"])
+    assert F.volume_particles(t + 0.37, R)[0]["spin"] != pytest.approx(
+        a[0]["spin"])
+
+    # Continuous: no body jumps between adjacent frames.
     prev = [(d["x"], d["y"]) for d in a]
     for k in range(1, 120):
-        cur = [(d["x"], d["y"]) for d in F.math_state(t + k / 60.0, R)]
+        cur = [(d["x"], d["y"]) for d in F.volume_particles(t + k / 60.0, R)]
         for (x, y), (px, py) in zip(cur, prev):
             assert math.hypot(x - px, y - py) < 3.0, k
         prev = cur
 
 
-def test_math_state_equations_are_rarer_and_larger():
+def test_math_state_is_retired_and_never_raises():
+    # The math-glyph text layer is retired: the name stays importable (so an
+    # older renderer degrades cleanly) but emits nothing, and the MATH_*
+    # constants are gone so no code can build a v-shaped checkmark again.
     from voicebridge.orb import mark_field as F
-    R, t = 64.0, 2.1
-    glyphs = F.math_state(t, R)
-    eq = [d for d in glyphs if d["char"] in set(F.MATH_EQUATIONS)]
-    sym = [d for d in glyphs if d["char"] in set(F.MATH_SYMBOLS)]
-    assert eq and sym
-    # The equation family is the rarer one...
-    assert len(eq) <= len(glyphs) // 4
-    # ...and every equation is drawn larger than the symbol baseline.
-    assert min(d["size"] for d in eq) > F.MATH_SIZE_BASE
+    assert F.math_state(1.0, 64.0) == []
+    assert F.math_state("bad", None) == []
+    for gone in ("MATH_SYMBOLS", "MATH_EQUATIONS", "MATH_COUNT",
+                 "MATH_EQUATION_EVERY", "MATH_SIZE_BASE"):
+        assert not hasattr(F, gone), gone
 
 
 # --------------------------------------------------------------------------- #
@@ -1720,7 +1778,10 @@ def test_screen_break_reaches_beyond_the_mark_radius():
     a = F.screen_break(t, R)
     assert a == F.screen_break(t, R)  # deterministic
     assert len(a) == F.SCREEN_BREAK_COUNT
-    assert F.SCREEN_BREAK_FRAC > 1.0
+    assert F.SCREEN_BREAK_COUNT >= 8, "the break set stays a real set"
+    # Task 6 "do more of that": the reach must cross the WIDGET edge, not just
+    # the mark radius. A 2R-wide frame's edge sits ~1.14 R from the centre.
+    assert F.SCREEN_BREAK_FRAC >= 1.30
     # The declared ceiling and the reachable radius cannot drift apart.
     r_max = (F.SCREEN_BREAK_R_FRAC_MIN + F.SCREEN_BREAK_R_FRAC_SPAN) * R
     assert r_max == pytest.approx(F.SCREEN_BREAK_FRAC * R)
@@ -1741,6 +1802,9 @@ def test_screen_break_reaches_beyond_the_mark_radius():
         for p in F.screen_break(k / 30.0, R):
             best = max(best, math.hypot(p["x"], p["y"]))
     assert best > R, f"screen_break never exits the widget (reach={best:.1f}px)"
+    assert best > R * 1.2, (
+        f"screen_break grazes the mark but never crosses the widget edge "
+        f"(reach={best:.1f}px)")
     assert best <= F.SCREEN_BREAK_FRAC * R * 1.05
     # Continuous: no body teleports between adjacent frames.
     prev = [(p["x"], p["y"]) for p in a]
@@ -1751,20 +1815,134 @@ def test_screen_break_reaches_beyond_the_mark_radius():
         prev = cur
 
 
-def test_math_and_screen_break_layers_are_exported():
+def test_volume_and_screen_break_layers_are_exported():
     from voicebridge.orb import mark_field as F
-    for name in ("math_state", "MATH_SYMBOLS", "MATH_EQUATIONS", "MATH_COUNT",
-                 "MATH_EQUATION_EVERY", "MATH_EQUATION_SCALE",
-                 "MATH_SIZE_BASE", "MATH_SIZE_SPAN", "MATH_PERIOD_BASE",
-                 "MATH_PERIOD_SPAN", "MATH_R_FRAC_MIN", "MATH_R_FRAC_SPAN",
-                 "MATH_INC_MIN_DEG", "MATH_INC_SPAN_DEG", "MATH_ALPHA_BASE",
-                 "MATH_ALPHA_GAIN", "MATH_LIFT_BASE", "MATH_LIFT_GAIN",
+    for name in ("volume_particles", "VOLUME_COUNT", "VOLUME_R_FRAC_MIN",
+                 "VOLUME_R_FRAC_SPAN", "VOLUME_PERIOD_BASE",
+                 "VOLUME_PERIOD_SPAN", "VOLUME_INC_MIN_DEG",
+                 "VOLUME_INC_SPAN_DEG", "VOLUME_SIZE_BASE", "VOLUME_SIZE_SPAN",
+                 "VOLUME_ALPHA_BASE", "VOLUME_ALPHA_GAIN", "VOLUME_LIFT_BASE",
+                 "VOLUME_LIFT_GAIN", "VOLUME_PULSE_PERIOD_BASE",
+                 "VOLUME_PULSE_PERIOD_SPAN", "VOLUME_SPIN_PERIOD_BASE",
+                 "VOLUME_SPIN_PERIOD_SPAN", "math_state",
                  "screen_break", "SCREEN_BREAK_COUNT", "SCREEN_BREAK_FRAC",
                  "SCREEN_BREAK_R_FRAC_MIN", "SCREEN_BREAK_R_FRAC_SPAN",
                  "SCREEN_BREAK_PERIOD_BASE", "SCREEN_BREAK_PERIOD_SPAN",
                  "SCREEN_BREAK_INC_MIN_DEG", "SCREEN_BREAK_INC_SPAN_DEG",
                  "SCREEN_BREAK_SIZE_BASE", "SCREEN_BREAK_ALPHA_BASE",
                  "SCREEN_BREAK_LIFT_BASE", "SCREEN_BREAK_LIFT_GAIN",
-                 "PALETTE_HUES", "palette_hue"):
+                 "PALETTE_HUES", "palette_hue",
+                 "accretion_stream", "ACCRETION_COUNT", "ACCRETION_R_OUT_FRAC",
+                 "ACCRETION_R_IN_FRAC", "ACCRETION_PERIOD_BASE",
+                 "ACCRETION_PERIOD_SPAN", "ACCRETION_SPIRAL_TURNS",
+                 "photon_ring", "PHOTON_SAMPLES", "PHOTON_LOBES",
+                 "infall_streaks", "INFALL_COUNT", "INFALL_TAIL_LEN_FRAC",
+                 "ring_intensity", "ring_shimmer", "RING_INTENSITY_MIN",
+                 "RING_STREAMERS_BASE",
+                 "RING_MOTION_PERIOD_2_S", "RING_MOTION_PERIOD_3_S",
+                 "RING_PRECESS_WEIGHTS", "RING_RADIUS_WEIGHTS"):
         assert name in F.__all__, name
         assert hasattr(F, name), name
+
+
+def test_ring_detail_gives_each_circle_blackhole_texture():
+    # Owner 2026-10-19: "the spirals or circles make them look like blackholes
+    # add more details and animations". Every declared circle carries its own
+    # deterministic intensity/shimmer/streamer detail, WITHOUT disturbing the
+    # rigid proportionality of the set (shimmer is sub-percent by design).
+    rings = F.ring_geometry(3.1)
+    assert len(rings) >= 6
+    intensities = []
+    for r in rings:
+        assert set(r) >= {"intensity_period_s", "shimmer_period_s",
+                          "intensity", "shimmer", "streamers"}, r["id"]
+        assert r["intensity_period_s"] > 0.0 and r["shimmer_period_s"] > 0.0
+        assert F.RING_INTENSITY_MIN - 1e-9 <= r["intensity"] <= \
+            F.RING_INTENSITY_MIN + F.RING_INTENSITY_SPAN + 1e-9
+        assert 1.0 - F.RING_SHIMMER_SPAN <= r["shimmer"] <= \
+            1.0 + F.RING_SHIMMER_SPAN
+        assert F.RING_STREAMERS_BASE <= r["streamers"] <= \
+            F.RING_STREAMERS_BASE + F.RING_STREAMERS_SPAN
+        assert r["intensity"] == pytest.approx(F.ring_intensity(3.1, r))
+        assert r["shimmer"] == pytest.approx(F.ring_shimmer(3.1, r))
+        intensities.append(round(r["intensity"], 9))
+    # Not one dead uniform outline: the rings sit at different brightnesses.
+    assert len(set(intensities)) > 1
+    assert F.ring_geometry(3.1) == rings  # deterministic
+    # The per-ring shimmer only ever bends the shared radius scale by its span.
+    for t in (0.0, 5.5, 17.3):
+        rr = F.ring_geometry(t)
+        shimmers = [F.ring_shimmer(t, r) for r in rr]
+        assert max(shimmers) - min(shimmers) <= F.RING_SHIMMER_SPAN + 1e-9
+
+
+def test_accretion_photon_and_infall_are_blackhole_structure():
+    R, t = 64.0, 2.7
+    # Accretion stream: matter winding in and out on a continuous spiral.
+    acc = F.accretion_stream(t, R)
+    assert acc == F.accretion_stream(t, R)
+    assert len(acc) == F.ACCRETION_COUNT
+    r_lo = R * F.ACCRETION_R_IN_FRAC * 0.85
+    r_hi = R * F.ACCRETION_R_OUT_FRAC * 1.08
+    for s in acc:
+        assert set(s) >= {"index", "x", "y", "depth", "z", "z2", "vx", "vy",
+                          "size", "alpha", "lift", "hue", "hue2", "dof",
+                          "skew", "s", "r", "ring_id"}, s
+        assert 0.0 <= s["depth"] <= 1.0
+        assert 0.0 <= s["z"] <= 1.0 and 0.0 <= s["z2"] <= 1.0
+        assert -0.05 <= s["s"] <= 1.05
+        assert r_lo - 1e-6 <= s["r"] <= r_hi + 1e-6
+    ss = [s["s"] for s in acc]
+    assert max(ss) - min(ss) > 0.4, "the stream is not winding inward"
+    prev = [(s["x"], s["y"]) for s in acc]
+    for k in range(1, 90):
+        cur = [(s["x"], s["y"]) for s in F.accretion_stream(t + k / 60.0, R)]
+        for (x, y), (px, py) in zip(cur, prev):
+            assert math.hypot(x - px, y - py) < 4.0, k
+        prev = cur
+
+    # Photon ring: a thin lensed ring with a couple of bright arcs.
+    ph = F.photon_ring(t, R)
+    assert ph == F.photon_ring(t, R)
+    assert len(ph) == F.PHOTON_SAMPLES
+    for p in ph:
+        assert set(p) >= {"index", "x", "y", "depth", "z", "z2", "size",
+                          "alpha", "lift", "hue", "hue2", "dof", "skew",
+                          "angle"}, p
+        assert 0.0 <= p["depth"] <= 1.0
+    alphas = [p["alpha"] for p in ph]
+    assert max(alphas) > F.PHOTON_ALPHA_BASE + 0.5 * F.PHOTON_ALPHA_PEAK
+    assert min(alphas) < max(alphas) * 0.6, "photon ring is a uniform circle"
+
+    # Infall streaks: inward velocity and a real tail.
+    inf = F.infall_streaks(t, R)
+    assert inf == F.infall_streaks(t, R)
+    assert len(inf) == F.INFALL_COUNT
+    for q in inf:
+        assert set(q) >= {"index", "x", "y", "depth", "z", "z2", "vx", "vy",
+                          "size", "alpha", "lift", "hue", "hue2", "dof",
+                          "skew", "r", "tail_len", "s"}, q
+        assert math.isfinite(q["vx"]) and math.isfinite(q["vy"])
+        assert q["tail_len"] > 0.0 and 0.0 <= q["depth"] <= 1.0
+
+    # Junk-safe: a bad clock / radius never raises; a list always comes back.
+    for fn in (F.accretion_stream, F.photon_ring, F.infall_streaks):
+        assert isinstance(fn("bad", None), list)
+
+
+def test_depth_ladder_was_widened_for_volume():
+    # Task 6: the depth ladder is deliberately stronger so the mark reads as a
+    # volume, not a sheet. All of it is scalar gain the renderers multiply, so
+    # the enhancement is additive.
+    assert F.DEPTH_POPOUT >= 0.90
+    assert F.DEPTH_PERSPECTIVE >= 0.25
+    assert F.DEPTH_PARALLAX >= 0.25
+    assert F.SKEW_GAIN_DEG >= 8.0
+    # Near bodies are several times larger than far ones (real pop-out).
+    assert F._depth_size(1.0, 1.0) / F._depth_size(0.0, 1.0) > 3.0
+    # Lift rises monotonically with depth: the front of the volume is hotter.
+    assert F._depth_lift(1.0) > F._depth_lift(0.5) > F._depth_lift(0.0)
+    # The shear is signed and vanishes at the plane's rim.
+    assert F.skew(0.0) == pytest.approx(F.SKEW_GAIN_DEG)
+    assert F.skew(0.5) == pytest.approx(0.0, abs=1e-9)
+    assert F.skew(1.0) == pytest.approx(-F.SKEW_GAIN_DEG)

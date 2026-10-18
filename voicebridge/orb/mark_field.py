@@ -27,12 +27,33 @@ Layers, back to front:
   * ``core_shells``     — the nucleus's INTERIOR structure: nested bodies at
     different radii and tilts, each turning at its own period.
   * ``filament_state``  — a travelling standing wave running around a ring.
+  * ``binary_state``    — deterministic "1"/"0" data fragments (text characters,
+    split by depth; the retired ``math_state`` never returns one).
+  * ``inner_ring_tilt`` — the third, interior core orbit.
+  * ``ring_particles``  — bodies riding EVERY :func:`ring_geometry` circle.
+  * ``cylinder_particles`` — a vertical column around the nucleus (volume cue).
+  * ``orbiter_particles`` — bodies on their OWN inclined orbits around the core.
+  * ``volume_particles`` — a real 3D particle field of bodies on their own
+    inclined orbits, each with a per-body twinkle (``pulse``) and rotation
+    (``spin``) animation. It REPLACES the retired math-glyph text layer
+    (``math_state``, now a no-op) — no ``char`` anywhere.
+  * ``accretion_stream`` — matter winding around the nucleus on a continuous
+    spiral, moving in and out (the black-hole accretion read).
+  * ``photon_ring``     — the thin, bright lensed arcs hugging the core.
+  * ``infall_streaks``  — fast radial streaks with an inward velocity + tail.
+  * ``screen_break``    — fast bodies on wide orbits that reach BEYOND R (and
+    past the widget edge): the deliberate overflow the owner asked for.
 
 Depth convention: ``depth = 0.5 + 0.5*cos(radians(angle))`` on a particle's
 orbit — 1.0 is nearest the viewer. Renderers draw every ``depth < 0.5`` element
 BEHIND the nucleus and every ``depth >= 0.5`` element IN FRONT; that z-split is
 what makes the flat mark read as three-dimensional. ``depth`` is unchanged and
 remains the shading / z-split scalar every existing contract reads.
+
+Owner 2026-10-19 (task 6): the whole ``DEPTH_*`` ladder was WIDENED (stronger
+perspective, a bigger near-body pop-out, more parallax, more skew and lift) so
+the volume reads deeper front to back. All of it is scalar gain the renderers
+already multiply; no key changed shape and nothing needs to be learned.
 
 Volume convention (ADDITIVE): every element dict also carries ``z`` and ``z2``,
 two INDEPENDENT deterministic depth axes in 0..1 built by :func:`depth_axes`
@@ -71,26 +92,41 @@ HALO_BASE = 0.22
 HALO_WIDTH = 1.0
 
 # --------------------------------------------------------------- 3D depth
+#: Owner 2026-10-19 (task 6): "enhance 3d animation overall and how it tries to
+#: break the screen". The depth ladder was deliberately WIDENED so the mark
+#: reads as a volume rather than a shallow sheet: near bodies are pushed
+#: strongly OUT of the screen, far bodies contract hard toward the centre, and
+#: the plane-skew grows with it. Every gain is a pure scalar the renderers
+#: already multiply (size, alpha, lift, position, arm shear), so the enhancement
+#: is ADDITIVE — no key changed shape, nothing new for a renderer to learn.
 DEPTH_RADIUS_BASE = 0.42
 DEPTH_RADIUS_GAIN = 1.05
 DEPTH_ALPHA_BASE = 0.10
 DEPTH_ALPHA_GAIN = 1.00
 DEPTH_LIFT_BASE = 0.04
-DEPTH_LIFT_GAIN = 0.42
-DEPTH_PARALLAX = 0.20
-#: Far points contract slightly toward the centre: a cheap perspective cue.
-DEPTH_PERSPECTIVE = 0.20
+#: Near bodies lift further toward white, so the front of the volume reads hot
+#: and the back stays cool — a stronger front/back light separation.
+DEPTH_LIFT_GAIN = 0.50
+#: Parallax along the orbit normal: the nearest logo particles sit visibly
+#: off-plane from the farthest, which is the strongest single "this is 3D"
+#: cue on the nine bodies (raised 0.20 -> 0.30 for the task-6 push).
+DEPTH_PARALLAX = 0.30
+#: Far points contract toward the centre: a cheap perspective cue, raised so
+#: the ellipses read as receding into the screen instead of flat on the glass.
+DEPTH_PERSPECTIVE = 0.30
 #: Elements nearest the viewer grow past their plane's size so the field reads
 #: as coming OUT of the screen (and the nearest can cross the orbit envelope).
-DEPTH_POPOUT = 0.70
+#: Raised 0.70 -> 0.95: the pop-out is the depth cue the owner asked to amplify.
+DEPTH_POPOUT = 0.95
 #: Depth of field: ``dof()`` maps a particle's depth to an out-of-focus amount.
 DOF_NEAR = 0.0
 DOF_FAR = 1.0
 DOF_GAMMA = 1.7
 #: Per-depth shear (degrees) a renderer may rotate a body by. A point on a
 #: tilted plane is foreshortened along one axis; a few degrees of skew is what
-#: stops a glint from reading as a flat sticker pasted on the orbit.
-SKEW_GAIN_DEG = 7.0
+#: stops a glint from reading as a flat sticker pasted on the orbit. Raised
+#: 7 -> 9 with the rest of the ladder so a body's lean tracks its depth harder.
+SKEW_GAIN_DEG = 9.0
 
 # --------------------------------------------------------- volume axes (z/z2)
 #: ADDITIVE volume axes. ``depth`` (above) is a flat function of an element's
@@ -303,24 +339,40 @@ RGB_TRAIL_HUE_DRIFT = 0.018
 #: sweep straight through the whole wheel — cyan -> green -> yellow -> red — so
 #: every streak was a full rainbow and the mark read "too coloured" (owner
 #: 2026-10-18). A small offset keeps the streak two neighbouring tints of ONE
-#: colour family, so the mark stays 2-3 colours total.
-HUE_PAIR_OFFSET = 0.07
-RGB_TRAIL_SAT_BASE = 0.90
-RGB_TRAIL_SAT_SPAN = 0.10
+#: colour family, so the mark stays a couple of colours total. Owner follow-up
+#: ("more professional"): the offset is tightened again so even the two-tone
+#: walk stays inside one hue family rather than crossing into a neighbour.
+HUE_PAIR_OFFSET = 0.045
+#: Saturation of a streak. Lowered from the neon 0.90 the owner called "too
+#: colored": most bodies now sit in the 0.62..0.82 band, a restrained, matte
+#: look rather than a saturated glow. The HEAD of every streak is pulled
+#: further toward white (see ``RGB_TRAIL_WHITE_FRAC``) so each body carries a
+#: neutral highlight and only its tail keeps colour — the "professional"
+#: highlight/lowlight split rather than a coloured blob.
+RGB_TRAIL_SAT_BASE = 0.62
+RGB_TRAIL_SAT_SPAN = 0.20
+#: How far toward white (zero saturation) the HEAD of a streak is pulled;
+#: 0.0 = fully coloured head, 1.0 = white head. Falls off along the tail, so
+#: only the leading edge reads as a neutral specular highlight.
+RGB_TRAIL_WHITE_FRAC = 0.55
 RGB_TRAIL_VAL_BASE = 1.00
 #: Body hues live in a band around the mark's own cyan/violet so a field of
 #: them still reads as ONE mark; the trail then walks the wheel away from it.
+#: Kept for API compatibility; body hues now come from :data:`PALETTE_HUES`
+#: through :func:`palette_hue`, not from this band.
 PARTICLE_HUE_BASE = 0.52
 PARTICLE_HUE_SPAN = 0.34
 
 #: Owner: the mark is "still too colored". Every body used to draw its own
 #: wheel position across ``PARTICLE_HUE_BASE..+SPAN`` (0.52 -> 0.86, i.e. six-
 #: plus distinct colours). ``PALETTE_HUES`` collapses that spray to a small,
-#: fixed set — the mark's own cyan with two adjacent neighbours — and
-#: :func:`palette_hue` is the ONE place a body hue is chosen, so the whole
-#: field carries at most ``len(PALETTE_HUES)`` colours. The duotone partner
-#: still comes from :func:`_hue_pair` (+0.5 turn), so streaks stay two-colour.
-PALETTE_HUES: Tuple[float, ...] = (0.52, 0.61, 0.70)
+#: fixed set — now just TWO adjacent cool hues, the mark's own cyan and the
+#: azure next to it — and :func:`palette_hue` is the ONE place a body hue is
+#: chosen, so the whole field carries at most two colours. The duotone partner
+#: still comes from :func:`_hue_pair` (a small nearby offset), so streaks stay
+#: two-colour. The breadth moved OUT of the hue axis and INTO value/warmth:
+#: the neutral white heads carry the highlights the extra hues used to.
+PALETTE_HUES: Tuple[float, ...] = (0.54, 0.60)
 
 #: The short version for the dense field (dust and glints): fewer samples,
 #: dimmer and shorter, so 30 motes do not turn into 30 comets.
@@ -485,7 +537,8 @@ def _rgb_trail(t: Any, R: float, body: Dict[str, Any], samples: int,
             "hue": (head + (k / float(n - 1) if n > 1 else 0.0)
                     * HUE_PAIR_OFFSET) % 1.0,
             "hue2": tail,
-            "sat": sat,
+            "sat": max(0.0, min(1.0,
+                               sat * (1.0 - RGB_TRAIL_WHITE_FRAC * (1.0 - f)))),
             "val": RGB_TRAIL_VAL_BASE * (1.0 - 0.25 * f),
             "alpha": alpha_base * strength * ((1.0 - f) ** RGB_TRAIL_FALLOFF),
             "size": size * size_base * (1.0 - RGB_TRAIL_TAPER * f),
@@ -1280,112 +1333,145 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
     return out
 
 
-# -------------------------------------------------------------- math glyphs
-#: Owner: "add math symbols equations not random lines". A field of mathematical
-#: glyphs drifting around the nucleus. It is the MATH sibling of
-#: :func:`binary_state` — the SAME dict shape, so a renderer draws it with the
-#: same text machinery — but instead of fragments riding the flat declared rings
-#: each glyph orbits the MIDDLE on its own inclined plane, so the symbols form a
-#: genuine volume around the core rather than a decal on the circles.
-MATH_SYMBOLS: Tuple[str, ...] = (
-    "∑", "∫", "π", "√", "∞", "∂", "Δ", "θ", "λ", "μ", "±", "≈",
-    "≠", "≤", "≥", "×", "÷", "∇", "φ", "ψ", "Ω", "Γ", "Σ", "Π",
-)
-#: A rarer, larger family: every ``MATH_EQUATION_EVERY``-th glyph is a short
-#: equation instead of a single symbol, so the field reads as real mathematics
-#: rather than a scatter of isolated marks.
-MATH_EQUATIONS: Tuple[str, ...] = (
-    "e=mc²", "E=hf", "∇·B=0", "∫dx", "U=IR", "Σn²", "λ=hc/E",
-)
-MATH_COUNT = 40
-MATH_EQUATION_EVERY = 10
-MATH_EQUATION_SCALE = 1.7
-MATH_SIZE_BASE = 0.085
-MATH_SIZE_SPAN = 0.06
-MATH_PERIOD_BASE = 6.2
-MATH_PERIOD_SPAN = 11.5
-MATH_R_FRAC_MIN = 0.16
-MATH_R_FRAC_SPAN = 0.62
-#: Inclinations 18..162 deg: ``|sin|`` stays >= 0.31 across the whole range, so
-#: even the flattest glyph's depth sweeps ~0.35..0.65 across a revolution — it
-#: genuinely circles the middle (in front of and behind the core) instead of
-#: sliding on one plane. (Past 162 deg ``|sin|`` collapses and the glyph would
-#: read as in-plane again, so the span stops there.)
-MATH_INC_MIN_DEG = 18.0
-MATH_INC_SPAN_DEG = 144.0
-MATH_ALPHA_BASE = 0.24
-MATH_ALPHA_GAIN = 0.42
-MATH_LIFT_BASE = 0.52
-MATH_LIFT_GAIN = 0.30
+# ------------------------------------------------------------ volume particles
+#: Owner: "there are some check marks that I don't like, replace the checkmark
+#: or v lines or whatever those are with real particles that are like 3d and
+#: have animations." The old MATH-GLYPH TEXT layer (the ``√``/``Δ``/``∇``
+#: symbols and equations, drawn as ``char`` text) is what read as checkmarks,
+#: so it is RETIRED. Its visual role is taken by this: a genuine 3D PARTICLE
+#: field — no text at all.
+#:
+#: Each particle revolves a full 360 in its OWN inclined circular orbit around
+#: the nucleus, so its depth crosses both sides of the core every revolution
+#: (near half in front, far half behind). Every body carries two independent
+#: volume axes (``z``/``z2``), its own screen velocity, and TWO per-body
+#: animations: ``pulse`` (a twinkle that scales the body's size and alpha on
+#: its own non-harmonic period) and ``spin`` (a body-rotation angle a renderer
+#: can apply to a 3D geometry). Size and alpha both derive from ``depth``
+#: through the shared :func:`_depth_size`/:func:`_depth_alpha` mapping, so the
+#: field reads as volume, not a flat scatter.
+#:
+#: The dict shape is ADDITIVE and documented on :func:`volume_particles`.
+VOLUME_COUNT = 52
+VOLUME_R_FRAC_MIN = 0.12
+VOLUME_R_FRAC_SPAN = 0.70
+VOLUME_PERIOD_BASE = 5.4
+VOLUME_PERIOD_SPAN = 9.6
+#: Inclinations 18..162 deg keep ``|sin|`` >= 0.31, so even the flattest
+#: particle's depth sweeps the ~0.35..0.65 band across a revolution — it
+#: genuinely circles the middle rather than sliding on one plane.
+VOLUME_INC_MIN_DEG = 18.0
+VOLUME_INC_SPAN_DEG = 144.0
+VOLUME_SIZE_BASE = 0.20
+VOLUME_SIZE_SPAN = 0.14
+VOLUME_ALPHA_BASE = 0.26
+VOLUME_ALPHA_GAIN = 0.46
+VOLUME_LIFT_BASE = 0.30
+VOLUME_LIFT_GAIN = 0.46
+#: Per-body twinkle periods (non-harmonic with the orbit periods and each
+#: other) so the field shimmers instead of pulsing in unison.
+VOLUME_PULSE_PERIOD_BASE = 1.4
+VOLUME_PULSE_PERIOD_SPAN = 2.4
+VOLUME_SPIN_PERIOD_BASE = 3.0
+VOLUME_SPIN_PERIOD_SPAN = 5.0
 
 
-def math_state(t: Any, R: float) -> List[Dict[str, Any]]:
-    """Math-symbol (and equation) glyphs orbiting the nucleus.
+def volume_particles(t: Any, R: float) -> List[Dict[str, Any]]:
+    """A deterministic 3D particle field orbiting the nucleus (no text).
 
-    One dict per glyph: ``{"index", "x", "y", "depth", "z", "z2", "size",
-    "alpha", "lift", "hue", "hue2", "char", "dof", "skew"}`` — the EXACT shape
-    :func:`binary_state` emits, so a renderer draws it with the same text
-    machinery (only ``char`` differs; ``binary_state`` is untouched). Each of
-    the ``MATH_COUNT`` glyphs makes a full 360 on its own inclined plane at its
-    own non-harmonic period, direction and radius (a fraction of R), so the
-    symbols drift and orbit the MIDDLE. Every ``MATH_EQUATION_EVERY``-th glyph
-    is a short equation from :data:`MATH_EQUATIONS`, drawn larger. Pure in
-    ``(t, R)``: ``hash01`` and trig only, no ``random``, no state, no I/O.
+    One dict per particle:
+    ``{"index", "x", "y", "depth", "z", "z2", "vx", "vy", "size", "alpha",
+    "lift", "hue", "hue2", "dof", "skew", "r", "inc", "pulse", "spin"}``.
+
+    * ``depth`` is the shared shading / z-split scalar; ``z``/``z2`` are two
+      INDEPENDENT volume axes (see :func:`depth_axes`), so a renderer can build
+      a true 3D cloud instead of one scalar.
+    * ``vx``/``vy`` are the screen velocity per second, so a renderer can streak
+      the particle through :func:`rgb_trail`.
+    * ``pulse`` in 0..1 is the body's own twinkle animation (size and alpha
+      already carry it); ``spin`` in 0..360 is its own rotation angle for a 3D
+      body. Both are per-body, deterministic and non-harmonic.
+    * No ``char`` — this layer is never drawn as text.
+
+    Radii, inclinations, periods, directions, phases, pulse and spin periods
+    are all derived by ``hash01`` of the index, so the field is varied but
+    perfectly reproducible. Pure in ``(t, R)``: no ``random``, no state, no
+    I/O, junk-safe and reduced-motion-safe (the renderer decides to drop it).
     """
     tt = _finite(t)
     r = _finite(R, 32.0) or 32.0
     dx, dy = camera_offset(tt, r)
     scale = r / 32.0
-    n_sym = len(MATH_SYMBOLS)
     out: List[Dict[str, Any]] = []
-    for i in range(MATH_COUNT):
+    for i in range(VOLUME_COUNT):
         idx = i + 1
-        rad = r * (MATH_R_FRAC_MIN + MATH_R_FRAC_SPAN * hash01(idx, 501.3))
-        inc = math.radians(MATH_INC_MIN_DEG
-                           + MATH_INC_SPAN_DEG * hash01(idx, 503.7))
-        period = MATH_PERIOD_BASE + MATH_PERIOD_SPAN * hash01(idx, 509.1)
-        direction = 1.0 if hash01(idx, 511.7) >= 0.5 else -1.0
-        phase0 = 360.0 * hash01(idx, 519.3)
-        ang = (phase0 + direction * 360.0 * tt / max(0.1, period)
-               + _phase_wobble(tt, phase0))
+        rad = r * (VOLUME_R_FRAC_MIN
+                   + VOLUME_R_FRAC_SPAN * hash01(idx, 701.3))
+        inc = math.radians(VOLUME_INC_MIN_DEG
+                           + VOLUME_INC_SPAN_DEG * hash01(idx, 703.7))
+        period = (VOLUME_PERIOD_BASE
+                  + VOLUME_PERIOD_SPAN * hash01(idx, 709.1))
+        direction = 1.0 if hash01(idx, 711.7) >= 0.5 else -1.0
+        phase0 = 360.0 * hash01(idx, 719.3)
+        rate = direction * 360.0 / max(0.1, period)
+        ang = phase0 + rate * tt + _phase_wobble(tt, phase0)
         ar = math.radians(ang)
         u, v = math.cos(ar), math.sin(ar)
-        # The glyph's own inclined plane: y is foreshortened by the
-        # inclination, the out-of-plane component becomes depth (the near half
-        # sits in front of the core, the far half behind it).
+        # The particle's own inclined plane: y is foreshortened by the
+        # inclination, the out-of-plane component becomes depth (near half in
+        # front of the core, far half behind it).
         x = rad * u
         y = rad * v * math.cos(inc)
         zunit = v * math.sin(inc)
         depth = min(1.0, max(0.0, 0.5 + 0.5 * zunit))
-        is_eq = MATH_EQUATION_EVERY > 0 and i % MATH_EQUATION_EVERY == 0
-        if is_eq and MATH_EQUATIONS:
-            char = MATH_EQUATIONS[(i // MATH_EQUATION_EVERY)
-                                  % len(MATH_EQUATIONS)]
-            char_scale = MATH_EQUATION_SCALE
-        elif n_sym:
-            pick = int(hash01(idx, 521.9) * n_sym) % n_sym
-            char = MATH_SYMBOLS[pick]
-            char_scale = 1.0
-        else:
-            char = ""
-            char_scale = 1.0
-        cz, cz2 = depth_axes(idx, 523.1)
-        hue = _hue_for(idx, 529.7)
+        # Per-body animation, both non-harmonic and deterministic.
+        pulse_period = (VOLUME_PULSE_PERIOD_BASE
+                        + VOLUME_PULSE_PERIOD_SPAN * hash01(idx, 731.9))
+        pulse = 0.5 + 0.5 * math.sin(
+            2.0 * math.pi * tt / max(0.1, pulse_period)
+            + phase0 * math.pi / 180.0)
+        spin_period = (VOLUME_SPIN_PERIOD_BASE
+                       + VOLUME_SPIN_PERIOD_SPAN * hash01(idx, 733.3))
+        spin = (360.0 * tt / max(0.1, spin_period) + phase0) % 360.0
+        # Screen velocity per second (the dt of the orbit), for streaking.
+        vx = -rad * v * rate
+        vy = rad * u * math.cos(inc) * rate
+        cz, cz2 = depth_axes(idx, 723.9)
+        hue = _hue_for(idx, 729.1)
         out.append({
             "index": float(idx),
             "x": x + dx, "y": y + dy,
             "depth": depth,
             "z": cz, "z2": cz2,
-            "size": (_depth_size(depth, MATH_SIZE_BASE * char_scale * scale)
-                     * (1.0 + MATH_SIZE_SPAN * hash01(idx, 531.3))),
-            "alpha": _depth_alpha(depth, MATH_ALPHA_BASE
-                                  + MATH_ALPHA_GAIN * hash01(idx, 537.1)),
-            "lift": MATH_LIFT_BASE + MATH_LIFT_GAIN * depth,
+            "vx": vx, "vy": vy,
+            "size": (_depth_size(
+                depth,
+                (VOLUME_SIZE_BASE
+                 + VOLUME_SIZE_SPAN * hash01(idx, 731.3)) * scale)
+                * (0.72 + 0.56 * pulse)),
+            "alpha": (_depth_alpha(depth, VOLUME_ALPHA_BASE
+                                   + VOLUME_ALPHA_GAIN * hash01(idx, 737.1))
+                      * (0.55 + 0.45 * pulse)),
+            "lift": VOLUME_LIFT_BASE + VOLUME_LIFT_GAIN * depth,
             "hue": hue, "hue2": _hue_pair(hue),
-            "char": char,
             "dof": dof(depth), "skew": skew(depth),
+            "r": rad, "inc": inc,
+            "pulse": min(1.0, max(0.0, pulse)), "spin": spin,
         })
     return out
+
+
+def math_state(t: Any, R: float) -> List[Dict[str, Any]]:
+    """RETIRED no-op — the math-glyph TEXT layer is gone.
+
+    Owner 2026-10-19: the ``√``/``Δ``/``∇`` math symbols and equations read as
+    "check marks / v lines"; they are replaced by :func:`volume_particles`, a
+    real 3D particle field with no ``char`` at all. This name is kept ONLY so
+    anything built against the old field stays importable and fail-soft: it
+    returns an empty list and never raises, so a renderer draws no glyphs
+    instead of blanking. New work must call :func:`volume_particles`.
+    """
+    return []
 
 
 # ---------------------------------------------------------------- core shells
@@ -1565,21 +1651,42 @@ RING_PATH_SAMPLES = 72
 #: radii.
 RING_MOTION_PERIOD_S = 23.3
 RING_MOTION_PHASE = 0.0
-RING_PRECESS_AMP_DEG = 5.0
+#: Owner 2026-10-19: "refine circles animation more". The shared rigid motion
+#: is no longer one bare sine (which read as a mechanical sway): it is a SUM of
+#: three sines on non-harmonic periods, so the plane precesses and the set
+#: breathes fluidly, like a body settling rather than a metronome. The weights
+#: sum to 1.0, so the total amplitude stays EXACTLY :data:`RING_PRECESS_AMP_DEG`
+#: for the whole rigid set — every ring still shares one offset.
+RING_MOTION_PERIOD_2_S = 8.5
+RING_MOTION_PERIOD_3_S = 31.7
+RING_PRECESS_AMP_DEG = 7.0
+RING_PRECESS_WEIGHTS = (0.62, 0.24, 0.14)
 #: Radius breath: a fraction of the ring radius, never enough to disturb the
-#: composition (always > 0.95). Same shared period as the sway, with a
-#: different phase so the tilt and the radius do not move together.
-RING_RADIUS_BREATH_SPAN = 0.035
+#: composition (always > 0.95). Driven by the SAME rigid period family, with a
+#: different phase so the tilt and the radius do not move together. Weights sum
+#: to 1.0, so the peak breath is exactly half :data:`RING_RADIUS_BREATH_SPAN`.
+RING_RADIUS_BREATH_SPAN = 0.040
 RING_RADIUS_BREATH_PHASE = 1.9
+RING_RADIUS_WEIGHTS = (0.68, 0.32)
+
+
+def _rigid_phase_vector(t: Any) -> Tuple[float, float, float]:
+    """The three shared phases the rigid ring motion is built from."""
+    tt = _finite(t)
+    base = 2.0 * math.pi * tt
+    return (base / RING_MOTION_PERIOD_S + RING_MOTION_PHASE,
+            base / RING_MOTION_PERIOD_2_S + RING_MOTION_PHASE + 1.3,
+            base / RING_MOTION_PERIOD_3_S + RING_MOTION_PHASE + 2.6)
 
 
 def ring_precess_period(ring: Any = None) -> float:
     """The shared ring-set motion period (seconds).
 
     Kept as a function (and kept in each ``ring_geometry`` entry as
-    ``precess_period_s``) for API compatibility, but it is now ONE period for
-    the whole set: the rings move together so no circle drifts out of
-    proportion with the rest.
+    ``precess_period_s``) for API compatibility, but the rigid set now moves on
+    a family of non-harmonic periods (see :data:`RING_MOTION_PERIODS_S`); this
+    returns the primary one. All rings still share the same motion, so no
+    circle ever drifts out of proportion with the rest.
     """
     return RING_MOTION_PERIOD_S
 
@@ -1589,12 +1696,15 @@ def ring_tilt_spin(t: Any, ring: Any = None) -> float:
 
     ADDITIVE: a renderer adds this to the entry's ``tilt``. Identical for every
     ring, so the set sways as one rigid body and each ring keeps its declared
-    tilt RELATIVE to the others. A bounded, smooth sine, so the plane evolves
-    fluidly instead of snapping.
+    tilt RELATIVE to the others. A sum of three weighted sines on non-harmonic
+    periods — smooth and bounded, so the plane evolves fluidly instead of
+    snapping, and richer than a single sway. ``|result| <= RING_PRECESS_AMP_DEG``
+    always (the weights sum to 1.0).
     """
-    phase = (2.0 * math.pi * _finite(t) / RING_MOTION_PERIOD_S
-             + RING_MOTION_PHASE)
-    return RING_PRECESS_AMP_DEG * math.sin(phase)
+    p1, p2, p3 = _rigid_phase_vector(t)
+    w0, w1, w2 = RING_PRECESS_WEIGHTS
+    return RING_PRECESS_AMP_DEG * (
+        w0 * math.sin(p1) + w1 * math.sin(p2) + w2 * math.sin(p3))
 
 
 def ring_radius_scale(t: Any, ring: Any = None) -> float:
@@ -1602,32 +1712,47 @@ def ring_radius_scale(t: Any, ring: Any = None) -> float:
 
     Identical for every ring, so all circles scale by the same factor and stay
     exactly proportional to their declared radii. A renderer multiplies the
-    declared ``rx``/``ry`` by this; the declared fractions are untouched.
+    declared ``rx``/``ry`` by this; the declared fractions are untouched. Two
+    weighted, non-harmonic sines give a fluid breath; the peak is exactly half
+    :data:`RING_RADIUS_BREATH_SPAN`, so it never disturbs the composition.
     """
-    phase = (2.0 * math.pi * _finite(t) / RING_MOTION_PERIOD_S
-             + RING_RADIUS_BREATH_PHASE)
-    return 1.0 + RING_RADIUS_BREATH_SPAN * 0.5 * math.sin(phase)
+    p1, p2, _p3 = _rigid_phase_vector(t)
+    w0, w1 = RING_RADIUS_WEIGHTS
+    breath = w0 * math.sin(p1 + RING_RADIUS_BREATH_PHASE) \
+        + w1 * math.sin(p2 + RING_RADIUS_BREATH_PHASE + 0.7)
+    return 1.0 + RING_RADIUS_BREATH_SPAN * 0.5 * breath
 
 
-#: Every per-ring motion period the field declares (the ring's own evolution).
-#: The contract test checks no two of these are harmonically locked.
-RING_MOTION_PERIODS_S = (RING_MOTION_PERIOD_S,)
+#: Every rigid ring-motion period the field declares. The contract test checks
+#: no two of these (nor any of them against the ring turns / spins) are
+#: harmonically locked, so the set never pulses in lock-step with a spin.
+RING_MOTION_PERIODS_S = (
+    RING_MOTION_PERIOD_S, RING_MOTION_PERIOD_2_S, RING_MOTION_PERIOD_3_S)
 
 
 def ring_geometry(t: Any) -> List[Dict[str, Any]]:
     """Every circle of the mark as a stroke description, back to front.
 
     Each entry: ``{"id", "layer", "orbit", "tilt", "rx_frac", "ry_frac",
-    "alpha", "width", "echo", "seed", "tilt_spin_deg", "precess_period_s"}``.
+    "alpha", "width", "echo", "seed", "tilt_spin_deg", "precess_period_s",
+    "intensity_period_s", "shimmer_period_s", "intensity", "shimmer",
+    "streamers"}``.
     Radii are FRACTIONS of the mark radius and the tilt is in degrees, so the
     same entry scales to any size; :func:`ring_path` turns one into points.
     ``layer`` is ``main``, ``echo``, ``inner`` or ``satellite``; the list is
     ordered so a renderer can paint it in order and get the near rings on top.
 
     ADDITIVE evolution keys: ``tilt`` remains the base tilt the contracts
-    assert; ``tilt_spin_deg`` is a bounded per-ring plane-precession offset the
-    renderer ADDS to ``tilt`` (:func:`ring_tilt_spin`), and ``precess_period_s``
-    is that ring's own non-harmonic period.
+    assert; ``tilt_spin_deg`` is a bounded offset the renderer ADDS to ``tilt``
+    (:func:`ring_tilt_spin`) and is IDENTICAL for every ring — the rigid set — so
+    ``precess_period_s`` (that ring's recorded period, kept for compatibility)
+    no longer varies per ring. ``intensity`` (a 0..1 accretion hot-spot
+    modulation, :func:`ring_intensity`), ``shimmer`` (a sub-percent per-ring
+    radius glitter, :func:`ring_shimmer`) and ``streamers`` (a suggested
+    streamer count) give each circle its own live detail WITHOUT disturbing the
+    rigid proportionality; renderers multiply the ring's alpha by
+    ``ring_alpha(t, ring) * ring_intensity(t, ring)`` and its radii by
+    ``ring_radius_scale(t, ring) * ring_shimmer(t, ring)``.
     """
     tt = _finite(t)
     near_tilt, far_tilt = orbit_tilts(tt)
@@ -1678,10 +1803,23 @@ def _ring_specs(tt: float, near_tilt: float, far_tilt: float,
         "id": "orbit_a", "layer": "main", "orbit": "a", "tilt": near_tilt,
         "rx_frac": RX_FRAC, "ry_frac": RY_FRAC, "alpha": RING_ALPHA_MAIN,
         "width": RING_WIDTH_MAIN, "echo": False, "seed": 7.0})
-    # Additive per-ring plane precession: each ring tips on its own period.
+    # Additive details. The PLANE offset is shared (rigid set), while each ring
+    # gets its own deterministic intensity/shimmer/streamer detail so a stroked
+    # circle reads as a live accretion structure instead of a dead outline.
     for entry in out:
         entry["precess_period_s"] = ring_precess_period(entry)
         entry["tilt_spin_deg"] = ring_tilt_spin(tt, entry)
+        entry["intensity_period_s"] = _ring_detail_period(
+            entry, "intensity_period_s", RING_INTENSITY_PERIOD_BASE,
+            RING_INTENSITY_PERIOD_SPAN, 601.1)
+        entry["shimmer_period_s"] = _ring_detail_period(
+            entry, "shimmer_period_s", RING_SHIMMER_PERIOD_BASE,
+            RING_SHIMMER_PERIOD_SPAN, 603.7)
+        entry["intensity"] = ring_intensity(tt, entry)
+        entry["shimmer"] = ring_shimmer(tt, entry)
+        seed = int(_finite(entry.get("seed")))
+        entry["streamers"] = RING_STREAMERS_BASE + int(
+            hash01(seed + 1, 607.7) * (RING_STREAMERS_SPAN + 1))
     return out
 
 
@@ -1717,6 +1855,79 @@ def ring_alpha(t: Any, ring: Dict[str, Any]) -> float:
     return _finite(ring.get("alpha"), RING_ALPHA_MAIN) * (
         1.0 - RING_BREATH_SPAN * 0.5
         + RING_BREATH_SPAN * 0.5 * math.sin(phase))
+
+
+# ---------------------------------------------------------- ring detail
+#: Owner 2026-10-19: "the spirals or circles make them look like blackholes add
+#: more details and animations". A plain stroked ellipse reads as a black-hole
+#: ring; these per-ring detail keys give the renderers something to modulate the
+#: stroke with, so each circle looks like a live structure:
+#:
+#:   * ``intensity`` — a 0..1 brightness modulation (accretion hot spots) on its
+#:     own per-ring non-harmonic period. Renderers multiply the ring's alpha by
+#:     ``ring_alpha(t, ring) * ring_intensity(t, ring)``.
+#:   * ``shimmer`` — a small multiplicative RADIUS detail (~1.0) that makes the
+#:     stroke breathe at the sub-percent level. It is deliberately much smaller
+#:     than the shared :func:`ring_radius_scale`, so the rigid set stays rigid
+#:     while each ring still glitters.
+#:   * ``streamers`` — how many accretion streamer samples that ring suggests
+#:     (a hint for :func:`accretion_stream`-style detail).
+#:
+#: All three are deterministic in the ring's ``seed`` and pure in ``t``.
+RING_INTENSITY_MIN = 0.55
+RING_INTENSITY_SPAN = 0.45
+RING_INTENSITY_PERIOD_BASE = 6.4
+RING_INTENSITY_PERIOD_SPAN = 9.1
+RING_SHIMMER_SPAN = 0.030
+RING_SHIMMER_PERIOD_BASE = 5.3
+RING_SHIMMER_PERIOD_SPAN = 8.1
+RING_STREAMERS_BASE = 2
+RING_STREAMERS_SPAN = 3
+
+
+def _ring_detail_period(ring: Dict[str, Any], key: str, base: float,
+                        span: float, salt: float) -> float:
+    """Resolve (or derive from the ring seed) one per-ring detail period."""
+    ring = ring if isinstance(ring, dict) else {}
+    have = _finite(ring.get(key), -1.0)
+    if have > 0.0:
+        return have
+    seed = int(_finite(ring.get("seed")))
+    return base + span * hash01(seed + 1, salt)
+
+
+def ring_intensity(t: Any, ring: Any = None) -> float:
+    """A ring's 0.55..1.0 brightness modulation at clock ``t`` (never 0).
+
+    Deterministic in the ring's ``seed`` and its ``intensity_period_s``; this
+    is the field-level "accretion hot spot" that stops a stroked circle from
+    reading as a dead outline. Junk-safe like every field helper.
+    """
+    ring = ring if isinstance(ring, dict) else {}
+    period = _ring_detail_period(
+        ring, "intensity_period_s", RING_INTENSITY_PERIOD_BASE,
+        RING_INTENSITY_PERIOD_SPAN, 601.1)
+    phase = (2.0 * math.pi * _finite(t) / max(0.1, period)
+             + _finite(ring.get("seed")) * 0.83)
+    return RING_INTENSITY_MIN + RING_INTENSITY_SPAN * (
+        0.5 + 0.5 * math.sin(phase))
+
+
+def ring_shimmer(t: Any, ring: Any = None) -> float:
+    """A small per-ring radius shimmer (~1.0) at clock ``t``.
+
+    ADDITIVE, per-ring texture only: the shared rigid
+    :func:`ring_radius_scale` keeps every ring proportional to the others, and
+    this sub-percent wobble sits on top so a ring's edge glitters. Never
+    negative, junk-safe.
+    """
+    ring = ring if isinstance(ring, dict) else {}
+    period = _ring_detail_period(
+        ring, "shimmer_period_s", RING_SHIMMER_PERIOD_BASE,
+        RING_SHIMMER_PERIOD_SPAN, 603.7)
+    phase = (2.0 * math.pi * _finite(t) / max(0.1, period)
+             + _finite(ring.get("seed")) * 1.37)
+    return 1.0 + RING_SHIMMER_SPAN * 0.5 * math.sin(phase)
 
 
 # -------------------------------------------------------------- ring particles
@@ -1788,6 +1999,252 @@ def ring_particles(t: Any, R: float) -> List[Dict[str, Any]]:
                 "dof": dof(depth), "skew": skew(depth),
                 "orbit": str(ring.get("orbit") or ""), "ring_id": rid,
             })
+    return out
+
+
+# ---------------------------------------------------------- accretion stream
+#: Owner 2026-10-19: the plain circles read as "blackholes". An accretion
+#: stream gives them structure: bodies that wind around the nucleus on a
+#: continuous spiral, moving INWARD and OUTWARD over their own non-harmonic
+#: period (never a pop), so a renderer can stroke a live, infalling stream
+#: along the rings rather than a dead outline. ``s`` is 0 at the outer edge and
+#: 1 at the inner edge; ``vx``/``vy`` let a renderer streak the sample.
+ACCRETION_COUNT = 28
+ACCRETION_R_OUT_FRAC = 0.86
+ACCRETION_R_IN_FRAC = 0.26
+ACCRETION_PERIOD_BASE = 6.2
+ACCRETION_PERIOD_SPAN = 7.4
+ACCRETION_SPIRAL_TURNS = 1.35
+ACCRETION_SIZE_BASE = 0.12
+ACCRETION_SIZE_SPAN = 0.10
+ACCRETION_ALPHA_BASE = 0.26
+ACCRETION_ALPHA_GAIN = 0.40
+ACCRETION_LIFT = 0.34
+
+
+def accretion_stream(t: Any, R: float) -> List[Dict[str, Any]]:
+    """Spiral accretion-stream samples winding around the nucleus.
+
+    One dict per sample:
+    ``{"index", "x", "y", "depth", "z", "z2", "vx", "vy", "size", "alpha",
+    "lift", "hue", "hue2", "dof", "skew", "s", "r", "ring_id"}``.
+
+    ``s`` runs 0 (outer edge) .. 1 (inner edge) as the sample winds in, and
+    ``r`` is its current radius in pixels. The spiral angle advances with time
+    AND with ``s``, so the stream reads as matter winding toward the core; the
+    radius oscillates smoothly between the two edges, so nothing teleports.
+    Deterministic and junk-safe, pure in ``(t, R)``.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    near_tilt, far_tilt = orbit_tilts(tt)
+    scale = r / 32.0
+    rings = ring_geometry(tt)
+    out: List[Dict[str, Any]] = []
+    for i in range(ACCRETION_COUNT):
+        idx = i + 1
+        ring = rings[i % len(rings)] if rings else {}
+        # Half the stream rides the near plane, half the far one, so the
+        # spiral wraps the whole volume rather than one face.
+        tilt = near_tilt if (i % 2 == 0) else far_tilt
+        period = (ACCRETION_PERIOD_BASE
+                  + ACCRETION_PERIOD_SPAN * hash01(idx, 801.3))
+        direction = 1.0 if hash01(idx, 803.7) >= 0.5 else -1.0
+        phase0 = 360.0 * hash01(idx, 809.1)
+        phase = (2.0 * math.pi * tt / max(0.1, period)
+                 + phase0 * math.pi / 180.0)
+        inward = 0.5 - 0.5 * math.cos(phase)
+        r_out = r * ACCRETION_R_OUT_FRAC * (
+            0.92 + 0.16 * hash01(idx, 811.3))
+        r_in = r * ACCRETION_R_IN_FRAC * (
+            0.85 + 0.30 * hash01(idx, 813.9))
+        rad = r_out + (r_in - r_out) * inward
+        ang = (phase0 + direction * 360.0 * tt / max(0.1, period)
+               + ACCRETION_SPIRAL_TURNS * 360.0 * inward * direction
+               + _phase_wobble(tt, phase0))
+        depth = _depth(ang)
+        pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+        rr = rad * pull
+        x, y = orbit_point(0.0, 0.0, rr, rr * (RY_FRAC / RX_FRAC), tilt, ang)
+        vx, vy = _orbit_velocity(rr, rr * (RY_FRAC / RX_FRAC), tilt, ang)
+        cz, cz2 = depth_axes(idx, 819.7)
+        hue = _hue_for(idx, 821.1)
+        out.append({
+            "index": float(idx),
+            "x": x + dx, "y": y + dy, "depth": depth,
+            "z": cz, "z2": cz2,
+            "vx": vx * 360.0 / max(0.1, period),
+            "vy": vy * 360.0 / max(0.1, period),
+            "size": _depth_size(
+                depth, (ACCRETION_SIZE_BASE
+                        + ACCRETION_SIZE_SPAN * hash01(idx, 823.3)) * scale),
+            "alpha": _depth_alpha(depth, ACCRETION_ALPHA_BASE
+                                  + ACCRETION_ALPHA_GAIN
+                                  * (0.35 + 0.65 * inward)),
+            "lift": ACCRETION_LIFT + 0.30 * depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "dof": dof(depth), "skew": skew(depth),
+            "s": inward, "r": rad,
+            "ring_id": str(ring.get("id") or ""),
+        })
+    return out
+
+
+# ------------------------------------------------------------- photon ring
+#: Owner: more "blackhole" detail. A photon ring is the thin, bright, LENSED
+#: ring hugging the core: not a uniform circle but a couple of bright arcs (the
+#: lensed image of the far side) fading around the rest. This layer emits the
+#: samples; the field owns the lobe profile so both renderers agree.
+PHOTON_SAMPLES = 44
+PHOTON_RX_FRAC = 0.15
+PHOTON_RY_FRAC = 0.095
+PHOTON_TILT_BASE = 10.0
+PHOTON_TILT_SWAY_DEG = 6.0
+PHOTON_PERIOD_S = 7.3
+PHOTON_LOBES = 2
+PHOTON_ALPHA_BASE = 0.08
+PHOTON_ALPHA_PEAK = 0.52
+PHOTON_SIZE_BASE = 0.055
+PHOTON_SIZE_PEAK = 0.075
+PHOTON_LIFT = 0.42
+
+
+def photon_ring(t: Any, R: float) -> List[Dict[str, Any]]:
+    """The bright, gravitationally-lensed ring hugging the nucleus.
+
+    One dict per sample:
+    ``{"index", "x", "y", "depth", "z", "z2", "size", "alpha", "lift", "hue",
+    "hue2", "dof", "skew", "angle"}``.
+
+    Samples sit on a small tilted ellipse just outside the core; their ALPHA
+    and SIZE ride a ``PHOTON_LOBES``-lobe cosine profile (two bright lensed
+    arcs, dim between them) that rotates slowly with the clock, so the ring
+    reads as lensed light rather than a painted circle. Deterministic, pure in
+    ``(t, R)``, junk-safe and reduced-motion-safe (renderer's call).
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    tilt = PHOTON_TILT_BASE + PHOTON_TILT_SWAY_DEG * math.sin(
+        2.0 * math.pi * tt / max(0.1, PHOTON_PERIOD_S))
+    rx = r * PHOTON_RX_FRAC
+    ry = r * PHOTON_RY_FRAC
+    spin = 2.0 * math.pi * tt / max(0.1, PHOTON_PERIOD_S)
+    out: List[Dict[str, Any]] = []
+    for i in range(PHOTON_SAMPLES):
+        ang = 360.0 * i / float(PHOTON_SAMPLES)
+        depth = _depth(ang)
+        pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+        x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
+        ar = math.radians(ang)
+        lobe = 0.5 + 0.5 * math.cos(PHOTON_LOBES * ar - spin)
+        cz, cz2 = depth_axes(i, 831.7)
+        hue = _hue_for(i, 833.1)
+        out.append({
+            "index": float(i),
+            "x": x + dx, "y": y + dy, "depth": depth,
+            "z": cz, "z2": cz2,
+            "size": (PHOTON_SIZE_BASE + PHOTON_SIZE_PEAK * lobe)
+                    * scale * (0.7 + 0.5 * depth),
+            "alpha": (PHOTON_ALPHA_BASE + PHOTON_ALPHA_PEAK * lobe)
+                     * (0.45 + 0.55 * depth),
+            "lift": PHOTON_LIFT + 0.35 * depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "dof": dof(depth), "skew": skew(depth),
+            "angle": ang,
+        })
+    return out
+
+
+# ------------------------------------------------------------ infall streaks
+#: Fast radial streaks falling toward the core: the third piece of the
+#: "blackhole" structure the owner asked for. Each streak carries an inward
+#: velocity (``vx``/``vy``) and a ``tail_len`` the renderer can draw as a
+#: tapering streak (or feed to :func:`rgb_trail`, which uses ``vx``/``vy``),
+#: so the field reads as matter falling IN rather than orbiting forever.
+INFALL_COUNT = 14
+INFALL_R_OUT_FRAC = 1.00
+INFALL_R_IN_FRAC = 0.20
+INFALL_PERIOD_BASE = 3.6
+INFALL_PERIOD_SPAN = 4.8
+INFALL_SIZE_BASE = 0.13
+INFALL_SIZE_SPAN = 0.08
+INFALL_ALPHA_BASE = 0.30
+INFALL_ALPHA_GAIN = 0.42
+INFALL_LIFT = 0.36
+INFALL_TAIL_LEN_FRAC = 0.30
+
+
+def infall_streaks(t: Any, R: float) -> List[Dict[str, Any]]:
+    """Streaks of matter falling toward the nucleus.
+
+    One dict per streak:
+    ``{"index", "x", "y", "depth", "z", "z2", "vx", "vy", "size", "alpha",
+    "lift", "hue", "hue2", "dof", "skew", "r", "tail_len", "s"}``.
+
+    The radius oscillates smoothly between the outer and inner edge (``s`` is
+    0 outside .. 1 inside) while the streak slowly winds, so its motion is
+    continuous and its velocity points INWARD (toward the core) on the way in
+    and outward on the way out. ``tail_len`` is the recommended streak length
+    in pixels. Deterministic, pure in ``(t, R)``, junk-safe.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    near_tilt, far_tilt = orbit_tilts(tt)
+    scale = r / 32.0
+    out: List[Dict[str, Any]] = []
+    for i in range(INFALL_COUNT):
+        idx = i + 1
+        tilt = near_tilt if (i % 2 == 0) else far_tilt
+        period = (INFALL_PERIOD_BASE
+                  + INFALL_PERIOD_SPAN * hash01(idx, 841.3))
+        direction = 1.0 if hash01(idx, 843.7) >= 0.5 else -1.0
+        phase0 = 360.0 * hash01(idx, 849.1)
+        phase = (2.0 * math.pi * tt / max(0.1, period)
+                 + phase0 * math.pi / 180.0)
+        inward = 0.5 - 0.5 * math.cos(phase)
+        r_out = r * INFALL_R_OUT_FRAC * (0.90 + 0.16 * hash01(idx, 851.3))
+        r_in = r * INFALL_R_IN_FRAC * (0.80 + 0.35 * hash01(idx, 853.9))
+        rad = r_out + (r_in - r_out) * inward
+        ang = (phase0 + direction * 70.0 * tt / max(0.1, period)
+               + 0.6 * direction * 360.0 * inward
+               + _phase_wobble(tt, phase0))
+        depth = _depth(ang)
+        pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+        rr = rad * pull
+        ratio = RY_FRAC / RX_FRAC
+        x, y = orbit_point(0.0, 0.0, rr, rr * ratio, tilt, ang)
+        # Velocity: radial (inward on the inbound leg) + tangential winding.
+        dr_dt = ((r_in - r_out) * 0.5 * math.sin(phase)
+                 * 2.0 * math.pi / max(0.1, period))
+        tang = rr * math.radians(direction * 70.0 / max(0.1, period))
+        vx = dr_dt * math.cos(math.radians(ang)) - tang * math.sin(
+            math.radians(ang))
+        vy = dr_dt * math.sin(math.radians(ang)) + tang * math.cos(
+            math.radians(ang))
+        cz, cz2 = depth_axes(idx, 859.7)
+        hue = _hue_for(idx, 861.1)
+        out.append({
+            "index": float(idx),
+            "x": x + dx, "y": y + dy, "depth": depth,
+            "z": cz, "z2": cz2,
+            "vx": vx, "vy": vy,
+            "size": _depth_size(
+                depth, (INFALL_SIZE_BASE
+                        + INFALL_SIZE_SPAN * hash01(idx, 863.3)) * scale),
+            "alpha": _depth_alpha(depth, INFALL_ALPHA_BASE
+                                  + INFALL_ALPHA_GAIN
+                                  * (0.30 + 0.70 * inward)),
+            "lift": INFALL_LIFT + 0.32 * depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "dof": dof(depth), "skew": skew(depth),
+            "r": rad,
+            "tail_len": INFALL_TAIL_LEN_FRAC * r * (0.6 + 0.8 * inward),
+            "s": inward,
+        })
     return out
 
 
@@ -1942,26 +2399,29 @@ def cylinder_particles(t: Any, R: float) -> List[Dict[str, Any]]:
 
 
 # --------------------------------------------------------------- screen break
-#: Owner: "I like it how it tries to 'break' the screen, do more of that". A
-#: handful of fast bodies on WIDE, steeply-inclined orbits whose radius grows
-#: past the mark's own envelope, so they visibly sweep out of the widget. The
-#: orbit radius fraction reaches :data:`SCREEN_BREAK_FRAC` (``> 1`` = beyond
-#: R); the excursion is a continuous full turn, never a pop. The set is small
-#: so the primitive budget barely moves. ``R_FRAC_MIN + R_FRAC_SPAN`` equals
-#: ``SCREEN_BREAK_FRAC`` on purpose, so the declared ceiling and the reachable
-#: maximum cannot drift apart.
-SCREEN_BREAK_COUNT = 8
-SCREEN_BREAK_FRAC = 1.18
-SCREEN_BREAK_R_FRAC_MIN = 0.88
-SCREEN_BREAK_R_FRAC_SPAN = 0.30
+#: Owner: "I like it how it tries to 'break' the screen, do more of that".
+#: Owner 2026-10-19 (task 6): push it further. A handful of fast bodies on WIDE,
+#: steeply-inclined orbits whose radius grows past the mark's own envelope, so
+#: they visibly sweep out of the widget. The orbit radius fraction reaches
+#: :data:`SCREEN_BREAK_FRAC` (``> 1`` = beyond R); the excursion is a continuous
+#: full turn, never a pop. Raised 1.18 -> 1.34 R and COUNT 8 -> 10 so the set
+#: reliably crosses the widget edge (a 2R-wide frame has its edge at ~1.14 R)
+#: rather than merely grazing the mark radius. The primitive budget absorbs ten
+#: bodies (renderer draw limits are 12); ``R_FRAC_MIN + R_FRAC_SPAN`` still
+#: equals ``SCREEN_BREAK_FRAC`` on purpose, so the declared ceiling and the
+#: reachable maximum cannot drift apart.
+SCREEN_BREAK_COUNT = 10
+SCREEN_BREAK_FRAC = 1.34
+SCREEN_BREAK_R_FRAC_MIN = 0.96
+SCREEN_BREAK_R_FRAC_SPAN = 0.38
 SCREEN_BREAK_PERIOD_BASE = 3.2
 SCREEN_BREAK_PERIOD_SPAN = 3.4
 SCREEN_BREAK_INC_MIN_DEG = 26.0
 SCREEN_BREAK_INC_SPAN_DEG = 116.0
-SCREEN_BREAK_SIZE_BASE = 0.24
-SCREEN_BREAK_ALPHA_BASE = 0.72
+SCREEN_BREAK_SIZE_BASE = 0.28
+SCREEN_BREAK_ALPHA_BASE = 0.80
 SCREEN_BREAK_LIFT_BASE = 0.35
-SCREEN_BREAK_LIFT_GAIN = 0.40
+SCREEN_BREAK_LIFT_GAIN = 0.50
 
 
 def screen_break(t: Any, R: float) -> List[Dict[str, Any]]:
@@ -2048,14 +2508,17 @@ __all__ = [
     "INNER_RING_RX_FRAC", "INNER_RING_PERIOD_S", "INNER_RING_DIRECTION",
     "INNER_RING_TILT_BASE", "inner_ring_tilt",
     "BINARY_COUNT", "BINARY_SIZE_BASE", "BINARY_PERIOD_BASE", "binary_state",
-    "math_state", "MATH_SYMBOLS", "MATH_EQUATIONS", "MATH_COUNT",
-    "MATH_EQUATION_EVERY", "MATH_EQUATION_SCALE", "MATH_SIZE_BASE",
-    "MATH_SIZE_SPAN", "MATH_PERIOD_BASE", "MATH_PERIOD_SPAN",
-    "MATH_R_FRAC_MIN", "MATH_R_FRAC_SPAN", "MATH_INC_MIN_DEG",
-    "MATH_INC_SPAN_DEG", "MATH_ALPHA_BASE", "MATH_ALPHA_GAIN",
-    "MATH_LIFT_BASE", "MATH_LIFT_GAIN",
+    "math_state",
+    "volume_particles", "VOLUME_COUNT", "VOLUME_R_FRAC_MIN",
+    "VOLUME_R_FRAC_SPAN", "VOLUME_PERIOD_BASE", "VOLUME_PERIOD_SPAN",
+    "VOLUME_INC_MIN_DEG", "VOLUME_INC_SPAN_DEG", "VOLUME_SIZE_BASE",
+    "VOLUME_SIZE_SPAN", "VOLUME_ALPHA_BASE", "VOLUME_ALPHA_GAIN",
+    "VOLUME_LIFT_BASE", "VOLUME_LIFT_GAIN", "VOLUME_PULSE_PERIOD_BASE",
+    "VOLUME_PULSE_PERIOD_SPAN", "VOLUME_SPIN_PERIOD_BASE",
+    "VOLUME_SPIN_PERIOD_SPAN",
     "hue_to_rgb", "rgb_trail", "dust_trail", "RGB_TRAIL_SAMPLES",
     "RGB_TRAIL_HUE_STEP", "RGB_TRAIL_HUE_DRIFT", "RGB_TRAIL_ALPHA_BASE",
+    "RGB_TRAIL_WHITE_FRAC", "RGB_TRAIL_SAT_BASE", "RGB_TRAIL_SAT_SPAN",
     "DUST_TRAIL_SAMPLES", "PARTICLE_HUE_BASE", "PARTICLE_HUE_SPAN",
     "PALETTE_HUES", "palette_hue", "_hue_for",
     "HUE_PAIR_OFFSET", "_hue_pair",
@@ -2084,9 +2547,27 @@ __all__ = [
     "FILAMENT_ALPHA_PEAK", "FILAMENT_SIZE_BASE", "FILAMENT_SIZE_PEAK",
     "FILAMENT_LIFT",
     "ring_precess_period", "ring_tilt_spin", "ring_radius_scale",
-    "RING_MOTION_PERIOD_S", "RING_MOTION_PHASE",
-    "RING_PRECESS_AMP_DEG", "RING_RADIUS_BREATH_SPAN",
+    "RING_MOTION_PERIOD_S", "RING_MOTION_PERIOD_2_S", "RING_MOTION_PERIOD_3_S",
+    "RING_MOTION_PHASE", "RING_PRECESS_AMP_DEG", "RING_PRECESS_WEIGHTS",
+    "RING_RADIUS_BREATH_SPAN", "RING_RADIUS_WEIGHTS",
     "RING_RADIUS_BREATH_PHASE", "RING_MOTION_PERIODS_S",
+    "ring_intensity", "ring_shimmer", "RING_INTENSITY_MIN",
+    "RING_INTENSITY_SPAN", "RING_INTENSITY_PERIOD_BASE",
+    "RING_INTENSITY_PERIOD_SPAN", "RING_SHIMMER_SPAN",
+    "RING_SHIMMER_PERIOD_BASE", "RING_SHIMMER_PERIOD_SPAN",
+    "RING_STREAMERS_BASE", "RING_STREAMERS_SPAN",
+    "accretion_stream", "ACCRETION_COUNT", "ACCRETION_R_OUT_FRAC",
+    "ACCRETION_R_IN_FRAC", "ACCRETION_PERIOD_BASE", "ACCRETION_PERIOD_SPAN",
+    "ACCRETION_SPIRAL_TURNS", "ACCRETION_SIZE_BASE", "ACCRETION_SIZE_SPAN",
+    "ACCRETION_ALPHA_BASE", "ACCRETION_ALPHA_GAIN", "ACCRETION_LIFT",
+    "photon_ring", "PHOTON_SAMPLES", "PHOTON_RX_FRAC", "PHOTON_RY_FRAC",
+    "PHOTON_TILT_BASE", "PHOTON_TILT_SWAY_DEG", "PHOTON_PERIOD_S",
+    "PHOTON_LOBES", "PHOTON_ALPHA_BASE", "PHOTON_ALPHA_PEAK",
+    "PHOTON_SIZE_BASE", "PHOTON_SIZE_PEAK", "PHOTON_LIFT",
+    "infall_streaks", "INFALL_COUNT", "INFALL_R_OUT_FRAC", "INFALL_R_IN_FRAC",
+    "INFALL_PERIOD_BASE", "INFALL_PERIOD_SPAN", "INFALL_SIZE_BASE",
+    "INFALL_SIZE_SPAN", "INFALL_ALPHA_BASE", "INFALL_ALPHA_GAIN",
+    "INFALL_LIFT", "INFALL_TAIL_LEN_FRAC",
     "ring_particles", "RING_PARTICLE_COUNTS", "RING_PARTICLE_DEFAULT",
     "RING_PARTICLE_PERIOD_BASE", "RING_PARTICLE_PERIOD_SPAN",
     "RING_PARTICLE_SIZE", "RING_PARTICLE_ALPHA",
