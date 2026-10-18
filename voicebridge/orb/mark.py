@@ -157,6 +157,17 @@ try:  # pragma: no cover
     from .mark_field import orbiter_particles as _field_orbiter_particles
 except Exception:  # noqa: BLE001
     _field_orbiter_particles = None
+#: The math-symbol layer and the screen-break bodies land in a sibling field
+#: commit. Import them the same defensive way: a field revision without them
+#: simply draws nothing for that layer until the re-merge.
+try:  # pragma: no cover - exercised by whichever field revision is checked out
+    from .mark_field import math_state as _field_math_state
+except Exception:  # noqa: BLE001
+    _field_math_state = None
+try:  # pragma: no cover
+    from .mark_field import screen_break as _field_screen_break
+except Exception:  # noqa: BLE001
+    _field_screen_break = None
 
 #: Fringe offset in DEVICE pixels, never scaled with the radius: a lens fringe
 #: is a pixel-level artifact, and scaling it turned the mark into three separate
@@ -198,6 +209,13 @@ STREAK_MAX_WIDTH = 6
 #: is one 8-bit step from appearing, which is exactly the hard pop the field's
 #: C1 envelopes exist to avoid.
 STREAK_MIN_LEN_PX = 0.75
+#: Owner 2026-10-18: "the curved lines what are those? ... refine even more".
+#: The field's trail follows the body's ORBITAL velocity, so at full length it
+#: curves along the orbit and read as an unexplained coloured line cutting
+#: across the mark. Only the head samples are drawn — a short local motion blur
+#: behind the body — so a wake can never span the mark. Parity with the Qt
+#: painter's ``TRAIL_DRAW_SAMPLES``.
+STREAK_DRAW_SAMPLES = 3
 #: Sparkles and satellite bodies take the SHORT streak: 40 glints and three
 #: shells must gain spectrum without turning the field into 40 comets.
 SHORT_STREAK_HALF_WIDTH = 0.34
@@ -413,6 +431,20 @@ NUCLEUS_RIM_OVALS = 3
 BINARY_FONT_MIN_PX = 5
 BINARY_FONT_PX_PER_UNIT = 12.0
 BINARY_FONT_PX_OFFSET = 2.0
+#: Math-symbol fragments (owner: "add math symbols equations not random lines"),
+#: parity with the Qt painter. Same dict contract as the "1"/"0" bits, drawn
+#: with ``create_text``. Sized a touch larger so an equation reads distinctly.
+MATH_FONT_MIN_PX = 6
+MATH_FONT_PX_PER_UNIT = 14.0
+MATH_FONT_PX_OFFSET = 2.0
+#: How many math glyphs are considered per frame (flat text cost).
+MATH_DRAW_LIMIT = 40
+MATH_GLYPH_SAT = 0.92
+#: Screen-break bodies (owner likes the mark "breaking the screen"): bodies the
+#: field places BEYOND the orb radius. Drawn as glints; nothing clips to a
+#: circle, so they run off the widget edge.
+SCREEN_BREAK_DRAW_LIMIT = 12
+SCREEN_BREAK_SAT = 0.95
 
 #: Exact primitive count of the nucleus stack, so a host or a test can predict
 #: a still frame's ovals. Everything here is a pure function of the clamped
@@ -988,6 +1020,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         alpha, which Tk expresses as a mix toward the background.
         """
         smps = [s for s in (samples or []) if isinstance(s, dict)]
+        # A wake is a SHORT local motion blur, never a curved line crossing the
+        # mark (owner 2026-10-18): only the head samples of the field's trail
+        # are stroked. The head rides the body, so the stub stays glued to it.
+        smps = smps[:STREAK_DRAW_SAMPLES]
         if len(smps) < 2:
             return
         # Every sample of one body's wake shares that body's volume offset, so
@@ -1270,6 +1306,28 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             orbiters = []
     if not isinstance(orbiters, list):
         orbiters = []
+    # Math-symbol/equation fragments and the screen-break bodies: the sibling
+    # field commit's two new layers. Drawn defensively when present, nothing
+    # before the re-merge.
+    maths = []
+    if _field_math_state is not None and not reduced_motion:
+        try:
+            maths = [m for m in _field_math_state(tt, r) if isinstance(m, dict)]
+        except Exception:  # noqa: BLE001
+            maths = []
+    if not isinstance(maths, list):
+        maths = []
+    maths = maths[:MATH_DRAW_LIMIT]
+    sbreaks = []
+    if _field_screen_break is not None and not reduced_motion:
+        try:
+            sbreaks = [b for b in _field_screen_break(tt, r)
+                       if isinstance(b, dict)]
+        except Exception:  # noqa: BLE001
+            sbreaks = []
+    if not isinstance(sbreaks, list):
+        sbreaks = []
+    sbreaks = sbreaks[:SCREEN_BREAK_DRAW_LIMIT]
     if reduced_motion:
         # A clean static frame: no dust, no glints, no comet, no streaks, no
         # follower rings, no nucleus sparks and none of the new life layers.
@@ -1286,6 +1344,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     near_glints = [g for g in glints if _num(g.get("depth"), 0.5) >= 0.5]
     far_binaries = [b for b in binaries if _num(b.get("depth"), 0.5) < 0.5]
     near_binaries = [b for b in binaries if _num(b.get("depth"), 0.5) >= 0.5]
+    far_maths = [m for m in maths if _num(m.get("depth"), 0.5) < 0.5]
+    near_maths = [m for m in maths if _num(m.get("depth"), 0.5) >= 0.5]
+    far_sbreaks = [b for b in sbreaks if _num(b.get("depth"), 0.5) < 0.5]
+    near_sbreaks = [b for b in sbreaks if _num(b.get("depth"), 0.5) >= 0.5]
     far_shells = [s for s in shells
                   if _num((s.get("body") or {}).get("depth"), 0.5) < 0.5]
     near_shells = [s for s in shells
@@ -1517,6 +1579,62 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 max_y = y
         except Exception:
             pass
+
+    def _math(sym: Dict[str, Any]) -> None:
+        """One math-symbol/equation fragment as a small glyph, parity with Qt.
+
+        Owner: "add math symbols equations not random lines". Same shape as
+        :func:`_binary` (placed/scaled through the whole-mark tumble,
+        depth-split, gone under reduced motion) but coloured from the FIELD's
+        own hue via ``hue_to_rgb``, never a renderer-side ramp, so the glyphs
+        stay inside the palette.
+        """
+        nonlocal texts, min_y, max_y
+        size = _num(sym.get("size"))
+        depth = _num(sym.get("depth"), 0.5)
+        if size <= 0.0 or _num(sym.get("alpha")) <= FIELD_ALPHA_FLOOR:
+            return
+        try:
+            x, y, g = _place3(_num(sym.get("x")), _num(sym.get("y")), depth,
+                               zseed=_num(sym.get("index"), None), zflat=True,
+                               vol_z=sym.get("z"), vol_z2=sym.get("z2"))
+            alpha = _shade(sym.get("alpha"), depth, g) * bright
+            if alpha <= ALPHA_EPS:
+                return
+            hue = sym.get("hue")
+            rgb = (_anchor(_spec(hue, MATH_GLYPH_SAT)) if hue is not None
+                   else _lift(_num(sym.get("lift"), 0.5)))
+            fs = max(MATH_FONT_MIN_PX,
+                     int(size * g * MATH_FONT_PX_PER_UNIT
+                         + MATH_FONT_PX_OFFSET))
+            canvas.create_text(x, y, text=str(sym.get("char") or "?"),
+                               fill=_dim(rgb, alpha),
+                               font=("TkDefaultFont", fs))
+            texts += 1
+            if y < min_y:
+                min_y = y
+            if y > max_y:
+                max_y = y
+        except Exception:
+            pass
+
+    def _screen_break(body: Dict[str, Any]) -> None:
+        """One body the field placed BEYOND the orb radius, as a glint.
+
+        Owner: "i like it how it tries to break the screen, do more of that".
+        Drawn through the same tumble as every other body and never clipped to
+        the orb's circle, so a body pushed past ``R`` — even past the canvas
+        edge — is still painted.
+        """
+        depth = _num(body.get("depth"), 0.5)
+        x, y, g = _place3(_num(body.get("x")), _num(body.get("y")), depth,
+                           zseed=_num(body.get("index"), None), zflat=True,
+                           vol_z=body.get("z"), vol_z2=body.get("z2"))
+        hue = body.get("hue")
+        rgb = (_anchor(_spec(hue, SCREEN_BREAK_SAT)) if hue is not None
+               else _lift(_num(body.get("lift"), 0.5)))
+        _glint(x, y, body.get("size"), body.get("alpha"), rgb,
+               skew_deg=body.get("skew"), depth=depth, gain=g)
 
     def _comet_head() -> None:
         """The one fast traveller: a wake, its own debris tail, and a head.
@@ -1777,6 +1895,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _blink(_d)
     for _b in far_binaries:
         _binary(_b)
+    for _m in far_maths:
+        _math(_m)
+    for _sb in far_sbreaks:
+        _screen_break(_sb)
     for _s in far_sparks:
         _spark(_s)
     for _shell in far_shells:
@@ -1886,6 +2008,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _blink(_d)
     for _b in near_binaries:
         _binary(_b)
+    for _m in near_maths:
+        _math(_m)
+    for _sb in near_sbreaks:
+        _screen_break(_sb)
     for _s in near_sparks:
         _spark(_s)
     for _shell in near_shells:
@@ -1927,6 +2053,9 @@ __all__ = [
     "NUCLEUS_RIM_ALPHA", "NUCLEUS_RIM_OFFSET_PX", "NUCLEUS_RIM_FRINGE_ALPHA",
     "NUCLEUS_RIM_OVALS",
     "STREAK_HALF_WIDTH", "STREAK_MIN_LEN_PX", "ALPHA_EPS",
+    "STREAK_DRAW_SAMPLES", "MATH_FONT_MIN_PX", "MATH_FONT_PX_PER_UNIT",
+    "MATH_FONT_PX_OFFSET", "MATH_DRAW_LIMIT", "MATH_GLYPH_SAT",
+    "SCREEN_BREAK_DRAW_LIMIT", "SCREEN_BREAK_SAT",
     "echo_follower_tilt", "nucleus_radius", "NUCLEUS_RADIUS_MULT",
     "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
     "FRINGE_PX", "FRINGE_PX_AT_96", "FRINGE_PIXELS", "LIFT_RING", "LIFT_BEAD",
