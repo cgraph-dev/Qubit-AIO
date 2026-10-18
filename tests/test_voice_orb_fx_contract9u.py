@@ -328,14 +328,20 @@ def _beads(frame: Frame):
 
 
 def _nucleus(frame: Frame):
-    """Ellipse nearest the centre (the nucleus is always drawn at centre)."""
-    best = None
-    best_d = float("inf")
-    for p in frame.ellipses():
-        d = math.hypot(p.cx - CX, p.cy - CY)
-        if d < best_d:
-            best, best_d = p, d
-    return best
+    """The nucleus body: the LARGEST ellipse sitting on the centre.
+
+    Picking merely the nearest ellipse no longer identifies it: the studio
+    nucleus carries an orbiting specular highlight and inner swirl layers that
+    pass closer to the centre than the body itself, so "nearest" tracked the
+    highlight and invented extra pulse peaks.
+    """
+    ell = list(frame.ellipses())
+    if not ell:
+        return None
+    reach = max(p.r for p in ell) * 0.5
+    centred = [p for p in ell if math.hypot(p.cx - CX, p.cy - CY) <= reach]
+    pool = centred or ell
+    return max(pool, key=lambda p: p.r)
 
 
 def _sample(fn, t0, t1, n):

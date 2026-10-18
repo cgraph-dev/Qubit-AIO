@@ -589,7 +589,9 @@ def test_app_draws_no_chrome_but_keeps_indicators():
         return (12 <= h <= 28 and y0 <= 8
                 and (x0 <= 10 or x1 >= size - 10))
     assert not any(_is_chrome_strip(*o) for o in ovals)
-    assert fc.texts == []  # no "x"/"-" glyphs anymore
+    # Binary "1"/"0" data fragments are legitimate text glyphs now;
+    # the old close/collapse "x"/"-" chrome buttons must be gone instead.
+    assert all(kw.get("text") in ("1", "0") for (_x, _y, kw) in fc.texts)
     off = _FakeOrbCanvas()
     orb_app.draw_orb_frame(off, size, "idle", 1.0, offline=True)
     assert len(off.ovals) > len(fc.ovals)  # offline dot still drawn
