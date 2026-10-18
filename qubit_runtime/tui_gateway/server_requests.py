@@ -45,6 +45,30 @@ from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
+# The terminal result of a batch clarify, shared by every registry that holds one: the session
+# owner (``gateway/session_server_requests.py``) and this sidecar both settle batches, so one rule
+# keeps the model told the same thing on every surface.
+_BATCH_OUTCOMES = ("submitted", "timed_out", "cancelled")
+
+
+def settle_batch(locked: dict, frame_result=None, *, ended: str | None = None) -> dict:
+    """``{answers, outcome}`` for a batch whose locks so far are *locked*.
+
+    - ``ended`` (``"timed_out"`` / ``"cancelled"``): the wait ended with no frame (timeout, interrupt,
+      a ``cancel()``), or ``"submitted"`` for the last lock. The locked answers stand.
+    - Otherwise *frame_result* is the closing frame's ``result``. A dict with an ``answers`` dict lays
+      those answers over the locks (the frame wins per question) and keeps the frame's own outcome when it
+      names a known one (main's classic CLI reports ``timed_out``), else ``submitted``. Anything else (Ink
+      Esc / Desktop Skip send ``{}``; an error frame gives ``None``) is a cancel-all: locks kept, ``cancelled``.
+    """
+    if ended is not None:
+        return {"answers": dict(locked), "outcome": ended if ended in _BATCH_OUTCOMES else "cancelled"}
+    if isinstance(frame_result, dict) and isinstance(frame_result.get("answers"), dict):
+        outcome = frame_result.get("outcome")
+        return {**frame_result, "answers": {**locked, **frame_result["answers"]},
+                "outcome": outcome if outcome in _BATCH_OUTCOMES else "submitted"}
+    return {"answers": dict(locked), "outcome": "cancelled"}
+
 
 class ServerRequest:
     __slots__ = ("id", "sid", "method", "params", "event", "result", "answered", "created_at",
@@ -195,7 +219,7 @@ def send(method: str, sid: str, params: dict, *, timeout: float | None,
     if timed_out:
         _emit_cancel(req, "timeout")
         if req.qids is not None:
-            return {"answers": locked, "outcome": "timed_out"}
+            return settle_batch(locked, ended="timed_out")
     return None
 
 
@@ -276,16 +300,11 @@ def resolve_response(frame: dict, transport: Any = None) -> bool:
         else:
             result = frame.get("result")
             req.result = result if isinstance(result, dict) else {}
-            if req.qids and "answers" in req.result:
+            if req.qids:
                 # Batch clarify: answers locked early via clarify.lock belong to the final set even when
-                # the closing response only carries the tail the user answered last.
-                answers = req.result.get("answers")
-                merged = dict(req.locked)
-                if isinstance(answers, dict):
-                    merged.update(answers)
-                req.result = {**req.result, "answers": merged, "outcome": "submitted"}
-            elif req.qids:
-                req.result = {"answers": dict(req.locked), "outcome": "cancelled"}
+                # the closing response only carries the tail the user answered last (one rule with the
+                # session owner's registry: :func:`settle_batch`).
+                req.result = settle_batch(req.locked, req.result)
             req.answered = True
     if req.on_result is not None:
         req.on_result(req.result)
@@ -306,7 +325,7 @@ def lock_answer(request_id: str, question_id: str, answer: str | None) -> list[s
         req.locked[question_id] = answer
         remaining = [qid for qid in req.qids if qid not in req.locked]
         if not remaining:
-            req.result, req.answered = {"answers": dict(req.locked), "outcome": "submitted"}, True
+            req.result, req.answered = settle_batch(req.locked, ended="submitted"), True
             _open.pop(request_id, None)
     if not remaining:
         req.event.set()
@@ -323,7 +342,7 @@ def cancel(sid: str | None = None, reason: str = "interrupted") -> int:
         for req in targets:
             _open.pop(req.id, None)
             if req.qids is not None:
-                req.result, req.answered = {"answers": dict(req.locked), "outcome": "cancelled"}, True
+                req.result, req.answered = settle_batch(req.locked, ended="cancelled"), True
             else:
                 req.result, req.answered = None, False
     for req in targets:

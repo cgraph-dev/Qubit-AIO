@@ -206,7 +206,9 @@ def _catalog_skills(cat: _Catalog, skills: dict[str, dict], module_loader) -> st
 def command_catalog(load_cfg=None, module_loader=import_module, scope=None) -> dict:
     """Registry-backed slash metadata, categorized, no aliases. Discovery failures land in ``warning``
     (skills' message wins, then quick commands', then plugins'); only with no failure does it carry
-    the built-in-name collision notice for skills that have no ``/<name>`` (empty when none). Quick
+    the built-in-name collision notice for skills that have no ``/<name>`` (empty when none). A plugin
+    discovery failure is also ``plugin_discovery_error`` (empty when it worked), so a client can tell
+    "no plugin commands" from "plugin commands unknown" without parsing ``warning``. Quick
     command, plugin command and skill discovery are all home-keyed, so ``scope`` (a context manager
     binding the calling session's profile home and workspace) wraps every loader: project-local skills
     register for the repo the session is actually in (#114359), and a profile-routed palette never
