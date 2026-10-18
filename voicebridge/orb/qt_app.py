@@ -113,6 +113,35 @@ SPARKLE_LIFT = 0.55
 #: sized by SPARK_ARM_FRAC (shorter than a particle's) so they read as
 #: pinpricks, never as stars the size of the nucleus.
 NUCLEUS_SPARK_DRAW_SCALE = 1.0
+#: Glints, painter-side refinement only (the shared field keeps its shape):
+#: a lower size floor, a sub-pixel pen and a smaller core turn the shared
+#: crossing arms into a pinprick instead of a fat cross. Only the nearest,
+#: largest glints get a soft halo so they still pop without marbling the field.
+GLINT_MIN_SIZE = 0.16
+GLINT_PEN_W = 0.8
+GLINT_CORE_SCALE = 0.58
+GLINT_CORE_MIN = 0.08
+GLINT_GLOW_MIN_FRAC = 0.045
+GLINT_GLOW_MULT = 2.8
+GLINT_GLOW_ALPHA = 0.13
+#: Nucleus: a shaded sphere rather than a flat disc. A near-white hot core
+#: falls through the state hue to a transparent rim, over a wide low-alpha
+#: glow, with a small off-centre specular highlight. The body is the mark's
+#: ONE solid ellipse; glow and highlight are gradient paths beside it. All of
+#: it is static, so reduced motion is a valid still frame.
+NUCLEUS_CORE_LIFT = 0.78
+NUCLEUS_GLOW_MULT = 3.4
+NUCLEUS_GLOW_ALPHA = 0.22
+NUCLEUS_SPEC_OFFSET_FRAC = 0.38
+NUCLEUS_SPEC_RADIUS_FRAC = 0.36
+NUCLEUS_SPEC_ALPHA = 0.90
+#: Ring chromatic fringe: a faint, softened split, never a second line, so the
+#: crisp main hairline stays the dominant stroke instead of a rainbow outline.
+FRINGE_WIDTH_MULT = 1.6
+FRINGE_ALPHA_MULT = 0.09
+#: Below this alpha a primitive is imperceptible: skip it rather than let the
+#: 8-bit quantisation snap it to zero in one frame (a tiny hard pop).
+ALPHA_EPS = 0.004
 _GOLDEN = 0.6180339887498949
 
 
@@ -272,7 +301,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     reduced motion paints a completely static, sparkle-free frame.
     """
     from PySide6.QtCore import QPointF, QRectF
-    from PySide6.QtGui import QColor, QPainterPath, QPen
+    from PySide6.QtGui import (QBrush, QColor, QPainterPath, QPen,
+                               QRadialGradient)
 
     def _clamp8(v: Any) -> int:
         try:
@@ -362,7 +392,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         dim, thin ghost that trails its orbit's (lagged) tilt.
         """
         a = _num(alpha, 0.0)
-        if a <= 0.0 or rxs <= 0.0 or rys <= 0.0:
+        if a <= ALPHA_EPS or rxs <= 0.0 or rys <= 0.0:
             return
         path = _ring_path(rxs, rys, tilt_deg)
         p.setBrush(Qt.NoBrush)
@@ -376,7 +406,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
              rgb: Tuple[int, int, int]) -> None:
         a = _num(alpha, 0.0)
         r = _num(rad, 0.0)
-        if a <= 0.0 or r <= 0.0:
+        if a <= ALPHA_EPS or r <= 0.0:
             return
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(rgb[0], rgb[1], rgb[2],
@@ -386,7 +416,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     def _outline(radius: float, rgb: Tuple[int, int, int], alpha: float,
                  width: float) -> None:
         a = _num(alpha, 0.0)
-        if a <= 0.0 or radius <= 0.0:
+        if a <= ALPHA_EPS or radius <= 0.0:
             return
         path = QPainterPath()
         path.addEllipse(QRectF(cx - radius, cy - radius,
@@ -500,6 +530,51 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
              max(0.4, _num(traveller.get("size"), 0.0)),
              _num(traveller.get("alpha"), 0.0) * bright, rgb)
 
+    def _nucleus(radius: float, rgb: Tuple[int, int, int]) -> None:
+        """The mark's ONE solid body, shaded instead of a flat disc.
+
+        A near-white hot core falls through the state hue to a transparent
+        rim, drawn over a wide low-alpha glow, with a small off-centre
+        specular highlight. The body is the only filled ellipse at the
+        centre; the glow and the highlight are gradient paths beside it, and
+        the whole thing is static (so reduced motion is a clean still frame).
+        """
+        r = _num(radius, 0.0)
+        if r <= 0.0:
+            return
+        hot = _lift(NUCLEUS_CORE_LIFT)
+        gr = r * NUCLEUS_GLOW_MULT
+        glow = QRadialGradient(QPointF(cx, cy), gr)
+        glow.setColorAt(0.0, QColor(rgb[0], rgb[1], rgb[2],
+                                    _clamp8(255.0 * NUCLEUS_GLOW_ALPHA)))
+        glow.setColorAt(0.5, QColor(hot[0], hot[1], hot[2],
+                                    _clamp8(255.0 * NUCLEUS_GLOW_ALPHA * 0.30)))
+        glow.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
+        gpath = QPainterPath()
+        gpath.addEllipse(QRectF(cx - gr, cy - gr, gr * 2.0, gr * 2.0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(glow))
+        p.drawPath(gpath)
+        body = QRadialGradient(QPointF(cx, cy), r)
+        body.setColorAt(0.0, QColor(hot[0], hot[1], hot[2], 255))
+        body.setColorAt(0.34, QColor(rgb[0], rgb[1], rgb[2], 250))
+        body.setColorAt(0.70, QColor(rgb[0], rgb[1], rgb[2], 200))
+        body.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
+        p.setBrush(QBrush(body))
+        p.drawEllipse(cx - r, cy - r, r * 2.0, r * 2.0)
+        sr = r * NUCLEUS_SPEC_RADIUS_FRAC
+        sx = cx - r * NUCLEUS_SPEC_OFFSET_FRAC
+        sy = cy - r * NUCLEUS_SPEC_OFFSET_FRAC
+        spec = QRadialGradient(QPointF(sx, sy), sr)
+        spec.setColorAt(0.0, QColor(255, 255, 255,
+                                    _clamp8(255.0 * NUCLEUS_SPEC_ALPHA)))
+        spec.setColorAt(1.0, QColor(255, 255, 255, 0))
+        spath = QPainterPath()
+        spath.addEllipse(QRectF(sx - sr, sy - sr, sr * 2.0, sr * 2.0))
+        p.setBrush(QBrush(spec))
+        p.drawPath(spath)
+        p.setBrush(Qt.NoBrush)
+
     tt = _mark_tt(t)
     reduced = _reduced_motion()
     near_tilt, far_tilt = _field.orbit_tilts(tt)
@@ -563,7 +638,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     if beat > 0.0:
         _outline(nuc_r * _field.HALO_SCALE, nuc_rgb,
                  _field.HALO_BASE * beat, 1.0)
-    _dot(cx, cy, nuc_r, 1.0, nuc_rgb)
+    _nucleus(nuc_r, nuc_rgb)
 
     # ---- near field (depth >= 0.5), in front of the nucleus --------------
     _ring(near_tilt, 0.95)
