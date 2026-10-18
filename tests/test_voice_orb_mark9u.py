@@ -1390,3 +1390,173 @@ def test_ring_precession_and_radius_breath_are_non_harmonic():
     for a in periods:
         for b in fixed:
             assert not _harmonically_locked(a, b), (a, b)
+
+
+# --------------------------------------------------------------------------- #
+# RING PARTICLES + CYLINDER — owner 2026-10-18: "check particles cos they spin
+# only around one of the circles, add particles like in a cylinder over middle
+# orb and fix particles to be everywhere". The field must populate EVERY
+# declared ring, and wrap a vertical column of particles around the nucleus.
+# --------------------------------------------------------------------------- #
+def _legs(t, R, ring):
+    """The ring's live (rx, ry, tilt) exactly as the field places bodies."""
+    from voicebridge.orb import mark_field as F
+    tilt = ring["tilt"] + ring["tilt_spin_deg"]
+    rad = F.ring_radius_scale(t, ring)
+    return (R * ring["rx_frac"] * rad, R * ring["ry_frac"] * rad, tilt)
+
+
+def _ellipse_ratio(m, t, R, ring, rx, ry, tilt, scale=1.0):
+    """How far off a body's ring's ellipse it sits (1.0 == exactly on it)."""
+    from voicebridge.orb import mark_field as F
+    dx, dy = F.camera_offset(t, R)
+    sx, sy = m["x"] - dx, m["y"] - dy
+    tr = math.radians(tilt)
+    u = sx * math.cos(tr) + sy * math.sin(tr)
+    v = -sx * math.sin(tr) + sy * math.cos(tr)
+    pull = 1.0 - F.DEPTH_PERSPECTIVE * (1.0 - m["depth"])
+    return math.hypot(u / (rx * scale * pull), v / (ry * scale * pull))
+
+
+def test_ring_particles_populate_every_declared_ring():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 2.3
+    rings = F.ring_geometry(t)
+    ids = [r["id"] for r in rings]
+    parts = F.ring_particles(t, R)
+    assert parts == F.ring_particles(t, R)
+
+    covered = {p["ring_id"] for p in parts}
+    assert covered == set(ids), (covered, ids)
+    per_ring = {}
+    for p in parts:
+        per_ring[p["ring_id"]] = per_ring.get(p["ring_id"], 0) + 1
+    for r in rings:
+        want = F.RING_PARTICLE_COUNTS.get(r["id"], F.RING_PARTICLE_DEFAULT)
+        assert per_ring[r["id"]] == want
+        assert per_ring[r["id"]] >= 2, "at least two bodies per ring"
+
+    for p in parts:
+        assert set(p) >= {"index", "x", "y", "depth", "z", "z2", "size",
+                          "alpha", "lift", "hue", "hue2", "dof", "skew",
+                          "orbit", "ring_id"}
+        assert 0.0 <= p["depth"] <= 1.0
+        assert 0.0 <= p["hue"] < 1.0
+        assert p["hue2"] == pytest.approx((p["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+    assert len({p["index"] for p in parts}) == len(parts)
+
+    # Each body rides its OWN ring's real animated path, not a stale circle.
+    by_id = {r["id"]: r for r in rings}
+    for p in parts:
+        ring = by_id[p["ring_id"]]
+        rx, ry, tilt = _legs(t, R, ring)
+        assert _ellipse_ratio(p, t, R, ring, rx, ry, tilt) == \
+            pytest.approx(1.0, abs=1e-9), p["ring_id"]
+
+    # Motion: the bodies travel (different clock -> different positions).
+    later = F.ring_particles(t + 0.5, R)
+    assert [(p["x"], p["y"]) for p in parts] != \
+        [(p["x"], p["y"]) for p in later]
+
+    # Continuous: no body jumps between adjacent frames, on every ring.
+    prev = {(p["ring_id"], p["index"]): (p["x"], p["y"]) for p in parts}
+    for k in range(1, 90):
+        cur = {(p["ring_id"], p["index"]): (p["x"], p["y"])
+               for p in F.ring_particles(t + k / 60.0, R)}
+        for key, (x, y) in cur.items():
+            px, py = prev[key]
+            assert math.hypot(x - px, y - py) < 3.0, (key, k)
+        prev = cur
+
+
+def test_dust_state_populates_every_declared_ring():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 4.4
+    rings = F.ring_geometry(t)
+    dust = F.dust_state(t, R)
+    assert len(dust) == F.DUST_COUNT
+    seen = set()
+    for i, m in enumerate(dust):
+        ring = rings[i % len(rings)]
+        seen.add(ring["id"])
+        rx, ry, tilt = _legs(t, R, ring)
+        grow = F.DUST_R_FRAC_MIN + F.DUST_R_FRAC_SPAN * F.hash01(i, 5.9)
+        assert _ellipse_ratio(m, t, R, ring, rx, ry, tilt, scale=grow) == \
+            pytest.approx(1.0, abs=1e-9), ring["id"]
+    assert seen == {r["id"] for r in rings}, seen
+
+
+def test_cylinder_particles_are_deterministic_bounded_and_sweep():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.7
+    cyl = F.cylinder_particles(t, R)
+    assert len(cyl) == F.CYLINDER_COUNT
+    assert cyl == F.cylinder_particles(t, R)
+
+    r_min = F.CYLINDER_R_FRAC_MIN * R
+    r_max = (F.CYLINDER_R_FRAC_MIN + F.CYLINDER_R_FRAC_SPAN) * R
+    h_max = F.CYLINDER_H_FRAC * R
+    assert r_min < r_max and h_max > 0.0
+    for p in cyl:
+        assert set(p) >= {"index", "x", "y", "depth", "z", "z2", "size",
+                          "alpha", "lift", "hue", "hue2", "dof", "skew",
+                          "r", "h"}
+        assert r_min <= p["r"] <= r_max + 1e-9
+        assert abs(p["h"]) <= h_max + 1e-9
+        assert 0.0 <= p["depth"] <= 1.0
+        assert p["hue2"] == pytest.approx((p["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+
+    # A full 360 sweep of the vertical axis: every particle's recovered orbital
+    # angle covers all four quadrants over one period.
+    n = 48
+    for i in range(len(cyl)):
+        angs = []
+        for k in range(n):
+            tk = F.CYLINDER_PERIOD_S * k / n
+            dx, dy = F.camera_offset(tk, R)
+            p = F.cylinder_particles(tk, R)[i]
+            cos_a = (p["x"] - dx) / p["r"]
+            sin_a = 2.0 * p["depth"] - 1.0
+            angs.append(math.degrees(math.atan2(sin_a, cos_a)))
+        unwrapped = _unwrap_deg(angs)
+        assert max(unwrapped) - min(unwrapped) > 300.0, (i, unwrapped)
+
+    # Continuous: no particle jumps between adjacent frames.
+    prev = [(p["x"], p["y"]) for p in cyl]
+    for k in range(1, 120):
+        cur = [(p["x"], p["y"]) for p in F.cylinder_particles(t + k / 60.0, R)]
+        for (x, y), (px, py) in zip(cur, prev):
+            assert math.hypot(x - px, y - py) < 3.0, k
+        prev = cur
+
+
+def _unwrap_deg(degs):
+    """Unwrap a sequence of degrees so a 360 sweep is a monotone ramp."""
+    out = [degs[0]]
+    for d in degs[1:]:
+        prev = out[-1]
+        w = d
+        while w - prev > 180.0:
+            w -= 360.0
+        while w - prev < -180.0:
+            w += 360.0
+        out.append(w)
+    return out
+
+
+def test_ring_and_cylinder_layers_are_exported():
+    from voicebridge.orb import mark_field as F
+    for name in ("ring_particles", "RING_PARTICLE_COUNTS",
+                 "RING_PARTICLE_DEFAULT", "RING_PARTICLE_PERIOD_BASE",
+                 "RING_PARTICLE_PERIOD_SPAN", "RING_PARTICLE_SIZE",
+                 "RING_PARTICLE_ALPHA", "RING_PARTICLE_LIFT_BASE",
+                 "RING_PARTICLE_LIFT_GAIN",
+                 "cylinder_particles", "CYLINDER_COUNT",
+                 "CYLINDER_R_FRAC_MIN", "CYLINDER_R_FRAC_SPAN",
+                 "CYLINDER_H_FRAC", "CYLINDER_PERIOD_S",
+                 "CYLINDER_DRIFT_PERIOD_S", "CYLINDER_DRIFT_AMP",
+                 "CYLINDER_H_BASE", "CYLINDER_SIZE_BASE",
+                 "CYLINDER_ALPHA_BASE", "CYLINDER_LIFT_BASE",
+                 "CYLINDER_LIFT_GAIN"):
+        assert name in F.__all__, name
+        assert hasattr(F, name), name

@@ -865,17 +865,33 @@ def trails(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, float]]
 
 
 def dust_state(t: Any, R: float) -> List[Dict[str, float]]:
-    """Denser motes on the same orbits: the field never looks bare."""
+    """Denser motes spread across EVERY declared ring, not just the two orbits.
+
+    Each mote rides one of the circles :func:`ring_geometry` declares (cycling
+    the list so the field is populated uniformly), on that ring's REAL animated
+    path — live tilt plus precession and a radius scaled by
+    :func:`ring_radius_scale`. The dict shape is unchanged.
+    """
     tt = _finite(t)
     r = _finite(R, 32.0) or 32.0
+    # Declare the same circles the renderers stroke, but from the field's own
+    # tilts directly: dust rides the geometry, not a stubbed ``echo_rings``.
+    # ``ring_geometry`` composes its echo tilts from ``echo_rings(tt -
+    # ECHO_LAG_S)``, which subtracts the lag itself, so the declared follower
+    # sits at a DOUBLE lag — match it exactly so dust rides the drawn circle.
     near_tilt, far_tilt = orbit_tilts(tt)
+    lag_near, lag_far = orbit_tilts(tt - 2.0 * ECHO_LAG_S)
+    rings = _ring_specs(tt, near_tilt, far_tilt, lag_near, lag_far)
     dx, dy = camera_offset(tt, r)
-    rx, ry = r * RX_FRAC, r * RY_FRAC
     scale = r / 32.0
     out: List[Dict[str, float]] = []
     for i in range(DUST_COUNT):
-        orbit = "a" if i % 3 else "b"
-        tilt = near_tilt if orbit == "a" else far_tilt
+        ring = rings[i % len(rings)] if rings else {}
+        tilt = (_finite(ring.get("tilt"))
+                + _finite(ring.get("tilt_spin_deg")))
+        rad = ring_radius_scale(tt, ring)
+        rx = r * _finite(ring.get("rx_frac"), RX_FRAC) * rad
+        ry = r * _finite(ring.get("ry_frac"), RY_FRAC) * rad
         seed = 360.0 * hash01(i, 1.7)
         period = DUST_PERIOD_BASE + DUST_PERIOD_SPAN * hash01(i, 3.1)
         ang = (seed + tt * 360.0 / max(0.1, period)
@@ -1462,6 +1478,17 @@ def ring_geometry(t: Any) -> List[Dict[str, Any]]:
     tt = _finite(t)
     near_tilt, far_tilt = orbit_tilts(tt)
     lag_near, lag_far = (e["tilt"] for e in echo_rings(tt - ECHO_LAG_S))
+    return _ring_specs(tt, near_tilt, far_tilt, lag_near, lag_far)
+
+
+def _ring_specs(tt: float, near_tilt: float, far_tilt: float,
+                lag_near: float, lag_far: float) -> List[Dict[str, Any]]:
+    """Build the declared circle list from already-resolved ring tilts.
+
+    Split out of :func:`ring_geometry` so the field's OWN consumers (dust)
+    can declare the same circles without going through the patchable
+    ``echo_rings`` reader: dust rides the geometry, not a stubbed layer.
+    """
     out: List[Dict[str, Any]] = [
         {"id": "orbit_b", "layer": "main", "orbit": "b", "tilt": far_tilt,
          "rx_frac": RX_FRAC, "ry_frac": RY_FRAC, "alpha": RING_ALPHA_MAIN,
@@ -1538,6 +1565,149 @@ def ring_alpha(t: Any, ring: Dict[str, Any]) -> float:
         + RING_BREATH_SPAN * 0.5 * math.sin(phase))
 
 
+# -------------------------------------------------------------- ring particles
+#: Bodies riding EVERY circle :func:`ring_geometry` declares, so the mark reads
+#: as populated everywhere instead of on the two main orbits alone. Each ring
+#: contributes at least ``RING_PARTICLE_DEFAULT`` bodies (the two main orbits
+#: more), each at its own non-harmonic period and direction, and each riding the
+#: ring's REAL animated path — the live tilt (``tilt`` + ``tilt_spin_deg``) and
+#: a radius scaled by :func:`ring_radius_scale` — rather than a stale circle.
+RING_PARTICLE_COUNTS = {
+    "orbit_a": 4, "orbit_b": 4,
+    "echo_a": 3, "echo_b": 3,
+    "shell_0": 2, "shell_1": 2, "shell_2": 2,
+    "inner": 2,
+}
+RING_PARTICLE_DEFAULT = 2
+RING_PARTICLE_PERIOD_BASE = 6.5
+RING_PARTICLE_PERIOD_SPAN = 9.0
+RING_PARTICLE_SIZE = 0.14
+RING_PARTICLE_ALPHA = 0.55
+RING_PARTICLE_LIFT_BASE = 0.30
+RING_PARTICLE_LIFT_GAIN = 0.35
+
+
+def ring_particles(t: Any, R: float) -> List[Dict[str, Any]]:
+    """Deterministic bodies spread across EVERY :func:`ring_geometry` ring.
+
+    One dict per body: ``{"index", "x", "y", "depth", "z", "z2", "size",
+    "alpha", "lift", "hue", "hue2", "dof", "skew", "orbit", "ring_id"}``. Each
+    body travels its own ring at its own non-harmonic period and direction,
+    riding the ring's REAL animated path — its live tilt and a radius scaled by
+    :func:`ring_radius_scale` — so the bodies follow the circles the renderers
+    actually stroke. Pure in ``(t, R)``: no ``random`` anywhere.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    out: List[Dict[str, Any]] = []
+    gi = 0
+    for ring in ring_geometry(tt):
+        rid = str(ring.get("id") or "")
+        count = int(RING_PARTICLE_COUNTS.get(rid, RING_PARTICLE_DEFAULT))
+        tilt = _finite(ring.get("tilt")) + _finite(ring.get("tilt_spin_deg"))
+        rad = ring_radius_scale(tt, ring)
+        rx = r * _finite(ring.get("rx_frac"), RX_FRAC) * rad
+        ry = r * _finite(ring.get("ry_frac"), RY_FRAC) * rad
+        for _k in range(max(1, count)):
+            gi += 1
+            seed = 360.0 * hash01(gi, 211.1)
+            direction = 1.0 if hash01(gi, 213.7) >= 0.5 else -1.0
+            period = (RING_PARTICLE_PERIOD_BASE
+                      + RING_PARTICLE_PERIOD_SPAN * hash01(gi, 217.3))
+            ang = (seed + direction * 360.0 * tt / max(0.1, period)
+                   + _phase_wobble(tt, seed))
+            depth = _depth(ang)
+            pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
+            x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
+            pz, pz2 = depth_axes(gi, 223.9)
+            hue = _hue_for(gi, 227.1)
+            out.append({
+                "index": float(gi), "x": x + dx, "y": y + dy, "depth": depth,
+                "z": pz, "z2": pz2,
+                "size": _depth_size(depth, RING_PARTICLE_SIZE * scale),
+                "alpha": _depth_alpha(depth, RING_PARTICLE_ALPHA),
+                "lift": (RING_PARTICLE_LIFT_BASE
+                         + RING_PARTICLE_LIFT_GAIN * depth),
+                "hue": hue, "hue2": _hue_pair(hue),
+                "dof": dof(depth), "skew": skew(depth),
+                "orbit": str(ring.get("orbit") or ""), "ring_id": rid,
+            })
+    return out
+
+
+# ---------------------------------------------------------- cylinder particles
+#: A vertical column of particles wrapped around the nucleus: bodies on a
+#: cylinder (axis = the mark's vertical Y axis) at deterministic radii and
+#: heights, ORBITING the axis in a full 360 about the middle orb while the
+#: column slowly drifts up and down. This is the strong volume cue the owner
+#: asked for — the mark's interior is no longer only the rings. Radius is a
+#: fraction of R so the column hugs the nucleus and stays around the orbit
+#: envelope; height is signed and bounded to ~±0.5 R so it reads as a column.
+CYLINDER_COUNT = 32
+CYLINDER_R_FRAC_MIN = 0.18
+CYLINDER_R_FRAC_SPAN = 0.37
+CYLINDER_H_FRAC = 0.50
+CYLINDER_PERIOD_S = 6.1
+CYLINDER_DRIFT_PERIOD_S = 9.5
+CYLINDER_DRIFT_AMP = 0.30
+CYLINDER_H_BASE = 0.65
+CYLINDER_SIZE_BASE = 0.16
+CYLINDER_ALPHA_BASE = 0.55
+CYLINDER_LIFT_BASE = 0.30
+CYLINDER_LIFT_GAIN = 0.35
+
+
+def cylinder_particles(t: Any, R: float) -> List[Dict[str, Any]]:
+    """A breathing vertical cylinder of particles around the nucleus.
+
+    One dict per particle: ``{"index", "x", "y", "depth", "z", "z2", "size",
+    "alpha", "lift", "hue", "hue2", "dof", "skew", "r", "h"}``. ``r`` is the
+    cylinder radius the particle sits at (a fraction of R, so the column hugs
+    the nucleus and stays inside the orbit envelope); ``h`` is its signed
+    height, so a renderer can shade by height. Particles orbit the mark's
+    vertical axis — a full 360 over ``CYLINDER_PERIOD_S``, half of them the
+    other way — while a slow vertical drift makes the column breathe. Pure in
+    ``(t, R)``: no ``random`` anywhere.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    out: List[Dict[str, Any]] = []
+    for i in range(CYLINDER_COUNT):
+        idx = i + 1
+        rad = r * (CYLINDER_R_FRAC_MIN
+                   + CYLINDER_R_FRAC_SPAN * hash01(idx, 311.3))
+        direction = 1.0 if hash01(idx, 313.9) >= 0.5 else -1.0
+        phase0 = 360.0 * hash01(idx, 319.7)
+        ang = (phase0 + direction * 360.0 * tt / max(0.1, CYLINDER_PERIOD_S)
+               + _phase_wobble(tt, phase0))
+        depth = 0.5 + 0.5 * math.sin(math.radians(ang))
+        h_unit = (CYLINDER_H_BASE * (2.0 * hash01(idx, 323.3) - 1.0)
+                  + CYLINDER_DRIFT_AMP
+                  * math.sin(2.0 * math.pi * tt
+                             / max(0.1, CYLINDER_DRIFT_PERIOD_S)
+                             + hash01(idx, 327.9) * 2.0 * math.pi))
+        h = r * CYLINDER_H_FRAC * h_unit
+        cz, cz2 = depth_axes(idx, 331.1)
+        hue = _hue_for(idx, 337.7)
+        out.append({
+            "index": float(idx),
+            "x": rad * math.cos(math.radians(ang)) + dx, "y": h + dy,
+            "depth": depth,
+            "z": cz, "z2": cz2,
+            "size": _depth_size(depth, CYLINDER_SIZE_BASE * scale),
+            "alpha": _depth_alpha(depth, CYLINDER_ALPHA_BASE),
+            "lift": CYLINDER_LIFT_BASE + CYLINDER_LIFT_GAIN * depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "dof": dof(depth), "skew": skew(depth),
+            "r": rad, "h": h,
+        })
+    return out
+
+
 __all__ = [
     "PARTICLES", "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
     "FRINGE_PX", "LIFT_RING", "LIFT_BEAD", "LIFT_NUCLEUS",
@@ -1595,4 +1765,13 @@ __all__ = [
     "RING_PRECESS_PERIODS_S", "RING_PRECESS_PERIOD_SAT",
     "RING_PRECESS_AMP_DEG", "RING_RADIUS_BREATH_SPAN",
     "RING_RADIUS_BREATH_PHASE", "RING_MOTION_PERIODS_S",
+    "ring_particles", "RING_PARTICLE_COUNTS", "RING_PARTICLE_DEFAULT",
+    "RING_PARTICLE_PERIOD_BASE", "RING_PARTICLE_PERIOD_SPAN",
+    "RING_PARTICLE_SIZE", "RING_PARTICLE_ALPHA",
+    "RING_PARTICLE_LIFT_BASE", "RING_PARTICLE_LIFT_GAIN",
+    "cylinder_particles", "CYLINDER_COUNT", "CYLINDER_R_FRAC_MIN",
+    "CYLINDER_R_FRAC_SPAN", "CYLINDER_H_FRAC", "CYLINDER_PERIOD_S",
+    "CYLINDER_DRIFT_PERIOD_S", "CYLINDER_DRIFT_AMP", "CYLINDER_H_BASE",
+    "CYLINDER_SIZE_BASE", "CYLINDER_ALPHA_BASE", "CYLINDER_LIFT_BASE",
+    "CYLINDER_LIFT_GAIN",
 ]
