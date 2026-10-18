@@ -13,6 +13,7 @@ the numbers in this module change.
 from __future__ import annotations
 
 import dataclasses
+import contextlib
 import math
 import os
 import sys
@@ -41,6 +42,20 @@ def _reduced_motion_off():
     """Default every test to full motion; individual tests opt in."""
     key = "QUBIT_REDUCED_MOTION"
     prior = os.environ.pop(key, None)
+    try:
+        yield
+    finally:
+        if prior is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = prior
+
+
+@contextlib.contextmanager
+def monkeypatch_env(key, value):
+    """Scoped env override (the fixture above only guarantees the default)."""
+    prior = os.environ.get(key)
+    os.environ[key] = value
     try:
         yield
     finally:
@@ -311,6 +326,7 @@ def test_heartbeat_changes_nucleus_size_and_alpha_across_phases():
 
 def test_nucleus_radius_follows_field_nucleus_scale():
     from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
 
     size, R = 192, 90.0
     for t in (0.0, 0.07, 0.5):
@@ -318,9 +334,50 @@ def test_nucleus_radius_follows_field_nucleus_scale():
         nuc = _at(prims, size / 2.0, size / 2.0, tol=0.75)
         nuc = [p for p in nuc if p.kind == "ellipse" and p.fill is not None]
         assert len(nuc) == 1, (t, nuc)
-        expect = R * F.NUCLEUS_FRAC * F.nucleus_scale(t)
+        # The field owns the heartbeat breathing; the studio body is drawn
+        # NUCLEUS_RADIUS_MULT times the field's base radius on top of it.
+        expect = (R * F.NUCLEUS_FRAC * F.nucleus_scale(t)
+                  * Q.NUCLEUS_RADIUS_MULT)
         assert nuc[0].r == pytest.approx(expect, rel=0.03)
         assert nuc[0].fill[3] == 255
+
+
+def test_studio_nucleus_is_bigger_than_the_field_base_radius():
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    size, R, c = 192, 90.0, 96.0
+    # The body is a studio nucleus, not a hair-thin core: measurably larger
+    # than the field's own base radius, and it carries extra shading layers
+    # (glow, swirl lobes, specular) rather than a single flat disc.
+    assert Q.NUCLEUS_RADIUS_MULT > 1.0
+    prims = _record(t=0.4, size=size)
+    body = [p for p in _at(prims, c, c, tol=0.75)
+            if p.kind == "ellipse" and p.fill is not None]
+    assert len(body) == 1, body
+    assert body[0].r > R * F.NUCLEUS_FRAC * 1.15, body[0].r
+
+    shading = [p for p in prims if p.kind == "path" and p.fill is not None
+               and math.hypot(p.cx - c, p.cy - c)
+               <= body[0].r * Q.NUCLEUS_GLOW_MULT * 0.5]
+    # glow + two counter-rotating swirl lobes + static specular + orbiting one
+    assert len(shading) >= 5, len(shading)
+
+    # The orbiting specular actually travels around the body rim: a small
+    # highlight out near the body's edge, distinct from the larger static one.
+    def specular_pos(t):
+        prims = _record(t=t, size=size)
+        nuc_r = [p for p in _at(prims, c, c, tol=0.75)
+                 if p.kind == "ellipse" and p.fill is not None][0].r
+        rim = [p for p in prims if p.kind == "path" and p.fill is not None
+               and 0.3 * nuc_r <= math.hypot(p.cx - c, p.cy - c) <= 0.8 * nuc_r]
+        assert rim, (t, nuc_r)
+        dot = min(rim, key=lambda p: p.r)
+        assert dot.r < 0.25 * nuc_r, (t, dot.r, nuc_r)
+        return math.atan2(dot.cy - c, dot.cx - c)
+
+    a, b = specular_pos(0.0), specular_pos(Q.NUCLEUS_SPECULAR_PERIOD_S / 4.0)
+    assert abs(math.degrees(b - a)) > 30.0, (a, b)
 
 
 # -- (b) depth / far-near z-order ------------------------------------------
@@ -383,6 +440,7 @@ def test_far_elements_draw_before_nucleus_and_near_after():
 
 def test_shockwave_ring_appears_near_beat_and_not_between():
     from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
 
     size, R, c = 192, 90.0, 96.0
     beat_t, gap_t = 0.07, 0.5
@@ -392,7 +450,7 @@ def test_shockwave_ring_appears_near_beat_and_not_between():
 
     def shock_rings(t):
         prims = _record(t=t, size=size)
-        nuc_r = R * F.NUCLEUS_FRAC * F.nucleus_scale(t)
+        nuc_r = R * F.NUCLEUS_FRAC * F.nucleus_scale(t) * Q.NUCLEUS_RADIUS_MULT
         return [p for p in prims
                 if p.kind == "path" and p.fill is None and p.pen is not None
                 and math.hypot(p.cx - c, p.cy - c) <= 0.75
@@ -805,3 +863,66 @@ def test_motion_is_frame_to_frame_continuous():
     assert worst <= CONTINUITY_EPS_PX, (worst, worst_key)
     # And the contract is not vacuous: something really did move.
     assert worst > 0.5, worst
+
+
+# --------------------------------------------------------------------------- #
+# (m) master spin: a slow full rotation of the WHOLE mark
+# --------------------------------------------------------------------------- #
+def test_master_spin_is_one_full_turn_per_period_and_continuous():
+    from voicebridge.orb import qt_app as Q
+
+    assert Q.mark_spin_deg(0.0) == pytest.approx(0.0)
+    # One full turn per period, and it keeps counting past it (a wrapped
+    # phase would snap; a ramp cannot).
+    assert Q.mark_spin_deg(Q.MASTER_SPIN_PERIOD_S) == pytest.approx(360.0)
+    assert Q.mark_spin_deg(2.5 * Q.MASTER_SPIN_PERIOD_S) == pytest.approx(900.0)
+    step = 360.0 / Q.MASTER_SPIN_PERIOD_S / 60.0
+    prev = Q.mark_spin_deg(0.0)
+    for k in range(1, int(60 * Q.MASTER_SPIN_PERIOD_S)):
+        cur = Q.mark_spin_deg(k / 60.0)
+        assert cur - prev == pytest.approx(step, abs=1e-9), (k, prev, cur)
+        prev = cur
+
+
+def test_master_spin_is_a_no_op_under_reduced_motion():
+    from voicebridge.orb import qt_app as Q
+
+    with monkeypatch_env("QUBIT_REDUCED_MOTION", "1"):
+        assert Q.mark_spin_deg(37.4) == 0.0
+        assert Q.mark_spin_deg(-12.0) == 0.0
+
+
+def test_master_spin_turns_the_whole_mark_without_snapping():
+    from voicebridge.orb import qt_app as Q
+
+    # Across the wrap the painted frame moves only by ONE frame's worth of
+    # rotation: the spin never jumps, it eases through the turn.
+    near_wrap = _diff(_paint(23.999), _paint(24.0))
+    one_second = _diff(_paint(23.999), _paint(24.999))
+    assert 0 < near_wrap < one_second, (near_wrap, one_second)
+    # A quarter turn is plainly visible: the assembly really does rotate.
+    quarter = _diff(_paint(1.0), _paint(1.0 + Q.MASTER_SPIN_PERIOD_S / 4.0))
+    assert quarter > 0
+
+
+def test_reduced_motion_paint_carries_no_spin_transform():
+    # A still frame must not leave a rotation on the painter either: the
+    # transform is pushed and popped around the mark body.
+    _qt_app()
+    from PySide6.QtGui import QColor, QImage, QPainter
+
+    from voicebridge.orb import ember as E
+    from voicebridge.orb import qt_app as Q
+
+    os.environ["QUBIT_REDUCED_MOTION"] = "1"
+    try:
+        img = QImage(128, 128, QImage.Format_ARGB32_Premultiplied)
+        img.fill(QColor(*BG))
+        p = QPainter(img)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        Q._paint_mark(p, 64.0, 64.0, 58.0, 21.7, "idle", 1.0,
+                      E.family_from_core(E.state_core("idle")))
+        assert p.transform().isIdentity(), p.transform()
+        p.end()
+    finally:
+        os.environ.pop("QUBIT_REDUCED_MOTION", None)

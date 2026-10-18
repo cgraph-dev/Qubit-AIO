@@ -139,6 +139,31 @@ NUCLEUS_SPEC_ALPHA = 0.90
 #: crisp main hairline stays the dominant stroke instead of a rainbow outline.
 FRINGE_WIDTH_MULT = 1.6
 FRINGE_ALPHA_MULT = 0.09
+#: Master spin: a slow 360 deg rotation of the WHOLE mark about its centre,
+#: layered on top of every other motion (the Tk sibling's
+#: ``mark.MASTER_SPIN_PERIOD_S``). One full turn per period, so nothing in the
+#: field snaps: the mark keeps its own life and the whole assembly turns under
+#: it. A NO-OP under reduced motion (``mark_spin_deg`` reads the clamped clock).
+MASTER_SPIN_PERIOD_S = 24.0
+#: Studio nucleus: the shaded body is drawn 1.25x the field's base radius. The
+#: field still owns the heartbeat breathing; this only scales the body.
+NUCLEUS_RADIUS_MULT = 1.25
+#: Nucleus swirl: two counter-rotating hot lobes inside the body, so the centre
+#: has internal movement instead of a static gradient.
+NUCLEUS_SWIRL_RADIUS_FRAC = 0.22
+NUCLEUS_SWIRL_SIZE_FRAC = 0.30
+NUCLEUS_SWIRL_PERIOD_S = 6.0
+NUCLEUS_SWIRL_RADIUS2_FRAC = 0.42
+NUCLEUS_SWIRL_SIZE2_FRAC = 0.20
+NUCLEUS_SWIRL_PERIOD2_S = 9.0
+NUCLEUS_SWIRL_ALPHA = 0.85
+#: Orbiting specular: a small white dot running around the body's rim, which
+#: is what makes a shaded sphere read as turning rather than merely breathing.
+NUCLEUS_SPECULAR_ORBIT_FRAC = 0.50
+NUCLEUS_SPECULAR_SIZE_FRAC = 0.07
+NUCLEUS_SPECULAR_PERIOD_S = 12.0
+NUCLEUS_SPECULAR_PHASE_DEG = 90.0
+NUCLEUS_SPECULAR_ALPHA = 0.90
 #: Below this alpha a primitive is imperceptible: skip it rather than let the
 #: 8-bit quantisation snap it to zero in one frame (a tiny hard pop).
 ALPHA_EPS = 0.004
@@ -281,6 +306,17 @@ def mark_nucleus_sparks(t: Any, R: Any) -> List[Dict[str, float]]:
         return list(_field.nucleus_sparks(_mark_tt(t), R))
     except Exception:
         return []
+
+
+def mark_spin_deg(t: Any) -> float:
+    """Master-spin angle (degrees) of the whole mark at clock ``t``.
+
+    One full 360 deg turn per :data:`MASTER_SPIN_PERIOD_S`, continuous by
+    construction (a linear ramp, never a wrapped phase), so the rotation can
+    never snap at the turn boundary. Reads the CLAMPED clock, so reduced
+    motion yields ``0.0`` — the spin is a no-op there. Never raises.
+    """
+    return 360.0 * _mark_tt(t) / MASTER_SPIN_PERIOD_S
 
 
 def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
@@ -558,14 +594,18 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
              max(0.4, _num(traveller.get("size"), 0.0)),
              _num(traveller.get("alpha"), 0.0) * bright, rgb)
 
-    def _nucleus(radius: float, rgb: Tuple[int, int, int]) -> None:
+    def _nucleus(radius: float, rgb: Tuple[int, int, int], tt: float) -> None:
         """The mark's ONE solid body, shaded instead of a flat disc.
 
         A near-white hot core falls through the state hue to a transparent
         rim, drawn over a wide low-alpha glow, with a small off-centre
         specular highlight. The body is the only filled ellipse at the
-        centre; the glow and the highlight are gradient paths beside it, and
-        the whole thing is static (so reduced motion is a clean still frame).
+        centre; the glow, the swirl lobes and the highlight are gradient paths
+        beside it. On top of the heartbeat breathing (the caller's radius) the
+        body carries two counter-rotating inner swirl lobes and a slowly
+        orbiting specular dot, so the nucleus reads as a turning, living body
+        rather than a static gradient. Every term is a pure function of the
+        clamped clock, so reduced motion paints the identical still body.
         """
         r = _num(radius, 0.0)
         if r <= 0.0:
@@ -590,6 +630,28 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         body.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
         p.setBrush(QBrush(body))
         p.drawEllipse(cx - r, cy - r, r * 2.0, r * 2.0)
+        # Inner swirl: two counter-rotating hot lobes inside the body. They
+        # give the centre internal motion the flat gradient could never have.
+        for orbit_frac, size_frac, period, phase in (
+                (NUCLEUS_SWIRL_RADIUS_FRAC, NUCLEUS_SWIRL_SIZE_FRAC,
+                 NUCLEUS_SWIRL_PERIOD_S, 0.0),
+                (NUCLEUS_SWIRL_RADIUS2_FRAC, NUCLEUS_SWIRL_SIZE2_FRAC,
+                 NUCLEUS_SWIRL_PERIOD2_S, 180.0)):
+            ang = math.radians(360.0 * _num(tt, 0.0) / period + phase)
+            lx = cx + r * orbit_frac * math.cos(ang)
+            ly = cy + r * orbit_frac * math.sin(ang)
+            lr = max(0.6, r * size_frac)
+            lobe = QRadialGradient(QPointF(lx, ly), lr)
+            lobe.setColorAt(0.0, QColor(255, 255, 255,
+                                        _clamp8(255.0 * NUCLEUS_SWIRL_ALPHA)))
+            lobe.setColorAt(0.6, QColor(hot[0], hot[1], hot[2],
+                                        _clamp8(255.0 * NUCLEUS_SWIRL_ALPHA
+                                                * 0.45)))
+            lobe.setColorAt(1.0, QColor(hot[0], hot[1], hot[2], 0))
+            lpath = QPainterPath()
+            lpath.addEllipse(QRectF(lx - lr, ly - lr, lr * 2.0, lr * 2.0))
+            p.setBrush(QBrush(lobe))
+            p.drawPath(lpath)
         sr = r * NUCLEUS_SPEC_RADIUS_FRAC
         sx = cx - r * NUCLEUS_SPEC_OFFSET_FRAC
         sy = cy - r * NUCLEUS_SPEC_OFFSET_FRAC
@@ -601,6 +663,25 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         spath.addEllipse(QRectF(sx - sr, sy - sr, sr * 2.0, sr * 2.0))
         p.setBrush(QBrush(spec))
         p.drawPath(spath)
+        # Orbiting specular: a small hot dot running once around the body per
+        # period — the cue that reads as rotation rather than pulsing.
+        pang = math.radians(360.0 * _num(tt, 0.0) / NUCLEUS_SPECULAR_PERIOD_S
+                            + NUCLEUS_SPECULAR_PHASE_DEG)
+        pr = max(0.5, r * NUCLEUS_SPECULAR_SIZE_FRAC)
+        px = cx + r * NUCLEUS_SPECULAR_ORBIT_FRAC * math.cos(pang)
+        py = cy + r * NUCLEUS_SPECULAR_ORBIT_FRAC * math.sin(pang)
+        pd = QRadialGradient(QPointF(px, py), pr * 2.0)
+        pd.setColorAt(0.0, QColor(255, 255, 255,
+                                  _clamp8(255.0 * NUCLEUS_SPECULAR_ALPHA)))
+        pd.setColorAt(0.5, QColor(255, 255, 255,
+                                  _clamp8(255.0 * NUCLEUS_SPECULAR_ALPHA
+                                          * 0.35)))
+        pd.setColorAt(1.0, QColor(255, 255, 255, 0))
+        ppath = QPainterPath()
+        ppath.addEllipse(QRectF(px - pr * 2.0, py - pr * 2.0, pr * 4.0,
+                                pr * 4.0))
+        p.setBrush(QBrush(pd))
+        p.drawPath(ppath)
         p.setBrush(Qt.NoBrush)
 
     tt = _mark_tt(t)
@@ -628,6 +709,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     near_sparks = [s for s in sparks
                    if _num(s.get("depth"), 0.0) >= 0.5]
     draw_trails = not reduced
+
+    # ---- master spin -----------------------------------------------------
+    # The whole mark turns once per MASTER_SPIN_PERIOD_S about (cx, cy), on
+    # top of every layer's own motion. Applied as a painter transform so each
+    # point keeps the field's exact geometry and only the assembly rotates.
+    # The angle comes from the clamped clock, so the rotation is a true no-op
+    # under reduced motion, and it is reduced modulo a full turn for numerical
+    # stability at large clocks — a turn is the identity, so that wrap is
+    # invisible (no snap).
+    spin = math.fmod(mark_spin_deg(tt), 360.0)
+    p.save()
+    if spin:
+        p.translate(cx, cy)
+        p.rotate(spin)
+        p.translate(-cx, -cy)
 
     # ---- far field (depth < 0.5), behind the nucleus ---------------------
     _ring(far_tilt, 0.60)
@@ -657,7 +753,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # ---- the z-seam: shockwave, halo, nucleus ----------------------------
     beat = 0.0 if reduced else _field.heartbeat(tt)
     nuc_scale = 1.0 if reduced else _field.nucleus_scale(tt)
-    nuc_r = Rf * _field.NUCLEUS_FRAC * nuc_scale
+    nuc_r = Rf * _field.NUCLEUS_FRAC * NUCLEUS_RADIUS_MULT * nuc_scale
     sw_scale, sw_alpha = (0.0, 0.0) if reduced else _field.shockwave(tt)
     if sw_alpha > 0.0:
         # One thin expanding ring per beat: stroke only, never a fill/glow.
@@ -666,7 +762,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     if beat > 0.0:
         _outline(nuc_r * _field.HALO_SCALE, nuc_rgb,
                  _field.HALO_BASE * beat, 1.0)
-    _nucleus(nuc_r, nuc_rgb)
+    _nucleus(nuc_r, nuc_rgb, tt)
 
     # ---- near field (depth >= 0.5), in front of the nucleus --------------
     _ring(near_tilt, 0.95)
@@ -692,6 +788,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     if (traveller is not None
             and _num(traveller.get("depth"), 0.0) >= 0.5):
         _comet(traveller)
+
+    p.restore()
 
 
 def backend_wanted() -> str:
