@@ -1013,7 +1013,7 @@ PLATFORM_HINT = (
     "preserved for threading. Do not include greetings or sign-offs unless contextually appropriate."
 )
 
-_SEND_TARGET_RE = re.compile("^\s*[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\s*$", re.IGNORECASE)
+_SEND_TARGET_RE = re.compile(r"^\s*[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\s*$", re.IGNORECASE)
 
 
 def register(ctx) -> None:

@@ -1151,7 +1151,7 @@ PLATFORM_HINT = (
     "documents; image URLs via ![alt](url) send as photos."
 )
 
-_SEND_JID_RE = re.compile("^\s*[\w-]+@(?:g\.us|s\.whatsapp\.net|lid|broadcast|newsletter)\s*$", re.IGNORECASE)
+_SEND_JID_RE = re.compile(r"^\s*[\w-]+@(?:g\.us|s\.whatsapp\.net|lid|broadcast|newsletter)\s*$", re.IGNORECASE)
 
 
 def register(ctx) -> None:
