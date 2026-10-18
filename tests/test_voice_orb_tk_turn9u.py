@@ -565,10 +565,13 @@ def _strip_moving_layers(monkeypatch):
     monkeypatch.setattr(M, "_field_ring_particles", None)
     monkeypatch.setattr(M, "_field_cylinder_particles", None)
     monkeypatch.setattr(M, "_field_orbiter_particles", None)
-    # The math-symbol layer and the screen-break bodies are their own layers
-    # too, so an isolated-body frame must suppress them or their glyphs/bodies
-    # pose as the body's.
-    monkeypatch.setattr(M, "_field_math_state", None)
+    # The 3D volume-particle field, the black-hole structure layers and the
+    # screen-break bodies are their own layers too, so an isolated-body frame
+    # must suppress them or their bodies pose as the body's.
+    monkeypatch.setattr(M, "_field_volume_particles", None)
+    monkeypatch.setattr(M, "_field_accretion_stream", None)
+    monkeypatch.setattr(M, "_field_photon_ring", None)
+    monkeypatch.setattr(M, "_field_infall_streaks", None)
     monkeypatch.setattr(M, "_field_screen_break", None)
     return part
 
@@ -737,7 +740,11 @@ def test_every_circle_is_stroked_from_the_declared_ring_set(monkeypatch):
     # drawn points are the declared ones plus the body's own (unswayed) centre.
     probe = dict(F.ring_geometry(0.0)[0])
     probe.update({"id": "probe", "layer": "satellite", "orbit": "",
-                  "rx_frac": 0.40, "ry_frac": 0.20, "alpha": 0.5, "tilt": 0.0})
+                  "rx_frac": 0.40, "ry_frac": 0.20, "alpha": 0.5, "tilt": 0.0,
+                  # Isolate the radius: kill the shared plane precession so the
+                  # drawn ellipse stays axis-aligned (otherwise max|x| is the
+                  # rotated rx, and this would be a tilt test).
+                  "tilt_spin_deg": 0.0})
     monkeypatch.setattr(M, "ring_geometry", lambda tt: [])
     zero, _ = render(0.0)
     monkeypatch.setattr(M, "ring_geometry", lambda tt: [probe])
@@ -747,9 +754,10 @@ def test_every_circle_is_stroked_from_the_declared_ring_set(monkeypatch):
     assert len(added) == 1
     pts = added[0][0]
     # No camera sway: the circles belong to the body, which does not sway. The
-    # reserved radii carry the field's gentle per-ring radius breath, so the
-    # expectation reads the same additive scale the renderer applies.
-    rscale = F.ring_radius_scale(0.0, probe)
+    # drawn radii carry the field's gentle shared radius breath AND the per-ring
+    # shimmer detail, so the expectation reads the same additive scale the
+    # renderer applies.
+    rscale = F.ring_radius_scale(0.0, probe) * F.ring_shimmer(0.0, probe)
     assert max(abs(p - CX) for p in pts[0::2]) == pytest.approx(
         R * probe["rx_frac"] * rscale, abs=1e-6)
     assert max(abs(p - CY) for p in pts[1::2]) == pytest.approx(
@@ -843,22 +851,91 @@ def test_a_long_field_trail_is_drawn_as_a_short_stub(monkeypatch):
     assert len(wake) == 2, "only the first 3 samples are kept"
 
 
-def test_math_glyphs_paint_as_text(monkeypatch):
-    # Owner: "add math symbols equations not random lines". Same glyph
-    # machinery as the "1"/"0" bits, drawn with create_text.
+def test_volume_particles_paint_as_glints_never_as_text(monkeypatch):
+    # Owner retired the math-glyph TEXT layer ("they read as checkmarks /
+    # v lines") for a real 3D particle field. The Tk renderer must draw each
+    # body as a glint (two arms + a core), coloured from the field's palette,
+    # and NEVER as a glyph.
     _strip_moving_layers(monkeypatch)
-    syms = [
+    bodies = [
         {"index": 0.0, "x": -20.0, "y": 0.0, "depth": 0.2, "size": 1.4,
-         "alpha": 0.9, "lift": 0.5, "hue": 0.0, "char": "\u03c0"},
+         "alpha": 0.9, "lift": 0.5, "hue": 0.0, "spin": 30.0,
+         "z": 0.2, "z2": 0.7},
         {"index": 1.0, "x": 18.0, "y": 0.0, "depth": 0.8, "size": 1.4,
-         "alpha": 0.9, "lift": 0.5, "hue": 0.5, "char": "\u2211"},
+         "alpha": 0.9, "lift": 0.5, "hue": 0.5, "spin": 210.0,
+         "z": 0.6, "z2": 0.3},
     ]
-    monkeypatch.setattr(M, "_field_math_state",
-                        lambda tt, rr: [dict(s) for s in syms])
+    monkeypatch.setattr(M, "_field_volume_particles",
+                        lambda tt, rr: [dict(b) for b in bodies])
     c, stats = render(1.7)
-    texts = [kw.get("text") for (_x, _y), kw in c.texts]
-    assert "\u03c0" in texts and "\u2211" in texts, texts
-    assert stats["texts"] >= 2
+    assert stats["texts"] == 0, "volume particles must never be text"
+    monkeypatch.setattr(M, "_field_volume_particles", lambda tt, rr: [])
+    bare, _ = render(1.7)
+    # Exactly one core oval and its two crossed arms per visible body, and no
+    # text primitive anywhere.
+    assert len(_new_ovals(c, bare)) == len(bodies)
+    assert len(_new_lines(c, bare)) == 2 * len(bodies)
+
+
+def test_accretion_photon_and_infall_layers_are_drawn(monkeypatch):
+    # Owner: "the spirals or circles make them look like blackholes add more
+    # details and animations". The three field layers must reach the canvas,
+    # with the right primitive shape, and be gone under reduced motion like
+    # every other life layer.
+    _strip_moving_layers(monkeypatch)
+    layer = {
+        "index": 0.0, "x": 12.0, "y": 0.0, "depth": 0.8, "size": 1.2,
+        "alpha": 0.9, "lift": 0.5, "hue": 0.6, "hue2": 0.65,
+        "z": 0.5, "z2": 0.5, "vx": -3.0, "vy": 0.0, "tail_len": 8.0,
+    }
+    for attr, d_ovals, d_lines in (("_field_accretion_stream", 1, 0),
+                                   ("_field_photon_ring", 1, 0),
+                                   ("_field_infall_streaks", 1, 1)):
+        monkeypatch.setattr(M, attr, lambda tt, rr: [])
+        _base, sb = render(1.7)
+        _fbase, sfb = render(1.7, reduced=True)
+        monkeypatch.setattr(M, attr, lambda tt, rr, d=layer: [dict(d)])
+        _live, sl = render(1.7)
+        _flive, sfl = render(1.7, reduced=True)
+        assert sl["ovals"] - sb["ovals"] == d_ovals, attr
+        assert sl["lines"] - sb["lines"] == d_lines, attr
+        # Reduced motion drops the layer entirely (compared like for like).
+        assert sfl["ovals"] == sfb["ovals"], attr
+        assert sfl["lines"] == sfb["lines"], attr
+        monkeypatch.setattr(M, attr, None)
+
+
+def test_ring_stroke_consumes_per_ring_intensity_and_shimmer(monkeypatch):
+    # Task 2: the field's per-ring INTENSITY must modulate the stroke alpha and
+    # its SHIMMER the drawn radius, so a circle reads as a live accretion
+    # structure instead of a dead outline. Measured against an empty ring set
+    # so the probe's stroke is the only line difference.
+    probe = dict(F.ring_geometry(0.0)[0])
+    probe.update({"id": "probe", "layer": "satellite", "orbit": "",
+                  "rx_frac": 0.40, "ry_frac": 0.20, "alpha": 0.5,
+                  "tilt": 0.0, "seed": 2.0})
+    monkeypatch.setattr(M, "ring_geometry", lambda tt: [])
+    empty, _ = render(0.0)
+    monkeypatch.setattr(M, "ring_geometry", lambda tt: [probe])
+
+    def probe_stroke():
+        c, _ = render(0.0)
+        added = _new_lines(c, empty)
+        assert len(added) == 1, len(added)
+        return added[0]
+
+    monkeypatch.setattr(M, "ring_intensity", lambda tt, ring: 0.30)
+    monkeypatch.setattr(M, "ring_shimmer", lambda tt, ring: 0.80)
+    dim_pts, dim_kw = probe_stroke()
+    monkeypatch.setattr(M, "ring_intensity", lambda tt, ring: 1.0)
+    bright_pts, bright_kw = probe_stroke()
+    # Intensity modulates the stroke colour (alpha is a mix toward background).
+    assert dict(dim_kw)["fill"] != dict(bright_kw)["fill"]
+    # Shimmer modulates the drawn radius; the shared rigid scale is untouched.
+    monkeypatch.setattr(M, "ring_shimmer", lambda tt, ring: 1.30)
+    wide_pts, _ = probe_stroke()
+    assert (max(abs(p - CX) for p in wide_pts[0::2])
+            > max(abs(p - CX) for p in bright_pts[0::2]))
 
 
 def test_screen_break_bodies_are_drawn_outside_the_radius(monkeypatch):
@@ -878,15 +955,16 @@ def test_screen_break_bodies_are_drawn_outside_the_radius(monkeypatch):
     assert reach > R, reach
 
 
-def test_reduced_motion_draws_no_math_or_screen_break(monkeypatch):
-    monkeypatch.setattr(M, "_field_math_state", lambda tt, rr: [
+def test_reduced_motion_draws_no_volume_or_screen_break(monkeypatch):
+    monkeypatch.setattr(M, "_field_volume_particles", lambda tt, rr: [
         {"index": 0.0, "x": 0.0, "y": 0.0, "depth": 0.8, "size": 1.5,
-         "alpha": 0.9, "lift": 0.5, "hue": 0.5, "char": "\u03c0"}])
+         "alpha": 0.9, "lift": 0.5, "hue": 0.5, "spin": 0.0}])
     monkeypatch.setattr(M, "_field_screen_break", lambda tt, rr: [
         {"index": 0.0, "x": 1.5 * R, "y": 0.0, "depth": 0.8, "size": 1.5,
          "alpha": 0.9, "lift": 0.5, "hue": 0.5}])
     c, stats = render(1.7, reduced=True)
-    # (Binary "1"/"0" fragments are a pre-existing still-frame layer; only the
-    # math glyphs and screen-break bodies must be absent.)
+    # (Binary "1"/"0" fragments are a pre-existing still-frame layer; the
+    # retired math glyphs, the volume field and the screen-break bodies must
+    # all be absent from a still frame.)
     assert all(kw.get("text") in ("0", "1") for (_x, _y), kw in c.texts)
     assert stats["ovals"] == len(M.PARTICLES) + M.NUCLEUS_OVAL_COUNT
