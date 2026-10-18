@@ -83,7 +83,7 @@ RING_PERIOD_FAR = 17.0
 #: Per-particle wobble: a bounded PHASE offset in degrees, never a clock
 #: multiplier (a multiplier makes the field accelerate with uptime).
 SPEED_MOD_AMP = 0.10
-SPEED_MOD_DEG = 7.0
+SPEED_MOD_DEG = 3.0
 SPEED_MOD_HZ = 0.7
 
 # ------------------------------------------------------------------ trails
