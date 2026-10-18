@@ -390,6 +390,9 @@ def rgb_trail(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, floa
     and ``RGB_TRAIL_HUE_DRIFT`` per second, so the tail is a live spectrum
     ramp. A particle dict from :func:`particle_state` works as-is; any dict
     with ``x``/``y``/``vx``/``vy`` streaks along its own velocity.
+
+    Hue wraps at 1.0 like the colour wheel does: convert per sample with
+    :func:`hue_to_rgb` and do not lerp hue linearly across the wrap.
     """
     body = particle if isinstance(particle, dict) else {}
     orbit = str(body.get("orbit") or "a")
