@@ -477,9 +477,11 @@ def test_every_stroked_circle_matches_the_declared_geometry():
     prims = T._record(t=t, size=size)
     # Only strokes as wide as a DECLARED circle. The core ring is the smallest,
     # and the nucleus's own halo/shockwave outlines are centre detail, not
-    # circles of the mark.
+    # circles of the mark. Strokes as thin as a glint ARM (GLINT_PEN_W) are the
+    # batched new-layer ring-particle arms, which are not circles at all.
     strokes = [p for p in prims if p.kind == "path" and p.fill is None
-               and p.pen is not None and max(p.w, p.h) >= 40.0]
+               and p.pen is not None and max(p.w, p.h) >= 40.0
+               and abs(p.width - Q.GLINT_PEN_W) > 0.05]
     echo_tilt = {str(e["orbit"]): e["tilt"] for e in F.echo_rings(t)}
     unmatched = list(strokes)
     for ring in F.ring_geometry(t):
@@ -502,7 +504,9 @@ def test_every_stroked_circle_matches_the_declared_geometry():
         assert hit is not None, (ring["id"], want, len(unmatched))
         unmatched.remove(hit)
     # The two main orbits also carry a two-stroke chromatic fringe, which is
-    # part of the logo's look and is exclusive to them.
+    # part of the logo's look and is exclusive to them. With the glint arms
+    # filtered out above, the only strokes left unidentified are the four
+    # fringe strokes.
     assert len(unmatched) == 4, [(round(p.w, 1), round(p.h, 1))
                                  for p in unmatched]
 

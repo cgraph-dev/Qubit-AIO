@@ -151,6 +151,26 @@ COMET_BEAD_SAT = 0.95
 #: snapping out between frames.
 BLINK_DOT_SAT = 0.9
 BLINK_DOT_MIN_PX = 0.30
+# --- the new rich layers: batched draws ------------------------------------
+#: The field now returns many more bodies (ring particles on EVERY circle, a
+#: cylinder column, a rarer flare family, a travelling filament, plus the
+#: existing dense sparkle cloud). They are all real layers, but the primitive
+#: ceiling is fixed, so high-count dot layers are emitted as a few SPECTRAL
+#: BUCKETS — each bucket is ONE fill path holding every body in it — and the
+#: trailing layer is stroked as one path. More life, flat cost. ``*_DRAW_LIMIT``
+#: bounds the bodies considered so the per-frame CPU stays flat too.
+RING_PARTICLE_DRAW_LIMIT = 22
+CYLINDER_DRAW_LIMIT = 32
+FLARE_DRAW_LIMIT = 8
+FILAMENT_DRAW_COUNT = 10
+RING_PARTICLE_BUCKETS = 3
+CYLINDER_BUCKETS = 3
+FLARE_BUCKETS = 2
+SPARKLE_BUCKETS = 4
+#: The cylinder column is shaded by height: a particle at the top/bottom of the
+#: column is dimmer than one at the nucleus's equator, so the column reads as a
+#: volume with a falloff instead of a flat scatter.
+CYLINDER_HEIGHT_DIM = 0.45
 #: A streak is pulled this far toward the state's lifted nucleus colour. Full
 #: saturation is the point, but an untinted rainbow in a mark that changes
 #: colour with the state would read as a different product.
@@ -1079,6 +1099,32 @@ def mark_cylinder_particles(t: Any, R: Any) -> List[Dict[str, Any]]:
     return _field_layer("cylinder_particles", t, R, reduced_empty=True)
 
 
+def strided(items: Any, target: int) -> List[Dict[str, Any]]:
+    """At most ``target`` dicts from ``items``, evenly strided.
+
+    The new rich layers return more bodies than the primitive ceiling can
+    afford to draw. Drawing a fixed, evenly-spread subset keeps the mark rich
+    while the per-frame cost stays flat and independent of the field's count.
+    Junk entries are dropped; never raises.
+    """
+    seq = [x for x in (items or []) if isinstance(x, dict)]
+    tgt = int(target) if isinstance(target, int) or str(target).lstrip("-").isdigit() else 0
+    if tgt <= 0:
+        return []
+    if len(seq) <= tgt:
+        return seq
+    step = int(math.ceil(len(seq) / float(tgt)))
+    return seq[::step][:tgt]
+
+
+def _is_near(item: Any, near: bool) -> bool:
+    """True when an element belongs to the near (depth >= 0.5) z-seam half."""
+    try:
+        return (_finite(item.get("depth"), 0.5) >= 0.5) == near
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _finite(v: Any, default: float = 0.0) -> float:
     try:
         f = float(v)
@@ -1605,13 +1651,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                     gain=SPARKLE_TRAIL_GAIN,
                     half=SPARKLE_TRAIL_HALF_WIDTH,
                     zseed=_num(glint.get("index"), None))
-        gx, gy, g = _place(glint.get("x"), glint.get("y"), depth,
-                           zseed=_num(glint.get("index"), None),
-                           zflat=True, z=glint.get("z"), z2=glint.get("z2"))
-        _dot(gx, gy,
-             max(0.3, _num(glint.get("size"), 0.0) * g),
-             _shade(_num(glint.get("alpha"), 0.0) * bright, depth, g),
-             _lift(glint.get("lift")), g)
+        # The sparkle's DOT is not drawn here: the many field glints are
+        # emitted as a few batched fill paths (_layer_batch) so the primitive
+        # ceiling holds while the cloud stays as dense. Its wake is personal
+        # and stays per-body.
 
     def _comet(traveller: Dict[str, Any], draw_trail: bool) -> None:
         if _num(traveller.get("alpha"), 0.0) <= 0.0:
@@ -1928,6 +1971,153 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.drawPath(path)
         p.setBrush(Qt.NoBrush)
 
+    def _ring_particle(body: Dict[str, Any]) -> None:
+        """Unused per-body path; the ring bodies are drawn batched below."""
+        _glint(_num(body.get("x"), 0.0), _num(body.get("y"), 0.0),
+               _num(body.get("size"), 0.0),
+               _shade(_num(body.get("alpha"), 0.0),
+                      _num(body.get("depth"), 0.5)),
+               _lift(_num(body.get("lift"), _field.LIFT_BEAD)),
+               arm_frac=_field.GLINT_ARM_FRAC * 0.8,
+               skew_deg=body.get("skew"), depth=_num(body.get("depth"), 0.5),
+               zseed=_num(body.get("index"), None),
+               z=body.get("z"), z2=body.get("z2"))
+
+    def _project_body(body: Dict[str, Any]) -> Tuple[float, float, float]:
+        """``(px, py, size_px)`` of one body through place + rotated depth."""
+        d = _num(body.get("depth"), 0.5)
+        px, py, g = _place(body.get("x"), body.get("y"), d,
+                           zseed=_num(body.get("index"), None), zflat=True,
+                           z=body.get("z"), z2=body.get("z2"))
+        return px, py, max(0.0, _num(body.get("size"), 0.0) * g)
+
+    def _layer_batch(items: Any, buckets: int, arm_frac: float = 0.0
+                     ) -> None:
+        """Draw MANY field bodies as a FEW batched paths, bucketed by hue.
+
+        The field's new layers return dozens of bodies (ring particles on
+        every circle, the cylinder column, the flare family). Drawing each
+        body as its own primitive would cross the mark's fixed primitive
+        ceiling, so bodies are collected into ``buckets`` spectral groups and
+        each group is emitted as ONE fill path (plus, when ``arm_frac`` > 0,
+        ONE stroke path for glint arms). The cloud reads dense and spectral
+        while the per-frame primitive cost stays flat.
+        """
+        n = max(1, int(buckets))
+        groups: List[List[Tuple[float, float, float, float]]] = [
+            [] for _ in range(n)]
+        for b in items:
+            if not isinstance(b, dict):
+                continue
+            d = _num(b.get("depth"), 0.5)
+            alpha = _shade(_num(b.get("alpha"), 0.0), d) * bright
+            px, py, size = _project_body(b)
+            if alpha <= ALPHA_EPS or size <= 0.0:
+                continue
+            k = int(max(0.0, min(0.999, _num(b.get("hue"), 0.0))) * n) % n
+            groups[k].append((px, py, max(BLINK_DOT_MIN_PX, size), alpha))
+        for k, pts in enumerate(groups):
+            if not pts:
+                continue
+            rgb = _anchor(_spec_rgb((k + 0.5) / float(n), BLINK_DOT_SAT))
+            if arm_frac > 0.0:
+                stroke = QPainterPath()
+                for px, py, size, _a in pts:
+                    arm = size * arm_frac
+                    stroke.moveTo(px - arm, py - arm)
+                    stroke.lineTo(px + arm, py + arm)
+                    stroke.moveTo(px - arm, py + arm)
+                    stroke.lineTo(px + arm, py - arm)
+                p.setBrush(Qt.NoBrush)
+                p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
+                                     _clamp8(255.0 * max(
+                                         a for _x, _y, _s, a in pts))),
+                              GLINT_PEN_W))
+                p.drawPath(stroke)
+                p.setPen(Qt.NoPen)
+            path = QPainterPath()
+            for px, py, size, _a in pts:
+                rr = size * (GLINT_CORE_SCALE if arm_frac > 0.0 else 1.0)
+                rr = max(GLINT_CORE_MIN, rr)
+                path.addEllipse(QRectF(px - rr, py - rr, rr * 2.0, rr * 2.0))
+            peak = max(a for _x, _y, _s, a in pts)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
+            p.drawPath(path)
+            p.setBrush(Qt.NoBrush)
+
+    def _cylinder(body: Dict[str, Any]) -> None:
+        """Unused per-body path; the column is drawn batched by height band."""
+        depth = _num(body.get("depth"), 0.5)
+        cx_, cy_, g = _place(body.get("x"), body.get("y"), depth,
+                             zseed=_num(body.get("index"), None), zflat=True,
+                             z=body.get("z"), z2=body.get("z2"))
+        hh = abs(_num(body.get("h"), 0.0)) / (Rf if Rf > 0.0 else 1.0)
+        dim = 1.0 - CYLINDER_HEIGHT_DIM * min(1.0, hh)
+        alpha = _shade(_num(body.get("alpha"), 0.0) * dim, depth, g) * bright
+        size = _num(body.get("size"), 0.0)
+        if alpha <= ALPHA_EPS or size <= 0.0:
+            return
+        rgb = _anchor(_spec_rgb(_num(body.get("hue"), 0.0), BLINK_DOT_SAT))
+        _dot(cx_, cy_, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
+
+    def _cylinder_batch(items: Any, buckets: int) -> None:
+        """The vertical column, batched; bodies dim toward the column ends."""
+        n = max(1, int(buckets))
+        groups: List[List[Tuple[float, float, float, float]]] = [
+            [] for _ in range(n)]
+        for b in items:
+            if not isinstance(b, dict):
+                continue
+            d = _num(b.get("depth"), 0.5)
+            hh = abs(_num(b.get("h"), 0.0)) / (Rf if Rf > 0.0 else 1.0)
+            dim = 1.0 - CYLINDER_HEIGHT_DIM * min(1.0, hh)
+            alpha = _shade(_num(b.get("alpha"), 0.0) * dim, d) * bright
+            px, py, size = _project_body(b)
+            if alpha <= ALPHA_EPS or size <= 0.0:
+                continue
+            k = int(max(0.0, min(0.999, _num(b.get("hue"), 0.0))) * n) % n
+            groups[k].append((px, py, max(BLINK_DOT_MIN_PX, size), alpha))
+        for k, pts in enumerate(groups):
+            if not pts:
+                continue
+            rgb = _anchor(_spec_rgb((k + 0.5) / float(n), BLINK_DOT_SAT))
+            path = QPainterPath()
+            for px, py, size, _a in pts:
+                path.addEllipse(QRectF(px - size, py - size,
+                                       size * 2.0, size * 2.0))
+            peak = max(a for _x, _y, _s, a in pts)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
+            p.drawPath(path)
+            p.setBrush(Qt.NoBrush)
+
+    def _flare(fl: Dict[str, Any]) -> None:
+        """Unused per-body path; the flare family is drawn batched."""
+        d = _num(fl.get("depth"), 0.5)
+        fx, fy, g = _place(fl.get("x"), fl.get("y"), d,
+                           zseed=_num(fl.get("index"), None), zflat=True,
+                           z=fl.get("z"), z2=fl.get("z2"))
+        size = _num(fl.get("size"), 0.0)
+        alpha = _num(fl.get("alpha"), 0.0) * bright * g
+        if alpha <= ALPHA_EPS or size <= 0.0:
+            return
+        rgb = _anchor(_spec_rgb(_num(fl.get("hue"), 0.0), BLINK_DOT_SAT))
+        _dot(fx, fy, max(BLINK_DOT_MIN_PX, size), alpha, rgb, g)
+
+    def _filament(smp: Dict[str, Any]) -> None:
+        """One sample of the travelling energy filament, a pulsing dot."""
+        d = _num(smp.get("depth"), 0.5)
+        fx, fy, g = _place(smp.get("x"), smp.get("y"), d,
+                           zseed=_num(smp.get("index"), None), zflat=True,
+                           z=smp.get("z"), z2=smp.get("z2"))
+        size = _num(smp.get("size"), 0.0)
+        alpha = _num(smp.get("alpha"), 0.0) * bright * g
+        if alpha <= ALPHA_EPS or size <= 0.0:
+            return
+        rgb = _anchor(_spec_rgb(_num(smp.get("hue"), 0.0), BLINK_DOT_SAT))
+        _dot(fx, fy, max(BLINK_DOT_MIN_PX, size), alpha, rgb, g)
+
     tt = _mark_tt(t)
     reduced = _reduced_motion()
     # The combined X+Y tumble's phases, bound here now that the clamped clock
@@ -1986,6 +2176,18 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     blinks = mark_blink_dots(tt, Rf)
     far_blinks = [b for b in blinks if _num(b.get("depth"), 0.0) < 0.5]
     near_blinks = [b for b in blinks if _num(b.get("depth"), 0.0) >= 0.5]
+    # The new rich layers: bodies on every ring, a vertical cylinder around the
+    # nucleus, a rarer flare family and the travelling energy filament. Each is
+    # strided to a fixed cap, so the frame gains life without unbounded work.
+    ring_parts = ([] if reduced
+                  else strided(mark_ring_particles(t, Rf),
+                               RING_PARTICLE_DRAW_LIMIT))
+    cyl_parts = ([] if reduced
+                 else strided(mark_cylinder_particles(t, Rf),
+                              CYLINDER_DRAW_LIMIT))
+    flares = ([] if reduced else strided(mark_flare_dots(t, Rf), FLARE_DRAW_LIMIT))
+    filament = ([] if reduced
+                else strided(mark_filament(t, Rf), FILAMENT_DRAW_COUNT))
     draw_trails = not reduced
 
     # ---- the two turns ---------------------------------------------------
@@ -2022,6 +2224,20 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                     blinks_: List[Dict[str, Any]]) -> None:
         """One half of the z-seam: its circles first, then the bodies in it."""
         _ring_pass(near)
+        # The dense new layers, batched into a few spectral paths per half:
+        # ring bodies (glints) on every declared circle, the nucleus's vertical
+        # column (shaded by height), the rarer flare family, and the many field
+        # sparkle dots. Their individual positions come from the field; only
+        # the draw is grouped, so the primitive cost stays flat.
+        _layer_batch([p for p in ring_parts if _is_near(p, near)],
+                     RING_PARTICLE_BUCKETS, arm_frac=_field.GLINT_ARM_FRAC * 0.8)
+        _cylinder_batch([p for p in cyl_parts if _is_near(p, near)],
+                        CYLINDER_BUCKETS)
+        _layer_batch([p for p in flares if _is_near(p, near)], FLARE_BUCKETS)
+        _layer_batch(glints_, SPARKLE_BUCKETS)
+        for smp in filament:
+            if _is_near(smp, near):
+                _filament(smp)
         for shell in shells_:
             _satellite(shell, draw_trails)
         for mote in motes:
