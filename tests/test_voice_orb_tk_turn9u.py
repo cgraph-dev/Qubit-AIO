@@ -452,8 +452,12 @@ def test_blink_dots_are_pinhole_ovals_depth_split(monkeypatch):
     import math as _m
     a = _m.radians(_m.fmod(M.spin_deg(1.7), 360.0))
 
-    def _screen(x, y, depth):
-        px, py, _g = M.turn_point(1.7, R, x, y, depth)
+    def _screen(x, y, depth, index):
+        # The renderer projects through turn_qdepth (hash-broken depth, flat
+        # per element), not the raw field depth — the expectation must take
+        # the same path or it asserts against a projection nobody paints.
+        qd = M.turn_qdepth(depth, index, flat=True)
+        px, py, _g = M.turn_point(1.7, R, x, y, qd)
         rx = px * _m.cos(a) - py * _m.sin(a)
         ry = px * _m.sin(a) + py * _m.cos(a)
         return (round(CX + rx, 6), round(CY + ry, 6))
@@ -464,8 +468,8 @@ def test_blink_dots_are_pinhole_ovals_depth_split(monkeypatch):
     nuc_idx = next(i for i, (o, kw) in enumerate(c.ovals)
                    if kw.get("fill")
                    and abs(abs((o[2] - o[0]) / 2) - body) < 1e-6)
-    far_at = _screen(-20.0, 5.0, 0.2)
-    near_at = _screen(18.0, -6.0, 0.8)
+    far_at = _screen(-20.0, 5.0, 0.2, 0.0)
+    near_at = _screen(18.0, -6.0, 0.8, 1.0)
     assert far_at in idx and near_at in idx, "both dots drawn"
     assert idx[far_at] < nuc_idx, "far dot behind the nucleus"
     assert idx[near_at] > nuc_idx, "near dot in front"
@@ -576,15 +580,23 @@ def test_every_travelling_body_leaves_a_streak(monkeypatch):
 
 
 def test_a_body_draws_its_wake_then_its_star(monkeypatch):
-    _strip_moving_layers(monkeypatch)
+    part = _strip_moving_layers(monkeypatch)
     monkeypatch.setattr(M, "rgb_trail",
                         lambda tt, rr, body: [_sample(0, 0.5), _sample(1, 0.55),
                                               _sample(2, 0.6)])
     c, _ = render(1.7)
     wake = _segments(c)
     # The synthetic body sits at the field origin, which the whole-mark
-    # transforms carry to the mark's own centre.
-    star_x = star_y = CX
+    # transforms carry to the mark's own centre — PLUS the body's own rotated
+    # depth (turn_qdepth, hash-broken and flat per element, so a turned body
+    # at the origin swings off-centre exactly as far as its z takes it).
+    # Wake and star share that projection, so they still coincide.
+    import math as _m2
+    qd = M.turn_qdepth(0.5, part.get("index"), flat=True)
+    _px, _py, _g = M.turn_point(1.7, R, 0.0, 0.0, qd)
+    _a = _m2.radians(_m2.fmod(M.spin_deg(1.7), 360.0))
+    star_x = CX + _px * _m2.cos(_a) - _py * _m2.sin(_a)
+    star_y = CY + _px * _m2.sin(_a) + _py * _m2.cos(_a)
     assert len(wake) == 2, "one stroke per consecutive pair of samples"
     # The head rides ON the star, so the first segment starts where the glint
     # is drawn: the wake and the star cannot drift apart.
@@ -613,11 +625,15 @@ def test_streak_colours_are_converted_per_sample_not_lerped_across_the_wheel(
         return [_rgb(kw["fill"]) for _pts, kw in _segments(c)]
 
     # Red -> green -> blue walks the ramp, so every segment is the blend of
-    # the two samples it joins: yellow at the head, cyan at the tail.
+    # the two samples it joins: yellow at the head, cyan at the tail. Margins,
+    # not absolute levels: the tumble's rotated-depth gain legitimately dims
+    # or brightens the whole streak a few points (per-element hash-broken
+    # depth now feeds the projection), but it scales channels together, so a
+    # yellow head stays R-and-G-dominant-over-B whatever the gain.
     straight = strokes((0.0, 0.34, 0.66))
     head, tail = straight
-    assert head[0] > 90 and head[1] > 90 and head[2] < 70, f"head: {head}"
-    assert tail[2] > 90 and tail[1] > 90 and tail[0] < 70, f"tail: {tail}"
+    assert head[0] - head[2] > 40 and head[1] - head[2] > 40, f"head: {head}"
+    assert tail[2] - tail[0] > 40 and tail[1] - tail[0] > 40, f"tail: {tail}"
 
     wrapped = strokes((0.98, 1.0, 1.02))
     # 0.98 and 1.02 are a twentieth of a turn apart on the wheel, so the two

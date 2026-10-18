@@ -447,9 +447,12 @@ def test_far_elements_draw_before_nucleus_and_near_after():
         for part in parts:
             # The painter places each particle through the mark's X+Y tumble,
             # so the expected pixel is the projected one, not the raw field
-            # coordinate. The z-split being asserted is the FIELD's, and it is
-            # the field's depth that feeds the projection too.
-            tx, ty = _turned(t, R, part["x"], part["y"], part["depth"])
+            # coordinate. The z-split being asserted is the FIELD's, and the
+            # projection takes the hash-broken depth (see ``turn_qdepth``),
+            # so the expectation routes through the same function.
+            from voicebridge.orb import qt_app as _Q
+            qd = _Q.turn_qdepth(part["depth"], part.get("index"), flat=True)
+            tx, ty = _turned(t, R, part["x"], part["y"], qd)
             px, py = c + tx, c + ty
             if math.hypot(p.cx - px, p.cy - py) <= 0.6:
                 (far_idx if part["depth"] < 0.5 else near_idx).append(i)
@@ -512,7 +515,8 @@ def test_dust_and_comet_paint_and_vanish_under_reduced_motion():
     tail_hits = sum(
         1 for smp in traveller["trail"]
         if smp["alpha"] > 0.02
-        and _at(prims, *_pix(t, R, c, smp, depth=traveller["depth"]), tol=0.6))
+        and _at(prims, *_pix(t, R, c, smp, depth=traveller["depth"],
+                             zseed=traveller.get("index")), tol=0.6))
     assert tail_hits >= 6, tail_hits
 
     dust = F.dust_state(t, R)
@@ -675,27 +679,36 @@ def _turned(t, R, x, y, depth=0.5):
     return xr * persp, yr * persp
 
 
-def _pix(t, R, c, item, depth=None):
+def _pix(t, R, c, item, depth=None, zseed="auto"):
     """The painted PIXEL position of one field element (``c`` is the centre).
 
     ``depth`` defaults to the element's own ``depth`` field; pass ``None``
-    explicitly for a trail sample that inherits its BODY's depth.
+    explicitly for a trail sample that inherits its BODY's depth. The
+    projection depth goes through the painter's ``turn_qdepth`` — hash-broken
+    and flat per element — exactly as the renderer does: ``zseed`` defaults
+    to the item's own ``index`` (pass the BODY's index explicitly for a trail
+    sample that rides its body's rigid streak).
     """
+    from voicebridge.orb import qt_app as Q
     d = item.get("depth", 0.5) if depth is None else depth
-    tx, ty = _turned(t, R, item.get("x", 0.0), item.get("y", 0.0), d)
+    seed = item.get("index") if zseed == "auto" else zseed
+    qd = Q.turn_qdepth(d, seed, flat=True) if seed is not None else d
+    tx, ty = _turned(t, R, item.get("x", 0.0), item.get("y", 0.0), qd)
     return c + tx, c + ty
 
 
 def _declared_ring_box(t, R, ring, tilt):
     """Bounding box of one DECLARED ring as the painter's tumble projects it.
 
-    The ring's points are sampled at the field's own ``ring_path`` angles, so
-    each point's depth follows the field's convention
-    (``0.5 + 0.5*cos(orbital angle)``, recoverable from the sample index), and
-    the whole path goes through :func:`_turned` after the camera sway is taken
-    back out. ``tilt`` is supplied by the caller so this can be asked for the
-    LAGGED follower tilt and for today's orbit tilt and the two compared.
+    Vertices carry the painter's smooth out-of-plane lobe
+    (``0.5 + TURN_RING_TILT*sin(angle + phase)``, phased by the ring's own
+    seed) rather than the field's depth convention — a per-vertex hash would
+    be noise (zigzags), a lobe is a plane tilt (clean) — so the expectation
+    re-derives the same lobe instead of the old depth ramp. ``tilt`` is
+    supplied by the caller so this can be asked for the LAGGED follower tilt
+    and for today's orbit tilt and the two compared.
     """
+    from voicebridge.orb import qt_app as Q
     from voicebridge.orb import mark_field as F
 
     spec = dict(ring)
@@ -703,10 +716,13 @@ def _declared_ring_box(t, R, ring, tilt):
     dx, dy = F.camera_offset(t, R)
     raw = F.ring_path(t, R, spec)
     n = len(raw) - 1
+    rphase = 2.0 * math.pi * F.hash01(float(ring.get("seed", 0.0)),
+                                     Q.TURN_RING_SALT)
     xs, ys = [], []
     for i, (px, py) in enumerate(raw):
-        d = 0.5 + 0.5 * math.cos(2.0 * math.pi * (i % n) / n)
-        tx, ty = _turned(t, R, px - dx, py - dy, d)
+        qd = 0.5 + Q.TURN_RING_TILT * math.sin(
+            2.0 * math.pi * (i % n) / n + rphase)
+        tx, ty = _turned(t, R, px - dx, py - dy, min(1.0, max(0.0, qd)))
         xs.append(tx)
         ys.append(ty)
     return max(xs) - min(xs), max(ys) - min(ys)

@@ -198,6 +198,27 @@ Y_SPIN_PERSP_MAX = 1.70
 Y_SPIN_DEPTH_GAIN = 0.85
 Y_SPIN_GAIN_MIN = 0.30
 Y_SPIN_GAIN_MAX = 2.20
+#: Uncorrelated projection depth (the "thin line" fix). The field's ``depth``
+#: is ``0.5 + 0.5*cos(orbit angle)`` while an orbit's x is ``~rx*cos(angle)``,
+#: so depth is a LINEAR function of x: every point satisfies ``z ~= c*x`` and
+#: the whole "3D" mark is secretly one flat plane, which any rotation still
+#: takes thin twice per turn. ``turn_qdepth`` breaks that lock by adding a
+#: per-element static component from ``hash01`` of an identity seed (element
+#: index, trail position, ring vertex): constant per element, uncorrelated
+#: with x, so the mark is a genuine volume and opens instead of collapsing.
+#: The fade still zeroes z at face-on phases, so still frames are untouched.
+TURN_Z_SALT = 17.31
+TURN_Z_SPREAD = 0.9
+#: Ring vertices get a smooth out-of-plane tilt (same mechanism, phased
+#: sine lobe): a declared circle must stay a clean ellipse face-on, so the
+#: warp is a single low-frequency lobe per ring — a genuine 3D plane tilt,
+#: never per-vertex noise (independent hash per vertex turned every orbit
+#: into a lightning-bolt zigzag at edge-on phases). The lobe phase comes
+#: from the ring's own seed, so no two circles share a plane and the set
+#: never collapses onto one diagonal together.
+TURN_RING_WARP = 0.14
+TURN_RING_TILT = 0.35
+TURN_RING_SALT = 5.77
 #: Brightness follows the same rotated depth: a body's tint is scaled by
 #: ``TURN_TONE_BASE + TURN_TONE_SLOPE * gain``, so near bodies render hotter
 #: and far ones cooler on top of the size/alpha spread. At gain 1 the factor
@@ -822,6 +843,45 @@ def _tumble_project(x: float, y: float, depth: float,
     return (xr * persp, yr * persp, g)
 
 
+def turn_qdepth(depth: Any, zseed: Any = None,
+                spread: Any = TURN_Z_SPREAD,
+                flat: bool = False) -> float:
+    """Projection depth with the x-lock broken (see ``TURN_Z_SALT``).
+
+    Pure. With no seed, the identity (raw field depth). With a seed, two
+    modes: blended (``flat=False``) adds ``spread * (hash - 0.5)`` to the
+    depth — a whisper of volume that keeps smooth loops smooth; flat
+    (``flat=True``) returns the hash itself, fully independent of orbital
+    position. Points use flat (a swarm must fill the volume, not ride one
+    plane); ring vertices use blended (a declared circle must stay a clean
+    ellipse face-on). At face-on phases the fade zeroes z whatever this
+    returns, so still frames never change. Never raises. Tests pin the
+    painter through this function, not around it.
+    """
+    try:
+        d = float(depth)
+    except (TypeError, ValueError):
+        d = 0.5
+    if not math.isfinite(d):
+        d = 0.5
+    d = min(1.0, max(0.0, d))
+    if zseed is None:
+        return d
+    try:
+        h = _field.hash01(float(zseed), TURN_Z_SALT)
+    except (TypeError, ValueError):
+        return d
+    if flat:
+        return h
+    try:
+        sp = float(spread)
+    except (TypeError, ValueError):
+        sp = TURN_Z_SPREAD
+    if not math.isfinite(sp):
+        sp = TURN_Z_SPREAD
+    return min(1.0, max(0.0, d + sp * (h - 0.5)))
+
+
 def tumble_point(t: Any, R: Any, x: Any, y: Any, depth: Any = 0.5
                  ) -> Tuple[float, float, float]:
     """Project one field point through the combined X+Y tumble.
@@ -994,16 +1054,20 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # Every gain is exactly 1.0 when both phases are 0, so a still frame is
     # the unturned mark, unaltered and with no transform pushed on the painter.
 
-    def _place(x: Any, y: Any, depth: Any = 0.5
-                ) -> Tuple[float, float, float]:
+    def _place(x: Any, y: Any, depth: Any = 0.5, zseed: Any = None,
+                 zspread: Any = TURN_Z_SPREAD, zflat: bool = False
+                 ) -> Tuple[float, float, float]:
         """A field point's painted position and rotated-depth gain.
 
         The tumble's phases are resolved once per frame above: a frame
         projects ~1000 points and they all share them, so the trigonometry is
-        not repeated per point.
+        not repeated per point. ``zseed`` breaks the depth/x lock per element
+        (see ``turn_qdepth``); ``None`` keeps the raw field depth. Points pass
+        ``zflat=True`` (full volume); ring vertices pass a small spread.
         """
         px, py, g = _tumble_project(_num(x, 0.0), _num(y, 0.0),
-                                    _num(depth, 0.5),
+                                    turn_qdepth(depth, zseed, zspread,
+                                                flat=zflat),
                                     turn_cy, turn_sy, turn_cx, turn_sx, Rf)
         return cx + px, cy + py, g
 
@@ -1151,10 +1215,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             warped = []
             add = warped.append
             n = max(1, len(raw) - 1)
-            depths = ring_depths(len(raw))
+            # One smooth out-of-plane lobe per ring (phased by the ring's own
+            # seed): each circle becomes a genuinely tilted 3D loop, so the
+            # set never shares one plane and never collapses onto a single
+            # diagonal together. A per-vertex hash would be noise (zigzags);
+            # a sine lobe is a plane tilt (clean). Face-on the fade zeroes z
+            # whatever this returns, so the declared ellipse is exact at rest.
+            rphase = (2.0 * math.pi
+                      * _field.hash01(_num(spec.get("seed"), 0.0),
+                                     TURN_RING_SALT))
             for i, (px, py) in enumerate(raw):
+                qd = 0.5 + TURN_RING_TILT * math.sin(
+                    2.0 * math.pi * float(i) / float(n) + rphase)
+                qd = min(1.0, max(0.0, qd))
                 X, Y, _g = _tumble_project(
-                    px - sway_dx, py - sway_dy, depths[i % n],
+                    px - sway_dx, py - sway_dy, qd,
                     turn_cy, turn_sy, turn_cx, turn_sx, Rf)
                 add((cx + X, cy + Y))
             if layer == "main":
@@ -1195,7 +1270,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.setPen(Qt.NoPen)
 
     def _streak(samples: Any, depth: Any = 0.5, gain: float = 1.0,
-                half: float = TRAIL_HALF_WIDTH) -> None:
+                half: float = TRAIL_HALF_WIDTH, zseed: Any = None) -> None:
         """One body's spectral wake, as a SINGLE tapered fill path.
 
         Owner 2026-10-18: a star should leave an RGB TRAIL, not sit inside an
@@ -1222,7 +1297,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         placed = []
         for s in smps:
             d = _num(s.get("depth"), depth)
-            X, Y, g = _place(s.get("x"), s.get("y"), d)
+            X, Y, g = _place(s.get("x"), s.get("y"), d, zseed=zseed,
+                             zflat=True)
             placed.append((X, Y, d, g))
         pts = [(px, py) for px, py, _d, _g in placed]
         run = [0.0]
@@ -1275,7 +1351,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     def _glint(fx: float, fy: float, size: float, alpha: float,
                rgb: Tuple[int, int, int],
                arm_frac: float = _field.GLINT_ARM_FRAC,
-               skew_deg: Any = 0.0, depth: Any = 0.5) -> None:
+               skew_deg: Any = 0.0, depth: Any = 0.5,
+               zseed: Any = None, zflat: bool = True) -> None:
         """A twinkling star, never a filled orb (owner 2026-10-17).
 
         Two thin crossing arms plus a tiny core read as a glint at this size
@@ -1297,7 +1374,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         surface catching light from an angle instead of a flat cross.
         """
         d = _num(depth, 0.5)
-        gx, gy, g = _place(fx, fy, d)
+        gx, gy, g = _place(fx, fy, d, zseed=zseed, zflat=zflat)
         sz = max(GLINT_MIN_SIZE, _num(size, 0.0) * g)
         a = _num(alpha, 0.0) * bright * _shade(1.0, d, g)
         if a <= ALPHA_EPS:
@@ -1317,13 +1394,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
 
     def _particle(part: Dict[str, Any], draw_trails: bool) -> None:
         depth = _num(part.get("depth"), 0.5)
+        pseed = _num(part.get("index"), None)
         if draw_trails:
-            _streak(_field.rgb_trail(tt, Rf, part), depth)
+            _streak(_field.rgb_trail(tt, Rf, part), depth, zseed=pseed)
         _glint(_num(part.get("x"), 0.0), _num(part.get("y"), 0.0),
                _num(part.get("size"), 0.0),
                _shade(_num(part.get("alpha"), 0.0), depth),
                _lift(_num(part.get("lift"), _field.LIFT_BEAD)),
-               skew_deg=part.get("skew"), depth=depth)
+               skew_deg=part.get("skew"), depth=depth, zseed=pseed)
 
 
     def _satellite(shell: Dict[str, Any], draw_trail: bool) -> None:
@@ -1337,6 +1415,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         """
         body = shell.get("body") or {}
         depth = _num(body.get("depth"), 0.5)
+        bseed = _num(body.get("index"), None)
         if draw_trail:
             # The SHORT streak here, not the full ``rgb_trail``: a shell body
             # turns its shell once in 5.5-13.5 s, and the long streak's step is
@@ -1344,12 +1423,13 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             # scratch right across the mark. The field's own ``vx``/``vy`` put
             # even the short one on the body's real path, tangent to the shell.
             _streak(_field.dust_trail(tt, Rf, body), depth,
-                    half=SPARKLE_TRAIL_HALF_WIDTH, gain=SATELLITE_TRAIL_GAIN)
+                    half=SPARKLE_TRAIL_HALF_WIDTH, gain=SATELLITE_TRAIL_GAIN,
+                    zseed=bseed)
         _glint(_num(body.get("x"), 0.0), _num(body.get("y"), 0.0),
                max(0.3, _num(body.get("size"), 0.0)),
                _shade(_num(body.get("alpha"), 0.0), depth),
                _lift(_num(body.get("lift"), _field.LIFT_BEAD)),
-               skew_deg=body.get("skew"), depth=depth)
+               skew_deg=body.get("skew"), depth=depth, zseed=bseed)
 
     def _spark(spark: Dict[str, Any]) -> None:
         """One nucleus spark: the same glint shape, thrown out past the orbits."""
@@ -1359,14 +1439,17 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                _shade(_num(spark.get("alpha"), 0.0), depth),
                _lift(_num(spark.get("lift"), _field.LIFT_NUCLEUS)),
                arm_frac=_field.SPARK_ARM_FRAC,
-               skew_deg=spark.get("skew"), depth=depth)
+               skew_deg=spark.get("skew"), depth=depth,
+               zseed=_num(spark.get("index"), None))
 
     def _dust(mote: Dict[str, Any]) -> None:
         # No wake for the dense field: 30 motes each dragging a streak turns
         # the field into 30 comets. The motes keep the mark's depth read; the
         # travelling BODIES carry the spectrum.
         d = _num(mote.get("depth"), 0.5)
-        mx, my, g = _place(mote.get("x"), mote.get("y"), d)
+        mx, my, g = _place(mote.get("x"), mote.get("y"), d,
+                           zseed=_num(mote.get("index"), None),
+                           zflat=True)
         _dot(mx, my,
              max(0.25, _num(mote.get("size"), 0.0) * g),
              _shade(_num(mote.get("alpha"), 0.0) * bright, d, g),
@@ -1377,8 +1460,11 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         if draw_trail:
             _streak(_field.dust_trail(tt, Rf, glint), depth,
                     gain=SPARKLE_TRAIL_GAIN,
-                    half=SPARKLE_TRAIL_HALF_WIDTH)
-        gx, gy, g = _place(glint.get("x"), glint.get("y"), depth)
+                    half=SPARKLE_TRAIL_HALF_WIDTH,
+                    zseed=_num(glint.get("index"), None))
+        gx, gy, g = _place(glint.get("x"), glint.get("y"), depth,
+                           zseed=_num(glint.get("index"), None),
+                           zflat=True)
         _dot(gx, gy,
              max(0.3, _num(glint.get("size"), 0.0) * g),
              _shade(_num(glint.get("alpha"), 0.0) * bright, depth, g),
@@ -1388,9 +1474,11 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         if _num(traveller.get("alpha"), 0.0) <= 0.0:
             return  # outside its sweep the field reports alpha 0
         depth = _num(traveller.get("depth"), 0.5)
+        tseed = _num(traveller.get("index"), 0.0)
         if draw_trail:
             _streak(_field.rgb_trail(tt, Rf, traveller), depth,
-                    gain=COMET_TRAIL_GAIN, half=COMET_TRAIL_HALF_WIDTH)
+                    gain=COMET_TRAIL_GAIN, half=COMET_TRAIL_HALF_WIDTH,
+                    zseed=tseed)
         # The field's own bead tail stays, tinted by the streak's duotone PAIR:
         # bright motion-blur fragments riding inside the wake. The head hue
         # and its half-turn partner are the streak's two colours (the old
@@ -1408,12 +1496,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         n_beads = max(1, len(trail))
         for k, smp in enumerate(trail):
             hue = (head_hue + ((k + 1) / float(n_beads)) * pair_span) % 1.0
-            bx, by, bg = _place(smp.get("x"), smp.get("y"), depth)
+            bx, by, bg = _place(smp.get("x"), smp.get("y"), depth,
+                                zseed=tseed, zflat=True)
             _dot(bx, by,
                  _num(smp.get("size"), 0.0) * bg,
                  _shade(_num(smp.get("alpha"), 0.0) * bright, depth, bg),
                  _anchor(_spec_rgb(hue, COMET_BEAD_SAT)), bg)
-        hx, hy, hg = _place(traveller.get("x"), traveller.get("y"), depth)
+        hx, hy, hg = _place(traveller.get("x"), traveller.get("y"), depth,
+                            zseed=tseed, zflat=True)
         _dot(hx, hy,
              max(0.4, _num(traveller.get("size"), 0.0) * hg),
              _shade(_num(traveller.get("alpha"), 0.0) * bright, depth, hg),
@@ -1619,7 +1709,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         half of the plane grows and brightens as it swings toward the viewer.
         """
         d = _num(bit.get("depth"), 0.5)
-        gx, gy, g = _place(bit.get("x"), bit.get("y"), d)
+        gx, gy, g = _place(bit.get("x"), bit.get("y"), d,
+                           zseed=_num(bit.get("index"), None),
+                           zflat=True)
         size = _num(bit.get("size"), 0.0)
         alpha = _num(bit.get("alpha"), 0.0) * bright * g
         if alpha <= ALPHA_EPS or size <= 0.0:
@@ -1647,7 +1739,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         by its own spectral hue on the shared colour wheel.
         """
         d = _num(bl.get("depth"), 0.5)
-        bx, by, g = _place(bl.get("x"), bl.get("y"), d)
+        bx, by, g = _place(bl.get("x"), bl.get("y"), d,
+                           zseed=_num(bl.get("index"), None),
+                           zflat=True)
         size = _num(bl.get("size"), 0.0)
         alpha = _num(bl.get("alpha"), 0.0) * bright * g
         if alpha <= ALPHA_EPS or size <= 0.0:

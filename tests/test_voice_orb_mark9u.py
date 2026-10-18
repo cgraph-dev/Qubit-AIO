@@ -186,10 +186,13 @@ def test_far_beads_draw_behind_and_near_beads_in_front():
         def _locate(f):
             # The renderer threads each element's own depth through the Y+X
             # tumble, so the locator must too: a depth-free helper lands on
-            # the wrong pixel once the turn is a real 3-D rotation. Tumble
-            # first, then the master spin — the renderer's own order.
-            px, py, _g = M.turn_point(t, 32.0, f["x"], f["y"],
-                                      f.get("depth", 0.5))
+            # the wrong pixel once the turn is a real 3-D rotation. The depth
+            # goes through turn_qdepth first (hash-broken, flat per element),
+            # exactly as the renderer does. Tumble first, then the master
+            # spin — the renderer's own order.
+            qd = M.turn_qdepth(f.get("depth", 0.5), f.get("index"),
+                               flat=True)
+            px, py, _g = M.turn_point(t, 32.0, f["x"], f["y"], qd)
             a = math.radians(math.fmod(M.spin_deg(t), 360.0))
             rx = px * math.cos(a) - py * math.sin(a)
             ry = px * math.sin(a) + py * math.cos(a)
@@ -259,8 +262,12 @@ def test_comet_head_drawn_during_sweep_and_not_outside(monkeypatch):
     info = F.comet(visible_t, 32.0)
     # Depth-aware locator: the head rides the Y+X tumble at its own depth
     # (tumble first, then the master spin — the renderer's own order).
+    # The projection depth goes through turn_qdepth (flat, comet seed),
+    # exactly as the renderer does.
+    _qd = M.turn_qdepth(info.get("depth", 0.5),
+                        info.get("index", 0.0), flat=True)
     _px, _py, _g = M.turn_point(visible_t, 32.0, info["x"], info["y"],
-                                info.get("depth", 0.5))
+                                _qd)
     _a = math.radians(math.fmod(M.spin_deg(visible_t), 360.0))
     head = (34.0 + _px * math.cos(_a) - _py * math.sin(_a),
             34.0 + _px * math.sin(_a) + _py * math.cos(_a))

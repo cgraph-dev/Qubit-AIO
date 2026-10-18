@@ -70,6 +70,7 @@ from typing import Any, Dict, List, Tuple
 
 from . import ember as _ember
 from .mark_field import (
+    hash01,
     GLINT_ARM_FRAC,
     GLINT_CORE_FRAC,
     SPARK_ARM_FRAC,
@@ -217,6 +218,17 @@ Y_SPIN_PERSP_MAX = 1.70
 Y_SPIN_DEPTH_GAIN = 0.55
 Y_SPIN_GAIN_MIN = 0.35
 Y_SPIN_GAIN_MAX = 1.90
+#: Uncorrelated projection depth (the "thin line" fix — parity with the Qt
+#: painter, same salt/spreads so both lanes put every element in the same
+#: place). The field's ``depth`` is ``0.5 + 0.5*cos(angle)`` while an orbit's
+#: x is ``~rx*cos(angle)``: depth is a LINEAR function of x, so the whole mark
+#: is secretly one flat plane, which any rotation still takes thin twice per
+#: turn. ``turn_qdepth`` breaks that lock per element (static hash) and per
+#: ring (smooth phased lobe, never per-vertex noise).
+TURN_Z_SALT = 17.31
+TURN_Z_SPREAD = 0.9
+TURN_RING_TILT = 0.35
+TURN_RING_SALT = 5.77
 #: Depth of field: how much a far element's alpha is pulled down. ``dof`` is
 #: 0.0 sharp / 1.0 far, so this softens distance WITHOUT touching brightness
 #: meaning — "far away" must not collapse into "barely visible".
@@ -486,6 +498,42 @@ def turn_project(x: float, y: float, depth: float,
     return (xr * persp, yr * persp, gain)
 
 
+def turn_qdepth(depth: Any, zseed: Any = None,
+                spread: Any = TURN_Z_SPREAD,
+                flat: bool = False) -> float:
+    """Projection depth with the x-lock broken (parity with Qt's helper).
+
+    Pure: ``depth`` clamped to 0..1; no seed is the identity. With a seed,
+    flat mode returns ``hash01(seed, TURN_Z_SALT)`` itself (points: a swarm
+    must fill the volume, not ride one plane); blend mode adds
+    ``spread * (hash - 0.5)`` (rings: a whisper that keeps smooth loops
+    smooth). Same salt/spreads as the Qt painter, so both lanes agree.
+    At face-on phases the fade zeroes z whatever this returns. Never raises.
+    """
+    try:
+        d = float(depth)
+    except (TypeError, ValueError):
+        d = 0.5
+    if not math.isfinite(d):
+        d = 0.5
+    d = min(1.0, max(0.0, d))
+    if zseed is None:
+        return d
+    try:
+        h = hash01(float(zseed), TURN_Z_SALT)
+    except (TypeError, ValueError):
+        return d
+    if flat:
+        return h
+    try:
+        sp = float(spread)
+    except (TypeError, ValueError):
+        sp = TURN_Z_SPREAD
+    if not math.isfinite(sp):
+        sp = TURN_Z_SPREAD
+    return min(1.0, max(0.0, d + sp * (h - 0.5)))
+
+
 def turn_point(t: Any, R: Any, x: Any, y: Any,
                depth: Any = 0.5) -> Tuple[float, float, float]:
     """Project one centre-relative field point through the Y+X tumble.
@@ -683,15 +731,19 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     spin_c, spin_s = math.cos(spin_a), math.sin(spin_a)
     turn_ct, turn_st, turn_cp, turn_sp = turn_basis(tt)
 
-    def _place(x: float, y: float, depth: Any = 0.5) -> Tuple[float, float]:
+    def _place(x: float, y: float, depth: Any = 0.5, zseed: Any = None,
+               zspread: Any = TURN_Z_SPREAD, zflat: bool = False
+               ) -> Tuple[float, float]:
         """A centre-relative FIELD point -> its screen position.
 
         The Y+X tumble at the element's own depth first, then the master
         spin — the same order and arithmetic as the Qt painter's per-point
         placement, so the two lanes put every element in the same place.
+        ``zseed``/``zflat`` break the depth/x lock per element (see
+        :func:`turn_qdepth`); ``None`` keeps the raw field depth.
         """
         try:
-            d = min(1.0, max(0.0, _num(depth, 0.5)))
+            d = turn_qdepth(depth, zseed, zspread, flat=zflat)
         except Exception:  # noqa: BLE001
             d = 0.5
         px, py, _g = turn_project(_num(x), _num(y), d, turn_ct, turn_st,
@@ -701,10 +753,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         return (cx_f + sx, cy_f + sy)
 
     def _place3(x: float, y: float,
-                depth: Any = 0.5) -> Tuple[float, float, float]:
+                depth: Any = 0.5, zseed: Any = None,
+                zspread: Any = TURN_Z_SPREAD, zflat: bool = False
+                ) -> Tuple[float, float, float]:
         """Like :func:`_place`, plus the rotated-depth size/alpha gain."""
         try:
-            d = min(1.0, max(0.0, _num(depth, 0.5)))
+            d = turn_qdepth(depth, zseed, zspread, flat=zflat)
         except Exception:  # noqa: BLE001
             d = 0.5
         px, py, g = turn_project(_num(x), _num(y), d, turn_ct, turn_st,
@@ -812,7 +866,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     # ---- the streak (one tapered wake per travelling body) ------------------
     def _streak(samples: Any, gain: float = 1.0,
-                half: float = STREAK_HALF_WIDTH) -> None:
+                half: float = STREAK_HALF_WIDTH,
+                zseed: Any = None) -> None:
         """One body's spectral wake, walked sample by sample.
 
         Owner 2026-10-18: a star should leave an RGB TRAIL, not sit inside an
@@ -825,7 +880,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         if len(smps) < 2:
             return
         pts = [_place3(_num(s.get("x")), _num(s.get("y")),
-                       _num(s.get("depth"), 0.5)) for s in smps]
+                       _num(s.get("depth"), 0.5),
+                       zseed=zseed, zflat=True) for s in smps]
         total = 0.0
         for i in range(1, len(pts)):
             total += math.dist(pts[i][:2], pts[i - 1][:2])
@@ -969,8 +1025,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             # index. The closing vertex repeats vertex 0, and ``cos(360 deg)``
             # is ``cos(0)``, so the join matches too.
             n = max(1, len(raw) - 1)
-            pts = [_place(px, py, 0.5 + 0.5 * math.cos(
-                2.0 * math.pi * (i % n) / float(n)))
+            rphase = (2.0 * math.pi
+                      * hash01(_num(spec.get("seed"), 0.0),
+                              TURN_RING_SALT))
+            pts = [_place(px, py,
+                           min(1.0, max(0.0,
+                               0.5 + TURN_RING_TILT * math.sin(
+                                   2.0 * math.pi * float(i) / float(n)
+                                   + rphase))))
                 for i, (px, py) in enumerate(raw)]
             if layer == "main":
                 scale = (RING_ALPHA_SCALE["near_main"] if near
@@ -1066,8 +1128,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         """One logo particle: its spectral wake, then the star that left it."""
         depth = _num(part.get("depth"), 0.5)
         if not reduced_motion:
-            _streak(rgb_trail(tt, r, part))
-        x, y, g = _place3(_num(part.get("x")), _num(part.get("y")), depth)
+            _streak(rgb_trail(tt, r, part),
+                    zseed=_num(part.get("index"), None))
+        x, y, g = _place3(_num(part.get("x")), _num(part.get("y")),
+                           depth, zseed=_num(part.get("index"), None),
+                           zflat=True)
         _glint(x, y, part.get("size"), part.get("alpha"),
                _lift(_num(part.get("lift"), LIFT_BEAD)),
                skew_deg=part.get("skew"), depth=depth, gain=g)
@@ -1085,8 +1150,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         depth = _num(body.get("depth"), 0.5)
         if not reduced_motion:
             _streak(dust_trail(tt, r, body), gain=SATELLITE_STREAK_GAIN,
-                    half=SHORT_STREAK_HALF_WIDTH)
-        x, y, g = _place3(_num(body.get("x")), _num(body.get("y")), depth)
+                    half=SHORT_STREAK_HALF_WIDTH,
+                    zseed=_num(body.get("index"), None))
+        x, y, g = _place3(_num(body.get("x")), _num(body.get("y")),
+                           depth, zseed=_num(body.get("index"), None),
+                           zflat=True)
         _glint(x, y, max(GLINT_MIN_SIZE, _num(body.get("size"))),
                body.get("alpha"),
                _lift(_num(body.get("lift"), LIFT_BEAD)),
@@ -1095,7 +1163,9 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     def _spark(spark: Dict[str, Any]) -> None:
         """One nucleus spark: the same glint, thrown out past the orbits."""
         depth = _num(spark.get("depth"), 0.5)
-        x, y, g = _place3(_num(spark.get("x")), _num(spark.get("y")), depth)
+        x, y, g = _place3(_num(spark.get("x")), _num(spark.get("y")),
+                           depth, zseed=_num(spark.get("index"), None),
+                           zflat=True)
         _glint(x, y, spark.get("size"), spark.get("alpha"),
                _lift(_num(spark.get("lift"), LIFT_NUCLEUS)),
                arm_frac=SPARK_ARM_FRAC,
@@ -1110,7 +1180,9 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         tumble's own rotated-depth gain now).
         """
         depth = _num(mote.get("depth"), 0.5)
-        x, y, g = _place3(_num(mote.get("x")), _num(mote.get("y")), depth)
+        x, y, g = _place3(_num(mote.get("x")), _num(mote.get("y")),
+                           depth, zseed=_num(mote.get("index"), None),
+                           zflat=True)
         _dot(x, y, max(0.25, _num(mote.get("size"))), mote.get("alpha"),
              _lift(mote.get("lift")), depth=depth, gain=g)
 
@@ -1118,8 +1190,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         depth = _num(glint.get("depth"), 0.5)
         if not reduced_motion:
             _streak(dust_trail(tt, r, glint), gain=SPARKLE_STREAK_GAIN,
-                    half=SHORT_STREAK_HALF_WIDTH)
-        x, y, g = _place3(_num(glint.get("x")), _num(glint.get("y")), depth)
+                    half=SHORT_STREAK_HALF_WIDTH,
+                    zseed=_num(glint.get("index"), None))
+        x, y, g = _place3(_num(glint.get("x")), _num(glint.get("y")),
+                           depth, zseed=_num(glint.get("index"), None),
+                           zflat=True)
         _dot(x, y, max(0.3, _num(glint.get("size"))), glint.get("alpha"),
              _lift(glint.get("lift")), depth=depth, gain=g)
 
@@ -1132,7 +1207,9 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         not a wall of glyphs.
         """
         depth = _num(dot.get("depth"), 0.5)
-        x, y, g = _place3(_num(dot.get("x")), _num(dot.get("y")), depth)
+        x, y, g = _place3(_num(dot.get("x")), _num(dot.get("y")),
+                           depth, zseed=_num(dot.get("index"), None),
+                           zflat=True)
         _dot(x, y, max(0.2, _num(dot.get("size"))), dot.get("alpha"),
              _lift(_num(dot.get("lift"), 0.5)), depth=depth, gain=g)
 
@@ -1144,7 +1221,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         if size <= 0.0 or _num(bit.get("alpha")) <= FIELD_ALPHA_FLOOR:
             return
         try:
-            x, y, g = _place3(_num(bit.get("x")), _num(bit.get("y")), depth)
+            x, y, g = _place3(_num(bit.get("x")), _num(bit.get("y")),
+                               depth,
+                               zseed=_num(bit.get("index"), None),
+                               zflat=True)
             alpha = _shade(bit.get("alpha"), depth, g) * bright
             if alpha <= ALPHA_EPS:
                 return
@@ -1186,18 +1266,23 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             tail_hue = (head + 0.5) % 1.0
         if comet_on:
             _streak(rgb_trail(tt, r, comet_info), gain=COMET_STREAK_GAIN,
-                    half=COMET_STREAK_HALF_WIDTH)
+                    half=COMET_STREAK_HALF_WIDTH,
+                    zseed=_num(comet_info.get("index"), 0.0))
             trail = list(comet_info.get("trail") or [])
             for k, smp in enumerate(trail):
                 f = (k + 1.0) / (len(trail) + 1.0)
                 hue = (head + f * 0.5) % 1.0
                 x, y, g = _place3(_num(smp.get("x")), _num(smp.get("y")),
-                                  depth)
+                                  depth,
+                                  zseed=_num(comet_info.get("index"), 0.0),
+                                  zflat=True)
                 _dot(x, y, _num(smp.get("size")), smp.get("alpha"),
                      _anchor(_spec(hue, COMET_BEAD_SAT)), depth=depth,
                      gain=g)
         x, y, g = _place3(_num(comet_info.get("x")),
-                          _num(comet_info.get("y")), depth)
+                          _num(comet_info.get("y")), depth,
+                          zseed=_num(comet_info.get("index"), 0.0),
+                          zflat=True)
         _dot(x, y, max(0.4, _num(comet_info.get("size"))),
              comet_info.get("alpha"),
              _anchor(_spec(hue0, COMET_BEAD_SAT)), depth=depth, gain=g)

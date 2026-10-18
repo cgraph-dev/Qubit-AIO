@@ -429,8 +429,11 @@ def _projected_ring_box(t, R, spec):
 
     Mirrors the painter exactly: sample :func:`mark_field.ring_path` (with
     the painter's sample count), take the camera sway back out, give each
-    point the field's own depth for its orbital angle, and project through
-    :func:`qt_app.tumble_point` (Y first, then X — the painter's order).
+    point the painter's smooth out-of-plane lobe
+    (``0.5 + TURN_RING_TILT*sin(angle + phase)``, phased by the ring's own
+    seed — never the field depth, which would lock every ring onto one
+    diagonal), and project through :func:`qt_app.tumble_point` (Y first,
+    then X — the painter's order).
     """
     from voicebridge.orb import mark_field as F
     from voicebridge.orb import qt_app as Q
@@ -438,10 +441,14 @@ def _projected_ring_box(t, R, spec):
     dx, dy = F.camera_offset(t, R)
     pts = F.ring_path(t, R, spec, samples=Q.RING_WARP_SAMPLES)
     n = max(1, len(pts) - 1)
+    rphase = 2.0 * math.pi * F.hash01(float(spec.get("seed", 0.0)),
+                                     Q.TURN_RING_SALT)
     xs, ys = [], []
     for i, (px, py) in enumerate(pts):
-        d = 0.5 + 0.5 * math.cos(2.0 * math.pi * (i % n) / n)
-        X, Y, _g = Q.tumble_point(t, R, px - dx, py - dy, d)
+        qd = 0.5 + Q.TURN_RING_TILT * math.sin(
+            2.0 * math.pi * (i % n) / n + rphase)
+        X, Y, _g = Q.tumble_point(t, R, px - dx, py - dy,
+                                 min(1.0, max(0.0, qd)))
         xs.append(X)
         ys.append(Y)
     return (max(xs) - min(xs), max(ys) - min(ys))
@@ -809,7 +816,8 @@ def test_blink_dots_paint_as_pinpricks_and_vanish_when_still():
     pinpricks = [p for p in prims if p.kind == "ellipse" and p.fill is not None
                  and p.pen is None and p.r <= 2.0]
     for d in live:
-        X, Y, _g = Q.tumble_point(t, R, d["x"], d["y"], d["depth"])
+        qd = Q.turn_qdepth(d["depth"], d.get("index"), flat=True)
+        X, Y, _g = Q.tumble_point(t, R, d["x"], d["y"], qd)
         assert any(math.hypot(p.cx - (c + X), p.cy - (c + Y)) <= 1.0
                    for p in pinpricks), (d["index"], X, Y)
     # They are dots, not streaks: killing them removes no filled path.
