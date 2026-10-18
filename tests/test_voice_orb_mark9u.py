@@ -238,10 +238,12 @@ def test_dust_field_adds_its_motes(monkeypatch):
     M.render(without, 34.0, 34.0, 32.0, t, "idle")
     assert len(full.ovals) - len(without.ovals) == len(F.dust_state(t, 32.0))
     assert len(F.dust_state(t, 32.0)) == F.DUST_COUNT
-    # And a reduced-motion frame carries none of them.
+    # And a reduced-motion frame carries none of them: only the nine particle
+    # cores plus the static nucleus stack (halo rings + gradient layers).
     frozen = FakeCanvas()
     M.render(frozen, 34.0, 34.0, 32.0, t, "idle", reduced_motion=True)
-    assert len(frozen.ovals) == len(M.PARTICLES) + 2
+    assert len(frozen.ovals) == len(M.PARTICLES) + M.NUCLEUS_OVAL_COUNT
+    assert len(frozen.ovals) < len(full.ovals)
 
 
 def test_sparkles_are_deterministic_and_turn_on_and_off():
@@ -466,7 +468,8 @@ def test_reduced_motion_is_free_of_the_moving_layers():
         M.render(c, 34.0, 34.0, R, t, "idle", reduced_motion=True)
         # Nine particle glints (2 arms + 1 core) and the two fringed orbits:
         # no trails, dust, sparkles, comet, follower rings or nucleus sparks.
-        assert len(c.ovals) == len(M.PARTICLES) + 2       # 9 cores + nucleus + halo
+        # Ovals = 9 particle cores + the static nucleus stack (halo + gradient).
+        assert len(c.ovals) == len(M.PARTICLES) + M.NUCLEUS_OVAL_COUNT
         assert len(c.lines) == 2 * len(M.PARTICLES) + 6   # 18 arms + 6 ring strokes
 
 

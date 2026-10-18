@@ -96,6 +96,22 @@ FRINGE_PX_AT_96 = FRINGE_PX
 #: Polyline sampling resolution for one ellipse.
 RING_SEGMENTS = 72
 
+#: Painter-side glint refinement, mirroring the Qt painter: the shared field
+#: sets the size, but Tk's old arm/core floors kept tiny dust and sparkles
+#: chunky. A low size floor, a smaller core and the field's own arm fraction
+#: turn the crossing arms into pinpricks instead of fat crosses.
+GLINT_MIN_SIZE = 0.16
+GLINT_CORE_SCALE = 0.58
+GLINT_CORE_MIN = 0.08
+
+#: Shaded nucleus: concentric filled ovals approximate the radial gradient Tk
+#: cannot draw (hot near-white core -> state hue -> fading rim), wrapped in a
+#: soft outline halo. All layers are pure functions of the frame, so reduced
+#: motion paints the identical static body.
+NUCLEUS_LAYERS = 5
+HALO_LAYERS = 2
+NUCLEUS_OVAL_COUNT = HALO_LAYERS + NUCLEUS_LAYERS
+
 #: Fringe channel colors, mixed toward the background (Tk alpha substitute).
 _FRINGE_RED = (150, 30, 55)
 _FRINGE_BLUE = (30, 80, 160)
@@ -276,10 +292,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             return
         colour = _mix(fam["core"], (255, 255, 255), lift)
         shown = _dim(colour, float(alpha) * bright)
-        arm = max(0.6, float(rad) * arm_frac)
+        sz = max(GLINT_MIN_SIZE, float(rad))
+        arm = sz * arm_frac
         _line([x - arm, y, x + arm, y], shown, 1)
         _line([x, y - arm, x, y + arm], shown, 1)
-        _oval(x, y, max(0.4, float(rad) * GLINT_CORE_FRAC), shown)
+        _oval(x, y, max(GLINT_CORE_MIN, sz * GLINT_CORE_FRAC * GLINT_CORE_SCALE),
+              shown)
         fills.append(colour)
 
     def _beads(group: List[Dict[str, float]]) -> None:
@@ -467,6 +485,52 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             _line(sw_pts, _dim(ring_rgb, sw_alpha * bright),
                   max(1, int(round(SHOCKWAVE_WIDTH))))
 
+    # ------------------------------------------------------ equalizer (voice)
+    # A live 12-band spectrum threads through as dim gradient bars at the
+    # mark's seam: listening/speaking with a fresh spectrum draw real bars
+    # (their peak-hold caps included) instead of nothing, while every other
+    # state (or no spectrum) stays byte-identical — there is no audio to
+    # analyse there. Bars carry no time phase, so reduced motion is static.
+    bars_on = False
+    try:
+        key = str(state or "").strip().lower()
+    except Exception:  # noqa: BLE001
+        key = "idle"
+    if key in ("listening", "speaking"):
+        try:
+            bands = _ember._spec_vector(spectrum)
+            if bands is not None:
+                caps = (_ember._spec_vector(spec_peaks)
+                        if spec_peaks is not None else list(bands))
+                if caps is None:
+                    caps = list(bands)
+                fam_bands = _ember.bands_from_family(fam)
+                rects = _ember.spec_bar_rects(bands, caps, ccx, ccy, r, 1.0)
+                for ri, rc in enumerate(rects):
+                    base = _ember.band_shade(fam_bands, ri, tt)
+                    top = rc["top"]
+                    bottom = rc["bottom"]
+                    span = bottom - top
+                    steps = 1 if span < 2.0 else _ember.BAR_GRADIENT_STEPS
+                    for si in range(steps):
+                        f0 = si / steps
+                        f1 = (si + 1) / steps
+                        y_hi = top + span * f0
+                        y_lo = top + span * f1
+                        shade = 0.55 + _ember.BAR_TIP_GAIN * (1.0 - f0)
+                        alpha = min(1.0, (0.24 + 0.66 * rc["value"])
+                                    * shade * bright)
+                        _line([rc["x"], y_hi, rc["x"], y_lo],
+                              _hex(_mix(base, _ember.NEAR_BLACK, alpha)), 2)
+                    hw = rc["half_w"]
+                    cap_fill = _hex(_mix(base, _ember.NEAR_BLACK,
+                                         min(1.0, 0.35 + 0.65 * bright)))
+                    _line([rc["x"] - hw, rc["peak_top"],
+                           rc["x"] + hw, rc["peak_top"]], cap_fill, 1)
+                bars_on = True
+        except Exception:  # noqa: BLE001 - a bad spectrum never breaks the frame
+            bars_on = False
+
     # ------------------------------------------------------- seam: halo + nuc
     if reduced_motion:
         nscale, beat = 1.0, 0.0
@@ -477,9 +541,24 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             nscale, beat = 1.0, 0.0
     nuc_rad = max(1.1, r * NUCLEUS_FRAC) * nscale * (0.95 + 0.05 * gain)
     halo_a = min(1.0, (HALO_BASE + (1.0 - HALO_BASE) * beat) * bright)
-    _ring_oval(ccx, ccy, nuc_rad * HALO_SCALE, _dim(nuc_rgb, halo_a),
-               max(1, int(HALO_WIDTH)))
-    _oval(ccx, ccy, nuc_rad, _hex(nuc_rgb))
+    # Soft halo: dim outline rings (outline-only, never a disc), strongest on
+    # the beat so the body reads as living even while the gradient stays still.
+    halo_w = max(1, int(HALO_WIDTH))
+    for hi in range(HALO_LAYERS):
+        _ring_oval(ccx, ccy, nuc_rad * HALO_SCALE * (1.0 + 0.24 * hi),
+                   _dim(nuc_rgb, halo_a * (1.0 - 0.5 * hi)), halo_w)
+    # Shaded body: concentric filled ovals fake the radial gradient Tk cannot
+    # draw — a fading rim, the state hue, then a hot near-white core. Drawn
+    # outer to inner so the brightest layer lands on top.
+    rim_rgb = _mix(nuc_rgb, _ember.NEAR_BLACK, 0.55 * (1.0 - 0.3 * bright))
+    hot_rgb = _mix(nuc_rgb, (255, 255, 255), 0.78)
+    for li in range(NUCLEUS_LAYERS):
+        frac = li / max(1, NUCLEUS_LAYERS - 1)
+        if frac <= 0.5:
+            layer_rgb = _mix(rim_rgb, nuc_rgb, frac / 0.5)
+        else:
+            layer_rgb = _mix(nuc_rgb, hot_rgb, (frac - 0.5) / 0.5)
+        _oval(ccx, ccy, nuc_rad * (1.0 - 0.70 * frac), _hex(layer_rgb))
     fills.append(nuc_rgb)
 
     # ------------------------------------------------------------ near field
@@ -507,11 +586,13 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     return {"ovals": ovals, "lines": lines, "points": points,
             "min_y": min_y, "max_y": max_y, "fills": fills,
-            "bars": False}
+            "bars": bars_on}
 
 
 __all__ = [
     "render", "resolve_core", "PARTICLES", "RING_SEGMENTS",
+    "GLINT_MIN_SIZE", "GLINT_CORE_SCALE", "GLINT_CORE_MIN",
+    "NUCLEUS_LAYERS", "HALO_LAYERS", "NUCLEUS_OVAL_COUNT",
     "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
     "FRINGE_PX", "FRINGE_PX_AT_96", "LIFT_RING", "LIFT_BEAD",
     "LIFT_NUCLEUS", "MIN_MARK_BRIGHTNESS", "HALO_SCALE", "HALO_BASE",
