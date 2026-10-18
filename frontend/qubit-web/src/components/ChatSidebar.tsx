@@ -26,6 +26,7 @@ import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Card } from "@nous-research/ui/ui/components/card";
 
 import { ModelPickerDialog } from "@/components/ModelPickerDialog";
+import { ModelReloadConfirm } from "@/components/ModelReloadConfirm";
 import { ReasoningPicker } from "@/components/ReasoningPicker";
 import { api, QUBIT_BASE_PATH } from "@/lib/api";
 import { maybeReloadForLoopbackWsAuthFailure } from "@/lib/dashboard-auth-reload";
@@ -157,6 +158,11 @@ export function ChatSidebar({
   const [modelRefreshKey, setModelRefreshKey] = useState(0);
   // Set after the picker saves a model, to confirm the swap to the operator.
   const [modelNotice, setModelNotice] = useState<string | null>(null);
+  // A main-model write persists to config.yaml, but the RUNNING chat keeps its
+  // model until its session is rebuilt — so we confirm and reload (fresh PTY
+  // session booting from the just-saved config), 1:1 with the reference's
+  // ChatSidebar. Null when the confirm dialog is closed.
+  const [pendingReloadModel, setPendingReloadModel] = useState<string | null>(null);
 
   const refreshEffectiveModel = useCallback(() => {
     // When the terminal grant names the model this session actually runs, read
@@ -686,17 +692,16 @@ export function ChatSidebar({
                     "Main model set. /chat keeps its current model.",
                 );
               } else {
-                // No reload: `h_model_set` publishes a `model.changed` frame on
-                // the single SSE feed, and every surface (this card, /chat's
-                // model state, other tabs) repaints from it. A full-page reload
-                // here raced the SSE socket + session-token rotation and left
-                // the page blank until a manual refresh — the reported
-                // "switching a model blacks out /chat" defect. The frame is the
-                // supported apply path; just confirm the write landed.
-                setModelNotice(
-                  `Main model set to ${model.split("/").slice(-1)[0]}.`,
-                );
+                // A main-slot write persists to config.yaml, but the RUNNING
+                // chat keeps its model until its session is rebuilt. Confirm
+                // and reload — a fresh PTY session boots its agent from the
+                // just-saved config — 1:1 with the reference's ChatSidebar.
+                // (The previous no-reload path relied on the `model.changed`
+                // SSE frame alone, which repainted the card but left the
+                // running chat on the old model, so the panel kept showing the
+                // previous provider after a pick.)
                 refreshEffectiveModelRef.current();
+                setPendingReloadModel(model.split("/").slice(-1)[0]);
               }
             }
             return result;
@@ -707,6 +712,17 @@ export function ChatSidebar({
           }}
         />
       )}
+
+      <ModelReloadConfirm
+        model={pendingReloadModel}
+        onCancel={() => {
+          const m = pendingReloadModel;
+          setPendingReloadModel(null);
+          setModelNotice(
+            `Model set to ${m}. Run /new or refresh the page to apply it to this chat.`,
+          );
+        }}
+      />
     </div>
   );
 }

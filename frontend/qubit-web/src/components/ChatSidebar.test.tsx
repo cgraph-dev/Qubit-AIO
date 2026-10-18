@@ -12,11 +12,30 @@ const apiMocks = vi.hoisted(() => ({
     ok: true,
     session: { id, model: patch.model ?? null },
   })),
-  setModelAssignment: vi.fn(async () => ({ ok: true, terminal_follows: true })),
+  setModelAssignment: vi.fn(async () => ({
+    ok: true,
+    terminal_follows: true,
+  }) as {
+    ok: boolean;
+    terminal_follows: boolean;
+    provider?: string;
+    model?: string;
+    terminal_detail?: string;
+    confirm_required?: boolean;
+  }),
 }));
 
 const reloadMocks = vi.hoisted(() => ({
   maybeReloadForLoopbackWsAuthFailure: vi.fn(() => false),
+}));
+
+// Captures the reload-confirm dialog's props so a test can assert the reload
+// prompt really appears after a successful main-model write (upstream parity).
+const reloadConfirmMocks = vi.hoisted(() => ({
+  lastProps: null as null | {
+    model?: string | null;
+    onCancel?: () => void;
+  },
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -49,7 +68,10 @@ vi.mock("@/components/ModelPickerDialog", () => ({
   },
 }));
 vi.mock("@/components/ModelReloadConfirm", () => ({
-  ModelReloadConfirm: () => null,
+  ModelReloadConfirm: (props: unknown) => {
+    reloadConfirmMocks.lastProps = props as typeof reloadConfirmMocks.lastProps;
+    return null;
+  },
 }));
 vi.mock("@/components/ReasoningPicker", () => ({
   ReasoningPicker: () => null,
@@ -445,6 +467,7 @@ describe("ChatSidebar SSE event feed", () => {
 
     expect(apiMocks.patchChatSession).toHaveBeenCalledWith("dashboard-bound", {
       model: "deepseek-v4.1-flash",
+      provider: "opencode-go",
     });
     expect(apiMocks.setModelAssignment).not.toHaveBeenCalled();
     expect(onSessionModelChange).toHaveBeenCalledWith("deepseek-v4.1-flash");
@@ -469,5 +492,67 @@ describe("ChatSidebar SSE event feed", () => {
 
     expect(apiMocks.setModelAssignment).toHaveBeenCalled();
     expect(apiMocks.patchChatSession).not.toHaveBeenCalled();
+  });
+
+  it("prompts a reload after a successful main-model write (upstream parity)", async () => {
+    // A main-slot write persists to config.yaml, but the RUNNING chat keeps its
+    // model until its session is rebuilt — so the picker must offer the
+    // confirm+reload, exactly like the reference ChatSidebar. Without it the
+    // panel kept rendering the previous provider after a pick.
+    apiMocks.setModelAssignment.mockResolvedValueOnce({
+      ok: true,
+      provider: "opencode-go",
+      model: "deepseek-v4.1-flash",
+      terminal_follows: true,
+    });
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(<ChatSidebar channel="chat-1" />);
+    await flushMicrotasks();
+
+    const pickerButton = container.querySelector("button[title]");
+    await act(async () => {
+      pickerButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushMicrotasks();
+
+    const onApply = pickerMocks.lastProps?.onApply;
+    await act(async () => {
+      await onApply!({ provider: "opencode-go", model: "deepseek-v4.1-flash" });
+    });
+
+    // The confirm dialog is handed the short model name awaiting confirmation.
+    expect(reloadConfirmMocks.lastProps?.model).toBe("deepseek-v4.1-flash");
+  });
+
+  it("does not prompt a reload when the terminal kept its own model", async () => {
+    // `terminal_follows === false` means /chat refused the pick (below the
+    // context floor); the write landed but the running chat did NOT take it, so
+    // offering "reload to apply" would promise a switch the terminal did not
+    // make. The honest notice is shown instead.
+    apiMocks.setModelAssignment.mockResolvedValueOnce({
+      ok: true,
+      provider: "opencode-go",
+      model: "deepseek-v4.1-flash",
+      terminal_follows: false,
+      terminal_detail: "Main model set. /chat keeps its current model.",
+    });
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(<ChatSidebar channel="chat-1" />);
+    await flushMicrotasks();
+
+    const pickerButton = container.querySelector("button[title]");
+    await act(async () => {
+      pickerButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushMicrotasks();
+
+    const onApply = pickerMocks.lastProps?.onApply;
+    await act(async () => {
+      await onApply!({ provider: "opencode-go", model: "deepseek-v4.1-flash" });
+    });
+
+    expect(reloadConfirmMocks.lastProps?.model ?? null).toBeNull();
   });
 });
