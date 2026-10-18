@@ -204,6 +204,7 @@ class _Router:
         self.preset_path = preset_path
         self.statuses = statuses
         self.reloads = 0
+        self.models_max = 4  # a real LlamaServerSupervisor always carries it (refit_idle_presets)
         self.proc = SimpleNamespace(poll=lambda: None)
         self._refit_usable = None
         import threading

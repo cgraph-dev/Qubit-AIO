@@ -1,6 +1,6 @@
 """Plugin slash commands of the classic CLI on the shared gateway (``slash.exec``).
 
-On main a plugin's ``/command`` ran in this process. Rewired, the plugin's hooks, tools and MCP servers
+Once a plugin's ``/command`` ran in the CLI process itself. Rewired, the plugin's hooks, tools and MCP servers
 live in the gateway, so its command runs there too (``gateway/session_commands.py``, the messaging
 gateway's own plugin dispatch): ``ctx.call_mcp`` reaches the servers the gateway connected, and this
 process never imports the plugin to run it. The names come from the gateway's ``commands.catalog``,
@@ -9,7 +9,7 @@ a typed name misses, so a plugin the gateway enabled since still dispatches; a c
 reload dropped since is re-read once when the gateway refuses it, then dispatched again (:data:`GONE`).
 A catalog whose ``plugin_discovery_error`` is set lists no plugins because the gateway could not load
 them, not because there are none: it is treated as a failed read and never cached. Off the gateway
-(tests, the TUI slash worker's shadow CLI) main's dispatch applies.
+(tests, the TUI slash worker's shadow CLI) this process's dispatch applies.
 """
 from __future__ import annotations
 
@@ -132,7 +132,7 @@ def skill_notes(cli):
 
 def run_skill(cli, base_cmd, rest):
     """``/skill ...`` on the gateway session: the gateway resolves and loads the skill (its plugin
-    skills and stacked skills too) and returns the message, which is queued as main queued it; True
+    skills and stacked skills too) and returns the message, which is queued as the CLI queued it; True
     when answered there (False off the gateway: main's local load)."""
     from qubit_cli.gateway_side import connection_for
     connection = connection_for(cli)
@@ -224,9 +224,9 @@ def run(cli, name, arg):
     from cli import _cprint
     from qubit_cli.gateway_client import GatewayRPCError
     from qubit_cli.gateway_connection import CallStopped
-    # No answer deadline: main's CLI waited for the handler, which may wait minutes (ctx.call_mcp). On
+    # No answer deadline: the CLI waited for the handler, which may wait minutes (ctx.call_mcp). On
     # a socket of its own, so the session's prompts and interrupts never queue behind it.
-    wake = cli._plugin_command_wait = threading.Event()  # set on Ctrl+C (the CLI interrupt path)
+    wake = cli._plugin_command_wait = threading.Event()  # set by Ctrl+C (cli_tui_mixin)
     try:
         reply = connection.call_until("slash.exec", wake, session_id=cli.session_id,
                                       command=name + (" " + arg if arg else ""))

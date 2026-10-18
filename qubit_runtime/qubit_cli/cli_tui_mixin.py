@@ -16,7 +16,7 @@ import time
 
 from agent.i18n import t
 from agent.interrupt_compat import request_hard_interrupt
-from qubit_cli.commands_completion import SlashCommandAutoSuggest, SlashCommandCompleter
+from qubit_cli.commands_completion import SlashCommandAutoSuggest, cli_slash_completer
 from pathlib import Path
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.history import FileHistory
@@ -1012,7 +1012,7 @@ class CLITuiMixin:
     def _tui_cancel_foreground_ui(self, event, *, closers) -> bool:
         """Close the first active foreground UI (slash-confirm / picker / palette); True if any."""
         for state_attr, close in closers:
-            if getattr(self, state_attr):
+            if getattr(self, state_attr, None):
                 close()
                 event.app.current_buffer.reset()
                 event.app.invalidate()
@@ -1045,16 +1045,16 @@ class CLITuiMixin:
             event.app.exit()
 
     def _tui_handle_ctrl_c(self, event):
-        """Ctrl+C priority: cancel voice recording → cancel foreground UI/overlay prompt →
-        interrupt the running agent (first press) → force exit (second press within 2s) → when
-        idle clear the draft or exit."""
+        """Ctrl+C priority: cancel voice recording → cancel foreground UI/overlay prompt or the wait for a
+        gateway plugin command → clear a typed draft, even mid-run (a correction must never kill the turn)
+        → interrupt the running agent → force exit (second press within 2s) → when idle and empty, exit."""
         now = time.time()
         if self._tui_cancel_voice_recording(event):
             return
         if self._tui_cancel_foreground_ui(event, closers=(
             ("_slash_confirm_state", lambda: self._submit_slash_confirm_response("cancel")),
-            ("_model_picker_state", self._close_model_picker),
-            ("_command_palette_state", self._close_command_palette))):
+            ("_model_picker_state", self._close_model_picker), ("_command_palette_state", self._close_command_palette),
+            ("_plugin_command_wait", lambda: self._plugin_command_wait.set()))):
             return
         overlay_cleared = self._tui_clear_blocking_overlays(event)
         if overlay_cleared and not (self._agent_running and self.agent):
@@ -1235,13 +1235,13 @@ class CLITuiMixin:
         run_in_terminal(_suspend)
 
     def _tui_handle_ctrl_d(self, event):
-        """Ctrl+D deletes under the cursor (readline); exits only on empty input, like bash/zsh.
-        Pending attached images count as input so the user doesn't lose them silently."""
+        """Ctrl+D deletes under the cursor (readline); exits only on empty input (pending images count),
+        like bash/zsh. Mid-turn it detaches: the gateway finishes the turn, Ctrl+C stops it (LC-6b)."""
         buf = event.app.current_buffer
         if buf.text:
             buf.delete()
         elif not self._attached_images:
-            self._should_exit = True
+            self._should_exit, self._detach_on_exit = True, bool(self._agent_running)
             event.app.exit()
 
     def _tui_recall_without_recollapse(self, buf, move):
@@ -1949,9 +1949,7 @@ class CLITuiMixin:
         self._should_exit = False
         self._last_ctrl_c_time = 0  # double Ctrl+C force-exit tracking
 
-        # Plugins get a CLI reference so they can inject messages.
-        from qubit_cli.plugins import get_plugin_manager
-        get_plugin_manager()._cli_ref = self
+        # No PluginManager._cli_ref: plugins load in the gateway, not here (PLG-7).
 
         # Config file watcher — detect mcp_servers changes and auto-reload.
         from qubit_cli.config import get_config_path as _get_config_path
@@ -2305,7 +2303,7 @@ class CLITuiMixin:
     def _tui_build_input_area(self):
         """Multi-line prompt TextArea with slash completion, paste-collapse tracking and
         placeholder/password processors."""
-        from cli import _estimate_tui_input_height, get_skill_bundles, get_skill_commands
+        from cli import _estimate_tui_input_height
         from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
         from prompt_toolkit.completion import ThreadedCompleter
         cli_ref = self
@@ -2313,10 +2311,7 @@ class CLITuiMixin:
         def get_prompt():
             return cli_ref._get_tui_prompt_fragments()
 
-        _completer = SlashCommandCompleter(
-            skill_commands_provider=lambda: get_skill_commands(),
-            command_filter=cli_ref._command_available,
-            skill_bundles_provider=lambda: get_skill_bundles())
+        _completer = cli_slash_completer(self)
         input_area = TextArea(
             height=Dimension(min=1, max=8, preferred=1),
             prompt=get_prompt,

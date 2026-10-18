@@ -103,7 +103,13 @@ class CatalogEntry:
     # before the file is on disk.
     architecture: str = ""
     mmproj: "AssetFile | None" = None    # vision projector, downloads with model
-    draft: "AssetFile | None" = None     # spec-decode draft model (e.g. DSpark)
+    draft: AssetFile | None = None     # spec-decode draft model (e.g. DSpark)
+    # How the draft decodes. draft-dspark drafts only for a model spilled past GPU memory;
+    # draft-dflash replaces MTP whenever it fits, on one slot (each slot keeps a recurrent-state
+    # copy per draft position). Optional: a missing draft leaves the model as it was.
+    draft_spec_type: str = "draft-dspark"
+    draft_depth: int = 3
+    draft_min_engine: str = ""          # oldest llama.cpp release that loads the draft
     # MTP head shipped as its own file (the model carries none): the engine loads it as the
     # draft for MTP spec decode. Downloads with the model.
     mtp_head: "AssetFile | None" = None
@@ -120,6 +126,9 @@ class CatalogEntry:
     # MoE. With memory bandwidth this predicts decode speed — the physics half of the
     # recommendation.
     decode_fraction: float = 1.0
+    # False lists the entry for explicit choice only: it is never the automatic recommendation or
+    # quickstart's pick on any machine, so it needs no quality ordering.
+    recommend: bool = True
 
     @property
     def mtp_capable(self) -> bool:
@@ -153,6 +162,12 @@ class CatalogEntry:
 
     def download_bytes(self, variant: QuantVariant) -> int:
         return sum(f.size_bytes for f in self.download_files(variant))
+
+    def install_files(self, variant: QuantVariant) -> tuple:
+        """The files a variant needs to count as downloaded. The draft is optional: a model
+        installed before its draft joined the catalog stays installed."""
+        extras = tuple(a for a in (self.mmproj, self.mtp_head) if a is not None)
+        return tuple(variant.files) + extras
 
 
 @dataclass(frozen=True)
@@ -258,7 +273,7 @@ def recommended_entry(budget: HardwareBudget,
     fastest-resident (nothing resident clears the floor). Returns None when no eligible entry
     runs resident; spilled models remain available for explicit selection.
     """
-    pool = CATALOG if entries is None else entries
+    pool = tuple(e for e in (CATALOG if entries is None else entries) if e.recommend)
     fitting = [(e, c) for e in pool if (c := select_variant(e, budget)) is not None]
     if not fitting:
         return None
@@ -295,7 +310,7 @@ def recommended_entry(budget: HardwareBudget,
 # installer source (``qubit_cli.install_source``) so it follows the Qubit repo
 # and branch, never a hardcoded Hermes repo.
 _CATALOG_URL = install_source.raw_asset_url("qubit_cli/local_runtime/catalog.json")
-_SCHEMA_VERSION = 2  # bump when an older app would read a newer catalog but launch its entries wrongly
+_SCHEMA_VERSION = 3  # bump when an older app would read a newer catalog but launch its entries wrongly
 _REFRESH_TTL_S = 6 * 3600
 _refresh_lock = threading.Lock()
 _last_refresh_attempt = 0.0
@@ -316,6 +331,8 @@ _SCALAR_FIELDS = {
     "moe": (bool, False), "mtp": (bool, False), "mtp_draft_depth": (int, 3),
     "n_vocab": (int, 0), "sampling": (dict, {}), "min_engine": (str, ""),
     "quality": (int, 0), "decode_fraction": (float, 1.0), "architecture": (str, ""),
+    "recommend": (bool, True), "draft_spec_type": (str, "draft-dspark"), "draft_depth": (int, 3),
+    "draft_min_engine": (str, ""),
 }
 
 
