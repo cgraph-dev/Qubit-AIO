@@ -160,7 +160,12 @@ TRAIL_HUE_ANCHOR_BLEND = 0.10
 #: two never visibly lock. Purely additive: the master spin is untouched.
 #: ``mark_horizontal_spin`` reads the CLAMPED clock, so this is a true no-op
 #: (scale 1.0, no transform pushed) under reduced motion.
-Y_SPIN_PERIOD_S = 19.0
+#: The period is deliberately non-harmonic with the 24 s master spin AND both
+#: ring turns. It is 20.5 s, not the "about 19" first considered, because 19 is
+#: exactly TWICE the 9.5 s near-ring period: the mark would then fall into the
+#: same relative configuration every half turn and the two motions would read
+#: as one locked pattern rather than as two independent lives.
+Y_SPIN_PERIOD_S = 20.5
 #: The mark dims as it turns edge-on and brightens face-on, by this much.
 Y_SPIN_DIM = 0.15
 #: Phase warp applied to the horizontal turn, ``psi = theta + k*sin(2*theta)``.
