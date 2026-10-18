@@ -187,12 +187,13 @@ def test_far_beads_draw_behind_and_near_beads_in_front():
             # The renderer threads each element's own depth through the Y+X
             # tumble, so the locator must too: a depth-free helper lands on
             # the wrong pixel once the turn is a real 3-D rotation. The depth
-            # goes through turn_qdepth first (hash-broken, flat per element),
-            # exactly as the renderer does. Tumble first, then the master
-            # spin — the renderer's own order.
-            qd = M.turn_qdepth(f.get("depth", 0.5), f.get("index"),
-                               flat=True)
+            # goes through turn_qdepth (hash-broken, flat per element) and the
+            # screen-space z/z2 volume offset, exactly as the renderer does.
+            # Tumble first, then the master spin — the renderer's own order.
+            qd = M.turn_qdepth(f.get("depth", 0.5), f.get("index"), flat=True)
             px, py, _g = M.turn_point(t, 32.0, f["x"], f["y"], qd)
+            ox, oy = M.volume_offset(t, 32.0, f.get("z"), f.get("z2"))
+            px, py = px + ox, py + oy
             a = math.radians(math.fmod(M.spin_deg(t), 360.0))
             rx = px * math.cos(a) - py * math.sin(a)
             ry = px * math.sin(a) + py * math.cos(a)
@@ -262,12 +263,15 @@ def test_comet_head_drawn_during_sweep_and_not_outside(monkeypatch):
     info = F.comet(visible_t, 32.0)
     # Depth-aware locator: the head rides the Y+X tumble at its own depth
     # (tumble first, then the master spin — the renderer's own order).
-    # The projection depth goes through turn_qdepth (flat, comet seed),
-    # exactly as the renderer does.
-    _qd = M.turn_qdepth(info.get("depth", 0.5),
-                        info.get("index", 0.0), flat=True)
-    _px, _py, _g = M.turn_point(visible_t, 32.0, info["x"], info["y"],
-                                _qd)
+    # The projection depth goes through turn_qdepth (flat with the comet seed)
+    # and the comet's screen-space z/z2 volume offset, exactly as the
+    # renderer does.
+    _qd = M.turn_qdepth(info.get("depth", 0.5), info.get("index", 0.0),
+                        flat=True)
+    _px, _py, _g = M.turn_point(visible_t, 32.0, info["x"], info["y"], _qd)
+    _ox, _oy = M.volume_offset(visible_t, 32.0, info.get("z"),
+                               info.get("z2"))
+    _px, _py = _px + _ox, _py + _oy
     _a = math.radians(math.fmod(M.spin_deg(visible_t), 360.0))
     head = (34.0 + _px * math.cos(_a) - _py * math.sin(_a),
             34.0 + _px * math.sin(_a) + _py * math.cos(_a))

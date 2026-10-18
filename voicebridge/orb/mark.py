@@ -127,11 +127,32 @@ from .mark_field import (
     ring_geometry,
     ring_path,
     ring_alpha,
+    ring_tilt_spin,
+    ring_radius_scale,
+    core_shells,
+    CORE_SHELL_COUNT,
+    flare_dots,
+    FLARE_COUNT,
+    filament_state,
+    FILAMENT_SAMPLES,
     dof,
     skew,
     INNER_RING_RX_FRAC,
     BINARY_COUNT,
 )
+
+#: The two concurrent field layers (all-ring riders + the vertical cylinder
+#: around the nucleus) land in a sibling commit. Import them defensively so this
+#: renderer runs against either field revision; a lane that lacks them simply
+#: draws nothing for that layer until the re-merge.
+try:  # pragma: no cover - exercised by whichever field revision is checked out
+    from .mark_field import ring_particles as _field_ring_particles
+except Exception:  # noqa: BLE001
+    _field_ring_particles = None
+try:  # pragma: no cover
+    from .mark_field import cylinder_particles as _field_cylinder_particles
+except Exception:  # noqa: BLE001
+    _field_cylinder_particles = None
 
 #: Fringe offset in DEVICE pixels, never scaled with the radius: a lens fringe
 #: is a pixel-level artifact, and scaling it turned the mark into three separate
@@ -229,10 +250,34 @@ TURN_Z_SALT = 17.31
 TURN_Z_SPREAD = 0.9
 TURN_RING_TILT = 0.35
 TURN_RING_SALT = 5.77
+#: VOLUME: the field publishes two independent 0..1 volume axes (``z`` / ``z2``)
+#: on every element (distinct ``hash01`` salts, so uncorrelated with ``depth``).
+#: ``z`` displaces an element vertically and ``z2`` horizontally, giving the
+#: cloud a genuine volume instead of one sheet riding the orbit plane. The
+#: displacement is driven by the HASH axes, never by the orbital angle, so it
+#: cannot reintroduce the depth/x lock; it is faded by the SAME combined-turn
+#: factor the projection uses (:func:`turn_fade`), so a face-on phase and
+#: reduced motion are the unturned mark bit for bit. Parity with the Qt
+#: painter's ``volume_offset`` (same constants).
+VOLUME_X_FRAC = 0.13
+VOLUME_Y_FRAC = 0.13
 #: Depth of field: how much a far element's alpha is pulled down. ``dof`` is
 #: 0.0 sharp / 1.0 far, so this softens distance WITHOUT touching brightness
 #: meaning — "far away" must not collapse into "barely visible".
 DOF_ALPHA_SOFT = 0.22
+
+#: The travelling filament is a RING stroked segment by segment. Tk's
+#: per-segment stroke cost is higher than the Qt painter's single gradient
+#: path, so this lane draws every other sample pair: the wave crest still
+#: sweeps the whole circle and the ring reads continuous, at half the
+#: primitives.
+FILAMENT_TK_STRIDE = 2
+FILAMENT_TK_SAT = 0.90
+FILAMENT_TK_VAL = 0.98
+#: Ring-rider star colour: the field's own hue, kept bright but anchored to the
+#: state core like every other spectral stroke.
+RING_PARTICLE_SAT = 0.92
+RING_PARTICLE_VAL = 1.00
 
 # --- one declared geometry, every circle's art direction ---------------------
 #: ``mark_field.ring_geometry`` declares EVERY circle of the mark once (the two
@@ -379,6 +424,7 @@ NUCLEUS_OVAL_COUNT = (
     + 2 * (NUCLEUS_SWIRL_LAYERS - 1)
     + (NUCLEUS_SPEC_LAYERS - 1)
     + 1                                             # the orbiting specular
+    + CORE_SHELL_COUNT   # nested interior bodies: real depth INSIDE the orb
     + NUCLEUS_RIM_OVALS  # hologram rim: bright edge + red/blue split
 )
 
@@ -462,7 +508,8 @@ def turn_project(x: float, y: float, depth: float,
     gain. The arithmetic mirrors the Qt painter's per-point placement with the
     same constants, so the two lanes put every element in the same place::
 
-        z   = (depth - 0.5) * Z_GAIN * R * sin(theta)**2
+        fade = sin(theta)**2 + sin(phi)**2 - sin(theta)**2*sin(phi)**2
+        z   = (depth - 0.5) * Z_GAIN * R * fade
         xr  = x * cos(theta) + z * sin(theta)
         zr0 = -x * sin(theta) + z * cos(theta)
         yr  = y * cos(phi) - zr0 * sin(phi)
@@ -471,15 +518,18 @@ def turn_project(x: float, y: float, depth: float,
         X, Y = xr * persp, yr * persp
         gain = 1 + DEPTH_GAIN * zr / R   (clamped)
 
-    The depth offset is faded by ``sin(theta)**2``: at ``theta = 0`` and
-    ``theta = pi`` every term collapses to ``xr = +-x``, ``persp = 1`` and
-    ``gain = 1``, so the face-on phases are the unturned mark, bit for bit.
-    ``phi = 0`` is likewise the identity for the X turn. ``y`` is untouched
-    by the Y turn and ``x`` by the X turn, which is exactly why the mark's
-    height never changes under Y alone and the turn never thins to a line:
-    the depth axis carries the quarter phases.
+    The depth offset is faded by the COMBINED turn
+    (``sin²θ + sin²φ − sin²θ·sin²φ``) rather than by the Y turn alone. The
+    Y-only fade still guaranteed a total collapse: near Y face-on the depth
+    vanishes exactly where the X turn tips the plane edge-on and the assembly
+    folds to a band (measured ~0.25 of face-on). The combined fade is 0 iff
+    BOTH phases are 0 (so ``t = 0`` and reduced motion stay the exact identity)
+    and 1 at ANY quarter turn of either axis, so the mark opens along whichever
+    axis is edge-on. Same polynomial as the Qt painter, so both lanes tumble
+    identically.
     """
-    z = (depth - 0.5) * Y_SPIN_Z_GAIN * r * st * st
+    fade = st * st + sp * sp - st * st * sp * sp
+    z = (depth - 0.5) * Y_SPIN_Z_GAIN * r * fade
     xr = x * ct + z * st
     zr0 = -x * st + z * ct
     yr = y * cp - zr0 * sp
@@ -556,6 +606,46 @@ def turn_point(t: Any, R: Any, x: Any, y: Any,
         return (0.0, 0.0, 1.0)
     ct, st, cp, sp = turn_basis(t)
     return turn_project(xx, yy, d, ct, st, cp, sp, r)
+
+
+def turn_fade(t: Any) -> float:
+    """The combined turn's depth-opening factor at ``t``, in ``[0, 1]``.
+
+    ``sin²θ + sin²φ − sin²θ·sin²φ``: exactly 0 when BOTH tumble phases are 0
+    (face-on, and every reduced-motion frame, since both reads clamp to 0) and
+    1 when either axis is edge-on. The SAME factor :func:`turn_project`
+    multiplies the depth offset by, so anything routed through it is an exact
+    no-op at a still clock. Parity with the Qt painter's ``turn_fade``. Never
+    raises.
+    """
+    try:
+        _ct, st, _cp, sp = turn_basis(t)
+    except Exception:  # noqa: BLE001 - a bad clock must not move the mark
+        return 0.0
+    return max(0.0, min(1.0, st * st + sp * sp - st * st * sp * sp))
+
+
+def volume_offset(t: Any, R: Any, z: Any, z2: Any = 0.5
+                  ) -> Tuple[float, float]:
+    """Screen-space 3D displacement from the field's ``z``/``z2`` volume axes.
+
+    Each axis is a 0..1 hash of the element's index, so the displacement is
+    CONSTANT per element and uncorrelated with its orbital angle — a real
+    volume, not the depth/x lock. ``z`` moves an element vertically and ``z2``
+    horizontally (independent axes, so the cloud fills a box, not a line). The
+    whole offset is faded by :func:`turn_fade`, so at a face-on phase and under
+    reduced motion it is exactly ``(0, 0)``: still frames carry the unturned
+    mark, unaltered. Mirrors the Qt painter's ``volume_offset`` with the same
+    constants. Pure, never raises.
+    """
+    f = turn_fade(t)
+    r = _num(R, 32.0)
+    if r <= 0.0:
+        r = 32.0
+    dz = min(1.0, max(0.0, _num(z, 0.5))) - 0.5
+    dz2 = min(1.0, max(0.0, _num(z2, 0.5))) - 0.5
+    return (dz2 * (2.0 * VOLUME_X_FRAC) * r * f,
+            -dz * (2.0 * VOLUME_Y_FRAC) * r * f)
 
 
 def nucleus_radius(R: Any, t: Any, level_gain: Any = 1.0) -> float:
@@ -730,6 +820,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     spin_a = math.radians(math.fmod(spin_deg(tt), 360.0))
     spin_c, spin_s = math.cos(spin_a), math.sin(spin_a)
     turn_ct, turn_st, turn_cp, turn_sp = turn_basis(tt)
+    # The combined-turn fade is a frame constant: resolve it once and reuse it
+    # for every element's volume offset (hundreds of points share it).
+    frame_fade = max(0.0, min(
+        1.0, turn_st * turn_st + turn_sp * turn_sp
+        - turn_st * turn_st * turn_sp * turn_sp))
 
     def _place(x: float, y: float, depth: Any = 0.5, zseed: Any = None,
                zspread: Any = TURN_Z_SPREAD, zflat: bool = False
@@ -754,15 +849,26 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     def _place3(x: float, y: float,
                 depth: Any = 0.5, zseed: Any = None,
-                zspread: Any = TURN_Z_SPREAD, zflat: bool = False
+                zspread: Any = TURN_Z_SPREAD, zflat: bool = False,
+                vol_z: Any = None, vol_z2: Any = None
                 ) -> Tuple[float, float, float]:
-        """Like :func:`_place`, plus the rotated-depth size/alpha gain."""
+        """Like :func:`_place`, plus the rotated-depth size/alpha gain.
+
+        ``vol_z``/``vol_z2`` are the element's field volume axes; when present
+        they add a screen-space displacement (:func:`volume_offset`) so the
+        body sits in a genuine volume rather than one lay on the orbit plane.
+        """
         try:
             d = turn_qdepth(depth, zseed, zspread, flat=zflat)
         except Exception:  # noqa: BLE001
             d = 0.5
         px, py, g = turn_project(_num(x), _num(y), d, turn_ct, turn_st,
                                  turn_cp, turn_sp, r)
+        if vol_z is not None or vol_z2 is not None:
+            dz = min(1.0, max(0.0, _num(vol_z, 0.5))) - 0.5
+            dz2 = min(1.0, max(0.0, _num(vol_z2, 0.5))) - 0.5
+            px += dz2 * (2.0 * VOLUME_X_FRAC) * r * frame_fade
+            py += -dz * (2.0 * VOLUME_Y_FRAC) * r * frame_fade
         sx = px * spin_c - py * spin_s
         sy = px * spin_s + py * spin_c
         return (cx_f + sx, cy_f + sy, g)
@@ -867,7 +973,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     # ---- the streak (one tapered wake per travelling body) ------------------
     def _streak(samples: Any, gain: float = 1.0,
                 half: float = STREAK_HALF_WIDTH,
-                zseed: Any = None) -> None:
+                zseed: Any = None, vol_z: Any = None,
+                vol_z2: Any = None) -> None:
         """One body's spectral wake, walked sample by sample.
 
         Owner 2026-10-18: a star should leave an RGB TRAIL, not sit inside an
@@ -879,9 +986,13 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         smps = [s for s in (samples or []) if isinstance(s, dict)]
         if len(smps) < 2:
             return
+        # Every sample of one body's wake shares that body's volume offset, so
+        # the whole streak swings as one body and its head still rides the
+        # star (see ``test_a_body_draws_its_wake_then_its_star``).
         pts = [_place3(_num(s.get("x")), _num(s.get("y")),
                        _num(s.get("depth"), 0.5),
-                       zseed=zseed, zflat=True) for s in smps]
+                       zseed=zseed, zflat=True,
+                       vol_z=vol_z, vol_z2=vol_z2) for s in smps]
         total = 0.0
         for i in range(1, len(pts)):
             total += math.dist(pts[i][:2], pts[i - 1][:2])
@@ -1009,9 +1120,22 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             if reduced_motion and layer in ("echo", "satellite"):
                 continue
             draw_spec = dict(spec)
+            # Fluid circles: the ring's live plane is its declared base tilt
+            # PLUS the field's additive plane-precession offset, and its radii
+            # breathe by the field's own gentle scale. The declaration stays
+            # authoritative (``tilt``/``rx_frac`` are untouched on the entry);
+            # this is exactly the additive evolution the field exposes.
+            base_tilt = _num(spec.get("tilt"), 0.0)
             if spec.get("echo"):
-                draw_spec["tilt"] = echo_follower_tilt(
+                base_tilt = echo_follower_tilt(
                     tt, str(spec.get("orbit") or "a"))
+            draw_spec["tilt"] = base_tilt + _num(spec.get("tilt_spin_deg"))
+            try:
+                rscale = _num(ring_radius_scale(tt, spec), 1.0)
+            except Exception:  # noqa: BLE001 - a field fault keeps the base radii
+                rscale = 1.0
+            draw_spec["rx_frac"] = _num(spec.get("rx_frac"), RX_FRAC) * rscale
+            draw_spec["ry_frac"] = _num(spec.get("ry_frac"), RY_FRAC) * rscale
             # ``ring_path`` carries the field's camera sway. The BODY does not
             # sway, so a circle drawn around it must not either: leaving the
             # sway in slides the mark's visual centre off its own core.
@@ -1097,9 +1221,46 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         binaries = []
     if not isinstance(binaries, list):
         binaries = []
+    try:
+        # Rarer, larger blinks than the pinprick field: same contract as
+        # ``blink_dots`` (fixed positions, alpha-only envelope). LIFE.
+        flares = [] if reduced_motion else flare_dots(tt, r)
+    except Exception:  # noqa: BLE001
+        flares = []
+    if not isinstance(flares, list):
+        flares = []
+    try:
+        # The travelling energy filament: fixed ring positions whose alpha and
+        # size ride a moving standing wave, so the mark gains a continuous
+        # flowing band that is neither a body nor a static circle.
+        filament = [] if reduced_motion else filament_state(tt, r)
+    except Exception:  # noqa: BLE001
+        filament = []
+    if not isinstance(filament, list):
+        filament = []
+    # Bodies riding EVERY declared ring, and a vertical cylindrical column
+    # around the nucleus: the concurrent field commit's two extra layers. The
+    # renderer draws them with the same dot machinery when present, and simply
+    # draws nothing before the re-merge.
+    ring_riders = []
+    if _field_ring_particles is not None and not reduced_motion:
+        try:
+            ring_riders = _field_ring_particles(tt, r)
+        except Exception:  # noqa: BLE001
+            ring_riders = []
+    if not isinstance(ring_riders, list):
+        ring_riders = []
+    cylinder = []
+    if _field_cylinder_particles is not None and not reduced_motion:
+        try:
+            cylinder = _field_cylinder_particles(tt, r)
+        except Exception:  # noqa: BLE001
+            cylinder = []
+    if not isinstance(cylinder, list):
+        cylinder = []
     if reduced_motion:
         # A clean static frame: no dust, no glints, no comet, no streaks, no
-        # follower rings and no nucleus sparks.
+        # follower rings, no nucleus sparks and none of the new life layers.
         dust = []
         glints = []
         sparks = []
@@ -1121,6 +1282,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     near_sparks = [s for s in sparks if _num(s.get("depth"), 0.5) >= 0.5]
     far_dots = [d for d in dots if _num(d.get("depth"), 0.5) < 0.5]
     near_dots = [d for d in dots if _num(d.get("depth"), 0.5) >= 0.5]
+    far_flares = [f for f in flares if _num(f.get("depth"), 0.5) < 0.5]
+    near_flares = [f for f in flares if _num(f.get("depth"), 0.5) >= 0.5]
+    far_riders = [s for s in ring_riders if _num(s.get("depth"), 0.5) < 0.5]
+    near_riders = [s for s in ring_riders if _num(s.get("depth"), 0.5) >= 0.5]
+    far_cyl = [s for s in cylinder if _num(s.get("depth"), 0.5) < 0.5]
+    near_cyl = [s for s in cylinder if _num(s.get("depth"), 0.5) >= 0.5]
     comet_on = (not reduced_motion) and _num(comet_info.get("alpha")) > 0.0
 
     # ------------------------------------------------------------- the bodies
@@ -1129,10 +1296,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         depth = _num(part.get("depth"), 0.5)
         if not reduced_motion:
             _streak(rgb_trail(tt, r, part),
-                    zseed=_num(part.get("index"), None))
+                    zseed=_num(part.get("index"), None),
+                    vol_z=part.get("z"), vol_z2=part.get("z2"))
         x, y, g = _place3(_num(part.get("x")), _num(part.get("y")),
                            depth, zseed=_num(part.get("index"), None),
-                           zflat=True)
+                           zflat=True, vol_z=part.get("z"),
+                           vol_z2=part.get("z2"))
         _glint(x, y, part.get("size"), part.get("alpha"),
                _lift(_num(part.get("lift"), LIFT_BEAD)),
                skew_deg=part.get("skew"), depth=depth, gain=g)
@@ -1151,10 +1320,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         if not reduced_motion:
             _streak(dust_trail(tt, r, body), gain=SATELLITE_STREAK_GAIN,
                     half=SHORT_STREAK_HALF_WIDTH,
-                    zseed=_num(body.get("index"), None))
+                    zseed=_num(body.get("index"), None),
+                    vol_z=body.get("z"), vol_z2=body.get("z2"))
         x, y, g = _place3(_num(body.get("x")), _num(body.get("y")),
                            depth, zseed=_num(body.get("index"), None),
-                           zflat=True)
+                           zflat=True, vol_z=body.get("z"),
+                           vol_z2=body.get("z2"))
         _glint(x, y, max(GLINT_MIN_SIZE, _num(body.get("size"))),
                body.get("alpha"),
                _lift(_num(body.get("lift"), LIFT_BEAD)),
@@ -1165,7 +1336,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         depth = _num(spark.get("depth"), 0.5)
         x, y, g = _place3(_num(spark.get("x")), _num(spark.get("y")),
                            depth, zseed=_num(spark.get("index"), None),
-                           zflat=True)
+                           zflat=True, vol_z=spark.get("z"),
+                           vol_z2=spark.get("z2"))
         _glint(x, y, spark.get("size"), spark.get("alpha"),
                _lift(_num(spark.get("lift"), LIFT_NUCLEUS)),
                arm_frac=SPARK_ARM_FRAC,
@@ -1182,7 +1354,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         depth = _num(mote.get("depth"), 0.5)
         x, y, g = _place3(_num(mote.get("x")), _num(mote.get("y")),
                            depth, zseed=_num(mote.get("index"), None),
-                           zflat=True)
+                           zflat=True, vol_z=mote.get("z"),
+                           vol_z2=mote.get("z2"))
         _dot(x, y, max(0.25, _num(mote.get("size"))), mote.get("alpha"),
              _lift(mote.get("lift")), depth=depth, gain=g)
 
@@ -1191,10 +1364,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         if not reduced_motion:
             _streak(dust_trail(tt, r, glint), gain=SPARKLE_STREAK_GAIN,
                     half=SHORT_STREAK_HALF_WIDTH,
-                    zseed=_num(glint.get("index"), None))
+                    zseed=_num(glint.get("index"), None),
+                    vol_z=glint.get("z"), vol_z2=glint.get("z2"))
         x, y, g = _place3(_num(glint.get("x")), _num(glint.get("y")),
                            depth, zseed=_num(glint.get("index"), None),
-                           zflat=True)
+                           zflat=True, vol_z=glint.get("z"),
+                           vol_z2=glint.get("z2"))
         _dot(x, y, max(0.3, _num(glint.get("size"))), glint.get("alpha"),
              _lift(glint.get("lift")), depth=depth, gain=g)
 
@@ -1209,9 +1384,94 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         depth = _num(dot.get("depth"), 0.5)
         x, y, g = _place3(_num(dot.get("x")), _num(dot.get("y")),
                            depth, zseed=_num(dot.get("index"), None),
-                           zflat=True)
+                           zflat=True, vol_z=dot.get("z"),
+                           vol_z2=dot.get("z2"))
         _dot(x, y, max(0.2, _num(dot.get("size"))), dot.get("alpha"),
              _lift(_num(dot.get("lift"), 0.5)), depth=depth, gain=g)
+
+    def _flare(dot: Dict[str, Any]) -> None:
+        """A rare, larger blink: a small glint that fires and dies in place.
+
+        Same contract as :func:`_blink` (fixed field position, alpha-only
+        envelope) but drawn as a glint so it reads as a flare rather than one
+        more pinprick in a dense field.
+        """
+        depth = _num(dot.get("depth"), 0.5)
+        x, y, g = _place3(_num(dot.get("x")), _num(dot.get("y")),
+                           depth, zseed=_num(dot.get("index"), None),
+                           zflat=True, vol_z=dot.get("z"),
+                           vol_z2=dot.get("z2"))
+        _glint(x, y, dot.get("size"), dot.get("alpha"),
+               _lift(_num(dot.get("lift"), 0.55)), depth=depth, gain=g)
+
+    def _filament(samples: Any) -> None:
+        """Stroke the travelling energy band, sample by sample in ring order.
+
+        The band's geometry is fixed on the circle; only its alpha/size ride
+        the field's standing wave, so this draws the wave as it moves. A small
+        stride keeps Tk's per-segment cost bounded without losing the reading
+        of a continuous filament (the wave crest still sweeps the whole ring).
+        """
+        smps = [s for s in (samples or []) if isinstance(s, dict)]
+        if len(smps) < 2:
+            return
+        pts = [_place3(_num(s.get("x")), _num(s.get("y")),
+                       _num(s.get("depth"), 0.5),
+                       zseed=_num(s.get("index"), None), zflat=True,
+                       vol_z=s.get("z"), vol_z2=s.get("z2"))
+               for s in smps]
+        n = len(pts)
+        for i in range(0, n - 1, FILAMENT_TK_STRIDE):
+            j = min(i + FILAMENT_TK_STRIDE, n - 1)
+            here = smps[i]
+            a = _shade(_num(here.get("alpha")), here.get("depth"),
+                       pts[i][2]) * bright
+            if a <= ALPHA_EPS:
+                continue
+            col = _anchor(_spec(here.get("hue"), FILAMENT_TK_SAT,
+                                FILAMENT_TK_VAL))
+            _line([pts[i][0], pts[i][1], pts[j][0], pts[j][1]],
+                  _dim(col, a), 1)
+
+    def _rider(item: Dict[str, Any]) -> None:
+        """One cylinder-column mote: a plain dot, shaded by its height.
+
+        The column's own ``h`` (signed height, fraction of R) is used only for
+        shading: a mote higher in the column reads a touch brighter than one at
+        the base, which is the cue that sells the vertical extent. Plain dots,
+        not glints — 32 of them must stay cheap.
+        """
+        depth = _num(item.get("depth"), 0.5)
+        x, y, g = _place3(_num(item.get("x")), _num(item.get("y")),
+                           depth, zseed=_num(item.get("index"), None),
+                           zflat=True, vol_z=item.get("z"),
+                           vol_z2=item.get("z2"))
+        hb = _num(item.get("h")) / max(1.0, r)
+        shade = 0.75 + 0.25 * max(-1.0, min(1.0, hb * 2.0))
+        a = _num(item.get("alpha")) * shade
+        _dot(x, y, max(0.25, _num(item.get("size"))), a,
+             _lift(_num(item.get("lift"), LIFT_BEAD)), depth=depth, gain=g)
+
+    def _ring_particle(item: Dict[str, Any]) -> None:
+        """One star riding a declared ring: a glint that leaves no long wake.
+
+        The bodies populate EVERY circle, so each is drawn as the same pinprick
+        glint as a main particle (two crossed arms plus a core) but WITHOUT the
+        spectral streak: 22 ring bodies each dragging a nine-sample RGB trail
+        would be the field's whole particle count again, and the owner asked
+        for populated rings, not a second comet storm.
+        """
+        depth = _num(item.get("depth"), 0.5)
+        x, y, g = _place3(_num(item.get("x")), _num(item.get("y")),
+                           depth, zseed=_num(item.get("index"), None),
+                           zflat=True, vol_z=item.get("z"),
+                           vol_z2=item.get("z2"))
+        hue = item.get("hue")
+        rgb = _anchor(_spec(_num(hue), RING_PARTICLE_SAT,
+                            RING_PARTICLE_VAL)) if hue is not None else \
+            _lift(_num(item.get("lift"), LIFT_BEAD))
+        _glint(x, y, item.get("size"), item.get("alpha"), rgb,
+               skew_deg=item.get("skew"), depth=depth, gain=g)
 
     def _binary(bit: Dict[str, Any]) -> None:
         """One "1"/"0" fragment as a small glyph at its field position."""
@@ -1224,7 +1484,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             x, y, g = _place3(_num(bit.get("x")), _num(bit.get("y")),
                                depth,
                                zseed=_num(bit.get("index"), None),
-                               zflat=True)
+                               zflat=True, vol_z=bit.get("z"),
+                               vol_z2=bit.get("z2"))
             alpha = _shade(bit.get("alpha"), depth, g) * bright
             if alpha <= ALPHA_EPS:
                 return
@@ -1267,7 +1528,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         if comet_on:
             _streak(rgb_trail(tt, r, comet_info), gain=COMET_STREAK_GAIN,
                     half=COMET_STREAK_HALF_WIDTH,
-                    zseed=_num(comet_info.get("index"), 0.0))
+                    zseed=_num(comet_info.get("index"), 0.0),
+                    vol_z=comet_info.get("z"), vol_z2=comet_info.get("z2"))
             trail = list(comet_info.get("trail") or [])
             for k, smp in enumerate(trail):
                 f = (k + 1.0) / (len(trail) + 1.0)
@@ -1275,14 +1537,16 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 x, y, g = _place3(_num(smp.get("x")), _num(smp.get("y")),
                                   depth,
                                   zseed=_num(comet_info.get("index"), 0.0),
-                                  zflat=True)
+                                  zflat=True, vol_z=smp.get("z"),
+                                  vol_z2=smp.get("z2"))
                 _dot(x, y, _num(smp.get("size")), smp.get("alpha"),
                      _anchor(_spec(hue, COMET_BEAD_SAT)), depth=depth,
                      gain=g)
         x, y, g = _place3(_num(comet_info.get("x")),
                           _num(comet_info.get("y")), depth,
                           zseed=_num(comet_info.get("index"), 0.0),
-                          zflat=True)
+                          zflat=True, vol_z=comet_info.get("z"),
+                          vol_z2=comet_info.get("z2"))
         _dot(x, y, max(0.4, _num(comet_info.get("size"))),
              comet_info.get("alpha"),
              _anchor(_spec(hue0, COMET_BEAD_SAT)), depth=depth, gain=g)
@@ -1345,6 +1609,32 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             else:
                 layer_rgb = _mix(nuc_rgb, hot, (frac - 0.5) / 0.5)
             _oval(cx_f, cy_f, n_r * (1.0 - 0.70 * frac), _hex(layer_rgb))
+
+        # Interior 3-D: the field's nested core shells, drawn ON the body so
+        # the inside of the orb reads as layered depth rather than a flat disc.
+        # Tk has no gradient or alpha, so each shell is a filled oval composited
+        # by contrasting toward the BODY's own colour (never the background, or
+        # it would punch a hole through the sphere). Back to front: far shells
+        # first, so a near shell lifts over a far one and the stack has a
+        # readable near/far order. The nucleus is deliberately OUTSIDE the
+        # whole-mark tumble (a sphere keeps its silhouette), so the shells are
+        # placed in the body's own frame and never fling out of the core.
+        try:
+            shells = core_shells(tt, r)
+        except Exception:  # noqa: BLE001 - a field fault costs shells, not the mark
+            shells = []
+        if isinstance(shells, list):
+            for sh in sorted(shells,
+                             key=lambda s: _num((s or {}).get("depth"), 0.5)):
+                if not isinstance(sh, dict):
+                    continue
+                d = _num(sh.get("depth"), 0.5)
+                sh_r = max(0.5, _num(sh.get("size")))
+                sh_a = min(1.0, _num(sh.get("alpha")) * (0.45 + 0.55 * d)
+                           * bright)
+                sh_col = _anchor(_spec(sh.get("hue"), 0.86, 0.96))
+                _oval(cx_f + _num(sh.get("x")), cy_f + _num(sh.get("y")),
+                      sh_r, _dim(sh_col, sh_a, nuc_rgb))
 
         # Hologram rim: a bright thin edge on the body plus a faint red/blue
         # split offset by a pixel — the lens-fringe cue. OUTLINES, so the edge
@@ -1477,6 +1767,16 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _spark(_s)
     for _shell in far_shells:
         _satellite(_shell)
+    for _f in far_flares:
+        _flare(_f)
+    for _rd in far_riders:
+        _ring_particle(_rd)
+    for _cy in far_cyl:
+        _rider(_cy)
+    # The energy filament is a whole RING: it is stroked once, in the far pass,
+    # so the band stays a connected circle instead of breaking at the z-seam.
+    if filament:
+        _filament(filament)
     if comet_on and _num(comet_info.get("depth"), 1.0) < 0.5:
         _comet_head()
 
@@ -1574,6 +1874,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _spark(_s)
     for _shell in near_shells:
         _satellite(_shell)
+    for _f in near_flares:
+        _flare(_f)
+    for _rd in near_riders:
+        _ring_particle(_rd)
+    for _cy in near_cyl:
+        _rider(_cy)
     if comet_on and _num(comet_info.get("depth"), 0.0) >= 0.5:
         _comet_head()
 
@@ -1596,7 +1902,9 @@ __all__ = [
     "Y_SPIN_PERSP_MIN", "Y_SPIN_PERSP_MAX", "Y_SPIN_DEPTH_GAIN",
     "Y_SPIN_GAIN_MIN", "Y_SPIN_GAIN_MAX",
     "horizontal_spin_deg", "horizontal_spin",
-    "turn_basis", "turn_project", "turn_point",
+    "turn_basis", "turn_project", "turn_point", "turn_fade", "volume_offset",
+    "VOLUME_X_FRAC", "VOLUME_Y_FRAC", "TURN_Z_SALT", "TURN_Z_SPREAD",
+    "TURN_RING_TILT", "TURN_RING_SALT", "FILAMENT_TK_STRIDE",
     "DOF_ALPHA_SOFT",
     "NUCLEUS_RIM_ALPHA", "NUCLEUS_RIM_OFFSET_PX", "NUCLEUS_RIM_FRINGE_ALPHA",
     "NUCLEUS_RIM_OVALS",
@@ -1615,5 +1923,8 @@ __all__ = [
     "inner_ring_tilt", "binary_state", "INNER_RING_RX_FRAC", "BINARY_COUNT",
     "blink_dots", "BLINK_COUNT", "spin_angles",
     "hue_to_rgb", "rgb_trail", "dust_trail", "ring_geometry", "ring_path",
-    "ring_alpha", "dof", "skew",
+    "ring_alpha", "ring_tilt_spin", "ring_radius_scale",
+    "core_shells", "CORE_SHELL_COUNT", "flare_dots", "FLARE_COUNT",
+    "filament_state", "FILAMENT_SAMPLES",
+    "dof", "skew",
 ]
