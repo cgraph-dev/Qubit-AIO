@@ -289,9 +289,24 @@ def test_heartbeat_changes_nucleus_size_and_alpha_across_phases():
     peak = _paint(0.0)     # beat envelope == 1
     quiet = _paint(0.5)    # beat envelope == 0
     assert _diff(peak, quiet) > 0
-    # Bigger at the beat peak; the nucleus itself stays full alpha (crisp).
-    assert _central_ink(peak) > _central_ink(quiet)
-    assert peak.pixelColor(96, 96) == quiet.pixelColor(96, 96)
+
+    # Bigger at the beat peak. The nucleus now carries a wide glow that
+    # fills the small central box at both phases, so compare the recorded
+    # body radius directly instead of central-ink saturation.
+    def _body_r(t):
+        prims = _record(t=t, size=192)
+        nuc = [p for p in _at(prims, 96.0, 96.0, tol=0.75)
+               if p.kind == "ellipse" and p.fill is not None]
+        assert len(nuc) == 1, nuc
+        return nuc[0].r
+
+    assert _body_r(0.0) > _body_r(0.5)
+    # The nucleus itself stays full alpha (crisp). A radial gradient varies
+    # the colour with radius, so it is the opacity at the centre that is
+    # pinned here, not one exact hue.
+    assert peak.pixelColor(96, 96).alpha() == 255
+    assert quiet.pixelColor(96, 96).alpha() == 255
+    assert _central_ink(peak) > 0 and _central_ink(quiet) > 0
 
 
 def test_nucleus_radius_follows_field_nucleus_scale():

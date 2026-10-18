@@ -113,6 +113,35 @@ SPARKLE_LIFT = 0.55
 #: sized by SPARK_ARM_FRAC (shorter than a particle's) so they read as
 #: pinpricks, never as stars the size of the nucleus.
 NUCLEUS_SPARK_DRAW_SCALE = 1.0
+#: Glints, painter-side refinement only (the shared field keeps its shape):
+#: a lower size floor, a sub-pixel pen and a smaller core turn the shared
+#: crossing arms into a pinprick instead of a fat cross. Only the nearest,
+#: largest glints get a soft halo so they still pop without marbling the field.
+GLINT_MIN_SIZE = 0.16
+GLINT_PEN_W = 0.8
+GLINT_CORE_SCALE = 0.58
+GLINT_CORE_MIN = 0.08
+GLINT_GLOW_MIN_FRAC = 0.045
+GLINT_GLOW_MULT = 2.8
+GLINT_GLOW_ALPHA = 0.13
+#: Nucleus: a shaded sphere rather than a flat disc. A near-white hot core
+#: falls through the state hue to a transparent rim, over a wide low-alpha
+#: glow, with a small off-centre specular highlight. The body is the mark's
+#: ONE solid ellipse; glow and highlight are gradient paths beside it. All of
+#: it is static, so reduced motion is a valid still frame.
+NUCLEUS_CORE_LIFT = 0.78
+NUCLEUS_GLOW_MULT = 3.4
+NUCLEUS_GLOW_ALPHA = 0.22
+NUCLEUS_SPEC_OFFSET_FRAC = 0.38
+NUCLEUS_SPEC_RADIUS_FRAC = 0.36
+NUCLEUS_SPEC_ALPHA = 0.90
+#: Ring chromatic fringe: a faint, softened split, never a second line, so the
+#: crisp main hairline stays the dominant stroke instead of a rainbow outline.
+FRINGE_WIDTH_MULT = 1.6
+FRINGE_ALPHA_MULT = 0.09
+#: Below this alpha a primitive is imperceptible: skip it rather than let the
+#: 8-bit quantisation snap it to zero in one frame (a tiny hard pop).
+ALPHA_EPS = 0.004
 _GOLDEN = 0.6180339887498949
 
 
@@ -272,7 +301,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     reduced motion paints a completely static, sparkle-free frame.
     """
     from PySide6.QtCore import QPointF, QRectF
-    from PySide6.QtGui import QColor, QPainterPath, QPen
+    from PySide6.QtGui import (QBrush, QColor, QPainterPath, QPen,
+                               QRadialGradient)
 
     def _clamp8(v: Any) -> int:
         try:
@@ -340,9 +370,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # translucent one reads as the soft chromatic halo the logo has.
         for dx, col in ((fringe, QColor(255, 45, 85)),
                         (-fringe, QColor(45, 130, 255))):
-            pen = QPen(col, ring_w * 2.6)
+            pen = QPen(col, ring_w * FRINGE_WIDTH_MULT)
             pen.setColor(QColor(col.red(), col.green(), col.blue(),
-                                int(255 * min(1.0, alpha * bright * 0.16))))
+                                int(255 * min(1.0, alpha * bright
+                                              * FRINGE_ALPHA_MULT))))
             p.setPen(pen)
             p.translate(dx, 0.0)
             p.drawPath(rotated)
@@ -362,7 +393,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         dim, thin ghost that trails its orbit's (lagged) tilt.
         """
         a = _num(alpha, 0.0)
-        if a <= 0.0 or rxs <= 0.0 or rys <= 0.0:
+        if a <= ALPHA_EPS or rxs <= 0.0 or rys <= 0.0:
             return
         path = _ring_path(rxs, rys, tilt_deg)
         p.setBrush(Qt.NoBrush)
@@ -376,7 +407,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
              rgb: Tuple[int, int, int]) -> None:
         a = _num(alpha, 0.0)
         r = _num(rad, 0.0)
-        if a <= 0.0 or r <= 0.0:
+        if a <= ALPHA_EPS or r <= 0.0:
             return
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(rgb[0], rgb[1], rgb[2],
@@ -386,7 +417,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     def _outline(radius: float, rgb: Tuple[int, int, int], alpha: float,
                  width: float) -> None:
         a = _num(alpha, 0.0)
-        if a <= 0.0 or radius <= 0.0:
+        if a <= ALPHA_EPS or radius <= 0.0:
             return
         path = QPainterPath()
         path.addEllipse(QRectF(cx - radius, cy - radius,
@@ -397,28 +428,49 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.drawPath(path)
         p.setPen(Qt.NoPen)
 
+    def _glint_glow(gx: float, gy: float, size: float, alpha: float,
+                    rgb: Tuple[int, int, int]) -> None:
+        """A faint soft halo behind only the nearest, largest glints."""
+        sz = _num(size, 0.0)
+        a = _num(alpha, 0.0) * bright
+        if a <= ALPHA_EPS or sz <= 0.0:
+            return
+        gr = sz * GLINT_GLOW_MULT
+        grad = QRadialGradient(QPointF(gx, gy), gr)
+        grad.setColorAt(0.0, QColor(rgb[0], rgb[1], rgb[2],
+                                    _clamp8(255.0 * min(1.0, a)
+                                            * GLINT_GLOW_ALPHA)))
+        grad.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
+        path = QPainterPath()
+        path.addEllipse(QRectF(gx - gr, gy - gr, gr * 2.0, gr * 2.0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(grad))
+        p.drawPath(path)
+        p.setBrush(Qt.NoBrush)
+
     def _glint(gx: float, gy: float, size: float, alpha: float,
                rgb: Tuple[int, int, int],
                arm_frac: float = _field.GLINT_ARM_FRAC) -> None:
         """A twinkling star, never a filled orb (owner 2026-10-17).
 
-        Two thin crossing arms plus a small core read as a glint at this size
+        Two thin crossing arms plus a tiny core read as a glint at this size
         and stay crisp — a filled disc here was what made the field look like
         marbles. Shared by the nine logo particles and the nucleus sparks so
         the shower reads as the same kind of element as the field.
         """
-        sz = max(0.35, _num(size, 0.0))
+        sz = max(GLINT_MIN_SIZE, _num(size, 0.0))
         a = _num(alpha, 0.0) * bright
-        if a <= 0.0:
+        if a <= ALPHA_EPS:
             return
-        arm = sz * _field.GLINT_ARM_FRAC
+        arm = sz * arm_frac
         pen = QPen(QColor(rgb[0], rgb[1], rgb[2], int(255 * min(1.0, a))))
-        pen.setWidthF(1.0)
+        pen.setWidthF(GLINT_PEN_W)
         p.setPen(pen)
         p.setBrush(Qt.NoBrush)
         p.drawLine(QPointF(gx - arm, gy), QPointF(gx + arm, gy))
         p.drawLine(QPointF(gx, gy - arm), QPointF(gx, gy + arm))
-        _dot(gx, gy, max(0.25, sz * _field.GLINT_CORE_FRAC), a, rgb)
+        _dot(gx, gy, max(GLINT_CORE_MIN, sz * _field.GLINT_CORE_FRAC
+                         * GLINT_CORE_SCALE), a, rgb)
 
     def _particle(part: Dict[str, Any], draw_trails: bool) -> None:
         bead_lift = _num(part.get("lift"), _field.LIFT_BEAD)
@@ -432,8 +484,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 _dot(cx + smp["x"], cy + smp["y"],
                      _num(smp.get("size"), 0.0),
                      _num(smp.get("alpha"), 0.0) * bright, trail_rgb)
-        _glint(px, py, _num(part.get("size"), 0.0),
-               _num(part.get("alpha"), 0.0), _lift(bead_lift))
+        sz = _num(part.get("size"), 0.0)
+        al = _num(part.get("alpha"), 0.0)
+        rgb = _lift(bead_lift)
+        if sz >= Rf * GLINT_GLOW_MIN_FRAC:
+            # Only the nearest, largest particles carry the soft halo: it
+            # makes them pop without the whole field turning to marbles.
+            _glint_glow(px, py, sz, al, rgb)
+        _glint(px, py, sz, al, rgb)
 
     def _satellite(shell: Dict[str, Any], draw_trail: bool) -> None:
         """One satellite shell: a thin CIRCLE plus the small body on it.
@@ -500,6 +558,51 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
              max(0.4, _num(traveller.get("size"), 0.0)),
              _num(traveller.get("alpha"), 0.0) * bright, rgb)
 
+    def _nucleus(radius: float, rgb: Tuple[int, int, int]) -> None:
+        """The mark's ONE solid body, shaded instead of a flat disc.
+
+        A near-white hot core falls through the state hue to a transparent
+        rim, drawn over a wide low-alpha glow, with a small off-centre
+        specular highlight. The body is the only filled ellipse at the
+        centre; the glow and the highlight are gradient paths beside it, and
+        the whole thing is static (so reduced motion is a clean still frame).
+        """
+        r = _num(radius, 0.0)
+        if r <= 0.0:
+            return
+        hot = _lift(NUCLEUS_CORE_LIFT)
+        gr = r * NUCLEUS_GLOW_MULT
+        glow = QRadialGradient(QPointF(cx, cy), gr)
+        glow.setColorAt(0.0, QColor(rgb[0], rgb[1], rgb[2],
+                                    _clamp8(255.0 * NUCLEUS_GLOW_ALPHA)))
+        glow.setColorAt(0.5, QColor(hot[0], hot[1], hot[2],
+                                    _clamp8(255.0 * NUCLEUS_GLOW_ALPHA * 0.30)))
+        glow.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
+        gpath = QPainterPath()
+        gpath.addEllipse(QRectF(cx - gr, cy - gr, gr * 2.0, gr * 2.0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(glow))
+        p.drawPath(gpath)
+        body = QRadialGradient(QPointF(cx, cy), r)
+        body.setColorAt(0.0, QColor(hot[0], hot[1], hot[2], 255))
+        body.setColorAt(0.34, QColor(rgb[0], rgb[1], rgb[2], 250))
+        body.setColorAt(0.70, QColor(rgb[0], rgb[1], rgb[2], 200))
+        body.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
+        p.setBrush(QBrush(body))
+        p.drawEllipse(cx - r, cy - r, r * 2.0, r * 2.0)
+        sr = r * NUCLEUS_SPEC_RADIUS_FRAC
+        sx = cx - r * NUCLEUS_SPEC_OFFSET_FRAC
+        sy = cy - r * NUCLEUS_SPEC_OFFSET_FRAC
+        spec = QRadialGradient(QPointF(sx, sy), sr)
+        spec.setColorAt(0.0, QColor(255, 255, 255,
+                                    _clamp8(255.0 * NUCLEUS_SPEC_ALPHA)))
+        spec.setColorAt(1.0, QColor(255, 255, 255, 0))
+        spath = QPainterPath()
+        spath.addEllipse(QRectF(sx - sr, sy - sr, sr * 2.0, sr * 2.0))
+        p.setBrush(QBrush(spec))
+        p.drawPath(spath)
+        p.setBrush(Qt.NoBrush)
+
     tt = _mark_tt(t)
     reduced = _reduced_motion()
     near_tilt, far_tilt = _field.orbit_tilts(tt)
@@ -563,7 +666,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     if beat > 0.0:
         _outline(nuc_r * _field.HALO_SCALE, nuc_rgb,
                  _field.HALO_BASE * beat, 1.0)
-    _dot(cx, cy, nuc_r, 1.0, nuc_rgb)
+    _nucleus(nuc_r, nuc_rgb)
 
     # ---- near field (depth >= 0.5), in front of the nucleus --------------
     _ring(near_tilt, 0.95)
