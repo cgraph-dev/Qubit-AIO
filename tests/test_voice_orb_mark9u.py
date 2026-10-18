@@ -782,7 +782,7 @@ def test_rgb_trail_is_pure_deterministic_and_starts_on_the_star():
 
 def test_rgb_trail_is_a_duotone_pair_lerp_that_drifts_with_the_clock():
     # Owner: two colours per streak, not a rainbow. Every streak is the
-    # head hue and its half-turn partner, lerped along the tail.
+    # head hue and its NEARBY partner, lerped along the tail.
     from voicebridge.orb import mark_field as F
     R, t = 64.0, 1.7
     part = F.particle_state(t, R)[0]
@@ -790,7 +790,10 @@ def test_rgb_trail_is_a_duotone_pair_lerp_that_drifts_with_the_clock():
     n = F.RGB_TRAIL_SAMPLES
     head = (part["hue"] + t * F.RGB_TRAIL_HUE_DRIFT) % 1.0
     tail = (head + F.HUE_PAIR_OFFSET) % 1.0
-    assert F.HUE_PAIR_OFFSET == pytest.approx(0.5)
+    # A SMALL offset: two neighbouring tints of one colour family. A half-turn
+    # partner would make the lerp sweep the whole wheel (cyan->green->yellow->
+    # red) and the mark read as a rainbow (owner: "too coloured").
+    assert 0.0 < F.HUE_PAIR_OFFSET <= 0.15
     for s in samples:
         # One shared pair across the whole streak: exactly two hues.
         assert s["hue2"] == pytest.approx(tail)
@@ -1108,8 +1111,10 @@ def test_every_element_dict_carries_its_duotone_partner():
     if comet.get("alpha", 0.0) > 0.0:
         assert comet["hue2"] == pytest.approx(
             (comet["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
-    assert F._hue_pair(0.2) == pytest.approx(0.7)
-    assert F._hue_pair(0.9) == pytest.approx(0.4)  # wraps like the wheel
+    # The partner is a NEARBY hue (a small offset), and wraps like the wheel.
+    assert F._hue_pair(0.2) == pytest.approx((0.2 + F.HUE_PAIR_OFFSET) % 1.0)
+    assert F._hue_pair(0.97) == pytest.approx(
+        (0.97 + F.HUE_PAIR_OFFSET) % 1.0)
 
 
 # --------------------------------------------------------------------------- #

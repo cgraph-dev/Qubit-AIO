@@ -297,7 +297,14 @@ RGB_TRAIL_HUE_DRIFT = 0.018
 #: a head hue and exactly one partner ``HUE_PAIR_OFFSET`` of a turn away, and
 #: every sample's hue is the lerp between the two — two hues per streak by
 #: construction. ``_hue_pair`` is the one place the partner is computed.
-HUE_PAIR_OFFSET = 0.5
+#:
+#: The partner is a NEARBY hue (a fraction of a turn), NOT the opposite colour.
+#: A half-turn partner (the original 0.5) made the lerp between the two ends
+#: sweep straight through the whole wheel — cyan -> green -> yellow -> red — so
+#: every streak was a full rainbow and the mark read "too coloured" (owner
+#: 2026-10-18). A small offset keeps the streak two neighbouring tints of ONE
+#: colour family, so the mark stays 2-3 colours total.
+HUE_PAIR_OFFSET = 0.07
 RGB_TRAIL_SAT_BASE = 0.90
 RGB_TRAIL_SAT_SPAN = 0.10
 RGB_TRAIL_VAL_BASE = 1.00
