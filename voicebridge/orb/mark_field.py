@@ -150,8 +150,8 @@ COMET_LIFT = 0.80
 #: phase and slightly scaled, so each orbit trails a ghost of itself. The lag
 #: is what makes the pair read as one connected system rather than two decals.
 ECHO_LAG_S = 1.15
-ECHO_SCALE = 1.14
-ECHO_ALPHA = 0.30
+ECHO_SCALE = 1.06
+ECHO_ALPHA = 0.20
 ECHO_WIDTH = 1.0
 
 # ------------------------------------------------------ nucleus spark shower
@@ -180,7 +180,7 @@ SATELLITE_SHELLS = (
     (0.50, 1.0, 5.5, 1.0, 1.05, 0.95, 0.85),
     (0.93, 1.0, 9.0, -1.0, 0.85, 0.90, 0.75),
 )
-SATELLITE_RING_ALPHA = 0.22
+SATELLITE_RING_ALPHA = 0.14
 SATELLITE_RING_WIDTH = 1.0
 SATELLITE_TRAIL_SAMPLES = 5
 SATELLITE_TRAIL_STEP_DEG = 7.0
