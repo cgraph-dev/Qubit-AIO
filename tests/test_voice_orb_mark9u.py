@@ -1532,6 +1532,46 @@ def test_cylinder_particles_are_deterministic_bounded_and_sweep():
         prev = cur
 
 
+def test_orbiter_particles_circle_the_middle_in_3d():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 2.1
+    orb = F.orbiter_particles(t, R)
+    assert len(orb) == F.ORBITER_COUNT
+    assert orb == F.orbiter_particles(t, R)  # deterministic
+
+    r_min = F.ORBITER_R_FRAC_MIN * R
+    r_max = (F.ORBITER_R_FRAC_MIN + F.ORBITER_R_FRAC_SPAN) * R
+    for p in orb:
+        assert set(p) >= {"index", "x", "y", "depth", "z", "z2", "size",
+                          "alpha", "lift", "hue", "hue2", "dof", "skew",
+                          "r", "inc"}
+        assert r_min <= p["r"] <= r_max + 1e-9
+        assert 0.0 <= p["depth"] <= 1.0
+        assert p["hue2"] == pytest.approx((p["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+
+    # A real orbit AROUND the middle: over one full revolution each body's
+    # depth visits both sides of the core (in front and behind), which is what
+    # distinguishes circling the nucleus from sliding on a ring. Each body has
+    # its own period, so sample across the LONGEST one to cover them all.
+    span = F.ORBITER_PERIOD_BASE + F.ORBITER_PERIOD_SPAN
+    for i in range(len(orb)):
+        dep = [F.orbiter_particles(span * k / 60.0, R)[i]["depth"]
+               for k in range(60)]
+        assert min(dep) < 0.35 and max(dep) > 0.65, (i, min(dep), max(dep))
+
+    # Depth spread across the whole set: the shell fills the volume, not a plane.
+    depths = [p["depth"] for p in orb]
+    assert min(depths) < 0.2 and max(depths) > 0.8
+
+    # Continuous: no orbiter jumps between adjacent frames.
+    prev = [(p["x"], p["y"]) for p in orb]
+    for k in range(1, 120):
+        cur = [(p["x"], p["y"]) for p in F.orbiter_particles(t + k / 60.0, R)]
+        for (x, y), (px, py) in zip(cur, prev):
+            assert math.hypot(x - px, y - py) < 3.0, k
+        prev = cur
+
+
 def _unwrap_deg(degs):
     """Unwrap a sequence of degrees so a 360 sweep is a monotone ramp."""
     out = [degs[0]]

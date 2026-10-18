@@ -564,6 +564,7 @@ def _strip_moving_layers(monkeypatch):
     monkeypatch.setattr(M, "filament_state", lambda *a, **k: [])
     monkeypatch.setattr(M, "_field_ring_particles", None)
     monkeypatch.setattr(M, "_field_cylinder_particles", None)
+    monkeypatch.setattr(M, "_field_orbiter_particles", None)
     return part
 
 

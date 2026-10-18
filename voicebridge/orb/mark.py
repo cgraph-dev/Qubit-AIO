@@ -153,6 +153,10 @@ try:  # pragma: no cover
     from .mark_field import cylinder_particles as _field_cylinder_particles
 except Exception:  # noqa: BLE001
     _field_cylinder_particles = None
+try:  # pragma: no cover
+    from .mark_field import orbiter_particles as _field_orbiter_particles
+except Exception:  # noqa: BLE001
+    _field_orbiter_particles = None
 
 #: Fringe offset in DEVICE pixels, never scaled with the radius: a lens fringe
 #: is a pixel-level artifact, and scaling it turned the mark into three separate
@@ -1258,6 +1262,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             cylinder = []
     if not isinstance(cylinder, list):
         cylinder = []
+    orbiters = []
+    if _field_orbiter_particles is not None and not reduced_motion:
+        try:
+            orbiters = _field_orbiter_particles(tt, r)
+        except Exception:  # noqa: BLE001
+            orbiters = []
+    if not isinstance(orbiters, list):
+        orbiters = []
     if reduced_motion:
         # A clean static frame: no dust, no glints, no comet, no streaks, no
         # follower rings, no nucleus sparks and none of the new life layers.
@@ -1288,6 +1300,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     near_riders = [s for s in ring_riders if _num(s.get("depth"), 0.5) >= 0.5]
     far_cyl = [s for s in cylinder if _num(s.get("depth"), 0.5) < 0.5]
     near_cyl = [s for s in cylinder if _num(s.get("depth"), 0.5) >= 0.5]
+    far_orbiters = [o for o in orbiters if _num(o.get("depth"), 0.5) < 0.5]
+    near_orbiters = [o for o in orbiters if _num(o.get("depth"), 0.5) >= 0.5]
     comet_on = (not reduced_motion) and _num(comet_info.get("alpha")) > 0.0
 
     # ------------------------------------------------------------- the bodies
@@ -1773,6 +1787,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _ring_particle(_rd)
     for _cy in far_cyl:
         _rider(_cy)
+    for _ob in far_orbiters:
+        _ring_particle(_ob)
     # The energy filament is a whole RING: it is stroked once, in the far pass,
     # so the band stays a connected circle instead of breaking at the z-seam.
     if filament:
@@ -1880,6 +1896,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         _ring_particle(_rd)
     for _cy in near_cyl:
         _rider(_cy)
+    for _ob in near_orbiters:
+        _ring_particle(_ob)
     if comet_on and _num(comet_info.get("depth"), 0.0) >= 0.5:
         _comet_head()
 

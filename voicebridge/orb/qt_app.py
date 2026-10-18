@@ -161,10 +161,12 @@ BLINK_DOT_MIN_PX = 0.30
 #: bounds the bodies considered so the per-frame CPU stays flat too.
 RING_PARTICLE_DRAW_LIMIT = 22
 CYLINDER_DRAW_LIMIT = 32
+ORBITER_DRAW_LIMIT = 30
 FLARE_DRAW_LIMIT = 8
 FILAMENT_DRAW_COUNT = 10
 RING_PARTICLE_BUCKETS = 3
-CYLINDER_BUCKETS = 3
+CYLINDER_BUCKETS = 2
+ORBITER_BUCKETS = 2
 FLARE_BUCKETS = 2
 SPARKLE_BUCKETS = 4
 #: The cylinder column is shaded by height: a particle at the top/bottom of the
@@ -1099,6 +1101,11 @@ def mark_ring_particles(t: Any, R: Any) -> List[Dict[str, Any]]:
 def mark_cylinder_particles(t: Any, R: Any) -> List[Dict[str, Any]]:
     """Bodies forming a vertical column around the nucleus; empty when still."""
     return _field_layer("cylinder_particles", t, R, reduced_empty=True)
+
+
+def mark_orbiter_particles(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """Bodies circling the NUCLEUS on inclined 3D orbits; empty when still."""
+    return _field_layer("orbiter_particles", t, R, reduced_empty=True)
 
 
 def strided(items: Any, target: int) -> List[Dict[str, Any]]:
@@ -2160,6 +2167,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     cyl_parts = ([] if reduced
                  else strided(mark_cylinder_particles(t, Rf),
                               CYLINDER_DRAW_LIMIT))
+    orbiters = ([] if reduced
+                else strided(mark_orbiter_particles(t, Rf),
+                             ORBITER_DRAW_LIMIT))
     flares = ([] if reduced else strided(mark_flare_dots(t, Rf), FLARE_DRAW_LIMIT))
     filament = ([] if reduced
                 else strided(mark_filament(t, Rf), FILAMENT_DRAW_COUNT))
@@ -2208,6 +2218,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                      RING_PARTICLE_BUCKETS, arm_frac=_field.GLINT_ARM_FRAC * 0.8)
         _cylinder_batch([p for p in cyl_parts if _is_near(p, near)],
                         CYLINDER_BUCKETS)
+        # Orbiters circle the NUCLEUS on inclined 3D orbits, so they split by
+        # their own depth: the far half passes behind the core, the near half
+        # in front of it — that is what reads as orbiting the middle rather
+        # than sliding along a ring. Plain dots (no glint arms): at orbiter
+        # size the arms are sub-pixel, and the batched arm stroke read as a
+        # third thin "orbit" outline to the echo-ring contract.
+        _layer_batch([p for p in orbiters if _is_near(p, near)],
+                     ORBITER_BUCKETS)
         _layer_batch([p for p in flares if _is_near(p, near)], FLARE_BUCKETS)
         _layer_batch(glints_, SPARKLE_BUCKETS)
         for smp in filament:
@@ -2262,11 +2280,6 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     nuc_scale = 1.0 if reduced else _field.nucleus_scale(tt)
     nuc_r = (Rf * _field.NUCLEUS_FRAC * NUCLEUS_RADIUS_MULT * nuc_scale
              * (1.0 + NUCLEUS_TUMBLE_SCALE * (1.0 - turn_cy * turn_cx)))
-
-    # ---- the z-seam: shockwave, halo, nucleus ----------------------------
-    beat = 0.0 if reduced else _field.heartbeat(tt)
-    nuc_scale = 1.0 if reduced else _field.nucleus_scale(tt)
-    nuc_r = Rf * _field.NUCLEUS_FRAC * NUCLEUS_RADIUS_MULT * nuc_scale
     sw_scale, sw_alpha = (0.0, 0.0) if reduced else _field.shockwave(tt)
     if sw_alpha > 0.0:
         # One thin expanding ring per beat: stroke only, never a fill/glow.

@@ -1658,6 +1658,85 @@ CYLINDER_ALPHA_BASE = 0.55
 CYLINDER_LIFT_BASE = 0.30
 CYLINDER_LIFT_GAIN = 0.35
 
+#: Orbiters: particles on their OWN inclined circular orbits around the
+#: NUCLEUS — the owner's "particles orbit the middle, not the circles". Each
+#: body revolves a full 360 in its own tilted plane at its own radius and
+#: non-harmonic period, so the set forms a 3D shell around the core instead of
+#: riding the flat declared rings. ``inc`` is the orbit's inclination: it mixes
+#: the orbital y with the depth axis, which is what makes an orbiter read as
+#: circling the middle rather than sliding along a ring.
+ORBITER_COUNT = 30
+ORBITER_R_FRAC_MIN = 0.14
+ORBITER_R_FRAC_SPAN = 0.48
+ORBITER_PERIOD_BASE = 4.6
+ORBITER_PERIOD_SPAN = 6.9
+ORBITER_INC_MIN_DEG = 18.0
+ORBITER_INC_SPAN_DEG = 144.0
+ORBITER_SIZE_BASE = 0.20
+ORBITER_ALPHA_BASE = 0.62
+ORBITER_LIFT_BASE = 0.30
+ORBITER_LIFT_GAIN = 0.40
+
+
+def orbiter_particles(t: Any, R: float) -> List[Dict[str, Any]]:
+    """Particles on inclined 3D orbits around the NUCLEUS (not the rings).
+
+    One dict per orbiter: ``{"index", "x", "y", "depth", "z", "z2", "size",
+    "alpha", "lift", "hue", "hue2", "dof", "skew", "r", "inc"}``.
+
+    Each body sweeps a full 360 in its own plane: a circle of radius ``r``
+    (a fraction of R) inclined by ``inc`` degrees, so its y is the orbital y
+    times ``cos(inc)`` and its out-of-plane travel rides the depth axis as
+    ``sin(inc)*sin(angle)``. That depth swing is what reads as circling the
+    MIDDLE — a body on the far side sits behind the nucleus and one on the
+    near side in front of it, every revolution. Radii, inclinations, periods
+    (non-harmonic) and directions are all deterministic from ``hash01`` of the
+    index, so the shell is varied but perfectly reproducible. Pure in
+    ``(t, R)``: no ``random`` anywhere.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    out: List[Dict[str, Any]] = []
+    for i in range(ORBITER_COUNT):
+        idx = i + 1
+        rad = r * (ORBITER_R_FRAC_MIN
+                   + ORBITER_R_FRAC_SPAN * hash01(idx, 401.3))
+        inc = math.radians(ORBITER_INC_MIN_DEG
+                           + ORBITER_INC_SPAN_DEG * hash01(idx, 403.7))
+        period = (ORBITER_PERIOD_BASE
+                  + ORBITER_PERIOD_SPAN * hash01(idx, 409.1))
+        direction = 1.0 if hash01(idx, 411.7) >= 0.5 else -1.0
+        phase0 = 360.0 * hash01(idx, 419.3)
+        ang = (phase0 + direction * 360.0 * tt / max(0.1, period)
+               + _phase_wobble(tt, phase0))
+        ar = math.radians(ang)
+        u = math.cos(ar)
+        v = math.sin(ar)
+        # The orbit's own plane: y is foreshortened by the inclination, the
+        # out-of-plane component becomes depth (near half in front of the
+        # core, far half behind it).
+        x = rad * u
+        y = rad * v * math.cos(inc)
+        zunit = v * math.sin(inc)
+        depth = min(1.0, max(0.0, 0.5 + 0.5 * zunit))
+        cz, cz2 = depth_axes(idx, 421.9)
+        hue = _hue_for(idx, 431.3)
+        out.append({
+            "index": float(idx),
+            "x": x + dx, "y": y + dy,
+            "depth": depth,
+            "z": cz, "z2": cz2,
+            "size": _depth_size(depth, ORBITER_SIZE_BASE * scale),
+            "alpha": _depth_alpha(depth, ORBITER_ALPHA_BASE),
+            "lift": ORBITER_LIFT_BASE + ORBITER_LIFT_GAIN * depth,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "dof": dof(depth), "skew": skew(depth),
+            "r": rad, "inc": inc,
+        })
+    return out
+
 
 def cylinder_particles(t: Any, R: float) -> List[Dict[str, Any]]:
     """A breathing vertical cylinder of particles around the nucleus.
@@ -1774,4 +1853,8 @@ __all__ = [
     "CYLINDER_DRIFT_PERIOD_S", "CYLINDER_DRIFT_AMP", "CYLINDER_H_BASE",
     "CYLINDER_SIZE_BASE", "CYLINDER_ALPHA_BASE", "CYLINDER_LIFT_BASE",
     "CYLINDER_LIFT_GAIN",
+    "orbiter_particles", "ORBITER_COUNT", "ORBITER_R_FRAC_MIN",
+    "ORBITER_R_FRAC_SPAN", "ORBITER_PERIOD_BASE", "ORBITER_PERIOD_SPAN",
+    "ORBITER_INC_MIN_DEG", "ORBITER_INC_SPAN_DEG", "ORBITER_SIZE_BASE",
+    "ORBITER_ALPHA_BASE", "ORBITER_LIFT_BASE", "ORBITER_LIFT_GAIN",
 ]
