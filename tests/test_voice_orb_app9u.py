@@ -148,6 +148,28 @@ def test_tk_stop_speaking_preferred_over_cancel_request():
     assert cli.calls == [("stop",)], cli.calls
 
 
+def test_tk_staged_cancel_falls_back_when_stop_speaking_raises():
+    import time
+
+    from voicebridge.orb import app as orb_app
+    from voicebridge.orb.client import OrbError
+
+    cli = _FakeToggleClient()
+
+    def _no_helper():
+        raise OrbError("ORB_HELPER_NOT_RUNNING", "no helper")
+
+    cli.stop_speaking = _no_helper
+    # Stage-only fallback (helper down): a fresh staged request, no live turn.
+    orb = _bare_tk_orb(cli, state="idle", pending_rid="staged-1",
+                       pending_ts=time.time() - 1.0)
+    orb_app.VoiceOrb.toggle_voice(orb)
+    # stop_speaking is present but the helper is down, so the staged request
+    # must still be cancelled rather than left stuck.
+    assert cli.calls == [("cancel", "staged-1")], cli.calls
+    assert orb._pending_rid is None
+
+
 def test_tk_poll_payload_learns_the_live_request_id():
     import time
 

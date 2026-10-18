@@ -420,3 +420,25 @@ def test_qt_stop_speaking_preferred_over_cancel_request():
     # One IPC call: stop_speaking halts the reply AND ends the turn.
     assert cli.calls == [("stop",)], cli.calls
     assert orb._active_rid is None
+
+
+def test_qt_staged_cancel_falls_back_when_stop_speaking_raises():
+    import time
+
+    from voicebridge.orb import qt_app as qa
+    from voicebridge.orb.client import OrbError
+
+    cli = _FakeToggleClient()
+
+    def _no_helper():
+        raise OrbError("ORB_HELPER_NOT_RUNNING", "no helper")
+
+    cli.stop_speaking = _no_helper
+    # Stage-only fallback (helper down): a fresh staged request, no live turn.
+    orb = _bare_qt_orb(cli, orb_state="idle", pending_rid="staged-1",
+                       pending_ts=time.time() - 1.0)
+    qa.QtVoiceOrb.toggle_voice(orb)
+    # stop_speaking is present but the helper is down, so the staged request
+    # must still be cancelled rather than left stuck.
+    assert cli.calls == [("cancel", "staged-1")], cli.calls
+    assert orb._pending_rid is None

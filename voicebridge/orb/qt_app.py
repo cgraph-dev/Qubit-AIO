@@ -3197,7 +3197,13 @@ if QWidget is not None:
                     # method is absent.
                     stop = getattr(cli, "stop_speaking", None)
                     if callable(stop):
-                        stop()
+                        try:
+                            stop()
+                        except Exception:
+                            # Helper down (e.g. the stage-only fallback): the
+                            # direct stop is unavailable, so pop the staged
+                            # request instead of leaving it stuck.
+                            cli.cancel_request(rid)
                     else:
                         cli.cancel_request(rid)
                     self._pending_rid = None
