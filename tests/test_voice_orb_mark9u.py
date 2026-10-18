@@ -1395,6 +1395,10 @@ def test_ring_set_moves_as_one_rigid_body():
         spins = {round(F.ring_tilt_spin(t, r), 12) for r in rings}
         assert len(scales) == 1, (t, scales)
         assert len(spins) == 1, (t, spins)
+        # The rigid offset reaches the geometry entries too, so a renderer that
+        # reads ``tilt_spin_deg`` straight off an entry moves with the set.
+        assert {round(r["tilt_spin_deg"], 12) for r in rings} == {*spins}, t
+        assert {r["precess_period_s"] for r in rings} == {F.RING_MOTION_PERIOD_S}
     # Bounded, and always positive (a ring never inverts or vanishes).
     for t in (0.0, 2.0, 9.0, 20.0):
         ring = F.ring_geometry(t)[0]
@@ -1406,6 +1410,19 @@ def test_ring_set_moves_as_one_rigid_body():
         assert ring["precess_period_s"] == pytest.approx(
             F.ring_precess_period(ring))
 
+    # Proportionality is the rigidity property that must never regress: the
+    # RATIO of any two rings' effective radii is identical at every clock, so
+    # the set scales as ONE body and no circle can drift out of proportion. The
+    # per-ring ``shimmer`` is deliberately sub-percent and does NOT enter here.
+    def _ratios(t):
+        rings = F.ring_geometry(t)
+        eff = [r["rx_frac"] * F.ring_radius_scale(t, r) for r in rings]
+        return [e / eff[0] for e in eff]
+
+    base_ratios = _ratios(0.0)
+    for t in (3.3, 12.1, 40.0):
+        assert _ratios(t) == pytest.approx(base_ratios), t
+
     # Continuous: the shared motion never jumps between adjacent frames.
     prev = F.ring_tilt_spin(0.0)
     for k in range(1, 241):
@@ -1413,14 +1430,23 @@ def test_ring_set_moves_as_one_rigid_body():
         assert abs(val - prev) < 1.0
         prev = val
 
-    # One shared period, non-harmonic with the ring turns and the spins, so
-    # the set breathes fluidly instead of pulsing in lock-step with a spin.
+    # New contract (owner 2026-10-19 "refine circles animation more"): the
+    # rigid set is no longer one bare sine but a SUM of three weighted sines on
+    # a non-harmonic period FAMILY — fluid, but still ONE shared offset. The
+    # family must be non-harmonic against itself, the ring turns (9.5/13.5) and
+    # the whole-mark spins (20.5/27), or the set could pulse in lock-step with a
+    # spin. Rigidity (above) is unchanged and is the property under test.
     periods = list(F.RING_MOTION_PERIODS_S)
-    assert periods == [F.RING_MOTION_PERIOD_S]
+    assert periods == [F.RING_MOTION_PERIOD_S, F.RING_MOTION_PERIOD_2_S,
+                       F.RING_MOTION_PERIOD_3_S]
+    assert len(set(periods)) == len(periods)
+    assert len(periods) == len(F.RING_PRECESS_WEIGHTS)
     fixed = ([F.RING_PERIOD_NEAR, F.RING_PERIOD_FAR, F.Y_SPIN_PERIOD_S,
               F.X_SPIN_PERIOD_S, F.INNER_RING_PERIOD_S]
              + [sh[2] for sh in F.SATELLITE_SHELLS])
-    for a in periods:
+    for i, a in enumerate(periods):
+        for b in periods[i + 1:]:
+            assert not _harmonically_locked(a, b), (a, b)
         for b in fixed:
             assert not _harmonically_locked(a, b), (a, b)
 
@@ -1752,7 +1778,10 @@ def test_screen_break_reaches_beyond_the_mark_radius():
     a = F.screen_break(t, R)
     assert a == F.screen_break(t, R)  # deterministic
     assert len(a) == F.SCREEN_BREAK_COUNT
-    assert F.SCREEN_BREAK_FRAC > 1.0
+    assert F.SCREEN_BREAK_COUNT >= 8, "the break set stays a real set"
+    # Task 6 "do more of that": the reach must cross the WIDGET edge, not just
+    # the mark radius. A 2R-wide frame's edge sits ~1.14 R from the centre.
+    assert F.SCREEN_BREAK_FRAC >= 1.30
     # The declared ceiling and the reachable radius cannot drift apart.
     r_max = (F.SCREEN_BREAK_R_FRAC_MIN + F.SCREEN_BREAK_R_FRAC_SPAN) * R
     assert r_max == pytest.approx(F.SCREEN_BREAK_FRAC * R)
@@ -1773,6 +1802,9 @@ def test_screen_break_reaches_beyond_the_mark_radius():
         for p in F.screen_break(k / 30.0, R):
             best = max(best, math.hypot(p["x"], p["y"]))
     assert best > R, f"screen_break never exits the widget (reach={best:.1f}px)"
+    assert best > R * 1.2, (
+        f"screen_break grazes the mark but never crosses the widget edge "
+        f"(reach={best:.1f}px)")
     assert best <= F.SCREEN_BREAK_FRAC * R * 1.05
     # Continuous: no body teleports between adjacent frames.
     prev = [(p["x"], p["y"]) for p in a]
@@ -1799,6 +1831,118 @@ def test_volume_and_screen_break_layers_are_exported():
                  "SCREEN_BREAK_INC_MIN_DEG", "SCREEN_BREAK_INC_SPAN_DEG",
                  "SCREEN_BREAK_SIZE_BASE", "SCREEN_BREAK_ALPHA_BASE",
                  "SCREEN_BREAK_LIFT_BASE", "SCREEN_BREAK_LIFT_GAIN",
-                 "PALETTE_HUES", "palette_hue"):
+                 "PALETTE_HUES", "palette_hue",
+                 "accretion_stream", "ACCRETION_COUNT", "ACCRETION_R_OUT_FRAC",
+                 "ACCRETION_R_IN_FRAC", "ACCRETION_PERIOD_BASE",
+                 "ACCRETION_PERIOD_SPAN", "ACCRETION_SPIRAL_TURNS",
+                 "photon_ring", "PHOTON_SAMPLES", "PHOTON_LOBES",
+                 "infall_streaks", "INFALL_COUNT", "INFALL_TAIL_LEN_FRAC",
+                 "ring_intensity", "ring_shimmer", "RING_INTENSITY_MIN",
+                 "RING_STREAMERS_BASE",
+                 "RING_MOTION_PERIOD_2_S", "RING_MOTION_PERIOD_3_S",
+                 "RING_PRECESS_WEIGHTS", "RING_RADIUS_WEIGHTS"):
         assert name in F.__all__, name
         assert hasattr(F, name), name
+
+
+def test_ring_detail_gives_each_circle_blackhole_texture():
+    # Owner 2026-10-19: "the spirals or circles make them look like blackholes
+    # add more details and animations". Every declared circle carries its own
+    # deterministic intensity/shimmer/streamer detail, WITHOUT disturbing the
+    # rigid proportionality of the set (shimmer is sub-percent by design).
+    rings = F.ring_geometry(3.1)
+    assert len(rings) >= 6
+    intensities = []
+    for r in rings:
+        assert set(r) >= {"intensity_period_s", "shimmer_period_s",
+                          "intensity", "shimmer", "streamers"}, r["id"]
+        assert r["intensity_period_s"] > 0.0 and r["shimmer_period_s"] > 0.0
+        assert F.RING_INTENSITY_MIN - 1e-9 <= r["intensity"] <= \
+            F.RING_INTENSITY_MIN + F.RING_INTENSITY_SPAN + 1e-9
+        assert 1.0 - F.RING_SHIMMER_SPAN <= r["shimmer"] <= \
+            1.0 + F.RING_SHIMMER_SPAN
+        assert F.RING_STREAMERS_BASE <= r["streamers"] <= \
+            F.RING_STREAMERS_BASE + F.RING_STREAMERS_SPAN
+        assert r["intensity"] == pytest.approx(F.ring_intensity(3.1, r))
+        assert r["shimmer"] == pytest.approx(F.ring_shimmer(3.1, r))
+        intensities.append(round(r["intensity"], 9))
+    # Not one dead uniform outline: the rings sit at different brightnesses.
+    assert len(set(intensities)) > 1
+    assert F.ring_geometry(3.1) == rings  # deterministic
+    # The per-ring shimmer only ever bends the shared radius scale by its span.
+    for t in (0.0, 5.5, 17.3):
+        rr = F.ring_geometry(t)
+        shimmers = [F.ring_shimmer(t, r) for r in rr]
+        assert max(shimmers) - min(shimmers) <= F.RING_SHIMMER_SPAN + 1e-9
+
+
+def test_accretion_photon_and_infall_are_blackhole_structure():
+    R, t = 64.0, 2.7
+    # Accretion stream: matter winding in and out on a continuous spiral.
+    acc = F.accretion_stream(t, R)
+    assert acc == F.accretion_stream(t, R)
+    assert len(acc) == F.ACCRETION_COUNT
+    r_lo = R * F.ACCRETION_R_IN_FRAC * 0.85
+    r_hi = R * F.ACCRETION_R_OUT_FRAC * 1.08
+    for s in acc:
+        assert set(s) >= {"index", "x", "y", "depth", "z", "z2", "vx", "vy",
+                          "size", "alpha", "lift", "hue", "hue2", "dof",
+                          "skew", "s", "r", "ring_id"}, s
+        assert 0.0 <= s["depth"] <= 1.0
+        assert 0.0 <= s["z"] <= 1.0 and 0.0 <= s["z2"] <= 1.0
+        assert -0.05 <= s["s"] <= 1.05
+        assert r_lo - 1e-6 <= s["r"] <= r_hi + 1e-6
+    ss = [s["s"] for s in acc]
+    assert max(ss) - min(ss) > 0.4, "the stream is not winding inward"
+    prev = [(s["x"], s["y"]) for s in acc]
+    for k in range(1, 90):
+        cur = [(s["x"], s["y"]) for s in F.accretion_stream(t + k / 60.0, R)]
+        for (x, y), (px, py) in zip(cur, prev):
+            assert math.hypot(x - px, y - py) < 4.0, k
+        prev = cur
+
+    # Photon ring: a thin lensed ring with a couple of bright arcs.
+    ph = F.photon_ring(t, R)
+    assert ph == F.photon_ring(t, R)
+    assert len(ph) == F.PHOTON_SAMPLES
+    for p in ph:
+        assert set(p) >= {"index", "x", "y", "depth", "z", "z2", "size",
+                          "alpha", "lift", "hue", "hue2", "dof", "skew",
+                          "angle"}, p
+        assert 0.0 <= p["depth"] <= 1.0
+    alphas = [p["alpha"] for p in ph]
+    assert max(alphas) > F.PHOTON_ALPHA_BASE + 0.5 * F.PHOTON_ALPHA_PEAK
+    assert min(alphas) < max(alphas) * 0.6, "photon ring is a uniform circle"
+
+    # Infall streaks: inward velocity and a real tail.
+    inf = F.infall_streaks(t, R)
+    assert inf == F.infall_streaks(t, R)
+    assert len(inf) == F.INFALL_COUNT
+    for q in inf:
+        assert set(q) >= {"index", "x", "y", "depth", "z", "z2", "vx", "vy",
+                          "size", "alpha", "lift", "hue", "hue2", "dof",
+                          "skew", "r", "tail_len", "s"}, q
+        assert math.isfinite(q["vx"]) and math.isfinite(q["vy"])
+        assert q["tail_len"] > 0.0 and 0.0 <= q["depth"] <= 1.0
+
+    # Junk-safe: a bad clock / radius never raises; a list always comes back.
+    for fn in (F.accretion_stream, F.photon_ring, F.infall_streaks):
+        assert isinstance(fn("bad", None), list)
+
+
+def test_depth_ladder_was_widened_for_volume():
+    # Task 6: the depth ladder is deliberately stronger so the mark reads as a
+    # volume, not a sheet. All of it is scalar gain the renderers multiply, so
+    # the enhancement is additive.
+    assert F.DEPTH_POPOUT >= 0.90
+    assert F.DEPTH_PERSPECTIVE >= 0.25
+    assert F.DEPTH_PARALLAX >= 0.25
+    assert F.SKEW_GAIN_DEG >= 8.0
+    # Near bodies are several times larger than far ones (real pop-out).
+    assert F._depth_size(1.0, 1.0) / F._depth_size(0.0, 1.0) > 3.0
+    # Lift rises monotonically with depth: the front of the volume is hotter.
+    assert F._depth_lift(1.0) > F._depth_lift(0.5) > F._depth_lift(0.0)
+    # The shear is signed and vanishes at the plane's rim.
+    assert F.skew(0.0) == pytest.approx(F.SKEW_GAIN_DEG)
+    assert F.skew(0.5) == pytest.approx(0.0, abs=1e-9)
+    assert F.skew(1.0) == pytest.approx(-F.SKEW_GAIN_DEG)

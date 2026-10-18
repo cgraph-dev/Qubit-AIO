@@ -27,16 +27,33 @@ Layers, back to front:
   * ``core_shells``     — the nucleus's INTERIOR structure: nested bodies at
     different radii and tilts, each turning at its own period.
   * ``filament_state``  — a travelling standing wave running around a ring.
+  * ``binary_state``    — deterministic "1"/"0" data fragments (text characters,
+    split by depth; the retired ``math_state`` never returns one).
+  * ``inner_ring_tilt`` — the third, interior core orbit.
+  * ``ring_particles``  — bodies riding EVERY :func:`ring_geometry` circle.
+  * ``cylinder_particles`` — a vertical column around the nucleus (volume cue).
+  * ``orbiter_particles`` — bodies on their OWN inclined orbits around the core.
   * ``volume_particles`` — a real 3D particle field of bodies on their own
     inclined orbits, each with a per-body twinkle (``pulse``) and rotation
     (``spin``) animation. It REPLACES the retired math-glyph text layer
     (``math_state``, now a no-op) — no ``char`` anywhere.
+  * ``accretion_stream`` — matter winding around the nucleus on a continuous
+    spiral, moving in and out (the black-hole accretion read).
+  * ``photon_ring``     — the thin, bright lensed arcs hugging the core.
+  * ``infall_streaks``  — fast radial streaks with an inward velocity + tail.
+  * ``screen_break``    — fast bodies on wide orbits that reach BEYOND R (and
+    past the widget edge): the deliberate overflow the owner asked for.
 
 Depth convention: ``depth = 0.5 + 0.5*cos(radians(angle))`` on a particle's
 orbit — 1.0 is nearest the viewer. Renderers draw every ``depth < 0.5`` element
 BEHIND the nucleus and every ``depth >= 0.5`` element IN FRONT; that z-split is
 what makes the flat mark read as three-dimensional. ``depth`` is unchanged and
 remains the shading / z-split scalar every existing contract reads.
+
+Owner 2026-10-19 (task 6): the whole ``DEPTH_*`` ladder was WIDENED (stronger
+perspective, a bigger near-body pop-out, more parallax, more skew and lift) so
+the volume reads deeper front to back. All of it is scalar gain the renderers
+already multiply; no key changed shape and nothing needs to be learned.
 
 Volume convention (ADDITIVE): every element dict also carries ``z`` and ``z2``,
 two INDEPENDENT deterministic depth axes in 0..1 built by :func:`depth_axes`
@@ -75,26 +92,41 @@ HALO_BASE = 0.22
 HALO_WIDTH = 1.0
 
 # --------------------------------------------------------------- 3D depth
+#: Owner 2026-10-19 (task 6): "enhance 3d animation overall and how it tries to
+#: break the screen". The depth ladder was deliberately WIDENED so the mark
+#: reads as a volume rather than a shallow sheet: near bodies are pushed
+#: strongly OUT of the screen, far bodies contract hard toward the centre, and
+#: the plane-skew grows with it. Every gain is a pure scalar the renderers
+#: already multiply (size, alpha, lift, position, arm shear), so the enhancement
+#: is ADDITIVE — no key changed shape, nothing new for a renderer to learn.
 DEPTH_RADIUS_BASE = 0.42
 DEPTH_RADIUS_GAIN = 1.05
 DEPTH_ALPHA_BASE = 0.10
 DEPTH_ALPHA_GAIN = 1.00
 DEPTH_LIFT_BASE = 0.04
-DEPTH_LIFT_GAIN = 0.42
-DEPTH_PARALLAX = 0.20
-#: Far points contract slightly toward the centre: a cheap perspective cue.
-DEPTH_PERSPECTIVE = 0.20
+#: Near bodies lift further toward white, so the front of the volume reads hot
+#: and the back stays cool — a stronger front/back light separation.
+DEPTH_LIFT_GAIN = 0.50
+#: Parallax along the orbit normal: the nearest logo particles sit visibly
+#: off-plane from the farthest, which is the strongest single "this is 3D"
+#: cue on the nine bodies (raised 0.20 -> 0.30 for the task-6 push).
+DEPTH_PARALLAX = 0.30
+#: Far points contract toward the centre: a cheap perspective cue, raised so
+#: the ellipses read as receding into the screen instead of flat on the glass.
+DEPTH_PERSPECTIVE = 0.30
 #: Elements nearest the viewer grow past their plane's size so the field reads
 #: as coming OUT of the screen (and the nearest can cross the orbit envelope).
-DEPTH_POPOUT = 0.70
+#: Raised 0.70 -> 0.95: the pop-out is the depth cue the owner asked to amplify.
+DEPTH_POPOUT = 0.95
 #: Depth of field: ``dof()`` maps a particle's depth to an out-of-focus amount.
 DOF_NEAR = 0.0
 DOF_FAR = 1.0
 DOF_GAMMA = 1.7
 #: Per-depth shear (degrees) a renderer may rotate a body by. A point on a
 #: tilted plane is foreshortened along one axis; a few degrees of skew is what
-#: stops a glint from reading as a flat sticker pasted on the orbit.
-SKEW_GAIN_DEG = 7.0
+#: stops a glint from reading as a flat sticker pasted on the orbit. Raised
+#: 7 -> 9 with the rest of the ladder so a body's lean tracks its depth harder.
+SKEW_GAIN_DEG = 9.0
 
 # --------------------------------------------------------- volume axes (z/z2)
 #: ADDITIVE volume axes. ``depth`` (above) is a flat function of an element's
@@ -1702,16 +1734,25 @@ def ring_geometry(t: Any) -> List[Dict[str, Any]]:
     """Every circle of the mark as a stroke description, back to front.
 
     Each entry: ``{"id", "layer", "orbit", "tilt", "rx_frac", "ry_frac",
-    "alpha", "width", "echo", "seed", "tilt_spin_deg", "precess_period_s"}``.
+    "alpha", "width", "echo", "seed", "tilt_spin_deg", "precess_period_s",
+    "intensity_period_s", "shimmer_period_s", "intensity", "shimmer",
+    "streamers"}``.
     Radii are FRACTIONS of the mark radius and the tilt is in degrees, so the
     same entry scales to any size; :func:`ring_path` turns one into points.
     ``layer`` is ``main``, ``echo``, ``inner`` or ``satellite``; the list is
     ordered so a renderer can paint it in order and get the near rings on top.
 
     ADDITIVE evolution keys: ``tilt`` remains the base tilt the contracts
-    assert; ``tilt_spin_deg`` is a bounded per-ring plane-precession offset the
-    renderer ADDS to ``tilt`` (:func:`ring_tilt_spin`), and ``precess_period_s``
-    is that ring's own non-harmonic period.
+    assert; ``tilt_spin_deg`` is a bounded offset the renderer ADDS to ``tilt``
+    (:func:`ring_tilt_spin`) and is IDENTICAL for every ring — the rigid set — so
+    ``precess_period_s`` (that ring's recorded period, kept for compatibility)
+    no longer varies per ring. ``intensity`` (a 0..1 accretion hot-spot
+    modulation, :func:`ring_intensity`), ``shimmer`` (a sub-percent per-ring
+    radius glitter, :func:`ring_shimmer`) and ``streamers`` (a suggested
+    streamer count) give each circle its own live detail WITHOUT disturbing the
+    rigid proportionality; renderers multiply the ring's alpha by
+    ``ring_alpha(t, ring) * ring_intensity(t, ring)`` and its radii by
+    ``ring_radius_scale(t, ring) * ring_shimmer(t, ring)``.
     """
     tt = _finite(t)
     near_tilt, far_tilt = orbit_tilts(tt)
@@ -2358,26 +2399,29 @@ def cylinder_particles(t: Any, R: float) -> List[Dict[str, Any]]:
 
 
 # --------------------------------------------------------------- screen break
-#: Owner: "I like it how it tries to 'break' the screen, do more of that". A
-#: handful of fast bodies on WIDE, steeply-inclined orbits whose radius grows
-#: past the mark's own envelope, so they visibly sweep out of the widget. The
-#: orbit radius fraction reaches :data:`SCREEN_BREAK_FRAC` (``> 1`` = beyond
-#: R); the excursion is a continuous full turn, never a pop. The set is small
-#: so the primitive budget barely moves. ``R_FRAC_MIN + R_FRAC_SPAN`` equals
-#: ``SCREEN_BREAK_FRAC`` on purpose, so the declared ceiling and the reachable
-#: maximum cannot drift apart.
-SCREEN_BREAK_COUNT = 8
-SCREEN_BREAK_FRAC = 1.18
-SCREEN_BREAK_R_FRAC_MIN = 0.88
-SCREEN_BREAK_R_FRAC_SPAN = 0.30
+#: Owner: "I like it how it tries to 'break' the screen, do more of that".
+#: Owner 2026-10-19 (task 6): push it further. A handful of fast bodies on WIDE,
+#: steeply-inclined orbits whose radius grows past the mark's own envelope, so
+#: they visibly sweep out of the widget. The orbit radius fraction reaches
+#: :data:`SCREEN_BREAK_FRAC` (``> 1`` = beyond R); the excursion is a continuous
+#: full turn, never a pop. Raised 1.18 -> 1.34 R and COUNT 8 -> 10 so the set
+#: reliably crosses the widget edge (a 2R-wide frame has its edge at ~1.14 R)
+#: rather than merely grazing the mark radius. The primitive budget absorbs ten
+#: bodies (renderer draw limits are 12); ``R_FRAC_MIN + R_FRAC_SPAN`` still
+#: equals ``SCREEN_BREAK_FRAC`` on purpose, so the declared ceiling and the
+#: reachable maximum cannot drift apart.
+SCREEN_BREAK_COUNT = 10
+SCREEN_BREAK_FRAC = 1.34
+SCREEN_BREAK_R_FRAC_MIN = 0.96
+SCREEN_BREAK_R_FRAC_SPAN = 0.38
 SCREEN_BREAK_PERIOD_BASE = 3.2
 SCREEN_BREAK_PERIOD_SPAN = 3.4
 SCREEN_BREAK_INC_MIN_DEG = 26.0
 SCREEN_BREAK_INC_SPAN_DEG = 116.0
-SCREEN_BREAK_SIZE_BASE = 0.24
-SCREEN_BREAK_ALPHA_BASE = 0.72
+SCREEN_BREAK_SIZE_BASE = 0.28
+SCREEN_BREAK_ALPHA_BASE = 0.80
 SCREEN_BREAK_LIFT_BASE = 0.35
-SCREEN_BREAK_LIFT_GAIN = 0.40
+SCREEN_BREAK_LIFT_GAIN = 0.50
 
 
 def screen_break(t: Any, R: float) -> List[Dict[str, Any]]:
@@ -2503,9 +2547,27 @@ __all__ = [
     "FILAMENT_ALPHA_PEAK", "FILAMENT_SIZE_BASE", "FILAMENT_SIZE_PEAK",
     "FILAMENT_LIFT",
     "ring_precess_period", "ring_tilt_spin", "ring_radius_scale",
-    "RING_MOTION_PERIOD_S", "RING_MOTION_PHASE",
-    "RING_PRECESS_AMP_DEG", "RING_RADIUS_BREATH_SPAN",
+    "RING_MOTION_PERIOD_S", "RING_MOTION_PERIOD_2_S", "RING_MOTION_PERIOD_3_S",
+    "RING_MOTION_PHASE", "RING_PRECESS_AMP_DEG", "RING_PRECESS_WEIGHTS",
+    "RING_RADIUS_BREATH_SPAN", "RING_RADIUS_WEIGHTS",
     "RING_RADIUS_BREATH_PHASE", "RING_MOTION_PERIODS_S",
+    "ring_intensity", "ring_shimmer", "RING_INTENSITY_MIN",
+    "RING_INTENSITY_SPAN", "RING_INTENSITY_PERIOD_BASE",
+    "RING_INTENSITY_PERIOD_SPAN", "RING_SHIMMER_SPAN",
+    "RING_SHIMMER_PERIOD_BASE", "RING_SHIMMER_PERIOD_SPAN",
+    "RING_STREAMERS_BASE", "RING_STREAMERS_SPAN",
+    "accretion_stream", "ACCRETION_COUNT", "ACCRETION_R_OUT_FRAC",
+    "ACCRETION_R_IN_FRAC", "ACCRETION_PERIOD_BASE", "ACCRETION_PERIOD_SPAN",
+    "ACCRETION_SPIRAL_TURNS", "ACCRETION_SIZE_BASE", "ACCRETION_SIZE_SPAN",
+    "ACCRETION_ALPHA_BASE", "ACCRETION_ALPHA_GAIN", "ACCRETION_LIFT",
+    "photon_ring", "PHOTON_SAMPLES", "PHOTON_RX_FRAC", "PHOTON_RY_FRAC",
+    "PHOTON_TILT_BASE", "PHOTON_TILT_SWAY_DEG", "PHOTON_PERIOD_S",
+    "PHOTON_LOBES", "PHOTON_ALPHA_BASE", "PHOTON_ALPHA_PEAK",
+    "PHOTON_SIZE_BASE", "PHOTON_SIZE_PEAK", "PHOTON_LIFT",
+    "infall_streaks", "INFALL_COUNT", "INFALL_R_OUT_FRAC", "INFALL_R_IN_FRAC",
+    "INFALL_PERIOD_BASE", "INFALL_PERIOD_SPAN", "INFALL_SIZE_BASE",
+    "INFALL_SIZE_SPAN", "INFALL_ALPHA_BASE", "INFALL_ALPHA_GAIN",
+    "INFALL_LIFT", "INFALL_TAIL_LEN_FRAC",
     "ring_particles", "RING_PARTICLE_COUNTS", "RING_PARTICLE_DEFAULT",
     "RING_PARTICLE_PERIOD_BASE", "RING_PARTICLE_PERIOD_SPAN",
     "RING_PARTICLE_SIZE", "RING_PARTICLE_ALPHA",
