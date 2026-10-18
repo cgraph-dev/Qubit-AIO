@@ -126,6 +126,22 @@ def test_heartbeat_pulses_nucleus_size_and_halo_opacity():
     assert M.heartbeat(0.0) > M.heartbeat(0.475)
 
 
+def test_heartbeat_envelope_is_continuous_and_rises_from_zero():
+    # The old envelope started at full amplitude and jumped 0->1 at the phase
+    # wrap (the visible beat jerk). Every adjacent frame, wrap included, must
+    # now move only a small step.
+    dt = 1.0 / 240.0
+    worst = max(abs(F.heartbeat((k + 1) * dt) - F.heartbeat(k * dt))
+                for k in range(int(3.0 / dt)))
+    assert worst < 0.08, f"heartbeat stepped {worst:.3f} in one 1/240s frame"
+    # Still a pulse, not a flat line: primary peaks at 1, the second thump at
+    # HEART_SECOND_AMP, and the gate between beats returns to 0.
+    assert F.heartbeat(0.0) == pytest.approx(1.0)
+    assert F.heartbeat(F.HEART_PERIOD_S * (1.0 + F.HEART_SECOND_PHASE)) == \
+        pytest.approx(F.HEART_SECOND_AMP, abs=0.02)
+    assert F.heartbeat(0.475) == pytest.approx(0.0)
+
+
 def test_far_beads_draw_behind_and_near_beads_in_front():
     for t in (0.0, 1.0):
         c = FakeCanvas()
