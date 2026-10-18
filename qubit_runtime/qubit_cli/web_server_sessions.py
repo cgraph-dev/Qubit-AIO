@@ -6,6 +6,7 @@ import logging
 import asyncio
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -75,6 +76,164 @@ def _session_latest_descendant(session_id: str, db):
         path.append(current)
         seen.add(current)
     return current, path
+
+
+def _session_mutation_context(request, profile):
+    """Use the same principal and profile boundary for prepare and apply."""
+    from fastapi import HTTPException
+    from gateway.session_contract import Principal
+    from qubit_cli.web_server import _has_valid_session_token
+    from qubit_cli.web_server_cron import _cron_profile_home
+    from qubit_state import _default_db_path
+
+    native = getattr(request.state, 'native_http_principal', None)
+    session = getattr(request.state, 'session', None)
+    if native is not None:
+        subject = native['subject']
+    elif session is not None:
+        from gateway.session_identity import authenticated_subject
+        subject = authenticated_subject({"user_id": session.user_id,
+            "provider": session.provider, "issuer": session.issuer})
+    elif not getattr(request.app.state, 'auth_required', False) and _has_valid_session_token(request):
+        from gateway.session_identity import authenticated_subject
+        subject = authenticated_subject({'user_id': 'legacy-token-owner', 'provider': 'session-token'})
+    else:
+        raise HTTPException(status_code=401, detail='Unauthorized')
+    authority = getattr(request.app.state, 'session_authority', None)
+    home = Path(_cron_profile_home(profile)[1]) if profile else Path(_default_db_path()).parent
+    capabilities = frozenset({'session:read', 'session:control', 'session:create', 'session:operator'})
+    if authority is None:
+        if getattr(request.app.state, 'gateway_runner', None) is not None:
+            raise HTTPException(status_code=503, detail='session_authority_unavailable')
+        # Standalone ``serve``/``dashboard`` (no composed gateway; its owner cutover is a
+        # follow-up): the store is the owner. Same principal id form as a gateway authority's
+        # (``str(home)``), so import bindings written offline stay valid once one starts.
+        return None, Principal(subject, str(home.resolve()), capabilities, 'http')
+    # ``?profile=`` selects a served home; its own authority (not the launch one) owns the mutation.
+    from gateway.session_authorities import authority_for_home
+    runner = getattr(request.app.state, 'gateway_runner', None)
+    owner = authority_for_home(runner, home) if runner is not None else None
+    if owner is None and home.resolve() == Path(authority.db.db_path).parent.resolve():
+        owner = authority
+    if owner is None:
+        raise HTTPException(status_code=403, detail='profile_mismatch')
+    authority = owner
+    if native is not None and native['profile_id'] != authority.profile_id:
+        raise HTTPException(status_code=403, detail='profile_mismatch')
+    if native is not None:
+        # One transport per verified native request, so the grant's own profile can claim its old
+        # local history exactly as over the native socket (``require_history_claim``); a shared
+        # 'http' id never can.
+        import uuid
+        return authority, Principal(subject, authority.profile_id, capabilities, 'native-http:' + uuid.uuid4().hex)
+    return authority, Principal(subject, authority.profile_id, capabilities, 'http')
+
+
+@contextmanager
+def _native_history_transport(request, authority, actor):
+    """Bind a verified native HTTP actor as a native legacy transport for one mutation."""
+    native = None
+    if authority is not None and str(getattr(actor, 'transport_id', '')).startswith('native-http:'):
+        native = getattr(request.state, 'native_http_principal', None)
+    if native is None:
+        yield
+        return
+    from gateway.session_local_migration import bind_native_transport, unbind_native_transport
+    bind_native_transport(authority, actor, {'provider': 'local', 'profile_id': authority.profile_id,
+                                             'instance_id': native['instance_id']})
+    try:
+        yield
+    finally:
+        unbind_native_transport(authority, actor)
+
+
+def _mutate_offline_store(profile, actor, params):
+    """Standalone edit: the receipt transaction on this process's single shared writer.
+
+    Runs under the exact owner lock (409 while any gateway owns the store, never a
+    second writer beside it); revision/generation/idle guards are the gateway's own.
+    """
+    from fastapi import HTTPException
+    from qubit_state_runtime import begin_runtime_epoch, mutate_runtime_session
+
+    def run():
+        db = _open_session_db_for_profile(profile, read_only=False)
+        try:
+            write_guard = None
+            if params['operation'] == 'import':
+                normalized, errors = db._validate_import_payload(params['payload']['sessions'])
+                if errors:
+                    raise HTTPException(status_code=400, detail={'errors': errors})
+                from functools import partial
+                from qubit_state_mutation_binding import import_history_control
+                write_guard = partial(import_history_control, actor=actor,
+                                      session_ids=tuple(item['session']['id'] for item in normalized))
+            with db._read_ctx() as conn:
+                row = conn.execute('SELECT epoch FROM runtime_epoch WHERE singleton=1').fetchone()
+            # The reservation held here is the ownership lock begin_runtime_epoch requires.
+            epoch = row[0] if row else begin_runtime_epoch(db, instance_id='dashboard-offline')
+            return mutate_runtime_session(db, epoch=epoch, principal_id=actor.subject,
+                expected_generation=params.get('expected_generation'), _authorize_write=write_guard,
+                **{key: params[key] for key in ('session_id', 'request_id', 'expected_revision',
+                                                'operation', 'payload')})
+        finally:
+            db.close()
+    return _with_session_maintenance(profile, run)
+
+
+async def _mutate_session_request(request, profile, session_id, *, request_id,
+                                  expected_revision, operation, payload, expected_generation=None):
+    """Resolve the authenticated principal and owner; never open a second writer."""
+    import sqlite3
+    from fastapi import HTTPException
+    from gateway.session_contract import SessionRef
+    from gateway.session_mutations import mutate_session
+    from qubit_state_mutation_guards import MUTATION_GUARD_REFUSALS
+    from qubit_state_runtime import RuntimeStoreError
+
+    authority, actor = _session_mutation_context(request, profile)
+    if operation == 'import' and authority is not None:
+        _, errors = authority.db._validate_import_payload(payload['sessions'])
+        if errors:
+            raise HTTPException(status_code=400, detail={'errors': errors})
+    if request_id is None or expected_revision is None:
+        raise HTTPException(status_code=409, detail='mutation_identity_required')
+    params = dict(session_id=session_id, request_id=request_id, expected_revision=expected_revision,
+        operation=operation, payload=payload)
+    if expected_generation is not None:
+        params['expected_generation'] = expected_generation
+    try:
+        if authority is None:
+            result = await asyncio.to_thread(_mutate_offline_store, profile, actor, params)
+        else:
+            with _native_history_transport(request, authority, actor):
+                result = await mutate_session(authority, actor, SessionRef(authority.profile_id, session_id), params)
+        return {'ok': True, **result}
+    except RuntimeStoreError as exc:
+        status = {'permission_denied': 403, 'profile_mismatch': 403, 'not_found': 404,
+                  'invalid_params': 400, 'runtime_draining': 503}.get(exc.reason, 409)
+        raise HTTPException(status_code=status, detail=exc.reason) from exc
+    except MUTATION_GUARD_REFUSALS as exc:
+        raise HTTPException(status_code=409, detail='session_busy') from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except sqlite3.Error as exc:
+        raise HTTPException(status_code=503, detail='storage_unavailable') from exc
+
+
+def _with_session_maintenance(profile, operation, *args):
+    """Offline bulk actions reserve the exact owner lock through final DB close."""
+    from fastapi import HTTPException
+    from gateway.runtime_ownership import OwnershipConflict, exclusive_maintenance
+    from qubit_cli.web_server_cron import _cron_profile_home
+    from qubit_state import _default_db_path
+
+    home = Path(_cron_profile_home(profile)[1]) if profile else Path(_default_db_path()).parent
+    try:
+        with exclusive_maintenance([home]):
+            return operation(*args)
+    except OwnershipConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 # Serialises the one-time writable schema bootstrap for read-only opens, so
