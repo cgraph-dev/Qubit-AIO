@@ -42,6 +42,8 @@ Tk has no rotated ellipse, no per-item alpha and no gradient, so:
     primitive (``_mix`` + ``_hex`` + ``_dim``); circles are ``create_oval``;
   * a radial gradient is approximated by concentric filled ovals
     (``NUCLEUS_LAYERS`` for the body, ``_soft_oval`` for the aura/corona);
+  * the declared circles and the filament are stroked with a finer Tk spline
+    than the default, which refines the curve without adding a primitive.
   * a spectral wake is no longer drawn: owner 2026-10-19, "you didnt replace
     the L and V's", retired the thick bent trail ribbons entirely. A body is
     its glint (and, for the comet, its own small bead tail) and nothing more.
@@ -196,6 +198,17 @@ except Exception:  # noqa: BLE001
 #: (the beat shockwave). The declared circles bring their own sampling.
 RING_SEGMENTS = 72
 
+#: Tk's ``create_line`` smooths a closed polyline into a Bezier through the
+#: sample points. Its default 12 spline steps is visibly faceted once a circle
+#: is a few hundred pixels across (the orb can be 320px), so the declared rings
+#: ask for more. This costs NO extra primitives: it only refines the curve Tk
+#: already draws, which is the cheapest "more professional" win available in
+#: this primitive model.
+RING_SPLINE_STEPS = 24
+#: ...and the filament band is sampled every other vertex (FILAMENT_TK_STRIDE),
+#: so its smooth pass needs a few more steps to hide the coarser input.
+FILAMENT_SPLINE_STEPS = 32
+
 #: Painter-side glint refinement, mirroring the Qt painter: the shared field
 #: sets the size, but Tk's old arm/core floors kept tiny dust and sparkles
 #: chunky. A low size floor, a smaller core and the field's own arm fraction
@@ -203,6 +216,16 @@ RING_SEGMENTS = 72
 GLINT_MIN_SIZE = 0.16
 GLINT_CORE_SCALE = 0.58
 GLINT_CORE_MIN = 0.08
+#: A glint is a four-point star, but a real specular reflection is never a
+#: symmetric cross: one axis catches the light. The SECONDARY arm is drawn
+#: slightly shorter and dimmer so the body reads as a lit 3-D point instead of
+#: a pasted-on plus sign. Same two lines and one core — no extra primitives.
+GLINT_SECOND_ARM = 0.80
+GLINT_SECOND_ALPHA = 0.78
+#: Near bodies lift toward white at the core (a close point source blooms) and
+#: far ones stay in their own tint. Colour only: the core size law, which the
+#: comet/tail contracts read, is untouched.
+GLINT_CORE_DEPTH_LIFT = 0.18
 
 #: Below this effective alpha a primitive is imperceptible on an 8-bit canvas:
 #: skipping it is cheaper than letting the quantisation snap it in one frame.
@@ -229,6 +252,11 @@ COMET_BEAD_SAT = 0.95
 #: makes every ring genuinely translucent instead of an opaque outline. One
 #: tint per frame (``ring_rgb``), never a red/blue fringe or a per-sample spray.
 RING_TRANSLUCENCY = 0.45
+#: Each ring's field ``intensity`` hot spot also lifts its TINT a little toward
+#: white (not just its alpha), so a bright ring reads incandescent and a dim
+#: one stays cool. The lift is bounded and always uses the ONE ``ring_rgb``
+#: family, so the circles remain near-monochrome glass.
+RING_HOTSPOT_LIFT = 0.20
 
 # --- true-3D whole-mark tumble (parity with the Qt painter) ------------------
 #: Master spin: a slow 360 deg rotation of the whole mark in the screen plane.
@@ -330,7 +358,11 @@ NUCLEUS_RADIUS_MULT = 1.25
 NUCLEUS_CORE_LIFT = 0.78
 #: Concentric filled ovals approximate the radial gradient Tk cannot draw (hot
 #: near-white core -> state hue -> fading rim), wrapped in a soft outline halo.
-NUCLEUS_LAYERS = 9
+#: Raised 9 -> 12: at orb scale the banding between stops was visible on the
+#: body, and the Qt painter's radial gradient has effectively continuous
+#: shading. 12 is the smallest count whose steps fall below one 8-bit level in
+#: the hue band, so the sphere reads smooth without a second glow pass.
+NUCLEUS_LAYERS = 12
 HALO_LAYERS = 3
 #: Two counter-rotating hot lobes inside the body, so the centre has internal
 #: movement instead of a static gradient.
@@ -355,6 +387,16 @@ NUCLEUS_SPECULAR_ORBIT_FRAC = 0.50
 NUCLEUS_SPECULAR_SIZE_FRAC = 0.07
 NUCLEUS_SPECULAR_PERIOD_S = 12.0
 NUCLEUS_SPECULAR_PHASE_DEG = 90.0
+#: Terminator: a soft body-tinted shade on the side AWAY from the light, so the
+#: sphere reads lit-side / shadow-side instead of an evenly glowing ball. It is
+#: offset along the SAME tumble cosines as the specular (opposite sign), so the
+#: shadow sweeps as the body turns — the strongest "this is a sphere turning"
+#: cue Tk can paint. Body-composited, so it darkens the sphere without punching
+#: a background hole (``on_body`` drops the zero-alpha stop).
+NUCLEUS_TERMINATOR_LAYERS = 4
+NUCLEUS_TERMINATOR_OFFSET_FRAC = 0.34
+NUCLEUS_TERMINATOR_RADIUS_FRAC = 0.86
+NUCLEUS_TERMINATOR_ALPHA = 0.34
 #: The caustic inside the body rides the beat: the hot inner bloom that makes
 #: the core look like it is boiling rather than merely rotating. It never fully
 #: vanishes, so the centre keeps a live inner light between beats.
@@ -390,6 +432,13 @@ NUCLEUS_GLOW_MULT = 3.15
 #: gentler falloff and fewer stops instead of Qt's 24.
 NUCLEUS_GLOW_ALPHA = 0.38
 NUCLEUS_AURA_POWER = 1.2
+#: The BASE aura: one wide, soft falloff UNDER the corona and the plumes, as
+#: the Qt painter draws (``_smoke(cx, cy, r * GLOW_MULT, rgb, GLOW_ALPHA)``).
+#: Without it the plumes had no shared bed and the core's light stopped at the
+#: body's rim; with it the surround is a continuous field that the plumes then
+#: break up. Drawn first, because Tk's opaque translucency substitute would
+#: otherwise paint over the hairlines.
+NUCLEUS_AURA_LAYERS = 5
 #: Chromatic corona: soft lobes OUTSIDE the body turning slowly through the
 #: spectrum, so the core reads as radiating rather than merely glowing. The
 #: hue drift is small on purpose: over one full turn the whole corona stays
@@ -459,12 +508,14 @@ SCREEN_BREAK_SAT = 0.95
 #: a still frame's ovals. Everything here is a pure function of the clamped
 #: clock, so reduced motion paints the identical static body.
 NUCLEUS_OVAL_COUNT = (
-    len(NUCLEUS_SMOKE) * NUCLEUS_SMOKE_LAYERS      # drifting plumes
+    NUCLEUS_AURA_LAYERS                             # base aura falloff
+    + len(NUCLEUS_SMOKE) * NUCLEUS_SMOKE_LAYERS      # drifting plumes
     + NUCLEUS_CORONA_COUNT * NUCLEUS_CORONA_LAYERS  # chromatic corona
     + NUCLEUS_FLARE_LAYERS                          # beat bloom
     + HALO_LAYERS                                   # outline smoke rings
     + NUCLEUS_LAYERS                                # the shaded body
     # On-body detail loses its zero-alpha rim stop (see ``_soft_oval``).
+    + (NUCLEUS_TERMINATOR_LAYERS - 1)               # sphere terminator shade
     + (NUCLEUS_CAUSTIC_LAYERS - 1)
     + 2 * (NUCLEUS_SWIRL_LAYERS - 1)
     + (NUCLEUS_SPEC_LAYERS - 1)
@@ -932,11 +983,19 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         return a
 
     # ------------------------------------------------------------- primitives
-    def _line(pts: List[float], fill: str, width: int = 1) -> None:
+    def _line(pts: List[float], fill: str, width: int = 1,
+              splinesteps: int | None = None) -> None:
         nonlocal lines, points, min_y, max_y
         try:
-            canvas.create_line(*pts, fill=fill, width=max(1, int(width)),
-                               smooth=True, capstyle="round", joinstyle="round")
+            kw: Dict[str, Any] = {
+                "fill": fill, "width": max(1, int(width)),
+                "smooth": True, "capstyle": "round", "joinstyle": "round"}
+            # A finer spline costs no primitives; it only refines the curve Tk
+            # already draws. Used for the declared circles and the filament,
+            # where a coarse smooth step is visible as faceting.
+            if splinesteps is not None:
+                kw["splinesteps"] = max(2, int(splinesteps))
+            canvas.create_line(*pts, **kw)
             lines += 1
             points += len(pts) // 2
             for i in range(1, len(pts), 2):
@@ -1014,7 +1073,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     def _glint(x: float, y: float, size: Any, alpha: Any,
                rgb: Tuple[int, int, int],
                arm_frac: float = GLINT_ARM_FRAC, skew_deg: Any = 0.0,
-               depth: Any = 0.5, gain: Any = 1.0) -> None:
+               depth: Any = 0.5, gain: Any = 1.0,
+               rgb2: Tuple[int, int, int] | None = None) -> None:
         """A twinkling star, never a filled orb (owner 2026-10-17) — and never
         a halo: the star's effect is the spectral streak it leaves.
 
@@ -1026,6 +1086,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         angle instead of a flat cross pasted on the orbit. ``gain`` is the
         tumble's rotated-depth gain: a body swinging toward the viewer grows
         and brightens, one tucking away shrinks and dims.
+
+        Refinement (same three primitives): the secondary arm is shorter and
+        dimmer than the primary, so the cross has a dominant axis like a real
+        specular highlight instead of a symmetric plus; the core lifts toward
+        white as a body comes forward; and ``rgb2`` (the field's duotone
+        partner) tints that secondary arm where the layer publishes one.
         """
         try:
             g = max(0.0, min(2.0, float(gain)))
@@ -1035,14 +1101,23 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         raw = _num(alpha)
         if raw <= FIELD_ALPHA_FLOOR or sz <= 0.0:
             return
-        shown = _dim(rgb, _shade(raw, depth, g) * bright)
+        d = max(0.0, min(1.0, _num(depth, 0.5)))
+        shown = _dim(rgb, _shade(raw, d, g) * bright)
+        # A darker (or partner-tinted) secondary arm keeps the same near-
+        # monochrome family; it is never a second spectrum hue of its own.
+        alt_rgb = rgb2 if rgb2 is not None else _mix(rgb, _ember.NEAR_BLACK, 0.28)
+        shown_alt = _dim(alt_rgb, _shade(raw * GLINT_SECOND_ALPHA, d, g) * bright)
         arm = sz * arm_frac
+        arm2 = arm * GLINT_SECOND_ARM
         sk = math.radians(_num(skew_deg))
         ax, ay = math.cos(sk) * arm, math.sin(sk) * arm
+        bx, by = math.cos(sk) * arm2, math.sin(sk) * arm2
         _line([x - ax, y - ay, x + ax, y + ay], shown, 1)
-        _line([x - ay, y + ax, x + ay, y - ax], shown, 1)
+        # Perpendicular, with the shorter/lower-contrast diagonal.
+        _line([x - by, y + bx, x + by, y - bx], shown_alt, 1)
+        core = _mix(rgb, (255, 255, 255), GLINT_CORE_DEPTH_LIFT * d)
         _oval(x, y, max(GLINT_CORE_MIN, sz * GLINT_CORE_FRAC * GLINT_CORE_SCALE),
-              shown)
+              _dim(core, _shade(raw, d, g) * bright))
         fills.append(rgb)
 
     def _dot(x: float, y: float, rad: Any, alpha: Any,
@@ -1068,13 +1143,16 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     # ---- one declared circle ----------------------------------------------
     def _ring_stroke(points: List[Tuple[float, float]], alpha: float,
-                     width: float) -> None:
+                     width: float,
+                     tint: Tuple[int, int, int] | None = None,
+                     spline_steps: int = RING_SPLINE_STEPS) -> None:
         """Stroke one declared circle as a single translucent tint.
 
         Owner 2026-10-19: the red/blue lens fringe and the multi-hue spray are
         gone — the circles read as galaxies. Every ring is now ONE tint
-        (``ring_rgb``) at ``RING_TRANSLUCENCY`` of its declared alpha, so it sits
-        quietly behind the bodies instead of glowing like an opaque outline.
+        (``ring_rgb``, optionally lifted toward white by its own hot spot) at
+        ``RING_TRANSLUCENCY`` of its declared alpha, so it sits quietly behind
+        the bodies instead of glowing like an opaque outline.
 
         ``points`` are SCREEN positions — the caller projects each vertex at
         its own depth through the Y+X tumble first, so the circle bends with
@@ -1087,7 +1165,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         for sx, sy in points:
             flat += [sx, sy]
         w = max(1, int(round(width)))
-        _line(flat, _dim(ring_rgb, a), w)
+        _line(flat, _dim(tint if tint is not None else ring_rgb, a), w,
+              splinesteps=max(RING_SPLINE_STEPS, int(spline_steps)))
 
     def _ring_pass(near: bool) -> None:
         """Stroke the declared circles belonging to the far or near half.
@@ -1163,10 +1242,26 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 intensity = _num(ring_intensity(tt, spec), 1.0)
             except Exception:  # noqa: BLE001 - a field fault keeps the dry alpha
                 intensity = 1.0
+            # The hot spot also makes the stroke incandescent: a small white
+            # lift on the SAME single tint (never a second hue), scaled by how
+            # far the ring is above the field's dimmest intensity.
+            hot = max(0.0, min(1.0, (intensity - 0.55) / 0.45))
+            tint = _mix(ring_rgb, (255, 255, 255), RING_HOTSPOT_LIFT * hot)
+            # The field's ``streamers`` hint (how busy that circle's accretion
+            # structure is) also buys the stroke a little more spline
+            # refinement, so the busiest circles are the smoothest. Defensive:
+            # a field revision without the key just gets the base steps.
+            try:
+                streamers = int(_num(spec.get("streamers"), 3.0))
+            except Exception:  # noqa: BLE001
+                streamers = 3
             _ring_stroke(pts,
                          ring_alpha(tt, spec) * scale * intensity * bright,
                          ring_w * _num(spec.get("width"), 1.0)
-                         * (1.15 if layer == "main" else 1.0))
+                         * (1.15 if layer == "main" else 1.0),
+                         tint=tint,
+                         spline_steps=RING_SPLINE_STEPS
+                         + 3 * max(0, min(8, streamers)))
 
     # ----------------------------------------------------------------- field
     # Every layer is one pure call; malformed input (already normalised) or a
@@ -1489,7 +1584,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             # spectral hue read as a rainbow spray around the core. The field's
             # alpha wave still carries the motion; only the colour is quiet.
             _line([pts[i][0], pts[i][1], pts[j][0], pts[j][1]],
-                  _dim(ring_rgb, a * RING_TRANSLUCENCY), 1)
+                  _dim(ring_rgb, a * RING_TRANSLUCENCY), 1,
+                  splinesteps=FILAMENT_SPLINE_STEPS)
 
     def _rider(item: Dict[str, Any]) -> None:
         """One cylinder-column mote: a plain dot, shaded by its height.
@@ -1528,8 +1624,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         rgb = _anchor(_spec(_num(hue), RING_PARTICLE_SAT,
                             RING_PARTICLE_VAL)) if hue is not None else \
             _lift(_num(item.get("lift"), LIFT_BEAD))
+        hue2 = item.get("hue2")
+        rgb2 = (_anchor(_spec(_num(hue2), RING_PARTICLE_SAT,
+                              RING_PARTICLE_VAL))
+                if hue2 is not None else None)
         _glint(x, y, item.get("size"), item.get("alpha"), rgb,
-               skew_deg=item.get("skew"), depth=depth, gain=g)
+               skew_deg=item.get("skew"), depth=depth, gain=g, rgb2=rgb2)
 
     def _binary(bit: Dict[str, Any]) -> None:
         """One "1"/"0" fragment as a small glyph at its field position."""
@@ -1580,8 +1680,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         rgb = (_anchor(_spec(_num(hue), VOLUME_SAT, VOLUME_VAL))
                if hue is not None
                else _lift(_num(item.get("lift"), LIFT_BEAD)))
+        hue2 = item.get("hue2")
+        rgb2 = (_anchor(_spec(_num(hue2), VOLUME_SAT, VOLUME_VAL))
+                if hue2 is not None else None)
         _glint(x, y, item.get("size"), item.get("alpha"), rgb,
-               skew_deg=item.get("spin"), depth=depth, gain=g)
+               skew_deg=item.get("spin"), depth=depth, gain=g, rgb2=rgb2)
 
     def _accretion(item: Dict[str, Any]) -> None:
         """One accretion-stream sample: a depth-shaded dot, never text.
@@ -1665,8 +1768,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         hue = body.get("hue")
         rgb = (_anchor(_spec(hue, SCREEN_BREAK_SAT)) if hue is not None
                else _lift(_num(body.get("lift"), 0.5)))
+        hue2 = body.get("hue2")
+        rgb2 = (_anchor(_spec(hue2, SCREEN_BREAK_SAT))
+                if hue2 is not None else None)
         _glint(x, y, body.get("size"), body.get("alpha"), rgb,
-               skew_deg=body.get("skew"), depth=depth, gain=g)
+               skew_deg=body.get("skew"), depth=depth, gain=g, rgb2=rgb2)
 
     def _comet_head() -> None:
         """The one fast traveller: its own small debris tail and a head.
@@ -1769,6 +1875,18 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 layer_rgb = _mix(nuc_rgb, hot, (frac - 0.5) / 0.5)
             _oval(cx_f, cy_f, n_r * (1.0 - 0.70 * frac), _hex(layer_rgb))
 
+        # Terminator: a soft shade on the anti-light side of the sphere, offset
+        # along the SAME tumble cosines the specular uses (opposite sign), so
+        # the lit side and the dark side sweep together as the body turns. It
+        # composites toward the body's own colour (never the background), so it
+        # darkens the sphere without punching a hole through it.
+        shadow_col = _mix(nuc_rgb, _ember.NEAR_BLACK, 0.55)
+        _soft_oval(cx_f + n_r * NUCLEUS_TERMINATOR_OFFSET_FRAC * turn_ct,
+                   cy_f + n_r * NUCLEUS_TERMINATOR_OFFSET_FRAC * turn_cp,
+                   max(0.6, n_r * NUCLEUS_TERMINATOR_RADIUS_FRAC),
+                   shadow_col, NUCLEUS_TERMINATOR_ALPHA, 1.5,
+                   NUCLEUS_TERMINATOR_LAYERS, rgb, on_body=True)
+
         # Interior 3-D: the field's nested core shells, drawn ON the body so
         # the inside of the orb reads as layered depth rather than a flat disc.
         # Tk has no gradient or alpha, so each shell is a filled oval composited
@@ -1827,11 +1945,16 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                        max(0.6, n_r * size_frac), hot, swirl_alpha, 1.6,
                        NUCLEUS_SWIRL_LAYERS, rgb, on_body=True)
 
-        # Fixed off-centre specular highlight, then a small hot dot running once
-        # around the rim: the cue that reads as rotation rather than pulsing.
+        # Off-centre specular highlight, CARRIED BY THE TUMBLE (parity with the
+        # Qt painter): the light is fixed in the room and the sphere turns under
+        # it, so the highlight sweeps across the face as each axis turns instead
+        # of sitting still like a smudge on a flat disc. Exactly where it was on
+        # a still frame (both cosines are 1 at t=0), so reduced motion is
+        # unchanged. Then a small hot dot running once around the rim: the cue
+        # that reads as rotation rather than pulsing.
         sr = max(0.6, n_r * NUCLEUS_SPEC_RADIUS_FRAC)
-        _soft_oval(cx_f - n_r * NUCLEUS_SPEC_OFFSET_FRAC,
-                   cy_f - n_r * NUCLEUS_SPEC_OFFSET_FRAC,
+        _soft_oval(cx_f - n_r * NUCLEUS_SPEC_OFFSET_FRAC * turn_ct,
+                   cy_f - n_r * NUCLEUS_SPEC_OFFSET_FRAC * turn_cp,
                    sr, (255, 255, 255), NUCLEUS_SPEC_ALPHA, 1.4,
                    NUCLEUS_SPEC_LAYERS, rgb, on_body=True)
         pang = math.radians(360.0 * tt / NUCLEUS_SPECULAR_PERIOD_S
@@ -1851,7 +1974,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         on top of it and stay crisp — the one place where Tk's translucency
         substitute genuinely diverges from the Qt painter, and it reads better.
         """
-        # Chromatic corona first, so the smoke and the body sit ON it and it
+        # BASE aura first: one wide, soft falloff under everything, so the core
+        # radiates into a continuous bed instead of the light stopping at the
+        # body's rim (the Qt painter's ``_smoke(cx, cy, r * GLOW_MULT, rgb,
+        # GLOW_ALPHA)``). Drawn before the corona and the plumes because Tk's
+        # opaque translucency substitute would otherwise paint over them.
+        _soft_oval(cx_f, cy_f, max(0.6, n_r * NUCLEUS_GLOW_MULT), nuc_rgb,
+                   NUCLEUS_GLOW_ALPHA, NUCLEUS_AURA_POWER, NUCLEUS_AURA_LAYERS)
+        # Chromatic corona next, so the smoke and the body sit ON it and it
         # reads as light radiated by the core rather than a haze over it.
         for i in range(NUCLEUS_CORONA_COUNT):
             ang = math.radians(360.0 * tt / NUCLEUS_CORONA_PERIOD_S
@@ -2075,6 +2205,9 @@ __all__ = [
     "GLINT_MIN_SIZE", "GLINT_CORE_SCALE", "GLINT_CORE_MIN",
     "NUCLEUS_LAYERS", "HALO_LAYERS", "NUCLEUS_OVAL_COUNT",
     "MASTER_SPIN_PERIOD_S", "spin_deg", "_spin_pt",
+    "RING_SPLINE_STEPS", "FILAMENT_SPLINE_STEPS",
+    "GLINT_SECOND_ARM", "GLINT_SECOND_ALPHA", "GLINT_CORE_DEPTH_LIFT",
+    "RING_HOTSPOT_LIFT", "NUCLEUS_AURA_LAYERS", "NUCLEUS_TERMINATOR_LAYERS",
     "Y_SPIN_PERIOD_S", "X_SPIN_PERIOD_S", "Y_SPIN_Z_GAIN", "Y_SPIN_PERSP",
     "Y_SPIN_PERSP_MIN", "Y_SPIN_PERSP_MAX", "Y_SPIN_DEPTH_GAIN",
     "Y_SPIN_GAIN_MIN", "Y_SPIN_GAIN_MAX",
