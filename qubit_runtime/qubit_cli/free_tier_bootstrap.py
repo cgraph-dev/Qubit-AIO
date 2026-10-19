@@ -216,6 +216,19 @@ def run_bootstrap(*, announce: bool = True) -> SetupRecord:
                 return _record
         _started = True
 
+    try:
+        from qubit_cli import anon_auth
+        from qubit_cli.onboarding_run import latch_first_install
+        if anon_auth.on_local_desktop_backend():
+            latch_first_install()
+    except Exception:  # the next boot tries again; onboarding.state still answers live
+        logger.warning("onboarding: could not record the first-install decision", exc_info=True)
+    try:
+        from qubit_cli.welcome_trial import grandfather_existing_guest, settle_interrupted_claim
+        settle_interrupted_claim()
+        grandfather_existing_guest()
+    except Exception:  # the record still says who carries inference without it
+        logger.warning("free tier: could not check for an existing free-model guest", exc_info=True)
     record = _build_record(other=_inventory_other_providers(), force=False)
     with _lock:
         _record = record
