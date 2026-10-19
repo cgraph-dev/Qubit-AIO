@@ -20,10 +20,12 @@ Shape:
     group. The replacement worker is then pre-warmed in a background thread,
     so the next reply after a stop is warm instead of paying the model load
     (~1.7 s for piper/sherpa) a second time;
-  * an idle worker is reaped after ``QUBIT_TTS_SYNTH_WORKER_IDLE_S`` seconds
-    (default 300; ``0`` disables) so the extra model copy is not pinned in
-    memory forever on an idle service. A reap only ever costs the next
-    reply's load, never interruptibility or correctness;
+  * the worker is KEPT WARM by default, so the next reply never pays a cold
+    reload (owner 2026-10-19: "nothing left"); set
+    ``QUBIT_TTS_SYNTH_WORKER_IDLE_S`` to a positive number to reap it after that
+    many idle seconds (releasing the copy at the cost of one reload). A reap
+    only ever costs the next reply's load, never interruptibility or
+    correctness;
   * ``warm_async`` lets the EARLIEST voice request that precedes a reply
     begin that load in the background — the keyed voice-edit ``begin`` /
     ``capture`` / ``transform`` / ``route`` hooks, the direct keyed ``ask``,
@@ -278,9 +280,11 @@ _REAPER: Optional[threading.Thread] = None
 
 #: Idle grace before a loaded worker is released (seconds; 0 disables).
 #: This is the memory/latency trade-off: the worker holds a provider/model
-#: copy, but reaping it means the first reply after a long silence reloads.
-#: A stopped worker is replaced eagerly, so stops are NOT penalised.
-_DEFAULT_IDLE_S = 300.0
+#: copy. The owner wants no cold start, so it is kept warm by default; opt into
+#: reaping with ``QUBIT_TTS_SYNTH_WORKER_IDLE_S`` (positive seconds) if memory
+#: matters more than the one reload. A stopped worker is replaced eagerly, so
+#: stops are NOT penalised.
+_DEFAULT_IDLE_S = 0.0
 #: Reaper sleep between checks; tests shorten it.
 _REAP_TICK_S = 5.0
 
