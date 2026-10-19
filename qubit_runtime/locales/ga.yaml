@@ -3096,7 +3096,7 @@ cli:
     fix_lm_studio: "Leigheas LM Studio: Socraigh fad an chomhthéacs i socruithe na samhla → athlódáil an tsamhail"
     fix_local_server: "Leigheas: tosaigh do fhreastalaí le comhthéacs {tokens_k}K ar a laghad (llama.cpp: -c {tokens}), nó socraigh model.ollama_num_ctx in config.yaml don fhuinneog a fhreastalaíonn sé i ndáiríre"
     fix_config: "Leigheas: Socraigh model.context_length in config.yaml, nó méadaigh socrú comhthéacs do fhreastalaí"
-    qubit_models_not_agentic: "⚠  NÍL samhlacha Qubit 3 & 4 de chuid Nous Research gníomhaireach agus níl siad deartha le húsáid le Qubit Agent."
+    qubit_models_not_agentic: "⚠  NÍL samhlacha Hermes 3 & 4 de chuid Nous Research gníomhaireach agus níl siad deartha le húsáid le Qubit Agent."
     qubit_models_lack_tools: "Níl na cumais glaonna uirlisí acu a theastaíonn do shreafaí oibre gníomhaire. Smaoinigh ar shamhail ghníomhaireach a úsáid (Claude, GPT, Gemini, DeepSeek, etc.)."
     qubit_models_switch_hint: "Athraigh le: /model sonnet  nó  /model gpt5"
     project_skills_loaded: "◆ {count} scil(eanna) tionscadail lódáilte ón stór seo"

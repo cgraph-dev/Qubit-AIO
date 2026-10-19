@@ -3096,7 +3096,7 @@ cli:
     fix_lm_studio: "LM Studio の対処法: モデル設定でコンテキスト長を設定 → モデルを再読み込み"
     fix_local_server: "対処法: サーバーを少なくとも {tokens_k}K コンテキストで起動する（llama.cpp: -c {tokens}）か、config.yaml の model.ollama_num_ctx を実際に提供しているウィンドウ長に設定してください"
     fix_config: "対処法: config.yaml で model.context_length を設定するか、サーバーのコンテキスト設定を増やしてください"
-    qubit_models_not_agentic: "⚠  Nous Research の Qubit 3 および 4 モデルはエージェント向けではなく、Qubit Agent での使用を想定していません。"
+    qubit_models_not_agentic: "⚠  Nous Research の Hermes 3 および 4 モデルはエージェント向けではなく、Qubit Agent での使用を想定していません。"
     qubit_models_lack_tools: "これらのモデルにはエージェントワークフローに必要なツール呼び出し機能がありません。エージェント対応モデル（Claude、GPT、Gemini、DeepSeek など）の使用を検討してください。"
     qubit_models_switch_hint: "切り替え方法: /model sonnet  または  /model gpt5"
     project_skills_loaded: "◆ このリポジトリからプロジェクトスキル {count} 件を読み込みました"

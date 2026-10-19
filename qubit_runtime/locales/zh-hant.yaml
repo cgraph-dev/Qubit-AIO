@@ -3096,7 +3096,7 @@ cli:
     fix_lm_studio: "LM Studio 修正方式：在模型設定中調整上下文長度 → 重新載入模型"
     fix_local_server: "修正方式：以至少 {tokens_k}K 上下文啟動你的伺服器（llama.cpp：-c {tokens}），或在 config.yaml 設定 model.ollama_num_ctx 為實際提供的視窗大小"
     fix_config: "修正方式：在 config.yaml 設定 model.context_length，或調高伺服器的上下文設定"
-    qubit_models_not_agentic: "⚠  Nous Research 的 Qubit 3 與 4 模型「不是」代理型模型，也並非為 Qubit Agent 而設計。"
+    qubit_models_not_agentic: "⚠  Nous Research 的 Hermes 3 與 4 模型「不是」代理型模型，也並非為 Qubit Agent 而設計。"
     qubit_models_lack_tools: "它們缺少代理工作流程所需的工具呼叫能力。建議改用代理型模型（Claude、GPT、Gemini、DeepSeek 等）。"
     qubit_models_switch_hint: "切換方式：/model sonnet  或  /model gpt5"
     project_skills_loaded: "◆ 已從此儲存庫載入 {count} 個專案技能"
