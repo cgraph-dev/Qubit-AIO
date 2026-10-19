@@ -8441,31 +8441,32 @@ def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     out = Path(tempfile.gettempdir()) / (
         f"qubit-runtime-tts-{os.getpid()}-{abs(hash(text)) % 10 ** 8}.wav")
     try:
-        # A keyed (orb) reply runs the synth in a KILLABLE child process:
-        # piper/sherpa synthesizes inside a blocking C call, so a thread
-        # cannot interrupt it, but the worker can be terminated the moment the
-        # turn's cancel is recorded. Normal (dashboard) calls keep the warm
-        # in-process provider path unchanged.
+        # EVERY speak request runs in the ONE warm killable child process, not
+        # just keyed orb turns. That is what keeps the service at a SINGLE TTS
+        # model copy: the parent process never builds/loads a provider for
+        # speech, so the dashboard's unkeyed calls and the orb's keyed turns
+        # share the same worker. A keyed turn additionally passes its cancel
+        # predicate, so piper/sherpa's blocking C synth can still be killed the
+        # moment a STOP is recorded. ``QUBIT_TTS_SYNTH_WORKER=0`` (or a config
+        # double without ``data``) keeps the historical in-process fallback.
         provider = ""
         used_worker = False
-        if _rid:
-            from .tts.synth_worker import (
-                SynthCancelled, SynthWorkerUnavailable,
-                synthesize_cancellable, worker_supported)
-            if worker_supported(cfg):
-                try:
-                    provider = synthesize_cancellable(
-                        cfg, text[:4000], out,
-                        stopped=lambda: _speak_turn_stopped(cfg, _rid),
-                        timeout=60.0)
-                    used_worker = True
-                except SynthCancelled:
-                    return _gate(
-                        "AUDIO_SPEAK_CANCELLED",
-                        "the turn was stopped during speech synthesis",
-                        counterpart, 400)
-                except SynthWorkerUnavailable as exc:
-                    raise TTSUnavailable(str(exc)) from exc
+        from .tts.synth_worker import (
+            SynthCancelled, SynthWorkerUnavailable,
+            synthesize_cancellable, worker_supported)
+        if worker_supported(cfg):
+            stopped = (lambda: _speak_turn_stopped(cfg, _rid)) if _rid else None
+            try:
+                provider = synthesize_cancellable(
+                    cfg, text[:4000], out, stopped=stopped, timeout=60.0)
+                used_worker = True
+            except SynthCancelled:
+                return _gate(
+                    "AUDIO_SPEAK_CANCELLED",
+                    "the turn was stopped during speech synthesis",
+                    counterpart, 400)
+            except SynthWorkerUnavailable as exc:
+                raise TTSUnavailable(str(exc)) from exc
         if not used_worker:
             tts = _tts_from_cfg(cfg)
             tts.load()

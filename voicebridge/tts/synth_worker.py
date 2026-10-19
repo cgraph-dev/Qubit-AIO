@@ -7,9 +7,13 @@ the HTTP request thread were not released). This module moves the synth into
 a child process the service OWNS, so a STOP can terminate it at once.
 
 Shape:
+  * ALL ``POST /api/audio/speak`` synthesis (keyed orb turns AND unkeyed
+    dashboard calls) goes through this one worker, so the service process
+    never builds/loads a TTS provider of its own. Total provider copies stay
+    at ONE (the worker's) instead of the worker's plus the parent's warm
+    in-process cache;
   * one warm worker process per config identity (the provider/model load is
-    paid once, exactly like the in-process provider cache, so normal replies
-    keep their latency);
+    paid once, so normal replies keep their latency);
   * each request/response is one JSON line over the child's stdin/stdout;
   * the parent polls the caller's ``stopped`` predicate every ~20 ms while it
     waits, and on a stop sends SIGTERM then SIGKILL to the child's process

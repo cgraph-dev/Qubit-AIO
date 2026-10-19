@@ -9,7 +9,10 @@ wav that would be discarded anyway.
 
 These tests are hermetic: the worker's spawn command is a small script that
 speaks the same line protocol, so no model, audio, mic or network is used.
-The in-process path (dashboard calls / test doubles) must stay byte-identical.
+KEYED and UNKEYED speak requests both use that worker, so the service process
+never holds a second TTS model copy; only the explicit
+``QUBIT_TTS_SYNTH_WORKER=0`` opt-out (or a config double without ``data``)
+uses the historical in-process provider.
 """
 from __future__ import annotations
 
@@ -180,7 +183,25 @@ def test_worker_unavailable_is_typed_tts_unavailable(monkeypatch):
     assert status == 403 and out["code"] == "AUDIO_TTS_UNAVAILABLE", out
 
 
-def test_dashboard_call_without_rid_keeps_in_process_path(monkeypatch):
+def test_unkeyed_dashboard_call_uses_the_same_worker(monkeypatch):
+    """Unkeyed dashboard speech must NOT build a parent provider copy."""
+    calls = []
+
+    def _fake_synth(cfg, text, out, *, stopped=None, timeout=60.0):
+        calls.append((text, stopped))
+        Path(out).write_bytes(b"RIFFworker")
+        return "worker-provider"
+
+    monkeypatch.setattr(SW, "synthesize_cancellable", _fake_synth)
+    monkeypatch.setattr(QC, "_tts_from_cfg",
+                        lambda cfg: pytest.fail("in-process factory used"))
+    status, out = QC.h_audio_speak(_DataCfg(), {}, {"text": "dashboard"}, {})
+    assert status == 200 and out["provider"] == "worker-provider"
+    assert calls and calls[0][0] == "dashboard"
+    assert calls[0][1] is None, "an unkeyed call has no cancel predicate"
+
+
+def test_worker_opt_out_keeps_the_in_process_path(monkeypatch):
     used = []
 
     class _T:
@@ -193,12 +214,31 @@ def test_dashboard_call_without_rid_keeps_in_process_path(monkeypatch):
             used.append(text)
             Path(out).write_bytes(b"RIFFinproc")
 
+    monkeypatch.setenv("QUBIT_TTS_SYNTH_WORKER", "0")
     monkeypatch.setattr(QC, "_tts_from_cfg", lambda cfg: _T())
     monkeypatch.setattr(SW, "synthesize_cancellable",
                         lambda *a, **k: pytest.fail("worker used"))
     status, out = QC.h_audio_speak(_DataCfg(), {}, {"text": "dashboard"}, {})
     assert status == 200 and out["provider"] == "inproc"
     assert used == ["dashboard"]
+
+
+def test_keyed_and_unkeyed_speak_share_one_child(tmp_path, fake_child,
+                                                 monkeypatch):
+    """The orb turn and a dashboard call reuse ONE worker (one model copy)."""
+    import base64
+
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    cfg = _DataCfg()
+    _svc(monkeypatch)
+    for body in ({"text": "dashboard"}, {"text": "orb", "request_id": "rid-s"}):
+        status, out = QC.h_audio_speak(cfg, {}, body, {})
+        assert status == 200 and out["ok"] is True, out
+        assert base64.b64decode(out["data_url"].split(",", 1)[1]) == b"RIFFfake"
+        assert out["provider"] == "fake"
+    pids = pidlog.read_text().split()
+    assert len(pids) == 1, f"expected one warm child, got {pids}"
 
 
 # ---------------------------------------------------------------------------

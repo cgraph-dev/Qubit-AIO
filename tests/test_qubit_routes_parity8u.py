@@ -613,6 +613,10 @@ def test_audio_speak_runs_local_tts_as_data_url(tmp_path, monkeypatch):
     from voicebridge import qubit_compat as HC
     from voicebridge.tts.base import TTSUnavailable
 
+    # This test injects an IN-PROCESS provider double; the production default
+    # is the persistent worker (which a monkeypatched factory cannot cross a
+    # process boundary into), so exercise the explicit opt-out fallback here.
+    monkeypatch.setenv("QUBIT_TTS_SYNTH_WORKER", "0")
     cfg = _cfg(tmp_path, monkeypatch)
 
     class _StubTTS:

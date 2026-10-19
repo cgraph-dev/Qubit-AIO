@@ -48,12 +48,23 @@ class _CaptureTTS:
         return out
 
 
+def _patch_worker(monkeypatch, fake):
+    """Serve the speak call through the worker seam with a recording fake."""
+    from voicebridge.tts import synth_worker as SW
+
+    def _synth(cfg, text, out, *, stopped=None, timeout=60.0):
+        fake.synthesize(text, out)
+        return fake.name
+
+    monkeypatch.setattr(SW, "synthesize_cancellable", _synth)
+
+
 def _speak(tmp_path, monkeypatch, text):
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     fake = _CaptureTTS()
-    monkeypatch.setattr(HC, "_tts_from_cfg", lambda c: fake)
+    _patch_worker(monkeypatch, fake)
     code, out = HC.dispatch(cfg, "POST", "/api/audio/speak", {}, {"text": text})
     return code, out, fake
 
@@ -110,7 +121,7 @@ def test_speak_pure_markup_is_typed_400_not_silent_audio(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     fake = _CaptureTTS()
-    monkeypatch.setattr(HC, "_tts_from_cfg", lambda c: fake)
+    _patch_worker(monkeypatch, fake)
     code, out = HC.dispatch(
         cfg, "POST", "/api/audio/speak", {}, {"text": "```\nonly code\n```"})
     assert code == 400 and out["ok"] is False, out
