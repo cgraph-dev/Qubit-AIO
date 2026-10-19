@@ -674,3 +674,191 @@ def test_stop_interrupt_survives_a_blocked_wait_returning_normally(monkeypatch):
         "a stop that terminates a blocked player wait must still emit "
         f"interrupt; got {types}")
     assert types.index("interrupt") < types.index("playback.stopped")
+
+
+# ---------------------------------------------------------------------------
+# on-demand canned speak (live harness): gated file + real-time signal
+# ---------------------------------------------------------------------------
+def _write_speak_request(path, text, *, ts=None):
+    import json as _json
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_json.dumps({"text": text,
+                                 "ts": time.time() if ts is None else ts}),
+                    encoding="utf-8")
+
+
+def test_helper_speak_protocol_constants_match_across_modules():
+    from voicebridge.orb import client as oc
+    assert dh.HELPER_SPEAK_SIGNAL == oc.HELPER_SPEAK_SIGNAL
+    assert dh.HELPER_SPEAK_ENV == oc.HELPER_SPEAK_ENV
+    assert dh.HELPER_SPEAK_REQUEST_NAME == oc.HELPER_SPEAK_REQUEST_NAME
+    assert dh.HELPER_SPEAK_MAX_CHARS == oc.HELPER_SPEAK_MAX_CHARS
+    # Distinct from the capture/stop signals.
+    assert dh.HELPER_SPEAK_SIGNAL not in (signal.SIGUSR1, signal.SIGUSR2)
+
+
+def test_helper_speak_gate_is_opt_in(monkeypatch):
+    assert dh.helper_speak_enabled({}) is False
+    assert dh.helper_speak_enabled({dh.HELPER_SPEAK_ENV: "0"}) is False
+    for value in ("1", "true", "YES", "on"):
+        assert dh.helper_speak_enabled({dh.HELPER_SPEAK_ENV: value}) is True
+
+
+def test_read_helper_speak_request_is_bounded_and_fresh(tmp_path):
+    path = tmp_path / "req.json"
+    _write_speak_request(path, "hello")
+    assert dh.read_helper_speak_request(path) == "hello"
+    # Stale request.
+    _write_speak_request(path, "old", ts=time.time() - 3600)
+    assert dh.read_helper_speak_request(path) is None
+    # Oversize text.
+    _write_speak_request(path, "x" * (dh.HELPER_SPEAK_MAX_CHARS + 1))
+    assert dh.read_helper_speak_request(path) is None
+    # Oversize file.
+    path.write_text("{" + "x" * (dh.HELPER_SPEAK_MAX_BYTES + 5) + "}",
+                    encoding="utf-8")
+    assert dh.read_helper_speak_request(path) is None
+    # Junk / empty / NUL.
+    path.write_text("not json", encoding="utf-8")
+    assert dh.read_helper_speak_request(path) is None
+    _write_speak_request(path, "")
+    assert dh.read_helper_speak_request(path) is None
+    _write_speak_request(path, "a\x00b")
+    assert dh.read_helper_speak_request(path) is None
+    assert dh.read_helper_speak_request(tmp_path / "missing.json") is None
+
+
+def test_on_orb_helper_speak_refuses_when_gate_disabled(monkeypatch, tmp_path):
+    h = _helper(monkeypatch, _cfg(), FakeMic(), [])
+    path = tmp_path / "req.json"
+    _write_speak_request(path, "do not speak")
+    monkeypatch.setattr(dh, "helper_speak_request_path", lambda: path)
+    monkeypatch.delenv(dh.HELPER_SPEAK_ENV, raising=False)
+    spoken = []
+    monkeypatch.setattr(h, "_speak", spoken.append)
+    assert h.on_orb_helper_speak() is False
+    assert spoken == [] and path.exists(), "disabled gate must not consume"
+    assert path.exists(), "a refused request is left for a real operator"
+
+
+def test_on_orb_helper_speak_accepts_a_fresh_request(monkeypatch, tmp_path):
+    h = _helper(monkeypatch, _cfg(), FakeMic(), [])
+    path = tmp_path / "req.json"
+    _write_speak_request(path, "hello from the harness")
+    monkeypatch.setattr(dh, "helper_speak_request_path", lambda: path)
+    monkeypatch.setenv(dh.HELPER_SPEAK_ENV, "1")
+    spoken = []
+    monkeypatch.setattr(h, "_speak", lambda text: spoken.append(text))
+    before = h._turn_seq
+    assert h.on_orb_helper_speak() is True
+    deadline = time.time() + 2.0
+    while not spoken and time.time() < deadline:
+        time.sleep(0.005)
+    assert spoken == ["hello from the harness"]
+    assert h._turn_seq == before + 1, "a canned speak is a fresh reply turn"
+    assert h._turn_stopped_seq == -1
+    assert not path.exists(), "an accepted request is consumed once"
+
+
+def test_on_orb_helper_speak_refuses_busy_helper(monkeypatch, tmp_path):
+    h = _helper(monkeypatch, _cfg(), FakeMic(), [])
+    path = tmp_path / "req.json"
+    _write_speak_request(path, "hello")
+    monkeypatch.setattr(dh, "helper_speak_request_path", lambda: path)
+    monkeypatch.setenv(dh.HELPER_SPEAK_ENV, "1")
+    spoken = []
+    monkeypatch.setattr(h, "_speak", spoken.append)
+    h.state = h.PROCESSING
+    assert h.on_orb_helper_speak() is False
+    assert spoken == [] and path.exists()
+    h.state = h.IDLE
+    h._speaking = True
+    assert h.on_orb_helper_speak() is False
+    assert spoken == [] and path.exists()
+    h._speaking = False
+
+
+def test_signal_handlers_install_and_restore_the_speak_signal(monkeypatch):
+    h = _helper(monkeypatch, _cfg(), FakeMic(), [])
+    installed = {}
+    monkeypatch.setattr(signal, "signal",
+                        lambda sig, fn: installed.__setitem__(sig, fn))
+    h._install_orb_signal_handlers()
+    assert signal.SIGRTMIN + 3 == dh.HELPER_SPEAK_SIGNAL
+    assert callable(installed[dh.HELPER_SPEAK_SIGNAL])
+
+    restored = {}
+    monkeypatch.setattr(signal, "signal",
+                        lambda sig, fn: restored.__setitem__(sig, fn))
+    sentinel = object()
+    h._orb_prev_sigrt = sentinel
+    h._orb_prev_sigusr1 = object()
+    h._orb_prev_sigusr2 = object()
+    h.shutdown()
+    assert restored.get(dh.HELPER_SPEAK_SIGNAL) is sentinel
+
+
+def test_orb_client_request_helper_speak_writes_restricted_file_and_signals(
+        monkeypatch, tmp_path):
+    sent = {}
+
+    def fake_kill(pid, sig):
+        sent["pid"] = pid
+        sent["sig"] = sig
+
+    req = tmp_path / "state" / dh.HELPER_SPEAK_REQUEST_NAME
+    monkeypatch.setattr(orb_client, "_helper_speak_request_path", lambda: req)
+    monkeypatch.setattr("voicebridge.orb.client._helper_heartbeat",
+                        lambda: {"schema": "qubit-voice-edit-helper/1",
+                                 "pid": 123456})
+    monkeypatch.setattr("voicebridge.orb.client._helper_cmdline",
+                        lambda pid: "python -m voicebridge.desktop_helper")
+    monkeypatch.setattr(os, "kill", fake_kill)
+    cli = orb_client.OrbClient("http://127.0.0.1:8890", "t")
+    out = cli.request_helper_speak("  hello harness  ")
+    assert out["ok"] is True and out["chars"] == len("hello harness")
+    assert sent == {"pid": 123456, "sig": dh.HELPER_SPEAK_SIGNAL}
+    assert req.read_text(encoding="utf-8").find("hello harness") >= 0
+    assert (req.stat().st_mode & 0o777) == 0o600
+    assert dh.read_helper_speak_request(req) == "hello harness"
+
+
+def test_orb_client_request_helper_speak_bounds_text(monkeypatch, tmp_path):
+    req = tmp_path / "req.json"
+    monkeypatch.setattr(orb_client, "_helper_speak_request_path", lambda: req)
+    monkeypatch.setattr("voicebridge.orb.client._helper_heartbeat",
+                        lambda: {"pid": 1})
+    monkeypatch.setattr("voicebridge.orb.client._helper_cmdline",
+                        lambda pid: "python -m voicebridge.desktop_helper")
+    monkeypatch.setattr(os, "kill", lambda pid, sig: None)
+    cli = orb_client.OrbClient("http://127.0.0.1:8890", "t")
+    out = cli.request_helper_speak("y" * (dh.HELPER_SPEAK_MAX_CHARS + 100))
+    assert out["chars"] == dh.HELPER_SPEAK_MAX_CHARS
+
+
+def test_orb_client_request_helper_speak_rejects_empty_and_foreign(
+        monkeypatch, tmp_path):
+    monkeypatch.setattr(orb_client, "_helper_speak_request_path",
+                        lambda: tmp_path / "req.json")
+    cli = orb_client.OrbClient("http://127.0.0.1:8890", "t")
+    for value in ("", "   ", "a\x00b"):
+        try:
+            cli.request_helper_speak(value)
+        except orb_client.OrbError as exc:
+            assert exc.code == "ORB_BAD_SPEAK_TEXT"
+        else:
+            raise AssertionError("bad text must be refused")
+
+    monkeypatch.setattr("voicebridge.orb.client._helper_heartbeat",
+                        lambda: {"pid": 99999})
+    monkeypatch.setattr("voicebridge.orb.client._helper_cmdline",
+                        lambda pid: "firefox --browser")
+    sent = []
+    monkeypatch.setattr(os, "kill", lambda pid, sig: sent.append(pid))
+    try:
+        cli.request_helper_speak("hello")
+    except orb_client.OrbError as exc:
+        assert exc.code == "ORB_HELPER_NOT_RUNNING"
+    else:
+        raise AssertionError("foreign pid must be refused")
+    assert sent == []

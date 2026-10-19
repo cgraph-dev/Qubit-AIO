@@ -119,6 +119,89 @@ _DEFAULT_VOICE_SESSION = "voice-chat"
 #: (180 s task + ~155 s speak ≈ 335 s). ``<= 0`` disables the watchdog.
 _WAKE_TURN_TIMEOUT_S = 360.0
 
+#: On-demand canned speak (live STOP harness only). A real-time signal asks
+#: this RUNNING helper to speak one short text supplied through a
+#: permissions-restricted file in the canonical state dir, so a helper-owned
+#: playback can be produced without the mic and then stopped. Opt-in twice:
+#: the process must run with ``QUBIT_ORB_HELPER_SPEAK=1`` AND the request must
+#: be a fresh, bounded file. Without the gate the handler refuses (it never
+#: speaks, never raises) — importantly it is still INSTALLED, so a stray
+#: SIGRTMIN+n can never hit the default "terminate" disposition.
+#:
+#: ``SIGRTMIN + 3`` is deliberately distinct from SIGUSR1 (capture) and
+#: SIGUSR2 (stop); both client and helper compute it identically (pinned by
+#: tests). ``signal`` is imported at module scope.
+HELPER_SPEAK_ENV = "QUBIT_ORB_HELPER_SPEAK"
+HELPER_SPEAK_SIGNAL = int(getattr(signal, "SIGRTMIN", 34)) + 3
+HELPER_SPEAK_REQUEST_NAME = "orb_helper_speak.json"
+HELPER_SPEAK_MAX_BYTES = 2048
+HELPER_SPEAK_MAX_CHARS = 400
+HELPER_SPEAK_MAX_AGE_S = 15.0
+
+
+def helper_speak_enabled(environ: Optional[Dict[str, str]] = None) -> bool:
+    """True only when the explicit helper-side opt-in gate is opened (pure)."""
+    env = os.environ if environ is None else environ
+    try:
+        return str(env.get(HELPER_SPEAK_ENV, "") or "").strip().lower() in (
+            "1", "true", "yes", "on")
+    except Exception:  # noqa: BLE001 - junk env is disabled, never fatal
+        return False
+
+
+def helper_speak_request_path() -> Path:
+    """The canonical request file (read-only resolution; never raises)."""
+    try:
+        from .config import canonical_state_dir
+        return Path(canonical_state_dir()) / HELPER_SPEAK_REQUEST_NAME
+    except Exception:  # noqa: BLE001
+        return (Path.home() / ".local" / "state" / "qubit-voicebridge"
+                / HELPER_SPEAK_REQUEST_NAME)
+
+
+def read_helper_speak_request(path: Optional[Path] = None,
+                              *, now: Optional[float] = None,
+                              max_age_s: float = HELPER_SPEAK_MAX_AGE_S
+                              ) -> Optional[str]:
+    """Read one fresh, bounded canned-speak request; ``None`` when unusable.
+
+    Junk-safe and never raises. The file is small by construction, but a
+    hostile/truncated file is still bounded here (read at most
+    ``HELPER_SPEAK_MAX_BYTES + 1`` and reject oversize). ``text`` must be a
+    non-empty string without NUL, at most ``HELPER_SPEAK_MAX_CHARS``; ``ts``
+    must be present, numeric and within ``max_age_s`` of ``now`` (so an old
+    file can never be replayed by an unrelated signal).
+    """
+    try:
+        target = Path(path) if path is not None else helper_speak_request_path()
+        with target.open("rb") as fh:
+            raw = fh.read(HELPER_SPEAK_MAX_BYTES + 1)
+        if not raw or len(raw) > HELPER_SPEAK_MAX_BYTES:
+            return None
+        payload = json.loads(raw.decode("utf-8", "replace"))
+        if not isinstance(payload, dict):
+            return None
+        text = payload.get("text")
+        if not isinstance(text, str):
+            return None
+        text = text.strip()
+        if not text or "\x00" in text or len(text) > HELPER_SPEAK_MAX_CHARS:
+            return None
+        ts = payload.get("ts")
+        if not isinstance(ts, (int, float)) or isinstance(ts, bool):
+            return None
+        try:
+            now_f = float(now) if now is not None else time.time()
+            if not (float(ts) <= now_f + 1.0):
+                return None  # a future stamp is not a request from this host clock
+            if now_f - float(ts) > max(0.0, float(max_age_s)):
+                return None
+        except (TypeError, ValueError):
+            return None
+        return text
+    except Exception:  # noqa: BLE001 - missing/junk file is simply no request
+        return None
+
 
 class HelperError(Exception):
     def __init__(self, code: str, detail: str = "") -> None:
@@ -1472,6 +1555,7 @@ class DesktopHelper:
         # never raises out of start().
         self._orb_prev_sigusr1: Any = None
         self._orb_prev_sigusr2: Any = None
+        self._orb_prev_sigrt: Any = None
         self._install_orb_signal_handlers()
         self._ui_status("idle", "hold Right-Ctrl to speak")
         return True
@@ -1563,6 +1647,12 @@ class DesktopHelper:
                     _sig.signal(_sig.SIGUSR2, prev2)
                 except Exception:
                     pass
+            prev3 = getattr(self, "_orb_prev_sigrt", None)
+            if prev3 is not None:
+                try:
+                    _sig.signal(HELPER_SPEAK_SIGNAL, prev3)
+                except Exception:
+                    pass
         except Exception:
             pass
         try:
@@ -1629,6 +1719,18 @@ class DesktopHelper:
             _sig.signal(_sig.SIGUSR2, lambda _s, _f: self.on_orb_stop())
         except Exception:
             pass
+        # On-demand canned speak (live STOP harness): SIGRTMIN+3 asks this
+        # helper to speak one bounded request from the state-dir file. It is
+        # installed UNCONDITIONALLY so an un-gated signal is a safe no-op
+        # instead of the real-time default (terminate). `on_orb_helper_speak`
+        # itself refuses unless QUBIT_ORB_HELPER_SPEAK is set.
+        try:
+            import signal as _sig
+            self._orb_prev_sigrt = _sig.getsignal(HELPER_SPEAK_SIGNAL)
+            _sig.signal(HELPER_SPEAK_SIGNAL,
+                        lambda _s, _f: self.on_orb_helper_speak())
+        except Exception:
+            pass
 
     def on_orb_toggle(self) -> None:
         """Orb click-to-talk trigger (SIGUSR1 from the voice orb).
@@ -1664,6 +1766,74 @@ class DesktopHelper:
             self.stop_speaking()
         except Exception:
             pass
+
+    def on_orb_helper_speak(self) -> bool:
+        """On-demand canned speak trigger (SIGRTMIN+3 from the live harness).
+
+        Refuses unless the helper-side opt-in gate is open AND the helper is
+        idle. The request itself is a fresh, bounded text file in the
+        canonical state dir (written by the caller, mode 0600); it is read,
+        validated and removed here, then spoken through the SAME ``_speak``
+        path a real reply uses (hence the canonical
+        ``playback.started``/triple boundaries). Speech runs on a short-lived
+        daemon thread: the signal handler must never block for the length of
+        a synthesis or a playback. Never raises; returns True when a request
+        was accepted.
+        """
+        try:
+            if not helper_speak_enabled():
+                _trace("helper_speak.refused", reason="gate_disabled")
+                return False
+            if self.state != self.IDLE:
+                _trace("helper_speak.refused", reason="not_idle",
+                       state=self.state)
+                return False
+            if (bool(getattr(self, "_speaking", False))
+                    or getattr(self, "_playback_proc", None) is not None):
+                _trace("helper_speak.refused", reason="already_speaking")
+                return False
+            path = helper_speak_request_path()
+            text = read_helper_speak_request(path)
+            if not text:
+                _trace("helper_speak.refused", reason="no_fresh_request")
+                return False
+            try:
+                path.unlink()
+            except OSError:
+                pass
+            # A canned request is a new reply turn: bump the epoch so a STOP
+            # marker from an earlier turn can never silence it, and reset the
+            # per-turn announcement.
+            self._turn_seq += 1
+            self._turn_stopped_seq = -1
+            self._turn_stop_announced = False
+            try:
+                self._speak_stop.clear()
+            except Exception:  # noqa: BLE001
+                pass
+            threading.Thread(target=self._run_orb_helper_speak, args=(text,),
+                             daemon=True,
+                             name="orb-helper-speak").start()
+            _trace("helper_speak.started", chars=len(text))
+            return True
+        except Exception:  # noqa: BLE001 - a signal handler is never fatal
+            return False
+
+    def _run_orb_helper_speak(self, text: str) -> None:
+        """Speak one accepted canned request on a fresh talk turn."""
+        try:
+            self._talk_begin()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            self._speak(text)
+        except Exception:  # noqa: BLE001 - observability path, never fatal
+            pass
+        finally:
+            try:
+                self._talk_end()
+            except Exception:  # noqa: BLE001
+                pass
 
     def stop_speaking(self) -> bool:
         """Stop the current spoken reply now (explicit orb STOP path).

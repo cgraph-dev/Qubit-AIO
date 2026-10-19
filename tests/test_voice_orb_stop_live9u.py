@@ -748,3 +748,248 @@ def test_run_speak_test_refuses_to_signal_a_busy_helper(harness, tmp_path,
     assert out["verdict"] == "DEGRADED"
     assert "busy" in out["reason"]
     assert calls == []
+
+
+# ---------------------------------------------------------------------------
+# gated helper-speak: real helper playback -> STOP -> canonical triple
+# ---------------------------------------------------------------------------
+def test_helper_speak_protocol_constants_match(harness):
+    from voicebridge.desktop_helper import (
+        HELPER_SPEAK_ENV as dh_env, HELPER_SPEAK_SIGNAL as dh_sig,
+        HELPER_SPEAK_REQUEST_NAME as dh_name,
+        HELPER_SPEAK_MAX_CHARS as dh_chars)
+    from voicebridge.orb.client import (
+        HELPER_SPEAK_ENV as oc_env, HELPER_SPEAK_SIGNAL as oc_sig,
+        HELPER_SPEAK_REQUEST_NAME as oc_name,
+        HELPER_SPEAK_MAX_CHARS as oc_chars)
+    assert (harness.HELPER_SPEAK_ENV, harness.HELPER_SPEAK_SIGNAL,
+            harness.HELPER_SPEAK_MAX_CHARS) == (dh_env, dh_sig, dh_chars)
+    assert (dh_env, dh_sig, dh_name, dh_chars) == (oc_env, oc_sig, oc_name,
+                                                   oc_chars)
+    assert harness.HELPER_SPEAK_SIGNAL == signal.SIGRTMIN + 3
+    assert harness.HELPER_SPEAK_SIGNAL not in (signal.SIGUSR1, signal.SIGUSR2)
+
+
+def test_proc_env_flag_is_read_only_and_junk_safe(harness, tmp_path):
+    d = tmp_path / "777"
+    d.mkdir()
+    (d / "environ").write_bytes(
+        b"HOME=/tmp\0QUBIT_ORB_HELPER_SPEAK=1\0X=Y\0")
+    assert harness.proc_env_flag(777, "QUBIT_ORB_HELPER_SPEAK", tmp_path) is True
+    (d / "environ").write_bytes(b"HOME=/tmp\0QUBIT_ORB_HELPER_SPEAK=0\0")
+    assert harness.proc_env_flag(777, "QUBIT_ORB_HELPER_SPEAK", tmp_path) is False
+    (d / "environ").write_bytes(b"HOME=/tmp\0")
+    assert harness.proc_env_flag(777, "QUBIT_ORB_HELPER_SPEAK", tmp_path) is False
+    assert harness.proc_env_flag(999, "QUBIT_ORB_HELPER_SPEAK", tmp_path) is None
+
+
+def test_helper_player_pids_filters_children_by_program(harness, tmp_path):
+    helper = tmp_path / "900"
+    task = helper / "task" / "900"
+    task.mkdir(parents=True)
+    (task / "children").write_text("901 902 903\n", encoding="utf-8")
+    for pid, cmd in ((901, "paplay /tmp/a.wav"),
+                     (902, "python -m voicebridge.desktop_helper"),
+                     (903, "/usr/bin/aplay x.wav")):
+        (tmp_path / str(pid)).mkdir()
+        (tmp_path / str(pid) / "cmdline").write_bytes(
+            cmd.replace(" ", "\0").encode() + b"\0")
+    assert harness.helper_player_pids(900, tmp_path) == [901, 903]
+    assert harness.helper_player_pids(901, tmp_path) == []
+    assert harness.read_proc_children(900, tmp_path) == [901, 902, 903]
+
+
+def test_summarize_helper_speak_verdicts(harness):
+    ok = {"present": True, "ordered": True, "missing": [], "latency_s": 0.01}
+    out = harness.summarize_helper_speak(
+        helper_pid=7, helper_gate=True, request_sent=True,
+        playback_started=True, playback_live_before_stop=True,
+        player_ended=True, helper_alive_after=True, triple=ok)
+    assert out["verdict"] == "PASS", out
+    assert out["triple_present"] is True and out["triple_ordered"] is True
+
+    base = dict(helper_pid=7, helper_gate=True, request_sent=True,
+                playback_started=True, playback_live_before_stop=True,
+                player_ended=True, helper_alive_after=True, triple=ok)
+    for change, expected, needle in (
+            ({"gate_open": False}, "BLOCKED", "not enabled"),
+            ({"helper_gate": False}, "DEGRADED", "does not have"),
+            ({"request_sent": False}, "DEGRADED", "could not be delivered"),
+            ({"playback_started": False}, "DEGRADED", "never journaled"),
+            ({"playback_live_before_stop": False}, "DEGRADED", "before the stop"),
+            ({"helper_alive_after": False}, "FAIL", "survive"),
+            ({"player_ended": False}, "FAIL", "still alive"),
+            ({"triple": {"present": False, "missing": ["interrupt"]}},
+             "FAIL", "missing"),
+            ({"triple": {"present": True, "ordered": False}}, "FAIL",
+             "out of order")):
+        args = dict(base)
+        args.update(change)
+        got = harness.summarize_helper_speak(**args)
+        assert got["verdict"] == expected, (change, got)
+        assert needle in got["reason"], (change, got)
+
+
+def _fake_helper():
+    return {"ok": True, "pid": 777,
+            "heartbeat": {"pid": 777, "state": "idle"},
+            "cmdline": "python -m voicebridge.desktop_helper", "reason": ""}
+
+
+def _speak_mask(harness):
+    return ((1 << (signal.SIGUSR2 - 1))
+            | (1 << (harness.HELPER_SPEAK_SIGNAL - 1)))
+
+
+def test_run_helper_speak_is_blocked_without_the_gate(harness, tmp_path,
+                                                     monkeypatch):
+    monkeypatch.delenv(harness.SPEAK_TEST_ENV, raising=False)
+    calls = []
+    out = harness.run_helper_speak(
+        out_dir=tmp_path, request_fn=lambda t: calls.append(t))
+    assert out["verdict"] == "BLOCKED"
+    assert harness.SPEAK_TEST_ENV in out["reason"]
+    assert calls == [], "a blocked gate must never signal the helper"
+    assert (Path(out["capture_dir"]) / "evidence.json").is_file()
+
+
+def test_run_helper_speak_refuses_without_the_speak_handler(harness, tmp_path,
+                                                            monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask",
+                        lambda _pid, _root=None: 1 << 11)  # SIGUSR2 only
+    calls = []
+    out = harness.run_helper_speak(
+        out_dir=tmp_path, journal=tmp_path / "events.jsonl",
+        resolve_fn=lambda: _fake_helper(),
+        request_fn=lambda t: calls.append(t),
+        now_fn=lambda: 1000.0, sleep_fn=lambda _s: None)
+    assert out["verdict"] == "DEGRADED"
+    assert "no handler" in out["reason"]
+    assert calls == []
+    assert out["speak_handler"] is False
+
+
+def test_run_helper_speak_refuses_when_helper_gate_is_disabled(
+        harness, tmp_path, monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask",
+                        lambda _pid, _root=None: _speak_mask(harness))
+    monkeypatch.setattr(harness, "proc_env_flag",
+                        lambda _pid, _name, _root=None: False)
+    calls = []
+    out = harness.run_helper_speak(
+        out_dir=tmp_path, journal=tmp_path / "events.jsonl",
+        resolve_fn=lambda: _fake_helper(),
+        request_fn=lambda t: calls.append(t),
+        now_fn=lambda: 1000.0, sleep_fn=lambda _s: None)
+    assert out["verdict"] == "DEGRADED"
+    assert harness.HELPER_SPEAK_ENV in out["reason"]
+    assert out["helper_gate"] is False and calls == []
+
+
+def test_run_helper_speak_degrades_when_no_playback_appears(
+        harness, tmp_path, monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask",
+                        lambda _pid, _root=None: _speak_mask(harness))
+    monkeypatch.setattr(harness, "proc_env_flag",
+                        lambda _pid, _name, _root=None: True)
+    journal = tmp_path / "events.jsonl"
+    journal.write_text("", encoding="utf-8")
+    clock = {"t": 1000.0}
+
+    def now():
+        clock["t"] += 0.1
+        return clock["t"]
+
+    out = harness.run_helper_speak(
+        out_dir=tmp_path, journal=journal, timeout=1.0,
+        resolve_fn=lambda: _fake_helper(),
+        request_fn=lambda t: {"ok": True}, stop_fn=lambda: None,
+        alive_fn=lambda _pid: True, now_fn=now, sleep_fn=lambda _s: None)
+    assert out["verdict"] == "DEGRADED"
+    assert out["request_sent"] is True and out["playback_started"] is False
+    assert "no playback.started" in out["reason"]
+
+
+def test_run_helper_speak_passes_with_a_real_helper_playback(
+        harness, tmp_path, monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask",
+                        lambda _pid, _root=None: _speak_mask(harness))
+    monkeypatch.setattr(harness, "proc_env_flag",
+                        lambda _pid, _name, _root=None: True)
+    journal = tmp_path / "events.jsonl"
+    journal.write_text("", encoding="utf-8")
+    stop_calls = []
+    player_calls = {"n": 0}
+
+    def players(_pid):
+        player_calls["n"] += 1
+        return [555] if player_calls["n"] == 1 else []
+
+    def request(_text):
+        with journal.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(_live_event(
+                "playback.started", 1000.0, 1, turn="turn-helper")) + "\n")
+        return {"ok": True, "request": "/state/orb_helper_speak.json",
+                "chars": len(_text)}
+
+    def stop():
+        stop_calls.append(True)
+        with journal.open("a", encoding="utf-8") as fh:
+            for seq, etype in enumerate(
+                    ("interrupt", "playback.stopped", "response.done"), start=2):
+                fh.write(json.dumps(_live_event(
+                    etype, 1000.05 + seq / 1000, seq,
+                    turn="turn-helper")) + "\n")
+        return {"ok": True}
+
+    out = harness.run_helper_speak(
+        out_dir=tmp_path, journal=journal,
+        resolve_fn=lambda: _fake_helper(), request_fn=request, stop_fn=stop,
+        player_pids_fn=players,
+        alive_fn=lambda _pid: True,
+        now_fn=lambda: 1000.1, sleep_fn=lambda _s: None)
+    assert out["verdict"] == "PASS", out
+    assert out["playback_started"] is True
+    assert out["playback_turn"] == "turn-helper"
+    assert out["triple_present"] is True and out["triple_ordered"] is True
+    assert out["helper_alive_after"] is True
+    assert stop_calls == [True]
+    cap = Path(out["capture_dir"])
+    assert (cap / "evidence.json").is_file()
+    assert json.loads((cap / "evidence.json").read_text())["verdict"] == "PASS"
+
+
+def test_run_helper_speak_fails_when_the_triple_is_missing(
+        harness, tmp_path, monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask",
+                        lambda _pid, _root=None: _speak_mask(harness))
+    monkeypatch.setattr(harness, "proc_env_flag",
+                        lambda _pid, _name, _root=None: True)
+    journal = tmp_path / "events.jsonl"
+    journal.write_text("", encoding="utf-8")
+    clock = {"t": 1000.0}
+
+    def now():
+        clock["t"] += 0.1
+        return clock["t"]
+
+    def request(_text):
+        with journal.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(_live_event(
+                "playback.started", 1000.0, 1, turn="turn-helper")) + "\n")
+        return {"ok": True}
+
+    out = harness.run_helper_speak(
+        out_dir=tmp_path, journal=journal, timeout=1.0,
+        resolve_fn=lambda: _fake_helper(), request_fn=request,
+        stop_fn=lambda: {"ok": True},
+        player_pids_fn=lambda _pid: [],
+        alive_fn=lambda _pid: True, now_fn=now, sleep_fn=lambda _s: None)
+    assert out["verdict"] == "FAIL"
+    assert out["triple_present"] is False
+    assert "missing" in out["reason"]

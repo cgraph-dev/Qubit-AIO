@@ -108,6 +108,67 @@ def mic_level_from_payload(payload: Any, now: Any = None) -> Optional[float]:
 #: orb's own pid-validation pattern in ``__main__._pid_is_our_orb``).
 _HELPER_CMDLINE_MARK = "voicebridge.desktop_helper"
 
+#: On-demand canned speak protocol (live STOP harness). The orb writes one
+#: small, permissions-restricted JSON request into the canonical state dir
+#: and sends the helper :data:`HELPER_SPEAK_SIGNAL`; the helper speaks it
+#: through its real ``_speak`` path. Constants mirror
+#: ``voicebridge.desktop_helper`` exactly (pinned by tests); the helper is the
+#: authority and refuses unless ``QUBIT_ORB_HELPER_SPEAK`` is enabled.
+HELPER_SPEAK_ENV = "QUBIT_ORB_HELPER_SPEAK"
+HELPER_SPEAK_SIGNAL = int(getattr(signal, "SIGRTMIN", 34)) + 3
+HELPER_SPEAK_REQUEST_NAME = "orb_helper_speak.json"
+HELPER_SPEAK_MAX_BYTES = 2048
+HELPER_SPEAK_MAX_CHARS = 400
+
+
+def _helper_speak_request_path() -> Path:
+    """Canonical state-dir request file (never raises)."""
+    try:
+        from voicebridge.config import canonical_state_dir
+        return Path(canonical_state_dir()) / HELPER_SPEAK_REQUEST_NAME
+    except Exception:  # noqa: BLE001
+        return (Path.home() / ".local" / "state" / "qubit-voicebridge"
+                / HELPER_SPEAK_REQUEST_NAME)
+
+
+def _write_helper_speak_request(text: str) -> Path:
+    """Atomically write a mode-0600 canned-speak request; return its path.
+
+    The parent is created mode 0700 when absent. The payload is bounded by
+    the caller; this function is fail-fast (``OSError`` propagates so the
+    caller can surface a typed error) and never logs the text.
+    """
+    target = _helper_speak_request_path()
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    payload = json.dumps({"text": text, "ts": time.time()},
+                         ensure_ascii=False).encode("utf-8")
+    tmp = target.parent / f".{HELPER_SPEAK_REQUEST_NAME}.{os.getpid()}.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+    try:
+        os.replace(tmp, target)
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+    try:
+        os.chmod(target, 0o600)
+    except OSError:
+        pass
+    return target
+
 
 #: Equalizer spectrum: 12 log-spaced bands 80Hz-8kHz, 0.0..1.0 each
 #: (spec design 2026-10-05). Published by the helper into heartbeat
@@ -403,6 +464,48 @@ class OrbClient:
                            "desktop helper not reachable")
         return {"ok": True, "helper_pid": pid}
 
+    def request_helper_speak(self, text: str) -> Dict[str, Any]:
+        """Ask the running helper to speak a short canned text on demand.
+
+        Writes one bounded, mode-0600 request file into the canonical state
+        dir and signals the SAME cmdline-validated heartbeat pid used by
+        :meth:`trigger_helper_capture`/:meth:`stop_speaking`, with a distinct
+        real-time signal (:data:`HELPER_SPEAK_SIGNAL`). The helper speaks it
+        through its real ``_speak`` path (so a subsequent
+        :meth:`stop_speaking` exercises helper-owned playback and the
+        canonical stop triple) and refuses unless its own
+        ``QUBIT_ORB_HELPER_SPEAK`` opt-in is set. Nothing is exposed over the
+        network, and the text is never logged.
+
+        Raises :class:`OrbError` with ``ORB_BAD_SPEAK_TEXT`` for empty/NUL
+        text (long text is bounded by truncation), ``ORB_HELPER_NOT_RUNNING``
+        when no validated helper exists, and ``ORB_SPEAK_REQUEST_FAILED`` when
+        the state file cannot be written. Never raises anything else.
+        """
+        raw = str(text or "").strip()
+        if not raw or "\x00" in raw:
+            raise OrbError("ORB_BAD_SPEAK_TEXT", "text is empty")
+        if len(raw) > HELPER_SPEAK_MAX_CHARS:
+            raw = raw[:HELPER_SPEAK_MAX_CHARS]
+        pid = self._validated_helper_pid()
+        try:
+            path = _write_helper_speak_request(raw)
+        except Exception as exc:  # noqa: BLE001 - typed, no text in detail
+            raise OrbError("ORB_SPEAK_REQUEST_FAILED",
+                           f"could not write the request file: "
+                           f"{str(exc)[:100]}")
+        try:
+            os.kill(pid, HELPER_SPEAK_SIGNAL)
+        except (OSError, ValueError):
+            try:
+                path.unlink()
+            except OSError:
+                pass
+            raise OrbError("ORB_HELPER_NOT_RUNNING",
+                           "desktop helper not reachable")
+        return {"ok": True, "helper_pid": pid, "request": str(path),
+                "chars": len(raw)}
+
 
 def fetch_poll_payload(cli: Any, tick: int) -> Dict[str, Any]:
     """One non-UI fetch round: status + log every round, settings every 5th.
@@ -661,6 +764,11 @@ __all__ = [
     "spec_bands_from_payload",
     "spec_tts_frame_from_payload",
     "frame_spectrum_for_state",
+    "HELPER_SPEAK_ENV",
+    "HELPER_SPEAK_SIGNAL",
+    "HELPER_SPEAK_REQUEST_NAME",
+    "HELPER_SPEAK_MAX_BYTES",
+    "HELPER_SPEAK_MAX_CHARS",
     "OrbError",
     "service_base",
     "service_token",
