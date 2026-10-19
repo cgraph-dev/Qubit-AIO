@@ -154,7 +154,14 @@ def _sandbox_workspace_cwd(profile_home) -> str | None:
 
 def _profile_workspace_cwd(profile_home) -> str | None:
     """A named profile's configured workspace: an ssh profile's remote dir, a host dir, else a container dir."""
-    return (_declared_remote_profile_cwd(profile_home) or _profile_configured_cwd(profile_home)
+    # ``_profile_configured_cwd`` lives on server.py, not here: it is private-named, so
+    # ``bind_module(skip=("_",))`` rebinds this module's helpers onto server's namespace but
+    # never injects server's private names back into this module's own globals. Resolve it
+    # through the server module at call time (the pattern split modules use for server-owned
+    # helpers; importing server at module level would close the import cycle).
+    from tui_gateway import server as _server
+
+    return (_declared_remote_profile_cwd(profile_home) or _server._profile_configured_cwd(profile_home)
             or (_sandbox_workspace_cwd(profile_home) if profile_home else None))
 
 
