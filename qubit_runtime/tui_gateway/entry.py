@@ -271,15 +271,30 @@ def _write_or_exit(payload: dict, reason: str) -> None:
         sys.exit(0)
 
 
+def _dashboard_launch() -> bool:
+    """True when the Qubit dashboard spawned this stdio server for a ``/chat`` PTY.
+
+    ``qubit_cli/web_server_chat.py::_resolve_chat_argv`` sets both spellings for every dashboard
+    terminal; the twin is inert today and exists so a future reader can move over.
+    """
+    for name in ("HERMES_TUI_DASHBOARD", "QUBIT_TUI_DASHBOARD"):
+        if (os.environ.get(name) or "").strip().lower() in ("1", "true", "yes", "on"):
+            return True
+    return False
+
+
 def _claim_launch_home():
     """Reserve the launch home exactly as the gateway does, or None when it is already owned.
 
-    No product surface launches this standalone stdio server any more: Ink and Desktop attach to
-    the profile's gateway over WS (``ui-tui/scripts/gateway_bootstrap.py``). Dev harnesses still
-    run it against a sandbox home (``apps/desktop/e2e/real-session-builder.ts``), and it opens that
-    home's ``state.db`` as a writer, so it must be the home's only owner: the gateway's
-    ``gateway.lock`` reservation refuses it beside a live gateway (or a second entry), and holding
-    that lock keeps a gateway from starting on the home while this process writes."""
+    A standalone TUI (``qubit --tui``, Desktop's real-session harness) opens the home's
+    ``state.db`` as a writer with no gateway of its own, so it must be the home's single owner:
+    the gateway's ``gateway.lock`` reservation refuses it beside a live gateway (or a second
+    entry), and holding that lock keeps a gateway from starting on the home while it writes.
+
+    The dashboard exceptions are handled by ``main()``: VoiceBridge runs its own messaging
+    gateway on the canonical home (``qubit-gateway.service``) and spawns one of these per
+    ``/chat`` terminal. Making them mutually exclusive would mean ``/chat`` never starts while
+    the gateway is up and the gateway can never restart while a chat is open."""
     from gateway.runtime_ownership import OwnershipConflict, process_ownership
     home = server._launch_home()
     try:
@@ -292,6 +307,13 @@ def _claim_launch_home():
 def main():
     # The home's single owner, claimed before any writer opens its state.db. A home a running gateway
     # already reserved (``gateway.lock``) refuses this process instead of racing it on the same store.
+    #
+    # Dashboard-spawned terminals are the exception: the Qubit VoiceBridge owns the canonical home
+    # through its messaging gateway, and ``/chat`` needs a stdio TUI beside it. They share the store
+    # by design (``voicebridge/pty_lease_shim.py``) and must not take the exclusive runtime lock.
+    if _dashboard_launch():
+        _serve()
+        return
     home = _claim_launch_home()
     if home is None:
         _log_exit(f"refused: {server._launch_home()} is owned by a running gateway; attach to it instead")
