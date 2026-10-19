@@ -474,6 +474,11 @@ class VoiceEditService:
         #: in-flight ask) is pruned on the request TTL. Both guarded by ``_lock``.
         self._ask_cancels: Dict[str, threading.Event] = {}
         self._ask_cancel_at: Dict[str, float] = {}
+        #: Worker threads running a keyed turn off the HTTP handler thread (see
+        #: :meth:`_run_cancellable`). A cancelled turn returns to the handler at
+        #: once and the worker is left to unwind on its own bounded timeout;
+        #: each worker removes itself here, so the set only holds live work.
+        self._ask_workers: set = set()
         #: Real in-flight turns (see _counts_turn). Seeds 0; sessions that
         #: merely began (orb click staging, helper begins) are not turns.
         self._inflight = 0
@@ -762,14 +767,24 @@ class VoiceEditService:
             return threading.Event()
 
     def _release_ask_cancel(self, request_id: str,
-                            ev: Optional[threading.Event]) -> None:
-        """Drop this turn's cancel event once the turn has finished."""
+                            ev: Optional[threading.Event], *,
+                            keep_if_set: bool = False) -> None:
+        """Drop this turn's cancel event once the turn has finished.
+
+        A SET event is retained when ``keep_if_set`` is true: it is the
+        tombstone the ``/api/audio/speak`` gate (``ask_turn_is_stopped``)
+        reads, so a reply synthesized after a stop for this turn is still
+        refused. Refreshing its timestamp gives the tombstone a fresh TTL.
+        """
         if ev is None:
             return
         rid = str(request_id or "").strip()
         try:
             with self._lock:
                 if self._ask_cancels.get(rid) is ev:
+                    if keep_if_set and ev.is_set():
+                        self._ask_cancel_at[rid] = time.monotonic()
+                        return
                     self._ask_cancels.pop(rid, None)
                     self._ask_cancel_at.pop(rid, None)
         except Exception:  # noqa: BLE001 - bookkeeping only
@@ -782,6 +797,75 @@ class VoiceEditService:
             return bool(ev is not None and ev.is_set())
         except Exception:  # noqa: BLE001
             return False
+
+    def _run_cancellable(self, fn: Any, _cancel: Optional[threading.Event],
+                         *, request_id: str = "", mode: str = "answer"
+                         ) -> Any:
+        """Run ``fn`` off the handler thread, returning at once on a STOP.
+
+        The model/agent call cannot always be interrupted (the blocking local
+        ``chat_local`` HTTP read and a single frontier response are outside
+        this module's control; see :meth:`_answer_question_text`). Running the
+        turn on a daemon worker and watching this turn's cancel event lets the
+        HTTP handler return the typed cancelled result IMMEDIATELY instead of
+        waiting for that call to unwind. The worker is left to finish on its
+        own bounded timeout; its result is discarded and it removes itself
+        from ``_ask_workers`` in a ``finally``, so nothing is delivered twice
+        and no worker outlives its call.
+
+        With no cancel event (a direct ``/ask`` carrying no request id) the
+        call runs inline, byte-identical to the pre-cancellation behavior.
+        Never starts ``fn`` twice.
+        """
+        if _cancel is None:
+            return fn()
+        if self._ask_stopped(_cancel):
+            return self._ask_cancelled(request_id, mode)
+        box: Dict[str, Any] = {}
+        done = threading.Event()
+
+        def _worker() -> None:
+            try:
+                box["value"] = fn()
+            except BaseException as exc:  # noqa: BLE001 - re-raised in caller
+                box["error"] = exc
+            finally:
+                done.set()
+                self._untrack_ask_worker(threading.current_thread())
+
+        worker = threading.Thread(
+            target=_worker, daemon=True,
+            name=f"voice-ask-{(str(request_id or 'turn')[:16])}")
+        self._track_ask_worker(worker)
+        try:
+            worker.start()
+        except Exception:  # noqa: BLE001 - no thread: run inline, still right
+            self._untrack_ask_worker(worker)
+            return fn()
+        # A short poll makes the STOP feel immediate without a busy wait. The
+        # cancel event is checked after every wake; when the call wins the
+        # race its own post-call check still sees the event and refuses the
+        # reply.
+        while not done.wait(0.01):
+            if self._ask_stopped(_cancel):
+                return self._ask_cancelled(request_id, mode)
+        if "error" in box:
+            raise box["error"]
+        return box.get("value")
+
+    def _track_ask_worker(self, worker: threading.Thread) -> None:
+        try:
+            with self._lock:
+                self._ask_workers.add(worker)
+        except Exception:  # noqa: BLE001 - tracking is best-effort
+            pass
+
+    def _untrack_ask_worker(self, worker: threading.Thread) -> None:
+        try:
+            with self._lock:
+                self._ask_workers.discard(worker)
+        except Exception:  # noqa: BLE001 - tracking is best-effort
+            pass
 
     def ask_turn_is_stopped(self, request_id: str) -> bool:
         """True when a recorded cancel marks this turn stopped (orb STOP).
@@ -2798,11 +2882,20 @@ class VoiceEditService:
         # has nothing a cancel can name and stays byte-identical.
         _cancel = self._ask_cancel_event(request_id)
         try:
-            return self._answer_question_text(
-                text, request_id=request_id, mode=mode, _cancel=_cancel)
+            # The expensive call may be genuinely uninterruptible; run the
+            # turn on a worker and return the typed cancelled result at once
+            # when the STOP lands (see _run_cancellable). No event (direct
+            # /ask, no request id) keeps the inline, byte-identical path.
+            return self._run_cancellable(
+                lambda: self._answer_question_text(
+                    text, request_id=request_id, mode=mode, _cancel=_cancel),
+                _cancel, request_id=request_id, mode=mode)
         finally:
+            # A stopped turn keeps its tombstone so a late reply's speech is
+            # still refused by the /api/audio/speak gate; a normal turn drops
+            # the event exactly as before.
             self._release_ask_cancel(
-                str(request_id or "").strip(), _cancel)
+                str(request_id or "").strip(), _cancel, keep_if_set=True)
 
     def _answer_question_text(self, text: str, *, request_id: str = "",
                               mode: str = "answer",

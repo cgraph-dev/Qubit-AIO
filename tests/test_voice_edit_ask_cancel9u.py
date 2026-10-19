@@ -145,6 +145,89 @@ def test_cancel_during_brain_uses_the_real_abort_hooks(monkeypatch):
     assert callable(seen["should_stop"]) and seen["should_stop"]() is True
 
 
+def test_cancel_returns_promptly_even_when_the_call_ignores_the_hooks(
+        monkeypatch):
+    """A genuinely uninterruptible call must not hold the /ask handler.
+
+    The blocking local ``chat_local`` HTTP read cannot be aborted from another
+    thread, so the service watches the turn's event on a worker and returns the
+    typed cancelled result at once; the late reply is then discarded (never
+    persisted, never spoken) and the worker cleans itself up.
+    """
+    entered = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    calls = []
+    remembered = []
+    fallback = []
+
+    def stubborn_run_role(prompt, cfg, **kw):
+        calls.append(1)
+        entered.set()
+        # Deliberately ignores both cancel hooks: this is the layer that
+        # cannot be interrupted mid-request.
+        release.wait(timeout=5.0)
+        finished.set()
+        return R(text="I can't help with that.")
+
+    monkeypatch.setattr(GW, "run_role", stubborn_run_role)
+    monkeypatch.setattr(CT, "turn", lambda *a, **k: fallback.append(1))
+    svc = _svc(monkeypatch)
+    svc._remember_ask_exchange = lambda *a, **k: remembered.append(a)
+    rid = "rid-stubborn"
+    result = {}
+    t = threading.Thread(
+        target=lambda: result.update(
+            out=svc.ask("tell me a joke", request_id=rid)))
+    t.start()
+    assert entered.wait(timeout=3.0), "brain call never started"
+    t0 = time.monotonic()
+    svc.cancel(rid)
+    t.join(timeout=1.0)
+    elapsed = time.monotonic() - t0
+    assert not t.is_alive(), "the /ask handler waited for the blocked call"
+    assert elapsed < 0.3, f"cancel took {elapsed:.3f}s to return"
+    assert result["out"]["ok"] is False
+    assert result["out"]["code"] == "VOICE_EDIT_ASK_CANCELLED"
+    assert calls == [1], "the turn must run exactly once (no retry/double-run)"
+    # The tombstone outlives the handler return, so a late reply's speech is
+    # still refused by the /api/audio/speak gate.
+    assert svc.ask_turn_is_stopped(rid) is True
+    # Let the abandoned worker finish: it must observe the event, discard the
+    # reply, skip the fallback, and leave no thread behind.
+    release.set()
+    assert finished.wait(timeout=2.0)
+    deadline = time.time() + 2.0
+    while svc._ask_workers and time.time() < deadline:
+        time.sleep(0.01)
+    assert svc._ask_workers == set(), "the cancelled worker leaked a thread"
+    assert remembered == [], "a stopped turn persisted a late reply"
+    assert fallback == [], "no fallback after a stop"
+
+
+def test_cancelled_turn_tombstone_is_pruned_by_the_request_ttl(monkeypatch):
+    monkeypatch.setattr(GW, "run_role", lambda *a, **k: R(text="ok"))
+    svc = _svc(monkeypatch)
+    rid = "rid-tombstone"
+    svc.cancel(rid)
+    assert svc.ask_turn_is_stopped(rid) is True
+    svc._ask_cancel_at[rid] = time.monotonic() - svc.ttl() - 1.0
+    svc._prune()
+    assert svc.ask_turn_is_stopped(rid) is False
+
+
+def test_normal_keyed_turn_leaves_no_worker_behind(monkeypatch):
+    monkeypatch.setattr(GW, "run_role", lambda *a, **k: R(text="the answer"))
+    svc = _svc(monkeypatch)
+    out = svc.ask("tell me a joke", request_id="rid-noworker")
+    assert out["ok"] is True and out["answer"] == "the answer"
+    deadline = time.time() + 2.0
+    while svc._ask_workers and time.time() < deadline:
+        time.sleep(0.01)
+    assert svc._ask_workers == set()
+    assert "rid-noworker" not in svc._ask_cancels
+
+
 def test_stop_during_brain_skips_the_full_turn_fallback(monkeypatch):
     called = []
     rid = "rid-skip"
@@ -187,6 +270,48 @@ def test_full_turn_agent_branch_is_cancellable(monkeypatch):
     assert out["code"] == "VOICE_EDIT_ASK_CANCELLED"
     assert callable(seen["cancel"])
     assert seen["cancel"]() is True
+
+
+def test_full_turn_cancel_returns_promptly_when_the_agent_ignores_cancel(
+        monkeypatch):
+    """Same prompt return for the full agent turn (the 120 s branch)."""
+    monkeypatch.setattr(GW, "run_role",
+                        lambda *a, **k: R(text="I can't help with that."))
+    entered = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    turns = []
+
+    def stubborn_turn(cfg, text, **kw):
+        turns.append(text)
+        entered.set()
+        release.wait(timeout=5.0)  # ignores kw["cancel"] on purpose
+        finished.set()
+        return {"ok": True, "reply": "a late agent reply"}
+
+    monkeypatch.setattr(CT, "turn", stubborn_turn)
+    svc = _svc(monkeypatch)
+    rid = "rid-stubborn-full"
+    result = {}
+    t = threading.Thread(
+        target=lambda: result.update(
+            out=svc.ask("do the thing", request_id=rid)))
+    t.start()
+    assert entered.wait(timeout=3.0), "agent turn never started"
+    t0 = time.monotonic()
+    svc.cancel(rid)
+    t.join(timeout=1.0)
+    elapsed = time.monotonic() - t0
+    assert not t.is_alive(), "the /ask handler waited for the agent turn"
+    assert elapsed < 0.3, f"cancel took {elapsed:.3f}s to return"
+    assert result["out"]["code"] == "VOICE_EDIT_ASK_CANCELLED"
+    assert turns == ["do the thing"], "the agent turn ran exactly once"
+    release.set()
+    assert finished.wait(timeout=2.0)
+    deadline = time.time() + 2.0
+    while svc._ask_workers and time.time() < deadline:
+        time.sleep(0.01)
+    assert svc._ask_workers == set()
 
 
 def test_full_turn_agent_branch_passes_cancel_to_transport(monkeypatch):
