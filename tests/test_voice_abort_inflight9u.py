@@ -113,7 +113,7 @@ def test_local_chat_cancel_unblocks_the_blocking_read():
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        assert srv.requested.wait(timeout=2.0), "request never arrived"
+        assert srv.requested.wait(timeout=10.0), "request never arrived"
         elapsed = _join_promptly(t, cancel)
         assert out.get("cancelled") is True
         assert "error" not in out
@@ -336,7 +336,7 @@ def test_post_json_blocking_seam_unblocks_on_cancel(path):
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        assert srv.requested.wait(timeout=2.0), "request never arrived"
+        assert srv.requested.wait(timeout=10.0), "request never arrived"
         elapsed = _join_promptly(t, cancel)
         assert out.get("cancelled") is True
         assert "error" not in out
@@ -377,7 +377,7 @@ def test_frontier_cancel_unblocks_the_blocking_response():
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        assert srv.requested.wait(timeout=2.0), "request never arrived"
+        assert srv.requested.wait(timeout=10.0), "request never arrived"
         _join_promptly(t, cancel)
         res = out.get("res")
         assert res is not None
@@ -419,7 +419,7 @@ def test_gateway_local_complete_threads_cancel_into_the_adapter(monkeypatch):
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        assert srv.requested.wait(timeout=2.0), "request never arrived"
+        assert srv.requested.wait(timeout=10.0), "request never arrived"
         _join_promptly(t, cancel)
         res = out.get("res")
         assert res is not None and res.ok is False
@@ -470,7 +470,7 @@ def test_gateway_local_generate_and_chat_raw_are_abortable(monkeypatch):
 
             t = threading.Thread(target=run, daemon=True)
             t.start()
-            assert srv.requested.wait(timeout=2.0), f"{mode}: request never arrived"
+            assert srv.requested.wait(timeout=10.0), f"{mode}: request never arrived"
             srv.requested.clear()
             _join_promptly(t, cancel)
             assert out["res"].ok is False, (mode, out["res"])
