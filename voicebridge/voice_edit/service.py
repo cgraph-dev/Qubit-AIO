@@ -2881,6 +2881,17 @@ class VoiceEditService:
         # released on every exit (one per request id); an empty request id
         # has nothing a cancel can name and stays byte-identical.
         _cancel = self._ask_cancel_event(request_id)
+        # Warm the killable TTS worker while the brain works. After the idle
+        # reaper releases it, the first keyed reply would otherwise pay a cold
+        # model load; starting it here hides that behind the model call. This
+        # is a no-op when the worker is already warm/loading, never blocks,
+        # never raises, and does not touch unkeyed (dashboard) speech.
+        try:
+            if str(request_id or "").strip() and not self._ask_stopped(_cancel):
+                from ..tts.synth_worker import warm_async
+                warm_async(self.cfg)
+        except Exception:  # noqa: BLE001 - warming must never break a turn
+            pass
         try:
             # The expensive call may be genuinely uninterruptible; run the
             # turn on a worker and return the typed cancelled result at once

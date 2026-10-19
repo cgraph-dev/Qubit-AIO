@@ -507,6 +507,170 @@ def test_shutdown_during_prewarm_does_not_reinstall_a_worker(
     assert SW._WORKER is not None and SW._WORKER.alive()
 
 
+# ---------------------------------------------------------------------------
+# warm_async: hide the post-idle cold load behind the brain turn
+# ---------------------------------------------------------------------------
+def test_warm_async_starts_a_cold_worker_in_the_background(
+        tmp_path, fake_child, monkeypatch):
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    monkeypatch.setenv("FAKE_READY_S", "0.8")
+    cfg = _DataCfg()
+
+    t0 = time.monotonic()
+    assert SW.warm_async(cfg) is True
+    elapsed = time.monotonic() - t0
+    assert elapsed < 0.25, f"warm_async blocked on the load ({elapsed:.2f}s)"
+    assert SW._WORKER is None, "warm_async loaded synchronously"
+
+    assert _wait_until(lambda: SW._WORKER is not None
+                       and SW._WORKER.alive(), timeout=5), \
+        "the background warm-up never loaded"
+    assert SW._WORKER.key == SW._cfg_key(cfg)
+    assert len(pidlog.read_text().split()) == 1
+
+
+def test_warm_async_is_a_noop_when_the_worker_is_warm(
+        tmp_path, fake_child, monkeypatch):
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    cfg = _DataCfg()
+    SW.synthesize_cancellable(cfg, "one", tmp_path / "a.wav",
+                              stopped=lambda: False, timeout=10)
+    warm_pid = SW._WORKER.proc.pid
+
+    assert SW.warm_async(cfg) is False
+    time.sleep(0.2)
+    assert SW._WORKER is not None and SW._WORKER.proc.pid == warm_pid
+    assert len(pidlog.read_text().split()) == 1, pidlog.read_text()
+
+
+def test_warm_async_never_double_loads_while_loading(
+        tmp_path, fake_child, monkeypatch):
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    monkeypatch.setenv("FAKE_READY_S", "0.8")
+    cfg = _DataCfg()
+
+    assert SW.warm_async(cfg) is True
+    assert SW.warm_async(cfg) is False, "a second load was queued"
+    assert _wait_until(lambda: SW._WORKER is not None
+                       and SW._WORKER.alive(), timeout=5)
+    assert len(pidlog.read_text().split()) == 1, pidlog.read_text()
+
+
+def test_warm_async_does_not_add_a_copy_beside_a_live_worker(
+        tmp_path, fake_child, monkeypatch):
+    """A warm worker of another identity owns the slot; no second copy."""
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    cfg = _DataCfg()
+    SW.synthesize_cancellable(cfg, "one", tmp_path / "a.wav",
+                              stopped=lambda: False, timeout=10)
+    other = _DataCfg(data={"tts": {"provider": "other"}})
+
+    assert SW.warm_async(other) is False
+    time.sleep(0.2)
+    assert SW._WORKER is not None and SW._WORKER.key == SW._cfg_key(cfg)
+    assert len(pidlog.read_text().split()) == 1, pidlog.read_text()
+
+
+def test_a_reply_joins_an_inflight_warm_up_without_double_load(
+        tmp_path, fake_child, monkeypatch):
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    monkeypatch.setenv("FAKE_READY_S", "0.8")
+    cfg = _DataCfg()
+
+    assert SW.warm_async(cfg) is True
+    provider = SW.synthesize_cancellable(cfg, "hello", tmp_path / "a.wav",
+                                         stopped=lambda: False, timeout=10)
+    assert provider == "fake"
+    assert (tmp_path / "a.wav").read_bytes() == b"RIFFfake"
+    assert len(pidlog.read_text().split()) == 1, pidlog.read_text()
+
+
+def test_warm_async_never_raises_and_respects_the_opt_out(monkeypatch):
+    assert SW.warm_async(object()) is False
+    monkeypatch.setenv("QUBIT_TTS_SYNTH_WORKER", "0")
+    assert SW.warm_async(_DataCfg()) is False
+    monkeypatch.delenv("QUBIT_TTS_SYNTH_WORKER")
+
+    def _boom(_cfg):
+        raise RuntimeError("key failed")
+
+    monkeypatch.setattr(SW, "_cfg_key", _boom)
+    assert SW.warm_async(_DataCfg()) is False
+
+
+def test_shutdown_discards_an_inflight_warm_up(tmp_path, fake_child,
+                                               monkeypatch):
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    monkeypatch.setenv("FAKE_READY_S", "0.6")
+    assert SW.warm_async(_DataCfg()) is True
+    SW.shutdown()
+    time.sleep(0.9)
+    assert SW._WORKER is None, "a warm-up installed after shutdown"
+
+
+def test_warmed_worker_is_still_killable_on_stop(tmp_path, fake_child,
+                                                 monkeypatch):
+    monkeypatch.setenv("FAKE_PIDLOG", str(tmp_path / "pids.txt"))
+    mode = tmp_path / "mode.txt"
+    mode.write_text("ok")
+    monkeypatch.setenv("FAKE_MODE_FILE", str(mode))
+    cfg = _DataCfg()
+
+    assert SW.warm_async(cfg) is True
+    assert _wait_until(lambda: SW._WORKER is not None
+                       and SW._WORKER.alive(), timeout=5)
+
+    mode.write_text("sleep")
+    stop = threading.Event()
+    timer = threading.Timer(0.3, stop.set)
+    timer.start()
+    t0 = time.monotonic()
+    try:
+        with pytest.raises(SW.SynthCancelled):
+            SW.synthesize_cancellable(cfg, "long", tmp_path / "stop.wav",
+                                      stopped=stop.is_set, timeout=20)
+    finally:
+        timer.cancel()
+    elapsed = time.monotonic() - t0
+    assert elapsed < 5.0, f"stop did not interrupt the warmed worker ({elapsed:.1f}s)"
+    assert not (tmp_path / "stop.wav").exists()
+
+
+# ---------------------------------------------------------------------------
+# service hook: a KEYED ask starts the warm-up, an unkeyed one does not
+# ---------------------------------------------------------------------------
+def test_keyed_ask_warms_the_tts_worker(monkeypatch):
+    calls = []
+    monkeypatch.setattr(SW, "warm_async",
+                        lambda cfg: calls.append(cfg) or True)
+    svc = _svc(monkeypatch)
+    monkeypatch.setattr(
+        VoiceEditService, "_answer_question_text",
+        lambda self, text, **kw: {"ok": True, "answer": "hi"})
+
+    assert svc.ask("hello", request_id="rid-warm")["ok"] is True
+    assert len(calls) == 1, "a keyed ask did not warm the worker"
+
+
+def test_unkeyed_ask_does_not_warm_the_tts_worker(monkeypatch):
+    calls = []
+    monkeypatch.setattr(SW, "warm_async",
+                        lambda cfg: calls.append(cfg) or True)
+    svc = _svc(monkeypatch)
+    monkeypatch.setattr(
+        VoiceEditService, "_answer_question_text",
+        lambda self, text, **kw: {"ok": True, "answer": "hi"})
+
+    assert svc.ask("hello")["ok"] is True
+    assert calls == [], "an unkeyed ask started a load"
+
+
 def _pid_alive(pid):
     try:
         os.kill(pid, 0)
