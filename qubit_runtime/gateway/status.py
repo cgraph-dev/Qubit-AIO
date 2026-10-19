@@ -44,7 +44,6 @@ _LOCKS_DIRNAME = "gateway-locks"
 _IS_WINDOWS = sys.platform == "win32"
 _UNSET = object()
 _GATEWAY_LOCK_FILENAME = "gateway.lock"
-_gateway_lock_handle = None
 # Windows byte-range locks are mandatory for other readers: lock a byte well past
 # the JSON payload so status/PID readers can read while another process holds it.
 _WINDOWS_LOCK_OFFSET = 1024 * 1024
@@ -1020,52 +1019,40 @@ def _release_file_lock(handle) -> None:
 
 
 def acquire_gateway_runtime_lock() -> bool:
-    """Claim the cross-process runtime lock; the OS releases it if the process dies."""
-    global _gateway_lock_handle
-    if _gateway_lock_handle is not None:
-        return True
-    path = _get_gateway_lock_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
+    """Claim the launch profile's runtime lock; the OS releases it if the process dies.
+
+    This delegates to :data:`gateway.runtime_ownership.process_ownership` — it does NOT open and
+    flock ``gateway.lock`` itself. The boot path reserves the launch home through that same
+    reservation first (``run_bootstrap._start_gateway_reserve_profiles``) and only then claims the
+    PID file. A second, independent descriptor flocked against an inode THIS process already holds
+    is refused on POSIX (``flock`` locks are per open file description, not per process), so the
+    claim read as a foreign owner and every boot aborted at its own reservation. Ownership of the
+    launch home is the reservation, answered by ``owns_gateway_runtime_lock`` below.
+    """
+    from gateway.runtime_ownership import process_ownership, OwnershipConflict
     try:
-        handle = open(path, "a+", encoding="utf-8")
-    except PermissionError:
-        # Stale root-owned lock (launchd session that ran as root): the directory owner can
-        # unlink it; retry once with a fresh file.
-        try:
-            path.unlink()
-            handle = open(path, "a+", encoding="utf-8")
-        except OSError:
-            return False
-    if not _try_acquire_file_lock(handle):
-        handle.close()
+        process_ownership.reserve([_get_process_qubit_home()])
+    except (OwnershipConflict, OSError):
         return False
-    handle.seek(0)
-    handle.truncate()
-    json.dump(_build_pid_record(), handle)
-    handle.flush()
-    with contextlib.suppress(OSError):
-        os.fsync(handle.fileno())
-    _gateway_lock_handle = handle
     _clear_running_pid_cache()
     return True
 
 
 def release_gateway_runtime_lock() -> None:
-    """Release the gateway runtime lock when owned by this process."""
-    global _gateway_lock_handle
-    handle, _gateway_lock_handle = _gateway_lock_handle, None
-    if handle is None:
-        return
-    _release_file_lock(handle)
-    with contextlib.suppress(OSError):
-        handle.close()
+    """Release this process's profile reservations (never the lock files themselves)."""
+    from gateway.runtime_ownership import process_ownership
+    process_ownership.close()
     _clear_running_pid_cache()
 
 
 def owns_gateway_runtime_lock() -> bool:
-    """True when THIS process holds the runtime lock. ``is_gateway_runtime_lock_active`` answers
-    "does anyone?"; re-probing our own flock succeeds on POSIX, so only the handle discriminates."""
-    return _gateway_lock_handle is not None
+    """True when THIS process holds the launch home's runtime lock — i.e. it reserved the home.
+
+    ``is_gateway_runtime_lock_active`` answers "does anyone?"; re-probing our own flock would
+    succeed on POSIX, so only the reservation discriminates.
+    """
+    from gateway.runtime_ownership import process_ownership
+    return process_ownership.owns(_get_process_qubit_home())
 
 
 def _probe_lock_file(handle) -> bool:
@@ -1083,7 +1070,7 @@ def _probe_lock_file(handle) -> bool:
 def is_gateway_runtime_lock_active(lock_path: Optional[Path] = None) -> bool:
     """True when some process currently owns the gateway runtime lock."""
     resolved_lock_path = lock_path or _get_gateway_lock_path()
-    if _gateway_lock_handle is not None and resolved_lock_path == _get_gateway_lock_path():
+    if resolved_lock_path == _get_gateway_lock_path() and owns_gateway_runtime_lock():
         return True
     if not resolved_lock_path.exists():
         return False
