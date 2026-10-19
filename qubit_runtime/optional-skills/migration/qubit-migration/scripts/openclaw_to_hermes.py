@@ -75,11 +75,11 @@ MIGRATION_OPTION_METADATA: Dict[str, Dict[str, str]] = {
     },
     "skills": {
         "label": "User skills",
-        "description": "Copy Qubit skills into ~/.hermes/skills/openclaw-imports/.",
+        "description": "Copy Qubit skills into ~/.qubit/skills/openclaw-imports/.",
     },
     "tts-assets": {
         "label": "TTS assets",
-        "description": "Copy compatible workspace TTS assets into ~/.hermes/tts/.",
+        "description": "Copy compatible workspace TTS assets into ~/.qubit/tts/.",
     },
     "discord-settings": {
         "label": "Discord settings",
@@ -3064,7 +3064,7 @@ class Migrator:
 
         notes.extend([
             "- Run `qubit gateway install` if you need the gateway service",
-            "- Review `~/.hermes/config.yaml` for any adjustments",
+            "- Review `~/.qubit/config.yaml` for any adjustments",
             "",
         ])
 
@@ -3185,7 +3185,7 @@ def main() -> int:
             seen_kinds.add(label)
             dest = item.get("destination") or ""
             if dest.startswith(str(report["target_root"])):
-                dest = "~/.hermes/" + dest[len(str(report["target_root"])) + 1:]
+                dest = "~/.qubit/" + dest[len(str(report["target_root"])) + 1:]
             meta = MIGRATION_OPTION_METADATA.get(label, {})
             display = meta.get("label", label)
             print(f"    ✔ {display:<35s} -> {dest}")
@@ -3231,7 +3231,7 @@ def main() -> int:
     if args.execute:
         print()
         print("  Next steps:")
-        print("    1. Review ~/.hermes/config.yaml")
+        print("    1. Review ~/.qubit/config.yaml")
         print("    2. Run: qubit mcp list")
         if any(i["kind"] == "cron-jobs" and i["status"] == "archived" for i in items):
             print("    3. Recreate cron jobs: qubit cron")

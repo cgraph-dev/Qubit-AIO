@@ -31,12 +31,12 @@ UA = "python-httpx/0.27"  # CF blocks default urllib UA on many providers
 
 
 def _qubit_home():
-    # Prefer Qubit' own resolver (profile-safe); fall back to env then ~/.hermes.
+    # Prefer Qubit' own resolver (profile-safe); fall back to env then ~/.qubit.
     try:
         from qubit_constants import get_qubit_home
         return str(get_qubit_home())
     except Exception:
-        return os.environ.get("QUBIT_HOME") or os.path.expanduser("~/.hermes")
+        return os.environ.get("QUBIT_HOME") or os.path.expanduser("~/.qubit")
 
 
 def _tokens_dir():

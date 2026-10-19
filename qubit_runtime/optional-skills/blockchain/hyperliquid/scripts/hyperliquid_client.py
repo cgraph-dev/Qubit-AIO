@@ -46,7 +46,7 @@ DEFAULT_API_BASE = "https://api.hyperliquid.xyz"
 
 
 def _qubit_home() -> Path:
-    return Path(os.environ.get("QUBIT_HOME", "~/.hermes")).expanduser()
+    return Path(os.environ.get("QUBIT_HOME", "~/.qubit")).expanduser()
 
 
 def _dotenv_paths() -> List[Path]:

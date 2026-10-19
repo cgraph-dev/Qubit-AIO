@@ -3096,7 +3096,7 @@ cli:
     fix_lm_studio: "Solución LM Studio: ajusta el contexto en los ajustes del modelo → recárgalo"
     fix_local_server: "Solución: inicia tu servidor con al menos {tokens_k}K de contexto (llama.cpp: -c {tokens}), o define model.ollama_num_ctx en config.yaml con la ventana que realmente sirve"
     fix_config: "Solución: define model.context_length en config.yaml, o aumenta el ajuste de contexto de tu servidor"
-    qubit_models_not_agentic: "⚠  Los modelos Qubit 3 y 4 de Nous Research NO son agénticos y no están diseñados para usarse con Qubit Agent."
+    qubit_models_not_agentic: "⚠  Los modelos Hermes 3 y 4 de Nous Research NO son agénticos y no están diseñados para usarse con Qubit Agent."
     qubit_models_lack_tools: "Carecen de la capacidad de llamar herramientas que requieren los flujos de trabajo del agente. Considera usar un modelo agéntico (Claude, GPT, Gemini, DeepSeek, etc.)."
     qubit_models_switch_hint: "Cambia con: /model sonnet  o  /model gpt5"
     project_skills_loaded: "◆ {count} skill(s) del proyecto cargada(s) desde este repositorio"
